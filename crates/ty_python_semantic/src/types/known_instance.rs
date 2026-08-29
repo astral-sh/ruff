@@ -445,7 +445,9 @@ impl<'db> KnownInstanceType<'db> {
                 | TypeMapping::Materialize(_)
                 | TypeMapping::ReplaceParameterDefaults
                 | TypeMapping::EagerExpansion
-                | TypeMapping::RescopeReturnCallables(_) => Type::KnownInstance(self),
+                | TypeMapping::RescopeReturnCallables(_)
+                | TypeMapping::UnfoldRecursive { .. }
+                | TypeMapping::FoldRecursive { .. } => Type::KnownInstance(self),
             },
             KnownInstanceType::UnionType(instance) => {
                 Type::KnownInstance(KnownInstanceType::UnionType(

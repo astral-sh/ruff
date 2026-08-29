@@ -3273,6 +3273,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             Type::Dynamic(..)
             | Type::Divergent(_)
+            | Type::Recursive(_)
             | Type::Never
             | Type::ModuleLiteral(..)
             | Type::BoundSuper(..) => true,
@@ -5462,6 +5463,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // All other types cannot have a callable kind propagated to them.
                 Type::Dynamic(_)
                 | Type::Divergent(_)
+                | Type::Recursive(_)
                 | Type::Never
                 | Type::FunctionLiteral(_)
                 | Type::BoundMethod(_)
@@ -11163,6 +11165,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::TypeIs(_)
                 | Type::TypeGuard(_)
                 | Type::TypeForm(_)
+                | Type::Recursive(_)
                 | Type::TypedDict(_)
                 | Type::NewTypeInstance(_),
             ) => fallback_unary_expression_type(),

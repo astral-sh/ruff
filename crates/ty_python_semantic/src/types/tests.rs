@@ -1,6 +1,7 @@
 use super::*;
 use crate::db::tests::{TestDbBuilder, setup_db};
 use crate::place::{typing_extensions_symbol, typing_symbol};
+use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::type_alias::PEP695TypeAliasType;
 use crate::{Db, ProgramEnvironment};
 use ruff_db::system::DbWithWritableSystem as _;
@@ -478,6 +479,131 @@ fn divergent_type() {
             .display(db, &db.program_environment())
             .to_string(),
         "Never"
+    );
+}
+
+#[test]
+fn recursive_type_fold_and_unfold() {
+    let db = setup_db();
+    let db = &db;
+    let env = db.program_environment();
+    let binder = DivergentType::new(salsa::plumbing::Id::from_bits(1));
+    let variable = Type::Divergent(binder);
+    let int = KnownClass::Int.to_instance(db, &env);
+
+    assert_eq!(
+        RecursiveType::build(db, &env, binder, RecursiveTypeOrigin::Implicit, int),
+        int
+    );
+
+    let direct_union = Type::Union(UnionType::new(
+        db,
+        vec![int, variable].into_boxed_slice(),
+        RecursivelyDefined::No,
+    ));
+    assert_eq!(
+        RecursiveType::build(
+            db,
+            &env,
+            binder,
+            RecursiveTypeOrigin::Implicit,
+            direct_union,
+        ),
+        int
+    );
+
+    let body = Type::GenericAlias(list_alias(db, &env, variable));
+    let recursive = RecursiveType::build(db, &env, binder, RecursiveTypeOrigin::Implicit, body);
+    let Type::Recursive(recursive) = recursive else {
+        panic!("a body containing the binder should remain recursive");
+    };
+
+    let unfolded = Type::GenericAlias(list_alias(db, &env, Type::Recursive(recursive)));
+    assert_eq!(recursive.unfold(db, &env), unfolded);
+    assert_eq!(
+        recursive.fold_type(db, &env, unfolded),
+        Type::Recursive(recursive)
+    );
+
+    let projected = UnionType::from_elements(db, &env, [int, Type::Recursive(recursive)]);
+    assert_eq!(recursive.fold_type(db, &env, projected), projected);
+}
+
+#[test]
+fn recursive_type_mapping_preserves_intersection_aliases() {
+    use crate::db::tests::TestDb;
+    use crate::place::global_symbol;
+
+    fn get_type_alias(db: &TestDb) -> Type<'_> {
+        let module = ruff_db::files::system_path_to_file(db, "/src/a.py").unwrap();
+        let module = ProgramFile::new(db, module, db.program_environment().program(db));
+        let ty = global_symbol(db, module, "Alias").place.expect_type();
+        let Type::KnownInstance(KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(alias))) =
+            ty
+        else {
+            panic!("expected Alias to be a type alias");
+        };
+        Type::TypeAlias(TypeAliasType::PEP695(alias))
+    }
+
+    let mut db = setup_db();
+    db.write_dedented("/src/a.py", "type Alias = int").unwrap();
+    let db = &db;
+    let env = db.program_environment();
+    let alias = get_type_alias(db);
+    let binder = DivergentType::new(salsa::plumbing::Id::from_bits(1));
+    let body = Type::Intersection(IntersectionType::new(
+        db,
+        FxOrderSet::from_iter([alias, Type::Divergent(binder)]),
+        NegativeIntersectionElements::Empty,
+    ));
+    let Type::Recursive(recursive) =
+        RecursiveType::build(db, &env, binder, RecursiveTypeOrigin::Implicit, body)
+    else {
+        panic!("a body containing the binder should remain recursive");
+    };
+
+    let Type::Intersection(unfolded) = recursive.unfold(db, &env) else {
+        panic!("unfolding should preserve the intersection structure");
+    };
+    assert!(unfolded.positive(db).contains(&alias));
+    assert!(unfolded.positive(db).contains(&Type::Recursive(recursive)));
+}
+
+#[test]
+fn recursive_type_mapping_preserves_recursive_unions() {
+    let db = setup_db();
+    let db = &db;
+    let env = db.program_environment();
+    let binder = DivergentType::new(salsa::plumbing::Id::from_bits(1));
+    let nested = Type::GenericAlias(list_alias(db, &env, Type::Divergent(binder)));
+    let body = Type::Union(UnionType::new(
+        db,
+        (0..6)
+            .map(Type::int_literal)
+            .chain(std::iter::once(nested))
+            .collect::<Vec<_>>()
+            .into_boxed_slice(),
+        RecursivelyDefined::Yes,
+    ));
+    let Type::Recursive(recursive) =
+        RecursiveType::build(db, &env, binder, RecursiveTypeOrigin::Implicit, body)
+    else {
+        panic!("a body containing the binder should remain recursive");
+    };
+
+    let Type::Union(unfolded) = recursive.unfold(db, &env) else {
+        panic!("unfolding should preserve the union structure");
+    };
+    assert_eq!(unfolded.elements(db).len(), 7);
+    assert!(
+        unfolded
+            .elements(db)
+            .contains(&Type::GenericAlias(list_alias(
+                db,
+                &env,
+                Type::Recursive(recursive)
+            )))
     );
 }
 

@@ -173,6 +173,7 @@ pub(super) enum NonAtomicType<'db> {
     TypedDict(TypedDictType<'db>),
     TypeAlias(TypeAliasType<'db>),
     NewTypeInstance(NewType<'db>),
+    Recursive(super::RecursiveType<'db>),
 }
 
 pub(super) enum TypeKind<'db> {
@@ -249,6 +250,7 @@ impl<'db> From<Type<'db>> for TypeKind<'db> {
             Type::NewTypeInstance(newtype) => {
                 TypeKind::NonAtomic(NonAtomicType::NewTypeInstance(newtype))
             }
+            Type::Recursive(recursive) => TypeKind::NonAtomic(NonAtomicType::Recursive(recursive)),
         }
     }
 }
@@ -321,6 +323,7 @@ pub(super) fn walk_non_atomic_type<'db, V: TypeVisitor<'db> + ?Sized>(
         NonAtomicType::NewTypeInstance(newtype) => {
             visitor.visit_newtype_instance_type(db, newtype);
         }
+        NonAtomicType::Recursive(recursive) => visitor.visit_type(db, recursive.body(db)),
     }
 }
 

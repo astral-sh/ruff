@@ -1575,6 +1575,11 @@ pub enum Type<'db> {
     Dynamic(DynamicType<'db>),
     /// A cycle marker used during recursive type inference.
     Divergent(DivergentType),
+    /// An anonymous recursive type created while recovering a Salsa inference cycle.
+    ///
+    /// The recursive variable in [`RecursiveType::body`] is represented by
+    /// [`Type::Divergent`]. A divergent marker has no meaning outside that body.
+    Recursive(RecursiveType<'db>),
     /// The empty set of values
     Never,
     /// A specific function object
@@ -2690,6 +2695,10 @@ impl<'db> Type<'db> {
                 .negated_divergent()
                 .expect("matched `Type::Divergent` above"),
 
+            Type::Recursive(recursive) => {
+                recursive.map_type(db, env, |unfolded| unfolded.negate(db, env))
+            }
+
             Type::NominalInstance(instance) if instance.is_object() => Type::Never,
 
             Type::AlwaysTruthy
@@ -2760,6 +2769,7 @@ impl<'db> Type<'db> {
             Type::Intersection(_) => false,
             Type::EnumComplement(complement) => complement.is_spellable(db),
             Type::Divergent(_)
+            | Type::Recursive(_)
             | Type::SpecialForm(_)
             | Type::BoundSuper(_)
             | Type::BoundMethod(_)
@@ -2794,6 +2804,7 @@ impl<'db> Type<'db> {
             Type::Intersection(_)
             | Type::EnumComplement(_)
             | Type::Divergent(_)
+            | Type::Recursive(_)
             | Type::SpecialForm(_)
             | Type::BoundSuper(_)
             | Type::BoundMethod(_)
@@ -3144,7 +3155,7 @@ impl<'db> Type<'db> {
                 .type_argument(db)
                 .recursive_type_normalized_impl(db, env, div, true)
                 .map(|ty| TypeFormType::from_type_expression(db, ty)),
-            Type::Divergent(_) => Some(self),
+            Type::Divergent(_) | Type::Recursive(_) => Some(self),
             Type::Dynamic(dynamic) => Some(Type::Dynamic(dynamic.recursive_type_normalized())),
             Type::TypedDict(_) => {
                 // TODO: Normalize TypedDicts
@@ -3255,7 +3266,7 @@ impl<'db> Type<'db> {
     /// for more complicated types that are actually singletons.
     fn is_singleton(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
         match self {
-            Type::Dynamic(_) | Type::Divergent(_) | Type::Never => false,
+            Type::Dynamic(_) | Type::Divergent(_) | Type::Recursive(_) | Type::Never => false,
 
             Type::LiteralValue(literal) => match literal.kind() {
                 LiteralValueTypeKind::Int(..)
@@ -3411,7 +3422,9 @@ impl<'db> Type<'db> {
 
             Type::Dynamic(_) if policy.require_concrete() => Some(Place::Undefined.into()),
 
-            Type::Dynamic(_) | Type::Divergent(_) | Type::Never => Some(Place::bound(self).into()),
+            Type::Dynamic(_) | Type::Divergent(_) | Type::Recursive(_) | Type::Never => {
+                Some(Place::bound(self).into())
+            }
 
             Type::ClassLiteral(class) if class.is_typed_dict(db) => {
                 Some(class.typed_dict_member(db, env, None, name, policy))
@@ -3982,7 +3995,9 @@ impl<'db> Type<'db> {
                 enums::instance_member_for_enum_complement(db, env, *complement, name)
             }
 
-            Type::Dynamic(_) | Type::Divergent(_) | Type::Never => Place::bound(self).into(),
+            Type::Dynamic(_) | Type::Divergent(_) | Type::Recursive(_) | Type::Never => {
+                Place::bound(self).into()
+            }
 
             Type::NominalInstance(instance) => {
                 instance.class(db, env).instance_member(db, env, name)
@@ -5130,7 +5145,9 @@ impl<'db> Type<'db> {
                         .into()
                 }
 
-                Type::Dynamic(..) | Type::Divergent(_) | Type::Never => Place::bound(this).into(),
+                Type::Dynamic(..) | Type::Divergent(_) | Type::Recursive(_) | Type::Never => {
+                    Place::bound(this).into()
+                }
 
                 Type::FunctionLiteral(function) if name == "__get__" => Place::bound(
                     Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(function)),
@@ -6184,7 +6201,7 @@ impl<'db> Type<'db> {
 
             // Dynamic types are callable, and the return type is the same dynamic type. Similarly,
             // `Never` is always callable and returns `Never`.
-            Type::Dynamic(_) | Type::Divergent(_) | Type::Never => {
+            Type::Dynamic(_) | Type::Divergent(_) | Type::Recursive(_) | Type::Never => {
                 Binding::single(self, Signature::dynamic(self)).into()
             }
 
@@ -7451,11 +7468,13 @@ impl<'db> Type<'db> {
                     return_ty: return_builder.map(IntersectionBuilder::build),
                 })
             }
-            ty @ (Type::Dynamic(_) | Type::Divergent(_) | Type::Never) => Some(GeneratorTypes {
-                yield_ty: Some(ty),
-                send_ty: Some(ty),
-                return_ty: Some(ty),
-            }),
+            ty @ (Type::Dynamic(_) | Type::Divergent(_) | Type::Recursive(_) | Type::Never) => {
+                Some(GeneratorTypes {
+                    yield_ty: Some(ty),
+                    send_ty: Some(ty),
+                    return_ty: Some(ty),
+                })
+            }
             _ => None,
         }
     }
@@ -7541,7 +7560,7 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
     ) -> Option<InstanceProjection<Type<'db>>> {
         match self {
-            Type::Dynamic(_) | Type::Divergent(_) | Type::Never => {
+            Type::Dynamic(_) | Type::Divergent(_) | Type::Recursive(_) | Type::Never => {
                 Some(InstanceProjection::Exact(self))
             }
             Type::ClassLiteral(class) => Some(InstanceProjection::OverApproximation(
@@ -7831,7 +7850,7 @@ impl<'db> Type<'db> {
                 }
             }
 
-            Type::Dynamic(_) | Type::Divergent(_) => Ok(*self),
+            Type::Dynamic(_) | Type::Divergent(_) | Type::Recursive(_) => Ok(*self),
 
             Type::NominalInstance(instance) => match instance.known_class(db) {
                 Some(KnownClass::NoneType) => Ok(Type::none(db, env)),
@@ -7946,7 +7965,7 @@ impl<'db> Type<'db> {
                 Type::Dynamic(dynamic) => {
                     SubclassOfType::from(db, env, SubclassOfInner::Dynamic(dynamic))
                 }
-                Type::Divergent(_) => ty,
+                Type::Divergent(_) | Type::Recursive(_) => ty,
                 Type::Intersection(intersection) => {
                     if let Some(alternatives) = intersection.finite_alternative_union(db, env) {
                         to_meta_type_inner(db, env, alternatives, visitor)
@@ -8125,6 +8144,7 @@ impl<'db> Type<'db> {
             self,
             Type::Dynamic(_)
                 | Type::Divergent(_)
+                | Type::Recursive(_)
                 | Type::Never
                 | Type::WrapperDescriptor(_)
                 | Type::DataclassDecorator(_)
@@ -8229,6 +8249,16 @@ impl<'db> Type<'db> {
         // the type, if it's something that can contain a `Self` reference.
         match type_mapping {
             TypeMapping::BindSelf(binding) if self == binding.self_type() => return self,
+            TypeMapping::UnfoldRecursive { recursive } if matches!(self, Type::Divergent(divergent) if divergent.same_marker(recursive.binder(db))) =>
+            {
+                return Type::Recursive(*recursive);
+            }
+            TypeMapping::FoldRecursive {
+                recursive,
+                unfolded,
+            } if self == *unfolded => {
+                return Type::Recursive(*recursive);
+            }
             _ => {}
         }
 
@@ -8393,35 +8423,97 @@ impl<'db> Type<'db> {
                     .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
             )),
 
-            Type::Union(union) => union.map_leave_aliases(db, visitor.env, |element| {
-                element.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
-            }),
-            Type::Intersection(intersection) => {
-                let mut builder = IntersectionBuilder::new(db, visitor.env);
-                for positive in intersection.positive(db) {
-                    builder.add_positive_in_place(positive.apply_type_mapping_impl(
-                        db,
-                        type_mapping,
-                        tcx,
-                        visitor,
-                    ));
-                }
-                // Regular promotion should remove negative contributions from intersections,
-                // so we don't preserve them here when regular promotion is enabled.
-                if !matches!(
-                    type_mapping,
-                    TypeMapping::Promote(PromotionMode::On, PromotionKind::Regular)
-                ) {
-                    for negative in intersection.negative(db) {
-                        builder.add_negative_in_place(negative.apply_type_mapping_impl(
+            Type::Union(union) => {
+                if type_mapping.used_in_cycle_recovery() {
+                    let elements = union
+                        .elements(db)
+                        .iter()
+                        .map(|element| {
+                            element.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                        })
+                        .collect::<Vec<_>>();
+                    match elements.as_slice() {
+                        [] => Type::Never,
+                        [element] => *element,
+                        _ => Type::Union(UnionType::new(
                             db,
-                            &type_mapping.flip(),
+                            elements.into_boxed_slice(),
+                            union.recursively_defined(db),
+                        )),
+                    }
+                } else {
+                    union.map_leave_aliases(db, visitor.env, |element| {
+                        element.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                    })
+                }
+            }
+            Type::Intersection(intersection) => {
+                if type_mapping.used_in_cycle_recovery() {
+                    let positive: FxOrderSet<_> = intersection
+                        .positive(db)
+                        .iter()
+                        .map(|positive| {
+                            positive.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                        })
+                        .collect();
+                    let negative = match intersection.negative(db) {
+                        NegativeIntersectionElements::Empty => NegativeIntersectionElements::Empty,
+                        NegativeIntersectionElements::Single(negative) => {
+                            NegativeIntersectionElements::Single(negative.apply_type_mapping_impl(
+                                db,
+                                &type_mapping.flip(),
+                                tcx,
+                                visitor,
+                            ))
+                        }
+                        NegativeIntersectionElements::Multiple(negative) => {
+                            NegativeIntersectionElements::Multiple(
+                                negative
+                                    .iter()
+                                    .map(|negative| {
+                                        negative.apply_type_mapping_impl(
+                                            db,
+                                            &type_mapping.flip(),
+                                            tcx,
+                                            visitor,
+                                        )
+                                    })
+                                    .collect(),
+                            )
+                        }
+                    };
+                    match (positive.len(), negative.is_empty()) {
+                        (0, true) => Type::object(),
+                        (1, true) => positive[0],
+                        _ => Type::Intersection(IntersectionType::new(db, positive, negative)),
+                    }
+                } else {
+                    let mut builder = IntersectionBuilder::new(db, visitor.env);
+                    for positive in intersection.positive(db) {
+                        builder.add_positive_in_place(positive.apply_type_mapping_impl(
+                            db,
+                            type_mapping,
                             tcx,
                             visitor,
                         ));
                     }
+                    // Regular promotion should remove negative contributions from intersections,
+                    // so we don't preserve them here when regular promotion is enabled.
+                    if !matches!(
+                        type_mapping,
+                        TypeMapping::Promote(PromotionMode::On, PromotionKind::Regular)
+                    ) {
+                        for negative in intersection.negative(db) {
+                            builder.add_negative_in_place(negative.apply_type_mapping_impl(
+                                db,
+                                &type_mapping.flip(),
+                                tcx,
+                                visitor,
+                            ));
+                        }
+                    }
+                    builder.build()
                 }
-                builder.build()
             }
 
             Type::EnumComplement(complement) => complement
@@ -8463,6 +8555,8 @@ impl<'db> Type<'db> {
                     ),
                 )
             }),
+
+            Type::TypeAlias(_) if type_mapping.used_in_cycle_recovery() => self,
 
             Type::TypeAlias(alias) => {
                 match type_mapping {
@@ -8547,6 +8641,8 @@ impl<'db> Type<'db> {
                 | TypeMapping::ReplaceParameterDefaults
                 | TypeMapping::EagerExpansion
                 | TypeMapping::RescopeReturnCallables(_)
+                | TypeMapping::UnfoldRecursive { .. }
+                | TypeMapping::FoldRecursive { .. }
                 | TypeMapping::Promote(PromotionMode::Off, _)
                 | TypeMapping::Promote(
                     PromotionMode::On,
@@ -8567,7 +8663,9 @@ impl<'db> Type<'db> {
                 | TypeMapping::Promote(..)
                 | TypeMapping::ReplaceParameterDefaults
                 | TypeMapping::EagerExpansion
-                | TypeMapping::RescopeReturnCallables(_) => self,
+                | TypeMapping::RescopeReturnCallables(_)
+                | TypeMapping::UnfoldRecursive { .. }
+                | TypeMapping::FoldRecursive { .. } => self,
                 TypeMapping::Materialize(materialization_kind) => match materialization_kind {
                     MaterializationKind::Top => Type::object(),
                     MaterializationKind::Bottom => Type::Never,
@@ -8582,6 +8680,18 @@ impl<'db> Type<'db> {
                 }
                 _ => self,
             },
+
+            Type::Recursive(recursive) => visitor.visit(db, self, type_mapping, || {
+                RecursiveType::build(
+                    db,
+                    visitor.env,
+                    recursive.binder(db),
+                    recursive.origin(db),
+                    recursive
+                        .body(db)
+                        .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                )
+            }),
 
             Type::Never
             | Type::AlwaysTruthy
@@ -8681,7 +8791,7 @@ impl<'db> Type<'db> {
                     typevars.insert(bound_typevar);
                 }
             }
-            Type::Divergent(_) => {}
+            Type::Divergent(_) | Type::Recursive(_) => {}
 
             Type::FunctionLiteral(function) => {
                 visitor.visit(db, self, || {
@@ -9180,7 +9290,9 @@ impl<'db> Type<'db> {
                 | DynamicType::UnknownGeneric(_)
                 | DynamicType::AmbiguousOverload,
             ) => Type::SpecialForm(SpecialFormType::Unknown).definition(db, env),
-            Self::Divergent(_) => Type::SpecialForm(SpecialFormType::Divergent).definition(db, env),
+            Self::Divergent(_) | Self::Recursive(_) => {
+                Type::SpecialForm(SpecialFormType::Divergent).definition(db, env)
+            }
             Self::Dynamic(DynamicType::Todo(_)) => {
                 Type::SpecialForm(SpecialFormType::Todo).definition(db, env)
             }
@@ -9595,6 +9707,7 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
             Type::TypeAlias(alias) => alias.variance_of(db, env, typevar),
             Type::Dynamic(_)
             | Type::Divergent(_)
+            | Type::Recursive(_)
             | Type::Never
             | Type::WrapperDescriptor(_)
             | Type::KnownBoundMethod(_)
@@ -9784,9 +9897,27 @@ pub enum TypeMapping<'a, 'db> {
 
     /// Updates any `Callable` types in a function signature return type to be generic if possible.
     RescopeReturnCallables(&'a FxHashMap<CallableType<'db>, CallableType<'db>>),
+    /// Replace the binder in an anonymous recursive type body with that recursive type.
+    UnfoldRecursive { recursive: RecursiveType<'db> },
+    /// Replace occurrences of an unfolded anonymous recursive type with that recursive type.
+    FoldRecursive {
+        recursive: RecursiveType<'db>,
+        unfolded: Type<'db>,
+    },
 }
 
 impl<'db> TypeMapping<'_, 'db> {
+    /// Whether this mapping is used while Salsa is recovering an inference cycle.
+    ///
+    /// These mappings may only inspect already-materialized type structure. Calling an
+    /// inference query from cycle recovery can immediately re-enter the same cycle.
+    const fn used_in_cycle_recovery(&self) -> bool {
+        matches!(
+            self,
+            TypeMapping::UnfoldRecursive { .. } | TypeMapping::FoldRecursive { .. }
+        )
+    }
+
     /// Update the generic context of a [`Signature`] according to the current type mapping
     fn update_signature_generic_context(
         &self,
@@ -9842,7 +9973,9 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::Materialize(_)
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion
-            | TypeMapping::RescopeReturnCallables(_) => context,
+            | TypeMapping::RescopeReturnCallables(_)
+            | TypeMapping::UnfoldRecursive { .. }
+            | TypeMapping::FoldRecursive { .. } => context,
             TypeMapping::BindSelf(binding) => {
                 if binding.binding_context().is_some() {
                     context.remove_self(db, binding.binding_context())
@@ -9889,7 +10022,9 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::ReplaceSelf { .. }
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion
-            | TypeMapping::RescopeReturnCallables(_) => self.clone(),
+            | TypeMapping::RescopeReturnCallables(_)
+            | TypeMapping::UnfoldRecursive { .. }
+            | TypeMapping::FoldRecursive { .. } => self.clone(),
         }
     }
 }
@@ -9906,6 +10041,167 @@ pub struct DivergentType {
     /// If this divergent marker has been materialized, preserve whether it should behave like the
     /// top (`object`) or bottom (`Never`) bound while still remaining recognizable as divergent.
     materialization: Option<MaterializationKind>,
+}
+
+/// The semantic source of an anonymous recursive type.
+///
+/// The query identity that determines the recursive binder lives on [`DivergentType`];
+/// this origin only records information needed to interpret the recursive body.
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+pub enum RecursiveTypeOrigin<'db> {
+    /// A recursive type inferred from a Salsa cycle without a generic alias context.
+    Implicit,
+    /// A recursive implicit alias whose body can be specialized.
+    GenericImplicitAlias(GenericContext<'db>),
+}
+
+/// An anonymous recursive type inferred from a Salsa cycle.
+///
+/// Conceptually, this represents `μbinder. body`. The binder is an internal
+/// [`Type::Divergent`] marker and must not escape this recursive type body.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+pub struct RecursiveType<'db> {
+    #[returns(copy)]
+    pub binder: DivergentType,
+    #[returns(copy)]
+    pub origin: RecursiveTypeOrigin<'db>,
+    #[returns(copy)]
+    pub body: Type<'db>,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for RecursiveType<'_> {}
+
+/// A value that can fold an unfolded anonymous recursive type back into its binder.
+pub(crate) trait Foldable<'db>: Sized {
+    fn fold(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        recursive: RecursiveType<'db>,
+    ) -> Self;
+}
+
+impl<'db> Foldable<'db> for Type<'db> {
+    fn fold(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        recursive: RecursiveType<'db>,
+    ) -> Self {
+        recursive.fold_type(db, env, self)
+    }
+}
+
+impl<'db> RecursiveType<'db> {
+    /// Construct an anonymous recursive type, returning its body when the binder is unused.
+    pub(crate) fn build(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        binder: DivergentType,
+        origin: RecursiveTypeOrigin<'db>,
+        body: Type<'db>,
+    ) -> Type<'db> {
+        let body = if let Type::Union(union) = body {
+            let elements = union
+                .elements(db)
+                .iter()
+                .copied()
+                .filter(|element| !matches!(element, Type::Divergent(divergent) if divergent.same_marker(binder)))
+                .collect::<Vec<_>>();
+            if elements.len() != union.elements(db).len() {
+                match elements.as_slice() {
+                    [] => Type::Divergent(binder),
+                    [element] => *element,
+                    _ => Type::Union(UnionType::new(
+                        db,
+                        elements.into_boxed_slice(),
+                        union.recursively_defined(db),
+                    )),
+                }
+            } else {
+                body
+            }
+        } else {
+            body
+        };
+
+        if any_over_type(
+            db,
+            env,
+            body,
+            false,
+            |ty| matches!(ty, Type::Divergent(divergent) if divergent.same_marker(binder)),
+        ) {
+            Type::Recursive(Self::new(db, binder, origin, body))
+        } else {
+            body
+        }
+    }
+
+    /// Replace this recursive type binder with the recursive type itself.
+    pub(crate) fn unfold(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
+        self.body(db).apply_type_mapping(
+            db,
+            env,
+            &TypeMapping::UnfoldRecursive { recursive: self },
+            TypeContext::default(),
+        )
+    }
+
+    /// Replace occurrences of this recursive type unfolded body with the recursive type.
+    pub(crate) fn fold_type(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+    ) -> Type<'db> {
+        let unfolded = self.unfold(db, env);
+        ty.apply_type_mapping(
+            db,
+            env,
+            &TypeMapping::FoldRecursive {
+                recursive: self,
+                unfolded,
+            },
+            TypeContext::default(),
+        )
+    }
+
+    /// Apply an operation to one unfolding of this recursive type and fold the result.
+    pub(crate) fn map_if_unfolded<F: Foldable<'db>>(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        operation: impl FnOnce(Type<'db>) -> F,
+    ) -> Option<F> {
+        let unfolded = self.unfold(db, env);
+        if unfolded == Type::Recursive(self) {
+            None
+        } else {
+            Some(operation(unfolded).fold(db, env, self))
+        }
+    }
+
+    pub(crate) fn map_or_else<F: Foldable<'db>>(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        fallback: impl FnOnce() -> F,
+        operation: impl FnOnce(Type<'db>) -> F,
+    ) -> F {
+        self.map_if_unfolded(db, env, operation)
+            .unwrap_or_else(fallback)
+    }
+
+    pub(crate) fn map_type(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        operation: impl FnOnce(Type<'db>) -> Type<'db>,
+    ) -> Type<'db> {
+        self.map_or_else(db, env, || Type::Recursive(self), operation)
+    }
 }
 
 // The Salsa heap is tracked separately.

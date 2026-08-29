@@ -323,6 +323,7 @@ impl<'db> AllMembers<'db> {
 
             Type::Dynamic(_)
             | Type::Divergent(_)
+            | Type::Recursive(_)
             | Type::Never
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy

@@ -263,7 +263,7 @@ pub(super) fn attribute_write_requirement<'db>(
         }
         Type::BoundSuper(_) => AttributeWriteRequirement::CannotAssign,
 
-        Type::Dynamic(..) | Type::Divergent(_) | Type::Never => {
+        Type::Dynamic(..) | Type::Divergent(_) | Type::Recursive(_) | Type::Never => {
             AttributeWriteRequirement::Unconstrained
         }
 
@@ -855,6 +855,7 @@ pub(super) fn assignment_attribute_members<'db>(
             | Type::TypeAlias(..)
             | Type::Dynamic(..)
             | Type::Divergent(_)
+            | Type::Recursive(_)
             | Type::Never
             | Type::ModuleLiteral(..)
             | Type::BoundSuper(..) => return None,

@@ -102,6 +102,7 @@ impl<'db> Type<'db> {
                 db,
                 Signature::dynamic(self),
             ))),
+            Type::Recursive(_) => None,
 
             Type::FunctionLiteral(function_literal)
                 if context.is_recursive_reference(db, function_literal) =>

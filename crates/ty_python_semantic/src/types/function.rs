@@ -1259,7 +1259,23 @@ impl<'db> FunctionType<'db> {
         // Returned-callable rescoping and type-alias specialization should not rebuild signatures from the
         // function literal; doing so can re-enter recursive `TypeOf` evaluation.
         let literal = self.literal(db);
-        let (updated_signature, updated_implementation_callables) = if matches!(
+        let (updated_signature, updated_implementation_callables) = if type_mapping
+            .used_in_cycle_recovery()
+        {
+            (
+                self.updated_signature(db).map(|signature| {
+                    signature.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                }),
+                self.updated_implementation_callables(db).map(|callables| {
+                    callables
+                        .iter()
+                        .map(|callable| {
+                            callable.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                        })
+                        .collect()
+                }),
+            )
+        } else if matches!(
             type_mapping,
             TypeMapping::ApplySpecialization(
                 ApplySpecialization::ReturnCallables(_) | ApplySpecialization::TypeAlias(_)
@@ -2080,6 +2096,7 @@ fn is_instance_truthiness<'db>(
         | Type::Callable(..)
         | Type::Dynamic(..)
         | Type::Divergent(_)
+        | Type::Recursive(_)
         | Type::Never
         | Type::TypedDict(_) => {
             // We could probably try to infer more precise types in some of these cases, but it's unclear

@@ -575,7 +575,9 @@ impl<'db> Type<'db> {
         let value_ty = self;
 
         let inferred = match (value_ty, slice_ty) {
-            (Type::Dynamic(_) | Type::Divergent(_) | Type::Never, _) => Some(Ok(value_ty)),
+            (Type::Dynamic(_) | Type::Divergent(_) | Type::Recursive(_) | Type::Never, _) => {
+                Some(Ok(value_ty))
+            }
 
             (Type::TypeAlias(alias), _) => Some(alias.value_type(db).subscript(
                 db,
