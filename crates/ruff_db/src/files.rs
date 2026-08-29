@@ -682,6 +682,8 @@ impl FileRange {
         self.file
     }
 
+    /// Return a new [`FileRange`] instance where `self.range`
+    /// has been extended to cover `range` as well.
     #[must_use]
     pub fn cover_range(mut self, range: TextRange) -> Self {
         self.range = self.range.cover(range);
