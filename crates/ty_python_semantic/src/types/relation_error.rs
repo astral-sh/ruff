@@ -284,7 +284,8 @@ impl<'db> ErrorContext<'db> {
                 let settings =
                     DisplaySettings::from_possibly_ambiguous_types(db, env, [*left, *right]);
                 format!(
-                    "`{}` and `{}` are not mutual subtypes of each other",
+                    "`{}` and `{}` are not mutual subtypes of each other, \
+                    but must be due to invariance",
                     left.display_with(db, env, settings.clone()),
                     right.display_with(db, env, settings),
                 )
@@ -317,7 +318,7 @@ impl<'db> ErrorContext<'db> {
                 let settings =
                     DisplaySettings::from_possibly_ambiguous_types(db, env, [*left, *right]);
                 format!(
-                    "`{}` and `{}` have incompatible instance layouts",
+                    "`{}` and `{}` are disjoint due to incompatible instance layouts",
                     left.display_with(db, env, settings.clone()),
                     right.display_with(db, env, settings),
                 )

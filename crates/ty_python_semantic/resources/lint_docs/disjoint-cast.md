@@ -14,16 +14,16 @@ Traceback (most recent call last):
 TypeError: multiple bases have instance lay-out conflict
 ```
 
-This means that any object of type `int` can never also be of type `str`, and any object of
-type `str` can never also inhabit the type `int`. The only common subtype of these two types is
+This means that any object of type `int` can never also be of type `str`, and any object of type
+`str` can never also inhabit the type `int`. The only common subtype of these two types is
 [`Never`][never], the uninhabited type, which has no members.
 
 ## Why is this bad?
 
 `cast()` is deliberately designed as an "escape hatch" in the type system that is entirely
-unvalidated at runtime. As such, any use of `cast()` is inherently unsound. However, casting a
-value to an entirely *disjoint* type is especially unsound, and may in many cases indicate a
-mistake in your code.
+unvalidated at runtime. As such, any use of `cast()` is inherently unsound. However, casting a value
+to an entirely *disjoint* type is especially unsound, and may in many cases indicate a mistake in
+your code.
 
 ## Example
 
@@ -45,12 +45,12 @@ def parse(value: int | str) -> str:
     return cast(str, value)
 ```
 
-Note that disjointness between types can sometimes be surprising. For example,
-`list[int]` is disjoint from `list[bool]` even though `bool` is a subtype of `int`. Due to the fact
-that `list` is mutable and invariant, the only common subtype of `list[int]` and `list[bool]` is
-`Never`, and it would be deeply unsound for ty to ever narrow an object of type `list[int]` to the
-type `list[bool]`. As such, ty will complain about a cast from `list[int]` to `list[bool]` when
-this rule is enabled.
+Note that disjointness between types can sometimes be surprising. For example, `list[int]` is
+disjoint from `list[bool]` even though `bool` is a subtype of `int`. Due to the fact that `list` is
+mutable and invariant, the only common subtype of `list[int]` and `list[bool]` is `Never`, and it
+would be deeply unsound for ty to ever narrow an object of type `list[int]` to the type
+`list[bool]`. As such, ty will complain about a cast from `list[int]` to `list[bool]` when this rule
+is enabled.
 
 Similarly, two `NewType`s can be disjoint even when they share the same underlying nominal base
 type, unless one `NewType` is explicitly declared as a sub-newtype of the other.
@@ -70,8 +70,8 @@ def f(x: list[int], user_id: UserId):
 
 ## Alternatives
 
-In some cases a `TypeGuard` can be used instead, which is still unsound, but less so than a
-disjoint cast in that it provides the opportunity for some runtime validation:
+In some cases a `TypeGuard` can be used instead, which is still unsound, but less so than a disjoint
+cast in that it provides the opportunity for some runtime validation:
 
 ```py
 from typing_extensions import TypeGuard, reveal_type
@@ -93,7 +93,8 @@ soundness checks from their type checker, and it may have false positives in som
 
 ## See also
 
-- The Ruff rule [`banned-api`][banned-api] can be used to ban the use of `cast()` entirely in your codebase.
+- The Ruff rule [`banned-api`][banned-api] can be used to ban the use of `cast()` entirely in your
+    codebase.
 - `redundant-cast` detects casts where the value already has the destination type.
 
 [banned-api]: https://docs.astral.sh/ruff/rules/banned-api/

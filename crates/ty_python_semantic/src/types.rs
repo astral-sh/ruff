@@ -2058,6 +2058,11 @@ impl<'db> Type<'db> {
         matches!(self, Type::Callable(..))
     }
 
+    /// Returns `true` if `self` is [`Type::ProtocolInstance`].
+    const fn is_protocol_instance(&self) -> bool {
+        matches!(self, Type::ProtocolInstance(..))
+    }
+
     pub(crate) fn cycle_normalized(
         self,
         db: &'db dyn Db,

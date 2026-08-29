@@ -2719,7 +2719,7 @@ impl KnownFunction {
                     let settings = DisplaySettings::from_possibly_ambiguous_types(db, env, types);
                     let source_display = source_type.display_with(db, env, settings.clone());
                     let casted_display = casted_type.display_with(db, env, settings.clone());
-                    let mut diagnostic = builder.into_diagnostic("Disjoint cast");
+                    let mut diagnostic = builder.into_diagnostic("Cast to a disjoint type");
                     diagnostic.set_concise_message(format_args!(
                         "Disjoint cast from `{source_display}` to `{casted_display}`",
                     ));
@@ -2737,13 +2737,16 @@ impl KnownFunction {
                                 .message(format_args!("Inferred as `{source_display}`")),
                         );
                     }
-                    let definitions: FxIndexMap<Definition<'db>, String> =
-                        [*source_type, casted_type]
-                            .into_iter()
-                            .filter_map(|ty| ty.definition(db, env))
-                            .filter_map(|definition| definition.definition())
-                            .filter_map(|definition| Some((definition, definition.name(db)?)))
-                            .collect();
+
+                    // deduplicate definitions before attaching a subdiagnostic to each definition,
+                    // or we'd have multiple subdiagnostics pointing to a single definition
+                    // if the two types are specializations of the same generic class.
+                    let definitions: FxIndexMap<Definition<'db>, String> = types
+                        .into_iter()
+                        .filter_map(|ty| ty.definition(db, env))
+                        .filter_map(|definition| definition.definition())
+                        .filter_map(|definition| Some((definition, definition.name(db)?)))
+                        .collect();
 
                     for (definition, name) in definitions {
                         let file = definition.python_file(db);
@@ -2767,6 +2770,30 @@ impl KnownFunction {
                                 .message(format_args!("`{name}` defined here")),
                         );
                     }
+
+                    if casted_type.is_protocol_instance() {
+                        if source_type.is_protocol_instance() {
+                            diagnostic.info(format_args!(
+                                "protocol `{casted_display}` is disjoint \
+                                from protocol `{source_display}`"
+                            ));
+                        } else {
+                            diagnostic.info(format_args!(
+                                "protocol `{casted_display}` is disjoint \
+                                from `{source_display}`"
+                            ));
+                        }
+                    } else if source_type.is_protocol_instance() {
+                        diagnostic.info(format_args!(
+                            "`{casted_display}` is disjoint \
+                            from protocol `{source_display}`"
+                        ));
+                    } else {
+                        diagnostic.info(format_args!(
+                            "`{casted_display}` is disjoint from `{source_display}`"
+                        ));
+                    }
+
                     source_type
                         .disjointness_error_context(db, env, casted_type)
                         .attach_to(db, env, &mut diagnostic);

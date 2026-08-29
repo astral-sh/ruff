@@ -230,7 +230,7 @@ def narrow_elements(values: list[int | str]) -> None:
 ```
 
 ```snapshot
-info[disjoint-cast]: Disjoint cast
+info[disjoint-cast]: Cast to a disjoint type
     --> src/mdtest_snippet.py:5:5
      |
    5 |     cast(list[int], values)
@@ -243,7 +243,8 @@ info[disjoint-cast]: Disjoint cast
      |
 2966 | class list(MutableSequence[_T]):
      |       ---- `list` defined here
-info: `int | str` and `int` are not mutual subtypes of each other
+info: `list[int]` is disjoint from `list[int | str]`
+info: `int | str` and `int` are not mutual subtypes of each other, but must be due to invariance
 info: └── element `str` of union `int | str` is not a subtype of `int`
 ```
 
@@ -273,7 +274,7 @@ def cast_function(function: Function) -> None:
 ```
 
 ```snapshot
-info[disjoint-cast]: Disjoint cast
+info[disjoint-cast]: Cast to a disjoint type
   --> src/mdtest_snippet.py:17:5
    |
 17 |       cast(Named, function)
@@ -291,6 +292,7 @@ info[disjoint-cast]: Disjoint cast
  9 | / @final
 10 | | class Function:
    | |______________- `Function` defined here
+info: `Named` is disjoint from `Function`
 info: `Function` is `@final` and not a subclass of `Named`
 ```
 
@@ -308,7 +310,7 @@ def cast_union(value: list[str] | list[bytes]) -> None:
 ```
 
 ```snapshot
-info[disjoint-cast]: Disjoint cast
+info[disjoint-cast]: Cast to a disjoint type
     --> src/mdtest_snippet.py:5:5
      |
    5 |     cast(list[int], value)
@@ -321,9 +323,10 @@ info[disjoint-cast]: Disjoint cast
      |
 2966 | class list(MutableSequence[_T]):
      |       ---- `list` defined here
+info: `list[int]` is disjoint from `list[str] | list[bytes]`
 info: every element of union `list[str] | list[bytes]` is disjoint from `list[int]`
-info: ├── `str` and `int` are not mutual subtypes of each other
-info: └── `bytes` and `int` are not mutual subtypes of each other
+info: ├── `str` and `int` are not mutual subtypes of each other, but must be due to invariance
+info: └── `bytes` and `int` are not mutual subtypes of each other, but must be due to invariance
 ```
 
 ### Disjoint tuple elements
@@ -340,7 +343,7 @@ def cast_tuple(value: tuple[int, str]) -> None:
 ```
 
 ```snapshot
-info[disjoint-cast]: Disjoint cast
+info[disjoint-cast]: Cast to a disjoint type
     --> src/mdtest_snippet.py:5:5
      |
    5 |     cast(tuple[int, int], value)
@@ -353,8 +356,9 @@ info[disjoint-cast]: Disjoint cast
      |
 2851 | class tuple(Sequence[_T_co]):
      |       ----- `tuple` defined here
+info: `tuple[int, int]` is disjoint from `tuple[int, str]`
 info: tuple element 2 has disjoint types `str` and `int`
-info: └── `str` and `int` have incompatible instance layouts
+info: └── `str` and `int` are disjoint due to incompatible instance layouts
 ```
 
 ### Disjoint tuple lengths
@@ -370,7 +374,7 @@ def cast_tuple(value: tuple[int]) -> None:
 ```
 
 ```snapshot
-info[disjoint-cast]: Disjoint cast
+info[disjoint-cast]: Cast to a disjoint type
     --> src/mdtest_snippet.py:5:5
      |
    5 |     cast(tuple[int, int], value)
@@ -383,6 +387,7 @@ info[disjoint-cast]: Disjoint cast
      |
 2851 | class tuple(Sequence[_T_co]):
      |       ----- `tuple` defined here
+info: `tuple[int, int]` is disjoint from `tuple[int]`
 info: the tuples have incompatible lengths: 1 and 2
 ```
 
@@ -408,7 +413,7 @@ def cast_protocol(value: Source) -> None:
 ```
 
 ```snapshot
-info[disjoint-cast]: Disjoint cast
+info[disjoint-cast]: Cast to a disjoint type
   --> src/mdtest_snippet.py:13:5
    |
 13 |       cast(Target, value)
@@ -427,6 +432,7 @@ info[disjoint-cast]: Disjoint cast
  7 | / @final
  8 | | class Source:
    | |____________- `Source` defined here
+info: protocol `Target` is disjoint from `Source`
 info: `@final` type `Source` does not provide all members of protocol `Target`
 info: └── protocol member `missing` is not defined on type `Source`
 ```
@@ -440,7 +446,7 @@ def cast_final(value: Target) -> None:
 ```
 
 ```snapshot
-info[disjoint-cast]: Disjoint cast
+info[disjoint-cast]: Cast to a disjoint type
   --> src/mdtest_snippet.py:16:5
    |
 16 |       cast(Source, value)
@@ -459,6 +465,7 @@ info[disjoint-cast]: Disjoint cast
  7 | / @final
  8 | | class Source:
    | |____________- `Source` defined here
+info: `Source` is disjoint from protocol `Target`
 info: `@final` type `Source` does not provide all members of protocol `Target`
 info: └── protocol member `missing` is not defined on type `Source`
 ```
@@ -485,7 +492,7 @@ def cast_protocol(value: Source) -> None:
 ```
 
 ```snapshot
-info[disjoint-cast]: Disjoint cast
+info[disjoint-cast]: Cast to a disjoint type
   --> src/mdtest_snippet.py:13:5
    |
 13 |       cast(Target, value)
@@ -503,9 +510,10 @@ info[disjoint-cast]: Disjoint cast
  6 | / @final
  7 | | class Source:
    | |____________- `Source` defined here
+info: protocol `Target` is disjoint from `Source`
 info: protocol member `values` is incompatible
 info: └── return types `list[int]` and `list[str]` are disjoint
-info:     └── `int` and `str` are not mutual subtypes of each other
+info:     └── `int` and `str` are not mutual subtypes of each other, but must be due to invariance
 ```
 
 ### Disjoint mutable TypedDict fields
@@ -528,7 +536,7 @@ def cast_fields(value: Source) -> None:
 ```
 
 ```snapshot
-info[disjoint-cast]: Disjoint cast
+info[disjoint-cast]: Cast to a disjoint type
   --> src/mdtest_snippet.py:11:5
    |
 11 |     cast(Target, value)
@@ -545,6 +553,7 @@ info[disjoint-cast]: Disjoint cast
  5 |
  6 | class Target(TypedDict):
    |       ------ `Target` defined here
+info: `Target` is disjoint from `Source`
 info: field `value` has incompatible types `int | str` and `int`
 info: └── element `str` of union `int | str` is not assignable to `int`
 ```
@@ -570,7 +579,7 @@ def cast_fields(value: Source) -> None:
 ```
 
 ```snapshot
-info[disjoint-cast]: Disjoint cast
+info[disjoint-cast]: Cast to a disjoint type
   --> src/mdtest_snippet.py:12:5
    |
 12 |     cast(Target, value)
@@ -587,6 +596,7 @@ info[disjoint-cast]: Disjoint cast
  6 |
  7 | class Target(TypedDict):
    |       ------ `Target` defined here
+info: `Target` is disjoint from `Source`
 info: field `value` is required in `Source` but mutable and not-required in `Target`
 ```
 
@@ -599,7 +609,7 @@ def cast_required(value: Target) -> None:
 ```
 
 ```snapshot
-info[disjoint-cast]: Disjoint cast
+info[disjoint-cast]: Cast to a disjoint type
   --> src/mdtest_snippet.py:15:5
    |
 15 |     cast(Source, value)
@@ -616,6 +626,7 @@ info[disjoint-cast]: Disjoint cast
  6 |
  7 | class Target(TypedDict):
    |       ------ `Target` defined here
+info: `Source` is disjoint from `Target`
 info: field `value` is required in `Source` but mutable and not-required in `Target`
 ```
 
