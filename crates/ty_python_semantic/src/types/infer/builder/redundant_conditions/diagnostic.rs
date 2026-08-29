@@ -62,11 +62,65 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 && ops.len() == 1
                 && let [single_comparator] = &**comparators
             {
-                for node in [left, single_comparator] {
-                    diagnostic.annotate(self.context.secondary(node).message(format_args!(
-                        "Has type `{}`",
-                        self.expression_type(node).display(db, env)
-                    )));
+                if let (ast::Expr::Call(call), other) | (other, ast::Expr::Call(call)) =
+                    (&**left, single_comparator)
+                    && let ast::Arguments { args, keywords, .. } = &call.arguments
+                    && keywords.is_empty()
+                    && let [single_arg] = &**args
+                    && let Type::FunctionLiteral(function) = self.expression_type(&call.func)
+                    && function.is_known(db, KnownFunction::Len)
+                    && self.expression_type(other).is_int_literal()
+                {
+                    let ty = self.expression_type(single_arg);
+                    if let Some(length_type) = ty.len(db, env)
+                        && let Some(length) = length_type.as_int_literal()
+                    {
+                        diagnostic.annotate(self.context.secondary(single_arg).message(
+                            format_args!(
+                                "Has type `{}`, which always has length {length}",
+                                ty.display(db, env),
+                            ),
+                        ));
+                    }
+                } else if let (Type::LiteralValue(left_type), Type::LiteralValue(right_type)) = (
+                    self.expression_type(left),
+                    self.expression_type(single_comparator),
+                ) && ((left_type.is_string() && right_type.is_bytes())
+                    || (left_type.is_bytes() && right_type.is_string()))
+                {
+                    // For the specific case of a string-literal type compared with a bytes-literal type,
+                    // cite their nominal-instance supertypes rather than their `Literal` types,
+                    // since their `Literal` types look quite similar in their display representations.
+                    for node in [left, single_comparator] {
+                        if let Some(class) = self.expression_type(node).nominal_class(db, env) {
+                            diagnostic.annotate(
+                                self.context
+                                    .secondary(node)
+                                    .message(format_args!("Instance of `{}`", class.name(db))),
+                            );
+                        }
+                    }
+                } else {
+                    for node in [left, single_comparator] {
+                        match node {
+                            ast::Expr::NoneLiteral(_)
+                            | ast::Expr::BooleanLiteral(_)
+                            | ast::Expr::NumberLiteral(_) => {}
+                            ast::Expr::UnaryOp(ast::ExprUnaryOp {
+                                op: ast::UnaryOp::Not,
+                                operand,
+                                ..
+                            }) if matches!(&**operand, ast::Expr::NumberLiteral(_)) => {}
+                            _ => {
+                                diagnostic.annotate(self.context.secondary(node).message(
+                                    format_args!(
+                                        "Has type `{}`",
+                                        self.expression_type(node).display(db, env)
+                                    ),
+                                ));
+                            }
+                        }
+                    }
                 }
             } else {
                 annotate_inferred_type(diagnostic);
@@ -221,12 +275,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }) {
                 let mut diagnostic = builder.into_diagnostic("A generator is always truthy");
                 describe_always_truthy_object(&mut diagnostic);
-                diagnostic.help("Did you mean to collect the generator into a tuple?");
+                diagnostic.help("Did you mean to use `any()`?");
                 if SemanticModel::new(db, self.program_file())
-                    .definitely_has_builtin_binding("tuple", test.into())
+                    .definitely_has_builtin_binding("any", test.into())
                 {
+                    // display-only edits rather than unsafe edits
+                    // because we don't know what the user *really* wanted here!
+                    // Collecting the result into a `tuple` is also a very plausible thing
+                    // they might have wanted to do (a lot of folks think that generator expressions
+                    // are actually "tuple comprehensions").
                     diagnostic.set_fix(Fix::display_only_edits(
-                        Edit::insertion("tuple(".to_string(), test.start()),
+                        Edit::insertion("any(".to_string(), test.start()),
                         [Edit::insertion(")".to_string(), test.end())],
                     ));
                 }

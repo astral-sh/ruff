@@ -90,11 +90,11 @@ warning[redundant-condition]: A generator is always truthy
    |
 14 |     if filtered:  # snapshot: redundant-condition
    |        ^^^^^^^^ Inferred type is `GeneratorType[int, None, None]`
-help: Did you mean to collect the generator into a tuple?
+help: Did you mean to use `any()`?
    |
 13 |     filtered = (item for item in items if item < 42)
    -     if filtered:  # snapshot: redundant-condition
-14 +     if tuple(filtered):  # snapshot: redundant-condition
+14 +     if any(filtered):  # snapshot: redundant-condition
 15 |         pass
    |
 note: This is a display-only fix and is likely to be incorrect
@@ -745,12 +745,6 @@ def g(flag: bool, some_bytes: bytes):
         pass
     elif some_bytes[0] == b"\x1e":  # snapshot: redundant-condition-strict
         pass
-
-def falsy(flag: bool):
-    if flag:
-        pass
-    elif "foo" == b"foo":  # snapshot: redundant-condition-strict
-        pass
 ```
 
 ```snapshot
@@ -769,16 +763,77 @@ error[redundant-condition-strict]: Condition is always false
    |          |                |
    |          |                Has type `Literal[b"/x1e"]`
    |          Has type `int`
+```
+
+We offer bespoke diagnostics for common mistakes such as accidentally comparing a string with a
+bytestring:
+
+```py
+def falsy(flag: bool):
+    if flag:
+        pass
+    elif "foo" == b"foo":  # snapshot: redundant-condition-strict
+        pass
+```
+
+```snapshot
+error[redundant-condition-strict]: Condition is always false
+  --> src/mdtest_snippet.py:18:10
+   |
+18 |     elif "foo" == b"foo":  # snapshot: redundant-condition-strict
+   |          -----^^^^------
+   |          |        |
+   |          |        Instance of `bytes`
+   |          Instance of `str`
+```
+
+Or testing the length of a tuple that always has a fixed length:
+
+```py
+def test(x: tuple[int]):  # the user probably meant to use `tuple[int, ...]` here
+    if len(x) == 2:  # snapshot: redundant-condition-strict
+        pass
+```
+
+```snapshot
+error[redundant-condition-strict]: Condition is always false
+  --> src/mdtest_snippet.py:21:8
+   |
+21 |     if len(x) == 2:  # snapshot: redundant-condition-strict
+   |        ^^^^-^^^^^^
+   |            |
+   |            Has type `tuple[int]`, which always has length 1
+```
+
+We avoid annotating the inferred types of comparison conditions for very obvious AST literals such
+as the `None` keyword or number-literal expressions:
+
+```py
+def f(x: None):
+    if x is None:  # snapshot: redundant-condition-strict
+        pass
+
+    if x == 3:  # snapshot: redundant-condition-strict
+        pass
+```
+
+```snapshot
+error[redundant-condition-strict]: Condition is always true
+  --> src/mdtest_snippet.py:24:8
+   |
+24 |     if x is None:  # snapshot: redundant-condition-strict
+   |        -^^^^^^^^
+   |        |
+   |        Has type `None`
 
 
 error[redundant-condition-strict]: Condition is always false
-  --> src/mdtest_snippet.py:19:10
+  --> src/mdtest_snippet.py:27:8
    |
-19 |     elif "foo" == b"foo":  # snapshot: redundant-condition-strict
-   |          -----^^^^------
-   |          |        |
-   |          |        Has type `Literal[b"foo"]`
-   |          Has type `Literal["foo"]`
+27 |     if x == 3:  # snapshot: redundant-condition-strict
+   |        -^^^^^
+   |        |
+   |        Has type `None`
 ```
 
 `redundant-condition-strict` is also emitted on negated conditions where the negated condition is

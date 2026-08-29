@@ -8,8 +8,8 @@ positives, it excludes conditions that meet any of these criteria:
 
 - The boolean test is inferred as evaluating to `True` itself, `False` itself, or an exact integer
     such as `1` or `0`.
-- The boolean test can be inferred as always evaluating to `True` and `False`, but this inference
-    is due to boolean-test short-circuting in `if` conditions, `while` conditions or `assert` tests
+- The boolean test can be inferred as always evaluating to `True` and `False`, but this inference is
+    due to boolean-test short-circuting in `if` conditions, `while` conditions or `assert` tests
     rather than the inferred type of the boolean test.
 - The condition uses a walrus operator (`:=`). The assignment's side effect may be intentional, even
     when its result has fixed truthiness.
