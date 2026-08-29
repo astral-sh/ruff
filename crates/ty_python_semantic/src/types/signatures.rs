@@ -645,8 +645,9 @@ pub(crate) enum ReturnTypeConsistency<'db> {
 pub(crate) struct SignatureRelationKey<'db> {
     // Signature recursion for recursive protocols keeps revisiting the same method declarations
     // under ever-growing specializations. We key the guard on declaration identity so it can
-    // break that active cycle, while synthetic `Callable[...]` signatures still fall through to
-    // the ordinary relation logic because they do not carry definitions.
+    // break that active cycle. Synthetic `Callable[...]` signatures normally fall through because
+    // they do not carry definitions; protocol member relations attach the containing declaration
+    // when it provides the stable identity for the same recursive obligation.
     source_definition: Definition<'db>,
     target_definition: Definition<'db>,
     relation: TypeRelation,

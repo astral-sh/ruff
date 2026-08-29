@@ -241,6 +241,17 @@ impl<'db> NominalInstanceType<'db> {
         }
     }
 
+    /// Returns the class stored directly by this instance without resolving an
+    /// environment-dependent optimized representation.
+    pub(super) fn stored_class(self, db: &'db dyn Db) -> Option<ClassType<'db>> {
+        match self.0 {
+            NominalInstanceInner::NonTuple(class) => Some(class.class(db)),
+            NominalInstanceInner::ExactTuple(_)
+            | NominalInstanceInner::Object
+            | NominalInstanceInner::SysVersionInfo => None,
+        }
+    }
+
     /// Returns the class literal for this instance.
     pub(super) fn class_literal(
         &self,

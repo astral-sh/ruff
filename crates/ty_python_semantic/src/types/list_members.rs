@@ -33,11 +33,18 @@ pub(crate) fn all_end_of_scope_members<'db>(
     db: &'db dyn Db,
     scope_id: ScopeId<'db>,
 ) -> impl Iterator<Item = MemberWithDefinition<'db>> + 'db {
+    all_end_of_scope_declarations(db, scope_id).chain(all_end_of_scope_bindings(db, scope_id))
+}
+
+/// Iterate over all declarations that exist at the end of the given scope.
+pub(crate) fn all_end_of_scope_declarations<'db>(
+    db: &'db dyn Db,
+    scope_id: ScopeId<'db>,
+) -> impl Iterator<Item = MemberWithDefinition<'db>> + 'db {
     let env = ProgramEnvironment::from_scope(scope_id);
 
     let use_def_map = use_def_map(db, scope_id);
     let table = place_table(db, scope_id);
-    let bindings_ctx = env.clone();
 
     use_def_map
         .all_end_of_scope_symbol_declarations()
@@ -59,28 +66,39 @@ pub(crate) fn all_end_of_scope_members<'db>(
                 first_reachable_definition,
             })
         })
-        .chain(use_def_map.all_end_of_scope_symbol_bindings().filter_map(
-            move |(symbol_id, bindings)| {
-                let PlaceWithDefinition {
-                    place,
-                    first_definition,
-                } = place_from_bindings(db, &bindings_ctx, bindings);
+}
 
-                let first_reachable_definition = first_definition?;
-                let ty = place.ignore_possibly_undefined()?;
+/// Iterate over all bindings that exist at the end of the given scope.
+pub(crate) fn all_end_of_scope_bindings<'db>(
+    db: &'db dyn Db,
+    scope_id: ScopeId<'db>,
+) -> impl Iterator<Item = MemberWithDefinition<'db>> + 'db {
+    let env = ProgramEnvironment::from_scope(scope_id);
+    let use_def_map = use_def_map(db, scope_id);
+    let table = place_table(db, scope_id);
 
-                let symbol = table.symbol(symbol_id);
-                let member = Member {
-                    name: symbol.name().clone(),
-                    ty,
-                    is_type_check_only: false,
-                };
-                Some(MemberWithDefinition {
-                    member,
-                    first_reachable_definition,
-                })
-            },
-        ))
+    use_def_map
+        .all_end_of_scope_symbol_bindings()
+        .filter_map(move |(symbol_id, bindings)| {
+            let PlaceWithDefinition {
+                place,
+                first_definition,
+            } = place_from_bindings(db, &env, bindings);
+
+            let first_reachable_definition = first_definition?;
+            let ty = place.ignore_possibly_undefined()?;
+
+            let symbol = table.symbol(symbol_id);
+            let member = Member {
+                name: symbol.name().clone(),
+                ty,
+                is_type_check_only: false,
+            };
+            Some(MemberWithDefinition {
+                member,
+                first_reachable_definition,
+            })
+        })
 }
 
 /// Iterate over all declarations and bindings that are reachable anywhere

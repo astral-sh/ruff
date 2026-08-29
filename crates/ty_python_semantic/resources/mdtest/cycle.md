@@ -579,3 +579,375 @@ reveal_mro(GenericBase["Foo", "Bar"])
 class Foo: ...
 class Bar: ...
 ```
+
+## Nominal instances in recursively-specialized relations
+
+A nominal class can expose a member whose specialization grows on every recursive step. Relating
+that class to the corresponding structural protocol must terminate even though no exact instance
+type repeats.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+
+class Impl[T]:
+    child: Impl[list[T]]
+
+class Proto[T](Protocol):
+    child: Proto[list[T]]
+
+def assign(value: Impl[int]) -> Proto[int]:
+    # TODO: This should be accepted once recursive structural relations can represent an
+    # indeterminate result instead of conservatively rejecting the recursive pair.
+    return value  # error: [invalid-return-type]
+```
+
+## Generic aliases in recursively-specialized relations
+
+The same growing nominal specialization can be reached through a generic alias for a class object.
+The alias must not hide the recursive nominal identity from relation checking.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+from ty_extensions._internal import TypeOf
+
+class Impl[T]:
+    child: TypeOf[Impl[list[T]]]
+
+class Proto[T](Protocol):
+    child: Proto[list[T]]
+
+def assign(value: TypeOf[Impl[int]]) -> Proto[int]:
+    return value  # error: [invalid-return-type]
+```
+
+## Subclass-of types in recursively-specialized relations
+
+A class object can expose a recursively specialized nominal member while it is checked against an
+instance protocol. This relation must terminate after projecting the class object into the member
+lookup domain.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+
+class Impl[T]:
+    child: type[Impl[list[T]]]
+
+class Proto[T](Protocol):
+    child: Proto[list[T]]
+
+def assign(value: type[Impl[int]]) -> Proto[int]:
+    # TODO: This should be accepted once recursive structural relations can represent an
+    # indeterminate result instead of conservatively rejecting the recursive pair.
+    return value  # error: [invalid-return-type]
+```
+
+## Subclass-of types in recursively-specialized meta-type relations
+
+When the target is also a class object, the recursive comparison stays in the meta-type domain. The
+same growing specialization must still terminate there.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+
+class Impl[T]:
+    child: type[Impl[list[T]]]
+
+class Proto[T](Protocol):
+    child: type[Proto[list[T]]]
+
+def assign(value: type[Impl[int]]) -> type[Proto[int]]:
+    # TODO: This should be accepted once recursive structural relations can represent an
+    # indeterminate result instead of conservatively rejecting the recursive pair.
+    return value  # error: [invalid-return-type]
+```
+
+## Recursively-specialized descriptor members
+
+Descriptor-backed protocol members can expose recursive specializations through their getter.
+Checking compatibility between such protocols must terminate.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+
+class LeftReadDescriptor[T]:
+    def __init__(self, getter: object) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> LeftReadProtocol[list[T]]:
+        raise NotImplementedError
+
+class RightReadDescriptor[T]:
+    def __init__(self, getter: object) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> RightReadProtocol[list[T]]:
+        raise NotImplementedError
+
+class LeftReadProtocol[T](Protocol):
+    @LeftReadDescriptor[T]
+    def child(self) -> object: ...
+
+class RightReadProtocol[T](Protocol):
+    @RightReadDescriptor[T]
+    def child(self) -> object: ...
+
+def assign_read(value: LeftReadProtocol[int]) -> RightReadProtocol[int]:
+    # TODO: This should be accepted once recursive structural relations can represent an
+    # indeterminate result instead of conservatively rejecting the recursive pair.
+    return value  # error: [invalid-return-type]
+```
+
+A descriptor stored on a nominal class can also expose a recursively specialized instance through
+its getter. Checking that instance against a recursive protocol must terminate.
+
+```py
+class NominalDescriptor[T]:
+    def __get__(self, instance: object, owner: type | None = None) -> NominalImpl[list[T]]:
+        raise NotImplementedError
+
+class NominalImpl[T]:
+    child = NominalDescriptor[T]()
+
+class NominalProtocol[T](Protocol):
+    child: NominalProtocol[list[T]]
+
+def assign_nominal(value: NominalImpl[int]) -> NominalProtocol[int]:
+    # TODO: This should be accepted once recursive structural relations can represent an
+    # indeterminate result instead of conservatively rejecting the recursive pair.
+    return value  # error: [invalid-return-type]
+```
+
+A descriptor annotation also contributes its effective read type, even when the class body has no
+runtime binding for that attribute.
+
+```py
+class DeclaredNominalDescriptor[T]:
+    def __get__(self, instance: object, owner: type | None = None) -> DeclaredNominalImpl[list[T]]:
+        raise NotImplementedError
+
+class DeclaredNominalImpl[T]:
+    child: DeclaredNominalDescriptor[T]
+
+class DeclaredNominalProtocol[T](Protocol):
+    child: DeclaredNominalProtocol[list[T]]
+
+def assign_declared_nominal(
+    value: DeclaredNominalImpl[int],
+) -> DeclaredNominalProtocol[int]:
+    # TODO: This should be accepted once recursive structural relations can represent an
+    # indeterminate result instead of conservatively rejecting the recursive pair.
+    return value  # error: [invalid-return-type]
+```
+
+A method can be checked against a callable protocol attribute. The callable attribute's declaration
+must participate in recursion detection even though its signature is synthesized from an annotation.
+
+```py
+from collections.abc import Callable
+
+class CallableNominalImpl[T]:
+    def child(self) -> CallableNominalImpl[list[T]]:
+        raise NotImplementedError
+
+class CallableNominalProtocol[T](Protocol):
+    child: Callable[[], CallableNominalProtocol[list[T]]]
+
+def assign_callable_nominal(
+    value: CallableNominalImpl[int],
+) -> CallableNominalProtocol[int]:
+    # TODO: This should be accepted once recursive structural relations can represent an
+    # indeterminate result instead of conservatively rejecting the recursive pair.
+    return value  # error: [invalid-return-type]
+```
+
+Writable descriptor members expose the recursive specialization contravariantly. The comparison
+therefore alternates direction before returning to the same pair of protocol definitions.
+
+```py
+class LeftWriteDescriptor[T]:
+    def __init__(self, setter: object) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        return 0
+    def __set__(self, instance: object, value: LeftWriteProtocol[list[T]]) -> None: ...
+
+class RightWriteDescriptor[T]:
+    def __init__(self, setter: object) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        return 0
+    def __set__(self, instance: object, value: RightWriteProtocol[list[T]]) -> None: ...
+
+class LeftWriteProtocol[T](Protocol):
+    @LeftWriteDescriptor[T]
+    def child(self, value: object) -> None: ...
+
+class RightWriteProtocol[T](Protocol):
+    @RightWriteDescriptor[T]
+    def child(self, value: object) -> None: ...
+
+def assign_write(value: LeftWriteProtocol[int]) -> RightWriteProtocol[int]:
+    # TODO: This should be accepted once recursive structural relations can represent an
+    # indeterminate result instead of conservatively rejecting the recursive pair.
+    return value  # error: [invalid-return-type]
+```
+
+A descriptor stored on a nominal class can expose the same recursive specialization through its
+setter. Checking its writable member against a protocol must terminate.
+
+```py
+class NominalWriteDescriptor[T]:
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        return 0
+    def __set__(self, instance: object, value: NominalWriteProtocol[list[T]]) -> None: ...
+
+class ProtocolWriteDescriptor[T]:
+    def __init__(self, setter: object) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        return 0
+    def __set__(self, instance: object, value: NominalWriteImpl[list[T]]) -> None: ...
+
+class NominalWriteImpl[T]:
+    child = NominalWriteDescriptor[T]()
+
+class NominalWriteProtocol[T](Protocol):
+    @ProtocolWriteDescriptor[T]
+    def child(self, value: object) -> None: ...
+
+def assign_nominal_write(
+    value: NominalWriteImpl[int],
+) -> NominalWriteProtocol[int]:
+    # TODO: This should be accepted once recursive structural relations can represent an
+    # indeterminate result instead of conservatively rejecting the recursive pair.
+    return value  # error: [invalid-return-type]
+```
+
+The getter of a `property` exposes its return type as the readable member type. Checking a recursive
+nominal property against a protocol member must terminate.
+
+```py
+class NominalReadPropertyImpl[T]:
+    @property
+    def child(self) -> NominalReadPropertyImpl[list[T]]:
+        raise NotImplementedError
+
+class NominalReadPropertyProtocol[T](Protocol):
+    child: NominalReadPropertyProtocol[list[T]]
+
+def assign_nominal_read_property(
+    value: NominalReadPropertyImpl[int],
+) -> NominalReadPropertyProtocol[int]:
+    # TODO: This should be accepted once recursive structural relations can represent an
+    # indeterminate result instead of conservatively rejecting the recursive pair.
+    return value  # error: [invalid-return-type]
+```
+
+The property accessor can expose the recursive specialization through a type alias. The alias still
+contributes the same growing instance flow as the direct return type above.
+
+```py
+type NominalReadPropertyAlias[T] = NominalReadPropertyAliasImpl[list[T]]
+
+class NominalReadPropertyAliasImpl[T]:
+    @property
+    def child(self) -> NominalReadPropertyAlias[T]:
+        raise NotImplementedError
+
+class NominalReadPropertyAliasProtocol[T](Protocol):
+    child: NominalReadPropertyAliasProtocol[list[T]]
+
+def assign_nominal_read_property_alias(
+    value: NominalReadPropertyAliasImpl[int],
+) -> NominalReadPropertyAliasProtocol[int]:
+    # TODO: This should be accepted once recursive structural relations can represent an
+    # indeterminate result instead of conservatively rejecting the recursive pair.
+    return value  # error: [invalid-return-type]
+```
+
+The setter of a `property` exposes its value parameter as the writable member type. Checking a
+recursive nominal property against a protocol property must terminate.
+
+```py
+class NominalPropertyImpl[T]:
+    @property
+    def child(self) -> int:
+        return 0
+
+    @child.setter
+    def child(self, value: NominalPropertyProtocol[list[T]]) -> None: ...
+
+class NominalPropertyProtocol[T](Protocol):
+    @property
+    def child(self) -> int: ...
+    @child.setter
+    def child(self, value: NominalPropertyImpl[list[T]]) -> None: ...
+
+def assign_nominal_property(
+    value: NominalPropertyImpl[int],
+) -> NominalPropertyProtocol[int]:
+    # TODO: This should be accepted once recursive structural relations can represent an
+    # indeterminate result instead of conservatively rejecting the recursive pair.
+    return value  # error: [invalid-return-type]
+```
+
+## Recursively-specialized fallback attribute types
+
+The return types of `__getattr__` and custom `__getattribute__` methods become the effective types
+of protocol members that are not declared directly on a nominal class.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+
+class GetattrImpl[T]:
+    def __getattr__(self, name: str) -> GetattrImpl[list[T]]:
+        raise AttributeError(name)
+
+class GetattributeImpl[T]:
+    def __getattribute__(self, name: str) -> GetattributeImpl[list[T]]:
+        raise AttributeError(name)
+
+class Proto[T](Protocol):
+    child: Proto[list[T]]
+
+def assign_getattr(value: GetattrImpl[int]) -> Proto[int]:
+    return value  # error: [invalid-return-type]
+
+def assign_getattribute(value: GetattributeImpl[int]) -> Proto[int]:
+    return value  # error: [invalid-return-type]
+```
