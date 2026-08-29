@@ -59,7 +59,6 @@ class Comparable:
         return object()
 
 def _(value: Comparable):
-    # error: [redundant-condition] "always falsy"
     reveal_type(1 if value < 1 < 0 else 2)  # revealed: Literal[2]
 
     saved = value < 1 < 0

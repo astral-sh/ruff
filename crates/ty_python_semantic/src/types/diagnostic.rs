@@ -1363,6 +1363,8 @@ declare_lint! {
 }
 
 declare_lint! {
+    // mdformat indents wrapped Markdown list items by four spaces.
+    #[expect(clippy::doc_overindented_list_items)]
     #[doc = include_str!("../../resources/lint_docs/redundant-condition.md")]
     pub(crate) static REDUNDANT_CONDITION = {
         summary: "detects conditions that are always truthy or always falsey",
@@ -1372,6 +1374,8 @@ declare_lint! {
 }
 
 declare_lint! {
+    // mdformat indents wrapped Markdown list items by four spaces.
+    #[expect(clippy::doc_overindented_list_items)]
     #[doc = include_str!("../../resources/lint_docs/redundant-condition-strict.md")]
     pub(crate) static REDUNDANT_CONDITION_STRICT = {
         summary: "detects conditions that are always truthy or always falsey (strict)",

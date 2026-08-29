@@ -2703,6 +2703,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 let truthiness = guard_ty
                     .try_bool(db, self.program_environment())
+                    .map(|_| self.condition_truthiness(guard))
                     .unwrap_or_else(|err| {
                         err.report_diagnostic(&self.context, guard);
                         err.fallback_truthiness()
@@ -5214,6 +5215,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let test_truthiness = test_ty
             .try_bool(db, self.program_environment())
+            .map(|_| self.condition_truthiness(test))
             .unwrap_or_else(|err| {
                 err.report_diagnostic(&self.context, &**test);
                 err.fallback_truthiness()
@@ -5239,10 +5241,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let test_ty = self.infer_standalone_expression(test, TypeContext::default());
 
-        let truthiness = test_ty.try_bool(db, env).unwrap_or_else(|err| {
-            err.report_diagnostic(&self.context, &**test);
-            err.fallback_truthiness()
-        });
+        let truthiness = test_ty
+            .try_bool(db, env)
+            .map(|_| self.condition_truthiness(test))
+            .unwrap_or_else(|err| {
+                err.report_diagnostic(&self.context, &**test);
+                err.fallback_truthiness()
+            });
 
         if self.should_check_condition_redundancy() {
             if test_ty.is_assignable_to(db, env, KnownClass::Int.to_instance(db, env)) {
@@ -8361,10 +8366,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         for expr in ifs {
             let test_ty = self.infer_maybe_standalone_expression(expr, TypeContext::default());
 
-            let truthiness = test_ty.try_bool(db, env).unwrap_or_else(|err| {
-                err.report_diagnostic(&self.context, expr);
-                err.fallback_truthiness()
-            });
+            let truthiness = test_ty
+                .try_bool(db, env)
+                .map(|_| self.condition_truthiness(expr))
+                .unwrap_or_else(|err| {
+                    err.report_diagnostic(&self.context, expr);
+                    err.fallback_truthiness()
+                });
 
             if should_check_condition_redundancy {
                 self.check_condition_redundancy(expr, test_ty, truthiness);
@@ -8513,19 +8521,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 (body_ty, orelse_ty)
             };
 
-        let test_truthiness = match test_ty.try_bool(db, env) {
-            Ok(_) => analyze_condition_expression(test, &|node| {
-                self.comparison_truthiness
-                    .get(&node.into())
-                    .copied()
-                    .or_else(|| self.expression_type(node).bool_if_inhabited(db, env))
-            })
-            .unwrap_or(Truthiness::Ambiguous),
-            Err(err) => {
+        let test_truthiness = test_ty
+            .try_bool(db, env)
+            .map(|_| self.condition_truthiness(test))
+            .unwrap_or_else(|err| {
                 err.report_diagnostic(&self.context, &**test);
                 err.fallback_truthiness()
-            }
-        };
+            });
         if self.should_check_condition_redundancy() {
             self.check_condition_redundancy(test, test_ty, test_truthiness);
         }
@@ -8535,6 +8537,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Truthiness::AlwaysFalse => orelse_ty,
             Truthiness::Ambiguous => UnionType::from_two_elements(db, env, body_ty, orelse_ty),
         }
+    }
+
+    /// Evaluates an already-inferred expression as a direct condition.
+    ///
+    /// Unlike testing a saved expression's value, this does not re-test intermediate
+    /// short-circuit results, whose truthiness may have changed.
+    fn condition_truthiness(&self, test: &ast::Expr) -> Truthiness {
+        let db = self.db();
+        let env = self.program_environment();
+        analyze_condition_expression(test, &|node| {
+            self.comparison_truthiness
+                .get(&node.into())
+                .copied()
+                .or_else(|| self.expression_type(node).bool_if_inhabited(db, env))
+        })
+        .unwrap_or(Truthiness::Ambiguous)
     }
 
     fn infer_lambda_body(&mut self, lambda_expression: &ast::ExprLambda, tcx: TypeContext<'db>) {

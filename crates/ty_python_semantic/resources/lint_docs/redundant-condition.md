@@ -1,14 +1,21 @@
 ## What it does
 
 Detects boolean conditions where the condition can be statically inferred to be always true or
-always false.
+always false due to the inferred type of the condition.
 
 This rule is enabled by default, and is deliberately not comprehensive. In order to avoid false
-positives, it is not emitted on any expression where the boolean test is inferred as evaluating to
-`True` itself, `False` itself, or an exact integer such as `1` or `0`. It also is not emitted on any
-expression where the boolean test uses a walrus operator. These cases are all covered by
-`redundant-condition-strict`, a sibling rule to this one that is disabled by default and which
-exclusively covers cases that are exempted by this rule.
+positives, it excludes conditions that meet any of these criteria:
+
+- The boolean test is inferred as evaluating to `True` itself, `False` itself, or an exact integer
+    such as `1` or `0`.
+- The boolean test can be inferred as always evaluating to `True` and `False`, but this inference
+    is due to boolean-test short-circuting in `if` conditions, `while` conditions or `assert` tests
+    rather than the inferred type of the boolean test.
+- The condition uses a walrus operator (`:=`). The assignment's side effect may be intentional, even
+    when its result has fixed truthiness.
+
+These cases are covered by `redundant-condition-strict`, a sibling rule that is disabled by default
+and exclusively covers cases excluded by this rule.
 
 ## Why is this bad?
 

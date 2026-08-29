@@ -3,12 +3,14 @@
 A common error in Python is to accidentally test truthiness of the wrong object: for example
 `if func:` (which is always true) where `if func():` was intended, or `if coroutine():` where
 `if await coroutine():` was intended. By default, ty alerts the user to these errors with the error
-code `redundant-condition`, but only if the inferred type of the object is not assignable to `int`.
-This heuristic catches the `if func` and `if coroutine()` cases, while avoiding false positives on
-cases such as `if DEBUG:` where `DEBUG = 0` or `DEBUG = False` is a constant.
+code `redundant-condition`, but only if the inferred type of the object is not assignable to `int`
+and has fixed truthiness. This heuristic catches the `if func` and `if coroutine()` cases, while
+avoiding false positives on cases such as `if DEBUG:` where `DEBUG = 0` or `DEBUG = False` is a
+constant.
 
-The remaining cases -- where the inferred type is assignable to `int` -- are covered by a separate,
-stricter rule (`redundant-condition-strict`).
+The remaining cases -- where the inferred type is assignable to `int`, or only short-circuit
+evaluation makes the condition's truthiness fixed -- are covered by a separate, stricter rule
+(`redundant-condition-strict`).
 
 ```toml
 [environment]
@@ -557,6 +559,55 @@ warning[redundant-condition]: Function `func` is always truthy
 24 +     assert flag and func()  # snapshot: redundant-condition
    |
 note: This is an unsafe fix and may change runtime behavior
+```
+
+## Chained comparison conditions
+
+A comparison chain used directly as a condition is always false if any comparison is always false,
+even when an earlier comparison returns an object with mutable truthiness. The assertion below
+always fails because `1 < 0` is false.
+
+```py
+class Comparable:
+    def __lt__(self, other: int) -> object:
+        return object()
+
+def direct_condition(value: Comparable):
+    assert value < 1 < 0  # error: [redundant-condition-strict] "Condition `value < 1 < 0` is always false"
+```
+
+The defensive-exit exemption also applies when short-circuit evaluation makes a condition always
+false.
+
+```py
+def defensive_condition(value: Comparable):
+    if value < 1 < 0:
+        raise ValueError
+```
+
+Saving the chain's result, or negating it outside a condition, can cause an intermediate object's
+truthiness to be tested twice. Its truthiness can change between those tests, so neither test below
+has fixed truthiness.
+
+```py
+def saved_condition(value: Comparable):
+    saved = value < 1 < 0
+    if saved:
+        pass
+    return not (value < 1 < 0)
+```
+
+## Conditional expressions used as conditions
+
+Both branches of this conditional expression are truthy when evaluated directly as conditions. Even
+if `value` has mutable truthiness, `value or True` short-circuits directly to the loop body when
+`value` is truthy and evaluates `True` otherwise.
+
+```py
+def conditional_expression(value: object, flag: bool):
+    # error: [redundant-condition-strict] "Condition `True if flag else (value or True)` is always true"
+    while True if flag else (value or True):
+        break
 ```
 
 ## Edge cases

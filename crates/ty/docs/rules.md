@@ -4597,11 +4597,27 @@ Detects boolean conditions where the condition can be statically inferred to be 
 always false.
 
 This rule is enabled by default, and is deliberately not comprehensive. In order to avoid false
-positives, it is not emitted on any expression where the boolean test is inferred as evaluating to
-`True` itself, `False` itself, or an exact integer such as `1` or `0`. It also is not emitted on any
-expression where the boolean test uses a walrus operator. These cases are all covered by
-[`redundant-condition-strict`](#redundant-condition-strict), a sibling rule to this one that is disabled by default and which
-exclusively covers cases that are exempted by this rule.
+positives, it excludes conditions that meet any of these criteria:
+
+- The boolean test is inferred as evaluating to `True` itself, `False` itself, or an exact integer
+    such as `1` or `0`.
+- Short-circuit evaluation makes the condition always truthy or always falsy, but the inferred type
+    of the expression's value does not have fixed truthiness.
+- The condition uses a walrus operator (`:=`). The assignment's side effect may be intentional, even
+    when its result has fixed truthiness.
+
+These cases are covered by [`redundant-condition-strict`](#redundant-condition-strict), a sibling rule that is disabled by default
+and exclusively covers cases excluded by this rule.
+
+The short-circuit criterion distinguishes evaluating an expression directly as a condition from
+saving its result and testing that value later. For example, `if value < 1 < 0:` always skips its
+body: either the first comparison is falsy, or evaluation continues to `1 < 0`, which is false. This
+remains true even when the first comparison returns a non-boolean object.
+
+If the chain's result is saved, however, it can be that intermediate object. Testing the saved value
+calls its truthiness method again, which may return a different result. Its inferred type therefore
+need not be always falsy, even though the direct condition is always false. Diagnosing the direct
+condition requires the strict rule; this rule does not report it.
 
 **Why is this bad?**
 
@@ -4718,7 +4734,7 @@ every context.
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'ignore'."><code>ignore</code></a> ·
 Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.75">0.0.75</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%22redundant-condition-strict%22" target="_blank">Related issues</a> ·
-<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1374" target="_blank">View source</a>
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1376" target="_blank">View source</a>
 </small>
 
 
@@ -4732,9 +4748,15 @@ This rule is disabled by default. It exclusively covers cases that its sibling (
 rule [`redundant-condition`](#redundant-condition) does not cover. These cases often flag real bugs in user code, but also
 have a significantly higher rate of unavoidable false positives than other cases.
 
-This rule is emitted on expressions where the boolean test is inferred as evaluating to `True`
-itself, `False` itself, or an exact integer such as `1` or `0`. It also is emitted on any expression
-where the boolean test uses a walrus operator.
+This rule reports redundant conditions that meet any of these criteria:
+
+- The boolean test is inferred as evaluating to `True` itself, `False` itself, or an exact integer
+    such as `1` or `0`.
+- Short-circuit evaluation makes the condition always truthy or always falsy, but the inferred type
+    of the expression's value does not have fixed truthiness. The short-circuit example below
+    illustrates why evaluating a condition directly can differ from testing its saved result.
+- The condition uses a walrus operator (`:=`). The assignment's side effect may be intentional, even
+    when its result has fixed truthiness.
 
 **Why is this bad?**
 
@@ -4768,6 +4790,34 @@ Comparing one of those values with a string will therefore always evaluate to `F
 def trace(**kwargs: dict[str, str]) -> None:
     if kwargs.get("operation") == "task":  # error: [redundant-condition-strict]
         print("Tracing task")
+```
+
+Short-circuit evaluation can also make a condition always false even when its inferred value type
+has ambiguous truthiness. Consider a class whose comparison method has an `object` return type:
+
+```py
+class Comparable:
+    def __lt__(self, other: int) -> object: ...
+
+
+def check(value: Comparable):
+    if value < 1 < 0:  # error: [redundant-condition-strict]
+        pass
+```
+
+When used directly as a condition, this chain always skips the body. If `value < 1` is falsy,
+evaluation short-circuits immediately. Otherwise, Python evaluates `1 < 0`, which is false.
+
+Saving the chain's result changes what Python evaluates. If the first comparison is falsy, the saved
+result can be the object returned by that comparison. Testing it again can call its `__bool__`
+method a second time, and that call may return a different result. We therefore do not report the
+saved result as always falsy:
+
+```py
+def check_saved(value: Comparable):
+    result = value < 1 < 0
+    if result:  # no diagnostic
+        pass
 ```
 
 **Exemptions**

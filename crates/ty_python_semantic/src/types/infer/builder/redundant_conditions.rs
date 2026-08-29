@@ -73,12 +73,25 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
     }
 
+    /// Whether a condition with known truthiness requires the strict rule based on its type.
+    ///
+    /// Boolean and integer tests are opt-in. So are conditions whose truthiness is fixed by
+    /// short-circuit evaluation but cannot be determined from their value type alone.
+    /// Walrus expressions require the strict rule independently of this check.
+    fn requires_strict_truthiness_check(&self, test_type: Type<'db>) -> bool {
+        let db = self.db();
+        let env = self.program_environment();
+        test_type.is_assignable_to(db, env, KnownClass::Int.to_instance(db, env))
+            || test_type.bool(db, env).is_ambiguous()
+    }
+
     /// Reports an unintentionally always-truthy or always-falsy condition.
     ///
     /// Whether `redundant-condition` or `redundant-condition-strict` is used depends on two
     /// things:
     /// - The inferred type of the condition. If the type is assignable to `int`, including `bool`,
-    ///   `redundant-condition-strict` is used. Otherwise, `redundant-condition` is used.
+    ///   or its truthiness is ambiguous and only short-circuit evaluation makes the condition
+    ///   redundant, `redundant-condition-strict` is used. Otherwise, `redundant-condition` is used.
     /// - Whether any eagerly evaluated walrus expressions appear inside the condition. Many
     ///   expressions can have side effects, but walrus expressions *always* have side effects,
     ///   so the chances that the user is *deliberately* using an always-truthy condition for the
@@ -119,6 +132,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let db = self.db();
         let env = self.program_environment();
         let int_instance = KnownClass::Int.to_instance(db, env);
+        let requires_strict_check = self.requires_strict_truthiness_check(test_type);
 
         match test {
             // If they literally have `if False:` in the source code, it's almost certainly deliberate;
@@ -131,15 +145,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 ..
             }) => return None,
 
-            // For values handled by `redundant-condition`, the operand checks are sufficient:
-            // checking the complete expression again would duplicate a diagnostic. Values assignable to `int`,
-            // including booleans, use `redundant-condition-strict` instead. That rule suppresses
-            // diagnostics on subexpressions of conditions, so the complete expression still needs
-            // to be checked.
-            ast::Expr::BoolOp(_) => {
-                if !test_type.is_assignable_to(db, env, int_instance) {
-                    return None;
-                }
+            // Only check complete `and`/`or` expressions with boolean or integer value types.
+            // Other value types can have operand diagnostics under `redundant-condition`, so
+            // also reporting the complete condition risks duplicates. For boolean and integer
+            // values, the strict rule suppresses operand diagnostics, so the complete expression
+            // still needs to be checked.
+            ast::Expr::BoolOp(_) if !test_type.is_assignable_to(db, env, int_instance) => {
+                return None;
             }
 
             // A negated condition reaches this method twice: `infer_unary_expression_type`
@@ -182,7 +194,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             _ => {}
         }
 
-        let rule = if test_type.is_assignable_to(db, env, int_instance) {
+        let rule = if requires_strict_check {
             if self
                 .index
                 .is_boolean_test_subexpression(self.scope().file_scope_id(db), test.range())
@@ -218,7 +230,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ));
         };
 
-        let describe_boolean_condition = |diagnostic: &mut LintDiagnosticGuard| {
+        let describe_condition = |diagnostic: &mut LintDiagnosticGuard| {
             let source = source_text(db, self.file());
             let condition = &source[test.range()];
             let is_true = test_truthiness.is_always_true();
@@ -249,6 +261,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 annotate_inferred_type(diagnostic);
             }
         };
+
+        // Short-circuit evaluation can determine a condition's truthiness even when its
+        // value type does not. In that case, describe the condition rather than the type.
+        let describe_as_condition =
+            test_type.is_subtype_of(db, env, KnownClass::Bool.to_instance(db, env))
+                || test_type.bool(db, env) != test_truthiness;
 
         match test_truthiness {
             Truthiness::AlwaysTrue => {
@@ -413,10 +431,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         builder.into_diagnostic("A nonempty string is always truthy");
                     describe_always_truthy_object(&mut diagnostic);
                     Some(diagnostic)
-                } else if test_type.is_subtype_of(db, env, KnownClass::Bool.to_instance(db, env)) {
+                } else if describe_as_condition {
                     let message = "Condition is always true";
                     let mut diagnostic = builder.into_diagnostic(message);
-                    describe_boolean_condition(&mut diagnostic);
+                    describe_condition(&mut diagnostic);
                     Some(diagnostic)
                 } else {
                     let mut diagnostic = builder.into_diagnostic("Condition is always truthy");
@@ -494,16 +512,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     annotate_inferred_type(&mut diagnostic);
                     Some(diagnostic)
                 } else {
-                    let is_bool =
-                        test_type.is_subtype_of(db, env, KnownClass::Bool.to_instance(db, env));
-                    let message = if is_bool {
+                    let message = if describe_as_condition {
                         "Condition is always false"
                     } else {
                         "Condition is always falsy"
                     };
                     let mut diagnostic = builder.into_diagnostic(message);
-                    if is_bool {
-                        describe_boolean_condition(&mut diagnostic);
+                    if describe_as_condition {
+                        describe_condition(&mut diagnostic);
                     } else {
                         diagnostic.set_concise_message(format_args!(
                             "Object of type `{}` is always falsy",
@@ -523,9 +539,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// Suppresses conditions guarding deliberately unreachable branches or trailing defensive
     /// exits, and adds an assertion-based autofix when a final `elif` is unnecessarily always true.
     pub(super) fn check_suite_for_redundant_if_statements(&self, suite: &[ast::Stmt]) {
-        let db = self.db();
-        let env = self.program_environment();
-
         for (i, statement) in suite.iter().enumerate() {
             let ast::Stmt::If(ast::StmtIf {
                 test,
@@ -545,15 +558,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
             for (branch_index, (test, body)) in branches.enumerate() {
                 let test_type = self.expression_type(test);
-                let test_truthiness = test_type.bool(db, env);
+                let test_truthiness = self.condition_truthiness(test);
                 let following_clauses = &elif_else_clauses[branch_index..];
-
-                // Checking if a suite is deliberately unreachable can be expensive. Only
-                // boolean- or integer-like conditions under the strict rule need this check.
-                let is_strict_boolean_condition = || {
-                    self.context.is_lint_enabled(&REDUNDANT_CONDITION_STRICT)
-                        && test_type.is_assignable_to(db, env, KnownClass::Int.to_instance(db, env))
-                };
 
                 let unreachable_suite = match test_truthiness {
                     Truthiness::AlwaysFalse => Some(body),
@@ -567,8 +573,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     Truthiness::Ambiguous => None,
                 };
 
+                // Checking if a suite is deliberately unreachable can be expensive. Only
+                // conditions requiring the strict truthiness check are eligible for this exemption.
                 if let Some(unreachable_suite) = unreachable_suite
-                    && is_strict_boolean_condition()
+                    && self.context.is_lint_enabled(&REDUNDANT_CONDITION_STRICT)
+                    && self.requires_strict_truthiness_check(test_type)
                     && self.is_deliberately_unreachable_suite(unreachable_suite)
                 {
                     // Defensive exits exempt the complete boolean condition, but an operand
@@ -601,7 +610,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             suite.last().is_some_and(|stmt| match stmt {
                 ast::Stmt::Raise(_) => true,
                 ast::Stmt::Assert(ast::StmtAssert { test, .. }) => {
-                    builder.expression_type(test).bool(db, env).may_be_false()
+                    builder.condition_truthiness(test).may_be_false()
                 }
                 ast::Stmt::Expr(ast::StmtExpr { value, .. }) if value.is_call_expr() => builder
                     .expression_type(value)
