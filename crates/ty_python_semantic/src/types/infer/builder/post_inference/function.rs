@@ -83,8 +83,8 @@ fn check_method_typevar_variance<'db>(
     // invariant type variables. Nominal classes can be more conservative, so they only reject uses
     // incompatible with a declared covariance or contravariance. Both checks share recursive
     // variance inference, but only nominal classes currently skip overloads and independently
-    // generic methods to avoid false positives. TODO: Handle these cases in shared variance
-    // inference so that both checks can account for them.
+    // generic methods to avoid false positives.
+    // TODO: Handle these cases in shared variance inference so both checks can account for them.
     if class.is_protocol(db) {
         return;
     }
