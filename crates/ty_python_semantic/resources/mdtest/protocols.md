@@ -4454,8 +4454,8 @@ static_assert(not is_assignable_to(BadReturnType, ShapeProtocolExplicitSelf))
 
 ## `Self` in generic type aliases during protocol matching
 
-Wrapping `Self` in a generic type alias does not change what it denotes. Method parameters and
-return types are bound to the structural implementation before their signatures are compared.
+`Self` in a protocol method's return type refers to the structural implementation, even when it is
+wrapped in a generic type alias. The implementation can return plain `Self`:
 
 ```toml
 [environment]
@@ -4468,17 +4468,12 @@ from typing import Protocol, Self
 type Identity[T] = T
 
 class Cloneable(Protocol):
-    def clone(self, other: Identity[Self]) -> Identity[Self]: ...
-
-class AliasedClone:
-    def clone(self, other: Identity[Self]) -> Identity[Self]:
-        return other
+    def clone(self) -> Identity[Self]: ...
 
 class DirectClone:
-    def clone(self, other: Self) -> Self:
-        return other
+    def clone(self) -> Self:
+        return self
 
-aliased: Cloneable = AliasedClone()
 direct: Cloneable = DirectClone()
 ```
 
@@ -4491,7 +4486,7 @@ class Current(Protocol):
 
 class CurrentImpl:
     @property
-    def current(self) -> Identity[Self]:
+    def current(self) -> Self:
         return self
 
 current: Current = CurrentImpl()
