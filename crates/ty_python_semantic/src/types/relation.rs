@@ -1153,19 +1153,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         ConstraintSet::from_bool(self.constraints, false)
     }
 
-    fn is_redundant_with(&self, db: &'db dyn Db, candidate: Type<'db>, current: Type<'db>) -> bool {
-        Self {
-            inferable: TypeVarSet::None,
-            relation: TypeRelation::Redundancy { pure: false },
-            typevar_evaluation: TypeVarEvaluation::Eager,
-            context_tree: None,
-            given: ConstraintSet::from_bool(self.constraints, false),
-            ..self.clone()
-        }
-        .check_type_pair(db, candidate, current)
-        .is_always_satisfied(db, self.env)
-    }
-
     /// Overwrite the error context tree with a new root context and child nodes.
     fn set_context(
         &self,
@@ -1473,12 +1460,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 if source_alias.recursive_alias_kind(db).is_growing() =>
             {
                 self.with_recursion_guard(db, source, target, || {
-                    // A recursion-guarded `false` is not proof that the deferred remainder is
-                    // absent, so force the sound `Unknown` fallback.
-                    let expanded = UnionBuilder::structural(db, env)
-                        .add(source)
-                        .build_deferred()
-                        .finish(false);
+                    let expanded = UnionBuilder::new(db, env).add(source).build();
                     self.check_type_pair(db, expanded, target)
                 })
             }
@@ -1500,13 +1482,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // that depend on multiple elements, such as all members of an enum, are visible.
             (_, Type::Union(union)) if union.has_aliases(db) => {
                 self.with_recursion_guard(db, source, target, || {
-                    let expansion =
-                        union.expand_aliases_with_deferred_recursive_alias_remainder(db, env);
-                    let is_redundant = expansion.recursive_alias_remainder().is_some_and(
-                        |(remainder, current)| self.is_redundant_with(db, remainder, current),
-                    );
-                    let expanded = expansion.finish(is_redundant);
-                    self.check_type_pair(db, source, expanded)
+                    self.check_type_pair(db, source, union.expand_aliases(db, env))
                 })
             }
 

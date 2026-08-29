@@ -324,11 +324,6 @@ pub(crate) enum RecursiveAliasKind {
 }
 
 impl RecursiveAliasKind {
-    /// Returns whether expansion reaches any recursive alias.
-    pub(crate) const fn is_recursive(self) -> bool {
-        !matches!(self, Self::None)
-    }
-
     /// Returns whether expansion reaches a recursion that can grow without bound.
     pub(crate) const fn is_growing(self) -> bool {
         matches!(self, Self::Growing)

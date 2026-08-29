@@ -15,7 +15,7 @@ use crate::{Db, FxOrderSet};
 pub(crate) mod builder;
 mod generic_gradual_intersections;
 
-pub(crate) use builder::{DeferredUnionBuild, IntersectionBuilder, UnionBuilder};
+pub(crate) use builder::{IntersectionBuilder, UnionBuilder};
 
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct UnionType<'db> {
@@ -136,44 +136,6 @@ impl<'db> UnionType<'db> {
     ) -> Type<'db> {
         // Rebuild the union so that `UnionBuilder` simplifies any redundancies exposed.
         Self::from_elements(db, env, self.elements(db).iter().copied())
-    }
-
-    /// Expands aliases while deferring the remainder of a growing recursive alias.
-    ///
-    /// Non-recursive aliases retain the normal relation-aware normalization. The caller can
-    /// inspect the deferred remainder and prove it redundant without starting a nested
-    /// type-relation query.
-    pub(crate) fn expand_aliases_with_deferred_recursive_alias_remainder(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-    ) -> DeferredUnionBuild<'db> {
-        let mut recursive = Vec::new();
-        let mut non_recursive = UnionBuilder::new(db, env);
-
-        for element in self.elements(db).iter().copied() {
-            if matches!(
-                element,
-                Type::TypeAlias(alias) if alias.recursive_alias_kind(db).is_recursive()
-            ) {
-                recursive.push(element);
-            } else {
-                non_recursive.add_in_place(element);
-            }
-        }
-
-        let non_recursive = non_recursive.build();
-        if recursive.is_empty() {
-            return DeferredUnionBuild::from_resolved(db, env, non_recursive);
-        }
-
-        recursive
-            .into_iter()
-            .fold(
-                UnionBuilder::structural(db, env).add(non_recursive),
-                UnionBuilder::add,
-            )
-            .build_deferred()
     }
 
     pub(crate) fn from_elements_cycle_recovery<I, T>(
