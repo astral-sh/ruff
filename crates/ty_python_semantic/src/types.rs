@@ -4894,7 +4894,7 @@ impl<'db> Type<'db> {
         {
             return false;
         }
-        let member = class.identity_specialization(db).class_member(
+        let member = Type::from(class.identity_specialization(db)).class_object_member(
             db,
             env,
             name,
@@ -4908,14 +4908,27 @@ impl<'db> Type<'db> {
         else {
             return false;
         };
-        !member.is_class_var()
-            // Methods and other descriptors define their own class-access behavior.
-            && ty.class_member(db, env, "__get__").is_undefined()
-            // Variance accounts for aliases without expanding recursive specializations, and
-            // ignores alias arguments that do not affect the resulting type.
-            && generic_context.variables(db).any(|typevar| {
-                ty.variance_of(db, env, typevar.identity(db)) != TypeVarVariance::Bivariant
-            })
+        if member.is_class_var() {
+            return false;
+        }
+        let ty = match ty.resolve_type_alias(db) {
+            Type::Union(union) if union.has_aliases(db) => union.expand_aliases(db, env),
+            ty => ty,
+        };
+        let alternatives = match &ty {
+            Type::Union(union) => union.elements(db),
+            _ => std::slice::from_ref(&ty),
+        };
+        alternatives.iter().any(|ty| {
+            // Descriptors define their own class-access behavior, but do not exempt other
+            // alternatives in a union from the restriction on generic instance storage.
+            ty.class_member(db, env, "__get__").is_undefined()
+                // Variance accounts for aliases without expanding recursive specializations,
+                // and ignores alias arguments that do not affect the resulting type.
+                && generic_context.variables(db).any(|typevar| {
+                    ty.variance_of(db, env, typevar.identity(db)) != TypeVarVariance::Bivariant
+                })
+        })
     }
 
     /// Similar to [`Type::member`], but allows the caller to specify what policy should be used

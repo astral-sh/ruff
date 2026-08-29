@@ -1446,6 +1446,30 @@ reveal_type(Box.value)  # revealed: property
 reveal_type(Box[int].value)  # revealed: property
 ```
 
+When an attribute can be either a descriptor or an ordinary value, each alternative is checked
+separately. A descriptor does not make class access to a generic list safe.
+
+```py
+class Mixed(Generic[T]):
+    value: list[T] | Descriptor[T] = []
+
+# error: [invalid-attribute-access]
+Mixed[int].value = [1]
+# error: [invalid-attribute-access]
+reveal_type(Mixed[str].value)  # revealed: list[str] | int
+```
+
+If only the descriptor depends on the type variable, class access is still valid. The ordinary value
+has the same type for every specialization.
+
+```py
+class DescriptorOrInt(Generic[T]):
+    value: int | Descriptor[T] = 0
+
+reveal_type(DescriptorOrInt[str].value)  # revealed: int
+DescriptorOrInt[int].value = 1
+```
+
 ## Metaclass descriptors shadow generic instance attributes
 
 A data descriptor on the metaclass governs class access even when instances have an attribute of the

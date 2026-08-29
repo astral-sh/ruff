@@ -990,6 +990,33 @@ reveal_type(Box.constant)  # revealed: int
 Box.fixed_recursive
 ```
 
+Aliases can also contain a union of descriptor and non-descriptor types. Only the non-descriptor
+alternatives are subject to the restriction on generic instance attributes.
+
+```py
+class Descriptor[T]:
+    def __get__(self, instance: object, owner: type) -> int:
+        return 0
+
+type DescriptorOrList[T] = Descriptor[T] | list[T]
+type Nested[T] = DescriptorOrList[T] | str
+type DescriptorOrInt[T] = Descriptor[T] | int
+
+class Aliased[T]:
+    value: DescriptorOrList[T]
+    nested: Nested[T]
+    constant: DescriptorOrInt[T]
+
+# error: [invalid-attribute-access]
+Aliased[int].value = [1]
+# error: [invalid-attribute-access]
+reveal_type(Aliased[str].value)  # revealed: int | list[str]
+# error: [invalid-attribute-access]
+Aliased[int].nested
+reveal_type(Aliased[str].constant)  # revealed: int
+Aliased[int].constant = 1
+```
+
 ## Specializations propagate
 
 In a specialized generic alias, the specialization is applied to the attributes and methods of the
