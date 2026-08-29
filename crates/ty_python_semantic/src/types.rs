@@ -1614,7 +1614,7 @@ pub enum Type<'db> {
     /// The dynamic type: a statically unknown set of values
     Dynamic(DynamicType<'db>),
     /// A cycle marker used during recursive type inference.
-    Divergent(DivergentType),
+    Divergent(DivergentType<'db>),
     /// An anonymous recursive type created while recovering a Salsa inference cycle.
     ///
     /// The recursive variable in [`RecursiveType::body`] is represented by
@@ -1881,11 +1881,26 @@ impl<'db> Type<'db> {
         Self::Divergent(DivergentType::new(id))
     }
 
+    /// Create the initial value for a single-type Salsa cycle.
+    pub(crate) fn recursive_cycle_initial(db: &'db dyn Db, id: salsa::Id) -> Self {
+        let binder = DivergentType::for_cycle(
+            DivergentQueryKind::InferExpressionType,
+            id,
+            DivergentSlot::Single,
+        );
+        Self::Recursive(RecursiveType::new(
+            db,
+            binder,
+            RecursiveTypeOrigin::Implicit,
+            Self::Divergent(binder),
+        ))
+    }
+
     const fn is_divergent(&self) -> bool {
         matches!(self, Type::Divergent(_))
     }
 
-    const fn as_divergent(self) -> Option<DivergentType> {
+    const fn as_divergent(self) -> Option<DivergentType<'db>> {
         match self {
             Type::Divergent(divergent) => Some(divergent),
             _ => None,
@@ -2037,6 +2052,17 @@ impl<'db> Type<'db> {
         previous: Self,
         cycle: &salsa::Cycle,
     ) -> Self {
+        if let Type::Recursive(recursive) = previous {
+            let current = recursive.collapse_backedges(db, env, self);
+            let previous = recursive.collapse_backedges(db, env, previous);
+            let body = if cycle.iteration() <= crate::TAINTED_CYCLES {
+                current
+            } else {
+                UnionType::from_elements_cycle_recovery(db, env, [previous, current])
+            };
+            return RecursiveType::build(db, env, recursive.binder(db), recursive.origin(db), body);
+        }
+
         // When we encounter a salsa cycle, we want to avoid oscillating between two or more types
         // without converging on a fixed-point result. Most of the time, we union together the
         // types from each cycle iteration to ensure that our result is monotonic, even if we
@@ -8318,6 +8344,15 @@ impl<'db> Type<'db> {
             } if self == *unfolded => {
                 return Type::Recursive(*recursive);
             }
+            TypeMapping::CollapseRecursiveBackedge { recursive }
+                if matches!(
+                    self,
+                    Type::Recursive(candidate)
+                        if candidate.binder(db).same_marker(recursive.binder(db))
+                ) =>
+            {
+                return Type::Divergent(recursive.binder(db));
+            }
             _ => {}
         }
 
@@ -8702,6 +8737,7 @@ impl<'db> Type<'db> {
                 | TypeMapping::RescopeReturnCallables(_)
                 | TypeMapping::UnfoldRecursive { .. }
                 | TypeMapping::FoldRecursive { .. }
+                | TypeMapping::CollapseRecursiveBackedge { .. }
                 | TypeMapping::Promote(PromotionMode::Off, _)
                 | TypeMapping::Promote(
                     PromotionMode::On,
@@ -8724,7 +8760,8 @@ impl<'db> Type<'db> {
                 | TypeMapping::EagerExpansion
                 | TypeMapping::RescopeReturnCallables(_)
                 | TypeMapping::UnfoldRecursive { .. }
-                | TypeMapping::FoldRecursive { .. } => self,
+                | TypeMapping::FoldRecursive { .. }
+                | TypeMapping::CollapseRecursiveBackedge { .. } => self,
                 TypeMapping::Materialize(materialization_kind) => match materialization_kind {
                     MaterializationKind::Top => Type::object(),
                     MaterializationKind::Bottom => Type::Never,
@@ -9963,6 +10000,12 @@ pub enum TypeMapping<'a, 'db> {
         recursive: RecursiveType<'db>,
         unfolded: Type<'db>,
     },
+    /// Replace a recursive type from this binder with its internal variable.
+    ///
+    /// Unlike `TypeMapping::FoldRecursive`, this is only used while normalizing a Salsa cycle:
+    /// a recursive value from the previous iteration is a backedge in the current iteration even
+    /// when its whole unfolding is not present as a subtree.
+    CollapseRecursiveBackedge { recursive: RecursiveType<'db> },
 }
 
 impl<'db> TypeMapping<'_, 'db> {
@@ -9973,7 +10016,9 @@ impl<'db> TypeMapping<'_, 'db> {
     const fn used_in_cycle_recovery(&self) -> bool {
         matches!(
             self,
-            TypeMapping::UnfoldRecursive { .. } | TypeMapping::FoldRecursive { .. }
+            TypeMapping::UnfoldRecursive { .. }
+                | TypeMapping::FoldRecursive { .. }
+                | TypeMapping::CollapseRecursiveBackedge { .. }
         )
     }
 
@@ -10034,7 +10079,8 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::EagerExpansion
             | TypeMapping::RescopeReturnCallables(_)
             | TypeMapping::UnfoldRecursive { .. }
-            | TypeMapping::FoldRecursive { .. } => context,
+            | TypeMapping::FoldRecursive { .. }
+            | TypeMapping::CollapseRecursiveBackedge { .. } => context,
             TypeMapping::BindSelf(binding) => {
                 if binding.binding_context().is_some() {
                     context.remove_self(db, binding.binding_context())
@@ -10083,7 +10129,8 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::EagerExpansion
             | TypeMapping::RescopeReturnCallables(_)
             | TypeMapping::UnfoldRecursive { .. }
-            | TypeMapping::FoldRecursive { .. } => self.clone(),
+            | TypeMapping::FoldRecursive { .. }
+            | TypeMapping::CollapseRecursiveBackedge { .. } => self.clone(),
         }
     }
 }
@@ -10093,13 +10140,43 @@ impl<'db> TypeMapping<'_, 'db> {
 /// (e.g. `Divergent` is assignable to `@Todo`, but `@Todo | Divergent` must not be reduced to `@Todo`).
 /// Otherwise, type inference cannot converge properly.
 /// For detailed properties of this type, see the unit test at the end of the file.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct DivergentType {
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::SalsaValue)]
+pub struct DivergentType<'db> {
+    /// The Salsa query family that owns this binder.
+    query_kind: DivergentQueryKind,
     /// The query ID that caused the cycle.
-    id: salsa::Id,
+    salsa_id: salsa::Id,
+    /// The output position within a composite query.
+    slot: DivergentSlot,
+    /// Specialization accumulated while following a generic recursive backedge.
+    application: Option<Specialization<'db>>,
     /// If this divergent marker has been materialized, preserve whether it should behave like the
     /// top (`object`) or bottom (`Never`) bound while still remaining recognizable as divergent.
     materialization: Option<MaterializationKind>,
+}
+
+/// The Salsa query family that owns an anonymous recursive binder.
+///
+/// Query ids are only unique within one query family, so the family is part of binder identity.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
+pub enum DivergentQueryKind {
+    /// A legacy cycle marker that has not yet been migrated to an anonymous recursive type.
+    Legacy,
+    InferExpressionType,
+}
+
+/// The output position within a query result.
+///
+/// A composite inference query can recover several unrelated types from one Salsa cycle. Those
+/// types need distinct binders even though they share the same query id.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
+pub enum DivergentSlot {
+    Single,
+    Expression(u32),
+    Definition(u32),
+    Place(u32),
+    Parameter(u32),
+    Base(u32),
 }
 
 /// The semantic source of an anonymous recursive type.
@@ -10121,7 +10198,7 @@ pub enum RecursiveTypeOrigin<'db> {
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct RecursiveType<'db> {
     #[returns(copy)]
-    pub binder: DivergentType,
+    pub binder: DivergentType<'db>,
     #[returns(copy)]
     pub origin: RecursiveTypeOrigin<'db>,
     #[returns(copy)]
@@ -10198,7 +10275,7 @@ impl<'db> RecursiveType<'db> {
     pub(crate) fn build(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        binder: DivergentType,
+        binder: DivergentType<'db>,
         origin: RecursiveTypeOrigin<'db>,
         body: Type<'db>,
     ) -> Type<'db> {
@@ -10268,6 +10345,25 @@ impl<'db> RecursiveType<'db> {
         )
     }
 
+    /// Replace recursive values from this binder with the binder marker.
+    ///
+    /// A Salsa cycle feeds its previous value back into the next iteration. Once that previous
+    /// value is represented as a recursive type, every occurrence of it in the new value is a
+    /// backedge to the same binder, not an ordinary nested recursive type.
+    pub(crate) fn collapse_backedges(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+    ) -> Type<'db> {
+        ty.apply_type_mapping(
+            db,
+            env,
+            &TypeMapping::CollapseRecursiveBackedge { recursive: self },
+            TypeContext::default(),
+        )
+    }
+
     /// Apply an operation to one unfolding of this recursive type and fold the result.
     pub(crate) fn map_if_unfolded<F: Foldable<'db>>(
         self,
@@ -10305,23 +10401,45 @@ impl<'db> RecursiveType<'db> {
 }
 
 // The Salsa heap is tracked separately.
-impl get_size2::GetSize for DivergentType {}
+impl get_size2::GetSize for DivergentType<'_> {}
 
-impl DivergentType {
+impl DivergentType<'_> {
     const fn new(id: salsa::Id) -> Self {
         Self {
-            id,
+            query_kind: DivergentQueryKind::Legacy,
+            salsa_id: id,
+            slot: DivergentSlot::Single,
+            application: None,
+            materialization: None,
+        }
+    }
+
+    const fn for_cycle(
+        query_kind: DivergentQueryKind,
+        salsa_id: salsa::Id,
+        slot: DivergentSlot,
+    ) -> Self {
+        Self {
+            query_kind,
+            salsa_id,
+            slot,
+            application: None,
             materialization: None,
         }
     }
 
     fn same_marker(self, other: Self) -> bool {
-        self.id == other.id
+        self.query_kind == other.query_kind
+            && self.salsa_id == other.salsa_id
+            && self.slot == other.slot
     }
 
     const fn materialized(self, kind: MaterializationKind) -> Self {
         Self {
-            id: self.id,
+            query_kind: self.query_kind,
+            salsa_id: self.salsa_id,
+            slot: self.slot,
+            application: self.application,
             materialization: Some(kind),
         }
     }

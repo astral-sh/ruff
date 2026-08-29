@@ -530,6 +530,54 @@ fn recursive_type_fold_and_unfold() {
 }
 
 #[test]
+fn recursive_type_cycle_backedges_collapse_before_rebinding() {
+    let db = setup_db();
+    let db = &db;
+    let env = db.program_environment();
+    let binder = DivergentType::new(salsa::plumbing::Id::from_bits(1));
+    let Type::Recursive(identity) = RecursiveType::build(
+        db,
+        &env,
+        binder,
+        RecursiveTypeOrigin::Implicit,
+        Type::Divergent(binder),
+    ) else {
+        panic!("an identity body should preserve the recursive binder");
+    };
+
+    let first_iteration =
+        KnownClass::List.to_specialized_instance(db, &env, &[Type::Recursive(identity)]);
+    let collapsed = identity.collapse_backedges(db, &env, first_iteration);
+    assert_eq!(
+        collapsed,
+        KnownClass::List.to_specialized_instance(db, &env, &[Type::Divergent(binder)])
+    );
+
+    let Type::Recursive(list_recursive) =
+        RecursiveType::build(db, &env, binder, RecursiveTypeOrigin::Implicit, collapsed)
+    else {
+        panic!("the collapsed backedge should form a recursive list");
+    };
+    let int = KnownClass::Int.to_instance(db, &env);
+    let element = Type::Union(UnionType::new(
+        db,
+        vec![int, Type::Recursive(list_recursive)].into_boxed_slice(),
+        RecursivelyDefined::No,
+    ));
+    let second_iteration = KnownClass::List.to_specialized_instance(db, &env, &[element]);
+    let collapsed = identity.collapse_backedges(db, &env, second_iteration);
+    let expected_element = Type::Union(UnionType::new(
+        db,
+        vec![int, Type::Divergent(binder)].into_boxed_slice(),
+        RecursivelyDefined::No,
+    ));
+    assert_eq!(
+        collapsed,
+        KnownClass::List.to_specialized_instance(db, &env, &[expected_element])
+    );
+}
+
+#[test]
 fn recursive_type_operations_unfold_and_fold() {
     let db = setup_db();
     let db = &db;
