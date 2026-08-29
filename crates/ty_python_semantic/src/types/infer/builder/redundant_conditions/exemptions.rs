@@ -362,12 +362,12 @@ fn is_special_cased_condition_expression<'db>(
 }
 
 /// Resolves the condition's source definitions using a scope or an already-inferred receiver type.
-fn condition_definition_info<'db>(
+pub(super) fn condition_definition_info<'db>(
     db: &'db dyn Db,
     file: ProgramFile<'db>,
     expression: &ast::Expr,
     mut expression_type: impl FnMut(&ast::Expr) -> Type<'db>,
-) -> ConditionDefinitionInfo {
+) -> ConditionDefinitionInfo<'db> {
     match expression {
         ast::Expr::Name(name) => {
             let index = semantic_index(db, file);
@@ -386,15 +386,19 @@ fn condition_definition_info<'db>(
     }
 }
 
-/// The information needed for condition exemptions.
+/// The information needed for condition exemptions and annotation hints.
+///
+/// Retaining only the unique definition and the provenance result lets both uses share a lookup
+/// without caching a potentially large list of bindings.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
-struct ConditionDefinitionInfo {
+pub(super) struct ConditionDefinitionInfo<'db> {
+    pub(super) single_definition: Option<Definition<'db>>,
     contains_special_cased_condition: bool,
 }
 
-impl ConditionDefinitionInfo {
+impl<'db> ConditionDefinitionInfo<'db> {
     /// Summarizes resolved definitions, following assignments to establish environment provenance.
-    fn from_definitions<'db>(db: &'db dyn Db, definitions: Vec<ResolvedDefinition<'db>>) -> Self {
+    fn from_definitions(db: &'db dyn Db, definitions: &[ResolvedDefinition<'db>]) -> Self {
         // A place is a variable or attribute, and several definitions can bind the same place.
         // The outer map identifies the place by its scope and place ID: place IDs are only unique
         // within a scope. Each inner map associates a definition with the reachability constraint
@@ -429,8 +433,8 @@ impl ConditionDefinitionInfo {
         let mut reachability_by_place = ReachabilityByPlace::default();
 
         let contains_special_cased_condition = definitions
-            .into_iter()
-            .filter_map(|resolved| resolved.definition())
+            .iter()
+            .filter_map(ResolvedDefinition::definition)
             .any(|definition| {
                 let scope = definition.scope(db);
                 let place = definition.place(db);
@@ -457,7 +461,13 @@ impl ConditionDefinitionInfo {
                 definition_contains_special_cased_condition(db, definition, reachability)
             });
 
+        let single_definition = match definitions {
+            [ResolvedDefinition::Definition(definition)] => Some(*definition),
+            _ => None,
+        };
+
         Self {
+            single_definition,
             contains_special_cased_condition,
         }
     }
@@ -480,10 +490,10 @@ fn name_condition_definition_info<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
     name: Name,
-) -> ConditionDefinitionInfo {
+) -> ConditionDefinitionInfo<'db> {
     ConditionDefinitionInfo::from_definitions(
         db,
-        definitions_for_name(db, scope, &name, ImportAliasResolution::ResolveAliases),
+        &definitions_for_name(db, scope, &name, ImportAliasResolution::ResolveAliases),
     )
 }
 
@@ -505,10 +515,10 @@ fn attribute_condition_definition_info<'db>(
     program: Program<'db>,
     receiver: Type<'db>,
     name: Name,
-) -> ConditionDefinitionInfo {
+) -> ConditionDefinitionInfo<'db> {
     ConditionDefinitionInfo::from_definitions(
         db,
-        definitions_for_attribute(
+        &definitions_for_attribute(
             db,
             &ProgramEnvironment::from_program(program),
             receiver,
