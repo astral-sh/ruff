@@ -10279,17 +10279,21 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
             }
 
             Type::BoundMethod(method_type) => {
-                // TODO: do we need to replace self?
-                let variance = method_type.func(db).variance_of(db, env, typevar);
-                if method_type.function(db).is_some() {
-                    variance
+                if let Some(function) = method_type.function(db) {
+                    function
+                        .bound_signatures(
+                            db,
+                            method_type.signature_receiver(db),
+                            method_type.typing_self_type(db),
+                        )
+                        .variance_of(db, env, typevar)
                 } else {
                     // A callable object's type does not include the additional receiver bound
                     // by classmethod, which is also exposed through `__self__`.
                     VarianceTerm::join(
                         db,
                         [
-                            variance,
+                            method_type.func(db).variance_of(db, env, typevar),
                             method_type.self_instance(db).variance_of(db, env, typevar),
                         ],
                     )
