@@ -1,8 +1,7 @@
 ## What it does
 
-Enforces that the `request` keyword is not used during parameterization.
-`pytest` passes the `request` argname to all functions, and raises an error on parameters of
-fixtures.
+Enforces that the `request` keyword is not used during parameterization. `pytest` passes the
+`request` argname to all functions, and raises an error on parameters of fixtures.
 
 ## Extra Information
 

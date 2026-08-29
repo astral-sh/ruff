@@ -1,7 +1,7 @@
 ## What it does
 
-Checks that the argnames passed to `pytest.mark.parametrize` are valid.
-If not, the tests will not run.
+Checks that the argnames passed to `pytest.mark.parametrize` are valid. If not, the tests will not
+run.
 
 ## Examples
 

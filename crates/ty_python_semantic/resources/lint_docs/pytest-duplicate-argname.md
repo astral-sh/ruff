@@ -1,7 +1,7 @@
 ## What it does
 
-Checks that there are no duplicate argnames in `pytest.mark.parametrize`.
-If there are, the tests will not run.
+Checks that there are no duplicate argnames in `pytest.mark.parametrize`. If there are, the tests
+will not run.
 
 ## Examples
 
