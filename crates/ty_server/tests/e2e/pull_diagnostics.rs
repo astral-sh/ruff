@@ -394,7 +394,7 @@ fn pull_excluded_file() -> Result<()> {
     let _filter = filter_result_id();
 
     let main_path = SystemPath::new("src/foo.py");
-    let main_content = r#"reveal_type("included")"#;
+    let main_content = "reveal_type(\"included\")\n";
 
     let excluded_path = SystemPath::new("src/excluded/lib.py");
     let excluded_content = r#"reveal_type("Excluded")"#;

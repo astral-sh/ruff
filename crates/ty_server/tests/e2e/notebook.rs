@@ -567,6 +567,24 @@ b: Litera
 }
 
 #[test]
+fn undefined_reveal_fix_stays_in_cell() -> anyhow::Result<()> {
+    let mut server = TestServerBuilder::new()?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    let mut builder = NotebookBuilder::virtual_file("test.ipynb");
+    builder
+        .add_python_cell("from __future__ import annotations\nfrom typing import TYPE_CHECKING\n");
+    builder.add_python_cell("\"\"\"A cell docstring.\"\"\"\nreveal_type(1)\n");
+    builder.open(&mut server);
+
+    let diagnostics = server.collect_publish_diagnostic_notifications(2);
+    assert_json_snapshot!(diagnostics);
+
+    Ok(())
+}
+
+#[test]
 fn invalid_syntax_with_syntax_errors_disabled() -> anyhow::Result<()> {
     let mut server = TestServerBuilder::new()?
         .with_workspace(
