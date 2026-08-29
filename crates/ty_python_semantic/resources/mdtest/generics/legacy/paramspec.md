@@ -191,10 +191,10 @@ class Contravariant(Generic[P_contra]):
 
 ```snapshot
 error[invalid-generic-class]: Variance of type variable `P_co` is incompatible with method `returns`
-  --> src/mdtest_snippet.py:10:9
+  --> src/mdtest_snippet.py:10:26
    |
 10 |     def returns(self) -> Callable[P_co, None]:
-   |         ^^^^^^^
+   |                          ^^^^^^^^^^^^^^^^^^^^
 info: Type variable `P_co` is declared as covariant, but this method requires it to be contravariant
 ```
 
@@ -202,13 +202,22 @@ Forwarding `P.args` and `P.kwargs` also consumes `P`.
 
 ```py
 class CovariantForwarder(Generic[P_co]):
-    # error: [invalid-generic-class]
+    # snapshot: invalid-generic-class
     def call(self, *args: P_co.args, **kwargs: P_co.kwargs) -> None: ...
 
 class ContravariantForwarder(Generic[P_contra]):
     def call(self, *args: P_contra.args, **kwargs: P_contra.kwargs) -> None: ...
     def returns(self) -> Callable[P_contra, None]:
         raise NotImplementedError
+```
+
+```snapshot
+error[invalid-generic-class]: Variance of type variable `P_co` is incompatible with method `call`
+  --> src/mdtest_snippet.py:21:27
+   |
+21 |     def call(self, *args: P_co.args, **kwargs: P_co.kwargs) -> None: ...
+   |                           ^^^^^^^^^
+info: Type variable `P_co` is declared as covariant, but this method requires it to be contravariant
 ```
 
 Constructors can establish a specialization without respecting its declared variance. A `ParamSpec`
@@ -244,8 +253,8 @@ class MethodKinds(Generic[P_contra]):
 ### Variance in overloaded methods
 
 TODO: Variance validation is deferred for overloaded methods until it accounts for the complete
-overload set. Neither overloads nor their implementation are checked individually, even when they
-use a covariant `ParamSpec` contravariantly.
+overload set. We miss the invalid use of a covariant `ParamSpec` in the first overload's return
+type.
 
 ```py
 from typing import Callable, Generic, ParamSpec, overload
@@ -254,6 +263,7 @@ P_co = ParamSpec("P_co", covariant=True)
 
 class Overloaded(Generic[P_co]):
     @overload
+    # TODO: Emit `invalid-generic-class`; this use of `P_co` requires contravariance.
     def method(self, value: int) -> Callable[P_co, None]: ...
     @overload
     def method(self, value: str) -> None: ...
@@ -263,8 +273,8 @@ class Overloaded(Generic[P_co]):
 
 ### Variance in generic methods
 
-A method's independent type variable can accept any default. The `Callable[P_contra, None]` arm in
-the parameter annotation is redundant because `T` already accepts that default, and the result
+A method's independent type variable can accept any argument. The `Callable[P_contra, None]` arm in
+the parameter annotation is redundant because `T` already accepts that argument, and the result
 includes both types. This signature respects the class's contravariance.
 
 ```toml
@@ -278,9 +288,9 @@ from typing import Callable, Generic, ParamSpec, TypeVar
 P_contra = ParamSpec("P_contra", contravariant=True)
 T = TypeVar("T")
 
-class Defaults(Generic[P_contra]):
-    def get(self, default: Callable[P_contra, None] | T) -> Callable[P_contra, None] | T:
-        return default
+class Contravariant(Generic[P_contra]):
+    def identity(self, value: Callable[P_contra, None] | T) -> Callable[P_contra, None] | T:
+        return value
 ```
 
 TODO: Until those relationships are checked, we defer validation for generic methods, including type
@@ -291,12 +301,15 @@ reported.
 P_co = ParamSpec("P_co", covariant=True)
 
 class GenericMethods(Generic[P_co]):
+    # TODO: Emit `invalid-generic-class`; this use of `P_co` requires contravariance.
     def legacy(self, value: T) -> Callable[P_co, T]:
         raise NotImplementedError
 
+    # TODO: Emit `invalid-generic-class`; this use of `P_co` requires contravariance.
     def pep695[U](self, value: U) -> Callable[P_co, U]:
         raise NotImplementedError
 
+    # TODO: Emit `invalid-generic-class`; this use of `P_co` requires contravariance.
     def returned_callable(self) -> Callable[P_co, T]:
         raise NotImplementedError
 ```
@@ -329,11 +342,11 @@ class Unrestricted(Generic[P_co]):
     def accepts(self: "Unrestricted[P_co]", callback: Callable[P_co, None]) -> None: ...
 ```
 
-TODO: A specialized receiver can restrict which class specializations expose a method. We defer
-variance validation for these methods until receiver restrictions are taken into account.
+A specialized receiver does not make this contravariant use of `P_co` valid.
 
 ```py
 class Restricted(Generic[P_co]):
+    # error: [invalid-generic-class]
     def method(self: "Restricted[[int]]") -> Callable[P_co, None]:
         raise NotImplementedError
 ```

@@ -1,7 +1,7 @@
 use crate::{
     diagnostic::format_enumeration,
     types::{
-        KnownInstanceType, Signature, SubclassOfType, Type, TypeVarKind, TypeVarVariance,
+        KnownInstanceType, Signature, Type, TypeVarKind, TypeVarVariance,
         context::InferContext,
         diagnostic::{
             INVALID_GENERIC_CLASS, INVALID_LEGACY_POSITIONAL_PARAMETER,
@@ -50,7 +50,9 @@ pub(crate) fn check_function_definition<'db>(
     check_legacy_typevar_defaults(context, last_definition, &signature, file_expression_type);
     check_legacy_typevar_ordering(context, last_definition, &signature, file_expression_type);
     // Variance depends on the complete overload set: a broader overload can cover an otherwise
-    // incompatible signature. Defer checking overloads until we can account for that coverage.
+    // incompatible signature.
+    // TODO: Account for that coverage in shared variance inference before
+    // checking overloaded methods here.
     if !function_type.has_known_decorator(db, FunctionDecorators::OVERLOAD) {
         check_method_typevar_variance(context, last_definition, &signature);
     }
@@ -58,6 +60,7 @@ pub(crate) fn check_function_definition<'db>(
 
 /// Check that a method respects the declared variance of its class's type parameters.
 /// Constructors are excluded because their parameters establish the class specialization.
+/// Recursively checks type variables nested in containers, unions, and callables as well as bare uses.
 fn check_method_typevar_variance<'db>(
     context: &InferContext<'db, '_>,
     last_definition: OverloadLiteral<'db>,
@@ -76,7 +79,12 @@ fn check_method_typevar_variance<'db>(
     let Some(class) = nearest_enclosing_class(db, index, body_scope) else {
         return;
     };
-    // Protocols have separate checks for variance in their interfaces.
+    // Protocols require declared variance to match the inferred variance, including for explicitly
+    // invariant type variables. Nominal classes can be more conservative, so they only reject uses
+    // incompatible with a declared covariance or contravariance. Both checks share recursive
+    // variance inference, but only nominal classes currently skip overloads and independently
+    // generic methods to avoid false positives. TODO: Handle these cases in shared variance
+    // inference so that both checks can account for them.
     if class.is_protocol(db) {
         return;
     }
@@ -93,7 +101,7 @@ fn check_method_typevar_variance<'db>(
     }
 
     // Independent method type parameters can make an occurrence of a class parameter redundant.
-    // Checking those relationships requires more than composing the variance of each occurrence.
+    // TODO: Account for those relationships instead of just composing each occurrence's variance.
     // Use the lexical context so that type parameters moved into a returned callable also count.
     let lexical_signature = last_definition.raw_signature(db, ReturnCallableTypeVarScope::Lexical);
     if lexical_signature.generic_context.is_some_and(|context| {
@@ -105,33 +113,16 @@ fn check_method_typevar_variance<'db>(
     }
     let env = context.program_environment();
     let signature = if last_definition.has_implicit_receiver(db) {
-        if signature.has_explicit_positional_receiver_annotation()
-            && let Some(receiver) = signature.parameters().get(0)
-        {
-            // `Self` and the class's identity specialization expose the method on every
-            // specialization. Other annotations can restrict the receiver; defer those until
-            // variance checking accounts for the restriction.
-            let class_type = class.identity_specialization(db);
-            let instance_type = Type::instance(db, env, class_type);
-            let receiver_type = if last_definition.is_classmethod(db) {
-                SubclassOfType::from(db, env, class_type)
-            } else {
-                instance_type
-            };
-            if !receiver
-                .annotated_type()
-                .bind_self_typevars(db, env, instance_type)
-                .is_equivalent_to(db, env, receiver_type)
-            {
-                return;
-            }
-        }
         // The implicit receiver does not consume the class's type parameters.
+        // TODO: Account for specialized receivers that make an otherwise incompatible occurrence
+        // redundant, such as `self: C[int]` with a parameter annotated as `T_co | int`.
         signature.bind_self(db, env, None)
     } else {
         signature.clone()
     };
 
+    // TODO: Validate the final class interface: decorators can replace a method, and later
+    // statements in the class body can delete or overwrite it.
     for typevar in generic_context.variables(db) {
         let Some(declared_variance) = typevar.typevar(db).explicit_variance(db) else {
             continue;
@@ -144,7 +135,43 @@ fn check_method_typevar_variance<'db>(
             continue;
         }
         let node = last_definition.node(db, context.file(), context.module());
-        if let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, &node.name) {
+        let range = signature
+            .parameters()
+            .iter()
+            .find_map(|parameter| {
+                // `P.args` and `P.kwargs` both consume `P`, despite having distinct identities.
+                let parameter_type = match parameter.annotated_type() {
+                    Type::TypeVar(typevar) if typevar.paramspec_attr(db).is_some() => {
+                        Type::TypeVar(typevar.without_paramspec_attr(db))
+                    }
+                    ty => ty,
+                };
+                let variance = parameter_type
+                    .with_polarity(TypeVarVariance::Contravariant)
+                    .variance_of(db, env, typevar.identity(db));
+                if declared_variance.join(variance) == declared_variance {
+                    return None;
+                }
+                node.parameters
+                    .iter()
+                    .nth(parameter.source_parameter_index()?)?
+                    .annotation()
+                    .map(Ranged::range)
+            })
+            .or_else(|| {
+                node.returns
+                    .as_deref()
+                    .filter(|_| {
+                        declared_variance.join(signature.return_ty.variance_of(
+                            db,
+                            env,
+                            typevar.identity(db),
+                        )) != declared_variance
+                    })
+                    .map(Ranged::range)
+            })
+            .unwrap_or_else(|| node.name.range());
+        if let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, range) {
             let mut diagnostic = builder.into_diagnostic(format_args!(
                 "Variance of type variable `{}` is incompatible with method `{}`",
                 typevar.name(db),
