@@ -296,6 +296,296 @@ equivalent to) each other.
 
 It is not possible to construct a legacy typevar that is explicitly bivariant.
 
+## Variance in method signatures
+
+Methods must respect the declared variance of the class's type variables. Covariant variables can be
+returned but cannot be consumed, while contravariant variables can be consumed but not returned.
+
+```py
+from typing import Callable, Generic, TypeVar
+
+T_co = TypeVar("T_co", covariant=True)
+T_contra = TypeVar("T_contra", contravariant=True)
+
+class Covariant(Generic[T_co]):
+    def returns(self) -> T_co:
+        raise NotImplementedError
+
+    # snapshot: invalid-generic-class
+    def accepts(self, value: T_co) -> None: ...
+    def accepts_callback(self, callback: Callable[[T_co], None]) -> None: ...
+
+class Contravariant(Generic[T_contra]):
+    def accepts(self, value: T_contra) -> None: ...
+
+    # error: [invalid-generic-class]
+    def returns(self) -> T_contra:
+        raise NotImplementedError
+```
+
+```snapshot
+error[invalid-generic-class]: Variance of type variable `T_co` is incompatible with method `accepts`
+  --> src/mdtest_snippet.py:11:30
+   |
+11 |     def accepts(self, value: T_co) -> None: ...
+   |                              ^^^^
+info: Type variable `T_co` is declared as covariant, but this method requires it to be contravariant
+```
+
+Returning a mutable `list[T_co]` requires invariance, as does using `T_co` in both parameter and
+return positions. In `identity`, the callback parameter and return annotation respect covariance;
+only the `value` parameter violates it.
+
+```py
+class InvariantMethods(Generic[T_co]):
+    # snapshot: invalid-generic-class
+    def values(self) -> list[T_co]:
+        raise NotImplementedError
+
+    # snapshot: invalid-generic-class
+    def identity(self, callback: Callable[[T_co], None], value: T_co) -> T_co:
+        return value
+```
+
+```snapshot
+error[invalid-generic-class]: Variance of type variable `T_co` is incompatible with method `values`
+  --> src/mdtest_snippet.py:22:25
+   |
+22 |     def values(self) -> list[T_co]:
+   |                         ^^^^^^^^^^
+info: Type variable `T_co` is declared as covariant, but this method requires it to be invariant
+
+
+error[invalid-generic-class]: Variance of type variable `T_co` is incompatible with method `identity`
+  --> src/mdtest_snippet.py:26:65
+   |
+26 |     def identity(self, callback: Callable[[T_co], None], value: T_co) -> T_co:
+   |                                                                 ^^^^
+info: Type variable `T_co` is declared as covariant, but this method requires it to be invariant
+```
+
+The same variable can be bound independently to a generic method. Its declared variance does not
+apply to that method binding. A nested function is not part of the class's interface either.
+
+```py
+class GenericMethod(Generic[T_contra]):
+    def identity(self, value: T_co) -> T_co:
+        return value
+
+class NestedFunction(Generic[T_co]):
+    def method(self) -> None:
+        def accepts(value: T_co) -> None: ...
+```
+
+Class methods also respect the declared variance. A static method has no receiver, so its first
+parameter still contributes to its variance.
+
+```py
+class ClassMethods(Generic[T_co]):
+    @classmethod
+    def returns(cls) -> T_co:
+        raise NotImplementedError
+
+    @classmethod
+    # error: [invalid-generic-class]
+    def accepts(cls, value: T_co) -> None: ...
+    @staticmethod
+    # error: [invalid-generic-class]
+    def static_accepts(value: T_co) -> None: ...
+```
+
+## Variance in generic methods
+
+A method's independent type variable can accept arguments outside the class's covariant value type.
+The `V_co` arm in the parameter annotation is redundant: `T` already accepts any argument, and the
+result includes both types. This signature does not require the class to be invariant.
+
+```py
+from typing import Generic, TypeVar
+
+V_co = TypeVar("V_co", covariant=True)
+T = TypeVar("T")
+
+class Covariant(Generic[V_co]):
+    def identity(self, value: V_co | T) -> V_co | T:
+        return value
+```
+
+Reusing `T` in another parameter can constrain which arguments the method accepts, so these generic
+methods do not always respect covariance. TODO: We defer variance checking for independently generic
+methods until we can account for these relationships, and miss this invalid use of `V_co`.
+
+```py
+class Correlated(Generic[V_co]):
+    # TODO: Emit `invalid-generic-class`; this use of `V_co` requires contravariance.
+    def get(self, value: V_co | T, other: T) -> T:
+        raise NotImplementedError
+```
+
+## Overloads with generic fallbacks
+
+An overload that consumes a covariant type variable can be covered by a generic fallback. The second
+overload below accepts the first overload's arguments with the same result when `T` is `T_co`. The
+complete method therefore respects covariance.
+
+```py
+from typing import Generic, TypeVar, overload
+
+T_co = TypeVar("T_co", covariant=True)
+T = TypeVar("T")
+
+class Sequence(Generic[T_co]):
+    @overload
+    def __add__(self, value: tuple[T_co, ...]) -> tuple[T_co, ...]: ...
+    @overload
+    def __add__(self, value: tuple[T, ...]) -> tuple[T_co | T, ...]: ...
+    def __add__(self, value: tuple[object, ...]) -> tuple[object, ...]:
+        return value
+```
+
+## Overloaded mapping defaults
+
+A mapping can similarly accept its covariant value type as a default when another overload accepts
+arbitrary defaults. The generic overload covers the specialized default without losing its result
+type. The key parameter is invariant and does not affect this value-variance relationship.
+
+`mapping.pyi`:
+
+```pyi
+from typing import Generic, TypeVar, overload
+
+K = TypeVar("K")
+V_co = TypeVar("V_co", covariant=True)
+T = TypeVar("T")
+
+class Mapping(Generic[K, V_co]):
+    @overload
+    def get(self, key: K) -> V_co | None: ...
+    @overload
+    def get(self, key: K, default: V_co) -> V_co: ...
+    @overload
+    def get(self, key: K, default: T) -> V_co | T: ...
+```
+
+## Variance in overloaded methods
+
+TODO: We defer variance checking for overloaded methods until we can account for the complete
+overload set. This also means we miss invalid uses of covariant variables that no other overload
+covers.
+
+```py
+from typing import Generic, TypeVar, overload
+
+T_co = TypeVar("T_co", covariant=True)
+
+class Overloaded(Generic[T_co]):
+    @overload
+    # TODO: Emit `invalid-generic-class`; this use of `T_co` requires contravariance.
+    def method(self, value: T_co) -> int: ...
+    @overload
+    def method(self, value: int, other: int) -> int: ...
+    def method(self, value: object, other: int = 0) -> int:
+        return 0
+```
+
+## Variance with explicit receivers
+
+Annotating the receiver with `Self` or the class's own type parameters does not restrict which
+specializations can call the method. These annotations do not affect variance checking, for either
+instance methods or class methods.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from typing import Generic, Self, TypeVar
+
+T_co = TypeVar("T_co", covariant=True)
+
+class Unrestricted(Generic[T_co]):
+    # error: [invalid-generic-class]
+    def accepts_self(self: Self, value: T_co) -> None: ...
+    # error: [invalid-generic-class]
+    def accepts_identity(self: "Unrestricted[T_co]", value: T_co) -> None: ...
+    def returns(self: "Unrestricted[T_co]") -> T_co:
+        raise NotImplementedError
+
+    @classmethod
+    # error: [invalid-generic-class]
+    def class_accepts_self(cls: type[Self], value: T_co) -> None: ...
+    @classmethod
+    # error: [invalid-generic-class]
+    def class_accepts_identity(cls: type["Unrestricted[T_co]"], value: T_co) -> None: ...
+    @classmethod
+    def class_returns(cls: type[Self]) -> T_co:
+        raise NotImplementedError
+```
+
+A specialized receiver does not in general make an incompatible use of a covariant type variable
+valid. These methods still consume the class's type variable.
+
+```py
+class Restricted(Generic[T_co]):
+    # error: [invalid-generic-class]
+    def accepts(self: "Restricted[int]", value: T_co) -> None: ...
+    @classmethod
+    # error: [invalid-generic-class]
+    def class_accepts(cls: type["Restricted[int]"], value: T_co) -> None: ...
+```
+
+The receiver can sometimes make a use of the type variable redundant. Here, `T_co` must be a subtype
+of `int`, so `T_co | int` accepts exactly the same arguments as `int`. This method does not
+constrain the class's variance.
+
+```py
+class Redundant(Generic[T_co]):
+    # TODO: Do not report an error; the receiver makes the `T_co` arm redundant.
+    # error: [invalid-generic-class]
+    def accepts(self: "Redundant[int]", value: T_co | int) -> None: ...
+```
+
+## Variance in decorated methods
+
+A decorator can replace a method with a value that does not consume the class's type variable.
+Variance checking should account for the exposed attribute, rather than the original signature.
+
+```py
+from typing import Generic, TypeVar
+
+T_co = TypeVar("T_co", covariant=True)
+
+def replace(func: object) -> int:
+    return 1
+
+class Decorated(Generic[T_co]):
+    @replace
+    # TODO: Do not report an error; the decorator replaces the method with an `int`.
+    # error: [invalid-generic-class]
+    def method(self, value: T_co) -> None: ...
+
+reveal_type(Decorated[int].method)  # revealed: int
+```
+
+## Variance in deleted methods
+
+A method deleted in the class body is not part of the class's interface and does not constrain its
+variance.
+
+```py
+from typing import Generic, TypeVar
+
+T_co = TypeVar("T_co", covariant=True)
+
+class Deleted(Generic[T_co]):
+    # TODO: Do not report an error; the method is absent from the final class interface.
+    # error: [invalid-generic-class]
+    def method(self, value: T_co) -> None: ...
+
+    del method
+```
+
 ## Generic protocol variance
 
 A protocol's declared variance must match whether its members consume or produce that type variable.

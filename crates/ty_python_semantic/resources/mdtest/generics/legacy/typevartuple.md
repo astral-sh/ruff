@@ -242,6 +242,184 @@ Ts_Contra = TypeVarTuple("Ts_Contra", contravariant=True)
 Ts_Inferred = TypeVarTuple("Ts_Inferred", infer_variance=True)
 ```
 
+### Variance in method signatures
+
+A tuple is covariant in its unpacked type variables. Returning `tuple[*Ts]` therefore uses `Ts`
+covariantly, while accepting either `*args: *Ts` or a parameter annotated as `tuple[*Ts]` uses it
+contravariantly.
+
+```toml
+[environment]
+python-version = "3.15"
+```
+
+```py
+from typing import Generic, TypeVarTuple
+
+Ts_co = TypeVarTuple("Ts_co", covariant=True)
+Ts_contra = TypeVarTuple("Ts_contra", contravariant=True)
+
+class Covariant(Generic[*Ts_co]):
+    def returns(self) -> tuple[*Ts_co]:
+        raise NotImplementedError
+
+    # snapshot: invalid-generic-class
+    def accepts(self, *args: *Ts_co) -> None: ...
+
+class Contravariant(Generic[*Ts_contra]):
+    def accepts(self, *args: *Ts_contra) -> None: ...
+
+    # error: [invalid-generic-class] "Variance of type variable `Ts_contra` is incompatible with method `returns`"
+    def returns(self) -> tuple[*Ts_contra]:
+        raise NotImplementedError
+```
+
+```snapshot
+error[invalid-generic-class]: Variance of type variable `Ts_co` is incompatible with method `accepts`
+  --> src/mdtest_snippet.py:11:30
+   |
+11 |     def accepts(self, *args: *Ts_co) -> None: ...
+   |                              ^^^^^^
+info: Type variable `Ts_co` is declared as covariant, but this method requires it to be contravariant
+```
+
+Passing the tuple as a single argument has the same variance as unpacking it into variadic
+arguments.
+
+```py
+class CovariantTuple(Generic[*Ts_co]):
+    # error: [invalid-generic-class]
+    def accepts(self, value: tuple[*Ts_co]) -> None: ...
+
+class ContravariantTuple(Generic[*Ts_contra]):
+    def accepts(self, value: tuple[*Ts_contra]) -> None: ...
+```
+
+A callable reverses the variance of its argument types. Returning a callable that consumes
+`Ts_contra` is valid, while accepting the same callable is not.
+
+```py
+from typing import Callable
+
+class Callbacks(Generic[*Ts_contra]):
+    def returns(self) -> Callable[[*Ts_contra], None]:
+        raise NotImplementedError
+
+    # error: [invalid-generic-class]
+    def accepts(self, callback: Callable[[*Ts_contra], None]) -> None: ...
+```
+
+Constructors and function-scoped type variables do not constrain the class's variance.
+
+```py
+class Constructed(Generic[*Ts_co]):
+    def __init__(self, *args: *Ts_co) -> None: ...
+    def __new__(cls, *args: *Ts_co) -> "Constructed[*Ts_co]":
+        raise NotImplementedError
+
+def accepts(*args: *Ts_co) -> None: ...
+
+class NotGeneric:
+    def accepts(self, *args: *Ts_co) -> None: ...
+```
+
+### Variance in overloaded methods
+
+TODO: Variance validation is deferred for overloaded methods until it accounts for the complete
+overload set. We miss the invalid use of a covariant `TypeVarTuple` in the first overload's
+parameter.
+
+```toml
+[environment]
+python-version = "3.15"
+```
+
+```py
+from typing import Generic, TypeVarTuple, overload
+
+Ts_co = TypeVarTuple("Ts_co", covariant=True)
+
+class Overloaded(Generic[*Ts_co]):
+    @overload
+    # TODO: Emit `invalid-generic-class`; this use of `Ts_co` requires contravariance.
+    def method(self, value: tuple[*Ts_co]) -> int: ...
+    @overload
+    def method(self, value: int) -> str: ...
+    def method(self, value: tuple[*Ts_co] | int) -> int | str:
+        return 0
+```
+
+### Variance in generic methods
+
+A method's independent type variable can accept any argument. The `tuple[*Ts_co]` arm in the
+parameter annotation is redundant because `T` already accepts that argument, and the result includes
+both types. This signature respects the class's covariance.
+
+```toml
+[environment]
+python-version = "3.15"
+```
+
+```py
+from typing import Generic, TypeVar, TypeVarTuple
+
+Ts_co = TypeVarTuple("Ts_co", covariant=True)
+T = TypeVar("T")
+
+class Covariant(Generic[*Ts_co]):
+    def identity(self, value: tuple[*Ts_co] | T) -> tuple[*Ts_co] | T:
+        return value
+```
+
+TODO: Variance validation is deferred for methods with independent type parameters. The
+contravariant `TypeVarTuple` in the return annotations below would otherwise be rejected.
+
+```py
+Ts_contra = TypeVarTuple("Ts_contra", contravariant=True)
+
+class GenericMethods(Generic[*Ts_contra]):
+    # TODO: Emit `invalid-generic-class`; this use of `Ts_contra` requires covariance.
+    def legacy(self, value: T) -> tuple[*Ts_contra]:
+        raise NotImplementedError
+
+    # TODO: Emit `invalid-generic-class`; this use of `Ts_contra` requires covariance.
+    def pep695[U](self, value: U) -> tuple[*Ts_contra]:
+        raise NotImplementedError
+```
+
+### Variance with explicit receivers
+
+`Self` and the class's own `TypeVarTuple` do not restrict the receiver. Consuming the covariant
+tuple still violates covariance.
+
+```toml
+[environment]
+python-version = "3.15"
+```
+
+```py
+from typing import Generic, Self, TypeVarTuple
+
+Ts_co = TypeVarTuple("Ts_co", covariant=True)
+
+class Unrestricted(Generic[*Ts_co]):
+    # error: [invalid-generic-class]
+    def method(self: "Unrestricted[*Ts_co]", value: tuple[*Ts_co]) -> None: ...
+    @classmethod
+    # error: [invalid-generic-class]
+    def class_method(cls: type[Self], value: tuple[*Ts_co]) -> None: ...
+    def returns(self: Self) -> tuple[*Ts_co]:
+        raise NotImplementedError
+```
+
+A specialized receiver does not make this contravariant use of `Ts_co` valid.
+
+```py
+class Restricted(Generic[*Ts_co]):
+    # error: [invalid-generic-class]
+    def method(self: "Restricted[int]", value: tuple[*Ts_co]) -> None: ...
+```
+
 ## Generic Classes
 
 ### Multiple `TypeVarTuple`s

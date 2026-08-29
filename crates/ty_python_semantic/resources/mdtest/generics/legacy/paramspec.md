@@ -162,6 +162,195 @@ AmbiguousInferVariance = ParamSpec("AmbiguousInferVariance", infer_variance=cond
 CovariantAndInferred = ParamSpec("CovariantAndInferred", covariant=True, infer_variance=True)
 ```
 
+### Variance in method signatures
+
+Returning `Callable[P, None]` uses `P` contravariantly. Accepting that callable as a parameter
+reverses the direction, using `P` covariantly. An explicit variance declaration must permit these
+uses.
+
+```py
+from typing import Callable, Generic, ParamSpec
+
+P_co = ParamSpec("P_co", covariant=True)
+P_contra = ParamSpec("P_contra", contravariant=True)
+
+class Covariant(Generic[P_co]):
+    def accepts(self, callback: Callable[P_co, None]) -> None: ...
+
+    # snapshot: invalid-generic-class
+    def returns(self) -> Callable[P_co, None]:
+        raise NotImplementedError
+
+class Contravariant(Generic[P_contra]):
+    def returns(self) -> Callable[P_contra, None]:
+        raise NotImplementedError
+
+    # error: [invalid-generic-class] "Variance of type variable `P_contra` is incompatible with method `accepts`"
+    def accepts(self, callback: Callable[P_contra, None]) -> None: ...
+```
+
+```snapshot
+error[invalid-generic-class]: Variance of type variable `P_co` is incompatible with method `returns`
+  --> src/mdtest_snippet.py:10:26
+   |
+10 |     def returns(self) -> Callable[P_co, None]:
+   |                          ^^^^^^^^^^^^^^^^^^^^
+info: Type variable `P_co` is declared as covariant, but this method requires it to be contravariant
+```
+
+Forwarding `P.args` and `P.kwargs` also consumes `P`.
+
+```py
+class CovariantForwarder(Generic[P_co]):
+    # snapshot: invalid-generic-class
+    def call(self, *args: P_co.args, **kwargs: P_co.kwargs) -> None: ...
+
+class ContravariantForwarder(Generic[P_contra]):
+    def call(self, *args: P_contra.args, **kwargs: P_contra.kwargs) -> None: ...
+    def returns(self) -> Callable[P_contra, None]:
+        raise NotImplementedError
+```
+
+```snapshot
+error[invalid-generic-class]: Variance of type variable `P_co` is incompatible with method `call`
+  --> src/mdtest_snippet.py:21:27
+   |
+21 |     def call(self, *args: P_co.args, **kwargs: P_co.kwargs) -> None: ...
+   |                           ^^^^^^^^^
+info: Type variable `P_co` is declared as covariant, but this method requires it to be contravariant
+```
+
+Constructors can establish a specialization without respecting its declared variance. A `ParamSpec`
+bound to a function or method instead of the class ignores its declared variance.
+
+```py
+class Constructed(Generic[P_co]):
+    def __init__(self, *args: P_co.args, **kwargs: P_co.kwargs) -> None: ...
+    def __new__(cls, *args: P_co.args, **kwargs: P_co.kwargs) -> "Constructed[P_co]":
+        raise NotImplementedError
+
+def returns() -> Callable[P_co, None]:
+    raise NotImplementedError
+
+class NotGeneric:
+    def returns(self) -> Callable[P_co, None]:
+        raise NotImplementedError
+```
+
+Class methods are checked too. A static method has no receiver, so its first parameter contributes
+to its variance.
+
+```py
+class MethodKinds(Generic[P_contra]):
+    @classmethod
+    # error: [invalid-generic-class]
+    def class_method(cls, callback: Callable[P_contra, None]) -> None: ...
+    @staticmethod
+    # error: [invalid-generic-class]
+    def static_method(callback: Callable[P_contra, None]) -> None: ...
+```
+
+### Variance in overloaded methods
+
+TODO: Variance validation is deferred for overloaded methods until it accounts for the complete
+overload set. We miss the invalid use of a covariant `ParamSpec` in the first overload's return
+type.
+
+```py
+from typing import Callable, Generic, ParamSpec, overload
+
+P_co = ParamSpec("P_co", covariant=True)
+
+class Overloaded(Generic[P_co]):
+    @overload
+    # TODO: Emit `invalid-generic-class`; this use of `P_co` requires contravariance.
+    def method(self, value: int) -> Callable[P_co, None]: ...
+    @overload
+    def method(self, value: str) -> None: ...
+    def method(self, value: object) -> Callable[P_co, None] | None:
+        return None
+```
+
+### Variance in generic methods
+
+A method's independent type variable can accept any argument. The `Callable[P_contra, None]` arm in
+the parameter annotation is redundant because `T` already accepts that argument, and the result
+includes both types. This signature respects the class's contravariance.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Callable, Generic, ParamSpec, TypeVar
+
+P_contra = ParamSpec("P_contra", contravariant=True)
+T = TypeVar("T")
+
+class Contravariant(Generic[P_contra]):
+    def identity(self, value: Callable[P_contra, None] | T) -> Callable[P_contra, None] | T:
+        return value
+```
+
+TODO: Until those relationships are checked, we defer validation for generic methods, including type
+parameters scoped to a returned callable. The incompatible return annotations below are not yet
+reported.
+
+```py
+P_co = ParamSpec("P_co", covariant=True)
+
+class GenericMethods(Generic[P_co]):
+    # TODO: Emit `invalid-generic-class`; this use of `P_co` requires contravariance.
+    def legacy(self, value: T) -> Callable[P_co, T]:
+        raise NotImplementedError
+
+    # TODO: Emit `invalid-generic-class`; this use of `P_co` requires contravariance.
+    def pep695[U](self, value: U) -> Callable[P_co, U]:
+        raise NotImplementedError
+
+    # TODO: Emit `invalid-generic-class`; this use of `P_co` requires contravariance.
+    def returned_callable(self) -> Callable[P_co, T]:
+        raise NotImplementedError
+```
+
+### Variance with explicit receivers
+
+`Self` and the class's own `ParamSpec` do not restrict the receiver. A covariant `ParamSpec` in a
+returned callable's parameters still violates covariance.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from typing import Callable, Generic, ParamSpec, Self
+
+P_co = ParamSpec("P_co", covariant=True)
+
+class Unrestricted(Generic[P_co]):
+    # error: [invalid-generic-class]
+    def method(self: Self) -> Callable[P_co, None]:
+        raise NotImplementedError
+
+    @classmethod
+    # error: [invalid-generic-class]
+    def class_method(cls: type["Unrestricted[P_co]"]) -> Callable[P_co, None]:
+        raise NotImplementedError
+
+    def accepts(self: "Unrestricted[P_co]", callback: Callable[P_co, None]) -> None: ...
+```
+
+A specialized receiver does not make this contravariant use of `P_co` valid.
+
+```py
+class Restricted(Generic[P_co]):
+    # error: [invalid-generic-class]
+    def method(self: "Restricted[[int]]") -> Callable[P_co, None]:
+        raise NotImplementedError
+```
+
 ### Defaults
 
 ```toml
