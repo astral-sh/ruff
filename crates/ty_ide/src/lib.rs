@@ -18,6 +18,7 @@ mod goto_implementation;
 mod goto_type_definition;
 mod hints;
 mod hover;
+#[cfg(test)]
 mod importer;
 mod inlay_hints;
 mod markup;
@@ -411,7 +412,6 @@ mod tests {
     use ruff_db::source::{SourceText, source_text};
     use ruff_db::system::{DbWithWritableSystem, SystemPath, SystemPathBuf};
     use ruff_python_ast::PythonVersion;
-    use ruff_python_codegen::Stylist;
     use ruff_python_trivia::textwrap::dedent;
     use ruff_text_size::TextSize;
     use ty_module_resolver::SearchPathSettings;
@@ -507,7 +507,6 @@ mod tests {
         pub(super) offset: TextSize,
         pub(super) parsed: ParsedModuleRef,
         pub(super) source: SourceText,
-        pub(super) stylist: Stylist<'static>,
     }
 
     #[derive(Default)]
@@ -569,14 +568,11 @@ mod tests {
                     let source = source_text(&db, file);
                     let parsed =
                         parsed_module(&db, db.program_file(file).python_file(&db)).load(&db);
-                    let stylist =
-                        Stylist::from_tokens(parsed.tokens(), source.as_str()).into_owned();
                     cursor = Some(Cursor {
                         file,
                         offset,
                         parsed,
                         source,
-                        stylist,
                     });
                 }
             }
@@ -717,14 +713,11 @@ mod tests {
                     let source = source_text(&db, file);
                     let parsed =
                         parsed_module(&db, db.program_file(file).python_file(&db)).load(&db);
-                    let stylist =
-                        Stylist::from_tokens(parsed.tokens(), source.as_str()).into_owned();
                     cursor = Some(Cursor {
                         file,
                         offset,
                         parsed,
                         source,
-                        stylist,
                     });
                 }
             }

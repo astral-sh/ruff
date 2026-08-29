@@ -3,6 +3,11 @@
 `reveal_type` is used to inspect the type of an expression at a given point in the code. It is often
 used for debugging and understanding how types are inferred by the type checker.
 
+```toml
+[environment]
+python-version = "3.11"
+```
+
 ## Basic usage
 
 ```py
@@ -32,10 +37,80 @@ def _(x: int):
 ## Without importing it
 
 For convenience, we also allow `reveal_type` to be used without importing it, even if that would
-fail at runtime:
+fail at runtime. The diagnostic offers a fix to import it from `typing`:
 
 ```py
-reveal_type(1)  # revealed: Literal[1]
+# snapshot: undefined-reveal
+reveal_type(1)  # error: [revealed-type] "Literal[1]"
+```
+
+```snapshot
+warning[undefined-reveal]: `reveal_type` used without importing it
+ --> src/mdtest_snippet.py:2:1
+  |
+2 | reveal_type(1)  # error: [revealed-type] "Literal[1]"
+  | ^^^^^^^^^^^
+info: This is allowed for debugging convenience but will fail at runtime
+help: Import `reveal_type` from `typing`
+  |
+1 | # snapshot: undefined-reveal
+2 + from typing import reveal_type
+3 | reveal_type(1)  # error: [revealed-type] "Literal[1]"
+  |
+note: This is an unsafe fix and may change runtime behavior
+```
+
+## With a shadowed alias
+
+An imported alias can be shadowed by a function parameter. The diagnostic does not offer to replace
+`reveal_type` with that alias.
+
+```py
+from typing import reveal_type as reveal
+
+def f(reveal: int):
+    # snapshot: undefined-reveal
+    reveal_type(1)  # error: [revealed-type] "Literal[1]"
+```
+
+```snapshot
+warning[undefined-reveal]: `reveal_type` used without importing it
+ --> src/mdtest_snippet.py:5:5
+  |
+5 |     reveal_type(1)  # error: [revealed-type] "Literal[1]"
+  |     ^^^^^^^^^^^
+info: This is allowed for debugging convenience but will fail at runtime
+```
+
+## On Python 3.10
+
+On Python versions before 3.11, the fix imports `reveal_type` from `typing_extensions` because
+`typing.reveal_type` is not available.
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+```py
+# snapshot: undefined-reveal
+reveal_type(1)  # error: [revealed-type] "Literal[1]"
+```
+
+```snapshot
+warning[undefined-reveal]: `reveal_type` used without importing it
+ --> src/mdtest_snippet.py:2:1
+  |
+2 | reveal_type(1)  # error: [revealed-type] "Literal[1]"
+  | ^^^^^^^^^^^
+info: This is allowed for debugging convenience but will fail at runtime
+help: Import `reveal_type` from `typing_extensions`
+  |
+1 | # snapshot: undefined-reveal
+2 + from typing_extensions import reveal_type
+3 | reveal_type(1)  # error: [revealed-type] "Literal[1]"
+  |
+note: This is an unsafe fix and may change runtime behavior
 ```
 
 ## In type-checking blocks

@@ -1,18 +1,18 @@
 ---
-source: crates/ty_server/tests/e2e/pull_diagnostics.rs
-expression: main_diagnostics
+source: crates/ty_server/tests/e2e/notebook.rs
+expression: diagnostics
 ---
 {
-  "resultId": "[RESULT_ID]",
-  "items": [
+  "vscode-notebook-cell://test.ipynb#0": [],
+  "vscode-notebook-cell://test.ipynb#1": [
     {
       "range": {
         "start": {
-          "line": 0,
+          "line": 1,
           "character": 0
         },
         "end": {
-          "line": 0,
+          "line": 1,
           "character": 11
         }
       },
@@ -25,17 +25,17 @@ expression: main_diagnostics
       "message": "`reveal_type` used without importing it\n\ninfo: This is allowed for debugging convenience but will fail at runtime\nhelp: Import `reveal_type` from `typing`",
       "data": {
         "edits": {
-          "file://<temp_dir>/src/foo.py": [
+          "vscode-notebook-cell://test.ipynb#1": [
             {
               "newText": "from typing import reveal_type\n",
               "range": {
                 "end": {
                   "character": 0,
-                  "line": 0
+                  "line": 1
                 },
                 "start": {
                   "character": 0,
-                  "line": 0
+                  "line": 1
                 }
               }
             }
@@ -48,19 +48,18 @@ expression: main_diagnostics
     {
       "range": {
         "start": {
-          "line": 0,
+          "line": 1,
           "character": 12
         },
         "end": {
-          "line": 0,
-          "character": 22
+          "line": 1,
+          "character": 13
         }
       },
       "severity": 3,
       "code": "revealed-type",
       "source": "ty",
-      "message": "Revealed type: `Literal[\"included\"]`"
+      "message": "Revealed type: `Literal[1]`"
     }
-  ],
-  "kind": "full"
+  ]
 }
