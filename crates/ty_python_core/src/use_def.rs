@@ -245,7 +245,7 @@ use std::rc::Rc;
 use std::sync::LazyLock;
 
 use ruff_index::{FrozenIndexVec, Idx, IndexVec, newtype_index};
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::TextRange;
 use rustc_hash::{FxBuildHasher, FxHashMap, FxHasher};
 use smallvec::SmallVec;
 use thin_vec::ThinVec;
@@ -666,7 +666,7 @@ struct UseDefMapExtra {
     loop_headers: FrozenIndexVec<LoopHeaderId, LoopHeader>,
 
     /// Non-overlapping assertion and compound conditional tests, in source order.
-    boolean_test_contexts: Box<[BooleanTestContext]>,
+    boolean_test_contexts: Box<[TextRange]>,
 }
 
 static EMPTY_CONSTRAINT_TABLES: LazyLock<ConstraintTables<'static>> =
@@ -823,21 +823,6 @@ pub struct UseDefMap<'db> {
 struct RangeInfo {
     reachability: ScopedReachabilityConstraintId,
     in_type_checking_block: bool,
-}
-
-/// A boolean test whose subexpressions need to retain their syntactic context.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, get_size2::GetSize)]
-enum BooleanTestContext {
-    Assertion(TextRange),
-    CompoundCondition(TextRange),
-}
-
-impl Ranged for BooleanTestContext {
-    fn range(&self) -> TextRange {
-        match self {
-            Self::Assertion(range) | Self::CompoundCondition(range) => *range,
-        }
-    }
 }
 
 impl Default for RangeInfo {
@@ -1010,29 +995,20 @@ impl<'db> UseDefMap<'db> {
             })
     }
 
-    /// Returns whether `range` belongs to an assertion or compound-condition context in this scope.
+    /// Returns whether `range` is a proper subexpression of a recorded boolean test in this scope.
     ///
-    /// Assertion tests include their whole expression; compound conditions include only proper
-    /// subexpressions. The recorded test ranges do not overlap, allowing a binary search by end
-    /// position.
-    pub(crate) fn is_assertion_test_or_compound_condition_subexpression(
-        &self,
-        range: TextRange,
-    ) -> bool {
+    /// The complete test is excluded, so callers can decide separately whether to check it.
+    /// The ranges do not overlap, allowing a binary search by end position.
+    pub(crate) fn is_boolean_test_subexpression(&self, range: TextRange) -> bool {
         self.extra.as_ref().is_some_and(|extra| {
             let index = extra
                 .boolean_test_contexts
-                .partition_point(|context| context.range().end() <= range.start());
+                .partition_point(|context| context.end() <= range.start());
 
             extra
                 .boolean_test_contexts
                 .get(index)
-                .is_some_and(|context| match context {
-                    BooleanTestContext::Assertion(test) => test.contains_range(range),
-                    BooleanTestContext::CompoundCondition(test) => {
-                        *test != range && test.contains_range(range)
-                    }
-                })
+                .is_some_and(|context| *context != range && context.contains_range(range))
         })
     }
 
@@ -1863,7 +1839,7 @@ pub(super) struct UseDefMapBuilder<'db> {
     range_reachability: Vec<(TextRange, RangeInfo)>,
 
     /// Non-overlapping assertion and compound conditional tests, in source order.
-    boolean_test_contexts: Vec<BooleanTestContext>,
+    boolean_test_contexts: Vec<TextRange>,
 
     /// Identifies the current control-flow path for exception checkpoints.
     ///
@@ -2643,33 +2619,20 @@ impl<'db> UseDefMapBuilder<'db> {
         self.range_reachability.push((range, this_range_info));
     }
 
-    /// Records an assertion's entire test expression and all its subexpressions.
+    /// Records an assertion or compound statement test while preserving non-overlapping source order.
     ///
-    /// The assertion's optional message lies outside this range and does not inherit its context.
-    pub(super) fn record_assertion_test(&mut self, range: TextRange) {
-        self.record_boolean_test_context(BooleanTestContext::Assertion(range));
-    }
-
-    /// Records a compound `if`, `elif`, `while` or `match`-guard test for its proper subexpressions.
-    ///
-    /// The test itself is excluded when looking up this context, so its overall truthiness can
-    /// still be checked.
-    pub(super) fn record_compound_condition_test(&mut self, range: TextRange) {
-        self.record_boolean_test_context(BooleanTestContext::CompoundCondition(range));
-    }
-
-    /// Appends a statement-test context while preserving non-overlapping source order.
+    /// An assertion's optional message lies outside this range and does not inherit its context.
     ///
     /// Statements cannot occur inside expressions, so test ranges in the same scope cannot
     /// overlap. Recording them in source order allows context lookups to use a binary search.
-    fn record_boolean_test_context(&mut self, context: BooleanTestContext) {
+    pub(super) fn record_boolean_test_context(&mut self, range: TextRange) {
         debug_assert!(
             self.boolean_test_contexts
                 .last()
-                .is_none_or(|previous| previous.range().end() <= context.range().start()),
+                .is_none_or(|previous| previous.end() <= range.start()),
             "boolean test contexts must be non-overlapping and recorded in source order"
         );
-        self.boolean_test_contexts.push(context);
+        self.boolean_test_contexts.push(range);
     }
 
     pub(super) fn snapshot_enclosing_state(

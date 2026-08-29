@@ -4598,8 +4598,8 @@ always false.
 
 This rule is enabled by default, and is deliberately not comprehensive. In order to avoid false
 positives, it is not emitted on any expression where the boolean test is inferred as evaluating to
-`True` itself, `False` itself, or an exact integer such as `1` or `0`. It also is not emitted on
-any expression where the boolean test uses a walrus operator. These cases are all covered by
+`True` itself, `False` itself, or an exact integer such as `1` or `0`. It also is not emitted on any
+expression where the boolean test uses a walrus operator. These cases are all covered by
 [`redundant-condition-strict`](#redundant-condition-strict), a sibling rule to this one that is disabled by default and which
 exclusively covers cases that are exempted by this rule.
 
@@ -4673,7 +4673,10 @@ def test_my_data(data: list[int]):
 **Boolean operators used to compute values**
 
 
-The rule checks `and` and `or` operands when the expression is used as a condition: in an `if`, `elif`, `while`, or `assert` test, a conditional expression, a comprehension filter, a match guard, or as the operand of `not`. It does not flag `and` or `or` expressions used to compute values, such as selecting a function to call:
+The rule checks `and` and `or` operands when the expression is used as a condition: in an `if`,
+`elif`, `while`, or `assert` test, a conditional expression, a comprehension filter, a match guard,
+or as the operand of `not`. It does not flag `and` or `or` expressions used to compute values, such
+as selecting a function to call:
 
 ```py
 def f(): ...
@@ -4706,7 +4709,8 @@ def test_ask_to_continue():
     assert prompts == ["Continue? "]
 ```
 
-Unlike `and` and `or`, `not` explicitly converts its operand to a boolean, so the rule checks it in every context.
+Unlike `and` and `or`, `not` explicitly converts its operand to a boolean, so the rule checks it in
+every context.
 
 ## `redundant-condition-strict`
 
@@ -4729,8 +4733,8 @@ rule [`redundant-condition`](#redundant-condition) does not cover. These cases o
 have a significantly higher rate of unavoidable false positives than other cases.
 
 This rule is emitted on expressions where the boolean test is inferred as evaluating to `True`
-itself, `False` itself, or an exact integer such as `1` or `0`. It also is emitted on any
-expression where the boolean test uses a walrus operator.
+itself, `False` itself, or an exact integer such as `1` or `0`. It also is emitted on any expression
+where the boolean test uses a walrus operator.
 
 **Why is this bad?**
 
@@ -4743,11 +4747,11 @@ any diagnostics on code in that region.
 **Examples**
 
 
-A common error in Python code is to make the mistake of thinking that indexing into a `bytes`
-object will get you an object of type `bytes`. But `bytes` work differently to `str`s in Python --
-although a string is a sequence of strings, a bytestring is a sequence of `int`s, so indexing into
-a `bytes` object gives you an `int`. This rule can catch that error by alerting you to the fact
-that checking whether a `bytes` object is unequal to an `int` will always evaluate to `True`:
+A common error in Python code is to make the mistake of thinking that indexing into a `bytes` object
+will get you an object of type `bytes`. But `bytes` work differently to `str`s in Python -- although
+a string is a sequence of strings, a bytestring is a sequence of `int`s, so indexing into a `bytes`
+object gives you an `int`. This rule can catch that error by alerting you to the fact that checking
+whether a `bytes` object is unequal to an `int` will always evaluate to `True`:
 
 ```py
 def validate_record(data: bytes) -> None:
@@ -4769,7 +4773,9 @@ def trace(**kwargs: dict[str, str]) -> None:
 **Exemptions**
 
 
-Like [`redundant-condition`](#redundant-condition), this rule checks `and` and `or` operands only when the expression is used as a condition. Expressions that compute values, such as assignments and return values, are exempt. The operand of `not` is checked in every context.
+Like [`redundant-condition`](#redundant-condition), this rule checks `and` and `or` operands only when the expression is
+used as a condition. Expressions that compute values, such as assignments and return values, are
+exempt. The operand of `not` is checked in every context.
 
 A common pattern in Python code is to use defensive `assert`s to enforce behaviour at runtime, even
 when the asserted condition can be inferred statically to be always true. This rule applies an
@@ -4824,8 +4830,8 @@ def parse_data_early_return(data: int | str):
     raise AssertionError("unexpected data")
 ```
 
-Any conditions involving `sys.version_info`, `sys.platform`, `os.name` or `typing.TYPE_CHECKING`
-are exempted. The rule recursively follows the definitions of names and attributes across module
+Any conditions involving `sys.version_info`, `sys.platform`, `os.name` or `typing.TYPE_CHECKING` are
+exempted. The rule recursively follows the definitions of names and attributes across module
 boundaries to determine if a name or attribute was indirectly defined in relation to one of these
 highly special-cased symbols:
 
@@ -4853,8 +4859,8 @@ if TYPE_CHECKING:  # inferred as always true, but no diagnostic
     pass
 ```
 
-Some conditions involving literal integers and booleans in the AST are also exempted: there's no reason
-why you'd use a condition like this unless it was intentional.
+Some conditions involving literal integers and booleans in the AST are also exempted: there's no
+reason why you'd use a condition like this unless it was intentional.
 
 ```py
 if True:  # inferred as always true (obviously), but no diagnostic
@@ -4886,7 +4892,8 @@ def say_yes_or_no(what_to_say: YesOrNo):
         print("no")
 ```
 
-This snippet could be written more clearly as this, which would not trigger the rule owing to the exemptions described in the section above:
+This snippet could be written more clearly as this, which would not trigger the rule owing to the
+exemptions described in the section above:
 
 ```py
 def say_yes_or_no(what_to_say: YesOrNo):
@@ -4897,7 +4904,8 @@ def say_yes_or_no(what_to_say: YesOrNo):
         print("no")
 ```
 
-or the snippet could also be rewritten as this, which would also be fine according to the rule's heuristics:
+or the snippet could also be rewritten as this, which would also be fine according to the rule's
+heuristics:
 
 ```py
 from typing_extensions import assert_never
@@ -4953,11 +4961,11 @@ def main():
             print(f"The weather is {weather}, let's go fishing")
 ```
 
-Lastly, the rule cannot reliably distinguish in all cases comparisons that are intentionally
-always true/false from those that are unintentionally always true/false. The rule takes care to
-avoid flagging code that uses `if TYPE_CHECKING`, `if sys.version_info < (X, Y)`,
-`if sys.platform == ...` and `if os.name == ...`. But it cannot reliably determine that code like
-this was written the way it was meant to:
+Lastly, the rule cannot reliably distinguish in all cases comparisons that are intentionally always
+true/false from those that are unintentionally always true/false. The rule takes care to avoid
+flagging code that uses `if TYPE_CHECKING`, `if sys.version_info < (X, Y)`, `if sys.platform == ...`
+and `if os.name == ...`. But it cannot reliably determine that code like this was written the way it
+was meant to:
 
 ```py
 DEBUGGING = 0

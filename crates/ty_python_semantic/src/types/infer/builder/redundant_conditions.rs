@@ -60,7 +60,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// the `if` tests `func` when `flag` is truthy. Recurse only through `and`/`or` so that value
     /// expressions such as the argument in `if consume(func and flag)` are not checked.
     /// Negated operands are checked separately during inference, regardless of their context.
-    fn check_condition_operands(&self, test: &ast::Expr) {
+    pub(super) fn check_condition_operands(&self, test: &ast::Expr) {
         if let ast::Expr::BoolOp(ast::ExprBoolOp { values, .. }) = test {
             for value in values {
                 let ty = self.expression_type(value);
@@ -185,10 +185,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let rule = if test_type.is_assignable_to(db, env, int_instance) {
             if self
                 .index
-                .is_assertion_test_or_compound_condition_subexpression(
-                    self.scope().file_scope_id(db),
-                    test.range(),
-                )
+                .is_boolean_test_subexpression(self.scope().file_scope_id(db), test.range())
             {
                 return None;
             }

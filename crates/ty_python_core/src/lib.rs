@@ -553,23 +553,19 @@ impl<'db> SemanticIndex<'db> {
         })
     }
 
-    /// Returns whether `range` belongs to an assertion test or occurs inside a compound condition.
+    /// Returns whether `range` is a proper subexpression of an assertion or compound condition test.
     /// This is useful information for the `redundant-condition-strict` rule, which is suppressed
     /// in these contexts.
     ///
-    /// An assertion test and all its subexpressions match. For `if`, `elif`, `while` and
-    /// `match`-guard tests using `not`, `and`, or `or`, only proper subexpressions match, so
-    /// callers can still check the overall condition's truthiness.
+    /// Assertion tests are always recorded. For `if`, `elif`, `while` and `match`-guard tests,
+    /// only conditions using `not`, `and`, or `or` are recorded. The complete test does not
+    /// match, so callers can decide separately whether to check its overall truthiness.
     ///
     /// Only tests recorded in `scope_id` are considered; an outer statement's context does not
     /// extend into a lambda or another nested scope.
-    pub fn is_assertion_test_or_compound_condition_subexpression(
-        &self,
-        scope_id: FileScopeId,
-        range: TextRange,
-    ) -> bool {
+    pub fn is_boolean_test_subexpression(&self, scope_id: FileScopeId, range: TextRange) -> bool {
         self.use_def_map(scope_id)
-            .is_assertion_test_or_compound_condition_subexpression(range)
+            .is_boolean_test_subexpression(range)
     }
 
     /// Returns an iterator over the descendent scopes of `scope`.

@@ -2273,7 +2273,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 })
         ) {
             self.current_use_def_map_mut()
-                .record_compound_condition_test(test.range());
+                .record_boolean_test_context(test.range());
         }
     }
 
@@ -4206,7 +4206,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // of that branch. Code after the assertion starts from the condition's truthy flow.
 
                 self.current_use_def_map_mut()
-                    .record_assertion_test(test.range());
+                    .record_boolean_test_context(test.range());
                 self.visit_expr_with_context(test, ExpressionContext::Condition);
                 let condition_flow_snapshot = self.flow_snapshot_for_condition(test);
                 let predicate = self.build_predicate(test, ExpressionContext::Condition);

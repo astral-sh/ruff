@@ -5229,6 +5229,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_assert_statement(&mut self, assert: &ast::StmtAssert) {
         let db = self.db();
+        let env = self.program_environment();
         let ast::StmtAssert {
             range: _,
             node_index: _,
@@ -5238,15 +5239,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let test_ty = self.infer_standalone_expression(test, TypeContext::default());
 
-        let truthiness = test_ty
-            .try_bool(db, self.program_environment())
-            .unwrap_or_else(|err| {
-                err.report_diagnostic(&self.context, &**test);
-                err.fallback_truthiness()
-            });
+        let truthiness = test_ty.try_bool(db, env).unwrap_or_else(|err| {
+            err.report_diagnostic(&self.context, &**test);
+            err.fallback_truthiness()
+        });
 
         if self.should_check_condition_redundancy() {
-            self.check_condition_redundancy(test, test_ty, truthiness);
+            if test_ty.is_assignable_to(db, env, KnownClass::Int.to_instance(db, env)) {
+                // Boolean and integer assertions are often deliberate runtime checks. Their
+                // operands can still contain mistakes such as `assert func and flag`.
+                self.check_condition_operands(test);
+            } else {
+                self.check_condition_redundancy(test, test_ty, truthiness);
+            }
         }
 
         self.infer_optional_expression(msg.as_deref(), TypeContext::default());

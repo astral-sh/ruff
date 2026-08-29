@@ -5,8 +5,8 @@ always false.
 
 This rule is enabled by default, and is deliberately not comprehensive. In order to avoid false
 positives, it is not emitted on any expression where the boolean test is inferred as evaluating to
-`True` itself, `False` itself, or an exact integer such as `1` or `0`. It also is not emitted on
-any expression where the boolean test uses a walrus operator. These cases are all covered by
+`True` itself, `False` itself, or an exact integer such as `1` or `0`. It also is not emitted on any
+expression where the boolean test uses a walrus operator. These cases are all covered by
 `redundant-condition-strict`, a sibling rule to this one that is disabled by default and which
 exclusively covers cases that are exempted by this rule.
 
@@ -77,7 +77,10 @@ def test_my_data(data: list[int]):
 
 ## Boolean operators used to compute values
 
-The rule checks `and` and `or` operands when the expression is used as a condition: in an `if`, `elif`, `while`, or `assert` test, a conditional expression, a comprehension filter, a match guard, or as the operand of `not`. It does not flag `and` or `or` expressions used to compute values, such as selecting a function to call:
+The rule checks `and` and `or` operands when the expression is used as a condition: in an `if`,
+`elif`, `while`, or `assert` test, a conditional expression, a comprehension filter, a match guard,
+or as the operand of `not`. It does not flag `and` or `or` expressions used to compute values, such
+as selecting a function to call:
 
 ```py
 def f(): ...
@@ -110,4 +113,5 @@ def test_ask_to_continue():
     assert prompts == ["Continue? "]
 ```
 
-Unlike `and` and `or`, `not` explicitly converts its operand to a boolean, so the rule checks it in every context.
+Unlike `and` and `or`, `not` explicitly converts its operand to a boolean, so the rule checks it in
+every context.
