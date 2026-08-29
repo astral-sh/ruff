@@ -853,6 +853,66 @@ def g(x: B) -> None:
     reveal_type(x)  # revealed: list[A]
 ```
 
+### Invalid cyclic `TypeAliasType` definitions
+
+An alias cannot refer only to itself, either directly or through other aliases. The same check
+applies to aliases created by calling `TypeAliasType` as to aliases declared with `type`.
+
+```py
+from typing_extensions import TypeAliasType, TypeVar
+
+# error: [cyclic-type-alias-definition] "Cyclic definition of `Itself`"
+Itself = TypeAliasType("Itself", "Itself")
+
+# error: [cyclic-type-alias-definition] "Cyclic definition of `First`"
+First = TypeAliasType("First", "Second")
+# error: [cyclic-type-alias-definition] "Cyclic definition of `Second`"
+Second = TypeAliasType("Second", First)
+
+T = TypeVar("T")
+
+# error: [cyclic-type-alias-definition] "Cyclic definition of `GenericCycle`"
+GenericCycle = TypeAliasType("GenericCycle", "GenericCycle[T]", type_params=(T,))
+```
+
+### Cyclic unions created with `TypeAliasType`
+
+Adding a union member does not make a circular definition valid. In contrast, recursion through a
+container describes nested values and is allowed.
+
+```py
+from typing_extensions import TypeAliasType, TypeVar, Union
+
+T = TypeVar("T")
+
+# error: [cyclic-type-alias-definition] "Cyclic definition of `IntOr`"
+IntOr = TypeAliasType("IntOr", "int | IntOr")
+# error: [cyclic-type-alias-definition] "Cyclic definition of `GenericCycle`"
+GenericCycle = TypeAliasType("GenericCycle", T | "GenericCycle[str]", type_params=(T,))
+# error: [cyclic-type-alias-definition] "Cyclic definition of `UnionCycle`"
+UnionCycle = TypeAliasType("UnionCycle", Union[int, "UnionCycle"])
+
+Tree = TypeAliasType("Tree", T | "list[Tree[T]]", type_params=(T,))
+
+tree: Tree[int] = [1, [2]]
+```
+
+### Cycles across alias syntaxes
+
+A cycle is also invalid when it passes through aliases defined using different syntaxes.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing_extensions import TypeAliasType
+
+type Statement = Functional  # error: [cyclic-type-alias-definition]
+Functional = TypeAliasType("Functional", "Statement")  # error: [cyclic-type-alias-definition]
+```
+
 ## Cyclic aliases
 
 ### Self-referential
@@ -873,9 +933,13 @@ def g(x: RecursiveList):
 
 ### Invalid self-referential
 
+An alias cannot be a member of its own union. We still recover the non-recursive union members so
+that uses of the invalid alias can be checked.
+
 ```py
-# TODO emit a diagnostic on these two lines
+# error: [cyclic-type-alias-definition] "Cyclic definition of `IntOr`"
 type IntOr = int | IntOr
+# error: [cyclic-type-alias-definition] "Cyclic definition of `OrInt`"
 type OrInt = OrInt | int
 
 def f(x: IntOr, y: OrInt):
@@ -919,12 +983,87 @@ type I[T] = H[T]
 # It's not possible to create an element of this type, but it's not an error for now
 type DirectRecursiveList[T] = list[DirectRecursiveList[T]]
 
-# TODO: this should probably be a cyclic-type-alias-definition error
+# error: [cyclic-type-alias-definition] "Cyclic definition of `Foo`"
 type Foo[T] = list[T] | Bar[T]
+# error: [cyclic-type-alias-definition] "Cyclic definition of `Bar`"
 type Bar[T] = int | Foo[T]
 
 def _(x: Bar[int]):
     reveal_type(x)  # revealed: int | list[int]
+```
+
+### Cyclic unions with specialized aliases
+
+Changing the type arguments on a recursive reference does not break a cycle through unions. This
+also applies when the arguments become more deeply nested on each expansion.
+
+```py
+# error: [cyclic-type-alias-definition] "Cyclic definition of `Cycle`"
+type Cycle[T] = T | Cycle[str]
+# error: [cyclic-type-alias-definition] "Cyclic definition of `Growing`"
+type Growing[T] = T | Growing[list[T]]
+```
+
+Repeated applications of a non-recursive alias are valid. A generic alias can also introduce the
+container that makes recursion valid.
+
+```py
+type Identity[T] = T
+type Repeated = Identity[Identity[int]]
+type Items[T] = list[T]
+type Tree = int | Items[Tree]
+
+repeated: Repeated = 1
+tree: Tree = [1, [2]]
+```
+
+An unused type argument does not make the alias recursive: `Constant[T]` always expands to `int`.
+
+```py
+type Constant[T] = int
+type UnusedArgument = Constant[UnusedArgument]
+
+unused: UnusedArgument = 1
+```
+
+A generic alias that returns its type argument does not introduce a container and cannot break a
+cycle.
+
+```py
+# error: [cyclic-type-alias-definition] "Cyclic definition of `ThroughIdentity`"
+type ThroughIdentity = Identity[ThroughIdentity]
+```
+
+### Finite nested applications of recursive aliases
+
+A recursive alias can appear in its own type arguments without creating a cycle in its expansion.
+Here, expanding the two applications exposes `int`; the remaining recursion is inside `list`.
+
+```py
+type Recursive[T] = T | list[Recursive[list[T]]]
+type Repeated = Recursive[Recursive[int]]
+
+value: Repeated = 1
+```
+
+An exposed type argument can still close a cycle. Unlike the finite nested applications above, this
+argument leads back to the alias being defined.
+
+```py
+type Cycle = Recursive[Cycle]  # error: [cyclic-type-alias-definition]
+```
+
+The same rule applies to aliases created with `TypeAliasType`.
+
+```py
+from typing_extensions import TypeAliasType, TypeVar
+
+T = TypeVar("T")
+Functional = TypeAliasType("Functional", T | "list[Functional[list[T]]]", type_params=(T,))
+RepeatedFunctional = TypeAliasType("RepeatedFunctional", Functional[Functional[int]])
+
+functional_value: RepeatedFunctional = 1
+FunctionalCycle = TypeAliasType("FunctionalCycle", Functional["FunctionalCycle"])  # error: [cyclic-type-alias-definition]
 ```
 
 ### With legacy generic
@@ -1210,6 +1349,7 @@ terminate and preserve the alias at the recursive position.
 ```py
 from typing import Callable, Concatenate
 
+# error: [cyclic-type-alias-definition]
 type Recursive[T] = int | Recursive[list[T]]
 
 def _(value: Recursive[int]):
@@ -1442,9 +1582,12 @@ reveal_type(CallableGuard)  # revealed: TypeAliasType
 
 ### Recursive alias in binary operators doesn't stack overflow
 
+An invalid union cycle still recovers its non-recursive member when checking operators.
+
 ```py
 from typing import reveal_type
 
+# error: [cyclic-type-alias-definition]
 type A = int | A
 
 def foo(x: A):

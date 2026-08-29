@@ -3886,8 +3886,8 @@ def test_match_alias_ignores_custom_ne(flag: bool) -> str:
 
 ## Recursive enum aliases in value patterns
 
-An enum value pattern narrows a recursive alias to the matching member while preserving its
-`NewType` tag.
+An enum value pattern uses the non-recursive members of an invalid recursive alias, narrowing to the
+matching member while preserving its `NewType` tag.
 
 ```toml
 [environment]
@@ -3903,7 +3903,7 @@ class Number(IntEnum):
     TWO = 2
 
 BrandedNumber = NewType("BrandedNumber", Number)
-type RecursiveNumber = BrandedNumber | RecursiveNumber
+type RecursiveNumber = BrandedNumber | RecursiveNumber  # error: [cyclic-type-alias-definition]
 
 def match_recursive_branded_enum(value: RecursiveNumber) -> None:
     match value:
@@ -3917,7 +3917,7 @@ A recursive alias that changes its specialization can also contain values outsid
 `True` compares equal to `Number.ONE`, both branches preserve the possible boolean values.
 
 ```py
-type Changing[T] = T | Changing[bool]
+type Changing[T] = T | Changing[bool]  # error: [cyclic-type-alias-definition]
 
 def match_changing_specialization(value: Changing[BrandedNumber]) -> None:
     match value:

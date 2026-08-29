@@ -6959,7 +6959,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
-type GrowingAlias[T] = T | GrowingAlias[list[T]]
+type GrowingAlias[T] = T | GrowingAlias[list[T]]  # error: [cyclic-type-alias-definition]
 
 class Recursive[T](Protocol):
     def consume(self, value: T) -> None: ...
