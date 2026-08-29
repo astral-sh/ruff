@@ -1019,7 +1019,7 @@ pub(crate) fn suspicious_function_reference(checker: &Checker, func: &Expr) {
     suspicious_function(checker, func, None, func.range());
 }
 
-/// S301, S302, S303, S304, S305, S306, S307, S308, S310, S311, S312, S313, S314, S315, S316, S317, S318, S319, S320, S321, S323
+/// S102, S301, S302, S303, S304, S305, S306, S307, S308, S310, S311, S312, S313, S314, S315, S316, S317, S318, S319, S320, S321, S323
 fn suspicious_function(
     checker: &Checker,
     func: &Expr,
