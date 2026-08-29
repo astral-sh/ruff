@@ -552,6 +552,9 @@ variable, since it does not include the secondary annotation pointing to that ta
 ```py
 # error: [invalid-assignment] "Object of type `list[int | str]` is not assignable to `list[int]` (declared type of variable `middle`)"
 first, *middle, last = [1, 2, "wrong", 3]
+reveal_type(first)  # revealed: Literal[1]
+reveal_type(middle)  # revealed: list[int]
+reveal_type(last)  # revealed: Literal[3]
 ```
 
 ## Multiple incompatible captured elements
@@ -562,6 +565,9 @@ highlights the full capture.
 ```py
 middle: list[int]
 first, *middle, last = [1, "wrong", b"also wrong", 2]  # snapshot: invalid-assignment
+reveal_type(first)  # revealed: Literal[1]
+reveal_type(middle)  # revealed: list[int]
+reveal_type(last)  # revealed: Literal[2]
 ```
 
 ```snapshot
@@ -582,6 +588,9 @@ Concise diagnostics name the target variable when unpacking a tuple:
 ```py
 # error: [invalid-assignment] "Object of type `list[int | str | bytes]` is not assignable to `list[int]` (declared type of variable `middle`)"
 first, *middle, last = (0, 1, "wrong", 2, b"also wrong", 3, 4)
+reveal_type(first)  # revealed: Literal[0]
+reveal_type(middle)  # revealed: list[int]
+reveal_type(last)  # revealed: Literal[4]
 ```
 
 ## Captured elements with incompatible mutable types
@@ -593,6 +602,9 @@ collected element type is incompatible with the annotated element type.
 values: list[int] = [1]
 middle: list[list[object]]
 first, *middle, last = (0, [], values, 1)  # snapshot: invalid-assignment
+reveal_type(first)  # revealed: Literal[0]
+reveal_type(middle)  # revealed: list[list[object]]
+reveal_type(last)  # revealed: Literal[1]
 ```
 
 ```snapshot
@@ -617,6 +629,9 @@ list's type.
 ```py
 middle: list[int] | list[str]
 first, *middle, last = (0, 1, "wrong", 2)  # snapshot: invalid-assignment
+reveal_type(first)  # revealed: Literal[0]
+reveal_type(middle)  # revealed: list[int] | list[str]
+reveal_type(last)  # revealed: Literal[2]
 ```
 
 ```snapshot

@@ -398,10 +398,14 @@ middle: list[int] = [returns_any()]
 reveal_type(middle)  # revealed: list[int]
 
 first, *middle, last = (0, returns_any(), 1)
+reveal_type(first)  # revealed: Literal[0]
 reveal_type(middle)  # revealed: list[int]
+reveal_type(last)  # revealed: Literal[1]
 
 first, *middle, last = [0, returns_any(), 1]
+reveal_type(first)  # revealed: Literal[0]
 reveal_type(middle)  # revealed: list[int]
+reveal_type(last)  # revealed: Literal[1]
 ```
 
 Capturing elements from an existing tuple also creates a new list. The annotation supplies context
@@ -410,7 +414,10 @@ for that list without changing the source tuple's type.
 ```py
 values = (0, returns_any(), 1)
 first, *middle, last = values
+
+reveal_type(first)  # revealed: Literal[0]
 reveal_type(middle)  # revealed: list[int]
+reveal_type(last)  # revealed: Literal[1]
 reveal_type(values)  # revealed: tuple[Literal[0], Any, Literal[1]]
 ```
 
@@ -429,7 +436,9 @@ middle: list[int] = [1, returns_any(), 2]
 reveal_type(middle)  # revealed: list[int]
 
 first, *middle, last = (0, 1, returns_any(), 2, 3)
+reveal_type(first)  # revealed: Literal[0]
 reveal_type(middle)  # revealed: list[int]
+reveal_type(last)  # revealed: Literal[3]
 ```
 
 ## Unsound assignments to for-loop targets

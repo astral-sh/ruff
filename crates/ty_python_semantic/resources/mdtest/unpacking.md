@@ -518,12 +518,15 @@ promote to a variable-length tuple, whether collected directly or through a lite
 ```py
 unconstrained: object
 first, *unconstrained = (0, (1,), (2, 3))
+reveal_type(first)  # revealed: Literal[0]
 reveal_type(unconstrained)  # revealed: list[tuple[int, ...]]
 
 first, *unconstrained = (0, *((1,), (2, 3)))
+reveal_type(first)  # revealed: Literal[0]
 reveal_type(unconstrained)  # revealed: list[tuple[int, ...]]
 
 first, *unconstrained = [0, *[(1,), (2, 3)]]
+reveal_type(first)  # revealed: Literal[0]
 reveal_type(unconstrained)  # revealed: list[tuple[int, ...]]
 
 accepted: list[tuple[int, ...]] = unconstrained
@@ -547,9 +550,11 @@ literal expansion. Elements unpacked from an existing sequence also retain their
 def existing_tuples(value: tuple[int, int], source: tuple[tuple[int], tuple[int, int]]):
     rest: object
     first, *rest = (0, (1,), value)
+    reveal_type(first)  # revealed: Literal[0]
     reveal_type(rest)  # revealed: list[tuple[int] | tuple[int, int]]
 
     first, *rest = (0, *((1,), value))
+    reveal_type(first)  # revealed: Literal[0]
     reveal_type(rest)  # revealed: list[tuple[int] | tuple[int, int]]
 
     (*rest,) = source
@@ -1651,6 +1656,7 @@ reveal_type(first)  # revealed: Literal[0]
 reveal_type(rest)  # revealed: list[int]
 
 first, *rest = [0, 1, 2]
+reveal_type(first)  # revealed: Literal[0]
 reveal_type(rest)  # revealed: list[int]
 ```
 
@@ -1674,9 +1680,14 @@ An empty capture also uses the annotation, just as an empty list literal does.
 
 ```py
 first, *rest, last = (0, 1)
+reveal_type(first)  # revealed: Literal[0]
 reveal_type(rest)  # revealed: list[int]
+reveal_type(last)  # revealed: Literal[1]
+
 first, *rest, last = [0, 1]
+reveal_type(first)  # revealed: Literal[0]
 reveal_type(rest)  # revealed: list[int]
+reveal_type(last)  # revealed: Literal[1]
 ```
 
 ### Ordinary and nested targets
@@ -1708,6 +1719,7 @@ capture widens its integer element to `int`.
 
 ```py
 (first, *rest), *outer = ((0, [1], [2]), 3)
+reveal_type(first)  # revealed: Literal[0]
 reveal_type(rest)  # revealed: list[list[object]]
 reveal_type(outer)  # revealed: list[int]
 ```
@@ -1832,10 +1844,13 @@ def expanded(strings: list[str]):
     reveal_type(last)  # revealed: Literal[1]
 
     first, *rest = (0, *strings)
+    reveal_type(first)  # revealed: Literal[0]
     reveal_type(rest)  # revealed: list[str]
 
     (first, *rest), last = [[0, *strings], 1]
+    reveal_type(first)  # revealed: Literal[0]
     reveal_type(rest)  # revealed: list[str]
+    reveal_type(last)  # revealed: Literal[1]
 ```
 
 Literal expansions retain their individual element types, even when the enclosing list's type has
@@ -1846,6 +1861,7 @@ from typing import Literal
 
 rest: list[Literal["x"]]
 first, *rest = [0, *["x"]]
+reveal_type(first)  # revealed: Literal[0]
 reveal_type(rest)  # revealed: list[Literal["x"]]
 ```
 
@@ -1868,6 +1884,7 @@ the expansion is empty. Context must not make that position appear unambiguous.
 def ambiguous(values: list[int]):
     rest: list[int | str]
     first, second, *rest = [0, *values, "last"]
+    reveal_type(first)  # revealed: Literal[0]
     reveal_type(second)  # revealed: int | Literal["last"]
     reveal_type(rest)  # revealed: list[int | str]
 ```
@@ -1880,6 +1897,8 @@ def mutable_elements(rows: list[list[int]]):
     rest: list[list[object]]
     # error: [invalid-assignment]
     first, *rest = [0, *rows]
+    reveal_type(first)  # revealed: Literal[0]
+    reveal_type(rest)  # revealed: list[list[object]]
 ```
 
 ### Union sources
@@ -1962,7 +1981,9 @@ contributes no elements to `rest`, so its strings do not affect the list's eleme
 def capture(source: tuple[int, int, int] | tuple[str, str]):
     rest: list[int]
     first, *rest, last = source
+    reveal_type(first)  # revealed: int | str
     reveal_type(rest)  # revealed: list[int]
+    reveal_type(last)  # revealed: int | str
 ```
 
 If a tuple alternative is too short, the assignment reports a length error and infers the capture
@@ -1975,7 +1996,9 @@ def invalid_length(source: tuple[int, int, int] | tuple[int]):
     # error: [invalid-assignment] "Not enough values to unpack: Expected at least 2"
     # error: [invalid-assignment] "Object of type `list[int] | list[Unknown]` is not assignable to `list[object]`"
     first, *rest, last = source
+    reveal_type(first)  # revealed: int | Unknown
     reveal_type(rest)  # revealed: list[object]
+    reveal_type(last)  # revealed: int | Unknown
 ```
 
 A non-iterable alternative also prevents contextual inference of the capture.
@@ -1986,7 +2009,9 @@ def non_iterable(source: tuple[int, int, int] | int):
     # error: [not-iterable] "Object of type `int` is not iterable"
     # error: [invalid-assignment] "Object of type `list[int] | list[Unknown]` is not assignable to `list[object]`"
     first, *rest, last = source
+    reveal_type(first)  # revealed: int | Unknown
     reveal_type(rest)  # revealed: list[object]
+    reveal_type(last)  # revealed: int | Unknown
 ```
 
 ### Context for a generic source
@@ -2004,8 +2029,9 @@ def pair[T]() -> tuple[list[T], int]:
     return [], 0
 
 items: list[int]
-items, first = pair()
+items, last = pair()
 reveal_type(items)  # revealed: list[int]
+reveal_type(last)  # revealed: int
 ```
 
 ### Non-iterable annotations on starred targets
@@ -2016,6 +2042,7 @@ A non-iterable annotation on a starred target supplies no element-type context. 
 ```py
 rest: object
 first, *rest = (0, 1, 2)
+reveal_type(first)  # revealed: Literal[0]
 reveal_type(rest)  # revealed: list[int]
 ```
 
@@ -2027,6 +2054,7 @@ type.
 invalid: int
 # error: [invalid-assignment] "Object of type `list[int]` is not assignable to `int` (declared type of variable `invalid`)"
 first, *invalid = (0, 1, 2)
+reveal_type(first)  # revealed: Literal[0]
 reveal_type(invalid)  # revealed: int
 ```
 
@@ -2053,6 +2081,8 @@ an incorrect element type.
 numbers: list[int]
 # error: [invalid-assignment]
 numbers, other = (["wrong"], 0)
+reveal_type(numbers)  # revealed: list[int]
+reveal_type(other)  # revealed: Literal[0]
 ```
 
 ## Empty

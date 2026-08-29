@@ -442,6 +442,8 @@ class Payload(TypedDict):
 
 payload: Payload
 payload, other = ({"value": "wrong"}, 0)  # snapshot: invalid-argument-type
+reveal_type(payload)  # revealed: Payload
+reveal_type(other)  # revealed: Literal[0]
 ```
 
 ```snapshot
@@ -468,14 +470,31 @@ that the literal was checked against the annotation.
 ```py
 # error: [invalid-assignment]
 payload, other = ({"value": "wrong"}, *(0,))
+reveal_type(payload)  # revealed: Payload
+reveal_type(other)  # revealed: Literal[0]
 ```
 
 Unpacking a dictionary itself assigns its keys to the targets. The dictionary is not a `TypedDict`
 literal assigned to `payload`, so the incompatible key type still produces an assignment diagnostic.
 
 ```py
-# error: [invalid-assignment]
+# snapshot: invalid-assignment
 payload, other = {"value": 1, "other": 2}
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `str` is not assignable to `Payload`
+  --> src/mdtest_snippet.py:15:18
+   |
+15 | payload, other = {"value": 1, "other": 2}
+   | -------          ^^^^^^^^^^^^^^^^^^^^^^^^ Incompatible value of type `str`
+   | |
+   | Assigned to this variable
+   |
+  ::: src/mdtest_snippet.py:6:10
+   |
+ 6 | payload: Payload
+   |          ------- Declared type
 ```
 
 The same contextual check applies when the target is a `TypedDict` key. Tuple, list, and nested
