@@ -11,6 +11,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::Locator;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::fastapi::rules::is_fastapi_route_call;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
@@ -66,7 +67,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// [gettext]: https://docs.python.org/3/library/gettext.html
 /// [FastAPI path]: https://fastapi.tiangolo.com/tutorial/path-params/
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.2.1")]
+#[violation_metadata(preview_since = "v0.2.1", category = Category::Suspicious)]
 pub(crate) struct MissingFStringSyntax;
 
 impl AlwaysFixableViolation for MissingFStringSyntax {

@@ -4,7 +4,7 @@ use criterion::{
     BenchmarkId, Criterion, Throughput, criterion_group, criterion_main, measurement::WallTime,
 };
 use ruff_benchmark::{
-    LARGE_DATASET, NUMPY_CTYPESLIB, NUMPY_GLOBALS, PYDANTIC_TYPES, TestCase, UNICODE_PYPINYIN,
+    LARGE_DATASET, NUMPY_CTYPESLIB, NUMPY_GLOBALS, PYDANTIC_TYPES, TestFile, UNICODE_PYPINYIN,
 };
 use ruff_python_ast::token::TokenKind;
 use ruff_python_parser::{Mode, lexer};
@@ -26,13 +26,13 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
-fn create_test_cases() -> Vec<TestCase> {
+fn create_test_cases() -> Vec<TestFile> {
     vec![
-        TestCase::fast(NUMPY_GLOBALS.clone()),
-        TestCase::fast(UNICODE_PYPINYIN.clone()),
-        TestCase::normal(PYDANTIC_TYPES.clone()),
-        TestCase::normal(NUMPY_CTYPESLIB.clone()),
-        TestCase::slow(LARGE_DATASET.clone()),
+        NUMPY_GLOBALS.clone(),
+        UNICODE_PYPINYIN.clone(),
+        PYDANTIC_TYPES.clone(),
+        NUMPY_CTYPESLIB.clone(),
+        LARGE_DATASET.clone(),
     ]
 }
 

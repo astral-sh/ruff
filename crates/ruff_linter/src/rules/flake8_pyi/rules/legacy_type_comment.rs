@@ -9,6 +9,7 @@ use ruff_python_trivia::CommentRanges;
 use crate::Locator;
 use crate::Violation;
 use crate::checkers::ast::LintContext;
+use crate::codes::Category;
 use crate::preview::is_legacy_type_comment_in_non_stub_enabled;
 
 /// ## What it does
@@ -35,7 +36,7 @@ use crate::preview::is_legacy_type_comment_in_non_stub_enabled;
 /// x: int = 1
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.254")]
+#[violation_metadata(stable_since = "v0.0.254", category = Category::Suspicious)]
 pub(crate) struct LegacyTypeComment;
 
 impl Violation for LegacyTypeComment {

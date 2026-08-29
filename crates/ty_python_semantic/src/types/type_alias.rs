@@ -4,9 +4,9 @@ use std::fmt::Write;
 use crate::{
     Db, FxOrderSet,
     types::{
-        ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, GenericContext, KnownClass,
-        KnownInstanceType, MaterializationKind, Type, TypeContext, TypeMapping, TypeVarVariance,
-        TypingModule, definition_expression_type,
+        ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
+        GenericContext, KnownClass, KnownInstanceType, MaterializationKind, Type, TypeContext,
+        TypeMapping, TypeVarVariance, TypingModule, definition_expression_type,
         display::qualified_name_components_from_scope,
         generics::{ApplySpecialization, Specialization, bind_typevar},
         variance::VarianceInferable,
@@ -22,6 +22,81 @@ use ty_python_core::{
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast};
+
+impl<'db> Type<'db> {
+    /// Returns whether expanding aliases and unions can return to the same alias without entering
+    /// another type. For example, `type A = int | A` is invalid, but
+    /// `type A = int | list[A]` is a valid recursive alias.
+    pub(super) fn has_unguarded_alias_cycle(self, db: &'db dyn Db) -> bool {
+        AliasCycleSummary::from_type(db, self).cyclic
+    }
+}
+
+/// An alias's cycles and the type variables exposed outside containers and other enclosing types.
+/// Only arguments substituted for these variables can introduce an unguarded cycle.
+#[derive(Clone, Debug, Default, PartialEq, Eq, salsa::SalsaValue, get_size2::GetSize)]
+struct AliasCycleSummary<'db> {
+    cyclic: bool,
+    typevars: Box<[BoundTypeVarInstance<'db>]>,
+}
+
+impl<'db> AliasCycleSummary<'db> {
+    fn from_type(db: &'db dyn Db, ty: Type<'db>) -> Self {
+        let mut typevars = FxOrderSet::default();
+        let cyclic = Self::collect(db, ty, &mut typevars);
+        Self {
+            cyclic,
+            typevars: typevars.into_iter().collect(),
+        }
+    }
+
+    fn collect(
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
+    ) -> bool {
+        match ty {
+            Type::TypeAlias(alias) => {
+                // Inspect the definition independently of its arguments. Nested applications like
+                // `Recursive[Recursive[int]]` can be finite even when `Recursive` has growing
+                // recursive references beneath a container.
+                let summary = alias.cycle_summary(db);
+                if summary.cyclic {
+                    return true;
+                }
+                let specialization = alias.specialization(db).or_else(|| {
+                    alias
+                        .generic_context(db)
+                        .map(|context| context.default_specialization(db, None))
+                });
+
+                // Process supplied arguments after completing the definition's summary. An
+                // exposed argument can still close a cycle in the caller, as in
+                // `type Identity[T] = T; type Cycle = Identity[Cycle]`.
+                summary.typevars.iter().any(|&typevar| {
+                    if let Some(argument) =
+                        specialization.and_then(|specialization| specialization.get(db, typevar))
+                        && argument != Type::TypeVar(typevar)
+                    {
+                        Self::collect(db, argument, typevars)
+                    } else {
+                        typevars.insert(typevar);
+                        false
+                    }
+                })
+            }
+            Type::TypeVar(typevar) => {
+                typevars.insert(typevar);
+                false
+            }
+            Type::Union(union) => union
+                .elements(db)
+                .iter()
+                .any(|&element| Self::collect(db, element, typevars)),
+            _ => ty.is_divergent(),
+        }
+    }
+}
 
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct PEP695TypeAliasType<'db> {
@@ -330,6 +405,25 @@ pub(super) fn walk_type_alias_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 
 #[salsa::tracked]
 impl<'db> TypeAliasType<'db> {
+    /// Summarize an alias's raw definition once, sharing the result across references.
+    /// Specializations reuse this summary and check their exposed arguments separately.
+    fn cycle_summary(self, db: &'db dyn Db) -> &'db AliasCycleSummary<'db> {
+        #[salsa::tracked(
+            returns(ref),
+            cycle_initial=|_, _, _, ()| AliasCycleSummary { cyclic: true, ..AliasCycleSummary::default() },
+            heap_size=ruff_memory_usage::heap_size
+        )]
+        fn cycle_summary<'db>(
+            db: &'db dyn Db,
+            alias: TypeAliasType<'db>,
+            (): (),
+        ) -> AliasCycleSummary<'db> {
+            AliasCycleSummary::from_type(db, alias.raw_value_type(db))
+        }
+
+        cycle_summary(db, self.unspecialized(db), ())
+    }
+
     pub(super) fn known_class(self, db: &'db dyn Db) -> KnownClass {
         match self {
             TypeAliasType::PEP695(_) => KnownClass::TypeAliasType,

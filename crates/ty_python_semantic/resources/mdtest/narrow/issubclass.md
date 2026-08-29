@@ -307,7 +307,7 @@ from typing import Sequence
 def narrow_sequence_to_list(cls: type[Sequence[int]]) -> None:
     if issubclass(cls, list):
         reveal_type(cls)  # revealed: type[Sequence[int]] & type[Top[list[Unknown]]]
-        reveal_type(cls())  # revealed: Sequence[int] & Top[list[Unknown]]
+        reveal_type(cls())  # revealed: Top[list[Unknown & int]]
 ```
 
 ### Gradual mode

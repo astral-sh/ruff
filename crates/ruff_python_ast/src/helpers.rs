@@ -283,7 +283,16 @@ where
                 any_over_expr(left, &mut *func) || any_over_expr(right, &mut *func)
             }
             Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) => any_over_expr(operand, func),
-            Expr::Lambda(ast::ExprLambda { body, .. }) => any_over_expr(body, func),
+            Expr::Lambda(ast::ExprLambda {
+                body, parameters, ..
+            }) => {
+                parameters
+                    .iter()
+                    .flat_map(|parameters| parameters.iter_non_variadic_params())
+                    .filter_map(|parameter| parameter.default.as_deref())
+                    .any(|default| any_over_expr(default, &mut *func))
+                    || any_over_expr(body, func)
+            }
             Expr::If(ast::ExprIf {
                 test,
                 body,

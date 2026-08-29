@@ -1,4 +1,5 @@
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::airflow::helpers::{FunctionSignatureChange, is_method_in_subclass};
 use crate::{FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -36,7 +37,7 @@ use ruff_text_size::Ranged;
 /// collector.create_asset(uri="s3://bucket/key")
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.16.0")]
+#[violation_metadata(stable_since = "0.16.0", category = Category::Pedantic)]
 pub(crate) struct Airflow3IncompatibleFunctionSignature {
     function_name: String,
     change: FunctionSignatureChange,

@@ -6,6 +6,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 use crate::rules::flake8_comprehensions::helpers;
@@ -35,7 +36,7 @@ use crate::rules::flake8_comprehensions::helpers;
 /// This rule's fix is marked as unsafe, as it may occasionally drop comments
 /// when rewriting the call. In most cases, though, comments will be preserved.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.262")]
+#[violation_metadata(stable_since = "v0.0.262", category = Category::Complexity)]
 pub(crate) struct UnnecessaryLiteralWithinDictCall {
     kind: DictKind,
 }

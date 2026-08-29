@@ -4,6 +4,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for `jinja2` templates that use `autoescape=False`.
@@ -35,7 +36,7 @@ use crate::checkers::ast::Checker;
 /// - [Jinja documentation: API](https://jinja.palletsprojects.com/en/latest/api/#autoescaping)
 /// - [Common Weakness Enumeration: CWE-94](https://cwe.mitre.org/data/definitions/94.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.220")]
+#[violation_metadata(stable_since = "v0.0.220", category = Category::Security)]
 pub(crate) struct Jinja2AutoescapeFalse {
     value: bool,
 }

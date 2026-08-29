@@ -6,6 +6,7 @@ use ruff_python_stdlib::open_mode::OpenMode;
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
@@ -30,7 +31,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## References
 /// - [Python documentation: `open`](https://docs.python.org/3/library/functions.html#open)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.155")]
+#[violation_metadata(stable_since = "v0.0.155", category = Category::Pedantic)]
 pub(crate) struct RedundantOpenModes {
     replacement: String,
 }

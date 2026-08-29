@@ -3,6 +3,7 @@ use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::importer::ImportRequest;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
@@ -67,7 +68,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// - [Why `os.path.commonprefix` is deprecated](https://sethmlarson.dev/deprecate-confusing-apis-like-os-path-commonprefix)
 /// - [CPython deprecation issue](https://github.com/python/cpython/issues/144347)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.15.6")]
+#[violation_metadata(preview_since = "0.15.6", category = Category::Suspicious)]
 pub(crate) struct OsPathCommonprefix;
 
 impl Violation for OsPathCommonprefix {

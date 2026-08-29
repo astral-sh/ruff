@@ -8,6 +8,7 @@ use ruff_python_ast::{Expr, ExprCall, ExprName, Keyword, StmtAnnAssign, StmtAssi
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::preview::is_type_var_default_enabled;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 use ruff_python_ast::PythonVersion;
@@ -89,7 +90,7 @@ use super::{
 /// [UP047]: https://docs.astral.sh/ruff/rules/non-pep695-generic-function/
 /// [UP049]: https://docs.astral.sh/ruff/rules/private-type-parameter/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.283")]
+#[violation_metadata(stable_since = "v0.0.283", category = Category::Complexity)]
 pub(crate) struct NonPEP695TypeAlias {
     name: String,
     type_alias_kind: TypeAliasKind,

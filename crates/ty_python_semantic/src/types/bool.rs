@@ -27,6 +27,23 @@ impl<'db> Type<'db> {
         .unwrap_or_else(|err| err.fallback_truthiness())
     }
 
+    /// Like [`Self::bool`], but returns `None` for a type equivalent to [`Type::Never`].
+    ///
+    /// An uninhabited type cannot produce either boolean outcome, unlike
+    /// [`Truthiness::Ambiguous`]. Condition analysis uses this distinction to retain the
+    /// short-circuit outcome of expressions like `flag and stop()`, where `stop` returns `Never`.
+    /// The equivalence check also handles aliases and type variables bounded by `Never`.
+    ///
+    /// This classifies a value type, not a compound condition's evaluation. It preserves
+    /// [`Self::bool`]'s error fallback and conservative handling of `__bool__` returning `Never`.
+    pub(crate) fn bool_if_inhabited(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Option<Truthiness> {
+        (!self.is_equivalent_to(db, env, Type::Never)).then(|| self.bool(db, env))
+    }
+
     /// Resolves the boolean value of a type.
     ///
     /// This is used to determine the value that would be returned

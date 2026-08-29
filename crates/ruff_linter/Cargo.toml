@@ -1,6 +1,6 @@
 [package]
 name = "ruff_linter"
-version = "0.16.4"
+version = "0.16.5"
 description = "This is an internal component crate of Ruff"
 authors = { workspace = true }
 edition = { workspace = true }
@@ -40,7 +40,6 @@ compact_str = { workspace = true }
 fern = { workspace = true }
 glob = { workspace = true }
 globset = { workspace = true }
-hashbrown = { workspace = true }
 imperative = { workspace = true }
 is-macro = { workspace = true }
 itertools = { workspace = true }

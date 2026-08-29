@@ -26,10 +26,13 @@ use ty_module_resolver::{
 
 pub(crate) use self::callable::UpcastPolicy;
 use self::class::ClassInstanceFlags;
-use self::cyclic::ActiveRecursionDetector;
 pub use self::cyclic::CycleDetector;
 pub(crate) use self::cyclic::TypeTransformer;
-pub use self::dedicated::pytest::{FixtureBinding, fixture_bindings_for_parameter};
+use self::cyclic::{ActiveRecursionDetector, TypeIdentity};
+pub use self::dedicated::pytest::{
+    FixtureBinding, FixtureExposure, FixtureNameSource, fixture_bindings_for_parameter,
+    fixture_exposures_for_definition, pytest_global_plugin_files,
+};
 pub(crate) use self::diagnostic::TypeCheckDiagnostics;
 pub(crate) use self::diagnostic::register_lints;
 pub use self::diagnostic::{UNDEFINED_REVEAL, UNRESOLVED_REFERENCE};
@@ -100,15 +103,17 @@ use crate::types::tuple::TupleSpec;
 pub use crate::types::type_alias::TypeAliasType;
 pub use crate::types::type_form::TypeFormType;
 pub(crate) use crate::types::typed_dict::TypedDictType;
-pub(crate) use crate::types::typevar::TypeVarBoundOrConstraints;
-pub use crate::types::typevar::{
-    BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance, ParamSpecAttrKind, TypeVarKind,
+pub(crate) use crate::types::typevar::{
+    BindingContext, BoundTypeVarIdentity, ParamSpecAttrKind, TypeVarBoundOrConstraints,
     TypeVarNonce,
 };
+pub use crate::types::typevar::{BoundTypeVarInstance, TypeVarKind};
 use crate::types::typevar::{TypeVarInstance, TypeVarSet};
 pub use crate::types::variance::TypeVarVariance;
 use crate::types::variance::VarianceInferable;
-use crate::types::visitor::{any_over_type, dynamic_content};
+use crate::types::visitor::{
+    any_over_type, any_over_type_including_alias_arguments, dynamic_content,
+};
 use crate::{Db, FxOrderSet, HasType, NameKind, Program, SemanticModel};
 pub(crate) use class::{ClassLiteral, ClassType, GenericAlias, StaticClassLiteral};
 pub use class::{KnownClass, MethodDecorator, SlotDescriptorType};
@@ -1762,6 +1767,30 @@ fn recursive_type_normalize_type_guard_like<'db, T: TypeGuardLike<'db>>(
     Some(guard.with_type(db, ty))
 }
 
+/// Whether generator-type extraction supplies defaults for iterator annotations.
+///
+/// `Iterator[T]` and `AsyncIterator[T]` constrain yielded values but do not declare
+/// send or return types. Defaults used to check a generator body do not describe
+/// an arbitrary iterator's termination value or establish a send requirement.
+#[derive(Clone, Copy)]
+enum GeneratorTypeMode {
+    /// Extract parameters exposed by `Generator` or `AsyncGenerator`, without
+    /// supplying defaults for plain iterators.
+    ///
+    /// Use this when inferring a delegated iterator's `yield from` result or
+    /// determining whether an outer generator annotation declares a send type.
+    /// An `Iterator[T]` can terminate with `StopIteration(42)`, so its annotation
+    /// does not imply that the `yield from` result is `None`.
+    GeneratorOnly,
+    /// Also recognize `Iterator[T]` and `AsyncIterator[T]`, using `T` as the yield
+    /// type and `None` as both the send and return types.
+    ///
+    /// These defaults support inference of `yield` expressions and validation of
+    /// `yield` and `return` statements in generator bodies. Return-type extraction
+    /// also uses this mode, including when inferring `await` expressions.
+    IteratorDefaults,
+}
+
 #[derive(Debug, Clone, Copy)]
 #[expect(clippy::struct_field_names)]
 struct GeneratorTypes<'db> {
@@ -1856,7 +1885,7 @@ impl<'db> Type<'db> {
         })
     }
 
-    pub(crate) fn is_fully_static(self, db: &'db dyn Db, env: &ProgramEnvironment) -> bool {
+    fn is_fully_static(self, db: &'db dyn Db, env: &ProgramEnvironment) -> bool {
         dynamic_content(db, env, self).is_absent()
     }
 
@@ -1897,7 +1926,9 @@ impl<'db> Type<'db> {
             return false;
         }
 
-        any_over_type(db, env, self, false, |ty| {
+        // Type alias bodies cannot declare `Self`, but their explicit type arguments can
+        // contain the `Self` from an enclosing method or class.
+        any_over_type_including_alias_arguments(db, env, self, |ty| {
             ty.as_typevar().is_some_and(|tv| tv.typevar(db).is_self(db))
         })
     }
@@ -1954,7 +1985,7 @@ impl<'db> Type<'db> {
         self.cycle_normalized_impl(db, env, previous, cycle)
     }
 
-    pub(super) fn cycle_normalized_impl(
+    fn cycle_normalized_impl(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -2899,6 +2930,36 @@ impl<'db> Type<'db> {
             &TypeMapping::Promote(PromotionMode::On, PromotionKind::Regular),
             TypeContext::default(),
         )
+    }
+
+    /// Finalizes the element type of a mutable collection after combining its element evidence.
+    /// Literal types supplied by explicit annotations remain unpromotable. Without contextual
+    /// constraints, singleton types also widen: `[None]` permits later mutation, as does the list
+    /// created by `*rest, = (None,)`.
+    /// Evidence from later collection uses also passes through this helper, since those types
+    /// have not necessarily undergone the promotion applied to literal elements during inference.
+    fn promote_collection_element_type(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        allow_tuple_size_promotion: bool,
+        unconstrained: bool,
+    ) -> Type<'db> {
+        let ty = if unconstrained {
+            self.promote(db, env)
+        } else {
+            self
+        };
+        let ty = if allow_tuple_size_promotion {
+            ty.promote_tuple_size_in_union(db, env)
+        } else {
+            ty
+        };
+        if unconstrained {
+            ty.promote_singletons_recursively(db, env)
+        } else {
+            ty
+        }
     }
 
     /// Promote a top-level singleton type (like `None`, `EllipsisType`) to `T | Unknown`.
@@ -4770,7 +4831,7 @@ impl<'db> Type<'db> {
     /// See also: [`Type::static_member`]
     ///
     #[must_use]
-    pub(crate) fn member(
+    fn member(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -4794,6 +4855,80 @@ impl<'db> Type<'db> {
             MemberLookupPolicy::default(),
             None,
         )
+    }
+
+    /// Whether class access exposes an instance attribute whose type depends on the class's
+    /// type parameters. Specializing a class does not give it separate attribute storage:
+    /// `Box[int].value` and `Box[str].value` both refer to `Box.value` at runtime.
+    /// A `type[Box[int]]` receiver can refer to a concrete subclass with its own attributes,
+    /// so this restriction only applies to class literals and generic aliases.
+    fn has_generic_instance_attribute(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        name: &str,
+    ) -> bool {
+        let class = match self {
+            Type::Union(union) => {
+                return union
+                    .elements(db)
+                    .iter()
+                    .any(|element| element.has_generic_instance_attribute(db, env, name));
+            }
+            Type::ClassLiteral(class) => class,
+            Type::GenericAlias(alias) => alias.origin(db).into(),
+            _ => return false,
+        };
+        let Some(generic_context) = class
+            .as_static()
+            .and_then(|class| class.generic_context(db))
+        else {
+            return false;
+        };
+        // A metaclass data descriptor takes precedence over the instance declaration.
+        if class
+            .metaclass(db)
+            .find_name_in_mro_with_policy(db, env, name, MemberLookupPolicy::default())
+            .and_then(|member| member.place.ignore_possibly_undefined())
+            .is_some_and(|ty| ty.is_data_descriptor(db, env))
+        {
+            return false;
+        }
+        let member = Type::from(class.identity_specialization(db)).class_object_member(
+            db,
+            env,
+            name,
+            MemberLookupPolicy::default(),
+        );
+        let Place::Defined(DefinedPlace {
+            ty,
+            origin: TypeOrigin::Declared,
+            ..
+        }) = member.place
+        else {
+            return false;
+        };
+        if member.is_class_var() {
+            return false;
+        }
+        let ty = match ty.resolve_type_alias(db) {
+            Type::Union(union) if union.has_aliases(db) => union.expand_aliases(db, env),
+            ty => ty,
+        };
+        let alternatives = match &ty {
+            Type::Union(union) => union.elements(db),
+            _ => std::slice::from_ref(&ty),
+        };
+        alternatives.iter().any(|ty| {
+            // Descriptors define their own class-access behavior, but do not exempt other
+            // alternatives in a union from the restriction on generic instance storage.
+            ty.class_member(db, env, "__get__").is_undefined()
+                // Variance accounts for aliases without expanding recursive specializations,
+                // and ignores alias arguments that do not affect the resulting type.
+                && generic_context.variables(db).any(|typevar| {
+                    ty.variance_of(db, env, typevar.identity(db)) != TypeVarVariance::Bivariant
+                })
+        })
     }
 
     /// Similar to [`Type::member`], but allows the caller to specify what policy should be used
@@ -5750,7 +5885,7 @@ impl<'db> Type<'db> {
                 } else {
                     // Solve exact receiver constraints before checking the other arguments, but
                     // retain the receiver itself for call inference and receiver diagnostics.
-                    let overloads = signature.overloads.iter().map(|overload| {
+                    let overloads = signature.overloads.iter().flat_map(|overload| {
                         if overload.has_receiver_determined_method_typevar(db, env)
                             && let Some(specialized) = overload.specialize_for_bound_receiver(
                                 db,
@@ -5759,9 +5894,9 @@ impl<'db> Type<'db> {
                                 bound_method.typing_self_type(db),
                             )
                         {
-                            specialized
+                            specialized.overloads
                         } else {
-                            overload.clone()
+                            smallvec_inline![overload.clone()]
                         }
                     });
 
@@ -7180,14 +7315,12 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Get the return type of a `yield from …` expression where `self` is the type of the generator.
-    ///
-    /// This corresponds to the `ReturnT` parameter of the generic `typing.Generator[YieldT, SendT, ReturnT]`
-    /// protocol.
+    /// Extract the yield, send, and return types of a generator.
     fn generator_types(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        mode: GeneratorTypeMode,
     ) -> Option<GeneratorTypes<'db>> {
         // TODO: Ideally, we would first try to upcast `self` to an instance of `Generator` and *then*
         // match on the protocol instance to get the `ReturnType` type parameter. For now, implement
@@ -7217,8 +7350,9 @@ impl<'db> Type<'db> {
                     send_ty: Some(*send_ty),
                     return_ty: None,
                 })
-            } else if (class.is_known(db, KnownClass::Iterator)
-                || class.is_known(db, KnownClass::AsyncIterator))
+            } else if matches!(mode, GeneratorTypeMode::IteratorDefaults)
+                && (class.is_known(db, KnownClass::Iterator)
+                    || class.is_known(db, KnownClass::AsyncIterator))
                 && let [yield_ty] = specialization.types(db)
             {
                 let none = Type::none(db, env);
@@ -7245,14 +7379,14 @@ impl<'db> Type<'db> {
                         .materialization_kind(db)
                         .map_or(types, |kind| types.materialize(db, env, kind))
                 }),
-            Type::TypeAlias(alias) => alias.value_type(db).generator_types(db, env),
+            Type::TypeAlias(alias) => alias.value_type(db).generator_types(db, env, mode),
             Type::Union(union) => {
                 let mut yield_builder = Some(UnionBuilder::new(db, env));
                 let mut send_builder = Some(UnionBuilder::new(db, env));
                 let mut return_builder = Some(UnionBuilder::new(db, env));
 
                 for ty in union.elements(db) {
-                    let gt = ty.generator_types(db, env)?;
+                    let gt = ty.generator_types(db, env, mode)?;
                     match gt.yield_ty {
                         Some(ty) => yield_builder = yield_builder.map(|b| b.add(ty)),
                         None => yield_builder = None,
@@ -7283,7 +7417,7 @@ impl<'db> Type<'db> {
                 let mut any_success = false;
 
                 for ty in intersection.positive(db) {
-                    let Some(gt) = ty.generator_types(db, env) else {
+                    let Some(gt) = ty.generator_types(db, env, mode) else {
                         continue;
                     };
                     any_success = true;
@@ -7326,22 +7460,63 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Extract explicit send constraints from a generator function's return annotation.
+    ///
+    /// An iterator annotation does not expose `send`, but its presence in a union must not
+    /// discard the send constraints from other generator alternatives.
+    fn generator_annotation_send_type(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Option<Type<'db>> {
+        if let Some(union) = self.as_union_like(db) {
+            let mut send_types = union
+                .elements(db)
+                .iter()
+                .filter_map(|ty| ty.generator_annotation_send_type(db, env));
+            let first = send_types.next()?;
+            return Some(
+                send_types
+                    .fold(UnionBuilder::new(db, env).add(first), UnionBuilder::add)
+                    .build(),
+            );
+        }
+
+        self.generator_types(db, env, GeneratorTypeMode::GeneratorOnly)
+            .and_then(|types| types.send_ty)
+    }
+
     fn generator_return_type(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Option<Type<'db>> {
-        self.generator_types(db, env)
+        self.generator_types(db, env, GeneratorTypeMode::IteratorDefaults)
             .and_then(|generator_types| generator_types.return_ty)
     }
 
-    fn generator_send_type(
+    /// Find a delegated generator's send type that cannot accept `send_ty`.
+    ///
+    /// Check union members independently to preserve gradual assignability. Intersecting
+    /// `list[int]` and `list[str]` would give `Never`, incorrectly rejecting `list[Any]`.
+    fn incompatible_yield_from_send_type(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        send_ty: Type<'db>,
     ) -> Option<Type<'db>> {
-        self.generator_types(db, env)
+        if let Some(union) = self.as_union_like(db) {
+            return union
+                .elements(db)
+                .iter()
+                .find_map(|ty| ty.incompatible_yield_from_send_type(db, env, send_ty));
+        }
+
+        let inner_send_ty = self
+            .generator_types(db, env, GeneratorTypeMode::GeneratorOnly)
             .and_then(|generator_types| generator_types.send_ty)
+            .unwrap_or_else(|| Type::none(db, env));
+        (!send_ty.is_assignable_to(db, env, inner_send_ty)).then_some(inner_send_ty)
     }
 
     /// Return the instance approximation, discarding whether the projection is exact.
@@ -7709,114 +7884,161 @@ impl<'db> Type<'db> {
     /// See `Self::dunder_class` for more details.
     #[must_use]
     fn to_meta_type(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
-        match self {
-            Type::Never => Type::Never,
-            Type::NominalInstance(instance) => instance.to_meta_type(db, env),
-            Type::KnownInstance(known_instance) => known_instance.to_meta_type(db, env),
-            Type::SpecialForm(special_form) => special_form.to_meta_type(db, env),
-            Type::PropertyInstance(property) => {
-                property.instance_class(db).to_class_literal(db, env)
-            }
-            Type::SlotDescriptor(_) => KnownClass::MemberDescriptorType.to_class_literal(db, env),
-            Type::Union(union) => union.map(db, env, |ty| ty.to_meta_type(db, env)),
-            Type::TypeIs(_) | Type::TypeGuard(_) => KnownClass::Bool.to_class_literal(db, env),
-            Type::TypeForm(_) => Type::object().to_meta_type(db, env),
-            Type::LiteralValue(literal) => match literal.kind() {
-                LiteralValueTypeKind::Bool(_) => KnownClass::Bool.to_class_literal(db, env),
-                LiteralValueTypeKind::Bytes(_) => KnownClass::Bytes.to_class_literal(db, env),
-                LiteralValueTypeKind::Int(_) => KnownClass::Int.to_class_literal(db, env),
-                LiteralValueTypeKind::Enum(enum_literal) => {
-                    Type::ClassLiteral(enum_literal.enum_class(db))
-                }
-                LiteralValueTypeKind::String(_) | LiteralValueTypeKind::LiteralString => {
-                    KnownClass::Str.to_class_literal(db, env)
-                }
-            },
-            Type::FunctionLiteral(_) => KnownClass::FunctionType.to_class_literal(db, env),
-            Type::BoundMethod(_) => KnownClass::MethodType.to_class_literal(db, env),
-            Type::KnownBoundMethod(method) => method.class().to_class_literal(db, env),
-            Type::WrapperDescriptor(_) => {
-                KnownClass::WrapperDescriptorType.to_class_literal(db, env)
-            }
-            Type::DataclassDecorator(_) => KnownClass::FunctionType.to_class_literal(db, env),
-            Type::Callable(callable) if callable.is_function_like(db) => {
-                KnownClass::FunctionType.to_class_literal(db, env)
-            }
-            Type::Callable(_) | Type::DataclassTransformer(_) => {
-                KnownClass::Type.to_instance(db, env)
-            }
-            Type::ModuleLiteral(_) => KnownClass::ModuleType.to_class_literal(db, env),
-            Type::TypeVar(bound_typevar) => {
-                SubclassOfType::from(db, env, SubclassOfInner::TypeVar(bound_typevar))
-            }
-            Type::ClassLiteral(class) => class.metaclass(db),
-            Type::GenericAlias(alias) => ClassType::from(alias).metaclass(db),
-            Type::SubclassOf(subclass_of_ty) => subclass_of_ty.to_meta_type(db, env),
-            Type::Dynamic(dynamic) => {
-                SubclassOfType::from(db, env, SubclassOfInner::Dynamic(dynamic))
-            }
-            Type::Divergent(_) => self,
-            Type::Intersection(intersection) => {
-                if let Some(alternatives) = intersection.finite_alternative_union(db, env) {
-                    alternatives.to_meta_type(db, env)
-                } else {
-                    // Negative constraints do not generally constrain classes: `int & ~Literal[0]`
-                    // still has meta-type `type[int]`. Pure negations are bounded by `object`.
-                    let mut builder = IntersectionBuilder::new(db, env);
-                    for positive in intersection.positive_elements_or_object(db) {
-                        builder.add_positive_in_place(positive.to_meta_type(db, env));
-                    }
+        #[derive(Default)]
+        struct MetaTypeVisitor<'db> {
+            active_aliases: ActiveRecursionDetector<TypeAliasType<'db>>,
+            active_identities: ActiveRecursionDetector<TypeIdentity<'db>>,
+        }
 
-                    // An exclusion can narrow a type variable's union bound to a definite class:
-                    // `(T: C | None) & ~None` has meta-type `type[T] & type[C]`.
-                    // If the remaining bound is a class object, retain its metaclass instead.
-                    // Structural bounds need separate runtime-class handling (see `dunder_class`).
-                    if !intersection.negative(db).is_empty()
-                        && intersection
-                            .iter_positive(db)
-                            .any(|positive| matches!(positive, Type::TypeVar(_)))
-                        && let Some(narrowed_bound) = match intersection
-                            .with_expanded_typevars_and_newtypes(db, env)
-                        {
-                            bound @ (Type::NominalInstance(_)
-                            | Type::ClassLiteral(_)
-                            | Type::GenericAlias(_)) => Some(bound),
-                            bound @ Type::SubclassOf(subclass_of)
-                                if let SubclassOfInner::Class(_) = subclass_of.subclass_of() =>
-                            {
-                                Some(bound)
-                            }
-                            _ => None,
+        fn to_meta_type_inner<'db>(
+            db: &'db dyn Db,
+            env: &ProgramEnvironment<'db>,
+            ty: Type<'db>,
+            visitor: &MetaTypeVisitor<'db>,
+        ) -> Type<'db> {
+            match ty {
+                Type::Never => Type::Never,
+                Type::NominalInstance(instance) => instance.to_meta_type(db, env),
+                Type::KnownInstance(known_instance) => known_instance.to_meta_type(db, env),
+                Type::SpecialForm(special_form) => special_form.to_meta_type(db, env),
+                Type::PropertyInstance(property) => {
+                    property.instance_class(db).to_class_literal(db, env)
+                }
+                Type::SlotDescriptor(_) => {
+                    KnownClass::MemberDescriptorType.to_class_literal(db, env)
+                }
+                Type::Union(union) => {
+                    union.map(db, env, |ty| to_meta_type_inner(db, env, *ty, visitor))
+                }
+                Type::TypeIs(_) | Type::TypeGuard(_) => KnownClass::Bool.to_class_literal(db, env),
+                Type::TypeForm(_) => to_meta_type_inner(db, env, Type::object(), visitor),
+                Type::LiteralValue(literal) => match literal.kind() {
+                    LiteralValueTypeKind::Bool(_) => KnownClass::Bool.to_class_literal(db, env),
+                    LiteralValueTypeKind::Bytes(_) => KnownClass::Bytes.to_class_literal(db, env),
+                    LiteralValueTypeKind::Int(_) => KnownClass::Int.to_class_literal(db, env),
+                    LiteralValueTypeKind::Enum(enum_literal) => {
+                        Type::ClassLiteral(enum_literal.enum_class(db))
+                    }
+                    LiteralValueTypeKind::String(_) | LiteralValueTypeKind::LiteralString => {
+                        KnownClass::Str.to_class_literal(db, env)
+                    }
+                },
+                Type::FunctionLiteral(_) => KnownClass::FunctionType.to_class_literal(db, env),
+                Type::BoundMethod(_) => KnownClass::MethodType.to_class_literal(db, env),
+                Type::KnownBoundMethod(method) => method.class().to_class_literal(db, env),
+                Type::WrapperDescriptor(_) => {
+                    KnownClass::WrapperDescriptorType.to_class_literal(db, env)
+                }
+                Type::DataclassDecorator(_) => KnownClass::FunctionType.to_class_literal(db, env),
+                Type::Callable(callable) if callable.is_function_like(db) => {
+                    KnownClass::FunctionType.to_class_literal(db, env)
+                }
+                Type::Callable(_) | Type::DataclassTransformer(_) => {
+                    KnownClass::Type.to_instance(db, env)
+                }
+                Type::ModuleLiteral(_) => KnownClass::ModuleType.to_class_literal(db, env),
+                Type::TypeVar(bound_typevar) => {
+                    SubclassOfType::from(db, env, SubclassOfInner::TypeVar(bound_typevar))
+                }
+                Type::ClassLiteral(class) => class.metaclass(db),
+                Type::GenericAlias(alias) => ClassType::from(alias).metaclass(db),
+                Type::SubclassOf(subclass_of_ty) => subclass_of_ty.to_meta_type(db, env),
+                Type::Dynamic(dynamic) => {
+                    SubclassOfType::from(db, env, SubclassOfInner::Dynamic(dynamic))
+                }
+                Type::Divergent(_) => ty,
+                Type::Intersection(intersection) => {
+                    if let Some(alternatives) = intersection.finite_alternative_union(db, env) {
+                        to_meta_type_inner(db, env, alternatives, visitor)
+                    } else {
+                        // Negative constraints do not generally constrain classes: `int & ~Literal[0]`
+                        // still has meta-type `type[int]`. Pure negations are bounded by `object`.
+                        let mut builder = IntersectionBuilder::new(db, env);
+                        for positive in intersection.positive_elements_or_object(db) {
+                            builder.add_positive_in_place(to_meta_type_inner(
+                                db, env, positive, visitor,
+                            ));
                         }
-                    {
-                        builder.add_positive_in_place(narrowed_bound.to_meta_type(db, env));
-                    }
 
-                    builder.build()
+                        // An exclusion can narrow a type variable's union bound to a definite class:
+                        // `(T: C | None) & ~None` has meta-type `type[T] & type[C]`.
+                        // If the remaining bound is a class object, retain its metaclass instead.
+                        // Structural bounds need separate runtime-class handling (see `dunder_class`).
+                        if !intersection.negative(db).is_empty()
+                            && intersection
+                                .iter_positive(db)
+                                .any(|positive| matches!(positive, Type::TypeVar(_)))
+                            && let Some(narrowed_bound) =
+                                match intersection.with_expanded_typevars_and_newtypes(db, env) {
+                                    bound @ (Type::NominalInstance(_)
+                                    | Type::ClassLiteral(_)
+                                    | Type::GenericAlias(_)) => Some(bound),
+                                    bound @ Type::SubclassOf(subclass_of)
+                                        if let SubclassOfInner::Class(_) =
+                                            subclass_of.subclass_of() =>
+                                    {
+                                        Some(bound)
+                                    }
+                                    _ => None,
+                                }
+                        {
+                            builder.add_positive_in_place(to_meta_type_inner(
+                                db,
+                                env,
+                                narrowed_bound,
+                                visitor,
+                            ));
+                        }
+
+                        builder.build()
+                    }
                 }
-            }
-            Type::EnumComplement(complement) => complement
-                .remaining_literal_union(db, env)
-                .to_meta_type(db, env),
-            Type::AlwaysTruthy | Type::AlwaysFalsy => KnownClass::Type.to_instance(db, env),
-            Type::BoundSuper(_) => KnownClass::Super.to_class_literal(db, env),
-            // Class-member lookup on a protocol instance must use the protocol's nominal class.
-            // The structural `type[Protocol]` view is exposed by `dunder_class` and explicit
-            // `type[Protocol]` annotations instead.
-            Type::ProtocolInstance(protocol) => protocol.to_nominal_meta_type(db, env),
-            // `TypedDict` instances are instances of `dict` at runtime, but its important that we
-            // understand a more specific meta type in order to correctly handle `__getitem__`.
-            Type::TypedDict(typed_dict) => match typed_dict {
-                TypedDictType::Class(class) => SubclassOfType::from(db, env, class),
-                TypedDictType::Synthesized(_) => SubclassOfType::from(
+                Type::EnumComplement(complement) => to_meta_type_inner(
                     db,
                     env,
-                    todo_type!("TypedDict synthesized meta-type").expect_dynamic(),
+                    complement.remaining_literal_union(db, env),
+                    visitor,
                 ),
-            },
-            Type::TypeAlias(alias) => alias.value_type(db).to_meta_type(db, env),
-            Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db).to_meta_type(db, env),
+                Type::AlwaysTruthy | Type::AlwaysFalsy => KnownClass::Type.to_instance(db, env),
+                Type::BoundSuper(_) => KnownClass::Super.to_class_literal(db, env),
+                // Class-member lookup on a protocol instance must use the protocol's nominal class.
+                // The structural `type[Protocol]` view is exposed by `dunder_class` and explicit
+                // `type[Protocol]` annotations instead.
+                Type::ProtocolInstance(protocol) => protocol.to_nominal_meta_type(db, env),
+                // `TypedDict` instances are instances of `dict` at runtime, but its important that we
+                // understand a more specific meta type in order to correctly handle `__getitem__`.
+                Type::TypedDict(typed_dict) => match typed_dict {
+                    TypedDictType::Class(class) => SubclassOfType::from(db, env, class),
+                    TypedDictType::Synthesized(_) => SubclassOfType::from(
+                        db,
+                        env,
+                        todo_type!("TypedDict synthesized meta-type").expect_dynamic(),
+                    ),
+                },
+                Type::TypeAlias(alias) => {
+                    // A repeated specialization adds no new classes to a recursive union. Changing
+                    // type arguments can introduce other classes, so use an unconstrained metatype.
+                    // Do not cache results: a projection made while another alias is active can omit
+                    // classes that are only encountered later in that alias's union.
+                    visitor.active_aliases.visit(
+                        &alias,
+                        || Type::Never,
+                        || {
+                            visitor.active_identities.visit(
+                                &Type::TypeAlias(alias).to_type_identity(db),
+                                || KnownClass::Type.to_instance(db, env),
+                                || to_meta_type_inner(db, env, alias.value_type(db), visitor),
+                            )
+                        },
+                    )
+                }
+                Type::NewTypeInstance(newtype) => {
+                    to_meta_type_inner(db, env, newtype.concrete_base_type(db), visitor)
+                }
+            }
         }
+
+        to_meta_type_inner(db, env, self, &MetaTypeVisitor::default())
     }
 
     /// Get the type of the `__class__` attribute of this type.
@@ -8302,10 +8524,7 @@ impl<'db> Type<'db> {
                         if mapped == self || alias.value_type(db) == mapped {
                             self
                         } else if let TypeMapping::Materialize(materialization_kind) = type_mapping
-                            && matches!(
-                                self.to_type_identity(db),
-                                cyclic::TypeIdentity::RecursiveTypeAlias(_)
-                            )
+                            && alias.is_recursive(db)
                         {
                             Type::TypeAlias(
                                 alias.with_materialization_kind(db, Some(*materialization_kind)),
@@ -9322,6 +9541,7 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
             Type::ProtocolInstance(protocol_instance_type) => {
                 protocol_instance_type.variance_of(db, env, typevar)
             }
+            Type::TypedDict(typed_dict) => typed_dict.variance_of(db, env, typevar),
             // unions are covariant in their disjuncts
             Type::Union(union_type) => union_type
                 .elements(db)
@@ -9387,7 +9607,6 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
             | Type::AlwaysTruthy
             | Type::BoundSuper(_)
             | Type::TypeVar(_)
-            | Type::TypedDict(_)
             | Type::NewTypeInstance(_) => TypeVarVariance::Bivariant,
         };
 

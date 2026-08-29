@@ -680,3 +680,74 @@ reveal_type(test(fn0))  # revealed: tuple[()]
 reveal_type(test(fn1))  # revealed: tuple[str]
 reveal_type(test(fn2))  # revealed: tuple[str, bytes]
 ```
+
+## Missing unpack
+
+A legacy type variable tuple must also be unpacked. In a tuple annotation, it recovers as
+`*tuple[Unknown, ...]`, so `tuple[Ts]` becomes `tuple[Unknown, ...]`, rather than the single-element
+`tuple[Unknown]`. This avoids a cascading assignment error when the value is assigned to a correctly
+unpacked tuple annotation.
+
+```py
+from typing import Generic, TypeVarTuple
+
+Ts = TypeVarTuple("Ts")
+
+# error: [invalid-generic-class] "`TypeVarTuple` must be unpacked with `*` or `Unpack[]` when used as an argument to `Generic`"
+class Container(Generic[Ts]):
+    # error: [invalid-type-form] "Bare TypeVarTuple `Ts`"
+    def __init__(self, values: tuple[Ts]) -> None:
+        reveal_type(values)  # revealed: tuple[Unknown, ...]
+        self.values: tuple[*Ts] = values
+```
+
+`typing.Tuple` uses the same recovery as the built-in `tuple`.
+
+```py
+from typing import Tuple
+
+# error: [invalid-type-form] "Bare TypeVarTuple `Ts`"
+def legacy_tuple(values: Tuple[Ts]) -> None:
+    reveal_type(values)  # revealed: tuple[Unknown, ...]
+```
+
+## Missing unpack in implicit tuple aliases
+
+Tuple specializations used to define implicit type aliases also recover bare type variable tuples as
+`*tuple[Unknown, ...]`. This applies to both `tuple` and `typing.Tuple`.
+
+```py
+from typing import Tuple, TypeVarTuple
+
+Ts = TypeVarTuple("Ts")
+
+BuiltinAlias = tuple[Ts]  # error: [invalid-type-form] "Bare TypeVarTuple `Ts`"
+LegacyAlias = Tuple[Ts]  # error: [invalid-type-form] "Bare TypeVarTuple `Ts`"
+
+reveal_type(BuiltinAlias)  # revealed: <class 'tuple[Unknown, ...]'>
+reveal_type(LegacyAlias)  # revealed: <class 'tuple[Unknown, ...]'>
+
+def aliases(builtin: BuiltinAlias, legacy: LegacyAlias) -> None:
+    reveal_type(builtin)  # revealed: tuple[Unknown, ...]
+    reveal_type(legacy)  # revealed: tuple[Unknown, ...]
+```
+
+## Missing unpack in a union-valued tuple element
+
+In a homogeneous tuple annotation, a name that may refer to a bare type variable tuple or a valid
+element type preserves the valid alternative and recovers the bare pack to `Unknown`.
+
+```py
+from typing import TypeVarTuple
+
+Ts = TypeVarTuple("Ts")
+
+def condition() -> bool:
+    return True
+
+Element = Ts if condition() else int
+
+# error: [invalid-type-form] "Bare TypeVarTuple `Ts`"
+def homogeneous_union(values: tuple[Element, ...]) -> None:
+    reveal_type(values)  # revealed: tuple[Unknown | int, ...]
+```

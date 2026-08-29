@@ -710,7 +710,7 @@ class C:
 
 c_instance = C()
 reveal_type(c_instance.a)  # revealed: int
-reveal_type(c_instance.b)  # revealed: list[Literal[2, 3]]
+reveal_type(c_instance.b)  # revealed: list[int]
 ```
 
 #### Attributes defined in for-loop (unpacking)
@@ -1741,6 +1741,26 @@ class DeclaringBase:
 class InitializedDerived(DeclaringBase, metaclass=DerivedInitializingMeta): ...
 
 reveal_type(InitializedDerived.inherited_attr)  # revealed: int
+```
+
+An attribute initialized by the metaclass also takes precedence over an inherited generic
+declaration. Access through the generic subclass refers to the ordinary `int` attribute installed by
+the metaclass, so reads, writes, and deletion are allowed.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class GenericDeclaringBase(Generic[T]):
+    inherited_attr: T | int
+
+class GenericInitializedDerived(GenericDeclaringBase[T], metaclass=DerivedInitializingMeta): ...
+
+reveal_type(GenericInitializedDerived.inherited_attr)  # revealed: int
+reveal_type(GenericInitializedDerived[str].inherited_attr)  # revealed: int
+GenericInitializedDerived[str].inherited_attr = 2
+del GenericInitializedDerived[str].inherited_attr
 ```
 
 An assignment through `cls` in an arbitrary metaclass method also writes to the constructed class
@@ -4913,6 +4933,19 @@ class F:
         self.x = make_homogeneous_tuple(other.x)
 
 reveal_type(F().x)  # revealed: tuple[Divergent, ...]
+```
+
+A homogeneous tuple of `Divergent` has gradual length, so it is assignable to a fixed-length tuple.
+This allows a recursively inferred instance attribute to retain an empty tuple as its class default:
+
+```py
+class G:
+    x = ()
+
+    def f(self):
+        self.x = tuple(self.x)
+
+reveal_type(G().x)  # revealed: tuple[Divergent, ...]
 ```
 
 ## Attributes of standard library modules that aren't yet defined

@@ -60,14 +60,16 @@ use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_db::source::source_text;
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::find_node::covering_node;
+use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::{self as ast, OperatorPrecedence, ParameterWithDefault};
+use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
 use salsa::plumbing::AsId;
 use ty_module_resolver::{ImportingFile, KnownModule, ModuleName, file_to_module, resolve_module};
 
 use crate::place::{DefinedPlace, Definedness, Place, place_from_bindings};
 use crate::types::call::{Binding, CallArguments};
-use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
+use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::ConstraintSet;
 use crate::types::context::InferContext;
 use crate::types::cyclic::ActiveRecursionDetector;
@@ -336,7 +338,7 @@ impl<'db> OverloadLiteral<'db> {
         self.body_scope(db).python_file(db)
     }
 
-    pub(crate) fn program_file(self, db: &'db dyn Db) -> ProgramFile<'db> {
+    fn program_file(self, db: &'db dyn Db) -> ProgramFile<'db> {
         self.body_scope(db).program_file(db)
     }
 
@@ -1233,7 +1235,6 @@ impl<'db> FunctionType<'db> {
                             .signatures(db)
                             .with_inherited_generic_context(db, inherited_generic_context),
                         callable.kind(db),
-                        callable.provenance(db),
                     )
                 })
                 .collect()
@@ -1389,18 +1390,26 @@ impl<'db> FunctionType<'db> {
         self.literal(db).has_known_decorator(db, decorator)
     }
 
-    /// Returns true if this method is decorated with `@classmethod`, or if it is implicitly a
-    /// classmethod.
+    /// Returns true if every definition of this method uses `@classmethod`, or is implicitly a
+    /// classmethod. An inconsistently applied decorator does not affect method binding.
     pub(crate) fn is_classmethod(self, db: &'db dyn Db) -> bool {
-        self.iter_overloads_and_implementation(db)
-            .any(|overload| overload.is_classmethod(db))
+        let mut overloads = self.iter_overloads_and_implementation(db);
+        // Overload discovery can return no definitions during cycle recovery.
+        overloads
+            .next()
+            .is_some_and(|overload| overload.is_classmethod(db))
+            && overloads.all(|overload| overload.is_classmethod(db))
     }
 
-    /// Returns true if this method is decorated with `@staticmethod`, or if it is implicitly a
-    /// static method.
+    /// Returns true if every definition of this method uses `@staticmethod`, or is implicitly a
+    /// static method. An inconsistently applied decorator does not affect method binding.
     pub(crate) fn is_staticmethod(self, db: &'db dyn Db) -> bool {
-        self.iter_overloads_and_implementation(db)
-            .any(|overload| overload.is_staticmethod(db))
+        let mut overloads = self.iter_overloads_and_implementation(db);
+        // Overload discovery can return no definitions during cycle recovery.
+        overloads
+            .next()
+            .is_some_and(|overload| overload.is_staticmethod(db))
+            && overloads.all(|overload| overload.is_staticmethod(db))
     }
 
     /// Returns true if this function has an implicit `self` or `cls` receiver parameter.
@@ -1649,14 +1658,7 @@ impl<'db> FunctionType<'db> {
 
     /// Convert the `FunctionType` into a [`CallableType`].
     pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> CallableType<'db> {
-        CallableType::new(
-            db,
-            self.signature(db),
-            self.callable_type_kind(db),
-            CallableFunctionProvenance::from_function_return_annotation(
-                self.has_explicit_return_annotation(db),
-            ),
-        )
+        CallableType::new(db, self.signature(db), self.callable_type_kind(db))
     }
 
     /// Convert the `FunctionType` into a [`BoundMethodType`].
@@ -2688,22 +2690,36 @@ impl KnownFunction {
                         }
                         if let Some(value) = call_expression.arguments.find_argument_value("val", 1)
                         {
-                            let covering = covering_node(
-                                context.module().syntax().into(),
-                                call_expression.range(),
-                            );
-                            let needs_parens = covering
-                                .parent()
-                                .and_then(ast::AnyNodeRef::as_expr_ref)
-                                .is_some_and(|parent| {
-                                    let value_precedence = OperatorPrecedence::from_expr(value);
-                                    OperatorPrecedence::from_expr_ref(parent) >= value_precedence
-                                });
-                            let value_text = &source_text(db, context.file())[value.range()];
-                            let replacement = if needs_parens {
-                                format!("({value_text})")
+                            let source = source_text(db, context.file());
+                            let replacement = if let Some(range) = parenthesized_range(
+                                value.into(),
+                                (&call_expression.arguments).into(),
+                                context.module().tokens(),
+                            ) {
+                                source[range].to_string()
                             } else {
-                                value_text.to_string()
+                                let covering = covering_node(
+                                    context.module().syntax().into(),
+                                    call_expression.range(),
+                                );
+                                // A multiline value can rely on the call's parentheses for
+                                // line continuation, independently of operator precedence.
+                                let needs_parens = source.contains_line_break(value.range())
+                                    || covering
+                                        .parent()
+                                        .and_then(ast::AnyNodeRef::as_expr_ref)
+                                        .is_some_and(|parent| {
+                                            let value_precedence =
+                                                OperatorPrecedence::from_expr(value);
+                                            OperatorPrecedence::from_expr_ref(parent)
+                                                >= value_precedence
+                                        });
+                                let value_text = &source[value.range()];
+                                if needs_parens {
+                                    format!("({value_text})")
+                                } else {
+                                    value_text.to_string()
+                                }
                             };
                             diagnostic.help("Remove the redundant `cast`");
                             diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(

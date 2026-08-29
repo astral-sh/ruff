@@ -37,7 +37,7 @@ impl SyncNotificationHandler for DidChangeTextDocumentHandler {
             .with_failure_code(ErrorCode::InternalError)?;
 
         document
-            .update_text_document(session, content_changes, version)
+            .update_text_document(session, client, content_changes, version)
             .with_failure_code(ErrorCode::InternalError)?;
 
         publish_diagnostics_if_needed(&document, session, client);

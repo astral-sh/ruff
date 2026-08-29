@@ -17,7 +17,10 @@ impl Rule {
         let (linter, code) = Linter::parse_code(code).ok_or(FromCodeError::Unknown)?;
         linter
             .all_rules()
-            .find(|rule| rule.noqa_code().suffix() == code)
+            .find(|rule| {
+                rule.noqa_code()
+                    .is_some_and(|rule_code| rule_code.suffix() == code)
+            })
             .ok_or(FromCodeError::Unknown)
     }
 }
@@ -363,6 +366,31 @@ impl Rule {
         let name: &'static str = self.into();
         LintName::of(name)
     }
+
+    /// Return the rule's name, followed by its code in parentheses when available.
+    ///
+    /// For example:
+    ///
+    /// ```text
+    /// unused-import (F401)
+    /// ```
+    ///
+    /// When formatted with the `#` flag, both the name and code will be surrounded by backticks:
+    ///
+    /// ```text
+    /// `unused-import` (`F401`)
+    /// ```
+    pub fn name_and_code(&self) -> impl std::fmt::Display + use<> {
+        let rule = *self;
+        std::fmt::from_fn(move |f| {
+            let quote = if f.alternate() { "`" } else { "" };
+            write!(f, "{quote}{}{quote}", rule.name())?;
+            if let Some(code) = rule.noqa_code() {
+                write!(f, " ({quote}{code}{quote})")?;
+            }
+            Ok(())
+        })
+    }
 }
 
 /// Pairs of checks that shouldn't be enabled together.
@@ -397,12 +425,17 @@ pub mod clap_completion {
     impl RuleParser {
         fn values() -> impl Iterator<Item = PossibleValue> {
             Rule::iter().flat_map(|rule| {
-                let code = rule.noqa_code().to_string();
                 let name = rule.name().as_str();
-                [
-                    PossibleValue::new(&code).help(name),
-                    PossibleValue::new(name).help(code),
-                ]
+                let (code, name) = if let Some(code) = rule.noqa_code() {
+                    let code = code.to_string();
+                    (
+                        Some(PossibleValue::new(&code).help(name)),
+                        PossibleValue::new(name).help(code),
+                    )
+                } else {
+                    (None, PossibleValue::new(name))
+                };
+                code.into_iter().chain(std::iter::once(name))
             })
         }
     }
@@ -484,8 +517,12 @@ mod tests {
     #[test]
     fn check_code_serialization() {
         for rule in Rule::iter() {
+            let Some(code) = rule.noqa_code() else {
+                continue;
+            };
+
             assert!(
-                Rule::from_code(&format!("{}", rule.noqa_code())).is_ok(),
+                Rule::from_code(&code.to_string()).is_ok(),
                 "{rule:?} could not be round-trip serialized."
             );
         }
@@ -494,7 +531,10 @@ mod tests {
     #[test]
     fn linter_parse_code() {
         for rule in Rule::iter() {
-            let code = format!("{}", rule.noqa_code());
+            let Some(code) = rule.noqa_code() else {
+                continue;
+            };
+            let code = code.to_string();
             let (linter, rest) =
                 Linter::parse_code(&code).unwrap_or_else(|| panic!("couldn't parse {code:?}"));
             assert_eq!(code, format!("{}{rest}", linter.common_prefix()));

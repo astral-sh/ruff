@@ -4,6 +4,7 @@ use ruff_python_semantic::{Scope, ScopeKind};
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for functions that include too many local variables.
@@ -20,7 +21,7 @@ use crate::checkers::ast::Checker;
 /// ## Options
 /// - `lint.pylint.max-locals`
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.1.9")]
+#[violation_metadata(preview_since = "v0.1.9", category = Category::Pedantic)]
 pub(crate) struct TooManyLocals {
     current_amount: usize,
     max_amount: usize,

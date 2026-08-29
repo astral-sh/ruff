@@ -507,7 +507,7 @@ impl<'db> ImportingFile<'db> {
         }
     }
 
-    pub fn resolver_environment(self, db: &'db dyn Db) -> ResolverEnvironment<'db> {
+    pub(crate) fn resolver_environment(self, db: &'db dyn Db) -> ResolverEnvironment<'db> {
         match self {
             Self::ResolverFile(file) => file.environment(db),
             Self::File(_, resolver_environment) => resolver_environment,

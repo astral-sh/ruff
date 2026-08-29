@@ -684,6 +684,28 @@ static_assert(not is_assignable_to(tuple[int, *tuple[int, ...], int], tuple[int]
 static_assert(not is_assignable_to(tuple[int, *tuple[int, ...], int], tuple[int, int]))
 ```
 
+An unbounded homogeneous tuple whose element type is an alias of `Any` is also gradual. It is
+assignable to fixed-length tuples, including the empty tuple, even through a chain of aliases.
+
+```py
+type Dynamic = Any
+type DynamicAlias = Dynamic
+
+static_assert(is_assignable_to(tuple[Dynamic, ...], tuple[()]))
+static_assert(is_assignable_to(tuple[Dynamic, ...], tuple[int]))
+static_assert(is_assignable_to(tuple[DynamicAlias, ...], tuple[int, str]))
+```
+
+When unpacked into a mixed tuple, the gradual segment can supply additional elements, but the fixed
+prefix and suffix must still fit within the target and have compatible types.
+
+```py
+static_assert(is_assignable_to(tuple[int, *tuple[Dynamic, ...], str], tuple[int, bool, str]))
+static_assert(not is_assignable_to(tuple[int, *tuple[Dynamic, ...], str], tuple[int]))
+static_assert(not is_assignable_to(tuple[int, *tuple[Dynamic, ...], str], tuple[str, bool, str]))
+static_assert(not is_assignable_to(tuple[int, *tuple[Dynamic, ...], str], tuple[int, bool, int]))
+```
+
 ## Union types
 
 ```py

@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
-assertion_line: 133
 ---
 RUF012 Mutable default value for class attribute
   --> RUF012.py:9:34

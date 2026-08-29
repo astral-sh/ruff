@@ -236,13 +236,17 @@ reveal_type(CollectionsAbcCallable)  # revealed: <special-form 'collections.abc.
 
 ## Class-pattern behavior for `typing.Callable` and `collections.abc.Callable`
 
-At runtime, `collections.abc.Callable` is supported in `match` statement class patterns, however
-`typing.Callable` is not.
+At runtime, `collections.abc.Callable` is an instance of `type` and is supported in `match`
+statement class patterns; however, `typing.Callable` is not.
 
 ### `collections.abc.Callable`
 
 ```py
 from collections import abc
+
+def accepts_type(x: type): ...
+
+accepts_type(abc.Callable)  # no diagnostic
 
 def _(subj: None | abc.Callable[..., str]) -> None:
     match subj:
@@ -272,6 +276,10 @@ def _(subj: abc.Callable[..., str]) -> None:
 
 ```py
 import typing
+
+def accepts_type(x: type): ...
+
+accepts_type(typing.Callable)  # error: [invalid-argument-type]
 
 def _(subj: None | typing.Callable[..., str]) -> None:
     match subj:

@@ -6,6 +6,7 @@ use ruff_text_size::{TextRange, TextSize};
 
 use crate::Locator;
 use crate::checkers::ast::LintContext;
+use crate::codes::Category;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -30,7 +31,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Pylint documentation](https://pylint.pycqa.org/en/latest/user_guide/messages/refactor/empty-comment.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.5.0")]
+#[violation_metadata(stable_since = "0.5.0", category = Category::Style)]
 pub(crate) struct EmptyComment;
 
 impl Violation for EmptyComment {

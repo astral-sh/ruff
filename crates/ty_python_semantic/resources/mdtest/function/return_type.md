@@ -70,7 +70,7 @@ class Baz(Bar):
     # error: [empty-body]
     def f(self) -> int: ...
 
-T = TypeVar("T")
+T = TypeVar("T", covariant=True)
 
 class Qux(Protocol[T]):
     def f(self) -> int: ...
@@ -975,7 +975,7 @@ unsound-return-statement = "error"
 ```py
 from typing import Generator, Protocol, TypeVar
 
-T = TypeVar("T")
+T = TypeVar("T", covariant=True)
 
 class Phantom(Protocol[T]):
     def ping(self) -> int: ...
