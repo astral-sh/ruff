@@ -8,9 +8,10 @@ use ruff_python_ast::name::Name;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::types::attribute_write::{
-    AttributeWriteRequirement, ClassAttributeWriteMember, ExplicitAttributeWriteRequirement,
-    FallbackAttributeWriteRequirement, InstanceAttributeWriteMember,
-    ProtocolMemberWriteRequirement, attribute_write_requirement,
+    AttributeWriteRequirement, ClassAttributeWriteMember, DescriptorSetterDomain,
+    ExplicitAttributeWriteRequirement, FallbackAttributeWriteRequirement,
+    InstanceAttributeWriteMember, ProtocolMemberWriteRequirement, attribute_write_requirement,
+    descriptor_setter_domain,
 };
 use crate::types::call::{CallArguments, CallDunderError};
 use crate::types::overrides::{VariableKind, effective_superclass_variable_kind};
@@ -26,11 +27,10 @@ use crate::{
     types::{
         ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
         CallableType, ClassBase, ClassType, ErrorContext, FindLegacyTypeVarsVisitor, GenericAlias,
-        GenericContext, InstanceFallbackShadowsNonDataDescriptor, IntersectionType, KnownFunction,
-        KnownInstanceType, MaterializationKind, MemberLookupKey, MemberLookupPolicy, Parameter,
-        PropertyInstanceType, ProtocolInstanceType, SelfBinding, Signature, StaticClassLiteral,
-        Type, TypeMapping, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarVariance, UnionType,
-        VarianceInferable,
+        GenericContext, InstanceFallbackShadowsNonDataDescriptor, KnownFunction, KnownInstanceType,
+        MaterializationKind, MemberLookupKey, MemberLookupPolicy, Parameter, PropertyInstanceType,
+        ProtocolInstanceType, SelfBinding, Signature, StaticClassLiteral, Type, TypeMapping,
+        TypeQualifiers, TypeVarVariance, UnionType, VarianceInferable,
         constraints::{ConstraintSet, IteratorConstraintsExtension, OptionConstraintsExtension},
         context::InferContext,
         diagnostic::{INVALID_PROTOCOL, report_undeclared_protocol_member},
@@ -2335,182 +2335,6 @@ fn descriptor_decorated_protocol_member<'db>(
     };
 
     Some(ProtocolMemberData::property(read, write, definition))
-}
-
-#[derive(Copy, Clone)]
-enum DescriptorSetterDomain<'db> {
-    Missing,
-    Known(Type<'db>),
-    Deferred,
-}
-
-/// Derive the values accepted by every possible descriptor setter when they fit in [`Type`].
-fn descriptor_setter_domain<'db>(
-    db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
-    descriptor_ty: Type<'db>,
-    receiver_ty: Type<'db>,
-) -> DescriptorSetterDomain<'db> {
-    match descriptor_ty {
-        Type::Union(union) => {
-            let mut write_types = Vec::with_capacity(union.elements(db).len());
-            for descriptor_ty in union.elements(db) {
-                match single_descriptor_setter_domain(db, env, *descriptor_ty, receiver_ty) {
-                    DescriptorSetterDomain::Missing => return DescriptorSetterDomain::Missing,
-                    DescriptorSetterDomain::Known(write_ty) => write_types.push(write_ty),
-                    DescriptorSetterDomain::Deferred => return DescriptorSetterDomain::Deferred,
-                }
-            }
-            IntersectionType::bounded_from_elements(db, env, write_types).map_or(
-                DescriptorSetterDomain::Deferred,
-                DescriptorSetterDomain::Known,
-            )
-        }
-        _ => single_descriptor_setter_domain(db, env, descriptor_ty, receiver_ty),
-    }
-}
-
-/// Derive the values accepted by one possible runtime descriptor.
-fn single_descriptor_setter_domain<'db>(
-    db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
-    descriptor_ty: Type<'db>,
-    receiver_ty: Type<'db>,
-) -> DescriptorSetterDomain<'db> {
-    let Place::Defined(DefinedPlace {
-        ty: setter_ty,
-        definedness: Definedness::AlwaysDefined,
-        ..
-    }) = descriptor_ty
-        .member_lookup_with_policy(
-            db,
-            env,
-            "__set__",
-            MemberLookupPolicy::REQUIRE_CONCRETE | MemberLookupPolicy::NO_INSTANCE_FALLBACK,
-        )
-        .place
-    else {
-        return DescriptorSetterDomain::Missing;
-    };
-
-    let Some(callables) = setter_ty.try_upcast_to_callable(db, env) else {
-        return DescriptorSetterDomain::Deferred;
-    };
-    let mut callable_domains = Vec::with_capacity(callables.iter().len());
-    for callable in &callables {
-        let mut write_types = Vec::new();
-        for signature in callable.signatures(db) {
-            match descriptor_setter_signature_domain(db, env, signature, descriptor_ty, receiver_ty)
-            {
-                DescriptorSetterSignatureDomain::Inapplicable => {}
-                DescriptorSetterSignatureDomain::Known(write_ty) => write_types.push(write_ty),
-                DescriptorSetterSignatureDomain::Deferred => {
-                    return DescriptorSetterDomain::Deferred;
-                }
-            }
-        }
-        callable_domains.push(UnionType::from_elements(db, env, write_types));
-    }
-    IntersectionType::bounded_from_elements(db, env, callable_domains).map_or(
-        DescriptorSetterDomain::Deferred,
-        DescriptorSetterDomain::Known,
-    )
-}
-
-enum DescriptorSetterSignatureDomain<'db> {
-    Inapplicable,
-    Known(Type<'db>),
-    Deferred,
-}
-
-/// Derive the values accepted by one `__set__` overload when they fit in [`Type`].
-fn descriptor_setter_signature_domain<'db>(
-    db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
-    signature: &Signature<'db>,
-    descriptor_ty: Type<'db>,
-    receiver_ty: Type<'db>,
-) -> DescriptorSetterSignatureDomain<'db> {
-    let parameters = signature.parameters();
-    let missing_required_parameter = || {
-        if parameters.is_gradual() || parameters.as_slice().iter().any(Parameter::is_variadic) {
-            DescriptorSetterSignatureDomain::Deferred
-        } else {
-            DescriptorSetterSignatureDomain::Inapplicable
-        }
-    };
-    let Some(trailing_parameters) = parameters.as_slice().get(2..) else {
-        return missing_required_parameter();
-    };
-    if !trailing_parameters.iter().all(|parameter| {
-        parameter.has_default()
-            || ((parameters.is_standard() || parameters.is_gradual())
-                && (parameter.is_variadic() || parameter.is_keyword_variadic()))
-    }) {
-        return DescriptorSetterSignatureDomain::Inapplicable;
-    }
-
-    let Some(receiver_parameter) = parameters.get_positional(0) else {
-        return missing_required_parameter();
-    };
-    let receiver_parameter =
-        receiver_parameter
-            .annotated_type()
-            .bind_self_typevars(db, env, descriptor_ty);
-    if contains_signature_typevar(db, env, signature, receiver_parameter) {
-        return DescriptorSetterSignatureDomain::Deferred;
-    }
-    if !receiver_ty.is_assignable_to(db, env, receiver_parameter) {
-        return DescriptorSetterSignatureDomain::Inapplicable;
-    }
-
-    let Some(write_parameter) = parameters.get_positional(1) else {
-        return missing_required_parameter();
-    };
-    let write_ty = write_parameter
-        .annotated_type()
-        .bind_self_typevars(db, env, descriptor_ty);
-    if !contains_signature_typevar(db, env, signature, write_ty) {
-        return DescriptorSetterSignatureDomain::Known(write_ty);
-    }
-
-    let Type::TypeVar(typevar) = write_ty else {
-        return DescriptorSetterSignatureDomain::Deferred;
-    };
-    let Some(generic_context) = signature.generic_context else {
-        return DescriptorSetterSignatureDomain::Deferred;
-    };
-    if !generic_context.contains(db, typevar.identity(db))
-        || !typevar
-            .binding_context(db)
-            .definition()
-            .is_some_and(|definition| definition.kind(db).is_function_def())
-    {
-        return DescriptorSetterSignatureDomain::Deferred;
-    }
-
-    match typevar.typevar(db).bound_or_constraints(db, env) {
-        None => DescriptorSetterSignatureDomain::Known(Type::object()),
-        Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-            DescriptorSetterSignatureDomain::Known(bound.bind_self_typevars(db, env, descriptor_ty))
-        }
-        Some(TypeVarBoundOrConstraints::Constraints(_)) => {
-            DescriptorSetterSignatureDomain::Deferred
-        }
-    }
-}
-
-fn contains_signature_typevar<'db>(
-    db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
-    signature: &Signature<'db>,
-    ty: Type<'db>,
-) -> bool {
-    signature.generic_context.is_some_and(|generic_context| {
-        super::visitor::any_over_type(db, env, ty, true, |ty| {
-            matches!(ty, Type::TypeVar(typevar) if generic_context.contains(db, typevar.identity(db)))
-        })
-    })
 }
 
 fn property_set_type<'db>(
