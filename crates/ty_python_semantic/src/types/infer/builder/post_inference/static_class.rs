@@ -1,5 +1,5 @@
 use crate::Db;
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 use ruff_db::{
     diagnostic::{Annotation, SubDiagnostic, SubDiagnosticSeverity},
     source::source_text,
@@ -28,9 +28,9 @@ use crate::{
         diagnostic::{
             ABSTRACT_METHOD_IN_FINAL_CLASS, AbstractMethodAnnotationPolicy, CONFLICTING_METACLASS,
             CYCLIC_CLASS_DEFINITION, DATACLASS_FIELD_ORDER, DUPLICATE_KW_ONLY, FINAL_WITHOUT_VALUE,
-            INCONSISTENT_MRO, INVALID_ARGUMENT_TYPE, INVALID_BASE, INVALID_DATACLASS,
-            INVALID_GENERIC_CLASS, INVALID_GENERIC_ENUM, INVALID_METACLASS, INVALID_NAMED_TUPLE,
-            INVALID_PROTOCOL, INVALID_TYPED_DICT_HEADER, IncompatibleBases,
+            INCONSISTENT_MRO, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_BASE,
+            INVALID_DATACLASS, INVALID_GENERIC_CLASS, INVALID_GENERIC_ENUM, INVALID_METACLASS,
+            INVALID_NAMED_TUPLE, INVALID_PROTOCOL, INVALID_TYPED_DICT_HEADER, IncompatibleBases,
             SUBCLASS_OF_DATACLASS_WITH_ORDER, SUBCLASS_OF_FINAL_CLASS, UNKNOWN_ARGUMENT,
             report_bad_frozen_dataclass_inheritance, report_conflicting_metaclass_from_bases,
             report_duplicate_bases, report_inconsistent_generic_bases,
@@ -61,6 +61,73 @@ use crate::{attribute_assignments, types::diagnostic::abstract_method_span};
 use ty_python_core::{
     SemanticIndex, attribute_scopes, definition::DefinitionKind, scope::ScopeId, semantic_index,
 };
+
+/// Rejects slot layouts that fail while Python constructs the runtime class.
+///
+/// ```python
+/// class Example:
+///     __slots__ = ("value",)
+///     value = 1  # This class binding conflicts with the generated slot descriptor.
+/// ```
+///
+/// Stub declarations do not execute and therefore cannot create runtime class-namespace conflicts.
+fn check_class_slots<'db>(
+    context: &InferContext<'db, '_>,
+    class: StaticClassLiteral<'db>,
+    index: &SemanticIndex<'db>,
+) {
+    let db = context.db();
+    let has_explicit_slots = class.has_explicit_slots(db);
+
+    if has_explicit_slots
+        && class
+            .dataclass_params(db)
+            .is_some_and(|parameters| parameters.flags(db).contains(DataclassFlags::SLOTS))
+    {
+        if let Some(builder) = context.report_lint(&INVALID_DATACLASS, class.header_range(db)) {
+            builder.into_diagnostic(format_args!(
+                "Dataclass `{}` cannot combine `slots=True` with manually assigned `__slots__`",
+                class.name(db),
+            ));
+        }
+        return;
+    }
+
+    if !has_explicit_slots || context.in_stub() {
+        return;
+    }
+
+    let Some(slot_names) = class.slot_names(db) else {
+        return;
+    };
+
+    let scope_id = class.body_scope(db).file_scope_id(db);
+    let table = index.place_table(scope_id);
+    let use_def = index.use_def_map(scope_id);
+
+    for name in slot_names {
+        let Some(symbol) = table.symbol_id(name) else {
+            continue;
+        };
+
+        for binding in use_def.end_of_scope_symbol_bindings(symbol) {
+            if let Some(definition) = binding.binding.definition()
+                && !index.is_in_type_checking_block(
+                    scope_id,
+                    definition.kind(db).full_range(context.module()),
+                )
+                && let Some(builder) = context.report_lint(
+                    &INVALID_ASSIGNMENT,
+                    definition.focus_range(db, context.module()),
+                )
+            {
+                builder.into_diagnostic(format_args!(
+                    "Class variable `{name}` conflicts with an instance slot"
+                ));
+            }
+        }
+    }
+}
 
 /// Iterate over all static class definitions (created using `class` statements) to check that
 /// the definition is semantically valid and will not cause an exception to be raised at runtime.
@@ -106,6 +173,8 @@ pub(crate) fn check_static_class_definitions<'db>(
     }
 
     let env = context.program_environment();
+
+    check_class_slots(context, class, index);
 
     // Check that the class is not an enum and generic
     if is_enum_class_by_inheritance(db, env, class) && class.generic_context(db).is_some() {
@@ -625,27 +694,23 @@ pub(crate) fn check_static_class_definitions<'db>(
                 }
             }
             MetaclassErrorKind::Conflict {
-                candidate1:
+                candidate:
                     MetaclassCandidate {
                         metaclass: metaclass1,
-                        explicit_metaclass_of: class1,
+                        base: base1,
                     },
-                candidate2:
-                    MetaclassCandidate {
-                        metaclass: metaclass2,
-                        explicit_metaclass_of: class2,
-                    },
-                candidate1_is_base_class,
+                base_metaclass: metaclass2,
+                base: base2,
             } => {
-                if *candidate1_is_base_class {
+                if let Some(base1) = base1 {
                     report_conflicting_metaclass_from_bases(
                         context,
                         class_node.into(),
                         class.name(db),
                         *metaclass1,
-                        class1.name(db),
+                        base1.name(db),
                         *metaclass2,
-                        class2.name(db),
+                        base2.name(db),
                     );
                 } else if let Some(builder) =
                     context.report_lint(&CONFLICTING_METACLASS, class_node)
@@ -654,9 +719,14 @@ pub(crate) fn check_static_class_definitions<'db>(
                         Type::from(class),
                         Type::from(*metaclass1),
                         Type::from(*metaclass2),
-                        Type::from(*class2),
+                        Type::from(*base2),
                     ];
                     let settings = DisplaySettings::from_possibly_ambiguous_types(db, env, types);
+                    let base = if let ClassBase::Class(base) = base2 {
+                        Either::Left(base.class_literal(db).display_with(db, settings.clone()))
+                    } else {
+                        Either::Right(base2.display_with(db, env, settings.clone()))
+                    };
                     builder.into_diagnostic(format_args!(
                         "The metaclass of a derived class (`{class}`) \
                             must be a subclass of the metaclasses of all its bases, \
@@ -667,10 +737,7 @@ pub(crate) fn check_static_class_definitions<'db>(
                         metaclass_of_class = metaclass1
                             .class_literal(db)
                             .display_with(db, settings.clone()),
-                        metaclass_of_base = metaclass2
-                            .class_literal(db)
-                            .display_with(db, settings.clone()),
-                        base = ClassLiteral::Static(*class2).display_with(db, settings),
+                        metaclass_of_base = metaclass2.class_literal(db).display_with(db, settings),
                     ));
                 }
             }
@@ -1157,7 +1224,7 @@ fn check_class_namespace_against_metaclass_members<'db>(
 ) {
     let db = context.db();
     let env = context.program_environment();
-    let metaclass = class.metaclass(db);
+    let metaclass = class.inferred_metaclass(db).for_inheritance(db, env);
     if metaclass == KnownClass::Type.to_class_literal(db, env) {
         return;
     }

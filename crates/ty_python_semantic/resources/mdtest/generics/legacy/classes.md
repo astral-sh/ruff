@@ -168,10 +168,32 @@ reveal_type(generic_context(ExplicitInheritedGenericPartiallySpecialized))
 reveal_type(generic_context(ExplicitInheritedGenericPartiallySpecializedExtraTypevar))
 ```
 
+## Class-preserving decorators
+
+A decorator that returns its class argument preserves the generic context of a base class. A
+subclass can forward a type variable to the decorated base.
+
+```py
+import collections.abc
+from typing import Generic, TypeVar
+from ty_extensions._internal import generic_context
+
+T = TypeVar("T")
+
+@collections.abc.Mapping.register
+class Base(Generic[T]): ...
+
+reveal_type(generic_context(Base))  # revealed: ty_extensions._internal.GenericContext[T@Base]
+
+class Child(Base[T]): ...
+
+child: Child[int]
+```
+
 ## Specializing classes with unavailable generic context
 
 When an earlier error prevents ty from determining a class's generic context, specializing the class
-can emit a cascading `not-subscriptable` diagnostic.
+can emit a cascading `invalid-type-form` diagnostic.
 
 ### Conditional typing compatibility imports
 
@@ -192,34 +214,31 @@ T = typing.TypeVar("T")
 class Parser(typing.Generic[T]): ...
 
 # TODO: Remove this cascading error when https://github.com/astral-sh/ty/issues/1585 is fixed.
-parser: Parser[int]  # error: [not-subscriptable] "Cannot subscript non-generic type `<class 'Parser'>`"
+parser: Parser[int]  # error: [invalid-type-form] "Non-generic class `Parser` cannot be specialized in a type expression"
 ```
 
 ### Decorated generic bases
 
-A decorator that ty cannot fully understand can obscure the generic context of a base class. A
-subclass that forwards type variables to that base remains possibly generic.
+An unresolved decorator obscures the generic context of a base class. Specializing a subclass that
+forwards a type variable to that base currently produces a cascading error.
 
 ```py
-import collections.abc
 from typing import Generic, TypeVar
 from ty_extensions._internal import generic_context
 
-K = TypeVar("K")
-V = TypeVar("V")
+T = TypeVar("T")
 
-# error: [unresolved-attribute] "Class `Mapping` has no attribute `register`"
-@collections.abc.Mapping.register
-class Mapping(Generic[K, V]): ...
+# error: [unresolved-reference] "Name `unknown_decorator` used when not defined"
+@unknown_decorator
+class Base(Generic[T]): ...
 
-# TODO: Invalid decorator causes us to lose the generic context from the class...
-reveal_type(generic_context(Mapping))  # revealed: None
+reveal_type(generic_context(Base))  # revealed: None
 
-class FrozenDict(Mapping[K, V]): ...
+class Child(Base[T]): ...
 
-# TODO: ...which then causes us to emit this
-# error: [not-subscriptable] "Cannot subscript non-generic type `<class 'FrozenDict'>`"
-mapping: FrozenDict[str, int]
+# TODO: Avoid this cascading error when the base's generic context is unavailable.
+# error: [invalid-type-form] "Non-generic class `Child` cannot be specialized in a type expression"
+child: Child[int]
 ```
 
 ### Unresolved generic bases
@@ -235,7 +254,7 @@ T = TypeVar("T")
 
 class Child(Base[T]): ...
 
-# error: [not-subscriptable] "Cannot subscript non-generic type `<class 'Child'>`"
+# error: [invalid-type-form] "Non-generic class `Child` cannot be specialized in a type expression"
 child: Child[int]
 ```
 
@@ -274,7 +293,7 @@ T = TypeVar("T")
 # error: [unsupported-base]
 class Child(Base[T]): ...
 
-# error: [not-subscriptable] "Cannot subscript non-generic type `<class 'Child'>`"
+# error: [invalid-type-form] "Non-generic class `Child` cannot be specialized in a type expression"
 child: Child[int]
 ```
 
@@ -1164,6 +1183,102 @@ reveal_type(generic_context(c))
 reveal_type(generic_context(c.method))
 # revealed: ty_extensions._internal.GenericContext[Self@generic_method, U@generic_method]
 reveal_type(generic_context(c.generic_method))
+```
+
+## Members of constrained type variables
+
+Member lookup distributes over the constraints of a non-inferable type variable. Each member is
+bound to its matching receiver alternative, while `Self` continues to refer to the original type
+variable.
+
+```py
+from typing_extensions import Self, TypeVar
+
+class TextStream:
+    @property
+    def closed(self) -> bool:
+        return False
+
+    def close(self) -> None: ...
+    def clone(self) -> Self:
+        raise NotImplementedError
+
+class BinaryStream:
+    @property
+    def closed(self) -> bool:
+        return False
+
+    def close(self) -> None: ...
+    def clone(self) -> Self:
+        raise NotImplementedError
+
+Stream = TypeVar("Stream", TextStream, BinaryStream)
+
+def use_stream(stream: Stream) -> Stream:
+    # revealed: bool
+    reveal_type(stream.closed)
+    # revealed: (bound method Stream@use_stream when TextStream.close() -> None) | (bound method Stream@use_stream when BinaryStream.close() -> None)
+    reveal_type(stream.close)
+    if not stream.closed:
+        stream.close()
+    return stream.clone()
+```
+
+## Members of type variables with union upper bounds
+
+Unlike constraints, a union upper bound does not enumerate the possible assignments of a type
+variable. Member lookup can still use the upper bound to prove that a common member is available.
+
+```py
+from typing_extensions import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Base(Generic[T]):
+    @property
+    def value(self) -> T:
+        raise NotImplementedError
+
+class A(Base[int]): ...
+class B(Base[str]): ...
+
+U = TypeVar("U", bound=A | B)
+
+def use_union(value: A | B):
+    # revealed: int | str
+    reveal_type(value.value)
+
+def use_typevar(value: U):
+    # TODO: This should not error once member lookup supports union upper bounds.
+    # error: [invalid-attribute-access] "Invalid access to descriptor attribute `value`"
+    # revealed: int | str
+    reveal_type(value.value)
+```
+
+## Correlated constrained receiver calls
+
+Multiple occurrences of the same constrained type variable have the same assignment. Distributing
+member lookup over the receiver's constraints must preserve that correlation when checking method
+arguments.
+
+```py
+from typing_extensions import TypeVar
+
+class A:
+    def combine(self, other: "A") -> None: ...
+
+class B:
+    def combine(self, other: "B") -> None: ...
+
+T = TypeVar("T", A, B)
+
+def combine(left: T, right: T) -> None:
+    # revealed: (bound method T@combine when A.combine(other: A) -> None) | (bound method T@combine when B.combine(other: B) -> None)
+    reveal_type(left.combine)
+    # TODO: This should not error once callable binding preserves the receiver branch correlation.
+    # error: [invalid-argument-type] "Argument to bound method `A.combine` is incorrect"
+    # error: [invalid-argument-type] "Argument to bound method `B.combine` is incorrect"
+    left.combine(right)
 ```
 
 ## Specializations propagate

@@ -1,3 +1,5 @@
+use std::debug_assert_matches;
+
 use crate::Db;
 use crate::place::{DefinedPlace, Place, builtins_symbol, global_symbol, known_module_symbol};
 use crate::types::enums::is_single_member_enum;
@@ -218,10 +220,12 @@ fn create_bound_method<'db>(
     builtins_class: Type<'db>,
 ) -> Type<'db> {
     let env = ProgramEnvironment::from_program(program);
+    let self_instance = builtins_class.to_instance_approximation(db, &env).unwrap();
     Type::BoundMethod(BoundMethodType::new(
         db,
         function.expect_function_literal(),
-        builtins_class.to_instance_approximation(db, &env).unwrap(),
+        self_instance,
+        self_instance,
     ))
 }
 
@@ -257,8 +261,10 @@ impl Ty {
                 let ty = known_module_symbol(db, env, KnownModule::Dataclasses, "MISSING")
                     .place
                     .expect_type();
-                debug_assert!(
-                    matches!(ty, Type::NominalInstance(instance) if is_single_member_enum(db, instance.class_literal(db, env)))
+                debug_assert_matches!(
+                    ty,
+                    Type::NominalInstance(instance)
+                        if is_single_member_enum(db, instance.class_literal(db, env))
                 );
                 ty
             }

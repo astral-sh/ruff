@@ -1,6 +1,6 @@
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+requires = ["uv_build>=0.12.3,<0.13"]
+build-backend = "uv_build"
 
 [project]
 name = "ruff-ecosystem"
@@ -14,3 +14,12 @@ ruff-ecosystem = "ruff_ecosystem.cli:entrypoint"
 [tool.ruff.lint]
 ignore = ["T100"]
 preview = true
+
+[tool.uv]
+no-build = true
+no-binary-package = ["ruff-ecosystem"]
+# Pin the isolated build environment for source-build exceptions.
+build-constraint-dependencies = ["uv-build==0.12.3"]
+
+[tool.uv.build-backend]
+module-root = ""

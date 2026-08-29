@@ -36,7 +36,7 @@ use ruff_python_stdlib::identifiers::is_identifier;
 
 use super::UnionType;
 use super::call::CallArguments;
-use super::constraints::{ConstraintSetBuilder, PathBounds, Solutions};
+use super::constraints::{ConstraintSetBuilder, PathBoundSolution, PathBounds, Solutions};
 use super::equality::{
     ComparisonSoundnessPolicy, equality_exclusion_constraint, equality_truthiness,
     evaluate_type_equality, evaluate_type_inequality,
@@ -116,7 +116,11 @@ pub(crate) fn infer_narrowing_constraints<'db>(
     }
 }
 
-#[salsa::tracked(returns(as_ref), heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(
+    returns(as_ref),
+    cycle_initial=|_, _, _| None,
+    heap_size=ruff_memory_usage::heap_size,
+)]
 fn all_narrowing_constraints_for_pattern<'db>(
     db: &'db dyn Db,
     pattern: PatternPredicate<'db>,
@@ -149,7 +153,11 @@ fn all_narrowing_constraints_for_expression<'db>(
     }
 }
 
-#[salsa::tracked(returns(as_ref), heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(
+    returns(as_ref),
+    cycle_initial=|_, _, _| None,
+    heap_size=ruff_memory_usage::heap_size,
+)]
 fn all_negative_narrowing_constraints_for_pattern<'db>(
     db: &'db dyn Db,
     pattern: PatternPredicate<'db>,
@@ -162,7 +170,11 @@ fn all_negative_narrowing_constraints_for_pattern<'db>(
         .finish()
 }
 
-#[salsa::tracked(returns(as_ref), heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(
+    returns(as_ref),
+    cycle_initial=|_, _, _, _| None,
+    heap_size=ruff_memory_usage::heap_size,
+)]
 fn all_narrowing_constraints_for_subject_element_pattern<'db>(
     db: &'db dyn Db,
     pattern: PatternPredicate<'db>,
@@ -683,6 +695,7 @@ impl ClassInfoConstraintFunction {
             | Type::FunctionLiteral(_)
             | Type::ProtocolInstance(_)
             | Type::PropertyInstance(_)
+            | Type::SlotDescriptor(_)
             | Type::KnownInstance(_)
             | Type::TypeIs(_)
             | Type::TypeGuard(_)
@@ -867,12 +880,9 @@ fn specialize_narrowing_target_from_intersection<'db>(
         combined_constraints.intersect(db, &constraints, base_constraint);
     }
 
-    let solutions = combined_constraints.solutions(
-        db,
-        env,
-        &constraints,
-        generic_context.inferable_typevars(db),
-    );
+    let solutions = combined_constraints
+        .solutions(db, env, generic_context.inferable_typevars(db))
+        .ok()?;
     let specialized_class =
         specialize_generic_class_from_solutions(db, env, target_class, solutions)?;
     Some(Type::instance(db, env, specialized_class))
@@ -2372,12 +2382,12 @@ impl<'db> PatternSuccessAnalyzer<'db> {
             )
             .solve_with(|variance, path_bound| {
                 let Some(lower) = path_bound.lower else {
-                    return Ok(None);
+                    return PathBoundSolution::Unsolved;
                 };
                 if variance != TypeVarVariance::Invariant
                     || path_bound.upper.materialize_exact(db, &self.env) != lower
                 {
-                    return Ok(None);
+                    return PathBoundSolution::Unsolved;
                 }
                 PathBounds::default_solve(db, &self.env, &constraints, path_bound)
             });
@@ -5045,6 +5055,7 @@ fn is_or_contains_typeddict<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
         | Type::SpecialForm(_)
         | Type::KnownInstance(_)
         | Type::PropertyInstance(_)
+        | Type::SlotDescriptor(_)
         | Type::AlwaysTruthy
         | Type::AlwaysFalsy
         | Type::LiteralValue(_)
@@ -5223,6 +5234,7 @@ fn all_matching_typeddict_fields_have_literal_types<'db>(
         | Type::SpecialForm(_)
         | Type::KnownInstance(_)
         | Type::PropertyInstance(_)
+        | Type::SlotDescriptor(_)
         | Type::AlwaysTruthy
         | Type::AlwaysFalsy
         | Type::LiteralValue(_)
@@ -5293,14 +5305,6 @@ impl<'db> NarrowingEvaluatorExtension<'db> for NarrowingEvaluator<'_, 'db> {
         base_type: Type<'db>,
         place: ScopedPlaceId,
     ) -> Type<'db> {
-        narrow_type_by_constraint(
-            db,
-            env,
-            self.narrowing_constraints(),
-            self.predicates(),
-            self.constraint(),
-            base_type,
-            place,
-        )
+        narrow_type_by_constraint(db, env, self, base_type, place)
     }
 }

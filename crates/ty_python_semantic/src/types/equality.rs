@@ -1853,14 +1853,16 @@ impl KnownComparisonSemantics {
             (KnownClass::Tuple, Self::Tuple),
             (KnownClass::Dict, Self::Dict),
         ] {
-            if dunder
-                == lookup_dunder(
+            if same_member_implementation(
+                db,
+                dunder,
+                lookup_dunder(
                     db,
                     env,
                     known_class.to_class_literal(db, env),
                     operator.dunder(),
-                )
-            {
+                ),
+            ) {
                 return Some(semantics);
             }
         }
@@ -1900,6 +1902,28 @@ fn has_known_identity_comparison_semantics<'db>(
                 && KnownComparisonSemantics::of_type(db, env, ty, operator)
                     == Some(KnownComparisonSemantics::Object)
         }
+    }
+}
+
+/// Return whether two looked-up members originate from the same implementation.
+fn same_member_implementation(
+    db: &dyn Db,
+    left: PlaceAndQualifiers<'_>,
+    right: PlaceAndQualifiers<'_>,
+) -> bool {
+    if left.qualifiers != right.qualifiers {
+        return false;
+    }
+
+    match (
+        left.ignore_possibly_undefined()
+            .and_then(Type::as_function_literal),
+        right
+            .ignore_possibly_undefined()
+            .and_then(Type::as_function_literal),
+    ) {
+        (Some(left), Some(right)) => left.literal(db) == right.literal(db),
+        _ => left == right,
     }
 }
 

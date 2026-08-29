@@ -83,7 +83,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             deferred_state
         };
 
-        let previous_deferred_state = std::mem::replace(&mut self.deferred_state, state);
+        let previous_deferred_state = self.replace_deferred_state(state);
         let previous_check_unbound_typevars = self
             .context
             .inference_flags

@@ -97,6 +97,44 @@ expression.
 reveal_type(lambda a=lambda x, y: 0: 2)  # revealed: (a=...) -> Literal[2]
 ```
 
+## Defaults in string annotations
+
+`Annotated` metadata can contain lambdas. Names in their default values must still be resolved in
+the enclosing string annotation, whose expressions are not part of the module's semantic index.
+
+```py
+from typing_extensions import Annotated
+
+def f(value: "Annotated[int, lambda default=int: None]"):
+    reveal_type(value)  # revealed: int
+
+# error: [unresolved-reference]
+def invalid(value: "Annotated[int, lambda default=missing: None]"): ...
+```
+
+Nested lambdas must retain the same context. Dynamic classes created in a default value also need
+the original string annotation as their source anchor.
+
+```py
+def nested(value: "Annotated[int, lambda outer=(lambda inner=int: None): None]"):
+    reveal_type(value)  # revealed: int
+
+def dynamic(value: "Annotated[int, lambda default=type('C', (), {}): None]"):
+    reveal_type(value)  # revealed: int
+```
+
+## Defaults in stub string annotations
+
+Stub files must preserve the string-annotation context too, including for positional-only and
+keyword-only defaults.
+
+```pyi
+from typing_extensions import Annotated
+
+value: "Annotated[int, lambda positional=int, /, normal=str, *, keyword=bytes: None]"
+reveal_type(value)  # revealed: int
+```
+
 ## Assignment
 
 This does not enumerate all combinations of parameter kinds as that should be covered by the

@@ -1665,7 +1665,7 @@ impl<'db> FunctionType<'db> {
         db: &'db dyn Db,
         self_instance: Type<'db>,
     ) -> BoundMethodType<'db> {
-        BoundMethodType::new(db, self, self_instance)
+        BoundMethodType::new(db, self, self_instance, self_instance)
     }
 
     pub(crate) fn find_legacy_typevars_impl(
@@ -2068,6 +2068,7 @@ fn is_instance_truthiness<'db>(
         | Type::SpecialForm(..)
         | Type::KnownInstance(..)
         | Type::PropertyInstance(..)
+        | Type::SlotDescriptor(..)
         | Type::AlwaysTruthy
         | Type::AlwaysFalsy
         | Type::BoundSuper(..)

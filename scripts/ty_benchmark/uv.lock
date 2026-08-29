@@ -6,6 +6,9 @@ requires-python = ">=3.14"
 exclude-newer = "0001-01-01T00:00:00Z" # This has no effect and is included for backwards compatibility when using relative exclude-newer values.
 exclude-newer-span = "P7D"
 
+[manifest]
+build-constraints = [{ name = "uv-build", specifier = "==0.12.3" }]
+
 [[package]]
 name = "attrs"
 version = "26.1.0"

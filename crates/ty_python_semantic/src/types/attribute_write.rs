@@ -282,6 +282,7 @@ pub(super) fn attribute_write_requirement<'db>(
         | Type::SpecialForm(..)
         | Type::KnownInstance(..)
         | Type::PropertyInstance(..)
+        | Type::SlotDescriptor(..)
         | Type::FunctionLiteral(..)
         | Type::Callable(..)
         | Type::BoundMethod(_)
@@ -377,19 +378,37 @@ fn instance_attribute_write_member_requirement<'db>(
         PlaceAndQualifiers {
             place: Place::Defined(DefinedPlace { ty, .. }),
             qualifiers,
-        } => InstanceAttributeWriteMember::Explicit {
-            member: explicit_attribute_write_requirement(
+        } => {
+            let member = explicit_attribute_write_requirement(
                 db,
                 env,
                 object_ty,
                 attribute,
                 ty.bind_self_typevars(db, env, object_ty),
                 qualifiers,
-            ),
-            fallback: receiver_fallback.map(|fallback| {
-                instance_fallback_write_requirement(db, env, object_ty, attribute, fallback)
-            }),
-        },
+            );
+
+            // Built-in classes can expose writable C-level descriptors that their stubs model as
+            // plain annotations. Only a known slot layout rules out that additional storage.
+            if matches!(
+                member,
+                ExplicitAttributeWriteRequirement::AssignableTo { .. }
+            ) && ty.is_definitely_non_data_descriptor(db, env)
+                && object_ty
+                    .nominal_class(db, env)
+                    .and_then(|class| class.static_class_literal(db))
+                    .is_some_and(|(class, _)| class.lacks_instance_storage(db, attribute))
+            {
+                return InstanceAttributeWriteMember::SetAttr;
+            }
+
+            InstanceAttributeWriteMember::Explicit {
+                member,
+                fallback: receiver_fallback.map(|fallback| {
+                    instance_fallback_write_requirement(db, env, object_ty, attribute, fallback)
+                }),
+            }
+        }
         PlaceAndQualifiers {
             place: Place::Undefined,
             ..
@@ -542,6 +561,9 @@ fn possible_class_attribute_descriptor<'db>(
 
 /// Convert an explicitly resolved member into either a descriptor call or a direct type check.
 ///
+/// A slot descriptor writes directly to instance storage, so the receiver's instance declaration
+/// determines its write type even when a subclass overrides the slot owner's annotation.
+///
 /// Descriptor behavior is used only when `__set__` is found with
 /// [`MemberLookupPolicy::REQUIRE_CONCRETE`]. An `Any` or `Unknown` base therefore does not cause an
 /// ordinary attribute to be treated as a data descriptor.
@@ -553,6 +575,24 @@ fn explicit_attribute_write_requirement<'db>(
     attr_ty: Type<'db>,
     qualifiers: TypeQualifiers,
 ) -> ExplicitAttributeWriteRequirement<'db> {
+    if matches!(attr_ty, Type::SlotDescriptor(_))
+        && let PlaceAndQualifiers {
+            place: Place::Defined(DefinedPlace { ty, .. }),
+            qualifiers: storage_qualifiers,
+        } = object_ty.instance_member(db, env, attribute)
+    {
+        return ExplicitAttributeWriteRequirement::AssignableTo {
+            ty: effective_write_type(
+                db,
+                env,
+                object_ty,
+                attribute,
+                ty.bind_self_typevars(db, env, object_ty),
+            ),
+            qualifiers: qualifiers.union(storage_qualifiers),
+        };
+    }
+
     if let Place::Defined(DefinedPlace { ty: setter_ty, .. }) = attr_ty
         .class_member_with_policy(db, env, "__set__", MemberLookupPolicy::REQUIRE_CONCRETE)
         .place
@@ -789,6 +829,7 @@ pub(super) fn assignment_attribute_members<'db>(
             | Type::SpecialForm(..)
             | Type::KnownInstance(..)
             | Type::PropertyInstance(..)
+            | Type::SlotDescriptor(..)
             | Type::FunctionLiteral(..)
             | Type::Callable(..)
             | Type::BoundMethod(_)

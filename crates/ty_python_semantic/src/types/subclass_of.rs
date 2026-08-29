@@ -314,9 +314,9 @@ impl<'db> SubclassOfType<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Type<'db> {
-        // This kind of looks like a no-op, but it's not. For `type[C]` where `C` has metaclass
-        // `M`, `to_meta_type` transforms `type[C]` to `type[M]`, and then `to_instance` makes it
-        // just `M`. And `to_meta_type` will transpose `type[T: C]` into `T: type[C]`, collapse to
+        // This kind of looks like a no-op, but it's not. For `type[C]` with guaranteed metaclass
+        // `M`, `to_meta_type` produces `type[M]`, and then `to_instance` makes it just `M`.
+        // And `to_meta_type` will transpose `type[T: C]` into `T: type[C]`, collapse to
         // the upper bound `type[C]`, and transform that to the meta-type `type[M]`, which
         // `to_instance` then resolves to `M`.
         self.to_meta_type(db, env)
@@ -326,7 +326,8 @@ impl<'db> SubclassOfType<'db> {
 
     /// Compute the metatype of this `type[T]`.
     ///
-    /// For `type[C]` where `C` is a concrete class, this returns `type[metaclass(C)]`.
+    /// For a concrete class `C`, this returns `type[M]`, where `M` is its guaranteed metaclass,
+    /// excluding the lookup-only typeshed fallback.
     /// For `type[T]` where `T` is a `TypeVar`, this computes the metatype based on the
     /// `TypeVar`'s bounds or constraints.
     pub(crate) fn to_meta_type(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
@@ -334,10 +335,12 @@ impl<'db> SubclassOfType<'db> {
             SubclassOfInner::Dynamic(dynamic) => {
                 SubclassOfType::from(db, env, SubclassOfInner::Dynamic(dynamic))
             }
-            SubclassOfInner::Class(class) => {
-                SubclassOfType::try_from_type(db, env, class.metaclass(db))
-                    .unwrap_or(SubclassOfType::subclass_of_unknown())
-            }
+            SubclassOfInner::Class(class) => SubclassOfType::try_from_type(
+                db,
+                env,
+                class.inferred_metaclass(db).for_inheritance(db, env),
+            )
+            .unwrap_or(SubclassOfType::subclass_of_unknown()),
             // Structural implementations of a protocol can have arbitrary metaclasses. The only
             // guaranteed upper bound is therefore `type`, not the protocol origin's metaclass.
             SubclassOfInner::Protocol(_) => KnownClass::Type.to_subclass_of(db, env),

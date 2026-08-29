@@ -5,6 +5,7 @@ use ruff_python_ast::PythonVersion;
 use ruff_ranged_value::{RangedValue, ValueSource, ValueSourceGuard};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::Bound;
+use std::fmt;
 use std::ops::Deref;
 use strum::IntoEnumIterator;
 use thiserror::Error;
@@ -130,21 +131,62 @@ pub(super) fn resolve_requires_python_lower_bound(
     ))
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug)]
 pub enum ResolveRequiresPythonError {
-    #[error("The major version `{0}` is larger than the maximum supported value 255")]
     TooLargeMajor(u64),
-    #[error("The minor version `{0}` is larger than the maximum supported value 255")]
     TooLargeMinor(u64),
-    #[error(
-        "value `{0}` does not contain a lower bound. Add a lower bound to indicate the minimum compatible Python version (e.g., `>=3.13`) or specify a version in `environment.python-version`."
-    )]
     NoLowerBound(String),
-    #[error(
-        "value `{0}` does not include any Python version supported by ty. Adjust `requires-python` to include a supported Python 3 version or specify `environment.python-version` explicitly."
-    )]
     NoSupportedVersion(String),
 }
+
+impl ResolveRequiresPythonError {
+    /// Returns the error without its optional recovery guidance.
+    pub fn message(&self) -> String {
+        match self {
+            Self::TooLargeMajor(version) => {
+                format!(
+                    "The major version `{version}` is larger than the maximum supported value 255"
+                )
+            }
+            Self::TooLargeMinor(version) => {
+                format!(
+                    "The minor version `{version}` is larger than the maximum supported value 255"
+                )
+            }
+            Self::NoLowerBound(version) => {
+                format!("value `{version}` does not contain a lower bound")
+            }
+            Self::NoSupportedVersion(version) => {
+                format!("value `{version}` does not include any Python version supported by ty")
+            }
+        }
+    }
+
+    /// Returns guidance for fixing the invalid Python requirement, when available.
+    pub fn hint(&self) -> Option<&'static str> {
+        match self {
+            Self::NoLowerBound(_) => Some(
+                "Add a lower bound to indicate the minimum compatible Python version (e.g., `>=3.13`) or specify a version in `environment.python-version`.",
+            ),
+            Self::NoSupportedVersion(_) => Some(
+                "Adjust `requires-python` to include a supported Python 3 version or specify `environment.python-version` explicitly.",
+            ),
+            Self::TooLargeMajor(_) | Self::TooLargeMinor(_) => None,
+        }
+    }
+}
+
+impl fmt::Display for ResolveRequiresPythonError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.message())?;
+        if let Some(hint) = self.hint() {
+            write!(f, ". {hint}")?;
+        }
+        Ok(())
+    }
+}
+
+impl std::error::Error for ResolveRequiresPythonError {}
 
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]

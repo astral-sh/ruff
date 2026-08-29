@@ -130,7 +130,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// This generates a warning if it is.
     /// Returns whether this is an optional argument.
     fn check_optional_argument(&self, parameter: &Parameter<'_>, range: TextRange) -> bool {
-        let has_default_value = parameter.default_type().is_some();
+        let has_default_value = parameter.default_type(self.db()).is_some();
         if has_default_value {
             if let Some(builder) = self
                 .context

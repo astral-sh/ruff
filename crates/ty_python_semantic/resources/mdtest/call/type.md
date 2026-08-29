@@ -81,6 +81,14 @@ takes_foo1(foo2)
 takes_foo2(foo1)
 ```
 
+The classes also remain distinct when both calls occur in the same string annotation, even though
+the surrounding type expression is invalid:
+
+```py
+# error: [invalid-type-form] "Only simple names and dotted names can be subscripted in type expressions"
+distinct: "static_assert(type('Foo', (), {}) is not type('Foo', (), {}))[int]"
+```
+
 ## Instances and attribute access
 
 Instances of dynamic classes are typed with the synthesized class name. Attributes from all base
@@ -975,6 +983,31 @@ bases: tuple[type[C], type[D]] = (C, D)
 Y = type("Y", bases, {})
 ```
 
+When a class is created in the metadata of a string annotation, the diagnostic still highlights the
+class-creation call, not the whole string:
+
+```py
+from typing import Annotated
+
+# snapshot: instance-layout-conflict
+bad: "Annotated[int, type('Bad', (A, B), {})]"
+```
+
+```snapshot
+error[instance-layout-conflict]: Class will raise `TypeError` at runtime due to incompatible bases
+  --> src/mdtest_snippet.py:21:22
+   |
+21 | bad: "Annotated[int, type('Bad', (A, B), {})]"
+   |                      ^^^^^^^^^^^^^^^^^^^^^^^ Bases `A` and `B` cannot be combined in multiple inheritance
+info: Two classes cannot coexist in a class's MRO if their instances have incompatible memory layouts
+  --> src/mdtest_snippet.py:21:35
+   |
+21 | bad: "Annotated[int, type('Bad', (A, B), {})]"
+   |                                   -  - `B` instances have a distinct memory layout because `B` defines non-empty `__slots__`
+   |                                   |
+   |                                   `A` instances have a distinct memory layout because `A` defines non-empty `__slots__`
+```
+
 ## Cyclic functional class definitions
 
 ### Self-referential
@@ -1180,6 +1213,44 @@ class Unrelated: ...
 Bad: type[Unrelated] = type("Bad", (Base,), {})
 ```
 
+## Dynamic class calls in string annotations
+
+Dynamic class constructors can appear as `Annotated` metadata inside valid string annotations:
+
+```py
+from collections import namedtuple
+from enum import Enum
+from types import new_class
+from typing import Annotated, NamedTuple, TypedDict
+
+def f(
+    builtin: "Annotated[int, type('X', (), {})]",
+    new: "Annotated[int, new_class('X', ())]",
+    enum: "Annotated[int, Enum('X', {'VALUE': 1})]",
+    named_tuple: "Annotated[int, NamedTuple('X', [('value', int)])]",
+    collections_named_tuple: "Annotated[int, namedtuple('X', ['value'])]",
+    typed_dict: "Annotated[int, TypedDict('X', {'value': int})]",
+):
+    reveal_type(builtin)  # revealed: int
+    reveal_type(new)  # revealed: int
+    reveal_type(enum)  # revealed: int
+    reveal_type(named_tuple)  # revealed: int
+    reveal_type(collections_named_tuple)  # revealed: int
+    reveal_type(typed_dict)  # revealed: int
+```
+
+An invalid subscript of a `type()` call should produce the usual diagnostic, including when the call
+appears in a nested string annotation:
+
+```py
+# error: [invalid-type-form] "Only simple names and dotted names can be subscripted in type expressions"
+plain: "type('X', (), {})[int]"
+
+name = "Nested"
+# error: [invalid-type-form] "Only simple names and dotted names can be subscripted in type expressions"
+nested: "'type(name, (), {})[int]'"
+```
+
 ## Dynamic class reassignment in a loop
 
 A dynamic class can capture the previous value of a loop-carried variable in its namespace. Type
@@ -1283,7 +1354,8 @@ NT = type("NT", (NamedTuple,), {})
 
 ### Protocol bases
 
-Inheriting from a class that is itself a protocol is valid:
+When a dynamic class inherits from a source-defined protocol, it also inherits the protocol's
+`_ProtocolMeta` metaclass:
 
 ```py
 from typing import Protocol
@@ -1294,10 +1366,20 @@ class MyProtocol(Protocol):
 
 ProtoImpl = type("ProtoImpl", (MyProtocol,), {"method": lambda self: 42})
 reveal_type(ProtoImpl)  # revealed: <class 'ProtoImpl'>
+reveal_type(type(ProtoImpl))  # revealed: <class '_ProtocolMeta'>
 reveal_mro(ProtoImpl)  # revealed: (<class 'ProtoImpl'>, <class 'MyProtocol'>, typing.Protocol, typing.Generic, <class 'object'>)
 
 instance = ProtoImpl()
 reveal_type(instance)  # revealed: ProtoImpl
+```
+
+A subclass of the dynamic class cannot choose a metaclass unrelated to `_ProtocolMeta`.
+
+```py
+class Meta(type): ...
+
+# error: [conflicting-metaclass]
+class Invalid(ProtoImpl, metaclass=Meta): ...
 ```
 
 ### TypedDict bases

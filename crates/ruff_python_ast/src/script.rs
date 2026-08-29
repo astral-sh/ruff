@@ -32,11 +32,6 @@ impl ScriptTag {
         &self.source_map
     }
 
-    /// Consumes this tag and returns its TOML together with its original-source mapping.
-    pub fn into_metadata_and_source_map(self) -> (String, ScriptSourceMap) {
-        (self.metadata, self.source_map)
-    }
-
     /// Given the contents of a Python file, extract the `script` metadata block with leading
     /// comment hashes removed and map its offsets to the original Python script.
     ///

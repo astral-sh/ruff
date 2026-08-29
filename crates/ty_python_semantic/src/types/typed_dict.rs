@@ -476,41 +476,24 @@ impl<'db> TypedDictType<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Option<Type<'db>> {
-        let extra_items = self.explicit_extra_items(db)?;
-        if extra_items.is_read_only()
-            || self.items(db).values().any(|field| {
-                field.is_required()
-                    || field.is_read_only()
-                    || !field
-                        .declared_ty
-                        .is_equivalent_to(db, env, extra_items.declared_ty)
-            })
-        {
-            return None;
-        }
-        Some(extra_items.declared_ty)
+        self.dict_value_type_if(db, |field_ty, extra_items_ty| {
+            field_ty.is_equivalent_to(db, env, extra_items_ty)
+        })
     }
 
-    /// Returns the value type if this `TypedDict` is assignable to `dict[str, VT]`.
-    ///
-    /// This uses mutual assignability rather than equivalence so gradual value types can satisfy
-    /// the mutable `dict` contract.
-    pub(crate) fn assignable_dict_value_type(
+    /// Like [`Self::dict_value_type`], but uses the caller's equivalence or mutual-assignability
+    /// check so recursive comparisons can share their cycle guards.
+    pub(super) fn dict_value_type_if(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        types_match: impl Fn(Type<'db>, Type<'db>) -> bool,
     ) -> Option<Type<'db>> {
         let extra_items = self.explicit_extra_items(db)?;
         if extra_items.is_read_only()
             || self.items(db).values().any(|field| {
                 field.is_required()
                     || field.is_read_only()
-                    || !field
-                        .declared_ty
-                        .is_assignable_to(db, env, extra_items.declared_ty)
-                    || !extra_items
-                        .declared_ty
-                        .is_assignable_to(db, env, field.declared_ty)
+                    || !types_match(field.declared_ty, extra_items.declared_ty)
             })
         {
             return None;
@@ -1956,6 +1939,7 @@ pub(crate) fn extract_unpacked_typed_dict_from_value_type<'db>(
         | Type::SpecialForm(_)
         | Type::KnownInstance(_)
         | Type::PropertyInstance(_)
+        | Type::SlotDescriptor(_)
         | Type::AlwaysTruthy
         | Type::AlwaysFalsy
         | Type::LiteralValue(_)

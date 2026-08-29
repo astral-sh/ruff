@@ -14,7 +14,7 @@ use crate::{
 };
 
 /// A rule entry in the big match statement such a
-/// `(Pycodestyle, "E112") => (RuleGroup::Preview, rules::pycodestyle::rules::logical_lines::NoIndentedBlock),`
+/// `(Pycodestyle, "E112") => rules::pycodestyle::rules::logical_lines::NoIndentedBlock,`
 #[derive(Clone)]
 struct Rule {
     /// The actual name of the rule, e.g., `NoIndentedBlock`.
@@ -58,8 +58,7 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
         ));
     };
 
-    // Map from: linter (e.g., `Flake8Bugbear`) to rule code (e.g.,`"002"`) to rule data (e.g.,
-    // `(Rule::UnaryPrefixIncrement, RuleGroup::Stable, vec![])`).
+    // Map from: linter (e.g., `Flake8Bugbear`) to rule code (e.g.,`"002"`) to rule data.
     let mut linter_to_rules: BTreeMap<Ident, BTreeMap<String, Rule>> = BTreeMap::new();
 
     for arm in arms {
@@ -307,19 +306,19 @@ See also https://github.com/astral-sh/ruff/issues/2186.
             }
 
             pub fn is_preview(&self) -> bool {
-                matches!(self.group(), RuleGroup::Preview { .. })
+                matches!(self.status(), RuleStatus::Preview { .. })
             }
 
             pub(crate) fn is_stable(&self) -> bool {
-                matches!(self.group(), RuleGroup::Stable { .. })
+                matches!(self.status(), RuleStatus::Stable { .. })
             }
 
             pub fn is_deprecated(&self) -> bool {
-                matches!(self.group(), RuleGroup::Deprecated { .. })
+                matches!(self.status(), RuleStatus::Deprecated { .. })
             }
 
             pub fn is_removed(&self) -> bool {
-                matches!(self.group(), RuleGroup::Removed { .. })
+                matches!(self.status(), RuleStatus::Removed { .. })
             }
         }
 
@@ -394,7 +393,7 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
     let mut rule_message_formats_match_arms = quote!();
     let mut rule_fixable_match_arms = quote!();
     let mut rule_explanation_match_arms = quote!();
-    let mut rule_group_match_arms = quote!();
+    let mut rule_status_match_arms = quote!();
     let mut rule_file_match_arms = quote!();
     let mut rule_line_match_arms = quote!();
     let mut rule_parse_match_arms = quote!();
@@ -416,8 +415,8 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
             quote! {#(#attrs)* Self::#name => <#path as crate::Violation>::FIX_AVAILABILITY,},
         );
         rule_explanation_match_arms.extend(quote! {#(#attrs)* Self::#name => #path::explain(),});
-        rule_group_match_arms.extend(
-            quote! {#(#attrs)* Self::#name => <#path as crate::ViolationMetadata>::group(),},
+        rule_status_match_arms.extend(
+            quote! {#(#attrs)* Self::#name => <#path as crate::ViolationMetadata>::status(),},
         );
         rule_file_match_arms.extend(
             quote! {#(#attrs)* Self::#name => <#path as crate::ViolationMetadata>::file(),},
@@ -462,8 +461,8 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
                 match self { #rule_fixable_match_arms }
             }
 
-            pub fn group(&self) -> crate::codes::RuleGroup {
-                match self { #rule_group_match_arms }
+            pub fn status(&self) -> crate::codes::RuleStatus {
+                match self { #rule_status_match_arms }
             }
 
             pub fn file(&self) -> &'static str {

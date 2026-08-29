@@ -17,8 +17,9 @@ use crate::{
     types::{
         ApplySpecialization, ApplyTypeMappingVisitor, CycleDetector, DynamicType, GenericContext,
         InstanceProjection, IntersectionType, KnownClass, KnownInstanceType, MaterializationKind,
-        Parameter, Parameters, Type, TypeAliasType, TypeContext, TypeMapping, TypeVarVariance,
-        UnionBuilder, UnionType, any_over_type, binding_type, definition_expression_type,
+        Parameter, Parameters, Specialization, Type, TypeAliasType, TypeContext, TypeMapping,
+        TypeVarVariance, UnionBuilder, UnionType, any_over_type, binding_type,
+        definition_expression_type,
         tuple::Tuple,
         variance::VarianceInferable,
         visitor::{self, TypeCollector, TypeVisitor, walk_type_with_recursion_guard},
@@ -1203,6 +1204,23 @@ impl<'db> BoundTypeVarInstance<'db> {
         Self::new(db, typevar, binding_context, None, TypeVarNonce::NONE)
     }
 
+    /// Applies a specialization to this occurrence's declared upper bound or constraints, if any.
+    fn apply_specialization_to_bound_or_constraints(
+        self,
+        db: &'db dyn Db,
+        specialization: Specialization<'db>,
+        env: &ProgramEnvironment<'db>,
+    ) -> Self {
+        self.map_bound_or_constraints(db, |original| {
+            let original = original?;
+            let mapping = TypeMapping::ApplySpecialization(ApplySpecialization::specialization(
+                specialization,
+            ));
+            let visitor = ApplyTypeMappingVisitor::new(env);
+            Some(original.apply_type_mapping_impl(db, &mapping, &visitor))
+        })
+    }
+
     /// Returns an identical type variable with its `TypeVarBoundOrConstraints` mapped by the
     /// provided closure.
     pub(crate) fn map_bound_or_constraints(
@@ -1281,9 +1299,27 @@ impl<'db> BoundTypeVarInstance<'db> {
                 })
             };
 
+        let possibly_apply_to_self = |specialization: &ApplySpecialization<'a, 'db>| {
+            if self.typevar(db).is_self(db)
+                && let ApplySpecialization::Specialization {
+                    specialization,
+                    specialize_self_domain: true,
+                } = specialization
+            {
+                Type::TypeVar(self.apply_specialization_to_bound_or_constraints(
+                    db,
+                    *specialization,
+                    visitor.env,
+                ))
+            } else {
+                Type::TypeVar(self)
+            }
+        };
+
         match type_mapping {
             TypeMapping::ApplySpecialization(specialization) => {
-                mapped_specialization_type(specialization).unwrap_or(Type::TypeVar(self))
+                mapped_specialization_type(specialization)
+                    .unwrap_or_else(|| possibly_apply_to_self(specialization))
             }
             TypeMapping::ApplySpecializationWithMaterialization {
                 specialization,
@@ -1317,7 +1353,7 @@ impl<'db> BoundTypeVarInstance<'db> {
                         }
                     }
                 })
-                .unwrap_or(Type::TypeVar(self)),
+                .unwrap_or_else(|| possibly_apply_to_self(specialization)),
             TypeMapping::BindSelf(binding) => {
                 if binding.should_bind(db, visitor.env, self) {
                     binding.self_type()

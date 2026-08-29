@@ -342,6 +342,197 @@ def _(
     reveal_type(bottom_aiu)  # revealed: Bottom[list[tuple[Any, int, Unknown]]]
 ```
 
+## Gradual tuple length in invariant positions
+
+An unrestricted variable-length tuple with dynamic elements can materialize to an empty tuple. The
+top materialization of an enclosing invariant generic includes that specialization, and its bottom
+materialization is a subtype of it.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from typing import Any, TypeVarTuple
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import is_disjoint_from, is_subtype_of
+
+Ts = TypeVarTuple("Ts")
+
+static_assert(is_subtype_of(list[tuple[()]], Top[list[tuple[Any, ...]]]))
+static_assert(not is_disjoint_from(list[tuple[()]], Top[list[tuple[Any, ...]]]))
+static_assert(not is_disjoint_from(Top[list[tuple[Any, ...]]], list[tuple[()]]))
+static_assert(is_subtype_of(Bottom[list[tuple[Any, ...]]], list[tuple[()]]))
+static_assert(not is_subtype_of(list[tuple[()]], Bottom[list[tuple[Any, ...]]]))
+```
+
+The same gradual-length choice also includes nonempty, fixed-length tuple specializations.
+
+```py
+static_assert(is_subtype_of(list[tuple[int]], Top[list[tuple[Any, ...]]]))
+static_assert(not is_disjoint_from(list[tuple[int]], Top[list[tuple[Any, ...]]]))
+static_assert(not is_disjoint_from(Top[list[tuple[Any, ...]]], list[tuple[int]]))
+static_assert(is_subtype_of(Bottom[list[tuple[Any, ...]]], list[tuple[int]]))
+static_assert(not is_subtype_of(list[tuple[int]], Bottom[list[tuple[Any, ...]]]))
+```
+
+An exact tuple remains a valid materialization when its element is spelled through a type alias.
+
+```py
+from typing_extensions import TypeAliasType
+
+ItemAlias = TypeAliasType("ItemAlias", int)
+
+static_assert(is_subtype_of(list[tuple[ItemAlias]], Top[list[tuple[Any, ...]]]))
+```
+
+Aliases around the entire tuple still need to be resolved before comparing the materialization
+families.
+
+```py
+FixedTupleAlias = TypeAliasType("FixedTupleAlias", tuple[int])
+
+# TODO: Resolve aliases around the entire tuple in invariant subtyping.
+static_assert(is_subtype_of(list[FixedTupleAlias], Top[list[tuple[Any, ...]]]))  # error: [static-assert-error]
+```
+
+A gradual fixed-length tuple has a narrower materialization range than an unrestricted gradual
+tuple. Their top bounds preserve that containment, while their bottom bounds reverse it.
+
+```py
+static_assert(is_subtype_of(Top[list[tuple[Any]]], Top[list[tuple[Any, ...]]]))
+static_assert(not is_subtype_of(Top[list[tuple[Any, ...]]], Top[list[tuple[Any]]]))
+static_assert(is_subtype_of(Bottom[list[tuple[Any, ...]]], Bottom[list[tuple[Any]]]))
+static_assert(not is_subtype_of(Bottom[list[tuple[Any]]], Bottom[list[tuple[Any, ...]]]))
+static_assert(not is_subtype_of(Top[list[tuple[Any, ...]]], Bottom[list[tuple[Any, ...]]]))
+```
+
+An unpacked type variable tuple is another valid exact-tuple specialization, even though its length
+is not known.
+
+```py
+def symbolic(value: list[tuple[*Ts]]) -> None:
+    static_assert(is_subtype_of(list[tuple[*Ts]], Top[list[tuple[Any, ...]]]))
+    static_assert(not is_disjoint_from(list[tuple[*Ts]], Top[list[tuple[Any, ...]]]))
+    static_assert(not is_disjoint_from(Top[list[tuple[Any, ...]]], list[tuple[*Ts]]))
+    static_assert(is_subtype_of(Bottom[list[tuple[Any, ...]]], list[tuple[*Ts]]))
+    static_assert(not is_subtype_of(list[tuple[*Ts]], Bottom[list[tuple[Any, ...]]]))
+```
+
+A tuple subclass is not itself a materialization of the exact built-in `tuple[Any, ...]` type. The
+surrounding invariant generic must therefore keep the subclass distinct.
+
+```py
+class IntTuple(tuple[int]): ...
+
+static_assert(is_subtype_of(IntTuple, tuple[object, ...]))
+static_assert(not is_subtype_of(list[IntTuple], Top[list[tuple[Any, ...]]]))
+static_assert(is_disjoint_from(list[IntTuple], Top[list[tuple[Any, ...]]]))
+static_assert(is_disjoint_from(Top[list[tuple[Any, ...]]], list[IntTuple]))
+static_assert(not is_subtype_of(Bottom[list[tuple[Any, ...]]], list[IntTuple]))
+```
+
+A static homogeneous tuple does not make a gradual choice of length, even though every `int` is an
+`object`.
+
+```py
+static_assert(not is_subtype_of(list[tuple[int]], Top[list[tuple[object, ...]]]))
+static_assert(is_disjoint_from(list[tuple[int]], Top[list[tuple[object, ...]]]))
+```
+
+Fixed elements in a mixed tuple must also retain their invariant identity. In particular, a `bool`
+prefix cannot replace the required `int` prefix simply because `bool` is a subtype of `int`.
+
+```py
+static_assert(not is_subtype_of(list[tuple[bool, str]], Top[list[tuple[int, *tuple[Any, ...]]]]))
+static_assert(is_disjoint_from(list[tuple[bool, str]], Top[list[tuple[int, *tuple[Any, ...]]]]))
+```
+
+A required suffix retains its invariant identity even when there is no required prefix. A `bool`
+cannot replace the required `int` suffix.
+
+```py
+static_assert(not is_subtype_of(list[tuple[bool]], Top[list[tuple[*tuple[Any, ...], int]]]))
+static_assert(is_disjoint_from(list[tuple[bool]], Top[list[tuple[*tuple[Any, ...], int]]]))
+```
+
+A tuple with a required suffix cannot materialize to an empty tuple.
+
+```py
+static_assert(not is_subtype_of(list[tuple[()]], Top[list[tuple[*tuple[Any, ...], int]]]))
+static_assert(is_disjoint_from(list[tuple[()]], Top[list[tuple[*tuple[Any, ...], int]]]))
+```
+
+TODO: Handle valid mixed gradual-length tuples without losing their required prefix and suffix
+elements. For example, `list[tuple[int, str]]` should be a subtype of
+`Top[list[tuple[int, *tuple[Any, ...]]]]`.
+
+## Gradual tuple length with aliased elements
+
+When `Dynamic` aliases `Any`, `tuple[Dynamic, ...]` has the same gradual-length choices as
+`tuple[Any, ...]`. These choices are preserved when the tuple is an invariant type argument.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any, TypeAliasType
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import is_disjoint_from, is_subtype_of
+
+type Dynamic = Any
+
+static_assert(is_subtype_of(list[tuple[int]], Top[list[tuple[Dynamic, ...]]]))
+static_assert(is_subtype_of(Bottom[list[tuple[Dynamic, ...]]], list[tuple[int]]))
+static_assert(not is_disjoint_from(list[tuple[int]], Top[list[tuple[Dynamic, ...]]]))
+static_assert(not is_disjoint_from(Top[list[tuple[Dynamic, ...]]], list[tuple[int]]))
+```
+
+Alias chains, nested generic aliases, and aliases created with `TypeAliasType` preserve the same
+gradual-length choice.
+
+```py
+type IndirectDynamic = Dynamic
+type Identity[T] = T
+
+CalledDynamic = TypeAliasType("CalledDynamic", Any)
+
+static_assert(is_subtype_of(list[tuple[int]], Top[list[tuple[IndirectDynamic, ...]]]))
+static_assert(is_subtype_of(list[tuple[int]], Top[list[tuple[Identity[Identity[Any]], ...]]]))
+static_assert(is_subtype_of(list[tuple[int]], Top[list[tuple[CalledDynamic, ...]]]))
+static_assert(is_subtype_of(Bottom[list[tuple[CalledDynamic, ...]]], list[tuple[int]]))
+```
+
+An alias of a fully static element type does not make the tuple's length gradual, even with an
+unused dynamic type argument. Likewise, `Any` within a container or union does not make the alias
+itself dynamic.
+
+```py
+type Constant[T] = object
+type Container = list[Any]
+type Recursive = list[Recursive] | Any
+
+static_assert(not is_subtype_of(list[tuple[int]], Top[list[tuple[Constant[Any], ...]]]))
+static_assert(is_disjoint_from(list[tuple[int]], Top[list[tuple[Constant[Any], ...]]]))
+static_assert(not is_subtype_of(list[tuple[int]], Top[list[tuple[Container, ...]]]))
+static_assert(not is_subtype_of(list[tuple[int]], Top[list[tuple[Recursive, ...]]]))
+```
+
+An alias cycle does not establish that the element is dynamic. Comparing these tuple specializations
+terminates without treating either alias as `Any`.
+
+```py
+Loop = TypeAliasType("Loop", "Loop")
+First = TypeAliasType("First", "Second")
+Second = TypeAliasType("Second", First)
+
+static_assert(is_disjoint_from(list[tuple[int]], list[tuple[Loop, ...]]))
+static_assert(is_disjoint_from(list[tuple[int]], list[tuple[First, ...]]))
+```
+
 ## Union
 
 All positions in a union are covariant.

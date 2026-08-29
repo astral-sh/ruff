@@ -14,7 +14,7 @@ use ty_static::EnvVars;
 use crate::Db;
 use crate::metadata::options::{
     EnvironmentOptions, OptionDiagnostic, OptionsContext, ProgramSettingsDiagnostic,
-    ToSettingsError,
+    ToProgramSettingsError, ToSettingsError,
 };
 use crate::metadata::pyproject::{Project, PyProject, PyProjectError, ResolveRequiresPythonError};
 use crate::metadata::settings::Settings;
@@ -573,8 +573,10 @@ impl MergedOptions<'_> {
         system: &dyn System,
         vendored: &VendoredFileSystem,
         strategy: &Strategy,
-    ) -> Result<(ProgramSettings, Vec<ProgramSettingsDiagnostic>), Strategy::Error<anyhow::Error>>
-    {
+    ) -> Result<
+        (ProgramSettings, Vec<ProgramSettingsDiagnostic>),
+        Strategy::Error<ToProgramSettingsError>,
+    > {
         self.options.to_program_settings(
             OptionsContext::Project(self.metadata.root()),
             self.metadata.name(),
@@ -591,6 +593,7 @@ impl MergedOptions<'_> {
     ) -> anyhow::Result<Option<PythonEnvironment>> {
         self.options
             .python_environment(self.metadata.root(), system)
+            .map_err(anyhow::Error::from)
     }
 
     pub fn to_settings<Strategy: MisconfigurationStrategy>(
@@ -650,6 +653,8 @@ pub enum ProjectMetadataError {
 #[cfg(test)]
 mod tests {
     //! Integration tests for project discovery
+
+    use std::assert_matches;
 
     use anyhow::{Context, anyhow};
     use insta::assert_ron_snapshot;
@@ -1132,18 +1137,18 @@ unclosed table, expected `]`
                 .map(RelativePathBuf::path),
             Some(environment.as_path())
         );
-        assert!(matches!(
+        assert_matches!(
             project_environment
                 .and_then(|environment| environment.python.as_ref())
                 .map(RelativePathBuf::source),
             Some(ValueSource::UvWorkspace)
-        ));
-        assert!(matches!(
+        );
+        assert_matches!(
             project_environment
                 .and_then(|environment| environment.python_version.as_ref())
                 .map(ruff_ranged_value::RangedValue::source),
             Some(ValueSource::UvWorkspace)
-        ));
+        );
 
         let user_config_directory = root.join("config");
         system
