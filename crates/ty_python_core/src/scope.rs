@@ -121,6 +121,10 @@ impl FileScopeId {
     pub fn is_async_comprehension(self, index: &SemanticIndex) -> bool {
         index.async_comprehensions.contains(&self)
     }
+
+    pub fn is_defined_in_annotation(self, index: &SemanticIndex) -> bool {
+        index.scopes_defined_in_annotations.contains(&self)
+    }
 }
 
 #[derive(Debug, get_size2::GetSize)]

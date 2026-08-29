@@ -1438,7 +1438,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         match definition.kind(self.db()) {
             DefinitionKind::Function(function) => {
-                self.infer_function_annotations(definition, function.node(self.module()));
+                let function = function.node(self.module());
+                self.with_annotation_context(|builder| {
+                    builder.infer_function_annotations(definition, function);
+                });
             }
             DefinitionKind::Class(class) => {
                 self.infer_class_deferred(definition, class.node(self.module()));
@@ -1473,6 +1476,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.infer_type_expression(expression.node_ref(self.db()).node(self.module()));
             }
         }
+    }
+
+    /// Run inference while visiting a syntactic annotation and restore the surrounding context.
+    fn with_annotation_context<T>(&mut self, infer: impl FnOnce(&mut Self) -> T) -> T {
+        let previously_in_annotation = self
+            .context
+            .inference_flags
+            .replace(InferenceFlags::IN_ANNOTATION, true);
+        let result = infer(self);
+        self.context
+            .inference_flags
+            .set(InferenceFlags::IN_ANNOTATION, previously_in_annotation);
+        result
     }
 
     /// Add a binding for the given definition.
@@ -4231,10 +4247,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 target,
                 simple: _,
             } = assignment;
-            let annotated = self.infer_annotation_expression(
-                annotation,
-                DeferredExpressionState::from(self.defer_annotations()),
-            );
+            let deferred_state = DeferredExpressionState::from(self.defer_annotations());
+            let annotated = self.with_annotation_context(|builder| {
+                builder.infer_annotation_expression(annotation, deferred_state)
+            });
 
             if !annotated.qualifiers.is_empty() {
                 for qualifier in TypeQualifier::iter() {
@@ -4418,10 +4434,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // Pydantic supports field specifiers in annotations via `Annotated[T, Field(...)]`.
         self.setup_dataclass_field_specifiers();
-        let declared = self.infer_annotation_expression_allow_pep_613(
-            annotation,
-            DeferredExpressionState::from(self.defer_annotations()),
-        );
+        let deferred_state = DeferredExpressionState::from(self.defer_annotations());
+        let declared = self.with_annotation_context(|builder| {
+            builder.infer_annotation_expression_allow_pep_613(annotation, deferred_state)
+        });
         self.dataclass_field_specifiers.clear();
 
         declared
