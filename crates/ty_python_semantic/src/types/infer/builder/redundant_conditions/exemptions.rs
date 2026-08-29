@@ -149,12 +149,12 @@ pub(super) fn is_special_cased_condition_expression<'db>(
 }
 
 /// Resolves the condition's source definitions using a scope or an already-inferred receiver type.
-fn condition_definition_info<'db>(
+pub(super) fn condition_definition_info<'db>(
     db: &'db dyn Db,
     file: ProgramFile<'db>,
     expression: &ast::Expr,
     mut expression_type: impl FnMut(&ast::Expr) -> Type<'db>,
-) -> ConditionDefinitionInfo {
+) -> ConditionDefinitionInfo<'db> {
     match expression {
         ast::Expr::Name(name) => {
             let index = semantic_index(db, file);
@@ -173,20 +173,29 @@ fn condition_definition_info<'db>(
     }
 }
 
-/// The information needed for condition exemptions.
+/// The information needed for condition exemptions and annotation hints.
+///
+/// Retaining only the unique definition and the provenance result lets both uses share a lookup
+/// without caching a potentially large list of bindings.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
-struct ConditionDefinitionInfo {
+pub(super) struct ConditionDefinitionInfo<'db> {
+    pub(super) single_definition: Option<Definition<'db>>,
     contains_special_cased_condition: bool,
 }
 
-impl ConditionDefinitionInfo {
+impl<'db> ConditionDefinitionInfo<'db> {
     /// Summarizes resolved definitions, following assignments to establish environment provenance.
-    fn from_definitions<'db>(db: &'db dyn Db, definitions: Vec<ResolvedDefinition<'db>>) -> Self {
+    fn from_definitions(db: &'db dyn Db, definitions: Vec<ResolvedDefinition<'db>>) -> Self {
+        let single_definition = match definitions.as_slice() {
+            [ResolvedDefinition::Definition(definition)] => Some(*definition),
+            _ => None,
+        };
         let contains_special_cased_condition = definitions
             .into_iter()
             .filter_map(|resolved| resolved.definition())
             .any(|definition| definition_contains_special_cased_condition(db, definition));
         Self {
+            single_definition,
             contains_special_cased_condition,
         }
     }
@@ -209,7 +218,7 @@ fn name_condition_definition_info<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
     name: Name,
-) -> ConditionDefinitionInfo {
+) -> ConditionDefinitionInfo<'db> {
     ConditionDefinitionInfo::from_definitions(
         db,
         definitions_for_name(db, scope, &name, ImportAliasResolution::ResolveAliases),
@@ -234,7 +243,7 @@ fn attribute_condition_definition_info<'db>(
     program: Program<'db>,
     receiver: Type<'db>,
     name: Name,
-) -> ConditionDefinitionInfo {
+) -> ConditionDefinitionInfo<'db> {
     ConditionDefinitionInfo::from_definitions(
         db,
         definitions_for_attribute(

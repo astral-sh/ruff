@@ -3,7 +3,7 @@
 use std::borrow::Cow;
 
 use ruff_db::{
-    diagnostic::{Annotation, Span, SubDiagnostic, SubDiagnosticSeverity},
+    diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity},
     parsed::parsed_module,
     source::source_text,
 };
@@ -11,18 +11,23 @@ use ruff_diagnostics::{Applicability, Edit, Fix};
 use ruff_python_ast as ast;
 use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
-use ty_python_core::Truthiness;
+use ty_module_resolver::{SearchPath, file_to_module};
+use ty_python_core::{Truthiness, definition::DefinitionKind};
 
 use crate::{
     SemanticModel,
     types::{
         KnownClass, LintDiagnosticGuard, LintDiagnosticGuardBuilder, MemberLookupPolicy, Type,
-        call::bind::CallableDescription, function::KnownFunction, infer::TypeInferenceBuilder,
-        tuple::TupleLength,
+        TypeContext,
+        call::bind::CallableDescription,
+        function::KnownFunction,
+        infer::TypeInferenceBuilder,
+        infer_definition_types, infer_scope_types,
+        tuple::{Tuple, TupleLength},
     },
 };
 
-use super::RedundantCondition;
+use super::{RedundantCondition, exemptions::condition_definition_info};
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
     pub(super) fn report_redundant_condition(&self, condition: RedundantCondition<'_, 'db>) {
@@ -196,7 +201,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     )),
                 };
                 describe_always_truthy_object(&mut diagnostic);
-
+                self.diagnose_single_length_tuple(length, test, test_type, &mut diagnostic);
                 diagnostic
             } else if let Type::TypedDict(typed_dict) = test_type
                 && let Some(field) = typed_dict
@@ -470,6 +475,101 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     subexpression_type.display(db, env)
                 )),
         );
+        if let Ok(length) = usize::try_from(length) {
+            self.diagnose_single_length_tuple(
+                TupleLength::Fixed(length),
+                test_subexpression,
+                subexpression_type,
+                &mut diagnostic,
+            );
+        }
         diagnostic
+    }
+
+    fn diagnose_single_length_tuple(
+        &self,
+        length: TupleLength,
+        node: &ast::Expr,
+        node_type: Type<'db>,
+        diagnostic: &mut Diagnostic,
+    ) {
+        let db = self.db();
+        let env = self.program_environment();
+
+        // The ellipsis suggestion is for `tuple[T]`, not named tuples or other
+        // subclasses whose fixed length is part of their definition.
+        if length == TupleLength::Fixed(1)
+            && let Some(tuple_spec) = node_type.exact_tuple_instance_spec(db)
+            && let Tuple::Fixed(fixed_length_tuple) = &*tuple_spec
+            && matches!(node, ast::Expr::Name(_) | ast::Expr::Attribute(_))
+        {
+            let definition_info =
+                condition_definition_info(db, self.program_file(), node, |expr| {
+                    self.expression_type(expr)
+                });
+
+            if let Some(single_definition) = definition_info.single_definition {
+                let file = single_definition.python_file(db);
+                let program_file = single_definition.program_file(db);
+                let module = parsed_module(db, file).load(db);
+                let annotation_info = match single_definition.kind(db) {
+                    DefinitionKind::AnnotatedAssignment(assignment) => {
+                        let annotation = assignment.annotation(&module);
+                        infer_definition_types(db, single_definition)
+                            .try_expression_type(annotation)
+                            .map(|annotation_type| (annotation, annotation_type))
+                    }
+                    DefinitionKind::Parameter(parameter) => {
+                        parameter.annotation(&module).and_then(|annotation| {
+                            let scope = single_definition.scope(db).scope(db).parent()?;
+                            let annotation_type = infer_scope_types(
+                                db,
+                                scope.to_scope_id(db, program_file),
+                                TypeContext::default(),
+                            )
+                            .try_expression_type(annotation)?;
+                            Some((annotation, annotation_type))
+                        })
+                    }
+                    _ => None,
+                };
+                if let Some((annotation, annotation_type)) = annotation_info
+                    && annotation_type == node_type
+                {
+                    let file = single_definition.file(db);
+                    let diagnostic_annotation =
+                        || Annotation::secondary(Span::from(file).with_range(annotation.range()));
+                    diagnostic.annotate(
+                        diagnostic_annotation()
+                            .message("Inferred as a 1-element tuple due to this annotation"),
+                    );
+
+                    let sole_element = fixed_length_tuple.elements_slice()[0];
+                    let suggested_type = Type::homogeneous_tuple(db, env, sole_element)
+                        .display(db, env)
+                        .to_string_parts();
+
+                    if suggested_type.is_valid_syntax {
+                        let resolver_file = single_definition.program_file(db).resolver_file(db);
+                        let annotated_in_first_party_code = file == self.file()
+                            || file_to_module(db, resolver_file)
+                                .and_then(|module| module.search_path(db))
+                                .is_some_and(SearchPath::is_first_party);
+
+                        let annotation = if annotated_in_first_party_code {
+                            diagnostic_annotation()
+                                .message(format_args!("Did you mean `{}`?", suggested_type.label))
+                        } else {
+                            diagnostic_annotation().message(format_args!(
+                                "The author of this code might have meant `{}`?",
+                                suggested_type.label
+                            ))
+                        };
+
+                        diagnostic.annotate(annotation);
+                    }
+                }
+            }
+        }
     }
 }
