@@ -10,7 +10,7 @@ python-version = "3.12"
 ```py
 from collections.abc import Iterable, Iterator
 
-class Unpacker[T: Iterable]:
+class Unpacker[T: Iterable[object]]:
     def __init__(self, it: T, /) -> None:
         self._it = it
     def __iter__[S](self: "Unpacker[Iterable[S]]") -> Iterator[S]:
