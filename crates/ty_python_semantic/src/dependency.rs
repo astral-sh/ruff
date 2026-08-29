@@ -2,7 +2,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use compact_str::CompactString;
+use char_str::CharStr;
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use ty_module_resolver::{
     ImportingFile, Module, ModuleName, editable_search_paths, file_to_module, resolve_real_module,
@@ -32,10 +32,10 @@ pub struct DependencyMetadata {
     /// Installable packages, keyed by opaque package-manager IDs rather than names.
     /// A distribution can provide several Python modules; its name need not match their import names.
     /// IDs distinguish distributions with the same name but different sources.
-    pub distributions: BTreeMap<CompactString, DependencyDistribution>,
+    pub distributions: BTreeMap<CharStr, DependencyDistribution>,
     /// Maps module names to the IDs in [`Self::distributions`] that provide those modules.
     /// A module can have several owners, for example when distributions share a namespace package.
-    pub module_owners: BTreeMap<ModuleName, Box<[CompactString]>>,
+    pub module_owners: BTreeMap<ModuleName, Box<[CharStr]>>,
 }
 
 impl DependencyMetadata {
@@ -89,7 +89,7 @@ impl DependencyMetadata {
         })
     }
 
-    fn owner<'db>(&self, db: &'db dyn Db, module: Module<'db>) -> Option<&CompactString> {
+    fn owner<'db>(&self, db: &'db dyn Db, module: Module<'db>) -> Option<&CharStr> {
         // A namespace can also contain local modules that the package manager doesn't know about.
         // Only attribute concrete modules; inference checks the children of `from ns import x`.
         let search_path = module.search_path(db)?;
@@ -117,7 +117,7 @@ impl DependencyMetadata {
         self.module_owner(module.name(db))
     }
 
-    fn module_owner(&self, module: &ModuleName) -> Option<&CompactString> {
+    fn module_owner(&self, module: &ModuleName) -> Option<&CharStr> {
         let owners = module
             .ancestors()
             .find_map(|name| self.module_owners.get(&name))?;
@@ -130,7 +130,7 @@ impl DependencyMetadata {
         }
     }
 
-    fn editable_owner(&self, path: &SystemPath) -> Option<&CompactString> {
+    fn editable_owner(&self, path: &SystemPath) -> Option<&CharStr> {
         let mut owner = None;
         let mut longest_root = 0;
 
@@ -198,20 +198,20 @@ impl DependencyMetadata {
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
 pub struct DependencyProject {
     pub path: SystemPathBuf,
-    pub distribution: Option<CompactString>,
-    pub dependencies: BTreeSet<CompactString>,
-    pub group_dependencies: BTreeSet<CompactString>,
+    pub distribution: Option<CharStr>,
+    pub dependencies: BTreeSet<CharStr>,
+    pub group_dependencies: BTreeSet<CharStr>,
 }
 
 /// A distribution's display name and, for editable installs, its source directory.
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
 pub struct DependencyDistribution {
-    pub name: CompactString,
+    pub name: CharStr,
     pub editable_path: Option<SystemPathBuf>,
 }
 
 #[derive(Debug, PartialEq, Eq, get_size2::GetSize)]
 pub(crate) struct MissingDependency {
-    pub(crate) distribution_name: CompactString,
+    pub(crate) distribution_name: CharStr,
     pub(crate) group_dependency: bool,
 }
