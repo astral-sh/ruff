@@ -3,23 +3,20 @@ use crate::types::{
     infer::{TypeInferenceBuilder, builder::post_inference::pytest::argnames::KnownArgnames},
 };
 use itertools::Itertools;
-use ruff_python_ast::{self as ast};
+use ruff_python_ast as ast;
 
 /// Representation of a `pytest.mark.parametrize` call.
 /// Only calls that will be checked are recorded.
+#[expect(dead_code)]
 pub(crate) struct Parametrization<'ast> {
     // If the argnames are unknown, no checking occurs, so we discard it.
     argnames: KnownArgnames,
     argvalues: &'ast ast::Expr,
 }
 
-impl<'ast> Parametrization<'ast> {
+impl Parametrization<'_> {
     pub(crate) fn argnames(&self) -> &KnownArgnames {
         &self.argnames
-    }
-
-    pub(crate) fn argvalues(&self) -> &'ast ast::Expr {
-        self.argvalues
     }
 }
 

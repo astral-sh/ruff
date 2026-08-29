@@ -11,6 +11,7 @@ use rustc_hash::FxHashMap;
 
 /// Representation of a pytest test.
 /// It is only used when the argnames and argvalues should be checked, and for that purpose only.
+#[expect(dead_code)]
 pub(crate) struct CheckablePytestTest<'db, 'ast> {
     name: &'ast ast::Identifier,
     // Type is not used for now, but acts as a placeholder for when more detailed typing
@@ -20,9 +21,6 @@ pub(crate) struct CheckablePytestTest<'db, 'ast> {
 }
 
 impl<'db, 'ast> CheckablePytestTest<'db, 'ast> {
-    pub(crate) fn name(&self) -> &'ast ast::Identifier {
-        self.name
-    }
     pub(crate) fn check_duplicate_argnames(&self, context: &InferContext<'db, 'ast>) {
         let mut argname_locations = FxHashMap::default();
         for parametrization in &self.parametrizations {

@@ -91,7 +91,7 @@ impl StringLiteralArgnames {
             .collect_vec();
         let range = literal.range();
         if let [name] = &filtered_names[..] {
-            SingleArgname::from_str(*name, range).into()
+            SingleArgname::from_str(name, range).into()
         } else {
             MultipleArgnames::from_strs(filtered_names.into_iter().map(|name| (name, range))).into()
         }
