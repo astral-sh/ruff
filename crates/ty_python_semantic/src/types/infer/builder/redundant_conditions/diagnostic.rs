@@ -8,11 +8,15 @@ use ruff_db::{
     source::source_text,
 };
 use ruff_diagnostics::{Applicability, Edit, Fix};
-use ruff_python_ast as ast;
+use ruff_python_ast::{self as ast, PythonVersion};
 use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
 use ty_module_resolver::{SearchPath, file_to_module};
-use ty_python_core::{Truthiness, definition::DefinitionKind};
+use ty_python_core::{
+    Truthiness,
+    definition::DefinitionKind,
+    scope::{NodeWithScopeKind, ScopeKind},
+};
 
 use crate::{
     SemanticModel,
@@ -21,7 +25,7 @@ use crate::{
         TypeContext,
         call::bind::CallableDescription,
         function::KnownFunction,
-        infer::TypeInferenceBuilder,
+        infer::{InferenceFlags, TypeInferenceBuilder},
         infer_definition_types, infer_scope_types,
         signatures::CallableSignature,
         tuple::{Tuple, TupleLength},
@@ -195,16 +199,39 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let mut diagnostic =
                     builder.into_diagnostic(format_args!("{function} is always truthy"));
 
-                // Add a suggestion and fix that they might have meant to call this function.
+                // Add a suggestion and fix that they might have meant to call (and possibly
+                // also await) this function.
                 //
                 // It's true that calling the function might not actually fix this diagnostic
                 // if the function returns something that is always truthy. They still probably
                 // meant to call the function, though, so it's still a useful suggestion/fix!
 
-                diagnostic.set_primary_annotation_message(format_args!(
-                    "Did you mean to call this {}?",
-                    function.kind()
-                ));
+                // A coroutine return type establishes that calling and awaiting the function
+                // is appropriate. `Any`, `Unknown`, and `Never` do not establish this, even
+                // though they are assignable to `CoroutineType`.
+                // Use the top materialization so the unspecified generic arguments do not
+                // prevent concrete coroutine types from being subtypes.
+                let coroutine = KnownClass::CoroutineType
+                    .to_instance(db, env)
+                    .top_materialization(db, env);
+
+                let is_awaitable_coro_function = self.can_await_here()
+                    && function.signature().iter().any(|signature| {
+                        !signature.return_ty.is_never()
+                            && signature.return_ty.is_subtype_of(db, env, coroutine)
+                    });
+
+                let kind = function.kind();
+
+                if is_awaitable_coro_function {
+                    diagnostic.set_primary_annotation_message(format_args!(
+                        "Did you mean to `await` and call this {kind}?",
+                    ));
+                } else {
+                    diagnostic.set_primary_annotation_message(format_args!(
+                        "Did you mean to call this {kind}?"
+                    ));
+                }
 
                 if matches!(test, ast::Expr::Name(_) | ast::Expr::Attribute(_)) {
                     let (call, applicability) = if function.signature().has_parameters() {
@@ -214,7 +241,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     };
                     let call_edit = Edit::insertion(call.to_string(), test.end());
 
-                    diagnostic.set_fix(Fix::applicable_edit(call_edit, applicability));
+                    let fix = if is_awaitable_coro_function {
+                        Fix::applicable_edits(
+                            Edit::insertion("await ".to_string(), test.start()),
+                            [call_edit],
+                            applicability,
+                        )
+                    } else {
+                        Fix::applicable_edit(call_edit, applicability)
+                    };
+                    diagnostic.set_fix(fix);
                 }
 
                 diagnostic
@@ -337,7 +373,23 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             } else {
                 let mut diagnostic = builder.into_diagnostic("Condition is always truthy");
                 describe_always_truthy_object(&mut diagnostic);
-                if let Type::NominalInstance(instance) = test_type {
+                if !test_type.is_never()
+                    && test_type.try_await(db, env).is_ok()
+                    && self.can_await_here()
+                {
+                    diagnostic.help("Did you mean to `await` this expression?");
+
+                    let fix = if test.precedence() <= ast::OperatorPrecedence::Await {
+                        Fix::unsafe_edits(
+                            Edit::insertion("await (".to_string(), test.start()),
+                            [Edit::insertion(")".to_string(), test.end())],
+                        )
+                    } else {
+                        Fix::unsafe_edit(Edit::insertion("await ".to_string(), test.start()))
+                    };
+
+                    diagnostic.set_fix(fix);
+                } else if let Type::NominalInstance(instance) = test_type {
                     let class = instance.class(db, env);
                     if class.is_final(db)
                         && !class.is_known(db, KnownClass::CoroutineType)
@@ -614,5 +666,67 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
             }
         }
+    }
+
+    /// Returns `true` if adding `await` at the current expression would produce valid Python.
+    ///
+    /// Accounts for asynchronous functions, notebook cells, annotation restrictions, enclosing
+    /// scopes, and the different scoping behavior of comprehensions and generator expressions.
+    fn can_await_here(&self) -> bool {
+        // Python forbids `await` in annotation nodes.
+        if self
+            .inference_flags()
+            .contains(InferenceFlags::IN_ANNOTATION)
+        {
+            return false;
+        }
+
+        let db = self.db();
+
+        // A list, set, or dictionary comprehension inherits an enclosing annotation's restriction.
+        // A generator expression in between creates its own scope where `await` is valid.
+        let mut comprehension_in_annotation = false;
+        let mut in_eager_comprehension = false;
+
+        for (scope_id, scope) in self.index.ancestor_scopes(self.scope().file_scope_id(db)) {
+            // Before Python 3.11, awaiting in a nested list, set, or dict comprehension cannot
+            // implicitly make its containing comprehension or generator expression asynchronous.
+            if in_eager_comprehension
+                && scope.kind() == ScopeKind::Comprehension
+                && self.program_environment().python_version(db) < PythonVersion::PY311
+                && !scope_id.is_async_comprehension(self.index)
+            {
+                return false;
+            }
+
+            match scope.node() {
+                NodeWithScopeKind::Function(function) => {
+                    return !comprehension_in_annotation && function.node(self.module()).is_async;
+                }
+                NodeWithScopeKind::Lambda(_)
+                | NodeWithScopeKind::Class(_)
+                | NodeWithScopeKind::ClassTypeParameters(_)
+                | NodeWithScopeKind::FunctionTypeParameters(_)
+                | NodeWithScopeKind::TypeAliasTypeParameters(_)
+                | NodeWithScopeKind::TypeAlias(_) => {
+                    return false;
+                }
+                NodeWithScopeKind::GeneratorExpression(_) => {
+                    return true;
+                }
+                NodeWithScopeKind::Module => {
+                    return !comprehension_in_annotation
+                        && source_text(db, self.file()).is_notebook();
+                }
+                NodeWithScopeKind::DictComprehension(_)
+                | NodeWithScopeKind::ListComprehension(_)
+                | NodeWithScopeKind::SetComprehension(_) => {
+                    comprehension_in_annotation |= scope_id.is_defined_in_annotation(self.index);
+                    in_eager_comprehension = true;
+                }
+            }
+        }
+
+        false
     }
 }
