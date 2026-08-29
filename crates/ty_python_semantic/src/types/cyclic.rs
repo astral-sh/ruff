@@ -36,11 +36,12 @@ use crate::types::class::{ClassLiteral, implicit_attribute_names};
 use crate::types::function::FunctionLiteral;
 use crate::types::generics::{GenericContext, Specialization, enclosing_generic_contexts};
 use crate::types::list_members::{all_end_of_scope_bindings, all_end_of_scope_declarations};
-use crate::types::protocol_class::EffectiveMemberTypes;
-use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
+use crate::types::visitor::{
+    TypeCollector, TypeVisitor, any_over_type_expanding_aliases, walk_type_with_recursion_guard,
+};
 use crate::types::{
-    BoundTypeVarIdentity, BoundTypeVarInstance, ClassType, StaticClassLiteral, SubclassOfInner,
-    Type, TypeAliasType, TypedDictType,
+    BoundTypeVarIdentity, BoundTypeVarInstance, ClassType, MemberLookupPolicy,
+    PropertyInstanceType, StaticClassLiteral, SubclassOfInner, Type, TypeAliasType, TypedDictType,
 };
 use crate::{Db, ProgramEnvironment, semantic_index};
 
@@ -687,13 +688,13 @@ impl<'db> SpecializationFlowVisitor<'db> {
             let name = memberdef.member.name.as_str();
             let ty = memberdef.member.ty;
             self.visit_nominal_member(db, name, ty);
-            self.visit_nominal_effective_member_types(db, instance, name, ty);
+            self.visit_nominal_descriptor_member_types(db, instance, name, ty);
         }
         for memberdef in all_end_of_scope_bindings(db, body_scope) {
             let name = memberdef.member.name.as_str();
             let ty = memberdef.member.ty;
             self.visit_nominal_member(db, name, ty);
-            self.visit_nominal_effective_member_types(db, instance, name, ty);
+            self.visit_nominal_descriptor_member_types(db, instance, name, ty);
         }
 
         // Instance attributes implicitly defined by `self.x = ...` assignments in methods.
@@ -706,13 +707,18 @@ impl<'db> SpecializationFlowVisitor<'db> {
         }
     }
 
-    fn visit_nominal_effective_member_types(
+    fn visit_nominal_descriptor_member_types(
         &self,
         db: &'db dyn Db,
         instance: Type<'db>,
         name: &str,
         member_ty: Type<'db>,
     ) {
+        if let Some(property) = member_ty.as_property_instance() {
+            self.visit_nominal_property_types(db, property, instance);
+            return;
+        }
+
         if matches!(
             member_ty,
             Type::FunctionLiteral(_)
@@ -723,35 +729,132 @@ impl<'db> SpecializationFlowVisitor<'db> {
             return;
         }
 
-        let effective_types = if let Some(property) = member_ty.as_property_instance() {
-            EffectiveMemberTypes::from_property(db, &self.env, property, instance)
-        } else {
-            EffectiveMemberTypes::from_descriptor(db, &self.env, member_ty, instance)
-        };
-        for read in effective_types.read_types() {
-            self.visit_nominal_member(db, name, read);
+        let owner = instance.to_meta_type(db, &self.env);
+        if let Some(get_result) = member_ty
+            .try_call_dunder_get(db, &self.env, Some(instance), owner)
+            .unwrap_or_else(|error| Some(error.fallback()))
+        {
+            self.visit_nominal_member(db, name, get_result.return_type);
         }
-        for write in effective_types.write_types() {
-            self.visit_type(db, write);
+
+        let Some(setter_ty) = member_ty
+            .class_member_with_policy(
+                db,
+                &self.env,
+                "__set__",
+                MemberLookupPolicy::REQUIRE_CONCRETE,
+            )
+            .place
+            .ignore_possibly_undefined()
+        else {
+            return;
+        };
+        self.visit_callable_parameter_types(db, setter_ty, 2, member_ty);
+    }
+
+    fn visit_nominal_property_types(
+        &self,
+        db: &'db dyn Db,
+        property: PropertyInstanceType<'db>,
+        instance: Type<'db>,
+    ) {
+        if let Some(getter) = property.getter(db)
+            && let Some(callables) = getter.try_upcast_to_callable(db, &self.env)
+        {
+            for callable in &callables {
+                for signature in callable.signatures(db) {
+                    self.visit_nominal_property_accessor_type(db, signature.return_ty, instance);
+                }
+            }
+        }
+
+        if let Some(setter) = property.setter(db)
+            && let Some(callables) = setter.try_upcast_to_callable(db, &self.env)
+        {
+            for callable in &callables {
+                for signature in callable.signatures(db) {
+                    let Some(parameter) = signature.parameters().get_positional(1) else {
+                        continue;
+                    };
+                    self.visit_nominal_property_accessor_type(
+                        db,
+                        parameter.annotated_type(),
+                        instance,
+                    );
+                }
+            }
+        }
+    }
+
+    fn visit_nominal_property_accessor_type(
+        &self,
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        instance: Type<'db>,
+    ) {
+        // An accessor type can only contribute specialization flow if it contains a type
+        // variable. The raw property traversal above already covers the descriptor itself.
+        if any_over_type_expanding_aliases(db, &self.env, ty, |ty| matches!(ty, Type::TypeVar(_))) {
+            self.visit_type(db, ty.bind_self_typevars(db, &self.env, instance));
         }
     }
 
     fn visit_nominal_member(&self, db: &'db dyn Db, name: &str, ty: Type<'db>) {
         // These hooks determine the effective type of otherwise missing attributes.
         if matches!(name, "__getattr__" | "__getattribute__") {
-            let Some(callables) = ty.try_upcast_to_callable(db, &self.env) else {
-                return;
-            };
-            for callable in &callables {
-                for signature in callable.signatures(db) {
-                    self.visit_type(db, signature.return_ty);
-                }
-            }
+            self.visit_callable_return_types(db, ty);
         }
         match ty {
             // Method relations have a separate declaration-based recursion guard.
             Type::FunctionLiteral(_) | Type::BoundMethod(_) | Type::KnownBoundMethod(_) => {}
             ty => self.visit_type(db, ty),
+        }
+    }
+
+    fn visit_callable_parameter_types(
+        &self,
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        parameter_index: usize,
+        self_ty: Type<'db>,
+    ) {
+        let Some(callables) = ty.try_upcast_to_callable(db, &self.env) else {
+            return;
+        };
+        for callable in &callables {
+            for signature in callable.signatures(db) {
+                let parameters = signature.parameters();
+                let parameter = if let Some(parameter) = parameters.get_positional(parameter_index)
+                {
+                    Some(parameter)
+                } else if let Some((index, parameter)) = parameters.variadic()
+                    && index <= parameter_index
+                {
+                    Some(parameter)
+                } else {
+                    None
+                };
+                let Some(parameter) = parameter else {
+                    continue;
+                };
+                self.visit_type(
+                    db,
+                    parameter
+                        .annotated_type()
+                        .bind_self_typevars(db, &self.env, self_ty),
+                );
+            }
+        }
+    }
+
+    fn visit_callable_return_types(&self, db: &'db dyn Db, ty: Type<'db>) {
+        let Some(callables) = ty.try_upcast_to_callable(db, &self.env) else {
+            return;
+        };
+        for callable in &callables {
+            for signature in callable.signatures(db) {
+                self.visit_type(db, signature.return_ty);
+            }
         }
     }
 
