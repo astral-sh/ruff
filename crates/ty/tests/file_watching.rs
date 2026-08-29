@@ -2807,6 +2807,21 @@ mod uv_metadata {
 
         assert!(case.db().check().is_empty());
 
+        assert!(update_and_synchronize_script(
+            &mut case,
+            r#"
+            # /// script
+            # requires-python = ">=3.12"
+            # dependencies = []
+            # ///
+            from attrs import define
+            "#,
+        )?);
+
+        let diagnostics = case.db().check();
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].id().as_str(), "unresolved-import");
+
         Ok(())
     }
 

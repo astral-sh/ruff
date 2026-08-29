@@ -1455,10 +1455,20 @@ mod uv_metadata {
         let output = Command::new("uv")
             .args(["workspace", "metadata", "--help"])
             .output()?;
+        assert!(
+            output.status.success(),
+            "`uv workspace metadata --help` failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let help = String::from_utf8_lossy(&output.stdout);
 
         assert!(
-            output.status.success() && String::from_utf8_lossy(&output.stdout).contains("--script"),
-            "installed uv does not support script metadata"
+            help.contains("--script"),
+            "installed uv does not support `uv workspace metadata --script`"
+        );
+        assert!(
+            help.contains("--exact"),
+            "installed uv does not support `uv workspace metadata --exact`"
         );
 
         Ok(())
@@ -1664,6 +1674,74 @@ mod uv_metadata {
         ----- stderr -----
         "
         );
+
+        Ok(())
+    }
+
+    #[test]
+    fn removed_dependencies_stop_resolving() -> anyhow::Result<()> {
+        assert_uv_supports_script_metadata()?;
+
+        let source = r#"
+            # /// script
+            # requires-python = ">=3.8"
+            # dependencies = ["first-dependency", "second-dependency"]
+            # [tool.uv]
+            # no-index = true
+            # find-links = ["wheels"]
+            # ///
+
+            import first_module
+            import second_module
+            "#;
+        let case = CliTest::with_file("script.py", source)?;
+        write_dependency_wheel(&case, "first-dependency", "first_module", &[])?;
+        write_dependency_wheel(&case, "second-dependency", "second_module", &[])?;
+
+        let mut command = command_with_script_uv(&case);
+        command
+            .args([
+                "script.py",
+                "--output-format",
+                "concise",
+                "--color",
+                "never",
+            ])
+            .env("UV_OFFLINE", "1")
+            .env("UV_PYTHON_DOWNLOADS", "never");
+        let output = command.output()?;
+        assert!(output.status.success(), "{output:?}");
+
+        // Removing one declaration leaves the other dependency available.
+        let source = source.replace(r#""first-dependency", "#, "");
+        case.write_file("script.py", &source)?;
+        let output = command.output()?;
+        assert_eq!(output.status.code(), Some(1), "{output:?}");
+        let stdout = String::from_utf8(output.stdout)?;
+        assert!(
+            stdout
+                .contains("error[unresolved-import] Cannot resolve imported module `first_module`"),
+            "{stdout}"
+        );
+        assert_eq!(stdout.matches("error[").count(), 1);
+
+        // Removing the final declaration also cleans the now-empty script environment.
+        case.write_file("script.py", &source.replace(r#""second-dependency""#, ""))?;
+        let output = command.output()?;
+        assert_eq!(output.status.code(), Some(1), "{output:?}");
+        let stdout = String::from_utf8(output.stdout)?;
+        assert!(
+            stdout
+                .contains("error[unresolved-import] Cannot resolve imported module `first_module`"),
+            "{stdout}"
+        );
+        assert!(
+            stdout.contains(
+                "error[unresolved-import] Cannot resolve imported module `second_module`"
+            ),
+            "{stdout}"
+        );
+        assert_eq!(stdout.matches("error[").count(), 2);
 
         Ok(())
     }

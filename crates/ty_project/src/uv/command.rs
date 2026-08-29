@@ -55,7 +55,9 @@ impl Uv {
                 command.args(["--frozen", "--active"]).current_dir(path);
             }
             MetadataTarget::Script { path, python } => {
-                command.args(["--sync", "--script", path.as_str()]);
+                // Remove packages left over from earlier declarations so they cannot hide
+                // unresolved imports.
+                command.args(["--sync", "--exact", "--script", path.as_str()]);
                 if let Some(python) = python {
                     command.args(["--python", python.as_str()]);
                 }
