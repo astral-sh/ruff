@@ -63,7 +63,7 @@ use crate::{
     },
 };
 
-use self::exemptions::is_special_cased_condition_expression;
+use self::exemptions::{SuiteExitKind, is_special_cased_condition_expression};
 
 /// Classification of a redundant condition.
 ///
@@ -293,7 +293,7 @@ enum RedundantConditionContext {
     ///         raise TypeError("expected an integer")
     /// ```
     ///
-    /// Or after an always-true final `if` or `elif`:
+    /// Or after an always-true final `if` or `elif` whose body ends in a recognized exit:
     ///
     /// ```python
     /// def check(value: int):
@@ -305,8 +305,8 @@ enum RedundantConditionContext {
     ///     raise TypeError("expected an integer")
     /// ```
     ///
-    /// [`TypeInferenceBuilder::is_deliberately_unreachable_suite`] describes the forms of rejection
-    /// we recognize.
+    /// [`TypeInferenceBuilder::suite_ends_with_exit`] describes the forms of rejection we recognize
+    /// with [`SuiteExitKind::Defensive`].
     ///
     /// This context only exempts the complete `if` or `elif` test. Mistakes within the test,
     /// such as testing the truthiness of an uncalled function, can still be reported.
@@ -594,7 +594,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         [else_clause] if else_clause.test.is_none() => {
                             Some(else_clause.body.as_slice())
                         }
-                        [] => Some(&suite[i + 1..]),
+                        [] if self.suite_ends_with_exit(body, SuiteExitKind::Any) => {
+                            Some(&suite[i + 1..])
+                        }
                         _ => None,
                     },
                     Truthiness::Ambiguous => None,
@@ -608,7 +610,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             .map(|condition| condition.kind),
                         Some(ConditionKind::Boolean | ConditionKind::ShortCircuit)
                     )
-                    && self.is_deliberately_unreachable_suite(unreachable_suite)
+                    && self.suite_ends_with_exit(unreachable_suite, SuiteExitKind::Defensive)
                 {
                     RedundantConditionContext::DefensiveExit
                 } else {

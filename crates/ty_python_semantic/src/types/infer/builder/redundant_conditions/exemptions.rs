@@ -29,69 +29,71 @@ use crate::{
     },
 };
 
+/// Which exits are accepted when checking the final statement of a suite.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum SuiteExitKind {
+    /// Accept any return statement, as well as defensive exits.
+    Any,
+    /// Only accept exits that can indicate a defensive runtime check.
+    Defensive,
+}
+
 impl TypeInferenceBuilder<'_, '_> {
-    /// Return `true` if `suite` is a sequence of statements that acts as a
-    /// [defensive exit](super::RedundantConditionContext::DefensiveExit) or exhaustiveness check.
+    /// Return `true` if `suite` ends in an exit recognized by the redundant-condition heuristic.
     ///
-    /// Concretely, we examine the final statement for any of the following:
+    /// Both kinds of exit accept the following final statements:
     /// - a `raise` statement
     /// - a potentially failing assertion
     /// - a call returning `Never`
-    /// - a `return NotImplemented` statement
     /// - or a nested `if` statement with an explicit `else` where every branch of the
-    ///   `if`/`elif`/`else` is itself a deliberately unreachable suite.
-    pub(super) fn is_deliberately_unreachable_suite(&self, suite: &[ast::Stmt]) -> bool {
-        fn is_deliberately_unreachable_inner<'db>(
-            builder: &TypeInferenceBuilder<'db, '_>,
-            suite: &[ast::Stmt],
-            not_implemented: Type<'db>,
-        ) -> bool {
-            let db = builder.db();
-            let env = builder.program_environment();
+    ///   `if`/`elif`/`else` ends in a recognized exit of the requested kind.
+    ///
+    /// [`SuiteExitKind::Any`] also accepts every `return` statement, while
+    /// [`SuiteExitKind::Defensive`] only accepts `return NotImplemented`.
+    ///
+    /// Potentially failing assertions count as exits even when they might succeed. This heuristic
+    /// prioritises avoiding false positives on intentional runtime checks.
+    pub(super) fn suite_ends_with_exit(&self, suite: &[ast::Stmt], kind: SuiteExitKind) -> bool {
+        let db = self.db();
+        let env = self.program_environment();
 
-            suite.last().is_some_and(|stmt| match stmt {
-                ast::Stmt::Raise(_) => true,
-                ast::Stmt::Assert(ast::StmtAssert { test, .. }) => {
-                    builder.condition_truthiness(test).may_be_false()
-                }
-                ast::Stmt::Expr(ast::StmtExpr { value, .. }) if value.is_call_expr() => builder
-                    .expression_type(value)
-                    .is_equivalent_to(db, env, Type::Never),
-                ast::Stmt::Return(ast::StmtReturn {
-                    value: Some(expr), ..
-                }) => {
+        suite.last().is_some_and(|stmt| match stmt {
+            ast::Stmt::Raise(_) => true,
+            ast::Stmt::Assert(ast::StmtAssert { test, .. }) => {
+                self.condition_truthiness(test).may_be_false()
+            }
+            ast::Stmt::Expr(ast::StmtExpr { value, .. }) if value.is_call_expr() => self
+                .expression_type(value)
+                .is_equivalent_to(db, env, Type::Never),
+            ast::Stmt::Return(ast::StmtReturn { value, .. }) => match kind {
+                SuiteExitKind::Any => true,
+                SuiteExitKind::Defensive => value.as_ref().is_some_and(|expr| {
                     // Known limitation: `Any`, `Unknown`, and `Never` are also assignable to
                     // `NotImplementedType`, so an ordinary return *can* suppress a diagnostic here.
                     // We prioritise minimising false positives over minimising false negatives
                     // when recognizing potentially deliberate defensive checks.
-                    builder
-                        .expression_type(expr)
-                        .is_assignable_to(db, env, not_implemented)
-                }
-                ast::Stmt::If(ast::StmtIf {
-                    body,
-                    elif_else_clauses,
-                    ..
-                }) => {
-                    elif_else_clauses
-                        .last()
-                        .is_some_and(|last_clause| last_clause.test.is_none())
-                        && is_deliberately_unreachable_inner(builder, body, not_implemented)
-                        && elif_else_clauses.iter().all(|clause| {
-                            is_deliberately_unreachable_inner(
-                                builder,
-                                &clause.body,
-                                not_implemented,
-                            )
-                        })
-                }
-                _ => false,
-            })
-        }
-
-        let not_implemented =
-            KnownClass::NotImplementedType.to_instance(self.db(), self.program_environment());
-        is_deliberately_unreachable_inner(self, suite, not_implemented)
+                    self.expression_type(expr).is_assignable_to(
+                        db,
+                        env,
+                        KnownClass::NotImplementedType.to_instance(db, env),
+                    )
+                }),
+            },
+            ast::Stmt::If(ast::StmtIf {
+                body,
+                elif_else_clauses,
+                ..
+            }) => {
+                elif_else_clauses
+                    .last()
+                    .is_some_and(|last_clause| last_clause.test.is_none())
+                    && self.suite_ends_with_exit(body, kind)
+                    && elif_else_clauses
+                        .iter()
+                        .all(|clause| self.suite_ends_with_exit(&clause.body, kind))
+            }
+            _ => false,
+        })
     }
 }
 

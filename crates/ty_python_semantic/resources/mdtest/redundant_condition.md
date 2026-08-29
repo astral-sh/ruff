@@ -852,7 +852,7 @@ error[redundant-condition-strict]: Condition is always false
 ```
 
 We avoid annotating the inferred types of comparison conditions for very obvious AST literals such
-as the `None` keyword or number-literal expressions:
+as the `None` keyword or number-literal expressions, including signed numbers:
 
 ```py
 def f(x: None):
@@ -860,6 +860,12 @@ def f(x: None):
         pass
 
     if x == 3:  # snapshot: redundant-condition-strict
+        pass
+
+    if x == -3:  # snapshot: redundant-condition-strict
+        pass
+
+    if x == +3:  # snapshot: redundant-condition-strict
         pass
 ```
 
@@ -878,6 +884,24 @@ error[redundant-condition-strict]: Condition is always false
    |
 27 |     if x == 3:  # snapshot: redundant-condition-strict
    |        -^^^^^
+   |        |
+   |        Has type `None`
+
+
+error[redundant-condition-strict]: Condition is always false
+  --> src/mdtest_snippet.py:30:8
+   |
+30 |     if x == -3:  # snapshot: redundant-condition-strict
+   |        -^^^^^^
+   |        |
+   |        Has type `None`
+
+
+error[redundant-condition-strict]: Condition is always false
+  --> src/mdtest_snippet.py:33:8
+   |
+33 |     if x == +3:  # snapshot: redundant-condition-strict
+   |        -^^^^^^
    |        |
    |        Has type `None`
 ```
@@ -1800,6 +1824,94 @@ def uncalled_function(flag: bool):
         pass
     else:
         raise AssertionError
+```
+
+## Implicit `else` branches
+
+An unrelated assertion after an `if` does not suppress a redundant-condition diagnostic when the
+body ends in an ordinary call:
+
+```py
+def fallthrough(value: int, limit: int):
+    if value is not None:  # error: [redundant-condition-strict] "Condition `value is not None` is always true"
+        print(value)
+    assert limit > 0
+```
+
+The same applies to a final `elif` whose body falls through:
+
+```py
+def fallthrough_elif(value: int | str):
+    if isinstance(value, int):
+        return
+    elif isinstance(value, str):  # error: [redundant-condition-strict] "Condition `isinstance(value, str)` is always true"
+        print(value)
+    raise TypeError
+```
+
+We recognize an implicit `else` when the preceding body ends in a return, a raise, a call returning
+`Never`, or a potentially failing assertion. A nested `if` must have an explicit `else`, and every
+branch must end in one of these statements. These exits can be mixed within the nested conditional:
+
+```py
+from typing import Never
+
+def stop() -> Never:
+    raise RuntimeError
+
+def nested_exits(value: int, choice: int, valid: bool):
+    if value is not None:
+        if choice == 0:
+            return value
+        elif choice == 1:
+            raise ValueError
+        elif choice == 2:
+            stop()
+        elif choice == 3:
+            assert False
+        else:
+            assert valid
+    raise TypeError
+```
+
+Potentially failing assertions count as exits even when they might succeed, because this heuristic
+favors suppressing diagnostics on intentional runtime checks. An assertion that always succeeds does
+not count as an exit:
+
+```py
+def successful_assertion(value: int):
+    if value is not None:  # error: [redundant-condition-strict] "Condition `value is not None` is always true"
+        assert True
+    raise TypeError
+```
+
+A nested conditional that has a branch that falls through, or lacks an explicit `else`, does not
+establish an implicit `else` after the outer `if`:
+
+```py
+def nested_fallthrough(value: int, flag: bool):
+    if value is not None:  # error: [redundant-condition-strict] "Condition `value is not None` is always true"
+        if flag:
+            return value
+        else:
+            print(value)
+    raise TypeError
+
+def nested_without_else(value: int, flag: bool):
+    if value is not None:  # error: [redundant-condition-strict] "Condition `value is not None` is always true"
+        if flag:
+            return value
+    raise TypeError
+```
+
+An ordinary return in the implicit `else` is not a defensive exit, so it does not establish
+exhaustiveness:
+
+```py
+def ordinary_return(value: int):
+    if value is not None:  # error: [redundant-condition-strict] "Condition `value is not None` is always true"
+        return value
+    return 0
 ```
 
 ## Dunder methods that return `NotImplemented`

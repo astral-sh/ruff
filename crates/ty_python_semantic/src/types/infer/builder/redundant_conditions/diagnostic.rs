@@ -107,7 +107,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             | ast::Expr::BooleanLiteral(_)
                             | ast::Expr::NumberLiteral(_) => {}
                             ast::Expr::UnaryOp(ast::ExprUnaryOp {
-                                op: ast::UnaryOp::Not,
+                                op: ast::UnaryOp::USub | ast::UnaryOp::UAdd,
                                 operand,
                                 ..
                             }) if matches!(&**operand, ast::Expr::NumberLiteral(_)) => {}
