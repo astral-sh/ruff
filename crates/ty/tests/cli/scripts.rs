@@ -1642,7 +1642,7 @@ mod uv_metadata {
                 "ordinary.py",
                 r#"
                 import indirect_module
-                from typing import reveal_type
+                from typing_extensions import reveal_type
 
                 reveal_type(indirect_module.value)
                 "#,
