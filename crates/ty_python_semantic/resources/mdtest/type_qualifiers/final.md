@@ -1088,6 +1088,38 @@ class D:
         # No else: y may be unbound at runtime, but there is still an assignment path
 ```
 
+### Assignment in a loop in `__init__`
+
+An assignment in a loop body provides a value for a `Final` attribute declared in the class body.
+
+```py
+from typing import Final
+
+class C:
+    value: Final[int]
+
+    def __init__(self) -> None:
+        for _ in range(2):
+            self.value = 1
+```
+
+### Rebinding `self` does not initialize `Final` attributes
+
+Reading a `Final` attribute before a loop and then rebinding `self` does not assign a value to the
+attribute.
+
+```py
+from typing import Final
+
+class C:
+    value: Final[int]  # error: [final-without-value] "`Final` symbol `value` is not assigned a value"
+
+    def __init__(self, repeat: bool, replacement: "C") -> None:
+        self.value
+        while repeat:
+            self = replacement
+```
+
 ### Reachable `Final` declaration wins for diagnostics
 
 If an earlier `Final` declaration is statically unreachable, diagnostics should be attached to the

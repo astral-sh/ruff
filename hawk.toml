@@ -576,14 +576,6 @@ reason = "change results expose both project and custom-stdlib invalidation stat
 
 [[override]]
 lint = "hawk::dead_public"
-crate = "ty_project"
-item = "watch::ChangeEvent::is_created"
-kind = "inherent_method"
-level = "expect"
-reason = "change event predicates intentionally cover created, changed, deleted, and rescan events"
-
-[[override]]
-lint = "hawk::dead_public"
 crate = "ruff_python_ast"
 item = "expression::StringLikePart::<'a>::as_string_literal"
 kind = "inherent_method"

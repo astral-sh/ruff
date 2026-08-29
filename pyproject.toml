@@ -153,29 +153,109 @@ extend-exclude = [
 ]
 
 [tool.ruff.lint]
+preview = true
 select = [
-    "E", # pycodestyle (error)
-    "F", # pyflakes
-    "B", # bugbear
-    "B9",
-    "C4", # flake8-comprehensions
-    "SIM", # flake8-simplify
-    "I", # isort
-    "UP", # pyupgrade
-    "PIE", # flake8-pie
-    "PGH", # pygrep-hooks
-    "PYI", # flake8-pyi
-    "RUF",
-    "S602", # flake8-bandit: subprocess-popen-with-shell-equals-true
+    # Categories
+    "correctness",
+    "suspicious",
+    "complexity",
+    "performance",
+    "style",
+
+    # E # pycodestyle (error)
+    "ambiguous-class-name",
+    "ambiguous-function-name",
+    "ambiguous-variable-name",
+    "lambda-assignment",
+    "module-import-not-at-top-of-file",
+    "multiple-imports-on-one-line",
+    "multiple-leading-hashes-for-block-comment",
+    "no-indented-block",
+    "none-comparison",
+    "not-in-test",
+    "not-is-test",
+    "true-false-comparison",
+    "type-comparison",
+    "unexpected-indentation",
+
+    # F # pyflakes
+    "forward-annotation-syntax-error",
+    "undefined-local-with-import-star",
+    "undefined-local-with-import-star-usage",
+
+    # B # bugbear
+    "batched-without-explicit-strict",
+    "class-as-data-structure",
+    "map-without-explicit-strict",
+    "no-explicit-stacklevel",
+    "raise-without-from-inside-except",
+    "re-sub-positional-args",
+    "unused-loop-control-variable",
+    "zip-without-explicit-strict",
+
+    # C4 # flake8-comprehensions
+    "unnecessary-comprehension",
+
+    # SIM # flake8-simplify
+    "compare-with-tuple",
+    "dict-get-with-none-default",
+    "if-else-block-instead-of-dict-lookup",
+    "if-else-block-instead-of-if-exp",
+    "if-expr-with-twisted-arms",
+    "suppressible-exception",
+    "uncapitalized-environment-variables",
+    "yoda-conditions",
+
+    # I # isort
+    "missing-required-import",
+
+    # UP # pyupgrade
+    "convert-typed-dict-functional-to-class",
+    "redundant-open-modes",
+
+    # PGH # pygrep-hooks
+    "blanket-noqa",
+    "blanket-type-ignore",
+
+    # PYI # flake8-pyi
+    "argument-default-in-stub",
+    "collections-named-tuple",
+    "docstring-in-stub",
+    "numeric-literal-too-long",
+    "redundant-literal-union",
+    "string-or-bytes-too-long",
+    "typed-argument-default-in-stub",
+    "unsupported-method-call-on-all",
+
+    # RUF
+    "ambiguous-unicode-character-comment",
+    "ambiguous-unicode-character-docstring",
+    "ambiguous-unicode-character-string",
+    "asyncio-dangling-task",
+    "collection-literal-concatenation",
+    "incorrectly-parenthesized-tuple-in-subscript",
+    "non-empty-init-module",
+    "noqa-comments",
+    "parenthesize-chained-operators",
+    "rule-codes-in-selectors",
+    "unnecessary-assign-before-yield",
+    "unraw-re-pattern",
+    "unused-async",
+    "used-dummy-variable",
+
+    # S
+    "subprocess-popen-with-shell-equals-true",
 ]
 
 ignore = [
     # only relevant if you run a script with `python -0`,
     # which seems unlikely for any of the scripts in this repo
-    "B011",
+    "assert-false",
     # Leave it to the formatter to split long lines and
     # the judgement of all of us.
-    "E501"
+    "line-too-long",
+    # This is often more readable in our scripts.
+    "repeated-append",
 ]
 
 [tool.ruff.lint.isort]

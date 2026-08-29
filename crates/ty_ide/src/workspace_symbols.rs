@@ -17,7 +17,7 @@ pub fn workspace_symbols(db: &dyn Db, query: &str) -> Vec<WorkspaceSymbolInfo> {
     let project = db.project();
     let query = QueryPattern::fuzzy(query);
     let files = project.files(db);
-    let files: Vec<_> = files.iter().copied().collect();
+    let files: Vec<_> = files.iter().collect();
 
     files
         .into_par_iter()

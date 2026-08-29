@@ -4,8 +4,8 @@ Checks for type alias definitions that (directly or mutually) refer to themselve
 
 ## Why is it bad?
 
-Although it is permitted to define a recursive type alias, it is not meaningful
-to have a type alias whose expansion can only result in itself, and is therefore not allowed.
+Although it is permitted to define a recursive type alias, it is not meaningful to have a type alias
+whose expansion can only result in itself, and is therefore not allowed.
 
 ## Examples
 

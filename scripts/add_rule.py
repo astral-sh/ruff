@@ -181,7 +181,7 @@ pub(crate) fn {rule_name_snake}(checker: &mut Checker) {{}}
             lines.append(line)
 
         variant = pascal_case(linter)
-        linter_name = linter.split(" ")[0].replace("-", "_")
+        linter_name = linter.split(" ", maxsplit=1)[0].replace("-", "_")
         rule = f"""rules::{linter_name}::rules::{name}"""
         lines.append(
             " " * 8 + f"""({variant}, "{code}") => {rule},\n""",
@@ -197,7 +197,7 @@ pub(crate) fn {rule_name_snake}(checker: &mut Checker) {{}}
 
 
 def _rustfmt(path: str | Path) -> None:
-    subprocess.run(["rustfmt", path])
+    subprocess.run(["rustfmt", path], check=True)
 
 
 if __name__ == "__main__":

@@ -1076,6 +1076,28 @@ def narrowed_bound_method_attribute():
         reveal_type(method.__globals__)  # revealed: dict[str, Any]
 ```
 
+## Receiver rebinding does not shadow methods
+
+Assigning to `self` does not assign to its method attributes. An empty loop targeting `self`
+therefore leaves method calls bound, both before the loop and outside the method containing it.
+
+This guards against a regression in implicit attribute type inference: synthetic loop-header
+definitions for attribute places such as `self.method` are not attribute assignments and must not be
+considered when inferring instance attribute types.
+
+```py
+class C:
+    def method(self) -> None:
+        pass
+
+    def rebind(self) -> None:
+        self.method()
+        for self in []:
+            pass
+
+C().method()
+```
+
 ## Builtin functions and methods
 
 Some builtin functions and methods are heavily special-cased by ty. This mdtest checks that various

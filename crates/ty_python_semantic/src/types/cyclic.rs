@@ -873,19 +873,37 @@ where
     ///
     /// The caller must convert `Err(item)` into an operation-specific conservative result. An
     /// exact recursive reentry uses the detector's configured fallback and is returned as `Ok`.
+    ///
+    /// Completed results are reused only when `reuse_cached` accepts them. Otherwise, the visit
+    /// recomputes the result using the same active recursion guards, without replacing the cached
+    /// value. Results for previously uncached items are memoized as usual.
     #[inline]
     pub(super) fn try_visit(
         &self,
         db: &'db dyn Db,
         item: T,
+        reuse_cached: impl FnOnce(&R) -> bool,
         compute: impl FnOnce() -> R,
     ) -> Result<R, T> {
-        match self.begin_visit(db, item) {
+        let cached_result = self.cache.borrow().get(&item).cloned();
+        let was_cached = cached_result.is_some();
+        if let Some(result) = cached_result
+            && reuse_cached(&result)
+        {
+            return Ok(result);
+        }
+
+        match self.begin_active_visit(db, item) {
             CycleDetectorVisit::Ready(result) => Ok(result),
             CycleDetectorVisit::Cycle(item) => Err(item),
             CycleDetectorVisit::Pending(item) => {
                 let result = compute();
-                Ok(self.finish_visit(item, result))
+                if was_cached {
+                    self.finish_active_visit(&item);
+                    Ok(result)
+                } else {
+                    Ok(self.finish_visit(item, result))
+                }
             }
         }
     }
@@ -895,6 +913,10 @@ where
             return CycleDetectorVisit::Ready(result.clone());
         }
 
+        self.begin_active_visit(db, item)
+    }
+
+    fn begin_active_visit(&self, db: &'db dyn Db, item: T) -> CycleDetectorVisit<T, R> {
         let seen = self.seen.borrow();
         if seen.iter().any(|active| active.item == item) {
             return CycleDetectorVisit::Ready(self.fallback.clone());
@@ -928,12 +950,16 @@ where
 
     /// Finish a [`CycleDetectorVisit::Pending`] visit and cache its result.
     fn finish_visit(&self, item: T, result: R) -> R {
-        let active = self.seen.borrow_mut().pop();
-        debug_assert!(active.as_ref().is_some_and(|active| active.item == item));
+        self.finish_active_visit(&item);
         self.cache
             .borrow_mut()
             .insert_completed(item, result.clone());
         result
+    }
+
+    fn finish_active_visit(&self, item: &T) {
+        let active = self.seen.borrow_mut().pop();
+        debug_assert!(active.as_ref().is_some_and(|active| active.item == *item));
     }
 }
 
@@ -1241,7 +1267,7 @@ mod tests {
         }
     }
 
-    #[derive(Clone, Eq, Hash, PartialEq)]
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
     struct ConstantIdentityItem(u8);
 
     impl<'db> HasIdentity<'db> for ConstantIdentityItem {
@@ -1582,6 +1608,89 @@ class RecursivePropertySetter[T](Protocol):
         assert_eq!(
             detector.visit(db, 1, || detector.visit(db, 1, || 20) + 10),
             10
+        );
+    }
+
+    #[test]
+    fn selectively_reuses_cached_results() {
+        let db = setup_db();
+        let db = &db;
+        let detector = Detector::new(0);
+
+        assert_eq!(detector.try_visit(db, 1, |_| true, || 10), Ok(10));
+        assert_eq!(
+            detector.try_visit(db, 1, |&result| result == 10, || 20),
+            Ok(10)
+        );
+        assert_eq!(
+            detector.try_visit(
+                db,
+                1,
+                |&result| result == 20,
+                || {
+                    assert_eq!(detector.try_visit(db, 1, |_| false, || 30), Ok(0));
+                    detector.visit(db, 1, || 30) + 10
+                }
+            ),
+            Ok(20)
+        );
+        assert_eq!(detector.visit(db, 1, || 30), 10);
+    }
+
+    #[test]
+    fn recomputed_visits_share_exact_recursion_guards() {
+        let db = setup_db();
+        let db = &db;
+        let detector = Detector::new(0);
+
+        assert_eq!(
+            detector.try_visit(db, 1, |_| false, || detector.visit(db, 1, || 20) + 10),
+            Ok(10)
+        );
+        assert_eq!(
+            detector.visit(db, 2, || {
+                assert_eq!(detector.try_visit(db, 2, |_| false, || 20), Ok(0));
+                10
+            }),
+            10
+        );
+    }
+
+    #[test]
+    fn recomputed_visits_share_abstract_identity_guards() {
+        let db = setup_db();
+        let db = &db;
+        let detector = CycleDetector::<TestVisit, ConstantIdentityItem, u8, 1>::new(0);
+
+        assert_eq!(
+            detector.try_visit(
+                db,
+                ConstantIdentityItem(1),
+                |_| false,
+                || {
+                    assert_eq!(
+                        detector.try_visit(db, ConstantIdentityItem(2), |_| true, || 20),
+                        Err(ConstantIdentityItem(2))
+                    );
+                    10
+                }
+            ),
+            Ok(10)
+        );
+        assert_eq!(
+            detector.try_visit(
+                db,
+                ConstantIdentityItem(3),
+                |_| true,
+                || {
+                    assert_eq!(
+                        detector.try_visit(db, ConstantIdentityItem(4), |_| false, || 20),
+                        Err(ConstantIdentityItem(4))
+                    );
+                    10
+                }
+            ),
+            Ok(10)
         );
     }
 

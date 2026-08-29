@@ -574,27 +574,35 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     return result;
                 }
 
-                if let Some(structurally_satisfied) = self.try_check_non_recursive_protocol_members(
-                    db,
-                    ty,
-                    protocol,
-                    source_protocol_as_nominal,
-                    nominal_instance,
-                ) {
-                    return result.or(db, self.constraints, || structurally_satisfied);
-                }
-
                 // For union simplification, failing the nominal relation between two
                 // specializations of the same protocol class is enough to keep both union elements.
                 // Falling back to the structural relation can recursively compare every protocol
                 // member even though a failed redundancy check only means that we preserve a
                 // potentially redundant union arm.
-                if matches!(self.relation, TypeRelation::Redundancy { pure: false })
-                    && source_protocol_as_nominal.is_some_and(|source_instance| {
-                        source_instance.class(db, env).class_literal(db)
-                            == nominal_instance.class(db, env).class_literal(db)
-                    })
+                let can_use_nominal_redundancy =
+                    matches!(self.relation, TypeRelation::Redundancy { pure: false })
+                        && source_protocol_as_nominal.is_some_and(|source_instance| {
+                            source_instance.class(db, env).class_literal(db)
+                                == nominal_instance.class(db, env).class_literal(db)
+                        });
+
+                // Eager finite checks can only reject. Lazy comparisons can also contribute
+                // structural solutions, so try them before using the nominal fallback.
+                if (self.typevar_evaluation == TypeVarEvaluation::Lazy
+                    || !can_use_nominal_redundancy)
+                    && let Some(structurally_satisfied) = self
+                        .try_check_non_recursive_protocol_members(
+                            db,
+                            ty,
+                            protocol,
+                            source_protocol_as_nominal,
+                            nominal_instance,
+                        )
                 {
+                    return result.or(db, self.constraints, || structurally_satisfied);
+                }
+
+                if can_use_nominal_redundancy {
                     return nominally_satisfied;
                 }
             }
@@ -769,6 +777,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     ///
     /// This retains structural solutions such as `T | int`, while recursive members are the
     /// coinductive edge currently being proved. Returns `None` when the shortcut is inapplicable.
+    ///
+    /// Eager comparisons can only reject: matching the finite requirements does not prove that
+    /// the omitted recursive members are compatible.
     fn try_check_non_recursive_protocol_members(
         &self,
         db: &'db dyn Db,
@@ -777,9 +788,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source_protocol_as_nominal: Option<NominalInstanceType<'db>>,
         nominal_instance: NominalInstanceType<'db>,
     ) -> Option<ConstraintSet<'db, 'c>> {
-        if self.typevar_evaluation != TypeVarEvaluation::Lazy
-            || self.is_context_collection_enabled()
-        {
+        if self.is_context_collection_enabled() {
             return None;
         }
 
@@ -826,7 +835,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
         // Filter requirements, not evidence: a target-finite member can contain the same protocol
         // in the source specialization and must remain available for comparison.
-        Some(self.check_protocol_interface_pair(
+        let structurally_satisfied = self.check_protocol_interface_pair(
             db,
             ty,
             source_interface,
@@ -834,7 +843,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 target_non_recursive,
                 target_interface.materialization_kind(),
             ),
-        ))
+        );
+
+        // We run the eager comparison to reject incompatible finite requirements before
+        // expanding recursive members. If it cannot reject, the caller checks the full
+        // interface instead.
+        (self.typevar_evaluation == TypeVarEvaluation::Lazy
+            || structurally_satisfied.is_never_satisfied(db, env))
+        .then_some(structurally_satisfied)
     }
 
     /// Return whether a class-object type inhabits `type[protocol]`.

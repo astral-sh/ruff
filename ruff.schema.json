@@ -582,7 +582,7 @@
       "deprecated": true
     },
     "per-file-ignores": {
-      "description": "A list of mappings from file pattern to rule codes or prefixes to\nexclude, when considering any matching files. An initial '!' negates\nthe file pattern.",
+      "description": "A list of mappings from file pattern to rule codes or prefixes to\nexclude, when considering any matching files. An initial '!' negates\nthe file pattern.\n\nFor more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
       "type": [
         "object",
         "null"
@@ -2512,7 +2512,7 @@
           ]
         },
         "per-file-ignores": {
-          "description": "A list of mappings from file pattern to rule codes or prefixes to\nexclude, when considering any matching files. An initial '!' negates\nthe file pattern.",
+          "description": "A list of mappings from file pattern to rule codes or prefixes to\nexclude, when considering any matching files. An initial '!' negates\nthe file pattern.\n\nFor more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
           "type": [
             "object",
             "null"

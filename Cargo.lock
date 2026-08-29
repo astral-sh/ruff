@@ -4675,6 +4675,7 @@ dependencies = [
  "ty_site_packages",
  "ty_static",
  "wild",
+ "zip",
 ]
 
 [[package]]
@@ -4751,6 +4752,7 @@ dependencies = [
  "smallvec",
  "strum",
  "strum_macros",
+ "toml_parser",
  "tracing",
  "ty_module_resolver",
  "ty_project",
@@ -4812,6 +4814,7 @@ dependencies = [
  "ruff_options_metadata",
  "ruff_python_ast",
  "ruff_python_formatter",
+ "ruff_python_trivia",
  "ruff_ranged_value",
  "ruff_text_size",
  "rustc-hash",
@@ -4941,6 +4944,7 @@ dependencies = [
  "ruff_macros",
  "ruff_notebook",
  "ruff_python_ast",
+ "ruff_python_trivia",
  "ruff_ranged_value",
  "ruff_source_file",
  "ruff_text_size",
@@ -4997,6 +5001,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "camino",
+ "compact_str",
  "dunce",
  "mdtest",
  "ruff_db",

@@ -6,7 +6,8 @@ use std::{cmp, fmt};
 pub use self::changes::ChangeResult;
 use crate::CollectReporter;
 use crate::metadata::settings::file_settings;
-use crate::script::{Script, ScriptEnvironments};
+use crate::script::Script;
+use crate::uv::UvEnvironments;
 use crate::{ProgressReporter, Project, ProjectMetadata};
 use get_size2::StandardTracker;
 use ruff_db::Db as SourceDb;
@@ -15,8 +16,10 @@ use ruff_db::files::{File, Files};
 use ruff_db::system::System;
 use ruff_db::vendored::VendoredFileSystem;
 use salsa::{Database, Event, Setter};
+use ty_module_resolver::system_module_search_paths;
 use ty_python_core::ProgramFile;
 use ty_python_core::program::{FallibleStrategy, MisconfigurationStrategy, UseDefaultStrategy};
+use ty_python_semantic::dependency::DependencyMetadata;
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::{AnalysisSettings, Db as SemanticDb, PythonVersionWithSource};
 
@@ -26,9 +29,45 @@ mod changes;
 pub trait Db: SemanticDb {
     fn project(&self) -> Project;
 
-    fn script_environments(&self) -> &ScriptEnvironments;
+    fn uv_environments(&self) -> &UvEnvironments;
 
     fn dyn_clone(&self) -> Box<dyn Db>;
+}
+
+/// Returns the program to use for `file`.
+///
+/// Scripts use their own program, and project files use the project program. For third-party files,
+/// this chooses the most likely program.
+fn program_file(db: &dyn Db, file: File) -> ProgramFile<'_> {
+    if let Some(script) = Script::for_file(db, file) {
+        return script.program(db).program_file(db, file);
+    }
+
+    let project = db.project();
+    let project_program = project.program(db);
+    let Some(path) = file.path(db).as_system_path() else {
+        return project_program.program_file(db, file);
+    };
+
+    if project.is_file_included(db, path).is_included()
+        || system_module_search_paths(db, project_program.resolver_environment(db))
+            .any(|search_path| path.starts_with(search_path))
+    {
+        return project_program.program_file(db, file);
+    }
+
+    let program = project
+        .script_files(db)
+        .iter()
+        .filter_map(|script| Script::for_file(db, script))
+        .map(|script| script.program(db))
+        .find(|program| {
+            system_module_search_paths(db, program.resolver_environment(db))
+                .any(|search_path| path.starts_with(search_path))
+        })
+        .unwrap_or(project_program);
+
+    program.program_file(db, file)
 }
 
 /// Tracked so that a change to the open-file set only invalidates queries
@@ -52,7 +91,7 @@ pub struct ProjectDatabase {
     // setters instead of swapping in a freshly constructed handle.
     project: Option<Project>,
     files: Files,
-    script_environments: ScriptEnvironments,
+    uv_environments: UvEnvironments,
 
     // IMPORTANT: Never return clones of `system` outside `ProjectDatabase` (only return references)
     // or the "trick" to get a mutable `Arc` in `Self::system_mut` is no longer guaranteed to work.
@@ -89,6 +128,8 @@ impl ProjectDatabase {
     /// read immutable [`Project`] inputs, and every field on files created after this call. Existing
     /// files retain their durability. This must not be used by incremental consumers or checks that
     /// apply fixes.
+    ///
+    /// Initial script synchronization only updates `ScriptEnvironment` inputs, which remain mutable.
     pub fn freeze(&mut self) {
         self.project().freeze(self);
         self.files.freeze();
@@ -108,7 +149,7 @@ impl ProjectDatabase {
     where
         S: System + 'static + Send + Sync + RefUnwindSafe,
     {
-        let script_environments = ScriptEnvironments::new(project_metadata.use_uv());
+        let uv_environments = UvEnvironments::new(project_metadata.use_uv());
         let mut db = Self {
             project: None,
             storage: salsa::Storage::new(if tracing::enabled!(tracing::Level::TRACE) {
@@ -125,7 +166,7 @@ impl ProjectDatabase {
                 None
             }),
             files: Files::default(),
-            script_environments,
+            uv_environments,
             system: Arc::new(system),
         };
 
@@ -169,6 +210,9 @@ impl ProjectDatabase {
 
     /// Checks the files in the project and its dependencies as per the project's check mode.
     ///
+    /// Uses current settings and environments without starting or waiting for uv. Callers that
+    /// require synchronized environments must request synchronization and apply its results first.
+    ///
     /// Use [`set_check_mode`] to update the check mode.
     ///
     /// [`set_check_mode`]: ProjectDatabase::set_check_mode
@@ -180,6 +224,8 @@ impl ProjectDatabase {
 
     /// Checks the files in the project and its dependencies, using the given reporter.
     ///
+    /// Uses the same environment synchronization behavior as [`check`](Self::check).
+    ///
     /// Use [`set_check_mode`] to update the check mode.
     ///
     /// [`set_check_mode`]: ProjectDatabase::set_check_mode
@@ -187,6 +233,9 @@ impl ProjectDatabase {
         self.project().check(self, reporter);
     }
 
+    /// Checks `file` using its current settings and available environment.
+    ///
+    /// Uses the same environment synchronization behavior as [`check`](Self::check).
     #[tracing::instrument(level = "debug", skip(self))]
     pub fn check_file(&self, file: File) -> Vec<Diagnostic> {
         crate::check_file(self, file)
@@ -533,12 +582,7 @@ impl SemanticDb for ProjectDatabase {
     }
 
     fn program_file(&self, file: File) -> ProgramFile<'_> {
-        let program = match Script::for_file(self, file) {
-            None => self.project().program(self),
-            Some(script) => script.program(self),
-        };
-
-        program.program_file(self, file)
+        program_file(self, file)
     }
 
     fn python_version_with_source(&self, file: File) -> &PythonVersionWithSource {
@@ -560,6 +604,18 @@ impl SemanticDb for ProjectDatabase {
     fn analysis_settings(&self, file: File) -> &AnalysisSettings {
         let settings = file_settings(self, file);
         settings.analysis(self)
+    }
+
+    fn dependency_metadata(&self, file: File) -> Option<&DependencyMetadata> {
+        if Script::for_file(self, file).is_some() {
+            return None;
+        }
+
+        self.project()
+            .dependency_metadata(self)
+            .as_ref()
+            .ok()?
+            .as_deref()
     }
 
     fn verbose(&self) -> bool {
@@ -612,8 +668,8 @@ impl Db for ProjectDatabase {
         self.project.unwrap()
     }
 
-    fn script_environments(&self) -> &ScriptEnvironments {
-        &self.script_environments
+    fn uv_environments(&self) -> &UvEnvironments {
+        &self.uv_environments
     }
 
     fn dyn_clone(&self) -> Box<dyn Db> {
@@ -656,12 +712,14 @@ pub(crate) mod testing {
     use ty_python_core::program::{FallibleStrategy, ProgramSettings};
     #[cfg(feature = "testing")]
     use ty_python_semantic::ProgramEnvironment;
+    use ty_python_semantic::dependency::DependencyMetadata;
     use ty_python_semantic::lint::{LintRegistry, RuleSelection};
     use ty_python_semantic::{AnalysisSettings, PythonVersionWithSource};
 
     use crate::db::Db;
     use crate::metadata::settings::file_settings;
-    use crate::script::{Script, ScriptEnvironments};
+    use crate::script::Script;
+    use crate::uv::UvEnvironments;
     use crate::{Project, ProjectMetadata};
 
     type Events = Arc<Mutex<Vec<salsa::Event>>>;
@@ -672,7 +730,7 @@ pub(crate) mod testing {
         storage: salsa::Storage<Self>,
         events: Events,
         files: Files,
-        script_environments: ScriptEnvironments,
+        uv_environments: UvEnvironments,
         system: TestSystem,
         vendored: VendoredFileSystem,
         project: Option<Project>,
@@ -681,7 +739,7 @@ pub(crate) mod testing {
     impl TestDb {
         pub fn new(project: ProjectMetadata) -> Self {
             let events = Events::default();
-            let script_environments = ScriptEnvironments::new(project.use_uv());
+            let uv_environments = UvEnvironments::new(project.use_uv());
             let mut db = Self {
                 storage: salsa::Storage::new(Some(Box::new({
                     let events = events.clone();
@@ -693,7 +751,7 @@ pub(crate) mod testing {
                 system: TestSystem::default(),
                 vendored: ty_vendored::file_system().clone(),
                 files: Files::default(),
-                script_environments,
+                uv_environments,
                 events,
                 project: None,
             };
@@ -796,12 +854,7 @@ pub(crate) mod testing {
     #[salsa::db]
     impl ty_python_semantic::Db for TestDb {
         fn program_file(&self, file: File) -> ProgramFile<'_> {
-            let program = match Script::for_file(self, file) {
-                None => self.project().program(self),
-                Some(script) => script.program(self),
-            };
-
-            program.program_file(self, file)
+            super::program_file(self, file)
         }
 
         fn python_version_with_source(&self, file: File) -> &PythonVersionWithSource {
@@ -828,6 +881,18 @@ pub(crate) mod testing {
             file_settings(self, file).analysis(self)
         }
 
+        fn dependency_metadata(&self, file: File) -> Option<&DependencyMetadata> {
+            if Script::for_file(self, file).is_some() {
+                return None;
+            }
+
+            self.project()
+                .dependency_metadata(self)
+                .as_ref()
+                .ok()?
+                .as_deref()
+        }
+
         fn verbose(&self) -> bool {
             false
         }
@@ -847,8 +912,8 @@ pub(crate) mod testing {
             self.project.unwrap()
         }
 
-        fn script_environments(&self) -> &ScriptEnvironments {
-            &self.script_environments
+        fn uv_environments(&self) -> &UvEnvironments {
+            &self.uv_environments
         }
 
         fn dyn_clone(&self) -> Box<dyn Db> {
@@ -863,11 +928,108 @@ pub(crate) mod testing {
 #[cfg(test)]
 mod tests {
     use ruff_db::Db as _;
-    use ruff_db::files::FileRootKind;
-    use ruff_db::system::{SystemPathBuf, TestSystem};
+    use ruff_db::files::{FileRootKind, system_path_to_file};
+    use ruff_db::system::{DbWithWritableSystem as _, SystemPathBuf, TestSystem};
+    use ruff_db::testing::assert_function_query_was_not_run_by_name;
+    use ruff_python_trivia::textwrap::dedent;
     use ty_module_resolver::list_modules;
+    use ty_python_semantic::Db as _;
 
-    use crate::{Db as _, ProjectDatabase, ProjectMetadata};
+    use crate::db::testing::TestDb;
+    use crate::watch::ChangeEvent;
+    use crate::{Db, ProjectDatabase, ProjectMetadata, UseUv};
+
+    #[test]
+    fn checks_use_available_script_environment_without_running_uv() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let root = SystemPathBuf::from("/project");
+        system.memory_file_system().write_file_all(
+            root.join("script.py"),
+            dedent(
+                r"
+                # /// script
+                # dependencies = []
+                # ///
+                import nonexistent_script_dependency
+                ",
+            )
+            .as_ref(),
+        )?;
+        let metadata = ProjectMetadata::discover(&root, &system)?.with_use_uv(UseUv::Scripts);
+        let db = ProjectDatabase::fallible(metadata, system)?;
+        let file = system_path_to_file(&db, root.join("script.py"))?;
+
+        // This system cannot run commands. Analysis still reports the missing import using its
+        // available configuration; preparing the environment is the host's responsibility.
+        let diagnostics = db.check();
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].id().as_str(), "unresolved-import");
+        let diagnostics = db.check_file(file);
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].id().as_str(), "unresolved-import");
+
+        Ok(())
+    }
+
+    #[test]
+    fn changed_script_metadata_updates_import_resolution() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let fs = system.memory_file_system().clone();
+        let root = SystemPathBuf::from("/project");
+        let script = root.join("script.py");
+        let ordinary = "import dependency";
+        fs.write_files_all([
+            (script.clone(), ordinary),
+            (SystemPathBuf::from("/external/dependency.py"), ""),
+        ])?;
+        let metadata = ProjectMetadata::discover(&root, &system)?;
+        let mut db = ProjectDatabase::fallible(metadata, system)?;
+        assert_eq!(db.check().len(), 1);
+
+        fs.write_file_all(
+            &script,
+            dedent(
+                r"
+                # /// script
+                # [tool.ty.environment]
+                # extra-paths = ['../external']
+                # ///
+                import dependency
+                ",
+            )
+            .as_ref(),
+        )?;
+        db.apply_changes(&[ChangeEvent::file_content_changed(script.clone())]);
+        assert!(db.check().is_empty());
+
+        fs.write_file_all(&script, ordinary)?;
+        db.apply_changes(&[ChangeEvent::file_content_changed(script)]);
+        assert_eq!(db.check().len(), 1);
+
+        Ok(())
+    }
+
+    // Without uv metadata or an enabled dependency rule, checking settings and imports
+    // should not query dependency metadata.
+    #[test]
+    fn dependency_metadata_isnt_queried_unnecessarily() -> anyhow::Result<()> {
+        let root = SystemPathBuf::from("/project");
+        let mut db = TestDb::new(ProjectMetadata::new("app", root.clone()));
+        db.write_file(
+            root.join("main.py"),
+            "import typing\nfrom typing import Any\n",
+        )?;
+        let file = system_path_to_file(&db, root.join("main.py"))?;
+
+        assert!(db.project().check_settings(&db).is_empty());
+        assert!(db.check_file(file).is_empty());
+        let events = db.take_salsa_events();
+        for query in ["missing_direct_dependency", "Project::dependency_metadata_"] {
+            assert_function_query_was_not_run_by_name(&db, query, None, &events);
+        }
+
+        Ok(())
+    }
 
     #[test]
     fn frozen_inputs_support_a_one_shot_check() -> anyhow::Result<()> {

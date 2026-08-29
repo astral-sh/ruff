@@ -13,7 +13,8 @@
 //! - A [`FixtureExposure`] is the name under which that declaration is available during fixture
 //!   lookup. The decorator's `name` argument can make this differ from the Python binding name.
 //! - A [`FixtureRequest`] is an eligible parameter in a collected test or another fixture function.
-//! - A [`FixtureBinding`] links a request to the declaration selected by static fixture lookup.
+//! - A [`FixtureBinding`] links a request to the selected declaration and the exposures through
+//!   which it was found.
 //!
 //! For example:
 //!
@@ -30,18 +31,25 @@
 //!     assert database is not None
 //! ```
 //!
-//! [`fixture_bindings_for_parameter`] provides the public interface to the model. Given a parameter
-//! definition, it classifies the parameter as a possible request, inspects fixture search scopes in
-//! pytest precedence order, and returns every equally viable declaration in the first matching
-//! scope. Language server and type-inference features can consume this data without changing general
-//! definition, reference or rename behavior for the parameter.
+//! We provide two entry points to this model:
+//!
+//! - [`fixture_bindings_for_parameter`]: Given a parameter definition, it classifies the parameter as
+//!   a possible request, inspects fixture search scopes in pytest precedence order, and returns every
+//!   equally viable declaration in the first matching scope. Language server and type-inference
+//!   features can consume this data without changing general definition, reference or rename behavior
+//!   for the parameter.
+//! - [`fixture_exposures_for_definition`]: Given a definition, it returns the fixture exposures made
+//!   available by that definition, including those reached through imports. Each exposure records the
+//!   fixture's public name, canonical declaration, and local and source bindings.
 
 use std::cmp::Ordering;
 
 use itertools::Either;
+use ruff_db::files::FileRange;
 use ruff_db::files::system_path_to_file;
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast::{self as ast, name::Name};
+use ruff_text_size::TextRange;
 use rustc_hash::FxHashSet;
 use ty_module_resolver::{
     ImportingFile, KnownModule, ModuleName, file_to_module, resolve_module_for_import_from,
@@ -63,7 +71,7 @@ use crate::types::{
     ClassBase, ClassLiteral, KnownClass, ProgramEnvironment, Type, definition_expression_type,
     exists_at_runtime, extract_fixed_length_iterable_element_types,
 };
-use crate::{Db, FxIndexSet};
+use crate::{Db, FxIndexMap, FxIndexSet};
 
 /// Resolves pytest fixtures requested by `parameter`.
 ///
@@ -206,23 +214,97 @@ pub fn fixture_bindings_for_parameter<'db>(
     Box::default()
 }
 
-/// A pytest fixture request and the declaration selected by static fixture lookup.
-#[derive(Debug, Clone, Copy, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+/// A pytest fixture request and the fixture selected by static fixture lookup.
+#[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub struct FixtureBinding<'db> {
     request: Definition<'db>,
     fixture: Definition<'db>,
+    exposures: Box<[FixtureExposure<'db>]>,
 }
 
 impl<'db> FixtureBinding<'db> {
     /// Returns the parameter definition that requests the fixture.
-    pub fn request(self) -> Definition<'db> {
+    pub fn request(&self) -> Definition<'db> {
         self.request
     }
 
     /// Returns the decorated function that declares the fixture.
-    pub fn fixture(self) -> Definition<'db> {
+    pub fn fixture(&self) -> Definition<'db> {
         self.fixture
     }
+
+    /// Returns the equally viable exposures through which the request reaches the fixture.
+    #[cfg_attr(not(test), expect(dead_code))]
+    fn exposures(&self) -> &[FixtureExposure<'db>] {
+        &self.exposures
+    }
+}
+
+/// Returns the available pytest fixture exposures contributed by `definition`.
+///
+/// A decorated function contributes an exposure directly:
+///
+/// ```python
+/// # fixtures.py
+/// import pytest
+///
+/// @pytest.fixture
+/// def resource(): ...
+/// ```
+///
+/// Querying the definition of `resource` returns one exposure, schematically:
+///
+/// ```text
+/// FixtureExposure {
+///     name: "resource",
+///     local_binding: Definition(fixtures.resource),
+///     fixture: Definition(fixtures.resource),
+///     source_binding: None,
+/// }
+/// ```
+///
+/// An import contributes the exposures reachable through that import:
+///
+/// ```python
+/// # fixtures.py
+/// import pytest
+///
+/// @pytest.fixture
+/// def resource(): ...
+///
+/// # plugin.py
+/// from fixtures import resource as helper
+/// ```
+///
+/// Querying the import definition of `helper` returns:
+///
+/// ```text
+/// FixtureExposure {
+///     name: "helper",
+///     local_binding: Definition(plugin.helper),
+///     fixture: Definition(fixtures.resource),
+///     source_binding: Some(Definition(fixtures.resource)),
+/// }
+/// ```
+#[cfg_attr(not(test), expect(dead_code))]
+fn fixture_exposures_for_definition<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> Vec<FixtureExposure<'db>> {
+    let index = semantic_index(db, definition.program_file(db));
+    let definition_scope = definition.file_scope(db);
+    if !is_available_fixture_search_scope(db, index, definition_scope)
+        || !is_available_definition_in_scope(db, index, definition_scope, definition)
+    {
+        return Vec::new();
+    }
+
+    let Some(symbol) = definition.place(db).as_symbol() else {
+        return Vec::new();
+    };
+    let name = place_table(db, definition.scope(db)).symbol(symbol).name();
+
+    exposures_contributed_by_definition(db, definition, name)
 }
 
 /// Returns the installed core pytest plugin files in registration order.
@@ -624,26 +706,114 @@ struct FixtureDeclaration<'db> {
     name: FixtureName,
 }
 
-/// A fixture declaration made available under a particular name.
-#[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+/// A fixture made available through one Python binding.
+///
+/// For example, consider a fixture re-exported through two aliases:
+///
+/// ```python
+/// # fixtures.py
+/// import pytest
+///
+/// @pytest.fixture
+/// def resource(): ...  # fixture
+///
+/// # reexports.py
+/// from fixtures import resource as helper  # source_binding
+///
+/// # plugin.py
+/// from reexports import helper as test_resource  # local_binding; name = "test_resource"
+/// ```
+///
+/// The exposure contributed by `test_resource` points to `helper` as its immediate source and to
+/// `resource` as the canonical fixture declaration.
+#[derive(Debug, Clone, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 struct FixtureExposure<'db> {
+    /// The name used to request this fixture (`"test_resource"` in the example above).
     name: Name,
-    definition: Definition<'db>,
+    /// The local Python binding that exposes the fixture (`test_resource` in the example above).
+    local_binding: Definition<'db>,
+    /// The decorated function that declares the fixture (`resource` in the example above).
+    fixture: Definition<'db>,
+    /// The immediately preceding binding (`helper` in the example above), if any.
+    ///
+    /// This is `None` for a direct fixture declaration. For a stub backed by a runtime
+    /// implementation, it is also `None` so the two definitions have separate reference families.
+    source_binding: Option<Definition<'db>>,
 }
 
+#[cfg_attr(not(test), expect(dead_code))]
 impl<'db> FixtureExposure<'db> {
     /// Exposes a declaration under its explicit fixture name or local Python binding name.
-    fn new(symbol_name: &Name, declaration: &FixtureDeclaration<'db>) -> Option<Self> {
+    fn new(
+        symbol_name: &Name,
+        local_binding: Definition<'db>,
+        declaration: &FixtureDeclaration<'db>,
+        source_binding: Option<Definition<'db>>,
+    ) -> Option<Self> {
         let name = match &declaration.name {
             FixtureName::Default => symbol_name.clone(),
-            FixtureName::Explicit(name) => name.clone(),
+            FixtureName::Explicit { name, .. } => name.clone(),
             FixtureName::Unknown => return None,
         };
         Some(Self {
             name,
-            definition: declaration.definition,
+            local_binding,
+            fixture: declaration.definition,
+            source_binding,
         })
     }
+
+    /// Returns the public name that pytest uses to request this exposure.
+    fn name(&self) -> &Name {
+        &self.name
+    }
+
+    /// Returns the local Python binding through which this fixture is exposed.
+    fn local_binding(&self) -> Definition<'db> {
+        self.local_binding
+    }
+
+    /// Returns the decorated function that declares the fixture.
+    fn fixture(&self) -> Definition<'db> {
+        self.fixture
+    }
+
+    /// Returns the binding from which this exposure was imported, if any.
+    fn source_binding(&self) -> Option<Definition<'db>> {
+        self.source_binding
+    }
+
+    /// Returns the binding or decorator from which this exposure gets its public name.
+    fn name_source(&self, db: &'db dyn Db) -> FixtureNameSource<'db> {
+        let Some(declaration) = fixture_declaration(db, self.fixture) else {
+            return FixtureNameSource::Binding(self.local_binding);
+        };
+
+        match &declaration.name {
+            FixtureName::Explicit { range, .. } => FixtureNameSource::Explicit {
+                fixture: self.fixture,
+                declaration: range.map(|range| FileRange::new(self.fixture.file(db), range)),
+            },
+            FixtureName::Default | FixtureName::Unknown => {
+                FixtureNameSource::Binding(self.local_binding)
+            }
+        }
+    }
+}
+
+/// The source from which a fixture obtains its public name.
+#[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]
+#[cfg_attr(not(test), expect(dead_code))]
+enum FixtureNameSource<'db> {
+    /// The Python binding that supplies the fixture name.
+    Binding(Definition<'db>),
+    /// An explicit fixture name supplied by the decorated function.
+    Explicit {
+        /// The decorated function that declares the fixture.
+        fixture: Definition<'db>,
+        /// The fixture-name literal's file and content range when it is one string literal.
+        declaration: Option<FileRange>,
+    },
 }
 
 /// A possible fixture name and the exposures it contributes to a fixture search scope.
@@ -662,10 +832,50 @@ enum FixtureName {
     /// Uses the Python binding name at the exposure site.
     Default,
     /// Uses a statically known explicit name.
-    Explicit(Name),
+    Explicit {
+        name: Name,
+        range: Option<TextRange>,
+    },
     /// Represents a public name that ty cannot determine statically, such as a
     /// dynamically-typed expression or a non-literal `str`.
     Unknown,
+}
+
+/// Returns whether `scope` and each enclosing class remain available from their parent scopes.
+fn is_available_fixture_search_scope<'db>(
+    db: &'db dyn Db,
+    index: &ty_python_core::SemanticIndex<'db>,
+    scope: FileScopeId,
+) -> bool {
+    match index.scope(scope).kind() {
+        ScopeKind::Module => true,
+        ScopeKind::Class => non_type_parameter_parent(index, scope).is_some_and(|parent| {
+            if !is_available_fixture_search_scope(db, index, parent) {
+                return false;
+            }
+
+            let class_ref = index.scope(scope).node().expect_class();
+            let definition = index.expect_single_definition(class_ref);
+            is_available_definition_in_scope(db, index, parent, definition)
+        }),
+        _ => false,
+    }
+}
+
+/// Returns whether `definition` remains bound in `scope` and exists at runtime.
+fn is_available_definition_in_scope<'db>(
+    db: &'db dyn Db,
+    index: &ty_python_core::SemanticIndex<'db>,
+    scope: FileScopeId,
+    definition: Definition<'db>,
+) -> bool {
+    let resolution = DefinitionResolution::from_bindings(
+        db,
+        index
+            .use_def_map(scope)
+            .end_of_scope_bindings(definition.place(db)),
+    );
+    resolution.definitions().contains(&definition) && exists_at_runtime(db, definition)
 }
 
 /// A class hierarchy or scope searched when resolving a fixture request.
@@ -694,19 +904,8 @@ fn fixture_name_candidates<'db>(
         let symbol = table.symbol(symbol_id);
         let name = symbol.name();
         let resolution = DefinitionResolution::from_bindings(db, bindings);
-        let mut exposures = Vec::new();
-
-        for fixture_definition in
-            fixture_candidates_from_symbol_definitions(db, name, resolution.definitions())
-        {
-            let Some(declaration) = fixture_declaration(db, fixture_definition) else {
-                continue;
-            };
-            let Some(exposure) = FixtureExposure::new(name, declaration) else {
-                continue;
-            };
-            exposures.push(exposure);
-        }
+        let exposures =
+            fixture_exposures_from_symbol_definitions(db, name, resolution.definitions());
 
         // Reject names that neither expose a fixture nor bind a runtime class attribute that
         // can shadow an inherited fixture.
@@ -726,21 +925,19 @@ fn fixture_name_candidates<'db>(
     name_candidates.into_boxed_slice()
 }
 
-/// Returns fixture function candidates reachable from the resolved definitions for one symbol.
-fn fixture_candidates_from_symbol_definitions<'db>(
+/// Returns fixture exposures reachable from the resolved definitions for one symbol.
+fn fixture_exposures_from_symbol_definitions<'db>(
     db: &'db dyn Db,
     name: &Name,
     definitions: &[Definition<'db>],
-) -> Vec<Definition<'db>> {
-    let mut candidates = FxIndexSet::default();
+) -> Vec<FixtureExposure<'db>> {
+    let mut exposures = FxIndexSet::default();
 
     for definition in definitions.iter().copied() {
-        for candidate in fixture_candidates_from_definition(db, definition, name) {
-            candidates.insert(candidate);
-        }
+        exposures.extend(exposures_contributed_by_definition(db, definition, name));
     }
 
-    candidates.into_iter().collect()
+    exposures.into_iter().collect()
 }
 
 /// Returns whether a class attribute has any reachable runtime binding.
@@ -773,7 +970,8 @@ fn bindings_in_search_scope<'db>(
 
     let mut seen_names = FxHashSet::default();
     let mut winning_name: Option<&Name> = None;
-    let mut fixtures = FxIndexSet::default();
+    let mut fixtures: FxIndexMap<Definition<'db>, Vec<FixtureExposure<'db>>> =
+        FxIndexMap::default();
 
     for scope in search_scopes {
         for name_candidate in fixture_name_candidates(db, scope) {
@@ -787,7 +985,7 @@ fn bindings_in_search_scope<'db>(
                 // Request must match public name of the fixture
                 if request.name != exposure.name
                     // A fixture definition cannot fulfill a request for itself
-                    || request.function_definition == exposure.definition
+                    || request.function_definition == exposure.fixture
                 {
                     continue;
                 }
@@ -809,16 +1007,20 @@ fn bindings_in_search_scope<'db>(
                     }
                     Some(Ordering::Equal) => {}
                 }
-                fixtures.insert(exposure.definition);
+                let exposures = fixtures.entry(exposure.fixture).or_default();
+                if !exposures.contains(exposure) {
+                    exposures.push(exposure.clone());
+                }
             }
         }
     }
 
     fixtures
         .into_iter()
-        .map(|fixture| FixtureBinding {
+        .map(|(fixture, exposures)| FixtureBinding {
             request: request.parameter_definition,
             fixture,
+            exposures: exposures.into_boxed_slice(),
         })
         .collect()
 }
@@ -919,29 +1121,41 @@ fn fixture_declaration<'db>(
     Some(FixtureDeclaration { definition, name })
 }
 
-/// Returns fixture function candidates reachable from a symbol definition.
-fn fixture_candidates_from_definition<'db>(
+/// Returns fixture exposures contributed by a symbol definition.
+fn exposures_contributed_by_definition<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
     symbol_name: &Name,
-) -> Vec<Definition<'db>> {
-    if definition.file(db).is_stub(db) {
-        if let Some(source_file) =
+) -> Vec<FixtureExposure<'db>> {
+    if definition.file(db).is_stub(db)
+        && let Some(source_file) =
             stub_file_to_real_module(db, definition.program_file(db).resolver_file(db))
                 .and_then(|module| module.file(db))
-        {
-            let source_file = ProgramFile::new(db, source_file, definition.program(db));
-            if definition.scope(db).node(db).scope_kind() == ScopeKind::Class {
-                return fixture_candidates_from_stub_class_definition(db, definition, source_file);
-            }
-
-            return fixture_candidates_for_name_in_scope(
+    {
+        let source_file = ProgramFile::new(db, source_file, definition.program(db));
+        let source_exposures = if definition.scope(db).node(db).scope_kind() == ScopeKind::Class {
+            fixture_exposures_from_stub_class_definition(db, definition, source_file)
+        } else {
+            fixture_exposures_for_name_in_scope(
                 db,
                 global_scope(db, source_file),
                 symbol_name.clone(),
             )
-            .to_vec();
-        }
+            .to_vec()
+        };
+
+        // The stub is the binding visible to callers. Keep the runtime fixture as the canonical
+        // declaration, but don't link the stub's exposure to the runtime binding, so their
+        // references remain in separate families. This matches reference behavior for ordinary
+        // Python symbols.
+        return source_exposures
+            .into_iter()
+            .map(|exposure| FixtureExposure {
+                local_binding: definition,
+                source_binding: None,
+                ..exposure
+            })
+            .collect();
     }
 
     let kind = definition.kind(db);
@@ -956,25 +1170,41 @@ fn fixture_candidates_from_definition<'db>(
     }
 
     match kind {
-        DefinitionKind::Function(_) => vec![definition],
+        DefinitionKind::Function(_) => {
+            let Some(declaration) = fixture_declaration(db, definition) else {
+                return Vec::new();
+            };
+            let Some(exposure) = FixtureExposure::new(symbol_name, definition, declaration, None)
+            else {
+                return Vec::new();
+            };
+            vec![exposure]
+        }
         DefinitionKind::ImportFrom(import) => {
             let parsed = parsed_module(db, definition.python_file(db)).load(db);
-            fixture_candidates_from_import(
+            fixture_exposures_from_import(
                 db,
                 definition,
                 import.import(&parsed),
                 import.alias(&parsed).name.id(),
+                symbol_name,
             )
         }
         DefinitionKind::StarImport(import) => {
             let parsed = parsed_module(db, definition.python_file(db)).load(db);
-            fixture_candidates_from_import(db, definition, import.import(&parsed), symbol_name)
+            fixture_exposures_from_import(
+                db,
+                definition,
+                import.import(&parsed),
+                symbol_name,
+                symbol_name,
+            )
         }
         _ => Vec::new(),
     }
 }
 
-/// Returns fixture candidates for a stub class member from its runtime source class.
+/// Returns fixture exposures for a stub class member from its runtime source class.
 ///
 /// For example, given these corresponding files:
 ///
@@ -991,11 +1221,11 @@ fn fixture_candidates_from_definition<'db>(
 ///
 /// The stub definition yields the lexical path `["Plugin", "resource"]`. This function finds the
 /// `Plugin` scope in the source file, then resolves the visible `resource` definitions in that scope.
-fn fixture_candidates_from_stub_class_definition<'db>(
+fn fixture_exposures_from_stub_class_definition<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
     source_file: ProgramFile<'db>,
-) -> Vec<Definition<'db>> {
+) -> Vec<FixtureExposure<'db>> {
     let Some(path) = lexical_name_path_for_definition(db, definition) else {
         return Vec::new();
     };
@@ -1004,16 +1234,16 @@ fn fixture_candidates_from_stub_class_definition<'db>(
         return Vec::new();
     };
 
-    let mut candidates = FxIndexSet::default();
+    let mut exposures = FxIndexSet::default();
     for source_scope in source_scopes_for_lexical_path(db, source_file, path.into_boxed_slice()) {
-        candidates.extend(
-            fixture_candidates_for_name_in_scope(db, *source_scope, member_name.clone())
+        exposures.extend(
+            fixture_exposures_for_name_in_scope(db, *source_scope, member_name.clone())
                 .iter()
-                .copied(),
+                .cloned(),
         );
     }
 
-    candidates.into_iter().collect()
+    exposures.into_iter().collect()
 }
 
 /// Returns scopes in `source_file` with the given lexical path.
@@ -1049,7 +1279,7 @@ fn source_scopes_for_lexical_path<'db>(
     scopes.into_boxed_slice()
 }
 
-/// Returns fixture candidates supplied by a name's end-of-scope bindings.
+/// Returns fixture exposures supplied by a name's end-of-scope bindings.
 #[allow(
     clippy::needless_pass_by_value,
     reason = "Salsa requires owned query keys, and lint expectations cannot observe diagnostics from the generated function"
@@ -1059,11 +1289,11 @@ fn source_scopes_for_lexical_path<'db>(
     cycle_initial=|_, _, _, _| Box::default(),
     heap_size=ruff_memory_usage::heap_size
 )]
-fn fixture_candidates_for_name_in_scope<'db>(
+fn fixture_exposures_for_name_in_scope<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
     name: Name,
-) -> Box<[Definition<'db>]> {
+) -> Box<[FixtureExposure<'db>]> {
     let Some(symbol) = place_table(db, scope).symbol_id(name.as_str()) else {
         return Box::default();
     };
@@ -1072,17 +1302,18 @@ fn fixture_candidates_for_name_in_scope<'db>(
         db,
         use_def_map(db, scope).end_of_scope_symbol_bindings(symbol),
     );
-    fixture_candidates_from_symbol_definitions(db, &name, resolution.definitions())
+    fixture_exposures_from_symbol_definitions(db, &name, resolution.definitions())
         .into_boxed_slice()
 }
 
-/// Follows an import to fixture function candidates exposed by its target.
-fn fixture_candidates_from_import<'db>(
+/// Follows an import to fixture exposures supplied by its target.
+fn fixture_exposures_from_import<'db>(
     db: &'db dyn Db,
     importing_definition: Definition<'db>,
     import: &ast::StmtImportFrom,
-    name: &Name,
-) -> Vec<Definition<'db>> {
+    imported_name: &Name,
+    local_name: &Name,
+) -> Vec<FixtureExposure<'db>> {
     let program_file = importing_definition.program_file(db);
     let importing_file =
         ImportingFile::File(program_file.file(db), program_file.resolver_environment(db));
@@ -1093,15 +1324,27 @@ fn fixture_candidates_from_import<'db>(
     let Some(imported_file) = imported_module.file(db) else {
         return Vec::new();
     };
-    fixture_candidates_for_name_in_scope(
+    let source_exposures = fixture_exposures_for_name_in_scope(
         db,
         global_scope(
             db,
             ProgramFile::new(db, imported_file, program_file.program(db)),
         ),
-        name.clone(),
-    )
-    .to_vec()
+        imported_name.clone(),
+    );
+
+    source_exposures
+        .iter()
+        .filter_map(|source| {
+            let declaration = fixture_declaration(db, source.fixture).as_ref()?;
+            FixtureExposure::new(
+                local_name,
+                importing_definition,
+                declaration,
+                Some(source.local_binding),
+            )
+        })
+        .collect()
 }
 
 /// Classifies the `name` argument to a fixture decorator.
@@ -1118,17 +1361,28 @@ fn fixture_name_from_arguments<'db>(
         return FixtureName::Unknown;
     };
     if name_type.is_none(db) {
-        FixtureName::Default
-    } else if let Some(string) = name_type.as_string_literal() {
-        let name_keyword_value = string.value(db);
-        if name_keyword_value.is_empty() {
-            FixtureName::Default
-        } else {
-            FixtureName::Explicit(Name::new(name_keyword_value))
-        }
-    } else {
-        FixtureName::Unknown
+        return FixtureName::Default;
     }
+    let Some(name) = name_type.as_string_literal().map(|string| string.value(db)) else {
+        return FixtureName::Unknown;
+    };
+    if name.is_empty() {
+        return FixtureName::Default;
+    }
+
+    FixtureName::Explicit {
+        name: Name::new(name),
+        range: fixture_name_literal_range(&name_keyword.value, name),
+    }
+}
+
+/// Returns the content range when `expression` spells `name` as one string literal.
+fn fixture_name_literal_range(expression: &ast::Expr, name: &str) -> Option<TextRange> {
+    expression
+        .as_string_literal_expr()?
+        .as_single_part_string()
+        .filter(|literal| literal.as_str() == name)
+        .map(ast::StringLiteral::content_range)
 }
 
 /// Returns a scope's lexical parent, skipping an intervening type-parameter scope.
@@ -1433,10 +1687,15 @@ mod tests {
     use ruff_db::parsed::parsed_module;
     use ruff_db::system::{DbWithWritableSystem, SystemPathBuf};
     use ruff_python_ast as ast;
+    use ruff_text_size::Ranged;
     use ty_python_core::definition::Definition;
     use ty_python_core::semantic_index;
 
-    use super::{fixture_bindings_for_parameter, pytest_global_plugin_files};
+    use super::{
+        FixtureExposure, FixtureNameSource, end_of_scope_definition,
+        fixture_bindings_for_parameter, fixture_exposures_for_definition,
+        pytest_global_plugin_files,
+    };
     use crate::Db as _;
     use crate::db::tests::{TestDb, TestDbBuilder};
 
@@ -2341,6 +2600,11 @@ class TestExample(Base):
         9 |     def implementation(self): ...
           |         --------------
         ");
+
+        let fixture = test.function_definition("/src/fixtures.py", "implementation");
+        let stub = test.global_definition("/src/fixtures.pyi", "implementation");
+        let stub_exposures = fixture_exposures_for_definition(&test.db, stub);
+        assert_single_exposure(&stub_exposures, "public_name", stub, fixture, None);
     }
 
     #[test]
@@ -3100,6 +3364,140 @@ default_plugins = ("not-valid", "baseplugin")
         );
     }
 
+    #[test]
+    fn preserves_fixture_exposure_provenance_across_imports() {
+        let test = PytestTestCase::with_files(
+            "/src/test_example.py",
+            &[
+                (
+                    "/src/fixtures.py",
+                    r#"
+import pytest
+
+@pytest.fixture
+def resource(): ...
+"#,
+                ),
+                (
+                    "/src/reexports.py",
+                    r#"
+from fixtures import resource as helper
+"#,
+                ),
+                (
+                    "/src/test_example.py",
+                    r#"
+from reexports import helper
+
+def test_use(helper): ...
+"#,
+                ),
+            ],
+        );
+
+        let fixture = test.function_definition("/src/fixtures.py", "resource");
+        let alias = test.global_definition("/src/reexports.py", "helper");
+        let imported_alias = test.global_definition("/src/test_example.py", "helper");
+
+        let fixture_exposures = fixture_exposures_for_definition(&test.db, fixture);
+        let fixture_exposure =
+            assert_single_exposure(&fixture_exposures, "resource", fixture, fixture, None);
+        assert_eq!(
+            fixture_exposure.name_source(&test.db),
+            FixtureNameSource::Binding(fixture)
+        );
+
+        let alias_exposures = fixture_exposures_for_definition(&test.db, alias);
+        assert_single_exposure(&alias_exposures, "helper", alias, fixture, Some(fixture));
+
+        let imported_exposures = fixture_exposures_for_definition(&test.db, imported_alias);
+        assert_single_exposure(
+            &imported_exposures,
+            "helper",
+            imported_alias,
+            fixture,
+            Some(alias),
+        );
+
+        let test_use = test.function("test_use");
+        let request = test_use.parameter_definition("helper");
+        let bindings = fixture_bindings_for_parameter(&test.db, request);
+        let [binding] = bindings else {
+            panic!("fixture request should have one binding");
+        };
+        assert_eq!(binding.fixture(), fixture);
+        assert_eq!(binding.exposures(), imported_exposures);
+    }
+
+    #[test]
+    fn preserves_explicit_fixture_name_declarations() {
+        let test = PytestTestCase::with_files(
+            "/src/test_example.py",
+            &[
+                (
+                    "/src/fixtures.py",
+                    r#"
+import pytest
+
+@pytest.fixture(name="resource")
+def implementation(): ...
+"#,
+                ),
+                (
+                    "/src/test_example.py",
+                    r#"
+from fixtures import implementation as helper
+
+def test_use(resource): ...
+"#,
+                ),
+            ],
+        );
+
+        let fixture = test.function_definition("/src/fixtures.py", "implementation");
+        let alias = test.global_definition("/src/test_example.py", "helper");
+        let alias_exposures = fixture_exposures_for_definition(&test.db, alias);
+        let alias_exposure =
+            assert_single_exposure(&alias_exposures, "resource", alias, fixture, Some(fixture));
+
+        let FixtureNameSource::Explicit {
+            fixture: declaring_fixture,
+            declaration: Some(declaration),
+        } = alias_exposure.name_source(&test.db)
+        else {
+            panic!("literal fixture name should retain its declaration range");
+        };
+        assert_eq!(declaring_fixture, fixture);
+        let source = ruff_db::source::source_text(&test.db, declaration.file());
+        assert_eq!(&source[declaration.range()], "resource");
+
+        let test_use = test.function("test_use");
+        let request = test_use.parameter_definition("resource");
+        let bindings = fixture_bindings_for_parameter(&test.db, request);
+        let [binding] = bindings else {
+            panic!("explicit fixture request should have one binding");
+        };
+        assert_eq!(binding.exposures(), alias_exposures);
+    }
+
+    #[test]
+    fn excludes_unavailable_definitions_from_fixture_exposures() {
+        let test = PytestTestCase::new(
+            "/src/test_example.py",
+            r#"
+import pytest
+
+@pytest.fixture
+def resource(): ...
+
+resource = None
+"#,
+        );
+        let fixture = test.function_definition("/src/test_example.py", "resource");
+
+        assert!(fixture_exposures_for_definition(&test.db, fixture).is_empty());
+    }
+
     struct PytestTestCase {
         db: TestDb,
         path: &'static str,
@@ -3167,6 +3565,20 @@ default_plugins = ("not-valid", "baseplugin")
                         .replace('\\', "/")
                 })
                 .collect()
+        }
+
+        fn function_definition<'db>(&'db self, path: &str, name: &str) -> Definition<'db> {
+            let file = system_path_to_file(&self.db, path).expect("test file exists");
+            let file = self.db.program_file(file);
+            let module = parsed_module(&self.db, file.python_file(&self.db)).load(&self.db);
+            let function = find_function(module.suite(), name).expect("function exists");
+            semantic_index(&self.db, file).expect_single_definition(function)
+        }
+
+        fn global_definition<'db>(&'db self, path: &str, name: &str) -> Definition<'db> {
+            let file = system_path_to_file(&self.db, path).expect("test file exists");
+            let file = self.db.program_file(file);
+            end_of_scope_definition(&self.db, file, name).expect("global definition exists")
         }
     }
 
@@ -3242,6 +3654,23 @@ default_plugins = ("not-valid", "baseplugin")
                 }
             }
         }
+    }
+
+    fn assert_single_exposure<'a, 'db>(
+        exposures: &'a [FixtureExposure<'db>],
+        name: &str,
+        local_binding: Definition<'db>,
+        fixture: Definition<'db>,
+        source_binding: Option<Definition<'db>>,
+    ) -> &'a FixtureExposure<'db> {
+        let [exposure] = exposures else {
+            panic!("expected exactly one fixture exposure, got {exposures:#?}");
+        };
+        assert_eq!(exposure.name(), name);
+        assert_eq!(exposure.local_binding(), local_binding);
+        assert_eq!(exposure.fixture(), fixture);
+        assert_eq!(exposure.source_binding(), source_binding);
+        exposure
     }
 
     fn find_function<'ast>(

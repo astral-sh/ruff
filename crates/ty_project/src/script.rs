@@ -17,14 +17,8 @@ use crate::metadata::options::{EnvironmentOptions, Options, OptionsContext};
 use crate::metadata::pyproject::Tool;
 use crate::metadata::settings::Settings;
 use crate::metadata::value::RelativePathBuf;
-use crate::uv::UvMetadata;
+use crate::uv::{UvMetadata, script_environment};
 use crate::{Db, ProjectMetadata};
-
-mod environment;
-
-pub(crate) use environment::ScriptEnvironmentCacheKey;
-use environment::script_environment;
-pub use environment::{ScriptEnvironmentAvailability, ScriptEnvironments};
 
 /// A standalone PEP 723 script and its resolved settings.
 #[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
@@ -79,7 +73,7 @@ pub(crate) fn script(db: &dyn Db, file: File) -> Option<Script<'_>> {
     let tag = script_tag(db, file)?;
 
     // Never treat third-party files as scripts.
-    if !crate::should_check_file(db, file) {
+    if !crate::is_project_file(db, file) {
         return None;
     }
 
@@ -137,7 +131,7 @@ pub(crate) fn script(db: &dyn Db, file: File) -> Option<Script<'_>> {
 ///
 /// Most files have no script tag. Boxing keeps the cached result compact when it is `None`.
 #[salsa::tracked(returns(as_deref))]
-pub(crate) fn script_tag(db: &dyn SourceDb, file: File) -> Option<Box<ScriptTag>> {
+pub fn script_tag(db: &dyn SourceDb, file: File) -> Option<Box<ScriptTag>> {
     let path = file.path(db);
     if path.is_vendored_path() {
         return None;
