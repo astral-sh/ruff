@@ -4148,6 +4148,26 @@ class Foo: ...
 reveal_type(Foo.__class__)  # revealed: <class 'type'>
 ```
 
+## `__class__` on recursive aliases
+
+For a recursive alias that contains both instances and classes, `value.__class__` agrees with
+`type(value)`. Repeated queries retain both the instance classes and their possible metaclasses.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+type Meta[T] = type[T]
+type Recursive = int | Meta[Recursive]
+
+def recursive_class(value: Recursive):
+    reveal_type(type(value))  # revealed: type[int | type]
+    reveal_type(value.__class__)  # revealed: type[int | type]
+    reveal_type(type(value))  # revealed: type[int | type]
+```
+
 ## Module attributes
 
 ### Basic

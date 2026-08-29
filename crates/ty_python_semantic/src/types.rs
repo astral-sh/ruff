@@ -403,6 +403,34 @@ fn definition_expression_annotation<'db>(
     }
 }
 
+/// Active recursion state shared across nested type operations.
+///
+/// A transformation cache belongs to one mapping, but recursion can span specialization,
+/// materialization, and meta-type projection. Preserve this context when starting a new mapping
+/// visitor. Each operation keeps its own guards because its recursion keys and cycle fallbacks
+/// differ.
+#[derive(Default)]
+struct TypeRecursionContext<'db> {
+    meta_type: MetaTypeRecursion<'db>,
+}
+
+/// Guards shared by meta-type projections and the specializations they trigger.
+///
+/// Each projection also tracks direct alias recursion locally: those cycles add no new classes,
+/// whereas re-entering through another projection can introduce metaclasses.
+#[derive(Default)]
+struct MetaTypeRecursion<'db> {
+    aliases: ActiveRecursionDetector<(Program<'db>, TypeAliasType<'db>)>,
+    growing_aliases: ActiveRecursionDetector<(Program<'db>, Definition<'db>)>,
+    typevars: ActiveRecursionDetector<(Program<'db>, BoundTypeVarIdentity<'db>)>,
+}
+
+impl MetaTypeRecursion<'_> {
+    fn is_active(&self) -> bool {
+        !self.aliases.is_empty() || !self.growing_aliases.is_empty() || !self.typevars.is_empty()
+    }
+}
+
 struct ApplyTypeMappingTag;
 struct ApplyMaterializationEquivalence;
 
@@ -416,6 +444,7 @@ type MaterializationEquivalenceVisitor<'db> =
 /// reuse the result of another.
 pub(crate) struct ApplyTypeMappingVisitor<'env, 'db> {
     env: &'env ProgramEnvironment<'db>,
+    recursion_context: Option<&'env TypeRecursionContext<'db>>,
     default: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
     top_materialization: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
     bottom_materialization: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
@@ -430,6 +459,7 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
     fn new(env: &'env ProgramEnvironment<'db>) -> Self {
         Self {
             env,
+            recursion_context: None,
             default: OnceCell::default(),
             top_materialization: OnceCell::default(),
             bottom_materialization: OnceCell::default(),
@@ -438,6 +468,18 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
             promotion: OnceCell::default(),
             skip_promotion: OnceCell::default(),
             materialization_equivalence: OnceCell::default(),
+        }
+    }
+
+    fn with_recursion_context(mut self, context: Option<&'env TypeRecursionContext<'db>>) -> Self {
+        self.recursion_context = context;
+        self
+    }
+
+    fn project_meta_type(&self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
+        match self.recursion_context {
+            Some(context) => ty.to_meta_type_with_recursion(db, self.env, context),
+            None => ty.to_meta_type(db, self.env),
         }
     }
 
@@ -493,6 +535,7 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
 
         Self {
             materialization_equivalence,
+            recursion_context: self.recursion_context,
             ..Self::new(self.env)
         }
     }
@@ -7884,17 +7927,21 @@ impl<'db> Type<'db> {
     /// See `Self::dunder_class` for more details.
     #[must_use]
     fn to_meta_type(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
-        #[derive(Default)]
-        struct MetaTypeVisitor<'db> {
-            active_aliases: ActiveRecursionDetector<TypeAliasType<'db>>,
-            active_identities: ActiveRecursionDetector<TypeIdentity<'db>>,
-        }
+        self.to_meta_type_with_recursion(db, env, &TypeRecursionContext::default())
+    }
 
+    fn to_meta_type_with_recursion(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        context: &TypeRecursionContext<'db>,
+    ) -> Type<'db> {
         fn to_meta_type_inner<'db>(
             db: &'db dyn Db,
             env: &ProgramEnvironment<'db>,
             ty: Type<'db>,
-            visitor: &MetaTypeVisitor<'db>,
+            context: &TypeRecursionContext<'db>,
+            visitor: &ActiveRecursionDetector<TypeAliasType<'db>>,
         ) -> Type<'db> {
             match ty {
                 Type::Never => Type::Never,
@@ -7907,11 +7954,11 @@ impl<'db> Type<'db> {
                 Type::SlotDescriptor(_) => {
                     KnownClass::MemberDescriptorType.to_class_literal(db, env)
                 }
-                Type::Union(union) => {
-                    union.map(db, env, |ty| to_meta_type_inner(db, env, *ty, visitor))
-                }
+                Type::Union(union) => union.map(db, env, |ty| {
+                    to_meta_type_inner(db, env, *ty, context, visitor)
+                }),
                 Type::TypeIs(_) | Type::TypeGuard(_) => KnownClass::Bool.to_class_literal(db, env),
-                Type::TypeForm(_) => to_meta_type_inner(db, env, Type::object(), visitor),
+                Type::TypeForm(_) => to_meta_type_inner(db, env, Type::object(), context, visitor),
                 Type::LiteralValue(literal) => match literal.kind() {
                     LiteralValueTypeKind::Bool(_) => KnownClass::Bool.to_class_literal(db, env),
                     LiteralValueTypeKind::Bytes(_) => KnownClass::Bytes.to_class_literal(db, env),
@@ -7942,21 +7989,34 @@ impl<'db> Type<'db> {
                 }
                 Type::ClassLiteral(class) => class.metaclass(db),
                 Type::GenericAlias(alias) => ClassType::from(alias).metaclass(db),
-                Type::SubclassOf(subclass_of_ty) => subclass_of_ty.to_meta_type(db, env),
+                Type::SubclassOf(subclass_of_ty)
+                    if let SubclassOfInner::TypeVar(typevar) = subclass_of_ty.subclass_of() =>
+                {
+                    // Transposition changes a type variable's bounds but preserves its bound
+                    // identity. Guard by that identity so newly transposed instances still match.
+                    context.meta_type.typevars.visit(
+                        &(env.program(db), typevar.identity(db)),
+                        || KnownClass::Type.to_instance(db, env),
+                        || subclass_of_ty.to_meta_type_with_recursion(db, env, context),
+                    )
+                }
+                Type::SubclassOf(subclass_of_ty) => {
+                    subclass_of_ty.to_meta_type_with_recursion(db, env, context)
+                }
                 Type::Dynamic(dynamic) => {
                     SubclassOfType::from(db, env, SubclassOfInner::Dynamic(dynamic))
                 }
                 Type::Divergent(_) => ty,
                 Type::Intersection(intersection) => {
                     if let Some(alternatives) = intersection.finite_alternative_union(db, env) {
-                        to_meta_type_inner(db, env, alternatives, visitor)
+                        to_meta_type_inner(db, env, alternatives, context, visitor)
                     } else {
                         // Negative constraints do not generally constrain classes: `int & ~Literal[0]`
                         // still has meta-type `type[int]`. Pure negations are bounded by `object`.
                         let mut builder = IntersectionBuilder::new(db, env);
                         for positive in intersection.positive_elements_or_object(db) {
                             builder.add_positive_in_place(to_meta_type_inner(
-                                db, env, positive, visitor,
+                                db, env, positive, context, visitor,
                             ));
                         }
 
@@ -7986,6 +8046,7 @@ impl<'db> Type<'db> {
                                 db,
                                 env,
                                 narrowed_bound,
+                                context,
                                 visitor,
                             ));
                         }
@@ -7997,6 +8058,7 @@ impl<'db> Type<'db> {
                     db,
                     env,
                     complement.remaining_literal_union(db, env),
+                    context,
                     visitor,
                 ),
                 Type::AlwaysTruthy | Type::AlwaysFalsy => KnownClass::Type.to_instance(db, env),
@@ -8020,25 +8082,48 @@ impl<'db> Type<'db> {
                     // type arguments can introduce other classes, so use an unconstrained metatype.
                     // Do not cache results: a projection made while another alias is active can omit
                     // classes that are only encountered later in that alias's union.
-                    visitor.active_aliases.visit(
+                    visitor.visit(
                         &alias,
                         || Type::Never,
                         || {
-                            visitor.active_identities.visit(
-                                &Type::TypeAlias(alias).to_type_identity(db),
+                            context.meta_type.aliases.visit(
+                                &(env.program(db), alias),
                                 || KnownClass::Type.to_instance(db, env),
-                                || to_meta_type_inner(db, env, alias.value_type(db), visitor),
+                                || {
+                                    let project_alias = || {
+                                        to_meta_type_inner(
+                                            db,
+                                            env,
+                                            alias.value_type_with_recursion(db, Some(context)),
+                                            context,
+                                            visitor,
+                                        )
+                                    };
+                                    // Identity analysis can itself expand aliases, so establish the
+                                    // exact-alias guard before checking for growing specializations.
+                                    if let TypeIdentity::GrowingTypeAlias(definition) =
+                                        Type::TypeAlias(alias).to_type_identity(db)
+                                    {
+                                        context.meta_type.growing_aliases.visit(
+                                            &(env.program(db), definition),
+                                            || KnownClass::Type.to_instance(db, env),
+                                            project_alias,
+                                        )
+                                    } else {
+                                        project_alias()
+                                    }
+                                },
                             )
                         },
                     )
                 }
                 Type::NewTypeInstance(newtype) => {
-                    to_meta_type_inner(db, env, newtype.concrete_base_type(db), visitor)
+                    to_meta_type_inner(db, env, newtype.concrete_base_type(db), context, visitor)
                 }
             }
         }
 
-        to_meta_type_inner(db, env, self, &MetaTypeVisitor::default())
+        to_meta_type_inner(db, env, self, context, &ActiveRecursionDetector::default())
     }
 
     /// Get the type of the `__class__` attribute of this type.
@@ -8468,7 +8553,9 @@ impl<'db> Type<'db> {
                 match type_mapping {
                     TypeMapping::Materialize(_) if alias.materialization_kind(db).is_some() => self,
                     TypeMapping::EagerExpansion if alias.materialization_kind(db).is_some() => {
-                        alias.value_type(db).expand_eagerly(db, visitor.env)
+                        alias
+                            .value_type_with_recursion(db, visitor.recursion_context)
+                            .expand_eagerly(db, visitor.env)
                     }
                     // For EagerExpansion, expand the raw value type. This path relies on Salsa's cycle
                     // detection rather than the visitor's cycle detection, because the visitor tracks
@@ -8502,7 +8589,11 @@ impl<'db> Type<'db> {
                             alias
                                 .specialization(db)
                                 .unwrap_or_else(|| generic_context.default_specialization(db, None))
-                                .apply_specialization(db, current_specialization)
+                                .apply_specialization_with_recursion(
+                                    db,
+                                    current_specialization,
+                                    visitor.recursion_context,
+                                )
                         }))
                     }
                     _ => {
@@ -8510,18 +8601,18 @@ impl<'db> Type<'db> {
                         // this same TypeAlias again (e.g., in `type RecursiveT = int | tuple[RecursiveT, ...]`), the visitor
                         // will detect the cycle and return the fallback value.
                         let mapped = visitor.visit(db, self, type_mapping, || {
-                            alias.value_type(db).apply_type_mapping_impl(
-                                db,
-                                type_mapping,
-                                tcx,
-                                visitor,
-                            )
+                            alias
+                                .value_type_with_recursion(db, visitor.recursion_context)
+                                .apply_type_mapping_impl(db, type_mapping, tcx, visitor)
                         });
 
                         // If the type mapping does not result in any change to this type alias, keep the
                         // alias node instead of eagerly expanding it. A recursive backedge also returns
                         // the alias itself, and fully static aliases must retain their original identity.
-                        if mapped == self || alias.value_type(db) == mapped {
+                        if mapped == self
+                            || alias.value_type_with_recursion(db, visitor.recursion_context)
+                                == mapped
+                        {
                             self
                         } else if let TypeMapping::Materialize(materialization_kind) = type_mapping
                             && alias.is_recursive(db)

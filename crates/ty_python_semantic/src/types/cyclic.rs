@@ -1163,6 +1163,10 @@ impl<T> Default for ActiveRecursionDetector<T> {
 }
 
 impl<T: Hash + Eq + Clone> ActiveRecursionDetector<T> {
+    pub(crate) fn is_empty(&self) -> bool {
+        self.seen.borrow().is_empty()
+    }
+
     pub(crate) fn visit<R>(
         &self,
         item: &T,
