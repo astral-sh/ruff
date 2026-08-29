@@ -128,6 +128,7 @@ use ty_python_core::place::ScopedPlaceId;
 use ty_python_core::scope::ScopeId;
 use ty_python_core::{ProgramFile, Truthiness, place_table, semantic_index, use_def_map};
 
+mod abstract_methods;
 mod attribute_write;
 mod bool;
 mod bound_super;

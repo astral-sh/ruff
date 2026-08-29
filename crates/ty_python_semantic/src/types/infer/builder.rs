@@ -49,6 +49,7 @@ use crate::place_load::{
 use crate::reachability::{
     ReachabilityEvaluationCache, analyze_condition_expression, evaluate_reachability_with_cache,
 };
+use crate::types::abstract_methods::AbstractMethods;
 use crate::types::add_inferred_python_version_hint_to_diagnostic;
 use crate::types::attribute_write::{AssignmentAttributeMembers, assignment_attribute_members};
 use crate::types::call::bind::{
@@ -73,8 +74,8 @@ use crate::types::diagnostic::{
     UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_REFERENCE,
     UNSOUND_ASSIGNMENT, UNSOUND_YIELD, UNSUPPORTED_OPERATOR, UNUSED_AWAITABLE, YieldKind,
     autofix_with_notimplementederror, hint_if_stdlib_attribute_exists_on_other_versions,
-    report_attempted_protocol_instantiation, report_bad_dunder_delattr_call,
-    report_bad_dunder_delete_call, report_call_to_abstract_method,
+    report_attempted_instantiation_of_abstract_class, report_attempted_protocol_instantiation,
+    report_bad_dunder_delattr_call, report_bad_dunder_delete_call, report_call_to_abstract_method,
     report_cannot_pop_required_field_on_typed_dict, report_dynamic_function_decorator_return,
     report_invalid_assignment, report_invalid_class_match_pattern, report_invalid_exception_caught,
     report_invalid_exception_cause, report_invalid_exception_raised,
@@ -9325,10 +9326,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // that protocol -- and indeed, according to the spec, type checkers must disallow abstract
             // subclasses of the protocol to be passed to parameters that accept `type[SomeProtocol]`.
             // <https://typing.python.org/en/latest/spec/protocol.html#type-and-class-objects-vs-protocols>.
-            if !callable_type.is_subclass_of()
-                && let Some(protocol) = class.into_protocol_class(self.db())
-            {
-                report_attempted_protocol_instantiation(&self.context, call_expression, protocol);
+            if !callable_type.is_subclass_of() {
+                if let Some(protocol) = class.into_protocol_class(db) {
+                    report_attempted_protocol_instantiation(
+                        &self.context,
+                        call_expression,
+                        protocol,
+                    );
+                } else if self.context.is_lint_enabled(&CALL_NON_CALLABLE) {
+                    let abstract_methods = AbstractMethods::of_class(db, class);
+                    if !abstract_methods.is_empty() {
+                        report_attempted_instantiation_of_abstract_class(
+                            &self.context,
+                            call_expression,
+                            class,
+                            &abstract_methods,
+                        );
+                    }
+                }
             }
 
             // Inference of correctly-placed `TypeVar`, `ParamSpec`, `NewType`, and
