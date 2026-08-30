@@ -4537,6 +4537,56 @@ class C3:
 reveal_type(C3(Sub()).x)  # revealed: list[Sub] | list[Base]
 ```
 
+Cycles between many attributes converge to the concrete type shared by their initial values and
+assignments:
+
+```py
+class ManyCycles:
+    def __init__(self: "ManyCycles"):
+        self.x1 = 0
+        self.x2 = 0
+        self.x3 = 0
+        self.x4 = 0
+        self.x5 = 0
+        self.x6 = 0
+        self.x7 = 1
+
+    def f1(self: "ManyCycles"):
+        self.x1 = self.x2 + self.x3 + self.x4 + self.x5 + self.x6 + self.x7
+        self.x2 = self.x1 + self.x3 + self.x4 + self.x5 + self.x6 + self.x7
+        self.x3 = self.x1 + self.x2 + self.x4 + self.x5 + self.x6 + self.x7
+        self.x4 = self.x1 + self.x2 + self.x3 + self.x5 + self.x6 + self.x7
+        self.x5 = self.x1 + self.x2 + self.x3 + self.x4 + self.x6 + self.x7
+        self.x6 = self.x1 + self.x2 + self.x3 + self.x4 + self.x5 + self.x7
+        self.x7 = self.x1 + self.x2 + self.x3 + self.x4 + self.x5 + self.x6
+
+    def f2(self: "ManyCycles"):
+        self.x1 = self.x2 + self.x3 + self.x4 + self.x5 + self.x6 + self.x7
+        self.x2 = self.x1 + self.x3 + self.x4 + self.x5 + self.x6 + self.x7
+        self.x3 = self.x1 + self.x2 + self.x4 + self.x5 + self.x6 + self.x7
+        self.x4 = self.x1 + self.x2 + self.x3 + self.x5 + self.x6 + self.x7
+        self.x5 = self.x1 + self.x2 + self.x3 + self.x4 + self.x6 + self.x7
+        self.x6 = self.x1 + self.x2 + self.x3 + self.x4 + self.x5 + self.x7
+        self.x7 = self.x1 + self.x2 + self.x3 + self.x4 + self.x5 + self.x6
+
+    def f3(self: "ManyCycles"):
+        self.x1 = self.x2 + self.x3 + self.x4 + self.x5 + self.x6 + self.x7
+        self.x2 = self.x1 + self.x3 + self.x4 + self.x5 + self.x6 + self.x7
+        self.x3 = self.x1 + self.x2 + self.x4 + self.x5 + self.x6 + self.x7
+        self.x4 = self.x1 + self.x2 + self.x3 + self.x5 + self.x6 + self.x7
+        self.x5 = self.x1 + self.x2 + self.x3 + self.x4 + self.x6 + self.x7
+        self.x6 = self.x1 + self.x2 + self.x3 + self.x4 + self.x5 + self.x7
+        self.x7 = self.x1 + self.x2 + self.x3 + self.x4 + self.x5 + self.x6
+
+        reveal_type(self.x1)  # revealed: int
+        reveal_type(self.x2)  # revealed: int
+        reveal_type(self.x3)  # revealed: int
+        reveal_type(self.x4)  # revealed: int
+        reveal_type(self.x5)  # revealed: int
+        reveal_type(self.x6)  # revealed: int
+        reveal_type(self.x7)  # revealed: int
+```
+
 This case additionally tests our union/intersection simplification logic:
 
 ```py

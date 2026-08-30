@@ -2119,10 +2119,20 @@ impl<'db> Type<'db> {
             } else {
                 self
             }
-        } else if let (Type::GenericAlias(current), Type::GenericAlias(previous)) = (self, previous)
-            && let Some(merged) = current.merge_cycle_recovery(db, previous)
+        } else if let (Type::GenericAlias(current), Type::GenericAlias(previous_alias)) =
+            (self, previous)
+            && let Some(merged) = current.merge_cycle_recovery(db, previous_alias)
         {
-            Type::GenericAlias(merged)
+            let merged = Type::GenericAlias(merged);
+            // Unlike union stabilization, this merge already incorporates the previous
+            // specialization. Folding a non-recursive result would add the raw previous alias
+            // back into the merged result.
+            if !merged.contains_cycle_binder(db, env, &[binder])
+                && !previous.contains_cycle_binder(db, env, &[binder])
+            {
+                return merged;
+            }
+            merged
         } else {
             // The current type is unioned to the previous type. Unioning in the reverse order can
             // cause the fixed-point iterations to converge slowly or even fail. Consider the case
