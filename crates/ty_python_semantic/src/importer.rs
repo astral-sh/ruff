@@ -28,9 +28,10 @@ use ruff_python_codegen::Stylist;
 use ruff_python_importer::Insertion;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use ty_module_resolver::{ImportingFile, ModuleName};
-use ty_python_core::ProgramFile;
 use ty_python_core::ast_node_ref::AstNodeRef;
-use ty_python_core::definition::DefinitionKind;
+use ty_python_core::definition::{DefinitionKind, DefinitionState};
+use ty_python_core::scope::FileScopeId;
+use ty_python_core::{ProgramFile, semantic_index};
 
 pub struct Importer<'a> {
     /// The ty Salsa database.
@@ -72,6 +73,11 @@ impl<'a> Importer<'a> {
         }
     }
 
+    /// The file's indentation unit, shared with inserted imports and diagnostic fixes.
+    pub(crate) fn indentation(&self) -> &str {
+        self.stylist.indentation().as_str()
+    }
+
     /// Builds a set of members in scope at the given AST node and position.
     ///
     /// Callers should use this routine to build "in scope members" to be used
@@ -96,7 +102,11 @@ impl<'a> Importer<'a> {
         MembersInScope::new(self.db, self.file, self.parsed, node, at)
     }
 
-    /// Imports a symbol into this importer's module.
+    /// Builds a best-effort import action for this module, usually for an IDE completion.
+    ///
+    /// This method always returns an action, even when it cannot avoid every name conflict.
+    /// For diagnostic fixes inside this crate, `Self::import_for_diagnostic` additionally checks
+    /// bindings without querying inferred types and may decline the import.
     ///
     /// The given request is assumed to be valid. That is, the module
     /// is assumed to be importable and the member is assumed to be a
@@ -197,6 +207,198 @@ impl<'a> Importer<'a> {
                 }
             }
         }
+    }
+
+    /// Builds an import action for a diagnostic fix, returning `None` if its name cannot be used
+    /// confidently at the proposed use site.
+    ///
+    /// [`Self::import`] uses a caller-supplied [`MembersInScope`] to choose an import style and
+    /// always returns an action. This is useful for completions: a candidate can still be offered
+    /// when resolving every possible conflict would be too restrictive. However, constructing
+    /// that map with [`Self::members_in_scope_at`] queries inferred types. Doing so while emitting
+    /// an inference diagnostic can re-enter the inference that is producing the diagnostic.
+    ///
+    /// This method instead checks bindings in the semantic index, without inferring their types.
+    /// It accepts a new name only if visible scopes have no binding or declaration for it, and
+    /// reuses an existing name only if it is a top-level runtime import that has not been
+    /// reassigned or deleted. These checks are deliberately conservative: a later reassignment
+    /// can prevent reuse even when the import would still be available at `at`.
+    ///
+    /// Both APIs assume that the requested module is importable and that it provides the requested
+    /// member. The caller must check Python-version and dependency requirements; neither API
+    /// establishes them. The examples below assume Python 3.11 or newer.
+    ///
+    /// # When the simpler API is sufficient
+    ///
+    /// An `undefined-reveal` diagnostic already establishes that `reveal_type` is unbound here:
+    ///
+    /// ```python
+    /// def show(value: int) -> None:
+    ///     reveal_type(value)
+    /// ```
+    ///
+    /// That fix can call [`Self::import`] with
+    /// `ImportRequest::import_from("typing", "reveal_type").force()` and an empty
+    /// [`MembersInScope`]. Forcing a `from` import avoids introducing a module name that could be
+    /// shadowed. Applying the returned import edit produces:
+    ///
+    /// ```python
+    /// from typing import reveal_type
+    ///
+    /// def show(value: int) -> None:
+    ///     reveal_type(value)
+    /// ```
+    ///
+    /// A fix that introduces a new call cannot generally assume that its chosen function name is
+    /// unbound. For example, `assert_never` could already name a function parameter. An empty
+    /// [`MembersInScope`] would conceal that conflict from [`Self::import`].
+    ///
+    /// # When an existing import is shadowed
+    ///
+    /// For an unforced request for `typing.assert_never`, [`Self::import`] can reuse an existing
+    /// `import typing as t` and return `t.assert_never`, even with a populated [`MembersInScope`].
+    /// Its conflict avoidance chooses between the requested module and member names; it does not
+    /// validate that an alias found in an existing import still refers to that import at the use
+    /// site. A caller adding an exhaustiveness check could therefore produce this incorrect call:
+    ///
+    /// ```python
+    /// import typing as t
+    ///
+    /// def handle(value: int | str, t: int) -> None:
+    ///     if isinstance(value, int):
+    ///         print(value)
+    ///     elif isinstance(value, str):
+    ///         print(value)
+    ///     else:
+    ///         t.assert_never(value)  # `t` is the integer parameter, not the module.
+    /// ```
+    ///
+    /// This method rejects that alias and tries a `from` import instead. It returns an import edit
+    /// and `assert_never` as the symbol text, allowing the caller to construct this fix:
+    ///
+    /// ```python
+    /// from typing import assert_never
+    /// import typing as t
+    ///
+    /// def handle(value: int | str, t: int) -> None:
+    ///     if isinstance(value, int):
+    ///         print(value)
+    ///     elif isinstance(value, str):
+    ///         print(value)
+    ///     else:
+    ///         assert_never(value)
+    /// ```
+    ///
+    /// The caller must use [`ImportAction::symbol_text`] for the new reference and include any
+    /// [`ImportAction::import`] edit. An unshadowed alias can be reused without an import edit;
+    /// an occupied function name can instead require a qualified reference and a module import.
+    ///
+    /// # When neither import style is usable
+    ///
+    /// Both possible names can already have unrelated bindings:
+    ///
+    /// ```python
+    /// def handle(value: int | str, typing: int, assert_never: int) -> None:
+    ///     if isinstance(value, int):
+    ///         print(value)
+    ///     elif isinstance(value, str):
+    ///         print(value)
+    /// ```
+    ///
+    /// With these members in scope, [`Self::import`] still returns a best-effort action: add
+    /// `import typing` at module level and use `typing.assert_never`. That module-level import
+    /// would remain shadowed by the function parameter. This method returns `None`, so the caller
+    /// can omit the import-dependent fix or offer a different fix. It does not invent a fresh alias.
+    ///
+    /// # Use site and shared implementation
+    ///
+    /// `scope` is the scope where the new reference will be evaluated. `at` is an offset in the
+    /// original source at or before the planned reference: existing imports must precede it, and
+    /// notebook import edits must respect its cell boundaries. The requested import style is
+    /// tried first, followed by forced `from` and module imports. Even a forced request can be
+    /// retried with the other style.
+    ///
+    /// All import lookup, formatting, and edit construction is shared with [`Self::import`]. This
+    /// method calls it for each candidate style and then validates the returned name. The extra
+    /// work here is deciding whether a diagnostic can use that action, not constructing a second
+    /// kind of import edit.
+    pub(crate) fn import_for_diagnostic(
+        &self,
+        request: ImportRequest<'_>,
+        scope: FileScopeId,
+        at: TextSize,
+    ) -> Option<ImportAction> {
+        let index = semantic_index(self.db, self.file);
+        let importing_file = ImportingFile::File(
+            self.file.file(self.db),
+            self.file.resolver_environment(self.db),
+        );
+        for request in [
+            request,
+            ImportRequest {
+                style: ImportStyle::ImportFrom,
+                force_style: true,
+                ..request
+            },
+            ImportRequest {
+                style: ImportStyle::Import,
+                force_style: true,
+                ..request
+            },
+        ] {
+            let action = self.import(request, &MembersInScope::empty(at));
+            let root = action.symbol_text().split('.').next()?;
+            let mut existing_import = false;
+            let available = index.visible_ancestor_scopes(scope).all(|(scope, _)| {
+                let places = index.place_table(scope);
+                let Some(symbol_id) = places.symbol_id(root) else {
+                    return true;
+                };
+                let symbol = places.symbol(symbol_id);
+                if !symbol.is_bound() && !symbol.is_declared() {
+                    return true;
+                }
+                if symbol.is_reassigned() {
+                    return false;
+                }
+                // Ignore the implicit initial unbound state, but retain deletions so a deleted
+                // import cannot be reused.
+                let mut bindings = index
+                    .use_def_map(scope)
+                    .end_of_scope_symbol_bindings(symbol_id)
+                    .map(|binding| binding.binding)
+                    .filter(|binding| !matches!(binding, DefinitionState::Undefined));
+                let Some(binding) = bindings.next().and_then(DefinitionState::definition) else {
+                    return false;
+                };
+                if bindings.next().is_some() {
+                    return false;
+                }
+                let import = match binding.kind(self.db) {
+                    DefinitionKind::Import(kind) => AstImportKind::Import(kind.import(self.parsed)),
+                    DefinitionKind::ImportFrom(kind) => {
+                        AstImportKind::ImportFrom(kind.import(self.parsed))
+                    }
+                    _ => return false,
+                };
+                existing_import = import.start() < at
+                    && self
+                        .imports()
+                        .any(|top_level| top_level.stmt.start() == import.start())
+                    && match import.satisfies(self.db, importing_file, &request) {
+                        Some(ImportResponseKind::Qualified { .. }) => true,
+                        Some(ImportResponseKind::Unqualified { alias }) => {
+                            Some(alias.name.as_str()) == request.member
+                        }
+                        _ => false,
+                    };
+                existing_import
+            });
+            if available && (existing_import || action.import().is_some()) {
+                return Some(action);
+            }
+        }
+        None
     }
 
     /// Look for an import already in this importer's module that
@@ -564,7 +766,7 @@ impl<'ast> AstImportKind<'ast> {
 }
 
 /// A request to import a module into the global scope of a Python module.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct ImportRequest<'a> {
     /// The module from which the symbol should be imported (e.g.,
     /// `foo`, in `from foo import bar`).
@@ -804,7 +1006,7 @@ impl ImportResponseKind<'_> {
 }
 
 /// The style of a Python import statement.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 enum ImportStyle {
     /// Import the symbol using the `import` statement (e.g. `import
     /// foo; foo.bar`).
