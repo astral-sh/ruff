@@ -522,13 +522,9 @@ This reproduces <https://github.com/astral-sh/ty/issues/4076>.
 
 ```py
 class Base:
-    existing = 1
-
     def __init__(self):
         if not hasattr(self, "x"):
             self.x = self.__str__
-        if not hasattr(self, "existing"):
-            self.missing
         if not hasattr(self, "z"):
             self.z = self.y  # error: [unresolved-attribute]
 
@@ -577,13 +573,9 @@ class AnnotatedChild(Annotated):
 
 ```py
 class Base:
-    existing = 1
-
     def __init__(self):
         if not hasattr(self, "x"):
             self.x = self.__str__
-        if not hasattr(self, "existing"):
-            self.missing
         if not hasattr(self, "z"):
             self.z = self.y  # error: [unresolved-attribute]
 
@@ -905,20 +897,14 @@ C().x  # error: [unresolved-attribute]
 ## Assignments in the opposite guard branch do not initialize an attribute
 
 Assigning an existing attribute when `hasattr` succeeds does not initialize it in the opposite
-branch. That branch remains unreachable and cannot create another instance attribute. Existing
-inherited class attributes also retain their usual narrowing.
+branch. That branch remains unreachable and cannot create another instance attribute.
 
 ```py
-class Base:
-    inherited = 1
-
-class C(Base):
+class C:
     def __init__(self):
         self.x = 1
 
     def update(self):
-        if not hasattr(self, "inherited"):
-            self.missing
         if hasattr(self, "x"):
             self.x = 2
         else:

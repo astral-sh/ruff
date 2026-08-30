@@ -1407,11 +1407,19 @@ enum IntersectionSimplification {
 
 /// Simplify a pair of intersection elements using non-circular relation checks.
 ///
-/// Inferring an attribute assigned under `not hasattr(self, "x")` can depend on the
-/// intersection produced by that guard. Treating a provisional subtype relation as
-/// proof would erase the branch that establishes the attribute. If the simplification
-/// participates in an inference cycle, retain both constraints instead. Ordinary type
-/// relations retain their usual cycle handling, including for recursive protocols.
+/// If this simplification participates in an inference cycle, retain both signed
+/// elements. Ordinary type relations keep their usual cycle handling, including for
+/// recursive protocols.
+///
+/// ```python
+/// class C:
+///     def __init__(self):
+///         if not hasattr(self, "x"):
+///             self.x = self.__str__
+/// ```
+///
+/// Inferring `C.x` needs the guarded type of `self`. The guard cannot use that unfinished
+/// inference to prove that `C` already satisfies the protocol for `x` and erase the branch.
 #[salsa::tracked(
     returns(copy),
     cycle_result=|_, _, _, _| IntersectionSimplification::KeepBoth,
