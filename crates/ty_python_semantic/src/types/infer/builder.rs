@@ -103,8 +103,8 @@ use crate::types::infer::{
     nearest_enclosing_function, original_class_type,
 };
 use crate::types::match_pattern::{ClassPatternPositionalResult, class_pattern_positional_result};
-use crate::types::narrow::NarrowingEvaluatorExtension;
 use crate::types::narrow::pattern_success_types;
+use crate::types::narrow::{NarrowedPlace, NarrowedPlaceBuilder, NarrowingEvaluatorExtension};
 use crate::types::newtype::NewType;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::signatures::{CallableSignature, ReturnCallableTypeVarScope};
@@ -9893,13 +9893,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         })
     }
 
-    // Perform narrowing with applicable constraints between the current scope and the enclosing scope.
+    /// Narrow a place's value type and presence using constraints from its load resolution.
     fn narrow_place_with_applicable_constraints(
         &self,
         expr: PlaceExprRef,
-        mut ty: Type<'db>,
+        mut narrowed: NarrowedPlace<'db>,
         constraint_keys: &[(FileScopeId, ConstraintKey)],
-    ) -> Type<'db> {
+    ) -> NarrowedPlace<'db> {
         let db = self.db();
         let env = self.program_environment();
         for (enclosing_scope_file_id, constraint_key) in constraint_keys {
@@ -9914,7 +9914,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.index,
             ) {
                 ApplicableConstraints::UnboundBinding(constraint) => {
-                    ty = constraint.narrow(db, env, ty, place);
+                    narrowed = constraint.narrow_place(db, env, narrowed, place);
                 }
                 // Performs narrowing based on constrained bindings.
                 // This handling must be performed even if narrowing is attempted and failed using `infer_place_load`.
@@ -9934,7 +9934,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 ApplicableConstraints::ConstrainedBindings(bindings) => {
                     let reachability_constraints = bindings.reachability_constraints();
                     let predicates = bindings.predicates();
-                    let mut union = UnionBuilder::new(db, env);
+                    let mut union = NarrowedPlaceBuilder::new(db, env);
                     let mut loop_header_fallbacks = FxHashMap::default();
                     for binding in bindings {
                         let static_reachability = evaluate_reachability_with_cache(
@@ -9955,7 +9955,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 if definition.kind(db).is_loop_header() {
                                     let fallback_ty = self.loop_header_fallback_type(
                                         definition,
-                                        ty,
+                                        narrowed.ty,
                                         &mut loop_header_fallbacks,
                                     );
                                     binding_ty = UnionType::from_elements(
@@ -9964,17 +9964,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                         [binding_ty, fallback_ty],
                                     );
                                 }
-                                union.add_in_place(
+                                let mut bound = NarrowedPlace::new(binding_ty);
+                                if !definition.kind(db).is_loop_header() {
+                                    bound.known_present = true;
+                                }
+                                union.add(
                                     binding
                                         .narrowing_constraint
-                                        .narrow(db, env, binding_ty, place),
+                                        .narrow_place(db, env, bound, place),
                                 );
                             }
                             DefinitionState::Defined(_)
                             | DefinitionState::Undefined
                             | DefinitionState::Deleted => {
-                                union.add_in_place(
-                                    binding.narrowing_constraint.narrow(db, env, ty, place),
+                                union.add(
+                                    binding
+                                        .narrowing_constraint
+                                        .narrow_place(db, env, narrowed, place),
                                 );
                             }
                         }
@@ -9983,11 +9989,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // Since an unbound binding is recorded even for an undefined place,
                     // this can only happen if the code is unreachable
                     // and therefore it is correct to set the result to `Never`.
-                    ty = union.build();
+                    narrowed = union.build();
                 }
             }
         }
-        ty
+        narrowed
     }
 
     /// Compute the type for reads such as `box.value` or `items[0]` in loop iterations after
@@ -10303,7 +10309,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             place
         } else {
             place.map_type(|ty| {
-                self.narrow_place_with_applicable_constraints(place_expr, ty, narrowing_constraints)
+                self.narrow_place_with_applicable_constraints(
+                    place_expr,
+                    NarrowedPlace::new(ty),
+                    narrowing_constraints,
+                )
+                .ty
             })
         }
     }
@@ -10488,9 +10499,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if let Some(place_expr) = PlaceExpr::try_from_expr(target) {
             self.narrow_place_with_applicable_constraints(
                 PlaceExprRef::from(&place_expr),
-                target_ty,
+                NarrowedPlace::new(target_ty),
                 constraint_keys,
             )
+            .ty
         } else {
             target_ty
         }
@@ -10594,10 +10606,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .unwrap_or_else(|error| {
                 error.report_diagnostic(&self.context, value_type, attribute, assigned_type);
                 error.fallback_member(db)
-            })
-            .map_type(|ty| {
-                self.narrow_expr_with_applicable_constraints(attribute, ty, &constraint_keys)
             });
+
+        let fallback_place = if let Some(member) = PlaceExpr::try_from_expr(attribute) {
+            let narrowed =
+                NarrowedPlace::new(fallback_place.place.raw_type().unwrap_or_else(Type::object));
+            self.narrow_place_with_applicable_constraints(
+                (&member).into(),
+                narrowed,
+                &constraint_keys,
+            )
+            .apply_to(fallback_place)
+        } else {
+            fallback_place
+        };
 
         // An augmented assignment also loads its target, but its write validation reports this
         // error. Avoid reporting the same invalid access twice.

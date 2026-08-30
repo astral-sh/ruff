@@ -14,6 +14,7 @@ use crate::reachability::{
     NarrowingProjector, ReachabilityEvaluationCache, evaluate_reachability,
     evaluate_reachability_with_cache,
 };
+use crate::types::narrow::NarrowedPlace;
 use crate::types::{
     DynamicType, KnownClass, MemberLookupPolicy, Type, TypeAndQualifiers, TypeQualifiers,
     UnionBuilder, UnionType, binding_type, inferred_declaration, is_discarded_dict_key_assignment,
@@ -1848,10 +1849,11 @@ fn place_from_bindings_impl<'db>(
                             predicates,
                             narrowing_constraint.predicate_narrowing_targets(),
                             binding.place(db),
-                            binding_ty,
+                            NarrowedPlace::new(binding_ty),
                         )
                     })
-                    .narrow(constraint, binding_ty),
+                    .narrow(constraint, NarrowedPlace::new(binding_ty))
+                    .ty,
             };
             Some((narrowed, static_reachability))
         },

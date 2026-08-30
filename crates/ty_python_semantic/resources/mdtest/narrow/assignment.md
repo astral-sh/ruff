@@ -90,13 +90,63 @@ class _:
 a = A()
 # error: [unresolved-attribute]
 a.dynamically_added = 0
-# error: [unresolved-attribute]
+# The assignment is invalid, but establishes the attribute's presence for subsequent reads.
 reveal_type(a.dynamically_added)  # revealed: Literal[0]
 
 # error: [unresolved-reference]
 does.nt.exist = 0
 # error: [unresolved-reference]
 reveal_type(does.nt.exist)  # revealed: Literal[0]
+```
+
+### Presence after conditional assignments
+
+Assigning an undeclared attribute is still an error, but a subsequent read does not repeat the error
+when every branch assigns the attribute.
+
+```py
+class Item: ...
+
+def assigned_on_both_branches(item: Item, condition: bool):
+    if condition:
+        item.value = 1  # error: [unresolved-attribute]
+    else:
+        item.value = 2  # error: [unresolved-attribute]
+    reveal_type(item.value)  # revealed: Literal[1, 2]
+```
+
+An assignment on only one branch does not establish presence after the conditional.
+
+```py
+def assigned_on_one_branch(item: Item, condition: bool):
+    if condition:
+        item.value = 1  # error: [unresolved-attribute]
+    item.value  # error: [unresolved-attribute]
+```
+
+A branch that exits without reaching the read does not affect whether the attribute is present.
+
+```py
+def assigned_or_raised(item: Item, condition: bool):
+    if condition:
+        item.value = 1  # error: [unresolved-attribute]
+    else:
+        raise ValueError
+    reveal_type(item.value)  # revealed: Literal[1]
+```
+
+### Presence after receiver reassignment
+
+Reassigning the receiver discards evidence that an attribute was assigned on the previous object.
+
+```py
+class Item: ...
+
+def f(item: Item, other: Item):
+    item.value = 1  # error: [unresolved-attribute]
+    reveal_type(item.value)  # revealed: Literal[1]
+    item = other
+    item.value  # error: [unresolved-attribute]
 ```
 
 ### Narrowing chain
