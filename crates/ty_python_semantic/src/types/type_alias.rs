@@ -93,7 +93,7 @@ impl<'db> AliasCycleSummary<'db> {
                 .elements(db)
                 .iter()
                 .any(|&element| Self::collect(db, element, typevars)),
-            _ => ty.is_divergent(),
+            _ => ty.is_identity_recursive(db),
         }
     }
 }

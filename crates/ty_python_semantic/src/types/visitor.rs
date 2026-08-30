@@ -565,7 +565,9 @@ fn dynamic_content_impl<'db>(
                 return;
             }
 
-            if matches!(self.mode, DynamicContentMode::Materialization) && ty.is_divergent() {
+            if matches!(self.mode, DynamicContentMode::Materialization)
+                && matches!(ty, Type::Divergent(_))
+            {
                 self.record(DynamicContent::Indeterminate);
                 return;
             }

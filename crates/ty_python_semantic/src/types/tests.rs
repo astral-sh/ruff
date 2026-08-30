@@ -288,8 +288,8 @@ fn divergent_type() {
     let top_div = div.materialize(db, MaterializationKind::Top, &visitor);
     let bottom_div = div.materialize(db, MaterializationKind::Bottom, &visitor);
 
-    assert!(top_div.is_divergent());
-    assert!(bottom_div.is_divergent());
+    assert!(matches!(top_div, Type::Divergent(_)));
+    assert!(matches!(bottom_div, Type::Divergent(_)));
     assert!(!top_div.is_dynamic());
     assert!(!bottom_div.is_dynamic());
     assert!(!top_div.has_dynamic(db, &env));
@@ -371,28 +371,34 @@ fn divergent_type() {
     assert!(!div.is_redundant_with(db, &env, Type::unknown()));
     assert!(!Type::unknown().is_redundant_with(db, &env, div));
 
-    // `Divergent & T` and `Divergent & ~T` both simplify to `Divergent`, except for the
-    // specific case of `Divergent & Never`, which simplifies to `Never`.
+    // The identity recursive type `μa.a` is the semantic cycle marker. It dominates
+    // intersections except for `μa.a & Never`, which simplifies to `Never`.
+    let identity_recursive = Type::identity_recursive(
+        db,
+        &env,
+        CycleQuery::Test,
+        salsa::plumbing::Id::from_bits(2),
+    );
     let divergent_intersection = IntersectionBuilder::new(db, &env)
-        .add_positive(div)
+        .add_positive(identity_recursive)
         .add_positive(todo_type!("2"))
         .add_negative(todo_type!("3"))
         .build();
-    assert_eq!(divergent_intersection, div);
+    assert_eq!(divergent_intersection, identity_recursive);
     let divergent_intersection = IntersectionBuilder::new(db, &env)
         .add_positive(todo_type!("2"))
         .add_negative(todo_type!("3"))
-        .add_positive(div)
+        .add_positive(identity_recursive)
         .build();
-    assert_eq!(divergent_intersection, div);
+    assert_eq!(divergent_intersection, identity_recursive);
     let divergent_never_intersection = IntersectionBuilder::new(db, &env)
-        .add_positive(div)
+        .add_positive(identity_recursive)
         .add_positive(Type::Never)
         .build();
     assert_eq!(divergent_never_intersection, Type::Never);
     let divergent_never_intersection = IntersectionBuilder::new(db, &env)
         .add_positive(Type::Never)
-        .add_positive(div)
+        .add_positive(identity_recursive)
         .build();
     assert_eq!(divergent_never_intersection, Type::Never);
 

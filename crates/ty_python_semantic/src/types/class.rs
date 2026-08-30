@@ -3002,13 +3002,16 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
         let inferred_ty = union.build().promote(db, env).promote_singletons(db, env);
         let inferred_ty = if let Some(elements) =
             inferred_ty.as_union().map(|union| union.elements(db))
-            && elements.iter().any(Type::is_divergent)
-            && elements.iter().any(|ty| !ty.is_divergent())
+            && elements.iter().any(|ty| ty.is_identity_recursive(db))
+            && elements.iter().any(|ty| !ty.is_identity_recursive(db))
         {
             UnionType::from_elements(
                 db,
                 env,
-                elements.iter().copied().filter(|ty| !ty.is_divergent()),
+                elements
+                    .iter()
+                    .copied()
+                    .filter(|ty| !ty.is_identity_recursive(db)),
             )
         } else {
             inferred_ty

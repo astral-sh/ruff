@@ -1587,7 +1587,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // A lazily inferred class member can contain its own unrelated recursive type, so only
         // inspect the alias structure and generic arguments when checking whether it is recursive.
         if !recursive_generic_implicit_alias
-            && any_over_type(db, env, value_ty, false, |ty| ty.is_divergent())
+            && any_over_type(db, env, value_ty, false, |ty| ty.is_identity_recursive(db))
         {
             let value_ty = value_ty.apply_specialization(
                 db,

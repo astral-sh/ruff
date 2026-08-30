@@ -767,7 +767,7 @@ fn class_object_assignment_members<'db>(
     let type_member_ty = type_member.place.ignore_possibly_undefined()?;
     let definitely_non_data_descriptor = type_member_ty.is_definitely_non_data_descriptor(db, env);
     if !definitely_non_data_descriptor
-        && (type_member_ty.is_divergent() || type_member_ty.is_data_descriptor(db, env))
+        && (type_member_ty.is_identity_recursive(db) || type_member_ty.is_data_descriptor(db, env))
     {
         return None;
     }

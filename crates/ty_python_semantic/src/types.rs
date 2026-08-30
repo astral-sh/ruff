@@ -1906,10 +1906,6 @@ impl<'db> Type<'db> {
         RecursiveType::build(db, env, binder, origin, body)
     }
 
-    pub(crate) const fn is_divergent(&self) -> bool {
-        matches!(self, Type::Divergent(_))
-    }
-
     pub(crate) const fn as_recursive(self) -> Option<RecursiveType<'db>> {
         match self {
             Type::Recursive(recursive) => Some(recursive),
@@ -2088,11 +2084,15 @@ impl<'db> Type<'db> {
         type_inference_slot: Option<TypeInferenceSlot>,
         cycle: &salsa::Cycle,
     ) -> Self {
+        let binder = DivergentType::new(query, cycle.id())
+            .with_optional_type_inference_slot(type_inference_slot);
         let self_degraded_by_overload =
             any_over_type(db, env, self, false, |ty| {
                 matches!(ty, Type::Dynamic(DynamicType::AmbiguousOverload))
-            }) && !any_over_type(db, env, self, false, |ty| ty.is_divergent())
-                && any_over_type(db, env, previous, false, |ty| ty.is_divergent());
+            }) && self.find_recursive_with_binder(db, env, binder).is_none()
+                && previous
+                    .find_recursive_with_binder(db, env, binder)
+                    .is_some();
 
         // When we encounter a salsa cycle, we want to avoid oscillating between two or more types
         // without converging on a fixed-point result. Most of the time, we union together the
@@ -2132,8 +2132,6 @@ impl<'db> Type<'db> {
             UnionType::from_elements_cycle_recovery(db, env, [previous, self])
         };
 
-        let binder = DivergentType::new(query, cycle.id())
-            .with_optional_type_inference_slot(type_inference_slot);
         stabilized.cycle_fold_recursive(db, env, previous, binder, include_previous, origin)
     }
 
@@ -2382,7 +2380,7 @@ impl<'db> Type<'db> {
     }
 
     const fn is_non_divergent_dynamic(&self) -> bool {
-        self.is_dynamic() && !self.is_divergent()
+        self.is_dynamic() && !matches!(self, Type::Divergent(_))
     }
 
     /// Returns `true` if this type is an awaitable that should be awaited before being discarded.
