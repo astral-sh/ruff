@@ -1292,11 +1292,7 @@ impl<'db> NarrowingConstraint<'db> {
     }
 
     /// Evaluate the type, disregarding whether the constraint also establishes member presence.
-    pub(crate) fn evaluate_constraint_type(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-    ) -> Type<'db> {
+    fn evaluate_constraint_type(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
         self.evaluate_place(db, env).ty
     }
 }
