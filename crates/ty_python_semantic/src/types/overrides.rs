@@ -480,16 +480,7 @@ fn check_class_declaration<'db>(
 
     let instance_of_class = Type::instance(db, env, class);
 
-    // Look up `__new__` on the class so generated and decorated callables retain `cls`
-    // until we bind them to the subclass below.
-    let lookup_member = |class: ClassType<'db>| {
-        if member.name == "__new__" {
-            class.class_member(db, env, &member.name, MemberLookupPolicy::default())
-        } else {
-            Type::instance(db, env, class).member(db, env, &member.name)
-        }
-    };
-    let subclass_instance_member = lookup_member(class);
+    let subclass_instance_member = lookup_override_member(db, env, class, &member.name);
     let Place::Defined(DefinedPlace {
         ty: type_on_subclass_instance,
         ..
@@ -715,7 +706,8 @@ fn check_class_declaration<'db>(
                     .unwrap_or_default();
             }
 
-            let superclass_instance_member = lookup_member(superclass);
+            let superclass_instance_member =
+                lookup_override_member(db, env, superclass, &member.name);
             let Place::Defined(DefinedPlace {
                 ty: superclass_type,
                 ..
@@ -895,64 +887,11 @@ fn check_class_declaration<'db>(
                 continue;
             }
 
-            // Compare constructor signatures on the subclass, including inherited `Self`
-            // annotations. Although `__new__` is static, its `cls` parameter must also be bound.
-            let bind_constructor = |ty| match ty {
-                Type::BoundMethod(method) if member.name == "__init__" => Type::BoundMethod(
-                    method.with_signature_receiver(db, instance_of_class, instance_of_class),
-                ),
-                ty if member.name == "__new__" => {
-                    let callable = match ty {
-                        Type::FunctionLiteral(function) => function.into_callable_type(db),
-                        Type::Callable(callable) => callable,
-                        _ => return ty,
-                    };
-                    let signature = callable.signatures(db);
-                    let receiver = Type::from(class);
-                    let bound_signature = if signature.overloads.len() > 1
-                        && signature
-                            .overloads
-                            .iter()
-                            .any(Signature::has_explicit_positional_receiver_annotation)
-                    {
-                        // Overloads specialized for other subclasses do not constrain this override.
-                        CallableSignature::from_overloads(
-                            signature
-                                .overloads
-                                .iter()
-                                .filter_map(|signature| {
-                                    signature.bind_self_if_compatible(
-                                        db,
-                                        env,
-                                        receiver,
-                                        instance_of_class,
-                                    )
-                                })
-                                .flat_map(|signature| signature.overloads),
-                        )
-                    } else {
-                        signature.bind_self_with_receiver(
-                            db,
-                            env,
-                            Some(receiver),
-                            Some(instance_of_class),
-                        )
-                    };
-                    Type::Callable(CallableType::new(
-                        db,
-                        bound_signature,
-                        // Compare call signatures independently of descriptor behavior.
-                        CallableTypeKind::Regular,
-                    ))
-                }
-                _ => ty,
-            };
-
             let Some((subclass_override_type, superclass_override_type)) = method_override_types(
                 db,
                 env,
-                bind_constructor(type_on_subclass_instance),
-                bind_constructor(superclass_type),
+                bind_new_for_override(db, env, class, &member.name, type_on_subclass_instance),
+                bind_new_for_override(db, env, class, &member.name, superclass_type),
             ) else {
                 continue;
             };
@@ -1063,6 +1002,75 @@ fn check_class_declaration<'db>(
     }
 }
 
+/// Look up `__new__` on the class so generated and decorated callables retain `cls`
+/// until they are bound for the override comparison.
+fn lookup_override_member<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    class: ClassType<'db>,
+    name: &Name,
+) -> PlaceAndQualifiers<'db> {
+    if name == "__new__" {
+        class.class_member(db, env, name, MemberLookupPolicy::default())
+    } else {
+        Type::instance(db, env, class).member(db, env, name)
+    }
+}
+
+/// Resolve `__new__` descriptors and normalize callable objects before binding the
+/// constructor's implicit `cls`. This consumes a classmethod's bound `cls` or a
+/// callable instance's `__call__` receiver first, as for constructor calls.
+fn bind_new_for_override<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    class: ClassType<'db>,
+    name: &Name,
+    ty: Type<'db>,
+) -> Type<'db> {
+    if name != "__new__" {
+        return ty;
+    }
+    let receiver = Type::from(class);
+    let instance_of_class = Type::instance(db, env, class);
+    let Some(callables) = Place::bound(ty)
+        .try_call_dunder_get(db, env, receiver)
+        .ignore_possibly_undefined()
+        .and_then(|ty| ty.try_upcast_to_callable(db, env))
+    else {
+        return ty;
+    };
+    callables
+        .map(|callable| {
+            let signature = callable.signatures(db);
+            let bound_signature = if signature.overloads.len() > 1
+                && signature
+                    .overloads
+                    .iter()
+                    .any(Signature::has_explicit_positional_receiver_annotation)
+            {
+                // Overloads specialized for other subclasses do not constrain this override.
+                CallableSignature::from_overloads(
+                    signature
+                        .overloads
+                        .iter()
+                        .filter_map(|signature| {
+                            signature.bind_self_if_compatible(db, env, receiver, instance_of_class)
+                        })
+                        .flat_map(|signature| signature.overloads),
+                )
+            } else {
+                signature.bind_self_with_receiver(db, env, Some(receiver), Some(instance_of_class))
+            };
+            CallableType::new(
+                db,
+                bound_signature,
+                // Compare call signatures independently of descriptor behavior.
+                CallableTypeKind::Regular,
+            )
+        })
+        .into_type(db, env)
+}
+
 /// Returns whether the selected inherited method already violates this ancestor's contract.
 ///
 /// The parent can inherit the method without defining an override. Its hierarchy may already
@@ -1089,10 +1097,13 @@ fn is_inherited_method_violation<'db>(
         .any(|parent| {
             let Place::Defined(DefinedPlace {
                 ty: parent_type, ..
-            }) = Type::instance(db, env, parent).member(db, env, name).place
+            }) = lookup_override_member(db, env, parent, name).place
             else {
                 return false;
             };
+            // An inherited violation belongs to the parent's own receiver domain.
+            let parent_type = bind_new_for_override(db, env, parent, name, parent_type);
+            let superclass_type = bind_new_for_override(db, env, parent, name, superclass_type);
             if is_assignable_method_override(db, env, parent_type, superclass_type) {
                 return false;
             }
@@ -1109,13 +1120,16 @@ fn is_inherited_method_violation<'db>(
                 .any(|ancestor| {
                     let Place::Defined(DefinedPlace {
                         ty: ancestor_type, ..
-                    }) = Type::instance(db, env, ancestor)
-                        .member(db, env, name)
-                        .place
+                    }) = lookup_override_member(db, env, ancestor, name).place
                     else {
                         return false;
                     };
-                    !is_assignable_method_override(db, env, parent_type, ancestor_type)
+                    !is_assignable_method_override(
+                        db,
+                        env,
+                        parent_type,
+                        bind_new_for_override(db, env, parent, name, ancestor_type),
+                    )
                 })
         })
 }
