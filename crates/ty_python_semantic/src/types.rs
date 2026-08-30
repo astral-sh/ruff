@@ -6324,7 +6324,18 @@ impl<'db> Type<'db> {
 
             // Dynamic types are callable, and the return type is the same dynamic type. Similarly,
             // `Never` is always callable and returns `Never`.
-            Type::Dynamic(_) | Type::Divergent(_) | Type::Recursive(_) | Type::Never => {
+            Type::Recursive(recursive) => {
+                let unfolded = recursive.unfold(db, env);
+                if unfolded == self {
+                    Binding::single(self, Signature::dynamic(self)).into()
+                } else {
+                    let mut bindings = unfolded.bindings_impl(db, env, recursion_guard);
+                    bindings.replace_callable_type(unfolded, self);
+                    bindings
+                }
+            }
+
+            Type::Dynamic(_) | Type::Divergent(_) | Type::Never => {
                 Binding::single(self, Signature::dynamic(self)).into()
             }
 
@@ -7591,13 +7602,23 @@ impl<'db> Type<'db> {
                     return_ty: return_builder.map(IntersectionBuilder::build),
                 })
             }
-            ty @ (Type::Dynamic(_) | Type::Divergent(_) | Type::Recursive(_) | Type::Never) => {
-                Some(GeneratorTypes {
-                    yield_ty: Some(ty),
-                    send_ty: Some(ty),
-                    return_ty: Some(ty),
-                })
-            }
+            Type::Recursive(recursive) => recursive.map_or_else(
+                db,
+                env,
+                || {
+                    Some(GeneratorTypes {
+                        yield_ty: Some(self),
+                        send_ty: Some(self),
+                        return_ty: Some(self),
+                    })
+                },
+                |unfolded| unfolded.generator_types(db, env, mode),
+            ),
+            ty @ (Type::Dynamic(_) | Type::Divergent(_) | Type::Never) => Some(GeneratorTypes {
+                yield_ty: Some(ty),
+                send_ty: Some(ty),
+                return_ty: Some(ty),
+            }),
             _ => None,
         }
     }
@@ -7683,7 +7704,13 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
     ) -> Option<InstanceProjection<Type<'db>>> {
         match self {
-            Type::Dynamic(_) | Type::Divergent(_) | Type::Recursive(_) | Type::Never => {
+            Type::Recursive(recursive) => recursive.map_or_else(
+                db,
+                env,
+                || Some(InstanceProjection::Exact(self)),
+                |unfolded| unfolded.to_instance(db, env),
+            ),
+            Type::Dynamic(_) | Type::Divergent(_) | Type::Never => {
                 Some(InstanceProjection::Exact(self))
             }
             Type::ClassLiteral(class) => Some(InstanceProjection::OverApproximation(
@@ -8088,7 +8115,10 @@ impl<'db> Type<'db> {
                 Type::Dynamic(dynamic) => {
                     SubclassOfType::from(db, env, SubclassOfInner::Dynamic(dynamic))
                 }
-                Type::Divergent(_) | Type::Recursive(_) => ty,
+                Type::Recursive(recursive) => recursive.map_type(db, env, |unfolded| {
+                    to_meta_type_inner(db, env, unfolded, visitor)
+                }),
+                Type::Divergent(_) => ty,
                 Type::Intersection(intersection) => {
                     if let Some(alternatives) = intersection.finite_alternative_union(db, env) {
                         to_meta_type_inner(db, env, alternatives, visitor)
@@ -8267,7 +8297,6 @@ impl<'db> Type<'db> {
             self,
             Type::Dynamic(_)
                 | Type::Divergent(_)
-                | Type::Recursive(_)
                 | Type::Never
                 | Type::WrapperDescriptor(_)
                 | Type::DataclassDecorator(_)
@@ -8925,7 +8954,18 @@ impl<'db> Type<'db> {
                     typevars.insert(bound_typevar);
                 }
             }
-            Type::Divergent(_) | Type::Recursive(_) => {}
+            Type::Recursive(recursive) => {
+                visitor.visit(db, self, || {
+                    recursive.unfold(db, env).find_legacy_typevars_impl(
+                        db,
+                        env,
+                        binding_context,
+                        typevars,
+                        visitor,
+                    );
+                });
+            }
+            Type::Divergent(_) => {}
 
             Type::FunctionLiteral(function) => {
                 visitor.visit(db, self, || {
@@ -9424,9 +9464,15 @@ impl<'db> Type<'db> {
                 | DynamicType::UnknownGeneric(_)
                 | DynamicType::AmbiguousOverload,
             ) => Type::SpecialForm(SpecialFormType::Unknown).definition(db, env),
-            Self::Divergent(_) | Self::Recursive(_) => {
-                Type::SpecialForm(SpecialFormType::Divergent).definition(db, env)
+            Self::Recursive(recursive) => {
+                let unfolded = recursive.unfold(db, env);
+                if unfolded == *self {
+                    None
+                } else {
+                    unfolded.definition(db, env)
+                }
             }
+            Self::Divergent(_) => Type::SpecialForm(SpecialFormType::Divergent).definition(db, env),
             Self::Dynamic(DynamicType::Todo(_)) => {
                 Type::SpecialForm(SpecialFormType::Todo).definition(db, env)
             }
@@ -9839,9 +9885,16 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
             Type::TypeForm(typeform_type) => typeform_type.variance_of(db, env, typevar),
             Type::KnownInstance(known_instance) => known_instance.variance_of(db, env, typevar),
             Type::TypeAlias(alias) => alias.variance_of(db, env, typevar),
+            Type::Recursive(recursive) => {
+                let unfolded = recursive.unfold(db, env);
+                if unfolded == self {
+                    TypeVarVariance::Bivariant
+                } else {
+                    unfolded.variance_of(db, env, typevar)
+                }
+            }
             Type::Dynamic(_)
             | Type::Divergent(_)
-            | Type::Recursive(_)
             | Type::Never
             | Type::WrapperDescriptor(_)
             | Type::KnownBoundMethod(_)
@@ -10264,6 +10317,35 @@ impl<'db> Foldable<'db> for Type<'db> {
         recursive: RecursiveType<'db>,
     ) -> Self {
         recursive.fold_type(db, env, self)
+    }
+}
+
+impl<'db, T> Foldable<'db> for InstanceProjection<T>
+where
+    T: Foldable<'db>,
+{
+    fn fold(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        recursive: RecursiveType<'db>,
+    ) -> Self {
+        self.map(|value| value.fold(db, env, recursive))
+    }
+}
+
+impl<'db> Foldable<'db> for GeneratorTypes<'db> {
+    fn fold(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        recursive: RecursiveType<'db>,
+    ) -> Self {
+        Self {
+            yield_ty: self.yield_ty.fold(db, env, recursive),
+            send_ty: self.send_ty.fold(db, env, recursive),
+            return_ty: self.return_ty.fold(db, env, recursive),
+        }
     }
 }
 

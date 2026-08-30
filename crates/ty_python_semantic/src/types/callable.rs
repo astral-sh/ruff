@@ -102,7 +102,15 @@ impl<'db> Type<'db> {
                 db,
                 Signature::dynamic(self),
             ))),
-            Type::Recursive(_) => None,
+            Type::Recursive(recursive) => {
+                let unfolded = recursive.unfold(db, env);
+                if unfolded == self {
+                    None
+                } else {
+                    unfolded
+                        .try_upcast_to_callable_with_policy_and_context(db, env, policy, context)
+                }
+            }
 
             Type::FunctionLiteral(function_literal)
                 if context.is_recursive_reference(db, function_literal) =>

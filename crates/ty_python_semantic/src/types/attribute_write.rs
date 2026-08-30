@@ -14,8 +14,8 @@ use ty_python_core::use_def_map;
 use super::call::CallArguments;
 use super::callable::CallableTypeKind;
 use super::{
-    IntersectionType, KnownClass, KnownInstanceType, MemberLookupPolicy, Parameter, Signature,
-    Type, TypeQualifiers, TypeVarBoundOrConstraints, UnionType,
+    Foldable, IntersectionType, KnownClass, KnownInstanceType, MemberLookupPolicy, Parameter,
+    RecursiveType, Signature, Type, TypeQualifiers, TypeVarBoundOrConstraints, UnionType,
 };
 use crate::ProgramEnvironment;
 use crate::place::{
@@ -67,6 +67,47 @@ pub(super) enum AttributeWriteRequirement<'db> {
     },
 }
 
+impl<'db> Foldable<'db> for AttributeWriteRequirement<'db> {
+    fn fold(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        recursive: RecursiveType<'db>,
+    ) -> Self {
+        match self {
+            Self::All {
+                object_ty,
+                element_tys,
+            } => Self::All {
+                object_ty: object_ty.fold(db, env, recursive),
+                element_tys,
+            },
+            Self::Any {
+                object_ty,
+                intersection,
+            } => Self::Any {
+                object_ty: object_ty.fold(db, env, recursive),
+                intersection,
+            },
+            Self::Module(ty) => Self::Module(ty.fold(db, env, recursive)),
+            Self::ProtocolMember { write, qualifiers } => Self::ProtocolMember {
+                write: write.map(|write| write.fold(db, env, recursive)),
+                qualifiers,
+            },
+            Self::Instance { object_ty, member } => Self::Instance {
+                object_ty: object_ty.fold(db, env, recursive),
+                member: member.fold(db, env, recursive),
+            },
+            Self::Class { object_ty, member } => Self::Class {
+                object_ty: object_ty.fold(db, env, recursive),
+                member: member.fold(db, env, recursive),
+            },
+            Self::Unconstrained => Self::Unconstrained,
+            Self::CannotAssign => Self::CannotAssign,
+        }
+    }
+}
+
 /// How a writable protocol member validates an assigned value.
 pub(super) enum ProtocolMemberWriteRequirement<'db> {
     /// Check the assigned value against a directly representable write type.
@@ -83,6 +124,28 @@ pub(super) enum ProtocolMemberWriteRequirement<'db> {
         receiver_ty: Type<'db>,
         domain: Option<Type<'db>>,
     },
+}
+
+impl<'db> Foldable<'db> for ProtocolMemberWriteRequirement<'db> {
+    fn fold(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        recursive: RecursiveType<'db>,
+    ) -> Self {
+        match self {
+            Self::AssignableTo(ty) => Self::AssignableTo(ty.fold(db, env, recursive)),
+            Self::Descriptor {
+                descriptor_ty,
+                receiver_ty,
+                domain,
+            } => Self::Descriptor {
+                descriptor_ty: descriptor_ty.fold(db, env, recursive),
+                receiver_ty: receiver_ty.fold(db, env, recursive),
+                domain: domain.fold(db, env, recursive),
+            },
+        }
+    }
 }
 
 /// The member that governs a write through an instance.
@@ -106,6 +169,25 @@ pub(super) enum InstanceAttributeWriteMember<'db> {
     SetAttr,
 }
 
+impl<'db> Foldable<'db> for InstanceAttributeWriteMember<'db> {
+    fn fold(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        recursive: RecursiveType<'db>,
+    ) -> Self {
+        match self {
+            Self::ClassVar => Self::ClassVar,
+            Self::Explicit { member, fallback } => Self::Explicit {
+                member: member.fold(db, env, recursive),
+                fallback: fallback.map(|fallback| fallback.fold(db, env, recursive)),
+            },
+            Self::Instance(fallback) => Self::Instance(fallback.fold(db, env, recursive)),
+            Self::SetAttr => Self::SetAttr,
+        }
+    }
+}
+
 /// The member that governs a write through a class object.
 ///
 /// A data descriptor on the metaclass takes precedence over the class object's own attributes,
@@ -127,6 +209,30 @@ pub(super) enum ClassAttributeWriteMember<'db> {
     Unresolved { has_instance_attribute: bool },
 }
 
+impl<'db> Foldable<'db> for ClassAttributeWriteMember<'db> {
+    fn fold(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        recursive: RecursiveType<'db>,
+    ) -> Self {
+        match self {
+            Self::Explicit { member, fallback } => Self::Explicit {
+                member: member.fold(db, env, recursive),
+                fallback: fallback.map(|fallback| fallback.fold(db, env, recursive)),
+            },
+            Self::ClassAttribute(fallback) => {
+                Self::ClassAttribute(fallback.fold(db, env, recursive))
+            }
+            Self::Unresolved {
+                has_instance_attribute,
+            } => Self::Unresolved {
+                has_instance_attribute,
+            },
+        }
+    }
+}
+
 /// How an explicitly resolved member accepts a write.
 pub(super) enum ExplicitAttributeWriteRequirement<'db> {
     /// Invoke a concrete descriptor's `__set__` method.
@@ -143,6 +249,31 @@ pub(super) enum ExplicitAttributeWriteRequirement<'db> {
         ty: Type<'db>,
         qualifiers: TypeQualifiers,
     },
+}
+
+impl<'db> Foldable<'db> for ExplicitAttributeWriteRequirement<'db> {
+    fn fold(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        recursive: RecursiveType<'db>,
+    ) -> Self {
+        match self {
+            Self::Descriptor {
+                descriptor_ty,
+                setter_ty,
+                qualifiers,
+            } => Self::Descriptor {
+                descriptor_ty: descriptor_ty.fold(db, env, recursive),
+                setter_ty: setter_ty.fold(db, env, recursive),
+                qualifiers,
+            },
+            Self::AssignableTo { ty, qualifiers } => Self::AssignableTo {
+                ty: ty.fold(db, env, recursive),
+                qualifiers,
+            },
+        }
+    }
 }
 
 impl ExplicitAttributeWriteRequirement<'_> {
@@ -165,6 +296,28 @@ pub(super) enum FallbackAttributeWriteRequirement<'db> {
     },
     /// The fallback may exist, but lookup did not produce a usable write type.
     PossiblyMissing,
+}
+
+impl<'db> Foldable<'db> for FallbackAttributeWriteRequirement<'db> {
+    fn fold(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        recursive: RecursiveType<'db>,
+    ) -> Self {
+        match self {
+            Self::AssignableTo {
+                ty,
+                qualifiers,
+                possibly_missing,
+            } => Self::AssignableTo {
+                ty: ty.fold(db, env, recursive),
+                qualifiers,
+                possibly_missing,
+            },
+            Self::PossiblyMissing => Self::PossiblyMissing,
+        }
+    }
 }
 
 /// The members that can govern an attribute write.
@@ -198,6 +351,26 @@ pub(super) enum AssignmentAttributeMembers<'db> {
     /// The receiver member governs the write, as `C.plain` does above because `Meta.plain` is
     /// definitely not a data descriptor.
     ReceiverMember(PlaceAndQualifiers<'db>),
+}
+
+impl<'db> Foldable<'db> for AssignmentAttributeMembers<'db> {
+    fn fold(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        recursive: RecursiveType<'db>,
+    ) -> Self {
+        match self {
+            Self::TypeMember {
+                member,
+                receiver_fallback,
+            } => Self::TypeMember {
+                member: member.fold(db, env, recursive),
+                receiver_fallback: receiver_fallback.fold(db, env, recursive),
+            },
+            Self::ReceiverMember(member) => Self::ReceiverMember(member.fold(db, env, recursive)),
+        }
+    }
 }
 
 impl<'db> AssignmentAttributeMembers<'db> {
@@ -263,7 +436,14 @@ pub(super) fn attribute_write_requirement<'db>(
         }
         Type::BoundSuper(_) => AttributeWriteRequirement::CannotAssign,
 
-        Type::Dynamic(..) | Type::Divergent(_) | Type::Recursive(_) | Type::Never => {
+        Type::Recursive(recursive) => recursive.map_or_else(
+            db,
+            env,
+            || AttributeWriteRequirement::Unconstrained,
+            |unfolded| attribute_write_requirement(db, env, unfolded, attribute),
+        ),
+
+        Type::Dynamic(..) | Type::Divergent(_) | Type::Never => {
             AttributeWriteRequirement::Unconstrained
         }
 
@@ -795,6 +975,15 @@ pub(super) fn assignment_attribute_members<'db>(
     object_ty: Type<'db>,
     attribute: &str,
 ) -> Option<AssignmentAttributeMembers<'db>> {
+    if let Type::Recursive(recursive) = object_ty {
+        return recursive.map_or_else(
+            db,
+            env,
+            || None,
+            |unfolded| assignment_attribute_members(db, env, unfolded, attribute),
+        );
+    }
+
     // Precise `functools.partial` instances synthesize a refined `__call__` member instead of
     // using the broad signature from typeshed.
     let type_member = if attribute == "__call__"

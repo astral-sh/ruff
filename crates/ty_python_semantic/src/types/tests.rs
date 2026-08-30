@@ -670,6 +670,76 @@ fn recursive_type_operations_unfold_and_fold() {
         Type::Recursive(_)
     ));
 
+    let callable_binder = DivergentType::new(salsa::plumbing::Id::from_bits(5));
+    let callable_body = Type::single_callable(
+        db,
+        Signature::new(Parameters::empty(), Type::Divergent(callable_binder)),
+    );
+    let recursive_callable = RecursiveType::build(
+        db,
+        &env,
+        callable_binder,
+        RecursiveTypeOrigin::Implicit,
+        callable_body,
+    );
+    assert!(
+        recursive_callable
+            .try_upcast_to_callable(db, &env)
+            .is_some()
+    );
+
+    let generator_binder = DivergentType::new(salsa::plumbing::Id::from_bits(6));
+    let generator_body = KnownClass::Generator.to_specialized_instance(
+        db,
+        &env,
+        &[int, Type::Divergent(generator_binder), Type::none(db, &env)],
+    );
+    let recursive_generator = RecursiveType::build(
+        db,
+        &env,
+        generator_binder,
+        RecursiveTypeOrigin::Implicit,
+        generator_body,
+    );
+    let generator_types = recursive_generator
+        .generator_types(db, &env, GeneratorTypeMode::GeneratorOnly)
+        .expect("a recursive generator should expose its type arguments");
+    assert_eq!(generator_types.yield_ty, Some(int));
+    assert_eq!(generator_types.send_ty, Some(recursive_generator));
+    assert_eq!(generator_types.return_ty, Some(Type::none(db, &env)));
+
+    let instance_binder = DivergentType::new(salsa::plumbing::Id::from_bits(7));
+    let instance_body = Type::GenericAlias(list_alias(db, &env, Type::Divergent(instance_binder)));
+    let recursive_instance = RecursiveType::build(
+        db,
+        &env,
+        instance_binder,
+        RecursiveTypeOrigin::Implicit,
+        instance_body,
+    );
+    assert_eq!(
+        recursive_instance
+            .to_instance(db, &env)
+            .expect("a recursive generic alias should project to an instance")
+            .into_inner(),
+        KnownClass::List.to_specialized_instance(db, &env, &[recursive_instance])
+    );
+
+    let meta_binder = DivergentType::new(salsa::plumbing::Id::from_bits(8));
+    let meta_body =
+        KnownClass::List.to_specialized_instance(db, &env, &[Type::Divergent(meta_binder)]);
+    let recursive_meta = RecursiveType::build(
+        db,
+        &env,
+        meta_binder,
+        RecursiveTypeOrigin::Implicit,
+        meta_body,
+    );
+    assert!(matches!(
+        recursive_meta.to_meta_type(db, &env),
+        Type::SubclassOf(_)
+    ));
+
     let identity_binder = DivergentType::new(salsa::plumbing::Id::from_bits(3));
     let Type::Recursive(identity_recursive) = RecursiveType::build(
         db,
