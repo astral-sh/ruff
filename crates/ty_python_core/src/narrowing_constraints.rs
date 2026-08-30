@@ -41,6 +41,7 @@ use crate::ast_ids::ScopedUseId;
 use crate::predicate::ScopedPredicateId;
 use crate::rank::{RankBitBox, RankBitBoxVec};
 use crate::scope::FileScopeId;
+use crate::use_def::BindingsSnapshotId;
 
 /// The ID of a narrowing formula within one scope.
 ///
@@ -425,6 +426,7 @@ pub enum ConstraintKey {
     NarrowingConstraint(ScopedNarrowingConstraint),
     NestedScope(FileScopeId),
     UseId(ScopedUseId),
+    Snapshot(BindingsSnapshotId),
 }
 
 #[cfg(test)]

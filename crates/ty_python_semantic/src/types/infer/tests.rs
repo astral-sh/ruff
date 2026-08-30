@@ -1120,6 +1120,80 @@ fn undefined_reveal_fix_updates_after_source_changes() -> anyhow::Result<()> {
 }
 
 #[test]
+fn redundant_elif_fix_preserves_line_endings_and_checks_cleanly() -> anyhow::Result<()> {
+    let registry = crate::default_lint_registry();
+    let mut rules = RuleSelection::from_registry(registry);
+    rules.enable(
+        registry.get("redundant-condition-strict")?,
+        Severity::Warning,
+        LintSource::File,
+    );
+    let mut db = TestDbBuilder::new()
+        .with_python_version(PythonVersion::PY311)
+        .with_rule_selection(rules)
+        .build()?;
+
+    // Reuse the file to check that edits use the current imports and source style.
+    for (newline, indent, trailing_newline, existing_import) in [
+        ("\n", "    ", true, false),
+        ("\r\n", "\t", false, true),
+        ("\r", "  ", false, false),
+    ] {
+        let mut source = format!(
+            "def f(value: str | int):\n\
+            {indent}if isinstance(value, str):\n\
+            {indent}{indent}print(value)\n\
+            {indent}elif isinstance(value, int):\n\
+            {indent}{indent}print(value)  # Inline comment.\n\
+            {indent}{indent}# Trailing comment."
+        )
+        .replace('\n', newline);
+        let (import, name) = if existing_import {
+            (
+                "from typing import assert_never as unreachable",
+                "unreachable",
+            )
+        } else {
+            ("from typing import assert_never", "assert_never")
+        };
+        if existing_import {
+            source = format!("{import}{newline}{source}");
+        }
+        if trailing_newline {
+            source.push_str(newline);
+        }
+        db.write_file("/src/main.py", &source)?;
+        let file = system_path_to_file(&db, "/src/main.py")?;
+        let diagnostics = check_types(&db, program_file(&db, file));
+        let [diagnostic] = diagnostics.as_slice() else {
+            anyhow::bail!("expected one diagnostic: {diagnostics:#?}");
+        };
+        let fix = diagnostic
+            .fix()
+            .ok_or_else(|| anyhow::anyhow!("expected an autofix"))?;
+        let mut fixed = source.clone();
+        for edit in fix.edits().iter().rev() {
+            fixed.replace_range(edit.range().to_std_range(), edit.content().unwrap_or(""));
+        }
+        let prefix = if existing_import {
+            String::new()
+        } else {
+            format!("{import}{newline}")
+        };
+        let separator = if trailing_newline { "" } else { newline };
+        assert_eq!(
+            fixed,
+            format!(
+                "{prefix}{source}{separator}{indent}else:{newline}{indent}{indent}{name}(value){newline}"
+            )
+        );
+        db.write_file("/src/main.py", fixed)?;
+        assert_file_diagnostics(&db, "/src/main.py", &[]);
+    }
+    Ok(())
+}
+
+#[test]
 fn function_inference_regions_are_disjoint() -> anyhow::Result<()> {
     let mut db = setup_db();
     db.write_dedented(

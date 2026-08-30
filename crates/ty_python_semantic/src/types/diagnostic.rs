@@ -3061,7 +3061,7 @@ pub(super) fn report_possibly_missing_attribute(
 
 /// Selects a runtime typing module for a fix, checking declared dependencies and installed exports
 /// when the requested member needs a backport.
-fn typing_module_for_fix(
+pub(super) fn typing_module_for_fix(
     context: &InferContext,
     member: &str,
     minimum_version: PythonVersion,

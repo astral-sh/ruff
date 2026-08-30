@@ -54,6 +54,7 @@ use ruff_python_ast::{
     helpers::any_over_expr,
     visitor::{Visitor, walk_expr},
 };
+use ruff_text_size::Ranged;
 use ty_python_core::{Truthiness, expression::ExpressionContext, predicate::StatementCall};
 
 use crate::{
@@ -455,7 +456,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             self.boolean_test(test, ExpressionContext::Condition),
                             context,
                         ) {
-                            self.report_redundant_condition(&condition);
+                            if let Some(mut diagnostic) =
+                                self.report_redundant_condition(&condition)
+                                && condition.expression.range() == test.range()
+                            {
+                                self.annotate_redundant_if_or_elif(
+                                    &condition,
+                                    &mut diagnostic,
+                                    if_stmt,
+                                );
+                            }
                         }
                     }
                 }
