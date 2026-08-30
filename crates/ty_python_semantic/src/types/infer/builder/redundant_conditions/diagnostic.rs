@@ -8,19 +8,27 @@ use ruff_db::{
     source::source_text,
 };
 use ruff_diagnostics::{Applicability, Edit, Fix};
-use ruff_python_ast::{self as ast, PythonVersion, token::parenthesized_range};
+use ruff_python_ast::{
+    self as ast, PythonVersion, helpers::any_over_expr, token::parenthesized_range,
+};
 use ruff_python_trivia::indentation_at_offset;
-use ruff_source_file::{LineRanges, find_newline};
+use ruff_source_file::{LineRanges, UniversalNewlineIterator, find_newline};
 use ruff_text_size::{Ranged, TextRange};
-use ty_module_resolver::{SearchPath, file_to_module};
+use ty_module_resolver::{
+    ImportingFile, KnownModule, SearchPath, file_to_module, resolve_real_shadowable_module,
+};
 use ty_python_core::{
     Truthiness,
     definition::DefinitionKind,
+    predicate::{Predicate, PredicateNode},
     scope::{NodeWithScopeKind, ScopeKind},
 };
 
 use crate::{
     SemanticModel,
+    dependency::is_direct_dependency,
+    importer::ImportRequest,
+    place::imported_symbol,
     types::{
         KnownClass, LintDiagnosticGuard, LintDiagnosticGuardBuilder, MemberLookupPolicy, Type,
         TypeContext,
@@ -28,6 +36,7 @@ use crate::{
         function::KnownFunction,
         infer::{InferenceFlags, TypeInferenceBuilder},
         infer_definition_types, infer_scope_types,
+        narrow::{NarrowingConstraint, infer_narrowing_constraints},
         tuple::{Tuple, TupleLength},
     },
 };
@@ -462,12 +471,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             && kind == ConditionKind::Boolean
             && !diagnostic.has_applicable_fix(Applicability::DisplayOnly)
         {
-            diagnostic.help(
-                "Replace this `elif` with an `else` branch \
-                that asserts the condition to be `True`",
-            );
-            if let Some(fix) = self.replace_redundant_elif_with_assertion(clause, test) {
+            if let Some(fix) = self.add_assert_never_else(clause, test) {
+                diagnostic.help("Add an `else` branch that calls `assert_never`");
                 diagnostic.set_fix(fix);
+            } else {
+                diagnostic.help(
+                    "Replace this `elif` with an `else` branch \
+                    that asserts the condition to be `True`",
+                );
+                if let Some(fix) = self.replace_redundant_elif_with_assertion(clause, test) {
+                    diagnostic.set_fix(fix);
+                }
             }
         }
     }
@@ -702,6 +716,135 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
 
         false
+    }
+
+    /// Add an explicit exhaustiveness check after a redundant final `elif`.
+    ///
+    /// Only read a plain variable whose type narrows to `Never` when the condition is false:
+    /// repeating attribute access or a function call could have side effects. Keep the original
+    /// assertion fix when no such variable or unshadowed runtime import is available.
+    /// The fix is unsafe because the new branch raises if the static assumptions fail at runtime.
+    fn add_assert_never_else(&self, clause: &ast::ElifElseClause, test: &ast::Expr) -> Option<Fix> {
+        let db = self.db();
+        let env = self.program_environment();
+        let first_statement = clause.body.first()?;
+        let source = source_text(db, self.file());
+        let indentation = indentation_at_offset(clause.start(), &source)?;
+        let argument = self.assert_never_argument(test)?;
+
+        let module = if env.python_version(db) >= PythonVersion::PY311 {
+            KnownModule::Typing
+        } else {
+            KnownModule::TypingExtensions
+        };
+        let model = SemanticModel::new(db, self.program_file());
+        let resolved = model.resolve_module(Some(module.as_str()), 0)?;
+        if !resolved.is_known(db, module)
+            || (module == KnownModule::TypingExtensions
+                && !is_direct_dependency(db, self.program_file(), resolved))
+        {
+            return None;
+        }
+        if module == KnownModule::TypingExtensions {
+            // The bundled stub includes `assert_never` even when the installed backport is too
+            // old to provide it. Check the runtime module's exports before adding a runtime import.
+            let runtime_module = resolve_real_shadowable_module(
+                db,
+                ImportingFile::File(self.file(), self.program_file().resolver_environment(db)),
+                &module.name(),
+            )?;
+            let runtime_file = env.program(db).program_file(db, runtime_module.file(db)?);
+            if !imported_symbol(db, env, Some(runtime_file), "assert_never", None)
+                .place
+                .is_definitely_bound()
+            {
+                return None;
+            }
+        }
+        let importer = self.context.importer();
+        let action = importer.import_for_diagnostic(
+            ImportRequest::import_from(module.as_str(), "assert_never"),
+            self.scope().file_scope_id(db),
+            clause.start(),
+        )?;
+        let body_indentation = indentation_at_offset(first_statement.start(), &source)
+            .map(Cow::Borrowed)
+            .unwrap_or_else(|| Cow::Owned(format!("{indentation}{}", importer.indentation())));
+        let line_ending = find_newline(&source)
+            .map(|(_, ending)| ending)
+            .unwrap_or_default()
+            .as_str();
+        let mut end = source.full_line_end(clause.end());
+        // Keep trailing body comments with the `elif`, including those after a nested statement.
+        for line in UniversalNewlineIterator::with_offset(&source[usize::from(end)..], end) {
+            if line.trim().is_empty() {
+                continue;
+            }
+            if line.starts_with(body_indentation.as_ref()) && line.trim_start().starts_with('#') {
+                end = line.full_end();
+            } else {
+                break;
+            }
+        }
+        let leading_newline = if source.line_start(end) == end {
+            ""
+        } else {
+            line_ending
+        };
+        Some(Fix::unsafe_edits(
+            Edit::insertion(
+                format!(
+                    "{leading_newline}{indentation}else:{line_ending}{body_indentation}{}({}){line_ending}",
+                    action.symbol_text(),
+                    argument.id,
+                ),
+                end,
+            ),
+            action.import().cloned(),
+        ))
+    }
+
+    /// Find a variable tested directly, by a comparison, or by a narrowing function.
+    /// More complex conditions retain the assertion fix rather than moving their evaluation.
+    fn assert_never_argument<'a>(&self, test: &'a ast::Expr) -> Option<&'a ast::ExprName> {
+        if any_over_expr(test, ast::Expr::is_named_expr) {
+            return None;
+        }
+        let mut operand = test;
+        while let ast::Expr::UnaryOp(unary) = operand
+            && unary.op == ast::UnaryOp::Not
+        {
+            operand = &unary.operand;
+        }
+        let candidates = match operand {
+            ast::Expr::Name(_) => [Some(operand), None],
+            ast::Expr::Compare(compare) if compare.ops.len() == 1 => {
+                [Some(compare.left.as_ref()), compare.comparators.first()]
+            }
+            ast::Expr::Call(call) => [call.arguments.args.first(), None],
+            _ => return None,
+        };
+        let db = self.db();
+        let env = self.program_environment();
+        let places = self.index.place_table(self.scope().file_scope_id(db));
+        let predicate = Predicate {
+            node: PredicateNode::Expression(self.index.expression(test)),
+            is_positive: false,
+        };
+        candidates.into_iter().flatten().find_map(|candidate| {
+            let name = candidate.as_name_expr()?;
+            let ty = self.expression_type(candidate);
+            if ty.is_never() {
+                return None;
+            }
+            let place = places.symbol_id(&name.id)?;
+            let (constraint, _) = infer_narrowing_constraints(db, predicate, place.into());
+            NarrowingConstraint::intersection(ty)
+                .merge_constraint_and(constraint?)
+                .evaluate_constraint_type(db, env)
+                .is_never()
+                .then_some(name)
+        })
     }
 
     /// Replaces an always-true final `elif` with an `else` branch and a defensive assertion.

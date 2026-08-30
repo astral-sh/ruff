@@ -25,6 +25,28 @@ pub(crate) fn missing_direct_dependency<'db>(
     metadata.missing_dependency(db, importing_file, imported_module)
 }
 
+/// Whether metadata positively identifies this module as a direct dependency available to the file.
+#[salsa::tracked]
+pub(crate) fn is_direct_dependency<'db>(
+    db: &'db dyn Db,
+    importing_file: ProgramFile<'db>,
+    imported_module: Module<'db>,
+) -> bool {
+    let Some(metadata) = db.dependency_metadata(importing_file.file(db)) else {
+        return false;
+    };
+    let Some(project) = metadata.project_for_file(db, importing_file) else {
+        return false;
+    };
+    let Some(id) = metadata.import_owner(db, importing_file, imported_module) else {
+        return false;
+    };
+
+    project.dependencies.contains(id)
+        || (project.group_dependencies.contains(id)
+            && !metadata.is_package_file(db, importing_file, project))
+}
+
 /// The dependency information needed to check imports, without source ranges or lockfile details.
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
 pub struct DependencyMetadata {
@@ -39,6 +61,18 @@ pub struct DependencyMetadata {
 }
 
 impl DependencyMetadata {
+    /// Find a script's declarations or the nearest containing project's declarations.
+    fn project_for_file(&self, db: &dyn Db, file: ProgramFile<'_>) -> Option<&DependencyProject> {
+        let path = file.file(db).path(db).as_system_path()?;
+        self.projects
+            .iter()
+            .filter(|project| match project.kind {
+                DependencyProjectKind::Project => path.starts_with(&project.path),
+                DependencyProjectKind::Script => path == project.path.as_path(),
+            })
+            .max_by_key(|project| project.path.as_str().len())
+    }
+
     /// Check whether `importing_file` is allowed to import `imported_module`.
     ///
     /// Use the script's own declarations or the nearest containing project's declarations.
@@ -53,28 +87,8 @@ impl DependencyMetadata {
         importing_file: ProgramFile<'db>,
         imported_module: Module<'db>,
     ) -> Option<MissingDependency> {
-        let path = importing_file.file(db).path(db).as_system_path()?;
-        let project = self
-            .projects
-            .iter()
-            .filter(|project| match project.kind {
-                DependencyProjectKind::Project => path.starts_with(&project.path),
-                DependencyProjectKind::Script => path == project.path.as_path(),
-            })
-            .max_by_key(|project| project.path.as_str().len())?;
-
-        // Stubs can belong to a different distribution, so prefer the runtime module.
-        // Fall back to the resolved stub for native modules that ty cannot resolve at runtime.
-        let runtime_module = resolve_real_module(
-            db,
-            ImportingFile::File(
-                importing_file.file(db),
-                importing_file.resolver_environment(db),
-            ),
-            imported_module.name(db),
-        )
-        .unwrap_or(imported_module);
-        let id = self.owner(db, runtime_module)?;
+        let project = self.project_for_file(db, importing_file)?;
+        let id = self.import_owner(db, importing_file, imported_module)?;
 
         // Runtime and optional declarations take precedence when a dependency is also in a group.
         if project.distribution.as_ref() == Some(id) || project.dependencies.contains(id) {
@@ -91,6 +105,43 @@ impl DependencyMetadata {
             group_dependency,
             project_kind: project.kind,
         })
+    }
+
+    /// Returns the distribution ID to use when checking the dependency required by an import.
+    ///
+    /// The returned string is an opaque package-manager ID from [`Self::distributions`], not a
+    /// Python module name or a distribution's display name. Callers compare this ID with the
+    /// importing project's dependency declarations.
+    ///
+    /// `imported_module` comes from type-checking resolution, which can prefer a stub package over
+    /// the runtime implementation. For example, `import widgets` might resolve to
+    /// `widgets-stubs/__init__.pyi`, installed by a separate stub distribution. The dependency
+    /// needed at runtime is the distribution providing `widgets/__init__.py`, rather than the one
+    /// providing those stubs. Resolve the same module name again, with stubs disabled and using
+    /// `importing_file`'s Python environment, then look up that module's owner in the metadata.
+    ///
+    /// If runtime resolution fails, use `imported_module` for the ownership lookup. This allows
+    /// dependency checks for native extension modules that ty can resolve only through their
+    /// stubs. The fallback applies only to module resolution: if a runtime module is found but
+    /// its owner cannot be identified unambiguously, return `None` rather than attributing the
+    /// import to the stub distribution. For example, a local module shadowing an installed package
+    /// does not establish a dependency on that package merely because their import names match.
+    fn import_owner<'db>(
+        &self,
+        db: &'db dyn Db,
+        importing_file: ProgramFile<'db>,
+        imported_module: Module<'db>,
+    ) -> Option<&CompactString> {
+        let runtime_module = resolve_real_module(
+            db,
+            ImportingFile::File(
+                importing_file.file(db),
+                importing_file.resolver_environment(db),
+            ),
+            imported_module.name(db),
+        )
+        .unwrap_or(imported_module);
+        self.owner(db, runtime_module)
     }
 
     fn owner<'db>(&self, db: &'db dyn Db, module: Module<'db>) -> Option<&CompactString> {

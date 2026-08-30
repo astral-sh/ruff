@@ -653,7 +653,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 struct RedundantConditionChecker<'a, 'db> {
     builder: &'a TypeInferenceBuilder<'db, 'a>,
     /// The final `elif` in the current statement, if there is no `else` branch.
-    /// Only a diagnostic on its complete test can replace the branch with an assertion.
+    /// Only a diagnostic on its complete test can offer an exhaustiveness-check fix.
     final_elif: Option<&'a ast::ElifElseClause>,
 }
 
