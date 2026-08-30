@@ -2396,7 +2396,8 @@ def example(value: str | Any) -> None:
     append([1], value)
 ```
 
-This also applies when a generic base class contributes gradual type context:
+Generic base classes also contribute type context. The MRO uses the first specialization of each
+generic base class, so `Mixed` contributes `str` through `Specialized`:
 
 ```py
 class GenericBase[T]: ...
@@ -2407,7 +2408,7 @@ def g[T](values: list[T], base: GenericBase[T]) -> list[T]:
     return values
 
 reveal_type(g([1], Specialized()))  # revealed: list[int | str]
-reveal_type(g([1], Mixed()))  # revealed: list[int | str | Any]
+reveal_type(g([1], Mixed()))  # revealed: list[int | str]
 ```
 
 Dynamic arguments also participate when inferring the specialization for a nested collection
