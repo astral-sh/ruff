@@ -498,6 +498,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         subscript: &ast::ExprSubscript,
     ) -> Option<Type<'db>> {
         let db = self.db();
+        let binder = match value_ty {
+            Type::Divergent(binder) => binder,
+            Type::Recursive(recursive) => *recursive.binder(db),
+            _ => return None,
+        };
         let definition = self.recursive_type_expression_definition()?;
         let ast::Expr::Name(name) = &*subscript.value else {
             return None;
@@ -529,12 +534,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .map(|argument| self.generic_context_from_typevars(argument))
             .reduce(|left, right| left.merge(db, right))?;
         self.record_cycle_recovery_generic_context(definition, generic_context);
-
-        let binder = match value_ty {
-            Type::Divergent(binder) => binder,
-            Type::Recursive(recursive) => *recursive.binder(db),
-            _ => return Some(value_ty),
-        };
 
         let alias = GenericImplicitAlias::new(db, definition, argument_tys.into_boxed_slice());
         Some(Type::Divergent(binder.with_generic_implicit_alias(alias)))
