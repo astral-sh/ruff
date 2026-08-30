@@ -4,7 +4,7 @@ use ruff_diagnostics::{Edit, Fix};
 use rustc_hash::FxHashMap;
 
 use std::borrow::Cow;
-use std::cell::OnceCell;
+use std::cell::{Cell, OnceCell};
 use std::iter;
 use std::rc::Rc;
 use std::time::Duration;
@@ -1882,12 +1882,13 @@ impl<'db> Type<'db> {
     }
 
     /// Create the initial value for a single-type Salsa cycle.
-    pub(crate) fn recursive_cycle_initial(db: &'db dyn Db, id: salsa::Id) -> Self {
-        let binder = DivergentType::for_cycle(
-            DivergentQueryKind::InferExpressionType,
-            id,
-            DivergentSlot::Single,
-        );
+    pub(crate) fn recursive_cycle_initial(
+        db: &'db dyn Db,
+        query_kind: DivergentQueryKind,
+        id: salsa::Id,
+        slot: DivergentSlot,
+    ) -> Self {
+        let binder = DivergentType::for_cycle(query_kind, id, slot);
         Self::Recursive(RecursiveType::new(
             db,
             binder,
@@ -2052,8 +2053,16 @@ impl<'db> Type<'db> {
         previous: Self,
         cycle: &salsa::Cycle,
     ) -> Self {
-        if let Type::Recursive(recursive) = previous {
+        if let Some(recursive) = previous.recursive_type_from_cycle(db, env, cycle) {
             let current = recursive.collapse_backedges(db, env, self);
+            if !recursive.contains_binder(db, env, current)
+                && any_over_type(db, env, current, false, |ty| ty.is_non_divergent_dynamic())
+            {
+                // A dynamic fallback cannot establish that a structural backedge disappeared.
+                // Keep the previous recursive value rather than replacing it with less
+                // information and then iterating forever.
+                return Type::Recursive(recursive);
+            }
             let previous = recursive.collapse_backedges(db, env, previous);
             let body = if cycle.iteration() <= crate::TAINTED_CYCLES {
                 current
@@ -2103,6 +2112,35 @@ impl<'db> Type<'db> {
             UnionType::from_elements_cycle_recovery(db, env, [previous, self])
         }
         .recursive_type_normalized_impl_with_cycle(db, env, cycle)
+    }
+
+    /// Find the anonymous recursive value that represents the current Salsa cycle.
+    ///
+    /// Collection-literal cycle initials preserve their outer container and put the identity
+    /// recursive value in an element slot, so the previous value is not always recursive at the
+    /// root.
+    fn recursive_type_from_cycle(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        cycle: &salsa::Cycle,
+    ) -> Option<RecursiveType<'db>> {
+        let found = Cell::new(None);
+        any_over_type(db, env, self, false, |ty| {
+            let Type::Recursive(recursive) = ty else {
+                return false;
+            };
+            if cycle
+                .head_ids()
+                .any(|id| id == recursive.binder(db).salsa_id)
+            {
+                found.set(Some(recursive));
+                true
+            } else {
+                false
+            }
+        });
+        found.get()
     }
 
     pub fn is_none(&self, db: &'db dyn Db) -> bool {
@@ -10303,17 +10341,35 @@ impl<'db> RecursiveType<'db> {
             body
         };
 
-        if any_over_type(
-            db,
-            env,
-            body,
-            false,
-            |ty| matches!(ty, Type::Divergent(divergent) if divergent.same_marker(binder)),
-        ) {
+        if Self::body_contains_binder(db, env, binder, body) {
             Type::Recursive(Self::new(db, binder, origin, body))
         } else {
             body
         }
+    }
+
+    fn contains_binder(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+    ) -> bool {
+        Self::body_contains_binder(db, env, self.binder(db), ty)
+    }
+
+    fn body_contains_binder(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        binder: DivergentType<'db>,
+        ty: Type<'db>,
+    ) -> bool {
+        any_over_type(
+            db,
+            env,
+            ty,
+            false,
+            |ty| matches!(ty, Type::Divergent(divergent) if divergent.same_marker(binder)),
+        )
     }
 
     /// Replace this recursive type binder with the recursive type itself.

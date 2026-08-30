@@ -59,7 +59,8 @@ use crate::types::function::{FunctionDecorators, FunctionType};
 use crate::types::generics::Specialization;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
-    ClassLiteral, KnownClass, StaticClassLiteral, Type, TypeAndQualifiers, TypeQualifiers,
+    ClassLiteral, DivergentQueryKind, DivergentSlot, KnownClass, StaticClassLiteral, Type,
+    TypeAndQualifiers, TypeQualifiers,
 };
 use crate::{Db, FxIndexSet};
 
@@ -532,7 +533,12 @@ pub(crate) fn infer_expression_type<'db>(
 
 #[salsa::tracked(
     returns(copy),
-    cycle_initial=|db, id, _| Type::recursive_cycle_initial(db, id),
+    cycle_initial=|db, id, _| Type::recursive_cycle_initial(
+        db,
+        DivergentQueryKind::InferExpressionType,
+        id,
+        DivergentSlot::Single,
+    ),
     cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, input: InferExpression<'db>| {
         let (expression, _) = input.into_inner(db);
         let env = ProgramEnvironment::from_scope(expression.scope(db));
