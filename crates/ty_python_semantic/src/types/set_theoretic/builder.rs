@@ -1397,12 +1397,13 @@ enum IntersectionPolarity {
     Mixed,
 }
 
+/// Describes the signed intersection elements, so `Disjoint` also covers `S & ~T` when `S <: T`.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, salsa::SalsaValue, get_size2::GetSize)]
 enum IntersectionSimplification {
-    KeepBoth,
-    KeepFirst,
-    KeepSecond,
-    Never,
+    Unchanged,
+    FirstRedundant,
+    SecondRedundant,
+    Disjoint,
 }
 
 /// Simplify a pair of intersection elements using non-circular relation checks.
@@ -1422,7 +1423,7 @@ enum IntersectionSimplification {
 /// inference to prove that `C` already satisfies the protocol for `x` and erase the branch.
 #[salsa::tracked(
     returns(copy),
-    cycle_result=|_, _, _, _| IntersectionSimplification::KeepBoth,
+    cycle_result=|_, _, _, _| IntersectionSimplification::Unchanged,
     heap_size=ruff_memory_usage::heap_size,
 )]
 fn simplify_intersection_pair<'db>(
@@ -1438,37 +1439,37 @@ fn simplify_intersection_pair<'db>(
         IntersectionPolarity::Positive => {
             // S & T = S if S <: T.
             if first.is_redundant_with(db, &env, second) {
-                return IntersectionSimplification::KeepFirst;
+                return IntersectionSimplification::SecondRedundant;
             }
-            let keep_second = second.is_redundant_with(db, &env, first);
+            let first_redundant = second.is_redundant_with(db, &env, first);
             if second.is_disjoint_from(db, &env, first) {
-                return IntersectionSimplification::Never;
+                return IntersectionSimplification::Disjoint;
             }
-            if keep_second {
-                return IntersectionSimplification::KeepSecond;
+            if first_redundant {
+                return IntersectionSimplification::FirstRedundant;
             }
         }
         IntersectionPolarity::Negative => {
             // ~S & ~T = ~T if S <: T; the narrower exclusion is redundant.
-            let keep_second = first.is_redundant_with(db, &env, second);
+            let first_redundant = first.is_redundant_with(db, &env, second);
             if second.is_subtype_of(db, &env, first) {
-                return IntersectionSimplification::KeepFirst;
+                return IntersectionSimplification::SecondRedundant;
             }
-            if keep_second {
-                return IntersectionSimplification::KeepSecond;
+            if first_redundant {
+                return IntersectionSimplification::FirstRedundant;
             }
         }
         IntersectionPolarity::Mixed => {
             // S & ~T = Never if S <: T, and S & ~T = S if S and T are disjoint.
             if first.is_subtype_of(db, &env, second) {
-                return IntersectionSimplification::Never;
+                return IntersectionSimplification::Disjoint;
             }
             if first.is_disjoint_from(db, &env, second) {
-                return IntersectionSimplification::KeepFirst;
+                return IntersectionSimplification::SecondRedundant;
             }
         }
     }
-    IntersectionSimplification::KeepBoth
+    IntersectionSimplification::Unchanged
 }
 
 #[derive(Debug, Clone, Default)]
@@ -1740,10 +1741,10 @@ impl<'db> InnerIntersectionBuilder<'db> {
                         TypePair::new(db, env.program(db), *existing_positive, new_positive),
                         IntersectionPolarity::Positive,
                     ) {
-                        IntersectionSimplification::KeepBoth => {}
-                        IntersectionSimplification::KeepFirst => return,
-                        IntersectionSimplification::KeepSecond => to_remove.push(index),
-                        IntersectionSimplification::Never => {
+                        IntersectionSimplification::Unchanged => {}
+                        IntersectionSimplification::SecondRedundant => return,
+                        IntersectionSimplification::FirstRedundant => to_remove.push(index),
+                        IntersectionSimplification::Disjoint => {
                             *self = Self::default();
                             self.positive.insert(Type::Never);
                             return;
@@ -1766,10 +1767,10 @@ impl<'db> InnerIntersectionBuilder<'db> {
                         TypePair::new(db, env.program(db), new_positive, *existing_negative),
                         IntersectionPolarity::Mixed,
                     ) {
-                        IntersectionSimplification::KeepBoth => {}
-                        IntersectionSimplification::KeepFirst => to_remove.push(index),
-                        IntersectionSimplification::KeepSecond => return,
-                        IntersectionSimplification::Never => {
+                        IntersectionSimplification::Unchanged => {}
+                        IntersectionSimplification::SecondRedundant => to_remove.push(index),
+                        IntersectionSimplification::FirstRedundant => return,
+                        IntersectionSimplification::Disjoint => {
                             *self = Self::default();
                             self.positive.insert(Type::Never);
                             return;
@@ -1886,10 +1887,10 @@ impl<'db> InnerIntersectionBuilder<'db> {
                         TypePair::new(db, env.program(db), *existing_negative, new_negative),
                         IntersectionPolarity::Negative,
                     ) {
-                        IntersectionSimplification::KeepBoth => {}
-                        IntersectionSimplification::KeepFirst => return,
-                        IntersectionSimplification::KeepSecond => to_remove.push(index),
-                        IntersectionSimplification::Never => {
+                        IntersectionSimplification::Unchanged => {}
+                        IntersectionSimplification::SecondRedundant => return,
+                        IntersectionSimplification::FirstRedundant => to_remove.push(index),
+                        IntersectionSimplification::Disjoint => {
                             *self = Self::default();
                             self.positive.insert(Type::Never);
                             return;
@@ -1928,10 +1929,10 @@ impl<'db> InnerIntersectionBuilder<'db> {
                         TypePair::new(db, env.program(db), *existing_positive, new_negative),
                         IntersectionPolarity::Mixed,
                     ) {
-                        IntersectionSimplification::KeepBoth => {}
-                        IntersectionSimplification::KeepFirst => return,
-                        IntersectionSimplification::KeepSecond => to_remove.push(index),
-                        IntersectionSimplification::Never => {
+                        IntersectionSimplification::Unchanged => {}
+                        IntersectionSimplification::SecondRedundant => return,
+                        IntersectionSimplification::FirstRedundant => to_remove.push(index),
+                        IntersectionSimplification::Disjoint => {
                             *self = Self::default();
                             self.positive.insert(Type::Never);
                             return;
