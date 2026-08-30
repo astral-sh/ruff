@@ -2003,8 +2003,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         {
             builder.into_diagnostic(format_args!("Cyclic definition of `{name}`"));
         }
-        if expanded.is_divergent() {
-            // Preserve the dynamic recovery type for aliases that cannot be expanded at all.
+        if expanded.is_identity_recursive(db) {
+            // Preserve the identity-recursive recovery type for aliases that cannot be expanded at all.
             // Union cycles retain their non-recursive members for recovery.
             self.expressions.insert(value.into(), expanded);
         }
