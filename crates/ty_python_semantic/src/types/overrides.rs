@@ -872,64 +872,68 @@ fn check_class_declaration<'db>(
                 continue;
             }
 
-            // Compare constructor signatures on the subclass, including inherited `Self`
-            // annotations. Although `__new__` is static, its `cls` parameter must also be bound.
-            let bind_constructor = |ty| match ty {
-                Type::BoundMethod(method) if member.name == "__init__" => Type::BoundMethod(
-                    method.with_signature_receiver(db, instance_of_class, instance_of_class),
-                ),
-                ty if member.name == "__new__" => {
-                    let callable = match ty {
-                        Type::FunctionLiteral(function) => function.into_callable_type(db),
-                        Type::Callable(callable) => callable,
-                        _ => return ty,
-                    };
-                    let signature = callable.signatures(db);
-                    let receiver = Type::from(class);
-                    let bound_signature = if signature.overloads.len() > 1
-                        && signature
-                            .overloads
-                            .iter()
-                            .any(Signature::has_explicit_positional_receiver_annotation)
-                    {
-                        // Overloads specialized for other subclasses do not constrain this override.
-                        CallableSignature::from_overloads(
-                            signature
+            // Resolve `__new__` descriptors and normalize callable objects before binding the
+            // constructor's implicit `cls`. This consumes a classmethod's bound `cls` or a
+            // callable instance's `__call__` receiver first, as for constructor calls.
+            let bind_new = |ty| {
+                if member.name != "__new__" {
+                    return ty;
+                }
+                let receiver = Type::from(class);
+                let Some(callables) = Place::bound(ty)
+                    .try_call_dunder_get(db, env, receiver)
+                    .ignore_possibly_undefined()
+                    .and_then(|ty| ty.try_upcast_to_callable(db, env))
+                else {
+                    return ty;
+                };
+                callables
+                    .map(|callable| {
+                        let signature = callable.signatures(db);
+                        let bound_signature = if signature.overloads.len() > 1
+                            && signature
                                 .overloads
                                 .iter()
-                                .filter_map(|signature| {
-                                    signature.bind_self_if_compatible(
-                                        db,
-                                        env,
-                                        receiver,
-                                        instance_of_class,
-                                    )
-                                })
-                                .flat_map(|signature| signature.overloads),
-                        )
-                    } else {
-                        signature.bind_self_with_receiver(
+                                .any(Signature::has_explicit_positional_receiver_annotation)
+                        {
+                            // Overloads specialized for other subclasses do not constrain this override.
+                            CallableSignature::from_overloads(
+                                signature
+                                    .overloads
+                                    .iter()
+                                    .filter_map(|signature| {
+                                        signature.bind_self_if_compatible(
+                                            db,
+                                            env,
+                                            receiver,
+                                            instance_of_class,
+                                        )
+                                    })
+                                    .flat_map(|signature| signature.overloads),
+                            )
+                        } else {
+                            signature.bind_self_with_receiver(
+                                db,
+                                env,
+                                Some(receiver),
+                                Some(instance_of_class),
+                            )
+                        };
+                        CallableType::new(
                             db,
-                            env,
-                            Some(receiver),
-                            Some(instance_of_class),
+                            bound_signature,
+                            // Compare call signatures independently of descriptor behavior.
+                            CallableTypeKind::Regular,
                         )
-                    };
-                    Type::Callable(CallableType::new(
-                        db,
-                        bound_signature,
-                        // Compare call signatures independently of descriptor behavior.
-                        CallableTypeKind::Regular,
-                    ))
-                }
-                _ => ty,
+                    })
+                    .into_type(db, env)
             };
 
             let Some((subclass_override_type, superclass_override_type)) = method_override_types(
                 db,
                 env,
-                bind_constructor(type_on_subclass_instance),
-                bind_constructor(superclass_type),
+                bind_new(type_on_subclass_instance),
+                bind_new(superclass_type),
             ) else {
                 continue;
             };
@@ -951,8 +955,8 @@ fn check_class_declaration<'db>(
                     if !is_assignable_method_override(
                         db,
                         env,
-                        bind_constructor(immediate_parent_type),
-                        bind_constructor(superclass_type),
+                        bind_new(immediate_parent_type),
+                        bind_new(superclass_type),
                     ) {
                         // The immediate parent already has an LSP violation with this ancestor.
                         // Don't report the same violation for the child.
