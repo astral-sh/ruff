@@ -46,6 +46,8 @@ pub enum PlaceExpr {
 
 impl PlaceExpr {
     /// Construct the member place read by a presence check such as `hasattr(value, "name")`.
+    /// This lets the check constrain `value.name` even without an attribute expression in the AST.
+    /// Returns `None` when the base is not trackable, such as the result of a function call.
     pub fn attribute(base: ast::ExprRef<'_>, name: &str) -> Option<Self> {
         Self::try_from_member_expr(MemberExprBuilder::attribute(base, name)?)
     }

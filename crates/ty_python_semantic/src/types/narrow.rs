@@ -718,8 +718,10 @@ impl ClassInfoConstraintFunction {
 }
 
 /// A place's value type and positive evidence that it is present.
-/// Without that evidence, ordinary member lookup determines definedness. `Never` represents an
-/// unreachable path, which contributes neither a value type nor presence at a control-flow join.
+///
+/// `known_present = false` leaves definedness to ordinary member lookup; it does not establish
+/// absence. `Never` represents an unreachable path, which contributes neither a value type nor
+/// presence at a control-flow join.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct NarrowedPlace<'db> {
     pub(crate) ty: Type<'db>,
@@ -734,23 +736,18 @@ impl<'db> NarrowedPlace<'db> {
         }
     }
 
-    pub(crate) fn union(
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        left: Self,
-        right: Self,
-    ) -> Self {
-        Self {
-            ty: UnionType::from_two_elements(db, env, left.ty, right.ty),
-            known_present: match (left.ty.is_never(), right.ty.is_never()) {
-                (true, _) => right.known_present,
-                (_, true) => left.known_present,
-                _ => left.known_present && right.known_present,
-            },
-        }
-    }
-
-    /// Apply flow facts after ordinary lookup, preserving its qualifiers and error recovery.
+    /// Apply flow facts after ordinary lookup and write validation, preserving lookup qualifiers.
+    ///
+    /// An assignment can establish presence for error recovery even when the write is invalid:
+    ///
+    /// ```python
+    /// class C: ...
+    /// c = C()
+    /// c.value = 1  # Reports an undeclared attribute.
+    /// c.value      # Does not repeat the missing-attribute error.
+    /// ```
+    ///
+    /// An unreachable place becomes a defined `Never` to avoid missing-attribute errors there.
     pub(crate) fn apply_to(self, mut member: PlaceAndQualifiers<'db>) -> PlaceAndQualifiers<'db> {
         member = member.map_type(|_| self.ty);
         member.place = match (self.ty, self.known_present, member.place) {
@@ -853,6 +850,7 @@ impl<'db> Conjunctions<'db> {
         self
     }
 
+    /// Apply conjunctions in order, tracking presence independently of constraints on the value.
     fn evaluate_place(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> NarrowedPlace<'db> {
         if let [NarrowingOperation::Intersection(ty) | NarrowingOperation::GenericFiltering(ty)] =
             &*self.conjuncts
@@ -5456,6 +5454,7 @@ fn all_matching_tuple_elements_have_literal_types<'db>(
 }
 
 pub(crate) trait NarrowingEvaluatorExtension<'db> {
+    /// Apply this evaluator's constraints to a place's value type and positive presence evidence.
     fn narrow_place(
         &self,
         db: &'db dyn Db,

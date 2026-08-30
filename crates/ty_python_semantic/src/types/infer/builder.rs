@@ -9964,10 +9964,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                         [binding_ty, fallback_ty],
                                     );
                                 }
-                                let mut bound = NarrowedPlace::new(binding_ty);
-                                if !definition.kind(db).is_loop_header() {
-                                    bound.known_present = true;
-                                }
+                                let bound = NarrowedPlace {
+                                    ty: binding_ty,
+                                    known_present: !definition.kind(db).is_loop_header(),
+                                };
                                 union.add(
                                     binding
                                         .narrowing_constraint

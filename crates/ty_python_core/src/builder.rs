@@ -3537,22 +3537,19 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     self.mark_current_comprehension_async();
                 }
             }
-            ast::Expr::Call(call) => {
+            ast::Expr::Call(_) | ast::Expr::BinOp(_) => {
                 walk_expr(self, expr);
                 self.record_exception_checkpoint();
 
                 // The callee is resolved later. Register the member so that a presence guard,
                 // including an alias of `hasattr`, can constrain it before its first use.
-                if let [base, ast::Expr::StringLiteral(name)] = &*call.arguments.args
+                if let ast::Expr::Call(call) = expr
+                    && let [base, ast::Expr::StringLiteral(name)] = &*call.arguments.args
                     && call.arguments.keywords.is_empty()
                     && let Some(member) = PlaceExpr::attribute(base.into(), name.value.to_str())
                 {
                     self.add_place(member);
                 }
-            }
-            ast::Expr::BinOp(_) => {
-                walk_expr(self, expr);
-                self.record_exception_checkpoint();
             }
             ast::Expr::UnaryOp(unary) => {
                 self.visit_expr_with_context(

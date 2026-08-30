@@ -194,7 +194,7 @@
 //! [bdd]: https://en.wikipedia.org/wiki/Binary_decision_diagram
 
 use crate::ProgramEnvironment;
-use crate::types::narrow::NarrowedPlace;
+use crate::types::narrow::{NarrowedPlace, NarrowedPlaceBuilder};
 use std::cell::RefCell;
 
 use crate::{
@@ -1066,7 +1066,8 @@ pub(crate) struct NarrowingProjector<'a, 'db> {
     place: ScopedPlaceId,
     base_ty: NarrowedPlace<'db>,
     /// Checkpoints retain types and presence, so both must be part of the projection key.
-    project_cache: FxHashMap<(ScopedNarrowingConstraint, NarrowedPlace<'db>), ProjectedNarrowingNodeId>,
+    project_cache:
+        FxHashMap<(ScopedNarrowingConstraint, NarrowedPlace<'db>), ProjectedNarrowingNodeId>,
     graph: ProjectedNarrowingGraph<'db>,
     narrowed_cache: FxHashMap<(ProjectedNarrowingNodeId, NarrowedPlace<'db>), NarrowedPlace<'db>>,
 }
@@ -1499,7 +1500,8 @@ struct ProjectedNarrowingContext<'a, 'db> {
     base_ty: NarrowedPlace<'db>,
     graph: &'a ProjectedNarrowingGraph<'db>,
     /// Caches each shared suffix for the binding type and presence being narrowed.
-    join_cache: &'a mut FxHashMap<(ProjectedNarrowingNodeId, NarrowedPlace<'db>), NarrowedPlace<'db>>,
+    join_cache:
+        &'a mut FxHashMap<(ProjectedNarrowingNodeId, NarrowedPlace<'db>), NarrowedPlace<'db>>,
 }
 
 impl<'db> ProjectedNarrowingContext<'_, 'db> {
@@ -1578,8 +1580,11 @@ impl<'db> ProjectedNarrowingContext<'_, 'db> {
                 let false_accumulated = accumulate_constraint(accumulated, neg_constraint);
                 let false_ty = self.narrow(node.if_false, false_accumulated);
 
-                let true_or_uncertain = NarrowedPlace::union(db, self.env, true_ty, uncertain_ty);
-                NarrowedPlace::union(db, self.env, true_or_uncertain, false_ty)
+                let mut union = NarrowedPlaceBuilder::new(db, self.env);
+                union.add(true_ty);
+                union.add(uncertain_ty);
+                union.add(false_ty);
+                union.build()
             }
         }
     }
