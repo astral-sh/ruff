@@ -2264,6 +2264,11 @@ impl<'db> Type<'db> {
         };
 
         let body = body.widen_recursive_tuples(db, env, Some(binder));
+        let body = if include_previous {
+            RecursiveType::simplify_stabilized_cycle_body(db, env, binder, body)
+        } else {
+            body
+        };
 
         let origin = origin
             .or_else(|| previous_recursive.map(|recursive| *recursive.origin(db)))
@@ -10794,37 +10799,33 @@ pub struct GenericImplicitAlias<'db> {
 impl get_size2::GetSize for GenericImplicitAlias<'_> {}
 
 impl<'db> RecursiveType<'db> {
-    /// Returns whether a union element can only narrow an existing fixed-point value.
-    ///
-    /// Such an element cannot add values to a least fixed point, so retaining it in the
-    /// recursive body only preserves stale cycle-initial markers from earlier iterations.
-    fn is_nonproductive_union_element(
+    fn is_bare_binder(binder: DivergentType<'db>, element: Type<'db>) -> bool {
+        matches!(element, Type::Divergent(divergent)
+            if divergent.same_marker(binder)
+                && divergent.generic_implicit_alias().is_none())
+    }
+
+    /// Returns whether a stabilized union element can only narrow an existing fixed-point value.
+    fn is_nonproductive_stabilized_union_element(
         db: &'db dyn Db,
         binder: DivergentType<'db>,
         element: Type<'db>,
     ) -> bool {
-        let is_bare_binder = |ty| {
-            matches!(ty, Type::Divergent(divergent)
-                if divergent.same_marker(binder)
-                    && divergent.generic_implicit_alias().is_none())
-        };
-
         match element {
             Type::Recursive(recursive) => recursive.is_identity(db),
-            Type::Intersection(intersection) => intersection
-                .positive(db)
-                .iter()
-                .any(|positive| is_bare_binder(*positive) || positive.is_identity_recursive(db)),
-            _ => is_bare_binder(element),
+            Type::Intersection(intersection) => intersection.positive(db).iter().any(|positive| {
+                Self::is_bare_binder(binder, *positive) || positive.is_identity_recursive(db)
+            }),
+            _ => Self::is_bare_binder(binder, element),
         }
     }
 
-    pub(crate) fn build(
+    fn filter_union_body(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         binder: DivergentType<'db>,
-        origin: RecursiveTypeOrigin<'db>,
         mut body: Type<'db>,
+        mut should_remove: impl FnMut(Type<'db>) -> bool,
     ) -> Type<'db> {
         if let Type::Union(union) = body {
             let mut builder = UnionBuilder::new(db, env)
@@ -10835,7 +10836,7 @@ impl<'db> RecursiveType<'db> {
             let mut retained = false;
 
             for element in union.elements(db) {
-                if Self::is_nonproductive_union_element(db, binder, *element) {
+                if should_remove(*element) {
                     removed_nonproductive = true;
                 } else {
                     retained = true;
@@ -10853,6 +10854,37 @@ impl<'db> RecursiveType<'db> {
                 }
             }
         }
+
+        body
+    }
+
+    /// Removes union elements that cannot add values once cycle recovery retains previous values.
+    ///
+    /// An identity recursive type from another cycle remains useful during early fixed-point
+    /// iterations: a later iteration can observe it under a constructor and form guarded
+    /// recursion. After previous values are retained, an identity alternative that is still at
+    /// the union root is only a stale cycle-initial marker.
+    fn simplify_stabilized_cycle_body(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        binder: DivergentType<'db>,
+        body: Type<'db>,
+    ) -> Type<'db> {
+        Self::filter_union_body(db, env, binder, body, |element| {
+            Self::is_nonproductive_stabilized_union_element(db, binder, element)
+        })
+    }
+
+    pub(crate) fn build(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        binder: DivergentType<'db>,
+        origin: RecursiveTypeOrigin<'db>,
+        body: Type<'db>,
+    ) -> Type<'db> {
+        let body = Self::filter_union_body(db, env, binder, body, |element| {
+            Self::is_bare_binder(binder, element)
+        });
 
         if !Self::contains_binder(db, env, body, binder) {
             return body;
