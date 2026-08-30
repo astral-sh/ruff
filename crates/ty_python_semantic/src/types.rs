@@ -10794,6 +10794,31 @@ pub struct GenericImplicitAlias<'db> {
 impl get_size2::GetSize for GenericImplicitAlias<'_> {}
 
 impl<'db> RecursiveType<'db> {
+    /// Returns whether a union element can only narrow an existing fixed-point value.
+    ///
+    /// Such an element cannot add values to a least fixed point, so retaining it in the
+    /// recursive body only preserves stale cycle-initial markers from earlier iterations.
+    fn is_nonproductive_union_element(
+        db: &'db dyn Db,
+        binder: DivergentType<'db>,
+        element: Type<'db>,
+    ) -> bool {
+        let is_bare_binder = |ty| {
+            matches!(ty, Type::Divergent(divergent)
+                if divergent.same_marker(binder)
+                    && divergent.generic_implicit_alias().is_none())
+        };
+
+        match element {
+            Type::Recursive(recursive) => recursive.is_identity(db),
+            Type::Intersection(intersection) => intersection
+                .positive(db)
+                .iter()
+                .any(|positive| is_bare_binder(*positive) || positive.is_identity_recursive(db)),
+            _ => is_bare_binder(element),
+        }
+    }
+
     pub(crate) fn build(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -10806,27 +10831,24 @@ impl<'db> RecursiveType<'db> {
                 .unpack_aliases(false)
                 .cycle_recovery(true)
                 .recursively_defined(union.recursively_defined(db));
-            let mut removed_binder = false;
+            let mut removed_nonproductive = false;
             let mut retained = false;
 
             for element in union.elements(db) {
-                if matches!(element, Type::Divergent(divergent)
-                    if divergent.same_marker(binder)
-                        && divergent.generic_implicit_alias().is_none())
-                {
-                    removed_binder = true;
+                if Self::is_nonproductive_union_element(db, binder, *element) {
+                    removed_nonproductive = true;
                 } else {
                     retained = true;
                     builder = builder.add(*element);
                 }
             }
 
-            if removed_binder {
+            if removed_nonproductive {
                 if retained {
                     builder = builder.recursively_defined(RecursivelyDefined::Yes);
                     body = builder.build();
                 } else {
-                    // All elements are recursive binders, e.g. `μa. a | a`
+                    // All elements are nonproductive, e.g. `μa. a | (a & T)`.
                     body = Type::Divergent(binder);
                 }
             }
