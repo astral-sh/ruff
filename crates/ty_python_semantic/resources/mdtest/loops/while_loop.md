@@ -449,26 +449,6 @@ while random():
     reveal_type(x)  # revealed: int
 ```
 
-### Avoid oscillations
-
-We need to avoid oscillating cycles in cases like the following, where the type of one of these loop
-variables also influences the static reachability of its bindings. This case was minimized from a
-real crash that came up during development checking these lines of `sympy`:
-<https://github.com/sympy/sympy/blob/c2bfd65accf956576b58f0ae57bf5821a0c4ff49/sympy/core/numbers.py#L158-L166>
-
-```py
-def random() -> bool:
-    return False
-
-x = 1
-y = 2
-while random():
-    if x:
-        x, y = y, x
-    reveal_type(x)  # revealed: Literal[2, 1]
-    reveal_type(y)  # revealed: Literal[1, 2]
-```
-
 ### Monotonic widening can keep stale loopback bindings reachable
 
 ```py

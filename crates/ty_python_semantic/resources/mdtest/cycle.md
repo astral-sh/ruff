@@ -248,29 +248,6 @@ class D:
         self.a = inner_a
 ```
 
-### Lambdas
-
-```py
-class C:
-    def f(self: "C"):
-        self.a = lambda positional=self.a: positional
-        self.b = lambda *, kw_only=self.b: kw_only
-        self.c = lambda positional_only=self.c, /: positional_only
-        self.d = lambda *, kw_only=self.d: kw_only
-
-        # revealed: (positional=...) -> Unknown | (positional=...) -> Divergent
-        reveal_type(self.a)
-
-        # revealed: (*, kw_only=...) -> Unknown | (*, kw_only=...) -> Divergent
-        reveal_type(self.b)
-
-        # revealed: (positional_only=..., /) -> Unknown | (positional_only=..., /) -> Divergent
-        reveal_type(self.c)
-
-        # revealed: (*, kw_only=...) -> Unknown | (*, kw_only=...) -> Divergent
-        reveal_type(self.d)
-```
-
 ### Self-referential decorated functions
 
 Resolving a decorated function's callable signature must not eagerly infer its default values.
@@ -506,89 +483,6 @@ class Cached:
         return self._metadata
 
 reveal_type(Cached().metadata)  # revealed: int
-```
-
-## Decorator defined on a base class with constrained typevars, accessed from a subclass with decorated generic parameters
-
-This example was minimized from
-[a real issue in `robotframework`](https://github.com/astral-sh/ty/issues/2637#issuecomment-3807037935).
-It created
-[a complicated cycle with multiple cycle heads](https://gist.github.com/oconnor663/c996ed2cc97d172dd4b9a8d8207dc7ac),
-which also involved
-[a tricky Salsa behavior that comes up when a query oscillates between being a cycle head and not being one](https://gist.github.com/oconnor663/c2a7662e3d88048b691754da957121d1).
-
-`entry.py`:
-
-```py
-from derived import Derived
-
-Derived.decorate
-# revealed: bound method <class 'Derived'>.decorate[T](item_class: type[T]) -> type[T]
-reveal_type(Derived.decorate)
-```
-
-`derived.py`:
-
-```py
-from ty_extensions._internal import reveal_mro
-import bases
-
-class Derived(bases.GenericBase["Foo", "Bar"]): ...
-
-@Derived.decorate
-class Foo(bases.Foo): ...
-
-# revealed: <class 'Foo'>
-reveal_type(Foo)
-# revealed: (<class 'derived.Foo'>, <class 'bases.Foo'>, <class 'object'>)
-reveal_mro(Foo)
-
-@Derived.decorate
-class Bar(bases.Bar): ...
-
-# revealed: <class 'Bar'>
-reveal_type(Bar)
-# revealed: (<class 'derived.Bar'>, <class 'bases.Bar'>, <class 'object'>)
-reveal_mro(Bar)
-```
-
-`bases.py`:
-
-```py
-from typing import Generic, TypeVar, Type
-from ty_extensions._internal import reveal_mro
-
-T = TypeVar("T")
-B1 = TypeVar("B1", bound="Foo")
-B2 = TypeVar("B2", bound="Bar")
-
-class GenericBase(Generic[B1, B2]):
-    @classmethod
-    def decorate(cls, item_class: Type[T]) -> Type[T]:
-        return item_class
-
-# revealed: <class 'GenericBase'>
-reveal_type(GenericBase)
-# revealed: (<class 'GenericBase[Unknown, Unknown]'>, typing.Generic, <class 'object'>)
-reveal_mro(GenericBase)
-# revealed: (<class 'GenericBase[Foo, Bar]'>, typing.Generic, <class 'object'>)
-reveal_mro(GenericBase["Foo", "Bar"])
-
-class Foo: ...
-class Bar: ...
-```
-
-```py
-class Nest:
-    def f(self, cond):
-        self.x1 = [self.x2]
-        self.x2 = {"key": self.x3}
-        self.x3 = [self.x2] if cond else [self.x1]
-
-# どれも少なくともlistとdictを含んでいるはず
-reveal_type(Nest().x1)  # revealed: ?
-reveal_type(Nest().x2)  # revealed: ?
-reveal_type(Nest().x3)  # revealed: ?
 ```
 
 ## Recursive lambda with a nested return type

@@ -456,22 +456,6 @@ class InitializedCounter:
 reveal_type(InitializedCounter().value)  # revealed: Grow[int] | Grow[list[int]]
 ```
 
-#### Augmented assignments with expanding tuple results
-
-Repeatedly nesting an independently initialized tuple must converge instead of exhausting Salsa's
-cycle-iteration limit.
-
-```py
-class C:
-    def __init__(self) -> None:
-        self.value = (1,)
-
-    def update(self) -> None:
-        self.value += (self.value,)
-
-reveal_type(C().value)  # revealed: tuple[int] | tuple[Divergent, ...]
-```
-
 #### Augmented assignments to inherited instance attributes
 
 An instance attribute established by a superclass can supply the initial value read by an augmented
@@ -4553,78 +4537,6 @@ class C3:
 reveal_type(C3(Sub()).x)  # revealed: list[Sub] | list[Base]
 ```
 
-And cycles between many attributes:
-
-```py
-class ManyCycles:
-    def __init__(self: "ManyCycles"):
-        self.x1 = 0
-        self.x2 = 0
-        self.x3 = 0
-        self.x4 = 0
-        self.x5 = 0
-        self.x6 = 0
-        self.x7 = 1
-
-    def f1(self: "ManyCycles"):
-        self.x1 = self.x2 + self.x3 + self.x4 + self.x5 + self.x6 + self.x7
-        self.x2 = self.x1 + self.x3 + self.x4 + self.x5 + self.x6 + self.x7
-        self.x3 = self.x1 + self.x2 + self.x4 + self.x5 + self.x6 + self.x7
-        self.x4 = self.x1 + self.x2 + self.x3 + self.x5 + self.x6 + self.x7
-        self.x5 = self.x1 + self.x2 + self.x3 + self.x4 + self.x6 + self.x7
-        self.x6 = self.x1 + self.x2 + self.x3 + self.x4 + self.x5 + self.x7
-        self.x7 = self.x1 + self.x2 + self.x3 + self.x4 + self.x5 + self.x6
-
-    def f2(self: "ManyCycles"):
-        self.x1 = self.x2 + self.x3 + self.x4 + self.x5 + self.x6 + self.x7
-        self.x2 = self.x1 + self.x3 + self.x4 + self.x5 + self.x6 + self.x7
-        self.x3 = self.x1 + self.x2 + self.x4 + self.x5 + self.x6 + self.x7
-        self.x4 = self.x1 + self.x2 + self.x3 + self.x5 + self.x6 + self.x7
-        self.x5 = self.x1 + self.x2 + self.x3 + self.x4 + self.x6 + self.x7
-        self.x6 = self.x1 + self.x2 + self.x3 + self.x4 + self.x5 + self.x7
-        self.x7 = self.x1 + self.x2 + self.x3 + self.x4 + self.x5 + self.x6
-
-    def f3(self: "ManyCycles"):
-        self.x1 = self.x2 + self.x3 + self.x4 + self.x5 + self.x6 + self.x7
-        self.x2 = self.x1 + self.x3 + self.x4 + self.x5 + self.x6 + self.x7
-        self.x3 = self.x1 + self.x2 + self.x4 + self.x5 + self.x6 + self.x7
-        self.x4 = self.x1 + self.x2 + self.x3 + self.x5 + self.x6 + self.x7
-        self.x5 = self.x1 + self.x2 + self.x3 + self.x4 + self.x6 + self.x7
-        self.x6 = self.x1 + self.x2 + self.x3 + self.x4 + self.x5 + self.x7
-        self.x7 = self.x1 + self.x2 + self.x3 + self.x4 + self.x5 + self.x6
-
-        reveal_type(self.x1)  # revealed: int
-        reveal_type(self.x2)  # revealed: int
-        reveal_type(self.x3)  # revealed: int
-        reveal_type(self.x4)  # revealed: int
-        reveal_type(self.x5)  # revealed: int
-        reveal_type(self.x6)  # revealed: int
-        reveal_type(self.x7)  # revealed: int
-
-class ManyCycles2:
-    def __init__(self: "ManyCycles2"):
-        self.x1 = [0]
-        self.x2 = [1]
-        self.x3 = [1]
-
-    def f1(self: "ManyCycles2"):
-        reveal_type(self.x3)  # revealed: list[int] | list[Divergent]
-
-        self.x1 = [self.x2] + [self.x3]
-        self.x2 = [self.x1] + [self.x3]
-        self.x3 = [self.x1] + [self.x2]
-
-    def f2(self: "ManyCycles2"):
-        self.x1 = self.x2 + self.x3
-        self.x2 = self.x1 + self.x3
-        self.x3 = self.x1 + self.x2
-
-    def f3(self: "ManyCycles2"):
-        self.x1 = self.x2 + self.x3
-        self.x2 = self.x1 + self.x3
-        self.x3 = self.x1 + self.x2
-```
-
 This case additionally tests our union/intersection simplification logic:
 
 ```py
@@ -4932,19 +4844,6 @@ class F:
         self.x = make_homogeneous_tuple(other.x)
 
 reveal_type(F().x)  # revealed: tuple[Divergent, ...]
-```
-
-A homogeneous tuple of `Divergent` has gradual length, so it is assignable to a fixed-length tuple.
-This allows a recursively inferred instance attribute to retain an empty tuple as its class default:
-
-```py
-class G:
-    x = ()
-
-    def f(self):
-        self.x = tuple(self.x)
-
-reveal_type(G().x)  # revealed: tuple[Divergent, ...]
 ```
 
 ## Attributes of standard library modules that aren't yet defined

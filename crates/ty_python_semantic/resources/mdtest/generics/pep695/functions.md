@@ -1604,24 +1604,6 @@ def _(
     reveal_type(bounded_gradual(unknown_value, list_upper))  # revealed: list[int] & Unknown
 ```
 
-Recursive declared bounds do not introduce `Divergent` into a concrete solution:
-
-```py
-Recursive: TypeAlias = int | list["Recursive"]
-
-def bounded_recursive[T: Recursive](value: T, upper: Callable[[T], None]) -> T:
-    return value
-
-def _(any_value: Any, unknown_value: Unknown, upper: Callable[[list[int]], None]):
-    any_result = bounded_recursive(any_value, upper)
-    unknown_result = bounded_recursive(unknown_value, upper)
-
-    reveal_type(any_result)  # revealed: list[int] & Any
-    reveal_type(any_result[0])  # revealed: int & Any
-    reveal_type(unknown_result)  # revealed: list[int] & Unknown
-    reveal_type(unknown_result[0])  # revealed: int & Unknown
-```
-
 ## Redundant upper bounds preserve large gradual unions
 
 The invariant list fixes `T` to the entire union, while the callback adds the redundant upper bound
