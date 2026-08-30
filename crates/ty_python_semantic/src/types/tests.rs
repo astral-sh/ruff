@@ -943,7 +943,7 @@ type H[T] = G[T]
             .expand_eagerly(&db, &db.program_environment())
             .display(&db, &db.program_environment())
             .to_string(),
-        "list[Divergent]",
+        "list[T@RecursiveList | Divergent]",
     );
 
     let rec_int_list = get_type_alias(&db, "RecursiveIntList");
@@ -952,7 +952,7 @@ type H[T] = G[T]
             .expand_eagerly(&db, &db.program_environment())
             .display(&db, &db.program_environment())
             .to_string(),
-        "list[Divergent]",
+        "list[T@RecursiveList | Divergent]",
     );
 
     let itself = get_type_alias(&db, "Itself");

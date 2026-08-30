@@ -9494,8 +9494,11 @@ impl<'db> Type<'db> {
         )
     }
 
-    /// Returns the eagerly expanded type.
-    /// In the case of recursive type aliases, this will diverge, so that part will be replaced with `Divergent`.
+    /// Returns an eagerly expanded approximation of this type.
+    ///
+    /// Generic aliases are expanded from their raw body, so this is only suitable for callers
+    /// that need the expanded shape rather than the specialized result. Recursive expansion is
+    /// replaced with `Divergent`.
     fn expand_eagerly(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
         self.expand_eagerly_(db, env.program(db))
     }
