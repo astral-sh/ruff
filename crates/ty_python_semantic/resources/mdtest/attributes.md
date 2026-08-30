@@ -456,6 +456,23 @@ class InitializedCounter:
 reveal_type(InitializedCounter().value)  # revealed: Grow[int] | Grow[list[int]]
 ```
 
+#### Augmented assignments with expanding tuple results
+
+Repeatedly nesting an independently initialized tuple must converge instead of exhausting Salsa's
+cycle-iteration limit. The recursive result preserves the nested tuple values observed while the
+type stabilizes.
+
+```py
+class C:
+    def __init__(self) -> None:
+        self.value = (1,)
+
+    def update(self) -> None:
+        self.value += (self.value,)
+
+reveal_type(C().value)  # revealed: tuple[int | tuple[int] | Divergent, ...] | tuple[int | Divergent, ...]
+```
+
 #### Augmented assignments to inherited instance attributes
 
 An instance attribute established by a superclass can supply the initial value read by an augmented
