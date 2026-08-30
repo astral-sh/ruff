@@ -29,9 +29,9 @@ use super::{
     CollectionUseConstraints, DeferredAndUndecorated, DefinitionInference,
     DefinitionInferenceExtra, DefinitionTypes, ExpressionInference, ExpressionInferenceExtra,
     FrozenMap, FrozenSet, FrozenValueMap, FunctionDecoratorInference, InferenceRegion,
-    OtherDefinitionInferenceExtra, ScopeInference, ScopeInferenceExtra, TypeInferenceCycleInitials,
-    infer_deferred_types, infer_definition_types, infer_expression_types,
-    infer_same_file_expression_type, infer_unpack_types,
+    OtherDefinitionInferenceExtra, ScopeInference, ScopeInferenceExtra, TypeInferenceCycleInitial,
+    TypeInferenceCycleInitials, infer_deferred_types, infer_definition_types,
+    infer_expression_types, infer_same_file_expression_type, infer_unpack_types,
 };
 use crate::diagnostic::format_enumeration;
 use crate::place::{
@@ -4451,6 +4451,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.dataclass_field_specifiers.clear();
 
         declared
+    }
+
+    /// Initialize a declaration cycle without discarding its annotation diagnostics or metadata.
+    pub(super) fn infer_annotated_assignment_cycle_initial(
+        mut self,
+        definition: Definition<'db>,
+        assignment: &AnnotatedAssignmentDefinitionKind,
+        cycle_initial: TypeInferenceCycleInitial,
+    ) -> DefinitionInference<'db> {
+        let declared = self.infer_annotated_assignment_annotation(assignment);
+        self.declarations.insert(definition, declared);
+        self.cycle_initials = TypeInferenceCycleInitials::one(cycle_initial);
+        self.finish_inferred_definition(definition)
     }
 
     /// Infer the types in an annotated assignment definition.
