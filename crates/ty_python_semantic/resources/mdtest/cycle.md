@@ -508,6 +508,29 @@ class Cached:
 reveal_type(Cached().metadata)  # revealed: int
 ```
 
+## Mutually recursive implicit attributes with nested containers
+
+Implicit instance attributes can form one cycle while each edge wraps the next value in a different
+container. The fixed point preserves the nested `list` and `dict` structure instead of replacing the
+whole cycle with a dynamic type.
+
+```py
+class Nest:
+    def f(self, cond):
+        self.x1 = [self.x2]
+        self.x2 = {"key": self.x3}
+        self.x3 = [self.x2] if cond else [self.x1]
+
+# revealed: list[dict[str, list[list[dict[str, Divergent]] | dict[str, Divergent]] | list[list[dict[str, Divergent]]]]]
+reveal_type(Nest().x1)
+
+# revealed: dict[str, list[list[dict[str, Divergent]] | dict[str, Divergent]] | list[list[dict[str, Divergent]]]]
+reveal_type(Nest().x2)
+
+# revealed: list[list[dict[str, list[list[dict[str, Divergent]] | dict[str, Divergent]] | list[list[dict[str, Divergent]]]]] | dict[str, list[list[dict[str, Divergent]] | dict[str, Divergent]] | list[list[dict[str, Divergent]]]]] | list[list[dict[str, list[list[dict[str, Divergent]] | dict[str, Divergent]] | list[list[dict[str, Divergent]]]]]]
+reveal_type(Nest().x3)
+```
+
 ## Recursive lambda with a nested return type
 
 The same recursive inference should converge when another type contains the recursive reference.
