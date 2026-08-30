@@ -4896,6 +4896,21 @@ class F:
 reveal_type(F().x)  # revealed: tuple[Divergent, ...]
 ```
 
+An unannotated class-level default still constrains later writes through an instance. The recursive
+instance attribute is inferred independently, but assigning it through the class default's
+fixed-length tuple type is rejected:
+
+```py
+class G:
+    x = ()
+
+    def f(self):
+        # error: [invalid-assignment] "Object of type `tuple[tuple[Divergent, ...], ...]` is not assignable to attribute `x` of type `tuple[()]`"
+        self.x = tuple(self.x)
+
+reveal_type(G().x)  # revealed: tuple[Divergent, ...]
+```
+
 ## Attributes of standard library modules that aren't yet defined
 
 For attributes of stdlib modules that exist in future versions, we can give better diagnostics.
