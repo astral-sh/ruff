@@ -989,9 +989,9 @@ mod tests {
     fn same_code_multiline_suppressions_with_different_ranges_can_become_redundant() {
         assert_snapshot!(
             suppress_all_in(r#"
-                from typing import TypeAlias
+                from typing import Any, TypeAlias
 
-                JsonValue: TypeAlias = dict[str, "JsonValue"] | list["JsonValue"] | int
+                JsonValue: TypeAlias = dict[str, Any] | list[Any] | int
 
 
                 def get_data() -> dict[str, JsonValue]:
@@ -1011,9 +1011,9 @@ mod tests {
         ## Fixed source
 
         ```py
-        from typing import TypeAlias
+        from typing import Any, TypeAlias
 
-        JsonValue: TypeAlias = dict[str, "JsonValue"] | list["JsonValue"] | int
+        JsonValue: TypeAlias = dict[str, Any] | list[Any] | int
 
 
         def get_data() -> dict[str, JsonValue]:
@@ -1033,9 +1033,9 @@ mod tests {
     fn add_ignore_deduplicates_existing_edit_against_planned_start_line() {
         assert_snapshot!(
             suppress_all_in(r#"
-                from typing import TypeAlias
+                from typing import Any, TypeAlias
 
-                JsonValue: TypeAlias = dict[str, "JsonValue"] | list["JsonValue"] | int
+                JsonValue: TypeAlias = dict[str, Any] | list[Any] | int
 
 
                 def get_data() -> dict[str, JsonValue]:
@@ -1054,9 +1054,9 @@ mod tests {
         ## Fixed source
 
         ```py
-        from typing import TypeAlias
+        from typing import Any, TypeAlias
 
-        JsonValue: TypeAlias = dict[str, "JsonValue"] | list["JsonValue"] | int
+        JsonValue: TypeAlias = dict[str, Any] | list[Any] | int
 
 
         def get_data() -> dict[str, JsonValue]:
