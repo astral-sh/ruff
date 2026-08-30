@@ -460,8 +460,8 @@ impl<'db, 'ast> FixtureRequestContext<'db, 'ast> {
             return None;
         }
 
-        let function_type = infer_definition_types(db, function_definition)
-            .function_type(db, function_definition)?;
+        let function_type =
+            infer_definition_types(db, function_definition).function_type(function_definition)?;
 
         Some(Self {
             function_definition,

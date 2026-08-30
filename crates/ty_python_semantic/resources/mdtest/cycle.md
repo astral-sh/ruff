@@ -248,6 +248,29 @@ class D:
         self.a = inner_a
 ```
 
+### Lambdas
+
+```py
+class C:
+    def f(self: "C"):
+        self.a = lambda positional=self.a: positional
+        self.b = lambda *, kw_only=self.b: kw_only
+        self.c = lambda positional_only=self.c, /: positional_only
+        self.d = lambda *, kw_only=self.d: kw_only
+
+        # revealed: (positional=...) -> Unknown | (positional=...) -> Unknown | Divergent
+        reveal_type(self.a)
+
+        # revealed: (*, kw_only=...) -> Unknown | (*, kw_only=...) -> Unknown | Divergent
+        reveal_type(self.b)
+
+        # revealed: (positional_only=..., /) -> Unknown | (positional_only=..., /) -> Unknown | Divergent
+        reveal_type(self.c)
+
+        # revealed: (*, kw_only=...) -> Unknown | (*, kw_only=...) -> Unknown | Divergent
+        reveal_type(self.d)
+```
+
 ### Self-referential decorated functions
 
 Resolving a decorated function's callable signature must not eagerly infer its default values.

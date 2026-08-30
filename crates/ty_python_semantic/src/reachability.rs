@@ -1676,11 +1676,9 @@ fn analyze_condition<'db>(db: &'db dyn Db, expression: Expression<'db>) -> Truth
     let module = parsed_module(db, expression.python_file(db)).load(db);
     let inference = infer_expression_types(db, expression, TypeContext::default());
     analyze_condition_expression(expression.node_ref(db).node(&module), &|node| {
-        inference.comparison_truthiness(node).or_else(|| {
-            inference
-                .expression_type(db, node)
-                .bool_if_inhabited(db, &env)
-        })
+        inference
+            .comparison_truthiness(node)
+            .or_else(|| inference.expression_type(node).bool_if_inhabited(db, &env))
     })
     .unwrap_or(Truthiness::Ambiguous)
 }
@@ -1702,7 +1700,7 @@ fn analyze_single(db: &dyn Db, env: &ProgramEnvironment<'_>, predicate: &Predica
             let expression = test_expr.node_ref(db);
             inference
                 .comparison_truthiness(expression)
-                .unwrap_or_else(|| inference.expression_type(db, expression).bool(db, env))
+                .unwrap_or_else(|| inference.expression_type(expression).bool(db, env))
                 .negate_if(!predicate.is_positive)
         }
         PredicateNode::ContextManagerSuppresses {

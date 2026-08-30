@@ -444,7 +444,7 @@ impl<'db> OverloadLiteral<'db> {
             Type::Callable(_) => {
                 let definition = provenance.definition()?;
                 infer_definition_types(db, definition)
-                    .function_type(db, definition)?
+                    .function_type(definition)?
                     .literal(db)
             }
             _ => return None,

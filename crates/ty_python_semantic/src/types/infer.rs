@@ -59,8 +59,8 @@ use crate::types::function::{FunctionDecorators, FunctionType};
 use crate::types::generics::Specialization;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
-    ClassLiteral, CycleQuery, GenericContext, KnownClass, RecursiveTypeOrigin, RecursivelyDefined,
-    StaticClassLiteral, Type, TypeAndQualifiers, TypeInferenceSlot, TypeQualifiers, UnionType,
+    ClassLiteral, CycleQuery, GenericContext, KnownClass, RecursiveTypeOrigin, StaticClassLiteral,
+    Type, TypeAndQualifiers, TypeQualifiers,
 };
 use crate::{Db, FxIndexSet};
 
@@ -113,129 +113,6 @@ fn cycle_recovery_generic_context<'db>(
         .find_map(|(candidate, context)| (*candidate == definition).then_some(*context))
 }
 
-/// A cycle head retained until a missing aggregate result slot is requested.
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
-struct TypeInferenceCycleInitial {
-    query: CycleQuery,
-    id: salsa::Id,
-}
-
-impl get_size2::GetSize for TypeInferenceCycleInitial {}
-
-impl TypeInferenceCycleInitial {
-    const fn new(query: CycleQuery, id: salsa::Id) -> Self {
-        Self { query, id }
-    }
-
-    fn type_for_slot(self, db: &dyn Db, slot: TypeInferenceSlot) -> Type<'_> {
-        Type::type_inference_cycle_initial(db, self.query, self.id, slot)
-    }
-
-    fn binding_type<'db>(self, db: &'db dyn Db, definition: Definition<'db>) -> Type<'db> {
-        let env = ProgramEnvironment::from_definition(definition);
-        let initial = self.type_for_slot(db, TypeInferenceSlot::Binding(definition.as_id()));
-
-        let DefinitionKind::Assignment(assignment) = definition.kind(db) else {
-            return initial;
-        };
-        let program_file = definition.program_file(db);
-        let module = parsed_module(db, program_file.python_file(db)).load(db);
-        let known_collection = match assignment.value(&module) {
-            ast::Expr::Set(_) => Some(KnownClass::Set),
-            ast::Expr::List(_) => Some(KnownClass::List),
-            ast::Expr::Dict(_) => Some(KnownClass::Dict),
-            _ => None,
-        };
-        let Some(collection_class) = known_collection
-            .and_then(|known_collection| known_collection.try_to_class_literal(db, &env))
-        else {
-            return initial;
-        };
-        let Type::Recursive(recursive) = initial else {
-            return initial;
-        };
-        let divergent_collection = collection_class.apply_specialization(db, |generic_context| {
-            generic_context.repeat_specialization(db, *recursive.body(db))
-        });
-        Type::recursive(
-            db,
-            &env,
-            *recursive.binder(db),
-            Type::instance(db, &env, divergent_collection),
-        )
-    }
-}
-
-/// Cycle heads propagated through an inference result.
-///
-/// More than one head can be present when Salsa cycles are nested.
-#[derive(Debug, Default, Eq, PartialEq, get_size2::GetSize)]
-enum TypeInferenceCycleInitials {
-    #[default]
-    None,
-    One(TypeInferenceCycleInitial),
-    Multiple(Box<[TypeInferenceCycleInitial]>),
-}
-
-impl TypeInferenceCycleInitials {
-    const fn one(initial: TypeInferenceCycleInitial) -> Self {
-        Self::One(initial)
-    }
-
-    const fn is_empty(&self) -> bool {
-        matches!(self, Self::None)
-    }
-
-    fn as_slice(&self) -> &[TypeInferenceCycleInitial] {
-        match self {
-            Self::None => &[],
-            Self::One(initial) => std::slice::from_ref(initial),
-            Self::Multiple(initials) => initials,
-        }
-    }
-
-    fn extend(&mut self, other: &Self) {
-        let mut initials = self.as_slice().to_vec();
-        for initial in other.as_slice() {
-            if !initials.contains(initial) {
-                initials.push(*initial);
-            }
-        }
-        *self = match initials.as_slice() {
-            [] => Self::None,
-            [initial] => Self::One(*initial),
-            _ => Self::Multiple(initials.into_boxed_slice()),
-        };
-    }
-
-    fn type_for_slot<'db>(&self, db: &'db dyn Db, slot: TypeInferenceSlot) -> Option<Type<'db>> {
-        match self.as_slice() {
-            [] => None,
-            [initial] => Some(initial.type_for_slot(db, slot)),
-            initials => Some(Type::Union(UnionType::new(
-                db,
-                initials
-                    .iter()
-                    .map(|initial| initial.type_for_slot(db, slot))
-                    .collect::<Box<[Type<'db>]>>(),
-                RecursivelyDefined::No,
-            ))),
-        }
-    }
-
-    fn binding_type<'db>(&self, db: &'db dyn Db, definition: Definition<'db>) -> Option<Type<'db>> {
-        (!self.is_empty()).then(|| {
-            UnionType::from_elements(
-                db,
-                &ProgramEnvironment::from_definition(definition),
-                self.as_slice()
-                    .iter()
-                    .map(|initial| initial.binding_type(db, definition)),
-            )
-        })
-    }
-}
-
 /// Extends the current collection-use constraints with those from the previous cycle iteration.
 ///
 /// Constraints for a collection can appear and disappear while dependent inference results are
@@ -261,10 +138,11 @@ fn extend_collection_use_constraints<'db>(
 #[salsa::tracked(
     returns(ref),
     cycle_initial=|db: &'db dyn Db, id, definition: Definition<'db>| {
+        let env = ProgramEnvironment::from_file(definition.program_file(db));
         DefinitionInference::cycle_initial(
             db,
             definition,
-            TypeInferenceCycleInitial::new(CycleQuery::DefinitionTypes, id),
+            Type::identity_recursive(db, &env, CycleQuery::DefinitionTypes, id),
         )
     },
     cycle_fn=|db: &'db dyn Db, cycle, previous: &DefinitionInference<'db>, inference: DefinitionInference<'db>, definition: Definition<'db>| {
@@ -417,10 +295,11 @@ impl<'db> FunctionDecoratorInference<'db> {
 #[salsa::tracked(
     returns(ref),
     cycle_initial=|db: &'db dyn Db, id, definition: Definition<'db>| {
+        let env = ProgramEnvironment::from_file(definition.program_file(db));
         DefinitionInference::cycle_initial(
             db,
             definition,
-            TypeInferenceCycleInitial::new(CycleQuery::DeferredTypes, id),
+            Type::identity_recursive(db, &env, CycleQuery::DeferredTypes, id),
         )
     },
     cycle_fn=|db: &'db dyn Db, cycle, previous: &DefinitionInference<'db>, inference: DefinitionInference<'db>, definition: Definition<'db>| {
@@ -470,7 +349,7 @@ pub(crate) fn infer_deferred_types<'db>(
         DefinitionInference::cycle_initial(
             db,
             definition,
-            TypeInferenceCycleInitial::new(CycleQuery::FunctionDefaultTypes, id),
+            Type::divergent(CycleQuery::FunctionDefaultTypes, id),
         )
     },
     cycle_fn=|db: &'db dyn Db, cycle, previous: &DefinitionInference<'db>, inference: DefinitionInference<'db>, definition: Definition<'db>| {
@@ -544,8 +423,15 @@ pub(crate) fn infer_scope_types<'db>(
 
 #[salsa::tracked(
     returns(ref),
-    cycle_initial=|_, id, _| {
-        ScopeInference::cycle_initial(TypeInferenceCycleInitial::new(CycleQuery::ScopeTypes, id))
+    cycle_initial=|db, id, input: InferScope<'db>| {
+        let (scope, _) = input.into_inner(db);
+        let env = ProgramEnvironment::from_scope(scope);
+        ScopeInference::cycle_initial(Type::identity_recursive(
+            db,
+            &env,
+            CycleQuery::ScopeTypes,
+            id,
+        ))
     },
     cycle_fn=|db, cycle, previous: &ScopeInference<'db>, inference: ScopeInference<'db>, input: InferScope<'db>| {
         let (scope, _) = input.into_inner(db);
@@ -645,10 +531,9 @@ fn expression_cycle_initial<'db>(
     input: InferExpression<'db>,
 ) -> ExpressionInference<'db> {
     let (expression, _) = input.into_inner(db);
-    ExpressionInference::cycle_initial(
-        expression.scope(db),
-        TypeInferenceCycleInitial::new(CycleQuery::ExpressionTypes, id),
-    )
+    let env = ProgramEnvironment::from_scope(expression.scope(db));
+    let cycle_recovery = Type::identity_recursive(db, &env, CycleQuery::ExpressionTypes, id);
+    ExpressionInference::cycle_initial(expression.scope(db), cycle_recovery)
 }
 
 /// Infers the type of an `expression` that is guaranteed to be in the same file as the calling query.
@@ -662,7 +547,7 @@ pub(crate) fn infer_same_file_expression_type<'db>(
     tcx: TypeContext<'db>,
 ) -> Type<'db> {
     let inference = infer_expression_types(db, expression, tcx);
-    inference.expression_type(db, expression.node_ref(db))
+    inference.expression_type(expression.node_ref(db))
 }
 
 /// Infers the type of an expression where the expression might come from another file.
@@ -700,7 +585,7 @@ fn infer_expression_type_impl<'db>(db: &'db dyn Db, input: InferExpression<'db>)
     // It's okay to call the "same file" version here because we're inside a salsa query.
     let inference = infer_expression_types_impl(db, input);
 
-    inference.expression_type(db, expression.node_ref(db))
+    inference.expression_type(expression.node_ref(db))
 }
 
 /// Infer all types for a [`Statement`].
@@ -727,9 +612,10 @@ pub(super) fn infer_statement_types<'db>(
 #[salsa::tracked(
     returns(ref),
     cycle_initial=|db: &'db dyn Db, id, statement: StatementInner<'db>| {
+        let env = ProgramEnvironment::from_file(statement.program_file(db));
         StatementInferenceInner::cycle_initial(
             statement.scope(db),
-            TypeInferenceCycleInitial::new(CycleQuery::StatementTypes, id),
+            Type::identity_recursive(db, &env, CycleQuery::StatementTypes, id),
         )
     },
     cycle_fn=|db, cycle, previous: &StatementInferenceInner<'db>, inference: StatementInferenceInner<'db>, statement: StatementInner<'db>| {
@@ -1003,7 +889,7 @@ pub(crate) fn original_class_type<'db>(
     let inference = infer_definition_types(db, definition);
     inference
         .undecorated_type()
-        .unwrap_or_else(|| inference.binding_type(db, definition))
+        .unwrap_or_else(|| inference.binding_type(definition))
         .as_class_literal()
 }
 
@@ -1023,7 +909,7 @@ pub(crate) fn nearest_enclosing_function<'db>(
         .find_map(|(_, ancestor_scope)| {
             let func = ancestor_scope.node().as_function()?;
             let definition = semantic.expect_single_definition(func);
-            infer_definition_types(db, definition).function_type(db, definition)
+            infer_definition_types(db, definition).function_type(definition)
         })
 }
 
@@ -1087,18 +973,18 @@ struct ScopeInferenceExtra<'db> {
     /// The constraints on any collection initializers that are accessed in this region.
     collection_use_constraints: CollectionUseConstraints<'db>,
 
-    /// Cycle heads used to create a distinct initial type for each missing result slot.
-    cycle_initials: TypeInferenceCycleInitials,
+    /// The fallback type for missing expressions/bindings/declarations or recursive type inference.
+    cycle_recovery: Option<Type<'db>>,
 
     /// The diagnostics for this region.
     diagnostics: TypeCheckDiagnostics,
 }
 
 impl<'db> ScopeInference<'db> {
-    fn cycle_initial(cycle_initial: TypeInferenceCycleInitial) -> Self {
+    fn cycle_initial(cycle_recovery: Type<'db>) -> Self {
         Self {
             extra: Some(Box::new(ScopeInferenceExtra {
-                cycle_initials: TypeInferenceCycleInitials::one(cycle_initial),
+                cycle_recovery: Some(cycle_recovery),
                 ..ScopeInferenceExtra::default()
             })),
             expressions: FrozenValueMap::default(),
@@ -1113,12 +999,11 @@ impl<'db> ScopeInference<'db> {
         cycle: &salsa::Cycle,
     ) -> ScopeInference<'db> {
         self.expressions.map_values(|expr, ty| {
-            ty.cycle_normalized_for_type_inference_slot(
+            ty.cycle_normalized(
                 db,
                 env,
                 CycleQuery::ScopeTypes,
-                previous_inference.expression_type(db, expr),
-                TypeInferenceSlot::Expression(expr),
+                previous_inference.expression_type(expr),
                 cycle,
             )
         });
@@ -1141,25 +1026,19 @@ impl<'db> ScopeInference<'db> {
         self.extra.as_deref().map(|extra| &extra.diagnostics)
     }
 
-    pub(crate) fn expression_type(
-        &self,
-        db: &'db dyn Db,
-        expression: impl Into<ExpressionNodeKey>,
-    ) -> Type<'db> {
-        self.try_expression_type(db, expression)
+    pub(crate) fn expression_type(&self, expression: impl Into<ExpressionNodeKey>) -> Type<'db> {
+        self.try_expression_type(expression)
             .unwrap_or_else(Type::unknown)
     }
 
     pub(crate) fn try_expression_type(
         &self,
-        db: &'db dyn Db,
         expression: impl Into<ExpressionNodeKey>,
     ) -> Option<Type<'db>> {
-        let expression = expression.into();
         self.expressions
-            .get(&expression)
+            .get(&expression.into())
             .copied()
-            .or_else(|| self.fallback_type(db, TypeInferenceSlot::Expression(expression)))
+            .or_else(|| self.fallback_type())
     }
 
     /// Get qualifiers for an annotation expression.
@@ -1179,10 +1058,8 @@ impl<'db> ScopeInference<'db> {
             .and_then(|extra| extra.expected_types.get(&expression.into()).copied())
     }
 
-    fn fallback_type(&self, db: &'db dyn Db, slot: TypeInferenceSlot) -> Option<Type<'db>> {
-        self.extra
-            .as_ref()
-            .and_then(|extra| extra.cycle_initials.type_for_slot(db, slot))
+    fn fallback_type(&self) -> Option<Type<'db>> {
+        self.extra.as_ref().and_then(|extra| extra.cycle_recovery)
     }
 
     /// Returns whether the given expression is a string annotation
@@ -1330,15 +1207,7 @@ impl<'db> DefinitionTypes<'db> {
         );
 
         if let Some(previous_ty) = previous.binding_type(owner, definition) {
-            ty.cycle_normalized_with_origin(
-                db,
-                env,
-                query,
-                previous_ty,
-                origin,
-                Some(TypeInferenceSlot::Binding(definition.as_id())),
-                cycle,
-            )
+            ty.cycle_normalized_with_origin(db, env, query, previous_ty, origin, cycle)
         } else {
             ty
         }
@@ -1357,14 +1226,7 @@ impl<'db> DefinitionTypes<'db> {
     ) -> TypeAndQualifiers<'db> {
         if let Some(previous_ty) = previous.declaration_type(owner, definition) {
             ty.map_type(|inner| {
-                inner.cycle_normalized_for_type_inference_slot(
-                    db,
-                    env,
-                    query,
-                    previous_ty.inner_type(),
-                    TypeInferenceSlot::Declaration(definition.as_id()),
-                    cycle,
-                )
+                inner.cycle_normalized(db, env, query, previous_ty.inner_type(), cycle)
             })
         } else {
             ty
@@ -1562,8 +1424,8 @@ struct OtherDefinitionInferenceExtra<'db> {
     /// The constraints on any collection initializers that are accessed in this region.
     collection_use_constraints: CollectionUseConstraints<'db>,
 
-    /// Cycle heads used to create a distinct initial type for each missing result slot.
-    cycle_initials: TypeInferenceCycleInitials,
+    /// The fallback type for missing expressions/bindings/declarations or recursive type inference.
+    cycle_recovery: Option<Type<'db>>,
 
     /// Generic contexts found while inferring recursive generic implicit aliases.
     cycle_recovery_generic_contexts: CycleRecoveryGenericContexts<'db>,
@@ -1655,9 +1517,38 @@ impl<'db> DefinitionInference<'db> {
     fn cycle_initial(
         db: &'db dyn Db,
         definition: Definition<'db>,
-        cycle_initial: TypeInferenceCycleInitial,
+        cycle_recovery: Type<'db>,
     ) -> Self {
-        if let DefinitionKind::AnnotatedAssignment(assignment) = definition.kind(db) {
+        let env = ProgramEnvironment::from_definition(definition);
+        let mut types = DefinitionTypes::Empty;
+
+        // Eagerly store more precise types for collection literals to avoid an extra
+        // cycle iteration, i.e., by inferring `list[Divergent]` instead of `Divergent`.
+        if let DefinitionKind::Assignment(assignment) = definition.kind(db) {
+            let program_file = definition.program_file(db);
+            let python_file = program_file.python_file(db);
+            let module = parsed_module(db, python_file).load(db);
+            let known_collection = match assignment.value(&module) {
+                ast::Expr::Set(_) => Some(KnownClass::Set),
+                ast::Expr::List(_) => Some(KnownClass::List),
+                ast::Expr::Dict(_) => Some(KnownClass::Dict),
+                _ => None,
+            };
+
+            if let Some(collection_class) = known_collection
+                .and_then(|known_collection| known_collection.try_to_class_literal(db, &env))
+                && let Type::Recursive(recursive) = cycle_recovery
+            {
+                let divergent_collection =
+                    collection_class.apply_specialization(db, |generic_context| {
+                        generic_context.repeat_specialization(db, *recursive.body(db))
+                    });
+                let body = Type::instance(db, &env, divergent_collection);
+                let recursive = Type::recursive(db, &env, *recursive.binder(db), body);
+
+                types = DefinitionTypes::Binding(recursive);
+            }
+        } else if let DefinitionKind::AnnotatedAssignment(assignment) = definition.kind(db) {
             let program_file = definition.program_file(db);
             let python_file = program_file.python_file(db);
             let module = parsed_module(db, python_file).load(db);
@@ -1675,7 +1566,6 @@ impl<'db> DefinitionInference<'db> {
             {
                 // Loop-carried assignments need this annotation as context before validating
                 // the declaration can infer their binding types.
-                let env = ProgramEnvironment::from_definition(definition);
                 return TypeInferenceBuilder::new(
                     db,
                     &env,
@@ -1688,19 +1578,19 @@ impl<'db> DefinitionInference<'db> {
                 .infer_annotated_assignment_cycle_initial(
                     definition,
                     assignment,
-                    cycle_initial,
+                    cycle_recovery,
                 );
             }
         }
 
         Self {
             expressions: FrozenMap::default(),
-            types: DefinitionTypes::Empty,
+            types,
             #[cfg(debug_assertions)]
             scope: definition.scope(db),
             extra: Some(Box::new(DefinitionInferenceExtra::Other(Box::new(
                 OtherDefinitionInferenceExtra {
-                    cycle_initials: TypeInferenceCycleInitials::one(cycle_initial),
+                    cycle_recovery: Some(cycle_recovery),
                     ..OtherDefinitionInferenceExtra::default()
                 },
             )))),
@@ -1722,15 +1612,8 @@ impl<'db> DefinitionInference<'db> {
             .map_or(&[][..], |extra| extra.cycle_recovery_generic_contexts());
 
         for (expr, ty) in &mut self.expressions {
-            let previous_ty = previous_inference.expression_type(db, *expr);
-            *ty = ty.cycle_normalized_for_type_inference_slot(
-                db,
-                &env,
-                query,
-                previous_ty,
-                TypeInferenceSlot::Expression(*expr),
-                cycle,
-            );
+            let previous_ty = previous_inference.expression_type(*expr);
+            *ty = ty.cycle_normalized(db, &env, query, previous_ty, cycle);
         }
         self.types = std::mem::take(&mut self.types).cycle_normalized(
             db,
@@ -1765,25 +1648,19 @@ impl<'db> DefinitionInference<'db> {
         self
     }
 
-    pub(crate) fn expression_type(
-        &self,
-        db: &'db dyn Db,
-        expression: impl Into<ExpressionNodeKey>,
-    ) -> Type<'db> {
-        self.try_expression_type(db, expression)
+    pub(crate) fn expression_type(&self, expression: impl Into<ExpressionNodeKey>) -> Type<'db> {
+        self.try_expression_type(expression)
             .unwrap_or_else(Type::unknown)
     }
 
     pub(crate) fn try_expression_type(
         &self,
-        db: &'db dyn Db,
         expression: impl Into<ExpressionNodeKey>,
     ) -> Option<Type<'db>> {
-        let expression = expression.into();
         self.expressions
-            .get(&expression)
+            .get(&expression.into())
             .copied()
-            .or_else(|| self.fallback_type(db, TypeInferenceSlot::Expression(expression)))
+            .or_else(|| self.fallback_type())
     }
 
     fn collection_use_constraints(
@@ -1828,14 +1705,11 @@ impl<'db> DefinitionInference<'db> {
     }
 
     #[track_caller]
-    pub(crate) fn binding_type(&self, db: &'db dyn Db, definition: Definition<'db>) -> Type<'db> {
+    pub(crate) fn binding_type(&self, definition: Definition<'db>) -> Type<'db> {
         self.types
             .bindings(definition)
             .find_map(|(def, ty)| if def == definition { Some(ty) } else { None })
-            .or_else(|| {
-                self.cycle_initials()
-                    .and_then(|initials| initials.binding_type(db, definition))
-            })
+            .or_else(|| self.fallback_type())
             .expect(
                 "definition should belong to this TypeInference region and \
                 TypeInferenceBuilder should have inferred a type for it",
@@ -1851,7 +1725,6 @@ impl<'db> DefinitionInference<'db> {
 
     pub(crate) fn inferred_declaration(
         &self,
-        db: &'db dyn Db,
         definition: Definition<'db>,
     ) -> InferredDeclaration<'db> {
         self.types
@@ -1864,7 +1737,7 @@ impl<'db> DefinitionInference<'db> {
                 }
             })
             .or_else(|| {
-                self.fallback_type(db, TypeInferenceSlot::Declaration(definition.as_id()))
+                self.fallback_type()
                     .map(TypeAndQualifiers::declared)
                     .map(InferredDeclaration::Declared)
             })
@@ -1882,20 +1755,11 @@ impl<'db> DefinitionInference<'db> {
         self.types.declaration_types()
     }
 
-    fn cycle_initials(&self) -> Option<&TypeInferenceCycleInitials> {
+    fn fallback_type(&self) -> Option<Type<'db>> {
         match self.extra.as_deref() {
-            Some(DefinitionInferenceExtra::Other(extra)) => Some(&extra.cycle_initials),
+            Some(DefinitionInferenceExtra::Other(extra)) => extra.cycle_recovery,
             Some(_) | None => None,
         }
-    }
-
-    pub(crate) fn fallback_type(
-        &self,
-        db: &'db dyn Db,
-        slot: TypeInferenceSlot,
-    ) -> Option<Type<'db>> {
-        self.cycle_initials()
-            .and_then(|initials| initials.type_for_slot(db, slot))
     }
 
     fn discards_dict_key_assignments(&self) -> bool {
@@ -1919,15 +1783,11 @@ impl<'db> DefinitionInference<'db> {
         }
     }
 
-    pub(crate) fn function_type(
-        &self,
-        db: &'db dyn Db,
-        definition: Definition<'db>,
-    ) -> Option<FunctionType<'db>> {
+    pub(crate) fn function_type(&self, definition: Definition<'db>) -> Option<FunctionType<'db>> {
         let ty = if let Some(undecorated) = self.undecorated_type() {
             undecorated
         } else {
-            self.inferred_declaration(db, definition)
+            self.inferred_declaration(definition)
                 .declared()?
                 .inner_type()
         };
@@ -2002,16 +1862,16 @@ struct ExpressionInferenceExtra<'db> {
     /// Functions called while inferring this expression.
     called_functions: Box<[FunctionType<'db>]>,
 
-    /// Cycle heads used to create a distinct initial type for each missing result slot.
-    cycle_initials: TypeInferenceCycleInitials,
+    /// The fallback type for missing expressions/bindings/declarations or recursive type inference.
+    cycle_recovery: Option<Type<'db>>,
 }
 
 impl<'db> ExpressionInference<'db> {
-    fn cycle_initial(scope: ScopeId<'db>, cycle_initial: TypeInferenceCycleInitial) -> Self {
+    fn cycle_initial(scope: ScopeId<'db>, cycle_recovery: Type<'db>) -> Self {
         let _ = scope;
         Self {
             extra: Some(Box::new(ExpressionInferenceExtra {
-                cycle_initials: TypeInferenceCycleInitials::one(cycle_initial),
+                cycle_recovery: Some(cycle_recovery),
                 ..ExpressionInferenceExtra::default()
             })),
             expressions: FrozenMap::default(),
@@ -2035,12 +1895,11 @@ impl<'db> ExpressionInference<'db> {
                         .iter()
                         .find(|(previous_binding, _)| previous_binding == binding)
                 }) {
-                    *binding_ty = binding_ty.cycle_normalized_for_type_inference_slot(
+                    *binding_ty = binding_ty.cycle_normalized(
                         db,
                         env,
                         CycleQuery::ExpressionTypes,
                         *previous_binding,
-                        TypeInferenceSlot::Binding(binding.as_id()),
                         cycle,
                     );
                 }
@@ -2052,15 +1911,8 @@ impl<'db> ExpressionInference<'db> {
         }
 
         for (expr, ty) in &mut self.expressions {
-            let previous_ty = previous.expression_type(db, *expr);
-            *ty = ty.cycle_normalized_for_type_inference_slot(
-                db,
-                env,
-                CycleQuery::ExpressionTypes,
-                previous_ty,
-                TypeInferenceSlot::Expression(*expr),
-                cycle,
-            );
+            let previous_ty = previous.expression_type(*expr);
+            *ty = ty.cycle_normalized(db, env, CycleQuery::ExpressionTypes, previous_ty, cycle);
         }
 
         if cycle.iteration() > crate::TAINTED_CYCLES
@@ -2094,10 +1946,10 @@ impl<'db> ExpressionInference<'db> {
             .map(|(expression, _)| {
                 let truthiness = self
                     .comparison_truthiness(*expression)
-                    .unwrap_or_else(|| self.expression_type(db, *expression).bool(db, env));
+                    .unwrap_or_else(|| self.expression_type(*expression).bool(db, env));
                 let previous_truthiness = previous
                     .comparison_truthiness(*expression)
-                    .unwrap_or_else(|| previous.expression_type(db, *expression).bool(db, env));
+                    .unwrap_or_else(|| previous.expression_type(*expression).bool(db, env));
                 (
                     *expression,
                     if truthiness == previous_truthiness {
@@ -2113,24 +1965,15 @@ impl<'db> ExpressionInference<'db> {
         }
     }
 
-    fn try_expression_type(
-        &self,
-        db: &'db dyn Db,
-        expression: impl Into<ExpressionNodeKey>,
-    ) -> Option<Type<'db>> {
-        let expression = expression.into();
+    fn try_expression_type(&self, expression: impl Into<ExpressionNodeKey>) -> Option<Type<'db>> {
         self.expressions
-            .get(&expression)
+            .get(&expression.into())
             .copied()
-            .or_else(|| self.fallback_type(db, TypeInferenceSlot::Expression(expression)))
+            .or_else(|| self.fallback_type())
     }
 
-    pub(crate) fn expression_type(
-        &self,
-        db: &'db dyn Db,
-        expression: impl Into<ExpressionNodeKey>,
-    ) -> Type<'db> {
-        self.try_expression_type(db, expression)
+    pub(crate) fn expression_type(&self, expression: impl Into<ExpressionNodeKey>) -> Type<'db> {
+        self.try_expression_type(expression)
             .unwrap_or_else(Type::unknown)
     }
 
@@ -2155,13 +1998,8 @@ impl<'db> ExpressionInference<'db> {
             .get(&collection_def)
     }
 
-    fn cycle_initials(&self) -> Option<&TypeInferenceCycleInitials> {
-        self.extra.as_ref().map(|extra| &extra.cycle_initials)
-    }
-
-    fn fallback_type(&self, db: &'db dyn Db, slot: TypeInferenceSlot) -> Option<Type<'db>> {
-        self.cycle_initials()
-            .and_then(|initials| initials.type_for_slot(db, slot))
+    fn fallback_type(&self) -> Option<Type<'db>> {
+        self.extra.as_ref().and_then(|extra| extra.cycle_recovery)
     }
 }
 
@@ -2177,17 +2015,11 @@ pub(crate) enum StatementInference<'db> {
 }
 
 impl<'db> StatementInference<'db> {
-    fn expression_type(
-        &self,
-        db: &'db dyn Db,
-        expression: impl Into<ExpressionNodeKey>,
-    ) -> Type<'db> {
+    fn expression_type(&self, expression: impl Into<ExpressionNodeKey>) -> Type<'db> {
         match self {
-            StatementInference::Expression(inference) => inference.expression_type(db, expression),
-            StatementInference::Definition(_, inference) => {
-                inference.expression_type(db, expression)
-            }
-            StatementInference::Other(inference) => inference.expression_type(db, expression),
+            StatementInference::Expression(inference) => inference.expression_type(expression),
+            StatementInference::Definition(_, inference) => inference.expression_type(expression),
+            StatementInference::Other(inference) => inference.expression_type(expression),
         }
     }
 
@@ -2249,8 +2081,8 @@ struct StatementInferenceInnerExtra<'db> {
     /// The constraints on any collection initializers that are accessed in this region.
     collection_use_constraints: CollectionUseConstraints<'db>,
 
-    /// Cycle heads used to create a distinct initial type for each missing result slot.
-    cycle_initials: TypeInferenceCycleInitials,
+    /// The fallback type for missing expressions/bindings/declarations or recursive type inference.
+    cycle_recovery: Option<Type<'db>>,
 
     /// The definitions that have some deferred parts.
     deferred: Box<[Definition<'db>]>,
@@ -2264,7 +2096,7 @@ struct StatementInferenceInnerExtra<'db> {
 }
 
 impl<'db> StatementInferenceInner<'db> {
-    fn cycle_initial(scope: ScopeId<'db>, cycle_initial: TypeInferenceCycleInitial) -> Self {
+    fn cycle_initial(scope: ScopeId<'db>, cycle_recovery: Type<'db>) -> Self {
         let _ = scope;
 
         Self {
@@ -2274,7 +2106,7 @@ impl<'db> StatementInferenceInner<'db> {
             #[cfg(debug_assertions)]
             scope,
             extra: Some(Box::new(StatementInferenceInnerExtra {
-                cycle_initials: TypeInferenceCycleInitials::one(cycle_initial),
+                cycle_recovery: Some(cycle_recovery),
                 ..StatementInferenceInnerExtra::default()
             })),
         }
@@ -2288,15 +2120,8 @@ impl<'db> StatementInferenceInner<'db> {
         cycle: &salsa::Cycle,
     ) -> StatementInferenceInner<'db> {
         for (expr, ty) in &mut self.expressions {
-            let previous_ty = previous_inference.expression_type(db, *expr);
-            *ty = ty.cycle_normalized_for_type_inference_slot(
-                db,
-                env,
-                CycleQuery::StatementTypes,
-                previous_ty,
-                TypeInferenceSlot::Expression(*expr),
-                cycle,
-            );
+            let previous_ty = previous_inference.expression_type(*expr);
+            *ty = ty.cycle_normalized(db, env, CycleQuery::StatementTypes, previous_ty, cycle);
         }
         for (binding, binding_ty) in &mut self.bindings {
             if let Some((_, previous_binding)) = previous_inference
@@ -2304,12 +2129,11 @@ impl<'db> StatementInferenceInner<'db> {
                 .iter()
                 .find(|(previous_binding, _)| previous_binding == binding)
             {
-                *binding_ty = binding_ty.cycle_normalized_for_type_inference_slot(
+                *binding_ty = binding_ty.cycle_normalized(
                     db,
                     env,
                     CycleQuery::StatementTypes,
                     *previous_binding,
-                    TypeInferenceSlot::Binding(binding.as_id()),
                     cycle,
                 );
             }
@@ -2321,12 +2145,11 @@ impl<'db> StatementInferenceInner<'db> {
                 .find(|(previous_declaration, _)| previous_declaration == declaration)
             {
                 *declaration_ty = declaration_ty.map_type(|decl_ty| {
-                    decl_ty.cycle_normalized_for_type_inference_slot(
+                    decl_ty.cycle_normalized(
                         db,
                         env,
                         CycleQuery::StatementTypes,
                         previous_declaration.inner_type(),
-                        TypeInferenceSlot::Declaration(declaration.as_id()),
                         cycle,
                     )
                 });
@@ -2347,25 +2170,16 @@ impl<'db> StatementInferenceInner<'db> {
         self
     }
 
-    fn expression_type(
-        &self,
-        db: &'db dyn Db,
-        expression: impl Into<ExpressionNodeKey>,
-    ) -> Type<'db> {
-        self.try_expression_type(db, expression)
+    fn expression_type(&self, expression: impl Into<ExpressionNodeKey>) -> Type<'db> {
+        self.try_expression_type(expression)
             .unwrap_or_else(Type::unknown)
     }
 
-    fn try_expression_type(
-        &self,
-        db: &'db dyn Db,
-        expression: impl Into<ExpressionNodeKey>,
-    ) -> Option<Type<'db>> {
-        let expression = expression.into();
+    fn try_expression_type(&self, expression: impl Into<ExpressionNodeKey>) -> Option<Type<'db>> {
         self.expressions
-            .get(&expression)
+            .get(&expression.into())
             .copied()
-            .or_else(|| self.fallback_type(db, TypeInferenceSlot::Expression(expression)))
+            .or_else(|| self.fallback_type())
     }
 
     fn collection_use_constraints(
@@ -2388,13 +2202,8 @@ impl<'db> StatementInferenceInner<'db> {
         self.declarations.iter().copied()
     }
 
-    fn cycle_initials(&self) -> Option<&TypeInferenceCycleInitials> {
-        self.extra.as_ref().map(|extra| &extra.cycle_initials)
-    }
-
-    fn fallback_type(&self, db: &'db dyn Db, slot: TypeInferenceSlot) -> Option<Type<'db>> {
-        self.cycle_initials()
-            .and_then(|initials| initials.type_for_slot(db, slot))
+    fn fallback_type(&self) -> Option<Type<'db>> {
+        self.extra.as_ref().and_then(|extra| extra.cycle_recovery)
     }
 }
 

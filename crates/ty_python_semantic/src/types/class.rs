@@ -2992,7 +2992,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
 
             for definition in bindings.definitions(db) {
                 let inferred_ty = infer_definition_types(db, *definition)
-                    .binding_type(db, *definition)
+                    .binding_type(*definition)
                     .apply_optional_specialization(db, specialization);
                 union = union.add(inferred_ty);
                 provenance = provenance.or(Provenance::SingleDefinition(*definition));

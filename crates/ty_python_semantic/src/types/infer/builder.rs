@@ -29,9 +29,9 @@ use super::{
     CollectionUseConstraints, DeferredAndUndecorated, DefinitionInference,
     DefinitionInferenceExtra, DefinitionTypes, ExpressionInference, ExpressionInferenceExtra,
     FrozenMap, FrozenSet, FrozenValueMap, FunctionDecoratorInference, InferenceRegion,
-    OtherDefinitionInferenceExtra, ScopeInference, ScopeInferenceExtra, TypeInferenceCycleInitial,
-    TypeInferenceCycleInitials, infer_deferred_types, infer_definition_types,
-    infer_expression_types, infer_same_file_expression_type, infer_unpack_types,
+    OtherDefinitionInferenceExtra, ScopeInference, ScopeInferenceExtra, infer_deferred_types,
+    infer_definition_types, infer_expression_types, infer_same_file_expression_type,
+    infer_unpack_types,
 };
 use crate::diagnostic::format_enumeration;
 use crate::place::{
@@ -128,8 +128,8 @@ use crate::types::{
     KnownInstanceType, KnownUnion, LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy,
     ParamSpecAttrKind, Parameter, Parameters, ProgramEnvironment, SentinelInstance, Signature,
     SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeAndQualifiers, TypeContext,
-    TypeInferenceSlot, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance,
-    TypingModule, UnionAccumulator, UnionBuilder, UnionType, any_over_type, binding_type,
+    TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, TypingModule,
+    UnionAccumulator, UnionBuilder, UnionType, any_over_type, binding_type,
     extract_fixed_length_iterable_element_types, infer_complete_scope_types, infer_scope_types,
     is_discarded_dict_key_assignment, todo_type,
 };
@@ -373,8 +373,8 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// For decorated function or class definitions, the type before applying decorators.
     undecorated_type: Option<Type<'db>>,
 
-    /// Cycle heads used to create a distinct initial type for each missing result slot.
-    cycle_initials: TypeInferenceCycleInitials,
+    /// The fallback type for missing expressions/bindings/declarations or recursive type inference.
+    cycle_recovery: Option<Type<'db>>,
 
     /// Generic contexts found while inferring recursive generic implicit aliases.
     cycle_recovery_generic_contexts: VecMap<Definition<'db>, GenericContext<'db>>,
@@ -511,7 +511,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             typevar_binding_context: None,
             deferred: VecSet::default(),
             undecorated_type: None,
-            cycle_initials: TypeInferenceCycleInitials::default(),
+            cycle_recovery: None,
             cycle_recovery_generic_contexts: VecMap::default(),
             discards_dict_key_assignments: false,
             dataclass_field_specifiers: SmallVec::new(),
@@ -540,8 +540,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    fn fallback_type(&self, slot: TypeInferenceSlot) -> Option<Type<'db>> {
-        self.cycle_initials.type_for_slot(self.db(), slot)
+    fn fallback_type(&self) -> Option<Type<'db>> {
+        self.cycle_recovery
     }
 
     fn recursive_type_expression_definition(&self) -> Option<Definition<'db>> {
@@ -556,8 +556,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         })
     }
 
-    fn extend_cycle_initials(&mut self, other: &TypeInferenceCycleInitials) {
-        self.cycle_initials.extend(other);
+    fn extend_cycle_recovery(&mut self, other: Option<Type<'db>>) {
+        let db = self.db();
+        if let Some(other) = other {
+            match self.cycle_recovery {
+                Some(existing) => {
+                    self.cycle_recovery = Some(UnionType::from_two_elements(
+                        db,
+                        self.program_environment(),
+                        existing,
+                        other,
+                    ));
+                }
+                None => {
+                    self.cycle_recovery = Some(other);
+                }
+            }
+        }
     }
 
     pub(super) fn generic_context_from_typevars(&self, ty: Type<'db>) -> GenericContext<'db> {
@@ -636,7 +651,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 DefinitionInferenceExtra::Other(extra) => {
                     self.called_functions
                         .extend(extra.called_functions.iter().copied());
-                    self.extend_cycle_initials(&extra.cycle_initials);
+                    self.extend_cycle_recovery(extra.cycle_recovery);
                     self.cycle_recovery_generic_contexts
                         .extend(extra.cycle_recovery_generic_contexts.iter().copied());
                     self.context.extend(&extra.diagnostics);
@@ -689,7 +704,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .extend(extra.called_functions.iter().copied());
             self.return_types_and_ranges
                 .extend(extra.return_types_and_ranges.iter().copied());
-            self.extend_cycle_initials(&extra.cycle_initials);
+            self.extend_cycle_recovery(extra.cycle_recovery);
             self.context.extend(&extra.diagnostics);
             self.deferred.extend(extra.deferred.iter().copied());
             self.string_annotations
@@ -743,7 +758,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.comparison_truthiness
                 .extend(extra.comparison_truthiness.iter().copied());
             self.context.extend(&extra.diagnostics);
-            self.extend_cycle_initials(&extra.cycle_initials);
+            self.extend_cycle_recovery(extra.cycle_recovery);
             self.called_functions
                 .extend(extra.called_functions.iter().copied());
             self.string_annotations
@@ -778,7 +793,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .map(|(key, truthiness)| (*key, *truthiness)),
         );
         self.context.extend(&inference.diagnostics);
-        self.extend_cycle_initials(&inference.cycle_initials);
+        self.extend_cycle_recovery(inference.cycle_recovery);
         self.called_functions
             .extend(inference.called_functions.iter().copied());
         self.string_annotations
@@ -818,7 +833,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         if let Some(extra) = &inference.extra {
             self.context.extend(&extra.diagnostics);
-            self.extend_cycle_initials(&extra.cycle_initials);
+            self.extend_cycle_recovery(extra.cycle_recovery);
             self.string_annotations
                 .extend(extra.string_annotations.iter().copied());
             self.expected_types
@@ -1024,11 +1039,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn try_expression_type(&self, expr: &ast::Expr) -> Option<Type<'db>> {
-        let expression = expr.into();
         self.expressions
-            .get(&expression)
+            .get(&expr.into())
             .copied()
-            .or_else(|| self.fallback_type(TypeInferenceSlot::Expression(expression)))
+            .or(self.fallback_type())
     }
 
     /// Return an already-inferred type for `expr`, or infer it with `tcx` if needed.
@@ -1091,8 +1105,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             InferenceRegion::Scope(scope, _) if scope == expr_scope => {
                 self.expression_type(expression)
             }
-            _ => infer_complete_scope_types(self.db(), expr_scope)
-                .expression_type(self.db(), expression),
+            _ => infer_complete_scope_types(self.db(), expr_scope).expression_type(expression),
         }
     }
 
@@ -2074,7 +2087,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn function_type(&self, function: &ast::StmtFunctionDef) -> Option<FunctionType<'db>> {
         let definition = self.index.expect_single_definition(function);
-        infer_definition_types(self.db(), definition).function_type(self.db(), definition)
+        infer_definition_types(self.db(), definition).function_type(definition)
     }
 
     fn current_function_type(&self) -> Option<FunctionType<'db>> {
@@ -2089,9 +2102,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let definition_types = infer_definition_types(self.db(), definition);
 
-        function.decorator_list.iter().map(move |decorator| {
-            definition_types.expression_type(self.db(), &decorator.expression)
-        })
+        function
+            .decorator_list
+            .iter()
+            .map(move |decorator| definition_types.expression_type(&decorator.expression))
     }
 
     /// Returns `true` if the current scope is the function body scope of a function overload (that
@@ -2958,7 +2972,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.infer_target(target, value, &|builder, tcx| {
                     let inference = infer_expression_types(builder.db(), shared_value, tcx);
                     builder.extend_expression_without_bindings(inference);
-                    inference.expression_type(builder.db(), value.as_ref())
+                    inference.expression_type(value.as_ref())
                 });
             }
         }
@@ -3472,7 +3486,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             self.extend_expression_without_bindings(inference);
                         }
                     }
-                    inference.expression_type(self.db(), value)
+                    inference.expression_type(value)
                 } else if let ast::Expr::Call(call_expr) = value {
                     // If the RHS is not a standalone expression, this is a simple assignment
                     // (single target, no unpackings). That means it's a valid syntactic form
@@ -4458,11 +4472,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         mut self,
         definition: Definition<'db>,
         assignment: &AnnotatedAssignmentDefinitionKind,
-        cycle_initial: TypeInferenceCycleInitial,
+        cycle_recovery: Type<'db>,
     ) -> DefinitionInference<'db> {
         let declared = self.infer_annotated_assignment_annotation(assignment);
         self.declarations.insert(definition, declared);
-        self.cycle_initials = TypeInferenceCycleInitials::one(cycle_initial);
+        self.cycle_recovery = Some(cycle_recovery);
         self.finish_inferred_definition(definition)
     }
 
@@ -5115,8 +5129,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         assignment: Definition<'db>,
         definition: Definition<'db>,
     ) {
-        let value_ty =
-            infer_definition_types(self.db(), assignment).expression_type(self.db(), value);
+        let value_ty = infer_definition_types(self.db(), assignment).expression_type(value);
         self.add_binding(key.into(), definition)
             .insert(self, value_ty);
     }
@@ -6492,7 +6505,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // the result from `types` directly because we might be in cycle recovery where
         // `types.cycle_fallback_type` is `Some(fallback_ty)`, which we can retrieve by
         // using `expression_type` on `types`:
-        types.expression_type(self.db(), expression)
+        types.expression_type(expression)
     }
 
     /// Infer the type of an expression.
@@ -6516,7 +6529,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             Some(ExpressionCacheEntry::Full(inference)) => {
-                let ty = inference.expression_type(self.db(), expression_key);
+                let ty = inference.expression_type(expression_key);
                 self.extend_expression_cache_entry(&inference);
                 ty
             }
@@ -7887,7 +7900,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             for (statement, use_expression) in collection_uses {
                 let statement_use_types = infer_statement_types(self.db(), statement);
-                let use_ty = statement_use_types.expression_type(self.db(), use_expression);
+                let use_ty = statement_use_types.expression_type(use_expression);
                 let use_is_recursive = use_ty.as_recursive().is_some();
 
                 // Contextual uses such as annotations and annotated returns are hard constraints.
@@ -8200,7 +8213,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) -> Type<'db> {
         let db = self.db();
         let env = self.program_environment();
-        let element_type = inference.expression_type(self.db(), element);
+        let element_type = inference.expression_type(element);
         if element.is_starred_expr() {
             element_type
                 .iterate(db, env)
@@ -8221,7 +8234,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         tcx: TypeContext<'db>,
     ) -> Option<Type<'db>> {
         let mut infer_element_ty =
-            |builder: &mut Self, (_, elt, _)| inference.expression_type(builder.db(), elt);
+            |_builder: &mut Self, (_, elt, _)| inference.expression_type(elt);
 
         self.infer_collection_literal(
             collection_class,
@@ -8534,12 +8547,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut infer_iterable_type = || {
             let expression = self.index.expression(iterable);
             let result = infer_expression_types(self.db(), expression, TypeContext::default());
-            let iterable_type = result.expression_type(self.db(), iterable);
+            let iterable_type = result.expression_type(iterable);
             let element_type = if comprehension.is_async() {
                 None
             } else {
                 self.fixed_length_iterable_element_type(iterable, |expr| {
-                    result.expression_type(self.db(), expr)
+                    result.expression_type(expr)
                 })
             };
 
@@ -8598,7 +8611,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let definition = self.index.expect_single_definition(named);
             let result = infer_definition_types(self.db(), definition);
             self.extend_definition(definition, result);
-            result.binding_type(self.db(), definition)
+            result.binding_type(definition)
         } else {
             // String annotations have no indexed definitions, and syntactically invalid targets
             // cannot define a name. Both sides still need inference to preserve their diagnostics.
@@ -8826,7 +8839,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let inference = infer_scope_types(self.db(), scope, return_tcx);
         self.extend_scope(inference);
 
-        let return_ty = inference.expression_type(self.db(), lambda_expression.body.as_ref());
+        let return_ty = inference.expression_type(lambda_expression.body.as_ref());
         Type::Callable(CallableType::new(
             self.db(),
             CallableSignature::single(Signature::new(parameters, return_ty)),
@@ -11636,7 +11649,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             bindings,
             declarations,
             deferred,
-            cycle_initials,
+            cycle_recovery,
             cycle_recovery_generic_contexts: _,
             dataclass_field_specifiers: _,
 
@@ -11677,7 +11690,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             bindings,
             diagnostics,
             called_functions,
-            cycle_initials,
+            cycle_recovery,
             #[cfg(debug_assertions)]
             scope,
         }
@@ -11699,7 +11712,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             bindings,
             declarations,
             deferred,
-            cycle_initials,
+            cycle_recovery,
             cycle_recovery_generic_contexts: _,
             called_functions,
             mut return_types_and_ranges,
@@ -11723,7 +11736,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let extra = (!diagnostics.is_empty()
             || !string_annotations.is_empty()
-            || !cycle_initials.is_empty()
+            || cycle_recovery.is_some()
             || !expected_types.is_empty()
             || !deferred.is_empty()
             || !called_functions.is_empty()
@@ -11744,7 +11757,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 return_types_and_ranges: return_types_and_ranges.into_boxed_slice(),
                 type_expression_flags: FrozenMap::from(type_expression_flags),
                 collection_use_constraints,
-                cycle_initials,
+                cycle_recovery,
                 deferred: deferred.into_boxed_slice(),
                 diagnostics,
                 qualifiers: FrozenMap::from(qualifiers),
@@ -11823,7 +11836,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             deferred_state: _,
             index: _,
             region: _,
-            cycle_initials: _,
+            cycle_recovery: _,
             cycle_recovery_generic_contexts: _,
             qualifiers: _,
             type_expression_flags: _,
@@ -11864,7 +11877,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             bindings,
             declarations,
             deferred,
-            cycle_initials,
+            cycle_recovery,
             cycle_recovery_generic_contexts,
             undecorated_type,
             discards_dict_key_assignments,
@@ -11889,7 +11902,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             + usize::from(!collection_use_constraints.is_empty())
             + usize::from(!called_functions.is_empty())
             + usize::from(!type_expression_flags.is_empty())
-            + usize::from(!cycle_initials.is_empty())
+            + usize::from(cycle_recovery.is_some())
             + usize::from(!cycle_recovery_generic_contexts.is_empty())
             + usize::from(!deferred.is_empty())
             + usize::from(!diagnostics.is_empty())
@@ -11946,7 +11959,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .collect::<Vec<_>>()
                         .into_boxed_slice(),
                     type_expression_flags: FrozenMap::from(type_expression_flags),
-                    cycle_initials,
+                    cycle_recovery,
                     cycle_recovery_generic_contexts: cycle_recovery_generic_contexts
                         .into_boxed_slice(),
                     deferred: deferred.into_boxed_slice(),
@@ -12002,7 +12015,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             expressions,
             comparison_truthiness: _,
             scope,
-            cycle_initials,
+            cycle_recovery,
             cycle_recovery_generic_contexts: _,
             qualifiers,
 
@@ -12033,7 +12046,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let extra = (!string_annotations.is_empty()
             || !expected_types.is_empty()
             || !diagnostics.is_empty()
-            || !cycle_initials.is_empty()
+            || cycle_recovery.is_some()
             || !type_expression_flags.is_empty()
             || !collection_use_constraints.is_empty()
             || !qualifiers.is_empty())
@@ -12045,7 +12058,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 expected_types: FrozenMap::from(expected_types),
                 type_expression_flags: FrozenMap::from(type_expression_flags),
                 collection_use_constraints,
-                cycle_initials,
+                cycle_recovery,
                 diagnostics,
             })
         });
@@ -12070,7 +12083,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let Self {
             region,
             index,
-            ref cycle_initials,
+            cycle_recovery,
             cycle_recovery_generic_contexts: _,
             deferred_state,
             typevar_binding_context,
@@ -12112,7 +12125,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         builder.context.defuse();
 
         // Ensure the speculative builder has the same inference context as the current one.
-        builder.cycle_initials.extend(cycle_initials);
+        builder.cycle_recovery = cycle_recovery;
         builder.deferred_state = deferred_state;
         builder.typevar_binding_context = typevar_binding_context;
         builder.context.inference_flags = self.inference_flags();
@@ -12153,7 +12166,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             bindings,
             declarations,
             deferred,
-            cycle_initials,
+            cycle_recovery,
             cycle_recovery_generic_contexts,
             dataclass_field_specifiers: _,
 
@@ -12188,7 +12201,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.extend_expression_types(expressions);
         self.comparison_truthiness.extend(comparison_truthiness);
         self.context.extend(&diagnostics);
-        self.extend_cycle_initials(&cycle_initials);
+        self.extend_cycle_recovery(cycle_recovery);
         self.cycle_recovery_generic_contexts
             .extend(cycle_recovery_generic_contexts.into_vec());
         self.string_annotations
@@ -12323,20 +12336,17 @@ struct FullExpressionCacheEntry<'db> {
     bindings: VecMap<Definition<'db>, Type<'db>>,
     diagnostics: TypeCheckDiagnostics,
     called_functions: FxIndexSet<FunctionType<'db>>,
-    cycle_initials: TypeInferenceCycleInitials,
+    cycle_recovery: Option<Type<'db>>,
     #[cfg(debug_assertions)]
     scope: ScopeId<'db>,
 }
 
 impl<'db> FullExpressionCacheEntry<'db> {
-    fn expression_type(&self, db: &'db dyn Db, expression: ExpressionNodeKey) -> Type<'db> {
+    fn expression_type(&self, expression: ExpressionNodeKey) -> Type<'db> {
         self.expressions
             .get(&expression)
             .copied()
-            .or_else(|| {
-                self.cycle_initials
-                    .type_for_slot(db, TypeInferenceSlot::Expression(expression))
-            })
+            .or(self.cycle_recovery)
             .unwrap_or_else(Type::unknown)
     }
 
@@ -12351,7 +12361,7 @@ impl<'db> FullExpressionCacheEntry<'db> {
             && self.bindings.is_empty()
             && self.diagnostics.is_empty()
             && self.called_functions.is_empty()
-            && self.cycle_initials.is_empty()
+            && self.cycle_recovery.is_none()
     }
 
     fn into_expression_inference(
@@ -12363,7 +12373,7 @@ impl<'db> FullExpressionCacheEntry<'db> {
             || !self.type_expression_flags.is_empty()
             || !self.collection_use_constraints.is_empty()
             || !self.expected_types.is_empty()
-            || !self.cycle_initials.is_empty()
+            || self.cycle_recovery.is_some()
             || !self.bindings.is_empty()
             || !self.called_functions.is_empty()
             || !self.diagnostics.is_empty())
@@ -12387,7 +12397,7 @@ impl<'db> FullExpressionCacheEntry<'db> {
                 bindings: self.bindings.into_boxed_slice(),
                 diagnostics: self.diagnostics,
                 called_functions: self.called_functions.into_iter().collect(),
-                cycle_initials: self.cycle_initials,
+                cycle_recovery: self.cycle_recovery,
                 collection_use_constraints: self.collection_use_constraints,
             })
         });
