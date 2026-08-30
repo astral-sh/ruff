@@ -4630,8 +4630,22 @@ pub(crate) fn report_inconsistent_generic_bases<'db>(
             _ => continue,
         };
 
-        for supercls in base_class.iter_mro(db) {
-            let ClassBase::Class(ClassType::Generic(supercls_alias)) = supercls else {
+        // The MRO contains each class only once, but separate inheritance paths can contribute
+        // different specializations. Visit those paths before comparing their type arguments.
+        let mut pending = vec![base_class];
+        let mut seen = FxHashSet::default();
+        while let Some(supercls) = pending.pop() {
+            if !seen.insert(supercls) || ClassBase::Class(supercls).has_cyclic_mro(db) {
+                continue;
+            }
+            let (literal, specialization) = supercls.class_literal_and_specialization(db);
+            pending.extend(literal.explicit_bases(db).iter().rev().filter_map(|base| {
+                ClassBase::try_from_explicit_base(db, env, *base, Some(literal))?
+                    .apply_optional_specialization(db, specialization)
+                    .into_class()
+            }));
+
+            let ClassType::Generic(supercls_alias) = supercls else {
                 continue;
             };
             let origin = supercls_alias.origin(db);

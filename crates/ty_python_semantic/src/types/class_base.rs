@@ -102,12 +102,20 @@ impl<'db> ClassBase<'db> {
 
     /// Return the identity of this base for method-resolution-order construction.
     ///
+    /// Specializations of a generic class share one runtime class and must occupy the same MRO
+    /// entry. Keep the specialization on the original `ClassBase` for member lookup.
+    ///
     /// The `TypedDict` module affects member lookup, but both special forms represent the same
-    /// pseudo-base when detecting duplicate or conflicting bases.
-    pub(super) const fn mro_identity(self) -> Self {
+    /// pseudo-base when detecting duplicate or conflicting bases. An explicit `Any` base remains
+    /// distinct from a base expression whose type is `Any`.
+    pub(super) fn mro_identity(self, db: &'db dyn Db) -> Type<'db> {
         match self {
-            Self::TypedDict(_) => Self::TypedDict(TypingModule::Typing),
-            _ => self,
+            Self::Any => Type::SpecialForm(SpecialFormType::Any),
+            Self::Class(class) => Type::ClassLiteral(class.class_literal(db)),
+            Self::TypedDict(_) => {
+                Type::SpecialForm(SpecialFormType::TypedDict(TypingModule::Typing))
+            }
+            _ => self.into(),
         }
     }
 

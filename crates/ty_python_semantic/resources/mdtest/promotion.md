@@ -668,12 +668,15 @@ def _(upper: Callable[[int], None]):
     reveal_type(f("x", upper))  # revealed: list[str | int]
 ```
 
-This also applies when multiple inheritance contributes both static and gradual specializations:
+This also applies when multiple inheritance contributes both static and gradual specializations of
+an invariant generic class:
 
 ```py
 from typing import Any
 
-class Base[T]: ...
+class Base[T]:
+    value: T
+
 class Specialized(Base[str]): ...
 class Mixed(Specialized, Base[Any]): ...
 

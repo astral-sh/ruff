@@ -234,7 +234,7 @@ impl<'db> Mro<'db> {
                         .collect(),
                 );
 
-                if let Some(mro) = c3_merge(seqs) {
+                if let Some(mro) = c3_merge(db, seqs) {
                     return Ok(mro);
                 }
 
@@ -258,14 +258,14 @@ impl<'db> Mro<'db> {
                 let mut duplicate_dynamic_bases = false;
 
                 let duplicate_bases: Vec<DuplicateBaseError<'db>> = {
-                    let mut base_to_indices: IndexMap<ClassBase<'db>, Vec<usize>, FxBuildHasher> =
-                        IndexMap::default();
+                    let mut base_to_indices =
+                        IndexMap::<_, (ClassBase<'db>, Vec<usize>), FxBuildHasher>::default();
 
                     // We need to iterate over `original_bases` here rather than `resolved_bases`
                     // so that we get the correct index of the duplicate bases if there were any
                     // (`resolved_bases` may be a longer list than `original_bases`!). However, we
-                    // need to use a `ClassBase` rather than a `Type` as the key type for the
-                    // `base_to_indices` map so that a class such as
+                    // need to use the base's MRO identity rather than its inferred type as the key
+                    // for the `base_to_indices` map so that a class such as
                     // `class Foo(Protocol[T], Protocol): ...` correctly causes us to emit a
                     // `duplicate-base` diagnostic (matching the runtime behaviour) rather than an
                     // `inconsistent-mro` diagnostic (which would be accurate -- but not nearly as
@@ -279,15 +279,15 @@ impl<'db> Mro<'db> {
                         ) else {
                             continue;
                         };
-                        base_to_indices
-                            .entry(base.mro_identity())
-                            .or_default()
-                            .push(index);
+                        let (_, indices) = base_to_indices
+                            .entry(base.mro_identity(db))
+                            .or_insert_with(|| (base, Vec::new()));
+                        indices.push(index);
                     }
 
                     let mut errors = vec![];
 
-                    for (base, indices) in base_to_indices {
+                    for (base, indices) in base_to_indices.into_values() {
                         let Some((first_index, later_indices)) = indices.split_first() else {
                             continue;
                         };
@@ -403,7 +403,7 @@ impl<'db> Mro<'db> {
         seqs.push(resolved_bases.iter().copied().collect());
 
         // Try C3 merge.
-        if let Some(mro) = c3_merge(seqs) {
+        if let Some(mro) = c3_merge(db, seqs) {
             return Ok(mro);
         }
 
@@ -414,14 +414,12 @@ impl<'db> Mro<'db> {
         let mut duplicates = Vec::new();
         let mut has_duplicate_dynamic_bases = false;
         for base in &resolved_bases {
-            if matches!(base, ClassBase::Any | ClassBase::Dynamic(_)) {
-                if !seen.insert(*base) {
+            if !seen.insert(base.mro_identity(db)) {
+                if matches!(base, ClassBase::Any | ClassBase::Dynamic(_)) {
                     has_duplicate_dynamic_bases = true;
+                } else {
+                    duplicates.push(*base);
                 }
-                continue;
-            }
-            if !seen.insert(base.mro_identity()) {
-                duplicates.push(*base);
             }
         }
 
@@ -505,7 +503,7 @@ impl<'db> Mro<'db> {
         }
         seqs.push(resolved_bases.iter().copied().collect());
 
-        c3_merge(seqs).ok_or_else(|| DynamicMroError {
+        c3_merge(db, seqs).ok_or_else(|| DynamicMroError {
             kind: DynamicMroErrorKind::UnresolvableMro,
             fallback_mro: fallback_mro(),
         })
@@ -819,7 +817,10 @@ pub(super) struct DuplicateBaseError<'db> {
 ///
 /// [C3-merge algorithm]: https://docs.python.org/3/howto/mro.html#python-2-3-mro
 /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
-fn c3_merge(mut sequences: Vec<VecDeque<ClassBase>>) -> Option<Mro> {
+fn c3_merge<'db>(
+    db: &'db dyn Db,
+    mut sequences: Vec<VecDeque<ClassBase<'db>>>,
+) -> Option<Mro<'db>> {
     // Most MROs aren't that long...
     let mut mro = Vec::with_capacity(8);
 
@@ -837,13 +838,13 @@ fn c3_merge(mut sequences: Vec<VecDeque<ClassBase>>) -> Option<Mro> {
         // with the given bases.
         let mro_entry = sequences.iter().find_map(|outer_sequence| {
             let candidate = outer_sequence[0];
-            let candidate_identity = candidate.mro_identity();
+            let candidate_identity = candidate.mro_identity(db);
 
             let not_head = sequences.iter().all(|sequence| {
                 sequence
                     .iter()
                     .skip(1)
-                    .all(|base| base.mro_identity() != candidate_identity)
+                    .all(|base| base.mro_identity(db) != candidate_identity)
             });
 
             not_head.then_some(candidate)
@@ -852,9 +853,9 @@ fn c3_merge(mut sequences: Vec<VecDeque<ClassBase>>) -> Option<Mro> {
         mro.push(mro_entry);
 
         // Make sure we don't try to add the candidate to the MRO twice:
-        let mro_entry_identity = mro_entry.mro_identity();
+        let mro_entry_identity = mro_entry.mro_identity(db);
         for sequence in &mut sequences {
-            sequence.pop_front_if(|base| base.mro_identity() == mro_entry_identity);
+            sequence.pop_front_if(|base| base.mro_identity(db) == mro_entry_identity);
         }
     }
 }
@@ -901,7 +902,7 @@ fn check_generic_reorder_fixes_mro<'db>(
         seqs.push(base.mro(db, env, None).collect());
     }
     seqs.push(reordered);
-    c3_merge(seqs)?;
+    c3_merge(db, seqs)?;
     Some(single_index)
 }
 
