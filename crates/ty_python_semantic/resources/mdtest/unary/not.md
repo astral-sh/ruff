@@ -3,10 +3,8 @@
 ## None
 
 ```py
-# error: [redundant-condition] "always falsy"
 reveal_type(not None)  # revealed: Literal[True]
 
-# error: [redundant-condition] "always falsy"
 reveal_type(not not None)  # revealed: Literal[False]
 ```
 

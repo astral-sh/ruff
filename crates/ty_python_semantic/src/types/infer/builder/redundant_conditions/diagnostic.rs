@@ -9,15 +9,16 @@ use ruff_db::{
 };
 use ruff_diagnostics::{Applicability, Edit, Fix};
 use ruff_python_ast as ast;
-use ruff_source_file::find_newline;
+use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
 use ty_python_core::Truthiness;
 
 use crate::{
     SemanticModel,
     types::{
-        KnownClass, LintDiagnosticGuard, MemberLookupPolicy, Type, call::bind::CallableDescription,
-        function::KnownFunction, infer::TypeInferenceBuilder, tuple::TupleLength,
+        KnownClass, LintDiagnosticGuard, LintDiagnosticGuardBuilder, MemberLookupPolicy, Type,
+        call::bind::CallableDescription, function::KnownFunction, infer::TypeInferenceBuilder,
+        tuple::TupleLength,
     },
 };
 
@@ -43,13 +44,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         let describe_condition = |diagnostic: &mut LintDiagnosticGuard| {
             let source = source_text(db, self.file());
-            let condition = &source[test.range()];
             let is_true = is_truthy;
-            if find_newline(condition).is_some() {
+            if source.contains_line_break(test.range()) {
                 diagnostic.set_concise_message(format_args!("Condition is always {is_true}"));
             } else {
                 diagnostic.set_concise_message(format_args!(
-                    "Condition `{condition}` is always {is_true}"
+                    "Condition `{}` is always {is_true}",
+                    &source[test.range()]
                 ));
             }
 
@@ -62,31 +63,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 && ops.len() == 1
                 && let [single_comparator] = &**comparators
             {
-                if let (ast::Expr::Call(call), other) | (other, ast::Expr::Call(call)) =
-                    (&**left, single_comparator)
-                    && let ast::Arguments { args, keywords, .. } = &call.arguments
-                    && keywords.is_empty()
-                    && let [single_arg] = &**args
-                    && let Type::FunctionLiteral(function) = self.expression_type(&call.func)
-                    && function.is_known(db, KnownFunction::Len)
-                    && self.expression_type(other).is_int_literal()
-                {
-                    let ty = self.expression_type(single_arg);
-                    if let Some(length_type) = ty.len(db, env)
-                        && let Some(length) = length_type.as_int_literal()
-                    {
-                        diagnostic.annotate(self.context.secondary(single_arg).message(
-                            format_args!(
-                                "Has type `{}`, which always has length {length}",
-                                ty.display(db, env),
-                            ),
-                        ));
-                    }
-                } else if let (Type::LiteralValue(left_type), Type::LiteralValue(right_type)) = (
+                if let (Type::LiteralValue(left_type), Type::LiteralValue(right_type)) = (
                     self.expression_type(left),
                     self.expression_type(single_comparator),
-                ) && ((left_type.is_string() && right_type.is_bytes())
-                    || (left_type.is_bytes() && right_type.is_string()))
+                ) && ((left_type.is_string() && (right_type.is_bytes() || right_type.is_int()))
+                    || ((left_type.is_bytes() || left_type.is_int()) && right_type.is_string()))
                 {
                     // For the specific case of a string-literal type compared with a bytes-literal type,
                     // cite their nominal-instance supertypes rather than their `Literal` types,
@@ -298,6 +279,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let mut diagnostic = builder.into_diagnostic("A nonempty string is always truthy");
                 describe_always_truthy_object(&mut diagnostic);
                 diagnostic
+            } else if describe_as_condition
+                && let Some((subexpr, subexpr_type, subexpr_length)) =
+                    self.length_test_against_type_with_known_length(test)
+            {
+                self.report_redundant_length_comparison(
+                    test,
+                    subexpr,
+                    subexpr_type,
+                    subexpr_length,
+                    builder,
+                )
             } else if describe_as_condition {
                 let message = "Condition is always true";
                 let mut diagnostic = builder.into_diagnostic(message);
@@ -374,6 +366,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 diagnostic.set_concise_message(message);
                 annotate_inferred_type(&mut diagnostic);
                 diagnostic
+            } else if describe_as_condition
+                && let Some((subexpr, subexpr_type, subexpr_length)) =
+                    self.length_test_against_type_with_known_length(test)
+            {
+                self.report_redundant_length_comparison(
+                    test,
+                    subexpr,
+                    subexpr_type,
+                    subexpr_length,
+                    builder,
+                )
             } else {
                 let message = if describe_as_condition {
                     "Condition is always false"
@@ -393,5 +396,80 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 diagnostic
             }
         };
+    }
+
+    /// Return `Some((expr, expr_ty, expr_length))`, where `expr_ty` is the type of an object
+    /// being tested for length, and `expr_length` is its known length.
+    ///
+    /// Returns `None` if `test` is not a comparison of the form `len(x) == i` or `len(x) != i`,
+    /// where `x` has a known length.
+    fn length_test_against_type_with_known_length<'a>(
+        &self,
+        test: &'a ast::Expr,
+    ) -> Option<(&'a ast::Expr, Type<'db>, i64)> {
+        let db = self.db();
+        let env = self.program_environment();
+
+        if let ast::Expr::Compare(ast::ExprCompare {
+            left,
+            ops,
+            comparators,
+            ..
+        }) = test
+            && let [single_op] = &**ops
+            && let [single_comparator] = &**comparators
+            && let (ast::Expr::Call(call), other) | (other, ast::Expr::Call(call)) =
+                (&**left, single_comparator)
+            && matches!(single_op, ast::CmpOp::Eq | ast::CmpOp::NotEq)
+            && let ast::Arguments { args, keywords, .. } = &call.arguments
+            && keywords.is_empty()
+            && let [single_arg] = &**args
+            && let Type::FunctionLiteral(function) = self.expression_type(&call.func)
+            && function.is_known(db, KnownFunction::Len)
+            && self.expression_type(other).is_int_literal()
+        {
+            let arg_type = self.expression_type(single_arg);
+            let length = arg_type.len(db, env)?.as_int_literal()?;
+            Some((single_arg, arg_type, length))
+        } else {
+            None
+        }
+    }
+
+    fn report_redundant_length_comparison<'a>(
+        &self,
+        test: &ast::Expr,
+        test_subexpression: &ast::Expr,
+        subexpression_type: Type<'db>,
+        length: i64,
+        builder: LintDiagnosticGuardBuilder<'a, 'a>,
+    ) -> LintDiagnosticGuard<'a, 'a> {
+        let db = self.db();
+        let env = self.program_environment();
+
+        let source = source_text(db, self.file());
+        let mut diagnostic = if !source.contains_line_break(test.range()) {
+            builder.into_diagnostic(format_args!(
+                "`{}` always has length {length}",
+                &source[test_subexpression.range()]
+            ))
+        } else {
+            let mut diag =
+                builder.into_diagnostic(format_args!("Value always has length {length}"));
+            diag.set_concise_message(format_args!(
+                "Object of type `{}` always has length {length}",
+                subexpression_type.display(db, env)
+            ));
+            diag
+        };
+        diagnostic.annotate(
+            self.context
+                .secondary(test_subexpression)
+                .message(format_args!(
+                    "Has type `{}`",
+                    subexpression_type.display(db, env)
+                )),
+        );
+        diagnostic
     }
 }

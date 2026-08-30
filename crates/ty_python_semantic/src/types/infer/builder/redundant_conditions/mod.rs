@@ -679,12 +679,14 @@ impl<'db> RedundantConditionChecker<'_, 'db> {
         if matches!(
             expression,
             ast::Expr::BooleanLiteral(_)
+                | ast::Expr::NoneLiteral(_)
                 | ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
                     value: ast::Number::Int(_),
                     ..
                 })
         ) {
             // Literal flags such as `if False` and `while 1` are almost certainly deliberate.
+            // `assert None` also comes up a weird amount in certain ecosystem projects, too!
             return None;
         }
 

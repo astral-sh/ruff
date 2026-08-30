@@ -122,3 +122,37 @@ def test_ask_to_continue():
 
 Unlike `and` and `or`, `not` explicitly converts its operand to a boolean, so the rule checks it in
 every context.
+
+## Known issues and workarounds
+
+This rule can sometimes trigger on code that is not incorrect, but could be written in a clearer
+way. For example, the rule will flag this code:
+
+```py
+def find_duplicate_coordinates(coordinates: list[tuple[int, int]]):
+    seen: set[tuple[int, int]] = set()
+    # error: [redundant-condition] "`None` is always falsy"
+    duplicates = {coord for coord in coordinates if coord in seen or seen.add(coord)}
+    print(f"Duplicates are {duplicates}")
+```
+
+The error here is triggered due to `seen.add(coord)` being used in a boolean expression, despite the
+fact that `set.add()` always returns `None`. Here this is deliberate: `set.add()` is being used for
+its side effect.
+
+To workaround this issue, the above code could be rewritten like this, which may also be easier for
+some readers to understand:
+
+```py
+def find_duplicate_coordinates(coordinates: list[tuple[int, int]]):
+    seen: set[tuple[int, int]] = set()
+    duplicates: set[tuple[int, int]] = set()
+
+    for coord in coordinates:
+        if coord in seen:
+            duplicates.add(coord)
+        else:
+            seen.add(coord)
+
+    print(f"Duplicates are {duplicates}")
+```

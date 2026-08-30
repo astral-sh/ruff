@@ -833,22 +833,45 @@ error[redundant-condition-strict]: Condition is always false
    |          Instance of `str`
 ```
 
+Or comparing a number with a string:
+
+```py
+x = 1
+if x == "1":  # snapshot: redundant-condition-strict
+    pass
+```
+
+```snapshot
+error[redundant-condition-strict]: Condition is always false
+  --> src/mdtest_snippet.py:21:4
+   |
+21 | if x == "1":  # snapshot: redundant-condition-strict
+   |    -^^^^---
+   |    |    |
+   |    |    Instance of `str`
+   |    Instance of `int`
+```
+
 Or testing the length of a tuple that always has a fixed length:
 
 ```py
 def test(x: tuple[int]):  # the user probably meant to use `tuple[int, ...]` here
+    # error: [redundant-condition-strict] "`x` always has length 1"
+    if len(x) == 1:
+        pass
+
     if len(x) == 2:  # snapshot: redundant-condition-strict
         pass
 ```
 
 ```snapshot
-error[redundant-condition-strict]: Condition is always false
-  --> src/mdtest_snippet.py:21:8
+error[redundant-condition-strict]: `x` always has length 1
+  --> src/mdtest_snippet.py:28:8
    |
-21 |     if len(x) == 2:  # snapshot: redundant-condition-strict
+28 |     if len(x) == 2:  # snapshot: redundant-condition-strict
    |        ^^^^-^^^^^^
    |            |
-   |            Has type `tuple[int]`, which always has length 1
+   |            Has type `tuple[int]`
 ```
 
 We avoid annotating the inferred types of comparison conditions for very obvious AST literals such
@@ -871,36 +894,36 @@ def f(x: None):
 
 ```snapshot
 error[redundant-condition-strict]: Condition is always true
-  --> src/mdtest_snippet.py:24:8
+  --> src/mdtest_snippet.py:31:8
    |
-24 |     if x is None:  # snapshot: redundant-condition-strict
+31 |     if x is None:  # snapshot: redundant-condition-strict
    |        -^^^^^^^^
    |        |
    |        Has type `None`
 
 
 error[redundant-condition-strict]: Condition is always false
-  --> src/mdtest_snippet.py:27:8
+  --> src/mdtest_snippet.py:34:8
    |
-27 |     if x == 3:  # snapshot: redundant-condition-strict
+34 |     if x == 3:  # snapshot: redundant-condition-strict
    |        -^^^^^
    |        |
    |        Has type `None`
 
 
 error[redundant-condition-strict]: Condition is always false
-  --> src/mdtest_snippet.py:30:8
+  --> src/mdtest_snippet.py:37:8
    |
-30 |     if x == -3:  # snapshot: redundant-condition-strict
+37 |     if x == -3:  # snapshot: redundant-condition-strict
    |        -^^^^^^
    |        |
    |        Has type `None`
 
 
 error[redundant-condition-strict]: Condition is always false
-  --> src/mdtest_snippet.py:33:8
+  --> src/mdtest_snippet.py:40:8
    |
-33 |     if x == +3:  # snapshot: redundant-condition-strict
+40 |     if x == +3:  # snapshot: redundant-condition-strict
    |        -^^^^^^
    |        |
    |        Has type `None`
@@ -1151,6 +1174,13 @@ if True:  # no diagnostic
 
 if 2:  # no diagnostic
     pass
+```
+
+`assert None` also comes up unexpectedly often in certain ecosystem projects to assert an
+unreachable region, so we special-case a literal `None` too:
+
+```py
+assert None  # no diagnostic
 ```
 
 ## Defensive assertions
