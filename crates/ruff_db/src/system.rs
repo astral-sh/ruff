@@ -243,6 +243,9 @@ pub trait WritableSystem: System {
     /// Writes the given content to the file at the given path.
     fn write_file_bytes(&self, path: &SystemPath, content: &[u8]) -> Result<()>;
 
+    /// Removes the file at the given path.
+    fn remove_file(&self, path: &SystemPath) -> Result<()>;
+
     /// Creates a directory at `path` as well as any intermediate directories.
     fn create_directory_all(&self, path: &SystemPath) -> Result<()>;
 
