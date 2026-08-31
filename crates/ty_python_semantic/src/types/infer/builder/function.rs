@@ -589,16 +589,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         for (decorator_ty, decorator_node) in decorator_types_and_nodes.iter().rev() {
-            // Function types and overload signatures retain these decorators as binding metadata.
-            // If an inner decorator returned another object, construct the descriptor normally.
+            // Function types, overload signatures, and method-like callables already retain
+            // binding metadata. Check every callable alternative: a decorator can return a
+            // union whose signatures cannot be represented by a single ParamSpec.
             if FunctionDecorators::from_decorator_type(db, *decorator_ty)
                 .intersects(FunctionDecorators::CLASSMETHOD | FunctionDecorators::STATICMETHOD)
                 && (is_decorated_overload_implementation
                     || is_decorated_overload
                     || matches!(inferred_ty, Type::FunctionLiteral(_))
                     || inferred_ty
-                        .as_callable()
-                        .is_some_and(|callable| callable.is_method_like(db)))
+                        .try_upcast_to_callable(db, self.program_environment())
+                        .is_some_and(|callables| {
+                            callables.iter().all(|callable| callable.is_method_like(db))
+                        }))
             {
                 continue;
             }
