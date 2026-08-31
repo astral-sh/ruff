@@ -15,8 +15,8 @@ use crate::reachability::{
 };
 use crate::types::{
     DynamicType, KnownClass, MemberLookupPolicy, Type, TypeAndQualifiers, TypeQualifiers,
-    UnionBuilder, UnionType, binding_type, exists_at_runtime, inferred_declaration,
-    is_discarded_dict_key_assignment,
+    UnionBuilder, UnionType, binding_type, inferred_declaration, is_discarded_dict_key_assignment,
+    may_exist_at_runtime,
 };
 use crate::{Db, FxIndexSet, FxOrderSet};
 use ty_python_core::definition::{Definition, DefinitionKind, DefinitionState};
@@ -694,7 +694,7 @@ fn builtins_symbol_impl<'db>(
         if matches!(visibility, BuiltinVisibility::RuntimeOnly)
             && let Place::Defined(defined) = found_symbol.place
             && let Some(definition) = defined.provenance.definition()
-            && !exists_at_runtime(db, definition)
+            && !may_exist_at_runtime(db, definition)
         {
             return None;
         }

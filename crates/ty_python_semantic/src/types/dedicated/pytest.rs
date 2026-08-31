@@ -69,7 +69,7 @@ use crate::types::infer::{function_known_decorators, infer_definition_types, ori
 use crate::types::signatures::Parameter as SignatureParameter;
 use crate::types::{
     ClassBase, ClassLiteral, KnownClass, ProgramEnvironment, Type, definition_expression_type,
-    exists_at_runtime, extract_fixed_length_iterable_element_types,
+    extract_fixed_length_iterable_element_types, may_exist_at_runtime,
 };
 use crate::{Db, FxIndexMap, FxIndexSet};
 
@@ -871,7 +871,7 @@ fn is_available_definition_in_scope<'db>(
             .use_def_map(scope)
             .end_of_scope_bindings(definition.place(db)),
     );
-    resolution.definitions().contains(&definition) && exists_at_runtime(db, definition)
+    resolution.definitions().contains(&definition) && may_exist_at_runtime(db, definition)
 }
 
 /// A class hierarchy or scope searched when resolving a fixture request.
@@ -943,7 +943,7 @@ fn class_attribute_exists_at_runtime<'db>(
 ) -> bool {
     definitions
         .iter()
-        .any(|definition| exists_at_runtime(db, *definition))
+        .any(|definition| may_exist_at_runtime(db, *definition))
 }
 
 /// Resolves a request against the fixture exposures in `search_scope`.
@@ -1161,7 +1161,7 @@ fn exposures_contributed_by_definition<'db>(
     ) {
         return Vec::new();
     }
-    if !exists_at_runtime(db, definition) {
+    if !may_exist_at_runtime(db, definition) {
         return Vec::new();
     }
 
