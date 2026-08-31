@@ -405,11 +405,11 @@ impl<'resolver, 'db> ModuleSearch<'resolver, 'db> {
 /// `acme.nested.tools`. Such prefixes are traversal positions, not resolved modules: recursive
 /// enumeration must explore them, but import-statement completion must not offer them.
 #[derive(Default)]
-pub(super) struct ModuleEnumeration<'db> {
+pub(crate) struct ModuleEnumeration<'db> {
     /// Modules that resolve independently and are eligible for enumeration.
-    modules: Vec<Module<'db>>,
+    pub(crate) modules: Vec<Module<'db>>,
     /// Unresolved names with eligible stub-overlay locations to search for descendants.
-    overlay_prefixes: Vec<ModuleName>,
+    pub(crate) overlay_prefixes: Vec<ModuleName>,
 }
 
 fn add_child_name(
