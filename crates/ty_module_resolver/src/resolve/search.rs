@@ -31,7 +31,7 @@ use super::{
     stub_package_index,
 };
 
-pub(super) struct ModuleSearchCursor<'a, 'db> {
+pub(crate) struct ModuleSearchCursor<'a, 'db> {
     pub(super) context: &'a ResolverContext<'db>,
     position: Position<'db>,
 }
@@ -43,7 +43,7 @@ impl<'a, 'db> ModuleSearchCursor<'a, 'db> {
     }
 
     /// Starts a search using only the supplied search paths.
-    pub(super) fn with_supplied_search_paths(
+    pub(crate) fn with_supplied_search_paths(
         context: &'a ResolverContext<'db>,
         search_paths: &'db [SearchPath],
     ) -> Self {
@@ -51,7 +51,7 @@ impl<'a, 'db> ModuleSearchCursor<'a, 'db> {
     }
 
     /// Advances this search through all components of the given name.
-    pub(super) fn for_prefix(mut self, prefix: &ModuleName) -> Option<Self> {
+    pub(crate) fn for_prefix(mut self, prefix: &ModuleName) -> Option<Self> {
         match &self.position {
             Position::Root(RootSearchPaths::Configured) => {
                 // The cache describes absolute names under the configured search paths,

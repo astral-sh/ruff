@@ -1,17 +1,18 @@
 use std::borrow::Cow;
-use std::debug_assert_matches;
 use std::fmt::Formatter;
 use std::str::FromStr;
 
-use ruff_db::files::{File, directory_listing, system_path_to_file, vendored_path_to_file};
-use ruff_db::system::SystemPath;
-use ruff_db::vendored::VendoredPath;
+use ruff_db::files::File;
 use ruff_python_ast::PythonVersion;
 use salsa::Database;
 use salsa::plumbing::AsId;
 
 use crate::module_name::ModuleName;
-use crate::path::{SearchPath, SystemOrVendoredPathRef};
+use crate::path::SearchPath;
+use crate::resolve::{
+    self, ListingTarget, ModuleListing, ModuleNameIngredient, ModuleResolveMode,
+    ModuleSearchCursor, ResolverContext, search_paths,
+};
 use crate::{Db, ResolverEnvironment};
 
 /// Representation of a Python module.
@@ -131,15 +132,19 @@ impl<'db> Module<'db> {
         }
     }
 
-    /// Return a list of all submodules of this module.
-    ///
-    /// Returns an empty list if the module is not a package, if it is an empty package,
-    /// or if it is a namespace package (one without an `__init__.py` or `__init__.pyi` file).
-    ///
-    /// The names returned correspond to the "base" name of the module.
-    /// That is, `{self.name}.{basename}` should give the full module name.
+    /// Returns resolved immediate submodules, including portions of namespace packages.
     pub fn all_submodules(self, db: &'db dyn Db) -> &'db [Module<'db>] {
-        all_submodule_names_for_package(db, self).unwrap_or_default()
+        &submodule_listing(db, self).modules
+    }
+
+    /// Returns the cached submodule listing needed for recursive module enumeration.
+    /// Returns `None` when there are no modules or stub override prefixes to visit.
+    pub(crate) fn submodule_listing(
+        self,
+        db: &'db dyn Db,
+    ) -> Option<&'db CachedModuleListing<'db>> {
+        let listing = submodule_listing(db, self);
+        (!listing.is_empty()).then_some(listing)
     }
 }
 
@@ -158,138 +163,116 @@ impl std::fmt::Debug for Module<'_> {
     }
 }
 
-#[salsa::tracked(returns(as_deref), heap_size=ruff_memory_usage::heap_size)]
-fn all_submodule_names_for_package<'db>(
-    db: &'db dyn Db,
-    module: Module<'db>,
-) -> Option<Box<[Module<'db>]>> {
-    fn is_submodule(
-        is_dir: bool,
-        is_file: bool,
-        basename: Option<&str>,
-        extension: Option<&str>,
-    ) -> bool {
-        is_dir
-            || (is_file
-                && matches!(extension, Some("py" | "pyi"))
-                && !matches!(basename, Some("__init__.py" | "__init__.pyi")))
-    }
-
-    fn find_package_init_system(db: &dyn Db, dir: &SystemPath) -> Option<File> {
-        let listing = directory_listing(db, dir).ok()?;
-        if listing.entry_is_file(db, dir, "__init__.pyi") {
-            system_path_to_file(db, dir.join("__init__.pyi")).ok()
-        } else if listing.entry_is_file(db, dir, "__init__.py") {
-            system_path_to_file(db, dir.join("__init__.py")).ok()
-        } else {
-            None
-        }
-    }
-
-    fn find_package_init_vendored(db: &dyn Db, dir: &VendoredPath) -> Option<File> {
-        vendored_path_to_file(db, dir.join("__init__.pyi"))
-            .or_else(|_| vendored_path_to_file(db, dir.join("__init__.py")))
-            .ok()
-    }
-
-    // It would be complex and expensive to compute all submodules for
-    // namespace packages, since a namespace package doesn't correspond
-    // to a single file; it can span multiple directories across multiple
-    // search paths. For now, we only compute submodules for traditional
-    // packages that exist in a single directory on a single search path.
-    let Module::File(module) = module else {
-        return None;
-    };
-    if !matches!(module.kind(db), ModuleKind::Package) {
-        return None;
-    }
-
-    let path = SystemOrVendoredPathRef::try_from_file(db, module.file(db))?;
-    debug_assert_matches!(path.file_name(), Some("__init__.py" | "__init__.pyi"));
-
+#[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+fn submodule_listing<'db>(db: &'db dyn Db, module: Module<'db>) -> CachedModuleListing<'db> {
     let resolver_environment = module.resolver_environment(db);
-    Some(match path.parent()? {
-        SystemOrVendoredPathRef::System(parent_directory) => {
-            directory_listing(db, parent_directory)
-                .inspect_err(|error| {
-                    tracing::debug!(
-                        "Failed to read {parent_directory:?} when looking for \
-                         its possible submodules: {error}"
-                    );
-                })
-                .ok()?
-                .iter()
-                .filter(|(name, ty)| {
-                    let path = SystemPath::new(name);
-                    is_submodule(
-                        ty.is_directory(),
-                        ty.is_file(),
-                        path.file_name(),
-                        path.extension(),
-                    )
-                })
-                .filter_map(|(entry_name, file_type)| {
-                    let relative = SystemPath::new(entry_name);
-                    let stem = relative.file_stem()?;
-                    let path = parent_directory.join(relative);
-                    let mut name = module.name(db).clone();
-                    name.extend(&ModuleName::new(stem)?);
+    let context = ResolverContext::new(db, resolver_environment, ModuleResolveMode::Typing);
 
-                    let (kind, file) = if file_type.is_directory() {
-                        (ModuleKind::Package, find_package_init_system(db, &path)?)
-                    } else {
-                        let file = system_path_to_file(db, &path).ok()?;
-                        (ModuleKind::Module, file)
-                    };
-                    Some(Module::file_module(
-                        db,
-                        file,
-                        resolver_environment,
-                        Cow::Owned(name),
-                        kind,
-                        module.search_path(db).clone(),
-                    ))
-                })
-                .collect()
-        }
-        SystemOrVendoredPathRef::Vendored(parent_directory) => db
-            .vendored()
-            .read_directory(parent_directory)
-            .filter(|entry| {
-                let ty = entry.file_type();
-                let path = entry.path();
-                is_submodule(
-                    ty.is_directory(),
-                    ty.is_file(),
-                    path.file_name(),
-                    path.extension(),
-                )
-            })
-            .filter_map(|entry| {
-                let stem = entry.path().file_stem()?;
-                let mut name = module.name(db).clone();
-                name.extend(&ModuleName::new(stem)?);
+    // Desperate resolution can use a search path absent from the configuration.
+    // Preserve that path when listing the module's submodules.
+    if let Some(path) = module.search_path(db)
+        && !search_paths(db, resolver_environment, ModuleResolveMode::Typing)
+            .any(|configured| configured == path)
+    {
+        return ModuleSearchCursor::with_supplied_search_paths(
+            &context,
+            std::slice::from_ref(path),
+        )
+        .for_prefix(module.name(db))
+        .map(|search| search.list_modules())
+        .unwrap_or_default()
+        .into();
+    }
 
-                let (kind, file) = if entry.file_type().is_directory() {
-                    (
-                        ModuleKind::Package,
-                        find_package_init_vendored(db, entry.path())?,
-                    )
-                } else {
-                    let file = vendored_path_to_file(db, entry.path()).ok()?;
-                    (ModuleKind::Module, file)
-                };
-                Some(Module::file_module(
+    resolve::list_modules(&context, &ListingTarget::ResolvedName(module)).into()
+}
+
+/// A cached listing of top-level modules or immediate submodules.
+#[derive(Debug, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+pub(crate) struct CachedModuleListing<'db> {
+    /// Resolved modules, suitable for import-statement completion.
+    pub(crate) modules: Box<[Module<'db>]>,
+    /// Prefixes used only by recursive enumeration; see [`ModuleListing`].
+    stub_override_prefixes: Box<[ModuleName]>,
+    /// Listed modules that may have descendants, including files with stub overrides.
+    pub(crate) modules_with_possible_children: Box<[Module<'db>]>,
+}
+
+impl<'db> CachedModuleListing<'db> {
+    /// Returns non-empty module listings for unresolved stub override prefixes.
+    ///
+    /// For example, suppose `/extra` is configured as an extra path and
+    /// `acme-stubs` is a complete stub package (i.e. not marked as partial):
+    ///
+    /// ```text
+    /// /extra/acme/nested/tools.pyi
+    ///
+    /// /site-packages/acme-stubs/__init__.pyi
+    ///
+    /// /site-packages/acme/__init__.py
+    /// /site-packages/acme/nested/__init__.py
+    /// /site-packages/acme/nested/tools.py
+    /// ```
+    ///
+    /// Typing-mode resolution selects the installed stubs for `acme`. Those
+    /// stubs do not supply `acme.nested`, and because the stub package is
+    /// "complete" it prevents falling back to the source package. Nonetheless,
+    /// the extra-path stub still supplies `acme.nested.tools`.
+    ///
+    /// Module enumeration must therefore visit the prefix `acme.nested` to reach
+    /// `tools`, even though the prefix itself does not resolve to a module. This
+    /// method returns listings beneath that prefix without including the prefix
+    /// among the resolved modules.
+    pub(crate) fn stub_override_listings(
+        &self,
+        db: &'db dyn Db,
+        resolver_environment: ResolverEnvironment<'db>,
+    ) -> impl Iterator<Item = &'db CachedModuleListing<'db>> {
+        self.stub_override_prefixes
+            .iter()
+            .filter_map(move |prefix| {
+                let name = ModuleNameIngredient::new(
                     db,
-                    file,
+                    prefix,
+                    ModuleResolveMode::Typing,
                     resolver_environment,
-                    Cow::Owned(name),
-                    kind,
-                    module.search_path(db).clone(),
-                ))
+                );
+                let listing = stub_override_listing(db, name);
+                (!listing.is_empty()).then_some(listing)
             })
-            .collect(),
-    })
+    }
+
+    /// Whether there are no modules or stub override prefixes to visit during recursive enumeration.
+    fn is_empty(&self) -> bool {
+        self.modules.is_empty() && self.stub_override_prefixes.is_empty()
+    }
+}
+
+impl<'db> From<ModuleListing<'db>> for CachedModuleListing<'db> {
+    fn from(listing: ModuleListing<'db>) -> Self {
+        Self {
+            modules: listing.modules.into_boxed_slice(),
+            stub_override_prefixes: listing.stub_override_prefixes.into_boxed_slice(),
+            modules_with_possible_children: listing
+                .modules_with_possible_children
+                .into_boxed_slice(),
+        }
+    }
+}
+
+/// Cache each unresolved prefix by its name and environment, just as resolved
+/// packages cache their submodule listings by `Module`.
+#[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+fn stub_override_listing<'db>(
+    db: &'db dyn Db,
+    name: ModuleNameIngredient<'db>,
+) -> CachedModuleListing<'db> {
+    let context = ResolverContext::new(db, name.resolver_environment(db), name.mode(db));
+    resolve::list_modules(
+        &context,
+        &ListingTarget::UnresolvedName(name.name(db).clone()),
+    )
+    .into()
 }
 
 /// A module that resolves to a file (`lib.py` or `package/__init__.py`).

@@ -1,27 +1,25 @@
-use std::borrow::Cow;
-use std::collections::btree_map::{BTreeMap, Entry};
-
 use crate::ResolverEnvironment;
 use crate::db::Db;
-use crate::module::{Module, ModuleKind};
-use crate::module_name::ModuleName;
-use crate::path::{ModuleDirectory, ModulePath, SearchPath, SystemOrVendoredPathRef};
-use crate::resolve::{ModuleResolveMode, ResolverContext, resolve_file_module, search_paths};
+use crate::module::{CachedModuleListing, Module};
+use crate::resolve::{self, ListingTarget, ModuleResolveMode, ResolverContext};
 
 /// List all available modules, including all sub-modules, sorted in lexicographic order.
 pub fn all_modules<'db>(
     db: &'db dyn Db,
     resolver_environment: ResolverEnvironment<'db>,
 ) -> Vec<Module<'db>> {
-    let mut modules = list_modules(db, resolver_environment).to_vec();
-    let mut stack = modules.clone();
-    while let Some(module) = stack.pop() {
-        for &submodule in module.all_submodules(db) {
-            modules.push(submodule);
-            stack.push(submodule);
+    let mut modules = Vec::new();
+    let mut stack = vec![list_modules_impl(db, resolver_environment)];
+    while let Some(listing) = stack.pop() {
+        modules.extend_from_slice(&listing.modules);
+        for module in &listing.modules_with_possible_children {
+            stack.extend(module.submodule_listing(db));
         }
+        // Reach local stub overrides through unresolved prefixes;
+        // see the example on `CachedModuleListing::stub_override_listings`.
+        stack.extend(listing.stub_override_listings(db, resolver_environment));
     }
-    modules.sort_by_key(|module| module.name(db));
+    modules.sort_by_cached_key(|module| module.name(db));
     modules
 }
 
@@ -30,384 +28,16 @@ pub fn list_modules<'db>(
     db: &'db dyn Db,
     resolver_environment: ResolverEnvironment<'db>,
 ) -> &'db [Module<'db>] {
-    list_modules_impl(db, resolver_environment)
+    &list_modules_impl(db, resolver_environment).modules
 }
 
-#[salsa::tracked(returns(deref))]
+#[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
 fn list_modules_impl<'db>(
     db: &'db dyn Db,
     resolver_environment: ResolverEnvironment<'db>,
-) -> Box<[Module<'db>]> {
-    let mut modules: BTreeMap<&ModuleName, ListedModule<'_>> = BTreeMap::new();
-    for search_path in search_paths(db, resolver_environment, ModuleResolveMode::Typing) {
-        for &new in list_modules_in(
-            db,
-            SearchPathIngredient::new(db, resolver_environment, search_path.clone()),
-        ) {
-            match modules.entry(new.module(db).name(db)) {
-                Entry::Vacant(entry) => {
-                    entry.insert(new);
-                }
-                Entry::Occupied(mut entry) => {
-                    // A module can override a module with the same name in
-                    // a higher precedent search path when either of the following
-                    // are true:
-                    //
-                    // 1. The higher precedent search path contained a namespace
-                    //    package and the lower precedent search path contained
-                    //    a "regular" module/package.
-                    // 2. The new module is from a stub package (`foo-stubs`),
-                    //    which has priority regardless of search path ordering
-                    //    per the typing spec's import resolution ordering.
-                    let existing = entry.get();
-                    let existing_is_namespace = existing.module(db).search_path(db).is_none();
-                    let new_is_non_namespace = new.module(db).search_path(db).is_some();
-                    if (existing_is_namespace && new_is_non_namespace)
-                        || (!existing.is_stub_package(db) && new.is_stub_package(db))
-                    {
-                        entry.insert(new);
-                    }
-                }
-            }
-        }
-    }
-    modules
-        .into_values()
-        .map(|listed| listed.module(db))
-        .collect()
-}
-
-#[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
-struct SearchPathIngredient<'db> {
-    #[returns(copy)]
-    resolver_environment: ResolverEnvironment<'db>,
-    #[returns(ref)]
-    path: SearchPath,
-}
-
-/// List all available top-level modules in the given `SearchPath`.
-#[salsa::tracked(returns(deref))]
-fn list_modules_in<'db>(
-    db: &'db dyn Db,
-    search_path: SearchPathIngredient<'db>,
-) -> Vec<ListedModule<'db>> {
-    let path = search_path.path(db);
-    tracing::debug!("Listing modules in search path '{}'", path);
-    let mut lister = Lister::new(db, search_path.resolver_environment(db), path);
-    match path.as_path() {
-        SystemOrVendoredPathRef::System(system_search_path) => {
-            let Some(listing) = lister.directory.system_listing() else {
-                return vec![];
-            };
-            for (name, file_type) in listing.iter() {
-                let path = system_search_path.join(name);
-                lister.add_path(&path.as_path().into(), file_type.into());
-            }
-        }
-        SystemOrVendoredPathRef::Vendored(vendored_search_path) => {
-            for entry in db.vendored().read_directory(vendored_search_path) {
-                lister.add_path(&entry.path().into(), entry.file_type().into());
-            }
-        }
-    }
-    lister.into_modules()
-}
-
-/// A module paired with whether it came from a stub package.
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-struct ListedModule<'db> {
-    #[returns(copy)]
-    module: Module<'db>,
-    #[returns(copy)]
-    is_stub_package: bool,
-}
-
-impl get_size2::GetSize for ListedModule<'_> {}
-
-/// An implementation helper for "list all modules."
-///
-/// This is responsible for accumulating modules indexed by
-/// module name. It also handles precedence by implementing the
-/// rules that determine which module gets priority when there is
-/// otherwise ambiguity (e.g., `foo.py` versus `foo/__init__.py`
-/// in the same directory).
-struct Lister<'db> {
-    db: &'db dyn Db,
-    directory: ModuleDirectory<'db>,
-    resolver_environment: ResolverEnvironment<'db>,
-    modules: BTreeMap<&'db ModuleName, ListedModule<'db>>,
-}
-
-impl<'db> Lister<'db> {
-    /// Create new state that can accumulate modules from a list
-    /// of file paths.
-    fn new(
-        db: &'db dyn Db,
-        resolver_environment: ResolverEnvironment<'db>,
-        search_path: &'db SearchPath,
-    ) -> Lister<'db> {
-        Lister {
-            db,
-            directory: ModuleDirectory::new(
-                &ResolverContext::new(db, resolver_environment, ModuleResolveMode::Typing),
-                search_path.to_module_path(),
-            ),
-            resolver_environment,
-            modules: BTreeMap::new(),
-        }
-    }
-
-    /// Returns the modules collected, sorted by module name.
-    fn into_modules(self) -> Vec<ListedModule<'db>> {
-        self.modules.into_values().collect()
-    }
-
-    /// Add the given `path` as a possible module to this lister. The
-    /// `file_type` should be the type of `path` (file, directory or
-    /// symlink).
-    ///
-    /// This may decide that the given path does not correspond to
-    /// a valid Python module. In which case, it is dropped and this
-    /// is a no-op.
-    ///
-    /// Callers must ensure that the path given came from the same
-    /// `SearchPath` used to create this `Lister`.
-    fn add_path(&mut self, path: &SystemOrVendoredPathRef<'_>, file_type: FileType) {
-        let mut has_py_extension = false;
-        // We must have no extension, a Python source file extension (`.py`)
-        // or a Python stub file extension (`.pyi`).
-        if let Some(ext) = path.extension() {
-            has_py_extension = is_python_extension(ext);
-            if !has_py_extension {
-                return;
-            }
-        }
-
-        let Some(name) = path.file_name() else { return };
-        let mut module_path = self.directory.path().search_path().to_module_path();
-        module_path.push(name);
-        let Some(module_name) = module_path.to_module_name() else {
-            return;
-        };
-
-        // Some modules cannot shadow a subset of special
-        // modules from the standard library.
-        if !self.directory.path().search_path().is_standard_library()
-            && self.is_non_shadowable(&module_name)
-        {
-            return;
-        }
-
-        if file_type.is_possibly_directory() {
-            if module_path.is_regular_package(&self.context()) {
-                module_path.push("__init__");
-                if let Some(file) = resolve_file_module(&module_path, &self.context()) {
-                    self.add_module(
-                        &module_path,
-                        Module::file_module(
-                            self.db,
-                            file,
-                            self.resolver_environment,
-                            Cow::Owned(module_name),
-                            ModuleKind::Package,
-                            self.directory.path().search_path().clone(),
-                        ),
-                    );
-                    return;
-                }
-                module_path.pop();
-            }
-
-            // Otherwise, we kind of have to assume that we have a
-            // namespace package, which can be any directory that
-            // *doesn't* contain an `__init__.{py,pyi}`. We do need to
-            // know if we have a real directory or not. If we have a
-            // symlink, then this requires hitting the file system.
-            //
-            // Note though that if we find a "regular" module in a
-            // lower priority search path, that will be allowed to
-            // overwrite this namespace package.
-            //
-            // We only do this when in a standard library search
-            // path, which matches how the "resolve this module"
-            // implementation works. In particular, typeshed doesn't
-            // use any namespace packages at time of writing
-            // (2025-08-08), so if we're in a standard library search
-            // path, we "know" this can't actually be a package.
-            //
-            // NOTE: Note that the
-            // `module_path.is_regular_package()` check above takes
-            // `VERSIONS` into consideration. Which means it can return
-            // `false` even when, say, `package/__init__.py` exists. In
-            // that case, outside of a standard library search path,
-            // we'd incorrectly report it here as a namespace package.
-            // HOWEVER, `VERSIONS` is only applicable for typeshed, so
-            // this ends up working okay. But if typeshed ever uses
-            // namespace packages, then this will need to be accounted
-            // for.
-            let is_dir =
-                file_type.is_definitely_directory() || module_path.is_directory(&self.context());
-            if is_dir {
-                if !self.directory.path().search_path().is_standard_library() {
-                    self.add_module(
-                        &module_path,
-                        Module::namespace_package(
-                            self.db,
-                            self.resolver_environment,
-                            Cow::Owned(module_name),
-                        ),
-                    );
-                }
-                return;
-            }
-            // At this point, we have a symlink that we know is not a
-            // directory, so press on as if it were a regular file...
-        }
-
-        // At this point, we're looking for a file module.
-        // For a file module, we require a `.py` or `.pyi`
-        // extension.
-        if !has_py_extension {
-            return;
-        }
-        // We also require stub packages to be packages, not
-        // single-file modules.
-        if module_path.is_stub_package() {
-            return;
-        }
-
-        let Some(file) = self.directory.resolve_file(&self.context(), name) else {
-            return;
-        };
-        self.add_module(
-            &module_path,
-            Module::file_module(
-                self.db,
-                file,
-                self.resolver_environment,
-                Cow::Owned(module_name),
-                ModuleKind::Module,
-                self.directory.path().search_path().clone(),
-            ),
-        );
-    }
-
-    /// Adds the given module to the collection.
-    ///
-    /// If the module had already been added and shouldn't override any
-    /// existing entry, then this is a no-op. That is, this assumes that the
-    /// caller looks for modules in search path priority order.
-    fn add_module(&mut self, path: &ModulePath, module: Module<'db>) {
-        let listed = ListedModule::new(self.db, module, path.is_stub_package());
-        let mut entry = match self.modules.entry(module.name(self.db)) {
-            Entry::Vacant(entry) => {
-                entry.insert(listed);
-                return;
-            }
-            Entry::Occupied(entry) => entry,
-        };
-
-        let existing = entry.get().module(self.db);
-        match (existing.search_path(self.db), module.search_path(self.db)) {
-            // When we had a namespace package and now try to
-            // insert a non-namespace package, the latter always
-            // takes precedent, even if it's in a lower priority
-            // search path.
-            (None, Some(_)) => {
-                entry.insert(listed);
-            }
-            (Some(_), Some(_)) => {
-                // Merging across search paths is only necessary for
-                // namespace packages. For all other modules, entries
-                // from earlier search paths take precedence. Thus, all
-                // of the cases below require that we're in the same
-                // directory. ... Which is true here, because a `Lister`
-                // only works for one specific search path.
-
-                // When we have a `foo/__init__.py` and a `foo.py` in
-                // the same directory, the former takes precedent.
-                // (This case can only occur when both have a search
-                // path.)
-                // Or if we have two file modules and the new one
-                // is a stub, then the stub takes priority.
-                if existing.kind(self.db) == ModuleKind::Module
-                    && let module_kind = module.kind(self.db)
-                    && (module_kind == ModuleKind::Package
-                        || module_kind == ModuleKind::Module && path.is_stub_file())
-                {
-                    entry.insert(listed);
-                    return;
-                }
-                // Or... if we have a stub package, the stub package
-                // always gets priority.
-                if path.is_stub_package() {
-                    entry.insert(listed);
-                }
-            }
-            _ => {}
-        }
-    }
-
-    /// Returns true if the given module name cannot be shadowable.
-    fn is_non_shadowable(&self, name: &ModuleName) -> bool {
-        ModuleResolveMode::Typing.is_non_shadowable(
-            self.resolver_environment.python_version(self.db).minor,
-            name.as_str(),
-        )
-    }
-
-    /// Constructs a resolver context for use with some APIs that require it.
-    fn context(&self) -> ResolverContext<'db> {
-        // We don't currently support listing modules in a "no stubs allowed" mode.
-        ResolverContext::new(
-            self.db,
-            self.resolver_environment,
-            ModuleResolveMode::Typing,
-        )
-    }
-}
-
-/// The type of a file.
-#[derive(Clone, Copy, Debug)]
-enum FileType {
-    File,
-    Directory,
-    Symlink,
-}
-
-impl FileType {
-    fn is_possibly_directory(self) -> bool {
-        matches!(self, FileType::Directory | FileType::Symlink)
-    }
-
-    fn is_definitely_directory(self) -> bool {
-        matches!(self, FileType::Directory)
-    }
-}
-
-impl From<ruff_db::vendored::FileType> for FileType {
-    fn from(ft: ruff_db::vendored::FileType) -> FileType {
-        match ft {
-            ruff_db::vendored::FileType::File => FileType::File,
-            ruff_db::vendored::FileType::Directory => FileType::Directory,
-        }
-    }
-}
-
-impl From<ruff_db::system::FileType> for FileType {
-    fn from(ft: ruff_db::system::FileType) -> FileType {
-        match ft {
-            ruff_db::system::FileType::File => FileType::File,
-            ruff_db::system::FileType::Directory => FileType::Directory,
-            ruff_db::system::FileType::Symlink => FileType::Symlink,
-        }
-    }
-}
-
-/// Returns true if and only if the given file extension corresponds
-/// to a Python source or stub file.
-fn is_python_extension(ext: &str) -> bool {
-    matches!(ext, "py" | "pyi")
+) -> CachedModuleListing<'db> {
+    let context = ResolverContext::new(db, resolver_environment, ModuleResolveMode::Typing);
+    resolve::list_modules(&context, &ListingTarget::Root).into()
 }
 
 #[cfg(test)]
@@ -429,12 +59,16 @@ mod tests {
 
     use crate::db::{Db, tests::TestDb};
     use crate::module::Module;
+    use crate::module_name::ModuleName;
     use crate::resolve::{
         ModuleResolveMode, ModuleResolveModeIngredient, dynamic_resolution_paths,
     };
     use crate::settings::SearchPathSettings;
     use crate::strategy::FallibleStrategy;
-    use crate::testing::{FileSpec, MockedTypeshed, TestCase, TestCaseBuilder};
+    use crate::testing::{
+        FileSpec, MockedTypeshed, TestCase, TestCaseBuilder, enumeration_db,
+        unresolved_stub_override_db, write_empty_file,
+    };
 
     fn list_modules(db: &TestDb) -> &[Module<'_>] {
         super::list_modules(db, db.resolver_environment())
@@ -555,51 +189,6 @@ mod tests {
         // "resolve this module") should prefer the stub file, although the
         // typing spec isn't perfectly clear on this point:
         // https://typing.python.org/en/latest/spec/distributing.html#stub-files
-        insta::assert_debug_snapshot!(
-            list_snapshot(&db),
-            @r#"
-        [
-            Module::File("foo", "first-party", "/src/foo/__init__.py", Package, None),
-        ]
-        "#,
-        );
-    }
-
-    /// Tests that if we have a `foo.py` and a `foo/__init__.py`, then the
-    /// latter takes precedence.
-    ///
-    /// This is somewhat difficult to test using the in-memory file system,
-    /// since it always returns directory entries in lexicographic order. This
-    /// in turn implies that `foo` will always appear before `foo.py`. But to
-    /// truly test this, we would like to also be correct in the case where
-    /// `foo.py` appears before `foo` (which can certainly happen in the real
-    /// world).
-    #[test]
-    fn package_over_module1() {
-        let TestCase { db, .. } = TestCaseBuilder::new()
-            .with_src_files(&[("foo.py", ""), ("foo/__init__.py", "")])
-            .build();
-
-        insta::assert_debug_snapshot!(
-            list_snapshot(&db),
-            @r#"
-        [
-            Module::File("foo", "first-party", "/src/foo/__init__.py", Package, None),
-        ]
-        "#,
-        );
-    }
-
-    /// Similar to `package_over_module1`, but flips the order of files.
-    ///
-    /// (At time of writing, 2025-08-07, this doesn't actually make a
-    /// difference since the in-memory file system sorts directory entries.)
-    #[test]
-    fn package_over_module2() {
-        let TestCase { db, .. } = TestCaseBuilder::new()
-            .with_src_files(&[("foo/__init__.py", ""), ("foo.py", "")])
-            .build();
-
         insta::assert_debug_snapshot!(
             list_snapshot(&db),
             @r#"
@@ -938,22 +527,6 @@ mod tests {
     }
 
     #[test]
-    fn typing_stub_over_module() {
-        const SRC: &[FileSpec] = &[("foo.py", "print('Hello, world!')"), ("foo.pyi", "x: int")];
-
-        let TestCase { db, .. } = TestCaseBuilder::new().with_src_files(SRC).build();
-
-        insta::assert_debug_snapshot!(
-            list_snapshot(&db),
-            @r#"
-        [
-            Module::File("foo", "first-party", "/src/foo.pyi", Module, None),
-        ]
-        "#,
-        );
-    }
-
-    #[test]
     fn sub_packages() {
         const SRC: &[FileSpec] = &[
             ("foo/__init__.py", ""),
@@ -1090,25 +663,21 @@ mod tests {
     }
 
     #[test]
-    fn deeply_nested_file_does_not_invalidate_top_level_listing() -> anyhow::Result<()> {
+    fn deeply_nested_file_does_not_invalidate_top_level_listing() {
         let TestCase { mut db, src, .. } = TestCaseBuilder::new()
             .with_src_files(&[("package/__init__.py", ""), ("package/sub/__init__.py", "")])
             .build();
 
         list_modules(&db);
         db.clear_salsa_events();
-
-        db.write_file(src.join("package/sub/nested.py"), "")?;
+        write_empty_file(&mut db, src.join("package/sub/nested.py"));
         list_modules(&db);
-
         let events = db.take_salsa_events();
-        assert_function_query_was_not_run_by_name(&db, "list_modules_in", None, &events);
-
-        Ok(())
+        assert_function_query_was_not_run_by_name(&db, "list_modules_impl", None, &events);
     }
 
     #[test]
-    fn sibling_file_does_not_invalidate_package_submodules() -> anyhow::Result<()> {
+    fn sibling_file_does_not_invalidate_package_submodules() {
         let TestCase { mut db, src, .. } = TestCaseBuilder::new()
             .with_src_files(&[("package/__init__.py", "")])
             .build();
@@ -1124,23 +693,44 @@ mod tests {
         };
         db.clear_salsa_events();
 
-        db.write_file(src.join("sibling.py"), "")?;
+        write_empty_file(&mut db, src.join("sibling.py"));
         let package = list_modules(&db)
             .iter()
             .find(|module| module.name(&db).as_str() == "package")
             .copied()
             .expect("package to exist");
         package.all_submodules(&db);
-
         let events = db.take_salsa_events();
         assert_function_query_was_not_run_by_name(
             &db,
-            "all_submodule_names_for_package",
+            "submodule_listing",
             Some(package_id),
             &events,
         );
+    }
 
-        Ok(())
+    #[test]
+    fn adding_sibling_file_does_not_invalidate_namespace_submodules() {
+        let mut db = enumeration_db(&["/src/acme/left.py", "/site-packages/acme/right.py"], &[]);
+        let name = ModuleName::new_static("acme").expect("valid package name");
+        let package_id = {
+            let package = crate::resolve_module_confident(&db, db.resolver_environment(), &name)
+                .expect("namespace resolves");
+            assert_eq!(package.all_submodules(&db).len(), 2);
+            package.as_id()
+        };
+        db.clear_salsa_events();
+        write_empty_file(&mut db, "/src/sibling.py");
+        let package = crate::resolve_module_confident(&db, db.resolver_environment(), &name)
+            .expect("namespace still resolves");
+        assert_eq!(package.all_submodules(&db).len(), 2);
+        let events = db.take_salsa_events();
+        assert_function_query_was_not_run_by_name(
+            &db,
+            "submodule_listing",
+            Some(package_id),
+            &events,
+        );
     }
 
     #[test]
@@ -1891,6 +1481,140 @@ not_a_directory
         );
     }
 
+    #[test]
+    fn enumeration_tracks_unresolved_stub_override_prefix_changes() {
+        let mut db = unresolved_stub_override_db();
+        let package = crate::resolve_module_confident(
+            &db,
+            db.resolver_environment(),
+            &ModuleName::new_static("acme").expect("valid package name"),
+        )
+        .expect("installed stub package resolves");
+        // The unresolved `acme.nested` prefix is not a public child, but enumeration still
+        // reaches the local stub beneath it.
+        assert!(package.all_submodules(&db).is_empty());
+        assert_eq!(enumerated_names(&db), ["acme", "acme.nested.deep.tools"]);
+
+        // A newly supplied initializer turns a traversal-only prefix into a resolved module.
+        write_empty_file(&mut db, "/extra/acme/nested/__init__.pyi");
+        assert_eq!(
+            enumerated_names(&db),
+            ["acme", "acme.nested", "acme.nested.deep.tools"]
+        );
+
+        remove_file(&mut db, "/extra/acme/nested/__init__.pyi");
+        assert_eq!(enumerated_names(&db), ["acme", "acme.nested.deep.tools"]);
+
+        remove_file(&mut db, "/extra/acme/nested/deep/tools.pyi");
+        assert_eq!(enumerated_names(&db), ["acme"]);
+    }
+
+    #[test]
+    fn enumeration_tracks_file_and_initializer_changes() {
+        let mut db = enumeration_db(&["/src/acme/left.py", "/site-packages/acme/right.py"], &[]);
+        assert_eq!(enumerated_names(&db), ["acme", "acme.left", "acme.right"]);
+
+        write_empty_file(&mut db, "/src/acme/nested/new.py");
+        assert_eq!(
+            enumerated_names(&db),
+            [
+                "acme",
+                "acme.left",
+                "acme.nested",
+                "acme.nested.new",
+                "acme.right"
+            ]
+        );
+
+        remove_file(&mut db, "/src/acme/nested/new.py");
+        assert_eq!(
+            enumerated_names(&db),
+            ["acme", "acme.left", "acme.nested", "acme.right"]
+        );
+
+        write_empty_file(&mut db, "/src/acme/__init__.py");
+        assert_eq!(enumerated_names(&db), ["acme", "acme.left", "acme.nested"]);
+
+        db.write_file(
+            "/src/acme/__init__.py",
+            "__path__ = __import__(\"pkgutil\").extend_path(__path__, __name__)",
+        )
+        .expect("turn initializer into a legacy namespace declaration");
+        assert_eq!(
+            enumerated_names(&db),
+            ["acme", "acme.left", "acme.nested", "acme.right"]
+        );
+    }
+
+    #[test]
+    fn enumeration_tracks_typing_marker_changes() {
+        let marker = "/site-packages/acme-stubs/py.typed";
+        let mut db = enumeration_db(
+            &[
+                "/site-packages/acme-stubs/__init__.pyi",
+                marker,
+                "/src/acme/__init__.py",
+                "/src/acme/runtime.py",
+            ],
+            &[],
+        );
+        assert_eq!(enumerated_names(&db), ["acme"]);
+
+        db.write_file(marker, "partial\n")
+            .expect("make marker partial");
+        assert_eq!(enumerated_names(&db), ["acme", "acme.runtime"]);
+
+        remove_file(&mut db, marker);
+        assert_eq!(enumerated_names(&db), ["acme"]);
+
+        db.write_file(marker, "partial\n")
+            .expect("recreate partial marker");
+        assert_eq!(enumerated_names(&db), ["acme", "acme.runtime"]);
+    }
+
+    #[test]
+    fn enumeration_includes_stub_override_descendants_of_source_modules() {
+        let db = enumeration_db(&["/src/leaf.py", "/extra/leaf/child.pyi"], &["/extra"]);
+        assert_eq!(enumerated_names(&db), ["leaf", "leaf.child"]);
+    }
+
+    #[test]
+    fn enumeration_tracks_new_stub_override_descendants_of_file_children() {
+        let mut db = enumeration_db(
+            &[
+                "/src/acme/__init__.py",
+                "/src/acme/leaf.py",
+                "/extra/other.py",
+            ],
+            &["/extra"],
+        );
+        assert_eq!(enumerated_names(&db), ["acme", "acme.leaf", "other"]);
+
+        // A file child with no descendants gains one through a new stub override.
+        write_empty_file(&mut db, "/extra/acme/leaf/child.pyi");
+        assert_eq!(
+            enumerated_names(&db),
+            ["acme", "acme.leaf", "acme.leaf.child", "other"]
+        );
+
+        remove_file(&mut db, "/extra/acme/leaf/child.pyi");
+        assert_eq!(enumerated_names(&db), ["acme", "acme.leaf", "other"]);
+    }
+
+    #[test]
+    fn enumerates_local_descendants_of_protected_standard_library_modules() {
+        let TestCase { db, .. } = TestCaseBuilder::new()
+            .with_vendored_typeshed()
+            .with_src_files(&[("types/__init__.py", ""), ("types/child.py", "")])
+            .build();
+        // `types` resolves to a standard-library file, but descendants can resolve locally.
+        assert!(
+            enumerated_names(&db)
+                .iter()
+                .any(|name| name == "types.child")
+        );
+    }
+
     /// This is a regression test for mishandling of file root matching.
     ///
     /// In particular, in some cases, `/` is added as a search root. This
@@ -1925,5 +1649,19 @@ not_a_directory
         ]
         "#,
         );
+    }
+
+    fn enumerated_names(db: &TestDb) -> Vec<String> {
+        super::all_modules(db, db.resolver_environment())
+            .into_iter()
+            .map(|module| module.name(db).to_string())
+            .collect()
+    }
+
+    fn remove_file(db: &mut TestDb, path: &str) {
+        db.memory_file_system()
+            .remove_file(path)
+            .expect("remove fixture file");
+        File::sync_path(db, SystemPath::new(path));
     }
 }
