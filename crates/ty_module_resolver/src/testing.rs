@@ -318,3 +318,126 @@ impl TestCaseBuilder<VendoredTypeshed> {
         }
     }
 }
+
+/// Creates a module-enumeration fixture with configurable extra search paths.
+pub(crate) fn enumeration_db(paths: &[&str], extra_paths: &[&str]) -> TestDb {
+    let TestCase { mut db, .. } = TestCaseBuilder::new().build();
+    db.write_files(paths.iter().map(|path| {
+        (
+            *path, r#"
+"#,
+        )
+    }))
+    .expect("create enumeration fixtures");
+    let settings = SearchPathSettings {
+        src_roots: vec![SystemPathBuf::from("/src")],
+        site_packages_paths: vec![SystemPathBuf::from("/site-packages")],
+        custom_typeshed: Some(SystemPathBuf::from("/typeshed")),
+        extra_paths: extra_paths
+            .iter()
+            .copied()
+            .map(SystemPathBuf::from)
+            .collect(),
+        ..SearchPathSettings::empty()
+    };
+    db.set_search_paths(
+        settings
+            .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
+            .expect("configure enumeration search paths"),
+    );
+    db
+}
+
+/// Creates a local stub override whose intermediate parents are hidden by installed stubs.
+pub(crate) fn unresolved_overlay_db() -> TestDb {
+    enumeration_db(
+        &[
+            "/site-packages/acme-stubs/__init__.pyi",
+            "/site-packages/acme-stubs/py.typed",
+            "/site-packages/acme/__init__.py",
+            "/site-packages/acme/nested/__init__.py",
+            "/site-packages/acme/nested/deep/__init__.py",
+            "/site-packages/acme/nested/deep/tools.py",
+            "/extra/acme/nested/deep/tools.pyi",
+            "/extra/acme/nested/source_only.py",
+        ],
+        &["/extra"],
+    )
+}
+
+#[cfg(target_family = "unix")]
+#[expect(
+    clippy::disallowed_methods,
+    reason = "Test fixture needs real filesystem symlinks"
+)]
+/// Creates an enumeration fixture with top-level and nested symlinks and shadowed alternatives.
+pub(crate) fn symlink_enumeration_db() -> (tempfile::TempDir, TestDb, SystemPathBuf) {
+    let temp = tempfile::TempDir::new().expect("create enumeration workspace");
+    let canonical = temp
+        .path()
+        .canonicalize()
+        .expect("canonical workspace path");
+    let root = SystemPathBuf::from_path_buf(canonical).expect("UTF-8 workspace path");
+    for path in ["src", "site-packages", "typeshed/stdlib"] {
+        std::fs::create_dir_all(root.join(path).as_std_path()).expect("create search root");
+    }
+    std::fs::write(
+        root.join("typeshed/stdlib/VERSIONS").as_std_path(),
+        r#"
+"#,
+    )
+    .expect("write empty typeshed versions");
+    let mut db = TestDb::new();
+    db.use_system(ruff_db::system::OsSystem::new(&root));
+    let settings = SearchPathSettings {
+        src_roots: vec![root.join("src")],
+        site_packages_paths: vec![root.join("site-packages")],
+        custom_typeshed: Some(root.join("typeshed")),
+        ..SearchPathSettings::empty()
+    };
+    db.set_search_paths(
+        settings
+            .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
+            .expect("configure real filesystem search paths"),
+    );
+    for path in [
+        "src/acme/own.py",
+        "site-packages/acme/hidden.py",
+        "site-packages/acme/ns/masked.py",
+        "site-packages/acme/ns/visible.py",
+        "site-packages/acme/blocked/visible.py",
+        "other_ns/masked.py",
+        "other_ns/source_only.py",
+        "regular/__init__.py",
+        "regular/child.py",
+        "regular/nested/__init__.py",
+        "regular/nested/child.py",
+        "target.py",
+    ] {
+        let path = root.join(path);
+        std::fs::create_dir_all(path.parent().expect("fixture parent").as_std_path())
+            .expect("create fixture directory");
+        std::fs::write(
+            path.as_std_path(),
+            r#"
+"#,
+        )
+        .expect("write symlink fixture");
+    }
+    for (source, link) in [
+        ("target.py", "src/top_alias.py"),
+        ("target.py", "src/acme/hidden.py"),
+        ("other_ns", "src/acme/ns"),
+        ("regular", "src/acme/blocked"),
+        ("src/acme", "src/alias"),
+        ("target.py", "regular/linked.py"),
+        ("other_ns", "regular/linked_dir"),
+    ] {
+        std::os::unix::fs::symlink(
+            root.join(source).as_std_path(),
+            root.join(link).as_std_path(),
+        )
+        .expect("create fixture symlink");
+    }
+    (temp, db, root)
+}
