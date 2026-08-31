@@ -466,7 +466,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
                 _ => {}
             }
-            if !decorator_function_decorator.is_empty() {
+            if !decorator_function_decorator.is_empty()
+                && !decorator_function_decorator
+                    .intersects(FunctionDecorators::CLASSMETHOD | FunctionDecorators::STATICMETHOD)
+            {
                 continue;
             }
 
@@ -539,10 +542,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         );
         let function_literal = FunctionLiteral::new(db, overload_literal);
         let function_type = FunctionType::new(db, function_literal, None);
-        let is_decorated_overload_implementation = !decorator_types_and_nodes.is_empty()
-            && function_literal.has_separate_implementation(db);
-        let is_decorated_overload =
-            !decorator_types_and_nodes.is_empty() && overload_literal.is_overload(db);
+        let has_custom_decorators = decorator_types_and_nodes
+            .iter()
+            .any(|(ty, _)| FunctionDecorators::from_decorator_type(db, *ty).is_empty());
+        let is_decorated_overload_implementation =
+            has_custom_decorators && function_literal.has_separate_implementation(db);
+        let is_decorated_overload = has_custom_decorators && overload_literal.is_overload(db);
 
         let mut inferred_ty = Type::FunctionLiteral(
             if is_decorated_overload_implementation || is_decorated_overload {
@@ -583,6 +588,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         for (decorator_ty, decorator_node) in decorator_types_and_nodes.iter().rev() {
+            // Function types and overload signatures retain these decorators as binding metadata.
+            // If an inner decorator returned another object, construct the descriptor normally.
+            if FunctionDecorators::from_decorator_type(db, *decorator_ty)
+                .intersects(FunctionDecorators::CLASSMETHOD | FunctionDecorators::STATICMETHOD)
+                && (is_decorated_overload_implementation
+                    || is_decorated_overload
+                    || matches!(inferred_ty, Type::FunctionLiteral(_))
+                    || inferred_ty
+                        .as_callable()
+                        .is_some_and(|callable| callable.is_method_like(db)))
+            {
+                continue;
+            }
+
             if let Type::KnownInstance(KnownInstanceType::Deprecated(deprecated)) = decorator_ty {
                 match inferred_ty {
                     Type::FunctionLiteral(function) => {

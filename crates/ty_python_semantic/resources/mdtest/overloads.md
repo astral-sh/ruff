@@ -140,6 +140,31 @@ reveal_type(foo3.takes_self_or_int(foo3))  # revealed: Foo3
 reveal_type(foo3.takes_self_or_int(1))  # revealed: int
 ```
 
+## Cached classmethod implementations
+
+Caching an overloaded classmethod's implementation preserves its method binding. The implementation
+remains callable for overload validation, and callers retain the overload-specific return types.
+
+```py
+from functools import lru_cache
+from typing import overload
+
+class Cached:
+    @overload
+    @classmethod
+    def identity(cls, value: int) -> int: ...
+    @overload
+    @classmethod
+    def identity(cls, value: str) -> str: ...
+    @classmethod
+    @lru_cache
+    def identity(cls, value: int | str) -> int | str:
+        return value
+
+reveal_type(Cached.identity(1))  # revealed: int
+reveal_type(Cached.identity("value"))  # revealed: str
+```
+
 ## Explicit receiver annotations
 
 Binding a method filters overloads that explicitly annotate `self` with a type that cannot accept

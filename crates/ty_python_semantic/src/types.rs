@@ -5266,6 +5266,14 @@ impl<'db> Type<'db> {
             _ => std::slice::from_ref(&ty),
         };
         alternatives.iter().any(|ty| {
+            // Synthesized methods bind through `try_call_dunder_get` without necessarily
+            // exposing a `__get__` member on their meta-type.
+            if let Type::Callable(callable) = ty
+                && callable.is_method_like(db)
+            {
+                return false;
+            }
+
             // Descriptors define their own class-access behavior, but do not exempt other
             // alternatives in a union from the restriction on generic instance storage.
             ty.class_member(db, env, "__get__").is_undefined()
