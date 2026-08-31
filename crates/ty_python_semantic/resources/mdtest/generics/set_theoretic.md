@@ -650,6 +650,27 @@ def alias(value: Co[Dynamic] & Top[Child[Any]]) -> str:
     return value.get()
 ```
 
+### Nested specializations of nonrecursive protocols
+
+A protocol can appear inside its own type argument without a recursive declaration. These finite
+nested specializations still allow intersection simplification:
+
+```pyi
+from typing import Protocol, reveal_type
+
+class Value[T](Protocol):
+    @property
+    def value(self) -> T: ...
+
+class Co[T]:
+    def get(self) -> T: ...
+
+class Child[T](Co[T]): ...
+
+def _(value: Co[Value[Value[int]]] & Child[object]):
+    reveal_type(value)  # revealed: Child[Value[Value[int]]]
+```
+
 ### Specializations with recursive types
 
 Fully static recursive types still allow simplification. Evaluating protocol attributes and
@@ -681,6 +702,18 @@ def _(
     reveal_type(record)  # revealed: Child[RecursiveRecord]
 ```
 
+A generic protocol method that returns the same specialization also permits simplification. Its
+recursive return type does not introduce new type arguments:
+
+```pyi
+class RecursiveMethods[T](Protocol):
+    def value(self) -> T: ...
+    def next(self) -> RecursiveMethods[T]: ...
+
+def _(value: Co[RecursiveMethods[int]] & Child[object]):
+    reveal_type(value)  # revealed: Child[RecursiveMethods[int]]
+```
+
 Recursive generic specializations can grow on each step, so we conservatively leave these
 intersections unsimplified. Checking only for repeated specializations does not prevent infinite
 expansion:
@@ -697,4 +730,64 @@ def _(
 ):
     reveal_type(alias)  # revealed: Co[GrowingAlias[int]] & Child[object]
     reveal_type(record)  # revealed: Co[GrowingRecord[int]] & Child[object]
+```
+
+### Inherited properties with recursive protocol bounds
+
+Reading an inherited generic property preserves its type parameter, even when the parameter's bound
+contains a method with an expanding recursive return type:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Protocol, reveal_type
+
+class Recursive[T](Protocol):
+    def grow(self) -> Recursive[tuple[int, T]]: ...
+
+class Base[T]:
+    @property
+    def value(self) -> T:
+        raise NotImplementedError
+
+class Child[T: Recursive[int]](Base[T]):
+    def read(self) -> T:
+        reveal_type(self.value)  # revealed: T@Child
+        return self.value
+```
+
+### Recursive protocols with gradual members
+
+An `Any` member does not remove an expanding recursive method from a protocol. Intersections with
+these protocols remain unsimplified regardless of member order:
+
+```pyi
+from typing import Any, Protocol, reveal_type
+
+class AnyFirst[T](Protocol):
+    a_marker: Any
+
+    def grow(self) -> AnyFirst[tuple[int, T]]: ...
+
+class AnyLast[T](Protocol):
+    def grow(self) -> AnyLast[tuple[int, T]]: ...
+
+    z_marker: Any
+
+class Co[T]:
+    def get(self) -> T: ...
+
+class Child[T](Co[T]): ...
+
+def _(
+    first: Co[AnyFirst[int]] & Child[object],
+    last: Co[AnyLast[int]] & Child[object],
+):
+    reveal_type(first)  # revealed: Co[AnyFirst[int]] & Child[object]
+    reveal_type(last)  # revealed: Co[AnyLast[int]] & Child[object]
 ```
