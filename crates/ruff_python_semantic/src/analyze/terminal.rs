@@ -372,7 +372,8 @@ fn sometimes_breaks(stmts: &[Stmt], semantic: &SemanticModel) -> bool {
     false
 }
 
-/// Returns `true` if the body may break via a `break` statement.
+/// Returns `true` if the body always breaks via a `break` statement, i.e., if it reaches a
+/// top-level `break` before any `return` or `raise`.
 fn always_breaks(stmts: &[Stmt]) -> bool {
     for stmt in stmts {
         match stmt {
