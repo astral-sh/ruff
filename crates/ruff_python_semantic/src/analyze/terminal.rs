@@ -1,6 +1,7 @@
 use ruff_python_ast::helpers::map_callable;
 use ruff_python_ast::{self as ast, ExceptHandler, Stmt};
 
+use crate::analyze::context_manager::may_suppress_exceptions;
 use crate::model::SemanticModel;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -149,8 +150,26 @@ impl Terminal {
                         );
                     }
                 }
-                Stmt::With(ast::StmtWith { body, .. }) => {
-                    terminal = terminal.and_then(Self::from_body(body, semantic));
+                Stmt::With(with_stmt) => {
+                    let body_terminal = Self::from_body(&with_stmt.body, semantic);
+
+                    if may_suppress_exceptions(with_stmt, semantic) {
+                        // The context manager can swallow an exception raised anywhere in the
+                        // body, in which case execution resumes after the `with` statement. So,
+                        // as for a `try` block, the body tells us nothing about how the function
+                        // ends, beyond the fact that it can return:
+                        // ```python
+                        // def func():
+                        //     with pytest.raises(ValueError):
+                        //         raise ValueError("boom")
+                        //     # We get here, so the function doesn't always raise.
+                        // ```
+                        if body_terminal.has_any_return() {
+                            terminal = terminal.and_then(Terminal::ConditionalReturn);
+                        }
+                    } else {
+                        terminal = terminal.and_then(body_terminal);
+                    }
                 }
                 Stmt::Return(_) => {
                     terminal = terminal.and_then(Terminal::RaiseOrReturn);
