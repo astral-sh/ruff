@@ -262,8 +262,9 @@ pub(crate) fn may_exist_at_runtime<'db>(db: &'db dyn Db, definition: Definition<
         return false;
     }
 
-    // A bare annotation can describe a value initialized elsewhere, but inference only records
-    // its declared type. Treat it as a possible runtime value without requesting a binding type.
+    // A declaration (without binding) can describe a value initialized elsewhere, but inference
+    // only records its declared type. Treat it as a possible runtime value without requesting a
+    // binding type.
     let is_stub = file.file(db).is_stub(db);
     if !definition.kind(db).category(is_stub, &module).is_binding() {
         return true;
