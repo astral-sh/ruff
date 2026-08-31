@@ -2175,8 +2175,16 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                     // `list[int]` when `T = int`, but cannot equal `int` for any `T`. Disjointness
                     // requires that no valid specialization satisfies the overlap constraints,
                     // including the type variables' declared bounds and constraints.
+                    // These variables stand for specializations we have yet to choose. Keep
+                    // their declared domains intact: materializing `T: Any` to `T: Never`
+                    // would incorrectly rule out the valid choice `T = str`.
+                    let materialization_visitor = ApplyTypeMappingVisitor {
+                        materialize_typevar_bounds_and_defaults: false,
+                        ..ApplyTypeMappingVisitor::new(self.env)
+                    };
                     let mut checker = self.as_relation_checker(TypeRelation::Subtyping);
                     checker.typevar_evaluation = TypeVarEvaluation::Lazy;
+                    checker.materialization_visitor = &materialization_visitor;
                     let overlap = checker.check_subtyping_in_invariant_position(
                         db,
                         left_type,
@@ -3794,9 +3802,19 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         let actual = actual
             .discard_disjoint_union_elements(db, self.env, formal, self.inferable)
             .unless_all_disjoint(actual);
-        let formal = formal
-            .discard_disjoint_union_elements(db, self.env, actual, self.inferable)
-            .unless_all_disjoint(formal);
+        // Retain formal members containing inferable variables even when their bounds make
+        // them disjoint. For `list[T] | Other` with `T: str`, dropping `list[T]` before
+        // comparing it with `list[object]` would skip the bound check. `Other` may overlap
+        // through a common subclass without accepting the argument itself.
+        let disjoint_constraints = ConstraintSetBuilder::new();
+        let formal = formal.filter_union(db, self.env, |element| {
+            any_over_type_expanding_aliases(db, self.env, *element, |ty| {
+                ty.as_typevar()
+                    .is_some_and(|typevar| typevar.is_inferable(db, self.inferable))
+            }) || !element
+                .when_disjoint_from(db, self.env, actual, &disjoint_constraints, self.inferable)
+                .is_always_satisfied(db, self.env)
+        });
 
         // ParamSpecs and TypeVarTuples still use the forward-only legacy mapping table. Keep
         // their entire inference context on the existing signature path, and use forward

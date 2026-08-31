@@ -1243,6 +1243,36 @@ def constrained[T: (str, bytes)]():
     static_assert(not is_disjoint_from(list[list[T]], list[list[bytes]]))
 ```
 
+### Gradual bounds in invariant arguments
+
+A gradual upper bound admits fully static specializations. Invariant types overlap when their
+arguments can be equal for one of those specializations, including inside another invariant type.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any
+from ty_extensions import static_assert
+from ty_extensions._internal import is_disjoint_from
+
+def any_bound[T: Any]():
+    static_assert(not is_disjoint_from(list[T], list[str]))
+    static_assert(not is_disjoint_from(list[str], list[T]))
+    static_assert(not is_disjoint_from(list[list[T]], list[list[str]]))
+    static_assert(not is_disjoint_from(list[list[str]], list[list[T]]))
+    static_assert(is_disjoint_from(list[T], int))
+    static_assert(is_disjoint_from(int, list[T]))
+
+def bounded[T: list[Any]]():
+    static_assert(not is_disjoint_from(list[T], list[list[str]]))
+    static_assert(not is_disjoint_from(list[list[str]], list[T]))
+    static_assert(is_disjoint_from(list[T], list[str]))
+    static_assert(is_disjoint_from(list[str], list[T]))
+```
+
 ### NewTypes and overlapping types
 
 A `NewType` overlaps with any nominal or structural type that overlaps its concrete base. This
