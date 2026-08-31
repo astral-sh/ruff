@@ -1083,7 +1083,7 @@ fn infer_membership_test_comparison<'db>(
         TypeContext::default(),
     ) {
         // If `__contains__` is available, it is used directly for the membership test.
-        Ok(bindings) => Some(bindings.return_type(db, env)),
+        Ok(bindings) => Some(bindings.return_type()),
         // If `__contains__` is not available or possibly unbound,
         // fall back to iteration-based membership test.
         Err(CallDunderError::MethodNotAvailable | CallDunderError::PossiblyUnbound { .. }) => right

@@ -2015,7 +2015,7 @@ fn known_literal_equality<'db>(
                 | MemberLookupPolicy::MRO_NO_INT_OR_STR_LOOKUP,
         )
         && let Some(result) = bindings
-            .return_type(db, env)
+            .return_type()
             .as_literal_value()
             .and_then(LiteralValueType::as_bool)
     {

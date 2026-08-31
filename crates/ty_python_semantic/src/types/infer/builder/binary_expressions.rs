@@ -200,7 +200,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 TypeContext::default(),
             )
             .ok()
-            .map(|bindings| bindings.return_type(db, env))
+            .map(|bindings| bindings.return_type())
     }
 
     /// Handle `TypedDict |= value` before the normal `__ior__` path runs.
@@ -968,7 +968,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
             )
             .ok()
-            .map(|binding| binding.return_type(db, env)),
+            .map(|binding| binding.return_type()),
 
             // We've handled all of the special cases that we support for literals, so we need to
             // fall back on looking for dunder methods on one of the operand types.

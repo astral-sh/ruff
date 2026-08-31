@@ -1433,6 +1433,7 @@ pub fn definitions_for_bin_op<'db>(
         return None;
     };
 
+    let bindings = bindings.binding_metadata();
     let callable_type = promote_for_self(db, env, bindings.callable_type());
 
     let definitions: Vec<_> = bindings
@@ -1471,7 +1472,7 @@ pub fn definitions_for_unary_op<'db>(
         CallArguments::none(),
         TypeContext::default(),
     ) {
-        Ok(bindings) => bindings,
+        Ok(bindings) => bindings.into_binding_metadata(),
         Err(CallDunderError::MethodNotAvailable) if unary_op.op == ast::UnaryOp::Not => {
             // The runtime falls back to `__len__` for `not` if `__bool__` is not defined.
             match operand_ty.try_call_dunder(
@@ -1481,7 +1482,7 @@ pub fn definitions_for_unary_op<'db>(
                 CallArguments::none(),
                 TypeContext::default(),
             ) {
-                Ok(bindings) => bindings,
+                Ok(bindings) => bindings.into_binding_metadata(),
                 Err(CallDunderError::MethodNotAvailable) => return None,
                 Err(
                     CallDunderError::PossiblyUnbound { bindings, .. }

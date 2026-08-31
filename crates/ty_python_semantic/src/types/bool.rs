@@ -100,7 +100,7 @@ impl<'db> Type<'db> {
                 TypeContext::default(),
             ) {
                 Ok(outcome) => {
-                    let return_type = outcome.return_type(db, env);
+                    let return_type = outcome.return_type();
                     if !return_type.is_assignable_to(db, env, KnownClass::Bool.to_instance(db, env))
                     {
                         // The type has a `__bool__` method, but it doesn't return a
@@ -157,7 +157,7 @@ impl<'db> Type<'db> {
                         TypeContext::default(),
                     ) {
                         Ok(outcome) => {
-                            let return_type = outcome.return_type(db, env);
+                            let return_type = outcome.return_type();
                             if return_type.is_assignable_to(
                                 db,
                                 env,

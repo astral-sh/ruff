@@ -611,6 +611,78 @@ def _(context_expr: Manager1 | Manager2):
         reveal_type(f)  # revealed: str | int
 ```
 
+## Intersection context managers with conditional methods
+
+A context manager can define `__enter__` differently depending on a runtime condition. Excluding an
+unrelated class from its type preserves both possible return types.
+
+```py
+def enabled() -> bool:
+    return True
+
+class Manager:
+    if enabled():
+        def __enter__(self) -> str:
+            return "entered"
+
+    else:
+        def __enter__(self) -> int:
+            return 42
+
+    def __exit__(self, exc_type, exc_value, traceback) -> None: ...
+
+class Excluded: ...
+
+def negative(context_expr: Manager):
+    if not isinstance(context_expr, Excluded):
+        with context_expr as target:
+            reveal_type(target)  # revealed: str | int
+```
+
+Narrowing the same context manager to a class whose `__enter__` returns `int` constrains the result
+to `int`. We intersect that return type with the union of the conditional method's return types.
+
+```py
+class IntManager:
+    def __enter__(self) -> int:
+        return 0
+
+def positive(context_expr: Manager):
+    if isinstance(context_expr, IntManager):
+        with context_expr as target:
+            reveal_type(target)  # revealed: int
+```
+
+## Intersection context managers with multiple union return types
+
+Intersecting independent union return types can require many combinations. When that expansion
+exceeds the complexity limit, we conservatively use the union of the component return types.
+
+```py
+class A: ...
+class B: ...
+class C: ...
+class D: ...
+class E: ...
+
+class FirstManager:
+    def __enter__(self) -> A | B | C:
+        return A()
+
+    def __exit__(self, exc_type, exc_value, traceback) -> None: ...
+
+class SecondManager:
+    def __enter__(self) -> D | E:
+        return D()
+
+    def __exit__(self, exc_type, exc_value, traceback) -> None: ...
+
+def combine(context_expr: FirstManager):
+    if isinstance(context_expr, SecondManager):
+        with context_expr as target:
+            reveal_type(target)  # revealed: A | B | C | D | E
+```
+
 ## Type aliases preserve context manager behavior
 
 ```toml

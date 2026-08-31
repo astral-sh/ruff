@@ -8,7 +8,7 @@ use crate::types::attribute_write::{
     FallbackAttributeWriteRequirement, InstanceAttributeWriteMember,
     ProtocolMemberWriteRequirement, attribute_write_requirement, property_setter_returns_never,
 };
-use crate::types::call::{Bindings, CallArguments, CallDiagnosticOverride, CallError};
+use crate::types::call::{CallArguments, CallDiagnosticOverride, CallDunderResult, CallError};
 use crate::types::class::FrozenDataclassDispatch;
 use crate::types::dedicated::pydantic;
 use crate::types::diagnostic::{
@@ -125,7 +125,10 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
         &mut self,
         object_ty: Type<'db>,
         emit_diagnostics: bool,
-    ) -> (Result<Bindings<'db>, CallDunderError<'db>>, Type<'db>) {
+    ) -> (
+        Result<CallDunderResult<'db>, CallDunderError<'db>>,
+        Type<'db>,
+    ) {
         let db = self.builder.db();
         let name_ty = Type::string_literal(db, self.attribute);
         let ast_arguments = [
@@ -155,7 +158,12 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
             TypeContext::default(),
         );
         let value_ty = self.infer_with_last_context(emit_diagnostics);
-        (setattr_result, value_ty)
+        (
+            setattr_result.map(|bindings| {
+                CallDunderResult::new(db, self.builder.program_environment(), bindings)
+            }),
+            value_ty,
+        )
     }
 
     fn evaluate(
@@ -406,7 +414,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
             frozen_dataclass_dispatch,
             Some(FrozenDataclassDispatch::FrozenField)
         ) || match &setattr_result {
-            Ok(bindings) => bindings.return_type(db, env).is_never(),
+            Ok(bindings) => bindings.return_type().is_never(),
             Err(error) => error.return_type(db, env).is_some_and(|ty| ty.is_never()),
         };
 
@@ -558,7 +566,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                 let (setattr_result, value_ty) =
                     self.infer_and_try_call_setattr(object_ty, emit_diagnostics);
                 let setattr_returns_never = match &setattr_result {
-                    Ok(bindings) => bindings.return_type(db, env).is_never(),
+                    Ok(bindings) => bindings.return_type().is_never(),
                     Err(error) => error.return_type(db, env).is_some_and(|ty| ty.is_never()),
                 };
                 if setattr_returns_never {

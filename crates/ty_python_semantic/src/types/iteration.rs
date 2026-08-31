@@ -1,9 +1,9 @@
 use crate::Db;
 use crate::ProgramEnvironment;
 use crate::types::{
-    AwaitError, Bindings, CallArguments, CallDunderError, KnownClass, LintDiagnosticGuard,
-    LintDiagnosticGuardBuilder, LiteralValueTypeKind, Type, TypeContext, TypeVarBoundOrConstraints,
-    UnionType,
+    AwaitError, Bindings, CallArguments, CallDunderError, CallDunderResult, KnownClass,
+    LintDiagnosticGuard, LintDiagnosticGuardBuilder, LiteralValueTypeKind, Type, TypeContext,
+    TypeVarBoundOrConstraints, UnionType,
     call::CallErrorKind,
     context::InferContext,
     diagnostic::NOT_ITERABLE,
@@ -297,7 +297,7 @@ impl<'db> Type<'db> {
                         TypeContext::default(),
                     )
                     .map(|dunder_anext_outcome| {
-                        dunder_anext_outcome.return_type(db, env).try_await(db, env)
+                        dunder_anext_outcome.return_type().try_await(db, env)
                     })
             };
 
@@ -309,7 +309,7 @@ impl<'db> Type<'db> {
                 TypeContext::default(),
             ) {
                 Ok(dunder_aiter_bindings) => {
-                    let iterator = dunder_aiter_bindings.return_type(db, env);
+                    let iterator = dunder_aiter_bindings.return_type();
                     match try_call_dunder_anext_on_iterator(iterator) {
                         Ok(Ok(result)) => Ok(Cow::Owned(TupleSpec::homogeneous(result))),
                         Ok(Err(AwaitError::InvalidReturnType(..))) => {
@@ -367,7 +367,7 @@ impl<'db> Type<'db> {
                 CallArguments::positional([KnownClass::Int.to_instance(db, env)]),
                 TypeContext::default(),
             )
-            .map(|dunder_getitem_outcome| dunder_getitem_outcome.return_type(db, env))
+            .map(|dunder_getitem_outcome| dunder_getitem_outcome.return_type())
         };
 
         let try_call_dunder_next_on_iterator = |iterator: Type<'db>| {
@@ -379,7 +379,7 @@ impl<'db> Type<'db> {
                     CallArguments::none(),
                     TypeContext::default(),
                 )
-                .map(|dunder_next_outcome| dunder_next_outcome.return_type(db, env))
+                .map(|dunder_next_outcome| dunder_next_outcome.return_type())
         };
 
         let dunder_iter_result = self
@@ -390,7 +390,7 @@ impl<'db> Type<'db> {
                 CallArguments::none(),
                 TypeContext::default(),
             )
-            .map(|dunder_iter_outcome| dunder_iter_outcome.return_type(db, env));
+            .map(|dunder_iter_outcome| dunder_iter_outcome.return_type());
 
         match dunder_iter_result {
             Ok(iterator) => {
@@ -535,9 +535,9 @@ impl<'db> IterationError<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Option<Type<'db>> {
-        let return_type = |result: Result<Bindings<'db>, CallDunderError<'db>>| {
+        let return_type = |result: Result<CallDunderResult<'db>, CallDunderError<'db>>| {
             result
-                .map(|outcome| Some(outcome.return_type(db, env)))
+                .map(|outcome| Some(outcome.return_type()))
                 .unwrap_or_else(|call_error| call_error.return_type(db, env))
         };
 

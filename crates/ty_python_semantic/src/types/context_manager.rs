@@ -3,7 +3,7 @@ use crate::ProgramEnvironment;
 use crate::{
     FxOrderSet, Program,
     types::{
-        Bindings, CallArguments, CallDunderError, KnownClass, MemberLookupPolicy, Type,
+        CallArguments, CallDunderError, CallDunderResult, KnownClass, MemberLookupPolicy, Type,
         TypeContext, call::CallErrorKind, context::InferContext,
         diagnostic::INVALID_CONTEXT_MANAGER,
     },
@@ -206,13 +206,16 @@ impl<'db> Type<'db> {
         );
 
         let awaited_enter_type = if mode.is_async() {
-            let return_type = |call: &Result<Bindings<'db>, CallDunderError<'db>>| match call {
-                Ok(bindings) => Some(bindings.return_type(db, env)),
-                Err(CallDunderError::PossiblyUnbound { bindings, .. }) => {
-                    Some(bindings.return_type(db, env))
-                }
-                Err(CallDunderError::MethodNotAvailable | CallDunderError::CallError(..)) => None,
-            };
+            let return_type =
+                |call: &Result<CallDunderResult<'db>, CallDunderError<'db>>| match call {
+                    Ok(bindings) => Some(bindings.return_type()),
+                    Err(CallDunderError::PossiblyUnbound { bindings, .. }) => {
+                        Some(bindings.return_type(db, env))
+                    }
+                    Err(CallDunderError::MethodNotAvailable | CallDunderError::CallError(..)) => {
+                        None
+                    }
+                };
 
             let enter_return_type = return_type(&enter);
             let exit_return_type = return_type(&exit);
@@ -242,7 +245,7 @@ impl<'db> Type<'db> {
         // TODO: Make use of Protocols when we support it (the manager be assignable to `contextlib.AbstractContextManager`).
         match (enter, exit) {
             (Ok(enter), Ok(_)) => {
-                let return_type = enter.return_type(db, env);
+                let return_type = enter.return_type();
                 Ok(if mode.is_async() {
                     awaited_enter_type.unwrap_or(Type::unknown())
                 } else {
@@ -250,7 +253,7 @@ impl<'db> Type<'db> {
                 })
             }
             (Ok(enter), Err(exit_error)) => {
-                let return_type = enter.return_type(db, env);
+                let return_type = enter.return_type();
                 Err(ContextManagerError::Exit {
                     enter_return_type: if mode.is_async() {
                         awaited_enter_type.unwrap_or(Type::unknown())

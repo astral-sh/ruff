@@ -1,5 +1,5 @@
 use super::context::InferContext;
-use super::{ClassType, Signature, Type, TypeContext, UnionType};
+use super::{ClassType, IntersectionType, Signature, Type, TypeContext, UnionType};
 use crate::Db;
 use crate::place::Provenance;
 use crate::types::call::bind::BindingError;
@@ -13,6 +13,84 @@ pub(super) use arguments::{Argument, CallArguments};
 pub(super) use bind::{
     Binding, Bindings, CallDiagnosticOverride, CallableBinding, MatchedArgument,
 };
+
+/// The result of a checked implicit dunder call.
+///
+/// Compose return types before combining binding metadata: `Bindings::from_intersection`
+/// flattens union alternatives within each component. For example, a conditional `__enter__`
+/// returning either `str` or `int` must keep `str | int` when its receiver is narrowed to an
+/// intersection, rather than intersecting those alternatives into `Never`.
+#[derive(Debug)]
+pub(crate) struct CallDunderResult<'db> {
+    return_type: Type<'db>,
+    bindings: Bindings<'db>,
+}
+
+impl<'db> CallDunderResult<'db> {
+    pub(super) fn new(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        bindings: Bindings<'db>,
+    ) -> Self {
+        Self {
+            return_type: bindings.return_type(db, env),
+            bindings,
+        }
+    }
+
+    pub(super) fn from_intersection(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        receiver: Type<'db>,
+        results: Vec<Self>,
+    ) -> Self {
+        let return_types = results.iter().map(Self::return_type);
+        let return_type = IntersectionType::bounded_from_elements(db, env, return_types.clone())
+            .unwrap_or_else(|| {
+                // Preserve all possible results if exact distribution exceeds the type budget.
+                UnionType::from_elements(db, env, return_types)
+            });
+        Self {
+            return_type,
+            bindings: Bindings::from_intersection(
+                receiver,
+                results.into_iter().map(Self::into_binding_metadata),
+            ),
+        }
+    }
+
+    fn from_union(db: &'db dyn Db, env: &ProgramEnvironment<'db>, results: [Self; 2]) -> Self {
+        let return_type = UnionType::from_elements(db, env, results.iter().map(Self::return_type));
+        let callable_type = UnionType::from_elements(
+            db,
+            env,
+            results.iter().map(|result| result.bindings.callable_type()),
+        );
+        Self {
+            return_type,
+            bindings: Bindings::from_union(
+                callable_type,
+                results.into_iter().map(Self::into_binding_metadata),
+            ),
+        }
+    }
+
+    pub(super) fn return_type(&self) -> Type<'db> {
+        self.return_type
+    }
+
+    /// The existing binding representation, for diagnostics and signature inspection only.
+    /// Use `Self::return_type` for the result of the call, since these bindings may have lost
+    /// union alternatives when combining intersection components.
+    pub(super) fn binding_metadata(&self) -> &Bindings<'db> {
+        &self.bindings
+    }
+
+    /// Consume the result when only diagnostics or signature information is needed.
+    pub(super) fn into_binding_metadata(self) -> Bindings<'db> {
+        self.bindings
+    }
+}
 
 /// Whether the right operand's reflected method has priority based on the possible runtime
 /// classes of both operands.
@@ -125,7 +203,7 @@ impl<'db> Type<'db> {
                     TypeContext::default(),
                     policy,
                 )
-                .map(|outcome| outcome.return_type(db, env))
+                .map(|outcome| outcome.return_type())
                 .ok()
         };
 
@@ -169,7 +247,7 @@ impl<'db> Type<'db> {
             let env = &ProgramEnvironment::from_program(program);
             Type::try_call_bin_op(db, env, left_ty, op, right_ty)
                 .ok()
-                .map(|bindings| bindings.return_type(db, env))
+                .map(|bindings| bindings.return_type())
         }
 
         try_call_bin_op_return_type_impl(db, env.program(db), left_ty, op, right_ty)
@@ -181,7 +259,7 @@ impl<'db> Type<'db> {
         left_ty: Type<'db>,
         op: ast::Operator,
         right_ty: Type<'db>,
-    ) -> Result<Bindings<'db>, CallBinOpError> {
+    ) -> Result<CallDunderResult<'db>, CallBinOpError> {
         Self::try_call_bin_op_with_policy(
             db,
             env,
@@ -199,7 +277,7 @@ impl<'db> Type<'db> {
         op: ast::Operator,
         right_ty: Type<'db>,
         policy: MemberLookupPolicy,
-    ) -> Result<Bindings<'db>, CallBinOpError> {
+    ) -> Result<CallDunderResult<'db>, CallBinOpError> {
         // We either want to call lhs.__op__ or rhs.__rop__. The full decision tree from
         // the Python spec [1] is:
         //
@@ -259,18 +337,11 @@ impl<'db> Type<'db> {
                 );
 
                 return match (call_on_right_instance, call_on_left_instance) {
-                    (Ok(right_bindings), Ok(left_bindings)) => {
-                        let callable_type = UnionType::from_two_elements(
-                            db,
-                            env,
-                            right_bindings.callable_type(),
-                            left_bindings.callable_type(),
-                        );
-                        Ok(Bindings::from_union(
-                            callable_type,
-                            [right_bindings, left_bindings],
-                        ))
-                    }
+                    (Ok(right_bindings), Ok(left_bindings)) => Ok(CallDunderResult::from_union(
+                        db,
+                        env,
+                        [right_bindings, left_bindings],
+                    )),
                     (Ok(bindings), Err(_)) | (Err(_), Ok(bindings)) => Ok(bindings),
                     (Err(_), Err(error)) => Err(error.into()),
                 };
