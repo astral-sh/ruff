@@ -841,8 +841,6 @@ pub(crate) fn check_static_class_definitions<'db>(
                 .ignore_possibly_undefined();
 
             if let Some(init_subclass) = init_subclass_type {
-                // Preserve the subclass's type variables to match the symbolic types in its bases.
-                // A bare class literal would apply defaults only to the receiver.
                 let call_args =
                     call_args.with_self(Some(Type::from(class.identity_specialization(db))));
                 if let Err(call_error) = init_subclass.try_call(db, env, &call_args) {

@@ -836,10 +836,11 @@ class InvalidType(Base[int], arg="x"): ...  # error: [invalid-argument-type]
 python-version = "3.13"
 ```
 
-##### Default type parameters
+##### Type parameter defaults
 
-Defaults do not specialize a subclass during class creation. The implicit `__init_subclass__` call
-accepts `Child[T]` as a subclass of `Base[T]`.
+When checking `cls` for an inherited `__init_subclass__` hook, the generic subclass retains its type
+parameters rather than replacing them with their defaults. `Child[T]` therefore satisfies the
+receiver bound `Base[T]`.
 
 ```py
 class Base[T]:
@@ -883,7 +884,7 @@ class Concrete(RestrictedBase[int]): ...
 class Invalid[T = int](RestrictedBase[T]): ...
 ```
 
-##### Legacy default type parameters
+##### Legacy type parameter defaults
 
 The same receiver relationship holds for subclasses using legacy type variables with defaults.
 
@@ -914,6 +915,12 @@ class Valid[T = int](Base[T], value=cast(T, 1)): ...
 
 # error: [invalid-argument-type] "Expected `T@Invalid`, found `Literal[1]`"
 class Invalid[T = int](Base[T], value=1): ...
+```
+
+An explicitly specialized base accepts the concrete argument.
+
+```py
+class AlsoValid(Base[int], value=1): ...
 ```
 
 ## `@staticmethod`
