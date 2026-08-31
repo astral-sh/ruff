@@ -867,9 +867,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: cargo-bins/cargo-binstall@e00d2c94cc0067b77737821097a62d91c0301baa # v1.21.1
-      - run: cargo binstall --no-confirm cargo-shear@1.12.4
-      - run: cargo shear --deny-warnings
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: "0.12.6"
+      - run: uv run --only-dev cargo shear --deny-warnings
 
   ty-completion-evaluation:
     name: "ty completion evaluation"

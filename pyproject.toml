@@ -57,6 +57,8 @@ exclude = [
 
 [dependency-groups]
 dev = [
+    "astral-dev-toolchain-cargo-shear>=1.13.4",
+    "astral-dev-toolchain-hyperfine>=1.20.0",
     "prek==0.4.12",
 ]
 release = [
@@ -122,6 +124,10 @@ build-constraint-dependencies = [
     "wheel==0.47.0",
 ]
 exclude-newer = "P7D"
+
+[tool.uv.exclude-newer-package]
+astral-dev-toolchain-hyperfine = "2026-08-27T00:00:00Z"
+astral-dev-toolchain-cargo-shear = "2026-08-27T00:00:00Z"
 
 [tool.uv.dependency-groups]
 dev = { requires-python = ">=3.12" }
