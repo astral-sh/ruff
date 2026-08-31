@@ -1547,7 +1547,7 @@ fn loop_header_reachability_impl<'db>(
             // Assignment validity can depend on this header, so avoid inferring it while
             // initializing a cycle.
             DefinitionState::Defined(def)
-                if is_cycle_initial || !is_discarded_dict_key_assignment(db, def) =>
+                if cycle_initial_cache.is_some() || !is_discarded_dict_key_assignment(db, def) =>
             {
                 debug_assert_ne!(
                     def, definition,
