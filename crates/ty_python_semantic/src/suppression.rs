@@ -145,6 +145,20 @@ pub(crate) fn check_suppressions(
 ) -> Vec<Diagnostic> {
     let mut context = CheckSuppressionsContext::new(db, file, diagnostics);
 
+    for diagnostic in db.unused_dependency_diagnostics(file.file(db)) {
+        let Some(range) = diagnostic.primary_span().and_then(|span| span.range()) else {
+            continue;
+        };
+        if let Some(suppression) = context
+            .suppressions
+            .find_suppression(range, LintId::of(&crate::dependency::UNUSED_DEPENDENCY))
+        {
+            context.diagnostics.borrow_mut().mark_used(suppression.id());
+        } else {
+            context.diagnostics.borrow_mut().push(diagnostic.clone());
+        }
+    }
+
     check_unknown_rule(&mut context);
     check_invalid_suppression(&mut context);
     check_blanket_suppressions(&mut context);
