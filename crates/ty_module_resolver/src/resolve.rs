@@ -34,6 +34,7 @@ specifies ty's implementation of Python's import resolution algorithm.
 
 use std::borrow::Cow;
 use std::cell::OnceCell;
+use std::collections::BTreeSet;
 use std::fmt;
 use std::iter::FusedIterator;
 use std::rc::Rc;
@@ -43,7 +44,7 @@ use rustc_hash::{FxBuildHasher, FxHashSet};
 use ruff_db::PythonFile;
 use ruff_db::files::{File, FilePath, FileRootKind, directory_listing, system_path_to_file};
 use ruff_db::source::source_text;
-use ruff_db::system::{System, SystemPath, SystemPathBuf};
+use ruff_db::system::{FileType, System, SystemPath, SystemPathBuf};
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_python_ast::{
     self as ast, PySourceType,
@@ -224,6 +225,10 @@ impl ModuleResolveMode {
     /// places due to being unable to resolve builtin symbols. This is similar
     /// behaviour to other type checkers such as mypy:
     /// <https://github.com/python/mypy/blob/3807423e9d98e678bf16b13ec8b4f909fe181908/mypy/build.py#L104-L117>
+    #[allow(
+        dead_code,
+        reason = "Keep this helper available to other resolver modules."
+    )]
     pub(super) fn is_non_shadowable(self, minor_version: u8, module_name: &str) -> bool {
         // Builtin modules are never shadowable, no matter what.
         if ruff_python_stdlib::sys::is_builtin_module(minor_version, module_name) {
@@ -1127,8 +1132,7 @@ pub(crate) fn dynamic_resolution_paths<'db>(
             // (Most importantly, don't register a root for editable installations from the project
             // directory as that would change the durability of files within those folders).
             // Not having an exact file root for editable installs just means that
-            // some queries (like `list_modules_in`) will run slightly more frequently
-            // than they would otherwise.
+            // some queries will run slightly more frequently than they would otherwise.
             if files.root(db, path).is_none() {
                 files.try_add_root(db, path, FileRootKind::SearchPath);
             }
@@ -1394,12 +1398,13 @@ impl ModuleResolutionCandidate {
 }
 
 /// Resolves module names against an environment's configured search paths.
-struct NameResolver<'db> {
+pub(crate) struct NameResolver<'db> {
     context: ResolverContext<'db>,
 }
 
 impl<'db> NameResolver<'db> {
-    fn new(
+    /// Creates a resolver for the given environment and resolution mode.
+    pub(crate) fn new(
         db: &'db dyn Db,
         resolver_environment: ResolverEnvironment<'db>,
         mode: ModuleResolveMode,
@@ -1429,6 +1434,24 @@ impl<'db> NameResolver<'db> {
         }
 
         None
+    }
+
+    /// Lists top-level modules using the same precedence as ordinary resolution.
+    pub(crate) fn root_modules(&self) -> Vec<Module<'db>> {
+        let context = &self.context;
+        let mut names = BTreeSet::new();
+        for path in search_paths(context.db, context.resolver_environment, context.mode) {
+            collect_child_names(context, &path.to_module_path(), &mut names);
+        }
+
+        let search = ModuleSearch::new(self);
+        names
+            .into_iter()
+            .filter_map(|name| {
+                context.db.unwind_if_revision_cancelled();
+                search.resolve_child(&name)
+            })
+            .collect()
     }
 
     fn is_non_shadowable(&self, name: &ModuleName) -> bool {
@@ -1701,6 +1724,48 @@ impl<'resolver, 'db> ModuleSearch<'resolver, 'db> {
     }
 }
 
+/// Collects possible names without treating filesystem entries as resolved modules.
+fn collect_child_names(context: &ResolverContext, path: &ModulePath, names: &mut BTreeSet<String>) {
+    if let Some(path) = path.to_system_path()
+        && let Ok(listing) = directory_listing(context.db, &path)
+    {
+        for (name, file_type) in listing.iter() {
+            context.db.unwind_if_revision_cancelled();
+            add_child_name(names, name, file_type);
+        }
+    } else if let Some(path) = path.to_vendored_path() {
+        for entry in context.db.vendored().read_directory(&path) {
+            let Some(name) = entry.path().file_name() else {
+                continue;
+            };
+            let file_type = if entry.file_type().is_directory() {
+                FileType::Directory
+            } else {
+                FileType::File
+            };
+            add_child_name(names, name, file_type);
+        }
+    }
+}
+
+fn add_child_name(names: &mut BTreeSet<String>, entry: &str, file_type: FileType) {
+    let name = if !file_type.is_directory()
+        && let Some(stem) = entry
+            .strip_suffix(".py")
+            .or_else(|| entry.strip_suffix(".pyi"))
+    {
+        stem
+    } else if !file_type.is_file() {
+        entry
+    } else {
+        return;
+    };
+    let name = name.strip_suffix("-stubs").unwrap_or(name);
+    if ModuleName::new(name).is_some() && !name.contains('.') {
+        names.insert(name.to_owned());
+    }
+}
+
 /// Advances normalized prefix candidates, preserving terminal shadowing even on a failed probe.
 ///
 /// With `for_descendants`, retain partial stub-package namespaces for the next component.
@@ -1848,12 +1913,12 @@ fn resolve_component(
 
     // Last resort, check if a folder with the given name exists. If so,
     // then this is a namespace package. We need to skip this check for
-    // typeshed because the `resolve_file_module` can also return `None` if the
+    // typeshed because `resolve_file_module_with_filter` can also return `None` if the
     // `__init__.py` exists but isn't available for the current Python version.
     // Let's assume that the `xml` module is only available on Python 3.11+ and
     // we're resolving for Python 3.10:
     //
-    // * `resolve_file_module("xml/__init__.pyi")` returns `None` even though
+    // * Looking up `xml/__init__.pyi` returns `None` even though
     //   the file exists but the module isn't available for the current Python
     //   version.
     // * The check here would now return `true` because the `xml` directory
@@ -1899,17 +1964,6 @@ fn candidate_may_exist(
 }
 
 type ResolvedNames = Vec<ModuleResolutionCandidate>;
-
-/// If `module` exists on disk with an extension permitted by the resolver's mode, return its
-/// [`File`].
-///
-/// Typing resolution prefers `.pyi` over `.py`; runtime resolution only considers `.py`.
-pub(super) fn resolve_file_module(
-    module: &ModulePath,
-    resolver_state: &ResolverContext,
-) -> Option<File> {
-    resolve_file_module_with_filter(module, resolver_state, ComponentFileFilter::ByMode)
-}
 
 fn resolve_file_module_with_filter(
     module: &ModulePath,
