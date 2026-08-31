@@ -154,16 +154,11 @@ impl Terminal {
                     let body_terminal = Self::from_body(&with_stmt.body, semantic);
 
                     if may_suppress_exceptions(with_stmt, semantic) {
-                        // The context manager can swallow an exception raised anywhere in the
-                        // body, in which case execution resumes after the `with` statement. So,
-                        // as for a `try` block, the body tells us nothing about how the function
-                        // ends, beyond the fact that it can return:
-                        // ```python
-                        // def func():
-                        //     with pytest.raises(ValueError):
-                        //         raise ValueError("boom")
-                        //     # We get here, so the function doesn't always raise.
-                        // ```
+                        // Execution resumes after the `with` statement once the exception is
+                        // swallowed, so the body never proves that the function always raises.
+                        // A `return` in the body proves only that the function *can* return:
+                        // `with suppress(ValueError): return int(value)` falls through to an
+                        // implicit `return None` whenever `int(value)` raises.
                         if body_terminal.has_any_return() {
                             terminal = terminal.and_then(Terminal::ConditionalReturn);
                         }
