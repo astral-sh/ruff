@@ -56,6 +56,10 @@ x: int = 1
 T = typing.TypeVar["T"]
 Decorator: TypeAlias = typing.Callable[[T], T]
 
+# Tuple type alias without parentheses
+TupleAlias: TypeAlias = int, str
+
+
 
 from typing import TypeVar, Annotated, TypeAliasType
 

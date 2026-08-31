@@ -276,13 +276,23 @@ fn create_diagnostic(
     let tokens = checker.tokens();
     let comment_ranges = checker.comment_ranges();
 
-    let range_with_parentheses =
-        parenthesized_range(value.into(), stmt.into(), tokens).unwrap_or(value.range());
+    let (range_with_parentheses, is_parenthesized) =
+        if let Some(range) = parenthesized_range(value.into(), stmt.into(), tokens) {
+            (range, true)
+        } else {
+            (value.range(), false)
+        };
+
+    let formatted_value = if value.is_tuple_expr() && !is_parenthesized {
+        format!("({})", &source[range_with_parentheses])
+    } else {
+        source[range_with_parentheses].to_string()
+    };
 
     let content = format!(
         "type {name}{type_params} = {value}",
         type_params = DisplayTypeVars { type_vars, source },
-        value = &source[range_with_parentheses]
+        value = formatted_value
     );
     let edit = Edit::range_replacement(content, stmt.range());
 
