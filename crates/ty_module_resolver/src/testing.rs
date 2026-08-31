@@ -318,3 +318,136 @@ impl TestCaseBuilder<VendoredTypeshed> {
         }
     }
 }
+
+/// Creates a module-enumeration fixture with configurable extra search paths.
+pub(crate) fn enumeration_db(paths: &[&str], extra_paths: &[&str]) -> TestDb {
+    let TestCase { mut db, .. } = TestCaseBuilder::new().build();
+    for path in paths {
+        write_empty_file(&mut db, path);
+    }
+    let settings = SearchPathSettings {
+        src_roots: vec![SystemPathBuf::from("/src")],
+        site_packages_paths: vec![SystemPathBuf::from("/site-packages")],
+        custom_typeshed: Some(SystemPathBuf::from("/typeshed")),
+        extra_paths: extra_paths
+            .iter()
+            .copied()
+            .map(SystemPathBuf::from)
+            .collect(),
+        ..SearchPathSettings::empty()
+    };
+    db.set_search_paths(
+        settings
+            .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
+            .expect("configure enumeration search paths"),
+    );
+    db
+}
+
+/// Creates a local stub override whose intermediate parents are hidden by installed stubs.
+pub(crate) fn unresolved_stub_override_db() -> TestDb {
+    enumeration_db(
+        &[
+            // Complete installed stubs omit `acme.nested` and block fallback to source packages.
+            "/site-packages/acme-stubs/__init__.pyi",
+            "/site-packages/acme-stubs/py.typed",
+            "/site-packages/acme/__init__.py",
+            "/site-packages/acme/nested/__init__.py",
+            "/site-packages/acme/nested/deep/__init__.py",
+            "/site-packages/acme/nested/deep/tools.py",
+            // A local stub override remains discoverable through those unresolved parents.
+            "/extra/acme/nested/deep/tools.pyi",
+            // A source file on an extra path must not count as a stub override.
+            "/extra/acme/nested/source_only.py",
+        ],
+        &["/extra"],
+    )
+}
+
+#[cfg(target_family = "unix")]
+/// Creates an enumeration fixture with top-level and nested symlinks and shadowed alternatives.
+pub(crate) fn symlink_enumeration_db() -> (tempfile::TempDir, TestDb, SystemPathBuf) {
+    let (temp, mut db, root) = os_enumeration_db(&[]);
+    for path in [
+        "src/acme/own.py",
+        "src/acme/stubbed.py",
+        "site-packages/acme/hidden.py",
+        "site-packages/acme/ns/masked.py",
+        "site-packages/acme/ns/visible.py",
+        "site-packages/acme/blocked/visible.py",
+        "other_ns/masked.py",
+        "other_ns/source_only.py",
+        "regular/__init__.py",
+        "regular/child.py",
+        "regular/nested/child.py",
+        "target.py",
+        "target.pyi",
+    ] {
+        write_empty_file(&mut db, root.join(path));
+    }
+    for (source, link) in [
+        ("target.py", "src/top_alias.py"),
+        // These aliases shadow ordinary entries from lower-priority candidates.
+        ("target.py", "src/acme/hidden.py"),
+        ("target.pyi", "src/acme/stubbed.pyi"),
+        ("other_ns", "src/acme/ns"),
+        ("regular", "src/acme/blocked"),
+        ("src/acme", "src/alias"),
+        ("regular", "src/regular_alias"),
+        ("target.py", "regular/linked.py"),
+        ("other_ns", "regular/linked_dir"),
+        ("regular", "regular/loop"),
+        ("regular/__init__.py", "regular/nested/__init__.py"),
+    ] {
+        std::os::unix::fs::symlink(
+            root.join(source).as_std_path(),
+            root.join(link).as_std_path(),
+        )
+        .expect("create fixture symlink");
+    }
+    (temp, db, root)
+}
+
+/// Creates an enumeration fixture on disk, with extra paths relative to its temporary root.
+#[cfg(target_family = "unix")]
+#[expect(
+    clippy::disallowed_methods,
+    reason = "Test fixture needs real filesystem symlinks"
+)]
+pub(crate) fn os_enumeration_db(
+    extra_paths: &[&str],
+) -> (tempfile::TempDir, TestDb, SystemPathBuf) {
+    let temp = tempfile::TempDir::new().expect("create enumeration workspace");
+    let canonical = temp
+        .path()
+        .canonicalize()
+        .expect("canonical workspace path");
+    let root = SystemPathBuf::from_path_buf(canonical).expect("UTF-8 workspace path");
+    for path in ["src", "site-packages", "typeshed/stdlib"]
+        .into_iter()
+        .chain(extra_paths.iter().copied())
+    {
+        std::fs::create_dir_all(root.join(path).as_std_path()).expect("create search root");
+    }
+    let mut db = TestDb::new();
+    db.use_system(ruff_db::system::OsSystem::new(&root));
+    write_empty_file(&mut db, root.join("typeshed/stdlib/VERSIONS"));
+    let settings = SearchPathSettings {
+        src_roots: vec![root.join("src")],
+        site_packages_paths: vec![root.join("site-packages")],
+        custom_typeshed: Some(root.join("typeshed")),
+        extra_paths: extra_paths.iter().map(|path| root.join(path)).collect(),
+        ..SearchPathSettings::empty()
+    };
+    db.set_search_paths(
+        settings
+            .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
+            .expect("configure real filesystem search paths"),
+    );
+    (temp, db, root)
+}
+
+/// Writes an empty fixture file, creating missing parent directories and notifying the database.
+pub(crate) fn write_empty_file(db: &mut TestDb, path: impl AsRef<SystemPath>) {
+    db.write_file(path, "").expect("write empty fixture file");
+}

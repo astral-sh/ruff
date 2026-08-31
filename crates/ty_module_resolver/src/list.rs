@@ -358,13 +358,12 @@ impl<'db> Lister<'db> {
 
     /// Constructs a resolver context for use with some APIs that require it.
     fn context(&self) -> ResolverContext<'db> {
-        ResolverContext {
-            db: self.db,
-            resolver_environment: self.resolver_environment,
-            // We don't currently support listing modules
-            // in a "no stubs allowed" mode.
-            mode: ModuleResolveMode::Typing,
-        }
+        // We don't currently support listing modules in a "no stubs allowed" mode.
+        ResolverContext::new(
+            self.db,
+            self.resolver_environment,
+            ModuleResolveMode::Typing,
+        )
     }
 }
 
