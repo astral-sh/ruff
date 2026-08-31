@@ -1,7 +1,6 @@
-use crate::types::cyclic::TypeIdentity;
 use crate::types::generics::specialization_variance;
 use crate::types::tuple::TupleSpec;
-use crate::types::visitor::any_over_type;
+use crate::types::visitor::contains_growing_type;
 use crate::types::{
     ClassBase, ClassType, IntersectionType, KnownClass, MaterializationKind, Type, TypeVarVariance,
     UnionType,
@@ -89,28 +88,8 @@ fn nominal_top_intersection<'db>(
 
     // Inspect lazy attributes only after establishing that the classes are related. Expanding a
     // recursive generic alias or member can re-enter intersection simplification with ever-growing
-    // type arguments. Non-generic recursion cannot grow its specialization and can still be checked.
-    if any_over_type(db, env, base, true, |ty| {
-        let is_generic = match ty {
-            Type::TypeAlias(alias) => alias.generic_context(db).is_some(),
-            Type::ProtocolInstance(protocol) => protocol
-                .class_origin(db)
-                .and_then(|class| class.class_literal(db).generic_context(db))
-                .is_some(),
-            Type::TypedDict(typed_dict) => typed_dict
-                .defining_class()
-                .and_then(|class| class.class_literal(db).generic_context(db))
-                .is_some(),
-            _ => false,
-        };
-        is_generic
-            && matches!(
-                ty.to_type_identity(db),
-                TypeIdentity::GrowingTypeAlias(_)
-                    | TypeIdentity::GrowingProtocol(_)
-                    | TypeIdentity::GrowingTypedDict(_)
-            )
-    }) {
+    // type arguments. Exact recursive specializations can still be checked.
+    if contains_growing_type(db, env, base) {
         return Some(GenericIntersection::Recursive);
     }
     if base_specialization.materialization_kind(db).is_some()
