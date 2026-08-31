@@ -24,14 +24,7 @@ impl<'db> NameResolver<'db> {
     /// The resolved module, when available, supplies its fallback search path.
     /// Its package ancestry may contain symlinks; other namespace portions and stub overrides
     /// keep their normal checks.
-    #[cfg_attr(
-        not(test),
-        expect(
-            dead_code,
-            reason = "Module enumeration is consumed by the next change's cached listings"
-        )
-    )]
-    pub(super) fn enumerate_modules(
+    pub(crate) fn enumerate_modules(
         &self,
         prefix: Option<&ModuleName>,
         module: Option<Module<'db>>,
@@ -123,11 +116,11 @@ impl<'db> NameResolver<'db> {
 /// Installed stubs can omit `acme.nested` while a stub override supplies `acme.nested.tools`.
 /// Recursive enumeration searches that prefix, but import-statement completion omits it.
 #[derive(Default)]
-pub(super) struct ModuleEnumeration<'db> {
+pub(crate) struct ModuleEnumeration<'db> {
     /// Modules that resolve independently and are eligible for enumeration.
-    pub(super) modules: Vec<Module<'db>>,
+    pub(crate) modules: Vec<Module<'db>>,
     /// Unresolved module name prefixes with eligible stub override candidates.
-    pub(super) stub_override_prefixes: Vec<ModuleName>,
+    pub(crate) stub_override_prefixes: Vec<ModuleName>,
 }
 
 /// Checks for possible descendant directories without resolving the prefix's ancestors.
