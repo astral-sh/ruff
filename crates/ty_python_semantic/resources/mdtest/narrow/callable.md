@@ -13,8 +13,6 @@ def f(x: Callable[..., Any] | None):
     if callable(x):
         reveal_type(x)  # revealed: (...) -> Any
     else:
-        # Since `(...) -> Any` is a subtype of `Top[(...) -> object]`, the intersection
-        # with the negation is empty (Never), leaving just None.
         reveal_type(x)  # revealed: None
 ```
 
@@ -120,6 +118,30 @@ An already-specialized callable retains its known parameter and return types:
 def preserve_callable_signature(fn: Callable[[int], str]) -> None:
     if isinstance(fn, Callable):
         reveal_type(fn)  # revealed: (int, /) -> str
+```
+
+### Truthiness before a callable check
+
+Checking that a callback is truthy or callable preserves its known parameter and return types.
+
+```py
+from collections.abc import Callable
+
+def f(callback: Callable[[int], object]) -> None:
+    if callback:
+        reveal_type(callback)  # revealed: ((int, /) -> object) & ~AlwaysFalsy
+
+    if callable(callback):
+        reveal_type(callback)  # revealed: (int, /) -> object
+
+    if isinstance(callback, Callable):
+        reveal_type(callback)  # revealed: (int, /) -> object
+
+    if callback and callable(callback):
+        reveal_type(callback)  # revealed: ((int, /) -> object) & ~AlwaysFalsy
+
+    if callback and isinstance(callback, Callable):
+        reveal_type(callback)  # revealed: ((int, /) -> object) & ~AlwaysFalsy
 ```
 
 ## Narrowing with named expressions (walrus operator)

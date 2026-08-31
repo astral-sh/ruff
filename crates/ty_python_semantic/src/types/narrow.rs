@@ -817,7 +817,7 @@ fn filter_generic_narrowing_constraint<'db>(
         (subject, Type::Union(union)) => union.map(db, env, |element| {
             filter_generic_narrowing_constraint(db, env, subject, *element)
         }),
-        (subject @ Type::Callable(_), target @ Type::Callable(_))
+        (subject, target @ Type::Callable(_))
             if subject.is_subtype_of(db, env, target.top_materialization(db, env)) =>
         {
             subject

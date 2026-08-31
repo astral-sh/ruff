@@ -715,9 +715,15 @@ def callable_return(value: Callable[..., object]):
     if is_str_callable(value):
         reveal_type(value())  # revealed: str
 
+    if value and is_str_callable(value):
+        reveal_type(value())  # revealed: str
+
 def callable_signature(value: Callable[[int], str]):
     if is_str_callable(value):
         reveal_type(value)  # revealed: (int, /) -> str
+
+    if value and is_str_callable(value):
+        reveal_type(value)  # revealed: ((int, /) -> str) & ~AlwaysFalsy
 ```
 
 ### Strict mode
