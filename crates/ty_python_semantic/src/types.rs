@@ -44,6 +44,7 @@ pub(crate) use self::infer::{
 };
 pub(crate) use self::iteration::extract_fixed_length_iterable_element_types;
 pub use self::known_instance::KnownInstanceType;
+use self::known_instance::{MethodWrapper, MethodWrapperKind};
 pub(crate) use self::match_pattern::{
     ClassPatternPositionalSource, callable_pattern_type, class_pattern_positional_sources,
     definite_match_pattern_type, definite_match_pattern_type_for_subject,
@@ -4535,6 +4536,24 @@ impl<'db> Type<'db> {
             }
 
             match ty {
+                Type::KnownInstance(KnownInstanceType::MethodWrapper(wrapper)) => {
+                    let return_type = match wrapper.kind(db) {
+                        MethodWrapperKind::Staticmethod => wrapper.wrapped(db),
+                        MethodWrapperKind::Classmethod => Type::KnownInstance(
+                            KnownInstanceType::MethodWrapper(MethodWrapper::new(
+                                db,
+                                wrapper.wrapped(db),
+                                wrapper.descriptor(db),
+                                MethodWrapperKind::BoundClassmethod(owner),
+                            )),
+                        ),
+                        MethodWrapperKind::BoundClassmethod(_) => ty,
+                    };
+                    return Ok(Some(DescriptorGetResult {
+                        return_type,
+                        kind: AttributeKind::NormalOrNonDataDescriptor,
+                    }));
+                }
                 Type::Callable(callable) if callable.is_staticmethod_like(db) => {
                     // For "staticmethod-like" callables, model the behavior of `staticmethod.__get__`.
                     // The underlying function is returned as-is, without binding self.
@@ -5667,6 +5686,37 @@ impl<'db> Type<'db> {
                 {
                     Place::bound(wrapper).into()
                 }
+                Type::KnownInstance(KnownInstanceType::MethodWrapper(wrapper)) => {
+                    match (wrapper.kind(db), name_str) {
+                        (_, "__func__")
+                        | (
+                            MethodWrapperKind::Staticmethod | MethodWrapperKind::Classmethod,
+                            "__wrapped__",
+                        ) => Place::bound(wrapper.wrapped(db)).into(),
+                        (MethodWrapperKind::BoundClassmethod(receiver), "__self__") => {
+                            Place::bound(receiver).into()
+                        }
+                        (_, "__call__") if let Some(callables) = wrapper.callables(db, env) => {
+                            Place::bound(callables.into_type(db, env)).into()
+                        }
+                        (kind, _) => {
+                            let result = wrapper
+                                .instance_fallback(db, env)
+                                .member_lookup_with_policy_and_receiver(
+                                    db, env, name_str, policy, receiver,
+                                );
+                            if matches!(kind, MethodWrapperKind::BoundClassmethod(_)) {
+                                member_lookup_or_fall_back_to(db, env, result, || {
+                                    wrapper.wrapped(db).member_lookup_with_policy_and_receiver(
+                                        db, env, name_str, policy, None,
+                                    )
+                                })
+                            } else {
+                                result
+                            }
+                        }
+                    }
+                }
                 Type::BoundMethod(bound_method) => match name_str {
                     "__self__" => Place::bound(bound_method.self_instance(db)).into(),
                     "__func__" => {
@@ -6682,6 +6732,17 @@ impl<'db> Type<'db> {
                 KnownInstanceType::FunctoolsPartial(partial)
                 | KnownInstanceType::FunctoolsPartialCall(partial),
             ) => Type::Callable(partial.partial(db)).bindings_impl(db, env, recursion_guard),
+
+            Type::KnownInstance(KnownInstanceType::MethodWrapper(wrapper)) => {
+                wrapper.callables(db, env).map_or_else(
+                    || CallableBinding::not_callable(self).into(),
+                    |callables| {
+                        callables
+                            .into_type(db, env)
+                            .bindings_impl(db, env, recursion_guard)
+                    },
+                )
+            }
 
             Type::KnownInstance(known_instance) => known_instance
                 .instance_fallback(db, env)
@@ -8183,6 +8244,7 @@ impl<'db> Type<'db> {
                 }
                 KnownInstanceType::FunctoolsPartial(_)
                 | KnownInstanceType::FunctoolsPartialCall(_)
+                | KnownInstanceType::MethodWrapper(_)
                 | KnownInstanceType::Range { .. } => Err(InvalidTypeExpressionError {
                     invalid_expressions: smallvec_inline![InvalidTypeExpression::InvalidType(
                         *self, scope_id
@@ -9413,6 +9475,24 @@ impl<'db> Type<'db> {
                         typevars,
                         visitor,
                     );
+                }
+                KnownInstanceType::MethodWrapper(wrapper) => {
+                    wrapper.wrapped(db).find_legacy_typevars_impl(
+                        db,
+                        env,
+                        binding_context,
+                        typevars,
+                        visitor,
+                    );
+                    if let MethodWrapperKind::BoundClassmethod(receiver) = wrapper.kind(db) {
+                        receiver.find_legacy_typevars_impl(
+                            db,
+                            env,
+                            binding_context,
+                            typevars,
+                            visitor,
+                        );
+                    }
                 }
                 KnownInstanceType::SubscriptedProtocol(_)
                 | KnownInstanceType::SubscriptedGeneric(_)

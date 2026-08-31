@@ -1553,10 +1553,27 @@ class Box(Generic[T]):
     def configured(cls) -> "Box[T]":
         return cls()
 
+    @staticmethod
+    @lru_cache
+    def identity(value: T) -> T:
+        return value
+
 reveal_type(Box.make())  # revealed: Box[Unknown]
 reveal_type(Box[int].make())  # revealed: Box[int]
 reveal_type(Box.configured())  # revealed: Box[Unknown]
 reveal_type(Box[int].configured())  # revealed: Box[int]
+```
+
+The cache-management methods remain accessible on the wrapped callable.
+
+```py
+Box.make.cache_clear()
+Box[int].make.cache_clear()
+reveal_type(Box.make.cache_info().hits)  # revealed: int
+reveal_type(Box[int]().configured.cache_info().misses)  # revealed: int
+Box[int].identity.cache_clear()
+reveal_type(Box[int].identity.cache_info().hits)  # revealed: int
+reveal_type(Box[int].identity(1))  # revealed: int
 ```
 
 ## Metaclass descriptors shadow generic instance attributes

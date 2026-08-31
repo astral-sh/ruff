@@ -3831,6 +3831,13 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'_, 'db> {
             KnownInstanceType::FunctoolsPartialCall(partial) => Type::Callable(partial.partial(db))
                 .display_with(db, self.env, DisplaySettings::default().singleline())
                 .fmt_detailed(f),
+            KnownInstanceType::MethodWrapper(wrapper) => {
+                f.set_invalid_type_annotation();
+                f.write_str(wrapper.class(db).name(self.env.python_version(db)))?;
+                f.write_char('[')?;
+                wrapper.wrapped(db).display(db, self.env).fmt_detailed(f)?;
+                f.write_char(']')
+            }
         }
     }
 }

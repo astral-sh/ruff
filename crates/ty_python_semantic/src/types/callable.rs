@@ -288,6 +288,10 @@ impl<'db> Type<'db> {
                 | KnownInstanceType::FunctoolsPartialCall(partial),
             ) => Some(CallableTypes::one(partial.partial(db))),
 
+            Type::KnownInstance(KnownInstanceType::MethodWrapper(wrapper)) => {
+                wrapper.callables(db, env)
+            }
+
             Type::Intersection(intersection) => intersection
                 .finite_alternative_union(db, env)
                 .and_then(|alternatives| {
