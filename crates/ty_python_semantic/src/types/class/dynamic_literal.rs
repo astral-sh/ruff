@@ -111,25 +111,6 @@ pub enum DynamicClassAnchor<'db> {
 }
 
 impl<'db> DynamicClassAnchor<'db> {
-    pub(super) fn same_visit_identity(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Self::Definition(left), Self::Definition(right)) => left == right,
-            (
-                Self::ScopeOffset {
-                    scope: left_scope,
-                    offset: left_offset,
-                    ..
-                },
-                Self::ScopeOffset {
-                    scope: right_scope,
-                    offset: right_offset,
-                    ..
-                },
-            ) => left_scope == right_scope && left_offset == right_offset,
-            _ => false,
-        }
-    }
-
     fn apply_type_mapping_impl<'a>(
         &self,
         db: &'db dyn Db,
@@ -317,9 +298,7 @@ impl<'db> DynamicClassLiteral<'db> {
         let mut has_protocol_fallback = false;
         let mut bases = original_bases
             .iter()
-            .filter_map(|base_type| {
-                ClassBase::try_from_type(db, &env, *base_type, Some(ClassLiteral::Dynamic(self)))
-            })
+            .filter_map(|base_type| ClassBase::try_from_type(db, &env, *base_type, None))
             .filter_map(|base| {
                 match base.inferred_metaclass(db, &env, ClassLiteral::Dynamic(self)) {
                     ClassMetaclass::Selected(metaclass) => Some((base, metaclass)),
