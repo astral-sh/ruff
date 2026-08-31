@@ -236,7 +236,7 @@ pub(crate) fn binding_type<'db>(db: &'db dyn Db, definition: Definition<'db>) ->
     inference.binding_type(definition)
 }
 
-/// Returns whether a definition represents a value that exists at runtime.
+/// Returns whether a definition may represent a value that exists at runtime.
 ///
 /// Type-checking-only decorators and guards never represent runtime values. Private type-variable
 /// declarations, explicit aliases, and unambiguous typing aliases in stub files are also
@@ -249,8 +249,26 @@ pub(crate) fn binding_type<'db>(db: &'db dyn Db, definition: Definition<'db>) ->
 /// _runtime_callback = callbacks[0]  # Runtime value.
 /// ```
 #[salsa::tracked(returns(copy))]
-pub(crate) fn exists_at_runtime<'db>(db: &'db dyn Db, definition: Definition<'db>) -> bool {
+pub(crate) fn may_exist_at_runtime<'db>(db: &'db dyn Db, definition: Definition<'db>) -> bool {
     let file = definition.program_file(db);
+    let parsed = parsed_module(db, file.python_file(db));
+    let module = parsed.load(db);
+
+    // Definitions inside an `if TYPE_CHECKING` block are never available at runtime.
+    if semantic_index(db, file).is_in_type_checking_block(
+        definition.file_scope(db),
+        definition.full_range(db, &module).range(),
+    ) {
+        return false;
+    }
+
+    // A bare annotation can describe a value initialized elsewhere, but inference only records
+    // its declared type. Treat it as a possible runtime value without requesting a binding type.
+    let is_stub = file.file(db).is_stub(db);
+    if !definition.kind(db).category(is_stub, &module).is_binding() {
+        return true;
+    }
+
     let inference = infer_definition_types(db, definition);
     let ty = inference.binding_type(definition);
 
@@ -263,19 +281,8 @@ pub(crate) fn exists_at_runtime<'db>(db: &'db dyn Db, definition: Definition<'db
         return false;
     }
 
-    let parsed = parsed_module(db, file.python_file(db));
-    let module = parsed.load(db);
-
-    // Definitions inside an `if TYPE_CHECKING` block are never available at runtime.
-    if semantic_index(db, file).is_in_type_checking_block(
-        definition.file_scope(db),
-        definition.full_range(db, &module).range(),
-    ) {
-        return false;
-    }
-
     // The remaining heuristics only apply to stub definitions.
-    if !file.file(db).is_stub(db) {
+    if !is_stub {
         return true;
     }
 

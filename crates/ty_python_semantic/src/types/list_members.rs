@@ -20,7 +20,7 @@ use crate::{
     types::{
         ClassBase, ClassLiteral, KnownClass, ProgramEnvironment, StaticClassLiteral,
         SubclassOfInner, Type, TypeVarBoundOrConstraints, class::CodeGeneratorKind,
-        exists_at_runtime, function::FunctionType, infer_definition_types,
+        function::FunctionType, infer_definition_types, may_exist_at_runtime,
     },
 };
 use ty_python_core::{
@@ -453,7 +453,7 @@ impl<'db> AllMembers<'db> {
                         is_type_check_only: defined
                             .provenance
                             .definition()
-                            .is_some_and(|definition| !exists_at_runtime(db, definition)),
+                            .is_some_and(|definition| !may_exist_at_runtime(db, definition)),
                     });
                 }
 
