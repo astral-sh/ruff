@@ -549,7 +549,7 @@ impl PathAssignments {
                 continue;
             }
 
-            let pair_map = SequentMap::for_constraint_pair(db, env, storage, a, b);
+            let pair_map = SequentMap::<ConstraintId>::for_constraint_pair(db, env, storage, a, b);
             self.sequents.extend_from_slice(&pair_map.sequents);
         }
     }
