@@ -474,10 +474,28 @@ def _(x: Foo | Bar, is_bar: Callable[[object], TypeIs[Bar]]):
         reveal_type(x)  # revealed: Foo & ~Bar
 ```
 
+## `TypeIs` narrowing with gradual generics
+
+### Default mode
+
+```toml
+[environment]
+python-version = "3.12"
+
+[rules]
+missing-type-argument = "ignore"
+
+[analysis]
+strict-generic-narrowing = false
+```
+
 A `TypeIs` function that returns a gradual specialization of a generic class narrows to that generic
 type without replacing its gradual type argument:
 
 ```py
+from typing import Any
+from typing_extensions import TypeIs
+
 class Covariant[T]:
     def get(self) -> T:
         raise NotImplementedError
@@ -490,8 +508,8 @@ def _(x: object):
         reveal_type(x)  # revealed: Covariant[Any]
 ```
 
-However, intersecting with the declared gradual type does not necessarily exclude every other
-specialization in the negative branch:
+The negative branch excludes the top materialization of the target, eliminating every specialization
+of this class:
 
 ```py
 from typing import final
@@ -506,13 +524,13 @@ def _(x: Unrelated | Covariant[int]):
     if is_instance_of_covariant(x):
         raise RuntimeError("oh no")
 
-    reveal_type(x)  # revealed: Unrelated | (Covariant[int] & ~Covariant[Any])
+    reveal_type(x)  # revealed: Unrelated
 
-    needs_instance_of_unrelated(x)  # error: [invalid-argument-type]
+    needs_instance_of_unrelated(x)
 ```
 
-If a user wants to select *all* instances of `Covariant`, they must use `Covariant[object]`, or more
-generally, `Top[C[Any]]`, which also works for invariant generic types:
+An explicitly top-materialized target also selects all specializations, including for invariant
+generic types:
 
 ```py
 from typing import TYPE_CHECKING
@@ -531,6 +549,237 @@ def _(x: Unrelated | Invariant[int]):
         reveal_type(x)  # revealed: Invariant[int]
     else:
         reveal_type(x)  # revealed: Unrelated
+
+def explicit_top(value: object):
+    if is_instance_of_invariant(value):
+        reveal_type(value)  # revealed: Top[Invariant[Any]]
+```
+
+An unspecialized `list` target eliminates all lists in the negative branch. Replacing the list in
+the positive branch therefore leaves only `int`, as in this
+[regression example](https://github.com/astral-sh/ty/issues/4394):
+
+```py
+def is_list(value: object) -> TypeIs[list]:
+    return isinstance(value, list)
+
+def f(value: list | int) -> int:
+    if is_list(value):
+        reveal_type(value)  # revealed: list[Unknown]
+        value = 0
+    reveal_type(value)  # revealed: int
+    return value
+```
+
+Known type arguments are preserved, including when they come from a superclass of the target. When
+the subject has no specialization to transfer, the declared `Any` is retained:
+
+```py
+from collections.abc import Sequence
+
+def is_any_list(value: object) -> TypeIs[list[Any]]:
+    return isinstance(value, list)
+
+def from_object(value: object):
+    if is_any_list(value):
+        reveal_type(value)  # revealed: list[Any]
+    else:
+        reveal_type(value)  # revealed: ~Top[list[Any]]
+
+def from_union(value: list[int] | str):
+    if is_any_list(value):
+        reveal_type(value)  # revealed: list[int]
+    else:
+        reveal_type(value)  # revealed: str
+
+def from_base(value: Sequence[int]):
+    if is_any_list(value):
+        reveal_type(value)  # revealed: list[int]
+```
+
+The same filtering applies to saved guard results and compound conditions:
+
+```py
+def indirect(value: list[int] | str):
+    result = is_any_list(value)
+    if result:
+        reveal_type(value)  # revealed: list[int]
+    else:
+        reveal_type(value)  # revealed: str
+
+def compound(value: Sequence[int] | str):
+    if is_any_list(value) and value:
+        reveal_type(value)  # revealed: list[int] & ~AlwaysFalsy
+```
+
+Union targets preserve each compatible specialization independently:
+
+```py
+def is_list_or_set(value: object) -> TypeIs[list[Any] | set[Any]]:
+    return isinstance(value, (list, set))
+
+def from_union_target(value: list[int] | set[str] | bytes):
+    if is_list_or_set(value):
+        reveal_type(value)  # revealed: list[int] | set[str]
+    else:
+        reveal_type(value)  # revealed: bytes
+```
+
+Specialization transfer does not discard explicit type arguments in the target. Here `str` keys are
+required, even though the value type is gradual:
+
+```py
+def is_str_dict(value: object) -> TypeIs[dict[str, Any]]:
+    return isinstance(value, dict) and all(isinstance(key, str) for key in value)
+
+def compatible(value: dict[str, int]):
+    if is_str_dict(value):
+        reveal_type(value)  # revealed: dict[str, int]
+    else:
+        reveal_type(value)  # revealed: Never
+
+def incompatible(value: dict[int, int]):
+    if is_str_dict(value):
+        reveal_type(value)  # revealed: Never
+    else:
+        reveal_type(value)  # revealed: dict[int, int]
+```
+
+Fully static targets still refine the subject using their explicit specialization:
+
+```py
+def is_str_list(value: object) -> TypeIs[list[str]]:
+    return isinstance(value, list) and all(isinstance(item, str) for item in value)
+
+def static_target(value: list[int] | list[str]):
+    if is_str_list(value):
+        reveal_type(value)  # revealed: list[str]
+    else:
+        reveal_type(value)  # revealed: list[int]
+
+def static_target_from_base(value: Sequence[object]):
+    if is_str_list(value):
+        reveal_type(value)  # revealed: list[str]
+```
+
+An unspecialized dictionary target preserves a `TypedDict`'s required keys. An explicitly
+specialized target adds its constraints instead of being discarded:
+
+```py
+from typing import TypedDict
+
+class Record(TypedDict):
+    value: int
+
+def is_dict(value: object) -> TypeIs[dict[Any, Any]]:
+    return isinstance(value, dict)
+
+def typed_dict(value: Record):
+    if is_dict(value):
+        reveal_type(value)  # revealed: Record
+
+    if is_str_dict(value):
+        reveal_type(value)  # revealed: Record & dict[str, Any]
+```
+
+Class-object targets preserve compatible specializations without discarding explicit type arguments:
+
+```py
+def is_list_class(value: object) -> TypeIs[type[list[Any]]]:
+    return isinstance(value, type) and issubclass(value, list)
+
+def class_target(value: type[list[int]] | type[int]):
+    if is_list_class(value):
+        reveal_type(value)  # revealed: type[list[int]]
+    else:
+        reveal_type(value)  # revealed: type[int]
+
+def is_str_list_class(value: object) -> TypeIs[type[list[str]]]:
+    return True
+
+def static_class_target(value: type[list[int]] | type[list[str]]):
+    if is_str_list_class(value):
+        reveal_type(value)  # revealed: type[list[str]]
+```
+
+A callable target's explicit return type also constrains the result. An already compatible callable
+retains its parameter types:
+
+```py
+from collections.abc import Callable
+
+def is_str_callable(value: object) -> TypeIs[Callable[..., str]]:
+    return True
+
+def callable_return(value: Callable[..., object]):
+    if is_str_callable(value):
+        reveal_type(value())  # revealed: str
+
+def callable_signature(value: Callable[[int], str]):
+    if is_str_callable(value):
+        reveal_type(value)  # revealed: (int, /) -> str
+```
+
+### Strict mode
+
+```toml
+[environment]
+python-version = "3.12"
+
+[rules]
+missing-type-argument = "ignore"
+
+[analysis]
+strict-generic-narrowing = true
+```
+
+Strict narrowing intersects the subject with the top materialization of the target. This retains
+known specializations but represents all possible specializations when narrowing from `object`:
+
+```py
+from typing import Any
+from typing_extensions import TypeIs
+
+class Covariant[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+def is_covariant(value: object) -> TypeIs[Covariant[Any]]:
+    return isinstance(value, Covariant)
+
+def from_object(value: object):
+    if is_covariant(value):
+        reveal_type(value)  # revealed: Covariant[object]
+
+def is_list(value: object) -> TypeIs[list[Any]]:
+    return isinstance(value, list)
+
+def invariant_from_object(value: object):
+    if is_list(value):
+        reveal_type(value)  # revealed: Top[list[Any]]
+    else:
+        reveal_type(value)  # revealed: ~Top[list[Any]]
+
+def from_union(value: list[int] | str):
+    if is_list(value):
+        reveal_type(value)  # revealed: list[int]
+    else:
+        reveal_type(value)  # revealed: str
+```
+
+The negative branch also excludes all lists for an unspecialized target, so the issue's regression
+example succeeds in strict mode as well:
+
+```py
+def is_unspecialized_list(value: object) -> TypeIs[list]:
+    return isinstance(value, list)
+
+def f(value: list | int) -> int:
+    if is_unspecialized_list(value):
+        reveal_type(value)  # revealed: list[Unknown]
+        value = 0
+    reveal_type(value)  # revealed: int
+    return value
 ```
 
 ## `TypeIs` narrowing of `NewType` instances

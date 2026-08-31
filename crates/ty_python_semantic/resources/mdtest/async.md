@@ -150,7 +150,7 @@ def get_any() -> Any:
 async def test():
     x = get_any()
     if inspect.isawaitable(x):
-        reveal_type(x)  # revealed: Any & Awaitable[object]
+        reveal_type(x)  # revealed: Any & Awaitable[Any]
         y = await x
         reveal_type(y)  # revealed: Any
 ```
@@ -244,6 +244,52 @@ async def f(fn: Callable[[int], int | Awaitable[int]]) -> None:
         # This includes `int & Top[Awaitable[object]]`: an `int` subtype could define `__await__`.
         reveal_type(result)  # revealed: (int & Top[Awaitable[object]]) | Awaitable[int]
         reveal_type(await result)  # revealed: object
+```
+
+## Narrowing with standard library predicates
+
+The standard library's `TypeIs` predicates preserve known result types and exclude all matching
+specializations in their negative branches:
+
+```py
+import asyncio
+import inspect
+from collections.abc import Awaitable, Coroutine
+from typing import Any
+
+async def awaitable(value: Awaitable[int] | None):
+    if inspect.isawaitable(value):
+        reveal_type(value)  # revealed: Awaitable[int]
+        reveal_type(await value)  # revealed: int
+    else:
+        reveal_type(value)  # revealed: None
+
+def future(value: asyncio.Future[int] | str):
+    if asyncio.isfuture(value):
+        reveal_type(value)  # revealed: Future[int]
+    else:
+        reveal_type(value)  # revealed: str
+
+async def coroutine(value: Coroutine[Any, Any, int] | None):
+    if asyncio.iscoroutine(value):
+        reveal_type(value)  # revealed: Coroutine[Any, Any, int]
+        reveal_type(await value)  # revealed: int
+    else:
+        reveal_type(value)  # revealed: None
+```
+
+When narrowing from `object`, the declared gradual specialization is retained:
+
+```py
+def from_object(value: object):
+    if inspect.isawaitable(value):
+        reveal_type(value)  # revealed: Awaitable[Any]
+    if inspect.iscoroutine(value):
+        reveal_type(value)  # revealed: CoroutineType[Any, Any, Any]
+    if asyncio.isfuture(value):
+        reveal_type(value)  # revealed: Future[Any]
+    if asyncio.iscoroutine(value):
+        reveal_type(value)  # revealed: Coroutine[Any, Any, Any]
 ```
 
 ## Awaiting intersection types (Python 3.12 or lower)
