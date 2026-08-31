@@ -158,12 +158,10 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
             TypeContext::default(),
         );
         let value_ty = self.infer_with_last_context(emit_diagnostics);
-        (
-            setattr_result.map(|bindings| {
-                CallDunderResult::new(db, self.builder.program_environment(), bindings)
-            }),
-            value_ty,
-        )
+        let setattr_result = setattr_result.map(|bindings| {
+            CallDunderResult::new(db, self.builder.program_environment(), bindings)
+        });
+        (setattr_result, value_ty)
     }
 
     fn evaluate(

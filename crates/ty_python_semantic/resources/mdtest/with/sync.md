@@ -675,8 +675,6 @@ class SecondManager:
     def __enter__(self) -> D | E:
         return D()
 
-    def __exit__(self, exc_type, exc_value, traceback) -> None: ...
-
 def combine(context_expr: FirstManager):
     if isinstance(context_expr, SecondManager):
         with context_expr as target:
