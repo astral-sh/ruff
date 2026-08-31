@@ -65,6 +65,13 @@ pub(super) enum Sequent<C> {
     /// path that assumes both is impossible and can be pruned.
     PairImpossibility { ante1: C, ante2: C },
 
+    /// Sequent of the form `C₁ ∧ C₂ ∧ C₃ → false`
+    ///
+    /// This indicates that `C₁`, `C₂` and `C₃` are mutually disjoint: it is not possible for all
+    /// three to hold. Any path that assumes all three is impossible and can be pruned.
+    #[expect(unused)]
+    TripleImpossibility { ante1: C, ante2: C, ante3: C },
+
     /// Sequent of the form `C → D`
     ///
     /// This indicates that `C` on its own is enough to imply `D`. For any path that assumes `C`
@@ -85,7 +92,9 @@ impl SequentMap<ConstraintId> {
             Sequent::SingleImplication { post, .. } | Sequent::PairImplication { post, .. } => {
                 Some(*post)
             }
-            Sequent::SingleTautology { .. } | Sequent::PairImpossibility { .. } => None,
+            Sequent::SingleTautology { .. }
+            | Sequent::PairImpossibility { .. }
+            | Sequent::TripleImpossibility { .. } => None,
         })
     }
 
@@ -188,6 +197,20 @@ impl SequentMap<ConstraintId> {
     fn add_pair_impossibility(&mut self, ante1: ConstraintId, ante2: ConstraintId) {
         self.sequents
             .push(Sequent::PairImpossibility { ante1, ante2 });
+    }
+
+    #[expect(unused)]
+    fn add_triple_impossibility(
+        &mut self,
+        ante1: ConstraintId,
+        ante2: ConstraintId,
+        ante3: ConstraintId,
+    ) {
+        self.sequents.push(Sequent::TripleImpossibility {
+            ante1,
+            ante2,
+            ante3,
+        });
     }
 
     fn add_pair_implication<'db>(
@@ -1355,6 +1378,21 @@ impl SequentMap<ConstraintId> {
                             "{} ∧ {} → false",
                             ante1.display(db, env, storage),
                             ante2.display(db, env, storage),
+                        )?;
+                    }
+
+                    Sequent::TripleImpossibility {
+                        ante1,
+                        ante2,
+                        ante3,
+                    } => {
+                        maybe_write_prefix(f)?;
+                        write!(
+                            f,
+                            "{} ∧ {} ∧ {} → false",
+                            ante1.display(db, env, storage),
+                            ante2.display(db, env, storage),
+                            ante3.display(db, env, storage),
                         )?;
                     }
 
