@@ -3387,6 +3387,8 @@ impl PartialOrd for CompletionRanker<'_> {
 #[cfg(test)]
 mod tests {
     use insta::assert_snapshot;
+    use ruff_db::files::File;
+    use ruff_db::system::{DbWithTestSystem, DbWithWritableSystem, SystemPath};
     use ruff_python_ast::helpers::is_dunder;
     use ruff_python_ast::token::{TokenKind, Tokens};
     use ruff_python_parser::{Mode, ParseOptions};
@@ -9618,7 +9620,10 @@ from .<CURSOR>
 ",
             )
             .completion_test_builder();
-        assert_snapshot!(builder.build().snapshot(), @"import");
+        assert_snapshot!(builder.build().snapshot(), @"
+        import
+        bar
+        ");
     }
 
     #[test]
@@ -9658,6 +9663,7 @@ from .imp<CURSOR>
         assert_snapshot!(builder.build().snapshot(), @"
         import
         foo
+        sub1
         ");
     }
 
@@ -9683,7 +9689,10 @@ from .imp<CURSOR>
             .source("package/foo.py", "")
             .source("package/sub1/sub2/bar.py", "from.<CURSOR>")
             .completion_test_builder();
-        assert_snapshot!(builder.build().snapshot(), @"import");
+        assert_snapshot!(builder.build().snapshot(), @"
+        import
+        bar
+        ");
     }
 
     #[test]
@@ -9696,6 +9705,7 @@ from .imp<CURSOR>
         assert_snapshot!(builder.build().snapshot(), @"
         import
         foo
+        sub1
         ");
     }
 
@@ -10334,6 +10344,121 @@ collabc<CURSOR>
             .build()
             .snapshot();
         assert_snapshot!(snapshot, @"collections.abc");
+    }
+
+    #[test]
+    fn auto_import_namespace_descendants() {
+        let builder = namespace_completion_builder(
+            r#"
+NamespaceSymbol<CURSOR>
+"#,
+        );
+        assert_snapshot!(builder.build().snapshot(), @"
+        NamespaceSymbolLocal :: acme.reports :: from acme.reports import NamespaceSymbolLocal
+
+        NamespaceSymbolNested :: acme.regular.nested.tools :: from acme.regular.nested.tools import NamespaceSymbolNested
+
+        NamespaceSymbolPrivateLocal :: acme._local :: from acme._local import NamespaceSymbolPrivateLocal
+
+        NamespaceSymbolDependency :: acme.widgets :: from acme.widgets import NamespaceSymbolDependency
+        ");
+    }
+
+    #[test]
+    fn import_statement_preserves_desperate_package_children() {
+        let builder = CursorTest::builder()
+            .source(
+                "scripts/main.py",
+                r#"
+from package import <CURSOR>
+"#,
+            )
+            .source(
+                "scripts/package/__init__.py",
+                r#"
+"#,
+            )
+            .source(
+                "scripts/package/child.py",
+                r#"
+"#,
+            )
+            .completion_test_builder()
+            .skip_auto_import();
+        builder.build().contains("child");
+    }
+
+    #[test]
+    fn auto_import_namespace_module_but_not_namespace_object() {
+        let builder = namespace_completion_builder(
+            r#"
+acme<CURSOR>
+"#,
+        );
+        let completions = builder.build();
+        assert!(
+            completions
+                .completions()
+                .iter()
+                .all(|completion| completion.name != "acme")
+        );
+        assert!(
+            completions
+                .completions()
+                .iter()
+                .any(|completion| completion.name == "acme.reports")
+        );
+    }
+
+    #[test]
+    fn import_statement_completes_split_namespace_children() {
+        let builder = namespace_completion_builder(
+            r#"
+from acme import <CURSOR>
+"#,
+        )
+        .skip_auto_import()
+        .skip_dunders();
+        assert_snapshot!(builder.build().snapshot(), @"
+        regular :: <no import required> :: <no import edit>
+        reports :: <no import required> :: <no import edit>
+        tests :: <no import required> :: <no import edit>
+        widgets :: <no import required> :: <no import edit>
+        _local :: <no import required> :: <no import edit>
+        _private :: <no import required> :: <no import edit>
+        ");
+    }
+
+    #[test]
+    fn auto_import_namespace_tracks_module_creation_and_deletion() {
+        let mut builder = namespace_completion_builder(
+            r#"
+NamespaceSymbolAdded<CURSOR>
+"#,
+        );
+        assert!(builder.build().completions().is_empty());
+        builder
+            .cursor_test
+            .db
+            .write_file(
+                "/src/acme/added.py",
+                r#"
+class NamespaceSymbolAdded: ...
+"#,
+            )
+            .expect("create a namespace descendant");
+        assert_snapshot!(builder.build().snapshot(), @"NamespaceSymbolAdded :: acme.added :: from acme.added import NamespaceSymbolAdded");
+        builder
+            .cursor_test
+            .db
+            .memory_file_system()
+            .remove_file("/src/acme/added.py")
+            .expect("remove the namespace descendant");
+        File::sync_path(
+            &mut builder.cursor_test.db,
+            SystemPath::new("/src/acme/added.py"),
+        );
+        assert!(builder.build().completions().is_empty());
     }
 
     #[test]
@@ -11176,6 +11301,63 @@ raise <CURSOR>
         CursorTest::builder()
             .source("main.py", source)
             .completion_test_builder()
+    }
+
+    fn namespace_completion_builder(source: &str) -> CompletionTestBuilder {
+        CursorTest::builder()
+            .with_site_packages()
+            .source("main.py", source)
+            .source(
+                "acme/reports.py",
+                r#"
+class NamespaceSymbolLocal: ...
+"#,
+            )
+            .source(
+                "acme/_local.py",
+                r#"
+class NamespaceSymbolPrivateLocal: ...
+"#,
+            )
+            .source(
+                "acme/regular/__init__.py",
+                r#"
+"#,
+            )
+            .source(
+                "acme/regular/nested/tools.py",
+                r#"
+class NamespaceSymbolNested: ...
+"#,
+            )
+            .site_packages(
+                "acme/widgets.py",
+                r#"
+class NamespaceSymbolDependency: ...
+"#,
+            )
+            .site_packages(
+                "acme/reports.py",
+                r#"
+class NamespaceSymbolShadowed: ...
+"#,
+            )
+            .site_packages(
+                "acme/_private.py",
+                r#"
+class NamespaceSymbolPrivate: ...
+"#,
+            )
+            .site_packages(
+                "acme/tests/helpers.py",
+                r#"
+class NamespaceSymbolTest: ...
+"#,
+            )
+            .completion_test_builder()
+            .skip_builtins()
+            .imports()
+            .module_names()
     }
 
     /// A builder for executing a completion test.
