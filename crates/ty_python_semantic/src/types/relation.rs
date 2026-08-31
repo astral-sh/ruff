@@ -791,6 +791,61 @@ impl<'db> Type<'db> {
         )
     }
 
+    pub(super) fn when_constraint_set_equivalent_to_owned(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        other: Type<'db>,
+    ) -> Cow<'db, OwnedConstraintSet<'db>> {
+        #[salsa::tracked(
+            returns(ref),
+            cycle_initial=|_, _, _| OwnedConstraintSet::always(),
+            heap_size=ruff_memory_usage::heap_size,
+        )]
+        fn when_constraint_set_equivalent_to_impl<'db>(
+            db: &'db dyn Db,
+            types: TypePair<'db>,
+        ) -> OwnedConstraintSet<'db> {
+            let env = ProgramEnvironment::from_program(types.program(db));
+            let constraints = ConstraintSetBuilder::new();
+            let materialization_visitor = ApplyTypeMappingVisitor::new(&env);
+            constraints.into_owned(|constraints| {
+                types
+                    .first(db)
+                    .when_equivalent_to_with_materialization_visitor(
+                        db,
+                        types.second(db),
+                        constraints,
+                        &materialization_visitor,
+                        TypeVarEvaluation::Lazy,
+                    )
+            })
+        }
+
+        if self == other {
+            return Cow::Owned(OwnedConstraintSet::always());
+        }
+
+        Cow::Borrowed(when_constraint_set_equivalent_to_impl(
+            db,
+            TypePair::new(db, env.program(db), self, other),
+        ))
+    }
+
+    pub(super) fn is_constraint_set_equivalent_to(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        other: Type<'db>,
+    ) -> bool {
+        if self == other {
+            return true;
+        }
+
+        self.when_constraint_set_equivalent_to_owned(db, env, other)
+            .query(|_constraints, when| when.is_always_satisfied(db, env))
+    }
+
     /// Returns whether `self` and `other` can be equivalent under some typevar specialization.
     pub(super) fn can_be_constraint_set_equivalent_to(
         self,
@@ -798,34 +853,12 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         other: Type<'db>,
     ) -> bool {
-        #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| true, heap_size=ruff_memory_usage::heap_size)]
-        fn can_be_constraint_set_equivalent_to_impl<'db>(
-            db: &'db dyn Db,
-            types: TypePair<'db>,
-        ) -> bool {
-            let env = ProgramEnvironment::from_program(types.program(db));
-            let constraints = ConstraintSetBuilder::new();
-            let materialization_visitor = ApplyTypeMappingVisitor::new(&env);
-            !types
-                .first(db)
-                .when_equivalent_to_with_materialization_visitor(
-                    db,
-                    types.second(db),
-                    &constraints,
-                    &materialization_visitor,
-                    TypeVarEvaluation::Lazy,
-                )
-                .is_never_satisfied(db, &env)
-        }
-
         if self == other {
             return true;
         }
 
-        can_be_constraint_set_equivalent_to_impl(
-            db,
-            TypePair::new(db, env.program(db), self, other),
-        )
+        self.when_constraint_set_equivalent_to_owned(db, env, other)
+            .query(|_constraints, when| !when.is_never_satisfied(db, env))
     }
 
     fn when_equivalent_to_with_materialization_visitor<'c>(
