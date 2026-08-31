@@ -1804,6 +1804,19 @@ accept([object()])  # error: [invalid-argument-type] "does not satisfy upper bou
 accept([1])  # error: [invalid-argument-type] "does not satisfy upper bound `str`"
 ```
 
+## Disjoint generic union members
+
+The `list[T]` member cannot match a string or `None`. Inference through the remaining `T` member
+rejects `None`, which satisfies neither of its constraints.
+
+```py
+def accept[T: (str, bytes)](value: T | list[T]) -> None:
+    pass
+
+def _(value: str | None):
+    accept(value)  # error: [invalid-argument-type] "does not satisfy constraints"
+```
+
 ## Bounded typevar call context through a union
 
 Regression test for an `invalid-assignment` false positive: `list(items)` should be assignable to

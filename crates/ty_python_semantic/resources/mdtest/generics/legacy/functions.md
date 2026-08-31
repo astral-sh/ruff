@@ -1212,6 +1212,23 @@ accept([object()])  # error: [invalid-argument-type] "does not satisfy upper bou
 accept([1])  # error: [invalid-argument-type] "does not satisfy upper bound `str`"
 ```
 
+## Disjoint generic union members
+
+The `list[T]` member cannot match a string or `None`. Inference through the remaining `T` member
+rejects `None`, which satisfies neither of its constraints.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T", str, bytes)
+
+def accept(value: T | list[T]) -> None:
+    pass
+
+def _(value: str | None):
+    accept(value)  # error: [invalid-argument-type] "does not satisfy constraints"
+```
+
 ## Nested functions see typevars bound in outer function
 
 ```py

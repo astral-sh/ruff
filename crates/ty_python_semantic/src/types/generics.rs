@@ -3802,16 +3802,14 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         let actual = actual
             .discard_disjoint_union_elements(db, self.env, formal, self.inferable)
             .unless_all_disjoint(actual);
-        // Retain formal members containing inferable variables even when their bounds make
-        // them disjoint. For `list[T] | Other` with `T: str`, dropping `list[T]` before
-        // comparing it with `list[object]` would skip the bound check. `Other` may overlap
-        // through a common subclass without accepting the argument itself.
+        // Ignore inferable variables' bounds when deciding which formal members can match.
+        // `list[T]` must survive a comparison with `list[object]` even if `T: str`, so that
+        // inference can report the bound violation. It can still be discarded when the
+        // argument is `str | None`, since no specialization of `list[T]` can match it.
         let disjoint_constraints = ConstraintSetBuilder::new();
         let formal = formal.filter_union(db, self.env, |element| {
-            any_over_type_expanding_aliases(db, self.env, *element, |ty| {
-                ty.as_typevar()
-                    .is_some_and(|typevar| typevar.is_inferable(db, self.inferable))
-            }) || !element
+            !element
+                .apply_specialization(db, self.generic_context.unknown_specialization(db, None))
                 .when_disjoint_from(db, self.env, actual, &disjoint_constraints, self.inferable)
                 .is_always_satisfied(db, self.env)
         });
