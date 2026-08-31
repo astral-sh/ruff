@@ -1862,6 +1862,17 @@ pub(crate) fn analyze_condition_expression(
 #[salsa::tracked(
     returns(copy),
     cycle_initial = |_, _, _| Truthiness::Ambiguous,
+    cycle_fn = |_, cycle: &salsa::Cycle, previous: &Truthiness, result: Truthiness, _| {
+        // A condition can control whether one of its own inputs is reachable. Expression inference
+        // can lose its previous result when it ceases to be a cycle head, so its type widening alone
+        // does not ensure that the condition's truthiness converges. Delay widening here to avoid
+        // retaining imprecise results from the first few iterations.
+        if cycle.iteration() > crate::TAINTED_CYCLES && *previous != result {
+            Truthiness::Ambiguous
+        } else {
+            result
+        }
+    },
     heap_size = get_size2::GetSize::get_heap_size
 )]
 fn analyze_condition<'db>(db: &'db dyn Db, expression: Expression<'db>) -> Truthiness {
