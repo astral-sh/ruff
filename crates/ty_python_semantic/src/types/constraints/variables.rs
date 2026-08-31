@@ -1,6 +1,7 @@
 //! The different conditions that can be checked by an interior node in a constraint set BDD
 #![expect(dead_code)]
 
+use std::fmt::Display;
 use std::marker::PhantomData;
 
 use itertools::Either;
@@ -308,6 +309,24 @@ impl<'db> Constraint<'db> {
             _ => bound,
         }
     }
+
+    pub(super) fn display<'a>(
+        self,
+        db: &'db dyn Db,
+        env: &'a ProgramEnvironment<'db>,
+        holds: Option<bool>,
+    ) -> impl Display + 'a {
+        std::fmt::from_fn(move |f| match self {
+            Constraint::ConcreteLower(this) => this.display(db, env, holds).fmt(f),
+            Constraint::ConcreteUpper(this) => this.display(db, env, holds).fmt(f),
+            Constraint::ConcreteEquivalence(this) => this.display(db, env, holds).fmt(f),
+            Constraint::ParamSpecLower(this) => this.display(db, env, holds).fmt(f),
+            Constraint::ParamSpecUpper(this) => this.display(db, env, holds).fmt(f),
+            Constraint::ParamSpecEquivalence(this) => this.display(db, env, holds).fmt(f),
+            Constraint::TypeVarRange(this) => this.display(db, holds).fmt(f),
+            Constraint::TypeVarEquivalence(this) => this.display(db, holds).fmt(f),
+        })
+    }
 }
 
 /// Restricts a single typevar so that a concrete lower bound is assignable to it. (A concrete type
@@ -343,6 +362,27 @@ impl<'db> ConcreteLowerBound<'db> {
             bound,
             _phantom: PhantomData,
         }
+    }
+
+    fn display<'a>(
+        self,
+        db: &'db dyn Db,
+        env: &'a ProgramEnvironment<'db>,
+        holds: Option<bool>,
+    ) -> impl Display + 'a {
+        let range_prefix = match holds {
+            Some(true) => "",
+            Some(false) => "¬",
+            None => "?",
+        };
+        std::fmt::from_fn(move |f| {
+            write!(
+                f,
+                "{range_prefix}({} ≤ {})",
+                self.bound.display(db, env),
+                self.typevar.identity(db).display(db),
+            )
+        })
     }
 }
 
@@ -386,6 +426,27 @@ impl<'db> ConcreteUpperBound<'db> {
             _phantom: PhantomData,
         }
     }
+
+    fn display<'a>(
+        self,
+        db: &'db dyn Db,
+        env: &'a ProgramEnvironment<'db>,
+        holds: Option<bool>,
+    ) -> impl Display + 'a {
+        let range_prefix = match holds {
+            Some(true) => "",
+            Some(false) => "¬",
+            None => "?",
+        };
+        std::fmt::from_fn(move |f| {
+            write!(
+                f,
+                "{range_prefix}({} ≤ {})",
+                self.typevar.identity(db).display(db),
+                self.bound.display(db, env),
+            )
+        })
+    }
 }
 
 impl<'db> From<ConcreteUpperBound<'db>> for Constraint<'db> {
@@ -425,6 +486,27 @@ impl<'db> ConcreteEquivalenceBound<'db> {
             _phantom: PhantomData,
         }
     }
+
+    fn display<'a>(
+        self,
+        db: &'db dyn Db,
+        env: &'a ProgramEnvironment<'db>,
+        holds: Option<bool>,
+    ) -> impl Display + 'a {
+        let equality_sign = match holds {
+            Some(true) => "=",
+            Some(false) => "≠",
+            None => "=?",
+        };
+        std::fmt::from_fn(move |f| {
+            write!(
+                f,
+                "({} {equality_sign} {})",
+                self.typevar.identity(db).display(db),
+                self.bound.display(db, env),
+            )
+        })
+    }
 }
 
 impl<'db> From<ConcreteEquivalenceBound<'db>> for Constraint<'db> {
@@ -462,6 +544,27 @@ impl<'db> ParamSpecLowerBound<'db> {
             bound,
             _phantom: PhantomData,
         }
+    }
+
+    fn display<'a>(
+        self,
+        db: &'db dyn Db,
+        env: &'a ProgramEnvironment<'db>,
+        holds: Option<bool>,
+    ) -> impl Display + 'a {
+        let range_prefix = match holds {
+            Some(true) => "",
+            Some(false) => "¬",
+            None => "?",
+        };
+        std::fmt::from_fn(move |f| {
+            write!(
+                f,
+                "{range_prefix}({} ≤ {})",
+                self.bound.display(db, env),
+                self.typevar.identity(db).display(db),
+            )
+        })
     }
 }
 
@@ -501,6 +604,27 @@ impl<'db> ParamSpecUpperBound<'db> {
             _phantom: PhantomData,
         }
     }
+
+    fn display<'a>(
+        self,
+        db: &'db dyn Db,
+        env: &'a ProgramEnvironment<'db>,
+        holds: Option<bool>,
+    ) -> impl Display + 'a {
+        let range_prefix = match holds {
+            Some(true) => "",
+            Some(false) => "¬",
+            None => "?",
+        };
+        std::fmt::from_fn(move |f| {
+            write!(
+                f,
+                "{range_prefix}({} ≤ {})",
+                self.typevar.identity(db).display(db),
+                self.bound.display(db, env),
+            )
+        })
+    }
 }
 
 impl<'db> From<ParamSpecUpperBound<'db>> for Constraint<'db> {
@@ -536,6 +660,27 @@ impl<'db> ParamSpecEquivalenceBound<'db> {
             _phantom: PhantomData,
         }
     }
+
+    fn display<'a>(
+        self,
+        db: &'db dyn Db,
+        env: &'a ProgramEnvironment<'db>,
+        holds: Option<bool>,
+    ) -> impl Display + 'a {
+        let equality_sign = match holds {
+            Some(true) => "=",
+            Some(false) => "≠",
+            None => "=?",
+        };
+        std::fmt::from_fn(move |f| {
+            write!(
+                f,
+                "({} {equality_sign} {})",
+                self.typevar.identity(db).display(db),
+                self.bound.display(db, env),
+            )
+        })
+    }
 }
 
 impl<'db> From<ParamSpecEquivalenceBound<'db>> for Constraint<'db> {
@@ -569,6 +714,22 @@ impl<'db> TypeVarRangeBound<'db> {
             right,
             _phantom: PhantomData,
         }
+    }
+
+    fn display(self, db: &'db dyn Db, holds: Option<bool>) -> impl Display {
+        let range_prefix = match holds {
+            Some(true) => "",
+            Some(false) => "¬",
+            None => "?",
+        };
+        std::fmt::from_fn(move |f| {
+            write!(
+                f,
+                "{range_prefix}({} ≤ {})",
+                self.left.identity(db).display(db),
+                self.right.identity(db).display(db),
+            )
+        })
     }
 }
 
@@ -614,6 +775,22 @@ impl<'db> TypeVarEquivalenceBound<'db> {
             right,
             _phantom: PhantomData,
         }
+    }
+
+    fn display(self, db: &'db dyn Db, holds: Option<bool>) -> impl Display {
+        let equality_sign = match holds {
+            Some(true) => "=",
+            Some(false) => "≠",
+            None => "=?",
+        };
+        std::fmt::from_fn(move |f| {
+            write!(
+                f,
+                "({} {equality_sign} {})",
+                self.left.identity(db).display(db),
+                self.right.identity(db).display(db),
+            )
+        })
     }
 }
 
