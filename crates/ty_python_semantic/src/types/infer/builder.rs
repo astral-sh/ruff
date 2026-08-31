@@ -5762,6 +5762,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // `TypedDict.get` on a field whose type is a literal union. If it is already a subtype
             // of the complete union, there is no need to try the remaining members. Use subtyping
             // for this additional check so a gradual alternative cannot bypass useful type context.
+            //
+            // TODO: Revisit narrowing to individual union members. Comparing the inferred return
+            // type with the full declared union could avoid more redundant inference attempts,
+            // but must preserve the precision provided by type context.
             let return_ty = speculative_bindings.return_type(db, env);
             if !(return_ty.is_assignable_to(db, env, narrowed_ty)
                 || (return_ty
