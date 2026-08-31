@@ -1493,6 +1493,58 @@ x8: EitherList = list(("1", "2", "3"))
 reveal_type(x8)  # revealed: list[int | str]
 ```
 
+## Literal union context for generic calls
+
+Narrowing a small literal union preserves the precise result of a nested generic call, including
+when the return type also contains `Any`:
+
+```py
+from typing import Any, Literal, assert_type
+
+def singleton[T](value: T) -> list[T]:
+    return [value]
+
+def first[T](values: list[T]) -> T:
+    return values[0]
+
+def first_gradual[T](values: list[T]) -> Any | T:
+    return values[0]
+
+precise: Literal["a", "b"] = first(singleton("a"))
+assert_type(precise, Literal["a"])
+
+gradual: Literal["a", "b"] = reveal_type(first_gradual(singleton("a")))  # revealed: Any | Literal["a"]
+```
+
+A result can contain several literal alternatives without including every member of the declared
+union. The surrounding optional type does not add `None` to this result:
+
+```py
+def literal_union(value: Literal["a", "b"]) -> None:
+    result: Literal["a", "b"] | None = first(singleton(value))
+    assert_type(result, Literal["a", "b"])
+```
+
+A generic collection alternative still provides context when it follows literal alternatives. The
+empty list is inferred as `list[str]`:
+
+```py
+type Values = Literal[0, 1, 2]
+
+def identity[T](value: T) -> T:
+    return value
+
+collection: Values | list[str] | None = identity([])
+assert_type(collection, list[str])
+```
+
+The result also stays precise when the matching literal is the last member of the declared union:
+
+```py
+late: Values = first(singleton(2))
+assert_type(late, Literal[2])
+```
+
 ## Assignability diagnostics ignore declared type
 
 The type displayed in an invalid assignment diagnostic should account for the type context, e.g., to
