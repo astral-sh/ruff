@@ -602,16 +602,10 @@ which makes it a good target for benchmarking.
 git clone --branch 3.10 https://github.com/python/cpython.git crates/ruff_linter/resources/test/cpython
 ```
 
-Install `hyperfine`:
-
-```shell
-cargo install --locked hyperfine
-```
-
 To benchmark the release build:
 
 ```shell
-cargo build --release --bin ruff && hyperfine --warmup 10 \
+cargo build --release --bin ruff && uv run --only-dev hyperfine --warmup 10 \
   "./target/release/ruff check ./crates/ruff_linter/resources/test/cpython/ --no-cache -e" \
   "./target/release/ruff check ./crates/ruff_linter/resources/test/cpython/ -e"
 
@@ -631,7 +625,7 @@ Summary
 To benchmark against the ecosystem's existing tools:
 
 ```shell
-hyperfine --ignore-failure --warmup 5 \
+uv run --only-dev hyperfine --ignore-failure --warmup 5 \
   "./target/release/ruff check ./crates/ruff_linter/resources/test/cpython/ --no-cache" \
   "pyflakes crates/ruff_linter/resources/test/cpython" \
   "autoflake --recursive --expand-star-imports --remove-all-unused-imports --remove-unused-variables --remove-duplicate-keys resources/test/cpython" \
@@ -677,7 +671,7 @@ Summary
 To benchmark a subset of rules, e.g. `LineTooLong` and `DocLineTooLong`:
 
 ```shell
-cargo build --release && hyperfine --warmup 10 \
+cargo build --release && uv run --only-dev hyperfine --warmup 10 \
   "./target/release/ruff check ./crates/ruff_linter/resources/test/cpython/ --no-cache -e --select W505,E501"
 ```
 
@@ -717,7 +711,7 @@ will execute Pylint with maximum parallelism and only report errors.
 To benchmark Pyupgrade, run the following from `crates/ruff_linter/resources/test/cpython`:
 
 ```shell
-hyperfine --ignore-failure --warmup 5 --prepare "git reset --hard HEAD" \
+uv run --only-dev hyperfine --ignore-failure --warmup 5 --prepare "git reset --hard HEAD" \
   "find . -type f -name \"*.py\" | xargs -P 0 pyupgrade --py311-plus"
 
 Benchmark 1: find . -type f -name "*.py" | xargs -P 0 pyupgrade --py311-plus
