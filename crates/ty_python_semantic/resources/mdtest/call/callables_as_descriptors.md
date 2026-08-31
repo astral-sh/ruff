@@ -422,6 +422,50 @@ C.f2(1)
 C().f2(1)
 ```
 
+## Decorators returning unions of callables
+
+Each alternative returned by a callable decorator retains the method's binding behavior.
+`staticmethod` and `classmethod` accept these alternatives even when their signatures differ.
+
+```py
+from collections.abc import Callable
+
+def static_decorator(function: object) -> Callable[[int], int] | Callable[[int, str], str]:
+    raise NotImplementedError
+
+type ClassCallable = Callable[[type, int], int]
+type ClassCallables = ClassCallable | Callable[[type, int, str], str]
+
+def class_decorator(function: object) -> ClassCallables:
+    raise NotImplementedError
+
+class C:
+    @staticmethod
+    @static_decorator
+    def static() -> None: ...
+    @classmethod
+    @class_decorator
+    def class_method(cls) -> None: ...
+
+reveal_type(C.static)  # revealed: ((int, /) -> int) | ((int, str, /) -> str)
+reveal_type(C().static)  # revealed: ((int, /) -> int) | ((int, str, /) -> str)
+reveal_type(C.class_method)  # revealed: ((int, /) -> int) | ((int, str, /) -> str)
+reveal_type(C().class_method)  # revealed: ((int, /) -> int) | ((int, str, /) -> str)
+```
+
+An alternative that is not callable still causes an error when applying `staticmethod`.
+
+```py
+def maybe_callable(function: object) -> Callable[[], int] | int:
+    raise NotImplementedError
+
+class Invalid:
+    # error: [invalid-argument-type]
+    @staticmethod
+    @maybe_callable
+    def method() -> None: ...
+```
+
 ## Callable wrappers retain attributes and overloads
 
 `staticmethod` returns the wrapped callable unchanged on attribute access. `classmethod` binds the
