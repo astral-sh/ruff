@@ -7,8 +7,8 @@ use crate::{
     Db, TypeQualifiers,
     place::{Place, PlaceAndQualifiers},
     types::{
-        ApplyTypeMappingVisitor, ClassBase, ClassLiteral, ClassType, DataclassParams, KnownClass,
-        MemberLookupPolicy, SubclassOfType, Type, TypeContext, TypeMapping,
+        ClassBase, ClassLiteral, ClassType, DataclassParams, KnownClass, MemberLookupPolicy,
+        SubclassOfType, Type,
         class::{
             ClassMemberResult, ClassMetaclass, CodeGeneratorKind, DisjointBase,
             DynamicClassHeaderAnchor, DynamicClassScopeOffset, InstanceMemberResult, MroLookup,
@@ -108,36 +108,6 @@ pub enum DynamicClassAnchor<'db> {
         offset: DynamicClassScopeOffset,
         explicit_bases: Box<[Type<'db>]>,
     },
-}
-
-impl<'db> DynamicClassAnchor<'db> {
-    fn apply_type_mapping_impl<'a>(
-        &self,
-        db: &'db dyn Db,
-        type_mapping: &TypeMapping<'a, 'db>,
-        tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
-    ) -> Self {
-        match self {
-            Self::Definition(definition) => Self::Definition(*definition),
-            Self::ScopeOffset {
-                scope,
-                offset,
-                explicit_bases,
-            } => {
-                let mapped_explicit_bases = explicit_bases
-                    .iter()
-                    .map(|base| base.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
-                    .collect::<Box<_>>();
-
-                Self::ScopeOffset {
-                    scope: *scope,
-                    offset: *offset,
-                    explicit_bases: mapped_explicit_bases,
-                }
-            }
-        }
-    }
 }
 
 impl get_size2::GetSize for DynamicClassLiteral<'_> {}
@@ -532,42 +502,6 @@ impl<'db> DynamicClassLiteral<'db> {
             self.name(db),
             self.anchor(db),
             self.members(db),
-            self.has_dynamic_namespace(db),
-            dataclass_params,
-        )
-    }
-}
-
-impl<'db> DynamicClassLiteral<'db> {
-    pub(super) fn apply_type_mapping_impl<'a>(
-        self,
-        db: &'db dyn Db,
-        type_mapping: &TypeMapping<'a, 'db>,
-        tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
-    ) -> Self {
-        let anchor = self
-            .anchor(db)
-            .apply_type_mapping_impl(db, type_mapping, tcx, visitor);
-        let members = self
-            .members(db)
-            .iter()
-            .map(|(name, ty)| {
-                (
-                    name.clone(),
-                    ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-                )
-            })
-            .collect::<Box<_>>();
-        let dataclass_params = self
-            .dataclass_params(db)
-            .map(|params| params.apply_type_mapping_impl(db, type_mapping, tcx, visitor));
-
-        Self::new(
-            db,
-            self.name(db),
-            anchor,
-            members,
             self.has_dynamic_namespace(db),
             dataclass_params,
         )

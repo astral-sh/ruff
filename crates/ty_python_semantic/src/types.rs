@@ -1564,26 +1564,6 @@ impl<'db> DataclassParams<'db> {
             params.field_specifiers(db),
         )
     }
-
-    pub(super) fn apply_type_mapping_impl<'a>(
-        self,
-        db: &'db dyn Db,
-        type_mapping: &TypeMapping<'a, 'db>,
-        tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
-    ) -> Self {
-        let original_field_specifiers = self.field_specifiers(db);
-        let field_specifiers = original_field_specifiers
-            .iter()
-            .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
-            .collect::<Box<_>>();
-
-        if *original_field_specifiers == *field_specifiers {
-            self
-        } else {
-            Self::new(db, self.flags(db), field_specifiers)
-        }
-    }
 }
 
 /// Representation of a type: a set of possible values at runtime.
@@ -8965,16 +8945,6 @@ impl<'db> Type<'db> {
                     }
                 }
             }
-
-            Type::ClassLiteral(class_literal) if type_mapping.as_structural().is_some() => visitor
-                .visit(db, self, type_mapping, || {
-                    Type::ClassLiteral(class_literal.apply_type_mapping_impl(
-                        db,
-                        child_type_mapping,
-                        tcx,
-                        visitor,
-                    ))
-                }),
 
             Type::LiteralValue(_) => match type_mapping {
                 TypeMapping::ApplySpecialization(_)

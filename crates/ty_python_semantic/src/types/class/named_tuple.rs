@@ -7,10 +7,9 @@ use crate::{
     Db,
     place::{Place, PlaceAndQualifiers},
     types::{
-        ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, ClassBase, ClassLiteral,
-        ClassType, GenericContext, KnownClass, KnownInstanceType, MemberLookupPolicy, Parameter,
-        Parameters, PropertyInstanceType, Signature, SubclassOfType, Type, TypeContext,
-        TypeMapping,
+        BindingContext, BoundTypeVarInstance, ClassBase, ClassLiteral, ClassType, GenericContext,
+        KnownClass, KnownInstanceType, MemberLookupPolicy, Parameter, Parameters,
+        PropertyInstanceType, Signature, SubclassOfType, Type, TypeContext, TypeMapping,
         class::{DynamicClassHeaderAnchor, DynamicClassScopeOffset, dynamic_class_header_range},
         definition_expression_type,
         member::Member,
@@ -169,23 +168,6 @@ pub struct DynamicNamedTupleLiteral<'db> {
 }
 
 impl get_size2::GetSize for DynamicNamedTupleLiteral<'_> {}
-
-impl<'db> DynamicNamedTupleLiteral<'db> {
-    pub(super) fn apply_type_mapping_impl<'a>(
-        self,
-        db: &'db dyn Db,
-        type_mapping: &TypeMapping<'a, 'db>,
-        tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
-    ) -> Self {
-        Self::new(
-            db,
-            self.name(db),
-            self.anchor(db)
-                .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-        )
-    }
-}
 
 #[salsa::tracked]
 impl<'db> DynamicNamedTupleLiteral<'db> {
@@ -538,33 +520,6 @@ pub enum DynamicNamedTupleAnchor<'db> {
     },
 }
 
-impl<'db> DynamicNamedTupleAnchor<'db> {
-    fn apply_type_mapping_impl<'a>(
-        &self,
-        db: &'db dyn Db,
-        type_mapping: &TypeMapping<'a, 'db>,
-        tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
-    ) -> Self {
-        match self {
-            Self::CollectionsDefinition { definition, spec } => Self::CollectionsDefinition {
-                definition: *definition,
-                spec: spec.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-            },
-            Self::TypingDefinition(definition) => Self::TypingDefinition(*definition),
-            Self::ScopeOffset {
-                scope,
-                offset,
-                spec,
-            } => Self::ScopeOffset {
-                scope: *scope,
-                offset: *offset,
-                spec: spec.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-            },
-        }
-    }
-}
-
 /// A specification describing the fields of a dynamic `namedtuple`
 /// or `NamedTuple` class.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
@@ -585,29 +540,6 @@ impl<'db> NamedTupleSpec<'db> {
     /// Create a [`NamedTupleSpec`] that indicates a namedtuple class has unknown fields.
     pub(crate) fn unknown(db: &'db dyn Db) -> Self {
         Self::new(db, Box::default(), false)
-    }
-
-    fn apply_type_mapping_impl<'a>(
-        self,
-        db: &'db dyn Db,
-        type_mapping: &TypeMapping<'a, 'db>,
-        tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
-    ) -> Self {
-        let fields = self
-            .fields(db)
-            .iter()
-            .map(|f| NamedTupleField {
-                name: f.name.clone(),
-                ty: f.ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-                default: f
-                    .default
-                    .map(|default| default.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
-                definition: f.definition,
-            })
-            .collect::<Box<_>>();
-
-        Self::new(db, fields, self.has_known_fields(db))
     }
 }
 
