@@ -18,10 +18,11 @@ use std::cell::OnceCell;
 use std::rc::Rc;
 
 use crate::module_name::ModuleName;
+use crate::path::SearchPath;
 
 use super::{
-    ComponentFileFilter, NameResolver, ResolvedNames, StubPackagePaths, normalize_candidates,
-    search_paths, stub_package_index,
+    ComponentFileFilter, ModuleResolutionCandidate, NameResolver, ResolvedNames, StubPackageIndex,
+    StubPackagePaths, normalize_candidates, search_paths, stub_package_index,
 };
 
 pub(super) struct ModuleSearch<'resolver, 'db> {
@@ -64,13 +65,77 @@ impl<'resolver, 'db> ModuleSearch<'resolver, 'db> {
         self.cursor.resolve_child(self.resolver, component_name)
     }
 
-    #[cfg(test)]
-    fn full_module_name(&self, component_name: &str) -> Option<ModuleName> {
+    /// Appends a component name to this search's module name prefix.
+    pub(super) fn full_module_name(&self, component_name: &str) -> Option<ModuleName> {
         let prefix = match &self.cursor {
             SearchCursor::Typing(cursor) => cursor.prefix(),
             SearchCursor::Runtime(cursor) => cursor.prefix(),
         };
         full_module_name(prefix, component_name)
+    }
+
+    /// Searches a module name prefix, optionally within one importing-file fallback path.
+    ///
+    /// The optional search path selects the root candidates. Subsequent components
+    /// advance those candidates, preserving the same search path restriction.
+    pub(super) fn for_prefix(
+        resolver: &'resolver NameResolver<'db>,
+        prefix: &ModuleName,
+        search_path: Option<&SearchPath>,
+    ) -> Option<Self> {
+        let mut components = prefix.components();
+        let component_name = components.next()?;
+        let mut search = Self::new(resolver);
+        if let Some(search_path) = search_path {
+            // An importing-file fallback uses only the given search path,
+            // without a separate stub override search.
+            let context = &resolver.context;
+            let stub_packages = context.mode.is_typing().then(|| {
+                StubPackageIndex::from_search_paths(context.db, std::iter::once(search_path))
+            });
+            let candidates = resolver.discover_roots(
+                component_name,
+                false,
+                std::iter::once(search_path),
+                stub_packages
+                    .as_ref()
+                    .map_or_else(StubPackagePaths::default, StubPackageIndex::all),
+            );
+            let candidates = normalize_candidates(context.db, candidates, true);
+            if candidates.is_empty() {
+                return None;
+            }
+            let prefix = ModuleName::new(component_name)?;
+            search.cursor = match search.cursor {
+                SearchCursor::Typing(_) => {
+                    SearchCursor::Typing(TypingSearchCursor::Prefix(TypingSearchPrefix {
+                        prefix,
+                        root_candidates_from_extra_paths: None,
+                        stub_override_candidates: Vec::new(),
+                        full_search_candidates: OnceCell::from(candidates),
+                    }))
+                }
+                SearchCursor::Runtime(_) => {
+                    SearchCursor::Runtime(RuntimeSearchCursor::Prefix { prefix, candidates })
+                }
+            };
+        } else {
+            search = search.enter_package(component_name)?;
+        }
+        for component_name in components {
+            search = search.enter_package(component_name)?;
+        }
+        Some(search)
+    }
+
+    /// Returns candidates for the module name prefix, including both the stub override
+    /// search and the full search in typing mode. Returns no candidates before the first component.
+    pub(super) fn candidates(&self) -> impl Iterator<Item = &ModuleResolutionCandidate<'db>> {
+        let (stub_override_candidates, candidates) = match &self.cursor {
+            SearchCursor::Typing(cursor) => cursor.candidates(self.resolver),
+            SearchCursor::Runtime(cursor) => (&[][..], cursor.candidates()),
+        };
+        stub_override_candidates.iter().chain(candidates)
     }
 }
 
@@ -246,6 +311,22 @@ impl<'db> TypingSearchCursor<'db> {
         (!candidates.is_empty()).then_some(candidates)
     }
 
+    fn candidates(
+        &self,
+        resolver: &NameResolver<'db>,
+    ) -> (
+        &[ModuleResolutionCandidate<'db>],
+        &[ModuleResolutionCandidate<'db>],
+    ) {
+        match self {
+            Self::Root => (&[], &[]),
+            Self::Prefix(prefix) => (
+                &prefix.stub_override_candidates,
+                prefix.full_search_candidates(resolver),
+            ),
+        }
+    }
+
     fn prefix(&self) -> Option<&ModuleName> {
         match self {
             Self::Root => None,
@@ -386,6 +467,13 @@ impl<'db> RuntimeSearchCursor<'db> {
         (!candidates.is_empty()).then_some(candidates)
     }
 
+    fn candidates(&self) -> &[ModuleResolutionCandidate<'db>] {
+        match self {
+            Self::Root => &[],
+            Self::Prefix { candidates, .. } => candidates,
+        }
+    }
+
     fn prefix(&self) -> Option<&ModuleName> {
         match self {
             Self::Root => None,
@@ -430,20 +518,17 @@ fn full_module_name(prefix: Option<&ModuleName>, component_name: &str) -> Option
 
 #[cfg(test)]
 mod tests {
-    use ruff_db::Db as _;
-    use ruff_db::system::{DbWithWritableSystem, SystemPath, SystemPathBuf};
+    use ruff_db::system::SystemPath;
 
     use crate::db::tests::TestDb;
     use crate::resolve::ModuleResolveMode;
-    use crate::settings::SearchPathSettings;
-    use crate::strategy::FallibleStrategy;
-    use crate::testing::TestCaseBuilder;
+    use crate::testing::enumeration_db;
 
     use super::{ModuleSearch, NameResolver};
 
     #[test]
     fn module_search_can_be_reused_across_sibling_module_resolutions() {
-        let db = search_db(
+        let db = enumeration_db(
             &["/src/acme/reports.py", "/site-packages/acme/tools.py"],
             &[],
         );
@@ -463,7 +548,7 @@ mod tests {
 
     #[test]
     fn sibling_modules_can_be_resolved_correctly_in_any_order() {
-        let db = search_db(
+        let db = enumeration_db(
             &[
                 "/extra/acme/patched.pyi",
                 "/src/acme/__init__.py",
@@ -477,7 +562,7 @@ mod tests {
                 NameResolver::new(&db, db.resolver_environment(), ModuleResolveMode::Typing);
             let acme = ModuleSearch::new(&resolver)
                 .enter_package("acme")
-                .expect("package has an overlay and runtime candidates");
+                .expect("package has a stub override and full search candidates");
             for child in children {
                 let expected = match child {
                     "patched" => "/extra/acme/patched.pyi",
@@ -490,7 +575,7 @@ mod tests {
 
     #[test]
     fn module_resolution_does_not_affect_nested_package_searches() {
-        let db = search_db(
+        let db = enumeration_db(
             &[
                 "/extra/acme/tools/patched.pyi",
                 "/src/acme/__init__.py",
@@ -516,29 +601,6 @@ mod tests {
             assert_resolves_to(&db, tools, "patched", "/extra/acme/tools/patched.pyi");
             assert_resolves_to(&db, tools, "runtime", "/src/acme/tools/runtime.py");
         }
-    }
-
-    fn search_db(paths: &[&str], extra_paths: &[&str]) -> TestDb {
-        let mut db = TestCaseBuilder::new().build().db;
-        db.write_files(paths.iter().map(|path| (*path, "")))
-            .expect("write search fixtures");
-        let settings = SearchPathSettings {
-            src_roots: vec![SystemPathBuf::from("/src")],
-            site_packages_paths: vec![SystemPathBuf::from("/site-packages")],
-            custom_typeshed: Some(SystemPathBuf::from("/typeshed")),
-            extra_paths: extra_paths
-                .iter()
-                .copied()
-                .map(SystemPathBuf::from)
-                .collect(),
-            ..SearchPathSettings::empty()
-        };
-        db.set_search_paths(
-            settings
-                .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
-                .expect("configure search fixtures"),
-        );
-        db
     }
 
     fn assert_resolves_to(db: &TestDb, search: &ModuleSearch, component: &str, expected: &str) {
