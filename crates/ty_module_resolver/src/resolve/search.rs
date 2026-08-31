@@ -22,6 +22,7 @@ use itertools::Either;
 use ruff_db::system::FileType;
 use ruff_python_stdlib::identifiers::is_identifier;
 
+use crate::ResolverEnvironment;
 use crate::db::Db;
 use crate::module::Module;
 use crate::module_name::ModuleName;
@@ -29,31 +30,17 @@ use crate::path::{ModuleDirectory, ModulePath, SearchPath};
 
 use super::{
     CandidatePrecedence, ComponentFileFilter, ModuleNameIngredient, ModuleResolutionCandidate,
-    PyTyped, ResolvedModule, ResolvedNames, ResolverContext, StubPackageIndex, StubPackagePaths,
-    normalize_candidates, resolve_component, resolve_stub_package_in_search_path, search_paths,
-    stub_package_index,
+    ModuleResolveMode, PyTyped, ResolvedModule, ResolvedNames, ResolverContext, StubPackageIndex,
+    StubPackagePaths, normalize_candidates, resolve_component, resolve_stub_package_in_search_path,
+    search_paths, stub_package_index,
 };
 
 /// Lists top-level modules across the configured search paths.
-#[cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "Module listing is consumed by the next change's cached queries"
-    )
-)]
 pub(crate) fn list_root_modules<'db>(context: &ResolverContext<'db>) -> ModuleListing<'db> {
     ModuleSearchCursor::with_configured_search_paths(context).list_modules()
 }
 
 /// Lists immediate submodules of a resolved module across the configured search paths.
-#[cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "Module listing is consumed by the next change's cached queries"
-    )
-)]
 pub(crate) fn list_submodules<'db>(
     context: &ResolverContext<'db>,
     module: Module<'db>,
@@ -89,7 +76,7 @@ impl<'a, 'db> ModuleSearchCursor<'a, 'db> {
     }
 
     /// Starts a search using only the supplied search paths.
-    pub(super) fn with_supplied_search_paths(
+    pub(crate) fn with_supplied_search_paths(
         context: &'a ResolverContext<'db>,
         search_paths: &'db [SearchPath],
     ) -> Self {
@@ -98,7 +85,7 @@ impl<'a, 'db> ModuleSearchCursor<'a, 'db> {
 
     /// Starts a search beneath the given (absolute) module name using
     /// the given root search paths.
-    pub(super) fn for_module_name(
+    pub(crate) fn for_module_name(
         context: &'a ResolverContext<'db>,
         name: &ModuleName,
         paths: &RootSearchPaths<'db>,
@@ -359,11 +346,7 @@ impl<'a, 'db> ModuleSearchCursor<'a, 'db> {
 /// a name like `acme.nested` while a stub override supplies `acme.nested.tools`.
 /// Hence recursive enumeration must search `acme.nested` even while import
 /// statement completion omits it.
-#[derive(Default)]
-#[expect(
-    dead_code,
-    reason = "Module listing is consumed by the next change's cached queries"
-)]
+#[derive(Debug, Default, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct ModuleListing<'db> {
     /// Modules resolved from discovered names, including symlink aliases.
     pub(crate) modules: Box<[Module<'db>]>,
@@ -372,6 +355,65 @@ pub(crate) struct ModuleListing<'db> {
     pub(crate) unresolved_names: Box<[ModuleName]>,
     /// Listed modules that may have enumerable descendants, including files with stub overrides.
     pub(crate) modules_with_possible_children: Box<[Module<'db>]>,
+}
+
+impl<'db> ModuleListing<'db> {
+    /// Returns non-empty module listings for unresolved stub override names.
+    ///
+    /// For example, suppose `/extra` is configured as an extra path and
+    /// `acme-stubs` is a complete stub package (i.e. not marked as partial):
+    ///
+    /// ```text
+    /// /extra/acme/nested/tools.pyi
+    ///
+    /// /site-packages/acme-stubs/__init__.pyi
+    ///
+    /// /site-packages/acme/__init__.py
+    /// /site-packages/acme/nested/__init__.py
+    /// /site-packages/acme/nested/tools.py
+    /// ```
+    ///
+    /// Typing-mode resolution selects the installed stubs for `acme`. Those
+    /// stubs do not supply `acme.nested`, and because the stub package is
+    /// "complete" it prevents falling back to the source package. Nonetheless,
+    /// the extra-path stub still supplies `acme.nested.tools`.
+    ///
+    /// Module enumeration must therefore visit the name `acme.nested` to reach
+    /// `tools`, even though the name itself does not resolve to a module. This
+    /// method returns listings beneath that name without including the name
+    /// among the resolved modules.
+    pub(crate) fn stub_override_listings(
+        &self,
+        db: &'db dyn Db,
+        resolver_environment: ResolverEnvironment<'db>,
+    ) -> impl Iterator<Item = &'db ModuleListing<'db>> {
+        self.unresolved_names.iter().filter_map(move |name| {
+            let name_key = ModuleNameIngredient::new(
+                db,
+                name,
+                ModuleResolveMode::Typing,
+                resolver_environment,
+            );
+            let listing = stub_override_listing(db, name_key);
+            (!listing.is_empty()).then_some(listing)
+        })
+    }
+
+    /// Whether there are no modules or stub override names to visit during recursive enumeration.
+    pub(crate) fn is_empty(&self) -> bool {
+        self.modules.is_empty() && self.unresolved_names.is_empty()
+    }
+}
+
+/// Cache each unresolved name with its environment, just as resolved
+/// packages cache their submodule listings by `Module`.
+#[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+fn stub_override_listing<'db>(
+    db: &'db dyn Db,
+    name: ModuleNameIngredient<'db>,
+) -> ModuleListing<'db> {
+    let context = ResolverContext::new(db, name.resolver_environment(db), name.mode(db));
+    list_submodules_by_name(&context, name.name(db))
 }
 
 /// Returns `Some(name)` for a directory entry that supplies a candidate child
@@ -834,7 +876,7 @@ impl<'db> RuntimeModeResolver<'db> {
     }
 }
 
-pub(super) enum RootSearchPaths<'db> {
+pub(crate) enum RootSearchPaths<'db> {
     Configured,
     Supplied(&'db [SearchPath]),
 }
