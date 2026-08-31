@@ -1834,7 +1834,7 @@ impl<'db> DefinitionInference<'db> {
             )
     }
 
-    fn bindings(
+    pub(crate) fn bindings(
         &self,
         owner: Definition<'db>,
     ) -> impl ExactSizeIterator<Item = (Definition<'db>, Type<'db>)> {

@@ -910,6 +910,29 @@ mod tests {
                 .is_lint_named("missing-direct-dependency")
         );
 
+        // Removing the declaration and its resolution node does not uninstall the package.
+        // The installed inventory must still identify the import as an undeclared dependency.
+        let mut unmanaged = dependency_metadata(root, &path, &[]);
+        unmanaged["resolution"] = json!({
+            "script+test": {"kind": "script", "dependencies": []}
+        });
+        unmanaged["environment"]["packages"] = json!({
+            "installed-leaf": {
+                "name": "leaf", "version": "1.0",
+                "path": site_packages.join("leaf-1.0.dist-info"), "editable": false
+            }
+        });
+        unmanaged["module_owners"]["leaf"] = json!([{"package_id": "installed-leaf"}]);
+        apply_dependency_metadata(&mut db, file, &unmanaged)?;
+        let diagnostics = db.check_file(file);
+        assert_eq!(diagnostics.len(), 1);
+        assert!(
+            diagnostics[0]
+                .id()
+                .is_lint_named("missing-direct-dependency")
+        );
+        assert!(diagnostics[0].headline_message().contains("leaf"));
+
         Ok(())
     }
 

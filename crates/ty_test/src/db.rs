@@ -189,6 +189,10 @@ impl SemanticDb for Db {
         }
     }
 
+    fn unused_dependency_diagnostics(&self, _file: File) -> &[Diagnostic] {
+        &[]
+    }
+
     fn dyn_clone(&self) -> Box<dyn SemanticDb> {
         Box::new(self.clone())
     }

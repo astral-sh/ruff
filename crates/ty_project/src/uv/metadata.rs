@@ -20,6 +20,7 @@ pub(crate) struct UvMetadata {
     workspace_root: SystemPathBuf,
     members: Box<[WorkspaceMember]>,
     environment: Option<SystemPathBuf>,
+    installed_packages: Option<BTreeMap<CharStr, InstalledPackage>>,
     schema: Schema,
     workspace: Option<NodeReference>,
     script: Option<PathNodeReference>,
@@ -53,19 +54,23 @@ impl UvMetadata {
 
         let workspace_root = existing_directory(metadata.workspace_root, "workspace root", system)?;
 
-        let environment = match metadata.environment {
-            Some(environment) => Some(existing_directory(
-                environment.root,
-                "environment root",
-                system,
-            )?),
-            None => None,
+        let (environment, installed_packages) = match metadata.environment {
+            Some(environment) => (
+                Some(existing_directory(
+                    environment.root,
+                    "environment root",
+                    system,
+                )?),
+                environment.packages,
+            ),
+            None => (None, None),
         };
 
         Ok(Self {
             workspace_root,
             members: metadata.members,
             environment,
+            installed_packages,
             schema: metadata.schema,
             workspace: metadata.workspace,
             script: metadata.script,
@@ -165,7 +170,7 @@ fn existing_directory(
 /// See uv's [schema documentation] and [serialization types] for the upstream format.
 ///
 /// [schema documentation]: https://docs.astral.sh/uv/reference/internals/metadata/#schema
-/// [serialization types]: https://github.com/astral-sh/uv/blob/main/crates/uv-resolver/src/lock/export/metadata.rs
+/// [serialization types]: https://github.com/astral-sh/uv/blob/main/crates/uv-lock/src/lock/export/metadata.rs
 #[derive(Deserialize)]
 struct WorkspaceMetadata {
     workspace_root: PathBuf,
@@ -184,6 +189,24 @@ struct WorkspaceMetadata {
 #[derive(Deserialize)]
 struct WorkspaceEnvironment {
     root: PathBuf,
+    // Older uv versions omit this field. When present, even an empty map determines which
+    // packages are installed.
+    #[serde(
+        default,
+        deserialize_with = "string_interner::deserialize_optional_map"
+    )]
+    packages: Option<BTreeMap<CharStr, InstalledPackage>>,
+}
+
+/// The installed package's name and editability, used for import ownership.
+///
+/// For editable installs, source roots come from the resolution: the installed package's `path`
+/// points to distribution metadata instead of source code.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, get_size2::GetSize)]
+struct InstalledPackage {
+    #[serde(deserialize_with = "string_interner::deserialize")]
+    name: CharStr,
+    editable: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, get_size2::GetSize)]

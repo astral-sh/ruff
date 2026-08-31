@@ -251,6 +251,10 @@ impl ty_python_semantic::Db for CorpusDb {
         None
     }
 
+    fn unused_dependency_diagnostics(&self, _file: File) -> &[Diagnostic] {
+        &[]
+    }
+
     fn dyn_clone(&self) -> Box<dyn ty_python_semantic::Db> {
         Box::new(self.clone())
     }
