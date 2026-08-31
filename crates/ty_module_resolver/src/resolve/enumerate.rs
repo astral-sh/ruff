@@ -14,47 +14,9 @@ use crate::path::ModuleDirectory;
 use super::search::ModuleSearchCursor;
 use super::{ModuleResolutionCandidate, ResolvedModule, ResolvedNames, ResolverContext};
 
-/// Lists top-level modules or immediate children of a resolved or unresolved module name.
-#[cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "Module listing is consumed by the next change's cached queries"
-    )
-)]
-fn list_modules<'db>(
-    context: &ResolverContext<'db>,
-    target: &ListingTarget<'db>,
-) -> ModuleListing<'db> {
-    let db = context.db;
-    let name = match target {
-        ListingTarget::Root => None,
-        ListingTarget::ResolvedName(module) => Some(module.name(db)),
-        ListingTarget::UnresolvedName(name) => Some(name),
-    };
-
-    let Some(search) = name.map_or_else(
-        || Some(ModuleSearchCursor::with_configured_search_paths(context)),
-        |prefix| ModuleSearchCursor::with_configured_search_paths(context).for_prefix(prefix),
-    ) else {
-        return ModuleListing::default();
-    };
-
-    search.list_modules()
-}
-
-/// The location whose immediate children should be enumerated.
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "Constructed by the module-listing consumers")
-)]
-enum ListingTarget<'db> {
-    /// Enumerate top-level module names across the configured search paths.
-    Root,
-    /// Enumerate children of this resolved module.
-    ResolvedName(Module<'db>),
-    /// Search an unresolved name for descendants supplied by local stub overrides.
-    UnresolvedName(ModuleName),
+/// Lists top-level modules across the configured search paths.
+pub(crate) fn list_root_modules<'db>(context: &ResolverContext<'db>) -> ModuleListing<'db> {
+    ModuleSearchCursor::with_configured_search_paths(context).list_modules()
 }
 
 /// Resolved modules and unresolved module name prefixes for stub overrides.
@@ -65,20 +27,44 @@ enum ListingTarget<'db> {
 /// Hence recursive enumeration must search `acme.nested` even while import
 /// statement completion omits it.
 #[derive(Default)]
-struct ModuleListing<'db> {
+pub(crate) struct ModuleListing<'db> {
     /// Modules that resolve independently and are also eligible for enumeration.
-    modules: Vec<Module<'db>>,
+    pub(crate) modules: Vec<Module<'db>>,
     /// Unresolved module name prefixes that are nonetheless eligible for enumeration
     /// because they have eligible stub override candidates.
-    stub_override_prefixes: Vec<ModuleName>,
+    pub(crate) stub_override_prefixes: Vec<ModuleName>,
     /// Listed modules that may have descendants, including files with stub overrides.
-    modules_with_possible_children: Vec<Module<'db>>,
+    pub(crate) modules_with_possible_children: Vec<Module<'db>>,
+}
+
+/// Lists immediate submodules of a resolved module across the configured search paths.
+pub(crate) fn list_submodules<'db>(
+    context: &ResolverContext<'db>,
+    module: Module<'db>,
+) -> ModuleListing<'db> {
+    let name = module.name(context.db);
+    list_submodules_by_name(context, name)
+}
+
+/// Lists immediate submodules without requiring the parent name to resolve.
+///
+/// This allows enumeration to reach local stub overrides beneath unresolved prefixes.
+pub(crate) fn list_submodules_by_name<'db>(
+    context: &ResolverContext<'db>,
+    name: &ModuleName,
+) -> ModuleListing<'db> {
+    let Some(search) = ModuleSearchCursor::with_configured_search_paths(context).for_prefix(name)
+    else {
+        return ModuleListing::default();
+    };
+
+    search.list_modules()
 }
 
 impl<'db> ModuleSearchCursor<'_, 'db> {
     /// Given a module, lists immediate submodules of that module; otherwise
     /// lists top-level modules at the start of the search.
-    fn list_modules(&self) -> ModuleListing<'db> {
+    pub(crate) fn list_modules(&self) -> ModuleListing<'db> {
         let context = self.context;
         let db = context.db;
         let prefix = self.prefix();
@@ -252,7 +238,7 @@ mod tests {
     #[cfg(target_family = "unix")]
     use crate::testing::{os_enumeration_db, symlink_enumeration_db};
 
-    use super::{ListingTarget, ModuleListing, list_modules};
+    use super::{ModuleListing, list_root_modules, list_submodules, list_submodules_by_name};
 
     #[test]
     fn preserves_file_precedence_when_listing_roots() {
@@ -568,7 +554,7 @@ mod tests {
         let name = ModuleName::new_static("acme").expect("valid name");
         let module = crate::resolve_real_module_confident(&db, db.resolver_environment(), &name)
             .expect("runtime package");
-        let listing = list_modules(&context, &ListingTarget::ResolvedName(module));
+        let listing = list_submodules(&context, module);
         assert!(listing.stub_override_prefixes.is_empty());
         assert_eq!(listing.modules.len(), 1);
         let child = listing.modules[0];
@@ -649,20 +635,19 @@ mod tests {
         /// Lists modules and checks that enumeration agrees with ordinary resolution.
         #[track_caller]
         fn list_modules(&self, name: Option<&str>) -> ModuleListing<'_> {
-            let target = match name {
-                None => ListingTarget::Root,
+            let context =
+                ResolverContext::new(self, self.resolver_environment(), ModuleResolveMode::Typing);
+            let listing = match name {
+                None => list_root_modules(&context),
                 Some(name) => {
                     let name = ModuleName::new(name).expect("valid module name");
                     match crate::resolve_module_confident(self, self.resolver_environment(), &name)
                     {
-                        Some(module) => ListingTarget::ResolvedName(module),
-                        None => ListingTarget::UnresolvedName(name),
+                        Some(module) => list_submodules(&context, module),
+                        None => list_submodules_by_name(&context, &name),
                     }
                 }
             };
-            let context =
-                ResolverContext::new(self, self.resolver_environment(), ModuleResolveMode::Typing);
-            let listing = list_modules(&context, &target);
             for module in &listing.modules {
                 let name = module.name(self);
                 assert_eq!(
