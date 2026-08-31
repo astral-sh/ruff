@@ -3797,11 +3797,21 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         // For example, if `formal` is `list[T]` and `actual` is `list[int] | None`, we want to
         // specialize `T` to `int`, and so ignore the `None`.
         //
+        // Replace inferable variables with `Unknown` for this filter to avoid solving
+        // specialization constraints separately for each actual union member. Inference below
+        // uses the original formal type to determine the specialization and validate its bounds.
+        //
         // If no elements survive, keep the original union: inferring from `Never` would discard
         // its type variables and skip the bound checks that reject the argument.
-        let actual = actual
-            .discard_disjoint_union_elements(db, self.env, formal, self.inferable)
-            .unless_all_disjoint(actual);
+        let actual = if actual.resolve_type_alias(db).is_union() {
+            let formal = formal
+                .apply_specialization(db, self.generic_context.unknown_specialization(db, None));
+            actual
+                .discard_disjoint_union_elements(db, self.env, formal, self.inferable)
+                .unless_all_disjoint(actual)
+        } else {
+            actual
+        };
         // Ignore inferable variables' bounds when deciding which formal members can match.
         // `list[T]` must survive a comparison with `list[object]` even if `T: str`, so that
         // inference can report the bound violation. It can still be discarded when the
