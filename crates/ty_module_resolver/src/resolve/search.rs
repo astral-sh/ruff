@@ -31,7 +31,7 @@ use super::{
     stub_package_index,
 };
 
-pub(super) struct ModuleSearchCursor<'a, 'db> {
+pub(crate) struct ModuleSearchCursor<'a, 'db> {
     context: &'a ResolverContext<'db>,
     position: Position<'db>,
 }
@@ -43,7 +43,7 @@ impl<'a, 'db> ModuleSearchCursor<'a, 'db> {
     }
 
     /// Starts a search using only the supplied search paths.
-    pub(super) fn with_supplied_search_paths(
+    pub(crate) fn with_supplied_search_paths(
         context: &'a ResolverContext<'db>,
         search_paths: &'db [SearchPath],
     ) -> Self {
@@ -51,7 +51,7 @@ impl<'a, 'db> ModuleSearchCursor<'a, 'db> {
     }
 
     /// Starts a search beneath an absolute module name using the given root paths.
-    pub(super) fn for_prefix(
+    pub(crate) fn for_prefix(
         context: &'a ResolverContext<'db>,
         prefix: &ModuleName,
         paths: &RootSearchPaths<'db>,
@@ -652,7 +652,7 @@ impl<'db> RuntimeModeResolver<'db> {
     }
 }
 
-pub(super) enum RootSearchPaths<'db> {
+pub(crate) enum RootSearchPaths<'db> {
     Configured,
     Supplied(&'db [SearchPath]),
 }
