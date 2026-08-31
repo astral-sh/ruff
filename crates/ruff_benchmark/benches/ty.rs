@@ -992,6 +992,45 @@ accepts_objects(
     });
 }
 
+/// Regression benchmark for contextual inference of `TypedDict.get` with a large literal union.
+///
+/// Passing the result to a typed function should not retry inference against each literal in the
+/// expected type: <https://github.com/astral-sh/ty/issues/4419>.
+fn benchmark_typed_dict_get_large_literal_union(criterion: &mut Criterion) {
+    const NUM_LITERAL_MEMBERS: usize = 1024;
+
+    setup_rayon();
+
+    let mut code = "from typing import Literal, TypedDict\n\nIcon = Literal[\n".to_string();
+    for i in 0..NUM_LITERAL_MEMBERS {
+        writeln!(&mut code, r#"    "icon_{i}","#).ok();
+    }
+    code.push_str(
+        r#"]
+
+class Message(TypedDict, total=False):
+    icon: Icon
+
+def accept_icon(icon: Icon | None) -> None: ...
+
+def check(message: Message, default: Icon | None) -> None:
+    accept_icon(message.get("icon", default))
+"#,
+    );
+
+    criterion.bench_function("ty_micro[typed_dict_get_large_literal_union]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 /// Benchmark for narrowing a large union type through multiple match statements.
 ///
 /// This is extracted from egglog-python's `pretty.py`, where a ~30-class union type
@@ -1776,6 +1815,7 @@ criterion_group!(
     benchmark_many_protocol_members_mismatch,
     benchmark_inherited_recursive_protocol,
     benchmark_vararg_parameter_type_accumulation,
+    benchmark_typed_dict_get_large_literal_union,
     benchmark_very_large_tuple,
     benchmark_large_union_narrowing,
     benchmark_large_isinstance_narrowing,
