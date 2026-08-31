@@ -115,27 +115,24 @@ pub struct Workspace {
 
 #[wasm_bindgen]
 impl Workspace {
+    /// Creates a workspace with defaults that can be overridden by configuration files.
     #[wasm_bindgen(constructor)]
     pub fn new(
         root: &str,
         position_encoding: PositionEncoding,
-        options: JsValue,
+        default_options: JsValue,
     ) -> Result<Workspace, Error> {
-        let options = Options::deserialize_with(
+        let default_options = Options::deserialize_with(
             ValueSource::Cli,
-            serde_wasm_bindgen::Deserializer::from(options),
+            serde_wasm_bindgen::Deserializer::from(default_options),
         )
         .map_err(into_error)?;
 
         let system = WasmSystem::new(SystemPath::new(root));
 
-        let project = ProjectMetadata::from_options(
-            options,
-            SystemPathBuf::from(root),
-            None,
-            &FallibleStrategy,
-        )
-        .map_err(into_error)?;
+        let mut project =
+            ProjectMetadata::discover(SystemPath::new(root), &system).map_err(into_error)?;
+        project.apply_fallback_options(default_options);
 
         let mut db = ProjectDatabase::fallible(project, system.clone()).map_err(into_error)?;
 
@@ -150,6 +147,7 @@ impl Workspace {
         })
     }
 
+    /// Replaces the explicit options, which take precedence over configuration files and defaults.
     #[wasm_bindgen(js_name = "updateOptions")]
     pub fn update_options(&mut self, options: JsValue) -> Result<(), Error> {
         let options = Options::deserialize_with(
@@ -158,36 +156,50 @@ impl Workspace {
         )
         .map_err(into_error)?;
 
-        let project = ProjectMetadata::from_options(
-            options,
-            self.db.project().root(&self.db).to_path_buf(),
-            None,
-            &FallibleStrategy,
-        )
-        .map_err(into_error)?;
+        let mut project = self.db.project().metadata(&self.db).clone();
+        project.replace_override_options(options);
 
-        let merged_options = project.to_merged_options();
-        let (program_settings, program_settings_diagnostics) = merged_options
-            .to_program_settings(&self.system, self.db.vendored(), &FallibleStrategy)
-            .map_err(into_error)?;
-        self.db
-            .project()
-            .update_program(&mut self.db, program_settings);
+        let settings = (|| {
+            let merged_options = project.to_merged_options();
+            let (program_settings, program_settings_diagnostics) = merged_options
+                .to_program_settings(&self.system, self.db.vendored(), &FallibleStrategy)
+                .map_err(into_error)?;
 
-        let (settings, mut settings_diagnostics) = merged_options
-            .to_settings(&self.db, &FallibleStrategy)
-            .map_err(into_error)?;
-        settings_diagnostics.extend(
-            program_settings_diagnostics
-                .into_iter()
-                .map(|diagnostic| diagnostic.into_diagnostic(&self.db)),
-        );
+            let (settings, mut settings_diagnostics) = merged_options
+                .to_settings(&self.db, &FallibleStrategy)
+                .map_err(into_error)?;
+            settings_diagnostics.extend(
+                program_settings_diagnostics
+                    .into_iter()
+                    .map(|diagnostic| diagnostic.into_diagnostic(&self.db)),
+            );
 
-        self.db
-            .project()
-            .reload(&mut self.db, project, Some(settings), settings_diagnostics);
+            Ok((program_settings, settings, settings_diagnostics))
+        })();
 
-        Ok(())
+        match settings {
+            Ok((program_settings, settings, settings_diagnostics)) => {
+                self.db
+                    .project()
+                    .update_program(&mut self.db, program_settings);
+                self.db.project().reload(
+                    &mut self.db,
+                    project,
+                    Some(settings),
+                    settings_diagnostics,
+                );
+                Ok(())
+            }
+            Err(error) => {
+                // Remember the parsed JSON options even if TOML settings are invalid. Repairing
+                // the TOML must not restore an override that was removed in the meantime.
+                let diagnostics = self.db.project().settings_diagnostics(&self.db).to_vec();
+                self.db
+                    .project()
+                    .reload(&mut self.db, project, None, diagnostics);
+                Err(error)
+            }
+        }
     }
 
     #[wasm_bindgen(js_name = "openFile")]
