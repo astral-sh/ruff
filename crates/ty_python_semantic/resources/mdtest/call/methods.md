@@ -829,6 +829,100 @@ class Valid(Base[int], arg=1): ...
 class InvalidType(Base[int], arg="x"): ...  # error: [invalid-argument-type]
 ```
 
+#### Generic subclasses
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+##### Type parameter defaults
+
+When checking `cls` for an inherited `__init_subclass__` hook, the generic subclass retains its type
+parameters rather than replacing them with their defaults. `Child[T]` therefore satisfies the
+receiver bound `Base[T]`.
+
+```py
+class Base[T]:
+    def __init_subclass__(cls, *, flag: bool = False) -> None: ...
+
+class NoDefault[T](Base[T]): ...
+class Child[T = int](Base[T]): ...
+class PartialDefault[U, T = int](Base[T]): ...
+```
+
+Class keyword arguments are still checked against the hook's signature.
+
+```py
+class WithKeyword[T = int](Base[T], flag=True): ...
+
+# error: [invalid-argument-type] "Expected `bool`, found"
+class InvalidKeyword[T = int](Base[T], flag="bad"): ...
+```
+
+##### Explicit receiver annotations
+
+The implicit call also accepts an explicit `cls: type[Base[T]]` annotation.
+
+```py
+class Base[T]:
+    def __init_subclass__(cls: type["Base[T]"]) -> None: ...
+
+class Child[T = int](Base[T]): ...
+```
+
+A hook restricted to `RestrictedBase[int]` rejects a subclass that remains generic, even when `int`
+is its default.
+
+```py
+class RestrictedBase[T]:
+    def __init_subclass__(cls: type["RestrictedBase[int]"]) -> None: ...
+
+class Concrete(RestrictedBase[int]): ...
+
+# error: [invalid-argument-type] "Expected `type[RestrictedBase[int]]`"
+class Invalid[T = int](RestrictedBase[T]): ...
+```
+
+##### Legacy type parameter defaults
+
+The same receiver relationship holds for subclasses using legacy type variables with defaults.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U", default=int)
+
+class Base(Generic[T]):
+    def __init_subclass__(cls) -> None: ...
+
+class Child(Base[U]): ...
+```
+
+##### Keyword arguments using subclass type parameters
+
+Keyword arguments can refer to the subclass's type parameters. The argument must be compatible with
+that type parameter, not just its default: `T` can be specialized to a type other than `int`.
+
+```py
+from typing import cast
+
+class Base[T]:
+    def __init_subclass__(cls, *, value: T) -> None: ...
+
+class Valid[T = int](Base[T], value=cast(T, 1)): ...
+
+# error: [invalid-argument-type] "Expected `T@Invalid`, found `Literal[1]`"
+class Invalid[T = int](Base[T], value=1): ...
+```
+
+An explicitly specialized base accepts the concrete argument.
+
+```py
+class AlsoValid(Base[int], value=1): ...
+```
+
 ## `@staticmethod`
 
 ### Basic
