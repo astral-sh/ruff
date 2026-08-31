@@ -11,6 +11,8 @@ use crate::walk::{ProjectFilesFilter, ProjectFilesWalker};
 pub use db::testing::TestDb;
 pub use db::{ChangeResult, CheckMode, Db, ProjectDatabase, SalsaMemoryDump};
 use files::{Index, Indexed, IndexedFiles};
+#[cfg(feature = "testing")]
+pub use uv::testing;
 
 use metadata::settings::Settings;
 pub use metadata::{ProjectMetadata, ProjectMetadataError};
@@ -41,6 +43,7 @@ pub use uv::{
 };
 
 mod db;
+pub mod dependency;
 mod files;
 pub mod glob;
 pub mod metadata;
@@ -533,6 +536,7 @@ impl Project {
         reporter.set_files(files.len());
 
         diagnostics.extend_from_slice(files.diagnostics());
+        diagnostics.extend_from_slice(dependency::project_dependency_diagnostics(db));
 
         reporter.report_diagnostics(db, diagnostics);
 
@@ -1009,7 +1013,10 @@ pub(crate) fn check_file_impl(
                 return Ok(script.settings_diagnostics(*db).to_vec().into_boxed_slice());
             }
 
-            let diagnostics = ty_python_semantic::check_file(*db, file)?;
+            let dependency_diagnostics = script
+                .map(|script| dependency::script_dependency_diagnostics(*db, script))
+                .unwrap_or_default();
+            let diagnostics = ty_python_semantic::check_file(*db, file, dependency_diagnostics)?;
             let Some(script) = script else {
                 return Ok(diagnostics);
             };
@@ -1177,9 +1184,8 @@ mod tests {
     use ruff_db::files::system_path_to_file;
     use ruff_db::source::source_text;
     use ruff_db::system::{DbWithTestSystem, DbWithWritableSystem as _, SystemPath, SystemPathBuf};
-    use ruff_db::testing::assert_function_query_was_not_run;
+    use ruff_db::testing::assert_function_query_was_not_run_by_name;
     use ty_python_semantic::Db as _;
-    use ty_python_semantic::types::check_types;
 
     #[test]
     fn check_file_skips_type_checking_when_file_cant_be_read() -> ruff_db::system::Result<()> {
@@ -1205,7 +1211,7 @@ mod tests {
         );
 
         let events = db.take_salsa_events();
-        assert_function_query_was_not_run(&db, check_types, db.program_file(file), &events);
+        assert_function_query_was_not_run_by_name(&db, "infer_scope_types", None, &events);
 
         // The user now creates a new file with an empty text. The source text
         // content returned by `source_text` remains unchanged, but the diagnostics should get updated.

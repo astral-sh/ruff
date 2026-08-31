@@ -69,7 +69,7 @@ fn assert_diagnostic_messages(diagnostics: &[Diagnostic], expected: &[&str]) {
 #[track_caller]
 fn assert_file_diagnostics(db: &TestDb, filename: &str, expected: &[&str]) {
     let file = system_path_to_file(db, filename).unwrap();
-    let diagnostics = check_types(db, program_file(db, file));
+    let diagnostics = check_types(db, program_file(db, file), &[]);
 
     assert_diagnostic_messages(&diagnostics, expected);
 }
@@ -77,7 +77,7 @@ fn assert_file_diagnostics(db: &TestDb, filename: &str, expected: &[&str]) {
 #[track_caller]
 fn assert_revealed_type(db: &TestDb, filename: &str, expected: &str) {
     let file = system_path_to_file(db, filename).unwrap();
-    let diagnostics = check_types(db, program_file(db, file));
+    let diagnostics = check_types(db, program_file(db, file), &[]);
     assert_eq!(diagnostics.len(), 1, "{diagnostics:#?}");
 
     let diagnostic = &diagnostics[0];
@@ -695,7 +695,7 @@ fn redundant_condition_lookup_does_not_reenter_scope_inference() -> anyhow::Resu
             .with_rule_selection(rules)
             .build()?;
         let file = system_path_to_file(&db, "/src/main.py")?;
-        let diagnostics = check_types(&db, program_file(&db, file));
+        let diagnostics = check_types(&db, program_file(&db, file), &[]);
         // Require the diagnostic so the cycle check cannot pass merely because the redundant
         // condition was never checked.
         assert_eq!(diagnostics.len(), 1, "{source}\n{diagnostics:#?}");
@@ -767,7 +767,7 @@ if value_{index}:
             .with_file("/src/main.py", &source)
             .build()?;
         let file = system_path_to_file(&db, "/src/main.py")?;
-        let diagnostics = check_types(&db, program_file(&db, file));
+        let diagnostics = check_types(&db, program_file(&db, file), &[]);
         // Sharing the definition lookup must still leave a diagnostic on every condition.
         assert_eq!(diagnostics.len(), repetitions);
 
@@ -1126,7 +1126,7 @@ fn undefined_reveal_fix_updates_after_source_changes() -> anyhow::Result<()> {
         let source = format!("{prefix}{body}");
         db.write_file("/src/main.py", &source)?;
         let file = system_path_to_file(&db, "/src/main.py")?;
-        let diagnostics = check_types(&db, program_file(&db, file));
+        let diagnostics = check_types(&db, program_file(&db, file), &[]);
         let fixes: Vec<_> = diagnostics
             .iter()
             .filter(|diagnostic| diagnostic.id() == DiagnosticId::lint("undefined-reveal"))
@@ -1190,7 +1190,7 @@ fn redundant_elif_fix_preserves_line_endings_and_checks_cleanly() -> anyhow::Res
         }
         db.write_file("/src/main.py", &source)?;
         let file = system_path_to_file(&db, "/src/main.py")?;
-        let diagnostics = check_types(&db, program_file(&db, file));
+        let diagnostics = check_types(&db, program_file(&db, file), &[]);
         let [diagnostic] = diagnostics.as_slice() else {
             anyhow::bail!("expected one diagnostic: {diagnostics:#?}");
         };

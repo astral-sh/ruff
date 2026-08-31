@@ -16,6 +16,9 @@ mod command;
 mod environments;
 mod metadata;
 mod service;
+#[cfg(any(test, feature = "testing"))]
+#[cfg_attr(not(feature = "testing"), expect(unreachable_pub))]
+pub mod testing;
 
 /// Controls which uv integrations ty uses.
 #[derive(

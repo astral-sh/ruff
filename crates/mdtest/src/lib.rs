@@ -11,6 +11,7 @@ use ruff_db::files::File;
 use ruff_db::panic::{PanicError, catch_unwind};
 use ruff_db::source::line_index;
 use ruff_diagnostics::Applicability;
+use ruff_python_ast::PythonVersion;
 use ruff_source_file::{LineIndex, OneIndexed};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -354,7 +355,38 @@ fn apply_snapshot_filters(rendered: &str) -> std::borrow::Cow<'_, str> {
     INLINE_SNAPSHOT_PATH_FILTER.replace_all(rendered, "/$1")
 }
 
-pub fn validate_inline_snapshot(
+/// Check a file's diagnostic assertions and inline snapshots.
+///
+/// Returns snapshot edits when `MDTEST_UPDATE_SNAPSHOTS` is enabled.
+pub fn check_diagnostics(
+    db: &dyn Db,
+    tool_name: &'static str,
+    test_file: &TestFile<'_>,
+    python_version: PythonVersion,
+    diagnostics: &[Diagnostic],
+    options: RunOptions,
+    snapshot_filter: impl Fn(&str) -> String,
+) -> Result<Vec<MarkdownEdit>, FileFailures> {
+    let mut edits = Vec::new();
+    matcher::match_file(db, test_file.file, python_version, diagnostics, options)
+        .and_then(|inline_diagnostics| {
+            validate_inline_snapshot(
+                db,
+                tool_name,
+                test_file,
+                &inline_diagnostics,
+                &mut edits,
+                snapshot_filter,
+            )
+        })
+        .map_err(|by_line| FileFailures {
+            backtick_offsets: test_file.to_code_block_backtick_offsets(),
+            by_line,
+        })?;
+    Ok(edits)
+}
+
+fn validate_inline_snapshot(
     db: &dyn Db,
     tool_name: &'static str,
     test_file: &TestFile<'_>,

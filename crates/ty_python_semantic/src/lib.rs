@@ -89,6 +89,7 @@ pub fn default_lint_registry() -> &'static LintRegistry {
 /// Register all known semantic lints.
 fn register_lints(registry: &mut LintRegistryBuilder) {
     types::register_lints(registry);
+    registry.register_lint(&dependency::UNUSED_DEPENDENCY);
     registry.register_lint(&UNUSED_IGNORE_COMMENT);
     registry.register_lint(&UNUSED_TYPE_IGNORE_COMMENT);
     registry.register_lint(&IGNORE_COMMENT_UNKNOWN_RULE);
@@ -224,12 +225,20 @@ pub(crate) fn module_docstring(db: &dyn Db, file: PythonFile<'_>) -> Option<Stri
 }
 
 pub fn check_file_unwrap(db: &dyn Db, file: ProgramFile<'_>) -> Vec<Diagnostic> {
-    check_file(db, file)
+    check_file(db, file, &[])
         .map(<[ruff_db::diagnostic::Diagnostic]>::into_vec)
         .unwrap_or_else(|error| vec![error])
 }
 
-pub fn check_file(db: &dyn Db, file: ProgramFile<'_>) -> Result<Box<[Diagnostic]>, Diagnostic> {
+/// Checks a Python file, applying suppression comments to any additional diagnostics.
+///
+/// `extra_diagnostics` must refer to this file. The caller must filter out disabled rules and
+/// set the configured severity before passing them here.
+pub fn check_file(
+    db: &dyn Db,
+    file: ProgramFile<'_>,
+    extra_diagnostics: &[Diagnostic],
+) -> Result<Box<[Diagnostic]>, Diagnostic> {
     let source_file = file.file(db);
     let mut diagnostics: Vec<Diagnostic> = Vec::new();
 
@@ -265,7 +274,7 @@ pub fn check_file(db: &dyn Db, file: ProgramFile<'_>) -> Result<Box<[Diagnostic]
         error
     }));
 
-    diagnostics.extend(check_types(db, file));
+    diagnostics.extend(check_types(db, file, extra_diagnostics));
 
     diagnostics.sort_unstable_by(|a, b| a.rendering_sort_key(db).cmp(&b.rendering_sort_key(db)));
 

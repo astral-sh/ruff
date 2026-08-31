@@ -339,29 +339,17 @@ fn run_test(
                 }
             };
 
-            let failure = match matcher::match_file(
+            let failure = mdtest::check_diagnostics(
                 db,
-                test_file.file,
+                "ty",
+                test_file,
                 python_version,
                 &diagnostics,
                 options,
+                |rendered| normalize_site_packages_paths(rendered, python_version),
             )
-            .and_then(|inline_diagnostics| {
-                mdtest::validate_inline_snapshot(
-                    db,
-                    "ty",
-                    test_file,
-                    &inline_diagnostics,
-                    &mut markdown_edits,
-                    |rendered| normalize_site_packages_paths(rendered, python_version),
-                )
-            }) {
-                Ok(()) => None,
-                Err(line_failures) => Some(FileFailures {
-                    backtick_offsets: test_file.to_code_block_backtick_offsets(),
-                    by_line: line_failures,
-                }),
-            };
+            .map(|edits| markdown_edits.extend(edits))
+            .err();
 
             all_diagnostics.extend(diagnostics);
 
