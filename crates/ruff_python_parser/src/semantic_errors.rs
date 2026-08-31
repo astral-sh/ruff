@@ -36,6 +36,9 @@ pub struct SemanticSyntaxChecker {
     /// The checker has traversed past the module docstring boundary (i.e. seen any statement in the
     /// module).
     seen_module_docstring_boundary: bool,
+
+    /// Range of the target of the augmented-assignment statement currently being visited, if any
+    augmented_assignment_target: Option<TextRange>,
 }
 
 impl SemanticSyntaxChecker {
@@ -688,10 +691,19 @@ impl SemanticSyntaxChecker {
 
     /// Check if `name` is `__debug__` in a `Store` or `Del` [`ExprContext`] and emit a
     /// [`SemanticSyntaxErrorKind::WriteToDebug`] if so.
+    ///
+    /// `is_attribute` should be `true` when checking an attribute target (e.g. `x.__debug__`)
+    /// and `false` when checking a bare name (e.g. `__debug__`). `in_augmented_assignment`
+    /// should be `true` when the target is that of an augmented assignment (e.g. `x.__debug__`
+    /// in `x.__debug__ += 1`). Unlike every other way of writing to `__debug__`, CPython did not
+    /// reject augmented assignment to a `__debug__` attribute until Python 3.14; before that, it
+    /// behaved like an ordinary attribute access.
     fn write_to_debug<Ctx: SemanticSyntaxContext>(
         name: &str,
         range: TextRange,
         expr_ctx: ExprContext,
+        is_attribute: bool,
+        in_augmented_assignment: bool,
         removed_in: PythonVersion,
         ctx: &Ctx,
     ) {
@@ -699,11 +711,29 @@ impl SemanticSyntaxChecker {
             return;
         }
         match expr_ctx {
-            ExprContext::Store => Self::add_error(
-                ctx,
-                SemanticSyntaxErrorKind::WriteToDebug(WriteToDebugKind::Store),
-                range,
-            ),
+            ExprContext::Store => {
+                if is_attribute && in_augmented_assignment {
+                    let version = ctx.python_version();
+                    if version >= removed_in {
+                        Self::add_error(
+                            ctx,
+                            SemanticSyntaxErrorKind::WriteToDebug(
+                                WriteToDebugKind::AugmentedAssign {
+                                    version,
+                                    removed_in,
+                                },
+                            ),
+                            range,
+                        );
+                    }
+                } else {
+                    Self::add_error(
+                        ctx,
+                        SemanticSyntaxErrorKind::WriteToDebug(WriteToDebugKind::Store),
+                        range,
+                    );
+                }
+            }
             ExprContext::Del => {
                 let version = ctx.python_version();
                 if version >= removed_in {
@@ -908,6 +938,8 @@ impl SemanticSyntaxChecker {
         self.check_stmt(stmt, ctx);
 
         // update internal state
+        self.augmented_assignment_target = None;
+
         match stmt {
             Stmt::Expr(StmtExpr { value, .. })
                 if !self.seen_module_docstring_boundary && value.is_string_literal_expr() => {}
@@ -935,6 +967,10 @@ impl SemanticSyntaxChecker {
                         }
                     }
                 }
+                self.seen_futures_boundary = true;
+            }
+            Stmt::AugAssign(ast::StmtAugAssign { target, .. }) => {
+                self.augmented_assignment_target = Some(target.range());
                 self.seen_futures_boundary = true;
             }
             _ => {
@@ -1016,7 +1052,21 @@ impl SemanticSyntaxChecker {
                 // test_ok read_from_debug
                 // if __debug__: ...
                 // x = __debug__
-                Self::write_to_debug(id, *range, *expr_ctx, PythonVersion::PY39, ctx);
+
+                // test_err aug_assign_debug
+                // __debug__ += 1
+
+                // `in_augmented_assignment` is only relevant for attribute targets; a bare-name
+                // augmented assignment (`__debug__ += 1`) is a syntax error on every version.
+                Self::write_to_debug(
+                    id,
+                    *range,
+                    *expr_ctx,
+                    false,
+                    false,
+                    PythonVersion::PY39,
+                    ctx,
+                );
 
                 // PLE0118
                 if let Some(stmt) = ctx.global(id) {
@@ -1064,7 +1114,33 @@ impl SemanticSyntaxChecker {
                 // test_ok read_debug_attribute
                 // if x.__debug__: ...
                 // y = x.__debug__
-                Self::write_to_debug(attr, *range, *expr_ctx, PythonVersion::PY314, ctx);
+
+                // test_err aug_assign_debug_attribute_py314
+                // # parse_options: {"target-version": "3.14"}
+                // x.__debug__ += 1
+
+                // test_ok aug_assign_debug_attribute_py313
+                // # parse_options: {"target-version": "3.13"}
+                // x.__debug__ += 1
+
+                // A `__debug__` attribute store that is only *reachable from* an augmented
+                // assignment (here, a comprehension target on the right-hand side) is still an
+                // ordinary illegal write, not an augmented-assignment target, so it is reported
+                // on every version.
+
+                // test_err aug_assign_debug_attribute_rhs
+                // # parse_options: {"target-version": "3.13"}
+                // x.y += [z for a.__debug__ in c]
+                let in_augmented_assignment = self.augmented_assignment_target == Some(*range);
+                Self::write_to_debug(
+                    attr,
+                    *range,
+                    *expr_ctx,
+                    true,
+                    in_augmented_assignment,
+                    PythonVersion::PY314,
+                    ctx,
+                );
             }
             Expr::YieldFrom(_) => {
                 Self::yield_outside_function(ctx, expr, YieldOutsideFunctionKind::YieldFrom);
@@ -1432,6 +1508,15 @@ impl Display for SemanticSyntaxError {
                     write!(
                         f,
                         "cannot delete `__debug__` on Python {version} (syntax was removed in {removed_in})"
+                    )
+                }
+                WriteToDebugKind::AugmentedAssign {
+                    version,
+                    removed_in,
+                } => {
+                    write!(
+                        f,
+                        "cannot assign to `__debug__` on Python {version} (syntax was removed in {removed_in})"
                     )
                 }
             },
@@ -2104,6 +2189,12 @@ impl Display for InvalidExpressionKind {
 pub enum WriteToDebugKind {
     Store,
     Delete {
+        /// The target Python version being checked against.
+        version: PythonVersion,
+        /// The Python version in which this syntax was removed.
+        removed_in: PythonVersion,
+    },
+    AugmentedAssign {
         /// The target Python version being checked against.
         version: PythonVersion,
         /// The Python version in which this syntax was removed.
