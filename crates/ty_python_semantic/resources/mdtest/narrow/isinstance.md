@@ -1084,6 +1084,135 @@ def _(value: Concrete[int]) -> None:
         reveal_type(value.read())  # revealed: int
 ```
 
+## Narrowing protocols with gradual members
+
+### Strict mode
+
+Strict narrowing materializes the protocol's member types as well as its type arguments. The `Any`
+in `Reader.read` becomes `object`, independently of the covariant parameter `T`:
+
+```toml
+[environment]
+python-version = "3.12"
+
+[analysis]
+strict-generic-narrowing = true
+```
+
+```py
+from typing import Any, Protocol, runtime_checkable
+
+@runtime_checkable
+class Reader[T](Protocol):
+    def read(self) -> tuple[T, Any]: ...
+
+def from_object(value: object):
+    if isinstance(value, Reader):
+        reveal_type(value)  # revealed: Top[Reader[object]]
+        reveal_type(value.read())  # revealed: tuple[object, object]
+    else:
+        reveal_type(value)  # revealed: ~Top[Reader[object]]
+```
+
+A known specialization is preserved. The negative branch excludes it completely:
+
+```py
+def from_union(value: Reader[int] | None):
+    if isinstance(value, Reader):
+        reveal_type(value)  # revealed: Reader[int]
+        reveal_type(value.read())  # revealed: tuple[int, Any]
+    else:
+        reveal_type(value)  # revealed: None
+```
+
+### Gradual mode
+
+Gradual narrowing retains the member's `Any` and uses `Unknown` for an unspecified type argument.
+The negative branch still excludes the fully materialized protocol:
+
+```toml
+[environment]
+python-version = "3.12"
+
+[analysis]
+strict-generic-narrowing = false
+```
+
+```py
+from typing import Any, Protocol, runtime_checkable
+
+@runtime_checkable
+class Reader[T](Protocol):
+    def read(self) -> tuple[T, Any]: ...
+
+def from_object(value: object):
+    if isinstance(value, Reader):
+        reveal_type(value)  # revealed: Reader[Unknown]
+        reveal_type(value.read())  # revealed: tuple[Unknown, Any]
+    else:
+        reveal_type(value)  # revealed: ~Top[Reader[object]]
+```
+
+### Non-generic protocols
+
+A protocol can have gradual members without having any type parameters:
+
+```toml
+[analysis]
+strict-generic-narrowing = true
+```
+
+```py
+from typing import Any, Protocol, runtime_checkable
+
+@runtime_checkable
+class Reader(Protocol):
+    def read(self) -> Any: ...
+
+def from_object(value: object):
+    if isinstance(value, Reader):
+        reveal_type(value)  # revealed: Top[Reader]
+        reveal_type(value.read())  # revealed: object
+    else:
+        reveal_type(value)  # revealed: ~Top[Reader]
+```
+
+### Awaitable
+
+`Awaitable.__await__` returns a generator with gradual yield and send types. Strict narrowing
+materializes those types, so sending an arbitrary value is rejected:
+
+```toml
+[analysis]
+strict-generic-narrowing = true
+```
+
+```py
+from collections.abc import Awaitable
+
+async def from_object(value: object):
+    if isinstance(value, Awaitable):
+        reveal_type(value)  # revealed: Top[Awaitable[object]]
+        reveal_type(await value)  # revealed: object
+        generator = value.__await__()
+        reveal_type(generator)  # revealed: Top[Generator[object, Never, object]]
+        # error: [invalid-argument-type] "Expected `Never`, found `Literal[1]`"
+        generator.send(1)
+    else:
+        reveal_type(value)  # revealed: ~Top[Awaitable[object]]
+```
+
+Narrowing an already known awaitable preserves its result type:
+
+```py
+async def from_union(value: Awaitable[int] | None):
+    if isinstance(value, Awaitable):
+        reveal_type(value)  # revealed: Awaitable[int]
+        reveal_type(await value)  # revealed: int
+    else:
+        reveal_type(value)  # revealed: None
+```
+
 ## Narrowing iterables to containers and iterators in strict mode
 
 ```toml

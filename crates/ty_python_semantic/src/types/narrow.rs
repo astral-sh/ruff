@@ -484,18 +484,20 @@ impl ClassInfoConstraintFunction {
         use_generic_filtering: bool,
     ) -> Option<Type<'db>> {
         let constraint_from_class_literal = |class: ClassLiteral<'db>| {
-            let specialization = if use_generic_filtering {
-                class.unknown_specialization(db)
-            } else {
-                // A negative result excludes every specialization of the class.
-                class.top_materialization(db)
-            };
-
-            match self {
+            let specialization = class.unknown_specialization(db);
+            let constraint = match self {
                 ClassInfoConstraintFunction::IsInstance => Type::instance(db, env, specialization),
                 ClassInfoConstraintFunction::IsSubclass => {
                     SubclassOfType::from(db, env, specialization)
                 }
+            };
+
+            if use_generic_filtering {
+                constraint
+            } else {
+                // A negative result excludes every specialization of the class. Materialize the
+                // whole type so that this also covers gradual protocol members.
+                constraint.top_materialization(db, env)
             }
         };
 

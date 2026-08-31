@@ -2619,6 +2619,32 @@ def runtime_protocol_pattern_is_exhaustive(value: RuntimeProtocolImplementer) ->
             return 1
 ```
 
+## Protocol patterns with gradual members
+
+Strict narrowing materializes protocol members as well as type arguments:
+
+```toml
+[environment]
+python-version = "3.12"
+
+[analysis]
+strict-generic-narrowing = true
+```
+
+```py
+from typing import Any, Protocol, runtime_checkable
+
+@runtime_checkable
+class Reader[T](Protocol):
+    def read(self) -> tuple[T, Any]: ...
+
+def from_object(value: object):
+    match value:
+        case Reader() as reader:
+            reveal_type(value)  # revealed: Top[Reader[object]]
+            reveal_type(reader.read())  # revealed: tuple[object, object]
+```
+
 ## Members from the subject type
 
 A keyword pattern reads the attribute from the matched value. The subject type can therefore provide
