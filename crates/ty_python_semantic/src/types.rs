@@ -3512,7 +3512,7 @@ impl<'db> Type<'db> {
                 Some(alias.origin(db).typed_dict_member(
                     db,
                     env,
-                    (name == "__init__").then_some(alias.specialization(db)),
+                    Some(alias.specialization(db)),
                     name,
                     policy,
                 ))
@@ -11124,18 +11124,21 @@ impl<'db> TypeGuardLike<'db> for TypeGuardType<'db> {
 /// Walk the MRO of this class and return the last class just before the specified known base.
 /// This can be used to determine upper bounds for `Self` type variables on methods that are
 /// being added to the given class.
+///
+/// Preserve the class's specialization so that a method on `Child[int]` has a bound such as
+/// `Base[int]`, rather than retaining the type variable in `Base[T@Child]`.
 pub(super) fn determine_upper_bound<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
-    class_literal: ClassLiteral<'db>,
+    class: ClassType<'db>,
     is_known_base: impl Fn(ClassBase<'db>) -> bool,
 ) -> Type<'db> {
-    let upper_bound = class_literal
+    let upper_bound = class
         .iter_mro(db)
         .take_while(|base| !is_known_base(*base))
         .filter_map(ClassBase::into_class)
         .last()
-        .unwrap_or_else(|| class_literal.unknown_specialization(db));
+        .unwrap_or(class);
     Type::instance(db, env, upper_bound)
 }
 

@@ -2068,7 +2068,7 @@ impl<'db> StaticClassLiteral<'db> {
                                 new_upper_bound: determine_upper_bound(
                                     db,
                                     env,
-                                    ClassLiteral::Static(self),
+                                    self.apply_optional_specialization(db, specialization),
                                     |base| {
                                         base.into_class()
                                             .is_some_and(|c| c.is_known(db, KnownClass::Tuple))
@@ -2347,12 +2347,7 @@ impl<'db> StaticClassLiteral<'db> {
         if let Some(member) = self.own_synthesized_member(db, env, specialization, None, name) {
             Place::bound(member).into()
         } else {
-            let class = match specialization {
-                Some(specialization) => {
-                    ClassType::Generic(GenericAlias::new(db, self, specialization))
-                }
-                None => self.identity_specialization(db),
-            };
+            let class = self.apply_optional_specialization(db, specialization);
             let Some(module) = self.typed_dict_module(db) else {
                 return Place::Undefined.into();
             };
