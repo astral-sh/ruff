@@ -655,8 +655,8 @@ def positive(context_expr: Manager):
 
 ## Intersection context managers with multiple union return types
 
-Intersecting independent union return types can require many combinations. When that expansion
-exceeds the complexity limit, we conservatively use the union of the component return types.
+The result must satisfy one alternative from each context manager's union return type. Distributing
+these unions preserves all six possible intersections.
 
 ```py
 class A: ...
@@ -678,7 +678,7 @@ class SecondManager:
 def combine(context_expr: FirstManager):
     if isinstance(context_expr, SecondManager):
         with context_expr as target:
-            reveal_type(target)  # revealed: A | B | C | D | E
+            reveal_type(target)  # revealed: (A & D) | (B & D) | (C & D) | (A & E) | (B & E) | (C & E)
 ```
 
 ## Type aliases preserve context manager behavior

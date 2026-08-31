@@ -44,14 +44,12 @@ impl<'db> CallDunderResult<'db> {
         receiver: Type<'db>,
         results: Vec<Self>,
     ) -> Self {
-        let return_types = results.iter().map(Self::return_type);
-        let return_type = IntersectionType::bounded_from_elements(db, env, return_types.clone())
-            .unwrap_or_else(|| {
-                // Preserve all possible results if exact distribution exceeds the type budget.
-                UnionType::from_elements(db, env, return_types)
-            });
         Self {
-            return_type,
+            return_type: IntersectionType::from_elements(
+                db,
+                env,
+                results.iter().map(Self::return_type),
+            ),
             bindings: Bindings::from_intersection(
                 receiver,
                 results.into_iter().map(Self::into_binding_metadata),
