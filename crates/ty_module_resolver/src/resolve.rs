@@ -36,6 +36,7 @@ use std::borrow::Cow;
 use std::cell::OnceCell;
 use std::fmt;
 use std::iter::FusedIterator;
+use std::rc::Rc;
 
 use compact_str::format_compact;
 use rustc_hash::{FxBuildHasher, FxHashSet};
@@ -261,15 +262,11 @@ fn resolve_module_query<'db>(
     let resolver_environment = module_name.resolver_environment(db);
     let _span = tracing::trace_span!("resolve_module", %name).entered();
 
-    let Some(resolved) = resolve_name(db, resolver_environment, name, mode) else {
+    let resolved = NameResolver::new(db, resolver_environment, mode).resolve(name);
+    if resolved.is_none() {
         tracing::debug!("Module `{name}` not found in search paths");
-        return None;
-    };
-
+    }
     resolved
-        .into_iter()
-        .next()
-        .map(|candidate| candidate.into_module(db, resolver_environment, name))
 }
 
 /// Like `resolve_module_query` but for cases where it failed to resolve the module
@@ -1199,30 +1196,14 @@ struct ModuleNameIngredient<'db> {
     pub(super) resolver_environment: ResolverEnvironment<'db>,
 }
 
-/// Given a module name and a list of search paths in which to lookup modules,
-/// attempt to resolve the module name
-fn resolve_name<'db>(
-    db: &'db dyn Db,
-    resolver_environment: ResolverEnvironment<'db>,
-    name: &ModuleName,
-    mode: ModuleResolveMode,
-) -> Option<ResolvedNames<'db>> {
-    let resolver = NameResolver::new(db, resolver_environment, name, mode);
-
-    match mode {
-        ModuleResolveMode::Typing => {
-            resolver.resolve_typing(stub_package_index(db, resolver_environment))
-        }
-        ModuleResolveMode::Runtime | ModuleResolveMode::RuntimeSomeShadowingAllowed => {
-            resolver.resolve_runtime(search_paths(db, resolver_environment, mode))
-        }
-    }
-}
-
-/// Like `resolve_name` but for cases where it failed to resolve the module
+/// Like `NameResolver::resolve` but for cases where it failed to resolve the module
 /// and we are now Getting Desperate and willing to try the ancestor directories of
 /// the `importing_file` as potential temporary search paths that are private
 /// to this import.
+///
+/// These paths can contain PEP 561 stub packages, but never user-provided extra paths, so typing
+/// resolution indexes them for stub packages without performing a separate stub-overlay pass.
+/// Runtime resolution instead ignores stub packages and `.pyi` files entirely.
 fn desperately_resolve_name<'db>(
     db: &'db dyn Db,
     importing_file: File,
@@ -1232,14 +1213,32 @@ fn desperately_resolve_name<'db>(
 ) -> Option<ResolvedNames<'db>> {
     let importing_file = ResolverFile::new(db, importing_file, resolver_environment);
     let search_paths = absolute_desperate_search_paths(db, importing_file).unwrap_or_default();
-    let resolver = NameResolver::new(db, resolver_environment, name, mode);
-
-    match mode {
-        ModuleResolveMode::Typing => resolver.resolve_desperate_typing(search_paths),
-        ModuleResolveMode::Runtime | ModuleResolveMode::RuntimeSomeShadowingAllowed => {
-            resolver.resolve_runtime(search_paths.iter())
-        }
+    let context = ResolverContext::new(db, resolver_environment, mode);
+    let stub_packages = mode
+        .is_typing()
+        .then(|| StubPackageIndex::from_search_paths(db, search_paths.iter()));
+    let mut candidates = discover_roots(
+        &context,
+        name.first_component(),
+        mode.is_non_shadowable(resolver_environment.python_version(db).minor, name.as_str()),
+        search_paths.iter(),
+        stub_packages
+            .as_ref()
+            .map_or_else(StubPackagePaths::default, StubPackageIndex::all),
+    );
+    let mut components = name.components().skip(1).peekable();
+    candidates = normalize_candidates(db, candidates, components.peek().is_some());
+    while let Some(component) = components.next() {
+        candidates = advance_candidates(
+            &context,
+            candidates,
+            component,
+            ComponentFileFilter::ByMode,
+            components.peek().is_some(),
+        );
     }
+
+    (!candidates.is_empty()).then_some(candidates)
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -1455,152 +1454,387 @@ impl<'db> ModuleDirectory<'db> {
     }
 }
 
-struct NameResolver<'db, 'name> {
+/// Resolves module names against an environment's configured search paths.
+struct NameResolver<'db> {
     context: ResolverContext<'db>,
-    name: &'name ModuleName,
-    is_non_shadowable: bool,
 }
 
-impl<'db, 'name> NameResolver<'db, 'name> {
+impl<'db> NameResolver<'db> {
     fn new(
         db: &'db dyn Db,
         resolver_environment: ResolverEnvironment<'db>,
-        name: &'name ModuleName,
         mode: ModuleResolveMode,
     ) -> Self {
-        let python_version = resolver_environment.python_version(db);
         Self {
             context: ResolverContext::new(db, resolver_environment, mode),
-            name,
-            is_non_shadowable: mode.is_non_shadowable(python_version.minor, name.as_str()),
         }
     }
 
-    /// Resolves the name as seen by a type checker.
+    /// Resolves a complete module name in one of two modes: typing or runtime.
     ///
-    /// This includes PEP 561 stub packages and user-provided stub overlays, with runtime source as
-    /// a fallback when no stub provides the requested module. A stub overlay may use runtime
-    /// packages as parents, but its final module must come from a stub file.
-    fn resolve_typing(&self, stub_packages: &StubPackageIndex) -> Option<ResolvedNames<'db>> {
-        if self.name.components().nth(1).is_none() {
-            let candidates = discover_roots(
-                &self.context,
-                self.name.first_component(),
-                self.is_non_shadowable,
-                search_paths(
-                    self.context.db,
-                    self.context.resolver_environment,
-                    ModuleResolveMode::Typing,
-                ),
-                stub_packages.all(),
-            );
-            return self.resolve_remaining(candidates, ComponentFileFilter::ByMode);
-        }
-
-        // Only submodules need separate overlay resolution: their extra-path namespace parent can
-        // be shadowed before the resolver reaches the requested stub. Reuse those roots for the
-        // normal fallback so that each extra path is probed only once.
-        let (overlay_stub_packages, remaining_stub_packages) = stub_packages.split_overlay();
-        let mut candidates = discover_roots(
-            &self.context,
-            self.name.first_component(),
-            self.is_non_shadowable,
-            search_paths(
-                self.context.db,
-                self.context.resolver_environment,
-                ModuleResolveMode::Typing,
-            )
-            .take_while(|search_path| search_path.is_extra()),
-            overlay_stub_packages,
-        );
-        if let Some(resolved) =
-            self.resolve_remaining(candidates.clone(), ComponentFileFilter::StubOnly)
-        {
-            return Some(resolved);
-        }
-
-        let remaining_candidates = discover_roots(
-            &self.context,
-            self.name.first_component(),
-            self.is_non_shadowable,
-            search_paths(
-                self.context.db,
-                self.context.resolver_environment,
-                ModuleResolveMode::Typing,
-            )
-            .skip_while(|search_path| search_path.is_extra()),
-            remaining_stub_packages,
-        );
-        candidates.extend(remaining_candidates);
-
-        self.resolve_remaining(candidates, ComponentFileFilter::ByMode)
-    }
-
-    /// Resolves the name for type checking against desperate ancestor search paths.
+    /// For example, consider these files, with `extra` configured as an extra search path:
     ///
-    /// These paths can contain PEP 561 stub packages, but never user-provided extra paths, so this
-    /// indexes them for stub packages without performing a separate stub-overlay pass. Runtime
-    /// resolution instead ignores stub packages and `.pyi` files entirely.
-    fn resolve_desperate_typing(&self, search_paths: &[SearchPath]) -> Option<ResolvedNames<'db>> {
-        let stub_packages =
-            StubPackageIndex::from_search_paths(self.context.db, search_paths.iter());
-        let candidates = discover_roots(
-            &self.context,
-            self.name.first_component(),
-            self.is_non_shadowable,
-            search_paths.iter(),
-            stub_packages.all(),
-        );
-        self.resolve_remaining(candidates, ComponentFileFilter::ByMode)
-    }
-
-    /// Resolves the name to the implementation that is available at runtime.
+    /// ```text
+    /// extra
+    /// └── acme
+    ///     └── patched.pyi
+    /// site-packages
+    /// ├── acme-stubs
+    /// │   ├── __init__.pyi
+    /// │   ├── py.typed          # contains "partial"
+    /// │   └── stubbed.pyi
+    /// └── acme
+    ///     ├── __init__.py
+    ///     ├── patched.py
+    ///     ├── stubbed.py
+    ///     └── source_only.py
+    /// ```
     ///
-    /// The runtime resolver ignores stub packages and `.pyi` files. Its search paths also use the
-    /// real standard library instead of typeshed.
-    fn resolve_runtime<'a>(
-        &self,
-        search_paths: impl Iterator<Item = &'a SearchPath>,
-    ) -> Option<ResolvedNames<'db>> {
-        let candidates = discover_roots(
-            &self.context,
-            self.name.first_component(),
-            self.is_non_shadowable,
-            search_paths,
-            StubPackagePaths::default(),
-        );
-        self.resolve_remaining(candidates, ComponentFileFilter::ByMode)
-    }
-
-    fn resolve_remaining(
-        &self,
-        mut cur_candidates: ResolvedNames<'db>,
-        final_filter: ComponentFileFilter,
-    ) -> Option<ResolvedNames<'db>> {
-        let mut components = self.name.components().skip(1).peekable();
-        cur_candidates =
-            normalize_candidates(self.context.db, cur_candidates, components.peek().is_some());
+    /// - **Typing mode** first tries extra-path stub overlays when resolving a submodule.
+    ///   Here, `acme.patched` resolves to `extra/acme/patched.pyi`. While following a dotted name,
+    ///   the overlay search may traverse namespace packages or packages defined by `__init__.py`
+    ///   for the preceding components (i.e., `acme`). It succeeds only if the requested module
+    ///   (`acme.patched`) is defined by a `.pyi` file; finding only `patched.py` would not suffice.
+    ///   If no overlay supplies the submodule, a full search considers stubs and runtime modules
+    ///   under typing precedence: `acme.stubbed` resolves to `acme-stubs/stubbed.pyi`, while
+    ///   `acme.source_only` resolves to `acme/source_only.py`[^1]. Top-level names (e.g., `acme`)
+    ///   go directly through the full search.
+    ///
+    /// - **Runtime mode** searches only runtime modules, ignoring stub packages and `.pyi` files.
+    ///   `acme.patched`, `acme.stubbed`, and `acme.source_only` therefore resolve to their `.py`
+    ///   files under `site-packages/acme`. It also uses the real standard library instead of
+    ///   typeshed's stubs.
+    ///
+    /// [^1]: The `partial` marker allows the full search to use runtime modules missing from the
+    /// stub package. Without this marker, the stub package is treated as complete, so
+    /// `acme.source_only` would not resolve.
+    fn resolve(&self, name: &ModuleName) -> Option<Module<'db>> {
+        let mut search = ModuleSearch::new(self);
+        let mut components = name.components().peekable();
 
         while let Some(component) = components.next() {
-            if cur_candidates.is_empty() {
-                return None;
+            if components.peek().is_none() {
+                return search.resolve_child(component);
             }
-            let has_remaining_components = components.peek().is_some();
-            let file_filter = if has_remaining_components {
-                ComponentFileFilter::ByMode
-            } else {
-                final_filter
-            };
-            cur_candidates = advance_candidates(
-                &self.context,
-                cur_candidates,
-                component,
-                file_filter,
-                has_remaining_components,
-            );
+            search = search.enter_package(component)?;
         }
 
-        (!cur_candidates.is_empty()).then_some(cur_candidates)
+        None
+    }
+}
+
+/// A reusable cursor for resolving immediate children of a module-name prefix.
+struct ModuleSearch<'resolver, 'db> {
+    resolver: &'resolver NameResolver<'db>,
+    cursor: SearchCursor<'db>,
+}
+
+impl<'resolver, 'db> ModuleSearch<'resolver, 'db> {
+    /// Starts before the first module-name component, without probing search paths.
+    fn new(resolver: &'resolver NameResolver<'db>) -> Self {
+        Self {
+            resolver,
+            cursor: SearchCursor::Root,
+        }
+    }
+
+    /// Enters one component without selecting a final module or consuming the parent cursor.
+    ///
+    /// Retains partial stub-package namespaces that may provide descendants even when a concrete
+    /// package or module would shadow them if this component were the final import target.
+    fn enter_package(&self, component: &str) -> Option<Self> {
+        let name = self.child_name(component)?;
+        let context = &self.resolver.context;
+
+        let candidates = match &self.cursor {
+            SearchCursor::Root => SearchCandidates::from_roots(context, component),
+            SearchCursor::Prefix(prefix) => prefix.candidates.enter_package(context, component),
+        };
+        if candidates.is_empty(context, &name) {
+            return None;
+        }
+
+        Some(Self {
+            resolver: self.resolver,
+            cursor: SearchCursor::Prefix(PrefixSearch { name, candidates }),
+        })
+    }
+
+    /// Selects one immediate child using endpoint precedence, leaving its parent reusable.
+    ///
+    /// Typing resolution first tries stub overlays, then the full search including stub packages.
+    /// Runtime resolution searches for runtime files only.
+    fn resolve_child(&self, component: &str) -> Option<Module<'db>> {
+        let name = self.child_name(component)?;
+        let context = &self.resolver.context;
+        self.resolve_child_candidates(&name)
+            .into_iter()
+            .next()
+            .map(|candidate| candidate.into_module(context.db, context.resolver_environment, &name))
+    }
+
+    /// Selects candidates for one immediate child without converting them to a final module.
+    fn resolve_child_candidates(&self, name: &ModuleName) -> ResolvedNames<'db> {
+        let context = &self.resolver.context;
+        if let SearchCursor::Prefix(prefix) = &self.cursor {
+            return prefix
+                .candidates
+                .resolve_child(context, &prefix.name, name.last_component());
+        }
+
+        // A top-level name needs no separate overlay pass: there is no parent to be shadowed.
+        let stubs = if context.mode.is_typing() {
+            stub_package_index(context.db, context.resolver_environment).all()
+        } else {
+            StubPackagePaths::default()
+        };
+
+        let roots = discover_roots(
+            context,
+            name.first_component(),
+            context.mode.is_non_shadowable(
+                context
+                    .resolver_environment
+                    .python_version(context.db)
+                    .minor,
+                name.as_str(),
+            ),
+            search_paths(context.db, context.resolver_environment, context.mode),
+            stubs,
+        );
+
+        normalize_candidates(context.db, roots, false)
+    }
+
+    fn child_name(&self, component: &str) -> Option<ModuleName> {
+        let child = ModuleName::new(component)?;
+        match &self.cursor {
+            SearchCursor::Root => Some(child),
+            SearchCursor::Prefix(prefix) => {
+                let mut name = prefix.name.clone();
+                name.extend(&child);
+                Some(name)
+            }
+        }
+    }
+}
+
+/// The position in a module name, independent of the resolution mode.
+enum SearchCursor<'db> {
+    Root,
+    Prefix(PrefixSearch<'db>),
+}
+
+/// Candidates retained for searching beneath a prefix such as `acme.tools`.
+///
+/// The prefix need not resolve independently: a stub overlay can supply a descendant even when
+/// an installed package shadows its parent.
+struct PrefixSearch<'db> {
+    name: ModuleName,
+    candidates: SearchCandidates<'db>,
+}
+
+/// The mode-specific searches available at a prefix.
+enum SearchCandidates<'db> {
+    Typing(TypingCandidates<'db>),
+    Runtime(ResolvedNames<'db>),
+}
+
+impl<'db> SearchCandidates<'db> {
+    /// Discovers the first component as a parent, retaining candidates for its descendants.
+    ///
+    /// Non-shadowable names apply to the complete import, not its parent prefixes: resolving
+    /// `types.child` does not force `types` to come from stdlib.
+    fn from_roots(context: &ResolverContext<'db>, component: &str) -> Self {
+        if context.mode.is_typing() {
+            return Self::Typing(TypingCandidates::from_roots(context, component));
+        }
+
+        // Runtime mode selects the real standard library instead of typeshed.
+        let paths = search_paths(context.db, context.resolver_environment, context.mode);
+        let roots = discover_roots(
+            context,
+            component,
+            false,
+            paths,
+            // Stub packages do not participate in runtime resolution.
+            StubPackagePaths::default(),
+        );
+
+        Self::Runtime(normalize_candidates(context.db, roots, true))
+    }
+
+    fn enter_package(&self, context: &ResolverContext<'db>, component: &str) -> Self {
+        match self {
+            Self::Typing(typing) => Self::Typing(typing.enter_package(context, component)),
+            Self::Runtime(candidates) => Self::Runtime(advance_candidates(
+                context,
+                candidates.clone(),
+                component,
+                ComponentFileFilter::ByMode,
+                true,
+            )),
+        }
+    }
+
+    fn resolve_child(
+        &self,
+        context: &ResolverContext<'db>,
+        prefix: &ModuleName,
+        component: &str,
+    ) -> ResolvedNames<'db> {
+        match self {
+            Self::Typing(typing) => typing.resolve_child(context, prefix, component),
+            Self::Runtime(candidates) => advance_candidates(
+                context,
+                candidates.clone(),
+                component,
+                ComponentFileFilter::ByMode,
+                false,
+            ),
+        }
+    }
+
+    fn is_empty(&self, context: &ResolverContext<'db>, prefix: &ModuleName) -> bool {
+        match self {
+            Self::Typing(typing) => {
+                // An overlay may supply descendants without probing the rest of the search paths.
+                typing.overlay_candidates.is_empty()
+                    && typing.full_search_candidates(context, prefix).is_empty()
+            }
+            Self::Runtime(candidates) => candidates.is_empty(),
+        }
+    }
+}
+
+/// Typing resolution first searches extra-path stub overlays, then the complete configured paths.
+struct TypingCandidates<'db> {
+    /// Candidates for the current prefix, searched separately so other roots cannot shadow them.
+    overlay_candidates: ResolvedNames<'db>,
+    /// Candidates for the first component from extra paths, before normalization or descent.
+    ///
+    /// The full search combines these with the other roots before applying precedence. Keep the
+    /// originals to avoid probing extra paths again; share them across cursors to avoid copying
+    /// the same starting point at each depth. `None` means no extra-path candidates were found.
+    extra_path_roots: Option<Rc<ResolvedNames<'db>>>,
+    /// Candidates for the current prefix from all paths, including PEP 561 stub packages.
+    ///
+    /// Compute these lazily so overlay-only resolution need not probe other paths, and reuse
+    /// them across sibling lookups.
+    full_search_candidates: OnceCell<ResolvedNames<'db>>,
+}
+
+impl<'db> TypingCandidates<'db> {
+    fn from_roots(context: &ResolverContext<'db>, component: &str) -> Self {
+        let (stubs, _) =
+            stub_package_index(context.db, context.resolver_environment).split_overlay();
+        let roots = discover_roots(
+            context,
+            component,
+            false,
+            search_paths(context.db, context.resolver_environment, context.mode)
+                .take_while(|path| path.is_extra()),
+            stubs,
+        );
+        Self {
+            overlay_candidates: normalize_candidates(context.db, roots.clone(), true),
+            extra_path_roots: (!roots.is_empty()).then(|| Rc::new(roots)),
+            full_search_candidates: OnceCell::new(),
+        }
+    }
+
+    fn enter_package(&self, context: &ResolverContext<'db>, component: &str) -> Self {
+        let overlay_candidates = advance_candidates(
+            context,
+            self.overlay_candidates.clone(),
+            component,
+            ComponentFileFilter::ByMode,
+            true,
+        );
+        // Advance an already computed full search, but do not force it while following an overlay.
+        let full_search_candidates = self.full_search_candidates.get().map(|candidates| {
+            advance_candidates(
+                context,
+                candidates.clone(),
+                component,
+                ComponentFileFilter::ByMode,
+                true,
+            )
+        });
+        Self {
+            overlay_candidates,
+            extra_path_roots: self.extra_path_roots.as_ref().map(Rc::clone),
+            full_search_candidates: full_search_candidates
+                .map(OnceCell::from)
+                .unwrap_or_default(),
+        }
+    }
+
+    fn resolve_child(
+        &self,
+        context: &ResolverContext<'db>,
+        prefix: &ModuleName,
+        component: &str,
+    ) -> ResolvedNames<'db> {
+        // When resolving `acme.tools`, the overlay search may have entered `acme` through
+        // `acme/__init__.py`. The lookup for the requested child `tools` must now find a stub:
+        // `tools.pyi` or `tools/__init__.pyi`, not a runtime `.py` file.
+        let overlay = advance_candidates(
+            context,
+            self.overlay_candidates.clone(),
+            component,
+            ComponentFileFilter::StubOnly,
+            false,
+        );
+        if !overlay.is_empty() {
+            return overlay;
+        }
+
+        advance_candidates(
+            context,
+            self.full_search_candidates(context, prefix).to_vec(),
+            component,
+            ComponentFileFilter::ByMode,
+            false,
+        )
+    }
+
+    /// Builds the complete search once for this prefix, retaining ordinary typing precedence.
+    fn full_search_candidates(
+        &self,
+        context: &ResolverContext<'db>,
+        prefix: &ModuleName,
+    ) -> &[ModuleResolutionCandidate<'db>] {
+        self.full_search_candidates.get_or_init(|| {
+            let (_, stubs) =
+                stub_package_index(context.db, context.resolver_environment).split_overlay();
+            let mut candidates = self
+                .extra_path_roots
+                .as_deref()
+                .cloned()
+                .unwrap_or_default();
+            candidates.extend(discover_roots(
+                context,
+                prefix.first_component(),
+                false,
+                search_paths(context.db, context.resolver_environment, context.mode)
+                    .skip_while(|path| path.is_extra()),
+                stubs,
+            ));
+            // Merge at the first component: a package there can shadow other roots before we
+            // reach the current prefix. Appending candidates at the current depth would be wrong.
+            candidates = normalize_candidates(context.db, candidates, true);
+            for component in prefix.components().skip(1) {
+                candidates = advance_candidates(
+                    context,
+                    candidates,
+                    component,
+                    ComponentFileFilter::ByMode,
+                    true,
+                );
+            }
+            candidates
+        })
     }
 }
 
