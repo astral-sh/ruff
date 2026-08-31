@@ -38,6 +38,7 @@ use uv::DependencyMetadataError;
 pub use uv::{ScriptEnvironmentAvailability, UseUv, UvEnvironments, UvSyncChanges};
 
 mod db;
+pub mod dependency;
 mod files;
 pub mod glob;
 pub mod metadata;
@@ -501,6 +502,7 @@ impl Project {
         reporter.set_files(files.len());
 
         diagnostics.extend_from_slice(files.diagnostics());
+        diagnostics.extend_from_slice(dependency::project_dependency_diagnostics(db));
 
         reporter.report_diagnostics(db, diagnostics);
 

@@ -22,6 +22,7 @@ use ruff_db::Db;
 use ruff_db::files::{File, system_path_to_file};
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_python_ast::PySourceType;
+use rustc_hash::FxHashMap;
 use ty_combine::Combine;
 use ty_project::metadata::Options;
 use ty_project::watch::ChangeEvent;
@@ -41,7 +42,7 @@ use crate::db::Db as _;
 use crate::document::{DocumentKey, DocumentVersion, LanguageId, NotebookDocument};
 use crate::server::{
     Action, LazyWorkDoneProgress, ScriptProgress, publish_all_document_diagnostics,
-    publish_diagnostics_if_needed, publish_settings_diagnostics,
+    publish_diagnostics_if_needed,
 };
 use crate::session::client::Client;
 use crate::session::index::Document;
@@ -126,7 +127,7 @@ pub(crate) struct Session {
 
 /// LSP State for a Project
 pub(crate) struct ProjectState {
-    /// Files that we have outstanding otherwise-untracked pushed diagnostics for.
+    /// The latest pushed diagnostics for otherwise-untracked project files.
     ///
     /// In `CheckMode::OpenFiles` we still read some files that the client hasn't
     /// told us to open. Notably settings files like `pyproject.toml`. In this
@@ -136,10 +137,9 @@ pub(crate) struct ProjectState {
     ///
     /// However diagnostics for those files include things like "you typo'd your
     /// configuration for the LSP itself", so it's really important that we tell
-    /// the user about them! So we remember which ones we have emitted diagnostics
-    /// for so that we can clear the diagnostics for all of them before we go
-    /// to update any of them.
-    pub(crate) untracked_files_with_pushed_diagnostics: Vec<Uri>,
+    /// the user about them! Remembering their diagnostics lets us clear resolved issues
+    /// without repeatedly publishing unchanged diagnostics after Python source edits.
+    pub(crate) pushed_project_diagnostics: FxHashMap<Uri, Vec<lsp_types::Diagnostic>>,
 
     // Note: This field should be last to ensure the `db` gets dropped last.
     // The db drop order matters because we call `Arc::into_inner` on some Arc's
@@ -307,10 +307,6 @@ impl Session {
             return;
         }
 
-        if changes.project.is_some() {
-            publish_settings_diagnostics(self, client, project_root.to_path_buf());
-        }
-
         self.bump_revision();
 
         self.resume_suspended_workspace_diagnostic_request(client);
@@ -395,6 +391,18 @@ impl Session {
     /// any change to the document states (but also when the open workspaces change etc.).
     fn bump_revision(&mut self) {
         self.revision += 1;
+    }
+
+    pub(crate) fn revision(&self) -> u64 {
+        self.revision
+    }
+
+    /// Snapshots each project together with the workspace root that identifies its state.
+    pub(crate) fn project_snapshots(&self) -> Vec<(SystemPathBuf, ProjectDatabase)> {
+        self.projects
+            .iter()
+            .map(|(root, state)| (root.clone(), state.db.clone()))
+            .collect()
     }
 
     /// The LSP specification doesn't allow configuration requests during initialization,
@@ -688,6 +696,7 @@ impl Session {
         }
 
         self.register_capabilities(client);
+        self.bump_revision();
     }
 
     /// Initializes a single workspace folder with the given URI
@@ -822,7 +831,7 @@ impl Session {
         // Carry forward diagnostic state if any exists
         let previous = self.projects.remove(&root);
         let untracked = previous
-            .map(|state| state.untracked_files_with_pushed_diagnostics)
+            .map(|state| state.pushed_project_diagnostics)
             .unwrap_or_default();
         let scripts: Vec<_> = db.project().script_files(&db).iter().collect();
         Self::synchronize_closed_scripts(
@@ -836,11 +845,9 @@ impl Session {
             root.clone(),
             ProjectState {
                 db,
-                untracked_files_with_pushed_diagnostics: untracked,
+                pushed_project_diagnostics: untracked,
             },
         );
-
-        publish_settings_diagnostics(self, client, root);
     }
 
     /// Adds an uninitialized workspace to this session.
@@ -1009,7 +1016,7 @@ impl Session {
         // Remove the associated project database.
         if let Some(project_state) = self.projects.remove(&workspace_path) {
             // Clear diagnostics for any files that had pushed diagnostics in this project.
-            for file_uri in project_state.untracked_files_with_pushed_diagnostics {
+            for file_uri in project_state.pushed_project_diagnostics.into_keys() {
                 self.clear_diagnostics(client, &file_uri);
             }
         }
@@ -1038,11 +1045,21 @@ impl Session {
     }
 
     pub(crate) fn clear_diagnostics_if_needed(&self, document: &DocumentHandle, client: &Client) {
+        if self.has_project_diagnostics(document.uri()) {
+            return;
+        }
         if self.client_capabilities().supports_pull_diagnostics() && !document.is_cell_or_notebook()
         {
             return;
         }
         self.clear_diagnostics(client, document.uri());
+    }
+
+    /// These diagnostics remain owned by the project query even if their document is opened.
+    pub(crate) fn has_project_diagnostics(&self, uri: &Uri) -> bool {
+        self.projects
+            .values()
+            .any(|state| state.pushed_project_diagnostics.contains_key(uri))
     }
 
     /// Clears the diagnostics for the document identified by `uri`.

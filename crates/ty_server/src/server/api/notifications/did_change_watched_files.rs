@@ -1,8 +1,6 @@
 use crate::document::DocumentKey;
 use crate::server::Result;
-use crate::server::api::diagnostics::{
-    publish_all_document_diagnostics, publish_settings_diagnostics,
-};
+use crate::server::api::diagnostics::publish_all_document_diagnostics;
 use crate::server::api::traits::{NotificationHandler, SyncNotificationHandler};
 use crate::session::Session;
 use crate::session::client::Client;
@@ -78,8 +76,7 @@ impl SyncNotificationHandler for DidChangeWatchedFiles {
         for root in roots {
             tracing::debug!("Applying changes to `{root}`");
 
-            session.apply_changes(client, &AnySystemPath::System(root.clone()), &changes);
-            publish_settings_diagnostics(session, client, root);
+            session.apply_changes(client, &AnySystemPath::System(root), &changes);
         }
 
         if client_capabilities.supports_workspace_diagnostic_refresh() {
