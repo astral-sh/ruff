@@ -1,4 +1,4 @@
-use ruff_python_ast::token::{TokenIterWithContext, TokenKind, Tokens, parenthesized_range};
+use ruff_python_ast::token::{TokenIterWithContext, Tokens, parenthesized_range};
 use ruff_python_ast::{self as ast, AnyNodeRef, Expr, ExprCall, OperatorPrecedence};
 use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
@@ -40,11 +40,10 @@ pub fn unwrapped_call_argument(
         .first()
         .filter(|token| token.start() == call.end());
     let needs_boundary_parens = adjacent_before.is_some_and(|token| {
-        token.kind().is_keyword()
-            || (token.kind() == TokenKind::Lbrace && argument_source.starts_with('{'))
+        token.kind().is_keyword() || (token.kind().is_lbrace() && argument_source.starts_with('{'))
     }) || adjacent_after.is_some_and(|token| {
         token.kind().is_keyword()
-            || (token.kind() == TokenKind::Dot
+            || (token.kind().is_dot()
                 && matches!(
                     argument,
                     Expr::NumberLiteral(ast::ExprNumberLiteral {
@@ -87,10 +86,18 @@ pub fn unwrapped_call_argument(
             && !parent_allows_unparenthesized)
         || matches!(
             argument,
-            Expr::Named(_) | Expr::Yield(_) | Expr::YieldFrom(_)
-        )
-        || matches!(argument, Expr::Tuple(tuple) if !tuple.parenthesized)
-        || matches!(argument, Expr::Generator(generator) if !generator.parenthesized);
+            Expr::Named(_)
+                | Expr::Yield(_)
+                | Expr::YieldFrom(_)
+                | Expr::Tuple(ast::ExprTuple {
+                    parenthesized: false,
+                    ..
+                })
+                | Expr::Generator(ast::ExprGenerator {
+                    parenthesized: false,
+                    ..
+                })
+        );
 
     if needs_parens {
         format!("({argument_source})")
