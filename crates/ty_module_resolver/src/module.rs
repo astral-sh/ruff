@@ -1,17 +1,15 @@
 use std::borrow::Cow;
-use std::debug_assert_matches;
 use std::fmt::Formatter;
 use std::str::FromStr;
 
-use ruff_db::files::{File, directory_listing, system_path_to_file, vendored_path_to_file};
-use ruff_db::system::SystemPath;
-use ruff_db::vendored::VendoredPath;
+use ruff_db::files::File;
 use ruff_python_ast::PythonVersion;
 use salsa::Database;
 use salsa::plumbing::AsId;
 
 use crate::module_name::ModuleName;
-use crate::path::{SearchPath, SystemOrVendoredPathRef};
+use crate::path::SearchPath;
+use crate::resolve::{ModuleResolveMode, NameResolver, search_paths};
 use crate::{Db, ResolverEnvironment};
 
 /// Representation of a Python module.
@@ -131,15 +129,13 @@ impl<'db> Module<'db> {
         }
     }
 
-    /// Return a list of all submodules of this module.
+    /// Returns resolved immediate children, including portions of namespace packages.
     ///
-    /// Returns an empty list if the module is not a package, if it is an empty package,
-    /// or if it is a namespace package (one without an `__init__.py` or `__init__.pyi` file).
-    ///
-    /// The names returned correspond to the "base" name of the module.
-    /// That is, `{self.name}.{basename}` should give the full module name.
+    /// Children have fully qualified names and follow typing-mode import resolution.
+    /// Ordinary file modules have no children, but stub overlays may provide descendants
+    /// even when the parent resolves to a runtime file module.
     pub fn all_submodules(self, db: &'db dyn Db) -> &'db [Module<'db>] {
-        all_submodule_names_for_package(db, self).unwrap_or_default()
+        module_children(db, self)
     }
 }
 
@@ -158,138 +154,20 @@ impl std::fmt::Debug for Module<'_> {
     }
 }
 
-#[salsa::tracked(returns(as_deref), heap_size=ruff_memory_usage::heap_size)]
-fn all_submodule_names_for_package<'db>(
-    db: &'db dyn Db,
-    module: Module<'db>,
-) -> Option<Box<[Module<'db>]>> {
-    fn is_submodule(
-        is_dir: bool,
-        is_file: bool,
-        basename: Option<&str>,
-        extension: Option<&str>,
-    ) -> bool {
-        is_dir
-            || (is_file
-                && matches!(extension, Some("py" | "pyi"))
-                && !matches!(basename, Some("__init__.py" | "__init__.pyi")))
-    }
-
-    fn find_package_init_system(db: &dyn Db, dir: &SystemPath) -> Option<File> {
-        let listing = directory_listing(db, dir).ok()?;
-        if listing.entry_is_file(db, dir, "__init__.pyi") {
-            system_path_to_file(db, dir.join("__init__.pyi")).ok()
-        } else if listing.entry_is_file(db, dir, "__init__.py") {
-            system_path_to_file(db, dir.join("__init__.py")).ok()
-        } else {
-            None
-        }
-    }
-
-    fn find_package_init_vendored(db: &dyn Db, dir: &VendoredPath) -> Option<File> {
-        vendored_path_to_file(db, dir.join("__init__.pyi"))
-            .or_else(|_| vendored_path_to_file(db, dir.join("__init__.py")))
-            .ok()
-    }
-
-    // It would be complex and expensive to compute all submodules for
-    // namespace packages, since a namespace package doesn't correspond
-    // to a single file; it can span multiple directories across multiple
-    // search paths. For now, we only compute submodules for traditional
-    // packages that exist in a single directory on a single search path.
-    let Module::File(module) = module else {
-        return None;
+#[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
+fn module_children<'db>(db: &'db dyn Db, module: Module<'db>) -> Box<[Module<'db>]> {
+    let environment = module.resolver_environment(db);
+    let resolver =
+        NameResolver::new(db, environment, ModuleResolveMode::Typing).with_known_package(module);
+    let children = if let Some(path) = module.search_path(db)
+        && !search_paths(db, environment, ModuleResolveMode::Typing)
+            .any(|configured| configured == path)
+    {
+        resolver.children_in_search_path(module.name(db), path)
+    } else {
+        resolver.children(Some(module.name(db)))
     };
-    if !matches!(module.kind(db), ModuleKind::Package) {
-        return None;
-    }
-
-    let path = SystemOrVendoredPathRef::try_from_file(db, module.file(db))?;
-    debug_assert_matches!(path.file_name(), Some("__init__.py" | "__init__.pyi"));
-
-    let resolver_environment = module.resolver_environment(db);
-    Some(match path.parent()? {
-        SystemOrVendoredPathRef::System(parent_directory) => {
-            directory_listing(db, parent_directory)
-                .inspect_err(|error| {
-                    tracing::debug!(
-                        "Failed to read {parent_directory:?} when looking for \
-                         its possible submodules: {error}"
-                    );
-                })
-                .ok()?
-                .iter()
-                .filter(|(name, ty)| {
-                    let path = SystemPath::new(name);
-                    is_submodule(
-                        ty.is_directory(),
-                        ty.is_file(),
-                        path.file_name(),
-                        path.extension(),
-                    )
-                })
-                .filter_map(|(entry_name, file_type)| {
-                    let relative = SystemPath::new(entry_name);
-                    let stem = relative.file_stem()?;
-                    let path = parent_directory.join(relative);
-                    let mut name = module.name(db).clone();
-                    name.extend(&ModuleName::new(stem)?);
-
-                    let (kind, file) = if file_type.is_directory() {
-                        (ModuleKind::Package, find_package_init_system(db, &path)?)
-                    } else {
-                        let file = system_path_to_file(db, &path).ok()?;
-                        (ModuleKind::Module, file)
-                    };
-                    Some(Module::file_module(
-                        db,
-                        file,
-                        resolver_environment,
-                        Cow::Owned(name),
-                        kind,
-                        module.search_path(db).clone(),
-                    ))
-                })
-                .collect()
-        }
-        SystemOrVendoredPathRef::Vendored(parent_directory) => db
-            .vendored()
-            .read_directory(parent_directory)
-            .filter(|entry| {
-                let ty = entry.file_type();
-                let path = entry.path();
-                is_submodule(
-                    ty.is_directory(),
-                    ty.is_file(),
-                    path.file_name(),
-                    path.extension(),
-                )
-            })
-            .filter_map(|entry| {
-                let stem = entry.path().file_stem()?;
-                let mut name = module.name(db).clone();
-                name.extend(&ModuleName::new(stem)?);
-
-                let (kind, file) = if entry.file_type().is_directory() {
-                    (
-                        ModuleKind::Package,
-                        find_package_init_vendored(db, entry.path())?,
-                    )
-                } else {
-                    let file = vendored_path_to_file(db, entry.path()).ok()?;
-                    (ModuleKind::Module, file)
-                };
-                Some(Module::file_module(
-                    db,
-                    file,
-                    resolver_environment,
-                    Cow::Owned(name),
-                    kind,
-                    module.search_path(db).clone(),
-                ))
-            })
-            .collect(),
-    })
+    children.into_boxed_slice()
 }
 
 /// A module that resolves to a file (`lib.py` or `package/__init__.py`).

@@ -34,7 +34,7 @@ fn list_modules_impl<'db>(
     resolver_environment: ResolverEnvironment<'db>,
 ) -> Box<[Module<'db>]> {
     NameResolver::new(db, resolver_environment, ModuleResolveMode::Typing)
-        .root_modules()
+        .children(None)
         .into_boxed_slice()
 }
 
@@ -49,14 +49,12 @@ mod tests {
     use ruff_db::Db as _;
     use ruff_db::files::{File, FilePath, FileRootKind};
     use ruff_db::system::{DbWithTestSystem, DbWithWritableSystem, SystemPath, SystemPathBuf};
-    use ruff_db::testing::{
-        assert_function_query_was_not_run, assert_function_query_was_not_run_by_name,
-    };
+    use ruff_db::testing::assert_function_query_was_not_run;
     use ruff_python_ast::PythonVersion;
-    use salsa::plumbing::AsId as _;
 
     use crate::db::{Db, tests::TestDb};
     use crate::module::Module;
+    use crate::module_name::ModuleName;
     use crate::resolve::{
         ModuleResolveMode, ModuleResolveModeIngredient, dynamic_resolution_paths,
     };
@@ -796,39 +794,36 @@ __path__ = __import__("pkgutil").extend_path(__path__, __name__)
     }
 
     #[test]
-    fn sibling_file_does_not_invalidate_package_submodules() -> anyhow::Result<()> {
+    fn sibling_file_does_not_change_package_submodules() {
         let TestCase { mut db, src, .. } = TestCaseBuilder::new()
-            .with_src_files(&[("package/__init__.py", "")])
+            .with_src_files(&[(
+                "package/__init__.py",
+                r#"
+"#,
+            )])
             .build();
 
-        let package_id = {
+        {
             let package = list_modules(&db)
                 .iter()
                 .find(|module| module.name(&db).as_str() == "package")
                 .copied()
                 .expect("package to exist");
-            package.all_submodules(&db);
-            package.as_id()
-        };
-        db.clear_salsa_events();
+            assert!(package.all_submodules(&db).is_empty());
+        }
 
-        db.write_file(src.join("sibling.py"), "")?;
+        db.write_file(
+            src.join("sibling.py"),
+            r#"
+"#,
+        )
+        .expect("create sibling module");
         let package = list_modules(&db)
             .iter()
             .find(|module| module.name(&db).as_str() == "package")
             .copied()
             .expect("package to exist");
-        package.all_submodules(&db);
-
-        let events = db.take_salsa_events();
-        assert_function_query_was_not_run_by_name(
-            &db,
-            "all_submodule_names_for_package",
-            Some(package_id),
-            &events,
-        );
-
-        Ok(())
+        assert!(package.all_submodules(&db).is_empty());
     }
 
     #[test]
@@ -1579,6 +1574,391 @@ not_a_directory
         );
     }
 
+    #[test]
+    fn enumerate_split_and_nested_namespaces() {
+        let db = enumeration_db(
+            &[
+                "/src/acme/left.py",
+                "/site-packages/acme/right.py",
+                "/src/acme/nested/deep.py",
+                "/src/acme/regular/__init__.py",
+                "/src/acme/regular/namespace/child.py",
+            ],
+            &[],
+        );
+        assert_eq!(
+            enumerated_names(&db),
+            [
+                "acme",
+                "acme.left",
+                "acme.nested",
+                "acme.nested.deep",
+                "acme.regular",
+                "acme.regular.namespace",
+                "acme.regular.namespace.child",
+                "acme.right",
+            ]
+        );
+    }
+
+    #[test]
+    fn enumerate_namespace_children_uses_resolution_precedence() {
+        let db = enumeration_db(
+            &[
+                "/src/acme/duplicate.py",
+                "/site-packages/acme/duplicate.py",
+                "/src/acme/stubbed.py",
+                "/src/acme/stubbed.pyi",
+                "/src/acme/package/__init__.py",
+                "/src/acme/package.pyi",
+                "/src/acme/package/local.py",
+                "/site-packages/acme/package/hidden.py",
+                "/src/acme/module.py",
+                "/site-packages/acme/module/hidden.py",
+            ],
+            &[],
+        );
+        assert_eq!(
+            enumerated_names(&db),
+            [
+                "acme",
+                "acme.duplicate",
+                "acme.module",
+                "acme.package",
+                "acme.package.local",
+                "acme.stubbed",
+            ]
+        );
+        assert_enumerated_file(&db, "acme.duplicate", "/src/acme/duplicate.py");
+        assert_enumerated_file(&db, "acme.stubbed", "/src/acme/stubbed.pyi");
+        assert_enumerated_file(&db, "acme.package", "/src/acme/package/__init__.py");
+    }
+
+    #[test]
+    fn enumerate_deep_namespaces() {
+        let components = (0..32)
+            .map(|depth| format!("level_{depth}"))
+            .collect::<Vec<_>>();
+        let path = format!("/src/{}/leaf.py", components.join("/"));
+        let db = enumeration_db(&[&path], &[]);
+        let names = enumerated_names(&db);
+        assert_eq!(names.len(), 33);
+        assert!(names.contains(&format!("{}.leaf", components.join("."))));
+    }
+
+    #[test]
+    fn enumerate_concrete_parents_shadow_namespace_portions() {
+        for parent in ["/site-packages/acme/__init__.py", "/site-packages/acme.py"] {
+            let db = enumeration_db(&["/src/acme/hidden.py", parent], &[]);
+            assert_eq!(enumerated_names(&db), ["acme"]);
+            assert_enumerated_file(&db, "acme", parent);
+        }
+    }
+
+    #[test]
+    fn enumerate_legacy_namespace_portions() {
+        for declaration in [
+            r#"
+__path__ = __import__("pkgutil").extend_path(__path__, __name__)
+"#,
+            r#"
+import pkgutil
+__path__ = pkgutil.extend_path(__path__, __name__)
+"#,
+            r#"
+__import__("pkg_resources").declare_namespace(__name__)
+"#,
+        ] {
+            let mut db =
+                enumeration_db(&["/src/acme/left.py", "/site-packages/acme/right.py"], &[]);
+            for init in ["/src/acme/__init__.py", "/site-packages/acme/__init__.py"] {
+                db.write_file(init, declaration)
+                    .expect("write legacy declaration");
+            }
+            assert_eq!(enumerated_names(&db), ["acme", "acme.left", "acme.right"]);
+            assert_enumerated_file(&db, "acme", "/src/acme/__init__.py");
+        }
+    }
+
+    #[test]
+    fn enumerate_partial_stub_namespaces() {
+        let mut db = enumeration_db(
+            &[
+                "/src/acme/__init__.py",
+                "/src/acme/api/__init__.py",
+                "/src/acme/api/runtime.py",
+                "/site-packages/acme-stubs/api/stubbed.pyi",
+            ],
+            &[],
+        );
+        db.write_file(
+            "/site-packages/acme-stubs/py.typed",
+            r#"
+partial
+"#,
+        )
+        .expect("preserve partial stub namespace alongside regular runtime packages");
+        assert_eq!(
+            enumerated_names(&db),
+            ["acme", "acme.api", "acme.api.runtime", "acme.api.stubbed"]
+        );
+        assert_enumerated_file(&db, "acme.api", "/src/acme/api/__init__.py");
+        assert_enumerated_file(
+            &db,
+            "acme.api.stubbed",
+            "/site-packages/acme-stubs/api/stubbed.pyi",
+        );
+    }
+
+    #[test]
+    fn enumerate_partial_child_of_complete_stub_package() {
+        let mut db = enumeration_db(
+            &[
+                "/site-packages/acme-stubs/__init__.pyi",
+                "/site-packages/acme-stubs/api/__init__.pyi",
+                "/site-packages/acme-stubs/api/stubbed.pyi",
+                "/src/acme/__init__.py",
+                "/src/acme/hidden.py",
+                "/src/acme/api/__init__.py",
+                "/src/acme/api/runtime.py",
+            ],
+            &[],
+        );
+        db.write_file(
+            "/site-packages/acme-stubs/api/py.typed",
+            r#"
+partial
+"#,
+        )
+        .expect("mark child as partial");
+        assert_eq!(
+            enumerated_names(&db),
+            ["acme", "acme.api", "acme.api.runtime", "acme.api.stubbed"]
+        );
+        assert_enumerated_file(
+            &db,
+            "acme.api",
+            "/site-packages/acme-stubs/api/__init__.pyi",
+        );
+    }
+
+    #[test]
+    fn enumerate_overlay_and_runtime_siblings() {
+        let db = enumeration_db(
+            &[
+                "/extra/acme/stubbed.pyi",
+                "/src/acme/__init__.py",
+                "/src/acme/stubbed.py",
+                "/src/acme/runtime.py",
+            ],
+            &["/extra"],
+        );
+        assert_eq!(
+            enumerated_names(&db),
+            ["acme", "acme.runtime", "acme.stubbed"]
+        );
+        assert_enumerated_file(&db, "acme.stubbed", "/extra/acme/stubbed.pyi");
+        assert_enumerated_file(&db, "acme.runtime", "/src/acme/runtime.py");
+    }
+
+    #[test]
+    fn enumerate_overlay_descendants_of_runtime_module() {
+        let db = enumeration_db(
+            &[
+                "/extra/acme/api/stubbed.pyi",
+                "/src/acme/__init__.py",
+                "/src/acme/api.py",
+            ],
+            &["/extra"],
+        );
+        assert_eq!(
+            enumerated_names(&db),
+            ["acme", "acme.api", "acme.api.stubbed"]
+        );
+        assert_enumerated_file(&db, "acme.api", "/src/acme/api.py");
+        assert_enumerated_file(&db, "acme.api.stubbed", "/extra/acme/api/stubbed.pyi");
+    }
+
+    #[test]
+    fn enumeration_tracks_files_and_initializers() {
+        let mut db = enumeration_db(&["/src/acme/left.py", "/site-packages/acme/right.py"], &[]);
+        assert_eq!(enumerated_names(&db), ["acme", "acme.left", "acme.right"]);
+        db.write_file(
+            "/src/acme/nested/new.py",
+            r#"
+"#,
+        )
+        .expect("create nested namespace and module");
+        assert_eq!(
+            enumerated_names(&db),
+            [
+                "acme",
+                "acme.left",
+                "acme.nested",
+                "acme.nested.new",
+                "acme.right"
+            ]
+        );
+        remove_enumerated_file(&mut db, "/src/acme/nested/new.py");
+        assert_eq!(
+            enumerated_names(&db),
+            ["acme", "acme.left", "acme.nested", "acme.right"]
+        );
+
+        db.write_file(
+            "/src/acme/__init__.py",
+            r#"
+"#,
+        )
+        .expect("turn namespace into regular package");
+        assert_eq!(enumerated_names(&db), ["acme", "acme.left", "acme.nested"]);
+        db.write_file(
+            "/src/acme/__init__.py",
+            r#"
+__path__ = __import__("pkgutil").extend_path(__path__, __name__)
+"#,
+        )
+        .expect("turn initializer into a legacy namespace declaration");
+        assert_eq!(
+            enumerated_names(&db),
+            ["acme", "acme.left", "acme.nested", "acme.right"]
+        );
+        remove_enumerated_file(&mut db, "/src/acme/__init__.py");
+        assert_eq!(
+            enumerated_names(&db),
+            ["acme", "acme.left", "acme.nested", "acme.right"]
+        );
+    }
+
+    #[test]
+    fn enumeration_tracks_typing_marker_changes() {
+        let mut db = enumeration_db(
+            &[
+                "/site-packages/acme-stubs/__init__.pyi",
+                "/src/acme/__init__.py",
+                "/src/acme/runtime.py",
+            ],
+            &[],
+        );
+        assert_eq!(enumerated_names(&db), ["acme"]);
+        let marker = "/site-packages/acme-stubs/py.typed";
+        db.write_file(
+            marker,
+            r#"
+partial
+"#,
+        )
+        .expect("create partial marker");
+        assert_eq!(enumerated_names(&db), ["acme", "acme.runtime"]);
+        db.write_file(
+            marker, r#"
+"#,
+        )
+        .expect("make marker complete");
+        assert_eq!(enumerated_names(&db), ["acme"]);
+        db.write_file(
+            marker,
+            r#"
+partial
+"#,
+        )
+        .expect("make marker partial again");
+        assert_eq!(enumerated_names(&db), ["acme", "acme.runtime"]);
+        remove_enumerated_file(&mut db, marker);
+        assert_eq!(enumerated_names(&db), ["acme"]);
+    }
+
+    #[test]
+    #[cfg(target_family = "unix")]
+    fn enumerate_preserves_symlink_boundary_and_shadowing() {
+        let (_temp, db, root) = os_enumeration_db();
+        for path in [
+            "src/acme/own.py",
+            "site-packages/acme/hidden.py",
+            "site-packages/acme/ns/masked.py",
+            "site-packages/acme/ns/visible.py",
+            "site-packages/acme/blocked/visible.py",
+            "other_ns/masked.py",
+            "other_ns/source_only.py",
+            "regular/__init__.py",
+            "regular/child.py",
+            "regular/nested/__init__.py",
+            "regular/nested/child.py",
+            "target.py",
+        ] {
+            let path = root.join(path);
+            std::fs::create_dir_all(path.parent().expect("fixture parent").as_std_path())
+                .expect("create fixture directory");
+            std::fs::write(
+                path.as_std_path(),
+                r#"
+"#,
+            )
+            .expect("write symlink fixture");
+        }
+        for (source, link) in [
+            ("target.py", "src/top_alias.py"),
+            ("target.py", "src/acme/hidden.py"),
+            ("other_ns", "src/acme/ns"),
+            ("regular", "src/acme/blocked"),
+            ("src/acme", "src/alias"),
+            ("target.py", "regular/linked.py"),
+            ("other_ns", "regular/linked_dir"),
+        ] {
+            std::os::unix::fs::symlink(
+                root.join(source).as_std_path(),
+                root.join(link).as_std_path(),
+            )
+            .expect("create fixture symlink");
+        }
+        assert_eq!(
+            enumerated_names(&db),
+            [
+                "acme",
+                "acme.ns",
+                "acme.ns.visible",
+                "acme.own",
+                "alias",
+                "alias.own",
+                "top_alias",
+            ]
+        );
+        for name in ["acme.hidden", "acme.ns.masked", "acme.blocked"] {
+            assert!(
+                crate::resolve_module_confident(
+                    &db,
+                    db.resolver_environment(),
+                    &ModuleName::new(name).expect("valid module name")
+                )
+                .is_some(),
+                "ordinary resolution still follows symlinks for {name}"
+            );
+        }
+
+        // An explicit import can resolve a package through a nested symlink. Completion
+        // lists its ordinary children, while still excluding new symlinks below that package.
+        for (name, expected) in [
+            (
+                "acme.blocked",
+                vec!["acme.blocked.child", "acme.blocked.nested"],
+            ),
+            ("acme.blocked.nested", vec!["acme.blocked.nested.child"]),
+        ] {
+            let package = crate::resolve_module_confident(
+                &db,
+                db.resolver_environment(),
+                &ModuleName::new(name).expect("valid package name"),
+            )
+            .expect("resolve explicitly named symlink package");
+            let children: Vec<_> = package
+                .all_submodules(&db)
+                .iter()
+                .map(|module| module.name(&db).as_str())
+                .collect();
+            assert_eq!(children, expected);
+        }
+    }
+
     /// This is a regression test for mishandling of file root matching.
     ///
     /// In particular, in some cases, `/` is added as a search root. This
@@ -1613,6 +1993,102 @@ not_a_directory
         ]
         "#,
         );
+    }
+
+    fn enumeration_db(paths: &[&str], extra_paths: &[&str]) -> TestDb {
+        let TestCase { mut db, .. } = TestCaseBuilder::new().build();
+        db.write_files(paths.iter().map(|path| {
+            (
+                *path, r#"
+"#,
+            )
+        }))
+        .expect("create enumeration fixtures");
+        let settings = SearchPathSettings {
+            src_roots: vec![SystemPathBuf::from("/src")],
+            site_packages_paths: vec![SystemPathBuf::from("/site-packages")],
+            custom_typeshed: Some(SystemPathBuf::from("/typeshed")),
+            extra_paths: extra_paths
+                .iter()
+                .copied()
+                .map(SystemPathBuf::from)
+                .collect(),
+            ..SearchPathSettings::empty()
+        };
+        db.set_search_paths(
+            settings
+                .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
+                .expect("configure enumeration search paths"),
+        );
+        db
+    }
+
+    fn enumerated_names(db: &TestDb) -> Vec<String> {
+        super::all_modules(db, db.resolver_environment())
+            .into_iter()
+            .map(|module| {
+                let name = module.name(db);
+                assert_eq!(
+                    Some(module),
+                    crate::resolve_module_confident(db, db.resolver_environment(), name),
+                    "enumeration must agree with resolution for {name}"
+                );
+                name.to_string()
+            })
+            .collect()
+    }
+
+    fn assert_enumerated_file(db: &TestDb, name: &str, expected: &str) {
+        let modules = super::all_modules(db, db.resolver_environment());
+        let module = modules
+            .iter()
+            .find(|module| module.name(db).as_str() == name)
+            .expect("module should be enumerated");
+        let file = module.file(db).expect("module should have a defining file");
+        assert_eq!(
+            file.path(db).as_system_path(),
+            Some(SystemPath::new(expected))
+        );
+    }
+
+    fn remove_enumerated_file(db: &mut TestDb, path: &str) {
+        db.memory_file_system()
+            .remove_file(path)
+            .expect("remove fixture file");
+        File::sync_path(db, SystemPath::new(path));
+    }
+
+    #[cfg(target_family = "unix")]
+    fn os_enumeration_db() -> (tempfile::TempDir, TestDb, SystemPathBuf) {
+        let temp = tempfile::TempDir::new().expect("create enumeration workspace");
+        let canonical = temp
+            .path()
+            .canonicalize()
+            .expect("canonical workspace path");
+        let root = SystemPathBuf::from_path_buf(canonical).expect("UTF-8 workspace path");
+        for path in ["src", "site-packages", "typeshed/stdlib"] {
+            std::fs::create_dir_all(root.join(path).as_std_path()).expect("create search root");
+        }
+        std::fs::write(
+            root.join("typeshed/stdlib/VERSIONS").as_std_path(),
+            r#"
+"#,
+        )
+        .expect("write empty typeshed versions");
+        let mut db = TestDb::new();
+        db.use_system(ruff_db::system::OsSystem::new(&root));
+        let settings = SearchPathSettings {
+            src_roots: vec![root.join("src")],
+            site_packages_paths: vec![root.join("site-packages")],
+            custom_typeshed: Some(root.join("typeshed")),
+            ..SearchPathSettings::empty()
+        };
+        db.set_search_paths(
+            settings
+                .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
+                .expect("configure real filesystem search paths"),
+        );
+        (temp, db, root)
     }
 
     fn assert_listed_file(db: &TestDb, name: &str, expected: &SystemPath) {

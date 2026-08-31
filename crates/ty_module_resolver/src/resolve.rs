@@ -1385,6 +1385,43 @@ impl ModuleResolutionCandidate {
         )
     }
 
+    /// Discovery follows top-level symlinks and the path to a known package, but excludes
+    /// symlinks below either starting point.
+    /// This check never removes candidates from resolution, where they can still shadow others.
+    fn is_discoverable(&self, db: &dyn Db, known_package: Option<&SystemPath>) -> bool {
+        let Some(root) = self.path.search_path().as_system_path() else {
+            return true;
+        };
+        let path = match self.module {
+            ResolvedModule::Module(file) => {
+                file.path(db).as_system_path().map(SystemPath::to_path_buf)
+            }
+            _ => self.path.to_system_path(),
+        };
+        let Some(path) = path else { return false };
+        // An explicit import may have reached a package through a nested symlink. Its
+        // own directory is already known; only new entries below it need checking.
+        // Other namespace portions and stub overlays keep their full ancestry checks.
+        let known_package = known_package.filter(|package| path.starts_with(package));
+        let root = known_package.unwrap_or(root);
+        let Ok(relative) = path.strip_prefix(root) else {
+            return false;
+        };
+        let mut parent = root.to_path_buf();
+        for (depth, component) in relative.components().enumerate() {
+            if (known_package.is_some() || depth > 0)
+                && directory_listing(db, &parent)
+                    .ok()
+                    .and_then(|listing| listing.file_type(component.as_str()))
+                    .is_none_or(FileType::is_symlink)
+            {
+                return false;
+            }
+            parent.push(component.as_str());
+        }
+        true
+    }
+
     fn to_str<'a>(&self, db: &'a dyn Db) -> Cow<'a, str> {
         match self.module {
             ResolvedModule::NamespacePackage => {
@@ -1400,6 +1437,7 @@ impl ModuleResolutionCandidate {
 /// Resolves module names against an environment's configured search paths.
 pub(crate) struct NameResolver<'db> {
     context: ResolverContext<'db>,
+    known_package: Option<&'db SystemPath>,
 }
 
 impl<'db> NameResolver<'db> {
@@ -1411,7 +1449,23 @@ impl<'db> NameResolver<'db> {
     ) -> Self {
         Self {
             context: ResolverContext::new(db, resolver_environment, mode),
+            known_package: None,
         }
+    }
+
+    /// Allows child discovery beneath an already resolved initializer-backed package.
+    ///
+    /// Explicit imports can reach nested symlink packages that global discovery skips.
+    /// Only the selected package directory is exempt, not its children or other portions.
+    pub(crate) fn with_known_package(mut self, module: Module<'db>) -> Self {
+        let db = self.context.db;
+        if module.kind(db) == ModuleKind::Package
+            && let Some(file) = module.file(db)
+            && let Some(path) = file.path(db).as_system_path()
+        {
+            self.known_package = path.parent();
+        }
+        self
     }
 
     /// Resolves a complete module name using the configured search paths and resolution mode.
@@ -1436,22 +1490,59 @@ impl<'db> NameResolver<'db> {
         None
     }
 
-    /// Lists top-level modules using the same precedence as ordinary resolution.
-    pub(crate) fn root_modules(&self) -> Vec<Module<'db>> {
-        let context = &self.context;
-        let mut names = BTreeSet::new();
-        for path in search_paths(context.db, context.resolver_environment, context.mode) {
-            collect_child_names(context, &path.to_module_path(), &mut names);
+    /// Discovers resolved immediate children.
+    /// `None` discovers top-level modules.
+    pub(crate) fn children(&self, package: Option<&ModuleName>) -> Vec<Module<'db>> {
+        let mut search = ModuleSearch::new(self);
+        if let Some(package) = package {
+            for component in package.components() {
+                let Some(child) = search.enter_package(component) else {
+                    return Vec::new();
+                };
+                search = child;
+            }
         }
+        search.children()
+    }
 
-        let search = ModuleSearch::new(self);
-        names
-            .into_iter()
-            .filter_map(|name| {
-                context.db.unwind_if_revision_cancelled();
-                search.resolve_child(&name)
-            })
-            .collect()
+    /// Lists children of a known package found outside the configured search paths.
+    ///
+    /// Import-statement completion can reach such packages through desperate resolution.
+    /// This preserves that package's location without adding roots to global discovery.
+    pub(crate) fn children_in_search_path(
+        &self,
+        package: &ModuleName,
+        search_path: &SearchPath,
+    ) -> Vec<Module<'db>> {
+        let context = &self.context;
+        let stubs = StubPackageIndex::from_search_paths(context.db, std::iter::once(search_path));
+        let mut candidates = normalize_candidates(
+            context.db,
+            self.discover_roots(
+                package.first_component(),
+                false,
+                std::iter::once(search_path),
+                stubs.all(),
+            ),
+            true,
+        );
+        for component in package.components().skip(1) {
+            candidates = advance_candidates(
+                context,
+                candidates,
+                component,
+                ComponentFileFilter::ByMode,
+                true,
+            );
+        }
+        ModuleSearch {
+            resolver: self,
+            name: Some(package.clone()),
+            overlay: Vec::new(),
+            overlay_roots: None,
+            fallback: OnceCell::from(candidates),
+        }
+        .children()
     }
 
     fn is_non_shadowable(&self, name: &ModuleName) -> bool {
@@ -1637,7 +1728,63 @@ impl<'resolver, 'db> ModuleSearch<'resolver, 'db> {
     fn resolve_child(&self, component: &str) -> Option<Module<'db>> {
         let name = self.child_name(component)?;
         let context = &self.resolver.context;
-        let candidates = if self.name.is_none() {
+        self.resolve_child_candidates(&name)
+            .into_iter()
+            .next()
+            .map(|candidate| candidate.into_module(context.db, context.resolver_environment, &name))
+    }
+
+    /// Enumerates names once, sharing prefix state across sibling resolutions.
+    fn children(&self) -> Vec<Module<'db>> {
+        let context = &self.resolver.context;
+        let mut names = BTreeSet::new();
+        if self.name.is_none() {
+            for path in search_paths(context.db, context.resolver_environment, context.mode) {
+                collect_child_names(
+                    self.resolver,
+                    &ModuleResolutionCandidate::root(path),
+                    true,
+                    &mut names,
+                );
+            }
+        } else {
+            for candidate in self.overlay.iter().chain(self.fallback()) {
+                collect_child_names(self.resolver, candidate, false, &mut names);
+            }
+        }
+
+        let mut children = Vec::new();
+        for component in names {
+            context.db.unwind_if_revision_cancelled();
+            let Some(name) = self.child_name(&component) else {
+                continue;
+            };
+            let candidates = self.resolve_child_candidates(&name);
+            if let Some(first) = candidates.first() {
+                // An implicit namespace has no single defining location. Any eligible portion can
+                // supply the traversal node. Concrete modules must use the selected location.
+                let eligible = if matches!(first.module, ResolvedModule::NamespacePackage) {
+                    candidates.iter().any(|candidate| {
+                        candidate.is_discoverable(context.db, self.resolver.known_package)
+                    })
+                } else {
+                    first.is_discoverable(context.db, self.resolver.known_package)
+                };
+                if !eligible {
+                    continue;
+                }
+                children.extend(candidates.into_iter().take(1).map(|candidate| {
+                    candidate.into_module(context.db, context.resolver_environment, &name)
+                }));
+            }
+        }
+        children
+    }
+
+    fn resolve_child_candidates(&self, name: &ModuleName) -> ResolvedNames {
+        let component = name.last_component();
+        let context = &self.resolver.context;
+        if self.name.is_none() {
             let stubs = if context.mode.is_typing() {
                 stub_package_index(context.db, context.resolver_environment).all()
             } else {
@@ -1647,7 +1794,7 @@ impl<'resolver, 'db> ModuleSearch<'resolver, 'db> {
                 context.db,
                 self.resolver.discover_roots(
                     component,
-                    self.resolver.is_non_shadowable(&name),
+                    self.resolver.is_non_shadowable(name),
                     search_paths(context.db, context.resolver_environment, context.mode),
                     stubs,
                 ),
@@ -1673,11 +1820,7 @@ impl<'resolver, 'db> ModuleSearch<'resolver, 'db> {
             } else {
                 overlay
             }
-        };
-        candidates
-            .into_iter()
-            .next()
-            .map(|candidate| candidate.into_module(context.db, context.resolver_environment, &name))
+        }
     }
 
     /// Materializes the normal search only if an overlay cannot answer, once for this prefix.
@@ -1725,15 +1868,26 @@ impl<'resolver, 'db> ModuleSearch<'resolver, 'db> {
 }
 
 /// Collects possible names without treating filesystem entries as resolved modules.
-fn collect_child_names(context: &ResolverContext, path: &ModulePath, names: &mut BTreeSet<String>) {
-    if let Some(path) = path.to_system_path()
+fn collect_child_names(
+    resolver: &NameResolver,
+    candidate: &ModuleResolutionCandidate,
+    at_roots: bool,
+    names: &mut BTreeSet<String>,
+) {
+    let context = &resolver.context;
+    if matches!(candidate.module, ResolvedModule::Module(_))
+        || !candidate.is_discoverable(context.db, resolver.known_package)
+    {
+        return;
+    }
+    if let Some(path) = candidate.path.to_system_path()
         && let Ok(listing) = directory_listing(context.db, &path)
     {
         for (name, file_type) in listing.iter() {
             context.db.unwind_if_revision_cancelled();
-            add_child_name(names, name, file_type);
+            add_child_name(names, name, file_type, at_roots);
         }
-    } else if let Some(path) = path.to_vendored_path() {
+    } else if let Some(path) = candidate.path.to_vendored_path() {
         for entry in context.db.vendored().read_directory(&path) {
             let Some(name) = entry.path().file_name() else {
                 continue;
@@ -1743,12 +1897,15 @@ fn collect_child_names(context: &ResolverContext, path: &ModulePath, names: &mut
             } else {
                 FileType::File
             };
-            add_child_name(names, name, file_type);
+            add_child_name(names, name, file_type, at_roots);
         }
     }
 }
 
-fn add_child_name(names: &mut BTreeSet<String>, entry: &str, file_type: FileType) {
+fn add_child_name(names: &mut BTreeSet<String>, entry: &str, file_type: FileType, at_roots: bool) {
+    if !at_roots && (file_type.is_symlink() || matches!(entry, "__init__.py" | "__init__.pyi")) {
+        return;
+    }
     let name = if !file_type.is_directory()
         && let Some(stem) = entry
             .strip_suffix(".py")
@@ -1760,7 +1917,11 @@ fn add_child_name(names: &mut BTreeSet<String>, entry: &str, file_type: FileType
     } else {
         return;
     };
-    let name = name.strip_suffix("-stubs").unwrap_or(name);
+    let name = if at_roots {
+        name.strip_suffix("-stubs").unwrap_or(name)
+    } else {
+        name
+    };
     if ModuleName::new(name).is_some() && !name.contains('.') {
         names.insert(name.to_owned());
     }

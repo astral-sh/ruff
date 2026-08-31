@@ -790,23 +790,6 @@ impl<'db> SystemOrVendoredPathRef<'db> {
         }
     }
 
-    pub(super) fn file_name(&self) -> Option<&str> {
-        match self {
-            Self::System(system) => system.file_name(),
-            Self::Vendored(vendored) => vendored.file_name(),
-        }
-    }
-
-    pub(super) fn parent<'a>(&'a self) -> Option<SystemOrVendoredPathRef<'a>>
-    where
-        'a: 'db,
-    {
-        match self {
-            Self::System(system) => system.parent().map(Self::System),
-            Self::Vendored(vendored) => vendored.parent().map(Self::Vendored),
-        }
-    }
-
     fn as_system_path(&self) -> Option<&'db SystemPath> {
         match self {
             SystemOrVendoredPathRef::System(path) => Some(path),
