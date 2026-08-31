@@ -4782,6 +4782,7 @@ dependencies = [
  "compact_str",
  "get-size2",
  "insta",
+ "itertools 0.15.0",
  "ordermap",
  "regex",
  "regex-syntax",
