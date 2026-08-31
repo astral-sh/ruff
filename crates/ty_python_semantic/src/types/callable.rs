@@ -734,6 +734,26 @@ impl<'db> CallableType<'db> {
         self.kind(db) == CallableTypeKind::ParamSpecValue
     }
 
+    pub(crate) fn is_bottom_paramspec_value(self, db: &'db dyn Db) -> bool {
+        if self.kind(db) != CallableTypeKind::ParamSpecValue {
+            return false;
+        }
+        let [signature] = self.signatures(db).overloads.as_slice() else {
+            return false;
+        };
+        signature.parameters().is_bottom()
+    }
+
+    pub(crate) fn is_top_paramspec_value(self, db: &'db dyn Db) -> bool {
+        if self.kind(db) != CallableTypeKind::ParamSpecValue {
+            return false;
+        }
+        let [signature] = self.signatures(db).overloads.as_slice() else {
+            return false;
+        };
+        signature.parameters().is_top()
+    }
+
     /// Create a callable type which accepts any parameters and returns an `Unknown` type.
     pub(crate) fn unknown(db: &'db dyn Db) -> CallableType<'db> {
         Self::single(db, Signature::unknown())

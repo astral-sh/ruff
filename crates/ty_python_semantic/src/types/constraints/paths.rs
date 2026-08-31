@@ -511,7 +511,7 @@ impl PathAssignments {
             return;
         }
 
-        let single_map = SequentMap::for_constraint(db, env, storage, constraint);
+        let single_map = SequentMap::<ConstraintId>::for_constraint(db, env, storage, constraint);
         self.sequents.extend_from_slice(&single_map.sequents);
 
         for (existing_index, (existing, _)) in self.discovered.iter().enumerate() {
