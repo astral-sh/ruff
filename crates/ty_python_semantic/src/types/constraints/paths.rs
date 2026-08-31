@@ -708,6 +708,11 @@ impl PathAssignments {
             Sequent::PairImpossibility { ante1, ante2 } => {
                 self.check_pair_impossibility(db, env, storage, ante1, ante2)
             }
+            Sequent::TripleImpossibility {
+                ante1,
+                ante2,
+                ante3,
+            } => self.check_triple_impossibility(db, env, storage, ante1, ante2, ante3),
             Sequent::PairImplication { ante1, ante2, post } => {
                 self.check_pair_implication(db, env, storage, ante1, ante2, post);
                 Ok(())
@@ -761,6 +766,40 @@ impl PathAssignments {
                 target: "ty_python_semantic::types::constraints::PathAssignment",
                 ante1 = %ante1.display(db, env, storage),
                 ante2 = %ante2.display(db, env, storage),
+                facts = %format_args!(
+                    "[{}]",
+                    self.assignments.iter().map(|(assignment, _)| {
+                        assignment.display(db, env, storage)
+                    }).format(", "),
+                ),
+                "found contradiction",
+            );
+            return Err(PathAssignmentConflict);
+        }
+
+        Ok(())
+    }
+
+    fn check_triple_impossibility<'db>(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
+        ante1: ConstraintId,
+        ante2: ConstraintId,
+        ante3: ConstraintId,
+    ) -> Result<(), PathAssignmentConflict> {
+        if self.assignment_holds(ante1.when_true())
+            && self.assignment_holds(ante2.when_true())
+            && self.assignment_holds(ante3.when_true())
+        {
+            // The sequent map says (ante1 ∧ ante2 ∧ ante3) is an impossible combination, and the
+            // current path asserts that all three are true.
+            tracing::trace!(
+                target: "ty_python_semantic::types::constraints::PathAssignment",
+                ante1 = %ante1.display(db, env, storage),
+                ante2 = %ante2.display(db, env, storage),
+                ante3 = %ante2.display(db, env, storage),
                 facts = %format_args!(
                     "[{}]",
                     self.assignments.iter().map(|(assignment, _)| {
