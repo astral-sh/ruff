@@ -44,7 +44,7 @@ impl DirectoryListing {
         match self.file_type(name) {
             Some(FileType::Directory) => true,
             Some(FileType::File) | None => false,
-            Some(FileType::Symlink) => db.system().is_directory(&directory.join(name)),
+            Some(FileType::Symlink) => system_path_to_directory(db, directory.join(name)).is_ok(),
         }
     }
 
