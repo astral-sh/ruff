@@ -9,8 +9,7 @@ use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::name::{Name, QualifiedName, QualifiedNameBuilder};
 use crate::statement_visitor::StatementVisitor;
-use crate::token::Tokens;
-use crate::token::parenthesized_range;
+use crate::token::{Tokens, parenthesized_range};
 use crate::visitor::Visitor;
 use crate::{
     self as ast, Arguments, AtomicNodeIndex, CmpOp, DictItem, ExceptHandler, Expr, ExprNoneLiteral,

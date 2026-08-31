@@ -3391,6 +3391,7 @@ dependencies = [
  "ruff_notebook",
  "ruff_python_ast",
  "ruff_python_codegen",
+ "ruff_python_edits",
  "ruff_python_importer",
  "ruff_python_index",
  "ruff_python_literal",
@@ -3541,6 +3542,16 @@ dependencies = [
  "ruff_source_file",
  "ruff_text_size",
  "test-case",
+]
+
+[[package]]
+name = "ruff_python_edits"
+version = "0.0.11"
+dependencies = [
+ "ruff_python_ast",
+ "ruff_python_parser",
+ "ruff_source_file",
+ "ruff_text_size",
 ]
 
 [[package]]
@@ -4900,6 +4911,7 @@ dependencies = [
  "ruff_macros",
  "ruff_memory_usage",
  "ruff_python_ast",
+ "ruff_python_edits",
  "ruff_python_literal",
  "ruff_python_parser",
  "ruff_python_stdlib",

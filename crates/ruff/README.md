@@ -29,6 +29,7 @@ The following Ruff workspace members are also available:
 - [ruff_options_metadata](https://crates.io/crates/ruff_options_metadata)
 - [ruff_python_ast](https://crates.io/crates/ruff_python_ast)
 - [ruff_python_codegen](https://crates.io/crates/ruff_python_codegen)
+- [ruff_python_edits](https://crates.io/crates/ruff_python_edits)
 - [ruff_python_formatter](https://crates.io/crates/ruff_python_formatter)
 - [ruff_python_importer](https://crates.io/crates/ruff_python_importer)
 - [ruff_python_index](https://crates.io/crates/ruff_python_index)

@@ -13,6 +13,7 @@ on:
       - "!crates/ty_wasm/**"
       - "crates/ruff_db/**"
       - "crates/ruff_python_ast/**"
+      - "crates/ruff_python_edits/**"
       - "crates/ruff_python_parser/**"
       - "scripts/memory_report.py"
       - ".github/workflows/memory_report.yaml"
