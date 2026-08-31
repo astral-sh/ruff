@@ -9,6 +9,7 @@ exclude-newer-span = "P7D"
 [options.exclude-newer-package]
 astral-dev-toolchain-hyperfine = "2026-08-27T00:00:00Z"
 astral-dev-toolchain-cargo-shear = "2026-08-27T00:00:00Z"
+astral-dev-toolchain-cargo-fuzz = "2026-09-01T00:00:00Z"
 
 [manifest]
 requirements = [{ name = "ruff" }]
