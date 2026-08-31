@@ -25,10 +25,11 @@ that are ready for contributions.
 ty is written in Rust. You'll need to install the
 [Rust toolchain](https://www.rust-lang.org/tools/install) for development.
 
-You'll also need [Insta](https://insta.rs/docs/) to update snapshot tests:
+We use [Insta](https://insta.rs/docs/) to update snapshot tests. It's already part
+of the development toolchain:
 
 ```shell
-cargo install --locked cargo-insta
+uv run --only-group dev cargo insta --version
 ```
 
 You'll need [uv](https://docs.astral.sh/uv/getting-started/installation/) (or `pipx` and `pip`) to
@@ -41,14 +42,10 @@ when making a commit:
 uv run --only-group dev --locked prek install
 ```
 
-We recommend [nextest](https://nexte.st/) to run ty's test suite (via `cargo nextest run`),
-though it's not strictly necessary:
+We recommend [nextest](https://nexte.st/) to run ty's test suite (via `uv run --only-dev cargo nextest run`),
+though it's not strictly necessary.
 
-```shell
-cargo install --locked cargo-nextest
-```
-
-Throughout this guide, any usages of `cargo test` can be replaced with `cargo nextest run`,
+Throughout this guide, any usages of `cargo test` can be replaced with `uv run --only-dev cargo nextest run`,
 if you choose to install `nextest`.
 
 ### Development
@@ -77,7 +74,7 @@ Note that many code changes also require updating the snapshot tests, which is d
 after running `cargo test` like so:
 
 ```shell
-cargo insta review
+uv run --only-dev cargo insta review
 ```
 
 Include the text `[ty]` at the beginning of your pull request title, to distinguish ty pull requests
