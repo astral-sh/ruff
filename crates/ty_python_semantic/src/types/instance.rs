@@ -66,7 +66,8 @@ impl<'db> Type<'db> {
             // Dynamic classes created via `type()` don't have special instance types.
             ClassLiteral::Dynamic(_)
             | ClassLiteral::DynamicNamedTuple(_)
-            | ClassLiteral::DynamicEnum(_) => {
+            | ClassLiteral::DynamicEnum(_)
+            | ClassLiteral::Dataclass(_) => {
                 Type::NominalInstance(NominalInstanceType::from_class(db, class))
             }
             // Functional TypedDicts return a TypedDict instance type.

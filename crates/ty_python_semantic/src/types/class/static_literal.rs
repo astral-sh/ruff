@@ -348,7 +348,8 @@ impl<'db> StaticClassLiteral<'db> {
                     }
                     ClassLiteral::DynamicNamedTuple(_)
                     | ClassLiteral::DynamicTypedDict(_)
-                    | ClassLiteral::DynamicEnum(_) => {}
+                    | ClassLiteral::DynamicEnum(_)
+                    | ClassLiteral::Dataclass(_) => {}
                 }
             }
         }
@@ -987,7 +988,8 @@ impl<'db> StaticClassLiteral<'db> {
                 ClassLiteral::DynamicNamedTuple(_) => true,
                 ClassLiteral::Dynamic(_)
                 | ClassLiteral::DynamicTypedDict(_)
-                | ClassLiteral::DynamicEnum(_) => false,
+                | ClassLiteral::DynamicEnum(_)
+                | ClassLiteral::Dataclass(_) => false,
                 ClassLiteral::Static(class) => class
                     .explicit_bases(db)
                     .contains(&Type::SpecialForm(SpecialFormType::NamedTuple)),

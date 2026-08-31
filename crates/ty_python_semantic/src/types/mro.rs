@@ -638,6 +638,7 @@ impl<'db> MroIterator<'db> {
             ClassLiteral::DynamicEnum(literal) => {
                 ClassBase::Class(ClassType::NonGeneric(literal.into()))
             }
+            ClassLiteral::Dataclass(_) => ClassBase::Class(ClassType::NonGeneric(self.class)),
         }
     }
 
@@ -677,6 +678,15 @@ impl<'db> MroIterator<'db> {
                     full_mro_iter
                 }
                 ClassLiteral::DynamicEnum(literal) => {
+                    let mut full_mro_iter = match literal.try_mro(db) {
+                        Ok(mro) => mro.iter(),
+                        Err(error) => error.fallback_mro().iter(),
+                    };
+                    full_mro_iter.next();
+                    full_mro_iter
+                }
+                ClassLiteral::Dataclass(class) => {
+                    let literal = class.class(db);
                     let mut full_mro_iter = match literal.try_mro(db) {
                         Ok(mro) => mro.iter(),
                         Err(error) => error.fallback_mro().iter(),

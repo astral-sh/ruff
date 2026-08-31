@@ -424,7 +424,8 @@ fn conflicting_named_tuple_field_in_mro<'db>(
                 }
                 ClassLiteral::Dynamic(_)
                 | ClassLiteral::DynamicTypedDict(_)
-                | ClassLiteral::DynamicEnum(_) => {}
+                | ClassLiteral::DynamicEnum(_)
+                | ClassLiteral::Dataclass(_) => {}
             }
         }
     }

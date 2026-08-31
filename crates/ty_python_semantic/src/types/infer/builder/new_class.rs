@@ -1,6 +1,6 @@
 use crate::types::class::{
-    ClassLiteral, DynamicClassAnchor, DynamicClassLiteral, DynamicMetaclassConflict,
-    dynamic_class_bases_argument,
+    ClassLiteral, DynamicClassAnchor, DynamicClassKind, DynamicClassLiteral,
+    DynamicMetaclassConflict, dynamic_class_bases_argument,
 };
 use crate::types::diagnostic::{
     INVALID_ARGUMENT_TYPE, NO_MATCHING_OVERLOAD, report_conflicting_metaclass_from_bases,
@@ -8,9 +8,7 @@ use crate::types::diagnostic::{
 };
 use crate::types::infer::builder::{
     ArgumentsIter, TypeInferenceBuilder,
-    dynamic_class::{
-        DynamicClassKind, report_dynamic_mro_errors, report_inconsistent_dynamic_generic_bases,
-    },
+    dynamic_class::{report_dynamic_mro_errors, report_inconsistent_dynamic_generic_bases},
 };
 use crate::types::{KnownClass, SubclassOfType, Type, TypeContext, definition_expression_type};
 use ruff_python_ast as ast;
@@ -71,9 +69,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             .map(|node| self.expression_type(node))
             .unwrap_or_else(Type::unknown);
 
-        let name = if let Some(literal) = name_type.as_string_literal() {
-            literal.value(db)
-        } else {
+        if name_type.as_string_literal().is_none() {
             if let Some(name_node) = name_node
                 && !name_type.is_assignable_to(db, env, KnownClass::Str.to_instance(db, env))
                 && let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, name_node)
@@ -86,12 +82,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     name_type.display(db, env)
                 ));
             }
-            "<unknown>"
-        };
+        }
 
-        // For assigned `new_class()` calls, bases inference is deferred to handle forward
-        // references and recursive references, matching the `type()` pattern. For dangling
-        // calls, infer and extract bases eagerly (they'll be stored in the anchor).
+        // Assigned calls defer base validation so forward and recursive references can use the
+        // class binding. Dangling calls infer bases here only to validate them immediately; the
+        // class shape query reconstructs bases from the source anchor when they are requested.
         let explicit_bases: Option<Box<[Type<'db>]>> = if definition.is_none() {
             if let Some(bases_arg) = bases_arg {
                 let bases_type = self.expression_type(bases_arg);
@@ -111,35 +106,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             self.deferred.insert(def);
             DynamicClassAnchor::Definition(def)
         } else {
-            // Use [Unknown] as fallback if bases extraction failed (e.g., not a tuple).
-            let anchor_bases = explicit_bases
-                .clone()
-                .unwrap_or_else(|| Box::from([Type::unknown()]));
-
             DynamicClassAnchor::ScopeOffset {
                 scope,
                 offset: self.dynamic_class_scope_offset(call_expr),
-                explicit_bases: anchor_bases,
             }
         };
 
-        // `new_class()` doesn't accept a namespace dict, so members are always empty.
-        // If `exec_body` is provided (and is not `None`), it can populate the namespace
-        // dynamically, so we mark it as dynamic. Without `exec_body`, no members can be added.
-        //
         // TODO: Model `kwds`, especially `{"metaclass": Meta}`. `types.new_class()` uses the
         // third argument for explicit metaclass overrides, but we currently only account for
         // metaclass behavior that follows from the resolved bases.
-        let exec_body_arg = args.get(3).or_else(|| {
-            keywords
-                .iter()
-                .find(|kw| kw.arg.as_deref() == Some("exec_body"))
-                .map(|kw| &kw.value)
-        });
-        let has_exec_body = exec_body_arg.is_some_and(|arg| !arg.is_none_literal_expr());
-        let members: Box<[(ast::name::Name, Type<'db>)]> = Box::new([]);
-        let dynamic_class =
-            DynamicClassLiteral::new(db, name, anchor, members, has_exec_body, None);
+        let dynamic_class = DynamicClassLiteral::new(db, anchor, DynamicClassKind::NewClass);
 
         // For dangling calls, validate bases eagerly. For assigned calls, validation is
         // deferred along with bases inference.

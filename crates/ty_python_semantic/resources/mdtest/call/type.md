@@ -1309,6 +1309,40 @@ name = "Nested"
 nested: "'type(name, (), {})[int]'"
 ```
 
+## Dynamic class reassignment in a loop
+
+A dynamic class can capture the previous value of a loop-carried variable in its namespace. Type
+inference should reach a fixed point instead of repeatedly nesting the dynamic class's member type.
+
+```py
+def make_chain(depth: int) -> type[object]:
+    current: type[object] = type("Leaf", (object,), {})
+    for index in range(depth):
+        current = type(f"Level{index}", (object,), {"child": current})
+    return current
+```
+
+## Dynamic class base reassignment in a loop
+
+A dynamic class nested inside another call can use a loop-carried variable as a base. The base is
+rejected, but inference still reaches a fixed point instead of repeatedly nesting the inferred base
+type.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def identity(value: T) -> T:
+    return value
+
+def make_chain(depth: int) -> type[object]:
+    current: type[object] = object
+    for _ in range(depth):
+        current = identity(type("Level", (current,), {}))  # error: [unsupported-dynamic-base]
+    return current
+```
+
 ## Functional dynamic class reassignment in a loop
 
 Functional class literals can capture the previous value of a loop-carried variable when they are
@@ -1316,6 +1350,7 @@ used in a dynamic class namespace. Their inferred field or member types should n
 inference from reaching a fixed point.
 
 ```py
+from enum import Enum
 from typing import NamedTuple, TypedDict
 
 def make_named_tuple_chain(depth: int) -> type[object]:
@@ -1328,6 +1363,12 @@ def make_typed_dict_chain(depth: int) -> type[object]:
     current: type[object] = object
     for _ in range(depth):
         current = type("Level", (), {"child": TypedDict("T", {"value": current})})
+    return current
+
+def make_enum_chain(depth: int) -> type[object]:
+    current: type[object] = object
+    for _ in range(depth):
+        current = type("Level", (), {"child": Enum("E", {"VALUE": current})})
     return current
 ```
 

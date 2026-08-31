@@ -473,6 +473,10 @@ impl<'db> StaticClassLiteral<'db> {
                     dictionary = dictionary.inherited_with(InstanceDictionary::Unknown);
                     continue;
                 }
+                ClassLiteral::Dataclass(_) => {
+                    dictionary = dictionary.inherited_with(InstanceDictionary::Unknown);
+                    continue;
+                }
             };
 
             if let Some(names) = base.slot_names(db) {

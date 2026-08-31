@@ -260,7 +260,8 @@ impl<'db> TypedDictType<'db> {
                 }
                 ClassLiteral::Dynamic(_)
                 | ClassLiteral::DynamicNamedTuple(_)
-                | ClassLiteral::DynamicEnum(_) => {
+                | ClassLiteral::DynamicEnum(_)
+                | ClassLiteral::Dataclass(_) => {
                     // A `TypedDictType::Class` is only constructed from classes known to be TypedDicts.
                     unreachable!("non-TypedDict dynamic class wrapped in `TypedDictType`")
                 }

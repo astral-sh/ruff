@@ -83,6 +83,22 @@ enum DynamicClassHeaderAnchor<'db> {
     ScopeOffset(DynamicClassScopeOffset),
 }
 
+/// The runtime constructor used to create a dynamic class.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
+pub enum DynamicClassKind {
+    TypeCall,
+    NewClass,
+}
+
+impl DynamicClassKind {
+    pub(crate) const fn function_name(self) -> &'static str {
+        match self {
+            Self::TypeCall => "type()",
+            Self::NewClass => "types.new_class()",
+        }
+    }
+}
+
 /// Identifies a dangling dynamic-class call relative to its enclosing scope.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub enum DynamicClassScopeOffset {
@@ -188,6 +204,7 @@ impl<'db> CodeGeneratorKind<'db> {
             ClassLiteral::DynamicNamedTuple(_) => Some(Self::NamedTuple),
             ClassLiteral::DynamicTypedDict(_) => Some(Self::TypedDict),
             ClassLiteral::DynamicEnum(_) => None,
+            ClassLiteral::Dataclass(_) => Some(Self::DataclassLike(None)),
         }
     }
 
@@ -289,11 +306,6 @@ impl<'db> CodeGeneratorKind<'db> {
             db: &'db dyn Db,
             class: DynamicClassLiteral<'db>,
         ) -> Option<CodeGeneratorKind<'db>> {
-            // Check if the dynamic class was passed to `dataclass()` as a function.
-            if class.dataclass_params(db).is_some() {
-                return Some(CodeGeneratorKind::DataclassLike(None));
-            }
-
             // Dynamic classes can also inherit from classes with dataclass_transform.
             class.iter_mro(db).skip(1).find_map(|base| {
                 base.into_class().and_then(|class| {
@@ -573,7 +585,31 @@ impl<'db> GenericAlias<'db> {
     }
 }
 
-/// A class literal, either defined via a `class` statement or a `type` function call.
+/// A type-checking view of a dynamic class after applying `dataclass()`.
+///
+/// Applying `dataclass()` changes synthesized members without creating a new runtime class.
+/// Keeping that view separate leaves the underlying dynamic class's source identity stable.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+pub struct DataclassClassLiteral<'db> {
+    /// The class object whose type-checking view was changed by `dataclass()`.
+    #[returns(copy)]
+    pub(crate) class: DynamicClassLiteral<'db>,
+
+    /// The parameters supplied to `dataclass()`.
+    #[returns(copy)]
+    pub(crate) params: DataclassParams<'db>,
+}
+
+impl get_size2::GetSize for DataclassClassLiteral<'_> {}
+
+impl<'db> DataclassClassLiteral<'db> {
+    /// Returns the undecorated dynamic class.
+    fn as_class_literal(self, db: &'db dyn Db) -> ClassLiteral<'db> {
+        ClassLiteral::Dynamic(self.class(db))
+    }
+}
+
+/// A class object known to ty.
 #[derive(
     Clone, Copy, Debug, Eq, Hash, PartialEq, salsa::Supertype, get_size2::GetSize, salsa::SalsaValue,
 )]
@@ -588,6 +624,8 @@ pub enum ClassLiteral<'db> {
     DynamicTypedDict(DynamicTypedDictLiteral<'db>),
     /// A class created via functional enum syntax, e.g., `Enum("Color", "RED GREEN BLUE")`.
     DynamicEnum(DynamicEnumLiteral<'db>),
+    /// A dynamic class object viewed after applying `dataclass()`.
+    Dataclass(DataclassClassLiteral<'db>),
 }
 
 #[salsa::tracked]
@@ -608,6 +646,7 @@ impl<'db> ClassLiteral<'db> {
             Self::DynamicNamedTuple(namedtuple) => namedtuple.name(db),
             Self::DynamicTypedDict(typeddict) => typeddict.name(db),
             Self::DynamicEnum(enum_lit) => enum_lit.name(db),
+            Self::Dataclass(class) => class.as_class_literal(db).name(db),
         }
     }
 
@@ -646,6 +685,7 @@ impl<'db> ClassLiteral<'db> {
                     ClassInstanceFlags::empty()
                 }
             }
+            Self::Dataclass(class) => class.as_class_literal(db).instance_flags(db),
         }
     }
 
@@ -669,6 +709,7 @@ impl<'db> ClassLiteral<'db> {
             Self::DynamicNamedTuple(namedtuple) => namedtuple.metaclass(db),
             Self::DynamicTypedDict(typeddict) => typeddict.metaclass(db),
             Self::DynamicEnum(enum_lit) => enum_lit.metaclass(db),
+            Self::Dataclass(class) => class.as_class_literal(db).metaclass(db),
         }
     }
 
@@ -679,6 +720,7 @@ impl<'db> ClassLiteral<'db> {
             Self::DynamicNamedTuple(_) | Self::DynamicTypedDict(_) | Self::DynamicEnum(_) => {
                 ClassMetaclass::Selected(self.metaclass(db))
             }
+            Self::Dataclass(class) => class.as_class_literal(db).inferred_metaclass(db),
         }
     }
 
@@ -696,6 +738,25 @@ impl<'db> ClassLiteral<'db> {
             Self::DynamicNamedTuple(namedtuple) => namedtuple.class_member(db, env, name, policy),
             Self::DynamicTypedDict(typeddict) => typeddict.class_member(db, env, name, policy),
             Self::DynamicEnum(enum_lit) => enum_lit.class_member(db, env, name, policy),
+            Self::Dataclass(class) => {
+                if name == "__dataclass_fields__" {
+                    Place::declared(KnownClass::Dict.to_specialized_instance(
+                        db,
+                        env,
+                        &[
+                            KnownClass::Str.to_instance(db, env),
+                            KnownClass::Field.to_specialized_instance(db, env, &[Type::any()]),
+                        ],
+                    ))
+                    .with_qualifiers(TypeQualifiers::CLASS_VAR)
+                } else if name == "__dataclass_params__" {
+                    Place::declared(Type::any()).with_qualifiers(TypeQualifiers::CLASS_VAR)
+                } else {
+                    class
+                        .as_class_literal(db)
+                        .class_member(db, env, name, policy)
+                }
+            }
         }
     }
 
@@ -726,6 +787,9 @@ impl<'db> ClassLiteral<'db> {
                     }
                 }
             }
+            Self::Dataclass(class) => class
+                .as_class_literal(db)
+                .class_member_from_mro(db, env, name, policy, mro_iter),
         }
     }
 
@@ -781,6 +845,7 @@ impl<'db> ClassLiteral<'db> {
             Self::Static(class) => class.is_typed_dict(db),
             Self::DynamicTypedDict(_) => true,
             Self::Dynamic(_) | Self::DynamicNamedTuple(_) | Self::DynamicEnum(_) => false,
+            Self::Dataclass(class) => class.as_class_literal(db).is_typed_dict(db),
         }
     }
 
@@ -817,6 +882,7 @@ impl<'db> ClassLiteral<'db> {
             Self::DynamicNamedTuple(class) => class.scope(db).file(db),
             Self::DynamicTypedDict(class) => class.scope(db).file(db),
             Self::DynamicEnum(enum_lit) => enum_lit.scope(db).file(db),
+            Self::Dataclass(class) => class.as_class_literal(db).file(db),
         }
     }
 
@@ -827,6 +893,7 @@ impl<'db> ClassLiteral<'db> {
             Self::DynamicNamedTuple(class) => class.scope(db).program_file(db),
             Self::DynamicTypedDict(class) => class.scope(db).program_file(db),
             Self::DynamicEnum(enum_lit) => enum_lit.scope(db).program_file(db),
+            Self::Dataclass(class) => class.as_class_literal(db).program_file(db),
         }
     }
 
@@ -841,6 +908,7 @@ impl<'db> ClassLiteral<'db> {
             Self::DynamicNamedTuple(class) => class.header_range(db),
             Self::DynamicTypedDict(class) => class.header_range(db),
             Self::DynamicEnum(enum_lit) => enum_lit.header_range(db),
+            Self::Dataclass(class) => class.as_class_literal(db).header_range(db),
         }
     }
 
@@ -860,6 +928,7 @@ impl<'db> ClassLiteral<'db> {
             // Dynamic classes created via `type()`, `collections.namedtuple()`, etc. cannot be
             // marked as final.
             Self::Dynamic(_) | Self::DynamicNamedTuple(_) | Self::DynamicTypedDict(_) => false,
+            Self::Dataclass(class) => class.as_class_literal(db).is_final(db),
         }
     }
 
@@ -877,6 +946,7 @@ impl<'db> ClassLiteral<'db> {
             Self::Static(class) => class.has_own_ordering_method(db),
             Self::Dynamic(class) => class.has_own_ordering_method(db),
             Self::DynamicNamedTuple(_) | Self::DynamicTypedDict(_) | Self::DynamicEnum(_) => false,
+            Self::Dataclass(class) => class.as_class_literal(db).has_own_ordering_method(db),
         }
     }
 
@@ -887,7 +957,8 @@ impl<'db> ClassLiteral<'db> {
             Self::Dynamic(_)
             | Self::DynamicNamedTuple(_)
             | Self::DynamicTypedDict(_)
-            | Self::DynamicEnum(_) => None,
+            | Self::DynamicEnum(_)
+            | Self::Dataclass(_) => None,
         }
     }
 
@@ -899,6 +970,7 @@ impl<'db> ClassLiteral<'db> {
             Self::DynamicNamedTuple(namedtuple) => namedtuple.definition(db),
             Self::DynamicTypedDict(typeddict) => typeddict.definition(db),
             Self::DynamicEnum(enum_lit) => enum_lit.definition(db),
+            Self::Dataclass(class) => class.as_class_literal(db).definition(db),
         }
     }
 
@@ -919,6 +991,7 @@ impl<'db> ClassLiteral<'db> {
             Self::DynamicEnum(enum_lit) => {
                 enum_lit.definition(db).map(TypeDefinition::DynamicClass)
             }
+            Self::Dataclass(class) => class.as_class_literal(db).type_definition(db),
         }
     }
 
@@ -938,6 +1011,7 @@ impl<'db> ClassLiteral<'db> {
             Self::DynamicNamedTuple(namedtuple) => namedtuple.header_span(db),
             Self::DynamicTypedDict(typeddict) => typeddict.header_span(db),
             Self::DynamicEnum(enum_lit) => enum_lit.header_span(db),
+            Self::Dataclass(class) => class.as_class_literal(db).header_span(db),
         }
     }
 
@@ -966,6 +1040,7 @@ impl<'db> ClassLiteral<'db> {
             // non-empty for a class to be a disjoint base.
             // Dynamic TypedDicts don't define `__slots__`.
             Self::DynamicNamedTuple(_) | Self::DynamicTypedDict(_) | Self::DynamicEnum(_) => None,
+            Self::Dataclass(class) => class.as_class_literal(db).as_disjoint_base(db),
         }
     }
 
@@ -980,7 +1055,8 @@ impl<'db> ClassLiteral<'db> {
             Self::Dynamic(_)
             | Self::DynamicNamedTuple(_)
             | Self::DynamicTypedDict(_)
-            | Self::DynamicEnum(_) => Type::instance(db, env, ClassType::NonGeneric(self)),
+            | Self::DynamicEnum(_)
+            | Self::Dataclass(_) => Type::instance(db, env, ClassType::NonGeneric(self)),
         }
     }
 
@@ -1004,7 +1080,8 @@ impl<'db> ClassLiteral<'db> {
             Self::Dynamic(_)
             | Self::DynamicNamedTuple(_)
             | Self::DynamicTypedDict(_)
-            | Self::DynamicEnum(_) => ClassType::NonGeneric(self),
+            | Self::DynamicEnum(_)
+            | Self::Dataclass(_) => ClassType::NonGeneric(self),
         }
     }
 
@@ -1022,6 +1099,11 @@ impl<'db> ClassLiteral<'db> {
             Self::DynamicNamedTuple(namedtuple) => namedtuple.instance_member(db, env, name),
             Self::DynamicTypedDict(_) => PlaceAndQualifiers::default(),
             Self::DynamicEnum(enum_lit) => enum_lit.instance_member(db, env, name),
+            Self::Dataclass(class) => {
+                class
+                    .as_class_literal(db)
+                    .instance_member(db, env, specialization, name)
+            }
         }
     }
 
@@ -1032,7 +1114,8 @@ impl<'db> ClassLiteral<'db> {
             Self::Dynamic(_)
             | Self::DynamicNamedTuple(_)
             | Self::DynamicTypedDict(_)
-            | Self::DynamicEnum(_) => ClassType::NonGeneric(self),
+            | Self::DynamicEnum(_)
+            | Self::Dataclass(_) => ClassType::NonGeneric(self),
         }
     }
 
@@ -1048,9 +1131,10 @@ impl<'db> ClassLiteral<'db> {
         match self {
             Self::Static(class) => class.typed_dict_member(db, env, specialization, name, policy),
             Self::DynamicTypedDict(typeddict) => typeddict.class_member(db, env, name, policy),
-            Self::Dynamic(_) | Self::DynamicNamedTuple(_) | Self::DynamicEnum(_) => {
-                Place::Undefined.into()
-            }
+            Self::Dynamic(_)
+            | Self::DynamicNamedTuple(_)
+            | Self::DynamicEnum(_)
+            | Self::Dataclass(_) => Place::Undefined.into(),
         }
     }
 
@@ -1062,8 +1146,14 @@ impl<'db> ClassLiteral<'db> {
     ) -> Self {
         match self {
             Self::Static(class) => Self::Static(class.with_dataclass_params(db, dataclass_params)),
-            Self::Dynamic(class) => {
-                Self::Dynamic(class.with_dataclass_params(db, dataclass_params))
+            Self::Dynamic(class) => dataclass_params.map_or(Self::Dynamic(class), |params| {
+                Self::Dataclass(DataclassClassLiteral::new(db, class, params))
+            }),
+            Self::Dataclass(class) => {
+                let dynamic_class = class.class(db);
+                dataclass_params.map_or(Self::Dynamic(dynamic_class), |params| {
+                    Self::Dataclass(DataclassClassLiteral::new(db, dynamic_class, params))
+                })
             }
             Self::DynamicNamedTuple(_) | Self::DynamicTypedDict(_) | Self::DynamicEnum(_) => self,
         }
@@ -1086,6 +1176,7 @@ impl<'db> ClassLiteral<'db> {
                 Box::default()
             }
             Self::DynamicEnum(enum_lit) => enum_lit.explicit_bases(db),
+            Self::Dataclass(class) => class.as_class_literal(db).explicit_bases(db),
         }
     }
 }
@@ -1197,7 +1288,8 @@ impl<'db> ClassType<'db> {
                 ClassLiteral::Dynamic(_)
                 | ClassLiteral::DynamicNamedTuple(_)
                 | ClassLiteral::DynamicTypedDict(_)
-                | ClassLiteral::DynamicEnum(_),
+                | ClassLiteral::DynamicEnum(_)
+                | ClassLiteral::Dataclass(_),
             ) => None,
             Self::Generic(generic) => Some((generic.origin(db), Some(generic.specialization(db)))),
         }
@@ -1216,7 +1308,8 @@ impl<'db> ClassType<'db> {
                 ClassLiteral::Dynamic(_)
                 | ClassLiteral::DynamicNamedTuple(_)
                 | ClassLiteral::DynamicTypedDict(_)
-                | ClassLiteral::DynamicEnum(_),
+                | ClassLiteral::DynamicEnum(_)
+                | ClassLiteral::Dataclass(_),
             ) => None,
             Self::Generic(generic) => {
                 let origin = generic.origin(db);
@@ -1829,6 +1922,14 @@ impl<'db> ClassType<'db> {
             Self::NonGeneric(ClassLiteral::DynamicEnum(enum_lit)) => {
                 return enum_lit.own_class_member(db, name);
             }
+            Self::NonGeneric(ClassLiteral::Dataclass(class)) => {
+                return Self::NonGeneric(class.as_class_literal(db)).own_class_member(
+                    db,
+                    env,
+                    inherited_generic_context,
+                    name,
+                );
+            }
             Self::NonGeneric(ClassLiteral::Static(class)) => (class, None),
             Self::Generic(generic) => (generic.origin(db), Some(generic.specialization(db))),
         };
@@ -2137,6 +2238,9 @@ impl<'db> ClassType<'db> {
             Self::NonGeneric(ClassLiteral::DynamicEnum(enum_lit)) => {
                 enum_lit.instance_member(db, env, name)
             }
+            Self::NonGeneric(ClassLiteral::Dataclass(class)) => {
+                Self::NonGeneric(class.as_class_literal(db)).instance_member(db, env, name)
+            }
             Self::NonGeneric(ClassLiteral::Static(class)) => {
                 if class.is_typed_dict(db) {
                     return Place::Undefined.into();
@@ -2178,7 +2282,8 @@ impl<'db> ClassType<'db> {
                 ClassLiteral::Dynamic(_)
                 | ClassLiteral::DynamicNamedTuple(_)
                 | ClassLiteral::DynamicTypedDict(_)
-                | ClassLiteral::DynamicEnum(_),
+                | ClassLiteral::DynamicEnum(_)
+                | ClassLiteral::Dataclass(_),
             ) => None,
         }
     }
@@ -2201,6 +2306,9 @@ impl<'db> ClassType<'db> {
             Self::NonGeneric(ClassLiteral::DynamicTypedDict(_)) => Member::default(),
             Self::NonGeneric(ClassLiteral::DynamicEnum(enum_lit)) => {
                 enum_lit.own_instance_member(db, name)
+            }
+            Self::NonGeneric(ClassLiteral::Dataclass(class)) => {
+                Self::NonGeneric(class.as_class_literal(db)).own_instance_member(db, env, name)
             }
             Self::NonGeneric(ClassLiteral::Static(class_literal)) => {
                 class_literal.own_instance_member(db, env, name)
@@ -2559,7 +2667,8 @@ impl<'db> VarianceInferable<'db> for ClassType<'db> {
                 ClassLiteral::Dynamic(_)
                 | ClassLiteral::DynamicNamedTuple(_)
                 | ClassLiteral::DynamicTypedDict(_)
-                | ClassLiteral::DynamicEnum(_),
+                | ClassLiteral::DynamicEnum(_)
+                | ClassLiteral::Dataclass(_),
             ) => TypeVarVariance::Bivariant,
             Self::Generic(generic) => generic.variance_of(db, env, typevar),
         }
@@ -2783,7 +2892,8 @@ impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
             Self::Dynamic(_)
             | Self::DynamicNamedTuple(_)
             | Self::DynamicTypedDict(_)
-            | Self::DynamicEnum(_) => TypeVarVariance::Bivariant,
+            | Self::DynamicEnum(_)
+            | Self::Dataclass(_) => TypeVarVariance::Bivariant,
         }
     }
 }
@@ -3253,6 +3363,13 @@ impl<'db> QualifiedClassName<'db> {
             ClassLiteral::DynamicEnum(enum_lit) => {
                 let scope = enum_lit.scope(self.db);
                 (scope.program_file(self.db), scope.file_scope_id(self.db), 0)
+            }
+            ClassLiteral::Dataclass(class) => {
+                return QualifiedClassName::from_class_literal(
+                    self.db,
+                    class.as_class_literal(self.db),
+                )
+                .components_excluding_self();
             }
         };
 

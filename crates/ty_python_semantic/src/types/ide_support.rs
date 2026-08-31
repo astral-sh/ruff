@@ -2927,6 +2927,9 @@ fn class_literal_to_hierarchy_info<'db>(
                 (header_range, header_range)
             }
         }
+        ClassLiteral::Dataclass(class) => {
+            return class_literal_to_hierarchy_info(db, ClassLiteral::Dynamic(class.class(db)));
+        }
     };
 
     TypeHierarchyClass {

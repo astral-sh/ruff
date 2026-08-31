@@ -1,20 +1,27 @@
 use crate::ProgramEnvironment;
-use ruff_db::{diagnostic::Span, parsed::parsed_module};
-use ruff_python_ast::{self as ast, name::Name};
-use ruff_text_size::TextRange;
+use ruff_db::{
+    diagnostic::Span,
+    parsed::{parsed_module, parsed_string_annotation},
+    source::source_text,
+};
+use ruff_python_ast::{self as ast, AnyNodeRef, NodeIndex, find_node::covering_node, name::Name};
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::{
     Db, TypeQualifiers,
     place::{Place, PlaceAndQualifiers},
     types::{
-        ClassBase, ClassLiteral, ClassType, DataclassParams, KnownClass, MemberLookupPolicy,
-        SubclassOfType, Type,
+        ClassBase, ClassLiteral, ClassType, KnownClass, MemberLookupPolicy, SubclassOfType, Type,
         class::{
             ClassMemberResult, ClassMetaclass, CodeGeneratorKind, DisjointBase,
-            DynamicClassHeaderAnchor, DynamicClassScopeOffset, InstanceMemberResult, MroLookup,
-            dynamic_class_header_range, typed_dict::typed_dict_fallback_class_member,
+            DynamicClassHeaderAnchor, DynamicClassKind, DynamicClassScopeOffset,
+            InstanceMemberResult, MroLookup, dynamic_class_header_range,
+            typed_dict::typed_dict_fallback_class_member,
         },
         definition_expression_type, extract_fixed_length_iterable_element_types,
+        infer::{
+            DefinitionInference, ScopeInference, infer_complete_scope_types, infer_definition_types,
+        },
         member::Member,
         mro::{DynamicMroError, Mro, MroIterator},
     },
@@ -28,18 +35,16 @@ use ty_python_core::{definition::Definition, scope::ScopeId};
 /// Foo = type("Foo", (Base,), {"attr": 1})
 /// ```
 ///
-/// The type of `Foo` would be `<class 'Foo'>` where `Foo` is a `DynamicClassLiteral` with:
-/// - name: "Foo"
-/// - members: [("attr", int)]
+/// The type of `Foo` would be `<class 'Foo'>`.
 ///
 /// This is called "dynamic" because the class is created dynamically at runtime
 /// via a function call rather than a class statement.
 ///
 /// # Salsa interning
 ///
-/// This is a Salsa-interned struct. Two different `type()` / `types.new_class()` calls
-/// always produce distinct `DynamicClassLiteral` instances, even if they have the same
-/// name and bases:
+/// The class identity is interned separately from its inferred shape. Two different
+/// `type()` / `types.new_class()` calls always produce distinct identities, even if they
+/// have the same name and bases:
 ///
 /// ```python
 /// Foo1 = type("Foo", (Base,), {})
@@ -47,40 +52,32 @@ use ty_python_core::{definition::Definition, scope::ScopeId};
 /// # Foo1 and Foo2 are distinct types
 /// ```
 ///
-/// The `anchor` field provides stable identity:
+/// The anchor provides stable identity:
 /// - For assigned calls, the `Definition` uniquely identifies the class.
 /// - For dangling calls, a call location anchored to the enclosing scope
 ///   provides stable identity that only changes when the scope itself changes.
+///
+/// The inferred name, members, namespace openness, and bases are computed by a separate query.
+/// Keeping them out of this handle lets a recursive namespace refer back to the same class
+/// identity instead of allocating a deeper interned value on every cycle iteration.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct DynamicClassLiteral<'db> {
-    /// The name of the class (from the first argument).
-    #[returns(ref)]
-    pub name: Name,
-
-    /// The anchor for this dynamic class, providing stable identity.
-    ///
-    /// - `Definition`: The call is assigned to a variable. The definition
-    ///   uniquely identifies this class and can be used to find the call expression.
-    /// - `ScopeOffset`: The call is "dangling" (not assigned). Its location
-    ///   is relative to the enclosing scope.
+    /// The source location that identifies the dynamic class constructor call.
     #[returns(ref)]
     pub anchor: DynamicClassAnchor<'db>,
 
-    /// The class members extracted from the namespace argument.
-    /// Each entry is a (name, type) pair extracted from the dict literal.
-    #[returns(deref)]
-    pub members: Box<[(Name, Type<'db>)]>,
-
-    /// Whether the namespace is dynamic (not a literal dict, or contains
-    /// non-string-literal keys). When true, attribute lookups on this class
-    /// and its instances return `Unknown` instead of failing.
+    /// Whether the source call uses `type()` or `types.new_class()`.
     #[returns(copy)]
-    pub has_dynamic_namespace: bool,
+    pub kind: DynamicClassKind,
+}
 
-    /// Dataclass parameters if this class has been wrapped with `@dataclass` decorator
-    /// or passed to `dataclass()` as a function.
-    #[returns(copy)]
-    pub dataclass_params: Option<DataclassParams<'db>>,
+/// The inferred properties of a dynamic class constructor call.
+#[derive(Debug, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+struct DynamicClassShape<'db> {
+    name: Name,
+    members: Box<[(Name, Type<'db>)]>,
+    has_dynamic_namespace: bool,
+    explicit_bases: Box<[Type<'db>]>,
 }
 
 /// Anchor for identifying a dynamic class literal.
@@ -101,16 +98,181 @@ pub enum DynamicClassAnchor<'db> {
     /// The [`DynamicClassScopeOffset`] locates the call relative to the enclosing scope,
     /// including when the call is inside a string annotation.
     ///
-    /// The `explicit_bases` are computed eagerly at creation time since dangling
-    /// calls cannot recursively reference the class being defined.
     ScopeOffset {
         scope: ScopeId<'db>,
         offset: DynamicClassScopeOffset,
-        explicit_bases: Box<[Type<'db>]>,
     },
 }
 
 impl get_size2::GetSize for DynamicClassLiteral<'_> {}
+
+#[derive(Clone, Copy)]
+enum DynamicClassInference<'db> {
+    Definition {
+        definition: Definition<'db>,
+        inference: &'db DefinitionInference<'db>,
+    },
+    Scope(&'db ScopeInference<'db>),
+}
+
+impl<'db> DynamicClassInference<'db> {
+    fn expression_type(self, expression: &ast::Expr) -> Type<'db> {
+        match self {
+            Self::Definition { inference, .. } => inference.expression_type(expression),
+            Self::Scope(inference) => inference.expression_type(expression),
+        }
+    }
+
+    fn base_expression_type(self, db: &'db dyn Db, expression: &ast::Expr) -> Type<'db> {
+        match self {
+            Self::Definition { definition, .. } => {
+                definition_expression_type(db, definition, expression)
+            }
+            Self::Scope(inference) => inference.expression_type(expression),
+        }
+    }
+}
+
+impl<'db> DynamicClassShape<'db> {
+    fn unknown() -> Self {
+        Self {
+            name: Name::new_static("<unknown>"),
+            members: Box::default(),
+            has_dynamic_namespace: true,
+            explicit_bases: Box::from([Type::unknown()]),
+        }
+    }
+
+    fn from_call(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        kind: DynamicClassKind,
+        call: &ast::ExprCall,
+        inference: DynamicClassInference<'db>,
+    ) -> Self {
+        match kind {
+            DynamicClassKind::TypeCall => Self::from_type_call(db, env, call, inference),
+            DynamicClassKind::NewClass => Self::from_new_class_call(db, env, call, inference),
+        }
+    }
+
+    fn from_type_call(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        call: &ast::ExprCall,
+        inference: DynamicClassInference<'db>,
+    ) -> Self {
+        let [name_arg, bases_arg, namespace_arg] = &*call.arguments.args else {
+            return Self::unknown();
+        };
+
+        let name = Self::name(db, inference.expression_type(name_arg));
+        let namespace_type = inference.expression_type(namespace_arg);
+        let (members, has_dynamic_namespace) =
+            Self::members(db, namespace_arg, namespace_type, inference);
+        let explicit_bases =
+            extract_fixed_length_iterable_element_types(db, env, bases_arg, |expr| {
+                inference.base_expression_type(db, expr)
+            })
+            .unwrap_or_else(|| Box::from([Type::unknown()]));
+
+        Self {
+            name,
+            members,
+            has_dynamic_namespace,
+            explicit_bases,
+        }
+    }
+
+    fn from_new_class_call(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        call: &ast::ExprCall,
+        inference: DynamicClassInference<'db>,
+    ) -> Self {
+        let name_arg = call.arguments.args.first().or_else(|| {
+            call.arguments
+                .keywords
+                .iter()
+                .find(|keyword| keyword.arg.as_deref() == Some("name"))
+                .map(|keyword| &keyword.value)
+        });
+        let name = name_arg.map_or_else(
+            || Name::new_static("<unknown>"),
+            |name_arg| Self::name(db, inference.expression_type(name_arg)),
+        );
+        let explicit_bases =
+            dynamic_class_bases_argument(&call.arguments).map_or_else(Box::default, |bases_arg| {
+                extract_fixed_length_iterable_element_types(db, env, bases_arg, |expr| {
+                    inference.base_expression_type(db, expr)
+                })
+                .unwrap_or_else(|| Box::from([Type::unknown()]))
+            });
+        let has_dynamic_namespace = call
+            .arguments
+            .args
+            .get(3)
+            .or_else(|| {
+                call.arguments
+                    .keywords
+                    .iter()
+                    .find(|keyword| keyword.arg.as_deref() == Some("exec_body"))
+                    .map(|keyword| &keyword.value)
+            })
+            .is_some_and(|exec_body| !exec_body.is_none_literal_expr());
+
+        Self {
+            name,
+            members: Box::default(),
+            has_dynamic_namespace,
+            explicit_bases,
+        }
+    }
+
+    fn name(db: &'db dyn Db, name_type: Type<'db>) -> Name {
+        name_type.as_string_literal().map_or_else(
+            || Name::new_static("<unknown>"),
+            |literal| Name::new(literal.value(db)),
+        )
+    }
+
+    fn members(
+        db: &'db dyn Db,
+        namespace: &ast::Expr,
+        namespace_type: Type<'db>,
+        inference: DynamicClassInference<'db>,
+    ) -> (Box<[(Name, Type<'db>)]>, bool) {
+        if let ast::Expr::Dict(dict) = namespace {
+            let all_keys_are_string_literals = dict.items.iter().all(|item| {
+                item.key
+                    .as_ref()
+                    .is_some_and(|key| inference.expression_type(key).is_string_literal())
+            });
+            let members = dict
+                .items
+                .iter()
+                .filter_map(|item| {
+                    let key = item.key.as_ref()?;
+                    let name = inference.expression_type(key).as_string_literal()?;
+                    Some((
+                        Name::new(name.value(db)),
+                        inference.expression_type(&item.value),
+                    ))
+                })
+                .collect();
+            (members, !all_keys_are_string_literals)
+        } else if let Type::TypedDict(typed_dict) = namespace_type {
+            let members = typed_dict
+                .items(db)
+                .iter()
+                .map(|(name, field)| (name.clone(), field.declared_ty))
+                .collect();
+            (members, true)
+        } else {
+            (Box::default(), true)
+        }
+    }
+}
 
 /// Returns the `bases` argument for a dynamic class constructor call.
 ///
@@ -128,6 +290,88 @@ pub(crate) fn dynamic_class_bases_argument(arguments: &ast::Arguments) -> Option
 
 #[salsa::tracked]
 impl<'db> DynamicClassLiteral<'db> {
+    #[salsa::tracked(
+        returns(ref),
+        cycle_initial=|_, _, _| DynamicClassShape::unknown(),
+        heap_size=ruff_memory_usage::heap_size
+    )]
+    fn shape(self, db: &'db dyn Db) -> DynamicClassShape<'db> {
+        let (scope, offset) = match self.anchor(db) {
+            DynamicClassAnchor::Definition(definition) => {
+                let program_file = definition.program_file(db);
+                let python_file = program_file.python_file(db);
+                let env = ProgramEnvironment::from_file(program_file);
+                let module = parsed_module(db, python_file).load(db);
+                let value = definition
+                    .kind(db)
+                    .value(&module)
+                    .expect("dynamic class definitions should only be used for assignments");
+                let call = value
+                    .as_call_expr()
+                    .expect("dynamic class definitions should be call expressions");
+                let inference = DynamicClassInference::Definition {
+                    definition: *definition,
+                    inference: infer_definition_types(db, *definition),
+                };
+                return DynamicClassShape::from_call(db, &env, self.kind(db), call, inference);
+            }
+            DynamicClassAnchor::ScopeOffset { scope, offset } => (*scope, *offset),
+        };
+
+        let program_file = scope.program_file(db);
+        let python_file = program_file.python_file(db);
+        let env = ProgramEnvironment::from_scope(scope);
+        let module = parsed_module(db, python_file).load(db);
+        let inference = DynamicClassInference::Scope(infer_complete_scope_types(db, scope));
+        let scope_anchor = scope.node(db).node_index().unwrap_or(NodeIndex::from(0));
+        let anchor = scope_anchor
+            .as_u32()
+            .expect("dynamic class scope anchors should have node indices");
+
+        match offset {
+            DynamicClassScopeOffset::Node(offset) => {
+                let call: &ast::ExprCall = module
+                    .get_by_index(NodeIndex::from(anchor + offset))
+                    .try_into()
+                    .expect("dynamic class scope offsets should point to calls");
+                DynamicClassShape::from_call(db, &env, self.kind(db), call, inference)
+            }
+            DynamicClassScopeOffset::StringAnnotation { offset, range } => {
+                let string: &ast::ExprStringLiteral = module
+                    .get_by_index(NodeIndex::from(anchor + offset))
+                    .try_into()
+                    .expect("string annotation offsets should point to string literals");
+                let source = source_text(db, scope.file(db));
+                let string_literal = string
+                    .as_single_part_string()
+                    .expect("parsed string annotations should have one string part");
+                let parsed = parsed_string_annotation(source.as_str(), string_literal)
+                    .expect("dynamic class string annotations should parse");
+                let node =
+                    covering_node(AnyNodeRef::from(parsed.syntax()), range + string.start()).node();
+                let AnyNodeRef::ExprCall(call) = node else {
+                    return DynamicClassShape::unknown();
+                };
+                DynamicClassShape::from_call(db, &env, self.kind(db), call, inference)
+            }
+        }
+    }
+
+    /// Returns the name inferred from the first constructor argument.
+    pub(crate) fn name(self, db: &'db dyn Db) -> &'db Name {
+        &self.shape(db).name
+    }
+
+    /// Returns the members inferred from the namespace argument.
+    pub(crate) fn members(self, db: &'db dyn Db) -> &'db [(Name, Type<'db>)] {
+        &self.shape(db).members
+    }
+
+    /// Returns whether unknown class members may be supplied by the namespace argument.
+    pub(crate) fn has_dynamic_namespace(self, db: &'db dyn Db) -> bool {
+        self.shape(db).has_dynamic_namespace
+    }
+
     /// Returns the definition where this class is created, if it was assigned to a variable.
     pub(crate) fn definition(self, db: &'db dyn Db) -> Option<Definition<'db>> {
         match self.anchor(db) {
@@ -144,57 +388,9 @@ impl<'db> DynamicClassLiteral<'db> {
         }
     }
 
-    /// Returns the explicit base classes of this dynamic class.
-    ///
-    /// For assigned calls, bases are computed lazily using deferred inference to handle
-    /// forward references (e.g., `X = type("X", (tuple["X | None"],), {})`).
-    ///
-    /// For dangling calls, bases are computed eagerly at creation time and stored
-    /// directly on the anchor, since dangling calls cannot recursively reference the
-    /// class being defined.
-    ///
-    /// Returns an empty slice if the bases cannot be computed (e.g., due to a cycle)
-    /// or if the bases argument cannot be extracted precisely.
-    ///
-    /// Returns `[Unknown]` if the bases iterable is variable-length.
+    /// Returns the explicit base classes inferred from the constructor arguments.
     pub(crate) fn explicit_bases(self, db: &'db dyn Db) -> &'db [Type<'db>] {
-        /// Inner cached function for deferred inference of bases.
-        /// Only called for assigned calls where inference was deferred.
-        #[salsa::tracked(returns(deref), cycle_initial=|_, _, _| Box::default(), heap_size=ruff_memory_usage::heap_size)]
-        fn deferred_explicit_bases<'db>(
-            db: &'db dyn Db,
-            definition: Definition<'db>,
-        ) -> Box<[Type<'db>]> {
-            let program_file = definition.program_file(db);
-            let python_file = program_file.python_file(db);
-            let env = ProgramEnvironment::from_file(program_file);
-            let module = parsed_module(db, python_file).load(db);
-
-            let value = definition
-                .kind(db)
-                .value(&module)
-                .expect("DynamicClassAnchor::Definition should only be used for assignments");
-            let call_expr = value
-                .as_call_expr()
-                .expect("Definition value should be a call expression");
-
-            let Some(bases_arg) = dynamic_class_bases_argument(&call_expr.arguments) else {
-                return Box::default();
-            };
-
-            // Use `definition_expression_type` for deferred inference support.
-            extract_fixed_length_iterable_element_types(db, &env, bases_arg, |expr| {
-                definition_expression_type(db, definition, expr)
-            })
-            .unwrap_or_else(|| Box::from([Type::unknown()]))
-        }
-
-        match self.anchor(db) {
-            // For dangling calls, bases are stored directly on the anchor.
-            DynamicClassAnchor::ScopeOffset { explicit_bases, .. } => explicit_bases.as_ref(),
-            // For assigned calls, use deferred inference.
-            DynamicClassAnchor::Definition(definition) => deferred_explicit_bases(db, *definition),
-        }
+        &self.shape(db).explicit_bases
     }
 
     /// Returns a [`Span`] with the range of the `type()` call expression.
@@ -489,22 +685,6 @@ impl<'db> DynamicClassLiteral<'db> {
         ORDERING_METHODS
             .iter()
             .any(|name| !self.own_class_member(db, name).is_undefined())
-    }
-
-    /// Returns a new [`DynamicClassLiteral`] with the given dataclass params, preserving all other fields.
-    pub(crate) fn with_dataclass_params(
-        self,
-        db: &'db dyn Db,
-        dataclass_params: Option<DataclassParams<'db>>,
-    ) -> Self {
-        Self::new(
-            db,
-            self.name(db),
-            self.anchor(db),
-            self.members(db),
-            self.has_dynamic_namespace(db),
-            dataclass_params,
-        )
     }
 }
 
