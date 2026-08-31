@@ -4,6 +4,7 @@ use crate::ProgramEnvironment;
 use itertools::Either;
 use ruff_index::IndexSlice;
 use ruff_python_ast::PythonVersion;
+use rustc_hash::FxHashMap;
 use ty_module_resolver::{
     KnownModule, Module, ModuleName, file_to_module, resolve_module_confident,
 };
@@ -1479,7 +1480,7 @@ fn symbol_impl<'db>(
 #[salsa::tracked(
     returns(clone),
     cycle_initial=|db, _, definition: Definition<'db>| {
-        loop_header_reachability_impl(db, definition, true)
+        loop_header_reachability_impl(db, definition, Some(&mut FxHashMap::default()))
     },
     cycle_fn=loop_header_reachability_cycle_recover,
     heap_size = ruff_memory_usage::heap_size,
@@ -1488,7 +1489,7 @@ pub(crate) fn loop_header_reachability<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
 ) -> LoopHeaderReachability<'db> {
-    loop_header_reachability_impl(db, definition, false)
+    loop_header_reachability_impl(db, definition, None)
 }
 
 fn loop_header_reachability_cycle_recover<'db>(
@@ -1504,7 +1505,7 @@ fn loop_header_reachability_cycle_recover<'db>(
 fn loop_header_reachability_impl<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
-    is_cycle_initial: bool,
+    mut cycle_initial_cache: Option<&mut FxHashMap<Definition<'db>, Truthiness>>,
 ) -> LoopHeaderReachability<'db> {
     // This cutoff was chosen by benchmarking real isort to keep loop analysis
     // overhead minimal while preserving diagnostics.
@@ -1526,7 +1527,7 @@ fn loop_header_reachability_impl<'db>(
     let use_exact_reachability = use_def.reachability_constraints().used_interiors().len()
         <= MAX_EXACT_LOOP_HEADER_REACHABILITY_NODES;
     for live_binding in live_bindings {
-        let reachability = if is_cycle_initial {
+        let reachability = if cycle_initial_cache.is_some() {
             Truthiness::Ambiguous
         } else if use_exact_reachability {
             evaluate_reachability(db, use_def, live_binding.reachability_constraint())
@@ -1552,6 +1553,33 @@ fn loop_header_reachability_impl<'db>(
                     def, definition,
                     "loop headers only include bindings from within the loop"
                 );
+                if def.kind(db).is_loop_header() {
+                    // An inner loop can reach a `break` with a header binding that carries a
+                    // deletion from an earlier iteration. That deletion also affects boundness
+                    // in the enclosing loop.
+                    let nested_deleted_reachability =
+                        if let Some(cache) = cycle_initial_cache.as_deref_mut() {
+                            // Cycle initialization cannot evaluate predicates that could re-enter
+                            // the cycle. Memoize this structural walk because a descendant header
+                            // can be reached through several containing headers.
+                            cache.get(&def).copied().unwrap_or_else(|| {
+                                let deleted_reachability =
+                                    loop_header_reachability_impl(db, def, Some(cache))
+                                        .deleted_reachability;
+                                cache.insert(def, deleted_reachability);
+                                deleted_reachability
+                            })
+                        } else {
+                            loop_header_reachability(db, def).deleted_reachability
+                        };
+                    // This binding is reachable, but a conditional loop-back path can make a
+                    // definitely reachable nested deletion only possibly reachable here.
+                    deleted_reachability =
+                        deleted_reachability.or(match nested_deleted_reachability {
+                            Truthiness::AlwaysTrue => reachability,
+                            other => other,
+                        });
+                }
                 reachable_bindings.insert(ReachableLoopBinding {
                     definition: def,
                     narrowing_constraint: live_binding.narrowing_constraint(),
@@ -1582,6 +1610,7 @@ fn loop_header_reachability_impl<'db>(
 /// Result of [`loop_header_reachability`]: pre-computed reachability info for loop-back bindings.
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct LoopHeaderReachability<'db> {
+    /// Reachability of deletions, including those carried by nested loop headers.
     pub(crate) deleted_reachability: Truthiness,
     /// Constraints established after a deletion, member invalidation, or discarded key assignment.
     /// These still narrow the fallback type of the member on the next iteration.
