@@ -6,7 +6,8 @@ use crate::{
     types::{
         ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
         GenericContext, KnownClass, KnownInstanceType, MaterializationKind, Type, TypeContext,
-        TypeMapping, TypeVarVariance, TypingModule, definition_expression_type,
+        TypeMapping, TypeRecursionContext, TypeVarVariance, TypingModule,
+        definition_expression_type,
         display::qualified_name_components_from_scope,
         generics::{ApplySpecialization, Specialization, bind_typevar},
         variance::VarianceInferable,
@@ -140,6 +141,7 @@ impl<'db> PEP695TypeAliasType<'db> {
             self.raw_value_type(db),
             self.generic_context(db),
             self.specialization(db),
+            None,
         )
     }
 
@@ -255,6 +257,7 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
             self.raw_value_type(db),
             self.generic_context(db),
             self.specialization(db),
+            None,
         )
     }
 
@@ -352,6 +355,7 @@ fn apply_type_alias_specialization<'db>(
     ty: Type<'db>,
     generic_context: Option<GenericContext<'db>>,
     specialization: Option<Specialization<'db>>,
+    recursion_context: Option<&TypeRecursionContext<'db>>,
 ) -> Type<'db> {
     let Some(generic_context) = generic_context else {
         return ty;
@@ -372,7 +376,7 @@ fn apply_type_alias_specialization<'db>(
         db,
         &type_mapping,
         TypeContext::default(),
-        &ApplyTypeMappingVisitor::new(&env),
+        &ApplyTypeMappingVisitor::new(&env).with_recursion_context(recursion_context),
     )
 }
 
@@ -456,6 +460,46 @@ impl<'db> TypeAliasType<'db> {
             TypeAliasType::PEP695(type_alias) => type_alias.value_type(db),
             TypeAliasType::ManualPEP695(type_alias) => type_alias.value_type(db),
         }
+    }
+
+    /// Resolve this alias while preserving active recursion guards.
+    ///
+    /// During meta-type projection, results can depend on which aliases or type variables are
+    /// already being projected and must stay out of the materialization cache. The raw alias body
+    /// is still inferred independently by Salsa. Other operations retain ordinary caching unless
+    /// their recursion state also requires context-dependent expansion.
+    pub(super) fn value_type_with_recursion(
+        self,
+        db: &'db dyn Db,
+        context: Option<&TypeRecursionContext<'db>>,
+    ) -> Type<'db> {
+        let Some(context) = context.filter(|context| context.meta_type.is_active()) else {
+            return self.value_type(db);
+        };
+
+        let alias = self.with_materialization_kind(db, None);
+        let value_type = apply_type_alias_specialization(
+            db,
+            alias.raw_value_type(db),
+            alias.generic_context(db),
+            alias.specialization(db),
+            Some(context),
+        );
+
+        let Some(materialization_kind) = self.materialization_kind(db) else {
+            return value_type;
+        };
+        let env = match alias {
+            TypeAliasType::PEP695(alias) => ProgramEnvironment::from_scope(alias.rhs_scope(db)),
+            TypeAliasType::ManualPEP695(alias) => {
+                ProgramEnvironment::from_definition(alias.definition(db))
+            }
+        };
+        value_type.materialize(
+            db,
+            materialization_kind,
+            &ApplyTypeMappingVisitor::new(&env).with_recursion_context(Some(context)),
+        )
     }
 
     /// Materialize the alias body lazily, keeping this alias as the recursive fallback.

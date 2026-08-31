@@ -36,8 +36,8 @@ use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypes,
     ClassLiteral, FindLegacyTypeVarsVisitor, IntersectionType, KnownClass, KnownInstanceType,
     MaterializationKind, SubclassOfInner, Type, TypeAliasType, TypeContext, TypeMapping,
-    TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, UnionAccumulator, UnionType,
-    binding_type, infer_definition_types, inferred_declaration,
+    TypeRecursionContext, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance,
+    UnionAccumulator, UnionType, binding_type, infer_definition_types, inferred_declaration,
 };
 use crate::{Db, FxIndexMap, FxOrderMap, FxOrderSet};
 use ty_python_core::definition::{Definition, DefinitionKind};
@@ -1335,19 +1335,29 @@ impl<'db> Specialization<'db> {
     /// `{U: int}`, we can apply the second specialization to the first, resulting in `T: int`.
     /// That lets us produce the generic alias `A[int]`, which is the corresponding entry in the
     /// MRO of `B[int]`.
-    pub(crate) fn apply_specialization(self, db: &'db dyn Db, other: Specialization<'db>) -> Self {
+    fn apply_specialization(self, db: &'db dyn Db, other: Specialization<'db>) -> Self {
+        self.apply_specialization_with_recursion(db, other, None)
+    }
+
+    pub(super) fn apply_specialization_with_recursion(
+        self,
+        db: &'db dyn Db,
+        other: Specialization<'db>,
+        recursion_context: Option<&TypeRecursionContext<'db>>,
+    ) -> Self {
         let env = &ProgramEnvironment::from_program(other.generic_context(db).program(db));
-        let new_specialization = self.apply_type_mapping(
+        let new_specialization = self.apply_type_mapping_impl(
             db,
-            env,
             &TypeMapping::ApplySpecialization(ApplySpecialization::specialization(other)),
+            &[],
+            &ApplyTypeMappingVisitor::new(env).with_recursion_context(recursion_context),
         );
         match other.materialization_kind(db) {
             None => new_specialization,
             Some(materialization_kind) => new_specialization.materialize_impl(
                 db,
                 materialization_kind,
-                &ApplyTypeMappingVisitor::new(env),
+                &ApplyTypeMappingVisitor::new(env).with_recursion_context(recursion_context),
             ),
         }
     }
@@ -1364,15 +1374,6 @@ impl<'db> Specialization<'db> {
             materialization_kind,
             self.tuple_inner(db),
         )
-    }
-
-    fn apply_type_mapping<'a>(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        type_mapping: &TypeMapping<'a, 'db>,
-    ) -> Self {
-        self.apply_type_mapping_impl(db, type_mapping, &[], &ApplyTypeMappingVisitor::new(env))
     }
 
     pub(crate) fn apply_type_mapping_impl<'a>(
@@ -1407,7 +1408,8 @@ impl<'db> Specialization<'db> {
                         db,
                         &TypeMapping::ApplySpecialization(*specialization),
                         tcx,
-                        &ApplyTypeMappingVisitor::new(env),
+                        &ApplyTypeMappingVisitor::new(env)
+                            .with_recursion_context(visitor.recursion_context),
                     );
 
                     if new_materialization_kind.is_none() {
@@ -1415,7 +1417,8 @@ impl<'db> Specialization<'db> {
                             db,
                             type_mapping,
                             tcx,
-                            &ApplyTypeMappingVisitor::new(env),
+                            &ApplyTypeMappingVisitor::new(env)
+                                .with_recursion_context(visitor.recursion_context),
                         );
                         if specialized != materialized {
                             new_materialization_kind = Some(*materialization_kind);
