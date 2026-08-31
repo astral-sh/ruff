@@ -1100,7 +1100,7 @@ from typing import Iterable, Iterator
 
 def f(values: Iterable[int]):
     if isinstance(values, Iterator):
-        reveal_type(values)  # revealed: Top[Iterator[int]]
+        reveal_type(values)  # revealed: Iterator[int]
         reveal_type(next(values))  # revealed: int
     if isinstance(values, tuple):
         reveal_type(values)  # revealed: tuple[int, ...]
