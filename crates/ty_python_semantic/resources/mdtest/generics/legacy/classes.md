@@ -1470,6 +1470,95 @@ reveal_type(DescriptorOrInt[str].value)  # revealed: int
 DescriptorOrInt[int].value = 1
 ```
 
+## Decorated methods on generic classes
+
+Wrapping a generic method in a callable object does not remove the descriptor behavior supplied by
+`classmethod` or `staticmethod`. Both remain accessible through the class and its generic aliases.
+Decorators returning `Callable` also preserve the classmethod binding.
+
+```py
+from collections.abc import Callable
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+R = TypeVar("R")
+
+class Wrapper(Generic[R]):
+    def __init__(self, function: Callable[..., R]) -> None:
+        self.function = function
+
+    def __call__(self, argument: object) -> R:
+        return self.function(argument)
+
+def preserve_return(function: Callable[..., R]) -> Callable[..., R]:
+    return function
+
+class Box(Generic[T]):
+    @classmethod
+    @Wrapper
+    def make(cls) -> "Box[T]":
+        return cls()
+
+    @staticmethod
+    @Wrapper
+    def identity(value: T) -> T:
+        return value
+
+    @preserve_return
+    @classmethod
+    def preserved(cls) -> "Box[T]":
+        return cls()
+
+reveal_type(Box.make())  # revealed: Box[Unknown]
+reveal_type(Box[int].make())  # revealed: Box[int]
+Box.identity(1)
+reveal_type(Box[int].identity(1))  # revealed: int
+reveal_type(Box.preserved())  # revealed: Box[Unknown]
+reveal_type(Box[int].preserved())  # revealed: Box[int]
+```
+
+A callable instance attribute whose type depends on the class's type parameter is still restricted.
+Neither a `Callable` annotation nor the wrapper's `__call__` method supplies descriptor behavior.
+
+```py
+class Callables(Generic[T]):
+    function: Callable[[], T]
+    wrapper: Wrapper[T]
+
+# error: [invalid-attribute-access]
+Callables[int].function()
+# error: [invalid-attribute-access]
+Callables[int].wrapper(1)
+```
+
+## Cached classmethods
+
+`functools.lru_cache` can wrap a generic classmethod's implementation without preventing class
+access. This works both with the decorator's defaults and with explicit cache options.
+
+```py
+from functools import lru_cache
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Box(Generic[T]):
+    @classmethod
+    @lru_cache
+    def make(cls) -> "Box[T]":
+        return cls()
+
+    @classmethod
+    @lru_cache(maxsize=128, typed=True)
+    def configured(cls) -> "Box[T]":
+        return cls()
+
+reveal_type(Box.make())  # revealed: Box[Unknown]
+reveal_type(Box[int].make())  # revealed: Box[int]
+reveal_type(Box.configured())  # revealed: Box[Unknown]
+reveal_type(Box[int].configured())  # revealed: Box[int]
+```
+
 ## Metaclass descriptors shadow generic instance attributes
 
 A data descriptor on the metaclass governs class access even when instances have an attribute of the
