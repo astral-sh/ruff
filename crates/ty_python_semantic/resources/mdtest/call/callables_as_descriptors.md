@@ -422,6 +422,52 @@ C.f2(1)
 C().f2(1)
 ```
 
+## Callable wrappers retain attributes and overloads
+
+`staticmethod` returns the wrapped callable unchanged on attribute access. `classmethod` binds the
+class argument, preserving the callable's overloads and forwarding access to its attributes.
+
+```py
+from collections.abc import Callable
+from typing import overload
+
+class Wrapper:
+    def __init__(self, function: Callable[..., object]) -> None:
+        self.function = function
+
+    def reset(self) -> None: ...
+    @overload
+    def __call__(self, receiver: object, value: int) -> int: ...
+    @overload
+    def __call__(self, receiver: object, value: str) -> str: ...
+    def __call__(self, receiver: object, value: int | str) -> int | str:
+        return value
+
+class C:
+    @staticmethod
+    @Wrapper
+    def static(receiver: object, value: int | str) -> int | str:
+        return value
+
+    @classmethod
+    @Wrapper
+    def class_method(cls, value: int | str) -> int | str:
+        return value
+
+C.static.reset()
+C().static.reset()
+reveal_type(C.static(None, 1))  # revealed: int
+reveal_type(C().static(None, "a"))  # revealed: str
+
+C.class_method.reset()
+C().class_method.reset()
+reveal_type(C.class_method(1))  # revealed: int
+reveal_type(C().class_method("a"))  # revealed: str
+
+static: Callable[[object, int], int] = C.static
+class_method: Callable[[int], int] = C.class_method
+```
+
 ## Types are not bound-method descriptors
 
 ```toml

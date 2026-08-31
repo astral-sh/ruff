@@ -9,6 +9,7 @@ use crate::{
         ClassType, GenericContext, InferenceFlags, InvalidTypeExpressionError, KnownClass,
         PromotionKind, PromotionMode, StringLiteralType, Type, TypeAliasType, TypeContext,
         TypeMapping, TypeVarNonce, UnionBuilder, VarianceTerm,
+        callable::CallableTypes,
         class::NamedTupleSpec,
         constraints::{OwnedConstraintSet, TypeVarSolution},
         dedicated::pydantic::ConfigBoolean,
@@ -70,6 +71,115 @@ pub struct FunctoolsPartialInstance<'db> {
 
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for FunctoolsPartialInstance<'_> {}
+
+/// A method descriptor that retains the object returned by an inner decorator.
+///
+/// The nominal `classmethod[T, P, R]` and `staticmethod[P, R]` types expose only a
+/// callable signature, which cannot preserve the wrapped object's attributes or
+/// correlations between its overloads.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+pub struct MethodWrapper<'db> {
+    #[returns(copy)]
+    pub(super) wrapped: Type<'db>,
+    /// The constructor's nominal result, used for the descriptor's own members.
+    #[returns(copy)]
+    pub(super) descriptor: Type<'db>,
+    #[returns(copy)]
+    pub(super) kind: MethodWrapperKind<'db>,
+}
+
+impl get_size2::GetSize for MethodWrapper<'_> {}
+
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+pub enum MethodWrapperKind<'db> {
+    Staticmethod,
+    Classmethod,
+    BoundClassmethod(Type<'db>),
+}
+
+impl<'db> MethodWrapper<'db> {
+    pub(super) fn class(self, db: &'db dyn Db) -> KnownClass {
+        match self.kind(db) {
+            MethodWrapperKind::Staticmethod => KnownClass::Staticmethod,
+            MethodWrapperKind::Classmethod => KnownClass::Classmethod,
+            MethodWrapperKind::BoundClassmethod(_) => KnownClass::MethodType,
+        }
+    }
+
+    pub(super) fn instance_fallback(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Type<'db> {
+        match self.kind(db) {
+            MethodWrapperKind::Staticmethod | MethodWrapperKind::Classmethod => self.descriptor(db),
+            MethodWrapperKind::BoundClassmethod(_) => KnownClass::MethodType.to_instance(db, env),
+        }
+    }
+
+    pub(super) fn callables(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Option<CallableTypes<'db>> {
+        match self.kind(db) {
+            MethodWrapperKind::Staticmethod => self.wrapped(db).try_upcast_to_callable(db, env),
+            MethodWrapperKind::Classmethod => None,
+            MethodWrapperKind::BoundClassmethod(receiver) => self
+                .wrapped(db)
+                .try_upcast_to_callable(db, env)
+                .map(|callables| {
+                    callables.map(|callable| callable.bind_self(db, env, Some(receiver)))
+                }),
+        }
+    }
+
+    fn recursive_type_normalized_impl(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        div: Type<'db>,
+        nested: bool,
+    ) -> Option<Self> {
+        let kind = match self.kind(db) {
+            MethodWrapperKind::BoundClassmethod(receiver) => MethodWrapperKind::BoundClassmethod(
+                receiver.recursive_type_normalized_impl(db, env, div, nested)?,
+            ),
+            kind => kind,
+        };
+        Some(Self::new(
+            db,
+            self.wrapped(db)
+                .recursive_type_normalized_impl(db, env, div, nested)?,
+            self.descriptor(db)
+                .recursive_type_normalized_impl(db, env, div, nested)?,
+            kind,
+        ))
+    }
+
+    fn apply_type_mapping_impl(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'_, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> Self {
+        let kind = match self.kind(db) {
+            MethodWrapperKind::BoundClassmethod(receiver) => MethodWrapperKind::BoundClassmethod(
+                receiver.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+            ),
+            kind => kind,
+        };
+        Self::new(
+            db,
+            self.wrapped(db)
+                .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+            self.descriptor(db)
+                .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+            kind,
+        )
+    }
+}
 
 /// Singleton types that are heavily special-cased by ty. Despite its name,
 /// quite a different type to [`super::NominalInstanceType`].
@@ -160,6 +270,9 @@ pub enum KnownInstanceType<'db> {
 
     /// The bound `__call__` attribute of a precise `functools.partial(...)` result.
     FunctoolsPartialCall(FunctoolsPartialInstance<'db>),
+
+    /// A class or static method wrapping a decorated callable, or its bound method.
+    MethodWrapper(MethodWrapper<'db>),
 }
 
 pub(super) fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -228,6 +341,13 @@ pub(super) fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Size
         | KnownInstanceType::FunctoolsPartialCall(partial) => {
             visitor.visit_callable_type(db, partial.partial(db));
         }
+        KnownInstanceType::MethodWrapper(wrapper) => {
+            visitor.visit_type(db, wrapper.wrapped(db));
+            visitor.visit_type(db, wrapper.descriptor(db));
+            if let MethodWrapperKind::BoundClassmethod(receiver) = wrapper.kind(db) {
+                visitor.visit_type(db, receiver);
+            }
+        }
     }
 }
 
@@ -241,6 +361,14 @@ impl<'db> VarianceInferable<'db> for KnownInstanceType<'db> {
         match self {
             KnownInstanceType::TypeAliasType(type_alias) => {
                 type_alias.raw_value_type(db).variance_of(db, env, typevar)
+            }
+            KnownInstanceType::MethodWrapper(wrapper) => {
+                let variance = wrapper.wrapped(db).variance_of(db, env, typevar);
+                if let MethodWrapperKind::BoundClassmethod(receiver) = wrapper.kind(db) {
+                    variance.join(receiver.variance_of(db, env, typevar))
+                } else {
+                    variance
+                }
             }
             _ => VarianceTerm::BIVARIANT,
         }
@@ -303,6 +431,9 @@ impl<'db> KnownInstanceType<'db> {
             Self::FunctoolsPartialCall(partial) => partial
                 .recursive_type_normalized_impl(db, env, div, nested)
                 .map(Self::FunctoolsPartialCall),
+            Self::MethodWrapper(wrapper) => wrapper
+                .recursive_type_normalized_impl(db, env, div, nested)
+                .map(Self::MethodWrapper),
         }
     }
 
@@ -338,6 +469,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::FunctoolsPartial(_) => KnownClass::FunctoolsPartial,
             Self::Range { .. } => KnownClass::Range,
             Self::FunctoolsPartialCall(_) => KnownClass::MethodWrapperType,
+            Self::MethodWrapper(wrapper) => wrapper.class(db),
         }
     }
 
@@ -355,7 +487,11 @@ impl<'db> KnownInstanceType<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Type<'db> {
-        self.class(db).to_instance(db, env)
+        if let Self::MethodWrapper(wrapper) = self {
+            wrapper.instance_fallback(db, env)
+        } else {
+            self.class(db).to_instance(db, env)
+        }
     }
 
     /// Return the type denoted by this retained runtime type-expression object.
@@ -462,6 +598,11 @@ impl<'db> KnownInstanceType<'db> {
             KnownInstanceType::Callable(callable_type) => {
                 Type::KnownInstance(KnownInstanceType::Callable(
                     callable_type.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                ))
+            }
+            KnownInstanceType::MethodWrapper(wrapper) => {
+                Type::KnownInstance(KnownInstanceType::MethodWrapper(
+                    wrapper.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
                 ))
             }
             KnownInstanceType::FunctoolsPartial(partial) => {
