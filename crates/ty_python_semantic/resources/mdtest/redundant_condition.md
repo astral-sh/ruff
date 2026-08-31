@@ -7,8 +7,9 @@ code `redundant-condition`, but only if the inferred type of the object is not a
 This heuristic catches the `if func` and `if coroutine()` cases, while avoiding false positives on
 cases such as `if DEBUG:` where `DEBUG = 0` or `DEBUG = False` is a constant.
 
-The remaining cases -- where the inferred type is assignable to `int` -- are covered by a separate,
-stricter rule (`redundant-condition-strict`).
+The remaining cases -- where the inferred type is assignable to `int`, or only short-circuit
+evaluation makes the condition's truthiness fixed -- are covered by a separate, stricter rule
+(`redundant-condition-strict`).
 
 ```toml
 [environment]
@@ -169,6 +170,24 @@ def f(x: Pattern[str]):
         pass
 ```
 
+## Required keys established by narrowing
+
+A `TypedDict` with no declared required keys can be empty. After a key-presence check establishes
+that a key is present, the dictionary is always truthy, so a subsequent truthiness check is
+redundant.
+
+```py
+from typing import TypedDict
+
+class Record(TypedDict):
+    pass
+
+def check(value: Record):
+    if "x" in value:
+        if value:  # TODO: should error
+            pass
+```
+
 ## Enum instances
 
 An enum with members is implicitly final, so its instances are always truthy if the enum defines
@@ -189,8 +208,12 @@ def f(choice: Choice):
 ## Other boolean contexts
 
 Redundant conditions are not merely detected in `if`-statement tests. They are also detected in
-unary `not` operations, `while` loops, `if` expressions, `and` expressions, `or` expressions,
-`match` guards, and in comprehension `if` tests.
+unary `not` operations, `while` loops, `assert` statements, `if` expressions, `match` guards, and
+comprehension `if` tests. When an `and` or `or` expression is used as a condition, each operand is
+checked.
+
+An `and` or `or` expression used to compute a value is exempt. The assignments to `b` and `c` below
+therefore produce no diagnostic, while the corresponding `if` conditions do.
 
 ```py
 def coinflip() -> bool:
@@ -209,12 +232,12 @@ a = True if func else False  # TODO: should error
 if coinflip() if func else False:  # TODO: should error
     pass
 
-b = func and coinflip()  # TODO: should error
+b = func and coinflip()  # no diagnostic
 
 if func and coinflip():  # TODO: should error
     pass
 
-c = func or coinflip()  # TODO: should error
+c = func or coinflip()  # no diagnostic
 
 if func or coinflip():  # TODO: should error
     pass
@@ -278,6 +301,121 @@ def compound_expression_conditions(flag: bool):
 
 def compound_assertion_condition(flag: bool):
     assert flag and func  # TODO: should error
+```
+
+## Chained comparison conditions
+
+A comparison chain used directly as a condition is always false if any comparison is always false,
+even when an earlier comparison returns an object with mutable truthiness. The condition below
+always fails because `1 < 0` is false.
+
+```py
+class Comparable:
+    def __lt__(self, other: int) -> object: ...
+
+def direct_condition(value: Comparable):
+    reveal_type(value < 1 < 0)  # revealed: ~AlwaysTruthy
+    reveal_type(bool(value < 1 < 0))  # revealed: bool
+
+    # Short-circuiting makes the direct condition always false, despite the standalone types above.
+    if value < 1 < 0:  # TODO: should flag `value < 1 < 0`
+        pass
+
+def negated_condition(value: Comparable):
+    reveal_type(not (value < 1 < 0))  # revealed: bool
+    reveal_type(bool(not (value < 1 < 0)))  # revealed: bool
+
+    # Short-circuiting makes the direct condition always true, despite the standalone types above.
+    if not (value < 1 < 0):  # TODO: should flag `not (value < 1 < 0)`
+        pass
+```
+
+An always-false condition is exempt when its body raises an exception, since this can be a
+deliberate defensive check. This exemption also applies when the condition is always false because
+of short-circuit evaluation.
+
+```py
+def defensive_condition(value: Comparable):
+    if value < 1 < 0:  # no diagnostic
+        raise ValueError
+```
+
+Saving the chain's result, or negating it outside a condition, can cause an intermediate object's
+truthiness to be tested twice. Its truthiness can change between those tests, so neither test below
+has fixed truthiness.
+
+```py
+def saved_condition(value: Comparable):
+    saved = value < 1 < 0
+    reveal_type(saved)  # revealed: ~AlwaysTruthy
+    reveal_type(bool(saved))  # revealed: bool
+
+    if saved:  # no diagnostic
+        pass
+    return not (value < 1 < 0)  # no diagnostic
+```
+
+## Conditional expressions used as conditions
+
+Using `a if flag else b` as a condition tests the truthiness of `a` when `flag` is true, or `b`
+otherwise. We report uncalled functions in either position, even when the complete condition has
+ambiguous truthiness. Reporting an uncalled function in a subexpression suppresses a second
+diagnostic on the complete condition.
+
+```py
+def ready() -> bool:
+    return False
+
+def uncalled_functions(flag: bool):
+    if ready if flag else False:  # TODO: should flag `ready`
+        pass
+    if False if flag else ready:  # TODO: should flag `ready`
+        pass
+    if ready if flag else True:  # TODO: should flag `ready`
+        pass
+    assert ready if flag else False  # TODO: should flag `ready`
+```
+
+The `not` operator also tests truthiness, so we report the uncalled function in
+`not (ready if flag else False)`. `not` expressions are flagged in all contexts, not just
+`if`/`elif`/`while`/`assert` tests:
+
+```py
+def negated_expression(flag: bool) -> bool:
+    return not (ready if flag else False)  # TODO: should flag `ready`
+```
+
+Passing a function as an argument does not test its truthiness. Here, `callable()` checks whether
+`ready` or `None` can be called, so there is no redundant truthiness test of `ready`:
+
+```py
+def callable_check(flag: bool):
+    if callable(ready if flag else None):  # no diagnostic
+        pass
+```
+
+Boolean branches inside an assertion remain exempt, since the assertion can defend against
+incorrectly typed runtime values. Outside assertions, an always-true conditional expression is
+reported as a whole:
+
+```py
+def boolean_branches(value: int, flag: bool):
+    assert isinstance(value, int) if flag else True  # no diagnostic
+
+    # TODO: should flag `isinstance(value, int) if flag else True`
+    if isinstance(value, int) if flag else True:
+        pass
+```
+
+Both branches of this conditional expression are truthy when evaluated directly as conditions. Even
+if `value` has mutable truthiness, `value or True` short-circuits directly to the loop body when
+`value` is truthy and evaluates `True` otherwise.
+
+```py
+def conditional_expression(value: object, flag: bool):
+    # TODO: should flag `True if flag else (value or True)`
+    while True if flag else (value or True):
+        break
 ```
 
 ## Edge cases
@@ -367,9 +505,9 @@ def negated_integer_return(value: Literal[1, 2]) -> bool:
     return not value  # TODO: should error
 ```
 
-To avoid two diagnostics being emitted on compound tests such as the following statements, we
-suppress `redundant-condition-strict` on subexpressions of `if`-statement tests, `elif` tests and
-`while` tests. Only a single diagnostic is emitted on each of these:
+When the strict rule can report that a complete compound condition is always true or always false,
+it reports that condition instead of its operands. Only a single diagnostic is emitted on each of
+these:
 
 ```py
 def compound_truthy(x: str):
@@ -384,13 +522,189 @@ def compound_truthy(x: str):
             pass
 ```
 
-The suppression reports redundant operands even when the whole condition has ambiguous truthiness:
+## Redundant boolean operands in ambiguous conditions
+
+When a condition's outcome is unknown, the strict rule reports individual operands with fixed
+truthiness. These checks do not affect the outcome: `value is not None` is always true given the
+annotation, while `value is None` is always false. The result depends on `enabled` in either case:
 
 ```py
 def check(value: int, enabled: bool):
-    # TODO: Ideally, flag `value is not None`
-    if enabled and value is not None:
+    if enabled and value is not None:  # TODO: should flag `value is not None`
         print(value)
+    if value is not None and enabled:  # TODO: should flag `value is not None`
+        print(value)
+    if enabled or value is None:  # TODO: should flag `value is None`
+        print(value)
+    if value is None or enabled:  # TODO: should flag `value is None`
+        print(value)
+```
+
+The same operand checks apply to loops, match guards, conditional expressions, and comprehension
+filters:
+
+```py
+def condition_contexts(value: int, enabled: bool):
+    while enabled and value is not None:  # TODO: should flag `value is not None`
+        break
+
+    match value:
+        # TODO: should flag `value is not None`
+        case _ if enabled and value is not None:
+            pass
+
+    # TODO: should flag `value is not None`
+    selected = value if enabled and value is not None else 0
+
+    # TODO: should flag `item is not None`
+    filtered = [item for item in range(3) if enabled and item is not None]
+```
+
+Nested conditions are reported at the largest expression with fixed truthiness. Negation does not
+hide a redundant operand when the complete condition still has unknown truthiness:
+
+```py
+def nested(value: int, enabled: bool):
+    # TODO: should flag `value is not None and isinstance(value, int)`
+    if enabled and (value is not None and isinstance(value, int)):
+        print(value)
+    if not (enabled or value is None):  # TODO: should flag `value is None`
+        print(value)
+    # TODO: should flag `(enabled and value is not None) or True`
+    if (enabled and value is not None) or True:
+        print(value)
+```
+
+When separate operands are redundant, both are reported. An always-true operand later in an `and`
+expression does not replace a diagnostic on an earlier operand:
+
+```py
+def separate_operands(value: int, text: str, enabled: bool):
+    if (
+        value is not None  # TODO: should flag `value is not None`
+        and enabled
+        and isinstance(text, str)  # TODO: should flag `isinstance(text, str)`
+    ):
+        print(value)
+```
+
+An operand can have fixed truthiness due to short-circuit evaluation, even when its value type does
+not guarantee that truthiness:
+
+```py
+def short_circuit_operands(value: object, enabled: bool):
+    if enabled and (value or True):  # TODO: should flag `value or True`
+        pass
+    if enabled or (value and False):  # TODO: should flag `value and False`
+        pass
+```
+
+The strict rule also checks the body and `else` expression of a conditional expression used as a
+condition. Here, `value is not None` is always true, even though the complete condition can be false
+when it evaluates to `enabled`:
+
+```py
+def conditional_branch(value: int, select: bool, enabled: bool):
+    # TODO: should flag `value is not None`
+    if value is not None if select else enabled:
+        print(value)
+```
+
+## Compound conditions with mixed value types
+
+Reporting a subexpression under `redundant-condition` takes precedence over reporting the complete
+condition under `redundant-condition-strict`. Negating the condition does not add a second
+diagnostic for the same subexpression.
+
+```py
+def func(): ...
+def mixed_operands(value: object):
+    if func and False:  # TODO: should flag `func`
+        pass
+
+    if not (value or func):  # TODO: should flag `func`
+        pass
+```
+
+When neither operand is reported, the strict rule can report a fixed outcome established by
+short-circuit evaluation, even if the expression's value type has ambiguous truthiness.
+
+```py
+def short_circuit(value: object):
+    reveal_type(value and False)  # revealed: ~AlwaysTruthy
+    reveal_type(bool(value and False))  # revealed: bool
+
+    # Short-circuiting means this body is never reached, despite the standalone types above.
+    if value and False:  # TODO: should flag `value and False`
+        pass
+```
+
+## Boolean tests inside value expressions
+
+A call's arguments compute values, but can contain their own boolean tests. Those tests are checked
+even when the call itself has ambiguous truthiness.
+
+```py
+def func(): ...
+def accepts(value: object) -> bool:
+    return bool(value)
+
+def nested_tests():
+    if accepts(not func):  # TODO: should error
+        pass
+```
+
+`lambda` bodies and comprehension filters have their own scopes. `lambda` defaults and a
+comprehension's first iterable are evaluated in the enclosing scope. Each nested boolean test is
+reported once in either case.
+
+```py
+def nested_scopes():
+    if accepts(lambda: not func):  # TODO: should error
+        pass
+    if accepts(lambda value=not func: value):  # TODO: should error
+        pass
+    if accepts([item for item in (not func,)]):  # TODO: should error
+        pass
+    if accepts([item for item in range(2) if not func]):  # TODO: should error
+        pass
+```
+
+Compound conditions in conditional expressions and comprehension filters also report the complete
+condition once, rather than both the condition and its negated operand.
+
+```py
+def compound_expression_tests():
+    selected = 1 if not not (1 == 1) else 0  # TODO: should flag `not not (1 == 1)`
+    filtered = [
+        item
+        for item in range(2)
+        # TODO: should flag `not not (1 == 1)`
+        if not not (1 == 1)
+    ]
+```
+
+Each branch of a conditional expression can contain its own boolean test. Both `not func`
+expressions are redundant, regardless of which one runs:
+
+```py
+def selected_values(flag: bool):
+    # TODO: should flag both uses of `func`
+    selected = not func if flag else not func
+```
+
+## Redundant boolean tests in call arguments
+
+Boolean tests in call arguments are independent of the enclosing condition's truthiness:
+
+```py
+def accepts(value: bool) -> bool:
+    return value
+
+def nested_boolean_test(value: int, enabled: bool):
+    # TODO: should flag `value is None`
+    if enabled and accepts(not (value is None)):
+        pass
 ```
 
 ## `if` and `while` conditions that use AST literal bools or ints
@@ -453,14 +767,45 @@ def f(x: str, y: str | int, z: str | int | bytes):
     assert (isinstance(y, str) or isinstance(y, int)) and not not isinstance(x, str)
 ```
 
-The ordinary rule still applies inside assertion tests, and the strict rule still applies to
-assertion messages:
+The ordinary rule still applies inside assertion tests. An assertion message computes a value, so
+neither rule checks its `and` or `or` operands:
 
 ```py
 def func(): ...
 def assertion_boundaries(x: str, flag: bool):
     assert func and isinstance(x, str)  # TODO: should error
-    assert flag, isinstance(x, str) and flag  # TODO: should error
+    
+    # no diagnostic: `and` is used as a value expression here, not as a condition.
+    assert flag, isinstance(x, str) and flag
+```
+
+Boolean and short-circuit operands within assertions remain exempt when the complete assertion has
+unknown truthiness. This includes boolean tests nested inside call arguments:
+
+```py
+def accepts(value: bool) -> bool:
+    return value
+
+def ambiguous_boolean_and(value: int, flag: bool):
+    assert flag and value is not None  # no diagnostic
+
+def ambiguous_boolean_or(value: int, flag: bool):
+    assert flag or value is None  # no diagnostic
+
+def ambiguous_short_circuit(other: object, flag: bool):
+    assert flag and (other or True)  # no diagnostic
+
+def nested_boolean_assertion(value: int, flag: bool):
+    assert flag and accepts(not (value is None))  # no diagnostic
+```
+
+Short-circuit conditions remain exempt when they are the complete assertion, whether they always
+succeed or always fail:
+
+```py
+def short_circuit_assertion(value: object):
+    assert value or True  # no diagnostic
+    assert value and False  # no diagnostic
 ```
 
 The strict rule can still fire in assertion tests if the assertion test uses a walrus expression
@@ -531,7 +876,9 @@ elif os.name == "nt":  # no diagnostic
 ```
 
 This also applies to the enabled-by-default `redundant-condition` rule, which only applies when
-checking a condition that is not inferred as being assignable to `int`:
+checking a condition that is not inferred as being assignable to `int`. A value that depends on an
+environment guard is exempt whether it is assigned using a conditional expression or an `if`
+statement:
 
 `b.py`:
 
@@ -543,6 +890,16 @@ catch_exe_failure = "\n" if sys.platform == "win32" else ""
 reveal_type(catch_exe_failure)  # revealed: Literal[""]
 
 if catch_exe_failure:  # no diagnostic
+    pass
+
+if sys.platform == "win32":
+    line_prefix = "\n"
+else:
+    line_prefix = ""
+
+reveal_type(line_prefix)  # revealed: Literal[""]
+
+if line_prefix:  # no diagnostic
     pass
 ```
 
@@ -628,7 +985,11 @@ And even in other imported modules:
 
 ```py
 import c
+from b import line_prefix
 from c import IS_PY314, PLATFORM, BAR
+
+if line_prefix:  # no diagnostic
+    pass
 
 if PLATFORM == "linux":  # no diagnostic
     pass
@@ -780,6 +1141,90 @@ class PlatformAttributeCycle:
         reveal_type(bool(self.first))  # revealed: Literal[True]
         if self.first:
             pass
+```
+
+## Environment-dependent assignment guards
+
+An assignment can depend on nested conditions or aliases of environment guards. The assigned value
+remains exempt when tested inside a function:
+
+```py
+import sys
+
+WINDOWS = sys.platform == "win32"
+
+def nested_guards(enabled: bool):
+    if enabled:
+        if WINDOWS:
+            prefix = "\n"
+        else:
+            prefix = ""
+        reveal_type(prefix)  # revealed: Literal[""]
+        if prefix:  # no diagnostic
+            pass
+```
+
+Boolean values assigned under compound environment guards are also exempt, although they would
+otherwise be reported by the strict rule:
+
+```py
+import os
+from typing import TYPE_CHECKING
+
+if os.name == "posix" and TYPE_CHECKING:
+    enabled = True
+else:
+    enabled = False
+
+reveal_type(enabled)  # revealed: Literal[True]
+if enabled:  # no diagnostic
+    pass
+```
+
+Assignments in `match` cases depend on the subject being matched, just as assignments in an `if`
+statement depend on its condition:
+
+```py
+match sys.platform:
+    case "win32":
+        marker = ">"
+    case _:
+        marker = ""
+
+reveal_type(marker)  # revealed: Literal[""]
+if marker:  # no diagnostic
+    pass
+```
+
+Ordinary predicates do not exempt assignments. A predicate can itself refer to the variable being
+assigned without making it environment-dependent:
+
+```py
+def ordinary_guard(flag: bool):
+    if flag:
+        value = "ready"
+    else:
+        value = "ready"
+    if value:  # TODO: should error
+        pass
+
+def recursive_guard():
+    value = "ready"
+    if value:  # TODO: should error
+        value = "still ready"
+```
+
+A completed environment-dependent branch or a call that merely reads an environment constant does
+not make subsequent assignments environment-dependent:
+
+```py
+if sys.platform == "win32":
+    pass
+
+print(sys.platform)
+fixed = "ready"
+if fixed:  # TODO: should error
+    pass
 ```
 
 ## Environment-dependent loop targets
@@ -1106,6 +1551,165 @@ def uncalled_function(flag: bool):
         pass
     else:
         raise AssertionError
+```
+
+## Defensive operands in ambiguous conditions
+
+Type annotations are not enforced at runtime, and not all users run type checkers on their code.
+Defensive runtime type checks are therefore common in well-written Python code.
+
+In these examples, a caller could pass `None` despite the `int` annotation. We report no diagnostic
+on the redundant condition because it can help reject that input: `value is not None` would be false
+and lead to the `else` branch, while `value is None` would be true and enter the raising body:
+
+```py
+def defensive_else(value: int, enabled: bool):
+    # no diagnostic: `value is not None` is always true, but the `else` branch
+    # contains a defensive exit.
+    if enabled and value is not None:
+        print(value)
+    else:
+        raise TypeError
+
+def defensive_body(value: int, enabled: bool):
+    # no diagnostic: `value is None` is always false, but the `if` branch
+    # contains a defensive exit.
+    if enabled or value is None:
+        raise TypeError
+```
+
+Negation reverses which branch an operand's truthiness contributes to. Defensive exits following an
+early return also exempt the condition from being reported by either rule:
+
+```py
+def negated_defensive_body(value: int, enabled: bool):
+    if not (enabled and value is not None):  # no diagnostic
+        raise TypeError
+
+def defensive_fallthrough(value: int, enabled: bool):
+    if enabled and value is not None:  # no diagnostic
+        return value
+    raise TypeError
+```
+
+A defensive exit does not exempt an operand whose opposite truthiness would contribute to taking the
+other branch. For example, a false result for `value is not None` below would skip the `raise`
+rather than reach it:
+
+```py
+def nondefensive_operand(value: int, enabled: bool):
+    if enabled and value is not None:  # TODO: should flag `value is not None`
+        raise TypeError
+
+def negated_nondefensive_operand(value: int, enabled: bool):
+    if not (enabled or value is None):  # TODO: should flag `value is None`
+        raise TypeError
+```
+
+Tests inside call arguments are independent of the enclosing condition's branches, so they do not
+inherit its defensive-exit exemption:
+
+```py
+def accepts(value: bool) -> bool:
+    return value
+
+def independent_test(value: int):
+    if accepts(not (value is None)):  # TODO: should flag `value is None`
+        raise TypeError
+```
+
+## Implicit `else` branches
+
+When an `if` body exits and the `if` statement has no explicit `else` branch, the following
+statements act as an implicit `else`. Defensive checks in these implicit `else` branches are
+recognised in the same way as defensive checks in explicit `else` branches. Ordinary fallthrough,
+however, does not establish an implicit `else`.
+
+For example, an unrelated assertion after an `if` does not suppress a redundant-condition diagnostic
+when the `if` body ends in an ordinary call:
+
+```py
+def fallthrough(value: int, limit: int):
+    if value is not None:  # TODO: should flag `value is not None`
+        print(value)
+    assert limit > 0
+```
+
+The same applies to a final `elif` whose body falls through:
+
+```py
+def fallthrough_elif(value: int | str):
+    if isinstance(value, int):
+        return
+    elif isinstance(value, str):  # TODO: should flag `isinstance(value, str)`
+        print(value)
+    raise TypeError
+```
+
+We recognize an implicit `else` when the preceding `if` or `elif` branch ends in a `return`, a
+`raise`, a call returning `Never`, or a potentially failing assertion. A nested `if` must have an
+explicit `else`, and every branch must end in one of these statements. These exits can be mixed
+within the nested conditional:
+
+```py
+from typing import Never
+
+def stop() -> Never:
+    raise RuntimeError
+
+def nested_exits(value: int, choice: int, valid: bool):
+    if value is not None:
+        if choice == 0:
+            return value
+        elif choice == 1:
+            raise ValueError
+        elif choice == 2:
+            stop()
+        elif choice == 3:
+            assert False
+        else:
+            assert valid
+    raise TypeError
+```
+
+Potentially failing assertions count as exits even when they might succeed, because this heuristic
+prioritises minimising false positives over catching every possible error. An assertion that always
+succeeds does not count as an exit:
+
+```py
+def successful_assertion(value: int):
+    if value is not None:  # TODO: should flag `value is not None`
+        assert True
+    raise TypeError
+```
+
+A nested conditional that has a branch that falls through, or lacks an explicit `else`, does not
+establish an implicit `else` after the outer `if`:
+
+```py
+def nested_fallthrough(value: int, flag: bool):
+    if value is not None:  # TODO: should flag `value is not None`
+        if flag:
+            return value
+        else:
+            print(value)
+    raise TypeError
+
+def nested_without_else(value: int, flag: bool):
+    if value is not None:  # TODO: should flag `value is not None`
+        if flag:
+            return value
+    raise TypeError
+```
+
+An ordinary return in the implicit `else` is not a defensive exit, so it does not establish
+exhaustiveness:
+
+```py
+def ordinary_return(value: int):
+    if value is not None:  # TODO: should flag `value is not None`
+        return value
+    return 0
 ```
 
 ## Dunder methods that return `NotImplemented`
