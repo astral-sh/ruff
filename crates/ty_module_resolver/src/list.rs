@@ -1,23 +1,53 @@
 use crate::ResolverEnvironment;
 use crate::db::Db;
 use crate::module::Module;
-use crate::resolve::{ModuleResolveMode, NameResolver};
+use crate::module_name::ModuleName;
+use crate::resolve::{DiscoveredChildren, ModuleNameIngredient, ModuleResolveMode, NameResolver};
 
 /// List all available modules, including all sub-modules, sorted in lexicographic order.
 pub fn all_modules<'db>(
     db: &'db dyn Db,
     resolver_environment: ResolverEnvironment<'db>,
 ) -> Vec<Module<'db>> {
-    let mut modules = list_modules(db, resolver_environment).to_vec();
-    let mut stack = modules.clone();
-    while let Some(module) = stack.pop() {
-        for &submodule in module.all_submodules(db) {
-            modules.push(submodule);
-            stack.push(submodule);
+    let mut modules = Vec::new();
+    let mut stack = vec![list_modules_impl(db, resolver_environment)];
+    while let Some(children) = stack.pop() {
+        for &module in &children.modules {
+            modules.push(module);
+            stack.push(module.children(db));
+        }
+        // Overlay prefixes can lead to resolved descendants without resolving independently.
+        // Only the descendants belong in the resulting module list.
+        for prefix in &children.overlay_prefixes {
+            let name = ModuleNameIngredient::new(
+                db,
+                prefix,
+                ModuleResolveMode::Typing,
+                resolver_environment,
+            );
+            stack.push(overlay_children(db, name));
         }
     }
     modules.sort_by_key(|module| module.name(db));
     modules
+}
+
+/// Cached child discovery, keeping unresolved overlay prefixes separate from public module lists.
+#[derive(Debug, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+pub(crate) struct ModuleChildren<'db> {
+    /// Resolved immediate children, suitable for import-statement completion.
+    pub(crate) modules: Box<[Module<'db>]>,
+    /// Prefixes used only by recursive discovery; see [`DiscoveredChildren`].
+    overlay_prefixes: Box<[ModuleName]>,
+}
+
+impl<'db> From<DiscoveredChildren<'db>> for ModuleChildren<'db> {
+    fn from(children: DiscoveredChildren<'db>) -> Self {
+        Self {
+            modules: children.modules.into_boxed_slice(),
+            overlay_prefixes: children.overlay_prefixes.into_boxed_slice(),
+        }
+    }
 }
 
 /// List all available top-level modules.
@@ -25,17 +55,26 @@ pub fn list_modules<'db>(
     db: &'db dyn Db,
     resolver_environment: ResolverEnvironment<'db>,
 ) -> &'db [Module<'db>] {
-    list_modules_impl(db, resolver_environment)
+    &list_modules_impl(db, resolver_environment).modules
 }
 
-#[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
 fn list_modules_impl<'db>(
     db: &'db dyn Db,
     resolver_environment: ResolverEnvironment<'db>,
-) -> Box<[Module<'db>]> {
+) -> ModuleChildren<'db> {
     NameResolver::new(db, resolver_environment, ModuleResolveMode::Typing)
         .children(None)
-        .into_boxed_slice()
+        .into()
+}
+
+/// Cache each unresolved prefix by its name and environment, just as resolved packages cache
+/// their children by `Module`. No candidate state survives the child-list computation.
+#[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+fn overlay_children<'db>(db: &'db dyn Db, name: ModuleNameIngredient<'db>) -> ModuleChildren<'db> {
+    NameResolver::new(db, name.resolver_environment(db), name.mode(db))
+        .children(Some(name.name(db)))
+        .into()
 }
 
 #[cfg(test)]
@@ -1780,6 +1819,60 @@ partial
     }
 
     #[test]
+    fn enumerate_overlay_through_unresolved_prefix() {
+        let db = unresolved_overlay_db();
+        let environment = db.resolver_environment();
+        let package = crate::resolve_module_confident(
+            &db,
+            environment,
+            &ModuleName::new_static("acme").expect("valid package name"),
+        )
+        .expect("installed stub package resolves");
+        // Installed stubs hide the runtime parents, but a local stub can still patch the leaf.
+        assert!(package.all_submodules(&db).is_empty());
+        for name in ["acme.nested", "acme.nested.deep"] {
+            let name = ModuleName::new(name).expect("valid prefix");
+            assert!(crate::resolve_module_confident(&db, environment, &name).is_none());
+            assert!(crate::resolve_real_module_confident(&db, environment, &name).is_some());
+        }
+        assert_eq!(enumerated_names(&db), ["acme", "acme.nested.deep.tools"]);
+        assert_enumerated_file(
+            &db,
+            "acme.nested.deep.tools",
+            "/extra/acme/nested/deep/tools.pyi",
+        );
+    }
+
+    #[test]
+    fn enumeration_tracks_unresolved_overlay_prefix_changes() {
+        let mut db = unresolved_overlay_db();
+        assert_eq!(enumerated_names(&db), ["acme", "acme.nested.deep.tools"]);
+        remove_enumerated_file(&mut db, "/extra/acme/nested/deep/tools.pyi");
+        assert_eq!(enumerated_names(&db), ["acme"]);
+        db.write_file(
+            "/extra/acme/nested/deep/tools.pyi",
+            r#"
+"#,
+        )
+        .expect("restore the local stub");
+        assert_eq!(enumerated_names(&db), ["acme", "acme.nested.deep.tools"]);
+
+        // A newly supplied initializer turns a traversal-only prefix into a resolved module.
+        db.write_file(
+            "/extra/acme/nested/__init__.pyi",
+            r#"
+"#,
+        )
+        .expect("provide the overlay parent");
+        assert_eq!(
+            enumerated_names(&db),
+            ["acme", "acme.nested", "acme.nested.deep.tools"]
+        );
+        remove_enumerated_file(&mut db, "/extra/acme/nested/__init__.pyi");
+        assert_eq!(enumerated_names(&db), ["acme", "acme.nested.deep.tools"]);
+    }
+
+    #[test]
     fn enumeration_tracks_files_and_initializers() {
         let mut db = enumeration_db(&["/src/acme/left.py", "/site-packages/acme/right.py"], &[]);
         assert_eq!(enumerated_names(&db), ["acme", "acme.left", "acme.right"]);
@@ -1993,6 +2086,22 @@ partial
         ]
         "#,
         );
+    }
+
+    fn unresolved_overlay_db() -> TestDb {
+        enumeration_db(
+            &[
+                "/site-packages/acme-stubs/__init__.pyi",
+                "/site-packages/acme-stubs/py.typed",
+                "/site-packages/acme/__init__.py",
+                "/site-packages/acme/nested/__init__.py",
+                "/site-packages/acme/nested/deep/__init__.py",
+                "/site-packages/acme/nested/deep/tools.py",
+                "/extra/acme/nested/deep/tools.pyi",
+                "/extra/acme/nested/source_only.py",
+            ],
+            &["/extra"],
+        )
     }
 
     fn enumeration_db(paths: &[&str], extra_paths: &[&str]) -> TestDb {

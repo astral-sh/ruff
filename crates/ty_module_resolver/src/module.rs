@@ -7,6 +7,7 @@ use ruff_python_ast::PythonVersion;
 use salsa::Database;
 use salsa::plumbing::AsId;
 
+use crate::list::ModuleChildren;
 use crate::module_name::ModuleName;
 use crate::path::SearchPath;
 use crate::resolve::{ModuleResolveMode, NameResolver, search_paths};
@@ -135,6 +136,12 @@ impl<'db> Module<'db> {
     /// Ordinary file modules have no children, but stub overlays may provide descendants
     /// even when the parent resolves to a runtime file module.
     pub fn all_submodules(self, db: &'db dyn Db) -> &'db [Module<'db>] {
+        &self.children(db).modules
+    }
+
+    /// Includes unresolved stub-overlay prefixes for recursive discovery, while
+    /// [`Self::all_submodules`] exposes only resolved immediate children.
+    pub(crate) fn children(self, db: &'db dyn Db) -> &'db ModuleChildren<'db> {
         module_children(db, self)
     }
 }
@@ -154,8 +161,8 @@ impl std::fmt::Debug for Module<'_> {
     }
 }
 
-#[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
-fn module_children<'db>(db: &'db dyn Db, module: Module<'db>) -> Box<[Module<'db>]> {
+#[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+fn module_children<'db>(db: &'db dyn Db, module: Module<'db>) -> ModuleChildren<'db> {
     let environment = module.resolver_environment(db);
     let resolver =
         NameResolver::new(db, environment, ModuleResolveMode::Typing).with_known_package(module);
@@ -167,7 +174,7 @@ fn module_children<'db>(db: &'db dyn Db, module: Module<'db>) -> Box<[Module<'db
     } else {
         resolver.children(Some(module.name(db)))
     };
-    children.into_boxed_slice()
+    children.into()
 }
 
 /// A module that resolves to a file (`lib.py` or `package/__init__.py`).

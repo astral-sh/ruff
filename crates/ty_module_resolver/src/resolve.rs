@@ -1188,7 +1188,7 @@ impl FusedIterator for SearchPathIterator<'_> {}
 ///
 /// This is needed because Salsa requires that all query arguments are salsa ingredients.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-struct ModuleNameIngredient<'db> {
+pub(crate) struct ModuleNameIngredient<'db> {
     #[returns(ref)]
     pub(super) name: ModuleName,
     #[returns(copy)]
@@ -1490,14 +1490,14 @@ impl<'db> NameResolver<'db> {
         None
     }
 
-    /// Discovers resolved immediate children.
+    /// Discovers immediate children and any unresolved stub-overlay prefixes to explore.
     /// `None` discovers top-level modules.
-    pub(crate) fn children(&self, package: Option<&ModuleName>) -> Vec<Module<'db>> {
+    pub(crate) fn children(&self, package: Option<&ModuleName>) -> DiscoveredChildren<'db> {
         let mut search = ModuleSearch::new(self);
         if let Some(package) = package {
             for component in package.components() {
                 let Some(child) = search.enter_package(component) else {
-                    return Vec::new();
+                    return DiscoveredChildren::default();
                 };
                 search = child;
             }
@@ -1513,7 +1513,7 @@ impl<'db> NameResolver<'db> {
         &self,
         package: &ModuleName,
         search_path: &SearchPath,
-    ) -> Vec<Module<'db>> {
+    ) -> DiscoveredChildren<'db> {
         let context = &self.context;
         let stubs = StubPackageIndex::from_search_paths(context.db, std::iter::once(search_path));
         let mut candidates = normalize_candidates(
@@ -1626,6 +1626,19 @@ impl<'db> NameResolver<'db> {
     }
 }
 
+/// Resolved immediate children, plus prefixes needed only for stub-overlay discovery.
+///
+/// An installed stub package can hide `acme.nested` while a local override still resolves
+/// `acme.nested.tools`. Such prefixes are traversal positions, not resolved modules: recursive
+/// discovery must explore them, but import-statement completion must not offer them.
+#[derive(Default)]
+pub(crate) struct DiscoveredChildren<'db> {
+    /// Modules that resolve independently and are eligible for discovery.
+    pub(crate) modules: Vec<Module<'db>>,
+    /// Unresolved names with eligible stub-overlay locations to search for descendants.
+    pub(crate) overlay_prefixes: Vec<ModuleName>,
+}
+
 /// Temporary search state for a prefix, reusable when resolving its immediate children.
 ///
 /// Typing searches keep stub overlays separate from the normal search so that another package
@@ -1735,7 +1748,7 @@ impl<'resolver, 'db> ModuleSearch<'resolver, 'db> {
     }
 
     /// Enumerates names once, sharing prefix state across sibling resolutions.
-    fn children(&self) -> Vec<Module<'db>> {
+    fn children(&self) -> DiscoveredChildren<'db> {
         let context = &self.resolver.context;
         let mut names = BTreeSet::new();
         if self.name.is_none() {
@@ -1753,7 +1766,7 @@ impl<'resolver, 'db> ModuleSearch<'resolver, 'db> {
             }
         }
 
-        let mut children = Vec::new();
+        let mut children = DiscoveredChildren::default();
         for component in names {
             context.db.unwind_if_revision_cancelled();
             let Some(name) = self.child_name(&component) else {
@@ -1773,9 +1786,21 @@ impl<'resolver, 'db> ModuleSearch<'resolver, 'db> {
                 if !eligible {
                     continue;
                 }
-                children.extend(candidates.into_iter().take(1).map(|candidate| {
-                    candidate.into_module(context.db, context.resolver_environment, &name)
-                }));
+                children
+                    .modules
+                    .extend(candidates.into_iter().take(1).map(|candidate| {
+                        candidate.into_module(context.db, context.resolver_environment, &name)
+                    }));
+            } else if !self.overlay.is_empty()
+                && let Some(search) = self.enter_package(&component)
+                && search.overlay.iter().any(|candidate| {
+                    !matches!(candidate.module, ResolvedModule::Module(_))
+                        && candidate.is_discoverable(context.db, self.resolver.known_package)
+                })
+            {
+                // A local stub can patch `acme.nested.tools` even when installed stubs omit
+                // `acme.nested`. Keep that prefix for traversal without inventing a module.
+                children.overlay_prefixes.push(name);
             }
         }
         children
