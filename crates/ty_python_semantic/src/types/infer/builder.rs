@@ -3558,6 +3558,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     self.infer_expression(value, tcx)
                 };
 
+                if tcx.annotation.is_none() && target.is_name_expr() {
+                    self.check_implicit_type_alias_scope(value, value_ty);
+                }
+
                 self.typevar_binding_context = previous_typevar_binding_context;
 
                 // `TYPE_CHECKING` is a special variable that should only be assigned `False`

@@ -808,6 +808,129 @@ def g(obj: Y[bool, range]):
     reveal_type(obj)  # revealed: tuple[bool, *tuple[tuple[int, str, range], ...], bytes]
 ```
 
+### Class-scoped type variables
+
+An implicit generic alias binds its own type variables. It cannot capture a type variable already
+bound to its enclosing class, including through a nested type argument or a union.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+S = TypeVar("S")
+
+class Box(Generic[T]):
+    # error: [invalid-type-form] "Type alias cannot capture class-scoped type variable `T`"
+    Items = list[T]
+    # error: [invalid-type-form] "Type alias cannot capture class-scoped type variable `T`"
+    Nested = list[list[T]]
+    # error: [invalid-type-form] "Type alias cannot capture class-scoped type variable `T`"
+    Optional = T | None
+
+    Independent = list[S]
+    Concrete = list[int]
+    # error: [invalid-type-form] "Type alias cannot capture class-scoped type variable `T`"
+    Specialized = Independent[T]
+
+reveal_type(Box.Independent[str]())  # revealed: list[str]
+reveal_type(Box.Concrete())  # revealed: list[int]
+```
+
+Ordinary value assignments can use the class's type variables. A constructor call creates an
+instance, and an explicit value annotation distinguishes a class-valued attribute from an alias.
+Type variables in `Annotated` metadata do not become alias parameters.
+
+```py
+from typing import Annotated
+
+class Values(Generic[T]):
+    instance = list[T]()
+    constructor: type[list[T]] = list[T]
+    declared_constructor: type[list[T]]
+    declared_constructor = list[T]
+    constructors = [list[T]]
+    indexed_constructor = (list[T],)[0]
+    constructor_tuple = (list[T],)
+    tuple_constructor = constructor_tuple[0]
+    Metadata = Annotated[int, list[T]]
+
+    def make(self) -> list[T]:
+        return list[T]()
+```
+
+The same restriction applies to implicit aliases inside PEP 695 classes. A `type` statement can
+capture the enclosing class's parameter because its own type parameters are declared explicitly.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+class Modern[T]:
+    # error: [invalid-type-form] "Type alias cannot capture class-scoped type variable `T`"
+    Items = list[T]
+    type Captured = list[T]
+```
+
+Referring to another alias does not permit an implicit alias to capture the class's parameter.
+Recursive aliases are subject to the same rule.
+
+```py
+class Indirect[T]:
+    type Captured = list[T]
+    # error: [invalid-type-form] "Type alias cannot capture class-scoped type variable `T`"
+    Items = Captured
+    # error: [invalid-type-form] "Type alias cannot capture class-scoped type variable `T`"
+    Optional = Captured | None
+
+    type Recursive = T | list[Recursive]
+    # error: [invalid-type-form] "Type alias cannot capture class-scoped type variable `T`"
+    RecursiveItems = Recursive
+
+    type ConcreteRecursive = int | list[ConcreteRecursive]
+    ConcreteItems = ConcreteRecursive
+```
+
+### Class-scoped variadic type variables
+
+Implicit aliases cannot capture a `ParamSpec` or `TypeVarTuple` bound to their enclosing class.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Callable, Generic, ParamSpec, TypeVarTuple
+
+P = ParamSpec("P")
+Ts = TypeVarTuple("Ts")
+
+class Callbacks(Generic[P]):
+    # error: [invalid-type-form] "Type alias cannot capture class-scoped type variable `P`"
+    Callback = Callable[P, None]
+
+class Tuples(Generic[*Ts]):
+    # error: [invalid-type-form] "Type alias cannot capture class-scoped type variable `Ts`"
+    Items = tuple[*Ts]
+```
+
+### Class-scoped implicit aliases in stubs
+
+Implicit aliases in stubs follow the same scoping rules as aliases in Python source files.
+
+```pyi
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Box(Generic[T]):
+    # error: [invalid-type-form] "Type alias cannot capture class-scoped type variable `T`"
+    Items = list[T]
+    constructor: type[list[T]] = list[T]
+```
+
 ### Error cases
 
 A generic alias that is already fully specialized cannot be specialized again:

@@ -22,6 +22,7 @@ use crate::types::signatures::{ConcatenateTail, Signature};
 use crate::types::special_form::{AliasSpec, LegacyStdlibAlias};
 use crate::types::string_annotation::parse_string_annotation;
 use crate::types::tuple::{TupleSpec, TupleSpecBuilder, TupleType};
+use crate::types::visitor::find_over_type;
 use ty_python_core::definition::DefinitionKind;
 use ty_python_core::scope::ScopeKind;
 
@@ -3251,6 +3252,86 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
     }
 
+    /// Check class-scoped implicit aliases after value inference has distinguished them from
+    /// ordinary assignments, such as `items = list[T]()`.
+    pub(super) fn check_implicit_type_alias_scope(&self, expression: &ast::Expr, ty: Type<'db>) {
+        let db = self.db();
+        if self.scope().scope(db).kind() != ScopeKind::Class
+            || !self.is_implicit_type_alias_expression(expression)
+        {
+            return;
+        }
+
+        if let Ok(alias_ty) = ty.in_type_expression(
+            db,
+            self.scope(),
+            self.typevar_binding_context,
+            self.inference_flags(),
+        ) {
+            self.check_type_alias_scope(
+                expression,
+                alias_ty.expand_eagerly(db, self.program_environment()),
+            );
+        }
+    }
+
+    /// Whether an expression can define an implicit alias. Subscripting a value such as a tuple
+    /// of constructors is an ordinary value expression, even when the result is a class object.
+    fn is_implicit_type_alias_expression(&self, expression: &ast::Expr) -> bool {
+        match expression {
+            ast::Expr::Name(_) | ast::Expr::Attribute(_) => is_dotted_name(expression),
+            ast::Expr::Subscript(subscript) => {
+                is_dotted_name(&subscript.value)
+                    && self
+                        .expression_type(&subscript.value)
+                        .in_type_expression(
+                            self.db(),
+                            self.scope(),
+                            self.typevar_binding_context,
+                            self.inference_flags(),
+                        )
+                        .is_ok()
+            }
+            ast::Expr::BinOp(ast::ExprBinOp {
+                left,
+                op: ast::Operator::BitOr,
+                right,
+                ..
+            }) => {
+                self.is_implicit_type_alias_expression(left)
+                    && self.is_implicit_type_alias_expression(right)
+            }
+            ast::Expr::NoneLiteral(_) => true,
+            _ => false,
+        }
+    }
+
+    fn check_type_alias_scope(&self, expression: &ast::Expr, ty: Type<'db>) {
+        let db = self.db();
+        // Bounds and protocol members have their own generic scopes. Inspect the alias's type
+        // arguments without descending into these lazily inferred attributes.
+        let Some(typevar) = find_over_type(db, self.program_environment(), ty, false, |ty| {
+            if let Type::TypeVar(typevar) = ty
+                && let Some(owner) = typevar.binding_context(db).definition()
+                && matches!(owner.kind(db), DefinitionKind::Class(_))
+            {
+                Some(typevar)
+            } else {
+                None
+            }
+        }) else {
+            return;
+        };
+
+        self.report_invalid_type_expression(
+            expression,
+            format_args!(
+                "Type alias cannot capture class-scoped type variable `{}`",
+                typevar.name(db)
+            ),
+        );
+    }
+
     /// Check whether a type variable can be used in the current type expression.
     ///
     /// Unbound variables fall back to `Unknown`. Bound variables retain their type so that an
@@ -3259,23 +3340,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let db = self.db();
         // Legacy aliases introduce independent type parameters. PEP 695 aliases can instead
         // capture their enclosing class's parameters.
-        if let Type::TypeVar(typevar) = ty
+        if let Type::TypeVar(_) = ty
             && self
                 .inference_flags()
                 .contains(InferenceFlags::IN_TYPE_ALIAS)
             && self.typevar_binding_context.is_some_and(|definition| {
                 matches!(definition.kind(db), DefinitionKind::AnnotatedAssignment(_))
             })
-            && let Some(owner) = typevar.binding_context(db).definition()
-            && matches!(owner.kind(db), DefinitionKind::Class(_))
         {
-            self.report_invalid_type_expression(
-                expression,
-                format_args!(
-                    "Type alias cannot capture class-scoped type variable `{}`",
-                    typevar.name(db)
-                ),
-            );
+            self.check_type_alias_scope(expression, ty);
             return ty;
         }
 
