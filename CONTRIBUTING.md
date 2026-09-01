@@ -37,6 +37,13 @@ exploration of new features, we will often close these pull requests immediately
 new feature to ruff creates a long-term maintenance burden and requires strong consensus from the ruff
 team before it is appropriate to begin work on an implementation.
 
+### Avoiding duplicate work
+
+Before starting on an issue, take a look at the discussion and any linked pull requests, including
+those in the sidebar. An issue may still be open while a fix is under review. Even if a previous
+attempt was closed, it may contain useful context or review comments that you could incorporate
+before submitting a new PR.
+
 ## Use of AI
 
 We **require all use of AI in contributions to follow our

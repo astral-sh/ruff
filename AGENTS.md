@@ -2,6 +2,12 @@
 
 This repository contains both Ruff (a Python linter and formatter) and ty (a Python type checker). The crates follow a naming convention: `ruff_*` for Ruff-specific code and `ty_*` for ty-specific code. ty reuses several Ruff crates, including the Python parser (`ruff_python_parser`) and AST definitions (`ruff_python_ast`).
 
+## Before contributing
+
+Before starting work on an issue and again before opening a pull request, follow the
+[guidance on avoiding duplicate work](CONTRIBUTING.md#avoiding-duplicate-work). If an open pull
+request already addresses the issue, do not submit a competing one without maintainer agreement.
+
 ## Code Review Rules
 
 When reviewing a branch or pull request, be deliberately nitpicky. Report not
