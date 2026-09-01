@@ -563,6 +563,86 @@ reveal_type(Explicit.class_method.__func__)  # revealed: Wrapper
 reveal_type(Explicit.class_method.__call__(1))  # revealed: int
 ```
 
+## Generic inference for method wrappers
+
+When a generic function returns a mutable container, inference can widen literal types in its
+argument. A method wrapper remains assignable to the inferred type when its callable's return type
+widens from a string literal to `str`.
+
+```py
+def as_list[T](value: T) -> list[T]:
+    return [value]
+
+reveal_type(as_list(classmethod(lambda cls: ""))[0].__func__(object))  # revealed: str
+reveal_type(as_list(staticmethod(lambda: ""))[0]())  # revealed: str
+```
+
+## Type relations between method wrappers
+
+Wrappers of the same kind preserve the type relationships between their wrapped callables. A
+callable returning `str` can be used where one returning `object` is expected, but the reverse is
+not safe. The wrapper types overlap because they can contain the same callable.
+
+```py
+from typing import Callable
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_assignable_to, is_disjoint_from, is_subtype_of
+
+def _(str_fn: Callable[[object], str], object_fn: Callable[[object], object]):
+    str_class = classmethod(str_fn)
+    object_class = classmethod(object_fn)
+    str_static = staticmethod(str_fn)
+    object_static = staticmethod(object_fn)
+
+    static_assert(is_subtype_of(TypeOf[str_class], TypeOf[object_class]))
+    static_assert(not is_assignable_to(TypeOf[object_class], TypeOf[str_class]))
+    static_assert(not is_disjoint_from(TypeOf[str_class], TypeOf[object_class]))
+
+    static_assert(is_subtype_of(TypeOf[str_static], TypeOf[object_static]))
+    static_assert(not is_assignable_to(TypeOf[object_static], TypeOf[str_static]))
+    static_assert(not is_disjoint_from(TypeOf[str_static], TypeOf[object_static]))
+```
+
+A classmethod and a staticmethod are distinct descriptor types, even if they wrap the same callable.
+
+```py
+    static_assert(not is_assignable_to(TypeOf[str_class], TypeOf[str_static]))
+    static_assert(not is_assignable_to(TypeOf[str_static], TypeOf[str_class]))
+    static_assert(is_disjoint_from(TypeOf[str_class], TypeOf[str_static]))
+```
+
+The wrapped object's attributes also matter. Sharing a call signature does not make a base-class
+instance assignable to a subclass that provides additional attributes.
+
+```py
+class Base:
+    def __call__(self, cls: object) -> str:
+        return ""
+
+class Derived(Base):
+    extra: int
+
+def _(base: Base, derived: Derived):
+    base_method = classmethod(base)
+    derived_method = classmethod(derived)
+
+    static_assert(is_subtype_of(TypeOf[derived_method], TypeOf[base_method]))
+    static_assert(not is_assignable_to(TypeOf[base_method], TypeOf[derived_method]))
+    static_assert(not is_disjoint_from(TypeOf[base_method], TypeOf[derived_method]))
+```
+
+Descriptors wrapping distinct function objects are disjoint, even when those functions have the same
+signature.
+
+```py
+def first(cls: object) -> None: ...
+def second(cls: object) -> None: ...
+
+first_method = classmethod(first)
+second_method = classmethod(second)
+static_assert(is_disjoint_from(TypeOf[first_method], TypeOf[second_method]))
+```
+
 ## Decorators returning a different function
 
 An inner decorator can replace a method with a function defined elsewhere. The outer `classmethod`
