@@ -228,6 +228,17 @@ impl Format<PyFormatContext<'_>> for FormatInterpolatedElement<'_> {
 
                     token(":").fmt(f)?;
 
+                    // Reset the interpolated string state so that interpolations
+                    // inside the format spec are treated as direct children of
+                    // the enclosing f-string, not as nested. Without this,
+                    // `f'x {v:,.{d["n"]}f} y'` would preserve the inner double
+                    // quotes instead of alternating them to single.
+                    let f =
+                        &mut WithInterpolatedStringState::new(
+                            InterpolatedStringState::Outside,
+                            &mut **f,
+                        );
+
                     for element in &format_spec.elements {
                         FormatInterpolatedStringElement::new(element, context).fmt(f)?;
                     }

@@ -750,5 +750,10 @@ print(f"{  # Tuple with multiple elements that doesn't fit on a single line gets
 print(f"{ {}, 1, }")
 
 
+# Regression tests for https://github.com/astral-sh/ruff/issues/28218
+# Quotes inside format-spec interpolations should be alternated, not preserved.
+a = f'x {d["k"]} y'
+b = f'x {v:,.{d["n"]}f} y'
+
 # The inner quotes should not be changed to double quotes before Python 3.12
 f"{f'''{'nested'} inner'''} outer"
