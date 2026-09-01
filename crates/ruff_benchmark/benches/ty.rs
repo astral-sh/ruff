@@ -412,7 +412,7 @@ fn benchmark_projection_stress(criterion: &mut Criterion) {
         b.iter_batched_ref(
             || setup_micro_case(&projection_deep_path_code(16)),
             |case| {
-                let Case { db, .. } = case;
+                let Case { db } = case;
                 let result = db.check();
                 assert_eq!(result.len(), 0);
             },
@@ -424,7 +424,7 @@ fn benchmark_projection_stress(criterion: &mut Criterion) {
         b.iter_batched_ref(
             || setup_micro_case(&projection_many_roots_code(16, 4)),
             |case| {
-                let Case { db, .. } = case;
+                let Case { db } = case;
                 let result = db.check();
                 assert_eq!(result.len(), 0);
             },
