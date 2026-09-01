@@ -25,15 +25,15 @@ that are ready for contributions.
 ty is written in Rust. You'll need to install the
 [Rust toolchain](https://www.rust-lang.org/tools/install) for development.
 
+You'll need [uv](https://docs.astral.sh/uv/getting-started/installation/) to
+run Python utility commands. uv also manages our development toolchain.
+
 We use [Insta](https://insta.rs/docs/) to update snapshot tests. It's already part
 of the development toolchain:
 
 ```shell
 uv run --only-group dev cargo insta --version
 ```
-
-You'll need [uv](https://docs.astral.sh/uv/getting-started/installation/) (or `pipx` and `pip`) to
-run Python utility commands.
 
 You can optionally install hooks to automatically run the validation checks
 when making a commit:
