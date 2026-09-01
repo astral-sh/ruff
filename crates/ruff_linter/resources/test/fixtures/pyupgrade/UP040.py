@@ -132,3 +132,8 @@ T: TypeAlias = ( # comment0
 # Test case for TypeVar with default - should be converted when preview mode is enabled
 T_default = TypeVar("T_default", default=int)
 DefaultList: TypeAlias = list[T_default]
+
+# Test case for TypeVar with starred constraints - should NOT be fixed
+constraints = (int, str)
+T_starred = TypeVar("T_starred", *constraints)
+StarredList = TypeAliasType("StarredList", list[T_starred], type_params=(T_starred,))

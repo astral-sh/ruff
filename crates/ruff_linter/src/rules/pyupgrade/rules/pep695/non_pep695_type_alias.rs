@@ -172,14 +172,8 @@ pub(crate) fn non_pep695_type_alias_type(checker: &Checker, stmt: &StmtAssign) {
     let Some(vars) = type_params
         .iter()
         .map(|expr| {
-            expr.as_name_expr().map(|name| {
-                expr_name_to_type_var(checker.semantic(), name).unwrap_or(TypeVar {
-                    name: &name.id,
-                    restriction: None,
-                    kind: TypeParamKind::TypeVar,
-                    default: None,
-                })
-            })
+            expr.as_name_expr()
+                .and_then(|name| expr_name_to_type_var(checker.semantic(), name))
         })
         .collect::<Option<Vec<_>>>()
     else {
