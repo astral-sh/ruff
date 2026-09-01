@@ -1973,6 +1973,43 @@ def narrow_awaitable(value: Awaitable[int]) -> None:
         reveal_type(value)  # revealed: Awaitable[int]
 ```
 
+### Generic protocol relations
+
+A generic protocol lies between its bottom and top materializations, even when its type parameters
+have constraints. Intersecting it with the complement of its top materialization produces `Never`:
+
+```py
+from typing import Any, Protocol
+from ty_extensions import Bottom, Intersection, Not, Top, static_assert
+from ty_extensions._internal import is_subtype_of
+
+class Constrained[T: (str, bytes)](Protocol):
+    def read(self) -> T: ...
+
+static_assert(is_subtype_of(Constrained[Any], Top[Constrained[Any]]))
+static_assert(is_subtype_of(Bottom[Constrained[Any]], Constrained[Any]))
+static_assert(not is_subtype_of(Constrained[str], Top[Constrained[bytes]]))
+
+def constrained(value: Intersection[Constrained[Any], Not[Top[Constrained[Any]]]]) -> None:
+    reveal_type(value)  # revealed: Never
+```
+
+Materializing a bounded parameter can replace `Any` with its bound. The same relations hold when the
+protocol also has an explicit `Any` member:
+
+```py
+class Bounded[T: str](Protocol):
+    def read(self) -> T: ...
+    def other(self) -> Any: ...
+
+static_assert(is_subtype_of(Bounded[Any], Top[Bounded[Any]]))
+static_assert(is_subtype_of(Bottom[Bounded[Any]], Bounded[Any]))
+static_assert(not is_subtype_of(Top[Bounded[Any]], Bounded[Any]))
+
+def bounded(value: Intersection[Bounded[Any], Not[Top[Bounded[Any]]]]) -> None:
+    reveal_type(value)  # revealed: Never
+```
+
 ### Class variables
 
 Class variables have separate read and write types. `Top` reads `object` and writes `Never`, while
