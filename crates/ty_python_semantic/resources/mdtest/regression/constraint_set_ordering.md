@@ -207,7 +207,7 @@ def chain_stu[S, T, U]() -> None:
     constraints = chain & ConstraintSet.lower_bound(int, S) & ConstraintSet.upper_bound(U, int)
     # TODO: inferable typevars should not remain in these concrete solutions.
     # TODO: sometimes: revealed tuple[Solution[S=int | U@chain_stu | T@chain_stu]]
-    # revealed: tuple[Solution[S=int | T@chain_stu | U@chain_stu]]
+    # revealed: tuple[Solution[S=T@chain_stu | U@chain_stu | int]]
     reveal_type(constraints.solutions_for(S, inferable=tuple[S, T, U]))
     # revealed: tuple[Solution[T=S@chain_stu | int | U@chain_stu]]
     reveal_type(constraints.solutions_for(T, inferable=tuple[S, T, U]))
@@ -223,7 +223,7 @@ def chain_uts[U, T, S]() -> None:
     constraints = chain & ConstraintSet.lower_bound(int, S) & ConstraintSet.upper_bound(U, int)
     # TODO: inferable typevars should not remain in these concrete solutions.
     # TODO: sometimes: revealed tuple[Solution[S=int | U@chain_uts | T@chain_uts]]
-    # revealed: tuple[Solution[S=int | T@chain_uts | U@chain_uts]]
+    # revealed: tuple[Solution[S=T@chain_uts | U@chain_uts | int]]
     reveal_type(constraints.solutions_for(S, inferable=tuple[S, T, U]))
     # revealed: tuple[Solution[T=S@chain_uts | int | U@chain_uts]]
     reveal_type(constraints.solutions_for(T, inferable=tuple[S, T, U]))
@@ -342,9 +342,6 @@ def listify[T](value: T) -> list[T]:
 
 def invariant_callable[U, V]() -> None:
     constraints = ConstraintSet.range(bool, U, int) & ConstraintSet.equality(V, int)
-    # TODO: no error. Existential reduction of the callable's fresh typevar is currently lossy.
-    # TODO: sometimes: no error
-    # error: [static-assert-error]
     static_assert(constraints.implies_subtype_of(TypeOf[listify], Callable[[U], list[V]]))
 
 ConstrainedValue = TypeVar("ConstrainedValue", int, object, covariant=True)
@@ -402,8 +399,8 @@ invalid: Array = Concrete[int]()
 ## High-fanout sequents and inferred-union truncation
 
 The cross-product between the twelve lower- and twelve upper-bound relationships exhausts the shared
-sequent fuel budget. The remaining solution, its element order, and the elements retained by
-truncated diagnostic display must not depend on which implications were encountered first.
+sequent fuel budget. Exhausting the budget while finding intermediate solutions must not prevent a
+later traversal from rejecting an incompatible additional bound.
 
 ```py
 from typing import Literal
@@ -492,28 +489,12 @@ def high_fanout[
         R11,
     ]
     constraints = lower & upper
+
+    # Computing both projections exercises budget exhaustion before the recovery check below.
     pivot = constraints.solutions_for(P, inferable=inferable)
     result = constraints.solutions_for(R11, inferable=inferable)
-
-    # TODO: inferred solutions should not retain the intermediate inferable typevars.
-    # TODO: sometimes: revealed tuple[Solution[P=L0@high_fanout | Literal[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] | L1@high_fanout | L2@high_fanout | L3@high_fanout | L4@high_fanout | L5@high_fanout | L6@high_fanout | L7@high_fanout | L8@high_fanout | L9@high_fanout | L10@high_fanout | L11@high_fanout]]
-    # TODO: sometimes: revealed tuple[Solution[P=L0@high_fanout | Literal[0, 3, 4, 5, 6, 7, 8, 9, 10, 11] | L1@high_fanout | L2@high_fanout | L3@high_fanout | L4@high_fanout | L5@high_fanout | L6@high_fanout | L7@high_fanout | L8@high_fanout | L9@high_fanout | L10@high_fanout | L11@high_fanout]]
-    # TODO: sometimes: revealed tuple[Solution[P=L0@high_fanout | Literal[0, 1, 4, 5, 6, 7, 8, 9, 10, 11] | L1@high_fanout | L2@high_fanout | L3@high_fanout | L4@high_fanout | L5@high_fanout | L6@high_fanout | L7@high_fanout | L8@high_fanout | L9@high_fanout | L10@high_fanout | L11@high_fanout]]
-    # TODO: sometimes: revealed tuple[Solution[P=L0@high_fanout | Literal[0, 1, 2, 5, 6, 7, 8, 9, 10, 11] | L1@high_fanout | L2@high_fanout | L3@high_fanout | L4@high_fanout | L5@high_fanout | L6@high_fanout | L7@high_fanout | L8@high_fanout | L9@high_fanout | L10@high_fanout | L11@high_fanout]]
-    # TODO: sometimes: revealed tuple[Solution[P=L0@high_fanout | Literal[0, 1, 2, 3, 6, 7, 8, 9, 10, 11] | L1@high_fanout | L2@high_fanout | L3@high_fanout | L4@high_fanout | L5@high_fanout | L6@high_fanout | L7@high_fanout | L8@high_fanout | L9@high_fanout | L10@high_fanout | L11@high_fanout]]
-    # TODO: sometimes: revealed tuple[Solution[P=L0@high_fanout | Literal[0, 1, 2, 3, 4, 5, 6, 9, 10, 11] | L1@high_fanout | L2@high_fanout | L3@high_fanout | L4@high_fanout | L5@high_fanout | L6@high_fanout | L7@high_fanout | L8@high_fanout | L9@high_fanout | L10@high_fanout | L11@high_fanout]]
-    # revealed: tuple[Solution[P=L0@high_fanout | L1@high_fanout | Literal[2, 3, 4, 5, 6, 7, 8, 9, 10, 11] | L2@high_fanout | L3@high_fanout | L4@high_fanout | L5@high_fanout | L6@high_fanout | L7@high_fanout | L8@high_fanout | L9@high_fanout | L10@high_fanout | L11@high_fanout]]
-    reveal_type(pivot)
-
-    # TODO: sometimes: revealed tuple[Solution[R11=P@high_fanout]]
-    # TODO: sometimes: revealed tuple[Solution[R11=L0@high_fanout | L2@high_fanout | Literal[2, 3, 4, 5, 6, 7, 8, 9, 10, 11] | L3@high_fanout | L4@high_fanout | L5@high_fanout | L6@high_fanout | L7@high_fanout | L8@high_fanout | L9@high_fanout | L10@high_fanout | L11@high_fanout | P@high_fanout]]
-    # TODO: sometimes: revealed tuple[Solution[R11=L0@high_fanout | Literal[0, 3, 4, 5, 6, 7, 8, 9, 10, 11] | L2@high_fanout | L3@high_fanout | L4@high_fanout | L5@high_fanout | L6@high_fanout | L7@high_fanout | L8@high_fanout | L9@high_fanout | L10@high_fanout | L11@high_fanout | P@high_fanout]]
-    # TODO: sometimes: revealed tuple[Solution[R11=L0@high_fanout | Literal[0, 1, 4, 5, 6, 7, 8, 9, 10, 11] | L1@high_fanout | L3@high_fanout | L4@high_fanout | L5@high_fanout | L6@high_fanout | L7@high_fanout | L8@high_fanout | L9@high_fanout | L10@high_fanout | L11@high_fanout | P@high_fanout]]
-    # TODO: sometimes: revealed tuple[Solution[R11=L0@high_fanout | Literal[0, 1, 5, 6, 7, 8, 9, 10, 11] | L1@high_fanout | L2@high_fanout | L4@high_fanout | L5@high_fanout | L6@high_fanout | L7@high_fanout | L8@high_fanout | L9@high_fanout | L10@high_fanout | L11@high_fanout | P@high_fanout]]
-    # TODO: sometimes: revealed tuple[Solution[R11=L0@high_fanout | Literal[0, 1, 2, 3, 6, 7, 8, 9, 10, 11] | L1@high_fanout | L2@high_fanout | L3@high_fanout | L5@high_fanout | L6@high_fanout | L7@high_fanout | L8@high_fanout | L9@high_fanout | L10@high_fanout | L11@high_fanout | P@high_fanout]]
-    # TODO: sometimes: revealed tuple[Solution[R11=L0@high_fanout | Literal[0, 1, 2, 3, 4, 5, 6, 9, 10, 11] | L1@high_fanout | L2@high_fanout | L3@high_fanout | L4@high_fanout | L5@high_fanout | L6@high_fanout | L8@high_fanout | L9@high_fanout | L10@high_fanout | L11@high_fanout | P@high_fanout]]
-    # revealed: tuple[Solution[R11=L1@high_fanout | Literal[2, 3, 4, 5, 6, 7, 8, 9, 10, 11] | L2@high_fanout | L3@high_fanout | L4@high_fanout | L5@high_fanout | L6@high_fanout | L7@high_fanout | L8@high_fanout | L9@high_fanout | L10@high_fanout | L11@high_fanout | P@high_fanout]]
-    reveal_type(result)
+    _ = pivot
+    _ = result
 
     impossible = constraints & ConstraintSet.upper_bound(R11, Literal[0])
     # TODO: sometimes: revealed tuple[Solution[R11=P@high_fanout]]

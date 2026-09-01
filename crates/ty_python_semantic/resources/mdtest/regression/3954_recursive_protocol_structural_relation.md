@@ -286,6 +286,6 @@ Options: TypeAlias = Iterable[U] | F[U] | M
 
 def s(value: Options[U]) -> list[U]:
     result = [value]
-    reveal_type(result)  # revealed: list[U@s | Iterable[M] | Iterable[Iterable[M]] | Iterable[U@s] | F[U@s] | M]
+    reveal_type(result)  # revealed: list[U@s | Iterable[U@s] | F[U@s] | M]
     return result  # error: [invalid-return-type]
 ```

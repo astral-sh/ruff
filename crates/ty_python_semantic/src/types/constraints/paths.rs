@@ -528,7 +528,6 @@ impl PathAssignments {
         Some(max_fuel)
     }
 
-    #[expect(dead_code)]
     fn add_sequents<'db>(
         &mut self,
         db: &'db dyn Db,
@@ -581,7 +580,6 @@ impl PathAssignments {
             .push(Sequent::SingleImplication { ante, post });
     }
 
-    #[expect(dead_code)]
     fn discover_single_constraint<'db>(
         &mut self,
         db: &'db dyn Db,
@@ -659,7 +657,6 @@ impl PathAssignments {
         );
     }
 
-    #[expect(dead_code)]
     fn discover_constraint_pair<'db>(
         &mut self,
         db: &'db dyn Db,
@@ -698,6 +695,11 @@ impl PathAssignments {
                 if *left == *right {
                     continue;
                 }
+
+                if SequentMap::<Constraint>::pair_cannot_produce_sequents(db, env, *left, *right) {
+                    continue;
+                }
+
                 let map =
                     SequentMap::<Constraint<'db>>::for_constraint_pair(db, env, *left, *right);
                 self.add_sequents(db, env, storage, map);
@@ -740,10 +742,14 @@ impl PathAssignments {
             return;
         }
 
-        let single_map = SequentMap::<ConstraintId>::for_constraint(db, env, storage, constraint);
-        self.sequents.extend_from_slice(&single_map.sequents);
+        let constraint_data = storage.constraint_data(constraint);
+        self.discover_single_constraint(db, env, storage, constraint, constraint_data);
 
-        for (existing_index, (existing, _)) in self.discovered.iter().enumerate() {
+        for existing_index in 0..self.discovered.len() {
+            let (existing, _) = self
+                .discovered
+                .get_index(existing_index)
+                .expect("element should be present");
             if *existing == constraint {
                 continue;
             }
@@ -764,11 +770,13 @@ impl PathAssignments {
                 continue;
             }
 
+            /* XXX
             if SequentMap::<ConstraintId>::pair_cannot_produce_sequents(
                 db, env, storage, *existing, constraint,
             ) {
                 continue;
             }
+            */
 
             let (a, b) = if existing_index < constraint_index {
                 (*existing, constraint)
@@ -780,8 +788,7 @@ impl PathAssignments {
                 continue;
             }
 
-            let pair_map = SequentMap::<ConstraintId>::for_constraint_pair(db, env, storage, a, b);
-            self.sequents.extend_from_slice(&pair_map.sequents);
+            self.discover_constraint_pair(db, env, storage, a, b);
         }
     }
 
