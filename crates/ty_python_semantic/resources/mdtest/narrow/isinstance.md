@@ -1177,6 +1177,46 @@ def from_object(value: object):
         reveal_type(value)  # revealed: ~Top[Reader]
 ```
 
+### Constrained type parameters
+
+Strict narrowing preserves a type parameter's constraints when materializing protocol members. The
+first tuple element remains `int | str`, while the unrelated `Any` in the second element is
+materialized to `object`:
+
+```toml
+[environment]
+python-version = "3.12"
+
+[analysis]
+strict-generic-narrowing = true
+```
+
+```py
+from typing import Any, Protocol, runtime_checkable
+
+@runtime_checkable
+class Reader[T: (int, str)](Protocol):
+    def read(self) -> tuple[T, Any]: ...
+
+def read(value: object) -> int | str:
+    if isinstance(value, Reader):
+        reveal_type(value.read())  # revealed: tuple[int | str, object]
+        return value.read()[0]
+    return 0
+```
+
+The standard-library `PathLike` protocol similarly constrains its result to `str` or `bytes`:
+
+```py
+from os import PathLike
+
+def path(value: object) -> str | bytes:
+    if isinstance(value, PathLike):
+        reveal_type(value.__fspath__())  # revealed: str | bytes
+        return value.__fspath__()
+    return ""
+```
+
 ### Awaitable
 
 `Awaitable.__await__` returns a generator with gradual yield and send types. Strict narrowing

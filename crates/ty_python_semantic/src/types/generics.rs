@@ -1404,6 +1404,39 @@ impl<'db> Specialization<'db> {
         )
     }
 
+    /// Remove pending materialization while preserving the range of each gradual argument.
+    ///
+    /// Protocol interfaces materialize reads and writes separately. Their shared specialization
+    /// must therefore retain gradual arguments, but replacing a bounded type variable with bare
+    /// `Unknown` would lose its bound before either access is materialized. Intersect the argument
+    /// with that bound (or the union of its constraints) while the type variable is still known.
+    pub(super) fn without_materialization(self, db: &'db dyn Db) -> Self {
+        if self.materialization_kind(db).is_none() {
+            return self;
+        }
+
+        let env = ProgramEnvironment::from_program(self.generic_context(db).program(db));
+        let visitor = ApplyTypeMappingVisitor::new(&env);
+        let types = self.map_types(db, |_, typevar, ty| {
+            let top = ty.materialize(db, MaterializationKind::Top, &visitor);
+            if !visitor.is_equivalent_to_materialization(db, ty, top)
+                && let Some(bound) = typevar.top_materialized_upper_bound(db)
+            {
+                IntersectionType::from_two_elements(db, &env, ty, bound)
+            } else {
+                ty
+            }
+        });
+
+        Specialization::new(
+            db,
+            self.generic_context(db),
+            types,
+            None,
+            self.tuple_inner(db),
+        )
+    }
+
     pub(crate) fn apply_type_mapping_impl<'a>(
         self,
         db: &'db dyn Db,
