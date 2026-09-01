@@ -4121,10 +4121,10 @@ class Container[T](Protocol):
     value: T
 
     def replace[U](self, value: U) -> None:
-        pass
+        return
 
     def flatten[U](self: "Container[Container[U]]") -> None:
-        pass
+        return
 
 class Implementation[T](Container[T]):
     pass
@@ -6973,9 +6973,9 @@ def check(value: Recursive[int]) -> None:
 ### Generic constructors inheriting recursive protocols
 
 A generic constructor can infer its specialization from an expected recursive protocol even when the
-protocol includes a method with an explicitly constrained receiver. Invalid constructor arguments
-are rejected. Without an expected type, the empty tuple is an `Iterable[Never]`, so the constructor
-infers `T = Never` regardless of the protocol's variance.
+protocol includes a concrete method with an explicitly constrained receiver. Invalid constructor
+arguments are rejected. Without an expected type, the empty tuple is an `Iterable[Never]`, so the
+constructor infers `T = Never` regardless of the protocol's variance.
 
 ```toml
 [environment]
@@ -6989,8 +6989,10 @@ from collections.abc import Iterable
 from typing import Protocol
 
 class Chain[T](Protocol):
-    def value(self) -> T: ...
-    def combine[S](self: Chain[S], pair: tuple[S, T]) -> Chain[T]: ...
+    def value(self) -> T:
+        raise RuntimeError
+    def combine[S](self: Chain[S], pair: tuple[S, T]) -> Chain[T]:
+        raise RuntimeError
 
 class Concrete[T](Chain[T]):
     def __init__(self, values: Iterable[T]) -> None: ...
@@ -7006,9 +7008,9 @@ def make() -> Chain[int]:
 
 ### Specialized sources with constrained protocol receivers
 
-A concrete class can inherit recursive methods with explicitly constrained receivers. Concrete,
-symbolic, and unknown specializations bind those receivers and preserve the corresponding return
-types.
+A concrete class can inherit implemented recursive methods with explicitly constrained receivers.
+Concrete, symbolic, and unknown specializations bind those receivers and preserve the corresponding
+return types.
 
 ```toml
 [environment]
@@ -7021,8 +7023,10 @@ from __future__ import annotations
 from typing import Protocol
 
 class Chain[T](Protocol):
-    def value(self) -> T: ...
-    def accumulate[S](self: Chain[S]) -> Chain[S]: ...
+    def value(self) -> T:
+        raise RuntimeError
+    def accumulate[S](self: Chain[S]) -> Chain[S]:
+        return self
 
 class Concrete[T](Chain[T]): ...
 

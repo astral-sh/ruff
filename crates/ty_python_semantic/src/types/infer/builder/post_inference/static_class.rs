@@ -1,36 +1,33 @@
 use crate::Db;
 use itertools::{Either, Itertools};
-use ruff_db::{
-    diagnostic::{Annotation, SubDiagnostic, SubDiagnosticSeverity},
-    source::source_text,
-};
+use ruff_db::{diagnostic::Annotation, source::source_text};
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::{self as ast, PythonVersion, name::Name};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 
+use crate::attribute_assignments;
 use crate::{
     TypeQualifiers,
-    diagnostic::format_enumeration,
     place::{DefinedPlace, Place, TypeOrigin, place_from_bindings, place_from_declarations},
     types::{
         CallArguments, ClassBase, ClassLiteral, ClassType, DataclassFlags, DisplaySettings,
-        KnownClass, KnownInstanceType, MemberLookupPolicy, MetaclassCandidate, Parameters,
-        Signature, SpecialFormType, StaticClassLiteral, Type, TypeVarVariance, TypingModule,
+        KnownClass, KnownInstanceType, MemberLookupPolicy, MetaclassCandidate, SpecialFormType,
+        StaticClassLiteral, Type, TypeVarVariance, TypingModule,
+        abstract_methods::AbstractMethods,
         binding_type,
         call::Argument,
         class::{
-            AbstractMethod, CodeGeneratorKind, Field, FieldKind, MetaclassErrorKind,
-            expanded_class_base_entries,
+            CodeGeneratorKind, Field, FieldKind, MetaclassErrorKind, expanded_class_base_entries,
         },
         context::InferContext,
         definition_expression_type,
         diagnostic::{
-            ABSTRACT_METHOD_IN_FINAL_CLASS, AbstractMethodAnnotationPolicy, CONFLICTING_METACLASS,
-            CYCLIC_CLASS_DEFINITION, DATACLASS_FIELD_ORDER, DUPLICATE_KW_ONLY, FINAL_WITHOUT_VALUE,
-            INCONSISTENT_MRO, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_BASE,
-            INVALID_DATACLASS, INVALID_GENERIC_CLASS, INVALID_GENERIC_ENUM, INVALID_METACLASS,
-            INVALID_NAMED_TUPLE, INVALID_PROTOCOL, INVALID_TYPED_DICT_HEADER, IncompatibleBases,
+            ABSTRACT_METHOD_IN_FINAL_CLASS, CONFLICTING_METACLASS, CYCLIC_CLASS_DEFINITION,
+            DATACLASS_FIELD_ORDER, DUPLICATE_KW_ONLY, FINAL_WITHOUT_VALUE, INCONSISTENT_MRO,
+            INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_BASE, INVALID_DATACLASS,
+            INVALID_GENERIC_CLASS, INVALID_GENERIC_ENUM, INVALID_METACLASS, INVALID_NAMED_TUPLE,
+            INVALID_PROTOCOL, INVALID_TYPED_DICT_HEADER, IncompatibleBases,
             SUBCLASS_OF_DATACLASS_WITH_ORDER, SUBCLASS_OF_FINAL_CLASS, UNKNOWN_ARGUMENT,
             report_bad_frozen_dataclass_inheritance, report_conflicting_metaclass_from_bases,
             report_duplicate_bases, report_inconsistent_generic_bases,
@@ -57,7 +54,6 @@ use crate::{
         visitor::find_over_type,
     },
 };
-use crate::{attribute_assignments, types::diagnostic::abstract_method_span};
 use ty_python_core::{
     SemanticIndex, attribute_scopes, definition::DefinitionKind, scope::ScopeId, semantic_index,
 };
@@ -1413,13 +1409,11 @@ fn check_final_class_abstract_methods<'db>(
         return;
     }
 
-    let env = context.program_environment();
-
     let class_type = class.identity_specialization(db);
-    let abstract_methods = class_type.abstract_methods(db);
+    let abstract_methods = AbstractMethods::of_class(db, class_type);
 
     // If there are no abstract methods, we're done.
-    let Some((first_method_name, abstract_method)) = abstract_methods.iter().next() else {
+    let Some(first_method_name) = abstract_methods.first_name(db) else {
         return;
     };
 
@@ -1451,106 +1445,23 @@ fn check_final_class_abstract_methods<'db>(
         diagnostic.annotate(context.secondary(decorator));
     }
 
-    let num_abstract_methods = abstract_methods.len();
-
+    abstract_methods.annotate_diagnostic(db, &mut diagnostic);
+    let num_abstract_methods = abstract_methods.len(db);
     if num_abstract_methods == 1 {
         diagnostic.set_concise_message(format_args!(
-            "Final class `{class_name}` has unimplemented abstract method \
-                `{first_method_name}`",
+            "Final class `{class_name}` has unimplemented abstract method `{first_method_name}`",
         ));
-        diagnostic
-            .set_primary_annotation_message(format_args!("`{first_method_name}` is unimplemented"));
     } else {
-        let verbose = db.verbose();
-        let max_abstract_methods_to_print = if verbose { num_abstract_methods } else { 3 };
-        let formatted_methods =
-            format_enumeration(abstract_methods.keys().take(max_abstract_methods_to_print));
-
-        if num_abstract_methods > max_abstract_methods_to_print {
-            diagnostic.set_primary_annotation_message(format_args!(
-                "{num_abstract_methods} abstract methods are unimplemented, \
-                        including {formatted_methods}",
-            ));
+        let formatted_methods = abstract_methods.formatted_names(db);
+        if formatted_methods.truncation_occurred {
             diagnostic.set_concise_message(format_args!(
                 "Final class `{class_name}` has {num_abstract_methods} unimplemented \
                     abstract methods, including {formatted_methods}",
             ));
-            diagnostic.info(format_args!(
-                "Use `--verbose` to see all {num_abstract_methods} \
-                    unimplemented abstract methods",
-            ));
         } else {
             diagnostic.set_concise_message(format_args!(
-                "Final class `{class_name}` has unimplemented \
-                    abstract methods {formatted_methods}",
+                "Final class `{class_name}` has unimplemented abstract methods {formatted_methods}",
             ));
-            diagnostic.set_primary_annotation_message(format_args!(
-                "Abstract methods {formatted_methods} are unimplemented"
-            ));
-        }
-    }
-
-    let AbstractMethod {
-        defining_class,
-        definition,
-        kind,
-    } = abstract_method;
-
-    let defining_class_name = defining_class.name(db);
-
-    if let Type::FunctionLiteral(function) = binding_type(db, *definition) {
-        let policy = if kind.is_explicit() {
-            AbstractMethodAnnotationPolicy::ExcludeVerboseBody
-        } else {
-            AbstractMethodAnnotationPolicy::AlwaysIncludeBody
-        };
-        let secondary_span = abstract_method_span(db, function, policy);
-        let mut secondary_annotation = Annotation::secondary(secondary_span);
-        secondary_annotation = if defining_class.class_literal(db) == ClassLiteral::Static(class) {
-            secondary_annotation.message(format_args!("`{first_method_name}` declared as abstract"))
-        } else {
-            secondary_annotation.message(format_args!(
-                "`{first_method_name}` declared as abstract on superclass `{defining_class_name}`",
-            ))
-        };
-        diagnostic.annotate(secondary_annotation);
-    }
-
-    if !kind.is_explicit() {
-        let mut sub = SubDiagnostic::new(
-            SubDiagnosticSeverity::Info,
-            format_args!(
-                "`{defining_class_name}.{first_method_name}` is implicitly abstract \
-                    because `{defining_class_name}` is a `Protocol` class \
-                    and `{first_method_name}` lacks an implementation",
-            ),
-        );
-        sub.annotate(
-            Annotation::secondary(defining_class.definition_span(db))
-                .message(format_args!("`{defining_class_name}` declared here")),
-        );
-        diagnostic.sub(sub);
-
-        // If the implicitly abstract method is defined in first-party code
-        // and the return type is assignable to `None`, they may not have intended
-        // for it to be implicitly abstract; add a clarificatory note:
-        if kind.is_implicit_due_to_stub_body() && db.should_check_file(definition.file(db)) {
-            let function_type_as_callable = infer_definition_types(db, *definition)
-                .binding_type(*definition)
-                .try_upcast_to_callable(db, env);
-
-            if let Some(callables) = function_type_as_callable
-                && Type::function_like_callable(
-                    db,
-                    Signature::new(Parameters::gradual_form(), Type::none(db, env)),
-                )
-                .is_assignable_to(db, env, callables.into_type(db, env))
-            {
-                diagnostic.help(format_args!(
-                    "Change the body of `{first_method_name}` to `return` \
-                        or `return None` if it was not intended to be abstract"
-                ));
-            }
         }
     }
 }
