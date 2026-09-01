@@ -255,13 +255,32 @@ class SourceLoader(_LoaderBasics):
         Raises OSError when the path cannot be handled.
         """
 
-    def source_to_code(
-        self, data: ReadableBuffer | str | _ast.Module | _ast.Expression | _ast.Interactive, path: bytes | StrPath
-    ) -> types.CodeType:
-        """Return the code object compiled from source.
+    if sys.version_info >= (3, 15):
+        def source_to_code(
+            self,
+            data: ReadableBuffer | str | _ast.Module | _ast.Expression | _ast.Interactive,
+            path: bytes | StrPath,
+            fullname: str | None = None,
+            *,
+            _optimize: int = -1,
+        ) -> types.CodeType:
+            """Return the code object compiled from source.
 
-        The 'data' argument can be any object type that compile() supports.
-        """
+            The 'data' argument can be any object type that compile() supports.
+            """
+
+    else:
+        def source_to_code(
+            self,
+            data: ReadableBuffer | str | _ast.Module | _ast.Expression | _ast.Interactive,
+            path: bytes | StrPath,
+            *,
+            _optimize: int = -1,
+        ) -> types.CodeType:
+            """Return the code object compiled from source.
+
+            The 'data' argument can be any object type that compile() supports.
+            """
 
     def get_code(self, fullname: str) -> types.CodeType | None:
         """Concrete implementation of InspectLoader.get_code.
@@ -307,18 +326,6 @@ class SourceFileLoader(importlib.abc.FileLoader, FileLoader, importlib.abc.Sourc
 
     def path_stats(self, path: str) -> Mapping[str, Any]:
         """Return the metadata for the path."""
-
-    def source_to_code(  # type: ignore[override]  # incompatible with InspectLoader.source_to_code
-        self,
-        data: ReadableBuffer | str | _ast.Module | _ast.Expression | _ast.Interactive,
-        path: bytes | StrPath,
-        *,
-        _optimize: int = -1,
-    ) -> types.CodeType:
-        """Return the code object compiled from source.
-
-        The 'data' argument can be any object type that compile() supports.
-        """
 
 class SourcelessFileLoader(importlib.abc.FileLoader, FileLoader, _LoaderBasics):
     """Loader which handles sourceless file imports."""
