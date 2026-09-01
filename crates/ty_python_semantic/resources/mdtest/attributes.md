@@ -4856,10 +4856,8 @@ reveal_type(Answer.__members__)  # revealed: MappingProxyType[str, Answer]
 
 ## Divergent inferred implicit instance attribute types
 
-If an implicit attribute is defined recursively and type inference diverges, the divergent part is
-filled in with the dynamic type `Divergent`. Types containing `Divergent` can be seen as "cheap"
-recursive types: they are not true recursive types based on recursive type theory, so no unfolding
-is performed when you use them.
+If an implicit attribute is defined recursively and type inference diverges, ty records the
+recursive variable as `Divergent`.
 
 ```py
 class C:

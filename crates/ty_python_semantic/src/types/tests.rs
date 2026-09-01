@@ -282,8 +282,8 @@ fn divergent_type() {
     let db = &db;
     let env = db.program_environment();
     let div = Type::divergent(CycleQuery::Test, salsa::plumbing::Id::from_bits(1));
-    assert!(div.is_dynamic());
-    assert!(div.has_dynamic(db, &env));
+    assert!(!div.is_dynamic());
+    assert!(!div.has_dynamic(db, &env));
     let visitor = ApplyTypeMappingVisitor::new(&env);
     assert_eq!(div.materialize(db, MaterializationKind::Top, &visitor), div);
     assert_eq!(
@@ -294,8 +294,8 @@ fn divergent_type() {
         IntersectionBuilder::new(db, &env).add_negative(div).build(),
         div
     );
-    // The `Divergent` type must not be eliminated in union with other dynamic types,
-    // as this would prevent detection of divergent type inference using `Divergent`.
+    // A recursive variable must not be eliminated when it appears alongside a dynamic type,
+    // as this would prevent detecting the recursive inference.
     let union = UnionType::from_elements(db, &env, [Type::unknown(), div]);
     assert_eq!(
         union.display(db, &db.program_environment()).to_string(),
@@ -319,6 +319,11 @@ fn divergent_type() {
     assert!(!Type::unknown().is_equivalent_to(db, &env, div));
     assert!(!div.is_redundant_with(db, &env, Type::unknown()));
     assert!(!Type::unknown().is_redundant_with(db, &env, div));
+    let int = KnownClass::Int.to_instance(db, &env);
+    for (source, target) in [(div, int), (int, div)] {
+        let when = source.when_constraint_set_assignable_to_owned(db, &env, target);
+        assert!(when.query(|_builder, when| when.is_never_satisfied(db, &env)));
+    }
 
     // The identity recursive type `μa.a` is the semantic cycle marker. It dominates
     // intersections except for `μa.a & Never`, which simplifies to `Never`.
@@ -386,10 +391,6 @@ fn divergent_type() {
         union.display(db, &db.program_environment()).to_string(),
         "Divergent | int"
     );
-    for (source, target) in [(div, union), (div, Type::unknown()), (Type::unknown(), div)] {
-        let when = source.when_constraint_set_assignable_to_owned(db, &env, target);
-        assert!(when.query(|_builder, when| when.is_always_satisfied(db, &env)));
-    }
     // The same can be said about intersections for the `Never` type.
     let intersection = IntersectionType::from_elements(db, &env, [Type::Never, div]);
     assert_eq!(

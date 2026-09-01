@@ -536,13 +536,6 @@ fn dynamic_content_impl<'db>(
                 return;
             }
 
-            if matches!(self.mode, DynamicContentMode::Materialization)
-                && matches!(ty, Type::Divergent(_))
-            {
-                self.record(DynamicContent::Indeterminate);
-                return;
-            }
-
             if ty.is_dynamic()
                 && (!matches!(self.mode, DynamicContentMode::NonAny)
                     || !matches!(ty, Type::Dynamic(crate::types::DynamicType::Any)))
@@ -905,7 +898,7 @@ mod tests {
     }
 
     #[test]
-    fn materialization_noop_rejects_divergent_markers() {
+    fn materialization_noop_accepts_divergent_markers() {
         let db = setup_db();
         let env = db.program_environment();
         let divergent = Type::divergent(CycleQuery::Test, salsa::plumbing::Id::from_bits(1));
@@ -915,7 +908,7 @@ mod tests {
             divergent.top_materialization(&db, &env),
             divergent.bottom_materialization(&db, &env),
         ] {
-            assert!(!materialization_is_noop(&db, &env, ty));
+            assert!(materialization_is_noop(&db, &env, ty));
         }
     }
 

@@ -1482,10 +1482,8 @@ impl<'db> InnerIntersectionBuilder<'db> {
             return;
         }
 
-        // `T & Divergent` -> `Divergent`. Conceptually, `Divergent` behaves like `Never` here and
-        // dominates intersections. However, `Divergent` is actually a dynamic/gradual type, so
-        // `~Divergent` acts like `Divergent` rather than dropping out like `~Never` does.
-        // `Divergent` also gets a lot of special handling in cycle recovery.
+        // `T & Divergent` -> `Divergent`. The identity recursive type `μa.a` denotes a
+        // recursion that cannot yield a value, so it dominates intersections.
         if new_positive.is_identity_recursive(db) {
             *self = Self::default();
             self.positive.insert(new_positive);

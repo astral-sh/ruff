@@ -1442,12 +1442,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 self.always()
             }
 
-            // In some specific situations, `Any`/`Unknown`/`@Todo` can be simplified out of unions and intersections,
-            // but this is not true for divergent types (and moving this case any lower down appears to cause
-            // "too many cycle iterations" panics).
-            (Type::Divergent(_), _) | (_, Type::Divergent(_)) => {
-                ConstraintSet::from_bool(self.constraints, self.relation.is_assignability())
-            }
+            (Type::Divergent(_), _) | (_, Type::Divergent(_)) => self.never(),
 
             (Type::Recursive(source_recursive), _) => {
                 let source_unfolded = source_recursive.unfold(db, self.env);
@@ -1664,11 +1659,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     TypeRelation::Redundancy { .. } => match source {
                         Type::Dynamic(_) => true,
                         Type::Intersection(intersection) => {
-                            // If a `Divergent` type is involved, it must not be eliminated.
-                            intersection
-                                .positive(db)
-                                .iter()
-                                .any(Type::is_non_divergent_dynamic)
+                            intersection.positive(db).iter().any(Type::is_dynamic)
                         }
                         _ => false,
                     },

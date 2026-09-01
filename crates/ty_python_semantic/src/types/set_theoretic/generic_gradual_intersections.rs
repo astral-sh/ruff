@@ -147,7 +147,7 @@ fn nominal_top_intersection<'db>(
             TypeVarVariance::Contravariant => subclass_type.is_never(),
             TypeVarVariance::Invariant => {
                 subclass_specialization.materialization_kind(db) == Some(MaterializationKind::Top)
-                    && subclass_type.is_non_divergent_dynamic()
+                    && subclass_type.is_dynamic()
             }
             TypeVarVariance::Bivariant => false,
         };
@@ -256,7 +256,7 @@ fn dynamic_generalization_intersection<'db>(
             }
 
             let general_element = general_variable.variable().homogeneous_type()?;
-            if !general_element.is_non_divergent_dynamic() {
+            if !general_element.is_dynamic() {
                 return None;
             }
             let specific_element = specific_variable.variable().homogeneous_type()?;
@@ -274,9 +274,7 @@ fn dynamic_generalization_intersection<'db>(
             || general_tuple
                 .iter_all_elements()
                 .zip(specific_tuple.iter_all_elements())
-                .any(|(general, specific)| {
-                    general != specific && !general.is_non_divergent_dynamic()
-                })
+                .any(|(general, specific)| general != specific && !general.is_dynamic())
         {
             return None;
         }
@@ -301,7 +299,7 @@ fn dynamic_generalization_intersection<'db>(
         .variables(db)
         .zip(general_specialization.types(db))
         .zip(specific_specialization.types(db))
-        .any(|((_, general), specific)| general != specific && !general.is_non_divergent_dynamic())
+        .any(|((_, general), specific)| general != specific && !general.is_dynamic())
     {
         return None;
     }

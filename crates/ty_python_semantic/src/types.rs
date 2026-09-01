@@ -2293,11 +2293,7 @@ impl<'db> Type<'db> {
     }
 
     const fn is_dynamic(&self) -> bool {
-        matches!(self, Type::Dynamic(_) | Type::Divergent(_))
-    }
-
-    const fn is_non_divergent_dynamic(&self) -> bool {
-        self.is_dynamic() && !matches!(self, Type::Divergent(_))
+        matches!(self, Type::Dynamic(_))
     }
 
     /// Returns `true` if this type is an awaitable that should be awaited before being discarded.
@@ -10946,11 +10942,10 @@ pub(crate) enum CycleQuery {
     Test,
 }
 
-/// A type that is determined to be divergent during recursive type inference.
-/// This type must never be eliminated by dynamic type reduction
-/// (e.g. `Divergent` is assignable to `@Todo`, but `@Todo | Divergent` must not be reduced to `@Todo`).
-/// Otherwise, type inference cannot converge properly.
-/// For detailed properties of this type, see the unit test at the end of the file.
+/// A recursive variable introduced while inferring a type through a query cycle.
+///
+/// The variable is meaningful only inside the body of a [`RecursiveType`]. Unfolding that
+/// recursive type substitutes the enclosing type for this variable.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::SalsaValue)]
 pub struct DivergentType<'db> {
     /// The tracked query function that caused the cycle.
