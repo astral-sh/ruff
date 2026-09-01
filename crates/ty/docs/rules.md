@@ -570,7 +570,7 @@ old_func()  # error: [deprecated]
 
 <small>
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'ignore'."><code>ignore</code></a> ·
-Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.76">0.0.76</a> ·
+Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.77">0.0.77</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%22disjoint-cast%22" target="_blank">Related issues</a> ·
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1246" target="_blank">View source</a>
 </small>
@@ -600,10 +600,19 @@ This means that any object of type `int` can never also be of type `str`, and an
 **Why is this bad?**
 
 
-`cast()` is deliberately designed as an "escape hatch" in the type system that is entirely
-unvalidated at runtime. As such, any use of `cast()` is inherently unsound. However, casting a value
-to an entirely *disjoint* type is especially unsound, and may in many cases indicate a mistake in
-your code.
+`cast()` is deliberately designed as an "escape hatch" in the type system that is neither validated
+at runtime nor, by default, by type checkers. While safe uses of `cast()` are possible -- for
+example, upcasting from a subtype to a supertype can be sound -- `cast()` is deliberately designed
+to allow unsound narrowing, and most useful applications of `cast()` in real-world code are unsound.
+
+Nonetheless, while allowing for the fact that `cast()` is intentionally designed to allow
+unsoundness, casting a value to an entirely *disjoint* type is especially likely to indicate a
+mistake in your code. Casting from an `int` to a `str`, for example, is extremely suspicious. ty
+provides no mechanism by which you could ever narrow a type from `int` to `str` without using escape
+hatches such as `cast` or `TypeGuard` that allow for unsound uses.
+
+This rule therefore provides a means for codebases to partially validate their uses of `cast()`
+without banning the API entirely.
 
 **Example**
 
@@ -616,7 +625,7 @@ def parse(value: int) -> str:
     return cast(str, value)  # error: [disjoint-cast]
 ```
 
-Casts between overlapping types are allowed:
+Casts between overlapping (non-disjoint) types are allowed:
 
 ```py
 from typing import cast
@@ -628,10 +637,9 @@ def parse(value: int | str) -> str:
 
 Note that disjointness between types can sometimes be surprising. For example, `list[int]` is
 disjoint from `list[bool]` even though `bool` is a subtype of `int`. Due to the fact that `list` is
-mutable and invariant, the only common subtype of `list[int]` and `list[bool]` is `Never`, and it
-would be deeply unsound for ty to ever narrow an object of type `list[int]` to the type
-`list[bool]`. As such, ty will complain about a cast from `list[int]` to `list[bool]` when this rule
-is enabled.
+[mutable and invariant], it would be deeply unsound for ty to ever narrow an object of type
+`list[int]` to the type `list[bool]`. As such, ty will complain about a cast from `list[int]` to
+`list[bool]` when this rule is enabled.
 
 Similarly, two `NewType`s can be disjoint even when they share the same underlying nominal base
 type, unless one `NewType` is explicitly declared as a sub-newtype of the other.
@@ -652,8 +660,50 @@ def f(x: list[int], user_id: UserId):
 **Alternatives**
 
 
-In some cases a `TypeGuard` can be used instead, which is still unsound, but less so than a disjoint
-cast in that it provides the opportunity for some runtime validation:
+In many cases, the diagnostic can be avoided by switching to use covariant generic types rather than
+invariant ones:
+
+```py
+# `Sequence`, unlike `list`, is immutable and covariant
+from collections.abc import Sequence
+from typing import cast
+
+
+def f(x: Sequence[int]):
+    y = cast(Sequence[bool], x)  # no diagnostic
+```
+
+Although a pattern that provides more soundness and validation is always to avoid `cast()`
+altogether, and instead write a custom `TypeIs` function for this:
+
+```py
+# `Sequence`, unlike `list`, is immutable and covariant
+from collections.abc import Sequence
+from typing_extensions import TypeIs, reveal_type
+
+
+def is_sequence_of_bools(x: Sequence[int]) -> TypeIs[Sequence[bool]]:
+    return all(isinstance(item, bool) for item in x)
+
+
+def f(x: Sequence[int]):
+    assert is_sequence_of_bools(x)
+    reveal_type(x)  # revealed: Sequence[bool]
+```
+
+If you're unable to switch to immutable, covariant generic types, other solutions to this particular
+diagnostic might include assigning a new list altogether:
+
+```py
+def f(x: list[int]):
+    y: list[bool] = []
+    for item in x:
+        assert isinstance(item, bool)
+        y.append(item)
+```
+
+Or using a `TypeGuard` -- which is still unsound, but, unlike a `cast()`, at least provides the
+opportunity for some runtime validation:
 
 ```py
 from typing_extensions import TypeGuard, reveal_type
@@ -682,6 +732,7 @@ soundness checks from their type checker, and it may have false positives in som
 - [`redundant-cast`](#redundant-cast) detects casts where the value already has the destination type.
 
 [banned-api]: https://docs.astral.sh/ruff/rules/banned-api/
+[mutable and invariant]: https://docs.astral.sh/ty/reference/typing-faq/#invariant-generics
 [never]: https://docs.python.org/3/library/typing.html#typing.Never
 
 ## `division-by-zero`

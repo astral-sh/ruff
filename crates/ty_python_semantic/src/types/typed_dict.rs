@@ -1165,7 +1165,11 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                         db,
                         self.as_relation_checker(TypeRelation::Assignability),
                         |checker| {
-                            checker.check_type_pair(db, left_field.declared_ty, right_field.declared_ty)
+                            checker.check_type_pair(
+                                db,
+                                left_field.declared_ty,
+                                right_field.declared_ty,
+                            )
                         },
                     )
                     .negate(db, self.constraints)
@@ -1175,7 +1179,11 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                         db,
                         self.as_relation_checker(TypeRelation::Assignability),
                         |checker| {
-                            checker.check_type_pair(db, right_field.declared_ty, left_field.declared_ty)
+                            checker.check_type_pair(
+                                db,
+                                right_field.declared_ty,
+                                left_field.declared_ty,
+                            )
                         },
                     )
                     .negate(db, self.constraints)

@@ -9444,6 +9444,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 overload,
                                 &call_arguments,
                                 call_expression,
+                                self.index,
                             );
                         }
                     }

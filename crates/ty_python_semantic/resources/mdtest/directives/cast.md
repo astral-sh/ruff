@@ -128,16 +128,16 @@ from typing import cast
 from typing_extensions import cast as extension_cast
 
 def incompatible_casts(integer: int, string: str) -> None:
-    # error: [disjoint-cast] "Disjoint cast from `int` to `str`"
+    # error: [disjoint-cast] "Cast from `int` to disjoint type `str`"
     cast(str, integer)
 
-    # error: [disjoint-cast] "Disjoint cast from `str` to `int`"
+    # error: [disjoint-cast] "Cast from `str` to disjoint type `int`"
     cast(int, string)
 
-    # error: [disjoint-cast] "Disjoint cast from `int` to `str`"
+    # error: [disjoint-cast] "Cast from `int` to disjoint type `str`"
     cast(val=integer, typ=str)
 
-    # error: [disjoint-cast] "Disjoint cast from `int` to `str`"
+    # error: [disjoint-cast] "Cast from `int` to disjoint type `str`"
     extension_cast(str, integer)
 ```
 
@@ -149,14 +149,14 @@ destination type.
 ```py
 from typing import Literal, cast
 
-# error: [disjoint-cast] "Disjoint cast from `Literal[1]` to `str`"
+# error: [disjoint-cast] "Cast from `Literal[1]` to disjoint type `str`"
 cast(str, 1)
 
-# error: [disjoint-cast] "Disjoint cast from `Literal["left"]` to `Literal["right"]`"
+# error: [disjoint-cast] "Cast from `Literal["left"]` to disjoint type `Literal["right"]`"
 cast(Literal["right"], "left")
 
 def cast_union(value: int | str) -> None:
-    # error: [disjoint-cast] "Disjoint cast from `int | str` to `bytes`"
+    # error: [disjoint-cast] "Cast from `int | str` to disjoint type `bytes`"
     cast(bytes, value)
 
     cast(str, value)
@@ -172,7 +172,7 @@ overlap with the destination type.
 from typing import Any, cast
 
 def cast_generic(integers: list[int], dynamic_values: list[Any], dynamic: Any) -> None:
-    # error: [disjoint-cast] "Disjoint cast from `list[int]` to `list[str]`"
+    # error: [disjoint-cast] "Cast from `list[int]` to disjoint type `list[str]`"
     cast(list[str], integers)
 
     cast(list[str], dynamic_values)
@@ -192,7 +192,7 @@ import first
 import second
 
 def cast_identically_named(value: first.Value) -> None:
-    # error: [disjoint-cast] "Disjoint cast from `first.Value` to `second.Value`"
+    # error: [disjoint-cast] "Cast from `first.Value` to disjoint type `second.Value`"
     cast(second.Value, value)
 ```
 
@@ -651,14 +651,67 @@ def test(x: Never):
     y = cast(str, x)  # no diagnostic
 ```
 
+The reason why casting to or from `Never` is allowed is that the normal rationale for this rule does
+not apply to either case.
+
+This rule seeks to prevent you from `cast`ing from a type `X` to a type `Y` if ty would never
+provide any way for you to soundly narrow a type `X` to a type `Y`. Casting from `Never` to any
+other type, however, poses no soundness issues: all types are supertypes of `Never`, so this can
+never be unsound. Meanwhile, casting from `int` to `Never` is unsound, of course, but not really in
+a different category than casting from `int` to `bool` (which would still be allowed under this
+rule). `Never` is a subtype of `int` just the same way that `bool` is a subtype of `int`, and there
+are lots of mechanisms ty provides that would let you soundly narrow a type from `int` to `Never`
+without using a `cast`.
+
 ### Casts in stub files
 
 `disjoint-cast` is not applied to stub files:
+
+`stub.pyi`:
 
 ```pyi
 from typing import cast
 
 x = cast(int, ...)  # no diagnostic
+```
+
+This is partly to accommodate the fact that the typing spec
+[recommends](https://typing.python.org/en/latest/spec/enums.html#defining-members) using
+`cast(<value type>, ...)` to declare enum members in stub files in cases where the type of the
+member's value cannot be unambiguously expressed as a static assignment. Without a special case for
+stubs, we would emit a false-positive diagnostic on this example from the spec. This is due to the
+fact that `EllipsisType` (the type of `...`) is disjoint from almost every other type, since it is
+`@final`:
+
+`stub2.pyi`:
+
+```pyi
+from enum import Enum
+from typing import cast
+
+class Pet(Enum):
+    genus: str  # Non-member attribute
+    species: str  # Non-member attribute
+
+    CAT = 1  # Member attribute with known value and type
+    DOG = cast(int, ...)  # Member attribute with unknown value and known type
+    BIRD = ...  # Member attribute with unknown value and type
+```
+
+But the rule would also serve little purpose in stub files. Since stub files are never executed at
+runtime, the only possible useful applications of `cast` in a stub file are special cases like the
+enum one above. There are no soundness implications to using `cast` in a stub file.
+
+For similar reasons, we also do not apply the rule in `if TYPE_CHECKING` blocks, which are also not
+executed at runtime:
+
+`regular_py_file.py`:
+
+```py
+from typing import TYPE_CHECKING, cast
+
+if TYPE_CHECKING:
+    x = cast(int, ...)  # no diagnostic
 ```
 
 ## Diagnostic snapshots

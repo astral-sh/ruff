@@ -2478,6 +2478,7 @@ impl KnownFunction {
         overload: &mut Binding<'db>,
         call_arguments: &CallArguments<'_, 'db>,
         call_expression: &ast::ExprCall,
+        caller_semantic_index: &SemanticIndex<'db>,
     ) {
         let db = context.db();
         let parameter_types = overload.parameter_types();
@@ -2710,6 +2711,10 @@ impl KnownFunction {
                     }
                 } else if context.is_lint_enabled(&DISJOINT_CAST)
                     && !context.file().is_stub(db)
+                    && !caller_semantic_index.is_in_type_checking_block(
+                        context.scope().file_scope_id(db),
+                        call_expression.range(),
+                    )
                     && source_type.is_disjoint_from(db, env, casted_type)
                     && !casted_type.is_equivalent_to(db, env, Type::Never)
                     && !source_type.is_equivalent_to(db, env, Type::Never)
@@ -2721,7 +2726,7 @@ impl KnownFunction {
                     let casted_display = casted_type.display_with(db, env, settings.clone());
                     let mut diagnostic = builder.into_diagnostic("Cast to a disjoint type");
                     diagnostic.set_concise_message(format_args!(
-                        "Disjoint cast from `{source_display}` to `{casted_display}`",
+                        "Cast from `{source_display}` to disjoint type `{casted_display}`",
                     ));
                     if let Some(arg) = call_expression.arguments.find_argument_value("typ", 0) {
                         diagnostic.annotate(
