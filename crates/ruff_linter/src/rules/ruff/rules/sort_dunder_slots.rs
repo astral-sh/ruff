@@ -10,6 +10,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::Locator;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::ruff::rules::sequence_sorting::{
     CommentComplexity, MultilineStringSequenceValue, SequenceKind, SortClassification,
     SortingStyle, sort_single_line_elements_sequence,
@@ -83,7 +84,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// `__slots__` definition occurs, in which case this rule's fix could
 /// theoretically cause breakage.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.8.0")]
+#[violation_metadata(stable_since = "0.8.0", category = Category::Style)]
 pub(crate) struct UnsortedDunderSlots {
     class_name: ast::name::Name,
 }
@@ -240,13 +241,9 @@ impl<'a> StringLiteralDisplay<'a> {
             ast::Expr::Dict(dict) => {
                 let mut narrowed_keys = Vec::with_capacity(dict.len());
                 for key in dict.iter_keys() {
-                    if let Some(key) = key {
-                        // This is somewhat unfortunate,
-                        // *but* using a dict for __slots__ is very rare
-                        narrowed_keys.push(key.to_owned());
-                    } else {
-                        return None;
-                    }
+                    // This is somewhat unfortunate,
+                    // *but* using a dict for __slots__ is very rare
+                    narrowed_keys.push(key?.to_owned());
                 }
                 // If `None` was present in the keys, it indicates a "** splat", .e.g
                 // `__slots__ = {"foo": "bar", **other_dict}`

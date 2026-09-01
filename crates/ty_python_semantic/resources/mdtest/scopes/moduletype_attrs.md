@@ -51,6 +51,18 @@ reveal_type(__dict__)
 reveal_type(__init__)
 ```
 
+## `__doc__` reflects the module's actual docstring
+
+Typeshed annotates `types.ModuleType.__doc__` as `str | None`, but a module with a literal docstring
+always has `__doc__` set (unless Python is run in `-OO` mode, which we ignore as a possibility). In
+that case, we narrow `__doc__` to `str`:
+
+```py
+"""Some docstring"""
+
+reveal_type(__doc__)  # revealed: str
+```
+
 ## `ModuleType` globals combined with explicit assignments and declarations
 
 A `ModuleType` attribute can be overridden in the global scope with a different type, but it must be

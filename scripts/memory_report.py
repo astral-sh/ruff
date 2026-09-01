@@ -1,16 +1,34 @@
+# /// script
+# requires-python = ">=3.12"
+# dependencies = []
+#
+# [tool.ty.rules]
+# blanket-ignore-comment = "warn"
+# missing-type-argument = "warn"
+# possibly-unresolved-reference = "warn"
+# unsound-return-statement = "warn"
+# unsound-yield = "warn"
+# unsupported-dynamic-base = "warn"
+# division-by-zero = "warn"
+#
+# [tool.uv]
+# no-build = true
+# exclude-newer = "P7D"
+# ///
+
 """
 Compare memory usage reports between two ty versions and generate a PR comment.
 
 This script can be used in two modes:
 
 1. Report comparison mode: Reads pre-generated JSON memory reports and compares them.
-2. Full run mode: Clones projects, builds ty, runs memory tests, and generates comparison.
+2. Full run mode: Sets up projects, runs memory tests, and generates comparison.
 
 Examples:
     # Compare pre-generated memory reports
     %(prog)s compare --old-dir old_reports/ --new-dir new_reports/
 
-    # Full run: clone projects, build ty, run memory tests
+    # Full run: set up projects and their dependencies, then run memory tests
     %(prog)s run --old-ty ./ty-old --new-ty ./ty-new
 
     # Write output to a file
@@ -22,21 +40,15 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shlex
 import subprocess
 import sys
 import tempfile
-from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Final, Self
 
-# Known projects with their Git URLs for memory testing.
-KNOWN_PROJECTS: Final[Mapping[str, str]] = {
-    "flake8": "https://github.com/PyCQA/flake8",
-    "sphinx": "https://github.com/sphinx-doc/sphinx",
-    "prefect": "https://github.com/PrefectHQ/prefect",
-    "trio": "https://github.com/python-trio/trio",
-}
+KNOWN_PROJECTS: Final = ("flake8", "sphinx", "prefect", "trio")
 
 
 @dataclass(slots=True, kw_only=True)
@@ -129,7 +141,9 @@ def load_reports_from_directory(directory: Path) -> dict[str, MemoryReport]:
 
 def item_total_bytes(item: dict[str, Any]) -> int:
     """Get total bytes (metadata + fields) for a struct or query item."""
-    return item.get("metadata_bytes", 0) + item.get("fields_bytes", 0)
+    result = item.get("metadata_bytes", 0) + item.get("fields_bytes", 0)
+    assert isinstance(result, int)
+    return result
 
 
 def diff_items(
@@ -139,8 +153,8 @@ def diff_items(
 
     Returns a list of (name, old_bytes, new_bytes) sorted by absolute diff descending.
     """
-    old_by_name = {item["name"]: item for item in old_items}
-    new_by_name = {item["name"]: item for item in new_items}
+    old_by_name: dict[str, dict[str, Any]] = {item["name"]: item for item in old_items}
+    new_by_name: dict[str, dict[str, Any]] = {item["name"]: item for item in new_items}
 
     all_names = old_by_name.keys() | new_by_name.keys()
 
@@ -224,9 +238,7 @@ def render_summary(projects: list[ProjectComparison]) -> str:
             )
 
             for name, old_bytes, new_bytes in item_diffs[:MAX_CHANGED_ITEMS]:
-                outcome = format_outcome(
-                    old_bytes=proj.old.total_bytes, new_bytes=proj.new.total_bytes
-                )
+                outcome = format_outcome(old_bytes=old_bytes, new_bytes=new_bytes)
 
                 lines.append(
                     f"| `{name}` | {format_bytes(old_bytes)} | "
@@ -253,25 +265,43 @@ def render_summary(projects: list[ProjectComparison]) -> str:
     return "\n".join(lines)
 
 
-def clone_project(*, name: str, url: str, dest: Path) -> Path:
-    """Clone a project from Git. Returns the path to the cloned project."""
+def setup_project(*, name: str, dest: Path) -> tuple[Path, list[str]]:
+    """Clone a project and install its mypy-primer dependencies."""
     project_path = dest / name
+    setup_script = Path(__file__).with_name("setup_primer_project.py")
+    setup_command = [
+        "uv",
+        "run",
+        "--locked",
+        "--python",
+        sys.executable,
+        "--script",
+        str(setup_script),
+    ]
+
     if project_path.exists():
         print(f"Project {name} already exists at {project_path}", file=sys.stderr)
-        return project_path
+    else:
+        print(f"Setting up {name} and its dependencies...", file=sys.stderr)
+        subprocess.run(
+            [*setup_command, name, str(project_path)],
+            check=True,
+            stdout=sys.stderr,
+        )
 
-    print(f"Cloning {name} from {url}...", file=sys.stderr)
-    subprocess.run(
-        ["git", "clone", "--depth=1", url, str(project_path)],
+    ty_command = subprocess.run(
+        [*setup_command, "--print-ty-command", name, str(project_path)],
         check=True,
         capture_output=True,
+        text=True,
     )
-    return project_path
+    return project_path, shlex.split(ty_command.stdout)
 
 
 def run_ty_memory_check(
     *,
     ty_path: str,
+    ty_command: list[str],
     project_path: Path,
     output_path: Path,
 ) -> None:
@@ -281,8 +311,14 @@ def run_ty_memory_check(
     env["TY_MAX_PARALLELISM"] = "1"  # For deterministic memory numbers
 
     print(f"Running {ty_path} on {project_path.name}...", file=sys.stderr)
+    command = [
+        str(Path(ty_path).resolve()) if argument == "{ty}" else argument
+        for argument in ty_command
+    ]
     result = subprocess.run(
-        [ty_path, "check", str(project_path), "--exit-zero"],
+        command,
+        cwd=project_path,
+        check=True,
         capture_output=True,
         text=True,
         env=env,
@@ -303,19 +339,25 @@ def run_memory_tests(
     old_reports_dir.mkdir(parents=True, exist_ok=True)
     new_reports_dir.mkdir(parents=True, exist_ok=True)
 
-    for project_name, url in KNOWN_PROJECTS.items():
-        project_path = clone_project(name=project_name, url=url, dest=projects_dir)
+    for project_name in KNOWN_PROJECTS:
+        project_path, ty_command = setup_project(name=project_name, dest=projects_dir)
 
         # Run old ty
         old_report_path = old_reports_dir / f"{project_name}.json"
         run_ty_memory_check(
-            ty_path=old_ty, project_path=project_path, output_path=old_report_path
+            ty_path=old_ty,
+            ty_command=ty_command,
+            project_path=project_path,
+            output_path=old_report_path,
         )
 
         # Run new ty
         new_report_path = new_reports_dir / f"{project_name}.json"
         run_ty_memory_check(
-            ty_path=new_ty, project_path=project_path, output_path=new_report_path
+            ty_path=new_ty,
+            ty_command=ty_command,
+            project_path=project_path,
+            output_path=new_report_path,
         )
 
 
@@ -457,7 +499,7 @@ def parse_args() -> argparse.Namespace:
     # Run subcommand
     run_parser = subparsers.add_parser(
         "run",
-        help="Clone projects, run ty, and compare memory usage",
+        help="Set up projects, run ty, and compare memory usage",
     )
     run_parser.add_argument(
         "--old-ty",

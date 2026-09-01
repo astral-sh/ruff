@@ -13,7 +13,6 @@ TC004 [*] Move import `pandas.DataFrame` out of type-checking block. Import is u
  9 | def example() -> DataFrame:
 10 |     x = DataFrame()
    |         --------- Used at runtime here
-   |
 help: Move out of type-checking block
   |
 3 | from typing_extensions import TYPE_CHECKING

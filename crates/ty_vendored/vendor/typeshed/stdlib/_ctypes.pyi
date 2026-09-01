@@ -337,7 +337,7 @@ class _UnionType(_CTypeBaseType):
     # At runtime, various attributes are created on a Union subclass based
     # on its _fields_. This method doesn't exist, but represents those
     # dynamically created attributes.
-    def __getattr__(self, name: str) -> _CField[Any, Any, Any]: ...
+    def __getattr__(self, name: str, /) -> _CField[Any, Any, Any]: ...
     if sys.version_info < (3, 13):
         # Inherited from CType_Type starting on 3.13
         def __mul__(cls: type[_CT], other: int) -> type[Array[_CT]]: ...  # type: ignore[misc] # pyright: ignore[reportGeneralTypeIssues]
@@ -353,8 +353,8 @@ class Union(_CData, metaclass=_UnionType):
         _align_: ClassVar[int]
 
     def __init__(self, *args: Any, **kw: Any) -> None: ...
-    def __getattr__(self, name: str) -> Any: ...
-    def __setattr__(self, name: str, value: Any) -> None: ...
+    def __getattr__(self, name: str, /) -> Any: ...
+    def __setattr__(self, name: str, value: Any, /) -> None: ...
 
 # This class is not exposed. It calls itself _ctypes.PyCStructType.
 @type_check_only
@@ -367,7 +367,7 @@ class _PyCStructType(_CTypeBaseType):
     # At runtime, various attributes are created on a Structure subclass based
     # on its _fields_. This method doesn't exist, but represents those
     # dynamically created attributes.
-    def __getattr__(self, name: str) -> _CField[Any, Any, Any]: ...
+    def __getattr__(self, name: str, /) -> _CField[Any, Any, Any]: ...
     if sys.version_info < (3, 13):
         # Inherited from CType_Type starting on 3.13
         def __mul__(cls: type[_CT], other: int) -> type[Array[_CT]]: ...  # type: ignore[misc] # pyright: ignore[reportGeneralTypeIssues]
@@ -387,7 +387,7 @@ class Structure(_CData, metaclass=_PyCStructType):
         _layout_: ClassVar[Literal["ms", "gcc-sysv"]]
 
     def __init__(self, *args: Any, **kw: Any) -> None: ...
-    def __getattr__(self, name: str) -> Any: ...
+    def __getattr__(self, name: str, /) -> Any: ...
     def __setattr__(self, name: str, value: Any) -> None: ...
 
 # This class is not exposed. It calls itself _ctypes.PyCArrayType.
@@ -465,7 +465,7 @@ class Array(_CData, Generic[_CT], metaclass=_PyCArrayType):
         """Return len(self)."""
 
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
-        """See PEP 585"""
+        """Arrays are generic over the type of their elements"""
 
 def addressof(obj: _CData | _CDataType, /) -> int:
     """Return the address of the C instance internal buffer"""
@@ -492,3 +492,9 @@ def buffer_info(o: _CData | _CDataType | type[_CData | _CDataType], /) -> tuple[
 
 def call_cdeclfunction(address: int, arguments: tuple[Any, ...], /) -> Any: ...
 def call_function(address: int, arguments: tuple[Any, ...], /) -> Any: ...
+
+# dllist() is available on Linux and other platforms like NetBSD
+if sys.version_info >= (3, 14) and sys.platform != "win32" and sys.platform != "darwin":
+    # Added in Python 3.14.7
+    def dllist() -> list[str]:
+        """dllist() return a list of loaded shared libraries"""

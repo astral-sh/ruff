@@ -34,7 +34,7 @@ reveal_type("abc".startswith("bc", 1, 3))  # revealed: bool
 reveal_type("abc".startswith(("a", "x")))  # revealed: bool
 ```
 
-And similiarly, we should still infer `bool` if the instance or the prefix are not string literals:
+And similarly, we should still infer `bool` if the instance or the prefix are not string literals:
 
 ```py
 from typing_extensions import LiteralString
@@ -52,7 +52,8 @@ Unlike bound methods for some other classes implemented in C, `"foo".startswith`
 
 ```py
 import types
-from ty_extensions import TypeOf, static_assert, is_subtype_of
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_subtype_of
 
 static_assert(is_subtype_of(TypeOf["foo".startswith], types.BuiltinFunctionType))
 

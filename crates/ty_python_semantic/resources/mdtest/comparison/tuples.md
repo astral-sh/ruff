@@ -149,6 +149,7 @@ of the dunder methods.)
 
 ```py
 from __future__ import annotations
+from typing import Literal
 
 class EqReturnType: ...
 class NeReturnType: ...
@@ -203,6 +204,18 @@ class B:
         return LtReturnTypeOnB()
 
 reveal_type((A(), B()) < (A(), B()))  # revealed: LtReturnType | LtReturnTypeOnB | Literal[False]
+
+class LaterLtReturnType: ...
+
+class CustomEq:
+    def __eq__(self, other: object) -> Literal[True]:
+        return True
+
+class Later:
+    def __lt__(self, other: Later) -> LaterLtReturnType:
+        return LaterLtReturnType()
+
+reveal_type((CustomEq(), Later()) < (CustomEq(), Later()))  # revealed: LaterLtReturnType | Literal[False]
 ```
 
 #### Special Handling of Eq and NotEq in Lexicographic Comparisons
@@ -309,6 +322,96 @@ def _(n: int):
 
     reveal_type(a in d)  # revealed: bool
     reveal_type(a not in d)  # revealed: bool
+```
+
+Membership in a fixed-length tuple compares each element with the needle, regardless of whether the
+needle is itself a tuple:
+
+```py
+from typing import Literal
+
+def scalar_membership(value: int, values: tuple[Literal[1], Literal[2]]):
+    reveal_type(1 in values)  # revealed: Literal[True]
+    reveal_type(3 in values)  # revealed: Literal[False]
+    reveal_type(value in values)  # revealed: bool
+
+    reveal_type(1 not in values)  # revealed: Literal[False]
+    reveal_type(3 not in values)  # revealed: Literal[True]
+    reveal_type(value not in values)  # revealed: bool
+
+def empty_tuple(value: object, values: tuple[()]):
+    reveal_type(value in values)  # revealed: Literal[False]
+    reveal_type(value not in values)  # revealed: Literal[True]
+```
+
+A variable-length tuple might be empty, even if all its possible elements would compare equal to the
+needle:
+
+```py
+from typing import Literal
+
+def variable_length(
+    nested: tuple[tuple[()], ...],
+    values: tuple[Literal[1], ...],
+):
+    reveal_type(() in nested)  # revealed: bool
+    reveal_type(() not in nested)  # revealed: bool
+
+    reveal_type(1 in values)  # revealed: bool
+    reveal_type(1 not in values)  # revealed: bool
+```
+
+Tuple membership checks whether the needle is the same object as an element before comparing the
+objects for equality. A non-reflexive equality method therefore cannot establish that membership is
+always false:
+
+```py
+from typing import Literal
+
+class NeverEqual:
+    def __eq__(self, other: object) -> Literal[False]:
+        return False
+
+class AlwaysEqual:
+    def __eq__(self, other: object) -> Literal[True]:
+        return True
+
+def identity_before_equality(value: NeverEqual):
+    reveal_type(value == value)  # revealed: Literal[False]
+    reveal_type(value in (value,))  # revealed: bool
+    reveal_type(value not in (value,))  # revealed: bool
+
+def custom_equality(value: AlwaysEqual):
+    reveal_type(value in (1,))  # revealed: bool
+    reveal_type(value not in (1,))  # revealed: bool
+    reveal_type((value,) == (1,))  # revealed: Literal[True]
+    reveal_type((value,) != (1,))  # revealed: Literal[False]
+
+def custom_equality_union(value: AlwaysEqual | None):
+    reveal_type(value in (1,))  # revealed: bool
+    reveal_type(value not in (1,))  # revealed: bool
+
+def custom_equality_union_member(value: AlwaysEqual | None, member: AlwaysEqual):
+    reveal_type(value.__eq__(member))  # revealed: bool
+    reveal_type(member.__eq__(value))  # revealed: Literal[True]
+    reveal_type(value in (member,))  # revealed: Literal[True]
+    reveal_type(value not in (member,))  # revealed: Literal[False]
+    reveal_type((value,) == (member,))  # revealed: bool
+    reveal_type((value,) != (member,))  # revealed: bool
+
+class Base:
+    def __eq__(self, other: object) -> bool:
+        return False
+
+class AlwaysEqualChild(Base):
+    def __eq__(self, other: object) -> Literal[True]:
+        return True
+
+def reflected_custom_equality(value: Base, child: AlwaysEqualChild):
+    reveal_type(value == child)  # revealed: bool
+    reveal_type(child == value)  # revealed: Literal[True]
+    reveal_type(value in (child,))  # revealed: Literal[True]
+    reveal_type(value not in (child,))  # revealed: Literal[False]
 ```
 
 ### Identity Comparisons
@@ -440,6 +543,69 @@ def _(
     reveal_type(prefix_int_var_int < prefix_int_var_bool)  # revealed: bool
 ```
 
+## Equality with sequences
+
+A `Sequence[object]` can be an empty or nonempty tuple. Both equality and inequality comparisons
+therefore have unknown results:
+
+```py
+from collections.abc import Sequence
+
+def _(value: Sequence[object]):
+    reveal_type(value == ())  # revealed: bool
+    reveal_type(() == value)  # revealed: bool
+    reveal_type(value != ())  # revealed: bool
+    reveal_type(() != value)  # revealed: bool
+
+    reveal_type(value == (1,))  # revealed: bool
+```
+
+The operand types can overlap without either being a subtype of the other. For example, `(1,)`
+inhabits both `Sequence[int]` and `tuple[int | str]`, so these comparisons also have unknown
+results:
+
+```py
+def _(value: Sequence[int], other: tuple[int | str]):
+    reveal_type(value == other)  # revealed: bool
+    reveal_type(other == value)  # revealed: bool
+```
+
+## Equality with tuple subclasses
+
+A `Base` value can be a `Child` instance, so comparing them has an unknown result despite their
+different inherited equality methods:
+
+```py
+class Base: ...
+class Child(tuple[int, ...], Base): ...
+
+def _(value: Base, child: Child):
+    reveal_type(value == child)  # revealed: bool
+    reveal_type(child == value)  # revealed: bool
+```
+
+For unrelated operand classes, the default equality semantics still ignore possible subclasses with
+different equality methods:
+
+```py
+def _(value: Base, other: tuple[int, ...]):
+    reveal_type(value == other)  # revealed: Literal[False]
+```
+
+## Comparisons with truthy strings
+
+A nonempty string cannot compare equal to an integer. Truthiness narrowing preserves this result
+when equality is used for tuple comparisons or membership tests:
+
+```py
+def _(text: str):
+    if text:
+        reveal_type((1,) == (text,))  # revealed: Literal[False]
+        reveal_type((text,) == (1,))  # revealed: Literal[False]
+        reveal_type(text in (1,))  # revealed: Literal[False]
+        reveal_type(1 in (text,))  # revealed: Literal[False]
+```
+
 ## Chained comparisons with elements that incorrectly implement `__bool__`
 
 <!-- snapshot-diagnostics -->
@@ -496,7 +662,20 @@ class A:
         return NotBoolable()
 
 # error: [unsupported-bool-conversion]
-(A(),) == (A(),)
+reveal_type((A(),) == (A(),))  # revealed: bool
+# error: [unsupported-bool-conversion]
+reveal_type((A(), "x") == (A(), "y"))  # revealed: Literal[False]
+# error: [unsupported-bool-conversion]
+reveal_type((A(),) != (A(), 0))  # revealed: Literal[True]
+```
+
+Tuple identity comparisons do not compare elements and therefore do not coerce their equality
+results to `bool`:
+
+```py
+def tuple_identity(left: tuple[A], right: tuple[A]) -> None:
+    reveal_type(left is right)  # revealed: bool
+    reveal_type(left is not right)  # revealed: bool
 ```
 
 ## Recursive NamedTuple

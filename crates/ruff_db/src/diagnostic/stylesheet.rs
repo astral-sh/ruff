@@ -1,6 +1,8 @@
 use anstyle::{AnsiColor, Effects, Style};
 use std::fmt::Formatter;
 
+use crate::diagnostic::HyperlinkMode;
+
 pub(super) const fn fmt_styled<'a, T>(
     content: T,
     style: anstyle::Style,
@@ -31,7 +33,7 @@ where
     FmtStyled { content, style }
 }
 
-pub(super) fn fmt_with_hyperlink<'a, T>(
+pub fn fmt_with_hyperlink<'a, T>(
     content: T,
     url: Option<&'a str>,
     stylesheet: &DiagnosticStylesheet,
@@ -39,33 +41,21 @@ pub(super) fn fmt_with_hyperlink<'a, T>(
 where
     T: std::fmt::Display + 'a,
 {
-    struct FmtHyperlink<'a, T> {
-        content: T,
-        url: Option<&'a str>,
-    }
-
-    impl<T> std::fmt::Display for FmtHyperlink<'_, T>
-    where
-        T: std::fmt::Display,
-    {
-        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-            if let Some(url) = self.url {
-                write!(f, "\x1B]8;;{url}\x1B\\")?;
-            }
-
-            self.content.fmt(f)?;
-
-            if self.url.is_some() {
-                f.write_str("\x1B]8;;\x1B\\")?;
-            }
-
-            Ok(())
-        }
-    }
-
     let url = if stylesheet.hyperlink { url } else { None };
 
-    FmtHyperlink { content, url }
+    std::fmt::from_fn(move |f| {
+        if let Some(url) = url {
+            write!(f, "\x1B]8;;{url}\x1B\\")?;
+        }
+
+        content.fmt(f)?;
+
+        if url.is_some() {
+            f.write_str("\x1B]8;;\x1B\\")?;
+        }
+
+        Ok(())
+    })
 }
 
 #[derive(Clone, Debug)]
@@ -116,6 +106,15 @@ impl DiagnosticStylesheet {
             deletion_line_no: AnsiColor::Red.on_default().effects(Effects::BOLD),
             hyperlink,
         }
+    }
+
+    pub(super) fn hyperlinks(mut self, mode: HyperlinkMode) -> Self {
+        match mode {
+            HyperlinkMode::Auto => {}
+            HyperlinkMode::Always => self.hyperlink = true,
+            HyperlinkMode::Never => self.hyperlink = false,
+        }
+        self
     }
 
     pub fn plain() -> Self {

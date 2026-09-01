@@ -1,5 +1,17 @@
 # Narrowing For Truthiness Checks (`if x` or `if not x`)
 
+## Generator expressions
+
+A generator object is truthy even when it yields no values.
+
+```py
+def narrow(value: int | None) -> None:
+    if (value for _ in ()):
+        if value is None:
+            return
+    reveal_type(value)  # revealed: int
+```
+
 ## Value Literals
 
 ```py
@@ -71,6 +83,59 @@ if (foo1 := Foo()).val:
     reveal_type(foo1.val)  # revealed: int & ~AlwaysFalsy
 ```
 
+## Narrowing tagged unions of nominal classes by attribute truthiness
+
+```py
+from typing import Literal
+
+class Success:
+    success: Literal[True]
+    result: int
+
+class Failure:
+    success: Literal[False]
+    errors: list[str]
+
+def _(response: Success | Failure):
+    if response.success:
+        reveal_type(response)  # revealed: Success
+        reveal_type(response.result)  # revealed: int
+    else:
+        reveal_type(response)  # revealed: Failure
+        reveal_type(response.errors)  # revealed: list[str]
+
+    if not response.success:
+        reveal_type(response)  # revealed: Failure
+    else:
+        reveal_type(response)  # revealed: Success
+
+class TruthyIntTag:
+    success: Literal[1]
+
+class FalsyIntTag:
+    success: Literal[0]
+
+class AmbiguousTag:
+    success: bool
+
+def _(response: Success | Failure | TruthyIntTag | FalsyIntTag | AmbiguousTag):
+    if response.success:
+        reveal_type(response)  # revealed: Success | TruthyIntTag | AmbiguousTag
+    else:
+        reveal_type(response)  # revealed: Failure | FalsyIntTag | AmbiguousTag
+
+def truthiness_after_value_guard(response: Success | Failure | None):
+    if not response:
+        return
+
+    if response.success:
+        reveal_type(response)  # revealed: Success & ~AlwaysFalsy
+        reveal_type(response.result)  # revealed: int
+    else:
+        reveal_type(response)  # revealed: Failure & ~AlwaysFalsy
+        reveal_type(response.errors)  # revealed: list[str]
+```
+
 ## Function Literals
 
 Basically functions are always truthy.
@@ -88,7 +153,7 @@ def bar(world: str, *args, **kwargs) -> float:
 x = foo if flag() else bar
 
 if x:
-    reveal_type(x)  # revealed: (def foo(hello: int) -> bytes) | (def bar(world: str, *args, **kwargs) -> int | float)
+    reveal_type(x)  # revealed: (def foo(hello: int) -> bytes) | (def bar(world: str, *args, **kwargs) -> float)
 else:
     reveal_type(x)  # revealed: Never
 ```
@@ -536,7 +601,7 @@ def f(floaty: FloatNewType, complexy: ComplexNewType):
 
     if complexy:
         reveal_type(complexy)  # revealed: ComplexNewType & ~AlwaysFalsy
-        reveal_type(complexy.real)  # revealed: int | float
+        reveal_type(complexy.real)  # revealed: float
         expects_complex(complexy)  # fine
         expects_float(complexy)  # error: [invalid-argument-type]
 ```

@@ -31,11 +31,9 @@ o: Not[()]
 p: Not[(int,)]
 
 def static_truthiness(not_one: Not[Literal[1]]) -> None:
-    # TODO: `bool` is not incorrect, but these would ideally be `Literal[True]` and `Literal[False]`
-    # respectively, since all possible runtime objects that are created by the literal syntax `1`
-    # are members of the type `Literal[1]`
-    reveal_type(not_one is not 1)  # revealed: bool
-    reveal_type(not_one is 1)  # revealed: bool
+    # Negating a literal rules out every literal with that value.
+    reveal_type(not_one is not 1)  # revealed: Literal[True]
+    reveal_type(not_one is 1)  # revealed: Literal[False]
 
     # But these are both `bool`, rather than `Literal[True]` or `Literal[False]`
     # as there are many runtime objects that inhabit the type `~Literal[1]`
@@ -52,7 +50,8 @@ python-version = "3.12"
 ```
 
 ```py
-from ty_extensions import Intersection, Not, is_subtype_of, static_assert
+from ty_extensions import Intersection, Not, static_assert
+from ty_extensions._internal import is_subtype_of
 from typing_extensions import Literal, Never
 
 class S: ...
@@ -91,7 +90,8 @@ The `Unknown` type is a special type that we use to represent actually unknown t
 annotation), as opposed to `Any` which represents an explicitly unknown type.
 
 ```py
-from ty_extensions import Unknown, static_assert, is_assignable_to, reveal_mro
+from ty_extensions import static_assert
+from ty_extensions._internal import Unknown, is_assignable_to, reveal_mro
 
 static_assert(is_assignable_to(Unknown, int))
 static_assert(is_assignable_to(int, Unknown))
@@ -110,7 +110,7 @@ class C(Unknown): ...
 # revealed: (<class 'C'>, Unknown, <class 'object'>)
 reveal_mro(C)
 
-# error: "Special form `ty_extensions.Unknown` expected no type parameter"
+# error: "Special form `ty_extensions._internal.Unknown` expected no type parameter"
 u: Unknown[str]
 ```
 
@@ -124,7 +124,8 @@ They do not accept any type arguments.
 ```py
 from typing_extensions import Literal
 
-from ty_extensions import AlwaysFalsy, AlwaysTruthy, is_subtype_of, static_assert
+from ty_extensions import AlwaysFalsy, AlwaysTruthy, static_assert
+from ty_extensions._internal import is_subtype_of
 
 static_assert(is_subtype_of(Literal[True], AlwaysTruthy))
 static_assert(is_subtype_of(Literal[False], AlwaysFalsy))
@@ -276,7 +277,7 @@ import secrets
 static_assert(1 < 2)
 ```
 
-When the argument evalutes to `False`:
+When the argument evaluates to `False`:
 
 ```py
 # snapshot: static-assert-error
@@ -291,7 +292,6 @@ error[static-assert-error]: Static assertion error: argument evaluates to `False
   | ^^^^^^^^^^^^^^-----^
   |               |
   |               Inferred type of argument is `Literal[False]`
-  |
 ```
 
 With a custom message:
@@ -309,7 +309,6 @@ error[static-assert-error]: Static assertion error: with a message
   | ^^^^^^^^^^^^^^-----^^^^^^^^^^^^^^^^^^^
   |               |
   |               Inferred type of argument is `Literal[False]`
-  |
 ```
 
 When it evaluates to something falsy:
@@ -327,7 +326,6 @@ error[static-assert-error]: Static assertion error: argument of type `Literal[""
    | ^^^^^^^^^^^^^^--^
    |               |
    |               Inferred type of argument is `Literal[""]`
-   |
 ```
 
 When it evaluates to something that is not statically known to be truthy or falsy:
@@ -345,7 +343,6 @@ error[static-assert-error]: Static assertion error: argument of type `int` has a
    | ^^^^^^^^^^^^^^--------------------^
    |               |
    |               Inferred type of argument is `int`
-   |
 ```
 
 ## Type predicates
@@ -357,11 +354,12 @@ the test.
 ### Equivalence
 
 ```py
-from ty_extensions import is_equivalent_to, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
 from typing_extensions import Never, Union
 
 static_assert(is_equivalent_to(type, type[object]))
-static_assert(is_equivalent_to(tuple[int, Never], Never))
+static_assert(is_equivalent_to(tuple[Never, ...], tuple[()]))
 static_assert(is_equivalent_to(int | str, Union[int, str]))
 
 static_assert(not is_equivalent_to(int, str))
@@ -371,7 +369,8 @@ static_assert(not is_equivalent_to(int | str, int | str | bytes))
 ### Subtyping
 
 ```py
-from ty_extensions import is_subtype_of, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
 
 static_assert(is_subtype_of(bool, int))
 static_assert(not is_subtype_of(str, int))
@@ -395,7 +394,8 @@ static_assert(not is_subtype_of(Base, Unrelated))
 ### Assignability
 
 ```py
-from ty_extensions import is_assignable_to, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to
 from typing import Any
 
 static_assert(is_assignable_to(int, Any))
@@ -406,7 +406,8 @@ static_assert(not is_assignable_to(int, str))
 ### Disjointness
 
 ```py
-from ty_extensions import is_disjoint_from, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import is_disjoint_from
 from typing import Literal
 
 static_assert(is_disjoint_from(None, int))
@@ -416,7 +417,8 @@ static_assert(not is_disjoint_from(Literal[2] | str, int))
 ### Singleton types
 
 ```py
-from ty_extensions import is_singleton, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import is_singleton
 from typing import Literal
 
 static_assert(is_singleton(None))
@@ -424,20 +426,6 @@ static_assert(is_singleton(Literal[True]))
 
 static_assert(not is_singleton(int))
 static_assert(not is_singleton(Literal["a"]))
-```
-
-### Single-valued types
-
-```py
-from ty_extensions import is_single_valued, static_assert
-from typing import Literal
-
-static_assert(is_single_valued(None))
-static_assert(is_single_valued(Literal[True]))
-static_assert(is_single_valued(Literal["a"]))
-
-static_assert(not is_single_valued(int))
-static_assert(not is_single_valued(Literal["a"] | Literal["b"]))
 ```
 
 ## `TypeOf`
@@ -449,7 +437,8 @@ type `str` itself is a subtype of `type[str]`. Instead, we can use `TypeOf[str]`
 the expression `str`:
 
 ```py
-from ty_extensions import TypeOf, is_subtype_of, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_subtype_of
 
 # This is incorrect and therefore fails with ...
 # error: "Static assertion error: argument of type `ConstraintSet[Literal[False]]` is always falsy"
@@ -473,10 +462,10 @@ def type_of_annotation() -> None:
     s1: type[Base] = Base
     s2: type[Base] = Derived  # no error here
 
-# error: "Special form `ty_extensions.TypeOf` expected exactly 1 type argument, got 3"
+# error: "Special form `ty_extensions._internal.TypeOf` expected exactly 1 type argument, got 3"
 t: TypeOf[int, str, bytes]
 
-# error: [invalid-type-form] "`ty_extensions.TypeOf` requires exactly one argument when used in a parameter annotation"
+# error: [invalid-type-form] "`ty_extensions._internal.TypeOf` requires exactly one argument when used in a parameter annotation"
 def f(x: TypeOf) -> None:
     reveal_type(x)  # revealed: Unknown
 ```
@@ -487,14 +476,13 @@ A function can reference itself via `TypeOf` in a deferred annotation. This shou
 overflow:
 
 ```py
-from ty_extensions import TypeOf
+from ty_extensions._internal import TypeOf
 
 def foo(x: "TypeOf[foo]"):
     reveal_type(x)  # revealed: def foo(x: def foo(...)) -> Unknown
 ```
 
-A `TypeOf` self-reference nested in a nominal specialization forms a recursive type. Cycle recovery
-preserves the outer nominal structure and replaces the recursive argument with `Divergent`:
+A direct self-reference in a variable annotation is resolved from the later assignment:
 
 ```toml
 [environment]
@@ -502,46 +490,11 @@ python-version = "3.14"
 ```
 
 ```py
-from ty_extensions import TypeOf
+from ty_extensions._internal import TypeOf
 
 direct: TypeOf[direct]
 direct = 1
 reveal_type(direct)  # revealed: Literal[1]
-
-x: list[TypeOf[x]]
-x = [1]
-reveal_type(x)  # revealed: list[Divergent]
-
-nested: list[tuple[TypeOf[nested]]]
-nested = [(1,)]
-reveal_type(nested)  # revealed: list[Divergent]
-
-variadic_tuple: tuple[TypeOf[variadic_tuple], ...]
-variadic_tuple = (1,)
-reveal_type(variadic_tuple)  # revealed: tuple[Literal[1]]
-
-mixed_variadic_tuple: tuple[TypeOf[mixed_variadic_tuple], *tuple[int, ...]]
-mixed_variadic_tuple = (1,)
-reveal_type(mixed_variadic_tuple)  # revealed: tuple[Literal[1]]
-
-optional: list[TypeOf[optional]] | None
-optional = [1]
-reveal_type(optional)  # revealed: list[Divergent]
-
-class Container[T]: ...
-
-y: Container[TypeOf[y]]
-y = 1  # error: [invalid-assignment]
-reveal_type(y)  # revealed: Container[Divergent]
-
-# Regression test for https://github.com/astral-sh/ty/issues/3837.
-union: list[TypeOf[union]] | Container[TypeOf[union]]
-union = [1]
-reveal_type(union)  # revealed: list[Divergent]
-
-stable_union: list[TypeOf[stable_union]] | Container[TypeOf[stable_union]] | None
-stable_union = [1]
-reveal_type(stable_union)  # revealed: list[Divergent]
 ```
 
 ## Recursive `TypeOf` in returned callables
@@ -556,14 +509,14 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from typing import Concatenate, Protocol, TypedDict
-from ty_extensions import TypeOf, generic_context
+from ty_extensions._internal import TypeOf, generic_context
 
 def self_recursive[**P, T](
     x: Callable[Concatenate[TypeOf[self_recursive], ...], T],
 ) -> Callable[Concatenate[TypeOf[self_recursive], P], T]:
     return x
 
-reveal_type(generic_context(self_recursive))  # revealed: ty_extensions.GenericContext[T@self_recursive]
+reveal_type(generic_context(self_recursive))  # revealed: ty_extensions._internal.GenericContext[T@self_recursive]
 # revealed: def self_recursive[T](x: (def self_recursive(...), /, *args: Any, **kwargs: Any) -> T) -> ((def self_recursive(...), /, *args: P'return.args, **kwargs: P'return.kwargs) -> T)
 reveal_type(self_recursive)
 
@@ -577,8 +530,8 @@ def mutual_second[**P, T](
 ) -> Callable[Concatenate[TypeOf[mutual_first], P], T]:
     return x
 
-reveal_type(generic_context(mutual_first))  # revealed: ty_extensions.GenericContext[T@mutual_first]
-reveal_type(generic_context(mutual_second))  # revealed: ty_extensions.GenericContext[T@mutual_second]
+reveal_type(generic_context(mutual_first))  # revealed: ty_extensions._internal.GenericContext[T@mutual_first]
+reveal_type(generic_context(mutual_second))  # revealed: ty_extensions._internal.GenericContext[T@mutual_second]
 
 class VarianceClass[T]:
     x: Callable[[TypeOf[variance_class]], T]
@@ -628,15 +581,15 @@ class Bar:
     ) -> Callable[Concatenate[TypeOf[Foo.method], P], T]:
         return x
 
-reveal_type(generic_context(Foo.method))  # revealed: ty_extensions.GenericContext[T@method]
-reveal_type(generic_context(Bar.method))  # revealed: ty_extensions.GenericContext[T@method]
+reveal_type(generic_context(Foo.method))  # revealed: ty_extensions._internal.GenericContext[T@method]
+reveal_type(generic_context(Bar.method))  # revealed: ty_extensions._internal.GenericContext[T@method]
 
 def dunder_get[**P, T](
     x: Callable[Concatenate[TypeOf[dunder_get.__get__], ...], T],
 ) -> Callable[Concatenate[TypeOf[dunder_get.__get__], P], T]:
     return x
 
-reveal_type(generic_context(dunder_get))  # revealed: ty_extensions.GenericContext[T@dunder_get]
+reveal_type(generic_context(dunder_get))  # revealed: ty_extensions._internal.GenericContext[T@dunder_get]
 
 def alias_get[**P, T](
     x: Callable[Concatenate[AliasGet, ...], T],
@@ -645,7 +598,7 @@ def alias_get[**P, T](
 
 type AliasGet = TypeOf[alias_get.__get__]
 
-reveal_type(generic_context(alias_get))  # revealed: ty_extensions.GenericContext[T@alias_get]
+reveal_type(generic_context(alias_get))  # revealed: ty_extensions._internal.GenericContext[T@alias_get]
 
 type ReturnedCallableAlias[**P] = Callable[Concatenate[TypeOf[alias_return], P], int]
 
@@ -680,7 +633,7 @@ Multiple redefinitions of a function with `TypeOf[foo]` as the return type creat
 distinct function types. The display of such chains is truncated to prevent extremely long output:
 
 ```py
-from ty_extensions import TypeOf
+from ty_extensions._internal import TypeOf
 
 def foo() -> TypeOf[foo]:  # error: [unresolved-reference]
     return foo
@@ -717,7 +670,7 @@ type-theoretic checks.
 It accepts a single type parameter which is expected to be a callable object.
 
 ```py
-from ty_extensions import CallableTypeOf
+from ty_extensions._internal import CallableTypeOf
 
 def f1():
     return
@@ -728,22 +681,22 @@ def f2() -> int:
 def f3(x: int, y: str) -> None:
     return
 
-# error: [invalid-type-form] "Special form `ty_extensions.CallableTypeOf` expected exactly 1 type argument, got 2"
+# error: [invalid-type-form] "Special form `ty_extensions._internal.CallableTypeOf` expected exactly 1 type argument, got 2"
 c1: CallableTypeOf[f1, f2]
 
-# error: [invalid-type-form] "Expected the first argument to `ty_extensions.CallableTypeOf` to be a callable object, but got an object of type `Literal["foo"]`"
+# error: [invalid-type-form] "Expected the first argument to `ty_extensions._internal.CallableTypeOf` to be a callable object, but got an object of type `Literal["foo"]`"
 c2: CallableTypeOf["foo"]
 
-# error: [invalid-type-form] "Expected the first argument to `ty_extensions.CallableTypeOf` to be a callable object, but got an object of type `Literal["foo"]`"
+# error: [invalid-type-form] "Expected the first argument to `ty_extensions._internal.CallableTypeOf` to be a callable object, but got an object of type `Literal["foo"]`"
 c20: CallableTypeOf[("foo",)]
 
-# error: [invalid-type-form] "`ty_extensions.CallableTypeOf` requires exactly one argument when used in a parameter annotation"
+# error: [invalid-type-form] "`ty_extensions._internal.CallableTypeOf` requires exactly one argument when used in a parameter annotation"
 def f(x: CallableTypeOf) -> None:
     reveal_type(x)  # revealed: Unknown
 
 c3: CallableTypeOf[(f3,)]
 
-# error: [invalid-type-form] "Special form `ty_extensions.CallableTypeOf` expected exactly 1 type argument, got 0"
+# error: [invalid-type-form] "Special form `ty_extensions._internal.CallableTypeOf` expected exactly 1 type argument, got 0"
 c4: CallableTypeOf[()]
 ```
 
@@ -793,7 +746,7 @@ respected:
 ```py
 from functools import partial
 from typing import Callable
-from ty_extensions import into_callable
+from ty_extensions._internal import into_callable
 
 class CallableInstance:
     def __call__(self, value: int, /) -> str:
@@ -825,7 +778,7 @@ Narrowed callable enum values can still be used with callable type extraction:
 
 ```py
 from enum import Enum
-from ty_extensions import CallableTypeOf, RegularCallableTypeOf
+from ty_extensions._internal import CallableTypeOf, RegularCallableTypeOf
 
 class CallableEnum(Enum):
     LEFT = 1
@@ -854,7 +807,8 @@ It accepts a single type parameter which is expected to be a callable object.
 
 ```py
 from typing import Callable
-from ty_extensions import CallableTypeOf, RegularCallableTypeOf, is_assignable_to, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import CallableTypeOf, RegularCallableTypeOf, is_assignable_to
 
 def f(x: int, /) -> None: ...
 
@@ -870,7 +824,7 @@ python-version = "3.14"
 ```
 
 ```py
-from ty_extensions import CallableTypeOf, RegularCallableTypeOf
+from ty_extensions._internal import CallableTypeOf, RegularCallableTypeOf
 
 def callable[T]() -> CallableTypeOf[callable]:
     raise NotImplementedError

@@ -5,11 +5,7 @@ use lsp_types::{Position, Range};
 use crate::TestServerBuilder;
 
 const CUSTOM_EXTENSION_CONFIG: &str = r#"[tool.ruff]
-preview = true
 extension = { thing = "markdown" }
-
-[tool.ruff.format]
-preview = true
 "#;
 
 const CUSTOM_EXTENSION_MARKDOWN: &str = "# title\n\n```python\nx='hi'\n```\n";

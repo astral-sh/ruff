@@ -1,8 +1,8 @@
 use itertools::Itertools;
-use ruff_python_ast::{self as ast, name::Name};
+use ruff_python_ast::{self as ast, HasNodeIndex, NodeIndex, name::Name};
 use ruff_text_size::Ranged;
 
-use crate::types::class::DynamicClassLiteral;
+use crate::types::class::{DynamicClassLiteral, DynamicClassScopeOffset};
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{
     CYCLIC_CLASS_DEFINITION, DUPLICATE_BASE, INCONSISTENT_MRO, INVALID_ARGUMENT_TYPE, INVALID_BASE,
@@ -10,7 +10,7 @@ use crate::types::diagnostic::{
     report_inconsistent_generic_bases,
 };
 use crate::types::enums::is_enum_class_by_inheritance;
-use crate::types::infer::builder::TypeInferenceBuilder;
+use crate::types::infer::builder::{DeferredExpressionState, TypeInferenceBuilder};
 use crate::types::mro::{DynamicMroError, DynamicMroErrorKind};
 use crate::types::{ClassBase, KnownClass, Type, extract_fixed_length_iterable_element_types};
 
@@ -36,6 +36,44 @@ impl DynamicClassKind {
 }
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
+    /// Identify a dangling dynamic-class call without retaining an absolute source position.
+    pub(super) fn dynamic_class_scope_offset(
+        &self,
+        call: &ast::ExprCall,
+    ) -> DynamicClassScopeOffset {
+        let scope_anchor = self
+            .scope()
+            .node(self.db())
+            .node_index()
+            .unwrap_or(NodeIndex::from(0));
+        let anchor_u32 = scope_anchor
+            .as_u32()
+            .expect("scope anchor should not be NodeIndex::NONE");
+        let relative_index = |index: NodeIndex| {
+            index
+                .as_u32()
+                .expect("dynamic class anchor should not be NodeIndex::NONE")
+                - anchor_u32
+        };
+
+        if let DeferredExpressionState::InStringAnnotation(enclosing_node_key) = self.deferred_state
+        {
+            let enclosing_index = enclosing_node_key.index();
+            let string: &ast::ExprStringLiteral = self
+                .module()
+                .get_by_index(enclosing_index)
+                .try_into()
+                .expect("string annotation key should point to ExprStringLiteral");
+
+            DynamicClassScopeOffset::StringAnnotation {
+                offset: relative_index(enclosing_index),
+                range: call.range() - string.start(),
+            }
+        } else {
+            DynamicClassScopeOffset::Node(relative_index(call.node_index().load()))
+        }
+    }
+
     /// Extract base classes from the bases argument of a `type()` or `types.new_class()` call.
     ///
     /// Emits a diagnostic if `bases_type` is not a valid bases iterable for the given kind.
@@ -48,28 +86,29 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         kind: DynamicClassKind,
     ) -> Option<Box<[Type<'db>]>> {
         let db = self.db();
+        let env = self.program_environment();
         let fn_name = kind.function_name();
         let formal_parameter_type = match kind {
-            DynamicClassKind::TypeCall => Type::homogeneous_tuple(db, Type::object()),
+            DynamicClassKind::TypeCall => Type::homogeneous_tuple(db, env, Type::object()),
             DynamicClassKind::NewClass => {
-                KnownClass::Iterable.to_specialized_instance(db, &[Type::object()])
+                KnownClass::Iterable.to_specialized_instance(db, env, &[Type::object()])
             }
         };
 
-        if !bases_type.is_assignable_to(db, formal_parameter_type)
+        if !bases_type.is_assignable_to(db, env, formal_parameter_type)
             && let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, bases_node)
         {
             let mut diagnostic = builder.into_diagnostic(format_args!(
                 "Invalid argument to parameter 2 (`bases`) of `{fn_name}`"
             ));
-            diagnostic.set_primary_message(format_args!(
+            diagnostic.set_primary_annotation_message(format_args!(
                 "Expected `{}`, found `{}`",
-                formal_parameter_type.display(db),
-                bases_type.display(db)
+                formal_parameter_type.display(db, env),
+                bases_type.display(db, env)
             ));
         }
 
-        extract_fixed_length_iterable_element_types(db, bases_node, |expr| {
+        extract_fixed_length_iterable_element_types(db, env, bases_node, |expr| {
             self.expression_type(expr)
         })
     }
@@ -95,25 +134,28 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             .map(|tuple| tuple.elts.as_slice());
         let mut disjoint_bases = IncompatibleBases::default();
         let fn_name = kind.function_name();
+        let env = self.context.program_environment();
 
         for (idx, base) in bases.iter().enumerate() {
             let diagnostic_node = bases_tuple_elts
                 .and_then(|elts| elts.get(idx))
                 .unwrap_or(bases_node);
 
-            let Some(class_base) = ClassBase::try_from_type(db, *base, None) else {
+            let Some(class_base) = ClassBase::try_from_type(db, env, *base, None) else {
                 continue;
             };
 
             match class_base {
-                ClassBase::Generic | ClassBase::TypedDict => {
+                ClassBase::Generic | ClassBase::TypedDict(_) => {
                     if let Some(builder) = self.context.report_lint(&INVALID_BASE, diagnostic_node)
                     {
                         let mut diagnostic = builder.into_diagnostic(format_args!(
                             "Invalid base for class created via `{fn_name}`"
                         ));
-                        diagnostic
-                            .set_primary_message(format_args!("Has type `{}`", base.display(db)));
+                        diagnostic.set_primary_annotation_message(format_args!(
+                            "Has type `{}`",
+                            base.display(db, env)
+                        ));
                         match class_base {
                             ClassBase::Generic => {
                                 diagnostic.info(format_args!(
@@ -123,7 +165,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                     "Consider using `class {name}(Generic[...]): ...` instead"
                                 ));
                             }
-                            ClassBase::TypedDict => {
+                            ClassBase::TypedDict(_) => {
                                 diagnostic.info(format_args!(
                                     "Classes created via `{fn_name}` cannot be TypedDicts"
                                 ));
@@ -143,8 +185,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         let mut diagnostic = builder.into_diagnostic(format_args!(
                             "Unsupported base for class created via `{fn_name}`"
                         ));
-                        diagnostic
-                            .set_primary_message(format_args!("Has type `{}`", base.display(db)));
+                        diagnostic.set_primary_annotation_message(format_args!(
+                            "Has type `{}`",
+                            base.display(db, env)
+                        ));
                         diagnostic.info(format_args!(
                             "Classes created via `{fn_name}` cannot be protocols",
                         ));
@@ -172,16 +216,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                     if kind == DynamicClassKind::TypeCall
                         && let Some((static_class, _)) = class_type.static_class_literal(db)
-                        && is_enum_class_by_inheritance(db, static_class)
+                        && is_enum_class_by_inheritance(db, env, static_class)
                     {
                         if let Some(builder) =
                             self.context.report_lint(&INVALID_BASE, diagnostic_node)
                         {
                             let mut diagnostic = builder
                                 .into_diagnostic("Invalid base for class created via `type()`");
-                            diagnostic.set_primary_message(format_args!(
+                            diagnostic.set_primary_annotation_message(format_args!(
                                 "Has type `{}`",
-                                base.display(db)
+                                base.display(db, env)
                             ));
                             diagnostic.info("Creating an enum class via `type()` is not supported");
                             diagnostic.info(format_args!(
@@ -216,14 +260,14 @@ pub(super) fn report_dynamic_mro_errors<'db>(
     bases: &ast::Expr,
 ) -> bool {
     let db = context.db();
+    let env = context.program_environment();
     let Err(error) = dynamic_class.try_mro(db) else {
         return true;
     };
-
     let bases_display = dynamic_class
         .explicit_bases(db)
         .iter()
-        .map(|base| base.display(db))
+        .map(|base| base.display(db, env))
         .join(", ");
     report_mro_error_kind(
         context,
@@ -247,7 +291,7 @@ pub(super) fn report_inconsistent_dynamic_generic_bases<'db>(
     bases: &ast::Expr,
 ) {
     let db = context.db();
-    let explicit_bases = dynamic_class.explicit_bases(db);
+    let explicit_bases = dynamic_class.explicit_bases(context.db());
     let base_nodes = bases
         .as_tuple_expr()
         .map(|tuple| tuple.elts.as_slice())
@@ -288,22 +332,23 @@ pub(super) fn report_mro_error_kind<'db>(
             let Some(bases) = bases_expr else {
                 return;
             };
+            let env = context.program_environment();
             let bases_tuple_elts = bases.as_tuple_expr().map(|tuple| tuple.elts.as_slice());
             for (idx, base_type) in invalid_bases {
-                let instance_of_type = KnownClass::Type.to_instance(db);
+                let instance_of_type = KnownClass::Type.to_instance(db, env);
                 let specific_base = bases_tuple_elts.and_then(|elts| elts.get(*idx));
                 let diagnostic_range = specific_base
                     .map(ast::Expr::range)
                     .unwrap_or_else(|| bases.range());
 
-                if base_type.is_assignable_to(db, instance_of_type) {
+                if base_type.is_assignable_to(db, env, instance_of_type) {
                     if let Some(builder) =
                         context.report_lint(&UNSUPPORTED_DYNAMIC_BASE, diagnostic_range)
                     {
                         let mut diagnostic = builder.into_diagnostic("Unsupported class base");
-                        diagnostic.set_primary_message(format_args!(
+                        diagnostic.set_primary_annotation_message(format_args!(
                             "Has type `{}`",
-                            base_type.display(db)
+                            base_type.display(db, env)
                         ));
                         diagnostic.info(format_args!(
                             "ty cannot determine a MRO for class `{class_name}` due to this base",
@@ -313,7 +358,7 @@ pub(super) fn report_mro_error_kind<'db>(
                 } else if let Some(builder) = context.report_lint(&INVALID_BASE, diagnostic_range) {
                     let mut diagnostic = builder.into_diagnostic(format_args!(
                         "Invalid class base with type `{}`",
-                        base_type.display(db)
+                        base_type.display(db, env)
                     ));
                     if specific_base.is_none() {
                         diagnostic
@@ -329,12 +374,13 @@ pub(super) fn report_mro_error_kind<'db>(
         }
         DynamicMroErrorKind::DuplicateBases(duplicates) => {
             if let Some(builder) = context.report_lint(&DUPLICATE_BASE, call_expr) {
+                let env = context.program_environment();
                 builder.into_diagnostic(format_args!(
                     "Duplicate base class{maybe_s} {dupes} in class `{class_name}`",
                     maybe_s = if duplicates.len() == 1 { "" } else { "es" },
                     dupes = duplicates
                         .iter()
-                        .map(|base: &ClassBase<'_>| base.display(db))
+                        .map(|base: &ClassBase<'_>| base.display(db, env))
                         .join(", "),
                 ));
             }

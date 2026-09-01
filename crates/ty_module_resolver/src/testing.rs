@@ -113,6 +113,16 @@ pub(crate) struct TestCaseBuilder<T> {
 }
 
 impl<T> TestCaseBuilder<T> {
+    fn with_typeshed<U>(self, typeshed_option: U) -> TestCaseBuilder<U> {
+        TestCaseBuilder {
+            typeshed_option,
+            python_version: self.python_version,
+            first_party_files: self.first_party_files,
+            site_packages_files: self.site_packages_files,
+            roots: self.roots,
+        }
+    }
+
     /// Specify files to be created in the `src` mock directory
     pub(crate) fn with_src_files(mut self, files: &[FileSpec]) -> Self {
         self.first_party_files.extend(files.iter().copied());
@@ -168,20 +178,7 @@ impl TestCaseBuilder<UnspecifiedTypeshed> {
 
     /// Use the vendored stdlib stubs included in the Ruff binary for this test case
     pub(crate) fn with_vendored_typeshed(self) -> TestCaseBuilder<VendoredTypeshed> {
-        let TestCaseBuilder {
-            typeshed_option: _,
-            python_version,
-            first_party_files,
-            site_packages_files,
-            roots,
-        } = self;
-        TestCaseBuilder {
-            typeshed_option: VendoredTypeshed,
-            python_version,
-            first_party_files,
-            site_packages_files,
-            roots,
-        }
+        self.with_typeshed(VendoredTypeshed)
     }
 
     /// Use a mock typeshed directory for this test case
@@ -189,21 +186,7 @@ impl TestCaseBuilder<UnspecifiedTypeshed> {
         self,
         typeshed: MockedTypeshed,
     ) -> TestCaseBuilder<MockedTypeshed> {
-        let TestCaseBuilder {
-            typeshed_option: _,
-            python_version,
-            first_party_files,
-            site_packages_files,
-            roots,
-        } = self;
-
-        TestCaseBuilder {
-            typeshed_option: typeshed,
-            python_version,
-            first_party_files,
-            site_packages_files,
-            roots,
-        }
+        self.with_typeshed(typeshed)
     }
 
     pub(crate) fn build(self) -> TestCase<()> {

@@ -1,0 +1,185 @@
+---
+source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+---
+W605 [*] Invalid escape sequence: `\.`
+ --> W605_0.py:2:10
+  |
+1 | #: W605:1:10
+2 | regex = '\.png$'
+  |          ^^
+3 |
+4 | #: W605:2:1
+  |
+help: Use a raw string literal
+  |
+1 | #: W605:1:10
+  - regex = '\.png$'
+2 + regex = r'\.png$'
+3 |
+  |
+
+W605 [*] Invalid escape sequence: `\.`
+ --> W605_0.py:6:1
+  |
+4 | #: W605:2:1
+5 | regex = '''
+6 | \.png$
+  | ^^
+7 | '''
+  |
+help: Use a raw string literal
+  |
+4 | #: W605:2:1
+  - regex = '''
+5 + regex = r'''
+6 | \.png$
+  |
+
+W605 [*] Invalid escape sequence: `\_`
+  --> W605_0.py:11:6
+   |
+ 9 | #: W605:2:6
+10 | f(
+11 |     '\_'
+   |      ^^
+12 | )
+   |
+help: Use a raw string literal
+   |
+10 | f(
+   -     '\_'
+11 +     r'\_'
+12 | )
+   |
+
+W605 [*] Invalid escape sequence: `\_`
+  --> W605_0.py:18:6
+   |
+16 | multi-line
+17 | literal
+18 | with \_ somewhere
+   |      ^^
+19 | in the middle
+20 | """
+   |
+help: Use a raw string literal
+   |
+14 | #: W605:4:6
+   - """
+15 + r"""
+16 | multi-line
+   |
+
+W605 [*] Invalid escape sequence: `\_`
+  --> W605_0.py:23:39
+   |
+22 | #: W605:1:38
+23 | value = 'new line\nand invalid escape \_ here'
+   |                                       ^^
+help: Add backslash to escape sequence
+   |
+22 | #: W605:1:38
+   - value = 'new line\nand invalid escape \_ here'
+23 + value = 'new line\nand invalid escape \\_ here'
+24 |
+   |
+
+W605 [*] Invalid escape sequence: `\.`
+  --> W605_0.py:28:12
+   |
+26 | def f():
+27 |     #: W605:1:11
+28 |     return'\.png$'
+   |            ^^
+29 |
+30 | #: Okay
+   |
+help: Use a raw string literal
+   |
+27 |     #: W605:1:11
+   -     return'\.png$'
+28 +     return r'\.png$'
+29 |
+   |
+
+W605 [*] Invalid escape sequence: `\_`
+  --> W605_0.py:45:12
+   |
+43 | '''  # noqa
+44 |
+45 | regex = '\\\_'
+   |            ^^
+46 |
+47 | #: W605:1:7
+   |
+help: Add backslash to escape sequence
+   |
+44 |
+   - regex = '\\\_'
+45 + regex = '\\\\_'
+46 |
+   |
+
+W605 [*] Invalid escape sequence: `\ `
+  --> W605_0.py:48:6
+   |
+47 | #: W605:1:7
+48 | u'foo\ bar'
+   |      ^^
+49 |
+50 | #: W605:1:13
+   |
+help: Use a raw string literal
+   |
+47 | #: W605:1:7
+   - u'foo\ bar'
+48 + r'foo\ bar'
+49 |
+   |
+
+W605 [*] Invalid escape sequence: `\.`
+  --> W605_0.py:53:9
+   |
+51 | (
+52 |     "foo \
+53 |     bar \. baz"
+   |         ^^
+54 | )
+   |
+help: Add backslash to escape sequence
+   |
+52 |     "foo \
+   -     bar \. baz"
+53 +     bar \\. baz"
+54 | )
+   |
+
+W605 [*] Invalid escape sequence: `\.`
+  --> W605_0.py:57:6
+   |
+56 | #: W605:1:6
+57 | "foo \. bar \t"
+   |      ^^
+58 |
+59 | #: W605:1:13
+   |
+help: Add backslash to escape sequence
+   |
+56 | #: W605:1:6
+   - "foo \. bar \t"
+57 + "foo \\. bar \t"
+58 |
+   |
+
+W605 [*] Invalid escape sequence: `\.`
+  --> W605_0.py:60:13
+   |
+59 | #: W605:1:13
+60 | "foo \t bar \."
+   |             ^^
+help: Add backslash to escape sequence
+   |
+59 | #: W605:1:13
+   - "foo \t bar \."
+60 + "foo \t bar \\."
+   |

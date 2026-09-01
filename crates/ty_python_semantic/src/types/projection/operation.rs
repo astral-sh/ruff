@@ -3,7 +3,10 @@ use ruff_python_ast::name::Name;
 use ty_python_core::EvaluationMode;
 
 use crate::Db;
-use crate::types::{DivergentType, MemberLookupPolicy, Type, UnionType, subscript::SubscriptError};
+use crate::types::{
+    DivergentType, MemberLookupPolicy, ProgramEnvironment, Type, UnionType,
+    subscript::SubscriptError,
+};
 
 use super::artifact::{
     ProjectionMember, ProjectionMemberName, ProjectionOp, ProjectionPath, ProjectionSubscript,
@@ -19,15 +22,16 @@ impl<'db> Type<'db> {
     pub(crate) fn try_iter_projection_result_with_mode(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         mode: EvaluationMode,
     ) -> Option<ProjectionResult<'db>> {
         let op = ProjectionOp::Iter {
             is_async: mode.is_async(),
         };
-        self.try_projection_with_non_cycle_result(db, op, |ty| {
-            ty.try_iterate_with_mode(db, mode)
+        self.try_projection_with_non_cycle_result(db, env, op, |ty| {
+            ty.try_iterate_with_mode(db, env, mode)
                 .ok()
-                .map(|tuple| ProjectionTerm::Homogeneous(tuple.homogeneous_element_type(db)))
+                .map(|tuple| ProjectionTerm::Homogeneous(tuple.homogeneous_element_type(db, env)))
         })
     }
 
@@ -35,12 +39,13 @@ impl<'db> Type<'db> {
     pub(crate) fn try_unpack_projection_result(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         len: usize,
         index: usize,
     ) -> Option<ProjectionResult<'db>> {
         let op = ProjectionOp::Unpack(UnpackProjection::Exact { len, index });
-        self.try_projection_with_non_cycle_result(db, op, |ty| {
-            ProjectionContainer::infer_projection_op(db, ty, op)
+        self.try_projection_with_non_cycle_result(db, env, op, |ty| {
+            ProjectionContainer::infer_projection_op(db, env, ty, op)
         })
     }
 
@@ -48,6 +53,7 @@ impl<'db> Type<'db> {
     pub(crate) fn try_star_unpack_prefix_projection_result(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         prefix: usize,
         suffix: usize,
         index: usize,
@@ -57,8 +63,8 @@ impl<'db> Type<'db> {
             suffix,
             position: StarUnpackPosition::Prefix(index),
         });
-        self.try_projection_with_non_cycle_result(db, op, |ty| {
-            ProjectionContainer::infer_projection_op(db, ty, op)
+        self.try_projection_with_non_cycle_result(db, env, op, |ty| {
+            ProjectionContainer::infer_projection_op(db, env, ty, op)
         })
     }
 
@@ -66,6 +72,7 @@ impl<'db> Type<'db> {
     pub(crate) fn try_star_unpack_rest_projection_result(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         prefix: usize,
         suffix: usize,
     ) -> Option<ProjectionResult<'db>> {
@@ -74,8 +81,8 @@ impl<'db> Type<'db> {
             suffix,
             position: StarUnpackPosition::Rest,
         });
-        self.try_projection_with_non_cycle_result(db, op, |ty| {
-            ProjectionContainer::infer_projection_op(db, ty, op)
+        self.try_projection_with_non_cycle_result(db, env, op, |ty| {
+            ProjectionContainer::infer_projection_op(db, env, ty, op)
         })
     }
 
@@ -83,6 +90,7 @@ impl<'db> Type<'db> {
     pub(crate) fn try_star_unpack_suffix_projection_result(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         prefix: usize,
         suffix: usize,
         index: usize,
@@ -92,8 +100,8 @@ impl<'db> Type<'db> {
             suffix,
             position: StarUnpackPosition::Suffix(index),
         });
-        self.try_projection_with_non_cycle_result(db, op, |ty| {
-            ProjectionContainer::infer_projection_op(db, ty, op)
+        self.try_projection_with_non_cycle_result(db, env, op, |ty| {
+            ProjectionContainer::infer_projection_op(db, env, ty, op)
         })
     }
 
@@ -101,9 +109,10 @@ impl<'db> Type<'db> {
     pub(crate) fn try_subscript_projection(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         slice_ty: Type<'db>,
     ) -> Option<Self> {
-        self.try_subscript_projection_result(db, slice_ty)
+        self.try_subscript_projection_result(db, env, slice_ty)
             .map(ProjectionResult::ty)
     }
 
@@ -111,16 +120,17 @@ impl<'db> Type<'db> {
     pub(crate) fn try_subscript_projection_result(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         slice_ty: Type<'db>,
     ) -> Option<ProjectionResult<'db>> {
-        if !self.needs_projection_operation(db) {
+        if !self.needs_projection_operation(db, env) {
             return None;
         }
 
         let subscript = ProjectionSubscript::from_type(db, slice_ty)?;
         let op = ProjectionOp::Subscript(subscript);
-        self.try_projection_with_non_cycle_result(db, op, |ty| {
-            ty.subscript(db, slice_ty, ast::ExprContext::Load)
+        self.try_projection_with_non_cycle_result(db, env, op, |ty| {
+            ty.subscript(db, env, slice_ty, ast::ExprContext::Load)
                 .ok()
                 .map(ProjectionTerm::Exact)
         })
@@ -133,10 +143,11 @@ impl<'db> Type<'db> {
     pub(crate) fn try_subscript_without_projection_for_concrete_key(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         slice_ty: Type<'db>,
         expr_context: ast::ExprContext,
     ) -> Option<Result<Self, SubscriptError<'db>>> {
-        if !self.needs_projection_operation(db) {
+        if !self.needs_projection_operation(db, env) {
             return None;
         }
 
@@ -147,7 +158,7 @@ impl<'db> Type<'db> {
             return None;
         }
 
-        let result = self.subscript_without_projection(db, slice_ty, expr_context);
+        let result = self.subscript_without_projection(db, env, slice_ty, expr_context);
         match result {
             Ok(ty) if !ty.has_top_level_cycle_artifact(db) => Some(Ok(ty)),
             Err(error) => Some(Err(error)),
@@ -159,16 +170,17 @@ impl<'db> Type<'db> {
     pub(crate) fn try_member_projection_result(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         name: &Name,
         policy: MemberLookupPolicy,
     ) -> Option<ProjectionResult<'db>> {
-        if !self.needs_projection_operation(db) {
+        if !self.needs_projection_operation(db, env) {
             return None;
         }
 
         let op = ProjectionOp::Member(ProjectionMember::new(db, name, policy));
-        self.try_projection_with_non_cycle_result(db, op, |ty| {
-            ProjectionContainer::infer_member_type_for_type(db, ty, name, policy)
+        self.try_projection_with_non_cycle_result(db, env, op, |ty| {
+            ProjectionContainer::infer_member_type_for_type(db, env, ty, name, policy)
                 .map(ProjectionTerm::Exact)
         })
     }
@@ -177,15 +189,16 @@ impl<'db> Type<'db> {
     pub(crate) fn try_method_call_projection_result(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         method_name: &Name,
     ) -> Option<ProjectionResult<'db>> {
-        if !self.needs_projection_operation(db) {
+        if !self.needs_projection_operation(db, env) {
             return None;
         }
 
         let op = ProjectionOp::CallMethod0(ProjectionMemberName::new(db, method_name));
-        self.try_projection_with_non_cycle_result(db, op, |ty| {
-            ProjectionContainer::infer_method_call0_type_for_type(db, ty, method_name)
+        self.try_projection_with_non_cycle_result(db, env, op, |ty| {
+            ProjectionContainer::infer_method_call0_type_for_type(db, env, ty, method_name)
                 .map(ProjectionTerm::Exact)
         })
     }
@@ -199,6 +212,7 @@ impl<'db> Type<'db> {
     pub(crate) fn member_projection_callee_fallback(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         method_name: &Name,
     ) -> Self {
         if !self.has_top_level_cycle_artifact(db) {
@@ -216,8 +230,8 @@ impl<'db> Type<'db> {
             {
                 Type::Divergent(projection.root(db))
             }
-            Type::Union(union) => union.map(db, |element| {
-                element.member_projection_callee_fallback(db, method_name)
+            Type::Union(union) => union.map(db, env, |element| {
+                element.member_projection_callee_fallback(db, env, method_name)
             }),
             _ => self,
         }
@@ -227,9 +241,10 @@ impl<'db> Type<'db> {
     pub(crate) fn try_context_enter_projection(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         mode: EvaluationMode,
     ) -> Option<Self> {
-        self.try_context_enter_projection_result(db, mode)
+        self.try_context_enter_projection_result(db, env, mode)
             .map(ProjectionResult::ty)
     }
 
@@ -237,13 +252,14 @@ impl<'db> Type<'db> {
     pub(crate) fn try_context_enter_projection_result(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         mode: EvaluationMode,
     ) -> Option<ProjectionResult<'db>> {
         let op = ProjectionOp::ContextEnter {
             is_async: mode.is_async(),
         };
-        self.try_projection_with_non_cycle_result(db, op, |ty| {
-            ty.try_enter_with_mode(db, mode)
+        self.try_projection_with_non_cycle_result(db, env, op, |ty| {
+            ty.try_enter_with_mode(db, env, mode)
                 .ok()
                 .map(ProjectionTerm::Exact)
         })
@@ -253,9 +269,10 @@ impl<'db> Type<'db> {
     pub(crate) fn try_await_projection_result(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
     ) -> Option<ProjectionResult<'db>> {
-        self.try_projection_with_non_cycle_result(db, ProjectionOp::AwaitResult, |ty| {
-            ty.try_await(db).ok().map(ProjectionTerm::Exact)
+        self.try_projection_with_non_cycle_result(db, env, ProjectionOp::AwaitResult, |ty| {
+            ty.try_await(db, env).ok().map(ProjectionTerm::Exact)
         })
     }
 
@@ -279,11 +296,12 @@ impl<'db> Type<'db> {
     fn try_projection_with_non_cycle_result(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         op: ProjectionOp<'db>,
         mut project_non_cycle: impl FnMut(Self) -> Option<ProjectionTerm<'db>>,
     ) -> Option<ProjectionResult<'db>> {
         if !self.has_top_level_cycle_artifact(db) {
-            return self.try_nested_cycle_projection_result(db, op, project_non_cycle);
+            return self.try_nested_cycle_projection_result(db, env, op, project_non_cycle);
         }
 
         let Type::Union(union) = self else {
@@ -314,12 +332,13 @@ impl<'db> Type<'db> {
             let term = project_non_cycle(element)?;
             projection_evidence.record_projected_arm(
                 db,
+                env,
                 roots.iter().copied(),
                 element,
                 &path,
                 term,
             );
-            projected_non_cycle_elements.push((element, term.ty(db)));
+            projected_non_cycle_elements.push((element, term.ty(db, env)));
         }
 
         let mut projected_non_cycle_elements = projected_non_cycle_elements.into_iter();
@@ -334,7 +353,7 @@ impl<'db> Type<'db> {
         }
 
         Some(ProjectionResult {
-            ty: UnionType::from_elements_cycle_recovery(db, elements),
+            ty: UnionType::from_elements_cycle_recovery(db, env, elements),
             projection_evidence: projection_evidence.finish(db),
         })
     }
@@ -343,18 +362,20 @@ impl<'db> Type<'db> {
     fn try_nested_cycle_projection_result(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         op: ProjectionOp<'db>,
         mut project_non_cycle: impl FnMut(Self) -> Option<ProjectionTerm<'db>>,
     ) -> Option<ProjectionResult<'db>> {
-        let mut roots = self.projection_artifact_roots(db);
+        let mut roots = self.projection_artifact_roots(db, env);
         // Bare divergent roots below a bridge container also need projection evidence. Unpack is
         // excluded because unpacking can be the operation that grows a recursive structure.
         if roots.is_empty() && !matches!(op, ProjectionOp::Unpack(_)) {
-            roots = self.cycle_artifact_roots(db);
+            roots = self.cycle_artifact_roots(db, env);
         }
         let [root] = roots.as_slice() else {
             return self.try_multi_root_nested_cycle_projection_result(
                 db,
+                env,
                 op,
                 &roots,
                 project_non_cycle,
@@ -368,26 +389,27 @@ impl<'db> Type<'db> {
         let mut recursive_elements = Vec::new();
 
         for (index, element) in elements.iter().copied().enumerate() {
-            if element.mentions_cycle_artifact_direct(db, *root) {
+            if element.mentions_cycle_artifact_direct(db, env, *root) {
                 recursive_elements.push((index, element));
                 continue;
             }
 
             let term = project_non_cycle(element)?;
-            projection_evidence.record_projected_arm(db, [*root], element, &path, term);
+            projection_evidence.record_projected_arm(db, env, [*root], element, &path, term);
             terms[index] = Some(term);
         }
 
         let evidence = projection_evidence.finish(db);
         for (index, element) in recursive_elements {
-            let container = ProjectionContainer::try_from(db, *root, element, evidence.as_ref())?;
+            let container =
+                ProjectionContainer::try_from(db, env, *root, element, evidence.as_ref())?;
             let term = container
-                .project_path(db, *root, evidence.as_ref(), &path)
+                .project_path(db, env, *root, evidence.as_ref(), &path)
                 .or_else(|| {
                     if matches!(op, ProjectionOp::Subscript(_)) {
                         // The subscript path suppresses projection creation, so it can expose a
                         // flat dependency without recursively extending the projection cycle.
-                        ProjectionContainer::infer_projection_op(db, element, op)
+                        ProjectionContainer::infer_projection_op(db, env, element, op)
                     } else {
                         None
                     }
@@ -397,7 +419,7 @@ impl<'db> Type<'db> {
 
         let terms = terms.into_iter().collect::<Option<Vec<_>>>()?;
 
-        let ty = Self::solve_projection_terms(db, *root, &path, &terms)?;
+        let ty = Self::solve_projection_terms(db, env, *root, &path, &terms)?;
         Some(ProjectionResult {
             ty,
             projection_evidence: evidence,
@@ -411,6 +433,7 @@ impl<'db> Type<'db> {
     fn try_multi_root_nested_cycle_projection_result(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         op: ProjectionOp<'db>,
         roots: &[DivergentType],
         mut project: impl FnMut(Self) -> Option<ProjectionTerm<'db>>,
@@ -426,35 +449,36 @@ impl<'db> Type<'db> {
         let mut terms = Vec::with_capacity(elements.len());
 
         for element in elements {
-            let term = if element.mentions_cycle_artifact_in_roots(db, &root_set) {
+            let term = if element.mentions_cycle_artifact_in_roots(db, env, &root_set) {
                 // Recursive arms must replay structurally. Re-running the full operation can
                 // re-enter projection construction with the same recursive element.
                 roots.iter().find_map(|root| {
-                    let container = ProjectionContainer::try_from(db, *root, element, None)?;
-                    container.project_multi_root_path(db, *root, None, &path)
+                    let container = ProjectionContainer::try_from(db, env, *root, element, None)?;
+                    container.project_multi_root_path(db, env, *root, None, &path)
                 })?
             } else {
                 project(element)?
             };
             projection_evidence.record_projected_arm(
                 db,
+                env,
                 roots.iter().copied(),
                 element,
                 &path,
                 term,
             );
-            terms.push(term.ty(db));
+            terms.push(term.ty(db, env));
         }
 
         Some(ProjectionResult {
-            ty: UnionType::from_elements_cycle_recovery(db, terms),
+            ty: UnionType::from_elements_cycle_recovery(db, env, terms),
             projection_evidence: projection_evidence.finish(db),
         })
     }
 }
 
 /// Inference-time result of a projection, plus facts needed to replay it during recovery.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, salsa::SalsaValue, get_size2::GetSize)]
 pub(crate) struct ProjectionResult<'db> {
     ty: Type<'db>,
     projection_evidence: Option<ProjectionEvidenceSet<'db>>,

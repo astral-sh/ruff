@@ -1,27 +1,29 @@
 use crate::goto::find_goto_target;
 use crate::{Db, HasNavigationTargets, NavigationTargets, RangedValue};
-use ruff_db::files::{File, FileRange};
+use ruff_db::files::FileRange;
 use ruff_db::parsed::parsed_module;
 use ruff_text_size::{Ranged, TextSize};
+use ty_python_core::ProgramFile;
 use ty_python_semantic::SemanticModel;
 
 pub fn goto_type_definition(
     db: &dyn Db,
-    file: File,
+    file: ProgramFile<'_>,
     offset: TextSize,
 ) -> Option<RangedValue<NavigationTargets>> {
-    let module = parsed_module(db, file).load(db);
+    let module = parsed_module(db, file.python_file(db)).load(db);
     let model = SemanticModel::new(db, file);
     let goto_target = find_goto_target(&model, &module, offset)?;
 
     let ty = goto_target.inferred_type(&model)?;
+    let env = model.program_environment();
 
-    tracing::debug!("Inferred type of covering node is {}", ty.display(db));
+    tracing::debug!("Inferred type of covering node is {}", ty.display(db, &env));
 
-    let navigation_targets = ty.navigation_targets(db);
+    let navigation_targets = ty.navigation_targets(db, &env);
 
     Some(RangedValue {
-        range: FileRange::new(file, goto_target.range()),
+        range: FileRange::new(file.file(db), goto_target.range()),
         value: navigation_targets,
     })
 }
@@ -48,13 +50,36 @@ mod tests {
           |
         4 | ab = Test()
           | ^^ Clicking here
-          |
         info: Found 1 type definition
          --> main.py:2:7
           |
         2 | class Test: ...
           |       ----
-          |
+        ");
+    }
+
+    #[test]
+    fn goto_type_of_slot_descriptor() {
+        let test = cursor_test(
+            r#"
+            class Slotted:
+                __slots__ = ("value",)
+
+            descriptor = Slotted.va<CURSOR>lue
+            "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @"
+        info[goto-type definition]: Go to type definition
+          --> main.py:LL:22
+           |
+        LL | descriptor = Slotted.value
+           |                      ^^^^^ Clicking here
+        info: Found 1 type definition
+          --> stdlib/types.pyi:LL:7
+           |
+        LL | class MemberDescriptorType:
+           |       --------------------
         ");
     }
 
@@ -74,13 +99,11 @@ mod tests {
            |
         LL | ab = Literal
            | ^^ Clicking here
-           |
         info: Found 1 type definition
           --> stdlib/typing.pyi:LL:1
            |
         LL | Literal: _SpecialForm
            | -------
-           |
         ");
     }
 
@@ -102,13 +125,11 @@ mod tests {
            |
         LL | ab = Any
            | ^^ Clicking here
-           |
         info: Found 1 type definition
           --> stdlib/typing.pyi:LL:7
            |
         LL | class Any:
            |       ---
-           |
         ");
     }
 
@@ -129,13 +150,11 @@ mod tests {
            |
         LL | ab = Generic
            | ^^ Clicking here
-           |
         info: Found 1 type definition
           --> stdlib/typing.pyi:LL:1
            |
         LL | Generic: type[_Generic]
            | -------
-           |
         ");
     }
 
@@ -155,13 +174,11 @@ mod tests {
            |
         LL | ab = AlwaysTruthy
            | ^^ Clicking here
-           |
         info: Found 1 type definition
-          --> stdlib/ty_extensions.pyi:LL:1
+          --> stdlib/ty_extensions/__init__.pyi:LL:1
            |
         LL | AlwaysTruthy: _SpecialForm
            | ------------
-           |
         ");
     }
 
@@ -183,13 +200,11 @@ mod tests {
            |
         LL | D().x
            |     ^ Clicking here
-           |
         info: Found 1 type definition
-          --> stdlib/ty_extensions.pyi:LL:1
+          --> stdlib/ty_extensions/_internal.pyi:LL:1
            |
         LL | Divergent: _SpecialForm
            | ---------
-           |
         ");
     }
 
@@ -211,13 +226,11 @@ mod tests {
           |
         6 | ab
           | ^^ Clicking here
-          |
         info: Found 1 type definition
          --> main.py:2:5
           |
         2 | def foo(a, b): ...
           |     ---
-          |
         ");
     }
 
@@ -245,7 +258,6 @@ mod tests {
            |
         12 | a
            | ^ Clicking here
-           |
         info: Found 2 type definitions
          --> main.py:3:5
           |
@@ -254,7 +266,6 @@ mod tests {
         4 |
         5 | def bar(a, b): ...
           |     ---
-          |
         ");
     }
 
@@ -282,13 +293,11 @@ mod tests {
            |
         12 |     color
            |     ^^^^^ Clicking here
-           |
         info: Found 1 type definition
          --> main.py:6:5
           |
         6 |     BLUE = 2
           |     ----
-          |
         "#);
     }
 
@@ -317,7 +326,6 @@ mod tests {
            |
         13 |     color
            |     ^^^^^ Clicking here
-           |
         info: Found 2 type definitions
          --> main.py:6:5
           |
@@ -325,7 +333,6 @@ mod tests {
           |     -----
         7 |     BLUE = 3
           |     ----
-          |
         "#);
     }
 
@@ -345,13 +352,11 @@ mod tests {
           |
         2 | import lib
           |        ^^^ Clicking here
-          |
         info: Found 1 type definition
          --> lib.py:1:1
           |
         1 | a = 10
           | ------
-          |
         ");
     }
 
@@ -372,13 +377,11 @@ mod tests {
           |
         2 | import lib.submod
           |        ^^^ Clicking here
-          |
         info: Found 1 type definition
          --> lib/__init__.py:1:1
           |
         1 | b = 7
           | -----
-          |
         ");
     }
 
@@ -399,13 +402,11 @@ mod tests {
           |
         2 | import lib.submod
           |            ^^^^^^ Clicking here
-          |
         info: Found 1 type definition
          --> lib/submod.py:1:1
           |
         1 | a = 10
           | ------
-          |
         ");
     }
 
@@ -425,13 +426,11 @@ mod tests {
           |
         2 | from lib import a
           |      ^^^ Clicking here
-          |
         info: Found 1 type definition
          --> lib.py:1:1
           |
         1 | a = 10
           | ------
-          |
         ");
     }
 
@@ -452,13 +451,11 @@ mod tests {
           |
         2 | from lib.submod import a
           |      ^^^ Clicking here
-          |
         info: Found 1 type definition
          --> lib/__init__.py:1:1
           |
         1 | b = 7
           | -----
-          |
         ");
     }
 
@@ -479,13 +476,11 @@ mod tests {
           |
         2 | from lib.submod import a
           |          ^^^^^^ Clicking here
-          |
         info: Found 1 type definition
          --> lib/submod.py:1:1
           |
         1 | a = 10
           | ------
-          |
         ");
     }
 
@@ -515,13 +510,11 @@ mod tests {
           |
         2 | from .bot.botmod import *
           |           ^^^^^^ Clicking here
-          |
         info: Found 1 type definition
          --> lib/sub/bot/botmod.py:1:1
           |
         1 | botmod = 31
           | -----------
-          |
         ");
     }
 
@@ -551,13 +544,11 @@ mod tests {
           |
         2 | from .bot.botmod import *
           |       ^^^ Clicking here
-          |
         info: Found 1 type definition
          --> lib/sub/bot/__init__.py:1:1
           |
         1 | bot = 3
           | -------
-          |
         ");
     }
 
@@ -587,13 +578,11 @@ mod tests {
           |
         2 | from .bot.botmod import *
           |       ^^^ Clicking here
-          |
         info: Found 1 type definition
          --> lib/sub/bot/__init__.py:1:1
           |
         1 | bot = 3
           | -------
-          |
         ");
     }
 
@@ -638,13 +627,11 @@ mod tests {
           |
         4 | lib
           | ^^^ Clicking here
-          |
         info: Found 1 type definition
          --> lib.py:1:1
           |
         1 | a = 10
           | ------
-          |
         ");
     }
 
@@ -664,13 +651,11 @@ mod tests {
            |
         LL | a
            | ^ Clicking here
-           |
         info: Found 1 type definition
           --> stdlib/builtins.pyi:LL:7
            |
         LL | class str(Sequence[str]):
            |       ---
-           |
         ");
     }
     #[test]
@@ -687,13 +672,11 @@ mod tests {
            |
         LL | a: str = "test"
            |          ^^^^^^ Clicking here
-           |
         info: Found 1 type definition
           --> stdlib/builtins.pyi:LL:7
            |
         LL | class str(Sequence[str]):
            |       ---
-           |
         "#);
     }
 
@@ -711,13 +694,11 @@ mod tests {
           |
         2 | type Alias[T: int = bool] = list[T]
           |                                  ^ Clicking here
-          |
         info: Found 1 type definition
          --> main.py:2:12
           |
         2 | type Alias[T: int = bool] = list[T]
           |            -
-          |
         ");
     }
 
@@ -735,13 +716,11 @@ mod tests {
           |
         2 | type Alias[**P = [int, str]] = Callable[P, int]
           |                                         ^ Clicking here
-          |
         info: Found 1 type definition
          --> main.py:2:14
           |
         2 | type Alias[**P = [int, str]] = Callable[P, int]
           |              -
-          |
         ");
     }
 
@@ -753,20 +732,17 @@ mod tests {
             "#,
         );
 
-        // TODO: Point to `Ts` once inference supports type-variable tuples here.
-        assert_snapshot!(test.goto_type_definition(), @"
+        assert_snapshot!(test.goto_type_definition(), @r"
         info[goto-type definition]: Go to type definition
-          --> main.py:LL:31
-           |
-        LL | type Alias[*Ts = ()] = tuple[*Ts]
-           |                               ^^ Clicking here
-           |
+         --> main.py:2:31
+          |
+        2 | type Alias[*Ts = ()] = tuple[*Ts]
+          |                               ^^ Clicking here
         info: Found 1 type definition
-          --> stdlib/ty_extensions.pyi:LL:1
-           |
-        LL | Todo: _SpecialForm
-           | ----
-           |
+         --> main.py:2:13
+          |
+        2 | type Alias[*Ts = ()] = tuple[*Ts]
+          |             --
         ");
     }
 
@@ -788,13 +764,11 @@ mod tests {
           |
         6 | Alias
           | ^^^^^ Clicking here
-          |
         info: Found 1 type definition
          --> main.py:4:1
           |
         4 | Alias = TypeAliasType("Alias", tuple[int, int])
           | -----
-          |
         "#);
     }
 
@@ -815,13 +789,11 @@ mod tests {
           |
         2 | a: "MyClass" = 1
           |     ^^^^^^^ Clicking here
-          |
         info: Found 1 type definition
          --> main.py:4:7
           |
         4 | class MyClass:
           |       -------
-          |
         "#);
     }
 
@@ -842,13 +814,11 @@ mod tests {
           |
         2 | a: "None | MyClass" = 1
           |            ^^^^^^^ Clicking here
-          |
         info: Found 1 type definition
          --> main.py:4:7
           |
         4 | class MyClass:
           |       -------
-          |
         "#);
     }
 
@@ -869,7 +839,6 @@ mod tests {
            |
         LL | a: "None | MyClass" = 1
            |    ^^^^^^^^^^^^^^^^ Clicking here
-           |
         info: Found 2 type definitions
           --> main.py:LL:7
            |
@@ -880,7 +849,6 @@ mod tests {
            |
         LL | class NoneType:
            |       --------
-           |
         "#);
     }
 
@@ -901,13 +869,11 @@ mod tests {
           |
         2 | a: "None | MyClass" = 1
           |            ^^^^^^^ Clicking here
-          |
         info: Found 1 type definition
          --> main.py:4:7
           |
         4 | class MyClass:
           |       -------
-          |
         "#);
     }
 
@@ -928,7 +894,6 @@ mod tests {
            |
         LL | a: "None | MyClass" = 1
            |    ^^^^^^^^^^^^^^^^ Clicking here
-           |
         info: Found 2 type definitions
           --> main.py:LL:7
            |
@@ -939,7 +904,6 @@ mod tests {
            |
         LL | class NoneType:
            |       --------
-           |
         "#);
     }
 
@@ -960,13 +924,11 @@ mod tests {
            |
         LL | a: "MyClass |" = 1
            |    ^^^^^^^^^^^ Clicking here
-           |
         info: Found 1 type definition
-          --> stdlib/ty_extensions.pyi:LL:1
+          --> stdlib/ty_extensions/_internal.pyi:LL:1
            |
         LL | Unknown: _SpecialForm
            | -------
-           |
         "#);
     }
 
@@ -987,13 +949,11 @@ mod tests {
           |
         2 | a: "MyClass | No" = 1
           |     ^^^^^^^ Clicking here
-          |
         info: Found 1 type definition
          --> main.py:4:7
           |
         4 | class MyClass:
           |       -------
-          |
         "#);
     }
 
@@ -1014,13 +974,11 @@ mod tests {
            |
         LL | a: "MyClass | No" = 1
            |               ^^ Clicking here
-           |
         info: Found 1 type definition
-          --> stdlib/ty_extensions.pyi:LL:1
+          --> stdlib/ty_extensions/_internal.pyi:LL:1
            |
         LL | Unknown: _SpecialForm
            | -------
-           |
         "#);
     }
 
@@ -1038,13 +996,11 @@ mod tests {
            |
         LL | ab: "ab"
            |      ^^ Clicking here
-           |
         info: Found 1 type definition
-          --> stdlib/ty_extensions.pyi:LL:1
+          --> stdlib/ty_extensions/_internal.pyi:LL:1
            |
         LL | Unknown: _SpecialForm
            | -------
-           |
         "#);
     }
 
@@ -1062,13 +1018,11 @@ mod tests {
            |
         LL | x: "foobar"
            |     ^^^^^^ Clicking here
-           |
         info: Found 1 type definition
-          --> stdlib/ty_extensions.pyi:LL:1
+          --> stdlib/ty_extensions/_internal.pyi:LL:1
            |
         LL | Unknown: _SpecialForm
            | -------
-           |
         "#);
     }
 
@@ -1089,13 +1043,11 @@ mod tests {
           |
         2 | x: "list['MyClass | int'] | None"
           |           ^^^^^^^ Clicking here
-          |
         info: Found 1 type definition
          --> main.py:4:7
           |
         4 | class MyClass:
           |       -------
-          |
         "#);
     }
 
@@ -1116,13 +1068,11 @@ mod tests {
           |
         2 | x: "list['int | MyClass'] | None"
           |                 ^^^^^^^ Clicking here
-          |
         info: Found 1 type definition
          --> main.py:4:7
           |
         4 | class MyClass:
           |       -------
-          |
         "#);
     }
 
@@ -1143,13 +1093,11 @@ mod tests {
           |
         2 | x: "list['int | None'] | MyClass"
           |                          ^^^^^^^ Clicking here
-          |
         info: Found 1 type definition
          --> main.py:4:7
           |
         4 | class MyClass:
           |       -------
-          |
         "#);
     }
 
@@ -1170,13 +1118,11 @@ mod tests {
           |
         2 | x: "list['int' | 'MyClass'] | None"
           |                   ^^^^^^^ Clicking here
-          |
         info: Found 1 type definition
          --> main.py:4:7
           |
         4 | class MyClass:
           |       -------
-          |
         "#);
     }
 
@@ -1197,13 +1143,11 @@ mod tests {
           |
         2 | x: "list['MyClass' | 'str'] | None"
           |           ^^^^^^^ Clicking here
-          |
         info: Found 1 type definition
          --> main.py:4:7
           |
         4 | class MyClass:
           |       -------
-          |
         "#);
     }
 
@@ -1224,13 +1168,11 @@ mod tests {
            |
         LL | x: """'list["MyClass" | "str"]' | None"""
            |             ^^^^^^^^^ Clicking here
-           |
         info: Found 1 type definition
-          --> stdlib/ty_extensions.pyi:LL:1
+          --> stdlib/ty_extensions/_internal.pyi:LL:1
            |
         LL | Unknown: _SpecialForm
            | -------
-           |
         "#);
     }
 
@@ -1251,13 +1193,11 @@ mod tests {
           |
         2 | x: """'list["int" | "str"]' | MyClass"""
           |                               ^^^^^^^ Clicking here
-          |
         info: Found 1 type definition
          --> main.py:4:7
           |
         4 | class MyClass:
           |       -------
-          |
         "#);
     }
 
@@ -1292,13 +1232,11 @@ mod tests {
            |
         LL |             x = ab
            |                 ^^ Clicking here
-           |
         info: Found 1 type definition
           --> stdlib/builtins.pyi:LL:7
            |
         LL | class str(Sequence[str]):
            |       ---
-           |
         "#);
     }
 
@@ -1333,13 +1271,11 @@ mod tests {
            |
         LL |             x = ab
            |                 ^^ Clicking here
-           |
         info: Found 1 type definition
           --> stdlib/builtins.pyi:LL:7
            |
         LL | class list(MutableSequence[_T]):
            |       ----
-           |
         "#);
     }
 
@@ -1374,13 +1310,11 @@ mod tests {
            |
         LL |             x = ab
            |                 ^^ Clicking here
-           |
         info: Found 1 type definition
           --> stdlib/builtins.pyi:LL:7
            |
         LL | class str(Sequence[str]):
            |       ---
-           |
         "#);
     }
 
@@ -1427,13 +1361,11 @@ mod tests {
            |
         LL |             x = ab
            |                 ^^ Clicking here
-           |
         info: Found 1 type definition
-          --> stdlib/ty_extensions.pyi:LL:1
+          --> stdlib/builtins.pyi:LL:7
            |
-        LL | Unknown: _SpecialForm
-           | -------
-           |
+        LL | class str(Sequence[str]):
+           |       ---
         ");
     }
 
@@ -1460,13 +1392,11 @@ mod tests {
            |
         10 |         case Click(x, button=ab):
            |              ^^^^^ Clicking here
-           |
         info: Found 1 type definition
          --> main.py:2:7
           |
         2 | class Click:
           |       -----
-          |
         ");
     }
 
@@ -1504,13 +1434,11 @@ mod tests {
           |
         2 | type Alias1[AB: int = bool] = tuple[AB, list[AB]]
           |             ^^ Clicking here
-          |
         info: Found 1 type definition
          --> main.py:2:13
           |
         2 | type Alias1[AB: int = bool] = tuple[AB, list[AB]]
           |             --
-          |
         ");
     }
 
@@ -1528,13 +1456,11 @@ mod tests {
           |
         2 | type Alias1[AB: int = bool] = tuple[AB, list[AB]]
           |                                     ^^ Clicking here
-          |
         info: Found 1 type definition
          --> main.py:2:13
           |
         2 | type Alias1[AB: int = bool] = tuple[AB, list[AB]]
           |             --
-          |
         ");
     }
 
@@ -1547,7 +1473,18 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @"No goto target found");
+        assert_snapshot!(test.goto_type_definition(), @"
+        info[goto-type definition]: Go to type definition
+         --> main.py:3:15
+          |
+        3 | type Alias2[**AB = [int, str]] = Callable[AB, tuple[AB]]
+          |               ^^ Clicking here
+        info: Found 1 type definition
+         --> main.py:3:15
+          |
+        3 | type Alias2[**AB = [int, str]] = Callable[AB, tuple[AB]]
+          |               --
+        ");
     }
 
     #[test]
@@ -1581,19 +1518,17 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @"
+        assert_snapshot!(test.goto_type_definition(), @r"
         info[goto-type definition]: Go to type definition
-          --> main.py:LL:38
-           |
-        LL | type Alias3[*AB = ()] = tuple[tuple[*AB], tuple[*AB]]
-           |                                      ^^ Clicking here
-           |
+         --> main.py:2:38
+          |
+        2 | type Alias3[*AB = ()] = tuple[tuple[*AB], tuple[*AB]]
+          |                                      ^^ Clicking here
         info: Found 1 type definition
-          --> stdlib/ty_extensions.pyi:LL:1
-           |
-        LL | Todo: _SpecialForm
-           | ----
-           |
+         --> main.py:2:14
+          |
+        2 | type Alias3[*AB = ()] = tuple[tuple[*AB], tuple[*AB]]
+          |              --
         ");
     }
 
@@ -1613,13 +1548,11 @@ mod tests {
            |
         LL | test(a= "123")
            |      ^ Clicking here
-           |
         info: Found 1 type definition
           --> stdlib/builtins.pyi:LL:7
            |
         LL | class str(Sequence[str]):
            |       ---
-           |
         "#);
     }
 
@@ -1642,13 +1575,11 @@ mod tests {
            |
         LL | test(a= 123)
            |      ^ Clicking here
-           |
         info: Found 1 type definition
           --> stdlib/builtins.pyi:LL:7
            |
         LL | class int:
            |       ---
-           |
         ");
     }
 
@@ -1670,13 +1601,11 @@ f(**kwargs<CURSOR>)
            |
         LL | f(**kwargs)
            |     ^^^^^^ Clicking here
-           |
         info: Found 1 type definition
           --> stdlib/builtins.pyi:LL:7
            |
         LL | class dict(MutableMapping[_KT, _VT]):
            |       ----
-           |
         ");
     }
 
@@ -1703,13 +1632,11 @@ def outer():
            |
         LL |         return x  # Should find the nonlocal x declaration in outer scope
            |                ^ Clicking here
-           |
         info: Found 1 type definition
           --> stdlib/builtins.pyi:LL:7
            |
         LL | class str(Sequence[str]):
            |       ---
-           |
         ");
     }
 
@@ -1753,13 +1680,11 @@ def function():
            |
         LL |     return global_var  # Should find the global variable declaration
            |            ^^^^^^^^^^ Clicking here
-           |
         info: Found 1 type definition
           --> stdlib/builtins.pyi:LL:7
            |
         LL | class str(Sequence[str]):
            |       ---
-           |
         ");
     }
 
@@ -1795,13 +1720,11 @@ def function():
            |
         LL |     a
            |     ^ Clicking here
-           |
         info: Found 1 type definition
           --> stdlib/builtins.pyi:LL:7
            |
         LL | class str(Sequence[str]):
            |       ---
-           |
         ");
     }
 
@@ -1824,13 +1747,11 @@ def function():
           |
         7 | x.foo()
           | ^ Clicking here
-          |
         info: Found 1 type definition
          --> main.py:2:7
           |
         2 | class X:
           |       -
-          |
         ");
     }
 
@@ -1850,13 +1771,11 @@ def function():
           |
         4 | foo()
           | ^^^ Clicking here
-          |
         info: Found 1 type definition
          --> main.py:2:5
           |
         2 | def foo(a, b): ...
           |     ---
-          |
         ");
     }
 
@@ -1876,13 +1795,11 @@ def function():
            |
         LL |         print(a)
            |               ^ Clicking here
-           |
         info: Found 1 type definition
           --> stdlib/builtins.pyi:LL:7
            |
         LL | class str(Sequence[str]):
            |       ---
-           |
         ");
     }
 
@@ -1901,7 +1818,6 @@ def function():
            |
         LL |     a
            |     ^ Clicking here
-           |
         info: Found 2 type definitions
           --> stdlib/builtins.pyi:LL:7
            |
@@ -1912,7 +1828,6 @@ def function():
            |
         LL | class NoneType:
            |       --------
-           |
         ");
     }
 
@@ -1943,11 +1858,11 @@ def function():
           |
         4 | x = subpkg
           |     ^^^^^^ Clicking here
-          |
         info: Found 1 type definition
-        --> mypackage/subpkg/__init__.py:1:1
-         |
-         |
+         --> mypackage/subpkg/__init__.py:1:1
+          |
+        1 |
+          | -
         ");
     }
 
@@ -1978,11 +1893,11 @@ def function():
           |
         2 | from .subpkg.submod import val
           |       ^^^^^^ Clicking here
-          |
         info: Found 1 type definition
-        --> mypackage/subpkg/__init__.py:1:1
-         |
-         |
+         --> mypackage/subpkg/__init__.py:1:1
+          |
+        1 |
+          | -
         ");
     }
 
@@ -2013,13 +1928,11 @@ def function():
            |
         LL | x = submod
            |     ^^^^^^ Clicking here
-           |
         info: Found 1 type definition
-          --> stdlib/ty_extensions.pyi:LL:1
+          --> stdlib/ty_extensions/_internal.pyi:LL:1
            |
         LL | Unknown: _SpecialForm
            | -------
-           |
         ");
     }
 
@@ -2050,14 +1963,12 @@ def function():
           |
         2 | from .subpkg.submod import val
           |              ^^^^^^ Clicking here
-          |
         info: Found 1 type definition
          --> mypackage/subpkg/submod.py:1:1
           |
         1 | /
         2 | | val: int = 0
           | |_____________-
-          |
         ");
     }
 
@@ -2087,14 +1998,12 @@ def function():
           |
         2 | from .subpkg import subpkg
           |       ^^^^^^ Clicking here
-          |
         info: Found 1 type definition
          --> mypackage/subpkg/__init__.py:1:1
           |
         1 | /
         2 | | subpkg: int = 10
           | |_________________-
-          |
         ");
     }
 
@@ -2124,13 +2033,11 @@ def function():
            |
         LL | from .subpkg import subpkg
            |                     ^^^^^^ Clicking here
-           |
         info: Found 1 type definition
           --> stdlib/builtins.pyi:LL:7
            |
         LL | class int:
            |       ---
-           |
         ");
     }
 
@@ -2160,20 +2067,22 @@ def function():
            |
         LL | x = subpkg
            |     ^^^^^^ Clicking here
-           |
         info: Found 1 type definition
           --> stdlib/builtins.pyi:LL:7
            |
         LL | class int:
            |       ---
-           |
         ");
     }
 
     impl CursorTest {
         fn goto_type_definition(&self) -> String {
             let Some(targets) = salsa::attach(&self.db, || {
-                goto_type_definition(&self.db, self.cursor.file, self.cursor.offset)
+                goto_type_definition(
+                    &self.db,
+                    self.program_file(self.cursor.file),
+                    self.cursor.offset,
+                )
             }) else {
                 return "No goto target found".to_string();
             };

@@ -273,7 +273,6 @@ ANN401 Dynamically typed expressions (typing.Any) are disallowed in `a`
 153 | def f(a: Annotated[Any, ...]) -> None: ...
 154 | def f(a: "Union[str, bytes, Any]") -> None: ...
     |          ^^^^^^^^^^^^^^^^^^^^^^^^
-    |
 
 ANN204 [*] Missing return type annotation for special method `__init__`
    --> annotation_presence.py:159:9
@@ -318,7 +317,6 @@ ANN201 [*] Missing return type annotation for public function `quoted_escape`
 171 | # should not cause a stack overflow.
 172 | def quoted_escape(x: "'in\x74'"): pass
     |     ^^^^^^^^^^^^^
-    |
 help: Add return type annotation: `None`
     |
 171 | # should not cause a stack overflow.
@@ -334,4 +332,3 @@ ANN401 Dynamically typed expressions (typing.Any) are disallowed in `x`
 171 | # should not cause a stack overflow.
 172 | def quoted_escape(x: "'in\x74'"): pass
     |                      ^^^^^^^^^^
-    |

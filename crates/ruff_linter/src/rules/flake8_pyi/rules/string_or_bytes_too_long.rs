@@ -5,6 +5,7 @@ use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
@@ -21,6 +22,9 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// checkers, the primary consumers of stub files. Replace very long constants
 /// with ellipses (`...`) to simplify the stub.
 ///
+/// The rule does not apply to long entries in `__all__`, which are assumed to
+/// be outside the stub author's control.
+///
 /// ## Example
 ///
 /// ```pyi
@@ -33,7 +37,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// def foo(arg: str = ...) -> None: ...
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.271")]
+#[violation_metadata(stable_since = "v0.0.271", category = Category::Pedantic)]
 pub(crate) struct StringOrBytesTooLong;
 
 impl AlwaysFixableViolation for StringOrBytesTooLong {
@@ -51,8 +55,10 @@ impl AlwaysFixableViolation for StringOrBytesTooLong {
 pub(crate) fn string_or_bytes_too_long(checker: &Checker, string: StringLike) {
     let semantic = checker.semantic();
 
+    let parent = semantic.current_statement();
+
     // Ignore docstrings.
-    if is_docstring_stmt(semantic.current_statement()) {
+    if is_docstring_stmt(parent) {
         return;
     }
 
@@ -61,6 +67,10 @@ pub(crate) fn string_or_bytes_too_long(checker: &Checker, string: StringLike) {
     }
 
     if semantic.in_type_definition() | semantic.in_deferred_type_definition() {
+        return;
+    }
+
+    if checker.in_dunder_all_assignment(parent) {
         return;
     }
 

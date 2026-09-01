@@ -184,7 +184,7 @@ from _typeshed import ReadableBuffer, Unused, WriteableBuffer
 from collections.abc import Iterable
 from enum import IntEnum, IntFlag
 from io import BufferedReader, BufferedRWPair, BufferedWriter, IOBase, RawIOBase, TextIOWrapper
-from typing import Any, Final, Literal, Protocol, SupportsIndex, overload, type_check_only
+from typing import Any, Final, Literal, Protocol, SupportsIndex, TypeAlias, overload, type_check_only
 from typing_extensions import Self
 
 __all__ = [
@@ -1783,9 +1783,14 @@ def create_server(
     """
 
 # The 5th tuple item is the socket address, for IP4, IP6, or IP6 if Python is compiled with --disable-ipv6, respectively.
+_GetAddrInfoResult: TypeAlias = list[
+    tuple[Literal[AddressFamily.AF_INET], SocketKind, int, str, tuple[str, int]]
+    | tuple[Literal[AddressFamily.AF_INET6], SocketKind, int, str, tuple[str, int, int, int] | tuple[int, bytes]]
+]
+
 def getaddrinfo(
     host: bytes | str | None, port: bytes | str | int | None, family: int = 0, type: int = 0, proto: int = 0, flags: int = 0
-) -> list[tuple[AddressFamily, SocketKind, int, str, tuple[str, int] | tuple[str, int, int, int] | tuple[int, bytes]]]:
+) -> _GetAddrInfoResult:
     """Resolve host and port into list of address info entries.
 
     Translate the host/port argument into a sequence of 5-tuples that contain

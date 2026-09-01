@@ -14,7 +14,6 @@ I001 [*] Import block is un-sorted or un-formatted
 8 | | import μεδιυυυυυμ
 9 | | import looooooooooooooong
   | |_________________________^
-  |
 help: Organize imports
   |
   - import loooooooooooooong

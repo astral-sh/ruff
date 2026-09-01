@@ -21,7 +21,8 @@ A bare `Callable` without any type arguments:
 
 ```py
 from typing import Callable, Any
-from ty_extensions import is_equivalent_to, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
 
 def _(c: Callable):  # error: [missing-type-argument]
     reveal_type(c)  # revealed: (...) -> Unknown
@@ -66,6 +67,75 @@ form uses `...` as the entire first argument, not inside a list):
 # error: [invalid-type-form] "`[...]` is not a valid parameter list for `Callable`: Did you mean `Callable[..., int]`?"
 def _(c: Callable[[...], int]):
     reveal_type(c)  # revealed: (...) -> int
+```
+
+The invalid parameter list also offers an autofix that replaces the list with an ellipsis.
+
+```py
+def fixable(callback: Callable[[...], int]): ...  # snapshot: invalid-type-form
+```
+
+```snapshot
+error[invalid-type-form]: `[...]` is not a valid parameter list for `Callable`
+  --> src/mdtest_snippet.py:17:32
+   |
+17 | def fixable(callback: Callable[[...], int]): ...  # snapshot: invalid-type-form
+   |                                ^^^^^ Did you mean `Callable[..., int]`?
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+help: Replace `[...]` with `...`
+   |
+16 |     reveal_type(c)  # revealed: (...) -> int
+   - def fixable(callback: Callable[[...], int]): ...  # snapshot: invalid-type-form
+17 + def fixable(callback: Callable[..., int]): ...  # snapshot: invalid-type-form
+18 | def with_comments(
+   |
+note: This is an unsafe fix and may change runtime behavior
+```
+
+A multiline parameter list can contain comments, so its brackets are not removed automatically.
+
+```py
+def with_comments(
+    callback: Callable[
+        [  # snapshot: invalid-type-form
+            # The callable accepts arbitrary arguments.
+            ...,  # The parameter description remains documented.
+        ],
+        int,
+    ],
+): ...
+```
+
+```snapshot
+error[invalid-type-form]: `[...]` is not a valid parameter list for `Callable`
+  --> src/mdtest_snippet.py:20:9
+   |
+20 | /         [  # snapshot: invalid-type-form
+21 | |             # The callable accepts arbitrary arguments.
+22 | |             ...,  # The parameter description remains documented.
+23 | |         ],
+   | |_________^ Did you mean `Callable[..., int]`?
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+```
+
+A quoted callable annotation still receives the diagnostic, but its parsed source range cannot be
+rewritten directly.
+
+```py
+# snapshot: invalid-type-form
+def quoted(callback: "Callable[[...], int]"): ...
+```
+
+```snapshot
+error[invalid-type-form]: `[...]` is not a valid parameter list for `Callable`
+  --> src/mdtest_snippet.py:28:32
+   |
+28 | def quoted(callback: "Callable[[...], int]"): ...
+   |                                ^^^^^ Did you mean `Callable[..., int]`?
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 ```
 
 ```py
@@ -435,9 +505,8 @@ from typing_extensions import Callable, TypeVarTuple
 
 Ts = TypeVarTuple("Ts")
 
-def _(c: Callable[[int, *Ts], int]):
-    # TODO: Should reveal the correct signature
-    reveal_type(c)  # revealed: (...) -> int
+def unpack_operator(c: Callable[[int, *Ts], int]):
+    reveal_type(c)  # revealed: (int, /, *Ts@unpack_operator) -> int
 ```
 
 And, using the legacy syntax using `Unpack`:
@@ -445,9 +514,8 @@ And, using the legacy syntax using `Unpack`:
 ```py
 from typing_extensions import Unpack
 
-def _(c: Callable[[int, Unpack[Ts]], int]):
-    # TODO: Should reveal the correct signature
-    reveal_type(c)  # revealed: (...) -> int
+def unpack_special_form(c: Callable[[int, Unpack[Ts]], int]):
+    reveal_type(c)  # revealed: (int, /, *Ts@unpack_special_form) -> int
 ```
 
 ## Member lookup
@@ -488,25 +556,26 @@ If users want to read/write to attributes such as `__qualname__`, they need to c
 of the attribute first:
 
 ```py
-from inspect import getattr_static
-
 def f_okay(c: Callable[[], None]):
     if hasattr(c, "__qualname__"):
         reveal_type(c.__qualname__)  # revealed: object
 
-        # TODO: should be `property`
-        # (or complain that we don't know that `type(c)` has the attribute at all!)
-        reveal_type(type(c).__qualname__)  # revealed: @Todo(Intersection meta-type)
+        # This is the class object's own qualified name, not the instance's descriptor.
+        reveal_type(type(c).__qualname__)  # revealed: str
 
         # `hasattr` only guarantees that an attribute is readable.
         #
         # error: [invalid-assignment] "Object of type `Literal["my_callable"]` is not assignable to attribute `__qualname__` on type `(() -> None) & <Protocol with members '__qualname__'>`"
         c.__qualname__ = "my_callable"
 
-        result = getattr_static(c, "__qualname__")
-        reveal_type(result)  # revealed: property
-        if isinstance(result, property) and result.fset:
-            c.__qualname__ = "my_callable"  # okay
+        # TODO: should we have some way for users to narrow a read-only attribute
+        # into a writable attribute...? What would that look like? Something like this?
+        if (
+            hasattr(type(c), "__qualname__")
+            and isinstance(descriptor := type(c).__qualname__, property)
+            and descriptor.fset is not None
+        ):
+            c.__qualname__ = "my_callable"  # error: [invalid-assignment]
 ```
 
 ## From a class
@@ -514,7 +583,7 @@ def f_okay(c: Callable[[], None]):
 ### Subclasses should return themselves, not superclass
 
 ```py
-from ty_extensions import into_regular_callable
+from ty_extensions._internal import into_regular_callable
 
 class Base:
     def __init__(self) -> None:
@@ -532,7 +601,8 @@ reveal_type(into_regular_callable(A))
 ```py
 from typing import Callable
 
-from ty_extensions import is_assignable_to, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to
 
 static_assert(
     not is_assignable_to(
@@ -578,7 +648,8 @@ def _(c1: typing.Callable[[int], str], c2: collections.abc.Callable[[int], str])
 ```py
 import typing
 import collections.abc
-from ty_extensions import is_equivalent_to, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
 
 static_assert(is_equivalent_to(typing.Callable[[int], str], collections.abc.Callable[[int], str]))
 # error: [missing-type-argument]

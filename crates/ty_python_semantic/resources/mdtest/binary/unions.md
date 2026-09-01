@@ -42,12 +42,12 @@ here:
 
 ```py
 def f4(x: float, y: float):
-    reveal_type(x + y)  # revealed: int | float
-    reveal_type(x - y)  # revealed: int | float
-    reveal_type(x * y)  # revealed: int | float
-    reveal_type(x / y)  # revealed: int | float
-    reveal_type(x // y)  # revealed: int | float
-    reveal_type(x % y)  # revealed: int | float
+    reveal_type(x + y)  # revealed: float
+    reveal_type(x - y)  # revealed: float
+    reveal_type(x * y)  # revealed: float
+    reveal_type(x / y)  # revealed: float
+    reveal_type(x // y)  # revealed: float
+    reveal_type(x % y)  # revealed: float
 ```
 
 If any of the union elements leads to a division by zero, we will report an error:

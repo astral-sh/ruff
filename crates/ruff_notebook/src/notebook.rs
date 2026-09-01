@@ -1,4 +1,3 @@
-use itertools::Itertools;
 use rand::{RngExt, SeedableRng};
 use serde::Serialize;
 use serde_json::error::Category;
@@ -303,10 +302,10 @@ impl Notebook {
     fn update_cell_content(&mut self, transformed: &str) -> bool {
         let mut missing_separator = false;
 
-        for (&idx, (start, end)) in self
+        for (&idx, &[start, end]) in self
             .valid_code_cells
             .iter()
-            .zip(self.cell_offsets.iter().tuple_windows::<(_, _)>())
+            .zip(self.cell_offsets.array_windows::<2>())
         {
             let cell_content = transformed
                 .get(start.to_usize()..end.to_usize())
@@ -444,10 +443,6 @@ impl Notebook {
         &self.raw.cells
     }
 
-    pub fn metadata(&self) -> &RawNotebookMetadata {
-        &self.raw.metadata
-    }
-
     /// Check if it's a Python notebook.
     ///
     /// This is determined by checking the `language_info` or `kernelspec` in the notebook
@@ -487,6 +482,7 @@ impl Eq for Notebook {}
 
 #[cfg(test)]
 mod tests {
+    use std::assert_matches;
     use std::path::Path;
 
     use anyhow::Result;
@@ -513,18 +509,18 @@ mod tests {
 
     #[test]
     fn test_invalid() {
-        assert!(matches!(
+        assert_matches!(
             Notebook::from_path(&notebook_path("invalid_extension.ipynb")),
             Err(NotebookError::InvalidJson(_))
-        ));
-        assert!(matches!(
+        );
+        assert_matches!(
             Notebook::from_path(&notebook_path("not_json.ipynb")),
             Err(NotebookError::InvalidJson(_))
-        ));
-        assert!(matches!(
+        );
+        assert_matches!(
             Notebook::from_path(&notebook_path("wrong_schema.ipynb")),
             Err(NotebookError::InvalidSchema(_))
-        ));
+        );
     }
 
     #[test]

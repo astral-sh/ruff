@@ -245,8 +245,6 @@ posixpath: 3.0-
 pprint: 3.0-
 profile: 3.0-
 profiling: 3.15-
-profiling.sampling: 3.15-
-profiling.tracing: 3.15-
 pstats: 3.0-
 pty: 3.0-
 pwd: 3.0-

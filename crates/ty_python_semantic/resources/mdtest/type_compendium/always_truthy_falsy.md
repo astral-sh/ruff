@@ -50,7 +50,8 @@ af = CustomAlwaysFalsyType()
 It follows directly from the definition that `AlwaysTruthy` and `AlwaysFalsy` are disjoint types:
 
 ```py
-from ty_extensions import static_assert, is_disjoint_from, AlwaysTruthy, AlwaysFalsy
+from ty_extensions import static_assert, AlwaysTruthy, AlwaysFalsy
+from ty_extensions._internal import is_disjoint_from
 
 static_assert(is_disjoint_from(AlwaysTruthy, AlwaysFalsy))
 ```
@@ -66,7 +67,8 @@ of values that can be truthy *and* falsy. This intersection is not empty. In the
 examples for values that belong to these three types:
 
 ```pyi
-from ty_extensions import static_assert, is_equivalent_to, is_disjoint_from, AlwaysTruthy, AlwaysFalsy
+from ty_extensions import static_assert, AlwaysTruthy, AlwaysFalsy
+from ty_extensions._internal import is_equivalent_to, is_disjoint_from
 from typing_extensions import Never
 from random import choice
 
@@ -115,7 +117,8 @@ f = CustomAmbiguousTruthinessType()  # error: [invalid-assignment]
 ## Subtypes of `AlwaysTruthy`, `AlwaysFalsy`
 
 ```py
-from ty_extensions import static_assert, is_subtype_of, is_disjoint_from, AlwaysTruthy, AlwaysFalsy
+from ty_extensions import static_assert, AlwaysTruthy, AlwaysFalsy
+from ty_extensions._internal import is_subtype_of, is_disjoint_from
 from typing_extensions import Literal
 ```
 
@@ -163,7 +166,8 @@ Is `tuple[()]` always falsy? We currently model it this way, but this is
 [under discussion](https://github.com/astral-sh/ruff/issues/15528).
 
 ```py
-from ty_extensions import static_assert, is_subtype_of, AlwaysFalsy
+from ty_extensions import static_assert, AlwaysFalsy
+from ty_extensions._internal import is_subtype_of
 
 static_assert(is_subtype_of(tuple[()], AlwaysFalsy))
 ```

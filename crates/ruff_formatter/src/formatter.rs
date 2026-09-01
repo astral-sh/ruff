@@ -12,7 +12,7 @@ pub struct Formatter<'buf, Context> {
 
 impl<'buf, Context> Formatter<'buf, Context> {
     /// Creates a new context that uses the given formatter context
-    pub fn new(buffer: &'buf mut (dyn Buffer<Context = Context> + 'buf)) -> Self {
+    pub(crate) fn new(buffer: &'buf mut (dyn Buffer<Context = Context> + 'buf)) -> Self {
         Self { buffer }
     }
 
@@ -164,7 +164,10 @@ impl<'buf, Context> Formatter<'buf, Context> {
     }
 
     /// Formats `content` into an interned element without writing it to the formatter's buffer.
-    pub fn intern(&mut self, content: &dyn Format<Context>) -> FormatResult<Option<FormatElement>> {
+    pub(crate) fn intern(
+        &mut self,
+        content: &dyn Format<Context>,
+    ) -> FormatResult<Option<FormatElement>> {
         let mut buffer = VecBuffer::new(self.state_mut());
         crate::write!(&mut buffer, [content])?;
         let elements = buffer.into_vec();

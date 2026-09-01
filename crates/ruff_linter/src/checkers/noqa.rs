@@ -48,22 +48,26 @@ pub(crate) fn check_noqa(
 
     let exemption = FileExemption::from(&file_noqa_directives);
 
+    // Generate diagnostics for suppression comments before applying suppressions so that the
+    // diagnostics can themselves be suppressed.
+    suppressions.check_rule_codes(context, locator);
+
     // Indices of diagnostics that were ignored by a `noqa` directive.
     let mut ignored_diagnostics = vec![];
 
     // Remove any ignored diagnostics.
     'outer: for (index, diagnostic) in context.iter().enumerate() {
-        // Can't ignore syntax errors.
-        let Some(code) = diagnostic.secondary_code() else {
+        // Syntax errors and other non-lint diagnostics cannot be suppressed.
+        let Some(name) = diagnostic.id().as_lint() else {
             continue;
         };
 
-        if *code == Rule::BlanketNOQA.noqa_code() {
+        if name == Rule::BlanketNOQA.name() {
             continue;
         }
 
         // Apply file-level suppressions first
-        if exemption.contains_secondary_code(code) {
+        if exemption.includes_name(name) {
             ignored_diagnostics.push(index);
             continue;
         }
@@ -86,46 +90,29 @@ pub(crate) fn check_noqa(
             if let Some(directive_line) = noqa_directives.find_line_with_directive_mut(noqa_offset)
             {
                 let suppressed = match &directive_line.directive {
-                    Directive::All(_) => {
-                        let Ok(rule) = Rule::from_code(code) else {
-                            debug_assert!(false, "Invalid secondary code `{code}`");
-                            continue;
-                        };
-                        directive_line.matches.push(rule);
-                        ignored_diagnostics.push(index);
-                        true
-                    }
-                    Directive::Codes(directive) => {
-                        if directive.includes(code) {
-                            let Ok(rule) = Rule::from_code(code) else {
-                                debug_assert!(false, "Invalid secondary code `{code}`");
-                                continue;
-                            };
-                            directive_line.matches.push(rule);
-                            ignored_diagnostics.push(index);
-                            true
-                        } else {
-                            false
-                        }
-                    }
+                    Directive::All(_) => true,
+                    Directive::Codes(directive) => diagnostic
+                        .secondary_code()
+                        .is_some_and(|code| directive.includes(code)),
                 };
 
-                if suppressed {
+                if suppressed && let Ok(rule) = Rule::from_name(name.as_str()) {
+                    directive_line.matches.push(rule);
+                    ignored_diagnostics.push(index);
                     continue 'outer;
                 }
             }
         }
     }
 
-    // Diagnostics for unused/invalid range suppressions
-    suppressions.check_suppressions(context, locator);
-
-    // Enforce that the noqa directive was actually used (RUF100), unless RUF100 was itself
-    // suppressed.
-    if context.is_rule_enabled(Rule::UnusedNOQA)
+    // Only migrate directives that don't require RUF100 cleanup first.
+    let check_unused_noqa = context.is_rule_enabled(Rule::UnusedNOQA)
         && analyze_directives
-        && !exemption.includes(Rule::UnusedNOQA)
-    {
+        && !exemption.includes(Rule::UnusedNOQA);
+    let check_noqa_comment =
+        context.is_rule_enabled(Rule::NoqaComments) && !exemption.enumerates(Rule::NoqaComments);
+
+    if check_unused_noqa || check_noqa_comment {
         let directives = noqa_directives
             .lines()
             .iter()
@@ -138,42 +125,72 @@ pub(crate) fn check_noqa(
             );
         for (directive, matches, is_file_level) in directives {
             match directive {
-                Directive::All(directive) => {
-                    if matches.is_empty() {
-                        let edit = delete_comment(directive.range(), locator);
+                Directive::All(all) => {
+                    if check_unused_noqa && matches.is_empty() {
+                        let edit = delete_comment(all.range(), locator);
                         let mut diagnostic = context.report_diagnostic(
                             UnusedNOQA {
                                 codes: None,
                                 kind: ruff::rules::UnusedNOQAKind::Noqa,
                             },
-                            directive.range(),
+                            all.range(),
                         );
                         diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Unnecessary);
                         diagnostic.set_fix(Fix::safe_edit(edit));
+                    } else if check_noqa_comment {
+                        ruff::rules::noqa_comments(
+                            context,
+                            locator,
+                            is_file_level,
+                            matches.is_empty(),
+                            directive,
+                            matches,
+                            suppressions,
+                        );
                     }
                 }
-                Directive::Codes(directive) => {
+                Directive::Codes(codes) => {
                     let mut disabled_codes = vec![];
                     let mut duplicated_codes = vec![];
-                    let mut unknown_codes = vec![];
                     let mut unmatched_codes = vec![];
                     let mut valid_codes = vec![];
                     let mut seen_codes = FxHashSet::default();
                     let mut self_ignore = false;
-                    for original_code in directive.iter().map(Code::as_str) {
+                    let mut suppress_noqa_comment = false;
+                    for original_code in codes.iter().map(Code::as_str) {
                         let code = get_redirect_target(original_code).unwrap_or(original_code);
-                        if Rule::UnusedNOQA.noqa_code() == code {
-                            self_ignore = true;
-                            break;
-                        }
-
                         if seen_codes.insert(original_code) {
+                            if Rule::UnusedNOQA
+                                .noqa_code()
+                                .is_some_and(|noqa_code| noqa_code == code)
+                            {
+                                self_ignore = true;
+                                if context.is_rule_enabled(Rule::UnusedNOQA) {
+                                    valid_codes.push(original_code);
+                                } else {
+                                    disabled_codes.push(original_code);
+                                }
+                                continue;
+                            }
+
+                            if context.is_rule_enabled(Rule::NoqaComments)
+                                && Rule::NoqaComments
+                                    .noqa_code()
+                                    .is_some_and(|noqa_code| noqa_code == code)
+                            {
+                                suppress_noqa_comment = true;
+                                valid_codes.push(original_code);
+                                continue;
+                            }
+
                             let is_code_used = if is_file_level {
                                 context.iter().any(|diag| {
                                     diag.secondary_code().is_some_and(|noqa| *noqa == code)
                                 })
                             } else {
-                                matches.iter().any(|match_| match_.noqa_code() == code)
+                                matches.iter().any(|rule| {
+                                    rule.noqa_code().is_some_and(|noqa_code| noqa_code == code)
+                                })
                             } || settings
                                 .external
                                 .iter()
@@ -187,26 +204,21 @@ pub(crate) fn check_noqa(
                                 } else {
                                     disabled_codes.push(original_code);
                                 }
-                            } else {
-                                unknown_codes.push(original_code);
                             }
                         } else {
                             duplicated_codes.push(original_code);
                         }
                     }
 
-                    if self_ignore {
-                        continue;
-                    }
-
-                    if !(disabled_codes.is_empty()
+                    let has_unused_codes = !(disabled_codes.is_empty()
                         && duplicated_codes.is_empty()
-                        && unmatched_codes.is_empty())
-                    {
+                        && unmatched_codes.is_empty());
+
+                    if check_unused_noqa && !self_ignore && has_unused_codes {
                         let edit = if valid_codes.is_empty() {
-                            delete_comment(directive.range(), locator)
+                            delete_comment(codes.range(), locator)
                         } else {
-                            let original_text = locator.slice(directive.range());
+                            let original_text = locator.slice(codes.range());
                             let prefix = if is_file_level {
                                 if original_text.contains("flake8") {
                                     "# flake8: noqa: "
@@ -218,7 +230,7 @@ pub(crate) fn check_noqa(
                             };
                             Edit::range_replacement(
                                 format!("{}{}", prefix, valid_codes.join(", ")),
-                                directive.range(),
+                                codes.range(),
                             )
                         };
                         let mut diagnostic = context.report_diagnostic(
@@ -230,15 +242,28 @@ pub(crate) fn check_noqa(
                                 }),
                                 kind: ruff::rules::UnusedNOQAKind::Noqa,
                             },
-                            directive.range(),
+                            codes.range(),
                         );
                         diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Unnecessary);
                         diagnostic.set_fix(Fix::safe_edit(edit));
+                    } else if check_noqa_comment && !suppress_noqa_comment {
+                        ruff::rules::noqa_comments(
+                            context,
+                            locator,
+                            is_file_level,
+                            has_unused_codes,
+                            directive,
+                            matches,
+                            suppressions,
+                        );
                     }
                 }
             }
         }
     }
+
+    // Diagnostics for unused/invalid range suppressions
+    suppressions.check_suppressions(context, locator);
 
     if context.is_rule_enabled(Rule::RedirectedNOQA) && !exemption.includes(Rule::RedirectedNOQA) {
         ruff::rules::redirected_noqa(context, &noqa_directives);

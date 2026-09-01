@@ -3,9 +3,11 @@ mod logging;
 mod printer;
 mod python_version;
 mod rule;
+mod server;
 mod version;
 
-use std::fmt::Write;
+use std::fmt::Display;
+use std::io::{BufWriter, Write};
 use std::process::{ExitCode, Termination};
 use std::sync::Mutex;
 
@@ -20,17 +22,18 @@ use ruff_db::diagnostic::{
     Diagnostic, DiagnosticId, DisplayDiagnosticConfig, DisplayDiagnostics, Severity,
 };
 use ruff_db::files::File;
-use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
+use ruff_db::system::{OsSystem, System, SystemPath, SystemPathBuf};
 use ruff_db::{STACK_SIZE, max_parallelism};
 use ruff_diagnostics::Applicability;
 use salsa::Database;
-use ty_project::metadata::options::ProjectOptionsOverrides;
 use ty_project::metadata::settings::TerminalSettings;
 use ty_project::watch::ProjectWatcher;
-use ty_project::{CollectReporter, Db, watch};
-use ty_project::{ProjectDatabase, ProjectMetadata};
+use ty_project::{
+    ChangeResult, CollectReporter, Db, Project, ScriptEnvironmentAvailability, UvSyncProgress,
+    watch,
+};
+use ty_project::{ProjectDatabase, ProjectMetadata, ProjectReloadResult};
 use ty_python_semantic::{fix_all_diagnostics, suppress_all_diagnostics};
-use ty_server::run_server;
 use ty_static::EnvVars;
 
 use crate::args::{CheckCommand, Command, ExplainCommand, HelpFormat, TerminalColor};
@@ -48,8 +51,8 @@ pub fn run() -> anyhow::Result<ExitStatus> {
     let args = Cli::parse_from(args);
 
     match args.command {
-        Command::Server => run_server().map(|()| ExitStatus::Success),
         Command::Check(check_args) => run_check(check_args),
+        Command::Server(server_args) => server::run(&server_args),
         Command::Version { output_format } => version(output_format).map(|()| ExitStatus::Success),
         Command::GenerateShellCompletion { shell } => {
             use std::io::stdout;
@@ -73,13 +76,13 @@ pub fn run() -> anyhow::Result<ExitStatus> {
     }
 }
 
-pub(crate) fn version(output_format: HelpFormat) -> Result<()> {
+fn version(output_format: HelpFormat) -> Result<()> {
     let mut stdout = Printer::default().stream_for_requested_summary().lock();
     let version_info = crate::version::version();
 
     match output_format {
         HelpFormat::Text => {
-            writeln!(stdout, "ty {}", &version_info)?;
+            writeln!(stdout, "ty {version_info}")?;
         }
         HelpFormat::Json => {
             serde_json::to_writer_pretty(&mut stdout, &version_info)?;
@@ -103,16 +106,7 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     tracing::debug!("Version: {}", version::version());
 
     // The base path to which all CLI arguments are relative to.
-    let cwd = {
-        let cwd = std::env::current_dir().context("Failed to get the current working directory")?;
-        SystemPathBuf::from_path_buf(cwd)
-            .map_err(|path| {
-                anyhow!(
-                    "The current working directory `{}` contains non-Unicode characters. ty only supports Unicode paths.",
-                    path.display()
-                )
-            })?
-    };
+    let cwd = current_directory()?;
 
     let project_path = args
         .project
@@ -146,6 +140,7 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     let system = OsSystem::new(&cwd);
     let watch = args.watch;
     let exit_zero = args.exit_zero;
+    let memory_report = std::env::var(EnvVars::TY_MEMORY_REPORT).ok();
     let config_file = args
         .config_file
         .as_ref()
@@ -156,18 +151,19 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         Some(config_file) => {
             ProjectMetadata::from_config_file(config_file.clone(), &project_path, &system)?
         }
+        None if check_paths.iter().any(|path| system.is_file(path)) => {
+            // `uv check --script` passes a file as its check path. Standalone scripts must not
+            // inherit the enclosing workspace; their environments are synchronized separately.
+            ProjectMetadata::discover_without_uv(&project_path, &system)?
+        }
         None => ProjectMetadata::discover(&project_path, &system)?,
     };
 
     project_metadata.apply_configuration_files(&system)?;
 
-    let project_options_overrides = ProjectOptionsOverrides::new(config_file, args.into_options());
-    project_metadata.apply_overrides(&project_options_overrides);
+    project_metadata.apply_override_options(args.into_options());
 
     let mut db = ProjectDatabase::fallible(project_metadata, system)?;
-    if !watch {
-        ruff_db::disable_lru(&mut db);
-    }
     let project = db.project();
 
     project.set_verbose(&mut db, verbosity >= VerbosityLevel::Verbose);
@@ -177,8 +173,24 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         project.set_included_paths(&mut db, check_paths);
     }
 
-    let (main_loop, main_loop_cancellation_token) =
-        MainLoop::new(mode, project_options_overrides, printer);
+    // Disabling LRU only assumes that the database is short-lived; unlike freezing below, it does
+    // not require immutable inputs.
+    if !watch {
+        ruff_db::disable_lru(&mut db);
+    }
+
+    // The CLI never opens files, so this is safe even where the freeze below isn't
+    db.freeze_open_files();
+
+    // A one-shot check never mutates these heavily read inputs, so freezing them avoids recording
+    // unnecessary Salsa dependencies. Watch mode updates inputs incrementally, fix modes apply
+    // source-text overrides, and memory reports measure the database without this optimization, so
+    // they must keep the inputs mutable.
+    if !watch && matches!(mode, MainLoopMode::Check) && memory_report.is_none() {
+        db.freeze();
+    }
+
+    let (main_loop, main_loop_cancellation_token) = MainLoop::new(mode, printer);
 
     // Listen to Ctrl+C and abort the watch mode.
     let main_loop_cancellation_token = Mutex::new(Some(main_loop_cancellation_token));
@@ -197,19 +209,24 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     };
 
     let mut stdout = printer.stream_for_requested_summary().lock();
-    match std::env::var(EnvVars::TY_MEMORY_REPORT).as_deref() {
-        Ok("short") => write!(stdout, "{}", db.salsa_memory_dump().display_short())?,
-        Ok("full") => write!(stdout, "{}", db.salsa_memory_dump().display_full())?,
-        Ok("json") => writeln!(stdout, "{}", db.salsa_memory_dump().to_json())?,
-        Ok(other) => {
+    match memory_report.as_deref() {
+        Some("short") => write!(stdout, "{}", db.salsa_memory_dump().display_short())?,
+        Some("full") => write!(stdout, "{}", db.salsa_memory_dump().display_full())?,
+        Some("json") => writeln!(stdout, "{}", db.salsa_memory_dump().to_json())?,
+        Some(other) => {
             tracing::warn!(
-                "Unknown value for `TY_MEMORY_REPORT`: `{other}`. Valid values are `short`, `full`, and `json`."
+                "Unknown value for `TY_MEMORY_REPORT`: `{other}`. \
+                Valid values are `short`, `full`, and `json`."
             );
         }
-        Err(_) => {}
+        None => {}
     }
 
     std::mem::forget(db);
+
+    if matches!(exit_status, ExitStatus::Interrupted) {
+        return Ok(ExitStatus::Interrupted);
+    }
 
     if exit_zero {
         Ok(ExitStatus::Success)
@@ -220,22 +237,25 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
 
 #[derive(Copy, Clone)]
 pub enum ExitStatus {
-    /// Checking was successful and there were no errors.
+    /// The command completed successfully.
     Success = 0,
 
-    /// Checking was successful but there were errors.
+    /// Checking was successful but there were errors, or executable discovery found no match.
     Failure = 1,
 
-    /// Checking failed due to an invocation error (e.g. the current directory no longer exists, incorrect CLI arguments, ...)
+    /// The command failed due to an invocation error (e.g. the current directory no longer exists, incorrect CLI arguments, ...)
     Error = 2,
 
     /// Internal ty error (panic, or any other error that isn't due to the user using the
     /// program incorrectly or transient environment errors).
     InternalError = 101,
+
+    /// Checking was interrupted by Ctrl+C.
+    Interrupted = 130,
 }
 
 impl ExitStatus {
-    pub const fn is_internal_error(self) -> bool {
+    const fn is_internal_error(self) -> bool {
         matches!(self, ExitStatus::InternalError)
     }
 }
@@ -258,10 +278,11 @@ struct MainLoop {
     /// The file system watcher, if running in watch mode.
     watcher: Option<ProjectWatcher>,
 
+    /// Progress for the current synchronization batch, cleared before checking starts.
+    sync_progress: Option<SyncProgress>,
+
     /// Interface for displaying information to the user.
     printer: Printer,
-
-    project_options_overrides: ProjectOptionsOverrides,
 
     /// Cancellation token that gets set by Ctrl+C.
     /// Used for long-running operations on the main thread. Operations on background threads
@@ -270,11 +291,7 @@ struct MainLoop {
 }
 
 impl MainLoop {
-    fn new(
-        mode: MainLoopMode,
-        project_options_overrides: ProjectOptionsOverrides,
-        printer: Printer,
-    ) -> (Self, MainLoopCancellationToken) {
+    fn new(mode: MainLoopMode, printer: Printer) -> (Self, MainLoopCancellationToken) {
         let (sender, receiver) = crossbeam_channel::bounded(10);
 
         let cancellation_token_source = CancellationTokenSource::new();
@@ -286,7 +303,7 @@ impl MainLoop {
                 sender: sender.clone(),
                 receiver,
                 watcher: None,
-                project_options_overrides,
+                sync_progress: None,
                 printer,
                 cancellation_token,
             },
@@ -305,14 +322,10 @@ impl MainLoop {
         })?;
 
         self.watcher = Some(ProjectWatcher::new(watcher, db));
-        self.run(db)?;
-
-        Ok(ExitStatus::Success)
+        self.run(db)
     }
 
     fn run(self, db: &mut ProjectDatabase) -> Result<ExitStatus> {
-        self.sender.send(MainLoopMessage::CheckWorkspace).unwrap();
-
         let result = self.main_loop(db);
 
         tracing::debug!("Exiting main loop");
@@ -321,27 +334,46 @@ impl MainLoop {
     }
 
     fn main_loop(mut self, db: &mut ProjectDatabase) -> Result<ExitStatus> {
-        // Schedule the first check.
         tracing::debug!("Starting main loop");
 
         let mut revision = 0u64;
+        let uv_sync_wakeups = db.uv_environments().sync_wakeups();
+        let (check_sender, check_receiver) = crossbeam_channel::bounded(1);
 
-        while let Ok(message) = self.receiver.recv() {
+        // Initialize the uv environment for all scripts
+        let scripts: Vec<_> = db.project().script_files(db).iter().collect();
+        self.synchronize_scripts(db, &scripts);
+
+        request_check(&check_sender);
+
+        // Apply all queued changes before starting a pending check because every applied change
+        // cancels the running check.
+        while let Ok(message) = crossbeam_channel::select_biased! {
+            recv(uv_sync_wakeups) -> wakeup => {
+                wakeup.map(|()| MainLoopMessage::PollUvEnvironments)
+            }
+            recv(self.receiver) -> message => message,
+            recv(check_receiver) -> request => request.map(|()| MainLoopMessage::CheckWorkspace),
+        } {
             match message {
                 MainLoopMessage::CheckWorkspace => {
+                    // Synchronization may have started after this request was queued.
+                    if db.uv_environments().has_pending_synchronizations() {
+                        tracing::debug!("Deferring check until uv synchronization completes");
+                        continue;
+                    }
+                    self.sync_progress = None;
                     let db = db.clone();
                     let sender = self.sender.clone();
+                    let printer = self.printer;
 
                     // Spawn a new task that checks the project. This needs to be done in a separate thread
                     // to prevent blocking the main loop here.
                     rayon::spawn(move || {
-                        let mut reporter = IndicatifReporter::from(self.printer);
-                        let bar = reporter.bar.clone();
-
                         match salsa::Cancelled::catch(|| {
+                            let mut reporter = IndicatifReporter::new(printer.progress_target());
                             db.check_with_reporter(&mut reporter);
-                            reporter.bar.finish_and_clear();
-                            reporter.collector.into_sorted(&db)
+                            reporter.into_sorted_diagnostics(&db)
                         }) {
                             Ok(result) => {
                                 // Send the result back to the main loop for printing.
@@ -350,20 +382,21 @@ impl MainLoop {
                                     .unwrap();
                             }
                             Err(cancelled) => {
-                                bar.finish_and_clear();
                                 tracing::debug!("Check has been cancelled: {cancelled:?}");
                             }
                         }
                     });
+                    tracing::debug!("Waiting for next main loop message.");
+                    continue;
                 }
-
                 MainLoopMessage::CheckCompleted {
                     result,
                     revision: check_revision,
                 } => {
                     if check_revision != revision {
                         tracing::debug!(
-                            "Discarding check result for outdated revision: current: {revision}, result revision: {check_revision}"
+                            "Discarding check result for outdated revision: \
+                            current: {revision}, result revision: {check_revision}"
                         );
                         continue;
                     }
@@ -438,12 +471,14 @@ impl MainLoop {
                             let terminal_settings = db.project().settings(db).terminal();
                             exit_status_from_diagnostics(diagnostics, terminal_settings)
                         }
-                        Err(Canceled) => ExitStatus::Success,
+                        Err(Canceled) => ExitStatus::Interrupted,
                     };
 
                     if exit_status.is_internal_error() {
                         tracing::warn!(
-                            "A fatal error occurred while checking some files. Not all project files were analyzed. See the diagnostics list above for details."
+                            "A fatal error occurred while checking some files. \
+                            Not all project files were analyzed. \
+                            See the diagnostics list above for details."
                         );
                     }
 
@@ -454,22 +489,46 @@ impl MainLoop {
                     return Ok(exit_status);
                 }
 
-                MainLoopMessage::ApplyChanges(changes) => {
-                    Printer::clear_screen()?;
+                MainLoopMessage::PollUvEnvironments => {
+                    let environments = db.uv_environments().clone();
+                    let changes = environments.poll_sync(db);
+                    if !changes.is_empty() {
+                        revision += 1;
+                    }
+                    if let Some(project_change) = changes.project {
+                        if matches!(
+                            project_change,
+                            ProjectReloadResult::Changed {
+                                files_changed: true,
+                            }
+                        ) {
+                            let scripts: Vec<_> = db.project().script_files(db).iter().collect();
+                            self.synchronize_scripts(db, &scripts);
+                        }
 
+                        if let Some(watcher) = self.watcher.as_mut() {
+                            watcher.update(db);
+                        }
+                    }
+                    request_check(&check_sender);
+                }
+
+                MainLoopMessage::ApplyChanges(changes) => {
                     revision += 1;
                     // Automatically cancels any pending queries and waits for them to complete.
-                    db.apply_changes(&changes, Some(&self.project_options_overrides));
+                    let result = db.apply_changes(&changes);
+                    self.synchronize_environments(db, &result)?;
+
                     if let Some(watcher) = self.watcher.as_mut() {
                         watcher.update(db);
                     }
 
-                    self.sender.send(MainLoopMessage::CheckWorkspace).unwrap();
+                    request_check(&check_sender);
                 }
                 MainLoopMessage::Exit => {
                     // Cancel any pending queries and wait for them to complete.
                     db.trigger_cancellation();
-                    return Ok(ExitStatus::Success);
+                    return Ok(ExitStatus::Interrupted);
                 }
             }
 
@@ -477,6 +536,60 @@ impl MainLoop {
         }
 
         Ok(ExitStatus::Success)
+    }
+
+    fn synchronize_environments(
+        &mut self,
+        db: &mut ProjectDatabase,
+        changes: &ChangeResult,
+    ) -> Result<()> {
+        // Another filesystem event can arrive while a script is still synchronizing.
+        // Keep its progress visible after clearing the previous check's output.
+        if let Some(progress) = &self.sync_progress {
+            progress.bars.suspend(Printer::clear_screen)?;
+        } else {
+            Printer::clear_screen()?;
+        }
+
+        let project_path = changes.project_sync_path();
+        let scripts = changes.scripts_to_synchronize(db);
+        if project_path.is_none() && scripts.is_empty() {
+            return Ok(());
+        }
+
+        let progress = self
+            .sync_progress
+            .get_or_insert_with(|| SyncProgress::new(self.printer.progress_target()));
+
+        if let Some(project_path) = project_path {
+            db.uv_environments()
+                .request_project_sync(db, project_path, &|db, project| {
+                    progress.for_project(db, project)
+                });
+        }
+        self.synchronize_scripts(db, &scripts);
+        Ok(())
+    }
+
+    fn synchronize_scripts(&mut self, db: &mut ProjectDatabase, scripts: &[File]) {
+        let environments = db.uv_environments().clone();
+
+        if scripts.is_empty() {
+            return;
+        }
+
+        let progress = self
+            .sync_progress
+            .get_or_insert_with(|| SyncProgress::new(self.printer.progress_target()));
+
+        for &file in scripts {
+            environments.request_sync(
+                db,
+                file,
+                ScriptEnvironmentAvailability::Pending,
+                &|db, file| progress.for_script(db, file),
+            );
+        }
     }
 
     fn write_diagnostics(
@@ -499,16 +612,16 @@ impl MainLoop {
             diagnostics => {
                 let diagnostics_count = diagnostics.len();
 
-                let mut stdout = self.printer.stream_for_details().lock();
+                let stdout = self.printer.stream_for_details().lock();
 
                 // Only render diagnostics if they're going to be displayed, since doing
                 // so is expensive.
                 if stdout.is_enabled() {
+                    let mut stdout = BufWriter::new(stdout);
                     let display_config = DisplayDiagnosticConfig::new("ty")
                         .format(terminal_settings.output_format.into())
                         .color(colored::control::SHOULD_COLORIZE.should_colorize())
                         .with_cancellation_token(Some(self.cancellation_token.clone()))
-                        .show_fix_diff(true)
                         .context(0);
 
                     write!(
@@ -516,6 +629,7 @@ impl MainLoop {
                         "{}",
                         DisplayDiagnostics::new(db, &display_config, diagnostics)
                     )?;
+                    stdout.flush()?;
                 }
 
                 if !self.cancellation_token.is_cancelled() && is_human_readable {
@@ -523,7 +637,8 @@ impl MainLoop {
                         let total = fixed + diagnostics_count;
                         writeln!(
                             self.printer.stream_for_failure_summary(),
-                            "Found {total} diagnostic{} ({fixed} fixed, {diagnostics_count} remaining).",
+                            "Found {total} diagnostic{} \
+                            ({fixed} fixed, {diagnostics_count} remaining).",
                             if total == 1 { "" } else { "s" }
                         )?;
                     } else {
@@ -592,23 +707,20 @@ fn exit_status_from_diagnostics(
 struct IndicatifReporter {
     collector: CollectReporter,
 
-    /// A reporter that is ready, containing a progress bar to report to.
-    ///
-    /// Initialization of the bar is deferred to [`ty_project::ProgressReporter::set_files`] so we
-    /// do not initialize the bar too early as it may take a while to collect the number of files to
-    /// process and we don't want to display an empty "0/0" bar.
-    bar: indicatif::ProgressBar,
-
-    printer: Printer,
+    /// Kept hidden until the files to check have been collected, to avoid displaying "0/0".
+    checking_bar: indicatif::ProgressBar,
 }
 
-impl From<Printer> for IndicatifReporter {
-    fn from(printer: Printer) -> Self {
+impl IndicatifReporter {
+    fn new(target: indicatif::ProgressDrawTarget) -> Self {
         Self {
-            bar: indicatif::ProgressBar::hidden(),
+            checking_bar: indicatif::ProgressBar::with_draw_target(None, target),
             collector: CollectReporter::default(),
-            printer,
         }
+    }
+
+    fn into_sorted_diagnostics(mut self, db: &dyn Db) -> Vec<Diagnostic> {
+        std::mem::take(&mut self.collector).into_sorted(db)
     }
 }
 
@@ -616,25 +728,130 @@ impl ty_project::ProgressReporter for IndicatifReporter {
     fn set_files(&mut self, files: usize) {
         self.collector.set_files(files);
 
-        self.bar.set_length(files as u64);
-        self.bar.set_message("Checking");
-        self.bar.set_style(
+        self.checking_bar.set_length(files as u64);
+        self.checking_bar.set_message("Checking");
+        self.checking_bar.set_style(
             indicatif::ProgressStyle::with_template(
-                "{msg:8.dim} {bar:60.green/dim} {pos}/{len} files",
+                "{msg:8.dim} {wide_bar:.green/dim} {pos}/{len} files",
             )
             .unwrap()
             .progress_chars("--"),
         );
-        self.bar.set_draw_target(self.printer.progress_target());
+        self.checking_bar.force_draw();
     }
 
     fn report_checked_file(&self, db: &ProjectDatabase, file: File, diagnostics: &[Diagnostic]) {
         self.collector.report_checked_file(db, file, diagnostics);
-        self.bar.inc(1);
+        self.checking_bar.inc(1);
     }
 
     fn report_diagnostics(&mut self, db: &ProjectDatabase, diagnostics: Vec<Diagnostic>) {
         self.collector.report_diagnostics(db, diagnostics);
+    }
+}
+
+impl Drop for IndicatifReporter {
+    fn drop(&mut self) {
+        self.checking_bar.finish_and_clear();
+    }
+}
+
+/// Shows the script count and individual uv status lines for one synchronization batch.
+struct SyncProgress {
+    bars: indicatif::MultiProgress,
+
+    /// Hidden until the first script synchronization is requested.
+    script_bar: indicatif::ProgressBar,
+}
+
+impl SyncProgress {
+    fn new(target: indicatif::ProgressDrawTarget) -> Self {
+        let bars = indicatif::MultiProgress::with_draw_target(target);
+        let script_bar = indicatif::ProgressBar::hidden();
+        script_bar.set_length(0);
+        script_bar.set_message("Syncing");
+        script_bar.set_style(
+            indicatif::ProgressStyle::with_template(
+                "{msg:8.dim} {wide_bar:.green/dim} {pos}/{len} scripts",
+            )
+            .unwrap()
+            .progress_chars("--"),
+        );
+        let script_bar = bars.add(script_bar);
+        Self { bars, script_bar }
+    }
+
+    fn for_project(&self, db: &dyn Db, project: Project) -> Option<Box<dyn UvSyncProgress>> {
+        Some(self.start("Refreshing", format_args!("{} metadata", project.name(db)))?)
+    }
+
+    fn for_script(&self, db: &dyn Db, file: File) -> Option<Box<dyn UvSyncProgress>> {
+        let path = file.path(db).as_system_path()?;
+        let path = path.strip_prefix(db.project().root(db)).unwrap_or(path);
+        let mut progress = self.start("Syncing", path)?;
+        self.script_bar.inc_length(1);
+        self.script_bar.force_draw();
+        progress.completion_bar = Some(self.script_bar.clone());
+        Some(progress)
+    }
+
+    fn start(&self, action: &str, target: impl Display) -> Option<Box<UvSyncProgressBar>> {
+        if self.bars.is_hidden() {
+            return None;
+        }
+
+        let bar = indicatif::ProgressBar::hidden();
+        bar.set_style(indicatif::ProgressStyle::with_template("{wide_msg}").unwrap());
+        bar.set_message(format!("   {} {target}", action.bold().cyan()));
+        Some(Box::new(UvSyncProgressBar {
+            bars: self.bars.clone(),
+            bar,
+            completion_bar: None,
+        }))
+    }
+}
+
+impl Drop for SyncProgress {
+    fn drop(&mut self) {
+        self.script_bar.finish_and_clear();
+        let _ = self.bars.clear();
+    }
+}
+
+struct UvSyncProgressBar {
+    bars: indicatif::MultiProgress,
+    bar: indicatif::ProgressBar,
+    /// The shared script synchronization bar, advanced when this request completes.
+    ///
+    /// This reporter handles both script synchronization (`Some`) and project metadata
+    /// refreshes (`None`), which do not contribute to the script count.
+    completion_bar: Option<indicatif::ProgressBar>,
+}
+
+impl UvSyncProgress for UvSyncProgressBar {
+    fn started(&mut self) {
+        self.bar.reset();
+        self.bars.insert(0, self.bar.clone());
+        // There are no periodic ticks to redraw this status line if drawing is rate-limited.
+        self.bar.force_draw();
+    }
+
+    fn finished(&mut self) {
+        self.bar.finish_and_clear();
+        self.bars.remove(&self.bar);
+    }
+
+    fn completed(self: Box<Self>) {
+        if let Some(bar) = &self.completion_bar {
+            bar.inc(1);
+            bar.force_draw();
+        }
+    }
+}
+
+impl Drop for UvSyncProgressBar {
+    fn drop(&mut self) {
+        self.finished();
     }
 }
 
@@ -660,8 +877,26 @@ enum MainLoopMessage {
         result: Vec<Diagnostic>,
         revision: u64,
     },
+    PollUvEnvironments,
     ApplyChanges(Vec<watch::ChangeEvent>),
     Exit,
+}
+
+fn request_check(sender: &crossbeam_channel::Sender<()>) {
+    // A full channel means that a check has already been requested. Keeping one pending request
+    // coalesces bursts of file changes while the main loop drains higher-priority work.
+    let _ = sender.try_send(());
+}
+
+fn current_directory() -> Result<SystemPathBuf> {
+    let cwd = std::env::current_dir().context("Failed to get the current working directory")?;
+    SystemPathBuf::from_path_buf(cwd).map_err(|path| {
+        anyhow!(
+            "The current working directory `{}` contains non-Unicode characters. \
+             ty only supports Unicode paths.",
+            path.display()
+        )
+    })
 }
 
 fn set_colored_override(color: Option<TerminalColor>) {

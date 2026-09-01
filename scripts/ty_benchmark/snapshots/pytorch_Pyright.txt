@@ -886,9 +886,9 @@
     Attribute "_torchdynamo_leaf_mutates_args" is unknown (reportAttributeAccessIssue)
   <CWD>/torch/_dynamo/decorators.py:882:8 - error: Cannot assign to attribute "_dynamo_forbidden" for class "FunctionType"
     Attribute "_dynamo_forbidden" is unknown (reportFunctionMemberAccess)
-  <CWD>/torch/_dynamo/decorators.py:1068:17 - error: Argument of type "type[Any] | ModuleType | ((**_P@substitute_in_graph) -> _R@substitute_in_graph)" cannot be assigned to parameter "fn" of type "_F@__init__" in function "__init__"
-    Type "type[Any] | ModuleType | ((**_P@substitute_in_graph) -> _R@substitute_in_graph)" is not assignable to type "(...) -> Any"
-      Type "type[Any] | ModuleType | ((**_P@substitute_in_graph) -> _R@substitute_in_graph)" is not assignable to type "(...) -> Any"
+  <CWD>/torch/_dynamo/decorators.py:1068:17 - error: Argument of type "ModuleType | ((**_P@substitute_in_graph) -> _R@substitute_in_graph)" cannot be assigned to parameter "fn" of type "_F@__init__" in function "__init__"
+    Type "ModuleType | ((**_P@substitute_in_graph) -> _R@substitute_in_graph)" is not assignable to type "(...) -> Any"
+      Type "ModuleType | ((**_P@substitute_in_graph) -> _R@substitute_in_graph)" is not assignable to type "(...) -> Any"
         Type "ModuleType" is not assignable to type "(...) -> Any" (reportArgumentType)
   <CWD>/torch/_dynamo/decorators.py:1168:30 - error: "tensor" is not a known attribute of module "torch.distributed" (reportAttributeAccessIssue)
   <CWD>/torch/_dynamo/decorators.py:1292:15 - error: Cannot assign to attribute "_dynamo_dynamic_indices" for class "TraceableWrapperSubclass"
@@ -1245,6 +1245,8 @@
     Attribute "_fields" is unknown (reportAttributeAccessIssue)
   <CWD>/torch/_dynamo/guards.py:4204:31 - error: Cannot access attribute "__name__" for class "property"
     Attribute "__name__" is unknown (reportAttributeAccessIssue)
+  <CWD>/torch/_dynamo/guards.py:4237:52 - error: Cannot access attribute "cell_contents" for class "type[object]"
+    Attribute "cell_contents" is unknown (reportAttributeAccessIssue)
   <CWD>/torch/_dynamo/guards.py:4237:52 - error: Cannot access attribute "cell_contents" for class "type[Function]"
     Attribute "cell_contents" is unknown (reportAttributeAccessIssue)
   <CWD>/torch/_dynamo/guards.py:4237:52 - error: Cannot access attribute "cell_contents" for class "type[tuple[Unknown, ...]]"
@@ -1252,6 +1254,8 @@
   <CWD>/torch/_dynamo/guards.py:4246:59 - error: Cannot access attribute "name" for class "Work"
     Attribute "name" is unknown (reportAttributeAccessIssue)
   <CWD>/torch/_dynamo/guards.py:4246:59 - error: Cannot access attribute "name" for class "count[int]"
+    Attribute "name" is unknown (reportAttributeAccessIssue)
+  <CWD>/torch/_dynamo/guards.py:4246:59 - error: Cannot access attribute "name" for class "type[object]"
     Attribute "name" is unknown (reportAttributeAccessIssue)
   <CWD>/torch/_dynamo/guards.py:4246:59 - error: Cannot access attribute "name" for class "type[Function]"
     Attribute "name" is unknown (reportAttributeAccessIssue)
@@ -3012,9 +3016,9 @@
   <CWD>/torch/_dynamo/variables/torch.py:786:34 - error: "_functorch" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_dynamo/variables/torch.py:805:34 - error: "_functorch" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_dynamo/variables/torch.py:812:33 - error: "_functorch" is not a known attribute of module "torch" (reportAttributeAccessIssue)
-  <CWD>/torch/_dynamo/variables/torch.py:843:17 - error: Argument of type "Any | type[Any] | type[set_grad_enabled]" cannot be assigned to parameter "func" of type "FunctionType" in function "bind_args_cached"
-    Type "Any | type[Any] | type[set_grad_enabled]" is not assignable to type "FunctionType"
-      "type[Any]" is not assignable to "FunctionType" (reportArgumentType)
+  <CWD>/torch/_dynamo/variables/torch.py:843:17 - error: Argument of type "Any | type[object] | type[set_grad_enabled]" cannot be assigned to parameter "func" of type "FunctionType" in function "bind_args_cached"
+    Type "Any | type[object] | type[set_grad_enabled]" is not assignable to type "FunctionType"
+      Type "type[object]" is not assignable to type "FunctionType" (reportArgumentType)
   <CWD>/torch/_dynamo/variables/torch.py:914:41 - error: "SDPAParams" is unknown import symbol (reportAttributeAccessIssue)
   <CWD>/torch/_dynamo/variables/torch.py:945:23 - error: "_utils" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_dynamo/variables/torch.py:971:39 - error: "_dispatch_keys" is not a known attribute of module "torch._C" (reportAttributeAccessIssue)
@@ -8300,7 +8304,7 @@
   <CWD>/torch/_inductor/codegen/multi_kernel.py:273:6 - error: Argument of type "CachedMethod[(), Unknown]" cannot be assigned to parameter "fget" of type "((Any) -> Any) | None" in function "__init__"
     Type "CachedMethod[(), Unknown]" is not assignable to type "((Any) -> Any) | None"
       Type "CachedMethod[(), Unknown]" is not assignable to type "(Any) -> Any"
-        Function accepts too many positional parameters; expected 0 but received 1
+        Function accepts too few positional parameters; expected 1 but received 0
       "CachedMethod[(), Unknown]" is not assignable to "None" (reportArgumentType)
 <CWD>/torch/_inductor/codegen/nv_universal_gemm/kernel_cache.py
   <CWD>/torch/_inductor/codegen/nv_universal_gemm/kernel_cache.py:26:12 - error: Import "cutlass_api" could not be resolved (reportMissingImports)
@@ -8626,7 +8630,7 @@
     Parameter 2 mismatch: base parameter "x" is keyword parameter, override parameter is position-only (reportIncompatibleMethodOverride)
   <CWD>/torch/_inductor/codegen/pallas.py:538:10 - error: Type "(x: str) -> str" is not assignable to declared type "(self: Self@OpsHandler[T@OpsHandler], x: Any) -> Any"
     Type "(x: str) -> str" is not assignable to type "(self: Self@OpsHandler[T@OpsHandler], x: T@OpsHandler) -> T@OpsHandler"
-      Function accepts too many positional parameters; expected 1 but received 2
+      Function accepts too few positional parameters; expected 2 but received 1
         Parameter name mismatch: "self" versus "x"
         Parameter 1: type "Self@OpsHandler[T@OpsHandler]" is incompatible with type "str"
           "OpsHandler[T@OpsHandler]*" is not assignable to "str" (reportAssignmentType)
@@ -8637,7 +8641,7 @@
     Parameter 2 mismatch: base parameter "x" is keyword parameter, override parameter is position-only (reportIncompatibleMethodOverride)
   <CWD>/torch/_inductor/codegen/pallas.py:545:10 - error: Type "(x: str) -> str" is not assignable to declared type "(self: Self@OpsHandler[T@OpsHandler], x: Any) -> Any"
     Type "(x: str) -> str" is not assignable to type "(self: Self@OpsHandler[T@OpsHandler], x: T@OpsHandler) -> T@OpsHandler"
-      Function accepts too many positional parameters; expected 1 but received 2
+      Function accepts too few positional parameters; expected 2 but received 1
         Parameter name mismatch: "self" versus "x"
         Parameter 1: type "Self@OpsHandler[T@OpsHandler]" is incompatible with type "str"
           "OpsHandler[T@OpsHandler]*" is not assignable to "str" (reportAssignmentType)
@@ -8660,14 +8664,14 @@
     Parameter 3 mismatch: base parameter "y" is keyword parameter, override parameter is position-only (reportIncompatibleMethodOverride)
   <CWD>/torch/_inductor/codegen/pallas.py:563:14 - error: Type "(x: str, y: str) -> str" is not assignable to declared type "(self: Self@OpsHandler[T@OpsHandler], x: Any, y: Any) -> Any"
     Type "(x: str, y: str) -> str" is not assignable to type "(self: Self@OpsHandler[T@OpsHandler], x: T@OpsHandler, y: T@OpsHandler) -> T@OpsHandler"
-      Function accepts too many positional parameters; expected 2 but received 3
+      Function accepts too few positional parameters; expected 3 but received 2
         Parameter name mismatch: "self" versus "x"
         Parameter 1: type "Self@OpsHandler[T@OpsHandler]" is incompatible with type "str"
           "OpsHandler[T@OpsHandler]*" is not assignable to "str"
         Parameter name mismatch: "x" versus "y" (reportAssignmentType)
   <CWD>/torch/_inductor/codegen/pallas.py:565:15 - error: Type "(x: str, y: str) -> str" is not assignable to declared type "(self: Self@OpsHandler[T@OpsHandler], x: Any, y: Any) -> Any"
     Type "(x: str, y: str) -> str" is not assignable to type "(self: Self@OpsHandler[T@OpsHandler], x: T@OpsHandler, y: T@OpsHandler) -> T@OpsHandler"
-      Function accepts too many positional parameters; expected 2 but received 3
+      Function accepts too few positional parameters; expected 3 but received 2
         Parameter name mismatch: "self" versus "x"
         Parameter 1: type "Self@OpsHandler[T@OpsHandler]" is incompatible with type "str"
           "OpsHandler[T@OpsHandler]*" is not assignable to "str"
@@ -8879,12 +8883,12 @@
   <CWD>/torch/_inductor/codegen/simd.py:144:6 - error: Argument of type "CachedMethod[(), bool]" cannot be assigned to parameter "fget" of type "((Any) -> Any) | None" in function "__init__"
     Type "CachedMethod[(), bool]" is not assignable to type "((Any) -> Any) | None"
       Type "CachedMethod[(), bool]" is not assignable to type "(Any) -> Any"
-        Function accepts too many positional parameters; expected 0 but received 1
+        Function accepts too few positional parameters; expected 1 but received 0
       "CachedMethod[(), bool]" is not assignable to "None" (reportArgumentType)
   <CWD>/torch/_inductor/codegen/simd.py:152:6 - error: Argument of type "CachedMethod[(), SymT]" cannot be assigned to parameter "fget" of type "((Any) -> Any) | None" in function "__init__"
     Type "CachedMethod[(), SymT]" is not assignable to type "((Any) -> Any) | None"
       Type "CachedMethod[(), SymT]" is not assignable to type "(Any) -> Any"
-        Function accepts too many positional parameters; expected 0 but received 1
+        Function accepts too few positional parameters; expected 1 but received 0
       "CachedMethod[(), SymT]" is not assignable to "None" (reportArgumentType)
   <CWD>/torch/_inductor/codegen/simd.py:373:22 - error: Cannot access attribute "cache_clear" for class "FunctionType"
     Attribute "cache_clear" is unknown (reportFunctionMemberAccess)
@@ -8900,7 +8904,7 @@
   <CWD>/torch/_inductor/codegen/simd.py:625:6 - error: Argument of type "CachedMethod[(), int]" cannot be assigned to parameter "fget" of type "((Any) -> Any) | None" in function "__init__"
     Type "CachedMethod[(), int]" is not assignable to type "((Any) -> Any) | None"
       Type "CachedMethod[(), int]" is not assignable to type "(Any) -> Any"
-        Function accepts too many positional parameters; expected 0 but received 1
+        Function accepts too few positional parameters; expected 1 but received 0
       "CachedMethod[(), int]" is not assignable to "None" (reportArgumentType)
   <CWD>/torch/_inductor/codegen/simd.py:630:41 - error: "dtype" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/codegen/simd.py:633:55 - error: "dtype" is not a known attribute of module "torch" (reportAttributeAccessIssue)
@@ -9174,7 +9178,7 @@
   <CWD>/torch/_inductor/codegen/wrapper_fxir.py:177:6 - error: Argument of type "CachedMethod[(), bool]" cannot be assigned to parameter "fget" of type "((Any) -> Any) | None" in function "__init__"
     Type "CachedMethod[(), bool]" is not assignable to type "((Any) -> Any) | None"
       Type "CachedMethod[(), bool]" is not assignable to type "(Any) -> Any"
-        Function accepts too many positional parameters; expected 0 but received 1
+        Function accepts too few positional parameters; expected 1 but received 0
       "CachedMethod[(), bool]" is not assignable to "None" (reportArgumentType)
   <CWD>/torch/_inductor/codegen/wrapper_fxir.py:196:16 - error: Type "dict[str, TensorBox | TorchBindObject | Expr]" is not assignable to return type "dict[str, TensorBox | TorchBindObject | Expr | None]"
     "dict[str, TensorBox | TorchBindObject | Expr]" is not assignable to "dict[str, TensorBox | TorchBindObject | Expr | None]"
@@ -28413,7 +28417,7 @@
 <CWD>/torch/distributed/tensor/_ops/single_dim_strategy.py
   <CWD>/torch/distributed/tensor/_ops/single_dim_strategy.py:143:17 - error: Argument of type "partial[_StridedShard]" cannot be assigned to parameter "value" of type "(int) -> Placement" in function "__setitem__"
     Type "partial[_StridedShard]" is not assignable to type "(int) -> Placement"
-      Function accepts too many positional parameters; expected 0 but received 1 (reportArgumentType)
+      Function accepts too few positional parameters; expected 1 but received 0 (reportArgumentType)
   <CWD>/torch/distributed/tensor/_ops/single_dim_strategy.py:144:36 - error: No parameter named "split_factor" (reportCallIssue)
 <CWD>/torch/distributed/tensor/_ops/strategy_validation.py
   <CWD>/torch/distributed/tensor/_ops/strategy_validation.py:245:45 - error: "bool" is not a known attribute of module "torch" (reportAttributeAccessIssue)
@@ -31156,10 +31160,10 @@
   <CWD>/torch/jit/_script.py:1270:26 - error: "_recursive" is not a known attribute of module "torch.jit" (reportAttributeAccessIssue)
   <CWD>/torch/jit/_script.py:1511:21 - error: "prev" is possibly unbound (reportPossiblyUnboundVariable)
   <CWD>/torch/jit/_script.py:1667:34 - error: "_jit_script_interface_compile" is not a known attribute of module "torch" (reportAttributeAccessIssue)
-  <CWD>/torch/jit/_script.py:1670:9 - error: Cannot assign to attribute "__torch_script_interface__" for class "type[Module]"
+  <CWD>/torch/jit/_script.py:1670:9 - error: Cannot assign to attribute "__torch_script_interface__" for class "type[object]*"
     Attribute "__torch_script_interface__" is unknown (reportAttributeAccessIssue)
-  <CWD>/torch/jit/_script.py:1671:12 - error: Type "type[Any] | type[Module]" is not assignable to return type "_T@interface"
-    Type "type[Any] | type[Module]" is not assignable to type "_T@interface" (reportReturnType)
+  <CWD>/torch/jit/_script.py:1670:9 - error: Cannot assign to attribute "__torch_script_interface__" for class "type[Module]*"
+    Attribute "__torch_script_interface__" is unknown (reportAttributeAccessIssue)
   <CWD>/torch/jit/_script.py:1683:28 - error: "CompilationUnit" is not a known attribute of module "torch" (reportAttributeAccessIssue)
 <CWD>/torch/jit/_script.pyi
   <CWD>/torch/jit/_script.pyi:53:27 - error: "ScriptFunction" is not a known attribute of module "torch" (reportAttributeAccessIssue)
@@ -34897,7 +34901,6 @@
 <CWD>/torch/sparse/_triton_ops_meta.py
   <CWD>/torch/sparse/_triton_ops_meta.py:491:12 - error: Import "triton" could not be resolved (reportMissingImports)
   <CWD>/torch/sparse/_triton_ops_meta.py:644:12 - error: Import "triton" could not be resolved (reportMissingImports)
-  <CWD>/torch/sparse/_triton_ops_meta.py:907:32 - error: Import "triton" could not be resolved (reportMissingImports)
   <CWD>/torch/sparse/_triton_ops_meta.py:977:65 - error: "int8" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/sparse/_triton_ops_meta.py:2197:65 - error: "int8" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/sparse/_triton_ops_meta.py:2259:65 - error: "int8" is not a known attribute of module "torch" (reportAttributeAccessIssue)
@@ -36160,4 +36163,4 @@
   <CWD>/torch/xpu/streams.py:106:22 - error: "_XpuEventBase" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/xpu/streams.py:124:45 - error: "Stream" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/xpu/streams.py:135:43 - error: "Stream" is not a known attribute of module "torch" (reportAttributeAccessIssue)
-23892 errors, 540 warnings, 0 informations
+23893 errors, 540 warnings, 0 informations

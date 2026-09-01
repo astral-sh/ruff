@@ -7,7 +7,7 @@ reveal_type(2 + 1)  # revealed: Literal[3]
 reveal_type(3 - 4)  # revealed: Literal[-1]
 reveal_type(3 * -1)  # revealed: Literal[-3]
 reveal_type(-3 // 3)  # revealed: Literal[-1]
-reveal_type(-3 / 3)  # revealed: float
+reveal_type(-3 / 3)  # revealed: float*
 reveal_type(5 % 3)  # revealed: Literal[2]
 reveal_type(3 | 4)  # revealed: Literal[7]
 reveal_type(5 & 6)  # revealed: Literal[4]
@@ -21,7 +21,7 @@ def lhs(x: int):
     reveal_type(x - 4)  # revealed: int
     reveal_type(x * -1)  # revealed: int
     reveal_type(x // 3)  # revealed: int
-    reveal_type(x / 3)  # revealed: int | float
+    reveal_type(x / 3)  # revealed: float
     reveal_type(x % 3)  # revealed: int
 
 def rhs(x: int):
@@ -29,7 +29,7 @@ def rhs(x: int):
     reveal_type(3 - x)  # revealed: int
     reveal_type(3 * x)  # revealed: int
     reveal_type(-3 // x)  # revealed: int
-    reveal_type(-3 / x)  # revealed: int | float
+    reveal_type(-3 / x)  # revealed: float
     reveal_type(5 % x)  # revealed: int
 
 def both(x: int):
@@ -37,7 +37,7 @@ def both(x: int):
     reveal_type(x - x)  # revealed: int
     reveal_type(x * x)  # revealed: int
     reveal_type(x // x)  # revealed: int
-    reveal_type(x / x)  # revealed: int | float
+    reveal_type(x / x)  # revealed: float
     reveal_type(x % x)  # revealed: int
 
 # Edge case: the runtime value is 9223372036854775808,
@@ -70,8 +70,8 @@ reveal_type(1**0)  # revealed: Literal[1]
 reveal_type(0**1)  # revealed: Literal[0]
 reveal_type(0**0)  # revealed: Literal[1]
 reveal_type((-1) ** 2)  # revealed: Literal[1]
-reveal_type(2 ** (-1))  # revealed: float
-reveal_type((-1) ** (-1))  # revealed: float
+reveal_type(2 ** (-1))  # revealed: float*
+reveal_type((-1) ** (-1))  # revealed: float*
 ```
 
 ## Division and Modulus
@@ -117,7 +117,7 @@ subclass; we only emit the error if the LHS type is exactly `int` or `float`, no
 
 ```py
 a = 1 / 0  # error: "Cannot divide object of type `Literal[1]` by zero"
-reveal_type(a)  # revealed: float
+reveal_type(a)  # revealed: float*
 
 b = 2 // 0  # error: "Cannot floor divide object of type `Literal[2]` by zero"
 reveal_type(b)  # revealed: int
@@ -126,22 +126,22 @@ c = 3 % 0  # error: "Cannot reduce object of type `Literal[3]` modulo zero"
 reveal_type(c)  # revealed: int
 
 # error: "Cannot divide object of type `int` by zero"
-reveal_type(int() / 0)  # revealed: int | float
+reveal_type(int() / 0)  # revealed: float
 
 # error: "Cannot divide object of type `Literal[1]` by zero"
-reveal_type(1 / False)  # revealed: float
+reveal_type(1 / False)  # revealed: float*
 # error: [division-by-zero] "Cannot divide object of type `Literal[True]` by zero"
 True / False
 # error: [division-by-zero] "Cannot divide object of type `Literal[True]` by zero"
 bool(1) / False
 
-# error: "Cannot divide object of type `float` by zero"
-reveal_type(1.0 / 0)  # revealed: int | float
+# error: "Cannot divide object of type `float*` by zero"
+reveal_type(1.0 / 0)  # revealed: float
 
 class MyInt(int): ...
 
 # No error for a subclass of int
-reveal_type(MyInt(3) / 0)  # revealed: int | float
+reveal_type(MyInt(3) / 0)  # revealed: float
 ```
 
 ## Bit-shifting

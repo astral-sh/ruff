@@ -24,4 +24,3 @@ TC010 Invalid string member in `X | Y`-style union type
 6 | a: TypeAlias = 'int | None'  # TC008
 7 | b: TypeAlias = 'int' | None  # TC010
   |                ^^^^^
-  |

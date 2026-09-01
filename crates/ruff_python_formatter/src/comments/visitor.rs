@@ -8,7 +8,7 @@ use ruff_python_ast::{Mod, Stmt};
 // pre-order.
 #[allow(clippy::wildcard_imports)]
 use ruff_python_ast::visitor::source_order::*;
-use ruff_python_trivia::{CommentLinePosition, CommentRanges};
+use ruff_python_trivia::{CommentLinePosition, CommentRanges, TriviaRanges};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::comments::node_key::NodeRefEqualityKey;
@@ -534,13 +534,13 @@ impl<'a> PushComment<'a> for CommentsVecBuilder<'a> {
 pub(super) struct CommentsMapBuilder<'a> {
     comments: CommentsMap<'a>,
     /// We need those for backwards lexing
-    comment_ranges: &'a CommentRanges,
+    trivia: &'a TriviaRanges,
     source: &'a str,
 }
 
 impl<'a> PushComment<'a> for CommentsMapBuilder<'a> {
     fn push_comment(&mut self, placement: DecoratedComment<'a>) {
-        let placement = place_comment(placement, self.comment_ranges, self.source);
+        let placement = place_comment(placement, self.trivia, self.source);
         match placement {
             CommentPlacement::Leading { node, comment } => {
                 self.push_leading_comment(node, comment);
@@ -602,10 +602,10 @@ impl<'a> PushComment<'a> for CommentsMapBuilder<'a> {
 }
 
 impl<'a> CommentsMapBuilder<'a> {
-    pub(crate) fn new(source: &'a str, comment_ranges: &'a CommentRanges) -> Self {
+    pub(crate) fn new(source: &'a str, trivia: &'a TriviaRanges) -> Self {
         Self {
             comments: CommentsMap::default(),
-            comment_ranges,
+            trivia,
             source,
         }
     }

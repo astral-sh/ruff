@@ -121,27 +121,39 @@ def _(target: int):
 ## Value match
 
 A value pattern matches based on equality: the first `case` branch here will be taken if `subject`
-is equal to `2`, even if `subject` is not an instance of `int`. We can't know whether `C` here has a
-custom `__eq__` implementation that might cause it to compare equal to `2`, so we have to consider
-the possibility that the `case` branch might be taken even though the type `C` is disjoint from the
-type `Literal[2]`.
+is equal to `2`, even if `subject` is not an instance of `int`. By default, we assume that
+subclasses of `C` do not override equality, so the `case` branch cannot be taken when the type `C`
+is disjoint from the type `Literal[2]`.
 
-This leads us to infer `Literal[1, 3]` as the type of `y` after the `match` statement, rather than
-`Literal[1]`:
+This leads us to infer `Literal[1]` as the type of `y` after the `match` statement:
 
 ```py
-from typing import final
-
-@final
-class C:
-    pass
+class C: ...
 
 def _(subject: C):
     y = 1
     match subject:
         case 2:
             y = 3
-    reveal_type(y)  # revealed: Literal[1, 3]
+    reveal_type(y)  # revealed: Literal[1]
+```
+
+However, in this variant, we can prove that `D` here does not have a custom `__eq__` implementation,
+since it is `@final`. This means that we know it does not compare equal to `2`, allowing us to infer
+`Literal[1]` after the `match` statement
+
+```py
+from typing import final
+
+@final
+class D: ...
+
+def _(subject: D):
+    y = 1
+    match subject:
+        case 2:
+            y = 3
+    reveal_type(y)  # revealed: Literal[1]
 ```
 
 ## Class match
@@ -209,7 +221,8 @@ def _(target: FooSub | str):
 
 ### Dynamic class
 
-A dynamically typed class pattern is not known to match every subject, so later cases remain
+A dynamically typed class expression may match any value, but we cannot prove which values it does
+not match. The failed branch therefore keeps the original subject type, and later cases remain
 reachable.
 
 ```py
@@ -219,11 +232,12 @@ DynamicClass: Any = int
 
 def _(target: int | str):
     match target:
-        case DynamicClass():
+        case DynamicClass() as whole:
             reveal_type(target)  # revealed: (int & Any) | (str & Any)
+            reveal_type(whole)  # revealed: (int & Any) | (str & Any)
             y = 1
         case _:
-            reveal_type(target)  # revealed: (int & Any) | (str & Any)
+            reveal_type(target)  # revealed: int | str
             y = 2
 
     reveal_type(y)  # revealed: Literal[1, 2]
@@ -334,6 +348,15 @@ def _(target: Point | Other):
             reveal_type(target)  # revealed: Point
         case Other():
             reveal_type(target)  # revealed: Other
+
+def missing_attribute_does_not_make_or_pattern_exhaustive(target: Point):
+    y = 1
+
+    match target:
+        case Point(missing=_) | Other():
+            y = 2
+
+    reveal_type(y)  # revealed: Literal[1, 2]
 ```
 
 ## Singleton match
@@ -543,9 +566,9 @@ the subject after that pattern succeeds.
 ### Value-pattern aliases
 
 Value patterns use `==`, and `as` binds the original subject rather than the value written in the
-pattern. An `int` or `str` subclass can define `__eq__` so that it compares equal to `1`, so `x`
-remains `int | str` in the first branch. If that branch fails, we can rule out the exact integer
-literal `1` and `True`, which compares equal to `1`, but not the rest of either class.
+pattern. Broad builtin types are treated as if they use builtin equality, so matching `1` narrows
+`x` to that integer literal without adding the boolean literal that compares equal to it. After that
+pattern fails, matching `"foo"` narrows `x` to that string literal.
 
 ```py
 def _(target: int | str):
@@ -554,14 +577,33 @@ def _(target: int | str):
     match target:
         case 1 as x:
             y = 2
-            reveal_type(x)  # revealed: int | str
+            reveal_type(x)  # revealed: Literal[1]
         case "foo" as x:
             y = 3
-            reveal_type(x)  # revealed: (int & ~Literal[1] & ~Literal[True]) | str
+            reveal_type(x)  # revealed: Literal["foo"]
         case _:
             y = 4
 
     reveal_type(y)  # revealed: Literal[2, 3, 4]
+```
+
+### Enabling strict equality narrowing
+
+With strict equality narrowing enabled, broad builtin types are preserved both in the capture and
+when narrowing the subject for later cases:
+
+```toml
+[analysis]
+strict-equality-semantics = true
+```
+
+```py
+def _(target: int | str):
+    match target:
+        case 1 as x:
+            reveal_type(x)  # revealed: int | str
+        case "foo" as x:
+            reveal_type(x)  # revealed: (int & ~Literal[1] & ~Literal[True]) | str
 ```
 
 ### Narrowing a value alias

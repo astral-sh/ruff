@@ -325,7 +325,7 @@ def foo(
         )?
         .with_file(foo, foo_content)?
         .with_initialization_options(
-            ClientOptions::default()
+            &ClientOptions::default()
                 .with_show_syntax_errors(false)
                 .with_diagnostic_mode(DiagnosticMode::Workspace),
         )
@@ -544,6 +544,68 @@ def foo() -> str:
 }
 
 #[test]
+fn document_diagnostic_caching_rendered_source_changed() -> Result<()> {
+    let _filter = filter_result_id();
+
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let foo_content_v1 = "\
+def foo() -> str:
+    return 42  # before
+";
+    let foo_content_v2 = "\
+def foo() -> str:
+    return 42  # after!
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(workspace_root, None)?
+        .with_file(foo, foo_content_v1)?
+        .with_full_diagnostic_output()
+        .enable_pull_diagnostics(true)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(foo, foo_content_v1, 1);
+
+    let first_response = server.document_diagnostic_request(foo, None);
+    let result_id = match &first_response {
+        DocumentDiagnosticReport::RelatedFullDocumentDiagnosticReport(report) => report
+            .full_document_diagnostic_report
+            .result_id
+            .clone()
+            .expect("First response should have a result ID"),
+        DocumentDiagnosticReport::RelatedUnchangedDocumentDiagnosticReport(_) => {
+            panic!("First response should be a full report")
+        }
+    };
+    assert_debug_snapshot!(
+        "document_diagnostic_caching_rendered_source_before",
+        first_response
+    );
+
+    server.change_text_document(
+        foo,
+        vec![
+            lsp_types::TextDocumentContentChangeEvent::TextDocumentContentChangeWholeDocument(
+                TextDocumentContentChangeWholeDocument {
+                    text: foo_content_v2.to_string(),
+                },
+            ),
+        ],
+        2,
+    );
+
+    let second_response = server.document_diagnostic_request(foo, Some(result_id));
+    assert_debug_snapshot!(
+        "document_diagnostic_caching_rendered_source_after",
+        second_response
+    );
+
+    Ok(())
+}
+
+#[test]
 fn workspace_diagnostic_caching() -> Result<()> {
     let _filter = filter_result_id();
 
@@ -606,7 +668,7 @@ def foo() -> str:
     let mut server = TestServerBuilder::new()?
         .with_workspace(workspace_root, None)?
         .with_initialization_options(
-            ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
+            &ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
         )
         .with_file(file_a, file_a_content)?
         .with_file(file_b, file_b_content_v1)?
@@ -729,7 +791,7 @@ def foo() -> str:
         .with_workspace(workspace_root, None)?
         .with_file(foo, foo_content)?
         .with_initialization_options(
-            ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
+            &ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
         )
         .build()
         .wait_until_workspaces_are_initialized();
@@ -819,7 +881,7 @@ def foo() -> str:
     let mut builder = TestServerBuilder::new()?
         .with_workspace(workspace_root, None)?
         .with_initialization_options(
-            ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
+            &ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
         );
 
     for i in 0..NUM_FILES {
@@ -896,7 +958,7 @@ fn workspace_diagnostic_streaming_with_caching() -> Result<()> {
     let mut builder = TestServerBuilder::new()?
         .with_workspace(workspace_root, None)?
         .with_initialization_options(
-            ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
+            &ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
         );
 
     for i in 0..NUM_FILES {
@@ -1007,7 +1069,7 @@ fn workspace_diagnostic_streaming_with_caching() -> Result<()> {
     Ok(())
 }
 
-fn sort_workspace_diagnostic_response(response: &mut WorkspaceDiagnosticReport) {
+pub(crate) fn sort_workspace_diagnostic_response(response: &mut WorkspaceDiagnosticReport) {
     sort_workspace_report_items(&mut response.items);
 }
 
@@ -1330,7 +1392,7 @@ fn create_workspace_server_with_file(
         .with_workspace(workspace_root, None)?
         .with_file(file_path, file_content)?
         .with_initialization_options(
-            ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
+            &ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
         )
         .build()
         .wait_until_workspaces_are_initialized())
@@ -1416,4 +1478,160 @@ fn extract_result_ids_from_response(response: &WorkspaceDiagnosticReport) -> Vec
             }
         })
         .collect()
+}
+
+mod uv_metadata {
+    use lsp_types::{
+        Code, Position, Range, TextDocumentContentChangeEvent,
+        TextDocumentContentChangeWholeDocument,
+    };
+    use ty_project::UseUv;
+
+    use super::{
+        ClientOptions, DiagnosticMode, DocumentDiagnosticReport, Result, SystemPath,
+        TestServerBuilder, WorkspaceDocumentDiagnosticReport,
+    };
+
+    #[test]
+    fn opening_new_file_updates_workspace_index() -> Result<()> {
+        let added = SystemPath::new("src/added.py");
+        let source = "missing\n";
+
+        let mut server = TestServerBuilder::new()?
+            .with_workspace(
+                SystemPath::new("src"),
+                Some(ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace)),
+            )?
+            .with_file(SystemPath::new("src/initial.py"), source)?
+            .with_use_uv(UseUv::Scripts)
+            .build()
+            .wait_until_workspaces_are_initialized();
+
+        // Build the index before creating the file, without sending a watcher event.
+        let _ = server.workspace_diagnostic_request(None, None);
+        server.write_file(added, source)?;
+        server.open_text_document(added, source, 1);
+
+        let uri = server.file_uri(added);
+        let diagnostics = server.workspace_diagnostic_request(None, None);
+        assert!(diagnostics.items.iter().any(|report| matches!(
+            report,
+            WorkspaceDocumentDiagnosticReport::WorkspaceFullDocumentDiagnosticReport(report)
+                if report.uri == uri
+        )));
+
+        Ok(())
+    }
+
+    #[test]
+    fn synchronization_failure_highlights_script_metadata() -> Result<()> {
+        let workspace_root = SystemPath::new("src");
+        let script = SystemPath::new("src/script.py");
+        let source =
+            "#!/usr/bin/env python3\n\n# /// script\n# dependencies = []\n# ///\nvalue = 1\n";
+
+        let mut server = TestServerBuilder::new()?
+            .with_workspace(workspace_root, None)?
+            .with_file(script, source)?
+            .with_use_uv(UseUv::Scripts)
+            .with_env_var("UV", "missing-ty-script-uv-executable")
+            .enable_workspace_diagnostic_refresh(true)
+            .build()
+            .wait_until_workspaces_are_initialized();
+
+        server.open_text_document(script, source, 1);
+        server.await_diagnostic_refresh();
+        let report = server.document_diagnostic_request(script, None);
+        let DocumentDiagnosticReport::RelatedFullDocumentDiagnosticReport(report) = report else {
+            anyhow::bail!("expected a full diagnostic report for the script");
+        };
+
+        let diagnostic = report
+            .full_document_diagnostic_report
+            .items
+            .iter()
+            .find(|diagnostic| diagnostic.code == Some(Code::String("uv-metadata".to_string())))
+            .ok_or_else(|| {
+                anyhow::anyhow!("expected the script synchronization error: {report:?}")
+            })?;
+
+        assert_eq!(
+            diagnostic.range,
+            Range::new(Position::new(2, 0), Position::new(4, 5))
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn unsaved_script_uses_its_settings_and_keeps_diagnostics() -> Result<()> {
+        let workspace_root = SystemPath::new("src");
+        let script = SystemPath::new("src/script.py");
+        let initial = "PythonFinalizationError\nmissing\n";
+        let updated = "# /// script\n# requires-python = '>=3.13'\n# dependencies = []\n# ///\nPythonFinalizationError\nmissing\n";
+
+        let mut server = TestServerBuilder::new()?
+            .with_workspace(workspace_root, None)?
+            .with_file(script, initial)?
+            .with_file(
+                SystemPath::new("src/ty.toml"),
+                "[environment]\npython-version = '3.12'\n",
+            )?
+            .with_use_uv(UseUv::Scripts)
+            .with_env_var("UV", "missing-ty-script-uv-executable")
+            .enable_workspace_diagnostic_refresh(true)
+            .build()
+            .wait_until_workspaces_are_initialized();
+
+        server.open_text_document(script, initial, 1);
+
+        let report = server.document_diagnostic_request(script, None);
+        let DocumentDiagnosticReport::RelatedFullDocumentDiagnosticReport(report) = report else {
+            anyhow::bail!("expected a full diagnostic report for the ordinary file");
+        };
+        assert_eq!(report.full_document_diagnostic_report.items.len(), 2);
+
+        server.change_text_document(
+            script,
+            vec![
+                TextDocumentContentChangeEvent::TextDocumentContentChangeWholeDocument(
+                    TextDocumentContentChangeWholeDocument {
+                        text: updated.to_string(),
+                    },
+                ),
+            ],
+            2,
+        );
+
+        let report = server.document_diagnostic_request(script, None);
+        let DocumentDiagnosticReport::RelatedFullDocumentDiagnosticReport(report) = report else {
+            anyhow::bail!("expected a full diagnostic report for the provisional script");
+        };
+        let [diagnostic] = report.full_document_diagnostic_report.items.as_slice() else {
+            anyhow::bail!("expected only the unresolved `missing` reference");
+        };
+        assert_eq!(
+            diagnostic.code,
+            Some(Code::String("unresolved-reference".to_string()))
+        );
+        assert_eq!(diagnostic.range.start.line, 5);
+
+        server.write_file(script, updated)?;
+        server.save_text_document(script);
+        server.await_diagnostic_refresh();
+
+        let report = server.document_diagnostic_request(script, None);
+        let DocumentDiagnosticReport::RelatedFullDocumentDiagnosticReport(report) = report else {
+            anyhow::bail!("expected a full diagnostic report for the synchronized script");
+        };
+        assert!(
+            report
+                .full_document_diagnostic_report
+                .items
+                .iter()
+                .any(|diagnostic| diagnostic.code == Some(Code::String("uv-metadata".to_string())))
+        );
+
+        Ok(())
+    }
 }

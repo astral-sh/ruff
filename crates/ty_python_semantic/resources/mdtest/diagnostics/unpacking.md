@@ -12,7 +12,6 @@ error[not-iterable]: Object of type `Literal[1]` is not iterable
   |
 1 | a, b = 1  # snapshot: not-iterable
   |        ^
-  |
 info: It doesn't have an `__iter__` method or a `__getitem__` method
 ```
 
@@ -30,7 +29,6 @@ error[invalid-assignment]: Too many values to unpack
   | ^^^^   --------- Got 3
   | |
   | Expected 2
-  |
 ```
 
 ## Exactly too few values to unpack
@@ -47,7 +45,6 @@ error[invalid-assignment]: Not enough values to unpack
   | ^^^^   ---- Got 1
   | |
   | Expected 2
-  |
 ```
 
 ## Too few values to unpack
@@ -64,5 +61,4 @@ error[invalid-assignment]: Not enough values to unpack
   | ^^^^^^^^^^^^^   ------ Got 2
   | |
   | Expected at least 3
-  |
 ```

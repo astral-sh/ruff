@@ -171,7 +171,6 @@ UP010 [*] Unnecessary `__future__` import `generators` for target Python version
 14 |     from __future__ import invalid_module, generators
 15 |     from __future__ import generators  # comment
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Remove unnecessary `__future__` import
    |
 14 |     from __future__ import invalid_module, generators

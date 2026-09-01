@@ -219,8 +219,8 @@ Module(
   |
 3 | exept:  # spellchecker:disable-line
 4 |     pass
-  |         ^ Syntax Error: Expected a statement
 5 | finally:
+  | ^^^^^^^ Syntax Error: Expected a statement
 6 |     pass
 7 | a = 1
   |
@@ -257,16 +257,6 @@ Module(
   |
 
 
-  |
-5 | finally:
-6 |     pass
-  |         ^ Syntax Error: Expected a statement
-7 | a = 1
-8 | try:
-9 |     pass
-  |
-
-
    |
 10 | except:
 11 |     pass
@@ -282,13 +272,5 @@ Module(
 12 | exept:  # spellchecker:disable-line
 13 |     pass
    | ^^^^ Syntax Error: Unexpected indentation
-14 | b = 1
-   |
-
-
-   |
-12 | exept:  # spellchecker:disable-line
-13 |     pass
-   |         ^ Syntax Error: Expected a statement
 14 | b = 1
    |

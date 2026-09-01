@@ -35,7 +35,7 @@ pub(crate) enum Command {
     Check(CheckCommand),
 
     /// Start the language server
-    Server,
+    Server(ServerCommand),
 
     /// Display ty's version
     Version {
@@ -101,11 +101,11 @@ pub(crate) struct CheckCommand {
     ///
     /// [`sys.prefix`]: https://docs.python.org/3/library/sys.html#sys.prefix
     #[arg(long, value_name = "PATH", alias = "venv")]
-    pub(crate) python: Option<SystemPathBuf>,
+    python: Option<SystemPathBuf>,
 
     /// Custom directory to use for stdlib typeshed stubs.
     #[arg(long, value_name = "PATH", alias = "custom-typeshed-dir")]
-    pub(crate) typeshed: Option<SystemPathBuf>,
+    typeshed: Option<SystemPathBuf>,
 
     /// Additional path to use as a module-resolution source (can be passed multiple times).
     ///
@@ -113,7 +113,7 @@ pub(crate) struct CheckCommand {
     /// modules that are not installed into your Python environment in a conventional way.
     /// Use `--python` to point ty to your Python environment if it is in an unusual location.
     #[arg(long, value_name = "PATH")]
-    pub(crate) extra_search_path: Option<Vec<SystemPathBuf>>,
+    extra_search_path: Option<Vec<SystemPathBuf>>,
 
     /// Python version to assume when resolving types.
     ///
@@ -128,7 +128,7 @@ pub(crate) struct CheckCommand {
     ///    and attempt to infer the Python version of that environment
     /// 3. Fall back to the latest stable Python version supported by ty (see `ty check --help` output)
     #[arg(long, value_name = "VERSION", alias = "target-version", value_enum)]
-    pub(crate) python_version: Option<PythonVersion>,
+    python_version: Option<PythonVersion>,
 
     /// Target platform to assume when resolving types.
     ///
@@ -137,16 +137,16 @@ pub(crate) struct CheckCommand {
     /// assumptions are made about the target platform. If unspecified, the current system's
     /// platform will be used.
     #[arg(long, value_name = "PLATFORM", alias = "platform")]
-    pub(crate) python_platform: Option<String>,
+    python_platform: Option<String>,
 
     #[clap(flatten)]
     pub(crate) verbosity: Verbosity,
 
     #[clap(flatten)]
-    pub(crate) rules: RulesArg,
+    rules: RulesArg,
 
     #[clap(flatten)]
-    pub(crate) config: ConfigsArg,
+    config: ConfigsArg,
 
     /// The path to a `ty.toml` file to use for configuration.
     ///
@@ -156,13 +156,13 @@ pub(crate) struct CheckCommand {
 
     /// The format to use for printing diagnostic messages.
     #[arg(long, env = EnvVars::TY_OUTPUT_FORMAT)]
-    pub(crate) output_format: Option<OutputFormat>,
+    output_format: Option<OutputFormat>,
 
     /// Use exit code 1 if there are any warning-level diagnostics.
     ///
     /// Cannot be used in combination with `--exit-zero` or `--exit-zero-on-warning`.
     #[arg(long, conflicts_with = "exit_zero", default_missing_value = "true", num_args=0..1)]
-    pub(crate) error_on_warning: Option<bool>,
+    error_on_warning: Option<bool>,
 
     /// Always use exit code 0, even when there are error-level diagnostics.
     ///
@@ -174,7 +174,7 @@ pub(crate) struct CheckCommand {
     ///
     /// Cannot be used in combination with `--error-on-warning`.
     #[arg(long, conflicts_with = "error_on_warning")]
-    pub(crate) exit_zero_on_warning: bool,
+    exit_zero_on_warning: bool,
 
     /// Watch files for changes and recheck files related to the changed files.
     #[arg(long, short = 'W')]
@@ -203,6 +203,19 @@ pub(crate) struct CheckCommand {
     force_exclude: bool,
     #[clap(long, overrides_with("force_exclude"), hide = true)]
     no_force_exclude: bool,
+
+    /// Exclude files containing PEP 723 inline script metadata unless passed explicitly.
+    /// Use `--include-scripts` to disable.
+    #[arg(
+        long,
+        overrides_with("include_scripts"),
+        help_heading = "File selection",
+        default_missing_value = "true",
+        num_args = 0..1
+    )]
+    exclude_scripts: Option<bool>,
+    #[clap(long, overrides_with("exclude_scripts"), hide = true)]
+    include_scripts: bool,
 
     /// Glob patterns for files to exclude from type checking.
     ///
@@ -251,6 +264,10 @@ impl CheckCommand {
             .no_respect_ignore_files
             .then_some(false)
             .or(self.respect_ignore_files);
+        let exclude_scripts = self
+            .include_scripts
+            .then_some(false)
+            .or(self.exclude_scripts);
         let error_on_warning = self
             .exit_zero_on_warning
             .then_some(false)
@@ -279,6 +296,7 @@ impl CheckCommand {
             }),
             src: Some(SrcOptions {
                 respect_ignore_files,
+                exclude_scripts,
                 exclude: self.exclude.map(|excludes| {
                     RangedValue::cli(excludes.iter().map(RelativeGlobPattern::cli).collect())
                 }),
@@ -290,6 +308,19 @@ impl CheckCommand {
         // Merge with options passed in via --config
         options.combine(self.config.into_options().unwrap_or_default())
     }
+}
+
+#[derive(Debug, Parser)]
+pub(crate) struct ServerCommand {
+    /// Print the absolute path to the ty executable to use for the current folder.
+    ///
+    /// Discover the project from the current working directory. Use `environment.python` if it
+    /// is configured; otherwise, discover the Python environment in the normal order.
+    /// Print the path to ty if it is installed there.
+    /// If project discovery fails, use the current working directory as the discovery root.
+    /// Exit with status 0 if ty is found, 1 if discovery fails, or 2 on an unexpected error.
+    #[arg(long, hide = true)]
+    pub(crate) find_executable: bool,
 }
 
 /// A list of rules to enable or disable with a given severity.
@@ -352,7 +383,11 @@ impl clap::Args for RulesArg {
             clap::Arg::new("error")
                 .long("error")
                 .action(ArgAction::Append)
-                .help("Treat the given rule as having severity 'error'. Can be specified multiple times. Use 'all' to apply to all rules.")
+                .help(
+                    "Treat the given rule as having severity 'error'. \
+                    Can be specified multiple times. \
+                    Use 'all' to apply to all rules.",
+                )
                 .value_name("RULE")
                 .help_heading(HELP_HEADING),
         )
@@ -360,7 +395,11 @@ impl clap::Args for RulesArg {
             clap::Arg::new("warn")
                 .long("warn")
                 .action(ArgAction::Append)
-                .help("Treat the given rule as having severity 'warn'. Can be specified multiple times. Use 'all' to apply to all rules.")
+                .help(
+                    "Treat the given rule as having severity 'warn'. \
+                    Can be specified multiple times. \
+                    Use 'all' to apply to all rules.",
+                )
                 .value_name("RULE")
                 .help_heading(HELP_HEADING),
         )
@@ -368,7 +407,11 @@ impl clap::Args for RulesArg {
             clap::Arg::new("ignore")
                 .long("ignore")
                 .action(ArgAction::Append)
-                .help("Disables the rule. Can be specified multiple times. Use 'all' to apply to all rules.")
+                .help(
+                    "Disables the rule. \
+                    Can be specified multiple times. \
+                    Use 'all' to apply to all rules.",
+                )
                 .value_name("RULE")
                 .help_heading(HELP_HEADING),
         )
@@ -497,7 +540,7 @@ over all configuration files.",
 }
 
 impl ConfigsArg {
-    pub(crate) fn into_options(self) -> Option<Options> {
+    fn into_options(self) -> Option<Options> {
         self.0
     }
 }

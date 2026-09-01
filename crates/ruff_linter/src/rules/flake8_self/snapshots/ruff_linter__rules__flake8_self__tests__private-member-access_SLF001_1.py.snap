@@ -8,4 +8,3 @@ SLF001 Private member accessed: `_x`
 69 |         alias = self
 70 |         print(alias._x)  # error (self is not an instance parameter)
    |               ^^^^^^^^
-   |

@@ -11,12 +11,12 @@ Many items that are callable can also be generic. Generic functions are the most
 
 ```py
 from typing import Callable
-from ty_extensions import generic_context
+from ty_extensions._internal import generic_context
 
 def identity[T](t: T) -> T:
     return t
 
-# revealed: ty_extensions.GenericContext[T@identity]
+# revealed: ty_extensions._internal.GenericContext[T@identity]
 reveal_type(generic_context(identity))
 # revealed: Literal[1]
 reveal_type(identity(1))
@@ -24,7 +24,7 @@ reveal_type(identity(1))
 def identity2[**P, T](c: Callable[P, T]) -> Callable[P, T]:
     return c
 
-# revealed: ty_extensions.GenericContext[P@identity2, T@identity2]
+# revealed: ty_extensions._internal.GenericContext[P@identity2, T@identity2]
 reveal_type(generic_context(identity2))
 # revealed: [T](t: T) -> T
 reveal_type(identity2(identity))
@@ -45,37 +45,122 @@ class C[T]:
 
     def __init__(self, t: T) -> None: ...
 
-# revealed: ty_extensions.GenericContext[T@C]
+# revealed: ty_extensions._internal.GenericContext[T@C]
 reveal_type(generic_context(C))
 # revealed: C[int]
 reveal_type(C(1))
 ```
 
+Explicit generic receiver annotations constrain a bound method's callable type:
+
+```py
+from typing import Callable
+
+class GenericReceiver:
+    def method[T](self: T, value: T) -> T:
+        return self
+
+receiver = GenericReceiver()
+
+# Binding adds `GenericReceiver <= T`. `T = object` satisfies that constraint, but `T = int` does
+# not.
+accepts_object: Callable[[object], object] = receiver.method
+accepts_int: Callable[[int], int] = receiver.method  # error: [invalid-assignment]
+```
+
+The receiver must also satisfy a method type variable's declared bound or constraints:
+
+```py
+from typing import Callable
+
+class InvalidBoundedReceiver:
+    def method[T: int](self: T) -> None: ...
+
+class ValidBoundedReceiver(int):
+    def method[T: int](self: T) -> None: ...
+
+class InvalidConstrainedReceiver:
+    def method[T: (int, str)](self: T) -> None: ...
+
+class ValidConstrainedReceiver(str):
+    def method[T: (int, str)](self: T) -> None: ...
+
+type ReceiverAlias[T] = T
+
+class InvalidAliasedBoundedReceiver:
+    def method[T: int](self: ReceiverAlias[T]) -> None: ...
+
+class InvalidNestedBoundedReceiver(list[str]):
+    def method[T: int](self: list[T]) -> None: ...
+
+class InvalidUnionConstrainedReceiver:
+    def method[T: (int, str)](self: T | None) -> None: ...
+
+invalid_bound: Callable[[], None] = InvalidBoundedReceiver().method  # error: [invalid-assignment]
+valid_bound: Callable[[], None] = ValidBoundedReceiver().method
+
+invalid_constraints: Callable[[], None] = InvalidConstrainedReceiver().method  # error: [invalid-assignment]
+valid_constraints: Callable[[], None] = ValidConstrainedReceiver().method
+
+invalid_aliased_bound: Callable[[], None] = InvalidAliasedBoundedReceiver().method  # error: [invalid-assignment]
+
+# TODO: Enforce valid specializations for TypeVars nested inside receiver annotations.
+invalid_nested_bound: Callable[[], None] = InvalidNestedBoundedReceiver().method  # TODO: error: [invalid-assignment]
+invalid_union_constraints: Callable[[], None] = InvalidUnionConstrainedReceiver().method  # TODO: error: [invalid-assignment]
+```
+
 When we coerce a generic callable into a `Callable` type, it remembers that it is generic:
 
 ```py
-from ty_extensions import into_regular_callable
+from ty_extensions._internal import into_regular_callable
 
 # revealed: [T](t: T) -> T
 reveal_type(into_regular_callable(identity))
-# revealed: ty_extensions.GenericContext[T@identity]
+# revealed: ty_extensions._internal.GenericContext[T@identity]
 reveal_type(generic_context(into_regular_callable(identity)))
 # revealed: Literal[1]
 reveal_type(into_regular_callable(identity)(1))
 
 # revealed: [**P, T](c: (**P) -> T) -> ((**P) -> T)
 reveal_type(into_regular_callable(identity2))
-# revealed: ty_extensions.GenericContext[P@identity2, T@identity2]
+# revealed: ty_extensions._internal.GenericContext[P@identity2, T@identity2]
 reveal_type(generic_context(into_regular_callable(identity2)))
 # revealed: [T](t: T) -> T
 reveal_type(into_regular_callable(identity2)(identity))
 
 # revealed: [T](t: T) -> C[T]
 reveal_type(into_regular_callable(C))
-# revealed: ty_extensions.GenericContext[T@C]
+# revealed: ty_extensions._internal.GenericContext[T@C]
 reveal_type(generic_context(into_regular_callable(C)))
 # revealed: C[int]
 reveal_type(into_regular_callable(C)(1))
+```
+
+## Generic `__iter__` methods with explicit receivers
+
+Binding `__iter__` to an `Unpacker[Iterable[int]]` infers `S` as `int` from the explicit
+`self: Unpacker[Iterable[S]]` annotation. Calls to `list()` and `iter()` preserve this element type,
+just as `tuple()` and `for` loops do.
+
+Regression test for <https://github.com/astral-sh/ty/issues/3598>.
+
+```py
+from collections.abc import Iterable, Iterator
+
+class Unpacker[T: Iterable[object]]:
+    def __init__(self, it: T, /) -> None:
+        self._it = it
+    def __iter__[S](self: "Unpacker[Iterable[S]]") -> Iterator[S]:
+        return iter(self._it)
+
+def integers() -> Unpacker[Iterable[int]]:
+    return Unpacker([1, 2, 3])
+
+reveal_type(tuple(integers()))  # revealed: tuple[int, ...]
+for x in integers():
+    reveal_type(x)  # revealed: int
+reveal_type(list(integers()))  # revealed: list[int]
+reveal_type(iter(integers()))  # revealed: Iterator[int]
 ```
 
 ## Naming a generic `Callable`: type aliases
@@ -84,14 +169,14 @@ The easiest way to refer to a generic `Callable` type directly is via a type ali
 
 ```py
 from typing import Callable
-from ty_extensions import generic_context
+from ty_extensions._internal import generic_context
 
 type IdentityCallable[T] = Callable[[T], T]
 
 def decorator_factory[T]() -> IdentityCallable[T]:
     def decorator[T](fn: T) -> T:
         return fn
-    # revealed: ty_extensions.GenericContext[T@decorator]
+    # revealed: ty_extensions._internal.GenericContext[T@decorator]
     reveal_type(generic_context(decorator))
 
     return decorator
@@ -102,7 +187,7 @@ reveal_type(generic_context(decorator_factory))
 
 # revealed: [T'return](T'return, /) -> T'return
 reveal_type(decorator_factory())
-# revealed: ty_extensions.GenericContext[T'return@decorator_factory]
+# revealed: ty_extensions._internal.GenericContext[T'return@decorator_factory]
 reveal_type(generic_context(decorator_factory()))
 # revealed: Literal[1]
 reveal_type(decorator_factory()(1))
@@ -114,14 +199,14 @@ The same pattern holds if the callable involves a paramspec.
 
 ```py
 from typing import Callable
-from ty_extensions import generic_context
+from ty_extensions._internal import generic_context
 
 type IdentityCallable[**P, T] = Callable[[Callable[P, T]], Callable[P, T]]
 
 def decorator_factory[**P, T]() -> IdentityCallable[P, T]:
     def decorator[**P, T](fn: Callable[P, T]) -> Callable[P, T]:
         return fn
-    # revealed: ty_extensions.GenericContext[P@decorator, T@decorator]
+    # revealed: ty_extensions._internal.GenericContext[P@decorator, T@decorator]
     reveal_type(generic_context(decorator))
 
     return decorator
@@ -135,7 +220,7 @@ def identity[T](t: T) -> T:
 
 # revealed: [**P'return, T'return]((**P'return) -> T'return, /) -> ((**P'return) -> T'return)
 reveal_type(decorator_factory())
-# revealed: ty_extensions.GenericContext[P'return@decorator_factory, T'return@decorator_factory]
+# revealed: ty_extensions._internal.GenericContext[P'return@decorator_factory, T'return@decorator_factory]
 reveal_type(generic_context(decorator_factory()))
 # revealed: [T](t: T) -> T
 reveal_type(decorator_factory()(identity))
@@ -156,12 +241,12 @@ callable that is generic, not the function.
 
 ```py
 from typing import Callable
-from ty_extensions import generic_context
+from ty_extensions._internal import generic_context
 
 def decorator_factory[T]() -> Callable[[T], T]:
     def decorator[T](fn: T) -> T:
         return fn
-    # revealed: ty_extensions.GenericContext[T@decorator]
+    # revealed: ty_extensions._internal.GenericContext[T@decorator]
     reveal_type(generic_context(decorator))
 
     return decorator
@@ -172,7 +257,7 @@ reveal_type(generic_context(decorator_factory))
 
 # revealed: [T'return](T'return, /) -> T'return
 reveal_type(decorator_factory())
-# revealed: ty_extensions.GenericContext[T'return@decorator_factory]
+# revealed: ty_extensions._internal.GenericContext[T'return@decorator_factory]
 reveal_type(generic_context(decorator_factory()))
 # revealed: Literal[1]
 reveal_type(decorator_factory()(1))
@@ -185,7 +270,7 @@ If the typevar also appears in a parameter, it is the function that is generic, 
 def outside_callable[T](t: T) -> Callable[[T], T]:
     raise NotImplementedError
 
-# revealed: ty_extensions.GenericContext[T@outside_callable]
+# revealed: ty_extensions._internal.GenericContext[T@outside_callable]
 reveal_type(generic_context(outside_callable))
 
 # revealed: (int, /) -> int
@@ -202,12 +287,12 @@ The same pattern holds if the callable involves a paramspec.
 
 ```py
 from typing import Callable
-from ty_extensions import generic_context
+from ty_extensions._internal import generic_context
 
 def decorator_factory[**P, T]() -> Callable[[Callable[P, T]], Callable[P, T]]:
     def decorator[**P, T](fn: Callable[P, T]) -> Callable[P, T]:
         return fn
-    # revealed: ty_extensions.GenericContext[P@decorator, T@decorator]
+    # revealed: ty_extensions._internal.GenericContext[P@decorator, T@decorator]
     reveal_type(generic_context(decorator))
 
     return decorator
@@ -221,7 +306,7 @@ def identity[T](t: T) -> T:
 
 # revealed: [**P'return, T'return]((**P'return) -> T'return, /) -> ((**P'return) -> T'return)
 reveal_type(decorator_factory())
-# revealed: ty_extensions.GenericContext[P'return@decorator_factory, T'return@decorator_factory]
+# revealed: ty_extensions._internal.GenericContext[P'return@decorator_factory, T'return@decorator_factory]
 reveal_type(generic_context(decorator_factory()))
 # revealed: [T](t: T) -> T
 reveal_type(decorator_factory()(identity))
@@ -236,7 +321,7 @@ If the typevar also appears in a parameter, it is the function that is generic, 
 def outside_callable[**P, T](func: Callable[P, T]) -> Callable[P, T]:
     raise NotImplementedError
 
-# revealed: ty_extensions.GenericContext[P@outside_callable, T@outside_callable]
+# revealed: ty_extensions._internal.GenericContext[P@outside_callable, T@outside_callable]
 reveal_type(generic_context(outside_callable))
 
 def int_identity(x: int) -> int:
@@ -259,6 +344,328 @@ from typing import Callable, cast
 def body_annotation[**P]() -> Callable[P, None]:
     local: Callable[P, None] = cast(Callable[P, None], object())
     return local
+```
+
+## Inferring an explicit `object` upper bound from a callable
+
+A type variable in a callable parameter position is constrained from above because callable
+parameters are contravariant. An explicit `object` upper bound is still inference evidence; it is
+different from having no inferred bound at all.
+
+```py
+from typing import Callable
+
+def infer_from_consumer[T](consumer: Callable[[T], None]) -> T:
+    raise NotImplementedError
+
+def consume_object(value: object) -> None: ...
+
+reveal_type(infer_from_consumer(consume_object))  # revealed: object
+```
+
+## Intersecting inferred union upper bounds
+
+Multiple callable arguments can infer multiple union upper bounds for the same type variable. We
+keep those bounds factored and infer a compact type satisfying every bound rather than losing the
+inference result while materializing their full cross product.
+
+```py
+from typing import Callable, final
+
+def infer_from_consumers[T](
+    left: Callable[[T], None],
+    right: Callable[[T], None],
+) -> T:
+    raise NotImplementedError
+
+@final
+class A: ...
+
+@final
+class B: ...
+
+@final
+class C: ...
+
+@final
+class D: ...
+
+@final
+class E: ...
+
+def consume_left(value: A | B | C) -> None: ...
+def consume_right(value: B | D | E) -> None: ...
+
+reveal_type(infer_from_consumers(consume_left, consume_right))  # revealed: B
+```
+
+## Union without intersection does not consider budget
+
+If the precise inferred solution comes from a single union type, rather than an intersection of
+several unions, we return the precise solution.
+
+```py
+from typing import Callable, final
+
+def infer_from_consumer[T](consumer: Callable[[T], None]) -> T:
+    raise NotImplementedError
+
+@final
+class A: ...
+
+@final
+class B: ...
+
+@final
+class C: ...
+
+@final
+class D: ...
+
+@final
+class E: ...
+
+def consume(value: A | B | C | D | E) -> None: ...
+
+reveal_type(infer_from_consumer(consume))  # revealed: A | B | C | D | E
+```
+
+## Overlapping inferred union upper bounds exceeding the solution budget
+
+Even if the precise intersection of two large union upper bounds is small, processing either union
+currently exceeds the solution budget before we can discover that intersection.
+
+```py
+from typing import Callable, final
+
+def infer_from_consumers[T](
+    left: Callable[[T], None],
+    right: Callable[[T], None],
+) -> T:
+    raise NotImplementedError
+
+@final
+class A: ...
+
+@final
+class B: ...
+
+@final
+class C: ...
+
+@final
+class D: ...
+
+@final
+class E: ...
+
+@final
+class F: ...
+
+@final
+class G: ...
+
+@final
+class H: ...
+
+def consume_left(value: A | B | C | D | E) -> None: ...
+def consume_right(value: A | B | F | G | H) -> None: ...
+
+reveal_type(infer_from_consumers(consume_left, consume_right))  # revealed: A | B
+```
+
+## Contextual generic return exceeding the solution budget
+
+A generic call can receive an upper bound from the type context in which its return value is used.
+An existing union in that upper bound should not consume the bounded-intersection budget unless an
+intersection actually needs to be distributed over it.
+
+```py
+from collections.abc import Sequence
+from typing import Literal
+
+def make_list[T](value: T) -> list[T]:
+    return [value]
+
+def consume(values: Sequence[Literal["a", "b", "c", "d", "e"]] | None) -> None: ...
+
+consume(make_list("a"))
+```
+
+## Disjoint inferred union upper bounds
+
+If `Never` is the only type satisfying all inferred union upper bounds, it is the valid inferred
+specialization for the type variable.
+
+```py
+from typing import Callable, final
+
+def infer_from_consumers[T](
+    left: Callable[[T], None],
+    right: Callable[[T], None],
+) -> T:
+    raise NotImplementedError
+
+@final
+class A: ...
+
+@final
+class B: ...
+
+@final
+class C: ...
+
+@final
+class D: ...
+
+def consume_left(value: A | B) -> None: ...
+def consume_right(value: C | D) -> None: ...
+
+reveal_type(infer_from_consumers(consume_left, consume_right))  # revealed: Never
+```
+
+## Disjoint inferred union upper bounds exceeding the solution budget
+
+Large disjoint union upper bounds also exceed the budget before we can discover that their precise
+intersection is bottom.
+
+```py
+from typing import Callable, final
+
+def infer_from_consumers[T](
+    left: Callable[[T], None],
+    right: Callable[[T], None],
+) -> T:
+    raise NotImplementedError
+
+@final
+class A: ...
+
+@final
+class B: ...
+
+@final
+class C: ...
+
+@final
+class D: ...
+
+@final
+class E: ...
+
+@final
+class F: ...
+
+@final
+class G: ...
+
+@final
+class H: ...
+
+@final
+class I: ...
+
+@final
+class J: ...
+
+def consume_left(value: A | B | C | D | E) -> None: ...
+def consume_right(value: F | G | H | I | J) -> None: ...
+
+reveal_type(infer_from_consumers(consume_left, consume_right))  # revealed: Never
+```
+
+## Combining inferred and declared upper bounds
+
+A declared type-variable bound also participates when selecting a type that satisfies an inferred
+union upper bound.
+
+```py
+from typing import Callable
+
+def infer_str[T: str](consumer: Callable[[T], None]) -> T:
+    raise NotImplementedError
+
+def consume_int_or_str(value: int | str) -> None: ...
+
+reveal_type(infer_str(consume_int_or_str))  # revealed: str
+```
+
+## Inferring `Never` from a callable parameter
+
+`Never` is a valid upper-bound inference result and should not be replaced with the fallback for an
+unsolved type variable.
+
+```py
+from typing import Callable, NoReturn
+
+def infer_from_consumer[T](consumer: Callable[[T], None]) -> T:
+    raise NotImplementedError
+
+def consume_never(value: NoReturn) -> None: ...
+
+reveal_type(infer_from_consumer(consume_never))  # revealed: Never
+```
+
+## Conflicting inferred lower and upper bounds
+
+A concrete argument can infer a lower bound that is incompatible with an upper bound inferred from a
+callable argument. Such a call is invalid rather than producing a solution outside the inferred
+upper bound.
+
+```py
+from typing import Callable, final
+
+def infer_with_consumer[T](value: T, consumer: Callable[[T], None]) -> T:
+    raise NotImplementedError
+
+@final
+class A: ...
+
+@final
+class B: ...
+
+def consume_b(value: B) -> None: ...
+
+infer_with_consumer(A(), consume_b)  # error: [invalid-argument-type]
+```
+
+A callable argument can make a call invalid even when another argument satisfies the declared
+type-variable bound. The diagnostic should describe the incompatible callable rather than claim that
+`Base` violates its own bound.
+
+```py
+from typing import Callable
+
+class Base: ...
+class Input: ...
+
+def call[T: Base](callback: Callable[[T], T], value: T) -> None:
+    raise NotImplementedError
+
+def callback(value: Input) -> Base:
+    raise NotImplementedError
+
+# error: [invalid-argument-type] "Argument to function `call` is incorrect: Expected `(Base, /) -> Base`, found `def callback(value: Input) -> Base`"
+call(callback, Base())
+```
+
+## Combined upper bounds uses redundancy
+
+When solving an upper bound involving a union, we should use the same typing relation to look for
+redundant elements as we use for unions in general.
+
+```py
+from typing import Any, Callable, final
+
+def infer[T](consumer: Callable[[T], None]) -> T:
+    raise NotImplementedError
+
+@final
+class A: ...
+
+def callback(value: A | Any) -> None: ...
+
+reveal_type(infer(callback))  # revealed: A | Any
 ```
 
 ## Overloaded callable as generic `Callable` argument
@@ -284,6 +691,25 @@ def f(val: str | bytes) -> None:
     pass
 
 reveal_type(accepts_callable(f))  # revealed: str | bytes
+```
+
+When overloads exchange their input and output types, the inferred return tuple currently contains a
+union for each type variable.
+
+```py
+def infer_pair[T, U](converter: Callable[[T], U]) -> tuple[T, U]:
+    raise NotImplementedError
+
+@overload
+def swap(value: int) -> str: ...
+@overload
+def swap(value: str) -> int: ...
+def swap(value: int | str) -> int | str:
+    raise NotImplementedError
+
+# TODO: Infer the intersection of `tuple[int, str]` and `tuple[str, int]`.
+# Both specializations validate the same call, so its result satisfies both return types.
+reveal_type(infer_pair(swap))  # revealed: tuple[int | str, str | int]
 ```
 
 When `T` is constrained to a union by other arguments, the overloaded callable must still be treated

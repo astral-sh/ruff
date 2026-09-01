@@ -1,16 +1,28 @@
+use crate::ProgramEnvironment;
 use std::borrow::Cow;
+use std::debug_assert_matches;
 
 use ruff_db::parsed::ParsedModuleRef;
+
 use rustc_hash::FxHashMap;
 
 use ruff_python_ast::visitor::{self, Visitor};
 use ruff_python_ast::{self as ast, AnyNodeRef};
+use ruff_text_size::Ranged;
 
 use crate::Db;
 use crate::types::infer::{ExpressionInference, FrozenMap};
-use crate::types::tuple::{ResizeTupleError, Tuple, TupleLength, TupleSpec, TupleUnpacker};
-use crate::types::{Type, TypeCheckDiagnostics, TypeContext, UnionType, infer_expression_types};
+use crate::types::tuple::promotion::TupleSizePromotionConstraints;
+use crate::types::tuple::{
+    ResizeTupleError, Tuple, TupleBuilder, TupleElement, TupleLength, TupleSpec,
+    VariableLengthTuple,
+};
+use crate::types::{
+    KnownClass, Type, TypeCheckDiagnostics, TypeContext, UnionBuilder, UnionType,
+    infer_expression_types,
+};
 use ty_python_core::ExpressionNodeKey;
+use ty_python_core::ProgramFile;
 use ty_python_core::scope::ScopeId;
 use ty_python_core::unpack::{UnpackKind, UnpackValue};
 
@@ -41,11 +53,20 @@ impl<'ast> Visitor<'ast> for UnknownTargetCollector<'_, '_> {
 impl<'db, 'ast> Unpacker<'db, 'ast> {
     pub(crate) fn new(
         db: &'db dyn Db,
+        env: &'ast ProgramEnvironment<'db>,
         target_scope: ScopeId<'db>,
+        program_file: ProgramFile<'db>,
         module: &'ast ParsedModuleRef,
     ) -> Self {
         Self {
-            context: InferContext::new(db, target_scope, module),
+            context: InferContext::new(
+                db,
+                env,
+                target_scope,
+                program_file.file(db),
+                program_file,
+                module,
+            ),
             targets: FxHashMap::default(),
             projection_evidence: None,
             needs_projection_evidence_from_types: false,
@@ -72,21 +93,20 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
 
     /// Unpack the value to the target expression.
     pub(crate) fn unpack(&mut self, target: &ast::Expr, value: UnpackValue<'db>) {
-        debug_assert!(
-            matches!(target, ast::Expr::List(_) | ast::Expr::Tuple(_)),
+        let db = self.db();
+        debug_assert_matches!(
+            target,
+            ast::Expr::List(_) | ast::Expr::Tuple(_),
             "Unpacking target must be a list or tuple expression"
         );
 
-        let value_inference =
-            infer_expression_types(self.db(), value.expression(), TypeContext::default());
+        let value_inference = infer_expression_types(
+            self.context.db(),
+            value.expression(),
+            TypeContext::default(),
+        );
         self.extend_projection_evidence(value_inference.projection_evidence());
         let value_expr = value.expression().node_ref(self.db()).node(self.module());
-
-        if matches!(value.kind(), UnpackKind::Assign)
-            && self.unpack_assignment_sequence_from_inference(target, value_expr, value_inference)
-        {
-            return;
-        }
 
         let value_type = value_inference.expression_type(value_expr);
         let allow_projection = matches!(
@@ -103,52 +123,72 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                 }
             }
             UnpackKind::Iterable { mode } => {
+                let env = self.context.program_environment();
                 if let Some(projected) =
-                    value_type.try_iter_projection_result_with_mode(self.db(), mode)
+                    value_type.try_iter_projection_result_with_mode(db, env, mode)
                 {
                     self.extend_projection_result(projected);
                     projected.ty()
                 } else {
                     value_type
-                        .try_iterate_with_mode(self.db(), mode)
-                        .map(|tuple| tuple.homogeneous_element_type(self.db()))
+                        .try_iterate_with_mode(db, env, mode)
+                        .map(|tuple| tuple.homogeneous_element_type(db, env))
                         .unwrap_or_else(|err| {
                             err.report_diagnostic(
                                 &self.context,
                                 value_type,
                                 value.as_any_node_ref(self.db(), self.module()),
                             );
-                            err.fallback_element_type(self.db())
+                            err.fallback_element_type(db, env)
                         })
                 }
             }
             UnpackKind::ContextManager { mode } => {
+                let env = self.context.program_environment();
                 if let Some(projected) =
-                    value_type.try_context_enter_projection_result(self.db(), mode)
+                    value_type.try_context_enter_projection_result(db, env, mode)
                 {
                     self.extend_projection_result(projected);
                     projected.ty()
                 } else {
                     value_type
-                        .try_enter_with_mode(self.db(), mode)
+                        .try_enter_with_mode(db, env, mode)
                         .unwrap_or_else(|err| {
                             err.report_diagnostic(
                                 &self.context,
                                 value_type,
                                 value.as_any_node_ref(self.db(), self.module()),
                             );
-                            err.fallback_enter_type(self.db())
+                            err.fallback_enter_type(db, env)
                         })
                 }
             }
         };
 
-        self.unpack_inner(target, value_expr.into(), value_type, allow_projection);
+        self.unpack_inner(
+            target,
+            value_expr.into(),
+            UnpackElement {
+                ty: value_type,
+                expression: matches!(value.kind(), UnpackKind::Assign).then_some(value_expr),
+                promote_literals: false,
+            },
+            value_inference,
+            allow_projection,
+        );
     }
 
-    /// In regular tuple assignments like `a, b = 1, 2` {or even `a, (b, c) = 1, (2, 3)`}, map each
-    /// expression on the left individually to the corresponding element type on the right, rather
-    /// than trying to walk the tuple type of the entire RHS.
+    /// Records `Unknown` for a malformed unpack target and all of its descendant expressions.
+    fn record_unknown_target_subtree(&mut self, target: &ast::Expr) {
+        UnknownTargetCollector {
+            targets: &mut self.targets,
+        }
+        .visit_expr(target);
+    }
+
+    /// In assignments from tuple or list literals, map each target to the corresponding element
+    /// types on the right, including the elements collected by a starred target. This preserves
+    /// element positions in list literals, whose inferred type combines all element types.
     ///
     /// We avoid infinitely growing types in cycle resolution by preserving only the
     /// topmost/outermost part of types that have `Divergent` components. For example, if the
@@ -165,155 +205,201 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
     /// This function avoids that problem by walking the AST on the RHS and looking directly at the
     /// individual element types. That gives us one more level of structure for those types, which
     /// is enough to resolve a lot of common cycles.
-    fn unpack_assignment_sequence_from_inference(
-        &mut self,
-        target: &ast::Expr,
-        value_expr: &ast::Expr,
-        value_inference: &ExpressionInference<'db>,
-    ) -> bool {
-        match target {
-            ast::Expr::Name(_) | ast::Expr::Attribute(_) | ast::Expr::Subscript(_) => {
-                self.targets
-                    .insert(target.into(), value_inference.expression_type(value_expr));
-                true
-            }
-            ast::Expr::List(ast::ExprList { elts, .. })
-            | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-                let Some(values) = sequence_elts(value_expr) else {
-                    return false;
-                };
-                self.unpack_fixed_sequence_from_inference(elts, values, value_inference)
-            }
-            _ => false,
-        }
-    }
-
-    fn unpack_fixed_sequence_from_inference(
-        &mut self,
-        targets: &[ast::Expr],
-        values: &[ast::Expr],
-        value_inference: &ExpressionInference<'db>,
-    ) -> bool {
-        if targets.len() != values.len()
-            || targets.iter().any(ast::Expr::is_starred_expr)
-            || values.iter().any(ast::Expr::is_starred_expr)
-        {
-            return false;
-        }
-
-        // Even `a, b = 1, 2` recurses through this helper. `.all()` short-circuits,
-        // so in nested cases an earlier element may update `self.targets` before a
-        // later element falls back to the general unpacking path. That's harmless
-        // because the fallback recomputes the full unpacking and overwrites any
-        // partial entries.
-        targets.iter().zip(values).all(|(target, value_expr)| {
-            self.unpack_assignment_sequence_from_inference(target, value_expr, value_inference)
-        })
-    }
-
-    /// Records `Unknown` for a malformed unpack target and all of its descendant expressions.
-    fn record_unknown_target_subtree(&mut self, target: &ast::Expr) {
-        UnknownTargetCollector {
-            targets: &mut self.targets,
-        }
-        .visit_expr(target);
-    }
-
     fn unpack_inner(
         &mut self,
         target: &ast::Expr,
         value_expr: AnyNodeRef<'_>,
-        value_ty: Type<'db>,
+        value: UnpackElement<'db, 'ast>,
+        value_inference: &ExpressionInference<'db>,
         allow_projection: bool,
     ) {
-        match target {
+        let db = self.db();
+        let env = self.context.program_environment();
+        let targets = match target {
             ast::Expr::Name(_) | ast::Expr::Attribute(_) | ast::Expr::Subscript(_) => {
-                self.targets.insert(target.into(), value_ty);
+                self.targets.insert(target.into(), value.ty);
+                return;
             }
-            ast::Expr::Starred(ast::ExprStarred { value, .. }) => {
-                self.unpack_inner(value, value_expr, value_ty, allow_projection);
+            ast::Expr::Starred(starred) => {
+                self.unpack_inner(
+                    &starred.value,
+                    value_expr,
+                    value,
+                    value_inference,
+                    allow_projection,
+                );
+                return;
             }
             ast::Expr::List(ast::ExprList { elts, .. })
-            | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-                if allow_projection
-                    && let Some(projected_tys) = self.try_unpack_projections(value_ty, elts)
-                {
-                    for (target, projected_ty) in elts.iter().zip(projected_tys) {
-                        self.unpack_inner(target, value_expr, projected_ty, allow_projection);
-                    }
-                    return;
-                }
-
-                let target_len = match elts.iter().position(ast::Expr::is_starred_expr) {
-                    Some(starred_index) => {
-                        TupleLength::Variable(starred_index, elts.len() - (starred_index + 1))
-                    }
-                    None => TupleLength::Fixed(elts.len()),
-                };
-                let mut unpacker = TupleUnpacker::new(self.db(), target_len);
-
-                // N.B. `Type::try_iterate` internally handles unions, but in a lossy way.
-                // For our purposes here, we get better error messages and more precise inference
-                // if we manually map over the union and call `try_iterate` on each union element.
-                // See <https://github.com/astral-sh/ruff/pull/20377#issuecomment-3401380305>
-                // for more discussion.
-                let unpack_types = match value_ty {
-                    Type::Union(union_ty) => union_ty.elements(self.db()),
-                    _ => std::slice::from_ref(&value_ty),
-                };
-
-                for ty in unpack_types.iter().copied() {
-                    let tuple = ty.try_iterate(self.db()).unwrap_or_else(|err| {
-                        err.report_diagnostic(&self.context, ty, value_expr);
-                        Cow::Owned(TupleSpec::homogeneous(err.fallback_element_type(self.db())))
-                    });
-
-                    if let Err(err) = unpacker.unpack_tuple(tuple.as_ref()) {
-                        unpacker
-                            .unpack_tuple(&Tuple::homogeneous(Type::unknown()))
-                            .expect("adding a homogeneous tuple should always succeed");
-                        if let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, target)
-                        {
-                            match err {
-                                ResizeTupleError::TooManyValues => {
-                                    let mut diag =
-                                        builder.into_diagnostic("Too many values to unpack");
-                                    diag.set_primary_message(format_args!(
-                                        "Expected {}",
-                                        target_len.display_minimum(),
-                                    ));
-                                    diag.annotate(self.context.secondary(value_expr).message(
-                                        format_args!("Got {}", tuple.len().display_minimum()),
-                                    ));
-                                }
-                                ResizeTupleError::TooFewValues => {
-                                    let mut diag =
-                                        builder.into_diagnostic("Not enough values to unpack");
-                                    diag.set_primary_message(format_args!(
-                                        "Expected {}",
-                                        target_len.display_minimum(),
-                                    ));
-                                    diag.annotate(self.context.secondary(value_expr).message(
-                                        format_args!("Got {}", tuple.len().display_maximum()),
-                                    ));
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // We constructed unpacker above using the length of elts, so the zip should
-                // consume the same number of elements from each.
-                for (target, value_ty) in elts.iter().zip(unpacker.into_types()) {
-                    self.unpack_inner(target, value_expr, value_ty, allow_projection);
-                }
-            }
+            | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => elts,
             _ => {
                 // Recovered syntax can still create assignment definitions for descendants of
                 // malformed targets. Give the whole subtree an unknown type so later lookups
                 // don't panic.
                 self.record_unknown_target_subtree(target);
+                return;
             }
+        };
+        if allow_projection
+            && let Some(projected_tys) = self.try_unpack_projections(value.ty, targets)
+        {
+            for (target, projected_ty) in targets.iter().zip(projected_tys) {
+                self.unpack_inner(
+                    target,
+                    value_expr,
+                    UnpackElement::from_type(projected_ty),
+                    value_inference,
+                    allow_projection,
+                );
+            }
+            return;
+        }
+        let target_len = target_length(targets);
+        let literal = value.expression.and_then(|expression| {
+            literal_sequence(
+                expression,
+                value.promote_literals,
+                &|expression, promote| {
+                    let ty = value_inference.expression_type(expression);
+                    UnpackElement {
+                        ty: if promote { ty.promote(db, env) } else { ty },
+                        expression: Some(expression),
+                        promote_literals: promote,
+                    }
+                },
+                &|expression, promote, known_length| {
+                    // The starred expression's inference has already reported iteration errors.
+                    // For `a, *rest = [1, *items]`, retain the shape of `items`' iterator even
+                    // though the enclosing list's type has erased positions and length.
+                    let ty = value_inference.expression_type(expression);
+                    let ty = if promote { ty.promote(db, env) } else { ty };
+                    let mut tuple = ty.iterate(db, env);
+                    if let Some(length) = known_length
+                        && let Ok(resized) = tuple.resize(db, env, TupleLength::Fixed(length))
+                    {
+                        tuple = Cow::Owned(resized);
+                    }
+                    sequence_from_type(db, &tuple)
+                },
+            )
+        });
+
+        let sequences = if let Some(literal) = literal {
+            vec![literal]
+        } else {
+            // N.B. `Type::try_iterate` internally handles unions, but in a lossy way.
+            // For our purposes here, we get better error messages and more precise inference
+            // if we manually map over the union and call `try_iterate` on each union element.
+            // See <https://github.com/astral-sh/ruff/pull/20377#issuecomment-3401380305>
+            // for more discussion.
+            let unpack_types = match value.ty {
+                Type::Union(union_ty) => union_ty.elements(db),
+                _ => std::slice::from_ref(&value.ty),
+            };
+            unpack_types
+                .iter()
+                .map(|ty| {
+                    let tuple = ty.try_iterate(db, env).unwrap_or_else(|err| {
+                        err.report_diagnostic(&self.context, *ty, value_expr);
+                        Cow::Owned(TupleSpec::homogeneous(err.fallback_element_type(db, env)))
+                    });
+                    sequence_from_type(db, &tuple)
+                })
+                .collect()
+        };
+
+        let mut inferred_targets: Vec<_> = targets
+            .iter()
+            .map(|_| {
+                (
+                    UnionBuilder::new(db, env).unpack_aliases(false),
+                    None,
+                    false,
+                )
+            })
+            .collect();
+        for sequence in sequences {
+            let matched = sequence.unpack(target_len, Clone::clone, |elements| {
+                UnpackElement::from_type(UnionType::from_elements_leave_aliases(
+                    db,
+                    env,
+                    elements.iter().map(|element| element.ty),
+                ))
+            });
+            match matched {
+                Ok(matched) => {
+                    for ((inferred, expression, promote_literals), element) in inferred_targets
+                        .iter_mut()
+                        .zip(matched.into_all_elements_with_kind())
+                    {
+                        let element = match element {
+                            TupleElement::Fixed(value)
+                            | TupleElement::Prefix(value)
+                            | TupleElement::Suffix(value) => value,
+                            TupleElement::Variable(values) => {
+                                UnpackElement::from_type(collected_list_type(
+                                    db,
+                                    env,
+                                    values.into_iter().map(|value| (value.ty, value.expression)),
+                                ))
+                            }
+                        };
+                        inferred.add_in_place(element.ty);
+                        // Literal sources contribute exactly one sequence. Only the type-based
+                        // path combines multiple union arms, and those have no source expressions.
+                        *expression = element.expression;
+                        *promote_literals = element.promote_literals;
+                    }
+                }
+                Err(err) => {
+                    // A length mismatch has no valid correspondence, e.g. `a, *b, c = [1]`.
+                    // Recover every target at this level, without discarding sibling literals
+                    // handled by the enclosing recursive call.
+                    for (target, (inferred, _, _)) in targets.iter().zip(&mut inferred_targets) {
+                        inferred.add_in_place(if target.is_starred_expr() {
+                            KnownClass::List.to_specialized_instance(db, env, &[Type::unknown()])
+                        } else {
+                            Type::unknown()
+                        });
+                    }
+                    if let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, target) {
+                        let (message, actual) = match err {
+                            ResizeTupleError::TooManyValues => (
+                                "Too many values to unpack",
+                                sequence.len().display_minimum(),
+                            ),
+                            ResizeTupleError::TooFewValues => (
+                                "Not enough values to unpack",
+                                sequence.len().display_maximum(),
+                            ),
+                        };
+                        let mut diag = builder.into_diagnostic(message);
+                        diag.set_primary_annotation_message(format_args!(
+                            "Expected {}",
+                            target_len.display_minimum()
+                        ));
+                        diag.annotate(
+                            self.context
+                                .secondary(value_expr)
+                                .message(format_args!("Got {actual}")),
+                        );
+                    }
+                }
+            }
+        }
+
+        for (target, (ty, expression, promote_literals)) in targets.iter().zip(inferred_targets) {
+            self.unpack_inner(
+                target,
+                expression.map(AnyNodeRef::from).unwrap_or(value_expr),
+                UnpackElement {
+                    ty: ty.build(),
+                    expression,
+                    promote_literals,
+                },
+                value_inference,
+                allow_projection,
+            );
         }
     }
 
@@ -334,7 +420,6 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
 
         let mut saw_projection = false;
         let mut target_tys = vec![Vec::new(); targets.len()];
-
         for element in union.elements(self.db()).iter().copied() {
             let before = self.projection_evidence;
             let element_tys = if let Some(projected) =
@@ -356,10 +441,11 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
             }
         }
 
+        let env = self.context.program_environment();
         saw_projection.then(|| {
             target_tys
                 .into_iter()
-                .map(|elements| UnionType::from_elements(self.db(), elements))
+                .map(|elements| UnionType::from_elements(self.db(), env, elements))
                 .collect()
         })
     }
@@ -369,6 +455,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
         value_ty: Type<'db>,
         targets: &[ast::Expr],
     ) -> Option<Vec<Type<'db>>> {
+        let env = self.context.program_environment();
         match targets.iter().position(ast::Expr::is_starred_expr) {
             Some(starred_index) => {
                 if targets
@@ -387,15 +474,22 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                     let projected = if index < prefix {
                         value_ty.try_star_unpack_prefix_projection_result(
                             self.db(),
+                            env,
                             prefix,
                             suffix,
                             index,
                         )
                     } else if index == starred_index {
-                        value_ty.try_star_unpack_rest_projection_result(self.db(), prefix, suffix)
+                        value_ty.try_star_unpack_rest_projection_result(
+                            self.db(),
+                            env,
+                            prefix,
+                            suffix,
+                        )
                     } else {
                         value_ty.try_star_unpack_suffix_projection_result(
                             self.db(),
+                            env,
                             prefix,
                             suffix,
                             index - starred_index - 1,
@@ -416,8 +510,12 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                 let mut projected_tys = Vec::with_capacity(targets.len());
                 let mut projection_evidence = None;
                 for index in 0..targets.len() {
-                    let projected =
-                        value_ty.try_unpack_projection_result(self.db(), targets.len(), index)?;
+                    let projected = value_ty.try_unpack_projection_result(
+                        self.db(),
+                        env,
+                        targets.len(),
+                        index,
+                    )?;
                     projection_evidence = ProjectionEvidenceSet::merged(
                         self.db(),
                         projection_evidence,
@@ -437,24 +535,34 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
         value_ty: Type<'db>,
         targets: &[ast::Expr],
     ) -> Option<Vec<Type<'db>>> {
-        let target_len = match targets.iter().position(ast::Expr::is_starred_expr) {
-            Some(starred_index) => {
-                if targets
-                    .iter()
-                    .skip(starred_index + 1)
-                    .any(ast::Expr::is_starred_expr)
-                {
-                    return None;
-                }
-                TupleLength::Variable(starred_index, targets.len() - (starred_index + 1))
-            }
-            None => TupleLength::Fixed(targets.len()),
-        };
-
-        let mut unpacker = TupleUnpacker::new(self.db(), target_len);
-        let tuple = value_ty.try_iterate(self.db()).ok()?;
-        unpacker.unpack_tuple(tuple.as_ref()).ok()?;
-        Some(unpacker.into_types().collect())
+        let db = self.db();
+        let env = self.context.program_environment();
+        let tuple = value_ty.try_iterate(db, env).ok()?;
+        let sequence = sequence_from_type(db, &tuple);
+        let matched = sequence
+            .unpack(target_length(targets), Clone::clone, |elements| {
+                UnpackElement::from_type(UnionType::from_elements_leave_aliases(
+                    db,
+                    env,
+                    elements.iter().map(|element| element.ty),
+                ))
+            })
+            .ok()?;
+        Some(
+            matched
+                .into_all_elements_with_kind()
+                .map(|element| match element {
+                    TupleElement::Fixed(value)
+                    | TupleElement::Prefix(value)
+                    | TupleElement::Suffix(value) => value.ty,
+                    TupleElement::Variable(values) => collected_list_type(
+                        db,
+                        env,
+                        values.into_iter().map(|value| (value.ty, value.expression)),
+                    ),
+                })
+                .collect(),
+        )
     }
 
     pub(crate) fn finish(self) -> UnpackResult<'db> {
@@ -463,6 +571,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
             self.projection_evidence,
             ProjectionEvidenceSet::from_types_if_needed(
                 self.db(),
+                self.context.program_environment(),
                 self.needs_projection_evidence_from_types,
                 self.targets.values().copied(),
             ),
@@ -477,7 +586,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
     }
 }
 
-#[derive(Debug, Default, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Default, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct UnpackResult<'db> {
     targets: FrozenMap<ExpressionNodeKey, Type<'db>>,
     diagnostics: TypeCheckDiagnostics,
@@ -486,12 +595,7 @@ pub(crate) struct UnpackResult<'db> {
     ///
     /// This is used only when constructing a cycle-recovery `UnpackResult`.
     cycle_recovery: Option<Type<'db>>,
-
-    /// Projection facts computed during inference for cycle recovery.
     projection_evidence: Option<ProjectionEvidenceSet<'db>>,
-
-    /// Whether unpacking produced a projection result whose enclosing inference
-    /// region may need to collect evidence from its final types.
     needs_projection_evidence_from_types: bool,
 }
 
@@ -511,10 +615,7 @@ impl<'db> UnpackResult<'db> {
         )
     }
 
-    pub(crate) fn try_expression_type(
-        &self,
-        expr: impl Into<ExpressionNodeKey>,
-    ) -> Option<Type<'db>> {
+    fn try_expression_type(&self, expr: impl Into<ExpressionNodeKey>) -> Option<Type<'db>> {
         self.targets
             .get(&expr.into())
             .copied()
@@ -547,6 +648,7 @@ impl<'db> UnpackResult<'db> {
     pub(crate) fn cycle_normalized(
         mut self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         previous_cycle_result: &UnpackResult<'db>,
         cycle: &salsa::Cycle,
     ) -> Self {
@@ -560,24 +662,317 @@ impl<'db> UnpackResult<'db> {
             let previous_ty = previous_cycle_result.expression_type(*expr);
             *ty = projection_recovery.push_candidate(
                 db,
+                env,
                 Some(previous_ty),
-                ty.cycle_join_for_recovery(db, previous_ty, cycle),
+                ty.cycle_join_for_recovery(db, env, previous_ty, cycle),
             );
         }
-        let projection_solutions = projection_recovery.finish(db, projection_evidence.as_ref());
+        let projection_solutions =
+            projection_recovery.finish(db, env, projection_evidence.as_ref());
         for (_, ty) in &mut self.targets {
             *ty = ty.recursive_type_normalized_with_projection_solutions(
                 db,
+                env,
                 cycle,
                 projection_solutions.as_ref(),
                 projection_evidence.as_ref(),
             );
         }
+
         self.projection_evidence = projection_evidence;
         self.needs_projection_evidence_from_types |=
             previous_cycle_result.needs_projection_evidence_from_types;
 
         self
+    }
+}
+
+/// Return a tuple or list's elements when they correspond exactly to a fixed-length sequence.
+pub(super) fn fixed_sequence_elements(
+    expression: &ast::Expr,
+    expected_length: usize,
+) -> Option<&[ast::Expr]> {
+    let elements = sequence_elts(expression)?;
+
+    if elements.len() != expected_length {
+        return None;
+    }
+
+    elements
+        .iter()
+        .all(|element| !element.is_starred_expr())
+        .then_some(elements)
+}
+
+/// Find the expression assigned to one target in a tuple or list unpacking.
+///
+/// For `first, (second, third) = (0, (1, 2))`, this associates `second` with `1`.
+/// Explicit values before or after a starred element remain unambiguous. Literal expansions
+/// retain their source expressions too; values supplied by arbitrary iterables do not.
+pub(super) fn unpacked_assignment_value<'ast>(
+    unpack_target: &ast::Expr,
+    value: &'ast ast::Expr,
+    requested_target: &ast::Expr,
+) -> Option<&'ast ast::Expr> {
+    assignment_values_for_target(unpack_target, value, requested_target)
+        .and_then(UnpackedAssignmentValues::into_single)
+}
+
+/// Return the explicit values collected by a starred assignment target.
+///
+/// For `first, *middle, last = (0, 1, 2, 3)`, `middle` collects the expressions `1` and `2`.
+/// Literal expansions are flattened; an unknown source in the collected portion makes the
+/// correspondence ambiguous.
+pub(super) fn starred_assignment_values<'ast>(
+    unpack_target: &ast::Expr,
+    value: &'ast ast::Expr,
+    requested_target: &ast::Expr,
+) -> Option<Vec<&'ast ast::Expr>> {
+    assignment_values_for_target(unpack_target, value, requested_target)
+        .and_then(UnpackedAssignmentValues::into_collected)
+}
+
+#[derive(Debug, Clone)]
+enum UnpackedAssignmentValues<'ast> {
+    Single(&'ast ast::Expr),
+    Collected(Vec<&'ast ast::Expr>),
+}
+
+impl<'ast> UnpackedAssignmentValues<'ast> {
+    fn into_single(self) -> Option<&'ast ast::Expr> {
+        match self {
+            Self::Single(value) => Some(value),
+            Self::Collected(_) => None,
+        }
+    }
+
+    fn into_collected(self) -> Option<Vec<&'ast ast::Expr>> {
+        match self {
+            Self::Single(_) => None,
+            Self::Collected(values) => Some(values),
+        }
+    }
+}
+
+fn assignment_values_for_target<'ast>(
+    unpack_target: &ast::Expr,
+    value: &'ast ast::Expr,
+    requested_target: &ast::Expr,
+) -> Option<UnpackedAssignmentValues<'ast>> {
+    if ExpressionNodeKey::from(unpack_target) == ExpressionNodeKey::from(requested_target) {
+        return Some(UnpackedAssignmentValues::Single(value));
+    }
+
+    let targets = sequence_elts(unpack_target)?;
+    let values = literal_sequence(
+        value,
+        false,
+        &|expression, _| Some(expression),
+        &|_, _, known_length| {
+            if let Some(length) = known_length {
+                Tuple::heterogeneous(std::iter::repeat_n(None, length))
+            } else {
+                VariableLengthTuple::mixed([], vec![None], [])
+            }
+        },
+    )?;
+    let matched = values
+        .unpack(target_length(targets), Clone::clone, |_| None)
+        .ok()?;
+    let (target, source) = targets
+        .iter()
+        .zip(matched.into_all_elements_with_kind())
+        .find(|(target, _)| target.range().contains_range(requested_target.range()))?;
+    match source {
+        TupleElement::Variable(values) => {
+            let ast::Expr::Starred(starred) = target else {
+                return None;
+            };
+            if ExpressionNodeKey::from(starred.value.as_ref())
+                != ExpressionNodeKey::from(requested_target)
+            {
+                return None;
+            }
+            Some(UnpackedAssignmentValues::Collected(
+                values.into_iter().collect::<Option<Vec<_>>>()?,
+            ))
+        }
+        TupleElement::Fixed(value) | TupleElement::Prefix(value) | TupleElement::Suffix(value) => {
+            assignment_values_for_target(target, value?, requested_target)
+        }
+    }
+}
+
+fn target_length(targets: &[ast::Expr]) -> TupleLength {
+    match targets.iter().position(ast::Expr::is_starred_expr) {
+        Some(index) => TupleLength::Variable(index, targets.len() - index - 1),
+        None => TupleLength::Fixed(targets.len()),
+    }
+}
+
+/// A source expression accompanies a type only when its position is unambiguous. We keep this
+/// transient information while unpacking, without giving mutable lists fixed-length types.
+#[derive(Clone, Copy)]
+struct UnpackElement<'db, 'ast> {
+    ty: Type<'db>,
+    expression: Option<&'ast ast::Expr>,
+    /// Widening a large tuple also widens nested tuple elements. Do not undo that widening
+    /// when following the source expression during nested unpacking.
+    promote_literals: bool,
+}
+
+impl<'db> UnpackElement<'db, '_> {
+    fn from_type(ty: Type<'db>) -> Self {
+        Self {
+            ty,
+            expression: None,
+            promote_literals: false,
+        }
+    }
+}
+
+fn sequence_from_type<'db, 'ast>(
+    db: &'db dyn Db,
+    tuple: &TupleSpec<'db>,
+) -> Tuple<UnpackElement<'db, 'ast>, Vec<UnpackElement<'db, 'ast>>> {
+    match tuple {
+        Tuple::Fixed(values) => {
+            Tuple::heterogeneous(values.iter_all_elements().map(UnpackElement::from_type))
+        }
+        Tuple::Variable(values) => VariableLengthTuple::mixed(
+            values.iter_prefix_elements().map(UnpackElement::from_type),
+            vec![UnpackElement::from_type(values.variable().element_type(db))],
+            values.iter_suffix_elements().map(UnpackElement::from_type),
+        ),
+    }
+}
+
+/// Infers the fresh list made by a starred assignment target or sequence-pattern capture.
+/// Both `first, *rest = values` and `case [first, *rest]:` create a new list whose inferred
+/// literal elements can widen without changing the type of the original sequence.
+pub(super) fn collected_list_type<'db, 'ast>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    values: impl ExactSizeIterator<Item = (Type<'db>, Option<&'ast ast::Expr>)>,
+) -> Type<'db> {
+    let is_empty = values.len() == 0;
+    let mut elements = UnionBuilder::new(db, env).unpack_aliases(false);
+    let mut allow_tuple_size_promotion = true;
+    for (ty, expression) in values {
+        let ty = ty.promote(db, env);
+        allow_tuple_size_promotion &=
+            TupleSizePromotionConstraints::allows_expression(db, env, expression, ty);
+        elements.add_in_place(ty);
+    }
+    // `first, *rest = (1,)` constructs an empty list, just as `rest = []` does.
+    let ty = if is_empty {
+        Type::unknown()
+    } else {
+        elements.build()
+    };
+    let ty = ty.promote_collection_element_type(db, env, allow_tuple_size_promotion, true);
+    KnownClass::List.to_specialized_instance(db, env, &[ty])
+}
+
+/// Describes literal positions for both inference and diagnostics. A starred literal is expanded
+/// recursively; other starred expressions contribute the shape supplied by the caller. For
+/// `first, *rest, last = [1, *items, 2]`, the unknown width of `items` leaves both ends intact.
+fn literal_sequence<'ast, T: Clone>(
+    expression: &'ast ast::Expr,
+    promote: bool,
+    element: &impl Fn(&'ast ast::Expr, bool) -> T,
+    spread: &impl Fn(&'ast ast::Expr, bool, Option<usize>) -> Tuple<T, Vec<T>>,
+) -> Option<Tuple<T, Vec<T>>> {
+    let (values, promote) = literal_sequence_elements(expression, promote)?;
+    Some(sequence_from_literal_elements(
+        values,
+        promote,
+        element,
+        spread,
+        &|builder, unpacked| {
+            builder.concat_with(unpacked, |suffix, left, right, prefix| {
+                // For `[*a, *b, *c, ...]`, retain the accumulated elements instead of copying
+                // them again for every expansion. Positions within this segment are unknown.
+                left.extend(suffix.iter().chain(prefix).chain(right).cloned());
+            })
+        },
+    ))
+}
+
+fn literal_sequence_elements(
+    expression: &ast::Expr,
+    promote: bool,
+) -> Option<(&[ast::Expr], bool)> {
+    // `a, *rest = (items := [1, "two"])` has the same elements as the list itself.
+    let expression = expression.expression_value();
+    let values = sequence_elts(expression)?;
+    let promote = promote || (expression.is_tuple_expr() && tuple_literal_needs_promotion(values));
+    Some((values, promote))
+}
+
+/// Applies the tuple precision limit after expanding literal elements. For `(*[1, 2], 3)`,
+/// all three positions count, even though the outer tuple has only two AST elements.
+/// Other starred iterables count as one item because their elements are not recovered from
+/// literal syntax. Stop counting as soon as the limit is exceeded.
+pub(super) fn tuple_literal_needs_promotion(values: &[ast::Expr]) -> bool {
+    /// Limit literal precision in large tuple expressions to avoid pathological inference costs.
+    const MAX_TUPLE_LENGTH_FOR_UNANNOTATED_LITERAL_INFERENCE: usize = 64;
+
+    fn remaining_budget(values: &[ast::Expr], remaining: usize) -> Option<usize> {
+        values.iter().try_fold(remaining, |remaining, value| {
+            if let ast::Expr::Starred(starred) = value
+                && let Some(values) = sequence_elts(starred.value.expression_value())
+            {
+                remaining_budget(values, remaining)
+            } else {
+                remaining.checked_sub(1)
+            }
+        })
+    }
+
+    remaining_budget(values, MAX_TUPLE_LENGTH_FOR_UNANNOTATED_LITERAL_INFERENCE).is_none()
+}
+
+/// Builds a literal's sequence shape from already-inferred elements and iterable shapes.
+/// In `source = (*[1, "two"],)`, expanding the list syntax preserves both tuple positions.
+/// The caller chooses the variable-segment representation and how to concatenate it: tuple
+/// inference retains symbolic `TypeVarTuple` segments, while unpacking retains source expressions.
+pub(super) fn sequence_from_literal_elements<'ast, T, V>(
+    values: &'ast [ast::Expr],
+    promote: bool,
+    element: &impl Fn(&'ast ast::Expr, bool) -> T,
+    spread: &impl Fn(&'ast ast::Expr, bool, Option<usize>) -> Tuple<T, V>,
+    concat: &impl Fn(TupleBuilder<T, V>, &Tuple<T, V>) -> TupleBuilder<T, V>,
+) -> Tuple<T, V> {
+    let mut builder = TupleBuilder::with_capacity(values.len());
+    for value in values {
+        if let ast::Expr::Starred(starred) = value {
+            let unpacked = literal_sequence_elements(&starred.value, promote)
+                .map(|(values, promote)| {
+                    sequence_from_literal_elements(values, promote, element, spread, concat)
+                })
+                .unwrap_or_else(|| spread(value, promote, literal_iterable_length(&starred.value)));
+            builder = concat(builder, &unpacked);
+        } else {
+            builder.push(element(value, promote));
+        }
+    }
+    builder.build()
+}
+
+/// The literal element count used when inferring expansions such as `(*{"key": 1},)`.
+/// An expansion within a set or dictionary, as in `{*items}` or `{**items}`, makes that count unknown.
+fn literal_iterable_length(expression: &ast::Expr) -> Option<usize> {
+    match expression {
+        ast::Expr::Set(ast::ExprSet { elts, .. }) => elts
+            .iter()
+            .all(|element| !element.is_starred_expr())
+            .then_some(elts.len()),
+        ast::Expr::Dict(ast::ExprDict { items, .. }) => items
+            .iter()
+            .all(|item| item.key.is_some())
+            .then_some(items.len()),
+        _ => None,
     }
 }
 

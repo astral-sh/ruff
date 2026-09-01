@@ -186,6 +186,11 @@ class Mailbox(Generic[_MessageT_co]):
     def close(self) -> None:
         """Flush and close the mailbox."""
 
+    if sys.version_info >= (3, 15):
+        def __enter__(self) -> Self: ...
+        def __exit__(
+            self, type: type[BaseException] | None, value: BaseException | None, traceback: TracebackType | None
+        ) -> None: ...
     # Undocumented, called by subclasses to parse added messages.
     def _dump_message(self, message: _MessageData, target: SupportsWrite[bytes], mangle_from_: bool = False) -> None:
         """Dump message contents to target file."""
@@ -193,7 +198,8 @@ class Mailbox(Generic[_MessageT_co]):
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
         """Represent a PEP 585 generic type
 
-        E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
+        For example, for t = list[int], t.__origin__ is list and t.__args__
+        is (int,).
         """
 
 class Maildir(Mailbox[MaildirMessage]):
@@ -577,11 +583,13 @@ class _ProxyFile:
     def flush(self) -> None: ...
     @property
     def closed(self) -> bool: ...
-    def __class_getitem__(cls, item: Any, /) -> GenericAlias:
-        """Represent a PEP 585 generic type
+    if sys.version_info < (3, 15):
+        def __class_getitem__(cls, item: Any, /) -> GenericAlias:
+            """Represent a PEP 585 generic type
 
-        E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
-        """
+            For example, for t = list[int], t.__origin__ is list and t.__args__
+            is (int,).
+            """
 
 class _PartialFile(_ProxyFile):
     """A read-only wrapper of part of a file."""

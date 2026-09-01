@@ -44,6 +44,8 @@ env:
 
   CARGO_NET_RETRY: 10
   CARGO_PROFILE_DEV_DEBUG: line-tables-only
+  CARGO_PROFILE_DEV_LTO: "false"
+  CARGO_PROFILE_DEV_OPT_LEVEL: 0
   CARGO_TERM_COLOR: always
   NEXTEST_PROFILE: "ci"
   RUSTUP_MAX_RETRIES: 10
@@ -69,12 +71,12 @@ jobs:
     permissions:
       contents: write # to push back to the repository
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         name: Checkout Ruff
         with:
           path: ruff
           persist-credentials: true
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         name: Checkout typeshed
         with:
           repository: python/typeshed
@@ -84,9 +86,9 @@ jobs:
         run: |
           git config --global user.name typeshedbot
           git config --global user.email '<>'
-      - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
-          version: "0.11.24"
+          version: "0.12.6"
       - name: Sync typeshed stubs
         run: |
           rm -rf "ruff/${VENDORED_TYPESHED}"
@@ -135,14 +137,14 @@ jobs:
     permissions:
       contents: write # to push back to the repository
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         name: Checkout Ruff
         with:
           persist-credentials: true
           ref: ${{ env.UPSTREAM_BRANCH}}
-      - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
-          version: "0.11.24"
+          version: "0.12.6"
       - name: Setup git
         run: |
           git config --global user.name typeshedbot
@@ -177,14 +179,14 @@ jobs:
     permissions:
       contents: write # to push back to the repository
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         name: Checkout Ruff
         with:
           persist-credentials: true
           ref: ${{ env.UPSTREAM_BRANCH}}
-      - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
-          version: "0.11.24"
+          version: "0.12.6"
       - name: Setup git
         run: |
           git config --global user.name typeshedbot
@@ -205,10 +207,9 @@ jobs:
           # consistent with the other typeshed stubs around them.
           # Typeshed formats code using black in their CI, so we just invoke
           # black on the stubs the same way that typeshed does.
-          # TODO: Switch to a released version of Black once a release includes
-          # https://github.com/psf/black/commit/f665703258bfa1916f8a6c1cbab0bc384b90cbac.
-          uvx \
-            --from="git+https://github.com/psf/black.git@e34bb1bef70e83410c2816dfd07485ec026959aa" \
+          uv run \
+            --locked \
+            --only-group=typeshed-formatting \
             black "${VENDORED_TYPESHED}/stdlib" \
             --config "${VENDORED_TYPESHED}/pyproject.toml" || true
           git commit -am "Format codemodded docstrings" --allow-empty
@@ -248,7 +249,7 @@ jobs:
     permissions:
       contents: write # to push back to the repository
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         name: Checkout Ruff
         with:
           persist-credentials: true
@@ -257,7 +258,7 @@ jobs:
         run: |
           git config --global user.name typeshedbot
           git config --global user.email '<>'
-      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           # Reuse the cache populated by the `cargo test (linux)` CI job on `main`.
           shared-key: ruff-linux-debug
@@ -268,7 +269,7 @@ jobs:
       - name: "Install mold"
         uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
       - name: "Install cargo nextest and insta"
-        uses: taiki-e/install-action@15449e3094499af05d8d964a1c884208e4b8b595 # v2.81.11
+        uses: taiki-e/install-action@cb33e69fad06166ca28a42b2575e4dadabf62ee8 # v2.85.8
         with:
           tool: |
             cargo-nextest

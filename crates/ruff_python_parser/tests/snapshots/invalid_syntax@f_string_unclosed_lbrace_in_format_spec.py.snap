@@ -155,4 +155,3 @@ Module(
 1 | f"hello {x:"
 2 | f"hello {x:.3f"
   |               ^ Syntax Error: f-string: expecting `}`
-  |

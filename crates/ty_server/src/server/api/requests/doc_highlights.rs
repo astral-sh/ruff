@@ -3,7 +3,7 @@ use std::borrow::Cow;
 use lsp_types::DocumentHighlightRequest;
 use lsp_types::{DocumentHighlight, DocumentHighlightKind, DocumentHighlightParams, Uri};
 use ty_ide::{ReferenceKind, document_highlights};
-use ty_project::ProjectDatabase;
+use ty_project::{ProjectDatabase, SemanticDb as _};
 
 use crate::document::{PositionExt, ToRangeExt};
 use crate::server::api::traits::{
@@ -49,7 +49,7 @@ impl BackgroundDocumentRequestHandler for DocumentHighlightRequestHandler {
             return Ok(None);
         };
 
-        let Some(highlights_result) = document_highlights(db, file, offset) else {
+        let Some(highlights_result) = document_highlights(db, db.program_file(file), offset) else {
             return Ok(None);
         };
 

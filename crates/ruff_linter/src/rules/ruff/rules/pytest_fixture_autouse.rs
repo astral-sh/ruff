@@ -5,6 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::flake8_pytest_style::helpers::is_pytest_fixture;
 
 /// ## What it does
@@ -53,14 +54,14 @@ use crate::rules::flake8_pytest_style::helpers::is_pytest_fixture;
 ///
 /// ```toml
 /// [tool.ruff.lint.per-file-ignores]
-/// "!**/conftest.py" = ["RUF076"]
+/// "!**/conftest.py" = ["pytest-fixture-autouse"]
 /// ```
 ///
 /// ## References
 /// - [`pytest` documentation: Sharing fixtures across classes, modules, packages or session](https://docs.pytest.org/en/stable/how-to/fixtures.html#scope-sharing-fixtures-across-classes-modules-packages-or-session)
 /// - [`pytest` documentation: Fixtures can request other fixtures](https://docs.pytest.org/en/stable/how-to/fixtures.html#fixtures-can-request-other-fixtures)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.15.17")]
+#[violation_metadata(preview_since = "0.16.5", category = Category::Pedantic)]
 pub(crate) struct PytestFixtureAutouse;
 
 impl Violation for PytestFixtureAutouse {
@@ -70,7 +71,7 @@ impl Violation for PytestFixtureAutouse {
     }
 }
 
-/// RUF076
+/// `pytest-fixture-autouse`
 pub(crate) fn pytest_fixture_autouse(checker: &Checker, decorators: &[Decorator]) {
     for decorator in decorators {
         if !is_pytest_fixture(decorator, checker) {

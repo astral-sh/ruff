@@ -25,7 +25,7 @@ from asyncio.transports import BaseTransport, DatagramTransport, ReadTransport, 
 from collections.abc import Callable, Iterable, Sequence
 from concurrent.futures import Executor, ThreadPoolExecutor
 from contextvars import Context
-from socket import AddressFamily, AddressInfo, SocketKind, _Address, _RetAddress, socket
+from socket import AddressFamily, AddressInfo, _Address, _GetAddrInfoResult, _RetAddress, socket
 from typing import IO, Any, Literal, TypeAlias, TypeVar, overload
 from typing_extensions import TypeVarTuple, Unpack
 
@@ -111,8 +111,8 @@ class BaseEventLoop(AbstractEventLoop):
     def stop(self) -> None:
         """Stop running the event loop.
 
-        Every callback already scheduled will still run.  This simply informs
-        run_forever to stop looping after a complete iteration.
+        Every callback already scheduled will still run.  This simply
+        informs run_forever to stop looping after a complete iteration.
         """
 
     def is_running(self) -> bool:
@@ -185,7 +185,8 @@ class BaseEventLoop(AbstractEventLoop):
         """Create a Future object attached to the loop."""
 
     # Tasks methods
-    if sys.version_info >= (3, 14):
+    # `eager_start` is supported as an arbitrary kwarg starting in 3.13.3.
+    if sys.version_info >= (3, 13):
         def create_task(
             self,
             coro: _CoroutineLike[_T],
@@ -219,10 +220,10 @@ class BaseEventLoop(AbstractEventLoop):
         If factory is None the default task factory will be set.
 
         If factory is a callable, it should have a signature matching
-        '(loop, coro, **kwargs)', where 'loop' will be a reference to the active
-        event loop, 'coro' will be a coroutine object, and **kwargs will be
-        arbitrary keyword arguments that should be passed on to Task.
-        The callable must return a Task.
+        '(loop, coro, **kwargs)', where 'loop' will be a reference to the
+        active event loop, 'coro' will be a coroutine object, and **kwargs
+        will be arbitrary keyword arguments that should be passed on to
+        Task.  The callable must return a Task.
         """
 
     def get_task_factory(self) -> _TaskFactory | None:
@@ -246,7 +247,7 @@ class BaseEventLoop(AbstractEventLoop):
         type: int = 0,
         proto: int = 0,
         flags: int = 0,
-    ) -> list[tuple[AddressFamily, SocketKind, int, str, tuple[str, int] | tuple[str, int, int, int] | tuple[int, bytes]]]: ...
+    ) -> _GetAddrInfoResult: ...
     async def getnameinfo(self, sockaddr: tuple[str, int] | tuple[str, int, int, int], flags: int = 0) -> tuple[str, str]: ...
 
     if sys.version_info >= (3, 12):
@@ -274,12 +275,12 @@ class BaseEventLoop(AbstractEventLoop):
 
             Create a streaming transport connection to a given internet host and
             port: socket family AF_INET or socket.AF_INET6 depending on host (or
-            family if specified), socket type SOCK_STREAM. protocol_factory must be
-            a callable returning a protocol instance.
+            family if specified), socket type SOCK_STREAM. protocol_factory must
+            be a callable returning a protocol instance.
 
-            This method is a coroutine which will try to establish the connection
-            in the background.  When successful, the coroutine returns a
-            (transport, protocol) pair.
+            This method is a coroutine which will try to establish the
+            connection in the background.  When successful, the coroutine
+            returns a (transport, protocol) pair.
             """
         @overload
         async def create_connection(
@@ -426,11 +427,11 @@ class BaseEventLoop(AbstractEventLoop):
             The host parameter can be a string, in that case the TCP server is
             bound to host and port.
 
-            The host parameter can also be a sequence of strings and in that case
-            the TCP server is bound to all hosts of the sequence. If a host
-            appears multiple times (possibly indirectly e.g. when hostnames
-            resolve to the same IP address), the server is only bound once to that
-            host.
+            The host parameter can also be a sequence of strings and in that
+            case the TCP server is bound to all hosts of the sequence.  If
+            a host appears multiple times (possibly indirectly e.g. when
+            hostnames resolve to the same IP address), the server is only bound
+            once to that host.
 
             Return a Server object which can be used to stop the service.
 

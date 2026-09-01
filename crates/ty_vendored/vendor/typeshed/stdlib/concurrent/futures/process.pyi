@@ -237,7 +237,13 @@ class _ExecutorManagerThread(Thread):
     def wait_result_broken_or_wakeup(self) -> tuple[Any, bool, str]: ...
     def process_result_item(self, result_item: int | _ResultItem) -> None: ...
     def is_shutting_down(self) -> bool: ...
-    def terminate_broken(self, cause: str) -> None: ...
+
+    if sys.version_info >= (3, 14):
+        # bpe_message parameter added in 3.14.7
+        def terminate_broken(self, cause: str, bpe_message: str | None = None) -> None: ...
+    else:
+        def terminate_broken(self, cause: str) -> None: ...
+
     def flag_executor_shutting_down(self) -> None: ...
     def shutdown_workers(self) -> None: ...
     def join_executor_internals(self) -> None: ...
@@ -291,19 +297,21 @@ class ProcessPoolExecutor(Executor):
 
             Args:
                 max_workers: The maximum number of processes that can be used to
-                    execute the given calls. If None or not given then as many
-                    worker processes will be created as the machine has processors.
-                mp_context: A multiprocessing context to launch the workers created
-                    using the multiprocessing.get_context('start method') API. This
-                    object should provide SimpleQueue, Queue and Process.
+                    execute the given calls.  If None or not given then as many
+                    worker processes will be created as the machine has
+                    processors.
+                mp_context: A multiprocessing context to launch the workers
+                    created using the multiprocessing.get_context('start method')
+                    API.  This object should provide SimpleQueue, Queue and
+                    Process.
                 initializer: A callable used to initialize worker processes.
                 initargs: A tuple of arguments to pass to the initializer.
-                max_tasks_per_child: The maximum number of tasks a worker process
-                    can complete before it will exit and be replaced with a fresh
-                    worker process. The default of None means worker process will
-                    live as long as the executor. Requires a non-'fork' mp_context
-                    start method. When given, we default to using 'spawn' if no
-                    mp_context is supplied.
+                max_tasks_per_child: The maximum number of tasks a worker
+                    process can complete before it will exit and be replaced
+                    with a fresh worker process.  The default of None means
+                    worker process will live as long as the executor.  Requires
+                    a non-'fork' mp_context start method.  When given, we
+                    default to using 'spawn' if no mp_context is supplied.
             """
         @overload
         def __init__(

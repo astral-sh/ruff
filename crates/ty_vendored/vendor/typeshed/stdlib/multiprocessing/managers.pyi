@@ -1,3 +1,4 @@
+import builtins
 import queue
 import sys
 import threading
@@ -89,7 +90,8 @@ class ValueProxy(BaseProxy, Generic[_T]):
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
         """Represent a PEP 585 generic type
 
-        E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
+        For example, for t = list[int], t.__origin__ is list and t.__args__
+        is (int,).
         """
 
 if sys.version_info >= (3, 13):
@@ -147,7 +149,8 @@ if sys.version_info >= (3, 13):
         def __class_getitem__(cls, args: Any, /) -> GenericAlias:
             """Represent a PEP 585 generic type
 
-            E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
+            For example, for t = list[int], t.__origin__ is list and t.__args__
+            is (int,).
             """
 
 else:
@@ -269,7 +272,8 @@ class ListProxy(BaseListProxy[_T]):
         def __class_getitem__(cls, args: Any, /) -> Any:
             """Represent a PEP 585 generic type
 
-            E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
+            For example, for t = list[int], t.__origin__ is list and t.__args__
+            is (int,).
             """
 
 # Send is (kind, result)
@@ -461,9 +465,9 @@ class SyncManager(BaseManager):
     @overload
     def dict(self, iterable: Iterable[tuple[str, _VT]], /, **kwargs: _VT) -> DictProxy[str, _VT]: ...
     @overload
-    def dict(self, iterable: Iterable[list[str]], /) -> DictProxy[str, str]: ...
+    def dict(self, iterable: Iterable[builtins.list[str]], /) -> DictProxy[str, str]: ...
     @overload
-    def dict(self, iterable: Iterable[list[bytes]], /) -> DictProxy[bytes, bytes]: ...
+    def dict(self, iterable: Iterable[builtins.list[bytes]], /) -> DictProxy[bytes, bytes]: ...
 
     # Overloads are copied from builtins.list.__init__
     @overload

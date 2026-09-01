@@ -16,5 +16,6 @@ async def to_thread(func: Callable[_P, _R], /, *args: _P.args, **kwargs: _P.kwar
     allowing context variables from the main thread to be accessed in the
     separate thread.
 
-    Return a coroutine that can be awaited to get the eventual result of *func*.
+    Return a coroutine that can be awaited to get the eventual result of
+    *func*.
     """

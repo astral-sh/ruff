@@ -61,4 +61,3 @@ Module(
   |
 1 | *a = (1,)
   | ^^ Syntax Error: starred assignment target must be in a list or tuple
-  |

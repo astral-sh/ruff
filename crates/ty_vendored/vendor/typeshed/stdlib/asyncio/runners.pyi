@@ -33,7 +33,8 @@ if sys.version_info >= (3, 11):
         with asyncio.Runner(debug=True) as runner:
             runner.run(main())
 
-        The run() method can be called multiple times within the runner's context.
+        The run() method can be called multiple times within the runner's
+        context.
 
         This can be useful for interactive console (e.g. IPython),
         unittest runners, console tools, -- everywhere when async code

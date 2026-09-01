@@ -8,4 +8,3 @@ PD008 Use `.loc` instead of `.at`. If speed is important, use NumPy.
 3 | x = pd.DataFrame()
 4 | index = x.at[:, ["B", "A"]]
   |         ^^^^^^^^^^^^^^^^^^^
-  |

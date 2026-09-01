@@ -7,9 +7,7 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::builders::parenthesize_if_expands;
 use crate::comments::SourceComment;
 use crate::expression::can_omit_optional_parentheses;
-use crate::expression::parentheses::{
-    is_expression_parenthesized, optional_parentheses, parenthesized,
-};
+use crate::expression::parentheses::{optional_parentheses, parenthesized};
 use crate::other::commas;
 use crate::other::with_item::WithItemLayout;
 use crate::prelude::*;
@@ -292,11 +290,7 @@ impl<'a> WithItemsLayout<'a> {
 
             // Preserve the parentheses around the context expression instead of parenthesizing the entire
             // with items.
-            if is_expression_parenthesized(
-                (&single.context_expr).into(),
-                context.comments().ranges(),
-                context.source(),
-            ) {
+            if context.is_expression_parenthesized((&single.context_expr).into()) {
                 return Ok(Self::SingleParenthesizedContextManager(single));
             }
         }

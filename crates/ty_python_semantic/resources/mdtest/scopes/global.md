@@ -299,6 +299,93 @@ def factory():
         reveal_type(x)  # revealed: Literal[1]
 ```
 
+An explicit module-level binding remains visible when the enclosing function only conditionally
+rebinds that global:
+
+```py
+value = 0
+
+def conditional_global_factory(flag: bool):
+    global value
+    if flag:
+        value = "updated"
+
+    class Nested:
+        reveal_type(value)  # revealed: Literal["updated", 0]
+```
+
+If the condition is known to be false, the nested class should see only the original module-level
+binding and should not report an unresolved reference:
+
+```py
+from typing import Literal
+
+known_false_value = 0
+
+def known_false_global_factory(flag: Literal[False]):
+    global known_false_value
+    if flag:
+        known_false_value = "updated"
+
+    class Nested:
+        reveal_type(known_false_value)  # revealed: Literal[0]
+```
+
+A module-level declaration also remains visible when the enclosing function only conditionally binds
+that global:
+
+```py
+declared_value: int
+
+def conditional_declared_global_factory(flag: bool):
+    global declared_value
+    if flag:
+        declared_value = 1
+
+    class Nested:
+        reveal_type(declared_value)  # revealed: int
+```
+
+If the rebinding is conditional, an unbound enclosing snapshot continues to the implicit global:
+
+```py
+def conditional_factory(flag: bool):
+    global __file__
+    if flag:
+        __file__ = "shadow"
+
+    class C:
+        reveal_type(__file__)  # revealed: str
+```
+
+An unbound snapshot can also continue through the module scope to a builtin.
+
+```py
+def conditional_builtin_factory(flag: bool):
+    global len  # error: [unresolved-global] "Invalid global declaration of `len`: `len` has no declarations or bindings in the global scope"
+    if flag:
+        len = 1
+
+    class C:
+        reveal_type(len)  # revealed: Literal[1] | (def len(obj: Sized, /) -> int)
+```
+
+## Comprehension after global rebinding
+
+A comprehension is also an eager nested scope, so it should see both the original module-level
+binding and a conditional global rebinding:
+
+```py
+value = 0
+
+def factory(flag: bool):
+    global value
+    if flag:
+        value = "updated"
+
+    [reveal_type(value) for _ in [0]]  # revealed: Literal["updated", 0]
+```
+
 ## References to variables before they are defined within a class scope are considered global
 
 If we try to access a variable in a class before it has been defined, the lookup will fall back to
@@ -389,7 +476,7 @@ reveal_type(x)  # revealed: Literal[1, 2]
 The example above (hopefully) feels natural, but if we look at it closely, the reveals there are
 making some beefy assumptions. For one, we assume `f` might be called before the final reveal, even
 though in this case we can actually see that it's never called. A "sufficiently smart compiler"
-could've narrowed that to `Literal[1]`, but we don't/can't track what functions are caled when
+could've narrowed that to `Literal[1]`, but we don't/can't track what functions are called when
 (anywhere really, but especially not in the global scope), so we're being conservative. On the other
 hand, the reveal of `Literal[2]` after the binding in `g` is the opposite, an aggressive assumption
 that's not generally sound. Consider this counterexample where `f` and `g` are siblings that both
@@ -556,7 +643,7 @@ def foo():
 We don't need to think about this ordering in normal execution, since the body of a function doesn't
 get to cause any side effects until the function is called. But we do need to think about it in
 inference, because of the (generally unsound) rule mentioned above about considering nested bindings
-visible after we encounter them. That can matter in unusual sitautions like this one:
+visible after we encounter them. That can matter in unusual situations like this one:
 
 ```py
 x = 1

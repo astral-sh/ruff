@@ -3,6 +3,7 @@ This module principally provides several routines for resolving a particular mod
 name to a `Module`:
 
 * [`file_to_module`][]: resolves the module `.<self>` (often as the first step in resolving `.`)
+* [`stub_file_to_real_module`][]: resolves the runtime module corresponding to a stub file
 * [`resolve_module`][]: resolves an absolute module name
 
 You may notice that we actually provide `resolve_(real)_(shadowable)_module_(confident)`.
@@ -37,33 +38,52 @@ use std::iter::FusedIterator;
 
 use rustc_hash::{FxBuildHasher, FxHashSet};
 
+use ruff_db::PythonFile;
 use ruff_db::files::{File, FilePath, FileRootKind, directory_listing, system_path_to_file};
 use ruff_db::source::source_text;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_python_ast::{
-    self as ast, PySourceType, PythonVersion,
+    self as ast, PySourceType,
     visitor::{Visitor, walk_body},
 };
 
 use crate::db::Db;
 use crate::module::{Module, ModuleKind};
-use crate::module_name::ModuleName;
+use crate::module_name::{ImportingFile, ModuleName};
 use crate::path::{ModulePath, SearchPath, SystemOrVendoredPathRef};
 use crate::strategy::MisconfigurationStrategy;
 use crate::typeshed::{TypeshedVersions, vendored_typeshed_versions};
-use crate::{SearchPathSettings, SearchPathSettingsError};
+use crate::{ResolverEnvironment, ResolverFile, SearchPathSettings, SearchPathSettingsError};
 
 /// Resolves a module name to a module.
 pub fn resolve_module<'db>(
     db: &'db dyn Db,
-    importing_file: File,
+    importing_file: ImportingFile<'db>,
     module_name: &ModuleName,
 ) -> Option<Module<'db>> {
-    let interned_name = ModuleNameIngredient::new(db, module_name, ModuleResolveMode::StubsAllowed);
+    let resolver_environment = importing_file.resolver_environment(db);
+    let interned_name = ModuleNameIngredient::new(
+        db,
+        module_name,
+        ModuleResolveMode::Typing,
+        resolver_environment,
+    );
 
     resolve_module_query(db, interned_name)
-        .or_else(|| desperately_resolve_module(db, importing_file, interned_name))
+        .or_else(|| desperately_resolve_module(db, importing_file.file(db), interned_name))
+}
+
+/// Resolves the module referenced by a `from` import statement.
+///
+/// Returns `None` if the statement does not name a valid module or the module cannot be resolved.
+pub fn resolve_module_for_import_from<'db>(
+    db: &'db dyn Db,
+    importing_file: ImportingFile<'db>,
+    import: &ast::StmtImportFrom,
+) -> Option<Module<'db>> {
+    let module_name = ModuleName::from_import_statement(db, importing_file, import).ok()?;
+    resolve_module(db, importing_file, &module_name)
 }
 
 /// Resolves a module name to a module, without desperate resolution available.
@@ -72,9 +92,15 @@ pub fn resolve_module<'db>(
 /// we don't have a well-defined importing file.
 pub fn resolve_module_confident<'db>(
     db: &'db dyn Db,
+    resolver_environment: ResolverEnvironment<'db>,
     module_name: &ModuleName,
 ) -> Option<Module<'db>> {
-    let interned_name = ModuleNameIngredient::new(db, module_name, ModuleResolveMode::StubsAllowed);
+    let interned_name = ModuleNameIngredient::new(
+        db,
+        module_name,
+        ModuleResolveMode::Typing,
+        resolver_environment,
+    );
 
     resolve_module_query(db, interned_name)
 }
@@ -82,14 +108,19 @@ pub fn resolve_module_confident<'db>(
 /// Resolves a module name to a module (stubs not allowed).
 pub fn resolve_real_module<'db>(
     db: &'db dyn Db,
-    importing_file: File,
+    importing_file: ImportingFile<'db>,
     module_name: &ModuleName,
 ) -> Option<Module<'db>> {
-    let interned_name =
-        ModuleNameIngredient::new(db, module_name, ModuleResolveMode::StubsNotAllowed);
+    let resolver_environment = importing_file.resolver_environment(db);
+    let interned_name = ModuleNameIngredient::new(
+        db,
+        module_name,
+        ModuleResolveMode::Runtime,
+        resolver_environment,
+    );
 
     resolve_module_query(db, interned_name)
-        .or_else(|| desperately_resolve_module(db, importing_file, interned_name))
+        .or_else(|| desperately_resolve_module(db, importing_file.file(db), interned_name))
 }
 
 /// Resolves a module name to a module, without desperate resolution available (stubs not allowed).
@@ -98,10 +129,15 @@ pub fn resolve_real_module<'db>(
 /// we don't have a well-defined importing file.
 pub fn resolve_real_module_confident<'db>(
     db: &'db dyn Db,
+    resolver_environment: ResolverEnvironment<'db>,
     module_name: &ModuleName,
 ) -> Option<Module<'db>> {
-    let interned_name =
-        ModuleNameIngredient::new(db, module_name, ModuleResolveMode::StubsNotAllowed);
+    let interned_name = ModuleNameIngredient::new(
+        db,
+        module_name,
+        ModuleResolveMode::Runtime,
+        resolver_environment,
+    );
 
     resolve_module_query(db, interned_name)
 }
@@ -119,52 +155,58 @@ pub fn resolve_real_module_confident<'db>(
 /// are involved in an import cycle with `builtins`.
 pub fn resolve_real_shadowable_module<'db>(
     db: &'db dyn Db,
-    importing_file: File,
+    importing_file: ImportingFile<'db>,
     module_name: &ModuleName,
 ) -> Option<Module<'db>> {
+    let resolver_environment = importing_file.resolver_environment(db);
     let interned_name = ModuleNameIngredient::new(
         db,
         module_name,
-        ModuleResolveMode::StubsNotAllowedSomeShadowingAllowed,
+        ModuleResolveMode::RuntimeSomeShadowingAllowed,
+        resolver_environment,
     );
 
     resolve_module_query(db, interned_name)
-        .or_else(|| desperately_resolve_module(db, importing_file, interned_name))
+        .or_else(|| desperately_resolve_module(db, importing_file.file(db), interned_name))
 }
 
-/// Which files should be visible when doing a module query
+/// Selects typing or runtime module-resolution semantics.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, get_size2::GetSize)]
-#[allow(clippy::enum_variant_names)]
 pub enum ModuleResolveMode {
-    /// Stubs are allowed to appear.
+    /// Resolve modules for type checking, preferring stubs over runtime implementations.
     ///
     /// This is the "normal" mode almost everything uses, as type checkers are in fact supposed
     /// to *prefer* stubs over the actual implementations.
-    StubsAllowed,
-    /// Stubs are not allowed to appear.
+    Typing,
+
+    /// Resolve modules to their runtime implementations without considering stubs.
     ///
     /// This is the "goto definition" mode, where we need to ignore the typing spec and find actual
     /// implementations. When querying searchpaths this also notably replaces typeshed with
     /// the "real" stdlib.
-    StubsNotAllowed,
-    /// Like `StubsNotAllowed`, but permits some modules to be shadowed.
+    Runtime,
+
+    /// Like [`ModuleResolveMode::Runtime`], but permits some modules to be shadowed.
     ///
     /// In particular, this allows `typing_extensions` to be shadowed by a
     /// non-standard library module. This is useful in the context of the LSP
     /// where we don't want to pretend as if these modules are always available
     /// at runtime.
-    StubsNotAllowedSomeShadowingAllowed,
+    RuntimeSomeShadowingAllowed,
 }
 
 #[salsa::interned(heap_size=ruff_memory_usage::heap_size)]
 #[derive(Debug)]
 pub(crate) struct ModuleResolveModeIngredient<'db> {
+    #[returns(copy)]
+    resolver_environment: ResolverEnvironment<'db>,
+    #[returns(copy)]
     mode: ModuleResolveMode,
 }
 
 impl ModuleResolveMode {
-    fn stubs_allowed(self) -> bool {
-        matches!(self, Self::StubsAllowed)
+    fn is_typing(self) -> bool {
+        matches!(self, Self::Typing)
     }
 
     /// Returns `true` if the module name refers to a standard library module
@@ -193,10 +235,10 @@ impl ModuleResolveMode {
         // Otherwise, some modules should only be conditionally allowed
         // to be shadowed, depending on the module resolution mode.
         match self {
-            ModuleResolveMode::StubsAllowed | ModuleResolveMode::StubsNotAllowed => {
+            ModuleResolveMode::Typing | ModuleResolveMode::Runtime => {
                 module_name == "typing_extensions"
             }
-            ModuleResolveMode::StubsNotAllowedSomeShadowingAllowed => false,
+            ModuleResolveMode::RuntimeSomeShadowingAllowed => false,
         }
     }
 }
@@ -205,16 +247,17 @@ impl ModuleResolveMode {
 ///
 /// This query should not be called directly. Instead, use [`resolve_module`]. It only exists
 /// because Salsa requires the module name to be an ingredient.
-#[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
 fn resolve_module_query<'db>(
     db: &'db dyn Db,
     module_name: ModuleNameIngredient<'db>,
 ) -> Option<Module<'db>> {
     let name = module_name.name(db);
     let mode = module_name.mode(db);
+    let resolver_environment = module_name.resolver_environment(db);
     let _span = tracing::trace_span!("resolve_module", %name).entered();
 
-    let Some(resolved) = resolve_name(db, name, mode) else {
+    let Some(resolved) = resolve_name(db, resolver_environment, name, mode) else {
         tracing::debug!("Module `{name}` not found in search paths");
         return None;
     };
@@ -222,7 +265,7 @@ fn resolve_module_query<'db>(
     resolved
         .into_iter()
         .next()
-        .map(|candidate| candidate.into_module(db, name.clone()))
+        .map(|candidate| candidate.into_module(db, resolver_environment, name))
 }
 
 /// Like `resolve_module_query` but for cases where it failed to resolve the module
@@ -237,7 +280,7 @@ fn resolve_module_query<'db>(
 ///
 /// Cache desperate resolution because repeated unresolved imports in a project can otherwise
 /// re-walk the same importing-file-relative search paths many times.
-#[salsa::tracked]
+#[salsa::tracked(returns(copy))]
 fn desperately_resolve_module<'db>(
     db: &'db dyn Db,
     importing_file: File,
@@ -245,31 +288,38 @@ fn desperately_resolve_module<'db>(
 ) -> Option<Module<'db>> {
     let name = module_name.name(db);
     let mode = module_name.mode(db);
+    let resolver_environment = module_name.resolver_environment(db);
     let _span = tracing::trace_span!("desperately_resolve_module", %name).entered();
 
-    let Some(resolved) = desperately_resolve_name(db, importing_file, name, mode) else {
-        let extra = match module_name.mode(db) {
-            ModuleResolveMode::StubsAllowed => "neither stub nor real module file",
-            ModuleResolveMode::StubsNotAllowed => "stubs not allowed",
-            ModuleResolveMode::StubsNotAllowedSomeShadowingAllowed => {
-                "stubs not allowed but some shadowing allowed"
+    let Some(resolved) =
+        desperately_resolve_name(db, importing_file, resolver_environment, name, mode)
+    else {
+        let mode = match mode {
+            ModuleResolveMode::Typing => "typing mode",
+            ModuleResolveMode::Runtime => "runtime mode",
+            ModuleResolveMode::RuntimeSomeShadowingAllowed => {
+                "runtime mode with some shadowing allowed"
             }
         };
-        tracing::debug!("Module `{name}` not found while looking in parent dirs ({extra})");
+        tracing::debug!("Module `{name}` not found while looking in parent dirs ({mode})");
         return None;
     };
 
     resolved
         .into_iter()
         .next()
-        .map(|candidate| candidate.into_module(db, name.clone()))
+        .map(|candidate| candidate.into_module(db, resolver_environment, name))
 }
 
 /// Resolves the module for the given path.
 ///
 /// Returns `None` if the path is not a module locatable via any of the known search paths.
 #[allow(unused)]
-pub(crate) fn path_to_module<'db>(db: &'db dyn Db, path: &FilePath) -> Option<Module<'db>> {
+pub(crate) fn path_to_module<'db>(
+    db: &'db dyn Db,
+    resolver_environment: ResolverEnvironment<'db>,
+    path: &FilePath,
+) -> Option<Module<'db>> {
     // It's not entirely clear on first sight why this method calls `file_to_module` instead of
     // it being the other way round, considering that the first thing that `file_to_module` does
     // is to retrieve the file's path.
@@ -279,7 +329,7 @@ pub(crate) fn path_to_module<'db>(db: &'db dyn Db, path: &FilePath) -> Option<Mo
     // `VfsFile` is. So what we do here is to retrieve the `path`'s `VfsFile` so that we can make
     // use of Salsa's caching and invalidation.
     let file = path.to_file(db)?;
-    file_to_module(db, file)
+    file_to_module(db, ResolverFile::new(db, file, resolver_environment))
 }
 
 /// Resolves the module for the file with the given id.
@@ -290,31 +340,61 @@ pub(crate) fn path_to_module<'db>(db: &'db dyn Db, path: &FilePath) -> Option<Mo
 /// and indeed, one of its primary jobs is resolving `.<self>` to derive the module name of `.`.
 /// This intuition is particularly useful for understanding why it's correct that we pass
 /// the file itself as `importing_file` to various subroutines.
-#[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
-pub fn file_to_module(db: &dyn Db, file: File) -> Option<Module<'_>> {
+#[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
+pub fn file_to_module<'db>(
+    db: &'db dyn Db,
+    resolver_file: ResolverFile<'db>,
+) -> Option<Module<'db>> {
+    let resolver_environment = resolver_file.environment(db);
+    let file = resolver_file.file(db);
     let _span = tracing::trace_span!("file_to_module", ?file).entered();
 
     let path = SystemOrVendoredPathRef::try_from_file(db, file)?;
 
     file_to_module_impl(
         db,
-        file,
+        resolver_file,
         path,
-        search_paths(db, ModuleResolveMode::StubsAllowed),
+        search_paths(db, resolver_environment, ModuleResolveMode::Typing),
     )
     .or_else(|| {
         file_to_module_impl(
             db,
-            file,
+            resolver_file,
             path,
-            relative_desperate_search_paths(db, file).iter(),
+            relative_desperate_search_paths(db, resolver_file).iter(),
         )
     })
 }
 
+/// Resolves the runtime module corresponding to a stub file.
+///
+/// Modules that are only available as stubs, including built-in modules, return `None`.
+pub fn stub_file_to_real_module<'db>(
+    db: &'db dyn Db,
+    resolver_file: ResolverFile<'db>,
+) -> Option<Module<'db>> {
+    debug_assert!(resolver_file.file(db).is_stub(db));
+
+    let module = file_to_module(db, resolver_file)?;
+    // Built-in modules have no source file to find. Checking here also avoids a failed
+    // resolution attempt that would emit misleading logs.
+    if ruff_python_stdlib::sys::is_builtin_module(module.python_version(db).minor, module.name(db))
+    {
+        return None;
+    }
+    // This lookup is equivalent to resolving `.<self>` from the stub, so the stub is the correct
+    // importing file.
+    resolve_real_module(
+        db,
+        ImportingFile::ResolverFile(resolver_file),
+        module.name(db),
+    )
+}
+
 fn file_to_module_impl<'db, 'a>(
     db: &'db dyn Db,
-    file: File,
+    resolver_file: ResolverFile<'db>,
     path: SystemOrVendoredPathRef<'a>,
     mut search_paths: impl Iterator<Item = &'a SearchPath>,
 ) -> Option<Module<'db>> {
@@ -330,10 +410,12 @@ fn file_to_module_impl<'db, 'a>(
     // If it doesn't, then that means that multiple modules have the same name in different
     // root paths, but that the module corresponding to `path` is in a lower priority search path,
     // in which case we ignore it.
-    let module = resolve_module(db, file, &module_name)?;
+    let module = resolve_module(db, ImportingFile::ResolverFile(resolver_file), &module_name)?;
     let module_file = module.file(db)?;
 
-    if file.path(db) == module_file.path(db) {
+    let file: File = resolver_file.file(db);
+    let file_path = file.path(db);
+    if file_path == module_file.path(db) {
         return Some(module);
     } else if file.source_type(db) == PySourceType::Python
         && module_file.source_type(db) == PySourceType::Stub
@@ -341,9 +423,10 @@ fn file_to_module_impl<'db, 'a>(
         // If a .py and .pyi are both defined, the .pyi will be the one returned by `resolve_module().file`,
         // which would make us erroneously believe the `.py` is *not* also this module (breaking things
         // like relative imports). So here we try `resolve_real_module().file` to cover both cases.
-        let module = resolve_real_module(db, file, &module_name)?;
+        let module =
+            resolve_real_module(db, ImportingFile::ResolverFile(resolver_file), &module_name)?;
         let module_file = module.file(db)?;
-        if file.path(db) == module_file.path(db) {
+        if file_path == module_file.path(db) {
             return Some(module);
         }
     }
@@ -357,24 +440,43 @@ fn file_to_module_impl<'db, 'a>(
     None
 }
 
-pub fn search_paths(db: &dyn Db, resolve_mode: ModuleResolveMode) -> SearchPathIterator<'_> {
-    db.search_paths().iter(db, resolve_mode)
+pub fn search_paths<'db>(
+    db: &'db dyn Db,
+    resolver_environment: ResolverEnvironment<'db>,
+    resolve_mode: ModuleResolveMode,
+) -> SearchPathIterator<'db> {
+    let search_paths = resolver_environment.search_paths(db);
+
+    SearchPathIterator {
+        db,
+        static_paths: search_paths.static_paths.iter(),
+        stdlib_path: search_paths.stdlib(resolve_mode),
+        dynamic_paths: None,
+        mode: ModuleResolveModeIngredient::new(db, resolver_environment, resolve_mode),
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+struct StubPackagePaths<'a> {
+    before_stdlib: &'a [SearchPath],
+    after_stdlib: &'a [SearchPath],
+}
+
+impl StubPackagePaths<'_> {
+    fn is_empty(self) -> bool {
+        self.before_stdlib.is_empty() && self.after_stdlib.is_empty()
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, get_size2::GetSize)]
-struct StubPackageSearchPaths {
+struct StubPackageIndex {
     paths: Box<[SearchPath]>,
     stdlib_offset: usize,
 }
 
-impl StubPackageSearchPaths {
-    fn empty() -> Self {
-        Self {
-            paths: Box::new([]),
-            stdlib_offset: 0,
-        }
-    }
-
+impl StubPackageIndex {
+    /// Indexes search paths that may contain a stub package, preserving their position relative to
+    /// the standard library.
     fn from_search_paths<'a>(
         db: &dyn Db,
         search_paths: impl Iterator<Item = &'a SearchPath>,
@@ -397,16 +499,57 @@ impl StubPackageSearchPaths {
         }
     }
 
-    fn is_empty(&self) -> bool {
-        self.paths.is_empty()
+    /// Returns all indexed paths in normal typing-resolution order.
+    fn all(&self) -> StubPackagePaths<'_> {
+        StubPackagePaths {
+            before_stdlib: self.before_stdlib(),
+            after_stdlib: self.after_stdlib(),
+        }
+    }
+
+    /// Splits the indexed paths between the stub-overlay pass and its normal fallback.
+    ///
+    /// The overlay contains only extra paths, which all precede stdlib. The fallback retains the
+    /// remaining paths' positions relative to stdlib.
+    fn split_overlay(&self) -> (StubPackagePaths<'_>, StubPackagePaths<'_>) {
+        let before_stdlib = self.before_stdlib();
+        let (extra, remaining) =
+            before_stdlib.split_at(before_stdlib.partition_point(SearchPath::is_extra));
+
+        (
+            StubPackagePaths {
+                before_stdlib: extra,
+                after_stdlib: &[],
+            },
+            StubPackagePaths {
+                before_stdlib: remaining,
+                after_stdlib: self.after_stdlib(),
+            },
+        )
+    }
+
+    /// Returns indexed paths that precede stdlib in normal typing resolution.
+    fn before_stdlib(&self) -> &[SearchPath] {
+        &self.paths[..self.stdlib_offset]
+    }
+
+    /// Returns indexed paths that follow stdlib in normal typing resolution.
+    fn after_stdlib(&self) -> &[SearchPath] {
+        &self.paths[self.stdlib_offset..]
     }
 }
 
-/// Returns the search paths that may contain a top-level stub package, preserving their
+/// Returns an index of search paths that may contain a top-level stub package, preserving their
 /// resolution order relative to stdlib.
 #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
-fn stub_package_search_paths(db: &dyn Db) -> StubPackageSearchPaths {
-    StubPackageSearchPaths::from_search_paths(db, search_paths(db, ModuleResolveMode::StubsAllowed))
+fn stub_package_index(
+    db: &dyn Db,
+    resolver_environment: ResolverEnvironment<'_>,
+) -> StubPackageIndex {
+    StubPackageIndex::from_search_paths(
+        db,
+        search_paths(db, resolver_environment, ModuleResolveMode::Typing),
+    )
 }
 
 fn search_path_may_contain_stub_package(db: &dyn Db, search_path: &SearchPath) -> bool {
@@ -428,21 +571,26 @@ fn search_path_may_contain_stub_package(db: &dyn Db, search_path: &SearchPath) -
 ///
 /// We exclude `__init__.py(i)` dirs to avoid truncating packages.
 #[salsa::tracked(returns(as_deref), heap_size=ruff_memory_usage::heap_size)]
-fn absolute_desperate_search_paths(db: &dyn Db, importing_file: File) -> Option<Box<[SearchPath]>> {
+fn absolute_desperate_search_paths(
+    db: &dyn Db,
+    importing_file: ResolverFile<'_>,
+) -> Option<Box<[SearchPath]>> {
+    let resolver_environment = importing_file.environment(db);
+    let importing_file = importing_file.file(db);
     let system = db.system();
     let importing_path = importing_file.path(db).as_system_path()?;
 
     // Only allow this if the importing_file is under the first-party search path
-    let (base_path, rel_path) =
-        search_paths(db, ModuleResolveMode::StubsAllowed).find_map(|search_path| {
-            if !search_path.is_first_party() {
-                return None;
-            }
-            Some((
-                search_path.as_system_path()?,
-                search_path.relativize_system_path_only(importing_path)?,
-            ))
-        })?;
+    let (base_path, rel_path) = search_paths(db, resolver_environment, ModuleResolveMode::Typing)
+        .find_map(|search_path| {
+        if !search_path.is_first_party() {
+            return None;
+        }
+        Some((
+            search_path.as_system_path()?,
+            search_path.relativize_system_path_only(importing_path)?,
+        ))
+    })?;
 
     // Only allow searching up to the first-party path's root
     let mut search_paths = Vec::new();
@@ -491,22 +639,27 @@ fn absolute_desperate_search_paths(db: &dyn Db, importing_file: File) -> Option<
 /// Being so strict minimizes concerns about this going off a lot and doing random
 /// chaotic things. In particular, all files under a given pyproject.toml will currently
 /// agree on this being their desperate search-path, which is really nice.
-#[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
-fn relative_desperate_search_paths(db: &dyn Db, importing_file: File) -> Option<SearchPath> {
+#[salsa::tracked(returns(clone), heap_size=ruff_memory_usage::heap_size)]
+fn relative_desperate_search_paths(
+    db: &dyn Db,
+    importing_file: ResolverFile<'_>,
+) -> Option<SearchPath> {
+    let resolver_environment = importing_file.environment(db);
+    let importing_file = importing_file.file(db);
     let system = db.system();
     let importing_path = importing_file.path(db).as_system_path()?;
 
     // Only allow this if the importing_file is under the first-party search path
-    let (base_path, rel_path) =
-        search_paths(db, ModuleResolveMode::StubsAllowed).find_map(|search_path| {
-            if !search_path.is_first_party() {
-                return None;
-            }
-            Some((
-                search_path.as_system_path()?,
-                search_path.relativize_system_path_only(importing_path)?,
-            ))
-        })?;
+    let (base_path, rel_path) = search_paths(db, resolver_environment, ModuleResolveMode::Typing)
+        .find_map(|search_path| {
+        if !search_path.is_first_party() {
+            return None;
+        }
+        Some((
+            search_path.as_system_path()?,
+            search_path.relativize_system_path_only(importing_path)?,
+        ))
+    })?;
 
     // Only allow searching up to the first-party path's root
     for rel_dir in rel_path.ancestors() {
@@ -525,7 +678,7 @@ fn relative_desperate_search_paths(db: &dyn Db, importing_file: File) -> Option<
 
     None
 }
-#[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
+#[derive(Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub struct SearchPaths {
     /// Search paths that have been statically determined purely from reading
     /// ty's configuration settings. These shouldn't ever change unless the
@@ -538,7 +691,7 @@ pub struct SearchPaths {
     stdlib_path: Option<SearchPath>,
 
     /// Path to the real stdlib, this replaces typeshed (`stdlib_path`) for goto-definition searches
-    /// ([`ModuleResolveMode::StubsNotAllowed`]).
+    /// ([`ModuleResolveMode::Runtime`]).
     real_stdlib_path: Option<SearchPath>,
 
     /// site-packages paths are not included in the above fields:
@@ -552,6 +705,27 @@ pub struct SearchPaths {
     typeshed_versions: TypeshedVersions,
 }
 
+impl fmt::Debug for SearchPaths {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self {
+            static_paths,
+            stdlib_path,
+            real_stdlib_path,
+            site_packages,
+            // Omit `typeshed_versions` because its debug representation spans thousands of lines,
+            // making even simple `Type` debug representations impractically large.
+            typeshed_versions: _,
+        } = self;
+
+        f.debug_struct("SearchPaths")
+            .field("static_paths", static_paths)
+            .field("stdlib_path", stdlib_path)
+            .field("real_stdlib_path", real_stdlib_path)
+            .field("site_packages", site_packages)
+            .finish_non_exhaustive()
+    }
+}
+
 impl SearchPaths {
     /// Validate and normalize the raw settings given by the user
     /// into settings we can use for module resolution
@@ -559,7 +733,7 @@ impl SearchPaths {
     /// This method also implements the typing spec's [module resolution order].
     ///
     /// [module resolution order]: https://typing.python.org/en/latest/spec/distributing.html#import-resolution-ordering
-    pub fn from_settings<Strategy: MisconfigurationStrategy>(
+    pub(crate) fn from_settings<Strategy: MisconfigurationStrategy>(
         settings: &SearchPathSettings,
         system: &dyn System,
         vendored: &VendoredFileSystem,
@@ -722,7 +896,7 @@ impl SearchPaths {
 
     /// Returns a new `SearchPaths` with no search paths configured.
     ///
-    /// This is primarily useful for testing.
+    /// The vendored standard library remains available.
     pub fn empty(vendored: &VendoredFileSystem) -> Self {
         Self {
             static_paths: vec![],
@@ -731,6 +905,14 @@ impl SearchPaths {
             site_packages: vec![],
             typeshed_versions: vendored_typeshed_versions(vendored),
         }
+    }
+
+    /// Returns the configured roots for first-party modules.
+    pub fn first_party_roots(&self) -> impl Iterator<Item = &SystemPath> {
+        self.static_paths
+            .iter()
+            .filter(|path| path.is_first_party())
+            .filter_map(SearchPath::as_system_path)
     }
 
     /// Registers file roots for all non-dynamically discovered search paths.
@@ -752,40 +934,12 @@ impl SearchPaths {
         }
     }
 
-    pub(super) fn iter<'a>(
-        &'a self,
-        db: &'a dyn Db,
-        mode: ModuleResolveMode,
-    ) -> SearchPathIterator<'a> {
-        let stdlib_path = self.stdlib(mode);
-        SearchPathIterator {
-            db,
-            static_paths: self.static_paths.iter(),
-            stdlib_path,
-            dynamic_paths: None,
-            mode: ModuleResolveModeIngredient::new(db, mode),
-        }
-    }
-
-    pub(crate) fn stdlib(&self, mode: ModuleResolveMode) -> Option<&SearchPath> {
+    fn stdlib(&self, mode: ModuleResolveMode) -> Option<&SearchPath> {
         match mode {
-            ModuleResolveMode::StubsAllowed => self.stdlib_path.as_ref(),
-            ModuleResolveMode::StubsNotAllowed
-            | ModuleResolveMode::StubsNotAllowedSomeShadowingAllowed => {
+            ModuleResolveMode::Typing => self.stdlib_path.as_ref(),
+            ModuleResolveMode::Runtime | ModuleResolveMode::RuntimeSomeShadowingAllowed => {
                 self.real_stdlib_path.as_ref()
             }
-        }
-    }
-
-    pub fn display<'a>(
-        &'a self,
-        db: &'a dyn Db,
-        mode: ModuleResolveMode,
-    ) -> DisplaySearchPaths<'a> {
-        DisplaySearchPaths {
-            search_paths: self,
-            db,
-            mode,
         }
     }
 
@@ -800,86 +954,40 @@ impl SearchPaths {
     }
 }
 
-pub struct DisplaySearchPaths<'a> {
-    search_paths: &'a SearchPaths,
-    db: &'a dyn Db,
-    mode: ModuleResolveMode,
-}
-
-impl fmt::Display for DisplaySearchPaths<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut paths = self.search_paths.iter(self.db, self.mode).peekable();
-
-        if paths.peek().is_none() {
-            return f.write_str("[]");
-        }
-
-        writeln!(f, "[")?;
-        for path in paths {
-            writeln!(f, "  {path},")?;
-        }
-        f.write_str("]")
-    }
-}
-
-/// Collect all dynamic search paths. For each `site-packages` path:
-/// - Collect that `site-packages` path
-/// - Collect any search paths listed in `.pth` files in that `site-packages` directory
-///   due to editable installations of third-party packages.
+/// Returns the validated roots listed in the environment's `.pth` files.
 ///
-/// The editable-install search paths for the first `site-packages` directory
-/// should come between the two `site-packages` directories when it comes to
-/// module-resolution priority.
-#[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
-pub(crate) fn dynamic_resolution_paths<'db>(
+/// Unlike [`search_paths`], this includes editable roots that are also first-party search paths.
+/// Those `.pth` entries still identify installed source trees, even though adding their paths to
+/// module resolution a second time would be redundant.
+pub fn editable_search_paths<'db>(
     db: &'db dyn Db,
-    mode: ModuleResolveModeIngredient<'db>,
-) -> Vec<SearchPath> {
-    tracing::debug!("Resolving dynamic module resolution paths");
-
-    let SearchPaths {
-        static_paths,
-        stdlib_path,
-        site_packages,
-        typeshed_versions: _,
-        real_stdlib_path,
-    } = db.search_paths();
-
-    let mut dynamic_paths = Vec::new();
-
-    if site_packages.is_empty() {
-        return dynamic_paths;
-    }
-
-    let mut existing_paths: FxHashSet<_> = static_paths
+    environment: ResolverEnvironment<'db>,
+) -> impl Iterator<Item = &'db SystemPath> {
+    site_packages_editables(db, environment)
         .iter()
-        .filter_map(|path| path.as_system_path())
-        .map(Cow::Borrowed)
-        .collect();
+        .flat_map(|paths| paths.editables.iter())
+        .filter_map(SearchPath::as_system_path)
+}
 
-    // Use the `ModuleResolveMode` to determine which stdlib (if any) to mark as existing
-    let stdlib = match mode.mode(db) {
-        ModuleResolveMode::StubsAllowed => stdlib_path,
-        ModuleResolveMode::StubsNotAllowed
-        | ModuleResolveMode::StubsNotAllowedSomeShadowingAllowed => real_stdlib_path,
-    };
-    if let Some(path) = stdlib.as_ref().and_then(SearchPath::as_system_path) {
-        existing_paths.insert(Cow::Borrowed(path));
-    }
+#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
+struct SitePackagesEditables {
+    site_packages: SearchPath,
+    editables: Box<[SearchPath]>,
+}
 
-    let files = db.files();
+/// Discover editable roots without discarding entries that overlap static search paths.
+#[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
+fn site_packages_editables<'db>(
+    db: &'db dyn Db,
+    environment: ResolverEnvironment<'db>,
+) -> Box<[SitePackagesEditables]> {
+    let mut paths = Vec::new();
     let system = db.system();
 
-    for site_packages_search_path in site_packages {
-        let site_packages_dir = site_packages_search_path
+    for site_packages in &environment.search_paths(db).site_packages {
+        let site_packages_dir = site_packages
             .as_system_path()
             .expect("Expected site package path to be a system path");
-
-        if !existing_paths.insert(Cow::Borrowed(site_packages_dir)) {
-            continue;
-        }
-
-        dynamic_paths.push(site_packages_search_path.clone());
 
         // As well as modules installed directly into `site-packages`,
         // the directory may also contain `.pth` files.
@@ -893,9 +1001,15 @@ pub(crate) fn dynamic_resolution_paths<'db>(
                 tracing::warn!(
                     "Failed to search for editable installation in {site_packages_dir}: {error}"
                 );
+                paths.push(SitePackagesEditables {
+                    site_packages: site_packages.clone(),
+                    editables: Box::default(),
+                });
                 continue;
             }
         };
+
+        let mut editables = Vec::new();
 
         // The Python documentation specifies that `.pth` files in `site-packages`
         // are processed in alphabetical order. `DirectoryListing` is already sorted.
@@ -936,39 +1050,95 @@ pub(crate) fn dynamic_resolution_paths<'db>(
                     .canonicalize_path(&installation)
                     .unwrap_or(installation);
 
-                if existing_paths.insert(Cow::Owned(installation.clone())) {
-                    match SearchPath::editable(system, installation.clone()) {
-                        Ok(search_path) => {
-                            tracing::debug!(
-                                "Adding editable installation to module resolution path {path}",
-                                path = installation
-                            );
-
-                            // Register a file root for editable installs that are outside any other root
-                            // (Most importantly, don't register a root for editable installations from the project
-                            // directory as that would change the durability of files within those folders).
-                            // Not having an exact file root for editable installs just means that
-                            // some queries (like `list_modules_in`) will run slightly more frequently
-                            // than they would otherwise.
-                            if let Some(dynamic_path) = search_path.as_system_path() {
-                                if files.root(db, dynamic_path).is_none() {
-                                    files.try_add_root(db, dynamic_path, FileRootKind::SearchPath);
-                                }
-                            }
-
-                            dynamic_paths.push(search_path);
-                        }
-
-                        Err(error) => {
-                            tracing::debug!("Skipping editable installation: {error}");
-                        }
+                match SearchPath::editable(system, installation) {
+                    Ok(search_path) => editables.push(search_path),
+                    Err(error) => {
+                        tracing::debug!("Skipping editable installation: {error}");
                     }
                 }
             }
         }
+
+        paths.push(SitePackagesEditables {
+            site_packages: site_packages.clone(),
+            editables: editables.into_boxed_slice(),
+        });
     }
 
-    dynamic_paths
+    paths.into_boxed_slice()
+}
+
+/// Collect all dynamic search paths. For each `site-packages` path:
+/// - Collect that `site-packages` path
+/// - Collect any search paths listed in `.pth` files in that `site-packages` directory
+///   due to editable installations of third-party packages.
+///
+/// The editable-install search paths for the first `site-packages` directory
+/// should come between the two `site-packages` directories when it comes to
+/// module-resolution priority.
+#[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
+pub(crate) fn dynamic_resolution_paths<'db>(
+    db: &'db dyn Db,
+    mode: ModuleResolveModeIngredient<'db>,
+) -> Box<[SearchPath]> {
+    tracing::debug!("Resolving dynamic module resolution paths");
+
+    let environment = mode.resolver_environment(db);
+    let site_packages = site_packages_editables(db, environment);
+    if site_packages.is_empty() {
+        return Box::default();
+    }
+
+    let search_paths = environment.search_paths(db);
+    let mut existing_paths: FxHashSet<_> = search_paths
+        .static_paths
+        .iter()
+        .filter_map(SearchPath::as_system_path)
+        .collect();
+
+    if let Some(path) = search_paths
+        .stdlib(mode.mode(db))
+        .and_then(SearchPath::as_system_path)
+    {
+        existing_paths.insert(path);
+    }
+
+    let mut dynamic_paths = Vec::new();
+    let files = db.files();
+
+    for paths in site_packages {
+        let site_packages_dir = paths
+            .site_packages
+            .as_system_path()
+            .expect("Expected site package path to be a system path");
+        if !existing_paths.insert(site_packages_dir) {
+            continue;
+        }
+        dynamic_paths.push(paths.site_packages.clone());
+
+        for search_path in &paths.editables {
+            let Some(path) = search_path.as_system_path() else {
+                continue;
+            };
+            if !existing_paths.insert(path) {
+                continue;
+            }
+            tracing::debug!("Adding editable installation to module resolution path {path}");
+
+            // Register a file root for editable installs that are outside any other root
+            // (Most importantly, don't register a root for editable installations from the project
+            // directory as that would change the durability of files within those folders).
+            // Not having an exact file root for editable installs just means that
+            // some queries (like `list_modules_in`) will run slightly more frequently
+            // than they would otherwise.
+            if files.root(db, path).is_none() {
+                files.try_add_root(db, path, FileRootKind::SearchPath);
+            }
+            dynamic_paths.push(search_path.clone());
+        }
+    }
+
+    dynamic_paths.into_boxed_slice()
 }
 
 /// Iterate over the available module-resolution search paths,
@@ -1011,51 +1181,61 @@ impl<'db> Iterator for SearchPathIterator<'db> {
 
 impl FusedIterator for SearchPathIterator<'_> {}
 
-/// A thin wrapper around `ModuleName` to make it a Salsa ingredient.
+/// A thin wrapper around a module name, resolution mode, and resolver environment to make them a Salsa
+/// ingredient.
 ///
 /// This is needed because Salsa requires that all query arguments are salsa ingredients.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 struct ModuleNameIngredient<'db> {
     #[returns(ref)]
     pub(super) name: ModuleName,
+    #[returns(copy)]
     pub(super) mode: ModuleResolveMode,
+    #[returns(copy)]
+    pub(super) resolver_environment: ResolverEnvironment<'db>,
 }
 
 /// Given a module name and a list of search paths in which to lookup modules,
 /// attempt to resolve the module name
-fn resolve_name(db: &dyn Db, name: &ModuleName, mode: ModuleResolveMode) -> Option<ResolvedNames> {
-    let search_paths = search_paths(db, mode);
-    let empty_stub_search_paths = StubPackageSearchPaths::empty();
-    let stub_search_paths = if mode.stubs_allowed() {
-        stub_package_search_paths(db)
-    } else {
-        &empty_stub_search_paths
-    };
-    resolve_name_impl(db, name, mode, search_paths, stub_search_paths)
+fn resolve_name<'db>(
+    db: &'db dyn Db,
+    resolver_environment: ResolverEnvironment<'db>,
+    name: &ModuleName,
+    mode: ModuleResolveMode,
+) -> Option<ResolvedNames> {
+    let resolver = NameResolver::new(db, resolver_environment, name, mode);
+
+    match mode {
+        ModuleResolveMode::Typing => {
+            resolver.resolve_typing(stub_package_index(db, resolver_environment))
+        }
+        ModuleResolveMode::Runtime | ModuleResolveMode::RuntimeSomeShadowingAllowed => {
+            resolver.resolve_runtime(search_paths(db, resolver_environment, mode))
+        }
+    }
 }
 
 /// Like `resolve_name` but for cases where it failed to resolve the module
 /// and we are now Getting Desperate and willing to try the ancestor directories of
 /// the `importing_file` as potential temporary search paths that are private
 /// to this import.
-fn desperately_resolve_name(
-    db: &dyn Db,
+fn desperately_resolve_name<'db>(
+    db: &'db dyn Db,
     importing_file: File,
+    resolver_environment: ResolverEnvironment<'db>,
     name: &ModuleName,
     mode: ModuleResolveMode,
 ) -> Option<ResolvedNames> {
+    let importing_file = ResolverFile::new(db, importing_file, resolver_environment);
     let search_paths = absolute_desperate_search_paths(db, importing_file).unwrap_or_default();
-    resolve_name_impl(
-        db,
-        name,
-        mode,
-        search_paths.iter(),
-        &if mode.stubs_allowed() {
-            StubPackageSearchPaths::from_search_paths(db, search_paths.iter())
-        } else {
-            StubPackageSearchPaths::empty()
-        },
-    )
+    let resolver = NameResolver::new(db, resolver_environment, name, mode);
+
+    match mode {
+        ModuleResolveMode::Typing => resolver.resolve_desperate_typing(search_paths),
+        ModuleResolveMode::Runtime | ModuleResolveMode::RuntimeSomeShadowingAllowed => {
+            resolver.resolve_runtime(search_paths.iter())
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -1066,23 +1246,58 @@ enum ResolvedModule {
     Module(File),
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+enum ComponentFileFilter {
+    /// Prefer `.pyi` over `.py` in typing mode, or only accept `.py` in runtime mode.
+    ByMode,
+
+    /// Only accept a `.pyi` file.
+    StubOnly,
+}
+
+/// Where a candidate sits in the typing specification's module-resolution order.
+///
+/// Variants are declared from highest to lowest precedence so that derived ordering can be used
+/// when traversing candidates. This is a precedence tier rather than a total ordering: the stable
+/// sorts used by the resolver preserve search-path order between candidates in the same tier.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
+enum CandidatePrecedence {
+    /// A PEP 561 stub-only package named `<package>-stubs`.
+    ///
+    /// Stub packages take precedence over candidates for `<package>` regardless of where those
+    /// candidates appear in the search-path order.
+    StubPackage,
+
+    /// A candidate whose precedence is determined by search-path order.
+    ///
+    /// This includes `.pyi` and `.py` packages and modules from extra paths, first-party code,
+    /// editable installs, site-packages, and the standard library.
+    SearchPathOrder,
+}
+
 #[derive(Debug, Clone)]
 struct ModuleResolutionCandidate {
     path: ModulePath,
     module: ResolvedModule,
     py_typed: PyTyped,
-    /// Whether this candidate originated from a stub package. Stub packages
-    /// have priority over runtime packages regardless of search path ordering.
-    is_stub_package: bool,
+    precedence: CandidatePrecedence,
 }
 
 impl ModuleResolutionCandidate {
     fn root(search_path: &SearchPath) -> Self {
+        Self::with_precedence(search_path, CandidatePrecedence::SearchPathOrder)
+    }
+
+    fn stub(search_path: &SearchPath) -> Self {
+        Self::with_precedence(search_path, CandidatePrecedence::StubPackage)
+    }
+
+    fn with_precedence(search_path: &SearchPath, precedence: CandidatePrecedence) -> Self {
         Self {
             path: search_path.to_module_path(),
             module: ResolvedModule::NamespacePackage,
             py_typed: PyTyped::Untyped,
-            is_stub_package: false,
+            precedence,
         }
     }
 
@@ -1097,11 +1312,16 @@ impl ModuleResolutionCandidate {
     }
 
     // This is the module we were actually interested in resolving, complete the resolution
-    fn into_module(self, db: &'_ dyn Db, name: ModuleName) -> Module<'_> {
+    fn into_module<'db>(
+        self,
+        db: &'db dyn Db,
+        resolver_environment: ResolverEnvironment<'db>,
+        name: &ModuleName,
+    ) -> Module<'db> {
         match self.module {
             ResolvedModule::NamespacePackage => {
                 tracing::trace!("Resolve namespace package `{name}`");
-                Module::namespace_package(db, name)
+                Module::namespace_package(db, resolver_environment, Cow::Borrowed(name))
             }
             ResolvedModule::LegacyNamespacePackage(file) => {
                 // legacy namespace packages behave like regular packages
@@ -1112,10 +1332,11 @@ impl ModuleResolutionCandidate {
                 );
                 Module::file_module(
                     db,
-                    name,
+                    file,
+                    resolver_environment,
+                    Cow::Borrowed(name),
                     ModuleKind::Package,
                     self.path.into_search_path(),
-                    file,
                 )
             }
             ResolvedModule::RegularPackage(file) => {
@@ -1125,20 +1346,22 @@ impl ModuleResolutionCandidate {
                 );
                 Module::file_module(
                     db,
-                    name,
+                    file,
+                    resolver_environment,
+                    Cow::Borrowed(name),
                     ModuleKind::Package,
                     self.path.into_search_path(),
-                    file,
                 )
             }
             ResolvedModule::Module(file) => {
                 tracing::trace!("Resolved module `{name}` to `{path}`", path = file.path(db));
                 Module::file_module(
                     db,
-                    name,
+                    file,
+                    resolver_environment,
+                    Cow::Borrowed(name),
                     ModuleKind::Module,
                     self.path.into_search_path(),
-                    file,
                 )
             }
         }
@@ -1171,230 +1394,304 @@ impl ModuleResolutionCandidate {
     }
 }
 
+struct NameResolver<'db, 'name> {
+    context: ResolverContext<'db>,
+    name: &'name ModuleName,
+    is_non_shadowable: bool,
+}
+
+impl<'db, 'name> NameResolver<'db, 'name> {
+    fn new(
+        db: &'db dyn Db,
+        resolver_environment: ResolverEnvironment<'db>,
+        name: &'name ModuleName,
+        mode: ModuleResolveMode,
+    ) -> Self {
+        let python_version = resolver_environment.python_version(db);
+        Self {
+            context: ResolverContext::new(db, resolver_environment, mode),
+            name,
+            is_non_shadowable: mode.is_non_shadowable(python_version.minor, name.as_str()),
+        }
+    }
+
+    /// Resolves the name as seen by a type checker.
+    ///
+    /// This includes PEP 561 stub packages and user-provided stub overlays, with runtime source as
+    /// a fallback when no stub provides the requested module. A stub overlay may use runtime
+    /// packages as parents, but its final module must come from a stub file.
+    fn resolve_typing(&self, stub_packages: &StubPackageIndex) -> Option<ResolvedNames> {
+        if self.name.components().nth(1).is_none() {
+            let candidates = self.discover_roots(
+                search_paths(
+                    self.context.db,
+                    self.context.resolver_environment,
+                    ModuleResolveMode::Typing,
+                ),
+                stub_packages.all(),
+            );
+            return self.resolve_remaining(candidates, ComponentFileFilter::ByMode);
+        }
+
+        // Only submodules need separate overlay resolution: their extra-path namespace parent can
+        // be shadowed before the resolver reaches the requested stub. Reuse those roots for the
+        // normal fallback so that each extra path is probed only once.
+        let (overlay_stub_packages, remaining_stub_packages) = stub_packages.split_overlay();
+        let mut candidates = self.discover_roots(
+            search_paths(
+                self.context.db,
+                self.context.resolver_environment,
+                ModuleResolveMode::Typing,
+            )
+            .take_while(|search_path| search_path.is_extra()),
+            overlay_stub_packages,
+        );
+        if let Some(resolved) =
+            self.resolve_remaining(candidates.clone(), ComponentFileFilter::StubOnly)
+        {
+            return Some(resolved);
+        }
+
+        let remaining_candidates = self.discover_roots(
+            search_paths(
+                self.context.db,
+                self.context.resolver_environment,
+                ModuleResolveMode::Typing,
+            )
+            .skip_while(|search_path| search_path.is_extra()),
+            remaining_stub_packages,
+        );
+        candidates.extend(remaining_candidates);
+
+        self.resolve_remaining(candidates, ComponentFileFilter::ByMode)
+    }
+
+    /// Resolves the name for type checking against desperate ancestor search paths.
+    ///
+    /// These paths can contain PEP 561 stub packages, but never user-provided extra paths, so this
+    /// indexes them for stub packages without performing a separate stub-overlay pass. Runtime
+    /// resolution instead ignores stub packages and `.pyi` files entirely.
+    fn resolve_desperate_typing(&self, search_paths: &[SearchPath]) -> Option<ResolvedNames> {
+        let stub_packages =
+            StubPackageIndex::from_search_paths(self.context.db, search_paths.iter());
+        let candidates = self.discover_roots(search_paths.iter(), stub_packages.all());
+        self.resolve_remaining(candidates, ComponentFileFilter::ByMode)
+    }
+
+    /// Resolves the name to the implementation that is available at runtime.
+    ///
+    /// The runtime resolver ignores stub packages and `.pyi` files. Its search paths also use the
+    /// real standard library instead of typeshed.
+    fn resolve_runtime<'a>(
+        &self,
+        search_paths: impl Iterator<Item = &'a SearchPath>,
+    ) -> Option<ResolvedNames> {
+        let candidates = self.discover_roots(search_paths, StubPackagePaths::default());
+        self.resolve_remaining(candidates, ComponentFileFilter::ByMode)
+    }
+
+    fn discover_roots<'a>(
+        &self,
+        search_paths: impl Iterator<Item = &'a SearchPath>,
+        stub_paths: StubPackagePaths<'_>,
+    ) -> ResolvedNames {
+        let root_component = self.name.first_component();
+        let mut cur_candidates = Vec::new();
+        let stub_name = (!stub_paths.is_empty() && !self.is_non_shadowable)
+            .then(|| format!("{root_component}-stubs"));
+        let mut pending_stub_paths = Vec::new();
+
+        if let Some(stub_name) = &stub_name {
+            cur_candidates.extend(stub_paths.before_stdlib.iter().filter_map(|search_path| {
+                resolve_stub_package_in_search_path(&self.context, search_path, stub_name)
+            }));
+            // Defer file probes after stdlib until we know that stdlib does not win.
+            pending_stub_paths.extend(stub_paths.after_stdlib.iter().filter(|search_path| {
+                candidate_may_exist(
+                    &self.context,
+                    &ModuleResolutionCandidate::stub(search_path),
+                    stub_name,
+                )
+            }));
+        }
+
+        for search_path in search_paths {
+            // When a builtin module is imported, standard module resolution is bypassed:
+            // the module name always resolves to the stdlib module,
+            // even if there's a module of the same name in the first-party root
+            // (which would normally result in the stdlib module being overridden).
+            // TODO: offer a diagnostic if there is a first-party module of the same name
+            if self.is_non_shadowable && !search_path.is_standard_library() {
+                continue;
+            }
+
+            let is_stdlib = search_path.is_standard_library();
+            // A terminal candidate can stop the search unless a matching post-stdlib stub package
+            // could still override it. A terminal stdlib candidate always stops the search.
+            let can_stop = is_stdlib || pending_stub_paths.is_empty();
+            let mut candidate = ModuleResolutionCandidate::root(search_path);
+            let resolved = resolve_component(
+                &self.context,
+                &mut candidate,
+                root_component,
+                ComponentFileFilter::ByMode,
+            )
+            .is_ok();
+            let terminal = candidate.missing_submodule_is_terminal();
+            if resolved {
+                cur_candidates.push(candidate);
+            }
+            // A terminal candidate shadows all later search paths. Earlier candidates remain in
+            // play because they already shadow this candidate.
+            if terminal && can_stop {
+                break;
+            }
+
+            // Reaching this point for stdlib means that it did not provide a terminal candidate.
+            // The deferred post-stdlib stub packages are therefore eligible, so resolve them now.
+            if is_stdlib && let Some(stub_name) = &stub_name {
+                cur_candidates.extend(pending_stub_paths.drain(..).filter_map(|search_path| {
+                    resolve_stub_package_in_search_path(&self.context, search_path, stub_name)
+                }));
+            }
+        }
+
+        cur_candidates
+    }
+
+    fn resolve_remaining(
+        &self,
+        mut cur_candidates: ResolvedNames,
+        final_filter: ComponentFileFilter,
+    ) -> Option<ResolvedNames> {
+        if cur_candidates.is_empty() {
+            return None;
+        }
+
+        let mut components = self.name.components().skip(1).peekable();
+
+        loop {
+            // Keep a partial stub package's namespace while resolving the next part of the module
+            // name. Once the complete name is resolved, a concrete package or module shadows that
+            // namespace.
+            let has_remaining_components = components.peek().is_some();
+            cur_candidates =
+                normalize_candidates(self.context.db, cur_candidates, has_remaining_components);
+
+            let Some(component) = components.next() else {
+                return Some(cur_candidates);
+            };
+            let file_filter = if components.peek().is_some() {
+                ComponentFileFilter::ByMode
+            } else {
+                final_filter
+            };
+
+            let mut remaining_are_shadowed = false;
+            cur_candidates.retain_mut(|candidate| {
+                if remaining_are_shadowed {
+                    return false;
+                }
+
+                let resolved =
+                    resolve_component(&self.context, candidate, component, file_filter).is_ok();
+
+                // A terminal candidate shadows every lower-priority candidate, even if resolving
+                // this component fails. Higher-priority candidates remain in play.
+                remaining_are_shadowed = candidate.missing_submodule_is_terminal();
+
+                resolved
+            });
+
+            if cur_candidates.is_empty() {
+                return None;
+            }
+        }
+    }
+}
+
 fn resolve_stub_package_in_search_path(
     context: &ResolverContext,
     search_path: &SearchPath,
     stub_name: &str,
 ) -> Option<ModuleResolutionCandidate> {
-    let mut candidate = ModuleResolutionCandidate::root(search_path);
-    if !candidate_may_exist(context, &candidate, stub_name) {
-        return None;
-    }
-    resolve_name_in_search_path(context, &mut candidate, stub_name).ok()?;
+    let mut candidate = ModuleResolutionCandidate::stub(search_path);
+    resolve_component(
+        context,
+        &mut candidate,
+        stub_name,
+        ComponentFileFilter::ByMode,
+    )
+    .ok()?;
 
     // `mypackage-stubs.py(i)` is not a valid result.
     if matches!(candidate.module, ResolvedModule::Module(_)) {
-        tracing::trace!(
+        tracing::debug!(
             "Search path `{search_path}` contains a module named `{stub_name}` but a standalone \
              module isn't a valid stub."
         );
         None
     } else {
-        candidate.is_stub_package = true;
         Some(candidate)
     }
 }
 
-fn resolve_name_impl<'a>(
+fn normalize_candidates(
     db: &dyn Db,
-    name: &ModuleName,
-    mode: ModuleResolveMode,
-    search_paths: impl Iterator<Item = &'a SearchPath>,
-    stub_search_paths: &StubPackageSearchPaths,
-) -> Option<ResolvedNames> {
-    let python_version = db.python_version();
-    let context = ResolverContext::new(db, python_version, mode);
-    let is_non_shadowable = mode.is_non_shadowable(python_version.minor, name.as_str());
-    let mut components = name.components();
-    let root_component = components.next()?;
-    let stub_name = (!is_non_shadowable && !stub_search_paths.is_empty())
-        .then(|| format!("{root_component}-stubs"));
-    let mut cur_candidates = Vec::new();
-    let mut pending_stub_paths = Vec::new();
-
-    if let Some(stub_name) = stub_name.as_deref() {
-        let (before_stdlib, after_stdlib) = stub_search_paths
-            .paths
-            .split_at(stub_search_paths.stdlib_offset);
-        cur_candidates.extend(before_stdlib.iter().filter_map(|search_path| {
-            resolve_stub_package_in_search_path(&context, search_path, stub_name)
-        }));
-        // Defer file probes after stdlib until we know that stdlib does not win.
-        pending_stub_paths.extend(after_stdlib.iter().filter(|search_path| {
-            candidate_may_exist(
-                &context,
-                &ModuleResolutionCandidate::root(search_path),
-                stub_name,
-            )
-        }));
-    }
-
-    for search_path in search_paths {
-        // When a builtin module is imported, standard module resolution is bypassed:
-        // the module name always resolves to the stdlib module,
-        // even if there's a module of the same name in the first-party root
-        // (which would normally result in the stdlib module being overridden).
-        // TODO: offer a diagnostic if there is a first-party module of the same name
-        if is_non_shadowable && !search_path.is_standard_library() {
-            continue;
-        }
-
-        let is_stdlib = search_path.is_standard_library();
-        // A terminal candidate can stop the search unless a matching post-stdlib stub package
-        // could still override it. A terminal stdlib candidate always stops the search.
-        let can_stop = is_stdlib || pending_stub_paths.is_empty();
-        let mut candidate = ModuleResolutionCandidate::root(search_path);
-        let terminal = if candidate_may_exist(&context, &candidate, root_component) {
-            let resolved =
-                resolve_name_in_search_path(&context, &mut candidate, root_component).is_ok();
-            let terminal = candidate.missing_submodule_is_terminal();
-            if resolved {
-                cur_candidates.push(candidate);
-            }
-            terminal
-        } else {
-            false
-        };
-        // A terminal candidate shadows all later search paths. Earlier candidates remain in play
-        // because they already shadow this candidate.
-        if terminal && can_stop {
-            break;
-        }
-
-        // Reaching this point for stdlib means that it did not provide a terminal candidate.
-        // The deferred post-stdlib stub packages are therefore eligible, so resolve them now.
-        if is_stdlib && let Some(stub_name) = stub_name.as_deref() {
-            cur_candidates.extend(pending_stub_paths.drain(..).filter_map(|search_path| {
-                resolve_stub_package_in_search_path(&context, search_path, stub_name)
-            }));
-        }
-    }
-
-    discard_shadowed_namespace_candidates(db, &mut cur_candidates);
-    if cur_candidates.is_empty() {
-        return None;
-    }
-
-    // Stub packages have priority over runtime packages regardless of
-    // search path ordering.
-    cur_candidates.sort_by_key(|candidate| !candidate.is_stub_package);
-
-    let mut next_candidates = Vec::new();
-
-    for component in components {
-        for mut candidate in cur_candidates.drain(..) {
-            if !candidate_may_exist(&context, &candidate, component)
-                || resolve_name_in_search_path(&context, &mut candidate, component).is_err()
-            {
-                if candidate.missing_submodule_is_terminal() {
-                    // Everything after this package should be shadowed out by
-                    // this failure. But the previous results are still in play
-                    // because they would have shadowed this one out anyway.
-                    break;
-                }
-                continue;
-            }
-            let shadows_all = candidate.missing_submodule_is_terminal();
-            next_candidates.push(candidate);
-            if shadows_all {
-                break;
-            }
-        }
-
-        discard_shadowed_namespace_candidates(db, &mut next_candidates);
-        if next_candidates.is_empty() {
-            return None;
-        }
-
-        // Stub packages have priority over runtime packages regardless of
-        // search path ordering.
-        next_candidates.sort_by_key(|c| !c.is_stub_package);
-
-        // Advance to the next level of candidates while reusing allocations
-        // (we used `drain` so cur_candidates is empty)
-        std::mem::swap(&mut cur_candidates, &mut next_candidates);
-    }
-
-    Some(cur_candidates)
-}
-
-fn discard_shadowed_namespace_candidates(
-    db: &dyn Db,
-    candidates: &mut Vec<ModuleResolutionCandidate>,
-) {
-    // Now that we have several candidates, we need to reject candidates
-    // that are shadowed. There are only two valid situations where we
-    // could proceed into the next iteration with multiple candidates:
-    //
-    // * All candidates are namespace packages.
-    // * At least one candidate is a stub package.
-    //
-    // The existence of a single non-namespace package will shadow
-    // all namespace packages *regardless of search-path order*.
-    //
-    // This is implemented with the `retain` that follows.
-    //
-    // We can't do this "delete all namespace packages" eagerly because we want a
-    // `PyTyped::Partial` regular package to shadow namespace packages after it.
-    // (FIXME: I guess we could just set a flag not to add them...)
-
-    let found_non_namespace = candidates
+    mut candidates: ResolvedNames,
+    has_remaining_components: bool,
+) -> ResolvedNames {
+    let best_concrete_precedence = candidates
         .iter()
-        .any(|candidate| !candidate.is_any_namespace_package());
+        .filter(|candidate| !candidate.is_any_namespace_package())
+        .map(|candidate| candidate.precedence)
+        .min();
 
-    // Note that we intentionally do *not* filter out non-stub
-    // candidates when a stub package is found. Even when a
-    // non-namespace, non-partial stub exists, we keep non-stub
-    // candidates as fallbacks because sub-packages within the
-    // stubs may override py.typed to partial. The stub candidate
-    // is ordered first so it takes priority. The non-stub will
-    // only be used when the stub fails to find a submodule in a
-    // partial sub-package.
+    candidates.sort_by_key(|candidate| candidate.precedence);
+
+    // Note that we intentionally do *not* filter out ordinary search-path candidates when a stub
+    // package is found. Even when a non-namespace, non-partial stub package exists, we keep the
+    // other candidates as fallbacks because sub-packages within the stubs may override py.typed to
+    // partial. The stub-package candidate is ordered first so it takes priority. Other candidates
+    // are only used when the stub package fails to find a submodule in a partial sub-package.
     candidates.retain(|candidate| {
-        // TODO: it might be nice to emit a warning in the case that
-        // we found a legacy namespace package and this candidate is
-        // anything *else*. When that "else" is a regular package or
-        // module, then the logic below will drop the legacy namespace
-        // package under the presumption that regular modules always shadow
-        // _all_ namespace packages, regardless of search path order. But
-        // I suppose there could be a case where we found both a legacy
-        // namespace package and a non-legacy namespace package (and no
-        // regular packages/modules). In that case, this logic currently
-        // retains both candidates.
-
-        // Regular packages and modules both shadow namespace packages
-        // independent of search path order.
-        if found_non_namespace && candidate.is_any_namespace_package() {
-            tracing::trace!(
-                "Discarding namespace package `{}` because a non-namespace entry of the same name \
-                 was found",
-                candidate.to_str(db),
-            );
-            false
-        } else {
-            true
+        if !candidate.is_any_namespace_package() {
+            return true;
         }
+
+        // A higher-precedence partial namespace remains available while resolving its descendants.
+        // At the final component, a concrete package or module shadows it.
+        let preserved_for_descendants = best_concrete_precedence.is_none_or(|precedence| {
+            has_remaining_components
+                && candidate.py_typed == PyTyped::Partial
+                && candidate.precedence < precedence
+        });
+
+        if preserved_for_descendants {
+            return true;
+        }
+
+        // TODO: It might be useful to warn when a concrete package or module shadows a legacy
+        // namespace package. If we only find legacy and non-legacy namespace packages, this logic
+        // retains both.
+
+        tracing::trace!(
+            "Discarding namespace package `{}` because a non-namespace entry of the same name \
+             was found",
+            candidate.to_str(db),
+        );
+        false
     });
+
+    candidates
 }
 
-/// Attempts to resolve a module name in a particular search path.
-///
-/// `search_path` should be the directory to start looking for the module.
-///
-/// `name` should be a complete non-empty module name, e.g, `foo` or
-/// `foo.bar.baz`.
-///
-/// Upon success, this returns the kind of the parent package (root, regular
-/// package or namespace package) along with the resolved details of the
-/// module: its kind (single-file module or package), the search path in
-/// which it was found (guaranteed to be equal to the one given) and the
-/// corresponding `File`.
-///
-/// Upon error, the kind of the parent package is returned.
-fn resolve_name_in_search_path(
+/// Resolves one component relative to the candidate's current package.
+fn resolve_component(
     context: &ResolverContext,
     candidate: &mut ModuleResolutionCandidate,
     module_name: &str,
+    file_filter: ComponentFileFilter,
 ) -> Result<(), ()> {
     if matches!(candidate.module, ResolvedModule::Module(_)) {
         tracing::trace!(
@@ -1403,12 +1700,17 @@ fn resolve_name_in_search_path(
         );
         return Err(());
     }
+
+    if !candidate_may_exist(context, candidate, module_name) {
+        return Err(());
+    }
+
     let package_path = &mut candidate.path;
     package_path.push(module_name);
 
     // Check for a regular package first (highest priority)
     package_path.push("__init__");
-    if let Some(init) = resolve_file_module(package_path, context) {
+    if let Some(init) = resolve_file_module_with_filter(package_path, context, file_filter) {
         // Remove the `__init__` component for any potential next step
         package_path.pop();
         candidate.py_typed = package_path
@@ -1425,7 +1727,7 @@ fn resolve_name_in_search_path(
     // Check for a file module next
     package_path.pop();
 
-    if let Some(file_module) = resolve_file_module(package_path, context) {
+    if let Some(file_module) = resolve_file_module_with_filter(package_path, context, file_filter) {
         candidate.module = ResolvedModule::Module(file_module);
         return Ok(());
     }
@@ -1447,7 +1749,11 @@ fn resolve_name_in_search_path(
     // simply skip this check which also helps performance. If typeshed
     // ever uses namespace packages, ensure that this check also takes the
     // `VERSIONS` file into consideration.
-    if !package_path.search_path().is_standard_library() && package_path.is_directory(context) {
+    // A namespace package is not backed by a file, so it cannot satisfy a stub-only lookup.
+    if file_filter != ComponentFileFilter::StubOnly
+        && !package_path.search_path().is_standard_library()
+        && package_path.is_directory(context)
+    {
         candidate.py_typed = package_path
             .py_typed(context)
             .inherit_parent(candidate.py_typed);
@@ -1480,28 +1786,36 @@ fn candidate_may_exist(
 
 type ResolvedNames = Vec<ModuleResolutionCandidate>;
 
-/// If `module` exists on disk with either a `.pyi` or `.py` extension,
-/// return the [`File`] corresponding to that path.
+/// If `module` exists on disk with an extension permitted by the resolver's mode, return its
+/// [`File`].
 ///
-/// `.pyi` files take priority, as they always have priority when
-/// resolving modules.
+/// Typing resolution prefers `.pyi` over `.py`; runtime resolution only considers `.py`.
 pub(super) fn resolve_file_module(
     module: &ModulePath,
     resolver_state: &ResolverContext,
 ) -> Option<File> {
-    // Stubs have precedence over source files
-    let stub_file = if resolver_state.mode.stubs_allowed() {
+    resolve_file_module_with_filter(module, resolver_state, ComponentFileFilter::ByMode)
+}
+
+fn resolve_file_module_with_filter(
+    module: &ModulePath,
+    resolver_state: &ResolverContext,
+    filter: ComponentFileFilter,
+) -> Option<File> {
+    let stub_file = if resolver_state.mode.is_typing() {
         module.with_pyi_extension().to_file(resolver_state)
     } else {
         None
     };
-    let file = stub_file.or_else(|| {
+    if filter == ComponentFileFilter::StubOnly {
+        return stub_file;
+    }
+
+    stub_file.or_else(|| {
         module
             .with_py_extension()
             .and_then(|path| path.to_file(resolver_state))
-    })?;
-
-    Some(file)
+    })
 }
 
 /// Determines whether a package is a legacy namespace package.
@@ -1548,7 +1862,14 @@ fn is_legacy_namespace_package(
     //
     // The downside is if you write slightly different syntax we will fail to detect the idiom,
     // but hey, this is better than nothing!
-    let parsed = ruff_db::parsed::parsed_module(context.db, init);
+    let parsed = ruff_db::parsed::parsed_module(
+        context.db,
+        PythonFile::new(
+            context.db,
+            init,
+            context.resolver_environment.python_version(context.db),
+        ),
+    );
     let mut visitor = LegacyNamespacePackageVisitor::default();
     visitor.visit_body(parsed.load(context.db).suite());
 
@@ -1583,19 +1904,19 @@ impl PyTyped {
 
 pub(super) struct ResolverContext<'db> {
     pub(super) db: &'db dyn Db,
-    pub(super) python_version: PythonVersion,
+    pub(super) resolver_environment: ResolverEnvironment<'db>,
     pub(super) mode: ModuleResolveMode,
 }
 
 impl<'db> ResolverContext<'db> {
     pub(super) fn new(
         db: &'db dyn Db,
-        python_version: PythonVersion,
+        resolver_environment: ResolverEnvironment<'db>,
         mode: ModuleResolveMode,
     ) -> Self {
         Self {
             db,
-            python_version,
+            resolver_environment,
             mode,
         }
     }
@@ -1808,6 +2129,8 @@ mod tests {
         clippy::disallowed_methods,
         reason = "These are tests, so it's fine to do I/O by-passing System."
     )]
+    use std::assert_matches;
+
     use ruff_db::Db;
     use ruff_db::files::{File, FilePath, system_path_to_file};
     use ruff_db::system::{DbWithTestSystem as _, DbWithWritableSystem as _};
@@ -1821,6 +2144,24 @@ mod tests {
     use crate::testing::{FileSpec, MockedTypeshed, TestCase, TestCaseBuilder};
 
     use super::*;
+
+    fn resolve_module_confident<'db>(
+        db: &'db TestDb,
+        module_name: &ModuleName,
+    ) -> Option<Module<'db>> {
+        super::resolve_module_confident(db, db.resolver_environment(), module_name)
+    }
+
+    fn resolve_real_module_confident<'db>(
+        db: &'db TestDb,
+        module_name: &ModuleName,
+    ) -> Option<Module<'db>> {
+        super::resolve_real_module_confident(db, db.resolver_environment(), module_name)
+    }
+
+    fn path_to_module<'db>(db: &'db TestDb, path: &FilePath) -> Option<Module<'db>> {
+        super::path_to_module(db, db.resolver_environment(), path)
+    }
 
     #[test]
     fn first_party_module() {
@@ -1894,8 +2235,12 @@ mod tests {
             .build();
         let importing_file = system_path_to_file(&db, src.join("nested/main.py")).unwrap();
 
-        let foo =
-            resolve_module(&db, importing_file, &ModuleName::new_static("foo").unwrap()).unwrap();
+        let foo = resolve_module(
+            &db,
+            ImportingFile::File(importing_file, db.resolver_environment()),
+            &ModuleName::new_static("foo").unwrap(),
+        )
+        .unwrap();
         assert_eq!(
             foo.file(&db).unwrap().path(&db),
             &src.join("nested/foo-stubs/__init__.pyi")
@@ -2090,6 +2435,105 @@ mod tests {
             .iter()
             .map(|raw| ModuleName::new(raw).unwrap())
             .collect()
+    }
+
+    #[test]
+    fn resolve_module_uses_resolver_environment_python_version() {
+        const TYPESHED: MockedTypeshed = MockedTypeshed {
+            stdlib_files: &[("_sha256.pyi", ""), ("py312_only.pyi", "")],
+            versions: "_sha256: 3.11-\npy312_only: 3.12-",
+        };
+
+        let TestCase {
+            db, src, stdlib, ..
+        } = TestCaseBuilder::new()
+            .with_src_files(&[
+                ("main.py", ""),
+                ("_sha256.py", ""),
+                ("namespace/module.py", ""),
+            ])
+            .with_mocked_typeshed(TYPESHED)
+            .with_python_version(PythonVersion::PY311)
+            .build();
+        let importing_file = system_path_to_file(&db, src.join("main.py")).unwrap();
+        let py311 = ResolverEnvironment::new(&db, PythonVersion::PY311, db.search_paths());
+        let py312 = ResolverEnvironment::new(&db, PythonVersion::PY312, db.search_paths());
+        let sha256 = ModuleName::new_static("_sha256").unwrap();
+        let py311_module =
+            resolve_module(&db, ImportingFile::File(importing_file, py311), &sha256).unwrap();
+        let py312_module =
+            resolve_module(&db, ImportingFile::File(importing_file, py312), &sha256).unwrap();
+        assert_eq!(
+            py311_module.file(&db).unwrap().path(&db),
+            &stdlib.join("_sha256.pyi")
+        );
+        assert_eq!(
+            py312_module.file(&db).unwrap().path(&db),
+            &src.join("_sha256.py")
+        );
+        assert_eq!(py311_module.python_version(&db), PythonVersion::PY311);
+        assert_eq!(py312_module.python_version(&db), PythonVersion::PY312);
+
+        let namespace = ModuleName::new_static("namespace").unwrap();
+        let py311_namespace =
+            resolve_module(&db, ImportingFile::File(importing_file, py311), &namespace).unwrap();
+        let py312_namespace =
+            resolve_module(&db, ImportingFile::File(importing_file, py312), &namespace).unwrap();
+        assert_matches!(py311_namespace, Module::Namespace(_));
+        assert_matches!(py312_namespace, Module::Namespace(_));
+        assert_eq!(py311_namespace.python_version(&db), PythonVersion::PY311);
+        assert_eq!(py312_namespace.python_version(&db), PythonVersion::PY312);
+        assert_ne!(py311_namespace, py312_namespace);
+
+        let py312_only = ModuleName::new_static("py312_only").unwrap();
+        assert!(
+            resolve_module(&db, ImportingFile::File(importing_file, py311), &py312_only).is_none()
+        );
+        assert_eq!(
+            resolve_module(&db, ImportingFile::File(importing_file, py312), &py312_only)
+                .and_then(|module| module.file(&db))
+                .unwrap()
+                .path(&db),
+            &stdlib.join("py312_only.pyi")
+        );
+    }
+
+    #[test]
+    fn resolve_module_uses_resolver_environment_search_paths() {
+        let TestCase { mut db, src, .. } = TestCaseBuilder::new()
+            .with_src_files(&[("main.py", ""), ("shared.py", "from_src = True")])
+            .with_vendored_typeshed()
+            .build();
+        db.write_file("/alternate/shared.py", "from_alternate = True")
+            .unwrap();
+
+        let alternate_paths = SearchPathSettings {
+            src_roots: vec![SystemPathBuf::from("/alternate")],
+            ..SearchPathSettings::empty()
+        }
+        .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
+        .unwrap();
+        alternate_paths.try_register_static_roots(&db);
+
+        let primary = db.resolver_environment();
+        let alternate = ResolverEnvironment::new(&db, PythonVersion::default(), &alternate_paths);
+        let importing_file = system_path_to_file(&db, src.join("main.py")).unwrap();
+        let name = ModuleName::new_static("shared").unwrap();
+
+        let primary_module =
+            resolve_module(&db, ImportingFile::File(importing_file, primary), &name).unwrap();
+        let alternate_module =
+            resolve_module(&db, ImportingFile::File(importing_file, alternate), &name).unwrap();
+
+        assert_eq!(
+            primary_module.file(&db).unwrap().path(&db),
+            &src.join("shared.py")
+        );
+        assert_eq!(
+            alternate_module.file(&db).unwrap().path(&db),
+            &SystemPathBuf::from("/alternate/shared.py")
+        );
+        assert_ne!(primary_module, alternate_module);
     }
 
     #[test]
@@ -2363,7 +2807,7 @@ mod tests {
             Some(foo_real),
             path_to_module(&db, &FilePath::from(src.join("foo.py")))
         );
-        assert!(foo_real != foo);
+        assert_ne!(foo_real, foo);
     }
 
     #[test]
@@ -2624,7 +3068,12 @@ mod tests {
         assert_function_query_was_not_run(
             &db,
             resolve_module_query,
-            ModuleNameIngredient::new(&db, functools_module_name, ModuleResolveMode::StubsAllowed),
+            ModuleNameIngredient::new(
+                &db,
+                functools_module_name,
+                ModuleResolveMode::Typing,
+                db.resolver_environment(),
+            ),
             &events,
         );
         assert_eq!(&functools_search_path, &stdlib);
@@ -2882,7 +3331,11 @@ not_a_directory
         assert_function_query_was_not_run(
             &db,
             dynamic_resolution_paths,
-            ModuleResolveModeIngredient::new(&db, ModuleResolveMode::StubsAllowed),
+            ModuleResolveModeIngredient::new(
+                &db,
+                db.resolver_environment(),
+                ModuleResolveMode::Typing,
+            ),
             &events,
         );
     }
@@ -2901,7 +3354,11 @@ not_a_directory
 
         dynamic_resolution_paths(
             &db,
-            ModuleResolveModeIngredient::new(&db, ModuleResolveMode::StubsAllowed),
+            ModuleResolveModeIngredient::new(
+                &db,
+                db.resolver_environment(),
+                ModuleResolveMode::Typing,
+            ),
         );
         db.clear_salsa_events();
 
@@ -2909,14 +3366,22 @@ not_a_directory
             .unwrap();
         dynamic_resolution_paths(
             &db,
-            ModuleResolveModeIngredient::new(&db, ModuleResolveMode::StubsAllowed),
+            ModuleResolveModeIngredient::new(
+                &db,
+                db.resolver_environment(),
+                ModuleResolveMode::Typing,
+            ),
         );
 
         let events = db.take_salsa_events();
         assert_function_query_was_not_run(
             &db,
             dynamic_resolution_paths,
-            ModuleResolveModeIngredient::new(&db, ModuleResolveMode::StubsAllowed),
+            ModuleResolveModeIngredient::new(
+                &db,
+                db.resolver_environment(),
+                ModuleResolveMode::Typing,
+            ),
             &events,
         );
     }
@@ -2936,6 +3401,10 @@ not_a_directory
             .unwrap();
 
         assert!(resolve_module_confident(&db, &ModuleName::new_static("foo").unwrap()).is_some());
+        assert_eq!(
+            editable_search_paths(&db, db.resolver_environment()).collect::<Vec<_>>(),
+            [SystemPath::new("/x/src")]
+        );
 
         let pth_path = site_packages.join("_editable.pth");
         db.memory_file_system()
@@ -2943,6 +3412,10 @@ not_a_directory
             .unwrap();
         File::sync_path_only(&mut db, &pth_path);
 
+        assert_eq!(
+            editable_search_paths(&db, db.resolver_environment()).collect::<Vec<_>>(),
+            [SystemPath::new("/y/src")]
+        );
         assert!(resolve_module_confident(&db, &ModuleName::new_static("foo").unwrap()).is_none());
         assert!(resolve_module_confident(&db, &ModuleName::new_static("bar").unwrap()).is_some());
     }
@@ -3014,7 +3487,7 @@ not_a_directory
             .build();
 
         let search_paths: Vec<&SearchPath> =
-            search_paths(&db, ModuleResolveMode::StubsAllowed).collect();
+            search_paths(&db, db.resolver_environment(), ModuleResolveMode::Typing).collect();
 
         assert!(search_paths.contains(
             &&SearchPath::first_party(db.system(), SystemPathBuf::from("/src")).unwrap()
@@ -3023,6 +3496,35 @@ not_a_directory
             !search_paths.contains(
                 &&SearchPath::editable(db.system(), SystemPathBuf::from("/src")).unwrap()
             )
+        );
+        assert_eq!(
+            editable_search_paths(&db, db.resolver_environment()).collect::<Vec<_>>(),
+            [SystemPath::new("/src")]
+        );
+    }
+
+    #[test]
+    fn first_party_roots_exclude_dynamic_search_paths() {
+        let TestCase { db, src, .. } = TestCaseBuilder::new()
+            .with_src_files(&[("foo.py", "")])
+            .with_site_packages_files(&[("_foo.pth", "/editable")])
+            .build();
+        db.memory_file_system()
+            .create_directory_all("/editable")
+            .expect("valid editable directory");
+
+        let all_paths: Vec<_> =
+            search_paths(&db, db.resolver_environment(), ModuleResolveMode::Typing).collect();
+        assert!(
+            all_paths.contains(
+                &&SearchPath::editable(db.system(), SystemPathBuf::from("/editable"))
+                    .expect("valid editable search path")
+            )
+        );
+
+        assert_eq!(
+            db.search_paths().first_party_roots().collect::<Vec<_>>(),
+            [&*src]
         );
     }
 
@@ -3160,7 +3662,11 @@ not_a_directory
         db.set_search_paths(search_paths);
 
         let foo_module_file = File::new(&db, FilePath::from(installed_foo_module));
-        let module = file_to_module(&db, foo_module_file).unwrap();
+        let module = file_to_module(
+            &db,
+            ResolverFile::new(&db, foo_module_file, db.resolver_environment()),
+        )
+        .unwrap();
         assert_eq!(module.search_path(&db).unwrap(), &site_packages);
     }
 }

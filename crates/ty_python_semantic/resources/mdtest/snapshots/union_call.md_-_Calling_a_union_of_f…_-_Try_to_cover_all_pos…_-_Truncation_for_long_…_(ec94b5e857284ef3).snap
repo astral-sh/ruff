@@ -39,12 +39,10 @@ error[invalid-argument-type]: Argument to function `f1` is incorrect
    |
 16 |     f1(x)
    |        ^ Expected `Literal[1, 2, 3, 4, 5, ... omitted 3 literals] | A | B | ... omitted 4 union elements`, found `int`
-   |
 info: Function defined here
   --> src/mdtest_snippet.py:10:5
    |
 10 | def f1(x: Union[Literal[1, 2, 3, 4, 5, 6, 7, 8], A, B, C, D, E, F]) -> int:
    |     ^^ ----------------------------------------------------------- Parameter declared here
-   |
 
 ```

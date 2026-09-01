@@ -18,7 +18,7 @@ use ruff_notebook::NotebookError;
 use ruff_python_ast::PySourceType;
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
-use ruff_python_parser::{ParseError, ParseOptions};
+use ruff_python_parser::ParseError;
 use ruff_python_trivia::textwrap::dedent;
 use ruff_source_file::SourceFileBuilder;
 
@@ -36,7 +36,7 @@ use crate::{Applicability, FixAvailability};
 use crate::{Locator, directives};
 
 /// Represents the difference between two diagnostic runs.
-#[cfg(any(test, fuzzing))]
+#[cfg(test)]
 #[derive(Debug)]
 pub(crate) struct DiagnosticsDiff {
     /// Diagnostics that were removed (present in 'before' but not in 'after')
@@ -49,7 +49,7 @@ pub(crate) struct DiagnosticsDiff {
     settings_after: LinterSettings,
 }
 
-#[cfg(any(test, fuzzing))]
+#[cfg(test)]
 impl std::fmt::Display for DiagnosticsDiff {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         writeln!(f, "--- Linter settings ---")?;
@@ -91,7 +91,7 @@ impl std::fmt::Display for DiagnosticsDiff {
 }
 
 /// Compare two sets of diagnostics and return the differences
-#[cfg(any(test, fuzzing))]
+#[cfg(test)]
 fn diff_diagnostics(
     before: Vec<Diagnostic>,
     after: Vec<Diagnostic>,
@@ -132,6 +132,24 @@ pub(crate) fn test_path(
     let source_type = ruff_python_ast::SourceType::Python(PySourceType::from(&path));
     let source_kind = SourceKind::from_path(path.as_ref(), source_type)?.expect("valid source");
     Ok(test_contents(&source_kind, &path, settings).0)
+}
+
+/// Run the configuration TOML linter on a file in the `resources/test/fixtures` directory.
+#[cfg(test)]
+pub(crate) fn test_toml_path(
+    path: impl AsRef<Path>,
+    settings: &LinterSettings,
+    source_type: ruff_python_ast::TomlSourceType,
+) -> Result<Vec<Diagnostic>> {
+    let path = test_resource_path("fixtures").join(path);
+    let filename = path.file_name().unwrap_or_else(|| path.as_os_str());
+    let contents = std::fs::read_to_string(&path)?;
+    Ok(crate::toml::lint_toml(
+        Path::new(filename),
+        &contents,
+        settings,
+        source_type,
+    ))
 }
 
 /// Test a file with two different settings and return the differences
@@ -231,11 +249,11 @@ pub fn test_contents<'a>(
 ) -> (Vec<Diagnostic>, Cow<'a, SourceKind>) {
     let source_type = PySourceType::from(path);
     let target_version = settings.resolve_target_version(path);
-    let options =
-        ParseOptions::from(source_type).with_target_version(target_version.parser_version());
-    let parsed = ruff_python_parser::parse_unchecked(source_kind.source_code(), options.clone())
-        .try_into_module()
-        .expect("PySourceType always parses into a module");
+    let parsed = crate::linter::parse_unchecked_source(
+        source_kind,
+        source_type,
+        target_version.parser_version(),
+    );
     let locator = Locator::new(source_kind.source_code());
     let stylist = Stylist::from_tokens(parsed.tokens(), locator.contents());
     let indexer = Indexer::from_tokens(parsed.tokens(), locator.contents());
@@ -299,10 +317,11 @@ pub fn test_contents<'a>(
 
             transformed = Cow::Owned(transformed.updated(fixed_contents, &source_map));
 
-            let parsed =
-                ruff_python_parser::parse_unchecked(transformed.source_code(), options.clone())
-                    .try_into_module()
-                    .expect("PySourceType always parses into a module");
+            let parsed = crate::linter::parse_unchecked_source(
+                &transformed,
+                source_type,
+                target_version.parser_version(),
+            );
             let locator = Locator::new(transformed.source_code());
             let stylist = Stylist::from_tokens(parsed.tokens(), locator.contents());
             let indexer = Indexer::from_tokens(parsed.tokens(), locator.contents());
@@ -359,9 +378,12 @@ Source with applied fixes:
 
     let messages = messages
         .into_iter()
-        .filter_map(|msg| Some((msg.secondary_code()?.to_string(), msg)))
-        .map(|(code, mut diagnostic)| {
-            let rule = Rule::from_code(&code).unwrap();
+        .filter_map(|diagnostic| {
+            Rule::from_name(diagnostic.name())
+                .ok()
+                .map(|rule| (rule, diagnostic))
+        })
+        .map(|(rule, mut diagnostic)| {
             let fixable = diagnostic.fix().is_some_and(|fix| {
                 matches!(
                     fix.applicability(),
@@ -467,7 +489,6 @@ pub(crate) fn print_jupyter_messages(
         .format(DiagnosticFormat::Full)
         .hide_severity(true)
         .with_show_fix_status(true)
-        .show_fix_diff(true)
         .with_fix_applicability(Applicability::DisplayOnly);
 
     DisplayDiagnostics::new(
@@ -486,7 +507,6 @@ pub(crate) fn print_messages(diagnostics: &[Diagnostic]) -> String {
         .format(DiagnosticFormat::Full)
         .hide_severity(true)
         .with_show_fix_status(true)
-        .show_fix_diff(true)
         .with_fix_applicability(Applicability::DisplayOnly);
 
     DisplayDiagnostics::new(

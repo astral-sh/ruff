@@ -280,7 +280,7 @@ class Match(Generic[AnyStr]):
     def __copy__(self) -> Match[AnyStr]: ...
     def __deepcopy__(self, memo: Any, /) -> Match[AnyStr]: ...
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
-        """See PEP 585"""
+        """Matches are generic over the type of string which was matched (str or bytes)"""
 
 @final
 class Pattern(Generic[AnyStr]):
@@ -347,7 +347,7 @@ class Pattern(Generic[AnyStr]):
     @overload
     def split(self, string: AnyStr, maxsplit: int = 0) -> list[AnyStr | MaybeNone]: ...
 
-    # return type depends on the number of groups in the pattern
+    # return type is either list[str/bytes] or list[tuple[str/bytes, ...]]
     @overload
     def findall(self: Pattern[str], string: str, pos: int = 0, endpos: int = sys.maxsize) -> list[Any]:
         """Return a list of all non-overlapping matches of pattern in string."""
@@ -400,7 +400,7 @@ class Pattern(Generic[AnyStr]):
     def __eq__(self, value: object, /) -> bool: ...
     def __hash__(self) -> int: ...
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
-        """See PEP 585"""
+        """Patterns are generic over the type of string they handle (str or bytes)"""
 
 # ----- re variables and constants -----
 
@@ -511,6 +511,7 @@ def split(
     pattern: bytes | Pattern[bytes], string: ReadableBuffer, maxsplit: int = 0, flags: _FlagsType = 0
 ) -> list[bytes | MaybeNone]: ...
 
+# return type is either list[str/bytes] or list[tuple[str/bytes, ...]]
 @overload
 def findall(pattern: str | Pattern[str], string: str, flags: _FlagsType = 0) -> list[Any]:
     """Return a list of all non-overlapping matches in the string.
@@ -585,6 +586,6 @@ def purge() -> None:
     """Clear the regular expression caches"""
 
 if sys.version_info < (3, 13):
-    @deprecated("Deprecated since Python 3.11; removed in Python 3.13. Use `re.compile()` instead.")
+    @deprecated("Deprecated; removed in Python 3.13. Use `re.compile()` instead.")
     def template(pattern: AnyStr | Pattern[AnyStr], flags: _FlagsType = 0) -> Pattern[AnyStr]:  # undocumented
         """Compile a template pattern, returning a Pattern object, deprecated"""

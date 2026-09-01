@@ -65,7 +65,6 @@ F841 [*] Local variable `baz` is assigned to but never used
 25 |
 26 |     (x, y) = baz = bar
    |              ^^^
-   |
 help: Remove assignment to unused variable `baz`
    |
 25 |
@@ -116,7 +115,6 @@ F841 [*] Local variable `_discarded` is assigned to but never used
 36 |     __ = 1
 37 |     _discarded = 1
    |     ^^^^^^^^^^
-   |
 help: Remove assignment to unused variable `_discarded`
    |
 36 |     __ = 1
@@ -262,7 +260,6 @@ F841 [*] Local variable `__class__` is assigned to but never used
 167 |     def set_class(self, cls):
 168 |         __class__ = cls  # F841
     |         ^^^^^^^^^
-    |
 help: Remove assignment to unused variable `__class__`
     |
 167 |     def set_class(self, cls):
@@ -279,7 +276,6 @@ F841 [*] Local variable `__class__` is assigned to but never used
 173 |         def set_class(self, cls):
 174 |             __class__ = cls  # F841
     |             ^^^^^^^^^
-    |
 help: Remove assignment to unused variable `__class__`
     |
 173 |         def set_class(self, cls):
@@ -296,7 +292,6 @@ F841 [*] Local variable `__class__` is assigned to but never used
 181 |             def set_class(self, cls):
 182 |                 __class__ = cls  # F841
     |                 ^^^^^^^^^
-    |
 help: Remove assignment to unused variable `__class__`
     |
 181 |             def set_class(self, cls):

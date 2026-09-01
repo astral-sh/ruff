@@ -7,6 +7,7 @@ use ruff_python_semantic::{Exceptions, Modules, SemanticModel};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::importer::ImportRequest;
 use crate::rules::numpy::helpers::{AttributeSearcher, ImportSearcher};
 use crate::{Edit, Fix, FixAvailability, Violation};
@@ -50,7 +51,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// np.round(arr2)
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.2.0")]
+#[violation_metadata(stable_since = "v0.2.0", category = Category::Suspicious)]
 pub(crate) struct Numpy2Deprecation {
     existing: String,
     migration_guide: Option<String>,
@@ -683,12 +684,26 @@ pub(crate) fn numpy_2_0_deprecation(checker: &Checker, expr: &Expr) {
             compatibility,
         } => {
             diagnostic.try_set_fix(|| {
+                // `numpy.char` is not an importable module path on NumPy 1.x.
+                let (path, name, attribute) = if matches!(
+                    (path, name),
+                    ("numpy.char", "chararray" | "compare_chararrays")
+                ) {
+                    ("numpy", "char", Some(name))
+                } else {
+                    (path, name, None)
+                };
                 let (import_edit, binding) = checker.importer().get_or_import_symbol(
                     &ImportRequest::import_from(path, name),
                     expr.start(),
                     checker.semantic(),
                 )?;
-                let replacement_edit = Edit::range_replacement(binding, expr.range());
+                let replacement = if let Some(attribute) = attribute {
+                    format!("{binding}.{attribute}")
+                } else {
+                    binding
+                };
+                let replacement_edit = Edit::range_replacement(replacement, expr.range());
                 Ok(match compatibility {
                     Compatibility::BackwardsCompatible => {
                         Fix::safe_edits(import_edit, [replacement_edit])
@@ -759,7 +774,7 @@ fn is_guarded_by_try_except(
             try_block_contains_undeprecated_attribute(try_node, &replacement.details, semantic)
         }
         Expr::Name(ast::ExprName { id, .. }) => {
-            let Some(binding_id) = semantic.lookup_symbol(id.as_str()) else {
+            let Some(binding_id) = semantic.lookup_symbol(id.as_str()).binding_id() else {
                 return false;
             };
             let binding = semantic.binding(binding_id);

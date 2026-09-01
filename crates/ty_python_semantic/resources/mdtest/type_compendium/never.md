@@ -13,7 +13,8 @@ The `Never` type is the bottom type of Python's type system. It is a subtype of 
 type is a subtype of `Never`, except for `Never` itself or type variables with upper bound `Never`.
 
 ```py
-from ty_extensions import static_assert, is_subtype_of
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
 from typing_extensions import Never, TypeVar
 
 class C: ...
@@ -38,7 +39,8 @@ context that requires a value of a specific type. For example, changing the `Nev
 `None` below would cause a type error:
 
 ```py
-from ty_extensions import static_assert, is_assignable_to
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to
 from typing_extensions import Never, Any
 
 static_assert(is_assignable_to(Never, int))
@@ -92,7 +94,8 @@ Two types `A` and `B` are disjoint if their intersection is empty. Since `Never`
 it is disjoint from every other type:
 
 ```py
-from ty_extensions import static_assert, is_disjoint_from
+from ty_extensions import static_assert
+from ty_extensions._internal import is_disjoint_from
 from typing_extensions import Never
 
 class C: ...
@@ -108,7 +111,8 @@ static_assert(is_disjoint_from(Never, Never))
 `Never` can always be removed from unions:
 
 ```py
-from ty_extensions import static_assert, is_equivalent_to
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
 from typing_extensions import Never
 
 class P: ...
@@ -122,7 +126,8 @@ static_assert(is_equivalent_to(P | Never | Q | None, P | Q | None))
 Intersecting with `Never` results in `Never`:
 
 ```pyi
-from ty_extensions import static_assert, is_equivalent_to
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
 from typing_extensions import Never
 
 class P: ...
@@ -137,7 +142,8 @@ static_assert(is_equivalent_to(P & Never & Q, Never))
 types are complements of each other:
 
 ```pyi
-from ty_extensions import static_assert, is_equivalent_to
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
 from typing_extensions import Never
 
 static_assert(is_equivalent_to(~object, Never))
@@ -150,7 +156,7 @@ This duality is also reflected in other facts:
 - `Never` is assignable to every type, while `object` is assignable from every type.
 - `Never` is disjoint from every type, while `object` overlaps with every type.
 - Building a union with `Never` is a no-op, intersecting with `object` is a no-op.
-- Interecting with `Never` results in `Never`, building a union with `object` results in `object`.
+- Intersecting with `Never` results in `Never`, building a union with `object` results in `object`.
 
 ## Lists of `Never`
 
@@ -165,17 +171,19 @@ x: list[Never] = []
 
 ## Tuples involving `Never`
 
-A type like `tuple[int, Never]` has no inhabitants, and so it is equivalent to `Never`:
+A type like `tuple[int, Never]` remains distinct from `Never`. A tuple annotation can describe
+user-defined subclasses, so its element types remain part of the type:
 
 ```py
-from ty_extensions import static_assert, is_equivalent_to
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
 from typing_extensions import Never
 
-static_assert(is_equivalent_to(tuple[int, Never], Never))
+static_assert(not is_equivalent_to(tuple[int, Never], Never))
 ```
 
-Note that this is not the case for the homogenous tuple type `tuple[Never, ...]` though, because
-that type is inhabited by the empty tuple:
+The homogeneous tuple type `tuple[Never, ...]` is also distinct from `Never`: it is inhabited by the
+empty tuple.
 
 ```py
 static_assert(not is_equivalent_to(tuple[Never, ...], Never))
@@ -188,7 +196,8 @@ t: tuple[Never, ...] = ()
 The `NoReturn` type is a different name for `Never`:
 
 ```py
-from ty_extensions import static_assert, is_equivalent_to
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
 from typing_extensions import NoReturn, Never
 
 static_assert(is_equivalent_to(NoReturn, Never))

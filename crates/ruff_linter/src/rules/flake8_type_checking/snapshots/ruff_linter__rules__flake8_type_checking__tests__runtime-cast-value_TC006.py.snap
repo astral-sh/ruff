@@ -8,7 +8,6 @@ TC006 [*] Add quotes to type expression in `typing.cast()`
 3 |
 4 |     cast(int, 3.0)  # TC006
   |          ^^^
-  |
 help: Add quotes
   |
 3 |
@@ -24,7 +23,6 @@ TC006 [*] Add quotes to type expression in `typing.cast()`
  9 |
 10 |     cast(list[tuple[bool | float | int | str]], 3.0)  # TC006
    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Add quotes
    |
 9  |
@@ -40,7 +38,6 @@ TC006 [*] Add quotes to type expression in `typing.cast()`
 15 |
 16 |     cast(list[tuple[Union[bool, float, int, str]]], 3.0)  # TC006
    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Add quotes
    |
 15 |
@@ -56,7 +53,6 @@ TC006 [*] Add quotes to type expression in `typing.cast()`
 39 |
 40 |     typecast(int, 3.0)  # TC006
    |              ^^^
-   |
 help: Add quotes
    |
 39 |
@@ -72,7 +68,6 @@ TC006 [*] Add quotes to type expression in `typing.cast()`
 45 |
 46 |     typing.cast(int, 3.0)  # TC006
    |                 ^^^
-   |
 help: Add quotes
    |
 45 |
@@ -88,7 +83,6 @@ TC006 [*] Add quotes to type expression in `typing.cast()`
 51 |
 52 |     t.cast(t.Literal["3.0", '3'], 3.0)  # TC006
    |            ^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Add quotes
    |
 51 |
@@ -124,7 +118,6 @@ TC006 [*] Add quotes to type expression in `typing.cast()`
 67 |     import typing
 68 |     typing.cast(M-())
    |                 ^^^^
-   |
 help: Add quotes
    |
 67 |     import typing
@@ -140,7 +133,6 @@ TC006 [*] Add quotes to type expression in `typing.cast()`
 74 |
 75 |     cast(Literal["A"], 'A')
    |          ^^^^^^^^^^^^
-   |
 help: Add quotes
    |
 74 |
@@ -156,7 +148,6 @@ TC006 [*] Add quotes to type expression in `typing.cast()`
 81 |
 82 |     cast(list[Annotated["list['Literal[\"A\"]']", "Foo"]], ['A'])
    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Add quotes
    |
 81 |
@@ -205,7 +196,6 @@ TC006 [*] Add quotes to type expression in `typing.cast()`
 98 |     cast(typ=int, val=3.0)  # TC006
 99 |     cast(val=3.0, typ=int)  # TC006
    |                       ^^^
-   |
 help: Add quotes
    |
 98 |     cast(typ=int, val=3.0)  # TC006

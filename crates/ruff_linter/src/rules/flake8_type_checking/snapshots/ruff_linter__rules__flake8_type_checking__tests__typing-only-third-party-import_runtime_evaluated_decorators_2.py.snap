@@ -8,7 +8,6 @@ TC002 [*] Move third-party import `numpy` into a type-checking block
  9 |
 10 | import numpy  # TC002
    |        ^^^^^
-   |
 help: Move into type-checking block
    |
 9  |

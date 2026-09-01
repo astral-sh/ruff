@@ -78,8 +78,8 @@ from builtins import object as _object
 from collections.abc import AsyncGenerator, Callable, Sequence
 from io import TextIOWrapper
 from types import FrameType, ModuleType, SimpleNamespace, TracebackType
-from typing import Any, Final, Literal, NoReturn, Protocol, TextIO, TypeAlias, TypeVar, final, overload, type_check_only
-from typing_extensions import LiteralString, deprecated
+from typing import Any, Final, Literal, Protocol, TextIO, TypeAlias, TypeVar, final, overload, type_check_only
+from typing_extensions import LiteralString, Never, deprecated
 
 _T = TypeVar("_T")
 _LazyImportMode: TypeAlias = Literal["normal", "all", "none"]
@@ -119,6 +119,7 @@ excepthook: Callable[[type[BaseException], BaseException, TracebackType | None],
 exec_prefix: str
 executable: str
 float_repr_style: Literal["short", "legacy"]
+_framework: str  # empty string on non-macOS platforms
 hexversion: int
 last_type: type[BaseException] | None
 last_value: BaseException | None
@@ -677,7 +678,7 @@ if sys.version_info >= (3, 11):
         if no such exception exists.
         """
 
-def exit(status: _ExitCode = None, /) -> NoReturn:
+def exit(status: _ExitCode = None, /) -> Never:
     """Exit the interpreter by raising SystemExit(status).
 
     If the status is omitted or None, it defaults to zero (i.e., success).
@@ -713,7 +714,6 @@ if sys.version_info >= (3, 15):
         """Gets the global lazy imports mode.
 
         Returns "all" if all top level imports are potentially lazy.
-        Returns "none" if all explicitly marked lazy imports are suppressed.
         Returns "normal" if only explicitly marked imports are lazy.
         """
 
@@ -996,7 +996,6 @@ if sys.version_info >= (3, 15):
 
         The mode parameter must be one of the following strings:
         - "all": All top-level imports become potentially lazy
-        - "none": All lazy imports are suppressed (even explicitly marked ones)
         - "normal": Only explicitly marked imports (with 'lazy' keyword) are
           lazy
 
@@ -1040,7 +1039,7 @@ if sys.version_info >= (3, 12):
             """Activate stack profiler trampoline *backend*."""
 
     else:
-        def activate_stack_trampoline(backend: str, /) -> NoReturn:
+        def activate_stack_trampoline(backend: str, /) -> Never:
             """Activate stack profiler trampoline *backend*."""
 
     from . import _monitoring

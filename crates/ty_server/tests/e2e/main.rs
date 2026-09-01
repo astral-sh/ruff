@@ -33,13 +33,16 @@ mod commands;
 mod completions;
 mod configuration;
 mod folding_range;
+mod goto_definition;
 mod hover;
+mod implementation;
 mod initialize;
 mod inlay_hints;
 mod notebook;
 mod publish_diagnostics;
 mod pull_diagnostics;
 mod rename;
+mod script_preparation;
 mod semantic_tokens;
 mod signature_help;
 mod type_hierarchy;
@@ -58,7 +61,8 @@ use insta::internals::SettingsBindDropGuard;
 use lsp_server::{Connection, Message, RequestId, Response, ResponseError};
 use lsp_types::{
     ClientCapabilities, CompletionItem, CompletionParams, CompletionRequest, CompletionResponse,
-    CompletionTriggerKind, ConfigurationParams, ConfigurationRequest, DiagnosticClientCapabilities,
+    CompletionTriggerKind, ConfigurationParams, ConfigurationRequest, DefinitionParams,
+    DefinitionRequest, DefinitionResponse, DiagnosticClientCapabilities,
     DidChangeTextDocumentNotification, DidChangeTextDocumentParams,
     DidChangeWatchedFilesClientCapabilities, DidChangeWatchedFilesNotification,
     DidChangeWatchedFilesParams, DidChangeWorkspaceFoldersNotification,
@@ -77,9 +81,13 @@ use lsp_types::{
     WorkspaceDiagnosticParams, WorkspaceDiagnosticReport, WorkspaceDiagnosticRequest,
     WorkspaceEdit, WorkspaceFolder, WorkspaceFoldersChangeEvent, WorkspaceFoldersInitializeParams,
 };
-use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf, TestSystem};
+#[cfg(feature = "test-uv")]
+use ruff_db::system::System as _;
+use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf, SystemVirtualPath, TestSystem};
 use rustc_hash::FxHashMap;
+use serde_json::{Value, json};
 use tempfile::TempDir;
+use ty_project::UseUv;
 use ty_server::{ClientOptions, LogLevel, Server, init_logging};
 
 /// Number of times to retry receiving a message before giving up
@@ -125,9 +133,6 @@ pub(crate) enum AwaitResponseError {
     /// The response came back, but was an error response, not a successful one.
     #[error("request failed because the server replied with an error: {0:?}")]
     RequestFailed(ResponseError),
-
-    #[error("malformed response message with both result and error: {0:#?}")]
-    MalformedResponse(Box<Response>),
 
     #[error("received multiple responses for the same request ID: {0:#?}")]
     MultipleResponses(Box<[Response]>),
@@ -213,7 +218,7 @@ impl TestServer {
         workspaces: Vec<(WorkspaceFolder, Option<ClientOptions>)>,
         test_context: TestContext,
         capabilities: ClientCapabilities,
-        initialization_options: Option<ClientOptions>,
+        initialization_options: Option<Value>,
         env_vars: Vec<(String, Option<String>)>,
     ) -> Self {
         setup_tracing();
@@ -279,26 +284,18 @@ impl TestServer {
     }
 
     /// Perform LSP initialization handshake
-    ///
-    /// # Panics
-    ///
-    /// If the `initialization_options` cannot be serialized to JSON
     fn initialize(
         mut self,
         workspace_folders: Vec<WorkspaceFolder>,
         capabilities: ClientCapabilities,
-        initialization_options: Option<ClientOptions>,
+        initialization_options: Option<Value>,
     ) -> Self {
         let init_params = InitializeParams {
             capabilities,
             workspace_folders_initialize_params: WorkspaceFoldersInitializeParams {
                 workspace_folders: Some(workspace_folders.into()),
             },
-            initialization_options: initialization_options.map(|options| {
-                serde_json::to_value(options)
-                    .context("Failed to serialize initialization options to `ClientOptions`")
-                    .unwrap()
-            }),
+            initialization_options,
             ..Default::default()
         };
 
@@ -477,23 +474,12 @@ impl TestServer {
 
                 let response = responses.pop().unwrap();
 
-                match response {
-                    Response {
-                        error: None,
-                        result: Some(result),
-                        ..
-                    } => {
+                match response.response_result {
+                    Ok(result) => {
                         return Ok(serde_json::from_value::<R::Result>(result)?);
                     }
-                    Response {
-                        error: Some(err),
-                        result: None,
-                        ..
-                    } => {
+                    Err(err) => {
                         return Err(AwaitResponseError::RequestFailed(err));
-                    }
-                    response => {
-                        return Err(AwaitResponseError::MalformedResponse(Box::new(response)));
                     }
                 }
             }
@@ -580,7 +566,7 @@ impl TestServer {
             {
                 panic!(
                     "Received multiple publish diagnostic notifications for {uri}: ({existing:#?})",
-                    uri = &notification.uri
+                    uri = notification.uri
                 );
             }
         }
@@ -608,6 +594,42 @@ impl TestServer {
             Ok(result) => result,
             Err(err) => {
                 panic!("Failed to receive server request `{}`: {err}", R::METHOD)
+            }
+        }
+    }
+
+    /// Wait for and acknowledge a server-requested diagnostic refresh.
+    pub(crate) fn await_diagnostic_refresh(&mut self) {
+        let (id, ()) = self.await_request::<lsp_types::DiagnosticRefreshRequest>();
+        self.send(Message::Response(Response::new_ok(id, ())));
+    }
+
+    /// Checks server-created progress with matching begin, report, and end notifications.
+    #[cfg(feature = "test-uv")]
+    #[track_caller]
+    pub(crate) fn assert_work_done_progress(
+        &mut self,
+        expected_title: &str,
+    ) -> Result<lsp_types::WorkDoneProgressEnd> {
+        let (request_id, progress) =
+            self.await_request::<lsp_types::WorkDoneProgressCreateRequest>();
+        self.send(Message::Response(Response::new_ok(request_id, ())));
+
+        let begin = self.await_notification::<lsp_types::ProgressNotification>();
+        assert_eq!(begin.token, progress.token);
+        assert_eq!(begin.value["kind"], "begin");
+        let begin: lsp_types::WorkDoneProgressBegin = serde_json::from_value(begin.value)?;
+        assert_eq!(begin.title, expected_title);
+
+        loop {
+            let notification = self.await_notification::<lsp_types::ProgressNotification>();
+            assert_eq!(notification.token, progress.token);
+            if notification.value["kind"] == "report" {
+                let _: lsp_types::WorkDoneProgressReport =
+                    serde_json::from_value(notification.value)?;
+            } else {
+                assert_eq!(notification.value["kind"], "end");
+                return Ok(serde_json::from_value(notification.value)?);
             }
         }
     }
@@ -789,7 +811,6 @@ impl TestServer {
         self.test_context.root().join(path)
     }
 
-    #[expect(dead_code)]
     pub(crate) fn write_file(
         &self,
         path: impl AsRef<SystemPath>,
@@ -811,9 +832,25 @@ impl TestServer {
         content: impl AsRef<str>,
         version: i32,
     ) {
+        self.open_text_document_with_uri(self.file_uri(path), content, version);
+    }
+
+    /// Send a `textDocument/didOpen` notification for an unsaved virtual document.
+    pub(crate) fn open_virtual_text_document(
+        &mut self,
+        path: impl AsRef<SystemVirtualPath>,
+        content: impl AsRef<str>,
+        version: i32,
+    ) -> Result<()> {
+        let uri = Uri::parse(path.as_ref().as_str())?;
+        self.open_text_document_with_uri(uri, content, version);
+        Ok(())
+    }
+
+    fn open_text_document_with_uri(&mut self, uri: Uri, content: impl AsRef<str>, version: i32) {
         let params = DidOpenTextDocumentParams {
             text_document: TextDocumentItem {
-                uri: self.file_uri(path),
+                uri,
                 language_id: LanguageKind::Python,
                 version,
                 text: content.as_ref().to_string(),
@@ -968,6 +1005,26 @@ impl TestServer {
         self.await_response::<WorkspaceDiagnosticRequest>(&id)
     }
 
+    /// Send a `textDocument/definition` request for the document at the given path and position.
+    pub(crate) fn goto_definition_request(
+        &mut self,
+        path: impl AsRef<SystemPath>,
+        position: Position,
+    ) -> Option<DefinitionResponse> {
+        let params = DefinitionParams {
+            text_document_position_params: TextDocumentPositionParams {
+                text_document: TextDocumentIdentifier {
+                    uri: self.file_uri(path),
+                },
+                position,
+            },
+            work_done_progress_params: WorkDoneProgressParams::default(),
+            partial_result_params: PartialResultParams::default(),
+        };
+        let id = self.send_request::<DefinitionRequest>(params);
+        self.await_response::<DefinitionRequest>(&id)
+    }
+
     /// Send a `textDocument/hover` request for the document at the given path and position.
     pub(crate) fn hover_request(
         &mut self,
@@ -1113,6 +1170,12 @@ impl fmt::Debug for TestServer {
 
 impl Drop for TestServer {
     fn drop(&mut self) {
+        // If initialization panicked, there is no running session to shut down. Trying to send
+        // another request could panic again while the test is already unwinding.
+        if self.initialize_response.is_none() {
+            return;
+        }
+
         self.drain_messages();
 
         // Follow the LSP protocol to shutdown the server gracefully.
@@ -1181,7 +1244,7 @@ impl Drop for TestServer {
 pub(crate) struct TestServerBuilder {
     test_context: TestContext,
     workspaces: Vec<(WorkspaceFolder, Option<ClientOptions>)>,
-    initialization_options: Option<ClientOptions>,
+    initialization_options: Option<Value>,
     client_capabilities: ClientCapabilities,
     env_vars: Vec<(String, Option<String>)>,
 }
@@ -1224,9 +1287,28 @@ impl TestServerBuilder {
         })
     }
 
-    /// Set the initial client options for the test server
-    pub(crate) fn with_initialization_options(mut self, options: ClientOptions) -> Self {
+    /// Set the initial client options for the test server.
+    pub(crate) fn with_initialization_options(self, options: &ClientOptions) -> Self {
+        self.with_raw_initialization_options(json!(options))
+    }
+
+    /// Set raw initialization JSON for malformed or startup-only settings.
+    pub(crate) fn with_raw_initialization_options(mut self, options: Value) -> Self {
         self.initialization_options = Some(options);
+        self
+    }
+
+    /// Enable uv integration using the uv executable on the test process's PATH.
+    #[cfg(feature = "test-uv")]
+    pub(crate) fn with_real_uv(self, use_uv: UseUv) -> Result<Self> {
+        let uv = OsSystem::default().which("uv")?;
+        Ok(self.with_use_uv(use_uv).with_env_var("UV", uv.as_str()))
+    }
+
+    /// Configure which uv integrations the test server enables.
+    pub(crate) fn with_use_uv(mut self, use_uv: UseUv) -> Self {
+        self.initialization_options.get_or_insert_with(|| json!({}))["experimental"]["useUv"] =
+            json!(use_uv);
         self
     }
 
@@ -1241,6 +1323,7 @@ impl TestServerBuilder {
     }
 
     /// Add a workspace to the test server with the given root path and options.
+    /// An existing file can also be used to model clients that send file-valued workspace roots.
     ///
     /// This option will be used to respond to the `workspace/configuration` request that the
     /// server will send to the client.
@@ -1253,7 +1336,9 @@ impl TestServerBuilder {
         options: Option<ClientOptions>,
     ) -> Result<Self> {
         let workspace_path = self.test_context.root().join(workspace_root);
-        fs::create_dir_all(workspace_path.as_std_path())?;
+        if !workspace_path.as_std_path().is_file() {
+            fs::create_dir_all(workspace_path.as_std_path())?;
+        }
 
         self.workspaces.push((
             WorkspaceFolder {
@@ -1278,6 +1363,27 @@ impl TestServerBuilder {
         } else {
             None
         };
+        self
+    }
+
+    /// Enable server-requested refreshes for pull diagnostics.
+    pub(crate) fn enable_workspace_diagnostic_refresh(mut self, enabled: bool) -> Self {
+        self.client_capabilities
+            .workspace
+            .get_or_insert_default()
+            .diagnostics
+            .get_or_insert_default()
+            .refresh_support = Some(enabled);
+        self
+    }
+
+    /// Enable server-created work-done progress.
+    #[cfg(feature = "test-uv")]
+    pub(crate) fn enable_work_done_progress(mut self, enabled: bool) -> Self {
+        self.client_capabilities
+            .window
+            .get_or_insert_default()
+            .work_done_progress = Some(enabled);
         self
     }
 
@@ -1389,6 +1495,46 @@ impl TestServerBuilder {
         self
     }
 
+    /// Advertise support for ty's fully rendered diagnostic output.
+    pub(crate) fn with_full_diagnostic_output(mut self) -> Self {
+        let experimental = self
+            .client_capabilities
+            .experimental
+            .get_or_insert_with(|| serde_json::json!({}));
+        experimental
+            .as_object_mut()
+            .expect("experimental capabilities must be a JSON object")
+            .insert("fullDiagnosticOutput".to_string(), serde_json::json!(true));
+        self
+    }
+
+    /// Advertise support for the `ty.triggerParameterHints` completion command.
+    pub(crate) fn with_trigger_parameter_hints_command(mut self) -> Self {
+        let experimental = self
+            .client_capabilities
+            .experimental
+            .get_or_insert_with(|| serde_json::json!({}));
+        experimental
+            .as_object_mut()
+            .expect("experimental capabilities must be a JSON object")
+            .insert(
+                "commands".to_string(),
+                serde_json::json!({ "commands": ["ty.triggerParameterHints"] }),
+            );
+        self
+    }
+
+    /// Enable or disable location link support for goto implementations
+    pub(crate) fn enable_implementations_link_support(mut self, enabled: bool) -> Self {
+        self.client_capabilities
+            .text_document
+            .get_or_insert_default()
+            .implementation
+            .get_or_insert_default()
+            .link_support = Some(enabled);
+        self
+    }
+
     /// Set custom client capabilities (overrides any previously set capabilities)
     #[expect(dead_code)]
     pub(crate) fn with_client_capabilities(mut self, capabilities: ClientCapabilities) -> Self {
@@ -1486,6 +1632,7 @@ impl TestContext {
             .map_err(|()| anyhow!("Failed to convert root directory to uri"))?;
         settings.add_filter(&tempdir_filter(project_dir.as_str()), "<temp_dir>/");
         settings.add_filter(&tempdir_filter(project_dir_uri.path()), "<temp_dir>/");
+        settings.add_filter(r#"\\\\"#, "/");
         settings.add_filter(
             r#"The system cannot find the file specified."#,
             "No such file or directory",

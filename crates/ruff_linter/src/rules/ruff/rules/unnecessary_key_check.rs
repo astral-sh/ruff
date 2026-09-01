@@ -8,6 +8,7 @@ use ruff_python_ast::token::parenthesized_range;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
@@ -34,7 +35,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// This rule's fix is marked as safe, unless the expression contains comments
 /// or may have side effects.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.2.0")]
+#[violation_metadata(stable_since = "v0.2.0", category = Category::Complexity)]
 pub(crate) struct UnnecessaryKeyCheck;
 
 impl AlwaysFixableViolation for UnnecessaryKeyCheck {

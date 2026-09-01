@@ -102,7 +102,7 @@ impl Serialize for SerializedMessages<'_> {
             fingerprints.insert(message_fingerprint);
 
             let description = diagnostic.concise_message();
-            let check_name = if self.config.preview {
+            let check_name = if self.config.preview && !self.config.prefer_rule_codes {
                 diagnostic.id().as_str()
             } else {
                 diagnostic.secondary_code_or_id()

@@ -12,7 +12,7 @@ At its simplest, to define a type alias using PEP 695 syntax, you add a list of 
 
 ```py
 from typing import Callable
-from ty_extensions import generic_context
+from ty_extensions._internal import generic_context
 
 type SingleTypevar[T] = list[T]
 type MultipleTypevars[T, S] = tuple[T, S]
@@ -21,20 +21,18 @@ type TypeVarAndParamSpec[T, **P] = Callable[P, T]
 type SingleTypeVarTuple[*Ts] = tuple[*Ts]
 type TypeVarAndTypeVarTuple[T, *Ts] = tuple[T, *Ts]
 
-# revealed: ty_extensions.GenericContext[T@SingleTypevar]
+# revealed: ty_extensions._internal.GenericContext[T@SingleTypevar]
 reveal_type(generic_context(SingleTypevar))
-# revealed: ty_extensions.GenericContext[T@MultipleTypevars, S@MultipleTypevars]
+# revealed: ty_extensions._internal.GenericContext[T@MultipleTypevars, S@MultipleTypevars]
 reveal_type(generic_context(MultipleTypevars))
 
-# TODO: support `TypeVarTuple` properly
-# (these should include the `TypeVarTuple`s in their generic contexts)
-# revealed: ty_extensions.GenericContext[P@SingleParamSpec]
+# revealed: ty_extensions._internal.GenericContext[P@SingleParamSpec]
 reveal_type(generic_context(SingleParamSpec))
-# revealed: ty_extensions.GenericContext[T@TypeVarAndParamSpec, P@TypeVarAndParamSpec]
+# revealed: ty_extensions._internal.GenericContext[T@TypeVarAndParamSpec, P@TypeVarAndParamSpec]
 reveal_type(generic_context(TypeVarAndParamSpec))
-# revealed: ty_extensions.GenericContext[]
+# revealed: ty_extensions._internal.GenericContext[Ts@SingleTypeVarTuple]
 reveal_type(generic_context(SingleTypeVarTuple))
-# revealed: ty_extensions.GenericContext[T@TypeVarAndTypeVarTuple]
+# revealed: ty_extensions._internal.GenericContext[T@TypeVarAndTypeVarTuple, Ts@TypeVarAndTypeVarTuple]
 reveal_type(generic_context(TypeVarAndTypeVarTuple))
 ```
 
@@ -105,6 +103,14 @@ def _(l: ListOfInts[int]):
 
 type List[T] = list[T]
 
+# error: [not-subscriptable] "Cannot specialize non-generic type alias: Double specialization is not allowed"
+reveal_type(List[int][str])  # revealed: Unknown
+
+SpecializedList = List[int]
+
+# error: [not-subscriptable] "Cannot specialize non-generic type alias: Double specialization is not allowed"
+reveal_type(SpecializedList[str])  # revealed: Unknown
+
 # error: [invalid-type-form] "Only simple names and dotted names can be subscripted in parameter annotations"
 def _(l: List[int][int]):
     reveal_type(l)  # revealed: Unknown
@@ -122,8 +128,9 @@ def _(doubly_specialized: Tuple[int]):
     reveal_type(doubly_specialized)  # revealed: Unknown
 
 T = TypeVar("T")
+T_co = TypeVar("T_co", covariant=True)
 
-class LegacyProto(Protocol[T]):
+class LegacyProto(Protocol[T_co]):
     pass
 
 type LegacyProtoInt = LegacyProto[int]
@@ -146,6 +153,7 @@ class LegacyDict(TypedDict[T]):
     # error: [unbound-type-variable]
     x: T
 
+# error: [invalid-type-form] "Non-generic class `LegacyDict` cannot be specialized in a type expression"
 type LegacyDictInt = LegacyDict[int]
 
 # error: [not-subscriptable] "Cannot specialize non-generic type alias `LegacyDictInt`"
@@ -319,6 +327,32 @@ def _(p: P) -> None:
     pass
 ```
 
+## Recursive TypeVarTuple alias defaults
+
+Recursive aliases that extend a `TypeVarTuple` specialization must not recursively expand while
+checking their defaults.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+# error: [invalid-legacy-type-variable]
+# error: [invalid-type-form]
+type Nested[*Ts = Nested[*Ts]] = tuple[Nested[*Ts, Nested[*Ts]]]
+
+# error: [invalid-legacy-type-variable]
+# error: [invalid-type-form]
+type Suffix[*Ts = Suffix[*Ts]] = list[Suffix[*Ts, int]]
+
+# error: [invalid-legacy-type-variable]
+# error: [invalid-type-form]
+type Prefix[*Ts = Prefix[*Ts]] = tuple[Prefix[int, *Ts]]
+
+type ValidDefault[*Ts = *tuple[ValidDefault[int]]] = tuple[ValidDefault[*Ts, int]]
+```
+
 ## Snapshots of verbose diagnostics
 
 ```py
@@ -340,7 +374,6 @@ error[not-subscriptable]: Cannot specialize non-generic type alias `AliasA`
   |          ------^^^^^
   |          |
   |          Alias to `A`, which is not generic
-  |
 ```
 
 ```py
@@ -356,7 +389,6 @@ error[not-subscriptable]: Cannot specialize non-generic type alias `AliasB`
    |          ------^^^^^
    |          |
    |          Alias to `B[int]`, which is already specialized
-   |
 ```
 
 ## Aliases are not callable
@@ -674,13 +706,12 @@ type Alias1[*Ts, T = int] = tuple[*Ts, T]
 
 ```snapshot
 error[invalid-type-variable-default]: Type parameters with defaults cannot follow a TypeVarTuple parameter
- --> src/mdtest_snippet.py:2:13
+ --> src/mdtest_snippet.py:2:18
   |
 2 | type Alias1[*Ts, T = int] = tuple[*Ts, T]
   |             ---  ^^^^^^^ `T` has a default
   |             |
   |             `Ts` is a TypeVarTuple
-  |
 info: See https://typing.python.org/en/latest/spec/generics.html#defaults-following-typevartuple
 ```
 
@@ -691,13 +722,12 @@ type Alias2[T1, *Ts, T2 = int] = tuple[T1, *Ts, T2]
 
 ```snapshot
 error[invalid-type-variable-default]: Type parameters with defaults cannot follow a TypeVarTuple parameter
- --> src/mdtest_snippet.py:4:17
+ --> src/mdtest_snippet.py:4:22
   |
 4 | type Alias2[T1, *Ts, T2 = int] = tuple[T1, *Ts, T2]
   |                 ---  ^^^^^^^^ `T2` has a default
   |                 |
   |                 `Ts` is a TypeVarTuple
-  |
 info: See https://typing.python.org/en/latest/spec/generics.html#defaults-following-typevartuple
 ```
 
@@ -708,31 +738,31 @@ type Alias3[*Ts, T1 = int, T2 = str] = tuple[*Ts, T1, T2]
 
 ```snapshot
 error[invalid-type-variable-default]: Type parameters with defaults cannot follow a TypeVarTuple parameter
- --> src/mdtest_snippet.py:6:13
+ --> src/mdtest_snippet.py:6:18
   |
 6 | type Alias3[*Ts, T1 = int, T2 = str] = tuple[*Ts, T1, T2]
   |             ---  ^^^^^^^^  -------- `T2` also has a default
   |             |    |
   |             |    `T1` has a default
   |             `Ts` is a TypeVarTuple
-  |
 info: See https://typing.python.org/en/latest/spec/generics.html#defaults-following-typevartuple
 ```
 
 ```py
 # snapshot: invalid-type-variable-default
+# error: [invalid-type-form] "Type alias `Alias4` cannot have multiple `TypeVarTuple` type parameters"
+# error: [invalid-type-form] "Multiple unpacked variadic tuples are not allowed in a `tuple` specialization"
 type Alias4[*Us, *Ts = *tuple[int, str]] = tuple[*Us, *Ts]
 ```
 
 ```snapshot
 error[invalid-type-variable-default]: Type parameters with defaults cannot follow a TypeVarTuple parameter
- --> src/mdtest_snippet.py:8:13
-  |
-8 | type Alias4[*Us, *Ts = *tuple[int, str]] = tuple[*Us, *Ts]
-  |             ---  ^^^^^^^^^^^^^^^^^^^^^^ `Ts` has a default
-  |             |
-  |             `Us` is a TypeVarTuple
-  |
+  --> src/mdtest_snippet.py:10:18
+   |
+10 | type Alias4[*Us, *Ts = *tuple[int, str]] = tuple[*Us, *Ts]
+   |             ---  ^^^^^^^^^^^^^^^^^^^^^^ `Ts` has a default
+   |             |
+   |             `Us` is a TypeVarTuple
 info: See https://typing.python.org/en/latest/spec/generics.html#defaults-following-typevartuple
 ```
 

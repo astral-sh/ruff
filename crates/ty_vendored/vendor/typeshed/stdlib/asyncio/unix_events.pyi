@@ -322,7 +322,8 @@ if sys.platform != "win32":
     class _UnixSelectorEventLoop(BaseSelectorEventLoop):
         """Unix event loop.
 
-        Adds signal handling and UNIX Domain Socket support to SelectorEventLoop.
+        Adds signal handling and UNIX Domain Socket support to
+        SelectorEventLoop.
         """
 
         if sys.version_info >= (3, 13):

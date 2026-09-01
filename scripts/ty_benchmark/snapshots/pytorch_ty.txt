@@ -1016,7 +1016,7 @@ torch/_dynamo/dynamo_profiler.py:317:9: error[unresolved-attribute] Unresolved a
 torch/_dynamo/dynamo_profiler.py:378:13: error[unresolved-attribute] Attribute `close` is not defined on `None` in union `IO[Any] | None`
 torch/_dynamo/dynamo_profiler.py:418:9: error[unresolved-attribute] Unresolved attribute `stream` on type `Stats`
 torch/_dynamo/eval_frame.py:203:1: error[unresolved-attribute] Unresolved attribute `_dynamo_forbidden` on type `def _set_stance(stance: DynamoStance) -> DynamoStance`
-torch/_dynamo/eval_frame.py:290:39: error[invalid-argument-type] Argument to function `innermost_backend` is incorrect: Expected `(...) -> Any`, found `Literal[True] | DynamoCallbackFn`
+torch/_dynamo/eval_frame.py:290:39: error[invalid-argument-type] Argument to function `innermost_backend` is incorrect: Expected `(...) -> Any`, found `DynamoCallbackFn | Literal[True]`
 torch/_dynamo/eval_frame.py:307:9: error[unresolved-attribute] Unresolved attribute `_torchdynamo_orig_backend` on type `def fail_callback(frame: _PyInterpreterFrame, *args: Any, **kwargs: Any) -> ConvertFrameReturn`
 torch/_dynamo/eval_frame.py:357:23: error[unresolved-attribute] Object of type `DynamoCallbackFn | None | bool` has no attribute `_torchdynamo_orig_backend`
 torch/_dynamo/eval_frame.py:361:5: error[unresolved-attribute] Unresolved attribute `_torchdynamo_orig_backend` on type `def callback_fn(...) -> ConvertFrameReturn`
@@ -1177,7 +1177,6 @@ torch/_dynamo/guards.py:4683:21: warning[possibly-missing-submodule] Submodule `
 torch/_dynamo/guards.py:4752:17: error[invalid-assignment] Object of type `None` is not assignable to attribute `scope` on type `GuardBuilder & ~AlwaysFalsy`
 torch/_dynamo/metrics_context.py:125:35: error[invalid-type-form] Invalid subscript of object of type `def set(self, metric: str, value: Any, overwrite: bool = False) -> None` in a parameter annotation
 torch/_dynamo/mutation_guard.py:147:9: error[invalid-assignment] Object of type `def patched_init(self: Module, *args: Any, **kwargs: Any) -> None` is not assignable to attribute `__init__` of type `Overload[(self, o: object, /) -> None, (self, name: str, bases: tuple[type, ...], dict: dict[str, Any], /, **kwds: Any) -> None]`
-torch/_dynamo/mutation_guard.py:155:9: error[invalid-assignment] Object of type `def patched_setstate(self: Module, state: Any) -> None` is not assignable to attribute `__setstate__` of type `def __setstate__(self, state) -> Unknown`
 torch/_dynamo/mutation_guard.py:157:9: error[unresolved-attribute] Unresolved attribute `___needs_generation_tag_patch` on type `<class 'Module'>`.
 torch/_dynamo/output_graph.py:163:5: warning[possibly-missing-import] Member `LazyString` of module `torch._dynamo.utils` may be missing
 torch/_dynamo/output_graph.py:263:5: error[unresolved-attribute] Unresolved attribute `__wrapped__` on type `def wrapped(gm: Any, example_inputs: Any) -> Any`
@@ -1356,8 +1355,11 @@ torch/_dynamo/polyfills/pytree.py:683:12: error[invalid-return-type] Return type
 torch/_dynamo/polyfills/pytree.py:691:1: error[invalid-argument-type] Argument is incorrect: Expected `[T](tree: PyTree[T], /, is_leaf: ((T, /) -> bool) | None = None, *, none_is_leaf: bool = False, namespace: str = "") -> PyTreeSpec`, found `def tree_structure(tree: Any, /, is_leaf: ((Any, /) -> bool) | None = None, *, none_is_leaf: bool = False, namespace: str = "") -> PyTreeSpec`
 torch/_dynamo/polyfills/pytree.py:705:12: error[invalid-return-type] Return type does not match returned value: expected `torch._dynamo.polyfills.pytree.PyTreeSpec`, found `optree._C.PyTreeSpec`
 torch/_dynamo/polyfills/pytree.py:713:1: error[invalid-argument-type] Argument is incorrect: Expected `[T](treespec: PyTreeSpec, leaves: Iterable[T]) -> PyTree[T]`, found `def tree_unflatten(treespec: PyTreeSpec, leaves: Iterable[Any]) -> Any`
+torch/_dynamo/polyfills/pytree.py:733:1: error[invalid-argument-type] Argument is incorrect: Expected `(metadata: Hashable, children: Iterable[Unknown], /) -> Collection[Unknown]`, found `def none_unflatten[_T](_: None, children: Iterable[_T], /) -> None`
 torch/_dynamo/polyfills/pytree.py:734:5: error[unresolved-attribute] Attribute `unflatten_func` is not defined on `dict[type, PyTreeNodeRegistryEntry[Unknown]]` in union `PyTreeNodeRegistryEntry[Unknown] | dict[type, PyTreeNodeRegistryEntry[Unknown]]`
+torch/_dynamo/polyfills/pytree.py:750:1: error[invalid-argument-type] Argument is incorrect: Expected `(container: Collection[Unknown], /) -> tuple[Iterable[Unknown], Hashable] | tuple[Iterable[Unknown], Hashable, Iterable[Any] | None]`, found `def dict_flatten[_KT, _VT](dct: dict[_KT, _VT], /) -> tuple[list[_VT], tuple[list[_KT], list[_KT]], tuple[_KT, ...]]`
 torch/_dynamo/polyfills/pytree.py:751:5: error[unresolved-attribute] Attribute `flatten_func` is not defined on `dict[type, PyTreeNodeRegistryEntry[Unknown]]` in union `PyTreeNodeRegistryEntry[Unknown] | dict[type, PyTreeNodeRegistryEntry[Unknown]]`
+torch/_dynamo/polyfills/pytree.py:764:1: error[invalid-argument-type] Argument is incorrect: Expected `(metadata: Hashable, children: Iterable[Unknown], /) -> Collection[Unknown]`, found `def dict_unflatten[_KT, _VT](metadata: tuple[list[_KT], list[_KT]], values: Iterable[_VT], /) -> dict[_KT, _VT]`
 torch/_dynamo/polyfills/pytree.py:765:5: error[unresolved-attribute] Attribute `unflatten_func` is not defined on `dict[type, PyTreeNodeRegistryEntry[Unknown]]` in union `PyTreeNodeRegistryEntry[Unknown] | dict[type, PyTreeNodeRegistryEntry[Unknown]]`
 torch/_dynamo/polyfills/pytree.py:777:12: error[invalid-return-type] Return type does not match returned value: expected `dict[_KT@dict_unflatten, _VT@dict_unflatten]`, found `dict[_KT@dict_unflatten, Any | None]`
 torch/_dynamo/polyfills/tensor.py:14:10: error[unresolved-attribute] Module `torch._C` has no member `DisableTorchFunctionSubclass`
@@ -1386,6 +1388,7 @@ torch/_dynamo/repro/after_aot.py:234:5: warning[possibly-missing-submodule] Subm
 torch/_dynamo/repro/after_aot.py:240:13: warning[possibly-missing-submodule] Submodule `_distributed_c10d` might not have been imported
 torch/_dynamo/repro/after_aot.py:243:22: warning[possibly-missing-attribute] Member `new_group` may be missing on module `torch.distributed`
 torch/_dynamo/repro/after_aot.py:245:13: warning[possibly-missing-submodule] Submodule `_distributed_c10d` might not have been imported
+torch/_dynamo/repro/after_aot.py:383:21: error[invalid-argument-type] Argument to function `same_two_models` is incorrect: Expected `GraphModule`, found `OutputCode`
 torch/_dynamo/repro/after_aot.py:438:13: error[unresolved-attribute] Unresolved attribute `_boxed_call` on type `def deferred_for_real_inputs(real_inputs: Sequence[Tensor | int | SymInt | None], **_kwargs: object) -> Any`
 torch/_dynamo/repro/after_aot.py:439:20: error[invalid-return-type] Return type does not match returned value: expected `OutputCode`, found `def deferred_for_real_inputs(real_inputs: Sequence[Tensor | int | SymInt | None], **_kwargs: object) -> Any`
 torch/_dynamo/repro/after_aot.py:703:30: error[unresolved-attribute] Module `torch._C` has no member `Generator`
@@ -2026,7 +2029,7 @@ torch/_dynamo/variables/dicts.py:1229:19: error[unresolved-attribute] Object of 
 torch/_dynamo/variables/dicts.py:1401:30: error[unresolved-attribute] Object of type `VariableTracker` has no attribute `set_items`
 torch/_dynamo/variables/dicts.py:1428:28: error[invalid-return-type] Return type does not match returned value: expected `dict[str, object]`, found `object`
 torch/_dynamo/variables/dicts.py:1532:9: error[invalid-method-override] Invalid override of method `__contains__`: Definition is incompatible with `Mapping.__contains__`
-torch/_dynamo/variables/dicts.py:1627:17: error[invalid-argument-type] Argument to `ConstDictVariable.__init__` is incorrect: Expected `dict[VariableTracker, VariableTracker]`, found `dict[VariableTracker | HashableTracker | str, VariableTracker | HashableTracker | str]`
+torch/_dynamo/variables/dicts.py:1627:17: error[invalid-argument-type] Argument to `ConstDictVariable.__init__` is incorrect: Expected `dict[VariableTracker, VariableTracker]`, found `dict[VariableTracker | HashableTracker | str, VariableTracker]`
 torch/_dynamo/variables/functions.py:24:8: error[unresolved-import] Cannot resolve imported module `_collections`
 torch/_dynamo/variables/functions.py:104:25: error[invalid-assignment] Object of type `None` is not assignable to `<module 'torch.distributed.fsdp._fully_shard._fsdp_param_group'>`
 torch/_dynamo/variables/functions.py:350:5: error[invalid-assignment] Object of type `None | dict[str, Any]` is not assignable to attribute `__annotations__` of type `dict[str, Any]`
@@ -3175,6 +3178,11 @@ torch/_export/serde/serialize.py:2949:28: warning[possibly-missing-submodule] Su
 torch/_export/serde/serialize.py:2950:29: warning[possibly-missing-submodule] Submodule `_sympy` might not have been imported
 torch/_export/serde/serialize.py:3549:51: error[unresolved-attribute] Module `torch._C` has no member `_get_max_operator_version`
 torch/_export/serde/serialize.py:3631:9: error[invalid-method-override] Invalid override of method `default`: Definition is incompatible with `JSONEncoder.default`
+torch/_export/serde/serialize.py:4073:28: error[no-matching-overload] No overload of `dict.__init__` matches arguments
+torch/_export/serde/serialize.py:4077:29: error[no-matching-overload] No overload of `dict.__init__` matches arguments
+torch/_export/serde/serialize.py:4081:31: error[no-matching-overload] No overload of `dict.__init__` matches arguments
+torch/_export/serde/serialize.py:4085:30: error[no-matching-overload] No overload of `dict.__init__` matches arguments
+torch/_export/serde/serialize.py:4089:32: error[no-matching-overload] No overload of `dict.__init__` matches arguments
 torch/_export/serde/serialize.py:4381:31: error[unresolved-attribute] Module `torch` has no member `FunctionSchema`
 torch/_export/verifier.py:50:19: error[unresolved-attribute] Module `torch` has no member `memory_format`
 torch/_export/verifier.py:50:40: error[unresolved-attribute] Module `torch` has no member `dtype`
@@ -5431,8 +5439,7 @@ torch/_inductor/codegen/cpp_utils.py:192:46: error[unresolved-attribute] Object 
 torch/_inductor/codegen/cpp_utils.py:258:12: error[unresolved-attribute] Object of type `Basic` has no attribute `name`
 torch/_inductor/codegen/cpp_utils.py:258:39: error[unresolved-attribute] Object of type `Basic` has no attribute `name`
 torch/_inductor/codegen/cpp_utils.py:261:31: error[invalid-argument-type] Argument to function `sympy_subs` is incorrect: Expected `dict[Expr, Any]`, found `dict[Basic, Zero]`
-torch/_inductor/codegen/cpp_utils.py:278:51: error[invalid-argument-type] Argument is incorrect: Expected `Sequence[Expr]`, found `list[Symbol | int]`
-torch/_inductor/codegen/cpp_utils.py:318:73: error[too-many-positional-arguments] Too many positional arguments to bound method `OpsHandler.store_reduction`: expected 4, got 5
+torch/_inductor/codegen/cpp_utils.py:282:29: warning[unsupported-base] Unsupported class base with type `type[WrapperHandler]`
 torch/_inductor/codegen/cpp_utils.py:465:11: error[unresolved-attribute] Module `torch` has no member `float`
 torch/_inductor/codegen/cpp_utils.py:485:19: error[unresolved-attribute] Module `torch` has no member `bool`
 torch/_inductor/codegen/cpp_utils.py:486:27: error[unresolved-attribute] Module `torch` has no member `bool`
@@ -5908,6 +5915,7 @@ torch/_inductor/codegen/cuda_combined_scheduling.py:52:44: error[unresolved-attr
 torch/_inductor/codegen/cuda_combined_scheduling.py:105:9: error[invalid-method-override] Invalid override of method `group_fn`: Definition is incompatible with `BaseScheduling.group_fn`
 torch/_inductor/codegen/cutedsl/_cutedsl_utils.py:3:8: error[unresolved-import] Cannot resolve imported module `cutlass.cute`
 torch/_inductor/codegen/cutedsl/cutedsl_kernel.py:196:37: error[unresolved-attribute] Module `torch` has no member `dtype`
+torch/_inductor/codegen/cutedsl/cutedsl_kernel.py:558:34: warning[unsupported-base] Unsupported class base with type `type[WrapperHandler]`
 torch/_inductor/codegen/cutedsl/cutedsl_kernel.py:591:46: error[unresolved-attribute] Module `torch` has no member `dtype`
 torch/_inductor/codegen/cutedsl/cutedsl_kernel.py:596:16: error[unresolved-attribute] Module `torch` has no member `float32`
 torch/_inductor/codegen/cutedsl/cutedsl_kernel.py:596:71: error[unresolved-attribute] Module `torch` has no member `int32`
@@ -5925,8 +5933,6 @@ torch/_inductor/codegen/cutedsl/cutedsl_kernel.py:729:25: error[unresolved-attri
 torch/_inductor/codegen/cutedsl/cutedsl_kernel.py:778:20: error[unresolved-attribute] Module `torch` has no member `dtype`
 torch/_inductor/codegen/cutedsl/cutedsl_kernel.py:786:52: error[unresolved-attribute] Module `torch` has no member `int32`
 torch/_inductor/codegen/cutedsl/cutedsl_kernel.py:866:22: error[unresolved-attribute] Module `torch` has no member `dtype`
-torch/_inductor/codegen/cutedsl/cutedsl_kernel.py:964:9: error[invalid-method-override] Invalid override of method `indirect_indexing`: Definition is incompatible with `OpsHandler.indirect_indexing`
-torch/_inductor/codegen/cutedsl/cutedsl_kernel.py:997:9: error[invalid-method-override] Invalid override of method `store`: Definition is incompatible with `OpsHandler.store`
 torch/_inductor/codegen/cutedsl/cutedsl_op_overrides.py:25:16: error[unresolved-attribute] Module `torch` has no member `dtype`
 torch/_inductor/codegen/cutedsl/cutedsl_op_overrides.py:39:32: error[unresolved-attribute] Module `torch` has no member `dtype`
 torch/_inductor/codegen/cutedsl/cutedsl_op_overrides.py:39:48: error[unresolved-attribute] Module `torch` has no member `dtype`
@@ -6163,8 +6169,6 @@ torch/_inductor/codegen/cutlass/lib_extensions/gemm_operation_extensions.py:418:
 torch/_inductor/codegen/cutlass/python_evt.py:60:20: error[unresolved-attribute] Module `torch` has no member `dtype`
 torch/_inductor/codegen/cutlass/python_evt.py:298:18: error[unresolved-attribute] Attribute `get_layout` is not defined on `Expr` in union `Buffer | TensorBox | TorchBindObject | Expr`
 torch/_inductor/codegen/cutlass/scheduling.py:81:17: error[invalid-argument-type] Argument to bound method `CUTLASSScheduling._can_fuse_epilogue_impl` is incorrect: Expected `CUTLASSTemplateBuffer`, found `TemplateBuffer | None`
-torch/_inductor/codegen/cutlass/scheduling.py:142:43: error[invalid-assignment] Object of type `list[Buffer | Operation | None]` is not assignable to `list[Buffer]`
-torch/_inductor/codegen/cutlass/scheduling.py:146:26: error[call-non-callable] Object of type `None` is not callable
 torch/_inductor/codegen/cutlass/scheduling.py:193:16: warning[redundant-cast] Value is already of type `list[BaseSchedulerNode]`
 torch/_inductor/codegen/cutlass/serialization.py:32:36: error[unresolved-reference] Name `GemmOperation` used when not defined
 torch/_inductor/codegen/cutlass/serialization.py:47:45: error[unresolved-reference] Name `GemmOperation` used when not defined
@@ -6719,7 +6723,6 @@ torch/_inductor/codegen/rocm/ck_universal_gemm_template.py:918:18: error[unresol
 torch/_inductor/codegen/rocm/ck_universal_gemm_template.py:921:18: error[unresolved-import] Cannot resolve imported module `ck4inductor.universal_gemm.gen_instances`
 torch/_inductor/codegen/rocm/rocm_benchmark_request.py:77:30: error[unresolved-attribute] Module `torch` has no member `zeros`
 torch/_inductor/codegen/rocm/rocm_benchmark_request.py:79:23: error[unresolved-attribute] Module `torch` has no member `float64`
-torch/_inductor/codegen/rocm/rocm_cpp_scheduling.py:88:26: error[call-non-callable] Object of type `None` is not callable
 torch/_inductor/codegen/rocm/rocm_kernel.py:187:17: error[invalid-argument-type] Argument is incorrect: Expected `Expr`, found `int`
 torch/_inductor/codegen/rocm/rocm_kernel.py:274:20: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 torch/_inductor/codegen/rocm/rocm_kernel.py:274:20: error[unresolved-attribute] Attribute `dict_items` is not defined on `int`, `float`, `str`, `list[int | str | float]`, `list[int | float | str | list[int | str | float]]` in union `int | float | str | ... omitted 3 union elements`
@@ -6734,7 +6737,8 @@ torch/_inductor/codegen/rocm/rocm_utils.py:16:5: error[unresolved-attribute] Mod
 torch/_inductor/codegen/simd.py:144:5: error[invalid-argument-type] Argument to class `property` is incorrect: Expected `((Any, /) -> Any) | None`, found `CachedMethod[(), bool]`
 torch/_inductor/codegen/simd.py:152:5: error[invalid-argument-type] Argument to class `property` is incorrect: Expected `((Any, /) -> Any) | None`, found `CachedMethod[(), SymT]`
 torch/_inductor/codegen/simd.py:369:9: error[unresolved-attribute] Unresolved attribute `cache_clear` on type `() -> str`
-torch/_inductor/codegen/simd.py:373:9: error[unresolved-attribute] Object of type `() -> str` has no attribute `cache_clear`
+torch/_inductor/codegen/simd.py:373:9: error[unresolved-attribute] Attribute `cache_clear` is not defined on `() -> str` in union `_lru_cache_wrapper[str] | (() -> str)`
+torch/_inductor/codegen/simd.py:391:45: error[invalid-argument-type] Argument to bound method `list.append` is incorrect: Expected `Expr`, found `Basic & ~Integer & ~Symbol`
 torch/_inductor/codegen/simd.py:572:66: error[invalid-argument-type] Argument is incorrect: Expected `dict[Expr, Expr]`, found `dict[Symbol, Expr]`
 torch/_inductor/codegen/simd.py:630:35: error[unresolved-attribute] Module `torch` has no member `dtype`
 torch/_inductor/codegen/simd.py:633:49: error[unresolved-attribute] Module `torch` has no member `dtype`
@@ -7108,6 +7112,7 @@ torch/_inductor/codegen/wrapper_fxir.py:973:18: error[unresolved-import] Cannot 
 torch/_inductor/codegen/wrapper_fxir.py:1000:24: error[unresolved-attribute] Module `torch` has no member `empty_strided`
 torch/_inductor/codegen/wrapper_fxir.py:1059:56: error[unresolved-attribute] Object of type `object` has no attribute `kwargs`
 torch/_inductor/codegen/wrapper_fxir.py:1068:31: error[unresolved-attribute] Object of type `object` has no attribute `kwargs`
+torch/_inductor/codegen/wrapper_fxir.py:1093:56: error[invalid-argument-type] Argument to bound method `FxConverter._generate_sym_nodes` is incorrect: Expected `Sequence[Expr]`, found `list[Expr | int]`
 torch/_inductor/codegen/wrapper_fxir.py:1142:23: error[call-non-callable] Object of type `object` is not callable
 torch/_inductor/codegen/wrapper_fxir.py:1165:13: error[invalid-argument-type] Argument to bound method `Graph.call_function` is incorrect: Expected `(...) -> Any`, found `OpOverload[(...), Any] | HigherOrderOperator | None`
 torch/_inductor/codegen/xpu/xpu_combined_scheduling.py:47:44: error[unresolved-attribute] Module `torch` has no member `device`
@@ -7194,6 +7199,7 @@ torch/_inductor/compile_fx.py:2651:17: warning[possibly-missing-submodule] Submo
 torch/_inductor/compile_fx.py:2897:9: warning[possibly-missing-submodule] Submodule `traceback` might not have been imported
 torch/_inductor/compile_fx.py:2900:9: warning[possibly-missing-submodule] Submodule `debug` might not have been imported
 torch/_inductor/compile_fx.py:2939:36: error[unresolved-attribute] Module `torch` has no member `is_grad_enabled`
+torch/_inductor/compile_fx.py:2969:23: error[invalid-assignment] Object of type `SerializableAOTDispatchCompiler` is not assignable to `(gm: GraphModule, example_inputs: Sequence[Tensor | int | SymInt | None]) -> OutputCode`
 torch/_inductor/compile_fx.py:2975:13: warning[possibly-missing-submodule] Submodule `_guards` might not have been imported
 torch/_inductor/compile_fx.py:2976:16: warning[possibly-missing-submodule] Submodule `_guards` might not have been imported
 torch/_inductor/compile_fx.py:3018:49: error[unresolved-attribute] Module `torch` has no member `ScriptObject`
@@ -7358,9 +7364,9 @@ torch/_inductor/debug.py:688:25: error[invalid-argument-type] Argument to `Layou
 torch/_inductor/debug.py:689:25: error[invalid-argument-type] Argument to `Layout.__init__` is incorrect: Expected `Expr`, found `int`
 torch/_inductor/debug.py:726:20: error[invalid-return-type] Return type does not match returned value: expected `dict[str, str]`, found `dict[str, object]`
 torch/_inductor/debug.py:891:13: error[unresolved-attribute] Module `torch` has no member `device`
-torch/_inductor/debug.py:1190:24: error[unresolved-attribute] Object of type `object` has no attribute `node`
-torch/_inductor/debug.py:1197:49: error[unresolved-attribute] Object of type `object` has no attribute `node`
-torch/_inductor/debug.py:1201:43: error[unresolved-attribute] Object of type `object` has no attribute `node`
+torch/_inductor/debug.py:1190:24: error[unresolved-attribute] Object of type `~<class 'EnableReduction'> & ~<class 'DisableReduction'>` has no attribute `node`
+torch/_inductor/debug.py:1197:49: error[unresolved-attribute] Object of type `~<class 'EnableReduction'> & ~<class 'DisableReduction'>` has no attribute `node`
+torch/_inductor/debug.py:1201:43: error[unresolved-attribute] Object of type `~<class 'EnableReduction'> & ~<class 'DisableReduction'>` has no attribute `node`
 torch/_inductor/debug.py:1372:20: warning[possibly-missing-submodule] Submodule `testing` might not have been imported
 torch/_inductor/decomposition.py:166:15: error[unresolved-attribute] Module `torch` has no member `contiguous_format`
 torch/_inductor/decomposition.py:170:16: error[unresolved-attribute] Module `torch` has no member `add`
@@ -7471,20 +7477,15 @@ torch/_inductor/dependencies.py:231:69: error[invalid-argument-type] Argument is
 torch/_inductor/dependencies.py:246:16: error[invalid-return-type] Return type does not match returned value: expected `Expr`, found `int | Expr | Unknown`
 torch/_inductor/dependencies.py:316:32: error[unresolved-attribute] Object of type `Basic` has no attribute `name`
 torch/_inductor/dependencies.py:332:16: error[invalid-return-type] Return type does not match returned value: expected `Expr`, found `int | Expr`
+torch/_inductor/dependencies.py:509:29: warning[unsupported-base] Unsupported class base with type `type[MockHandler]`
 torch/_inductor/dependencies.py:560:16: error[invalid-return-type] Return type does not match returned value: expected `tuple[Expr, tuple[Symbol, ...], tuple[Expr, ...]]`, found `tuple[Expr, tuple[Expr, ...], tuple[Unknown, ...]]`
-torch/_inductor/dependencies.py:572:20: error[invalid-return-type] Return type does not match returned value: expected `tuple[Expr, tuple[Symbol, ...], tuple[Expr, ...]]`, found `tuple[Expr, tuple[Expr, ...], tuple[Unknown, ...]]`
-torch/_inductor/dependencies.py:584:9: error[invalid-method-override] Invalid override of method `load_seed`: Definition is incompatible with `OpsHandler.load_seed`
-torch/_inductor/dependencies.py:596:9: error[invalid-method-override] Invalid override of method `index_expr`: Definition is incompatible with `OpsHandler.index_expr`
 torch/_inductor/dependencies.py:596:52: error[unresolved-attribute] Module `torch` has no member `dtype`
-torch/_inductor/dependencies.py:599:9: error[invalid-method-override] Invalid override of method `value_expr`: Definition is incompatible with `OpsHandler.value_expr`
 torch/_inductor/dependencies.py:599:52: error[unresolved-attribute] Module `torch` has no member `dtype`
 torch/_inductor/dependencies.py:607:25: error[unresolved-attribute] Module `torch` has no member `dtype`
+torch/_inductor/dependencies.py:618:23: warning[unsupported-base] Unsupported class base with type `type[KernelFormatterHandler]`
 torch/_inductor/dependencies.py:656:29: error[invalid-argument-type] Argument is incorrect: Expected `Sequence[Expr]`, found `list[_S@map]`
 torch/_inductor/dependencies.py:656:38: error[invalid-argument-type] Argument to constructor `map.__new__` is incorrect: Expected `(Expr | int, /) -> Symbol`, found `(Expr, /) -> Symbol`
 torch/_inductor/dependencies.py:674:13: error[invalid-argument-type] Argument to function `extract_loop_body_with_args` is incorrect: Expected `list[list[Expr]]`, found `list[Sequence[Expr]]`
-torch/_inductor/dependencies.py:692:20: error[unresolved-attribute] Object of type `OpsHandler[Any]` has no attribute `_reads`
-torch/_inductor/dependencies.py:694:20: error[unresolved-attribute] Object of type `OpsHandler[Any]` has no attribute `_writes`
-torch/_inductor/dependencies.py:696:9: error[unresolved-attribute] Object of type `OpsHandler[Any]` has no attribute `_index_exprs`
 torch/_inductor/dependencies.py:725:13: error[invalid-argument-type] Argument to bound method `_RecordLoadStoreInner.store` is incorrect: Expected `str`, found `None`
 torch/_inductor/dependencies.py:732:13: error[invalid-argument-type] Argument to bound method `_RecordLoadStoreInner.store_reduction` is incorrect: Expected `str`, found `None`
 torch/_inductor/dependencies.py:741:13: error[invalid-argument-type] Argument to bound method `_RecordLoadStoreInner.bucketize` is incorrect: Expected `tuple[str, Expr, Expr, Expr]`, found `tuple[Any, None, None, None]`
@@ -7632,6 +7633,7 @@ torch/_inductor/fx_passes/auto_chunker/propagator.py:152:20: error[unresolved-at
 torch/_inductor/fx_passes/auto_chunker/propagator.py:165:14: error[unresolved-attribute] Attribute `numel` is not defined on `None` in union `Tensor | None`
 torch/_inductor/fx_passes/auto_chunker/propagator.py:241:20: error[unsupported-operator] Operator `in` is not supported between objects of type `Literal["tangent"]` and `((...) -> Any) | str`
 torch/_inductor/fx_passes/auto_chunker/propagator.py:518:54: error[unknown-argument] Argument `ignore_broadcast` does not match any known parameter
+torch/_inductor/fx_passes/auto_chunker/propagator.py:591:42: error[invalid-assignment] Object of type `dict[object, int]` is not assignable to `dict[int, int]`
 torch/_inductor/fx_passes/auto_chunker/propagator.py:647:18: error[unresolved-attribute] Attribute `ndim` is not defined on `None` in union `Tensor | None`
 torch/_inductor/fx_passes/auto_chunker/propagator.py:716:24: error[unresolved-attribute] Attribute `shape` is not defined on `None` in union `Tensor | None`
 torch/_inductor/fx_passes/auto_chunker/propagator.py:717:25: error[unresolved-attribute] Attribute `shape` is not defined on `None` in union `Tensor | None`
@@ -8090,7 +8092,6 @@ torch/_inductor/fx_passes/mkldnn_fusion.py:1285:13: error[unresolved-attribute] 
 torch/_inductor/fx_passes/mkldnn_fusion.py:1287:38: error[unresolved-attribute] Module `torch.backends.mkldnn` has no member `matmul`
 torch/_inductor/fx_passes/mkldnn_fusion.py:1292:71: error[unresolved-attribute] Module `torch` has no member `float32`
 torch/_inductor/fx_passes/mkldnn_fusion.py:1300:21: error[unresolved-attribute] Module `torch._C` has no member `has_mkl`
-torch/_inductor/fx_passes/mkldnn_fusion.py:1314:20: warning[possibly-unresolved-reference] Name `meta_value` used when possibly not defined
 torch/_inductor/fx_passes/mkldnn_fusion.py:1322:39: error[unresolved-attribute] Module `torch` has no member `bfloat16`
 torch/_inductor/fx_passes/mkldnn_fusion.py:1323:43: error[unresolved-attribute] Module `torch` has no member `bfloat16`
 torch/_inductor/fx_passes/mkldnn_fusion.py:1328:39: error[unresolved-attribute] Module `torch` has no member `float16`
@@ -8377,6 +8378,35 @@ torch/_inductor/fx_passes/reinplace.py:623:14: error[invalid-argument-type] Meth
 torch/_inductor/fx_passes/reinplace.py:623:14: error[invalid-argument-type] Method `__getitem__` of type `bound method defaultdict[Node, list[ViewOp]].__getitem__(key: Node, /) -> list[ViewOp]` cannot be called with key of type `slice[Any, Any, Any]` on object of type `defaultdict[Node, list[ViewOp]]`
 torch/_inductor/fx_passes/reinplace.py:623:14: error[invalid-argument-type] Method `__getitem__` of type `bound method defaultdict[Node, list[ViewOp]].__getitem__(key: Node, /) -> list[ViewOp]` cannot be called with key of type `str` on object of type `defaultdict[Node, list[ViewOp]]`
 torch/_inductor/fx_passes/reinplace.py:625:17: error[invalid-argument-type] Argument is incorrect: Expected `OpOverload[(...), Any]`, found `((...) -> Any) | str`
+torch/_inductor/fx_passes/reinplace.py:657:45: error[invalid-argument-type] Method `__getitem__` of type `bound method defaultdict[Node, list[ViewOp]].__getitem__(key: Node, /) -> list[ViewOp]` cannot be called with key of type `Mapping[str, Divergent]` on object of type `defaultdict[Node, list[ViewOp]]`
+torch/_inductor/fx_passes/reinplace.py:657:45: error[invalid-argument-type] Method `__getitem__` of type `bound method defaultdict[Node, list[ViewOp]].__getitem__(key: Node, /) -> list[ViewOp]` cannot be called with key of type `None` on object of type `defaultdict[Node, list[ViewOp]]`
+torch/_inductor/fx_passes/reinplace.py:657:45: error[invalid-argument-type] Method `__getitem__` of type `bound method defaultdict[Node, list[ViewOp]].__getitem__(key: Node, /) -> list[ViewOp]` cannot be called with key of type `OpOverload[(...), Any]` on object of type `defaultdict[Node, list[ViewOp]]`
+torch/_inductor/fx_passes/reinplace.py:657:45: error[invalid-argument-type] Method `__getitem__` of type `bound method defaultdict[Node, list[ViewOp]].__getitem__(key: Node, /) -> list[ViewOp]` cannot be called with key of type `Sequence[Divergent]` on object of type `defaultdict[Node, list[ViewOp]]`
+torch/_inductor/fx_passes/reinplace.py:657:45: error[invalid-argument-type] Method `__getitem__` of type `bound method defaultdict[Node, list[ViewOp]].__getitem__(key: Node, /) -> list[ViewOp]` cannot be called with key of type `SymBool` on object of type `defaultdict[Node, list[ViewOp]]`
+torch/_inductor/fx_passes/reinplace.py:657:45: error[invalid-argument-type] Method `__getitem__` of type `bound method defaultdict[Node, list[ViewOp]].__getitem__(key: Node, /) -> list[ViewOp]` cannot be called with key of type `SymFloat` on object of type `defaultdict[Node, list[ViewOp]]`
+torch/_inductor/fx_passes/reinplace.py:657:45: error[invalid-argument-type] Method `__getitem__` of type `bound method defaultdict[Node, list[ViewOp]].__getitem__(key: Node, /) -> list[ViewOp]` cannot be called with key of type `SymInt` on object of type `defaultdict[Node, list[ViewOp]]`
+torch/_inductor/fx_passes/reinplace.py:657:45: error[invalid-argument-type] Method `__getitem__` of type `bound method defaultdict[Node, list[ViewOp]].__getitem__(key: Node, /) -> list[ViewOp]` cannot be called with key of type `complex` on object of type `defaultdict[Node, list[ViewOp]]`
+torch/_inductor/fx_passes/reinplace.py:657:45: error[invalid-argument-type] Method `__getitem__` of type `bound method defaultdict[Node, list[ViewOp]].__getitem__(key: Node, /) -> list[ViewOp]` cannot be called with key of type `float` on object of type `defaultdict[Node, list[ViewOp]]`
+torch/_inductor/fx_passes/reinplace.py:657:45: error[invalid-argument-type] Method `__getitem__` of type `bound method defaultdict[Node, list[ViewOp]].__getitem__(key: Node, /) -> list[ViewOp]` cannot be called with key of type `int` on object of type `defaultdict[Node, list[ViewOp]]`
+torch/_inductor/fx_passes/reinplace.py:657:45: error[invalid-argument-type] Method `__getitem__` of type `bound method defaultdict[Node, list[ViewOp]].__getitem__(key: Node, /) -> list[ViewOp]` cannot be called with key of type `slice[Any, Any, Any]` on object of type `defaultdict[Node, list[ViewOp]]`
+torch/_inductor/fx_passes/reinplace.py:657:45: error[invalid-argument-type] Method `__getitem__` of type `bound method defaultdict[Node, list[ViewOp]].__getitem__(key: Node, /) -> list[ViewOp]` cannot be called with key of type `str` on object of type `defaultdict[Node, list[ViewOp]]`
+torch/_inductor/fx_passes/reinplace.py:658:18: error[invalid-argument-type] Method `__getitem__` of type `bound method defaultdict[Node, list[ViewOp]].__getitem__(key: Node, /) -> list[ViewOp]` cannot be called with key of type `Mapping[str, Divergent]` on object of type `defaultdict[Node, list[ViewOp]]`
+torch/_inductor/fx_passes/reinplace.py:658:18: error[invalid-argument-type] Method `__getitem__` of type `bound method defaultdict[Node, list[ViewOp]].__getitem__(key: Node, /) -> list[ViewOp]` cannot be called with key of type `None` on object of type `defaultdict[Node, list[ViewOp]]`
+torch/_inductor/fx_passes/reinplace.py:658:18: error[invalid-argument-type] Method `__getitem__` of type `bound method defaultdict[Node, list[ViewOp]].__getitem__(key: Node, /) -> list[ViewOp]` cannot be called with key of type `OpOverload[(...), Any]` on object of type `defaultdict[Node, list[ViewOp]]`
+torch/_inductor/fx_passes/reinplace.py:658:18: error[invalid-argument-type] Method `__getitem__` of type `bound method defaultdict[Node, list[ViewOp]].__getitem__(key: Node, /) -> list[ViewOp]` cannot be called with key of type `Sequence[Divergent]` on object of type `defaultdict[Node, list[ViewOp]]`
+torch/_inductor/fx_passes/reinplace.py:658:18: error[invalid-argument-type] Method `__getitem__` of type `bound method defaultdict[Node, list[ViewOp]].__getitem__(key: Node, /) -> list[ViewOp]` cannot be called with key of type `SymBool` on object of type `defaultdict[Node, list[ViewOp]]`
+torch/_inductor/fx_passes/reinplace.py:658:18: error[invalid-argument-type] Method `__getitem__` of type `bound method defaultdict[Node, list[ViewOp]].__getitem__(key: Node, /) -> list[ViewOp]` cannot be called with key of type `SymFloat` on object of type `defaultdict[Node, list[ViewOp]]`
+torch/_inductor/fx_passes/reinplace.py:658:18: error[invalid-argument-type] Method `__getitem__` of type `bound method defaultdict[Node, list[ViewOp]].__getitem__(key: Node, /) -> list[ViewOp]` cannot be called with key of type `SymInt` on object of type `defaultdict[Node, list[ViewOp]]`
+torch/_inductor/fx_passes/reinplace.py:658:18: error[invalid-argument-type] Method `__getitem__` of type `bound method defaultdict[Node, list[ViewOp]].__getitem__(key: Node, /) -> list[ViewOp]` cannot be called with key of type `complex` on object of type `defaultdict[Node, list[ViewOp]]`
+torch/_inductor/fx_passes/reinplace.py:658:18: error[invalid-argument-type] Method `__getitem__` of type `bound method defaultdict[Node, list[ViewOp]].__getitem__(key: Node, /) -> list[ViewOp]` cannot be called with key of type `float` on object of type `defaultdict[Node, list[ViewOp]]`
+torch/_inductor/fx_passes/reinplace.py:658:18: error[invalid-argument-type] Method `__getitem__` of type `bound method defaultdict[Node, list[ViewOp]].__getitem__(key: Node, /) -> list[ViewOp]` cannot be called with key of type `int` on object of type `defaultdict[Node, list[ViewOp]]`
+torch/_inductor/fx_passes/reinplace.py:658:18: error[invalid-argument-type] Method `__getitem__` of type `bound method defaultdict[Node, list[ViewOp]].__getitem__(key: Node, /) -> list[ViewOp]` cannot be called with key of type `slice[Any, Any, Any]` on object of type `defaultdict[Node, list[ViewOp]]`
+torch/_inductor/fx_passes/reinplace.py:658:18: error[invalid-argument-type] Method `__getitem__` of type `bound method defaultdict[Node, list[ViewOp]].__getitem__(key: Node, /) -> list[ViewOp]` cannot be called with key of type `str` on object of type `defaultdict[Node, list[ViewOp]]`
+torch/_inductor/fx_passes/reinplace.py:675:52: error[unresolved-attribute] Attribute `args` is not defined on `Sequence[Divergent]`, `Mapping[str, Divergent]`, `slice[Any, Any, Any]`, `int`, `float`, `complex`, `OpOverload[(...), Any]`, `SymInt`, `SymBool`, `SymFloat`, `None`, `str` in union `Sequence[Divergent] | Mapping[str, Divergent] | slice[Any, Any, Any] | ... omitted 12 union elements`
+torch/_inductor/fx_passes/reinplace.py:679:37: error[invalid-argument-type] Argument to bound method `Graph.inserting_before` is incorrect: Expected `Node | None`, found `Sequence[Divergent] | Mapping[str, Divergent] | slice[Any, Any, Any] | ... omitted 12 union elements`
+torch/_inductor/fx_passes/reinplace.py:690:16: error[unresolved-attribute] Attribute `users` is not defined on `Sequence[Divergent]`, `Mapping[str, Divergent]`, `slice[Any, Any, Any]`, `int`, `float`, `complex`, `OpOverload[(...), Any]`, `SymInt`, `SymBool`, `SymFloat`, `None`, `str` in union `Sequence[Divergent] | Mapping[str, Divergent] | slice[Any, Any, Any] | ... omitted 12 union elements`
+torch/_inductor/fx_passes/reinplace.py:700:17: error[unresolved-attribute] Attribute `replace_all_uses_with` is not defined on `Sequence[Divergent]`, `Mapping[str, Divergent]`, `slice[Any, Any, Any]`, `int`, `float`, `complex`, `OpOverload[(...), Any]`, `SymInt`, `SymBool`, `SymFloat`, `None`, `str` in union `Sequence[Divergent] | Mapping[str, Divergent] | slice[Any, Any, Any] | ... omitted 12 union elements`
+torch/_inductor/fx_passes/reinplace.py:702:30: error[invalid-argument-type] Argument to bound method `Graph.erase_node` is incorrect: Expected `Node`, found `Sequence[Divergent] | Mapping[str, Divergent] | slice[Any, Any, Any] | ... omitted 12 union elements`
 torch/_inductor/fx_passes/reinplace.py:1141:19: warning[possibly-missing-submodule] Submodule `utils` might not have been imported
 torch/_inductor/fx_passes/reinplace.py:1316:18: error[unresolved-import] Cannot resolve imported module `triton.runtime.autotuner`
 torch/_inductor/fx_passes/reinplace.py:1317:18: error[unresolved-import] Cannot resolve imported module `triton.runtime.jit`
@@ -9639,7 +9669,6 @@ torch/_inductor/kernel/flex/flex_decoding.py:266:15: error[unresolved-attribute]
 torch/_inductor/kernel/flex/flex_decoding.py:272:9: error[unresolved-attribute] Module `torch` has no member `float32`
 torch/_inductor/kernel/flex/flex_flash_attention.py:59:13: error[unresolved-attribute] Module `torch` has no member `device`
 torch/_inductor/kernel/flex/flex_flash_attention.py:138:16: warning[possibly-missing-submodule] Submodule `util` might not have been imported
-torch/_inductor/kernel/flex/flex_flash_attention.py:214:5: error[invalid-assignment] Object of type `def cutedsl_make_indexer(self) -> Unknown` is not assignable to attribute `make_indexer` of type `def make_indexer(self) -> ((Sequence[Expr], /) -> Expr)`
 torch/_inductor/kernel/flex/flex_flash_attention.py:430:15: error[unresolved-attribute] Module `torch` has no member `float32`
 torch/_inductor/kernel/flex/flex_flash_attention.py:722:14: error[unresolved-import] Cannot resolve imported module `flash_attn.cute.block_sparsity`
 torch/_inductor/kernel/flex/flex_mps.py:55:34: error[unresolved-attribute] Module `torch` has no member `float32`
@@ -10720,6 +10749,8 @@ torch/_inductor/scheduler.py:9246:58: error[invalid-argument-type] Argument to b
 torch/_inductor/scheduler.py:9295:73: error[unresolved-attribute] Module `torch` has no member `device`
 torch/_inductor/scheduler.py:9301:54: error[unresolved-attribute] Module `torch` has no member `device`
 torch/_inductor/scheduler.py:9722:44: error[unresolved-attribute] Module `torch` has no member `device`
+torch/_inductor/select_algorithm.py:360:18: error[invalid-type-form] Variable of type `type[WrapperHandler]` is not allowed in a type expression
+torch/_inductor/select_algorithm.py:387:27: warning[unsupported-base] Unsupported class base with type `type[WrapperHandler]`
 torch/_inductor/select_algorithm.py:397:33: error[unresolved-attribute] Module `torch` has no member `dtype`
 torch/_inductor/select_algorithm.py:425:31: error[unresolved-attribute] Module `torch` has no member `float16`
 torch/_inductor/select_algorithm.py:425:46: error[unresolved-attribute] Module `torch` has no member `bfloat16`
@@ -10734,31 +10765,27 @@ torch/_inductor/select_algorithm.py:457:48: error[unresolved-attribute] Module `
 torch/_inductor/select_algorithm.py:469:20: error[unresolved-attribute] Module `torch` has no member `bool`
 torch/_inductor/select_algorithm.py:471:20: error[unresolved-attribute] Module `torch` has no member `float32`
 torch/_inductor/select_algorithm.py:472:16: error[unresolved-attribute] Module `torch` has no member `float32`
-torch/_inductor/select_algorithm.py:474:9: error[invalid-method-override] Invalid override of method `indirect_indexing`: Definition is incompatible with `OpsHandler.indirect_indexing`
-torch/_inductor/select_algorithm.py:479:9: error[invalid-method-override] Invalid override of method `store`: Definition is incompatible with `OpsHandler.store`
-torch/_inductor/select_algorithm.py:757:44: error[call-non-callable] Object of type `WrapperHandler | None` is not callable
+torch/_inductor/select_algorithm.py:663:27: error[invalid-type-form] Variable of type `type[WrapperHandler]` is not allowed in a type expression
+torch/_inductor/select_algorithm.py:757:44: error[call-non-callable] Object of type `None` is not callable
 torch/_inductor/select_algorithm.py:819:50: error[invalid-argument-type] Argument to function `FlexibleLayout.contiguous_strides` is incorrect: Expected `Sequence[int]`, found `list[Expr]`
 torch/_inductor/select_algorithm.py:893:38: error[unresolved-attribute] Attribute `name` is not defined on `WorkspaceArg` in union `WorkspaceArg | TensorArg | SizeArg | TMADescriptorArg | ConstexprArg`
 torch/_inductor/select_algorithm.py:1072:54: error[invalid-argument-type] Argument to bound method `Kernel.rename_indexing` is incorrect: Expected `list[Expr] | tuple[Expr, ...] | Expr`, found `Unknown | int`
 torch/_inductor/select_algorithm.py:1111:33: error[unresolved-attribute] Module `torch` has no member `dtype`
-torch/_inductor/select_algorithm.py:1270:13: error[invalid-assignment] Object of type `<class 'StoreOutputSubstitution'>` is not assignable to attribute `ops_handler` of type `WrapperHandler | None`
+torch/_inductor/select_algorithm.py:1235:43: warning[unsupported-base] Unsupported class base with type `type[WrapperHandler]`
 torch/_inductor/select_algorithm.py:1556:22: error[unresolved-attribute] Module `torch` has no member `float32`
 torch/_inductor/select_algorithm.py:1663:13: error[unresolved-attribute] Attribute `__name__` is not defined on `(...) -> Any` in union `(bound method Self@render.def_kernel(*argnames) -> Unknown) | (bound method Self@render.size(name: str | None, index: int) -> Unknown) | (bound method Self@render.stride(name, index=None) -> Unknown) | ... omitted 7 union elements`
 torch/_inductor/select_algorithm.py:1698:43: error[invalid-argument-type] Argument to bound method `Kernel.rename_indexing` is incorrect: Expected `list[Expr] | tuple[Expr, ...] | Expr`, found `int`
 torch/_inductor/select_algorithm.py:1837:24: error[invalid-return-type] Return type does not match returned value: expected `list[int]`, found `list[Expr]`
-torch/_inductor/select_algorithm.py:2062:45: error[invalid-argument-type] Argument to `PartialRender.__init__` is incorrect: Expected `dict[str, (() -> str) | None]`, found `dict[str, (captured=...) -> Unknown] | dict[str, (captured=...) -> Unknown | str] | dict[Unknown, Unknown]`
+torch/_inductor/select_algorithm.py:2062:45: error[invalid-argument-type] Argument to `PartialRender.__init__` is incorrect: Expected `dict[str, (() -> str) | None]`, found `dict[str, (captured=...) -> Unknown | str] | dict[Unknown, Unknown]`
 torch/_inductor/select_algorithm.py:2191:9: error[invalid-assignment] Invalid subscript assignment with key of type `Literal["<DEF_KERNEL>"]` and value of type `() -> Literal[""]` on object of type `dict[str, (captured=...) -> Unknown | str]`
-torch/_inductor/select_algorithm.py:2191:9: error[invalid-assignment] Invalid subscript assignment with key of type `Literal["<DEF_KERNEL>"]` and value of type `() -> Literal[""]` on object of type `dict[str, (captured=...) -> Unknown]`
 torch/_inductor/select_algorithm.py:2241:13: error[invalid-assignment] Invalid subscript assignment with key of type `str` and value of type `() -> Literal[""]` on object of type `dict[str, (captured=...) -> Unknown | str]`
-torch/_inductor/select_algorithm.py:2241:13: error[invalid-assignment] Invalid subscript assignment with key of type `str` and value of type `() -> Literal[""]` on object of type `dict[str, (captured=...) -> Unknown]`
 torch/_inductor/select_algorithm.py:2256:70: error[invalid-argument-type] Argument to function `sympy_product` is incorrect: Expected `Iterable[Expr]`, found `list[int | Expr] | list[Unknown]`
 torch/_inductor/select_algorithm.py:2260:50: error[invalid-argument-type] Argument to bound method `SizeVarAllocator.simplify` is incorrect: Expected `Expr`, found `int | Expr | Unknown`
 torch/_inductor/select_algorithm.py:2281:28: error[unresolved-attribute] Module `torch` has no member `float32`
 torch/_inductor/select_algorithm.py:2286:9: error[invalid-assignment] Invalid subscript assignment with key of type `str` and value of type `() -> str` on object of type `dict[str, (captured=...) -> Unknown | str]`
-torch/_inductor/select_algorithm.py:2286:9: error[invalid-assignment] Invalid subscript assignment with key of type `str` and value of type `() -> str` on object of type `dict[str, (captured=...) -> Unknown]`
+torch/_inductor/select_algorithm.py:2323:36: warning[unsupported-base] Unsupported class base with type `type[WrapperHandler]`
 torch/_inductor/select_algorithm.py:2331:27: error[invalid-argument-type] Argument to function `sympy_product` is incorrect: Expected `Iterable[Expr]`, found `Sequence[int | Expr]`
 torch/_inductor/select_algorithm.py:2349:9: error[invalid-assignment] Invalid subscript assignment with key of type `str` and value of type `def hook(_name=..., _input=..., _self=...) -> Unknown` on object of type `dict[str, (captured=...) -> Unknown | str]`
-torch/_inductor/select_algorithm.py:2349:9: error[invalid-assignment] Invalid subscript assignment with key of type `str` and value of type `def hook(_name=..., _input=..., _self=...) -> Unknown` on object of type `dict[str, (captured=...) -> Unknown]`
 torch/_inductor/select_algorithm.py:2356:13: error[missing-argument] No argument provided for required parameter `line` of function `PythonWrapperCodegen.writeline`
 torch/_inductor/select_algorithm.py:2356:31: error[invalid-argument-type] Argument to function `PythonWrapperCodegen.writeline` is incorrect: Expected `PythonWrapperCodegen`, found `str`
 torch/_inductor/select_algorithm.py:2358:9: error[missing-argument] No argument provided for required parameter `line` of function `PythonWrapperCodegen.writeline`
@@ -10856,9 +10883,7 @@ torch/_inductor/sizevars.py:1141:56: error[invalid-argument-type] Argument to bo
 torch/_inductor/sizevars.py:1259:43: error[invalid-argument-type] Argument to function `sympy_subs` is incorrect: Expected `dict[Expr, Any]`, found `dict[Basic, Any]`
 torch/_inductor/sizevars.py:1421:46: error[invalid-argument-type] Argument to bound method `SizeVarAllocator.statically_known_geq` is incorrect: Expected `Expr`, found `Basic`
 torch/_inductor/sizevars.py:1423:20: error[invalid-return-type] Return type does not match returned value: expected `tuple[Expr, Symbol] | None`, found `tuple[Expr | Unknown, Basic]`
-torch/_inductor/sizevars.py:1559:9: error[invalid-method-override] Invalid override of method `index_expr`: Definition is incompatible with `OpsHandler.index_expr`
-torch/_inductor/sizevars.py:1562:9: error[invalid-method-override] Invalid override of method `value_expr`: Definition is incompatible with `OpsHandler.value_expr`
-torch/_inductor/sizevars.py:1565:9: error[invalid-method-override] Invalid override of method `check_bounds`: Definition is incompatible with `OpsHandler.check_bounds`
+torch/_inductor/sizevars.py:1537:24: warning[unsupported-base] Unsupported class base with type `type[WrapperHandler]`
 torch/_inductor/standalone_compile.py:216:18: warning[possibly-missing-submodule] Submodule `_functorch` might not have been imported
 torch/_inductor/standalone_compile.py:240:23: warning[possibly-missing-submodule] Submodule `_guards` might not have been imported
 torch/_inductor/standalone_compile.py:241:18: warning[possibly-missing-submodule] Submodule `_guards` might not have been imported
@@ -12094,7 +12119,7 @@ torch/_meta_registrations.py:8933:65: error[unresolved-attribute] Module `torch`
 torch/_meta_registrations.py:8984:12: error[unresolved-attribute] Module `torch` has no member `empty`
 torch/_meta_registrations.py:9005:27: error[unresolved-attribute] Module `torch` has no member `long`
 torch/_meta_registrations.py:9005:39: error[unresolved-attribute] Module `torch` has no member `int32`
-torch/_meta_registrations.py:9154:11: error[invalid-assignment] Object of type `(...) -> Unknown` is not assignable to `_Wrapped[(...), Unknown, (self, *args, **kwargs), Unknown]`
+torch/_meta_registrations.py:9154:11: error[invalid-assignment] Object of type `(self, *args, **kwargs) -> Unknown` is not assignable to `_Wrapped[(...), Unknown, (self, *args, **kwargs), Unknown]`
 torch/_meta_registrations.py:9247:29: error[unresolved-attribute] Module `torch._C` has no member `DispatchKey`
 torch/_meta_registrations.py:9249:12: error[unresolved-attribute] Module `torch._C` has no member `_dispatch_has_kernel_for_dispatch_key`
 torch/_native/common_utils.py:30:21: warning[possibly-missing-submodule] Submodule `util` might not have been imported
@@ -14059,18 +14084,35 @@ torch/_numpy/_funcs_impl.py:1621:13: error[unresolved-attribute] Object of type 
 torch/_numpy/_funcs_impl.py:1622:17: error[unresolved-attribute] Module `torch` has no member `float64`
 torch/_numpy/_funcs_impl.py:1625:12: error[unresolved-attribute] Attribute `shape` is not defined on `ArrayLike@gradient` in union `ArrayLike@gradient | Unknown`
 torch/_numpy/_funcs_impl.py:1631:15: error[unresolved-attribute] Module `torch` has no member `empty_like`
+torch/_numpy/_funcs_impl.py:1634:60: error[unresolved-attribute] Attribute `ndim` is not defined on `int`, `float` in union `int | float | Unknown`
 torch/_numpy/_funcs_impl.py:1643:35: error[not-subscriptable] Cannot subscript object of type `ArrayLike@gradient` with no `__getitem__` method
 torch/_numpy/_funcs_impl.py:1643:54: error[not-subscriptable] Cannot subscript object of type `ArrayLike@gradient` with no `__getitem__` method
+torch/_numpy/_funcs_impl.py:1645:19: error[not-subscriptable] Cannot subscript object of type `float` with no `__getitem__` method
+torch/_numpy/_funcs_impl.py:1645:19: error[not-subscriptable] Cannot subscript object of type `int` with no `__getitem__` method
+torch/_numpy/_funcs_impl.py:1646:19: error[not-subscriptable] Cannot subscript object of type `float` with no `__getitem__` method
+torch/_numpy/_funcs_impl.py:1646:19: error[not-subscriptable] Cannot subscript object of type `int` with no `__getitem__` method
 torch/_numpy/_funcs_impl.py:1658:21: error[not-subscriptable] Cannot subscript object of type `ArrayLike@gradient` with no `__getitem__` method
 torch/_numpy/_funcs_impl.py:1658:44: error[not-subscriptable] Cannot subscript object of type `ArrayLike@gradient` with no `__getitem__` method
 torch/_numpy/_funcs_impl.py:1658:67: error[not-subscriptable] Cannot subscript object of type `ArrayLike@gradient` with no `__getitem__` method
+torch/_numpy/_funcs_impl.py:1666:50: error[not-subscriptable] Cannot subscript object of type `float` with no `__getitem__` method
+torch/_numpy/_funcs_impl.py:1666:50: error[not-subscriptable] Cannot subscript object of type `int` with no `__getitem__` method
 torch/_numpy/_funcs_impl.py:1668:35: error[not-subscriptable] Cannot subscript object of type `ArrayLike@gradient` with no `__getitem__` method
 torch/_numpy/_funcs_impl.py:1668:54: error[not-subscriptable] Cannot subscript object of type `ArrayLike@gradient` with no `__getitem__` method
+torch/_numpy/_funcs_impl.py:1673:50: error[not-subscriptable] Cannot subscript object of type `float` with no `__getitem__` method
+torch/_numpy/_funcs_impl.py:1673:50: error[not-subscriptable] Cannot subscript object of type `int` with no `__getitem__` method
 torch/_numpy/_funcs_impl.py:1675:35: error[not-subscriptable] Cannot subscript object of type `ArrayLike@gradient` with no `__getitem__` method
 torch/_numpy/_funcs_impl.py:1675:54: error[not-subscriptable] Cannot subscript object of type `ArrayLike@gradient` with no `__getitem__` method
+torch/_numpy/_funcs_impl.py:1688:23: error[not-subscriptable] Cannot subscript object of type `float` with no `__getitem__` method
+torch/_numpy/_funcs_impl.py:1688:23: error[not-subscriptable] Cannot subscript object of type `int` with no `__getitem__` method
+torch/_numpy/_funcs_impl.py:1689:23: error[not-subscriptable] Cannot subscript object of type `float` with no `__getitem__` method
+torch/_numpy/_funcs_impl.py:1689:23: error[not-subscriptable] Cannot subscript object of type `int` with no `__getitem__` method
 torch/_numpy/_funcs_impl.py:1695:21: error[not-subscriptable] Cannot subscript object of type `ArrayLike@gradient` with no `__getitem__` method
 torch/_numpy/_funcs_impl.py:1695:44: error[not-subscriptable] Cannot subscript object of type `ArrayLike@gradient` with no `__getitem__` method
 torch/_numpy/_funcs_impl.py:1695:67: error[not-subscriptable] Cannot subscript object of type `ArrayLike@gradient` with no `__getitem__` method
+torch/_numpy/_funcs_impl.py:1707:23: error[not-subscriptable] Cannot subscript object of type `float` with no `__getitem__` method
+torch/_numpy/_funcs_impl.py:1707:23: error[not-subscriptable] Cannot subscript object of type `int` with no `__getitem__` method
+torch/_numpy/_funcs_impl.py:1708:23: error[not-subscriptable] Cannot subscript object of type `float` with no `__getitem__` method
+torch/_numpy/_funcs_impl.py:1708:23: error[not-subscriptable] Cannot subscript object of type `int` with no `__getitem__` method
 torch/_numpy/_funcs_impl.py:1714:21: error[not-subscriptable] Cannot subscript object of type `ArrayLike@gradient` with no `__getitem__` method
 torch/_numpy/_funcs_impl.py:1714:44: error[not-subscriptable] Cannot subscript object of type `ArrayLike@gradient` with no `__getitem__` method
 torch/_numpy/_funcs_impl.py:1714:67: error[not-subscriptable] Cannot subscript object of type `ArrayLike@gradient` with no `__getitem__` method
@@ -14460,7 +14502,6 @@ torch/_numpy/testing/utils.py:687:42: error[unresolved-attribute] Attribute `ndi
 torch/_numpy/testing/utils.py:699:21: error[unresolved-attribute] Module `torch._numpy` has no member `minimum`
 torch/_numpy/testing/utils.py:709:24: error[unsupported-operator] Unary operator `~` is not supported for object of type `bool_`
 torch/_numpy/testing/utils.py:930:44: error[unresolved-import] Module `torch._numpy` has no member `float_`
-torch/_numpy/testing/utils.py:1232:9: warning[possibly-unresolved-reference] Name `d` used when possibly not defined
 torch/_numpy/testing/utils.py:1303:16: error[unresolved-attribute] Module `torch._numpy` has no member `isclose`
 torch/_numpy/testing/utils.py:1908:9: error[invalid-method-override] Invalid override of method `__exit__`: Definition is incompatible with `catch_warnings.__exit__`
 torch/_numpy/testing/utils.py:2121:9: error[invalid-assignment] Object of type `bound method Self@__enter__._showwarning(message, category, filename, lineno, *args, *, use_warnmsg=None, **kwargs) -> Unknown` is not assignable to attribute `showwarning` of type `def showwarning(message: Warning | str, category: type[Warning], filename: str, lineno: int, file: TextIO | None = None, line: str | None = None) -> None`
@@ -14961,7 +15002,7 @@ torch/_refs/__init__.py:396:17: warning[possibly-missing-submodule] Submodule `_
 torch/_refs/__init__.py:569:47: error[unresolved-attribute] Object of type `(...) -> Unknown` has no attribute `__name__`
 torch/_refs/__init__.py:590:22: error[unresolved-attribute] Attribute `f_back` is not defined on `None` in union `FrameType | None`
 torch/_refs/__init__.py:590:22: error[unresolved-attribute] Attribute `f_globals` is not defined on `None` in union `FrameType | None`
-torch/_refs/__init__.py:607:11: error[invalid-assignment] Object of type `(...) -> Unknown` is not assignable to `_Wrapped[(...), Unknown, (a, *args, **kwargs), Unknown]`
+torch/_refs/__init__.py:607:11: error[invalid-assignment] Object of type `(a, *args, **kwargs) -> Unknown` is not assignable to `_Wrapped[(...), Unknown, (a, *args, **kwargs), Unknown]`
 torch/_refs/__init__.py:613:12: error[unresolved-attribute] Attribute `__all__` is not defined on `None` in union `ModuleType | None`
 torch/_refs/__init__.py:758:12: error[unresolved-attribute] Module `torch` has no member `zeros_like`
 torch/_refs/__init__.py:774:12: error[unresolved-attribute] Module `torch` has no member `sub`
@@ -15864,7 +15905,7 @@ torch/_subclasses/complex_tensor/_ops/common.py:190:50: error[unresolved-attribu
 torch/_subclasses/complex_tensor/_ops/common.py:193:34: error[unresolved-attribute] Module `torch` has no member `dtype`
 torch/_subclasses/complex_tensor/_ops/common.py:193:50: error[unresolved-attribute] Module `torch` has no member `dtype`
 torch/_subclasses/complex_tensor/_ops/common.py:253:49: error[unresolved-attribute] Module `torch` has no member `dtype`
-torch/_subclasses/complex_tensor/_ops/common.py:345:20: error[invalid-assignment] Object of type `(...) -> Unknown` is not assignable to `OpOverload[(...), Any]`
+torch/_subclasses/complex_tensor/_ops/common.py:345:20: error[invalid-assignment] Object of type `(...) -> Any` is not assignable to `OpOverload[(...), Any]`
 torch/_subclasses/complex_tensor/_ops/prims.py:18:56: error[unresolved-attribute] Module `torch` has no member `dtype`
 torch/_subclasses/fake_impls.py:55:10: warning[possibly-missing-submodule] Submodule `_pytree` might not have been imported
 torch/_subclasses/fake_impls.py:79:40: error[unresolved-attribute] Module `torch` has no member `device`
@@ -17352,6 +17393,7 @@ torch/_vendor/quack/gemm_sm100.py:338:17: error[not-subscriptable] Cannot subscr
 torch/_vendor/quack/gemm_sm100.py:339:17: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 torch/_vendor/quack/gemm_sm100.py:352:18: error[unresolved-attribute] Attribute `thr_id` is not defined on `None` in union `None | Unknown`
 torch/_vendor/quack/gemm_sm100.py:365:49: error[unresolved-attribute] Attribute `shape` is not defined on `None` in union `Unknown | None`
+torch/_vendor/quack/gemm_sm100.py:408:9: error[invalid-assignment] Not enough values to unpack: Expected 4
 torch/_vendor/quack/gemm_sm100.py:554:55: error[unresolved-attribute] Attribute `leading_dim` is not defined on `None` in union `Unknown | None`
 torch/_vendor/quack/gemm_sm100.py:560:24: error[unresolved-attribute] Attribute `element_type` is not defined on `None` in union `Unknown | None`
 torch/_vendor/quack/gemm_sm100.py:561:24: error[unresolved-attribute] Attribute `element_type` is not defined on `None` in union `Unknown | None`
@@ -17457,6 +17499,7 @@ torch/_vendor/quack/gemm_sm90.py:17:6: error[unresolved-import] Cannot resolve i
 torch/_vendor/quack/gemm_sm90.py:18:8: error[unresolved-import] Cannot resolve imported module `cutlass.utils.hopper_helpers`
 torch/_vendor/quack/gemm_sm90.py:19:6: error[unresolved-import] Cannot resolve imported module `cutlass`
 torch/_vendor/quack/gemm_sm90.py:20:6: error[unresolved-import] Cannot resolve imported module `cutlass.utils`
+torch/_vendor/quack/gemm_sm90.py:329:9: error[invalid-assignment] Not enough values to unpack: Expected 3
 torch/_vendor/quack/gemm_sm90.py:396:55: error[unresolved-attribute] Attribute `leading_dim` is not defined on `None` in union `Unknown | None`
 torch/_vendor/quack/gemm_sm90.py:403:24: error[unresolved-attribute] Attribute `element_type` is not defined on `None` in union `Unknown | None`
 torch/_vendor/quack/gemm_sm90.py:404:24: error[unresolved-attribute] Attribute `element_type` is not defined on `None` in union `Unknown | None`
@@ -20616,6 +20659,8 @@ torch/autograd/profiler_util.py:824:46: error[invalid-assignment] Object of type
 torch/autograd/profiler_util.py:826:47: error[invalid-assignment] Object of type `Unknown | None` is not assignable to `list[Unknown]`: Incompatible value of type `Unknown | None`
 torch/autograd/profiler_util.py:828:40: error[invalid-assignment] Object of type `Unknown | None` is not assignable to `list[str]`: Incompatible value of type `Unknown | None`
 torch/autograd/profiler_util.py:1134:21: error[unresolved-attribute] Module `torch._C` has no member `_demangle`
+torch/autograd/profiler_util.py:1147:13: error[invalid-assignment] Object of type `tuple[Any, ...]` is not assignable to attribute `_start_nses` of type `list[int]`
+torch/autograd/profiler_util.py:1147:31: error[invalid-assignment] Object of type `tuple[Any, ...]` is not assignable to attribute `_indices` of type `list[int]`
 torch/autograd/profiler_util.py:1378:18: error[invalid-assignment] Object of type `None` is not assignable to `def add_column(padding, text_dir=">") -> Unknown`
 torch/autograd/profiler_util.py:1534:50: warning[possibly-unresolved-reference] Name `flops_scale` used when possibly not defined
 torch/autograd/variable.py:3:22: error[unresolved-import] Module `torch._C` has no member `_ImperativeEngine`
@@ -20853,6 +20898,7 @@ torch/cuda/__init__.py:43:26: error[unresolved-import] Module `torch._C` has no 
 torch/cuda/__init__.py:64:20: error[unresolved-import] Cannot resolve imported module `pynvml`
 torch/cuda/__init__.py:102:47: error[invalid-argument-type] Argument to `CDLL.__init__` is incorrect: Expected `str | None`, found `str | Path | None`
 torch/cuda/__init__.py:105:21: error[invalid-assignment] Object of type `bound method Self@__enter__.hooked_CDLL(name: str | Path | None, *args: Any, **kwargs: Any) -> CDLL` is not assignable to attribute `CDLL` of type `<class 'CDLL'>`
+torch/cuda/__init__.py:108:21: error[invalid-assignment] Object of type `type[CDLL]` is not assignable to attribute `CDLL` of type `<class 'CDLL'>`
 torch/cuda/__init__.py:112:28: error[unresolved-import] Cannot resolve imported module `amdsmi`
 torch/cuda/__init__.py:155:19: error[unresolved-attribute] Module `torch._C` has no member `_has_magma`
 torch/cuda/__init__.py:157:27: error[unresolved-attribute] Module `torch._C` has no member `Generator`
@@ -21356,7 +21402,10 @@ torch/distributed/_pycute/layout.py:214:36: error[invalid-argument-type] Argumen
 torch/distributed/_pycute/layout.py:245:13: error[invalid-argument-type] Argument to function `make_layout` is incorrect: Expected `Layout | tuple[Layout, ...]`, found `chain[Layout]`
 torch/distributed/_pycute/layout.py:246:42: error[invalid-argument-type] Argument to function `composition` is incorrect: Expected `Layout | int | tuple[object, ...] | None`, found `object`
 torch/distributed/_pycute/layout.py:251:28: error[invalid-argument-type] Argument to function `make_layout` is incorrect: Expected `Layout | tuple[Layout, ...]`, found `GeneratorType[Layout, None, None]`
-torch/distributed/_pycute/layout.py:282:17: error[unsupported-operator] Unary operator `-` is not supported for object of type `(int & ~Literal[0] & ~Literal[False]) | tuple[Divergent, ...] | Unknown`
+torch/distributed/_pycute/layout.py:272:21: error[unsupported-operator] Operator `%` is not supported between objects of type `int` and `int | tuple[Divergent, ...]`
+torch/distributed/_pycute/layout.py:272:54: error[unsupported-operator] Operator `%` is not supported between objects of type `int | tuple[Divergent, ...]` and `int`
+torch/distributed/_pycute/layout.py:274:36: error[unsupported-operator] Operator `//` is not supported between objects of type `int` and `int | tuple[Divergent, ...]`
+torch/distributed/_pycute/layout.py:282:17: error[unsupported-operator] Unary operator `-` is not supported for object of type `int | tuple[Divergent, ...]`
 torch/distributed/_pycute/layout.py:311:36: error[unresolved-attribute] Attribute `stride` is not defined on `tuple[Divergent, ...]` in union `(Layout & ~int) | tuple[Divergent, ...]`
 torch/distributed/_pycute/layout.py:311:60: error[unresolved-attribute] Attribute `shape` is not defined on `tuple[Divergent, ...]` in union `(Layout & ~int) | tuple[Divergent, ...]`
 torch/distributed/_pycute/layout.py:346:26: error[unresolved-attribute] Attribute `shape` is not defined on `tuple[Divergent, ...]` in union `(Layout & ~int) | tuple[Divergent, ...]`
@@ -22913,7 +22962,6 @@ torch/distributed/fsdp/_fully_shard/_fsdp_param.py:626:13: error[unresolved-attr
 torch/distributed/fsdp/_fully_shard/_fsdp_param.py:626:25: error[unresolved-attribute] Module `torch` has no member `Size`
 torch/distributed/fsdp/_fully_shard/_fsdp_param.py:666:27: error[unresolved-attribute] Module `torch` has no member `as_strided`
 torch/distributed/fsdp/_fully_shard/_fsdp_param.py:734:39: error[unresolved-attribute] Module `torch` has no member `as_strided`
-torch/distributed/fsdp/_fully_shard/_fsdp_param.py:744:34: error[invalid-argument-type] Argument to bound method `FSDPParam._setattr_on_modules` is incorrect: Expected `Parameter`, found `Unknown | None | Parameter`
 torch/distributed/fsdp/_fully_shard/_fsdp_param.py:910:17: error[unresolved-attribute] Module `torch` has no member `empty`
 torch/distributed/fsdp/_fully_shard/_fsdp_param.py:932:44: error[unresolved-attribute] Module `torch` has no member `zeros_like`
 torch/distributed/fsdp/_fully_shard/_fsdp_param_group.py:12:43: warning[possibly-missing-import] Member `_get_device_handle` of module `torch.distributed.device_mesh` may be missing
@@ -23903,6 +23951,8 @@ torch/distributed/tensor/debug/__init__.py:29:12: error[unresolved-attribute] Mo
 torch/distributed/tensor/debug/__init__.py:47:5: error[unresolved-attribute] Module `torch._C` has no member `_clear_DTensor_sharding_propagator_cache`
 torch/distributed/tensor/debug/__init__.py:65:5: error[unresolved-attribute] Module `torch._C` has no member `_reinit_DTensor_dispatch_logger`
 torch/distributed/tensor/debug/_comm_mode.py:600:9: error[invalid-method-override] Invalid override of method `__exit__`: Definition is incompatible with `TorchDispatchMode.__exit__`
+torch/distributed/tensor/debug/_op_coverage.py:94:20: error[invalid-argument-type] Argument to function `tabulate` is incorrect: Expected `Mapping[str, Iterable[Any]] | Iterable[Iterable[Any]]`, found `list[list[(Unknown & Top[OpOverload[(...), Any]]) | str | int] | SupportsGetItem[Any, Any]]`
+torch/distributed/tensor/debug/_op_coverage.py:105:37: error[invalid-argument-type] Argument to bound method `Writer.writerow` is incorrect: Expected `Iterable[Any]`, found `list[(Unknown & Top[OpOverload[(...), Any]]) | str | int] | SupportsGetItem[Any, Any]`
 torch/distributed/tensor/debug/_visualize_sharding.py:74:12: error[unresolved-import] Cannot resolve imported module `matplotlib`
 torch/distributed/tensor/device_mesh.py:2:5: warning[possibly-missing-import] Member `_get_device_handle` of module `torch.distributed.device_mesh` may be missing
 torch/distributed/tensor/device_mesh.py:3:5: warning[possibly-missing-import] Member `_mesh_resources` of module `torch.distributed.device_mesh` may be missing
@@ -25152,6 +25202,17 @@ torch/fx/experimental/migrate_gradual_types/constraint_generator.py:124:9: error
 torch/fx/experimental/migrate_gradual_types/constraint_generator.py:165:26: error[unresolved-attribute] Module `torch` has no member `bmm`
 torch/fx/experimental/migrate_gradual_types/constraint_generator.py:272:25: error[invalid-argument-type] Argument to `IndexSelect.__init__` is incorrect: Expected `TVar`, found `TVar | DVar | BVar`
 torch/fx/experimental/migrate_gradual_types/constraint_generator.py:291:25: error[invalid-argument-type] Argument to `IndexSelect.__init__` is incorrect: Expected `TVar`, found `TVar | DVar | BVar`
+torch/fx/experimental/migrate_gradual_types/constraint_generator.py:342:22: error[invalid-argument-type] Method `__getitem__` of type `bound method dict[Node, TVar | DVar | BVar].__getitem__(key: Node, /) -> TVar | DVar | BVar` cannot be called with key of type `Mapping[str, Divergent]` on object of type `dict[Node, TVar | DVar | BVar]`
+torch/fx/experimental/migrate_gradual_types/constraint_generator.py:342:22: error[invalid-argument-type] Method `__getitem__` of type `bound method dict[Node, TVar | DVar | BVar].__getitem__(key: Node, /) -> TVar | DVar | BVar` cannot be called with key of type `None` on object of type `dict[Node, TVar | DVar | BVar]`
+torch/fx/experimental/migrate_gradual_types/constraint_generator.py:342:22: error[invalid-argument-type] Method `__getitem__` of type `bound method dict[Node, TVar | DVar | BVar].__getitem__(key: Node, /) -> TVar | DVar | BVar` cannot be called with key of type `OpOverload[(...), Any]` on object of type `dict[Node, TVar | DVar | BVar]`
+torch/fx/experimental/migrate_gradual_types/constraint_generator.py:342:22: error[invalid-argument-type] Method `__getitem__` of type `bound method dict[Node, TVar | DVar | BVar].__getitem__(key: Node, /) -> TVar | DVar | BVar` cannot be called with key of type `Sequence[Divergent]` on object of type `dict[Node, TVar | DVar | BVar]`
+torch/fx/experimental/migrate_gradual_types/constraint_generator.py:342:22: error[invalid-argument-type] Method `__getitem__` of type `bound method dict[Node, TVar | DVar | BVar].__getitem__(key: Node, /) -> TVar | DVar | BVar` cannot be called with key of type `SymBool` on object of type `dict[Node, TVar | DVar | BVar]`
+torch/fx/experimental/migrate_gradual_types/constraint_generator.py:342:22: error[invalid-argument-type] Method `__getitem__` of type `bound method dict[Node, TVar | DVar | BVar].__getitem__(key: Node, /) -> TVar | DVar | BVar` cannot be called with key of type `SymFloat` on object of type `dict[Node, TVar | DVar | BVar]`
+torch/fx/experimental/migrate_gradual_types/constraint_generator.py:342:22: error[invalid-argument-type] Method `__getitem__` of type `bound method dict[Node, TVar | DVar | BVar].__getitem__(key: Node, /) -> TVar | DVar | BVar` cannot be called with key of type `SymInt` on object of type `dict[Node, TVar | DVar | BVar]`
+torch/fx/experimental/migrate_gradual_types/constraint_generator.py:342:22: error[invalid-argument-type] Method `__getitem__` of type `bound method dict[Node, TVar | DVar | BVar].__getitem__(key: Node, /) -> TVar | DVar | BVar` cannot be called with key of type `complex` on object of type `dict[Node, TVar | DVar | BVar]`
+torch/fx/experimental/migrate_gradual_types/constraint_generator.py:342:22: error[invalid-argument-type] Method `__getitem__` of type `bound method dict[Node, TVar | DVar | BVar].__getitem__(key: Node, /) -> TVar | DVar | BVar` cannot be called with key of type `float` on object of type `dict[Node, TVar | DVar | BVar]`
+torch/fx/experimental/migrate_gradual_types/constraint_generator.py:342:22: error[invalid-argument-type] Method `__getitem__` of type `bound method dict[Node, TVar | DVar | BVar].__getitem__(key: Node, /) -> TVar | DVar | BVar` cannot be called with key of type `slice[Any, Any, Any]` on object of type `dict[Node, TVar | DVar | BVar]`
+torch/fx/experimental/migrate_gradual_types/constraint_generator.py:342:22: error[invalid-argument-type] Method `__getitem__` of type `bound method dict[Node, TVar | DVar | BVar].__getitem__(key: Node, /) -> TVar | DVar | BVar` cannot be called with key of type `str` on object of type `dict[Node, TVar | DVar | BVar]`
 torch/fx/experimental/migrate_gradual_types/constraint_generator.py:350:9: error[invalid-argument-type] Argument to function `gen_broadcasting_constraints` is incorrect: Expected `TVar`, found `TVar | DVar | BVar`
 torch/fx/experimental/migrate_gradual_types/constraint_generator.py:379:26: error[unresolved-attribute] Module `torch` has no member `ones`
 torch/fx/experimental/migrate_gradual_types/constraint_generator.py:380:26: error[unresolved-attribute] Module `torch` has no member `zeros`
@@ -25217,6 +25278,7 @@ torch/fx/experimental/migrate_gradual_types/constraint_generator.py:552:23: erro
 torch/fx/experimental/migrate_gradual_types/constraint_generator.py:552:23: error[invalid-argument-type] Method `__getitem__` of type `bound method dict[Node, TVar | DVar | BVar].__getitem__(key: Node, /) -> TVar | DVar | BVar` cannot be called with key of type `slice[Any, Any, Any]` on object of type `dict[Node, TVar | DVar | BVar]`
 torch/fx/experimental/migrate_gradual_types/constraint_generator.py:552:23: error[invalid-argument-type] Method `__getitem__` of type `bound method dict[Node, TVar | DVar | BVar].__getitem__(key: Node, /) -> TVar | DVar | BVar` cannot be called with key of type `str` on object of type `dict[Node, TVar | DVar | BVar]`
 torch/fx/experimental/migrate_gradual_types/constraint_generator.py:579:26: error[unresolved-attribute] Module `torch` has no member `tensor`
+torch/fx/experimental/migrate_gradual_types/constraint_generator.py:622:51: error[invalid-argument-type] Argument to `BinConstraintD.__init__` is incorrect: Expected `TVar | TensorType | DVar | ... omitted 9 union elements`, found `TVar | DVar | BVar | ... omitted 14 union elements`
 torch/fx/experimental/migrate_gradual_types/constraint_generator.py:628:21: error[invalid-argument-type] Argument to `CanReshape.__init__` is incorrect: Expected `TVar`, found `TVar | DVar | BVar`
 torch/fx/experimental/migrate_gradual_types/constraint_generator.py:649:17: error[invalid-argument-type] Method `__getitem__` of type `bound method dict[Node, TVar | DVar | BVar].__getitem__(key: Node, /) -> TVar | DVar | BVar` cannot be called with key of type `Mapping[str, Divergent]` on object of type `dict[Node, TVar | DVar | BVar]`
 torch/fx/experimental/migrate_gradual_types/constraint_generator.py:649:17: error[invalid-argument-type] Method `__getitem__` of type `bound method dict[Node, TVar | DVar | BVar].__getitem__(key: Node, /) -> TVar | DVar | BVar` cannot be called with key of type `None` on object of type `dict[Node, TVar | DVar | BVar]`
@@ -25501,8 +25563,8 @@ torch/fx/experimental/proxy_tensor.py:3174:45: error[unresolved-attribute] Modul
 torch/fx/experimental/recording.py:187:56: error[unresolved-attribute] Object of type `(...) -> Any` has no attribute `__name__`
 torch/fx/experimental/recording.py:268:20: error[unresolved-attribute] Object of type `(**_P@decorator) -> _R@decorator` has no attribute `__name__`
 torch/fx/experimental/recording.py:302:66: error[invalid-argument-type] Argument to function `_extract_shape_env_and_assert_equal` is incorrect: Expected `dict[str, object]`, found `_P@decorator.kwargs`
-torch/fx/experimental/rewriter.py:68:13: error[unresolved-attribute] Unresolved attribute `__kwdefaults__` on type `_Wrapped[(...), Unknown, (...), Unknown]`
-torch/fx/experimental/rewriter.py:69:20: error[invalid-return-type] Return type does not match returned value: expected `FunctionType`, found `_Wrapped[(...), Unknown, (...), Unknown]`
+torch/fx/experimental/rewriter.py:68:13: error[unresolved-attribute] Unresolved attribute `__kwdefaults__` on type `_Wrapped[(...), Any, (...), Any]`
+torch/fx/experimental/rewriter.py:69:20: error[invalid-return-type] Return type does not match returned value: expected `FunctionType`, found `_Wrapped[(...), Any, (...), Any]`
 torch/fx/experimental/rewriter.py:110:17: error[invalid-argument-type] Argument to `Call.__init__` is incorrect: Expected `list[expr]`, found `list[expr | None]`
 torch/fx/experimental/schema_type_annotation.py:117:38: error[unresolved-attribute] Module `torch._C` has no member `_jit_try_infer_type`
 torch/fx/experimental/shape_inference/infer_shape.py:57:30: error[unresolved-attribute] Module `torch` has no member `randn`
@@ -25607,6 +25669,7 @@ torch/fx/experimental/symbolic_shapes.py:795:12: error[invalid-return-type] Retu
 torch/fx/experimental/symbolic_shapes.py:825:16: error[unresolved-attribute] Object of type `type[Add | Mul]` has no attribute `identity`
 torch/fx/experimental/symbolic_shapes.py:873:16: error[invalid-return-type] Return type does not match returned value: expected `bool`, found `bool | None`
 torch/fx/experimental/symbolic_shapes.py:913:28: error[invalid-argument-type] Argument to constructor `int.__new__` is incorrect: Expected `str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc`, found `Basic`
+torch/fx/experimental/symbolic_shapes.py:927:48: error[invalid-argument-type] Argument to function `_sympy_from_args` is incorrect: Expected `list[Expr]`, found `list[Basic | Unknown] | list[Basic]`
 torch/fx/experimental/symbolic_shapes.py:996:39: error[invalid-argument-type] Argument to function `_iterate_exprs` is incorrect: Expected `SymInt | SymFloat | SymBool | ... omitted 5 union elements`, found `object`
 torch/fx/experimental/symbolic_shapes.py:1006:26: error[unresolved-attribute] Module `torch` has no member `Generator`
 torch/fx/experimental/symbolic_shapes.py:1026:40: error[unresolved-attribute] Module `torch` has no member `Size`
@@ -25672,7 +25735,6 @@ torch/fx/experimental/symbolic_shapes.py:4132:57: warning[possibly-missing-impor
 torch/fx/experimental/symbolic_shapes.py:4218:16: error[unresolved-attribute] Object of type `Expr` has no attribute `node`
 torch/fx/experimental/symbolic_shapes.py:4218:25: error[invalid-argument-type] Argument is incorrect: Expected `Symbol`, found `SymInt`
 torch/fx/experimental/symbolic_shapes.py:4231:9: error[no-matching-overload] No overload of bound method `MutableMapping.update` matches arguments
-torch/fx/experimental/symbolic_shapes.py:4240:17: error[no-matching-overload] No overload of bound method `dict.pop` matches arguments
 torch/fx/experimental/symbolic_shapes.py:4324:32: error[invalid-argument-type] Argument is incorrect: Expected `FakeTensor | SymInt | SymFloat`, found `SymInt | SymFloat | FakeTensorMeta`
 torch/fx/experimental/symbolic_shapes.py:4555:66: error[unresolved-attribute] Object of type `(...) -> object` has no attribute `__name__`
 torch/fx/experimental/symbolic_shapes.py:4702:24: error[unresolved-attribute] Object of type `SymbolicContext` has no attribute `dynamic_sizes`
@@ -25710,8 +25772,7 @@ torch/fx/experimental/symbolic_shapes.py:7058:32: error[invalid-argument-type] A
 torch/fx/experimental/symbolic_shapes.py:7077:27: error[invalid-argument-type] Argument to function `bound_sympy` is incorrect: Expected `Expr`, found `Basic`
 torch/fx/experimental/symbolic_shapes.py:7077:33: error[invalid-argument-type] Argument to function `bound_sympy` is incorrect: Expected `dict[Symbol, ValueRanges[Unknown]] | None`, found `dict[Basic, ValueRanges[Expr] | None]`
 torch/fx/experimental/symbolic_shapes.py:7131:13: error[no-matching-overload] No overload of bound method `MutableMapping.update` matches arguments
-torch/fx/experimental/symbolic_shapes.py:7141:21: error[no-matching-overload] No overload of bound method `MutableMapping.update` matches arguments
-torch/fx/experimental/symbolic_shapes.py:7143:34: error[invalid-argument-type] Argument to function `resimplify_floor_div` is incorrect: Expected `dict[Expr, Expr]`, found `dict[Unknown, Unknown] | dict[Boolean, BooleanAtom]`
+torch/fx/experimental/symbolic_shapes.py:7143:34: error[invalid-argument-type] Argument to function `resimplify_floor_div` is incorrect: Expected `dict[Expr, Expr]`, found `dict[Boolean, BooleanAtom]`
 torch/fx/experimental/symbolic_shapes.py:7160:17: error[invalid-argument-type] Argument is incorrect: Expected `Symbol`, found `object`
 torch/fx/experimental/symbolic_shapes.py:7394:34: error[invalid-argument-type] Method `__getitem__` of type `bound method dict[Symbol, CapturedTraceback].__getitem__(key: Symbol, /) -> CapturedTraceback` cannot be called with key of type `Basic` on object of type `dict[Symbol, CapturedTraceback]`
 torch/fx/experimental/symbolic_shapes.py:7402:12: error[unresolved-attribute] Object of type `Basic` has no attribute `is_integer`
@@ -30264,7 +30325,7 @@ torch/testing/_comparison.py:583:18: error[unresolved-attribute] Module `torch` 
 torch/testing/_comparison.py:603:15: error[invalid-argument-type] Method `__getitem__` of type `bound method dict[<class 'int'> | <class 'float'> | <class 'complex'>, Unknown].__getitem__(key: <class 'int'> | <class 'float'> | <class 'complex'>, /) -> Unknown` cannot be called with key of type `type[complex]` on object of type `dict[<class 'int'> | <class 'float'> | <class 'complex'>, Unknown]`
 torch/testing/_comparison.py:603:15: error[invalid-argument-type] Method `__getitem__` of type `bound method dict[<class 'int'> | <class 'float'> | <class 'complex'>, Unknown].__getitem__(key: <class 'int'> | <class 'float'> | <class 'complex'>, /) -> Unknown` cannot be called with key of type `type[float]` on object of type `dict[<class 'int'> | <class 'float'> | <class 'complex'>, Unknown]`
 torch/testing/_comparison.py:603:15: error[invalid-argument-type] Method `__getitem__` of type `bound method dict[<class 'int'> | <class 'float'> | <class 'complex'>, Unknown].__getitem__(key: <class 'int'> | <class 'float'> | <class 'complex'>, /) -> Unknown` cannot be called with key of type `type[int]` on object of type `dict[<class 'int'> | <class 'float'> | <class 'complex'>, Unknown]`
-torch/testing/_comparison.py:616:24: error[invalid-argument-type] Argument to bound method `list.append` is incorrect: Expected `<class 'int'> | <class 'float'> | <class 'complex'>`, found `<class 'number'>`
+torch/testing/_comparison.py:616:24: error[invalid-argument-type] Argument to bound method `list.append` is incorrect: Expected `type[int | float | complex]`, found `<class 'number'>`
 torch/testing/_comparison.py:750:20: error[unresolved-attribute] Module `torch` has no member `as_tensor`
 torch/testing/_comparison.py:756:13: error[unresolved-attribute] Module `torch` has no member `strided`
 torch/testing/_comparison.py:757:13: error[unresolved-attribute] Module `torch` has no member `jagged`
@@ -30550,7 +30611,13 @@ torch/utils/_sympy/functions.py:176:21: error[unsupported-operator] Operator `/`
 torch/utils/_sympy/functions.py:184:19: error[unsupported-operator] Operator `*` is not supported between objects of type `int | Unknown` and `Basic`
 torch/utils/_sympy/functions.py:185:12: error[invalid-return-type] Return type does not match returned value: expected `Basic`, found `int | Unknown`
 torch/utils/_sympy/functions.py:235:9: error[invalid-method-override] Invalid override of method `eval`: Definition is incompatible with `Application.eval`
+torch/utils/_sympy/functions.py:325:17: error[unresolved-attribute] Object of type `Basic` has no attribute `is_integer`
+torch/utils/_sympy/functions.py:325:31: error[unresolved-attribute] Object of type `Basic` has no attribute `is_integer`
+torch/utils/_sympy/functions.py:325:45: error[unresolved-attribute] Object of type `Basic` has no attribute `is_nonnegative`
+torch/utils/_sympy/functions.py:325:63: error[unresolved-attribute] Object of type `Basic` has no attribute `is_nonnegative`
 torch/utils/_sympy/functions.py:340:9: error[invalid-method-override] Invalid override of method `eval`: Definition is incompatible with `Application.eval`
+torch/utils/_sympy/functions.py:396:25: error[unresolved-attribute] Object of type `Basic` has no attribute `is_nonnegative`
+torch/utils/_sympy/functions.py:396:43: error[unresolved-attribute] Object of type `Basic` has no attribute `is_nonnegative`
 torch/utils/_sympy/functions.py:408:24: error[unresolved-attribute] Object of type `Basic` has no attribute `is_integer`
 torch/utils/_sympy/functions.py:408:52: error[unresolved-attribute] Object of type `Basic` has no attribute `is_integer`
 torch/utils/_sympy/functions.py:413:16: error[unresolved-attribute] Object of type `Basic` has no attribute `is_nonnegative`
@@ -31206,4 +31273,4 @@ torch/xpu/streams.py:63:43: error[unresolved-attribute] Module `torch` has no me
 torch/xpu/streams.py:106:13: error[unresolved-attribute] Module `torch._C` has no member `_XpuEventBase`
 torch/xpu/streams.py:124:39: error[unresolved-attribute] Module `torch` has no member `Stream`
 torch/xpu/streams.py:135:37: error[unresolved-attribute] Module `torch` has no member `Stream`
-Found 31036 diagnostics
+Found 31103 diagnostics

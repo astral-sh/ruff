@@ -8,13 +8,12 @@ Using an undefined variable will raise a `NameError` at runtime.
 
 ## Rule status
 
-This rule is currently disabled by default because of the number of
-false positives it can produce.
+This rule is currently disabled by default because of the number of false positives it can produce.
 
 ## Example
 
 ```python
-for i in range(0):
+for i in range(int(input())):
     x = i
 
 # NameError: name 'x' is not defined

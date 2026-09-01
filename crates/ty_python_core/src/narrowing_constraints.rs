@@ -46,7 +46,7 @@ use crate::scope::FileScopeId;
 ///
 /// `ALWAYS_TRUE` means that no narrowing applies. `ALWAYS_FALSE` means that the path is
 /// impossible.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
 pub struct ScopedNarrowingConstraint(u32);
 
 impl ScopedNarrowingConstraint {
@@ -90,7 +90,7 @@ pub struct InteriorNode {
     pub if_false: ScopedNarrowingConstraint,
 }
 
-#[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, PartialEq, Eq, get_size2::GetSize)]
 pub struct NarrowingConstraints {
     used_interiors: Box<[InteriorNode]>,
     used_indices: Option<RankBitBox>,
@@ -266,6 +266,29 @@ impl NarrowingConstraintsBuilder {
         }
     }
 
+    /// Adds a constraint that selects between two formulas based on `predicate`.
+    pub(crate) fn add_conditional(
+        &mut self,
+        predicate: ScopedPredicateId,
+        if_true: ScopedNarrowingConstraint,
+        if_false: ScopedNarrowingConstraint,
+    ) -> ScopedNarrowingConstraint {
+        let node = InteriorNode {
+            atom: predicate,
+            if_true,
+            if_uncertain: ALWAYS_FALSE,
+            if_false,
+        };
+        if let Some(cached) = self.interior_cache.get(&node) {
+            return *cached;
+        }
+        if self.interiors.len() >= MAX_INTERIOR_NODES {
+            return ALWAYS_TRUE;
+        }
+
+        self.add_interior(node)
+    }
+
     pub(crate) fn add_or_constraint(
         &mut self,
         a: ScopedNarrowingConstraint,
@@ -303,19 +326,13 @@ impl NarrowingConstraintsBuilder {
                     if_false,
                 })
             }
-            Ordering::Less => {
-                let node = self.interiors[a];
-                let if_uncertain = self.add_or_constraint(node.if_uncertain, b);
-                self.add_interior(InteriorNode {
-                    atom: node.atom,
-                    if_true: node.if_true,
-                    if_uncertain,
-                    if_false: node.if_false,
-                })
-            }
-            Ordering::Greater => {
-                let node = self.interiors[b];
-                let if_uncertain = self.add_or_constraint(a, node.if_uncertain);
+            ordering @ (Ordering::Less | Ordering::Greater) => {
+                let (node, other) = if ordering == Ordering::Less {
+                    (self.interiors[a], b)
+                } else {
+                    (self.interiors[b], a)
+                };
+                let if_uncertain = self.add_or_constraint(node.if_uncertain, other);
                 self.add_interior(InteriorNode {
                     atom: node.atom,
                     if_true: node.if_true,
@@ -380,23 +397,15 @@ impl NarrowingConstraintsBuilder {
                     if_false,
                 })
             }
-            Ordering::Less => {
-                let node = self.interiors[a];
-                let if_true = self.add_and_constraint(node.if_true, b);
-                let if_uncertain = self.add_and_constraint(node.if_uncertain, b);
-                let if_false = self.add_and_constraint(node.if_false, b);
-                self.add_interior(InteriorNode {
-                    atom: node.atom,
-                    if_true,
-                    if_uncertain,
-                    if_false,
-                })
-            }
-            Ordering::Greater => {
-                let node = self.interiors[b];
-                let if_true = self.add_and_constraint(a, node.if_true);
-                let if_uncertain = self.add_and_constraint(a, node.if_uncertain);
-                let if_false = self.add_and_constraint(a, node.if_false);
+            ordering @ (Ordering::Less | Ordering::Greater) => {
+                let (node, other) = if ordering == Ordering::Less {
+                    (self.interiors[a], b)
+                } else {
+                    (self.interiors[b], a)
+                };
+                let if_true = self.add_and_constraint(node.if_true, other);
+                let if_uncertain = self.add_and_constraint(node.if_uncertain, other);
+                let if_false = self.add_and_constraint(node.if_false, other);
                 self.add_interior(InteriorNode {
                     atom: node.atom,
                     if_true,

@@ -24,10 +24,6 @@ impl RuleSet {
         Self(Self::EMPTY)
     }
 
-    pub fn clear(&mut self) {
-        self.0 = Self::EMPTY;
-    }
-
     #[inline]
     pub const fn from_rule(rule: Rule) -> Self {
         let rule = rule as u16;
@@ -257,7 +253,7 @@ impl RuleSet {
 
     /// Returns `true` if any of the rules in `rules` are in this set.
     #[inline]
-    pub const fn any(&self, rules: &[Rule]) -> bool {
+    pub(crate) const fn any(&self, rules: &[Rule]) -> bool {
         let mut any = false;
         let mut i = 0;
 
@@ -302,8 +298,7 @@ impl Display for RuleSet {
         } else {
             writeln!(f, "[")?;
             for rule in self {
-                let code = rule.noqa_code();
-                writeln!(f, "\t{name} ({code}),", name = rule.name())?;
+                writeln!(f, "\t{},", rule.name_and_code())?;
             }
             write!(f, "]")?;
         }

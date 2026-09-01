@@ -47,7 +47,6 @@ error[invalid-type-variable-bound]: TypeVar upper bound cannot be generic
   |
 2 | class C[S: T, T]:
   |            ^
-  |
 
 ```
 
@@ -57,7 +56,6 @@ error[invalid-type-variable-bound]: TypeVar upper bound cannot be generic
   |
 6 | class D[S, T: S]:
   |               ^
-  |
 
 ```
 
@@ -67,7 +65,6 @@ error[invalid-type-variable-constraints]: TypeVar constraint cannot be generic
    |
 10 | class E[S: (int, T), T]:
    |                  ^
-   |
 
 ```
 
@@ -79,7 +76,6 @@ error[invalid-generic-class]: Default of `S` cannot reference later type paramet
    |       ^^^ -----  ------- `T` defined here
    |           |
    |           `S` defined here
-   |
 
 ```
 
@@ -91,6 +87,5 @@ error[invalid-generic-class]: Default of `S` cannot reference later type paramet
    |       ^^^^^^^ -----------  ------- `T` defined here
    |               |
    |               `S` defined here
-   |
 
 ```

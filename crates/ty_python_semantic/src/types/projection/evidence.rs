@@ -4,7 +4,7 @@
 //! inference. Cycle recovery reuses these facts instead of calling inference
 //! queries while solving projection equations.
 
-use crate::types::{DivergentType, StaticClassLiteral, Type};
+use crate::types::{DivergentType, ProgramEnvironment, StaticClassLiteral, Type};
 use crate::{Db, FxIndexSet};
 
 use super::artifact::{ProjectionOp, ProjectionPath};
@@ -12,7 +12,7 @@ use super::container::ProjectionContainer;
 use super::term::ProjectionTerm;
 
 /// Projection facts computed during normal inference and reused during cycle recovery.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::SalsaValue)]
 pub(crate) struct ProjectionEvidenceSet<'db>(ProjectionEvidenceSetInterned<'db>);
 
 // The Salsa heap is tracked separately.
@@ -27,11 +27,16 @@ pub(super) struct ProjectionEvidenceBuilder<'db> {
 
 impl<'db> ProjectionEvidenceBuilder<'db> {
     /// Inference-time API: records facts needed by projection cycle recovery.
-    fn extend_from_types(&mut self, db: &'db dyn Db, types: impl IntoIterator<Item = Type<'db>>) {
+    fn extend_from_types(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        types: impl IntoIterator<Item = Type<'db>>,
+    ) {
         for ty in types {
-            let demands = ty.projection_demands(db);
+            let demands = ty.projection_demands(db, env);
             for (root, path) in demands {
-                self.record_projection_path(db, root, ty, &path);
+                self.record_projection_path(db, env, root, ty, &path);
             }
         }
     }
@@ -39,6 +44,7 @@ impl<'db> ProjectionEvidenceBuilder<'db> {
     fn record_projection_path(
         &mut self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         root: DivergentType,
         ty: Type<'db>,
         path: &ProjectionPath<'db>,
@@ -47,7 +53,7 @@ impl<'db> ProjectionEvidenceBuilder<'db> {
             let mut terms = Vec::new();
             let mut all_arms_projected = true;
             for element in union.elements(db) {
-                if let Some(term) = self.record_projection_path(db, root, *element, path) {
+                if let Some(term) = self.record_projection_path(db, env, root, *element, path) {
                     terms.push(term);
                 } else {
                     all_arms_projected = false;
@@ -57,20 +63,20 @@ impl<'db> ProjectionEvidenceBuilder<'db> {
             // Evidence remains useful for arms that projected successfully; the union result is
             // valid only when every arm supports the operation.
             return all_arms_projected
-                .then(|| ProjectionTerm::from_union_terms(db, &terms))
+                .then(|| ProjectionTerm::from_union_terms(db, env, &terms))
                 .flatten();
         }
 
         let ops = path.ops();
         let (&op, tail) = ops.split_first()?;
-        let projected = ProjectionContainer::infer_projection_op(db, ty, op)?;
+        let projected = ProjectionContainer::infer_projection_op(db, env, ty, op)?;
         let term = if tail.is_empty() {
             projected
         } else {
-            self.record_projection_term_path(db, root, projected, tail)?
+            self.record_projection_term_path(db, env, root, projected, tail)?
         };
 
-        self.record_inferred_projection_fact(db, root, ty, path, term);
+        self.record_inferred_projection_fact(db, env, root, ty, path, term);
         Some(term)
     }
 
@@ -79,18 +85,22 @@ impl<'db> ProjectionEvidenceBuilder<'db> {
     fn record_projection_term_path(
         &mut self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         root: DivergentType,
         term: ProjectionTerm<'db>,
         path: &[ProjectionOp<'db>],
     ) -> Option<ProjectionTerm<'db>> {
         let (&op, tail) = path.split_first()?;
         let projected = match term {
-            ProjectionTerm::List(element) => ProjectionContainer::project_list_op(db, element, op)?,
+            ProjectionTerm::List(element) => {
+                ProjectionContainer::project_list_op(db, env, element, op)?
+            }
             _ => {
                 return self.record_projection_path(
                     db,
+                    env,
                     root,
-                    term.ty(db),
+                    term.ty(db, env),
                     &ProjectionPath::from_ops(path.iter().copied()),
                 );
             }
@@ -100,22 +110,24 @@ impl<'db> ProjectionEvidenceBuilder<'db> {
             return Some(projected);
         }
 
-        self.record_projection_term_path(db, root, projected, tail)
+        self.record_projection_term_path(db, env, root, projected, tail)
     }
 
     fn record_inferred_projection_fact(
         &mut self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         root: DivergentType,
         arm: Type<'db>,
         path: &ProjectionPath<'db>,
         term: ProjectionTerm<'db>,
     ) {
-        if term.is_ambiguous(db) {
+        if term.is_ambiguous(db, env) {
             return;
         }
 
-        if let Some(container_fact) = ProjectionContainerFact::try_from_inference_type(db, arm) {
+        if let Some(container_fact) = ProjectionContainerFact::try_from_inference_type(db, env, arm)
+        {
             self.push_container_fact(container_fact);
             self.push_projection_fact(ProjectionEvidenceFact {
                 root,
@@ -130,16 +142,18 @@ impl<'db> ProjectionEvidenceBuilder<'db> {
     pub(super) fn record_projected_arm(
         &mut self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         roots: impl IntoIterator<Item = DivergentType>,
         arm: Type<'db>,
         path: &ProjectionPath<'db>,
         term: ProjectionTerm<'db>,
     ) {
-        if term.is_ambiguous(db) {
+        if term.is_ambiguous(db, env) {
             return;
         }
 
-        if let Some(container_fact) = ProjectionContainerFact::try_from_inference_type(db, arm) {
+        if let Some(container_fact) = ProjectionContainerFact::try_from_inference_type(db, env, arm)
+        {
             self.push_container_fact(container_fact);
         }
         for root in roots {
@@ -176,10 +190,11 @@ impl<'db> ProjectionEvidenceSet<'db> {
     /// produced, so the result cannot know ahead of time whether evidence will be needed.
     pub(crate) fn from_types(
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         types: impl IntoIterator<Item = Type<'db>>,
     ) -> Option<Self> {
         let mut builder = ProjectionEvidenceBuilder::default();
-        builder.extend_from_types(db, types);
+        builder.extend_from_types(db, env, types);
         builder.finish(db)
     }
 
@@ -193,18 +208,19 @@ impl<'db> ProjectionEvidenceSet<'db> {
     /// instead.
     pub(crate) fn from_types_if_needed(
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         should_collect: bool,
         types: impl IntoIterator<Item = Type<'db>>,
     ) -> Option<Self> {
         if should_collect {
-            return Self::from_types(db, types);
+            return Self::from_types(db, env, types);
         }
 
         let mut builder = ProjectionEvidenceBuilder::default();
         for ty in types {
-            let demands = ty.projection_demands(db);
+            let demands = ty.projection_demands(db, env);
             for (root, path) in demands {
-                builder.record_projection_path(db, root, ty, &path);
+                builder.record_projection_path(db, env, root, ty, &path);
             }
         }
 
@@ -281,11 +297,12 @@ impl<'db> ProjectionEvidenceSet<'db> {
     pub(super) fn container_fact_for_arm(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         root: DivergentType,
         arm: Type<'db>,
     ) -> Option<&'db ProjectionContainerFact<'db>> {
         let normalized_arm = arm
-            .replace_projection_artifacts_with_root(db, root)
+            .replace_projection_artifacts_with_root(db, env, root)
             .unwrap_or(arm);
         self.container_facts(db).iter().find(|fact| {
             if fact.arm == arm {
@@ -294,7 +311,7 @@ impl<'db> ProjectionEvidenceSet<'db> {
 
             let fact_arm = fact
                 .arm
-                .replace_projection_artifacts_with_root(db, root)
+                .replace_projection_artifacts_with_root(db, env, root)
                 .unwrap_or(fact.arm);
             fact_arm == normalized_arm
         })
@@ -304,12 +321,13 @@ impl<'db> ProjectionEvidenceSet<'db> {
     pub(super) fn project_arm_path(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         root: DivergentType,
         arm: Type<'db>,
         path: &ProjectionPath<'db>,
     ) -> Option<ProjectionTerm<'db>> {
         let normalized_arm = arm
-            .replace_projection_artifacts_with_root(db, root)
+            .replace_projection_artifacts_with_root(db, env, root)
             .unwrap_or(arm);
         self.projection_facts(db).iter().find_map(|fact| {
             if !fact.root.same_marker(root) || fact.path != *path {
@@ -321,7 +339,7 @@ impl<'db> ProjectionEvidenceSet<'db> {
 
             let fact_arm = fact
                 .arm
-                .replace_projection_artifacts_with_root(db, root)
+                .replace_projection_artifacts_with_root(db, env, root)
                 .unwrap_or(fact.arm);
             (fact_arm == normalized_arm).then_some(fact.term)
         })
@@ -341,7 +359,7 @@ struct ProjectionEvidenceSetInterned<'db> {
 impl get_size2::GetSize for ProjectionEvidenceSetInterned<'_> {}
 
 /// The result of projecting one non-cycle arm during inference.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, salsa::SalsaValue, get_size2::GetSize)]
 pub(super) struct ProjectionEvidenceFact<'db> {
     pub(super) root: DivergentType,
     pub(super) arm: Type<'db>,
@@ -350,7 +368,7 @@ pub(super) struct ProjectionEvidenceFact<'db> {
 }
 
 /// A generic container specialization computed during inference.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, salsa::SalsaValue, get_size2::GetSize)]
 pub(super) struct ProjectionContainerFact<'db> {
     pub(super) arm: Type<'db>,
     pub(super) class: StaticClassLiteral<'db>,
@@ -371,24 +389,32 @@ impl<'db> ProjectionContainerFact<'db> {
     }
 
     /// Cycle-recovery-time API: builds a fact from direct specialization only.
-    pub(super) fn try_from_recovery_type(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
+    pub(super) fn try_from_recovery_type(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+    ) -> Option<Self> {
         if ty.exact_tuple_instance_spec(db).is_some() {
             return None;
         }
 
-        let (class, specialization) = ty.direct_class_specialization(db)?;
+        let (class, specialization) = ty.direct_class_specialization(db, env)?;
         Self::try_from_parts(ty, class, specialization.types(db))
     }
 
     /// Inference-time API: builds a fact from the full specialization view.
     ///
     /// This may expand aliases, bounds, and fallbacks.
-    fn try_from_inference_type(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
+    fn try_from_inference_type(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+    ) -> Option<Self> {
         if ty.exact_tuple_instance_spec(db).is_some() {
             return None;
         }
 
-        let (class, specialization) = ty.class_specialization(db)?;
+        let (class, specialization) = ty.class_specialization(db, env)?;
         Self::try_from_parts(ty, class, specialization.types(db))
     }
 }

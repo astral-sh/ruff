@@ -339,7 +339,6 @@ Module(
 8 |
 9 | lambda a, *, **a: 1
   |              ^^^ Syntax Error: Expected one or more keyword parameter after `*` separator
-  |
 
 
 ## Semantic Syntax Errors
@@ -387,4 +386,3 @@ Module(
 8 |
 9 | lambda a, *, **a: 1
   |                ^ Syntax Error: Duplicate parameter "a"
-  |

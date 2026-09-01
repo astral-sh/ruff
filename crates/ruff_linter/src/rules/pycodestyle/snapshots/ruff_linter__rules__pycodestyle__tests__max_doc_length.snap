@@ -7,7 +7,6 @@ W505 Doc line too long (57 > 50)
 1 | #!/usr/bin/env python3
 2 | """Here's a top-level docstring that's over the limit."""
   |                                                   ^^^^^^^
-  |
 
 W505 Doc line too long (56 > 50)
  --> W505.py:6:51
@@ -45,7 +44,6 @@ W505 Doc line too long (61 > 50)
    |
 18 | "This is also considered a docstring, and is over the limit."
    |                                                   ^^^^^^^^^^^
-   |
 
 W505 Doc line too long (82 > 50)
   --> W505.py:24:51
@@ -64,4 +62,3 @@ W505 Doc line too long (85 > 50)
 30 |
 31 |     It's over the limit on this line, which isn't the first line in the docstring."""
    |                                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |

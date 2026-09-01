@@ -1,8 +1,9 @@
+use std::borrow::Cow;
 use std::collections::btree_map::{BTreeMap, Entry};
 
 use ruff_db::files::directory_listing;
-use ruff_python_ast::PythonVersion;
 
+use crate::ResolverEnvironment;
 use crate::db::Db;
 use crate::module::{Module, ModuleKind};
 use crate::module_name::ModuleName;
@@ -10,8 +11,11 @@ use crate::path::{ModulePath, SearchPath, SystemOrVendoredPathRef};
 use crate::resolve::{ModuleResolveMode, ResolverContext, resolve_file_module, search_paths};
 
 /// List all available modules, including all sub-modules, sorted in lexicographic order.
-pub fn all_modules(db: &dyn Db) -> Vec<Module<'_>> {
-    let mut modules = list_modules(db).to_vec();
+pub fn all_modules<'db>(
+    db: &'db dyn Db,
+    resolver_environment: ResolverEnvironment<'db>,
+) -> Vec<Module<'db>> {
+    let mut modules = list_modules(db, resolver_environment).to_vec();
     let mut stack = modules.clone();
     while let Some(module) = stack.pop() {
         for &submodule in module.all_submodules(db) {
@@ -24,11 +28,24 @@ pub fn all_modules(db: &dyn Db) -> Vec<Module<'_>> {
 }
 
 /// List all available top-level modules.
+pub fn list_modules<'db>(
+    db: &'db dyn Db,
+    resolver_environment: ResolverEnvironment<'db>,
+) -> &'db [Module<'db>] {
+    list_modules_impl(db, resolver_environment)
+}
+
 #[salsa::tracked(returns(deref))]
-pub fn list_modules(db: &dyn Db) -> Box<[Module<'_>]> {
+fn list_modules_impl<'db>(
+    db: &'db dyn Db,
+    resolver_environment: ResolverEnvironment<'db>,
+) -> Box<[Module<'db>]> {
     let mut modules: BTreeMap<&ModuleName, ListedModule<'_>> = BTreeMap::new();
-    for search_path in search_paths(db, ModuleResolveMode::StubsAllowed) {
-        for &new in list_modules_in(db, SearchPathIngredient::new(db, search_path.clone())) {
+    for search_path in search_paths(db, resolver_environment, ModuleResolveMode::Typing) {
+        for &new in list_modules_in(
+            db,
+            SearchPathIngredient::new(db, resolver_environment, search_path.clone()),
+        ) {
             match modules.entry(new.module(db).name(db)) {
                 Entry::Vacant(entry) => {
                     entry.insert(new);
@@ -64,6 +81,8 @@ pub fn list_modules(db: &dyn Db) -> Box<[Module<'_>]> {
 
 #[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
 struct SearchPathIngredient<'db> {
+    #[returns(copy)]
+    resolver_environment: ResolverEnvironment<'db>,
     #[returns(ref)]
     path: SearchPath,
 }
@@ -74,9 +93,10 @@ fn list_modules_in<'db>(
     db: &'db dyn Db,
     search_path: SearchPathIngredient<'db>,
 ) -> Vec<ListedModule<'db>> {
-    tracing::debug!("Listing modules in search path '{}'", search_path.path(db));
-    let mut lister = Lister::new(db, search_path.path(db));
-    match search_path.path(db).as_path() {
+    let path = search_path.path(db);
+    tracing::debug!("Listing modules in search path '{}'", path);
+    let mut lister = Lister::new(db, search_path.resolver_environment(db), path);
+    match path.as_path() {
         SystemOrVendoredPathRef::System(system_search_path) => {
             let Ok(listing) = directory_listing(db, system_search_path) else {
                 return vec![];
@@ -98,7 +118,9 @@ fn list_modules_in<'db>(
 /// A module paired with whether it came from a stub package.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 struct ListedModule<'db> {
+    #[returns(copy)]
     module: Module<'db>,
+    #[returns(copy)]
     is_stub_package: bool,
 }
 
@@ -114,16 +136,22 @@ impl get_size2::GetSize for ListedModule<'_> {}
 struct Lister<'db> {
     db: &'db dyn Db,
     search_path: &'db SearchPath,
+    resolver_environment: ResolverEnvironment<'db>,
     modules: BTreeMap<&'db ModuleName, ListedModule<'db>>,
 }
 
 impl<'db> Lister<'db> {
     /// Create new state that can accumulate modules from a list
     /// of file paths.
-    fn new(db: &'db dyn Db, search_path: &'db SearchPath) -> Lister<'db> {
+    fn new(
+        db: &'db dyn Db,
+        resolver_environment: ResolverEnvironment<'db>,
+        search_path: &'db SearchPath,
+    ) -> Lister<'db> {
         Lister {
             db,
             search_path,
+            resolver_environment,
             modules: BTreeMap::new(),
         }
     }
@@ -175,10 +203,11 @@ impl<'db> Lister<'db> {
                         &module_path,
                         Module::file_module(
                             self.db,
-                            module_name,
+                            file,
+                            self.resolver_environment,
+                            Cow::Owned(module_name),
                             ModuleKind::Package,
                             self.search_path.clone(),
-                            file,
                         ),
                     );
                     return;
@@ -219,7 +248,11 @@ impl<'db> Lister<'db> {
                 if !self.search_path.is_standard_library() {
                     self.add_module(
                         &module_path,
-                        Module::namespace_package(self.db, module_name),
+                        Module::namespace_package(
+                            self.db,
+                            self.resolver_environment,
+                            Cow::Owned(module_name),
+                        ),
                     );
                 }
                 return;
@@ -247,10 +280,11 @@ impl<'db> Lister<'db> {
             &module_path,
             Module::file_module(
                 self.db,
-                module_name,
+                file,
+                self.resolver_environment,
+                Cow::Owned(module_name),
                 ModuleKind::Module,
                 self.search_path.clone(),
-                file,
             ),
         );
     }
@@ -291,17 +325,12 @@ impl<'db> Lister<'db> {
                 // the same directory, the former takes precedent.
                 // (This case can only occur when both have a search
                 // path.)
-                if existing.kind(self.db) == ModuleKind::Module
-                    && module.kind(self.db) == ModuleKind::Package
-                {
-                    entry.insert(listed);
-                    return;
-                }
                 // Or if we have two file modules and the new one
                 // is a stub, then the stub takes priority.
                 if existing.kind(self.db) == ModuleKind::Module
-                    && module.kind(self.db) == ModuleKind::Module
-                    && path.is_stub_file()
+                    && let module_kind = module.kind(self.db)
+                    && (module_kind == ModuleKind::Package
+                        || module_kind == ModuleKind::Module && path.is_stub_file())
                 {
                     entry.insert(listed);
                     return;
@@ -318,24 +347,20 @@ impl<'db> Lister<'db> {
 
     /// Returns true if the given module name cannot be shadowable.
     fn is_non_shadowable(&self, name: &ModuleName) -> bool {
-        ModuleResolveMode::StubsAllowed
-            .is_non_shadowable(self.python_version().minor, name.as_str())
-    }
-
-    /// Returns the Python version we want to perform module resolution
-    /// with.
-    fn python_version(&self) -> PythonVersion {
-        self.db.python_version()
+        ModuleResolveMode::Typing.is_non_shadowable(
+            self.resolver_environment.python_version(self.db).minor,
+            name.as_str(),
+        )
     }
 
     /// Constructs a resolver context for use with some APIs that require it.
     fn context(&self) -> ResolverContext<'db> {
         ResolverContext {
             db: self.db,
-            python_version: self.python_version(),
+            resolver_environment: self.resolver_environment,
             // We don't currently support listing modules
             // in a "no stubs allowed" mode.
-            mode: ModuleResolveMode::StubsAllowed,
+            mode: ModuleResolveMode::Typing,
         }
     }
 }
@@ -409,7 +434,9 @@ mod tests {
     use crate::strategy::FallibleStrategy;
     use crate::testing::{FileSpec, MockedTypeshed, TestCase, TestCaseBuilder};
 
-    use super::list_modules;
+    fn list_modules(db: &TestDb) -> &[Module<'_>] {
+        super::list_modules(db, db.resolver_environment())
+    }
 
     struct ModuleDebugSnapshot<'db> {
         db: &'db dyn Db,
@@ -459,18 +486,18 @@ mod tests {
         }
     }
 
-    fn sorted_list(db: &dyn Db) -> Vec<Module<'_>> {
+    fn sorted_list(db: &TestDb) -> Vec<Module<'_>> {
         let mut modules = list_modules(db).to_vec();
         modules.sort_by(|m1, m2| m1.name(db).cmp(m2.name(db)));
         modules
     }
 
-    fn list_snapshot(db: &dyn Db) -> Vec<ModuleDebugSnapshot<'_>> {
+    fn list_snapshot(db: &TestDb) -> Vec<ModuleDebugSnapshot<'_>> {
         list_snapshot_filter(db, |_| true)
     }
 
     fn list_snapshot_filter<'db>(
-        db: &'db dyn Db,
+        db: &'db TestDb,
         predicate: impl Fn(&Module<'db>) -> bool,
     ) -> Vec<ModuleDebugSnapshot<'db>> {
         sorted_list(db)
@@ -593,6 +620,20 @@ mod tests {
             @r#"
         [
             Module::File("builtins", "std-vendored", "stdlib/builtins.pyi", Module, Some(Builtins)),
+        ]
+        "#,
+        );
+    }
+
+    #[test]
+    fn ty_extensions_vendored() {
+        let TestCase { db, .. } = TestCaseBuilder::new().with_vendored_typeshed().build();
+
+        insta::assert_debug_snapshot!(
+            list_snapshot_filter(&db, |module| module.name(&db).as_str() == "ty_extensions"),
+            @r#"
+        [
+            Module::File("ty_extensions", "std-vendored", "stdlib/ty_extensions/__init__.pyi", Package, Some(TyExtensions)),
         ]
         "#,
         );
@@ -1438,7 +1479,11 @@ not_a_directory
         assert_function_query_was_not_run(
             &db,
             dynamic_resolution_paths,
-            ModuleResolveModeIngredient::new(&db, ModuleResolveMode::StubsAllowed),
+            ModuleResolveModeIngredient::new(
+                &db,
+                db.resolver_environment(),
+                ModuleResolveMode::Typing,
+            ),
             &events,
         );
     }

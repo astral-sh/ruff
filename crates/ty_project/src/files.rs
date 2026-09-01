@@ -1,9 +1,9 @@
 use std::marker::PhantomData;
-use std::ops::Deref;
 use std::sync::Arc;
 
-use rustc_hash::FxHashSet;
-use salsa::Setter;
+use parking_lot::{Mutex, MutexGuard};
+use rustc_hash::{FxBuildHasher, FxHashSet};
+use salsa::{Durability, Setter};
 
 use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::File;
@@ -23,24 +23,27 @@ use crate::db::Db;
 /// ensure that Salsa always knows when the set of indexed files have changed.
 #[derive(Debug, get_size2::GetSize)]
 pub struct IndexedFiles {
-    state: std::sync::Mutex<State>,
+    // This mutex is intentionally non-poisoning: Salsa cancellation can unwind while the lazy
+    // index is being built. Indexing only transitions to `Indexed` after a complete walk, so the
+    // `Lazy` state remains valid and can be retried.
+    state: Mutex<State>,
 }
 
 impl IndexedFiles {
     pub fn lazy() -> Self {
         Self {
-            state: std::sync::Mutex::new(State::Lazy),
+            state: Mutex::new(State::Lazy),
         }
     }
 
     fn indexed(inner: Arc<IndexedInner>) -> Self {
         Self {
-            state: std::sync::Mutex::new(State::Indexed(inner)),
+            state: Mutex::new(State::Indexed(inner)),
         }
     }
 
     pub(super) fn get(&self) -> Index<'_> {
-        let state = self.state.lock().unwrap();
+        let state = self.state.lock();
 
         match &*state {
             State::Lazy => Index::Lazy(LazyFiles { files: state }),
@@ -52,7 +55,22 @@ impl IndexedFiles {
     }
 
     pub(super) fn is_lazy(&self) -> bool {
-        matches!(*self.state.lock().unwrap(), State::Lazy)
+        matches!(*self.state.lock(), State::Lazy)
+    }
+
+    /// Permanently freezes the project's file-set input without cloning the indexed files.
+    pub(super) fn freeze(db: &mut dyn Db, project: Project) {
+        let state = {
+            let files = project.file_set(db);
+            std::mem::replace(&mut *files.state.lock(), State::Lazy)
+        };
+
+        project
+            .set_file_set(db)
+            .with_durability(Durability::NEVER_CHANGE)
+            .to(Self {
+                state: Mutex::new(state),
+            });
     }
 
     /// Returns a mutable view on the index that allows cheap in-place mutations.
@@ -77,7 +95,7 @@ impl IndexedFiles {
         //   can't outlive the database (constrained by the `db` lifetime).
         let state = {
             let files = project.file_set(db);
-            let mut locked = files.state.lock().unwrap();
+            let mut locked = files.state.lock();
             std::mem::replace(&mut *locked, State::Lazy)
         };
 
@@ -121,23 +139,42 @@ pub(super) enum Index<'db> {
 
 /// Package files that have not been indexed yet.
 pub(super) struct LazyFiles<'db> {
-    files: std::sync::MutexGuard<'db, State>,
+    files: MutexGuard<'db, State>,
 }
 
 impl<'db> LazyFiles<'db> {
     /// Sets the indexed files of a package to `files`.
     pub(super) fn set(
         mut self,
-        files: FxHashSet<File>,
+        files: Vec<IndexedFile>,
         diagnostics: Vec<Diagnostic>,
     ) -> Indexed<'db> {
+        let mut inner = IndexedInner {
+            files: FxHashSet::with_capacity_and_hasher(files.len(), FxBuildHasher),
+            scripts: FxHashSet::default(),
+            diagnostics,
+        };
+        for IndexedFile { file, is_script } in files {
+            inner.files.insert(file);
+            if is_script {
+                inner.scripts.insert(file);
+            }
+        }
+        inner.files.shrink_to_fit();
+        inner.scripts.shrink_to_fit();
         let files = Indexed {
-            inner: Arc::new(IndexedInner { files, diagnostics }),
+            inner: Arc::new(inner),
             _lifetime: PhantomData,
         };
         *self.files = State::Indexed(Arc::clone(&files.inner));
         files
     }
+}
+
+/// A file classified by the walker without resolving its script settings or environment.
+pub(crate) struct IndexedFile {
+    pub(crate) file: File,
+    pub(crate) is_script: bool,
 }
 
 /// The indexed files of the project.
@@ -154,10 +191,23 @@ pub struct Indexed<'db> {
 #[derive(Debug, get_size2::GetSize)]
 struct IndexedInner {
     files: FxHashSet<File>,
+    scripts: FxHashSet<File>,
     diagnostics: Vec<Diagnostic>,
 }
 
 impl Indexed<'_> {
+    pub fn iter(&self) -> impl Iterator<Item = File> {
+        self.inner.files.iter().copied()
+    }
+
+    pub fn contains(&self, file: File) -> bool {
+        self.inner.files.contains(&file)
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.inner.files.is_empty()
+    }
+
     pub(super) fn diagnostics(&self) -> &[Diagnostic] {
         &self.inner.diagnostics
     }
@@ -165,13 +215,9 @@ impl Indexed<'_> {
     pub(super) fn len(&self) -> usize {
         self.inner.files.len()
     }
-}
 
-impl Deref for Indexed<'_> {
-    type Target = FxHashSet<File>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.inner.files
+    pub(super) fn scripts(&self) -> &FxHashSet<File> {
+        &self.inner.scripts
     }
 }
 
@@ -189,8 +235,7 @@ impl<'a> IntoIterator for &'a Indexed<'_> {
 /// A Mutable view of a project's indexed files.
 ///
 /// Allows in-place mutation of the files without deep cloning the hash set.
-/// The changes are written back when the mutable view is dropped or by calling
-/// [`Self::set_diagnostics`] manually.
+/// The changes are written back when the mutable view is dropped.
 pub(super) struct IndexedMut<'db> {
     db: Option<&'db mut dyn Db>,
     project: Project,
@@ -199,17 +244,20 @@ pub(super) struct IndexedMut<'db> {
 }
 
 impl IndexedMut<'_> {
-    pub(super) fn insert(&mut self, file: File) -> bool {
-        if self.inner_mut().files.insert(file) {
-            self.did_change = true;
-            true
+    pub(super) fn insert(&mut self, file: File, is_script: bool) {
+        let inner = self.inner_mut();
+        let file_added = inner.files.insert(file);
+        let script_changed = if is_script {
+            inner.scripts.insert(file)
         } else {
-            false
-        }
+            inner.scripts.remove(&file)
+        };
+        self.did_change |= file_added || script_changed;
     }
 
     pub(super) fn remove(&mut self, file: File) -> bool {
         if self.inner_mut().files.remove(&file) {
+            self.inner_mut().scripts.remove(&file);
             self.did_change = true;
             true
         } else {
@@ -240,7 +288,7 @@ impl IndexedMut<'_> {
                 .to(IndexedFiles::indexed(indexed));
         } else {
             // The `indexed_mut` replaced the `state` with Lazy. Restore it back to the indexed state.
-            *self.project.file_set(db).state.lock().unwrap() = State::Indexed(indexed);
+            *self.project.file_set(db).state.lock() = State::Indexed(indexed);
         }
     }
 }
@@ -253,48 +301,82 @@ impl Drop for IndexedMut<'_> {
 
 #[cfg(test)]
 mod tests {
-    use rustc_hash::FxHashSet;
+    use std::assert_matches;
+    use std::time::{Duration, Instant};
+
+    use salsa::{Database, Durability, EventKind};
 
     use crate::ProjectMetadata;
     use crate::db::Db;
     use crate::db::testing::TestDb;
-    use crate::files::Index;
     use ruff_db::files::system_path_to_file;
     use ruff_db::system::{DbWithWritableSystem as _, SystemPathBuf};
-    use ruff_python_ast::name::Name;
 
     #[test]
     fn re_entrance() -> anyhow::Result<()> {
-        let metadata = ProjectMetadata::new(Name::new_static("test"), SystemPathBuf::from("/test"));
+        let metadata = ProjectMetadata::new("test", SystemPathBuf::from("/test"));
         let mut db = TestDb::new(metadata);
 
-        db.write_file("test.py", "")?;
+        db.write_file("/test/test.py", "")?;
 
         let project = db.project();
 
-        let file = system_path_to_file(&db, "test.py").unwrap();
-
-        let files = match project.file_set(&db).get() {
-            Index::Lazy(lazy) => lazy.set(FxHashSet::from_iter([file]), Vec::new()),
-            Index::Indexed(files) => files,
-        };
+        let file = system_path_to_file(&db, "/test/test.py")?;
+        let files = project.files(&db);
+        assert!(files.contains(file));
 
         // Calling files a second time should not dead-lock.
         // This can e.g. happen when `check_file` iterates over all files and
         // `should_check_file` queries the open files.
-        let files_2 = project.file_set(&db).get();
+        let files_2 = project.files(&db);
+        assert_eq!(
+            files_2.iter().collect::<Vec<_>>(),
+            files.iter().collect::<Vec<_>>()
+        );
 
-        match files_2 {
-            Index::Lazy(_) => {
-                panic!("Expected indexed files, got lazy files");
-            }
-            Index::Indexed(files_2) => {
-                assert_eq!(
-                    files_2.iter().collect::<Vec<_>>(),
-                    files.iter().collect::<Vec<_>>()
-                );
-            }
+        Ok(())
+    }
+
+    #[test]
+    fn cancelled_file_indexing_recovers_file_set() -> anyhow::Result<()> {
+        let metadata = ProjectMetadata::new("test", SystemPathBuf::from("/test"));
+        let mut db = TestDb::new(metadata);
+        db.write_files((0..10_000).map(|index| (format!("/test/test_{index}.py"), "")))?;
+        db.take_salsa_events();
+
+        let project = db.project();
+        let indexing_db = db.clone();
+        let indexing = std::thread::spawn(move || project.files(&indexing_db).len());
+
+        // Wait until the lazy index has started walking files before requesting cancellation.
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while !db
+            .take_salsa_events()
+            .iter()
+            .any(|event| matches!(event.kind, EventKind::WillCheckCancellation))
+        {
+            assert!(Instant::now() < deadline, "file indexing did not start");
+            std::thread::yield_now();
         }
+
+        db.synthetic_write(Durability::LOW);
+        let cancelled = match indexing.join() {
+            Ok(indexed_files) => {
+                // Indexing can finish between the cancellation check and the write. That's valid;
+                // there is no interrupted index to recover in that case.
+                assert_eq!(indexed_files, 10_000);
+                return Ok(());
+            }
+            Err(cancelled) => cancelled,
+        };
+        assert_matches!(
+            cancelled.downcast_ref::<salsa::Cancelled>(),
+            Some(salsa::Cancelled::PendingWrite),
+            "file indexing did not propagate the salsa cancellation"
+        );
+
+        // The next access must retry the incomplete lazy index.
+        assert_eq!(project.files(&db).len(), 10_000);
 
         Ok(())
     }

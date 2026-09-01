@@ -27,7 +27,6 @@ dumps() -- marshal value as a bytes object
 loads() -- read value from a bytes-like object
 """
 
-import builtins
 import sys
 import types
 from _typeshed import ReadableBuffer, SupportsRead, SupportsWrite
@@ -39,7 +38,7 @@ _Marshallable: TypeAlias = (
     # handled in w_object() in marshal.c
     None
     | type[StopIteration]
-    | builtins.ellipsis
+    | types.EllipsisType
     | bool
     # handled in w_complex_object() in marshal.c
     | int
@@ -116,8 +115,8 @@ elif sys.version_info >= (3, 14):
           allow_code
             Allow to write code objects.
 
-        Raise a ValueError exception if value has (or contains an object that has) an
-        unsupported type.
+        Raise a ValueError exception if value has (or contains an object that
+        has) an unsupported type.
         """
 
 elif sys.version_info >= (3, 13):
@@ -148,8 +147,8 @@ elif sys.version_info >= (3, 13):
           allow_code
             Allow to write code objects.
 
-        Raise a ValueError exception if value has (or contains an object that has) an
-        unsupported type.
+        Raise a ValueError exception if value has (or contains an object that
+        has) an unsupported type.
         """
 
 else:

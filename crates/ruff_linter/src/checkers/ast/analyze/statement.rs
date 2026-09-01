@@ -152,7 +152,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 flake8_pyi::rules::bad_exit_annotation(checker, function_def);
             }
             if checker.is_rule_enabled(Rule::RedundantNumericUnion) {
-                flake8_pyi::rules::redundant_numeric_union(checker, parameters);
+                flake8_pyi::rules::redundant_numeric_union(checker, function_def);
             }
             if checker.is_rule_enabled(Rule::Pep484StylePositionalOnlyParameter) {
                 flake8_pyi::rules::pep_484_positional_parameter(checker, function_def);
@@ -178,6 +178,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 if checker.target_version() >= PythonVersion::PY39 {
                     pyupgrade::rules::lru_cache_with_maxsize_none(checker, decorator_list);
                 }
+            }
+            if checker.is_rule_enabled(Rule::DeprecatedAbcDecorator) {
+                pyupgrade::rules::deprecated_abc_decorator(checker, decorator_list);
             }
             if checker.is_rule_enabled(Rule::CachedInstanceMethod) {
                 flake8_bugbear::rules::cached_instance_method(checker, function_def);
@@ -1239,6 +1242,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::NeedlessElse) {
                 ruff::rules::needless_else(checker, while_stmt.into());
             }
+            if checker.is_rule_enabled(Rule::WhileOne) {
+                pyupgrade::rules::while_one(checker, while_stmt);
+            }
         }
         Stmt::For(
             for_stmt @ ast::StmtFor {
@@ -1352,7 +1358,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 flake8_bugbear::rules::jump_statement_in_finally(checker, finalbody);
             }
             if checker.is_rule_enabled(Rule::ContinueInFinally) {
-                if checker.target_version() <= PythonVersion::PY38 {
+                if checker.target_version() < PythonVersion::PY38 {
                     pylint::rules::continue_in_finally(checker, finalbody);
                 }
             }

@@ -4,6 +4,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -35,7 +36,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// - [Python documentation: `NotImplemented`](https://docs.python.org/3/library/constants.html#NotImplemented)
 /// - [Python documentation: `NotImplementedError`](https://docs.python.org/3/library/exceptions.html#NotImplementedError)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.18")]
+#[violation_metadata(stable_since = "v0.0.18", category = Category::Correctness)]
 pub(crate) struct RaiseNotImplemented;
 
 impl Violation for RaiseNotImplemented {

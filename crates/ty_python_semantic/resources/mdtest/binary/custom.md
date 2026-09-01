@@ -260,20 +260,21 @@ class No:
     def __rfloordiv__(self, other) -> Literal["r//"]:
         return "r//"
 
-# Subclass reflected dunder methods take precedence over the superclass's regular dunders.
-reveal_type(Yes() + Sub())  # revealed: Literal["r+"]
-reveal_type(Yes() - Sub())  # revealed: Literal["r-"]
-reveal_type(Yes() * Sub())  # revealed: Literal["r*"]
-reveal_type(Yes() @ Sub())  # revealed: Literal["r@"]
-reveal_type(Yes() / Sub())  # revealed: Literal["r/"]
-reveal_type(Yes() % Sub())  # revealed: Literal["r%"]
-reveal_type(Yes() ** Sub())  # revealed: Literal["r**"]
-reveal_type(Yes() << Sub())  # revealed: Literal["r<<"]
-reveal_type(Yes() >> Sub())  # revealed: Literal["r>>"]
-reveal_type(Yes() | Sub())  # revealed: Literal["r|"]
-reveal_type(Yes() ^ Sub())  # revealed: Literal["r^"]
-reveal_type(Yes() & Sub())  # revealed: Literal["r&"]
-reveal_type(Yes() // Sub())  # revealed: Literal["r//"]
+# Subclass reflected dunder methods may take precedence over the superclass's regular dunders,
+# depending on the operands' runtime classes.
+reveal_type(Yes() + Sub())  # revealed: Literal["r+", "+"]
+reveal_type(Yes() - Sub())  # revealed: Literal["r-", "-"]
+reveal_type(Yes() * Sub())  # revealed: Literal["r*", "*"]
+reveal_type(Yes() @ Sub())  # revealed: Literal["r@", "@"]
+reveal_type(Yes() / Sub())  # revealed: Literal["r/", "/"]
+reveal_type(Yes() % Sub())  # revealed: Literal["r%", "%"]
+reveal_type(Yes() ** Sub())  # revealed: Literal["r**", "**"]
+reveal_type(Yes() << Sub())  # revealed: Literal["r<<", "<<"]
+reveal_type(Yes() >> Sub())  # revealed: Literal["r>>", ">>"]
+reveal_type(Yes() | Sub())  # revealed: Literal["r|", "|"]
+reveal_type(Yes() ^ Sub())  # revealed: Literal["r^", "^"]
+reveal_type(Yes() & Sub())  # revealed: Literal["r&", "&"]
+reveal_type(Yes() // Sub())  # revealed: Literal["r//", "//"]
 
 # But for an unrelated class, the superclass regular dunders are used.
 reveal_type(Yes() + No())  # revealed: Literal["+"]
@@ -319,7 +320,6 @@ error[unsupported-operator]: Unsupported `+` operation
    |             ---^^^---
    |             |
    |             Both operands have type `<class 'Yes'>`
-   |
 ```
 
 ```py
@@ -335,7 +335,6 @@ error[unsupported-operator]: Unsupported `+` operation
    |             ---^^^---
    |             |
    |             Both operands have type `<class 'Sub'>`
-   |
 ```
 
 ```py
@@ -351,7 +350,6 @@ error[unsupported-operator]: Unsupported `+` operation
    |             --^^^--
    |             |
    |             Both operands have type `<class 'No'>`
-   |
 ```
 
 ## Subclass
@@ -448,5 +446,4 @@ error[unsupported-operator]: Unsupported `+` operation
   | |     |
   | |     Has type `mod1.A`
   | Has type `mod2.A`
-  |
 ```

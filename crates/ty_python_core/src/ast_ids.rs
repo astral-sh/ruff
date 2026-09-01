@@ -1,11 +1,11 @@
 use rustc_hash::FxHashMap;
 
-use ruff_db::files::File;
 use ruff_index::{IndexVec, newtype_index};
 use ruff_python_ast as ast;
 use ruff_python_ast::ExprRef;
 
 use crate::Db;
+use crate::ProgramFile;
 use crate::frozen::FrozenMap;
 use crate::scope::FileScopeId;
 use crate::semantic_index;
@@ -26,7 +26,7 @@ pub use node_key::ExpressionNodeKey;
 ///
 /// x = foo()
 /// ```
-#[derive(Debug, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, get_size2::GetSize)]
 pub(crate) struct AstIds {
     /// Maps expressions which "use" a place (that is, [`ast::ExprName`], [`ast::ExprAttribute`] or [`ast::ExprSubscript`]) to a use id.
     uses_map: FrozenMap<ExpressionNodeKey, ScopedUseId>,
@@ -55,7 +55,7 @@ impl AstIds {
     }
 }
 
-fn ast_ids(db: &dyn Db, file: File) -> &AstIds {
+fn ast_ids<'db>(db: &'db dyn Db, file: ProgramFile<'db>) -> &'db AstIds {
     semantic_index(db, file).ast_ids()
 }
 
@@ -66,46 +66,46 @@ pub struct ScopedUseId;
 
 pub trait HasScopedUseId {
     /// Returns the ID that uniquely identifies the use in its scope.
-    fn scoped_use_id(&self, db: &dyn Db, file: File) -> ScopedUseId;
+    fn scoped_use_id(&self, db: &dyn Db, file: ProgramFile<'_>) -> ScopedUseId;
 }
 
 impl HasScopedUseId for ast::Identifier {
-    fn scoped_use_id(&self, db: &dyn Db, file: File) -> ScopedUseId {
+    fn scoped_use_id(&self, db: &dyn Db, file: ProgramFile<'_>) -> ScopedUseId {
         let ast_ids = ast_ids(db, file);
         ast_ids.use_id(self)
     }
 }
 
 impl HasScopedUseId for ast::ExprName {
-    fn scoped_use_id(&self, db: &dyn Db, file: File) -> ScopedUseId {
+    fn scoped_use_id(&self, db: &dyn Db, file: ProgramFile<'_>) -> ScopedUseId {
         let expression_ref = ExprRef::from(self);
         expression_ref.scoped_use_id(db, file)
     }
 }
 
 impl HasScopedUseId for ast::ExprAttribute {
-    fn scoped_use_id(&self, db: &dyn Db, file: File) -> ScopedUseId {
+    fn scoped_use_id(&self, db: &dyn Db, file: ProgramFile<'_>) -> ScopedUseId {
         let expression_ref = ExprRef::from(self);
         expression_ref.scoped_use_id(db, file)
     }
 }
 
 impl HasScopedUseId for ast::ExprSubscript {
-    fn scoped_use_id(&self, db: &dyn Db, file: File) -> ScopedUseId {
+    fn scoped_use_id(&self, db: &dyn Db, file: ProgramFile<'_>) -> ScopedUseId {
         let expression_ref = ExprRef::from(self);
         expression_ref.scoped_use_id(db, file)
     }
 }
 
 impl HasScopedUseId for ast::Keyword {
-    fn scoped_use_id(&self, db: &dyn Db, file: File) -> ScopedUseId {
+    fn scoped_use_id(&self, db: &dyn Db, file: ProgramFile<'_>) -> ScopedUseId {
         let ast_ids = ast_ids(db, file);
         ast_ids.use_id(self)
     }
 }
 
 impl HasScopedUseId for ast::ExprRef<'_> {
-    fn scoped_use_id(&self, db: &dyn Db, file: File) -> ScopedUseId {
+    fn scoped_use_id(&self, db: &dyn Db, file: ProgramFile<'_>) -> ScopedUseId {
         let ast_ids = ast_ids(db, file);
         ast_ids.use_id(*self)
     }
@@ -136,7 +136,16 @@ pub(crate) mod node_key {
     use crate::{ast_node_ref::AstNodeRef, node_key::NodeKey};
 
     #[derive(
-        Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, salsa::Update, get_size2::GetSize,
+        Copy,
+        Clone,
+        Eq,
+        PartialEq,
+        Ord,
+        PartialOrd,
+        Hash,
+        Debug,
+        get_size2::GetSize,
+        salsa::SalsaValue,
     )]
     pub struct ExpressionNodeKey(NodeKey);
 

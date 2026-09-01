@@ -4,6 +4,7 @@ use ruff_python_ast::{self as ast, ExceptHandler, Expr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::pad;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
@@ -40,7 +41,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## References
 /// - [Python documentation: `except` clause](https://docs.python.org/3/reference/compound_stmts.html#except-clause)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.89")]
+#[violation_metadata(stable_since = "v0.0.89", category = Category::Complexity)]
 pub(crate) struct RedundantTupleInExceptionHandler {
     name: String,
 }

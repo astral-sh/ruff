@@ -496,7 +496,7 @@ class Handler(Filterer):
 
     level: int  # undocumented
     formatter: Formatter | None  # undocumented
-    lock: threading.Lock | None  # undocumented
+    lock: threading.RLock | None  # undocumented
     name: str | None  # undocumented
     def __init__(self, level: _Level = 0) -> None:
         """
@@ -1102,7 +1102,8 @@ class LoggerAdapter(Generic[_L]):
         def __class_getitem__(cls, item: Any, /) -> GenericAlias:
             """Represent a PEP 585 generic type
 
-            E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
+            For example, for t = list[int], t.__origin__ is list and t.__args__
+            is (int,).
             """
 
 def getLogger(name: str | None = None) -> Logger:
@@ -1460,7 +1461,8 @@ class StreamHandler(Handler, Generic[_StreamT]):
         def __class_getitem__(cls, item: Any, /) -> GenericAlias:
             """Represent a PEP 585 generic type
 
-            E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
+            For example, for t = list[int], t.__origin__ is list and t.__args__
+            is (int,).
             """
 
 class FileHandler(StreamHandler[TextIOWrapper]):

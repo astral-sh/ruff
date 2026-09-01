@@ -729,14 +729,14 @@ homeassistant/components/dwd_weather_warnings/coordinator.py:69:21: error[not-su
 homeassistant/components/dynalite/bridge.py:58:53: error[unresolved-attribute] Object of type `DynaliteBaseDevice & ~AlwaysFalsy` has no attribute `unique_id`
 homeassistant/components/dynalite/bridge.py:113:49: error[unresolved-attribute] Object of type `DynaliteBaseDevice` has no attribute `category`
 homeassistant/components/dynalite/bridge.py:120:55: error[invalid-argument-type] Argument to bound method `list.extend` is incorrect: Expected `Iterable[str]`, found `list[DynaliteBaseDevice]`
-homeassistant/components/ecobee/__init__.py:118:16: error[unresolved-attribute] Attribute `get` is not defined on `str`, `None` in union `dict[Unknown, Unknown] | str | None`
-homeassistant/components/ecobee/__init__.py:130:16: error[unresolved-attribute] Attribute `get` is not defined on `str`, `None` in union `dict[Unknown, Unknown] | str | None`
+homeassistant/components/ecobee/__init__.py:118:16: error[unresolved-attribute] Attribute `get` is not defined on `str`, `None` in union `dict[Unknown, Unknown] | str | None | dict[str, None | Unknown | str]`
+homeassistant/components/ecobee/__init__.py:130:16: error[unresolved-attribute] Attribute `get` is not defined on `str`, `None` in union `dict[Unknown, Unknown] | str | None | dict[str, None | Unknown | str]`
 homeassistant/components/ecobee/__init__.py:132:35: error[invalid-argument-type] Method `__getitem__` of type `bound method str.__getitem__(key: SupportsIndex | slice[SupportsIndex | None, SupportsIndex | None, SupportsIndex | None], /) -> str` cannot be called with key of type `Literal["API_KEY"]` on object of type `str`
 homeassistant/components/ecobee/__init__.py:132:35: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/components/ecobee/__init__.py:133:41: error[invalid-argument-type] Method `__getitem__` of type `bound method str.__getitem__(key: SupportsIndex | slice[SupportsIndex | None, SupportsIndex | None, SupportsIndex | None], /) -> str` cannot be called with key of type `Literal["REFRESH_TOKEN"]` on object of type `str`
 homeassistant/components/ecobee/__init__.py:133:41: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
-homeassistant/components/ecobee/__init__.py:135:18: error[unresolved-attribute] Attribute `get` is not defined on `str`, `None` in union `dict[Unknown, Unknown] | str | None`
-homeassistant/components/ecobee/__init__.py:135:62: error[unresolved-attribute] Attribute `get` is not defined on `str`, `None` in union `dict[Unknown, Unknown] | str | None`
+homeassistant/components/ecobee/__init__.py:135:18: error[unresolved-attribute] Attribute `get` is not defined on `str`, `None` in union `dict[Unknown, Unknown] | str | None | dict[str, None | Unknown | str]`
+homeassistant/components/ecobee/__init__.py:135:62: error[unresolved-attribute] Attribute `get` is not defined on `str`, `None` in union `dict[Unknown, Unknown] | str | None | dict[str, None | Unknown | str]`
 homeassistant/components/ecobee/__init__.py:139:36: error[invalid-argument-type] Method `__getitem__` of type `bound method str.__getitem__(key: SupportsIndex | slice[SupportsIndex | None, SupportsIndex | None, SupportsIndex | None], /) -> str` cannot be called with key of type `Literal["USERNAME"]` on object of type `str`
 homeassistant/components/ecobee/__init__.py:139:36: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/components/ecobee/__init__.py:140:36: error[invalid-argument-type] Method `__getitem__` of type `bound method str.__getitem__(key: SupportsIndex | slice[SupportsIndex | None, SupportsIndex | None, SupportsIndex | None], /) -> str` cannot be called with key of type `Literal["PASSWORD"]` on object of type `str`
@@ -801,7 +801,7 @@ homeassistant/components/ecobee/number.py:168:75: error[invalid-argument-type] A
 homeassistant/components/ecobee/sensor.py:80:28: error[invalid-argument-type] Method `__getitem__` of type `bound method str.__getitem__(key: SupportsIndex | slice[SupportsIndex | None, SupportsIndex | None, SupportsIndex | None], /) -> str` cannot be called with key of type `Literal["name"]` on object of type `str`
 homeassistant/components/ecobee/sensor.py:81:32: error[invalid-argument-type] Argument to function `len` is incorrect: Expected `Sized`, found `None | Unknown`
 homeassistant/components/ecobee/sensor.py:83:21: error[invalid-argument-type] Method `__getitem__` of type `bound method str.__getitem__(key: SupportsIndex | slice[SupportsIndex | None, SupportsIndex | None, SupportsIndex | None], /) -> str` cannot be called with key of type `Literal["capability"]` on object of type `str`
-homeassistant/components/ecobee/sensor.py:172:26: error[invalid-argument-type] Argument to constructor `float.__new__` is incorrect: Expected `str | Buffer | SupportsFloat | SupportsIndex`, found `None | Unknown`
+homeassistant/components/ecobee/sensor.py:172:26: error[invalid-argument-type] Argument to constructor `float.__new__` is incorrect: Expected `str | Buffer | SupportsFloat | SupportsIndex`, found `None | (Unknown & ~Literal[-5003] & ~Literal[-5002] & ~Literal["unknown"])`
 homeassistant/components/ecobee/switch.py:35:48: error[not-subscriptable] Cannot subscript object of type `_T@enumerate` with no `__getitem__` method
 homeassistant/components/ecobee/switch.py:38:44: error[invalid-argument-type] Argument to constructor `enumerate.__new__` is incorrect: Expected `Iterable[Unknown]`, found `None | Unknown`
 homeassistant/components/ecobee/switch.py:39:12: error[not-subscriptable] Cannot subscript object of type `_T@enumerate` with no `__getitem__` method
@@ -1260,7 +1260,7 @@ homeassistant/components/google_weather/config_flow.py:163:63: warning[possibly-
 homeassistant/components/google_wifi/sensor.py:197:20: error[unsupported-operator] Operator `in` is not supported between objects of type `str` and `None | Any`
 homeassistant/components/google_wifi/sensor.py:198:36: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/components/google_wifi/sensor.py:215:59: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
-homeassistant/components/govee_ble/binary_sensor.py:108:16: error[invalid-return-type] Return type does not match returned value: expected `bool`, found `bool | (ModelInfo & ~AlwaysTruthy & ~AlwaysFalsy)`
+homeassistant/components/govee_ble/binary_sensor.py:108:16: error[invalid-return-type] Return type does not match returned value: expected `bool`, found `(ModelInfo & ~AlwaysTruthy & ~AlwaysFalsy) | bool`
 homeassistant/components/govee_ble/sensor.py:142:16: error[invalid-return-type] Return type does not match returned value: expected `bool`, found `bool | (ModelInfo & ~AlwaysTruthy & ~AlwaysFalsy)`
 homeassistant/components/govee_light_local/__init__.py:35:34: error[invalid-type-form] List literals are not allowed in this context in a type expression: Did you mean `list[Event]`?
 homeassistant/components/govee_light_local/__init__.py:56:13: error[invalid-argument-type] Argument to `HomeAssistantError.__init__` is incorrect: Expected `dict[str, str] | None`, found `dict[str, str | int]`
@@ -3086,6 +3086,7 @@ homeassistant/components/onedrive_for_business/backup.py:98:17: error[unresolved
 homeassistant/components/onedrive_for_business/config_flow.py:159:41: warning[possibly-unresolved-reference] Name `folder` used when possibly not defined
 homeassistant/components/onedrive_for_business/config_flow.py:197:41: warning[possibly-unresolved-reference] Name `folder` used when possibly not defined
 homeassistant/components/onewire/onewirehub.py:45:31: error[not-subscriptable] Cannot subscript non-generic type `<class 'SignalType'>`
+homeassistant/components/onkyo/media_player.py:383:39: error[unsupported-operator] Operator `/` is not supported between objects of type `PowerParam | int | MutingParam | ... omitted 4 union elements` and `int | float`
 homeassistant/components/onvif/camera.py:179:17: error[invalid-argument-type] Argument to function `async_aiohttp_proxy_stream` is incorrect: Expected `aiohttp.streams.StreamReader`, found `asyncio.streams.StreamReader`
 homeassistant/components/onvif/device.py:189:20: error[call-non-callable] Object of type `None` is not callable
 homeassistant/components/onvif/device.py:432:21: error[unresolved-attribute] Object of type `object` has no attribute `VideoEncoderConfiguration`
@@ -3234,12 +3235,6 @@ homeassistant/components/openweathermap/coordinator.py:215:24: error[invalid-arg
 homeassistant/components/openweathermap/coordinator.py:216:36: error[invalid-argument-type] Invalid argument to key "native_wind_gust_speed" with declared type `int | float | None` on TypedDict `Forecast`: value of type `Decimal | None`
 homeassistant/components/openweathermap/coordinator.py:220:27: error[invalid-argument-type] Invalid argument to key "precipitation" with declared type `None` on TypedDict `Forecast`: value of type `Decimal`
 homeassistant/components/opnsense/__init__.py:138:32: warning[possibly-unresolved-reference] Name `interfaces_resp` used when possibly not defined
-homeassistant/components/opower/coordinator.py:298:24: warning[possibly-unresolved-reference] Name `stats` used when possibly not defined
-homeassistant/components/opower/coordinator.py:305:42: warning[possibly-unresolved-reference] Name `stats` used when possibly not defined
-homeassistant/components/opower/coordinator.py:307:21: warning[possibly-unresolved-reference] Name `stats` used when possibly not defined
-homeassistant/components/opower/coordinator.py:309:49: warning[possibly-unresolved-reference] Name `stats` used when possibly not defined
-homeassistant/components/opower/coordinator.py:310:44: warning[possibly-unresolved-reference] Name `stats` used when possibly not defined
-homeassistant/components/opower/coordinator.py:311:35: warning[possibly-unresolved-reference] Name `stats` used when possibly not defined
 homeassistant/components/osoenergy/binary_sensor.py:31:38: error[unresolved-attribute] Object of type `OSOEnergy` has no attribute `state`
 homeassistant/components/osoenergy/binary_sensor.py:36:38: error[unresolved-attribute] Object of type `OSOEnergy` has no attribute `state`
 homeassistant/components/osoenergy/binary_sensor.py:41:38: error[unresolved-attribute] Object of type `OSOEnergy` has no attribute `state`
@@ -4066,9 +4061,9 @@ homeassistant/components/tasmota/__init__.py:62:38: error[invalid-argument-type]
 homeassistant/components/tasmota/camera.py:101:24: error[unresolved-attribute] Object of type `object` has no attribute `Request`
 homeassistant/components/tasmota/camera.py:102:10: error[unresolved-attribute] Object of type `object` has no attribute `StreamResponse`
 homeassistant/components/tasmota/device_trigger.py:267:40: error[invalid-argument-type] Argument to function `clear_discovery_hash` is incorrect: Expected `tuple[str, str, str, str | int]`, found `tuple[str, str, str, str | int] | None`
-homeassistant/components/tasmota/light.py:217:40: error[unsupported-operator] Operator `in` is not supported between objects of type `Literal[ColorMode.HS]` and `set[ColorMode] | None | set[Unknown]`
-homeassistant/components/tasmota/light.py:221:37: error[unsupported-operator] Operator `in` is not supported between objects of type `Literal[ColorMode.WHITE]` and `set[ColorMode] | None | set[Unknown]`
-homeassistant/components/tasmota/light.py:232:17: error[unsupported-operator] Operator `in` is not supported between objects of type `Literal[ColorMode.COLOR_TEMP]` and `set[ColorMode] | None | set[Unknown]`
+homeassistant/components/tasmota/light.py:217:40: error[unsupported-operator] Operator `in` is not supported between objects of type `Literal[ColorMode.HS]` and `set[ColorMode] | None`
+homeassistant/components/tasmota/light.py:221:37: error[unsupported-operator] Operator `in` is not supported between objects of type `Literal[ColorMode.WHITE]` and `set[ColorMode] | None`
+homeassistant/components/tasmota/light.py:232:17: error[unsupported-operator] Operator `in` is not supported between objects of type `Literal[ColorMode.COLOR_TEMP]` and `set[ColorMode] | None`
 homeassistant/components/tautulli/entity.py:33:25: error[invalid-argument-type] Invalid argument to key "identifiers" with declared type `set[tuple[str, str]]` on TypedDict `DeviceInfo`: value of type `set[tuple[str, int | None | str]]`
 homeassistant/components/tautulli/sensor.py:40:17: error[not-iterable] Object of type `PyTautulliApiHomeStats` is not iterable
 homeassistant/components/tautulli/sensor.py:250:13: error[invalid-argument-type] Argument is incorrect: Expected `PyTautulliApiHomeStats`, found `list[PyTautulliApiHomeStats] | None`
@@ -4224,7 +4219,7 @@ homeassistant/components/tradfri/__init__.py:257:50: warning[possibly-unresolved
 homeassistant/components/tradfri/__init__.py:263:66: warning[possibly-unresolved-reference] Name `device_id` used when possibly not defined
 homeassistant/components/tradfri/light.py:236:29: error[unsupported-operator] Operator `+` is not supported between two objects of type `Unknown | None`
 homeassistant/components/transmission/__init__.py:163:32: warning[possibly-unresolved-reference] Name `new` used when possibly not defined
-homeassistant/components/trend/binary_sensor.py:236:73: error[invalid-argument-type] Argument to constructor `float.__new__` is incorrect: Expected `str | Buffer | SupportsFloat | SupportsIndex`, found `None | Any | str`
+homeassistant/components/trend/binary_sensor.py:236:73: error[invalid-argument-type] Argument to constructor `float.__new__` is incorrect: Expected `str | Buffer | SupportsFloat | SupportsIndex`, found `(Any & ~Literal["unknown"] & ~Literal["unavailable"]) | None | (str & ~Literal["unknown"] & ~Literal["unavailable"])`
 homeassistant/components/triggercmd/switch.py:26:41: error[invalid-argument-type] Argument to `TRIGGERcmdSwitch.__init__` is incorrect: Expected `TRIGGERcmdSwitch`, found `Unknown | Trigger`
 homeassistant/components/tts/__init__.py:285:13: error[invalid-argument-type] Argument to bound method `SpeechManager.async_get_result_stream` is incorrect: Expected `str`, found `object`
 homeassistant/components/tts/media_source.py:140:21: error[invalid-argument-type] Argument to bound method `SpeechManager.async_get_result_stream` is incorrect: Expected `str`, found `object`
@@ -4247,7 +4242,6 @@ homeassistant/components/tuya/vacuum.py:150:13: error[invalid-argument-type] Arg
 homeassistant/components/twilio_call/notify.py:62:28: warning[possibly-missing-submodule] Submodule `parse` might not have been imported
 homeassistant/components/twinkly/coordinator.py:97:13: error[invalid-argument-type] Argument is incorrect: Expected `bool`, found `bool | None`
 homeassistant/components/twitter/notify.py:12:24: warning[possibly-missing-import] Member `TwitterAPI` of module `TwitterAPI` may be missing
-homeassistant/components/twitter/notify.py:77:20: error[call-non-callable] Object of type `<module 'TwitterAPI.TwitterAPI'>` is not callable
 homeassistant/components/ukraine_alarm/__init__.py:69:22: error[invalid-argument-type] Method `__getitem__` of type `bound method Top[dict[Unknown, Unknown]].__getitem__(key: Never, /) -> object` cannot be called with key of type `Literal["states"]` on object of type `Top[dict[Unknown, Unknown]]`
 homeassistant/components/ukraine_alarm/__init__.py:69:22: error[not-iterable] Object of type `object` is not iterable
 homeassistant/components/ukraine_alarm/config_flow.py:57:35: warning[possibly-unresolved-reference] Name `regions` used when possibly not defined
@@ -4925,7 +4919,6 @@ homeassistant/components/worldtidesinfo/sensor.py:94:40: error[not-subscriptable
 homeassistant/components/worldtidesinfo/sensor.py:95:41: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/components/worldtidesinfo/sensor.py:96:39: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/components/worxlandroid/sensor.py:119:26: warning[possibly-unresolved-reference] Name `mower_response` used when possibly not defined
-homeassistant/components/ws66i/__init__.py:52:41: warning[possibly-unresolved-reference] Name `amp_num` used when possibly not defined
 homeassistant/components/wsdot/config_flow.py:90:34: error[unresolved-attribute] Attribute `split` is not defined on `None` in union `str | None`
 homeassistant/components/wsdot/config_flow.py:95:21: error[invalid-argument-type] Argument is incorrect: Expected `str`, found `str | None`
 homeassistant/components/xbox/__init__.py:159:21: error[invalid-argument-type] Argument is incorrect: Expected `MappingProxyType[str, Any]`, found `dict[Unknown, Unknown]`
@@ -5288,7 +5281,6 @@ homeassistant/components/zha/number.py:74:16: error[unresolved-attribute] Object
 homeassistant/components/zha/number.py:79:16: error[unresolved-attribute] Object of type `PlatformEntity | GroupEntity` has no attribute `native_unit_of_measurement`
 homeassistant/components/zha/number.py:84:15: error[unresolved-attribute] Object of type `PlatformEntity | GroupEntity` has no attribute `async_set_native_value`
 homeassistant/components/zha/radio_manager.py:423:41: warning[possibly-unresolved-reference] Name `backup` used when possibly not defined
-homeassistant/components/zha/radio_manager.py:463:59: warning[possibly-unresolved-reference] Name `retry` used when possibly not defined
 homeassistant/components/zha/select.py:54:30: error[unresolved-attribute] Object of type `BaseEntityInfo` has no attribute `options`
 homeassistant/components/zha/select.py:59:16: error[unresolved-attribute] Object of type `PlatformEntity | GroupEntity` has no attribute `current_option`
 homeassistant/components/zha/select.py:64:15: error[unresolved-attribute] Object of type `PlatformEntity | GroupEntity` has no attribute `async_select_option`
@@ -5401,7 +5393,6 @@ homeassistant/core.py:1314:29: error[invalid-assignment] Object of type `(_DataT
 homeassistant/core.py:1371:32: error[invalid-type-form] Variable of type `under_cached_property[Unknown]` is not allowed in a return type annotation
 homeassistant/core.py:1497:13: error[invalid-argument-type] Argument to bound method `EventBus.async_fire_internal` is incorrect: Expected `EventType[Mapping[str, Any]] | str`, found `EventType[_DataT@async_fire] | str`
 homeassistant/core.py:1520:48: error[invalid-argument-type] Argument to function `_event_repr` is incorrect: Expected `EventType[Mapping[str, Any]] | str`, found `EventType[_DataT@async_fire_internal] | str`
-homeassistant/core.py:1680:13: error[invalid-argument-type] Argument to bound method `EventBus._async_listen_filterable_job` is incorrect: Expected `EventType[Mapping[str, Any]] | str`, found `EventType[_DataT@async_listen_once] | str`
 homeassistant/core.py:1804:13: error[invalid-assignment] Object of type `Mapping[str, Any] & Top[ReadOnlyDict[Unknown, Unknown]]` is not assignable to attribute `attributes` of type `ReadOnlyDict[str, Any]`
 homeassistant/core.py:1918:32: error[invalid-type-form] Variable of type `under_cached_property[Unknown]` is not allowed in a return type annotation
 homeassistant/core.py:2041:9: error[invalid-method-override] Invalid override of method `__setitem__`: Definition is incompatible with `UserDict.__setitem__`
@@ -5767,4 +5758,4 @@ homeassistant/util/signal_type.pyi:63:5: error[type-assertion-failure] Type `Sig
 homeassistant/util/signal_type.pyi:63:32: error[not-subscriptable] Cannot subscript non-generic type `<class 'SignalTypeFormat'>`
 homeassistant/util/signal_type.pyi:64:27: error[not-subscriptable] Cannot subscript non-generic type `<class 'SignalType'>`
 homeassistant/util/unit_system.py:65:57: error[invalid-assignment] Object of type `dict[str, set[str] | set[str | None] | set[UnitOfLength] | ... omitted 3 union elements]` is not assignable to `dict[str, set[str] | set[str | None]]`
-Found 5765 diagnostics
+Found 5756 diagnostics

@@ -61,7 +61,7 @@ If you're wondering how to configure Ruff, here are some **recommended guideline
 
 - Prefer [`lint.select`](settings.md#lint_select) over [`lint.extend-select`](settings.md#lint_extend-select) to make your rule set explicit.
 - Use `ALL` with discretion. Enabling `ALL` will implicitly enable new rules whenever you upgrade.
-- Start with a small set of rules (`select = ["E", "F"]`) and add a category at-a-time. For example,
+- Start with a small set of rules (`select = ["E", "F"]`) and add a group at-a-time. For example,
     you might consider expanding to `select = ["E", "F", "B"]` to enable the popular flake8-bugbear
     extension.
 
@@ -140,6 +140,132 @@ Running `ruff check --select F401` would result in Ruff enforcing `F401`, and no
 
 Running `ruff check --extend-select B` would result in Ruff enforcing the `E`, `F`, and `B` rules,
 with the exception of `F401`.
+
+When [preview mode](preview.md) is enabled, rule selectors also accept the human-readable name of a
+rule (e.g., `unused-import`).
+
+## Rule categories
+
+In [preview](preview.md), Ruff supports rule categories in addition to the Flake8-style linter
+groups described above. These categories organize rules by the types of issues they detect and
+determine whether rules are enabled by default. These categories and their descriptions, in
+order of decreasing severity, are:
+
+- **Correctness**: These rules flag code that is outright wrong as written. If you encounter a
+  correctness issue, you should try to fix it rather than suppressing the error with `noqa` or
+  `ruff: ignore`.
+- **Suspicious**: These rules are similar to `correctness` lints in that the code is likely wrong,
+  but `suspicious` lints acknowledge that there are valid reasons for the code to be written in this
+  way. You will still typically want to fix these issues, but using a suppression comment may
+  occasionally be necessary. Deprecations generally also fit into this category.
+- **Complexity**: These rules detect code that can be written in a simpler or more readable way
+  without changing its semantics.
+- **Performance**: These rules detect code that can be written in a more efficient way, without changing its semantics or significantly degrading readability.
+- **Style**: These rules flag code that could be written more idiomatically and where the relevant
+  idiom has broad community acceptance.
+- **Security**: These rules flag issues that could lead to security vulnerabilities, and as such,
+  bias heavily toward false positives to avoid false negatives.
+- **Formatting**: These rules flag formatting issues and are generally redundant with a code
+  formatter.
+- **Pedantic**: These rules are generally stylistic, like those in the `style` or similar
+  categories, but enforce styles that are too opinionated or are too prone to false positives to fit
+  into another category.
+- **Restriction**: These rules restrict the usage of basic language features in arbitrary ways.
+
+The first five categories compose the default rule set:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ruff.lint]
+	preview = true
+    select = [
+        "correctness",
+        "suspicious",
+        "complexity",
+        "performance",
+        "style",
+    ]
+    ```
+
+=== "ruff.toml"
+
+    ```toml
+    [lint]
+	preview = true
+    select = [
+        "correctness",
+        "suspicious",
+        "complexity",
+        "performance",
+        "style",
+    ]
+    ```
+
+while the remaining four (`security`, `formatting`, `pedantic`, and `restriction`) are off by
+default. For certain projects, you may want to enable either `security` or `formatting` as entire
+categories, but `pedantic` and `restriction` contain a wider variety of opinionated lints, and you
+will typically only want to select individual rules from these categories directly.
+
+### Interaction with other selectors
+
+Categories can be freely mixed with linter groups, linter prefixes, rule codes, and rule names. In
+addition to the priority relationships described above for settings like `lint.select`,
+`lint.extend-select`, and `lint.ignore`, and those for various configuration sources like
+`pyproject.toml` files and the CLI, the various selectors also have precedence relationships with
+each other. In general, you can think of this precedence as increasing from the broadest selector
+(`ALL`) to the narrowest single-rule selectors (e.g. `F401` or `unused-import`):
+
+```text
+ALL < category < linter group < linter prefix < rule
+```
+
+As shown above, this means that configuration like:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ruff.lint]
+    preview = true
+    select = ["E", "F"]
+    ignore = ["F401"]
+    ```
+
+=== "ruff.toml"
+
+    ```toml
+    [lint]
+    preview = true
+    select = ["E", "F"]
+    ignore = ["F401"]
+    ```
+
+will select all `E` and `F` rules, with the exception of `F401`. Analogously, a selection with the
+`suspicious` category like:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ruff.lint]
+    preview = true
+    select = ["suspicious"]
+    ignore = ["UP"]
+    ```
+
+=== "ruff.toml"
+
+    ```toml
+    [lint]
+    preview = true
+    select = ["suspicious"]
+    ignore = ["UP"]
+    ```
+
+would select all `suspicious` rules, except for the `UP` rules in that category.
+
+Note that we plan to deprecate and eventually remove the linter groups in the future. If you give
+the new categories a try and run into situations where you need to fall back on linter groups,
+please let us know on the [tracking issue](https://github.com/astral-sh/ruff/issues/27959).
 
 ## Fixes
 
@@ -289,8 +415,12 @@ see the [`lint.per-file-ignores`](settings.md#lint_per-file-ignores) setting.
 
 ### Comments
 
-Ruff supports multiple forms of suppression comments, including inline and file-level `noqa`
-comments, and range suppressions.
+Ruff supports multiple forms of suppression comments, including inline and file-level `noqa` and
+`ruff: ignore` comments, and range suppressions.
+
+In [`preview`](preview.md) mode, rule names (e.g. `unused-import`) can be used in `ruff: ignore`,
+`ruff: file-ignore`, `ruff: disable`, and `ruff: enable` comments instead of rule codes (e.g.
+`F401`).
 
 #### Line-level
 
@@ -341,20 +471,18 @@ The full inline comment specification is as follows:
   missing delimiter (e.g. `F401F841`), though a warning will be emitted in this
   case.
 
-*The following is currently only available in [preview mode](`preview.md`).*
-
 To cover an entire "logical" line (a multi-line statement or suite header),
 an "ignore" comment may be placed above the first line:
 
 ```python
-# ruff: ignore[unused-function-argument]  # Covers the entire function signature
+# ruff: ignore[ARG001]  # Covers the entire function signature
 def foo(
     arg1,
     arg2,
 ):
     pass
 
-# ruff: ignore[line-too-long]  # Covers the entire list literal
+# ruff: ignore[E501]  # Covers the entire list literal
 things = [
     "really long string literal ...",
     "really long string literal ...",
@@ -368,13 +496,13 @@ of the multi-line statement or header uncovered:
 ```python
 def foo(
     arg1,
-    # ruff: ignore[unused-function-argument]  # Only covers `arg2`
+    # ruff: ignore[ARG001]  # Only covers `arg2`
     arg2,
 ):
     pass
 
 things = [
-    "really long string literal ...",  # ruff: ignore[line-too-long]  # Only covers this line
+    "really long string literal ...",  # ruff: ignore[E501]  # Only covers this line
     "really long string literal ...",
 ]
 ```
@@ -383,8 +511,8 @@ Ignore comments can also be "stacked" with other comments or pragmas, and will
 still cover the next logical line:
 
 ```python
-# ruff: ignore[ambiguous-variable-name]
-# ruff: ignore[unused-variable]
+# ruff: ignore[E741]
+# ruff: ignore[F841]
 # I definitely know what I'm doing.
 i = 1
 ```
@@ -451,9 +579,6 @@ be used to terminate a preceding "disable" comment with identical codes.
 Unlike `noqa` suppressions, range suppressions do not support "blanket" suppression
 of all violations. At least one violation code must be listed.
 
-In [`preview`](preview.md) mode, rule names (e.g. `unused-import`) can be used in these comments
-instead of rule codes (e.g. `F401`).
-
 The full range suppression comment specification is as follows:
 
 - An own-line comment starting with case sensitive `#ruff:`, with optional whitespace
@@ -493,12 +618,11 @@ The file-level suppression comment specification is as follows:
   optional whitespace and a case-insensitive match for `noqa`. After this, the
   specification is as in the inline `noqa` suppressions above.
 
-In [`preview`](preview.md) mode, one or more rules can be ignored across an
-entire file with a `file-ignore` comment on its own line, at global module scope,
-and preferably near the top of the file:
+One or more rules can also be ignored across an entire file with a `file-ignore` comment on its own
+line, at global module scope, and preferably near the top of the file:
 
 ```python
-# ruff: file-ignore[unused-import, unused-function-argument]
+# ruff: file-ignore[F401, ARG001]
 ```
 
 The full-level suppression comment specification is as follows:
@@ -530,13 +654,18 @@ $ ruff check /path/to/file.py --extend-select RUF100 --fix
 
 ### Inserting necessary suppression comments
 
-Ruff can _automatically add_ `noqa` directives to all lines that contain violations, which is
-useful when migrating a new codebase to Ruff. To automatically add `noqa` directives to all
-relevant lines (with the appropriate rule codes), run Ruff with `--add-noqa`, like so:
+Ruff can _automatically add_ suppression comments to all lines that contain violations, which is
+useful when migrating a new codebase to Ruff. To add the appropriate comments to all relevant lines,
+run Ruff with `--add-noqa` to add `noqa` comments or with `--add-ignore` to add `ruff: ignore`
+comments:
 
 ```shell-session
 $ ruff check /path/to/file.py --add-noqa
+$ ruff check /path/to/file.py --add-ignore
 ```
+
+Both of these flags use rule codes on stable. To add `ruff: ignore` comments with human-readable
+rule names instead, use `--add-ignore` with preview mode enabled.
 
 ### isort action comments
 

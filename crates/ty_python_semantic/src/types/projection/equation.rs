@@ -1,6 +1,6 @@
 use smallvec::SmallVec;
 
-use crate::types::{DivergentType, KnownClass, Type, UnionType};
+use crate::types::{DivergentType, KnownClass, ProgramEnvironment, Type, UnionType};
 use crate::{Db, FxIndexMap, FxIndexSet};
 
 use super::artifact::ProjectionPath;
@@ -13,7 +13,7 @@ use super::term::ProjectionTerm;
 ///
 /// `Projection(root, path)` is treated as an equation variable whose value is
 /// derived from the container structure observed for `root`.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, salsa::SalsaValue, get_size2::GetSize)]
 pub(super) struct ProjectionVar<'db> {
     pub(super) root: DivergentType,
     pub(super) path: ProjectionPath<'db>,
@@ -62,22 +62,28 @@ pub(crate) struct ProjectionSolutions<'db> {
 impl<'db> ProjectionSolutions<'db> {
     pub(super) fn from_recovery_slots(
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         roots: &CycleRootSet,
         slots: &[ProjectionRecoverySlot<'db>],
         evidence: Option<&ProjectionEvidenceSet<'db>>,
     ) -> Option<Self> {
-        ProjectionEquationSystem::from_recovery_slots(db, roots, slots, evidence)?.solve(db)
+        ProjectionEquationSystem::from_recovery_slots(db, env, roots, slots, evidence)?
+            .solve(db, env)
     }
 
     fn new(solved: FxIndexMap<ProjectionVar<'db>, Type<'db>>) -> Self {
         Self { solved }
     }
 
-    fn contains_projection_artifact_in_roots(&self, db: &'db dyn Db) -> bool {
+    fn contains_projection_artifact_in_roots(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> bool {
         let roots = self.roots();
         self.solved
             .values()
-            .any(|ty| ty.mentions_projection_artifact_in_roots(db, &roots))
+            .any(|ty| ty.mentions_projection_artifact_in_roots(db, env, &roots))
     }
 
     pub(super) fn roots(&self) -> CycleRootSet {
@@ -96,11 +102,16 @@ impl<'db> ProjectionSolutions<'db> {
     pub(super) fn solved_type(
         &self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         var: &ProjectionVar<'db>,
     ) -> Option<Type<'db>> {
         if let Some(solved) = self.solved.get(var).copied() {
             debug_assert!(
-                !solved.mentions_projection_artifact_in_roots(db, &CycleRootSet::single(var.root)),
+                !solved.mentions_projection_artifact_in_roots(
+                    db,
+                    env,
+                    &CycleRootSet::single(var.root)
+                ),
                 "projection solver must not return an unsolved projection artifact"
             );
             return Some(solved);
@@ -120,10 +131,15 @@ impl<'db> ProjectionSolutions<'db> {
             if solved.same_divergent_marker(db, Type::Divergent(var.root)) {
                 return Some(*solved);
             }
-            let solved = ProjectionContainer::project_type_path(db, *solved, var.root, None, &tail)
-                .map(|term| term.ty(db))?;
+            let solved =
+                ProjectionContainer::project_type_path(db, env, *solved, var.root, None, &tail)
+                    .map(|term| term.ty(db, env))?;
             debug_assert!(
-                !solved.mentions_projection_artifact_in_roots(db, &CycleRootSet::single(var.root)),
+                !solved.mentions_projection_artifact_in_roots(
+                    db,
+                    env,
+                    &CycleRootSet::single(var.root)
+                ),
                 "projection solver must not return an unsolved projection artifact"
             );
             return Some(solved);
@@ -148,6 +164,7 @@ pub(super) struct ProjectionEquationSystem<'db> {
 impl<'db> ProjectionEquationSystem<'db> {
     pub(super) fn from_recovery_slots(
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         roots: &CycleRootSet,
         slots: &[ProjectionRecoverySlot<'db>],
         evidence: Option<&ProjectionEvidenceSet<'db>>,
@@ -158,7 +175,7 @@ impl<'db> ProjectionEquationSystem<'db> {
 
         let mut demands = FxIndexSet::default();
         for slot in slots {
-            for (root, path) in slot.joined.projection_demands(db) {
+            for (root, path) in slot.joined.projection_demands(db, env) {
                 if roots.contains(root) {
                     demands.insert(ProjectionVar { root, path });
                 }
@@ -174,14 +191,14 @@ impl<'db> ProjectionEquationSystem<'db> {
             let ProjectionRecoverySlotRole::Candidate { root_hint } = slot.role else {
                 continue;
             };
-            let joined_demands = slot.joined.projection_demands(db);
+            let joined_demands = slot.joined.projection_demands(db, env);
             if let Some(root) =
                 root_hint.or_else(|| root_candidate_from_demands(&joined_demands, roots))
             {
                 if !demands.iter().any(|var| var.root.same_marker(root)) {
                     continue;
                 }
-                if !is_plausible_root_candidate(db, root, slot.joined, evidence) {
+                if !is_plausible_root_candidate(db, env, root, slot.joined, evidence) {
                     continue;
                 }
                 candidates.insert(root, slot.joined);
@@ -191,7 +208,7 @@ impl<'db> ProjectionEquationSystem<'db> {
             if slot.previous.is_none() {
                 for (root, _) in joined_demands {
                     if demands.iter().any(|var| var.root.same_marker(root))
-                        && is_plausible_root_candidate(db, root, slot.joined, evidence)
+                        && is_plausible_root_candidate(db, env, root, slot.joined, evidence)
                     {
                         candidates.insert(root, slot.joined);
                     }
@@ -223,7 +240,7 @@ impl<'db> ProjectionEquationSystem<'db> {
             if let Some(candidates) = candidates.get(var.root) {
                 for candidate in candidates {
                     let Some(candidate_equation) =
-                        Self::build_equation(db, roots, *candidate, &var, evidence)
+                        Self::build_equation(db, env, roots, *candidate, &var, evidence)
                     else {
                         continue;
                     };
@@ -235,7 +252,7 @@ impl<'db> ProjectionEquationSystem<'db> {
                 for fact in evidence.projection_facts(db) {
                     if fact.root.same_marker(var.root) && fact.path == var.path {
                         has_equation_terms = true;
-                        equation.add_projection_term(db, roots, &var, fact.term, true)?;
+                        equation.add_projection_term(db, env, roots, &var, fact.term, true)?;
                     }
                 }
             }
@@ -259,6 +276,7 @@ impl<'db> ProjectionEquationSystem<'db> {
 
     pub(super) fn from_terms_by_op(
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         root: DivergentType,
         terms_by_op: &FxIndexMap<ProjectionPath<'db>, Vec<ProjectionTerm<'db>>>,
     ) -> Option<Self> {
@@ -280,7 +298,7 @@ impl<'db> ProjectionEquationSystem<'db> {
             let terms = terms_by_op.get(&var.path)?;
             let mut equation = ProjectionEquation::default();
             for term in terms {
-                equation.add_projection_term(db, &roots, &var, *term, true)?;
+                equation.add_projection_term(db, env, &roots, &var, *term, true)?;
             }
             equation.wrap_in_list?;
             if equation.unsupported {
@@ -299,6 +317,7 @@ impl<'db> ProjectionEquationSystem<'db> {
 
     fn build_equation(
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         roots: &CycleRootSet,
         candidate: Type<'db>,
         var: &ProjectionVar<'db>,
@@ -312,19 +331,23 @@ impl<'db> ProjectionEquationSystem<'db> {
                 continue;
             }
 
-            let container = ProjectionContainer::try_from(db, var.root, element, evidence)?;
-            let term = container.project_multi_root_path(db, var.root, evidence, &var.path)?;
+            let container = ProjectionContainer::try_from(db, env, var.root, element, evidence)?;
+            let term = container.project_multi_root_path(db, env, var.root, evidence, &var.path)?;
             // Terms projected from an arm that already contains this root are recursive evidence,
             // not a productive base. Cross-root projection terms may still be productive because
             // they can be substituted once the other root is solved.
-            let allow_productive = !element.mentions_cycle_artifact_direct(db, var.root);
-            equation.add_projection_term(db, roots, var, term, allow_productive)?;
+            let allow_productive = !element.mentions_cycle_artifact_direct(db, env, var.root);
+            equation.add_projection_term(db, env, roots, var, term, allow_productive)?;
         }
 
         Some(equation)
     }
 
-    pub(super) fn solve(self, db: &'db dyn Db) -> Option<ProjectionSolutions<'db>> {
+    pub(super) fn solve(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Option<ProjectionSolutions<'db>> {
         let Self { equations } = self;
         if equations.is_empty() || equations.values().any(|equation| equation.unsupported) {
             return None;
@@ -365,7 +388,7 @@ impl<'db> ProjectionEquationSystem<'db> {
                     || equation
                         .productive
                         .iter()
-                        .any(|term| term.mentions_projection_var_in(db, &scc_vars))
+                        .any(|term| term.mentions_projection_var_in(db, env, &scc_vars))
             });
             let solved_so_far = vars
                 .iter()
@@ -380,10 +403,10 @@ impl<'db> ProjectionEquationSystem<'db> {
                     let mut base = Vec::new();
                     let equation = &equations[&vars[index]];
                     for term in &equation.productive {
-                        if term.mentions_projection_var_in(db, &scc_vars) {
+                        if term.mentions_projection_var_in(db, env, &scc_vars) {
                             continue;
                         }
-                        base.push(term.replace_solved_projection_vars(db, &solved_so_far)?);
+                        base.push(term.replace_solved_projection_vars(db, env, &solved_so_far)?);
                     }
                     for dependency in &equation.dependencies {
                         let dependency_index = var_indices[dependency];
@@ -395,10 +418,10 @@ impl<'db> ProjectionEquationSystem<'db> {
                     base.push(Type::Divergent(root));
                     let solved = match base.as_slice() {
                         [term] => *term,
-                        _ => UnionType::from_elements_cycle_recovery(db, base),
+                        _ => UnionType::from_elements_cycle_recovery(db, env, base),
                     };
                     solutions[index] = Some(if wrap_in_list {
-                        KnownClass::List.to_specialized_instance(db, &[solved])
+                        KnownClass::List.to_specialized_instance(db, env, &[solved])
                     } else {
                         solved
                     });
@@ -410,7 +433,7 @@ impl<'db> ProjectionEquationSystem<'db> {
             for &index in &scc {
                 let equation = &equations[&vars[index]];
                 for term in &equation.productive {
-                    base.push(term.replace_solved_projection_vars(db, &solved_so_far)?);
+                    base.push(term.replace_solved_projection_vars(db, env, &solved_so_far)?);
                 }
                 for dependency in &equation.dependencies {
                     let dependency_index = var_indices[dependency];
@@ -424,7 +447,7 @@ impl<'db> ProjectionEquationSystem<'db> {
                 for index in scc {
                     let root = vars[index].root;
                     let solved = if wrap_in_list {
-                        KnownClass::List.to_specialized_instance(db, &[Type::Divergent(root)])
+                        KnownClass::List.to_specialized_instance(db, env, &[Type::Divergent(root)])
                     } else {
                         Type::Divergent(root)
                     };
@@ -435,10 +458,10 @@ impl<'db> ProjectionEquationSystem<'db> {
 
             let solved = match base.as_slice() {
                 [term] => *term,
-                _ => UnionType::from_elements_cycle_recovery(db, base),
+                _ => UnionType::from_elements_cycle_recovery(db, env, base),
             };
             let solved = if wrap_in_list {
-                KnownClass::List.to_specialized_instance(db, &[solved])
+                KnownClass::List.to_specialized_instance(db, env, &[solved])
             } else {
                 solved
             };
@@ -455,7 +478,7 @@ impl<'db> ProjectionEquationSystem<'db> {
 
         let solutions = ProjectionSolutions::new(solved);
         debug_assert!(
-            !solutions.contains_projection_artifact_in_roots(db),
+            !solutions.contains_projection_artifact_in_roots(db, env),
             "projection solver must not leave unsolved projection artifacts"
         );
         Some(solutions)
@@ -500,6 +523,28 @@ struct ProjectionEquation<'db> {
     wrap_in_list: Option<bool>,
 }
 
+#[derive(Clone, Copy)]
+struct TypeTermPolicy {
+    allow_dependencies: bool,
+    allow_productive: bool,
+}
+
+impl TypeTermPolicy {
+    const fn with_dependencies(allow_productive: bool) -> Self {
+        Self {
+            allow_dependencies: true,
+            allow_productive,
+        }
+    }
+
+    const fn without_dependencies(allow_productive: bool) -> Self {
+        Self {
+            allow_dependencies: false,
+            allow_productive,
+        }
+    }
+}
+
 impl<'db> ProjectionEquation<'db> {
     fn merge(&mut self, other: Self) -> Option<()> {
         match (self.wrap_in_list, other.wrap_in_list) {
@@ -518,6 +563,7 @@ impl<'db> ProjectionEquation<'db> {
     fn add_projection_term(
         &mut self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         roots: &CycleRootSet,
         var: &ProjectionVar<'db>,
         term: ProjectionTerm<'db>,
@@ -538,22 +584,36 @@ impl<'db> ProjectionEquation<'db> {
                 }
 
                 if !term.is_matching_projection(db, var.root, &var.path)
-                    && term.mentions_matching_projection(db, var.root, &var.path)
+                    && term.mentions_matching_projection(db, env, var.root, &var.path)
                     && let Some(projected) = ProjectionContainer::project_multi_root_type_path(
-                        db, term, var.root, None, &var.path,
+                        db, env, term, var.root, None, &var.path,
                     )
                 {
                     if projected
-                        .ty(db)
+                        .ty(db, env)
                         .is_matching_projection(db, var.root, &var.path)
                     {
                         self.divergent = true;
                         return Some(());
                     }
-                    return self.add_projection_term(db, roots, var, projected, allow_productive);
+                    return self.add_projection_term(
+                        db,
+                        env,
+                        roots,
+                        var,
+                        projected,
+                        allow_productive,
+                    );
                 }
 
-                self.add_type_term(db, roots, var, term, true, allow_productive)
+                self.add_type_term(
+                    db,
+                    env,
+                    roots,
+                    var,
+                    term,
+                    TypeTermPolicy::with_dependencies(allow_productive),
+                )
             }
             ProjectionTerm::Homogeneous(term) => {
                 if term.same_divergent_marker(db, Type::Divergent(var.root)) {
@@ -561,43 +621,48 @@ impl<'db> ProjectionEquation<'db> {
                     return Some(());
                 }
 
-                self.add_type_term(db, roots, var, term, true, allow_productive)
+                self.add_type_term(
+                    db,
+                    env,
+                    roots,
+                    var,
+                    term,
+                    TypeTermPolicy::with_dependencies(allow_productive),
+                )
             }
-            ProjectionTerm::List(term) => {
-                self.add_type_term(db, roots, var, term, false, allow_productive)
-            }
+            ProjectionTerm::List(term) => self.add_type_term(
+                db,
+                env,
+                roots,
+                var,
+                term,
+                TypeTermPolicy::without_dependencies(allow_productive),
+            ),
         }
     }
 
     fn add_type_term(
         &mut self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         roots: &CycleRootSet,
         var: &ProjectionVar<'db>,
         term: Type<'db>,
-        allow_dependencies: bool,
-        allow_productive: bool,
+        policy: TypeTermPolicy,
     ) -> Option<()> {
         if let Type::Union(union) = term {
             for element in union.elements(db) {
-                self.add_type_term(
-                    db,
-                    roots,
-                    var,
-                    *element,
-                    allow_dependencies,
-                    allow_productive,
-                )?;
+                self.add_type_term(db, env, roots, var, *element, policy)?;
             }
             return Some(());
         }
 
-        if term.mentions_cycle_artifact_outside_roots(db, roots) {
+        if term.mentions_cycle_artifact_outside_roots(db, env, roots) {
             self.unsupported = true;
             return Some(());
         }
 
-        if allow_dependencies {
+        if policy.allow_dependencies {
             if let Type::Projection(projection) = term {
                 let root = projection.root(db);
                 if roots.contains(root) {
@@ -618,15 +683,15 @@ impl<'db> ProjectionEquation<'db> {
                 return Some(());
             }
 
-            if let Some(var) = term.matching_projection_narrowing_var_multi(db, roots) {
+            if let Some(var) = term.matching_projection_narrowing_var_multi(db, env, roots) {
                 self.dependencies.insert(var);
                 return Some(());
             }
         }
 
-        if allow_dependencies {
+        if policy.allow_dependencies {
             let dependencies = term
-                .projection_demands(db)
+                .projection_demands(db, env)
                 .into_iter()
                 .filter_map(|(root, path)| {
                     roots.contains(root).then_some(ProjectionVar { root, path })
@@ -643,21 +708,21 @@ impl<'db> ProjectionEquation<'db> {
                     return Some(());
                 }
                 self.dependencies.extend(dependencies);
-                if allow_productive {
+                if policy.allow_productive {
                     self.productive.push(term);
                 }
                 return Some(());
             }
         }
 
-        if term.mentions_divergent_in_roots(db, roots)
-            || term.mentions_cycle_artifact_in_roots(db, roots)
+        if term.mentions_divergent_in_roots(db, env, roots)
+            || term.mentions_cycle_artifact_in_roots(db, env, roots)
         {
             self.divergent = true;
             return Some(());
         }
 
-        if allow_productive {
+        if policy.allow_productive {
             self.productive.push(term);
         }
         Some(())
@@ -666,11 +731,12 @@ impl<'db> ProjectionEquation<'db> {
 
 pub(super) fn root_candidate_from_previous(
     db: &dyn Db,
+    env: &ProgramEnvironment<'_>,
     previous: Type<'_>,
     roots: &CycleRootSet,
 ) -> Option<DivergentType> {
     let mut candidates = previous
-        .cycle_artifact_roots(db)
+        .cycle_artifact_roots(db, env)
         .into_iter()
         .filter(|root| roots.contains(*root))
         .collect::<Vec<_>>();
@@ -699,6 +765,7 @@ fn root_candidate_from_demands(
 
 fn is_plausible_root_candidate<'db>(
     db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
     root: DivergentType,
     ty: Type<'db>,
     evidence: Option<&ProjectionEvidenceSet<'db>>,
@@ -706,7 +773,7 @@ fn is_plausible_root_candidate<'db>(
     ty.top_level_projection_union_elements(db)
         .into_iter()
         .filter(|element| !element.same_divergent_marker(db, Type::Divergent(root)))
-        .any(|element| ProjectionContainer::try_from(db, root, element, evidence).is_some())
+        .any(|element| ProjectionContainer::try_from(db, env, root, element, evidence).is_some())
 }
 
 /// Returns strongly connected components in dependency-first order for a graph

@@ -9,7 +9,7 @@ dependencies = [
     # Pyright is missing because we install it with `npm` to avoid measuring the overhead
     # of the Python wrapper script (that lazily installs Pyright).
     "mslex>=1.3.0",
-    "pyrefly==1.1.0",
+    "pyrefly==1.2.0",
     "pytest-benchmark>=4.0.0",
     "pytest>=8.0.0",
     "pygls>=2.0.0",
@@ -20,11 +20,8 @@ dependencies = [
 benchmark = "benchmark.run:main"
 
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
-
-[tool.hatch.build.targets.wheel]
-packages = ["src/benchmark"]
+requires = ["uv_build>=0.12.3,<0.13"]
+build-backend = "uv_build"
 
 [tool.ruff.lint]
 ignore = [
@@ -35,3 +32,13 @@ ignore = [
 possibly-unresolved-reference = "error"
 division-by-zero = "error"
 unused-ignore-comment = "error"
+
+[tool.uv]
+no-build = true
+no-binary-package = ["ty-benchmark"]
+# Pin the isolated build environment for source-build exceptions.
+build-constraint-dependencies = ["uv-build==0.12.3"]
+exclude-newer = "P7D"
+
+[tool.uv.build-backend]
+module-name = "benchmark"

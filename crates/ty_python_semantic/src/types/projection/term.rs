@@ -6,10 +6,10 @@
 
 use crate::Db;
 use crate::types::visitor::any_over_type;
-use crate::types::{DynamicType, KnownClass, Type, UnionType};
+use crate::types::{DynamicType, KnownClass, ProgramEnvironment, Type, UnionType};
 
 /// The result of applying one projection path to one container arm.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::SalsaValue, get_size2::GetSize)]
 pub(super) enum ProjectionTerm<'db> {
     Exact(Type<'db>),
     Homogeneous(Type<'db>),
@@ -17,16 +17,20 @@ pub(super) enum ProjectionTerm<'db> {
 }
 
 impl<'db> ProjectionTerm<'db> {
-    pub(super) fn ty(self, db: &'db dyn Db) -> Type<'db> {
+    pub(super) fn ty(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
         match self {
             ProjectionTerm::Exact(ty) | ProjectionTerm::Homogeneous(ty) => ty,
             ProjectionTerm::List(element) => {
-                KnownClass::List.to_specialized_instance(db, &[element])
+                KnownClass::List.to_specialized_instance(db, env, &[element])
             }
         }
     }
 
-    pub(super) fn from_union_terms(db: &'db dyn Db, terms: &[Self]) -> Option<Self> {
+    pub(super) fn from_union_terms(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        terms: &[Self],
+    ) -> Option<Self> {
         let wrap_in_list = terms
             .iter()
             .any(|term| matches!(term, ProjectionTerm::List(_)));
@@ -42,7 +46,7 @@ impl<'db> ProjectionTerm<'db> {
             ProjectionTerm::List(element) => element,
             ProjectionTerm::Exact(ty) | ProjectionTerm::Homogeneous(ty) => ty,
         });
-        let ty = UnionType::from_elements_cycle_recovery(db, elements);
+        let ty = UnionType::from_elements_cycle_recovery(db, env, elements);
         Some(if wrap_in_list {
             ProjectionTerm::List(ty)
         } else {
@@ -50,8 +54,8 @@ impl<'db> ProjectionTerm<'db> {
         })
     }
 
-    pub(super) fn is_ambiguous(self, db: &'db dyn Db) -> bool {
-        any_over_type(db, self.ty(db), false, |ty| {
+    pub(super) fn is_ambiguous(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
+        any_over_type(db, env, self.ty(db, env), false, |ty| {
             matches!(ty, Type::Dynamic(DynamicType::AmbiguousOverload))
         })
     }

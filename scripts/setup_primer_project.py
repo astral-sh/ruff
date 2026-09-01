@@ -4,14 +4,28 @@
 # requires-python = ">=3.11"
 # dependencies = ["mypy-primer"]
 #
+# [tool.ty.rules]
+# blanket-ignore-comment = "warn"
+# missing-type-argument = "warn"
+# possibly-unresolved-reference = "warn"
+# unsound-return-statement = "warn"
+# unsound-yield = "warn"
+# unsupported-dynamic-base = "warn"
+# division-by-zero = "warn"
+#
 # [tool.uv]
+# no-build = true
+# no-binary-package = ["mypy-primer"]
+# build-constraint-dependencies = ["setuptools==84.0.0"]
 # # This is the default for ad hoc use. Historical ecosystem reproduction must
 # # bypass the adjacent lock and select ecosystem-analyzer's exact mypy-primer
 # # revision and project Python version, as shown in the module docstring.
 # # `exclude-newer` still constrains mypy-primer's registry dependencies.
-# exclude-newer = "7 days"
+# exclude-newer = "P7D"
 #
 # [tool.uv.sources]
+# # Keep the script's lockfile in sync with the mypy-primer pin in the project's uv.lock file
+# # so memory reports and ecosystem jobs use the same project definitions.
 # mypy-primer = { git = "https://github.com/hauntsaninja/mypy_primer" }
 # ///
 
@@ -91,12 +105,20 @@ def main() -> None:
         "--exclude-newer",
         help="Limit dependency resolution to packages uploaded before this timestamp",
     )
+    parser.add_argument(
+        "--print-ty-command",
+        action="store_true",
+        help="Print the project-specific ty command without setting up the project",
+    )
     args = parser.parse_args()
 
     project = find_project(args.project)
     revision = args.revision or project.revision
 
     target_dir = Path(args.directory or project.name).resolve()
+    if args.print_ty_command:
+        print(get_ty_command(project, ty_binary="{ty}", venv_dir=target_dir / ".venv"))
+        return
 
     # Use a full clone only when a historical ecosystem report revision must be checked out.
     clone_cmd = [
@@ -139,7 +161,7 @@ def main() -> None:
         install_cmd = project.install_cmd.format(install=install_base)
         print(f"Running install command: {install_cmd}")
         # Primer install commands are trusted project metadata and may use shell syntax.
-        subprocess.run(install_cmd, cwd=target_dir, shell=True, check=True)  # noqa: S602
+        subprocess.run(install_cmd, cwd=target_dir, shell=True, check=True)  # ruff: ignore[subprocess-popen-with-shell-equals-true]
 
     # Install listed dependencies (matching primer's setup())
     if project.deps:

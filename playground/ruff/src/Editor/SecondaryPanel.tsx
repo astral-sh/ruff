@@ -5,17 +5,15 @@ import IStandaloneCodeEditor = editor.IStandaloneCodeEditor;
 import MonacoEditor from "@monaco-editor/react";
 
 export enum SecondaryTool {
-  "Format" = "Format",
-  "AST" = "AST",
-  "Tokens" = "Tokens",
-  "FIR" = "FIR",
-  "Comments" = "Comments",
+  Format = "Format",
+  AST = "AST",
+  Tokens = "Tokens",
+  FIR = "FIR",
+  Comments = "Comments",
 }
 
 export type SecondaryPanelResult =
-  | null
-  | { status: "ok"; content: string }
-  | { status: "error"; error: string };
+  null | { status: "ok"; content: string } | { status: "error"; error: string };
 
 export type SecondaryPanelProps = {
   tool: SecondaryTool;

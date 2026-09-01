@@ -134,7 +134,8 @@ class CompletedProcess(Generic[_T]):
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
         """Represent a PEP 585 generic type
 
-        E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
+        For example, for t = list[int], t.__origin__ is list and t.__args__
+        is (int,).
         """
 
 if sys.version_info >= (3, 11):
@@ -1309,9 +1310,9 @@ class Popen(Generic[AnyStr]):
     """
 
     args: _CMD
-    stdin: IO[Any] | None
-    stdout: IO[Any] | None
-    stderr: IO[Any] | None
+    stdin: IO[AnyStr] | None
+    stdout: IO[AnyStr] | None
+    stderr: IO[AnyStr] | None
     pid: int
     returncode: int | MaybeNone
     universal_newlines: bool
@@ -1737,7 +1738,8 @@ class Popen(Generic[AnyStr]):
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
         """Represent a PEP 585 generic type
 
-        E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
+        For example, for t = list[int], t.__origin__ is list and t.__args__
+        is (int,).
         """
 
 # The result really is always a str.

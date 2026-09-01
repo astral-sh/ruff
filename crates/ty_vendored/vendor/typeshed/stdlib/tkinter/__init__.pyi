@@ -3,7 +3,7 @@
 Tkinter provides classes which allow the display, positioning and
 control of widgets. Toplevel widgets are Tk and Toplevel. Other
 widgets are Frame, Label, Entry, Text, Canvas, Button, Radiobutton,
-Checkbutton, Scale, Listbox, Scrollbar, OptionMenu, Spinbox
+Checkbutton, Scale, Listbox, Scrollbar, OptionMenu, Spinbox,
 LabelFrame and PanedWindow.
 
 Properties of the widgets are specified with keyword arguments.
@@ -402,7 +402,8 @@ class Event(Generic[_W_co]):
         def __class_getitem__(cls, item: Any, /) -> GenericAlias:
             """Represent a PEP 585 generic type
 
-            E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
+            For example, for t = list[int], t.__origin__ is list and t.__args__
+            is (int,).
             """
 
 def NoDefaultRoot() -> None:
@@ -459,7 +460,7 @@ class Variable:
     def trace_info(self) -> list[tuple[tuple[Literal["array", "read", "write", "unset"], ...], str]]:
         """Return all trace callback information."""
 
-    @deprecated("Deprecated since Python 3.14. Use `trace_add()` instead.")
+    @deprecated("Deprecated; will be removed in Python 3.17. Use `trace_add()` instead.")
     def trace(self, mode, callback) -> str:
         """Define a trace callback for the variable.
 
@@ -470,10 +471,11 @@ class Variable:
         Return the name of the callback.
 
         This deprecated method wraps a deprecated Tcl method removed
-        in Tcl 9.0.  Use trace_add() instead.
+        in Tcl 9.0 and will be removed in Python 3.17.  Use trace_add()
+        instead.
         """
 
-    @deprecated("Deprecated since Python 3.14. Use `trace_add()` instead.")
+    @deprecated("Deprecated; will be removed in Python 3.17. Use `trace_add()` instead.")
     def trace_variable(self, mode, callback) -> str:
         """Define a trace callback for the variable.
 
@@ -484,10 +486,11 @@ class Variable:
         Return the name of the callback.
 
         This deprecated method wraps a deprecated Tcl method removed
-        in Tcl 9.0.  Use trace_add() instead.
+        in Tcl 9.0 and will be removed in Python 3.17.  Use trace_add()
+        instead.
         """
 
-    @deprecated("Deprecated since Python 3.14. Use `trace_remove()` instead.")
+    @deprecated("Deprecated; will be removed in Python 3.17. Use `trace_remove()` instead.")
     def trace_vdelete(self, mode, cbname) -> None:
         """Delete the trace callback for a variable.
 
@@ -495,15 +498,17 @@ class Variable:
         CBNAME is the name of the callback returned from trace_variable or trace.
 
         This deprecated method wraps a deprecated Tcl method removed
-        in Tcl 9.0.  Use trace_remove() instead.
+        in Tcl 9.0 and will be removed in Python 3.17.  Use trace_remove()
+        instead.
         """
 
-    @deprecated("Deprecated since Python 3.14. Use `trace_info()` instead.")
+    @deprecated("Deprecated; will be removed in Python 3.17. Use `trace_info()` instead.")
     def trace_vinfo(self) -> list[Incomplete]:
         """Return all trace callback information.
 
         This deprecated method wraps a deprecated Tcl method removed
-        in Tcl 9.0.  Use trace_info() instead.
+        in Tcl 9.0 and will be removed in Python 3.17.  Use trace_info()
+        instead.
         """
 
     def __eq__(self, other: object) -> bool: ...
@@ -628,6 +633,9 @@ class Misc:
     master: Misc | None
     tk: _tkinter.TkappType
     children: dict[str, Widget]
+    if sys.version_info >= (3, 15):
+        __iter__: ClassVar[None]  # prevent using __getitem__ for iteration
+
     def destroy(self) -> None:
         """Internal function.
 
@@ -2178,7 +2186,7 @@ class Wm:
     iconphoto = wm_iconphoto
     def wm_iconposition(self, x: int | None = None, y: int | None = None) -> tuple[int, int] | None:
         """Set the position of the icon of this widget to X and Y. Return
-        a tuple of the current values of X and X if None is given.
+        a tuple of the current values of X and Y if None is given.
         """
 
     iconposition = wm_iconposition
@@ -2747,10 +2755,11 @@ class Toplevel(BaseWidget, Wm):
     ) -> None:
         """Construct a toplevel widget with the parent MASTER.
 
-        Valid option names: background, bd, bg, borderwidth, class,
-        colormap, container, cursor, height, highlightbackground,
-        highlightcolor, highlightthickness, menu, relief, screen, takefocus,
-        use, visual, width.
+        Valid option names: background, backgroundimage (Tk 9.0+), bd, bg,
+        bgimg (Tk 9.0+), borderwidth, class, colormap, container,
+        cursor, height, highlightbackground, highlightcolor,
+        highlightthickness, menu, padx, pady, relief, screen,
+        takefocus, tile (Tk 9.0+), use, visual, width.
         """
 
     @overload
@@ -3862,12 +3871,13 @@ class Checkbutton(Widget):
         """Construct a checkbutton widget with the parent MASTER.
 
         Valid option names: activebackground, activeforeground, anchor,
-        background, bd, bg, bitmap, borderwidth, command, cursor,
-        disabledforeground, fg, font, foreground, height,
-        highlightbackground, highlightcolor, highlightthickness, image,
-        indicatoron, justify, offvalue, onvalue, padx, pady, relief,
-        selectcolor, selectimage, state, takefocus, text, textvariable,
-        underline, variable, width, wraplength.
+        background, bd, bg, bitmap, borderwidth, command, compound,
+        cursor, disabledforeground, fg, font, foreground, height,
+        highlightbackground, highlightcolor, highlightthickness,
+        image, indicatoron, justify, offrelief, offvalue, onvalue,
+        overrelief, padx, pady, relief, selectcolor, selectimage,
+        state, takefocus, text, textvariable, tristateimage,
+        tristatevalue, underline, variable, width, wraplength.
         """
 
     @overload
@@ -3977,8 +3987,8 @@ class Entry(Widget, XView):
         insertofftime: int = 300,
         insertontime: int = 600,
         insertwidth: float | str = ...,
-        invalidcommand: str | list[str] | tuple[str, ...] | Callable[[], bool] = "",
-        invcmd: str | list[str] | tuple[str, ...] | Callable[[], bool] = "",  # same as invalidcommand
+        invalidcommand: str | list[str] | tuple[str, ...] | Callable[[], object] = "",
+        invcmd: str | list[str] | tuple[str, ...] | Callable[[], object] = "",  # same as invalidcommand
         justify: Literal["left", "center", "right"] = "left",
         name: str = ...,
         readonlybackground: str = ...,
@@ -3999,13 +4009,15 @@ class Entry(Widget, XView):
         """Construct an entry widget with the parent MASTER.
 
         Valid option names: background, bd, bg, borderwidth, cursor,
-        exportselection, fg, font, foreground, highlightbackground,
-        highlightcolor, highlightthickness, insertbackground,
-        insertborderwidth, insertofftime, insertontime, insertwidth,
-        invalidcommand, invcmd, justify, relief, selectbackground,
-        selectborderwidth, selectforeground, show, state, takefocus,
-        textvariable, validate, validatecommand, vcmd, width,
-        xscrollcommand.
+        disabledbackground, disabledforeground, exportselection, fg,
+        font, foreground, highlightbackground, highlightcolor,
+        highlightthickness, insertbackground, insertborderwidth,
+        insertofftime, insertontime, insertwidth, invalidcommand,
+        invcmd, justify, locale (Tk 9.1+), placeholder (Tk 9.0+),
+        placeholderforeground (Tk 9.0+), readonlybackground, relief,
+        selectbackground, selectborderwidth, selectforeground, show,
+        state, takefocus, textvariable, validate, validatecommand,
+        vcmd, width, xscrollcommand.
         """
 
     @overload
@@ -4033,8 +4045,8 @@ class Entry(Widget, XView):
         insertofftime: int = ...,
         insertontime: int = ...,
         insertwidth: float | str = ...,
-        invalidcommand: str | list[str] | tuple[str, ...] | Callable[[], bool] = ...,
-        invcmd: str | list[str] | tuple[str, ...] | Callable[[], bool] = ...,
+        invalidcommand: str | list[str] | tuple[str, ...] | Callable[[], object] = ...,
+        invcmd: str | list[str] | tuple[str, ...] | Callable[[], object] = ...,
         justify: Literal["left", "center", "right"] = ...,
         readonlybackground: str = ...,
         relief: Literal["raised", "sunken", "flat", "ridge", "solid", "groove"] = ...,
@@ -4149,9 +4161,11 @@ class Frame(Widget):
     ) -> None:
         """Construct a frame widget with the parent MASTER.
 
-        Valid option names: background, bd, bg, borderwidth, class,
-        colormap, container, cursor, height, highlightbackground,
-        highlightcolor, highlightthickness, relief, takefocus, visual, width.
+        Valid option names: background, backgroundimage (Tk 9.0+), bd, bg,
+        bgimg (Tk 9.0+), borderwidth, class, colormap, container,
+        cursor, height, highlightbackground, highlightcolor,
+        highlightthickness, padx, pady, relief, takefocus, tile (Tk
+        9.0+), visual, width.
         """
 
     @overload
@@ -4247,7 +4261,8 @@ class Label(Widget):
 
         WIDGET-SPECIFIC OPTIONS
 
-            height, state, width
+            compound, height, state,
+            textangle (Tk 9.1+), width
 
         """
 
@@ -4361,11 +4376,14 @@ class Listbox(Widget, XView, YView):
     ) -> None:
         """Construct a listbox widget with the parent MASTER.
 
-        Valid option names: background, bd, bg, borderwidth, cursor,
-        exportselection, fg, font, foreground, height, highlightbackground,
-        highlightcolor, highlightthickness, relief, selectbackground,
-        selectborderwidth, selectforeground, selectmode, setgrid, takefocus,
-        width, xscrollcommand, yscrollcommand, listvariable.
+        Valid option names: activestyle, background, bd, bg, borderwidth,
+        cursor, disabledforeground, exportselection, fg, font,
+        foreground, height, highlightbackground, highlightcolor,
+        highlightthickness, inactiveselectbackground (Tk 9.1+),
+        inactiveselectforeground (Tk 9.1+), justify, listvariable,
+        relief, selectbackground, selectborderwidth, selectforeground,
+        selectmode, setgrid, state, takefocus, width, xscrollcommand,
+        yscrollcommand.
         """
 
     @overload
@@ -4526,7 +4544,8 @@ class Menu(Widget):
         """Construct menu widget with the parent MASTER.
 
         Valid option names: activebackground, activeborderwidth,
-        activeforeground, background, bd, bg, borderwidth, cursor,
+        activeforeground, activerelief (Tk 9.0+), background, bd, bg,
+        borderwidth, cursor,
         disabledforeground, fg, font, foreground, postcommand, relief,
         selectcolor, takefocus, tearoff, tearoffcommand, title, type.
         """
@@ -4880,7 +4899,16 @@ class Menubutton(Widget):
         underline: int = -1,
         width: float | str = 0,
         wraplength: float | str = 0,
-    ) -> None: ...
+    ) -> None:
+        """Construct a menubutton widget with the parent MASTER.
+
+        Valid option names: activebackground, activeforeground, anchor,
+        background, bd, bg, bitmap, borderwidth, compound, cursor,
+        direction, disabledforeground, fg, font, foreground, height,
+        highlightbackground, highlightcolor, highlightthickness,
+        image, indicatoron, justify, menu, padx, pady, relief, state,
+        takefocus, text, textvariable, underline, width, wraplength.
+        """
 
     @overload
     def configure(
@@ -4971,7 +4999,14 @@ class Message(Widget):
         textvariable: Variable = ...,
         # there's width but no height
         width: float | str = 0,
-    ) -> None: ...
+    ) -> None:
+        """Construct a message widget with the parent MASTER.
+
+        Valid option names: anchor, aspect, background, bd, bg, borderwidth,
+        cursor, fg, font, foreground, highlightbackground,
+        highlightcolor, highlightthickness, justify, padx, pady,
+        relief, takefocus, text, textvariable, width.
+        """
 
     @overload
     def configure(
@@ -5072,12 +5107,13 @@ class Radiobutton(Widget):
         """Construct a radiobutton widget with the parent MASTER.
 
         Valid option names: activebackground, activeforeground, anchor,
-        background, bd, bg, bitmap, borderwidth, command, cursor,
-        disabledforeground, fg, font, foreground, height,
-        highlightbackground, highlightcolor, highlightthickness, image,
-        indicatoron, justify, padx, pady, relief, selectcolor, selectimage,
-        state, takefocus, text, textvariable, underline, value, variable,
-        width, wraplength.
+        background, bd, bg, bitmap, borderwidth, command, compound,
+        cursor, disabledforeground, fg, font, foreground, height,
+        highlightbackground, highlightcolor, highlightthickness,
+        image, indicatoron, justify, offrelief, overrelief, padx,
+        pady, relief, selectcolor, selectimage, state, takefocus,
+        text, textvariable, tristateimage, tristatevalue, underline,
+        value, variable, width, wraplength.
         """
 
     @overload
@@ -5485,9 +5521,11 @@ class Text(Widget, XView, YView):
 
         WIDGET-SPECIFIC OPTIONS
 
-            autoseparators, height, maxundo,
-            spacing1, spacing2, spacing3,
-            state, tabs, undo, width, wrap,
+            autoseparators, blockcursor, endline,
+            height, inactiveselectbackground,
+            insertunfocussed, locale (Tk 9.1+), maxundo,
+            spacing1, spacing2, spacing3, startline,
+            state, tabs, tabstyle, undo, width, wrap,
 
         """
 
@@ -6300,7 +6338,7 @@ class OptionMenu(Menubutton):
             variable: StringVar,
             value: str,
             *values: str,
-            command: Callable[[StringVar], object] | None = ...,
+            command: Callable[[str], object] | None = ...,
             name: str | None = None,
         ) -> None:
             """Construct an optionmenu widget with the parent MASTER, with
@@ -6317,7 +6355,7 @@ class OptionMenu(Menubutton):
             variable: StringVar,
             value: str,
             *values: str,
-            command: Callable[[StringVar], object] | None = ...,
+            command: Callable[[str], object] | None = ...,
         ) -> None:
             """Construct an optionmenu widget with the parent MASTER, with
             the option textvariable set to VARIABLE, the initially selected
@@ -6348,6 +6386,9 @@ class Image(_Image):
 
     name: Incomplete
     tk: _tkinter.TkappType
+    if sys.version_info >= (3, 15):
+        __iter__: ClassVar[None]  # prevent using __getitem__ for iteration
+
     def __init__(self, imgtype, name=None, cnf={}, master: Misc | _tkinter.TkappType | None = None, **kw) -> None: ...
     def __del__(self) -> None: ...
     def __setitem__(self, key, value) -> None: ...
@@ -6717,8 +6758,8 @@ class Spinbox(Widget, XView):
         insertofftime: int = 300,
         insertontime: int = 600,
         insertwidth: float | str = ...,
-        invalidcommand: str | list[str] | tuple[str, ...] | Callable[[], bool] = "",
-        invcmd: str | list[str] | tuple[str, ...] | Callable[[], bool] = "",
+        invalidcommand: str | list[str] | tuple[str, ...] | Callable[[], object] = "",
+        invcmd: str | list[str] | tuple[str, ...] | Callable[[], object] = "",
         justify: Literal["left", "center", "right"] = "left",
         name: str = ...,
         readonlybackground: str = ...,
@@ -6761,9 +6802,12 @@ class Spinbox(Widget, XView):
             buttondownrelief, buttonuprelief,
             command, disabledbackground,
             disabledforeground, format, from,
-            invalidcommand, increment,
+            invalidcommand, invcmd, increment,
+            locale (Tk 9.1+),
+            placeholder (Tk 9.0+),
+            placeholderforeground (Tk 9.0+),
             readonlybackground, state, to,
-            validate, validatecommand values,
+            validate, validatecommand, vcmd, values,
             width, wrap,
         """
 
@@ -6801,8 +6845,8 @@ class Spinbox(Widget, XView):
         insertofftime: int = ...,
         insertontime: int = ...,
         insertwidth: float | str = ...,
-        invalidcommand: str | list[str] | tuple[str, ...] | Callable[[], bool] = ...,
-        invcmd: str | list[str] | tuple[str, ...] | Callable[[], bool] = ...,
+        invalidcommand: str | list[str] | tuple[str, ...] | Callable[[], object] = ...,
+        invcmd: str | list[str] | tuple[str, ...] | Callable[[], object] = ...,
         justify: Literal["left", "center", "right"] = ...,
         readonlybackground: str = ...,
         relief: Literal["raised", "sunken", "flat", "ridge", "solid", "groove"] = ...,
@@ -7098,8 +7142,9 @@ class PanedWindow(Widget):
         WIDGET-SPECIFIC OPTIONS
 
             handlepad, handlesize, opaqueresize,
-            sashcursor, sashpad, sashrelief,
-            sashwidth, showhandle,
+            proxybackground, proxyborderwidth,
+            proxyrelief, sashcursor, sashpad,
+            sashrelief, sashwidth, showhandle,
         """
 
     @overload

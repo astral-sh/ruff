@@ -1,30 +1,37 @@
-use rustc_hash::FxHashSet;
-
-use crate::{
-    Db,
-    types::{
-        BoundMethodType, BoundSuperType, BoundTypeVarInstance, CallableType, EnumComplementType,
-        GenericAlias, IntersectionType, KnownBoundMethodType, KnownInstanceType,
-        NominalInstanceType, PropertyInstanceType, ProtocolInstanceType, SubclassOfType, Type,
-        TypeAliasType, TypeFormType, TypeGuardType, TypeIsType, TypedDictType, UnionType,
-        bound_super::walk_bound_super_type,
-        callable::walk_callable_type,
-        class::walk_generic_alias,
-        function::{FunctionType, walk_function_type},
-        instance::{walk_nominal_instance_type, walk_protocol_instance_type},
-        known_instance::walk_known_instance_type,
-        method::{walk_bound_method_type, walk_method_wrapper_type},
-        newtype::{NewType, walk_newtype_instance_type},
-        set_theoretic::{walk_intersection_type, walk_union},
-        subclass_of::walk_subclass_of_type,
-        type_alias::walk_type_alias_type,
-        type_form::walk_typeform_type,
-        typed_dict::walk_typed_dict_type,
-        typevar::{TypeVarInstance, walk_bound_type_var_type, walk_type_var_type},
-        walk_property_instance_type, walk_typeguard_type, walk_typeis_type,
-    },
-};
+use crate::Db;
+use crate::ProgramEnvironment;
 use std::cell::{Cell, RefCell};
+use std::hash::Hash;
+
+use rustc_hash::{FxBuildHasher, FxHashSet};
+use smallvec::SmallVec;
+use ty_python_core::definition::Definition;
+
+use crate::types::{
+    BoundMethodType, BoundSuperType, BoundTypeVarInstance, CallableType, EnumComplementType,
+    GenericAlias, IntersectionType, KnownBoundMethodType, KnownInstanceType, NominalInstanceType,
+    PropertyInstanceType, ProtocolInstanceType, SlotDescriptorType, StaticClassLiteral,
+    SubclassOfType, Type, TypeAliasType, TypeFormType, TypeGuardType, TypeIsType, TypedDictType,
+    UnionType,
+    bound_super::walk_bound_super_type,
+    callable::walk_callable_type,
+    class::walk_generic_alias,
+    cyclic::{ActiveRecursionDetector, TypeIdentity},
+    function::{FunctionType, walk_function_type},
+    generics::walk_specialization_types,
+    instance::{walk_nominal_instance_type, walk_protocol_instance_type},
+    known_instance::walk_known_instance_type,
+    method::{walk_bound_method_type, walk_method_wrapper_type},
+    newtype::{NewType, walk_newtype_instance_type},
+    protocol_class::walk_protocol_instance_interface,
+    set_theoretic::{walk_intersection_type, walk_union},
+    subclass_of::walk_subclass_of_type,
+    type_alias::walk_type_alias_type,
+    type_form::walk_typeform_type,
+    typed_dict::walk_typed_dict_type,
+    typevar::{TypeVarInstance, walk_bound_type_var_type, walk_type_var_type},
+    walk_property_instance_type, walk_typeguard_type, walk_typeis_type,
+};
 
 /// A visitor trait that recurses into nested types.
 ///
@@ -32,8 +39,13 @@ use std::cell::{Cell, RefCell};
 /// but it makes it easy for implementors of the trait to do so.
 /// See [`any_over_type`] for an example of how to do this.
 pub(crate) trait TypeVisitor<'db> {
+    fn program_environment(&self) -> &ProgramEnvironment<'db>;
+
     /// Should the visitor trigger inference of and visit lazily-inferred type attributes?
     fn should_visit_lazy_type_attributes(&self) -> bool;
+
+    /// Notify the visitor that lazily-inferred type attributes were not visited.
+    fn notify_skipped_lazy_type_attributes(&self) {}
 
     fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>);
 
@@ -57,6 +69,10 @@ pub(crate) trait TypeVisitor<'db> {
 
     fn visit_property_instance_type(&self, db: &'db dyn Db, property: PropertyInstanceType<'db>) {
         walk_property_instance_type(db, property, self);
+    }
+
+    fn visit_slot_descriptor_type(&self, db: &'db dyn Db, descriptor: SlotDescriptorType<'db>) {
+        self.visit_type(db, descriptor.value_type(db));
     }
 
     fn visit_typeis_type(&self, db: &'db dyn Db, type_is: TypeIsType<'db>) {
@@ -148,6 +164,7 @@ pub(super) enum NonAtomicType<'db> {
     SubclassOf(SubclassOfType<'db>),
     NominalInstance(NominalInstanceType<'db>),
     PropertyInstance(PropertyInstanceType<'db>),
+    SlotDescriptor(SlotDescriptorType<'db>),
     TypeIs(TypeIsType<'db>),
     TypeGuard(TypeGuardType<'db>),
     TypeForm(TypeFormType<'db>),
@@ -215,6 +232,9 @@ impl<'db> From<Type<'db>> for TypeKind<'db> {
             Type::PropertyInstance(property) => {
                 TypeKind::NonAtomic(NonAtomicType::PropertyInstance(property))
             }
+            Type::SlotDescriptor(descriptor) => {
+                TypeKind::NonAtomic(NonAtomicType::SlotDescriptor(descriptor))
+            }
             Type::TypeVar(bound_typevar) => {
                 TypeKind::NonAtomic(NonAtomicType::TypeVar(bound_typevar))
             }
@@ -240,7 +260,9 @@ pub(super) fn walk_non_atomic_type<'db, V: TypeVisitor<'db> + ?Sized>(
     visitor: &V,
 ) {
     match non_atomic_type {
-        NonAtomicType::FunctionLiteral(function) => visitor.visit_function_type(db, function),
+        NonAtomicType::FunctionLiteral(function) => {
+            visitor.visit_function_type(db, function);
+        }
         NonAtomicType::Intersection(intersection) => {
             visitor.visit_intersection_type(db, intersection);
         }
@@ -248,31 +270,52 @@ pub(super) fn walk_non_atomic_type<'db, V: TypeVisitor<'db> + ?Sized>(
             visitor.visit_enum_complement_type(db, complement);
         }
         NonAtomicType::Union(union) => visitor.visit_union_type(db, union),
-        NonAtomicType::BoundMethod(method) => visitor.visit_bound_method_type(db, method),
-        NonAtomicType::BoundSuper(bound_super) => visitor.visit_bound_super_type(db, bound_super),
+        NonAtomicType::BoundMethod(method) => {
+            visitor.visit_bound_method_type(db, method);
+        }
+        NonAtomicType::BoundSuper(bound_super) => {
+            visitor.visit_bound_super_type(db, bound_super);
+        }
         NonAtomicType::MethodWrapper(method_wrapper) => {
             visitor.visit_method_wrapper_type(db, method_wrapper);
         }
-        NonAtomicType::Callable(callable) => visitor.visit_callable_type(db, callable),
-        NonAtomicType::GenericAlias(alias) => visitor.visit_generic_alias_type(db, alias),
+        NonAtomicType::Callable(callable) => {
+            visitor.visit_callable_type(db, callable);
+        }
+        NonAtomicType::GenericAlias(alias) => {
+            visitor.visit_generic_alias_type(db, alias);
+        }
         NonAtomicType::KnownInstance(known_instance) => {
             visitor.visit_known_instance_type(db, known_instance);
         }
-        NonAtomicType::SubclassOf(subclass_of) => visitor.visit_subclass_of_type(db, subclass_of),
-        NonAtomicType::NominalInstance(nominal) => visitor.visit_nominal_instance_type(db, nominal),
+        NonAtomicType::SubclassOf(subclass_of) => {
+            visitor.visit_subclass_of_type(db, subclass_of);
+        }
+        NonAtomicType::NominalInstance(nominal) => {
+            visitor.visit_nominal_instance_type(db, nominal);
+        }
         NonAtomicType::PropertyInstance(property) => {
             visitor.visit_property_instance_type(db, property);
         }
+        NonAtomicType::SlotDescriptor(descriptor) => {
+            visitor.visit_slot_descriptor_type(db, descriptor);
+        }
         NonAtomicType::TypeIs(type_is) => visitor.visit_typeis_type(db, type_is),
-        NonAtomicType::TypeGuard(type_guard) => visitor.visit_typeguard_type(db, type_guard),
-        NonAtomicType::TypeForm(typeform) => visitor.visit_typeform_type(db, typeform),
+        NonAtomicType::TypeGuard(type_guard) => {
+            visitor.visit_typeguard_type(db, type_guard);
+        }
+        NonAtomicType::TypeForm(typeform) => {
+            visitor.visit_typeform_type(db, typeform);
+        }
         NonAtomicType::TypeVar(bound_typevar) => {
             visitor.visit_bound_type_var_type(db, bound_typevar);
         }
         NonAtomicType::ProtocolInstance(protocol) => {
             visitor.visit_protocol_instance_type(db, protocol);
         }
-        NonAtomicType::TypedDict(typed_dict) => visitor.visit_typed_dict_type(db, typed_dict),
+        NonAtomicType::TypedDict(typed_dict) => {
+            visitor.visit_typed_dict_type(db, typed_dict);
+        }
         NonAtomicType::TypeAlias(alias) => {
             visitor.visit_type_alias_type(db, alias);
         }
@@ -301,19 +344,434 @@ pub(crate) fn walk_type_with_recursion_guard<'db>(
 }
 
 #[derive(Default, Debug)]
-pub(crate) struct TypeCollector<'db>(RefCell<FxHashSet<Type<'db>>>);
+pub(crate) struct TypeCollector<'db>(RefCell<CollectedTypes<'db>>);
 
 impl<'db> TypeCollector<'db> {
-    pub(crate) fn type_was_already_seen(&self, ty: Type<'db>) -> bool {
+    fn type_was_already_seen(&self, ty: Type<'db>) -> bool {
         !self.0.borrow_mut().insert(ty)
     }
 }
 
-/// Implementation for `any_over_type` and `find_over_type`.
+// Most guarded walks are shallow; avoid allocating a hash table until linear search is costly.
+type CollectedTypes<'db> = SmallSet<Type<'db>, 8>;
+
+/// A set optimized for values that usually contain only a few distinct elements.
+#[derive(Debug)]
+enum SmallSet<T, const INLINE_CAPACITY: usize> {
+    Inline(SmallVec<[T; INLINE_CAPACITY]>),
+    Spilled(FxHashSet<T>),
+}
+
+impl<T, const INLINE_CAPACITY: usize> Default for SmallSet<T, INLINE_CAPACITY> {
+    fn default() -> Self {
+        Self::Inline(SmallVec::new())
+    }
+}
+
+impl<T, const INLINE_CAPACITY: usize> SmallSet<T, INLINE_CAPACITY> {
+    #[inline]
+    fn insert(&mut self, value: T) -> bool
+    where
+        T: Hash + Eq,
+    {
+        match self {
+            Self::Inline(inline) => {
+                if inline.contains(&value) {
+                    return false;
+                }
+
+                if inline.len() < INLINE_CAPACITY {
+                    inline.push(value);
+                    return true;
+                }
+
+                *self = Self::Spilled(Self::spill(inline, value));
+                true
+            }
+            Self::Spilled(set) => set.insert(value),
+        }
+    }
+
+    #[cold]
+    fn spill(inline: &mut SmallVec<[T; INLINE_CAPACITY]>, value: T) -> FxHashSet<T>
+    where
+        T: Hash + Eq,
+    {
+        let mut set = FxHashSet::with_capacity_and_hasher(inline.len() + 1, FxBuildHasher);
+        set.extend(inline.drain(..));
+        let inserted = set.insert(value);
+        debug_assert!(inserted);
+        set
+    }
+
+    #[cfg(test)]
+    const fn is_spilled(&self) -> bool {
+        matches!(self, Self::Spilled(_))
+    }
+}
+
+/// Whether a type contains a dynamic type matching the requested filter.
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub(super) enum DynamicContent {
+    /// The type was fully inspected and contains no matching dynamic type.
+    Absent,
+    /// The type contains a matching dynamic type.
+    Present,
+    /// Lazy type information or recursive specialization prevented a complete inspection.
+    Indeterminate,
+}
+
+impl DynamicContent {
+    pub(super) const fn is_absent(self) -> bool {
+        matches!(self, Self::Absent)
+    }
+}
+
+#[derive(Clone, Copy)]
+enum DynamicContentMode {
+    All,
+    NonAny,
+    /// Require enough information to prove that materialization preserves type requirements.
+    Materialization,
+}
+
+/// Determine whether `ty` contains any dynamic type.
+pub(super) fn dynamic_content<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+) -> DynamicContent {
+    dynamic_content_impl(db, env, ty, DynamicContentMode::All)
+}
+
+/// Whether both materializations preserve the requirements described by `ty`.
+///
+/// Unlike ordinary static-content checks, this proof cannot ignore lazy function signatures or
+/// the wrapped callable of a partial. It does not compare metadata such as parameter-default types,
+/// which do not affect whether one callable satisfies another's requirements.
+pub(super) fn materialization_is_noop<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+) -> bool {
+    dynamic_content_impl(db, env, ty, DynamicContentMode::Materialization).is_absent()
+}
+
+/// Determine whether `ty` contains a dynamic type other than `Any`.
+///
+/// Class-based protocol interfaces can be recursively specialized. An exact recursive cycle adds
+/// no new information, but revisiting the same protocol definition under a different
+/// specialization may expose different members and is therefore indeterminate.
+///
+/// ```python
+/// class Exact[T](Protocol):
+///     next: Exact[T]
+///
+/// class Growing[T](Protocol):
+///     next: Growing[list[T]]
+/// ```
+///
+/// Walking `Exact[int]` can skip its exact back-edge. Walking `Growing[int]` is indeterminate
+/// because each recursive edge creates a new specialization.
+pub(super) fn non_any_dynamic_content<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+) -> DynamicContent {
+    dynamic_content_impl(db, env, ty, DynamicContentMode::NonAny)
+}
+
+fn dynamic_content_impl<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+    mode: DynamicContentMode,
+) -> DynamicContent {
+    struct DynamicContentVisitor<'a, 'db> {
+        env: &'a ProgramEnvironment<'db>,
+        recursion_guard: TypeCollector<'db>,
+        active_class_protocols: ActiveRecursionDetector<StaticClassLiteral<'db>>,
+        active_class_typed_dicts: ActiveRecursionDetector<StaticClassLiteral<'db>>,
+        active_type_aliases: ActiveRecursionDetector<Definition<'db>>,
+        content: Cell<DynamicContent>,
+        mode: DynamicContentMode,
+    }
+
+    impl DynamicContentVisitor<'_, '_> {
+        fn record(&self, content: DynamicContent) {
+            debug_assert!(self.content.get().is_absent());
+            debug_assert!(!content.is_absent());
+            self.content.set(content);
+        }
+    }
+
+    impl<'db> TypeVisitor<'db> for DynamicContentVisitor<'_, 'db> {
+        fn program_environment(&self) -> &ProgramEnvironment<'db> {
+            self.env
+        }
+
+        fn should_visit_lazy_type_attributes(&self) -> bool {
+            true
+        }
+
+        fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+            if !self.content.get().is_absent() {
+                return;
+            }
+
+            if matches!(self.mode, DynamicContentMode::Materialization) && ty.is_divergent() {
+                self.record(DynamicContent::Indeterminate);
+                return;
+            }
+
+            if ty.is_dynamic()
+                && (!matches!(self.mode, DynamicContentMode::NonAny)
+                    || !matches!(ty, Type::Dynamic(crate::types::DynamicType::Any)))
+            {
+                self.record(DynamicContent::Present);
+                return;
+            }
+
+            walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+        }
+
+        fn visit_function_type(&self, db: &'db dyn Db, function: FunctionType<'db>) {
+            if !self.content.get().is_absent() {
+                return;
+            }
+
+            if matches!(self.mode, DynamicContentMode::Materialization) {
+                // The ordinary walker only visits updated signatures. Inferring an original
+                // signature here could re-enter recursive `TypeOf` evaluation, so do not claim
+                // that materialization leaves this function's requirements unchanged.
+                self.record(DynamicContent::Indeterminate);
+            } else {
+                walk_function_type(db, function, self);
+            }
+        }
+
+        fn visit_known_instance_type(&self, db: &'db dyn Db, known: KnownInstanceType<'db>) {
+            if matches!(self.mode, DynamicContentMode::Materialization)
+                && let KnownInstanceType::FunctoolsPartial(partial)
+                | KnownInstanceType::FunctoolsPartialCall(partial) = known
+            {
+                // Materialization maps both the reduced signature and the wrapped callable.
+                self.visit_type(db, partial.wrapped(db).inner(db));
+            }
+            if self.content.get().is_absent() {
+                walk_known_instance_type(db, known, self);
+            }
+        }
+
+        fn visit_generic_alias_type(&self, db: &'db dyn Db, alias: GenericAlias<'db>) {
+            // Use `walk_specialization_types` rather than `walk_specialization` to avoid walking
+            // the bounds/constraints/defaults of the generic context.
+            // Only the types the class was actually specialized with are relevant to whether
+            // the `GenericAlias` contains a dynamic type.
+            walk_specialization_types(db, alias.specialization(db), self);
+        }
+
+        fn visit_type_alias_type(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
+            self.active_type_aliases.visit(
+                &alias.definition(db),
+                || self.record(DynamicContent::Indeterminate),
+                || walk_type_alias_type(db, alias, self),
+            );
+        }
+
+        fn visit_protocol_instance_type(
+            &self,
+            db: &'db dyn Db,
+            protocol: ProtocolInstanceType<'db>,
+        ) {
+            let protocol_ty = Type::ProtocolInstance(protocol);
+            let Some(class) = protocol.class_origin(db) else {
+                walk_protocol_instance_interface(db, protocol.interface(db), protocol_ty, self);
+                return;
+            };
+            let Some((origin, specialization)) = class.static_class_literal(db) else {
+                walk_protocol_instance_interface(db, protocol.interface(db), protocol_ty, self);
+                return;
+            };
+
+            if let Some(specialization) = specialization {
+                // Bounds and defaults in the generic context do not describe the specialized
+                // instance; only inspect the types assigned to its parameters.
+                for ty in specialization.types(db) {
+                    self.visit_type(db, *ty);
+                    if !self.content.get().is_absent() {
+                        return;
+                    }
+                }
+            }
+
+            self.active_class_protocols.visit(
+                &origin,
+                || self.record(DynamicContent::Indeterminate),
+                || {
+                    walk_protocol_instance_interface(db, protocol.interface(db), protocol_ty, self);
+                },
+            );
+        }
+
+        fn visit_typed_dict_type(&self, db: &'db dyn Db, typed_dict: TypedDictType<'db>) {
+            let Some(class) = typed_dict.defining_class() else {
+                walk_typed_dict_type(db, typed_dict, self);
+                return;
+            };
+            let Some((origin, _)) = class.static_class_literal(db) else {
+                walk_typed_dict_type(db, typed_dict, self);
+                return;
+            };
+
+            self.active_class_typed_dicts.visit(
+                &origin,
+                || self.record(DynamicContent::Indeterminate),
+                || walk_typed_dict_type(db, typed_dict, self),
+            );
+        }
+    }
+
+    let visitor = DynamicContentVisitor {
+        env,
+        recursion_guard: TypeCollector::default(),
+        active_class_protocols: ActiveRecursionDetector::default(),
+        active_class_typed_dicts: ActiveRecursionDetector::default(),
+        active_type_aliases: ActiveRecursionDetector::default(),
+        content: Cell::new(DynamicContent::Absent),
+        mode,
+    };
+    visitor.visit_type(db, ty);
+    visitor.content.get()
+}
+
+/// Whether inspecting `ty` can encounter recursive types with changing specializations.
+///
+/// Exact recursive types are safe to inspect once. For protocol methods, conservatively treat
+/// a new specialization of an active protocol definition as potentially growing: their signatures
+/// are not included in the specialization-flow analysis used by [`TypeIdentity`].
+pub(super) fn contains_growing_type<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+) -> bool {
+    struct GrowingTypeVisitor<'a, 'db> {
+        env: &'a ProgramEnvironment<'db>,
+        recursion_guard: TypeCollector<'db>,
+        active_class_protocols: ActiveRecursionDetector<StaticClassLiteral<'db>>,
+        found: Cell<bool>,
+    }
+
+    impl<'db> TypeVisitor<'db> for GrowingTypeVisitor<'_, 'db> {
+        fn program_environment(&self) -> &ProgramEnvironment<'db> {
+            self.env
+        }
+
+        fn should_visit_lazy_type_attributes(&self) -> bool {
+            true
+        }
+
+        fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+            if self.found.get() {
+                return;
+            }
+
+            let is_generic = match ty {
+                Type::TypeAlias(alias) => alias.generic_context(db).is_some(),
+                Type::ProtocolInstance(protocol) => protocol
+                    .class_origin(db)
+                    .and_then(|class| class.class_literal(db).generic_context(db))
+                    .is_some(),
+                Type::TypedDict(typed_dict) => typed_dict
+                    .defining_class()
+                    .and_then(|class| class.class_literal(db).generic_context(db))
+                    .is_some(),
+                _ => false,
+            };
+            if is_generic
+                && matches!(
+                    ty.to_type_identity(db),
+                    TypeIdentity::GrowingTypeAlias(_)
+                        | TypeIdentity::GrowingProtocol(_)
+                        | TypeIdentity::GrowingTypedDict(_)
+                )
+            {
+                self.found.set(true);
+                return;
+            }
+
+            walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+        }
+
+        fn visit_protocol_instance_type(
+            &self,
+            db: &'db dyn Db,
+            protocol: ProtocolInstanceType<'db>,
+        ) {
+            let protocol_ty = Type::ProtocolInstance(protocol);
+            let Some((origin, specialization)) = protocol
+                .class_origin(db)
+                .and_then(|class| class.static_class_literal(db))
+            else {
+                walk_protocol_instance_interface(db, protocol.interface(db), protocol_ty, self);
+                return;
+            };
+
+            if let Some(specialization) = specialization {
+                // Inspect arguments before activating the definition so finite nesting such as
+                // `P[P[int]]` does not look like an expanding recursive declaration.
+                walk_specialization_types(db, specialization, self);
+                if self.found.get() {
+                    return;
+                }
+            }
+
+            self.active_class_protocols.visit(
+                &origin,
+                || self.found.set(true),
+                || {
+                    // Bind implicit receivers so they do not introduce recursive edges of their
+                    // own. Explicitly recursive method signatures still need to be inspected.
+                    walk_protocol_instance_interface(db, protocol.interface(db), protocol_ty, self);
+                },
+            );
+        }
+    }
+
+    let visitor = GrowingTypeVisitor {
+        env,
+        recursion_guard: TypeCollector::default(),
+        active_class_protocols: ActiveRecursionDetector::default(),
+        found: Cell::new(false),
+    };
+    visitor.visit_type(db, ty);
+    visitor.found.get()
+}
+
+#[derive(Clone, Copy)]
+enum TypeSearchMode {
+    SkipLazyAttributes,
+    IncludeLazyAttributes,
+    /// Visit alias arguments without evaluating alias bodies or other lazy attributes.
+    IncludeAliasArguments,
+}
+
+impl TypeSearchMode {
+    const fn should_visit_lazy_type_attributes(self) -> bool {
+        matches!(self, Self::IncludeLazyAttributes)
+    }
+
+    const fn should_visit_alias_arguments(self) -> bool {
+        matches!(self, Self::IncludeAliasArguments)
+    }
+}
+
+/// Shared implementation for type searches.
 fn any_over_type_impl<'db, F, T>(
     db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
     ty: Type<'db>,
-    should_visit_lazy_type_attributes: bool,
+    mode: TypeSearchMode,
     query: F,
 ) -> T
 where
@@ -321,18 +779,23 @@ where
     F: Fn(Type<'db>) -> T,
 {
     struct AnyOverTypeVisitor<'db, 'a, U> {
+        env: &'a ProgramEnvironment<'db>,
         query: &'a dyn Fn(Type<'db>) -> U,
         recursion_guard: TypeCollector<'db>,
         found_matching_type: Cell<U>,
-        should_visit_lazy_type_attributes: bool,
+        mode: TypeSearchMode,
     }
 
     impl<'db, U> TypeVisitor<'db> for AnyOverTypeVisitor<'db, '_, U>
     where
         U: Copy + Default + PartialEq,
     {
+        fn program_environment(&self) -> &ProgramEnvironment<'db> {
+            self.env
+        }
+
         fn should_visit_lazy_type_attributes(&self) -> bool {
-            self.should_visit_lazy_type_attributes
+            self.mode.should_visit_lazy_type_attributes()
         }
 
         fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
@@ -346,15 +809,26 @@ where
             if new_value != default_value {
                 return;
             }
-            walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+            if self.mode.should_visit_alias_arguments()
+                && let Type::TypeAlias(alias) = ty
+            {
+                if !self.recursion_guard.type_was_already_seen(ty)
+                    && let Some(specialization) = alias.specialization(db)
+                {
+                    walk_specialization_types(db, specialization, self);
+                }
+            } else {
+                walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+            }
         }
     }
 
     let visitor = AnyOverTypeVisitor {
+        env,
         query: &query,
         recursion_guard: TypeCollector::default(),
         found_matching_type: Cell::default(),
-        should_visit_lazy_type_attributes,
+        mode,
     };
     visitor.visit_type(db, ty);
     visitor.found_matching_type.get()
@@ -370,11 +844,61 @@ where
 /// are visited or not.
 pub(super) fn any_over_type<'db>(
     db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
     ty: Type<'db>,
     should_visit_lazy_type_attributes: bool,
     query: impl Fn(Type<'db>) -> bool,
 ) -> bool {
-    any_over_type_impl(db, ty, should_visit_lazy_type_attributes, query)
+    let mode = if should_visit_lazy_type_attributes {
+        TypeSearchMode::IncludeLazyAttributes
+    } else {
+        TypeSearchMode::SkipLazyAttributes
+    };
+    any_over_type_impl(db, env, ty, mode, query)
+}
+
+/// Searches through the arguments of [`Type::TypeAlias`] without evaluating alias bodies or other
+/// lazy attributes.
+/// This also visits arguments that the alias's value does not use.
+/// Shared arguments use the same recursion guard, so their descendants are not visited repeatedly.
+pub(super) fn any_over_type_including_alias_arguments<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+    query: impl Fn(Type<'db>) -> bool,
+) -> bool {
+    any_over_type_impl(db, env, ty, TypeSearchMode::IncludeAliasArguments, query)
+}
+
+/// Searches through type aliases without forcing other lazily inferred type attributes.
+///
+/// Revisiting a recursive alias counts as a match because its specialization can grow on each
+/// visit. Distinct specializations of a nonrecursive alias remain separate, so nested uses such as
+/// `Identity[Identity[int]]` are still considered finite.
+pub(super) fn any_over_type_expanding_aliases<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+    query: impl Fn(Type<'db>) -> bool,
+) -> bool {
+    fn search<'db>(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+        query: &impl Fn(Type<'db>) -> bool,
+        active_aliases: &ActiveRecursionDetector<TypeIdentity<'db>>,
+    ) -> bool {
+        any_over_type(db, env, ty, false, |nested| {
+            query(nested)
+                || matches!(nested, Type::TypeAlias(alias) if active_aliases.visit(
+                    &Type::TypeAlias(alias).to_type_identity(db),
+                    || true,
+                    || search(db, env, alias.value_type(db), query, active_aliases),
+                ))
+        })
+    }
+
+    search(db, env, ty, &query, &ActiveRecursionDetector::default())
 }
 
 /// Recurse into a type and calls the passed-in closure on every nested type
@@ -392,6 +916,7 @@ pub(super) fn any_over_type<'db>(
 /// are visited or not.
 pub(super) fn find_over_type<'db, T>(
     db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
     ty: Type<'db>,
     should_visit_lazy_type_attributes: bool,
     query: impl Fn(Type<'db>) -> Option<T>,
@@ -399,5 +924,107 @@ pub(super) fn find_over_type<'db, T>(
 where
     T: Copy + PartialEq,
 {
-    any_over_type_impl(db, ty, should_visit_lazy_type_attributes, query)
+    let mode = if should_visit_lazy_type_attributes {
+        TypeSearchMode::IncludeLazyAttributes
+    } else {
+        TypeSearchMode::SkipLazyAttributes
+    };
+    any_over_type_impl(db, env, ty, mode, query)
+}
+
+#[cfg(test)]
+mod tests {
+    use ruff_db::files::system_path_to_file;
+    use ruff_db::system::DbWithWritableSystem as _;
+    use ty_python_core::ProgramFile;
+
+    use crate::db::tests::setup_db;
+    use crate::place::global_symbol;
+    use crate::types::{DynamicType, SpecialFormType, Type};
+
+    use super::{CollectedTypes, materialization_is_noop};
+
+    #[test]
+    fn materialization_noop_checks_hidden_function_types() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/a.py",
+            r#"
+            from __future__ import annotations
+            from functools import partial
+            from typing import Any, Protocol
+            from ty_extensions._internal import TypeOf
+
+            def gradual_callback(value: Any) -> None: ...
+
+            class Callbacks(Protocol):
+                @property
+                def callback(self) -> TypeOf[gradual_callback]: ...
+
+            class Recursive[T](Protocol):
+                @property
+                def value(self) -> T: ...
+                @property
+                def child(self) -> Recursive[T]: ...
+
+            plain: Recursive[int]
+            callbacks: Recursive[Callbacks]
+            partial_callback = partial(gradual_callback, 0)
+            partial_call = partial_callback.__call__
+            "#,
+        )?;
+        let env = db.program_environment();
+        let file = system_path_to_file(&db, "/src/a.py")?;
+        let module = ProgramFile::new(&db, file, env.program(&db));
+        for (name, expected) in [
+            ("plain", true),
+            ("callbacks", false),
+            ("partial_callback", false),
+            ("partial_call", false),
+        ] {
+            let ty = global_symbol(&db, module, name).place.expect_type();
+            assert_eq!(materialization_is_noop(&db, &env, ty), expected, "{name}");
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn materialization_noop_rejects_divergent_markers() {
+        let db = setup_db();
+        let env = db.program_environment();
+        let divergent = Type::divergent(salsa::plumbing::Id::from_bits(1));
+
+        for ty in [
+            divergent,
+            divergent.top_materialization(&db, &env),
+            divergent.bottom_materialization(&db, &env),
+        ] {
+            assert!(!materialization_is_noop(&db, &env, ty));
+        }
+    }
+
+    #[test]
+    fn collected_types_spills_without_losing_deduplication() {
+        let mut collected = CollectedTypes::default();
+        let types = [
+            Type::Never,
+            Type::AlwaysTruthy,
+            Type::AlwaysFalsy,
+            Type::Dynamic(DynamicType::Any),
+            Type::Dynamic(DynamicType::Unknown),
+            Type::Dynamic(DynamicType::UnspecializedTypeVar),
+            Type::Dynamic(DynamicType::InvalidConcatenateUnknown),
+            Type::Dynamic(DynamicType::AmbiguousOverload),
+            Type::SpecialForm(SpecialFormType::Any),
+        ];
+
+        for ty in types {
+            assert!(collected.insert(ty));
+        }
+
+        assert!(collected.is_spilled());
+        assert!(!collected.insert(Type::Never));
+        assert!(!collected.insert(Type::SpecialForm(SpecialFormType::Any)));
+        assert!(collected.insert(Type::SpecialForm(SpecialFormType::Unknown)));
+    }
 }

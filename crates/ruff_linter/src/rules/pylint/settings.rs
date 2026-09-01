@@ -20,7 +20,7 @@ pub enum ConstantType {
 }
 
 impl ConstantType {
-    pub fn try_from_literal_expr(literal_expr: LiteralExpressionRef<'_>) -> Option<Self> {
+    pub(crate) fn try_from_literal_expr(literal_expr: LiteralExpressionRef<'_>) -> Option<Self> {
         match literal_expr {
             LiteralExpressionRef::StringLiteral(_) => Some(Self::Str),
             LiteralExpressionRef::BytesLiteral(_) => Some(Self::Bytes),

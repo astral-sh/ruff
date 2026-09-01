@@ -20,20 +20,26 @@ on:
 permissions:
   contents: read
 
+env:
+  ACTIONS_CACHE_MODE: none
+  CARGO_PROFILE_DEV_LTO: "false"
+  CARGO_PROFILE_DEV_OPT_LEVEL: 0
+
 jobs:
   mkdocs:
     environment:
       name: release
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.ref }}
           persist-credentials: true
 
-      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
-          python-version: 3.12
+          version: "0.12.6"
+          enable-cache: false
 
       - name: "Set docs version"
         env:
@@ -65,18 +71,13 @@ jobs:
       - name: "Install Rust toolchain"
         run: rustup show
 
-      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
-
-      - name: "Install dependencies"
-        run: pip install -r docs/requirements.txt
-
       - name: "Copy README File"
         run: |
-          python scripts/transform_readme.py --target mkdocs
-          python scripts/generate_mkdocs.py
+          uv run scripts/transform_readme.py --target mkdocs
+          uv run scripts/generate_mkdocs.py
 
       - name: "Build docs"
-        run: mkdocs build --strict -f mkdocs.yml
+        run: uv run --only-group=docs mkdocs build --strict -f mkdocs.yml
 
       - name: "Clone docs repo"
         run: git clone https://${{ secrets.ASTRAL_DOCS_PAT }}@github.com/astral-sh/docs.git astral-docs

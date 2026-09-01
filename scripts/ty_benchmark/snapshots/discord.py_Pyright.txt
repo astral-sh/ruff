@@ -35,6 +35,13 @@
     Attribute "__func__" is unknown (reportFunctionMemberAccess)
 <CWD>/discord/app_commands/errors.py
   <CWD>/discord/app_commands/errors.py:483:27 - error: "errors" is possibly unbound (reportPossiblyUnboundVariable)
+<CWD>/discord/app_commands/transformers.py
+  <CWD>/discord/app_commands/transformers.py:824:27 - error: Cannot access attribute "__args__" for class "type[object]"
+    Attribute "__args__" is unknown (reportAttributeAccessIssue)
+  <CWD>/discord/app_commands/transformers.py:828:26 - error: Cannot access attribute "__args__" for class "type[object]"
+    Attribute "__args__" is unknown (reportAttributeAccessIssue)
+  <CWD>/discord/app_commands/transformers.py:836:23 - error: Cannot access attribute "__args__" for class "type[object]"
+    Attribute "__args__" is unknown (reportAttributeAccessIssue)
 <CWD>/discord/app_commands/tree.py
   <CWD>/discord/app_commands/tree.py:605:9 - error: Overload 1 for "get_commands" overlaps overload 4 and returns an incompatible type (reportOverlappingOverload)
 <CWD>/discord/asset.py
@@ -134,6 +141,7 @@
   <CWD>/discord/ext/commands/converter.py:1143:9 - error: Method "__class_getitem__" overrides class "list" in an incompatible manner
     Return type mismatch: base method returns type "GenericAlias", override returns type "Greedy[T@Greedy]"
       "Greedy[T@Greedy]" is not assignable to "GenericAlias" (reportIncompatibleMethodOverride)
+  <CWD>/discord/ext/commands/converter.py:1359:26 - error: Expected 0 positional arguments (reportCallIssue)
 <CWD>/discord/ext/commands/cooldowns.py
   <CWD>/discord/ext/commands/cooldowns.py:171:9 - error: Method "create_bucket" overrides class "CooldownMapping" in an incompatible manner
     Return type mismatch: base method returns type "Cooldown", override returns type "Cooldown | None"
@@ -714,4 +722,4 @@
   <CWD>/discord/webhook/sync.py:713:16 - warning: Import "requests" could not be resolved from source (reportMissingModuleSource)
 <CWD>/discord/widget.py
   <CWD>/discord/widget.py:161:9 - error: "avatar" incorrectly overrides property of same name in class "BaseUser" (reportIncompatibleMethodOverride)
-233 errors, 4 warnings, 0 informations
+237 errors, 4 warnings, 0 informations

@@ -3,13 +3,17 @@ from __future__ import annotations
 import logging
 import subprocess
 import sys
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Mapping, NamedTuple
+from typing import NamedTuple
 
 if sys.platform == "win32":
     import mslex as shlex
 else:
     import shlex
+
+
+logger = logging.getLogger(__name__)
 
 
 class Command(NamedTuple):
@@ -76,6 +80,6 @@ class Hyperfine(NamedTuple):
         for command in self.commands:
             args.append(shlex.join(command.command))
 
-        logging.info(f"Running {args}")
+        logger.info(f"Running {args}")
 
-        subprocess.run(args, cwd=cwd, env=env)
+        subprocess.run(args, cwd=cwd, env=env, check=True)

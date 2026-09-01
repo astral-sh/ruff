@@ -20,7 +20,6 @@ I001 [*] Import block is un-sorted or un-formatted
 14 | |     Member  # Comment on `Member`
 15 | | )
    | |_^
-   |
 help: Organize imports
   |
   - from foo import (  # Comment on `foo`

@@ -6,6 +6,7 @@ use ruff_python_semantic::Modules;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 use crate::rules::flake8_datetimez::helpers;
 
@@ -46,7 +47,7 @@ use crate::rules::flake8_datetimez::helpers;
 /// ## References
 /// - [Python documentation: Aware and Naive Objects](https://docs.python.org/3/library/datetime.html#aware-and-naive-objects)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.188")]
+#[violation_metadata(stable_since = "v0.0.188", category = Category::Suspicious)]
 pub(crate) struct CallDatetimeUtcnow;
 
 impl Violation for CallDatetimeUtcnow {

@@ -8,6 +8,7 @@ use ruff_python_codegen::Generator;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::snippet::SourceCodeSnippet;
 use crate::importer::ImportRequest;
 use crate::rules::refurb::helpers::{FileOpen, OpenArgument, find_file_opens};
@@ -41,7 +42,7 @@ use crate::{FixAvailability, Violation};
 /// - [Python documentation: `Path.read_bytes`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.read_bytes)
 /// - [Python documentation: `Path.read_text`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.read_text)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.1.2")]
+#[violation_metadata(preview_since = "v0.1.2", category = Category::Pedantic)]
 pub(crate) struct ReadWholeFile<'a> {
     filename: SourceCodeSnippet,
     suggestion: SourceCodeSnippet,
@@ -183,7 +184,7 @@ fn make_suggestion(open: &FileOpen<'_>, generator: Generator) -> String {
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         },
-        range: TextRange::default(),
+        range_start: ruff_text_size::TextSize::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     generator.expr(&call.into())

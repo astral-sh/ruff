@@ -123,7 +123,7 @@ impl LintMetadata {
         self.documentation_lines().join("\n")
     }
 
-    pub fn documentation_url(&self) -> String {
+    pub(crate) fn documentation_url(&self) -> String {
         lint_documentation_url(self.name())
     }
 
@@ -144,18 +144,18 @@ impl LintMetadata {
     }
 }
 
-pub fn lint_documentation_url(lint_name: LintName) -> String {
+pub(crate) fn lint_documentation_url(lint_name: LintName) -> String {
     format!("https://ty.dev/rules#{lint_name}")
 }
 
 #[doc(hidden)]
-pub const fn lint_metadata_defaults() -> LintMetadata {
+pub const fn lint_metadata_defaults(status: LintStatus) -> LintMetadata {
     LintMetadata {
         name: LintName::of(""),
         summary: "",
         raw_documentation: "",
         default_level: Level::Error,
-        status: LintStatus::preview("0.0.0"),
+        status,
         file: "",
         line: 1,
     }
@@ -168,7 +168,7 @@ pub const fn lint_metadata_defaults() -> LintMetadata {
     serde(tag = "type", rename_all = "lowercase")
 )]
 pub enum LintStatus {
-    /// The lint has been added to the linter, but is not yet stable.
+    /// The lint is available, but its behavior is not yet stable.
     Preview {
         /// The version in which the lint was added.
         since: &'static str,
@@ -176,7 +176,7 @@ pub enum LintStatus {
 
     /// The lint is stable.
     Stable {
-        /// The version in which the lint was stabilized.
+        /// The version in which the lint was added.
         since: &'static str,
     },
 
@@ -203,7 +203,7 @@ pub enum LintStatus {
 }
 
 impl LintStatus {
-    pub const fn preview(since: &'static str) -> Self {
+    pub(crate) const fn preview(since: &'static str) -> Self {
         LintStatus::Preview { since }
     }
 
@@ -215,11 +215,11 @@ impl LintStatus {
         LintStatus::Deprecated { since, reason }
     }
 
-    pub const fn removed(since: &'static str, reason: &'static str) -> Self {
+    pub(crate) const fn removed(since: &'static str, reason: &'static str) -> Self {
         LintStatus::Removed { since, reason }
     }
 
-    pub const fn is_removed(&self) -> bool {
+    const fn is_removed(&self) -> bool {
         matches!(self, LintStatus::Removed { .. })
     }
 
@@ -248,7 +248,7 @@ impl LintStatus {
 ///     /// ```
 ///     pub(crate) static UNRESOLVED_REFERENCE = {
 ///         summary: "detects references to names that are not defined",
-///         status: LintStatus::preview("1.0.0"),
+///         status: LintStatus::stable("1.0.0"),
 ///         default_level: Level::Warn,
 ///     }
 /// }
@@ -257,6 +257,7 @@ impl LintStatus {
 macro_rules! declare_lint {
     (
         $(#[expect($($expect:tt)*)])?
+        $(#[allow($($allow:tt)*)])?
         $(#[doc = $doc:expr])+
         $vis: vis static $name: ident = {
             summary: $summary: literal,
@@ -266,17 +267,16 @@ macro_rules! declare_lint {
         }
     ) => {
         $(#[expect($($expect)*)])?
+        $(#[allow($($allow)*)])?
         $( #[doc = $doc] )+
-        #[expect(clippy::needless_update)]
         $vis static $name: $crate::lint::LintMetadata = $crate::lint::LintMetadata {
             name: ruff_db::diagnostic::LintName::of(ruff_macros::kebab_case!($name)),
             summary: $summary,
             raw_documentation: concat!($($doc, '\n',)+),
-            status: $status,
             file: file!(),
             line: line!(),
             $( $key: $value, )*
-            ..$crate::lint::lint_metadata_defaults()
+            ..$crate::lint::lint_metadata_defaults($status)
         };
     };
 }
@@ -291,7 +291,7 @@ mod tests {
         ///     indented
         static INLINE_DOCUMENTATION = {
             summary: "inline documentation",
-            status: LintStatus::preview("0.0.0"),
+            status: LintStatus::stable("0.0.0"),
             default_level: Level::Error,
         }
     }
@@ -300,7 +300,7 @@ mod tests {
         #[doc = include_str!("../resources/lint_docs/invalid-attribute-access.md")]
         static INCLUDED_DOCUMENTATION = {
             summary: "included documentation",
-            status: LintStatus::preview("0.0.0"),
+            status: LintStatus::stable("0.0.0"),
             default_level: Level::Error,
         }
     }
@@ -369,7 +369,7 @@ pub struct LintRegistryBuilder {
 
 impl LintRegistryBuilder {
     #[track_caller]
-    pub fn register_lint(&mut self, lint: &'static LintMetadata) {
+    pub(crate) fn register_lint(&mut self, lint: &'static LintMetadata) {
         assert_eq!(
             self.by_name.insert(&*lint.name, lint.into()),
             None,
@@ -406,7 +406,7 @@ impl LintRegistryBuilder {
         );
     }
 
-    pub fn build(self) -> LintRegistry {
+    pub(crate) fn build(self) -> LintRegistry {
         LintRegistry {
             lints: self.lints,
             by_name: self.by_name,
@@ -603,16 +603,16 @@ impl RuleSelection {
     }
 
     /// Returns the configured severity for the lint with the given id or `None` if the lint is disabled.
-    pub fn severity(&self, lint: LintId) -> Option<Severity> {
+    pub(crate) fn severity(&self, lint: LintId) -> Option<Severity> {
         self.lints.get(&lint).map(|(severity, _)| *severity)
     }
 
-    pub fn get(&self, lint: LintId) -> Option<(Severity, LintSource)> {
+    pub(crate) fn get(&self, lint: LintId) -> Option<(Severity, LintSource)> {
         self.lints.get(&lint).copied()
     }
 
     /// Returns `true` if the `lint` is enabled.
-    pub fn is_enabled(&self, lint: LintId) -> bool {
+    pub(crate) fn is_enabled(&self, lint: LintId) -> bool {
         self.severity(lint).is_some()
     }
 
@@ -670,6 +670,12 @@ pub enum LintSource {
     /// The rule was enabled in a configuration file.
     File,
 
+    /// The rule was enabled in a standalone script's inline metadata.
+    ScriptMetadata,
+
     /// The rule was enabled from the configuration in the editor.
     Editor,
+
+    /// The rule was enabled by uv metadata.
+    UvMetadata,
 }

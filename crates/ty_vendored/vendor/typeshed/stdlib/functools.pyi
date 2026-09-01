@@ -330,7 +330,7 @@ class partial(Generic[_T]):
         """Call self as a function."""
 
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
-        """See PEP 585"""
+        """partial is generic over the wrapped function's return type"""
 
 # With protocols, this could change into a generic protocol that defines __get__ and returns _T
 _Descriptor: TypeAlias = Any
@@ -363,7 +363,8 @@ class partialmethod(Generic[_T]):
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
         """Represent a PEP 585 generic type
 
-        E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
+        For example, for t = list[int], t.__origin__ is list and t.__args__
+        is (int,).
         """
 
 if sys.version_info >= (3, 11):
@@ -439,11 +440,12 @@ class cached_property(Generic[_T_co]):
 
     def __set_name__(self, owner: type[Any], name: str) -> None: ...
     # __set__ is not defined at runtime, but @cached_property is designed to be settable
-    def __set__(self, instance: object, value: _T_co) -> None: ...  # type: ignore[misc]  # pyright: ignore[reportGeneralTypeIssues]
+    def __set__(self, instance: object, value: _T_co) -> None: ...  # type: ignore[misc]  # pyright: ignore[reportGeneralTypeIssues]  # pyrefly: ignore [invalid-variance]
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
         """Represent a PEP 585 generic type
 
-        E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
+        For example, for t = list[int], t.__origin__ is list and t.__args__
+        is (int,).
         """
 
 def cache(user_function: Callable[..., _T], /) -> _lru_cache_wrapper[_T]:

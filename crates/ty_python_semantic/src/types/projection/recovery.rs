@@ -1,5 +1,5 @@
 use crate::Db;
-use crate::types::{DivergentType, Type};
+use crate::types::{DivergentType, ProgramEnvironment, Type};
 
 use super::equation::{CycleRootSet, ProjectionSolutions, root_candidate_from_previous};
 use super::evidence::ProjectionEvidenceSet;
@@ -49,11 +49,12 @@ impl<'db> ProjectionRecoveryBuilder<'db> {
     pub(crate) fn push_candidate(
         &mut self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         previous: Option<Type<'db>>,
         joined: Type<'db>,
     ) -> Type<'db> {
-        let root_hint =
-            previous.and_then(|previous| root_candidate_from_previous(db, previous, &self.roots));
+        let root_hint = previous
+            .and_then(|previous| root_candidate_from_previous(db, env, previous, &self.roots));
         self.slots.push(ProjectionRecoverySlot {
             previous,
             joined,
@@ -66,8 +67,9 @@ impl<'db> ProjectionRecoveryBuilder<'db> {
     pub(crate) fn finish(
         &self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         evidence: Option<&ProjectionEvidenceSet<'db>>,
     ) -> Option<ProjectionSolutions<'db>> {
-        ProjectionSolutions::from_recovery_slots(db, &self.roots, &self.slots, evidence)
+        ProjectionSolutions::from_recovery_slots(db, env, &self.roots, &self.slots, evidence)
     }
 }

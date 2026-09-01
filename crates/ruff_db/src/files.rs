@@ -1,11 +1,10 @@
 use std::collections::BTreeSet;
 use std::fmt;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use dashmap::mapref::entry::Entry;
-pub use directory::{
-    DirectoryListing, DirectoryListingError, directory_listing, system_path_to_directory,
-};
+pub use directory::{DirectoryListing, DirectoryListingError, directory_listing};
 pub use file_root::{FileRoot, FileRootKind};
 pub use path::FilePath;
 use ruff_notebook::{Notebook, NotebookError};
@@ -64,6 +63,9 @@ pub struct Files {
 
 #[derive(Default)]
 struct FilesInner {
+    /// Whether inputs on newly created files should be frozen.
+    frozen: AtomicBool,
+
     /// Lookup table that maps [`SystemPathBuf`]s to salsa interned [`File`] instances.
     ///
     /// The map also stores entries for files that don't exist on the file system. This is necessary
@@ -81,6 +83,22 @@ struct FilesInner {
 }
 
 impl Files {
+    /// Freezes all inputs on files created from now on.
+    ///
+    /// Existing files retain their current durability. Callers should therefore call this before
+    /// discovering any files if they need the freeze to apply to the entire project.
+    pub fn freeze(&self) {
+        self.inner.frozen.store(true, Ordering::Relaxed);
+    }
+
+    fn input_durability(&self, default: Durability) -> Durability {
+        if self.inner.frozen.load(Ordering::Relaxed) {
+            Durability::NEVER_CHANGE
+        } else {
+            default
+        }
+    }
+
     /// Looks up a file by its `path`.
     ///
     /// For a non-existing file, creates a new salsa [`File`] ingredient and stores it for future lookups.
@@ -88,6 +106,19 @@ impl Files {
     /// The operation always succeeds even if the path doesn't exist on disk, isn't accessible or if the path points to a directory.
     /// In these cases, a file with the appropriate [`FileStatus`] is returned.
     fn system(&self, db: &dyn Db, path: &SystemPath) -> File {
+        // All cache keys are normalized, absolute paths. However, an absolute path does not need
+        // to be fully normalized for this lookup: Camino's equality and hashing ignore redundant
+        // separators and `.` components, so `/foo/bar.py`, `/foo//bar.py`, and `/foo/./bar.py`
+        // all match the same cached `File`. A `..` component is not ignored, so a path such as
+        // `/foo/baz/../bar.py` misses the cache and falls through to full normalization. Since
+        // this fast path only returns an existing entry and never inserts one, it cannot create
+        // separate `File` identities for different spellings of the same path.
+        if path.is_absolute()
+            && let Some(file) = self.inner.system_by_path.get(path)
+        {
+            return *file;
+        }
+
         let absolute = SystemPath::absolute(path, db.system().current_directory());
 
         // DashMap's entry API requires an owned key. Avoid cloning it for cached paths.
@@ -104,13 +135,14 @@ impl Files {
 
                 tracing::trace!("Adding file '{absolute}'");
 
-                let durability = self
-                    .root(db, &absolute)
-                    .map_or(Durability::default(), |root| root.durability(db));
+                let durability = self.input_durability(
+                    self.root(db, &absolute)
+                        .map_or(Durability::default(), |root| root.durability(db)),
+                );
 
                 let builder = File::builder(FilePath::from(absolute))
                     .durability(durability)
-                    .path_durability(Durability::HIGH);
+                    .path_durability(Durability::NEVER_CHANGE);
 
                 let builder = match metadata {
                     Ok(metadata) if metadata.file_type().is_file() => builder
@@ -132,6 +164,13 @@ impl Files {
 
     /// Tries to look up the file for the given system path, returns `None` if no such file exists yet
     pub fn try_system(&self, db: &dyn Db, path: &SystemPath) -> Option<File> {
+        // As in `system`, path equality normalizes redundant separators and `.`, but not `..`.
+        if path.is_absolute()
+            && let Some(file) = self.inner.system_by_path.get(path)
+        {
+            return Some(*file);
+        }
+
         let absolute = SystemPath::absolute(path, db.system().current_directory());
         self.inner
             .system_by_path
@@ -161,7 +200,7 @@ impl Files {
                 let file = File::builder(FilePath::from(path))
                     .permissions(Some(0o444))
                     .revision(metadata.revision())
-                    .durability(Durability::HIGH)
+                    .durability(Durability::NEVER_CHANGE)
                     .new(db);
 
                 entry.insert(file);
@@ -181,11 +220,12 @@ impl Files {
         tracing::trace!("Adding virtual file {}", path);
         let virtual_file = VirtualFile(
             File::builder(FilePath::from(path))
-                .path_durability(Durability::HIGH)
+                .durability(self.input_durability(Durability::LOW))
+                .path_durability(Durability::NEVER_CHANGE)
                 .status(FileStatus::Exists)
                 .revision(FileRevision::zero())
                 .permissions(None)
-                .permissions_durability(Durability::HIGH)
+                .permissions_durability(Durability::NEVER_CHANGE)
                 .new(db),
         );
         self.inner
@@ -322,10 +362,12 @@ pub struct File {
     /// The unix permissions of the file. Only supported on unix systems. Always `None` on Windows
     /// or when the file has been deleted.
     #[default]
+    #[returns(copy)]
     pub permissions: Option<u32>,
 
     /// The path revision. A file or directory has changed if the revisions don't compare equal.
     #[default]
+    #[returns(copy)]
     pub revision: FileRevision,
 
     /// The status of the file.
@@ -333,6 +375,7 @@ pub struct File {
     /// Salsa doesn't support deleting inputs. The only way to signal dependent queries that
     /// the file has been deleted is to change the status to `Deleted`.
     #[default]
+    #[returns(copy)]
     pub status: FileStatus,
 
     /// Overrides the result of [`source_text`](crate::source::source_text).
@@ -359,7 +402,7 @@ impl File {
     ///
     /// Reading the same file multiple times isn't guaranteed to return the same content. It's possible
     /// that the file has been modified in between the reads.
-    pub fn read_to_string(&self, db: &dyn Db) -> crate::system::Result<String> {
+    pub(crate) fn read_to_string(&self, db: &dyn Db) -> crate::system::Result<String> {
         let path = self.path(db);
 
         match path {
@@ -383,7 +426,7 @@ impl File {
     ///
     /// Reading the same file multiple times isn't guaranteed to return the same content. It's possible
     /// that the file has been modified in between the reads.
-    pub fn read_to_notebook(&self, db: &dyn Db) -> Result<Notebook, NotebookError> {
+    pub(crate) fn read_to_notebook(&self, db: &dyn Db) -> Result<Notebook, NotebookError> {
         let path = self.path(db);
 
         match path {
@@ -521,11 +564,6 @@ impl File {
     /// Returns `true` if the file should be analyzed as a type stub.
     pub fn is_stub(self, db: &dyn Db) -> bool {
         self.source_type(db).is_stub()
-    }
-
-    /// Returns `true` if the file is an `__init__.pyi`
-    pub fn is_package_stub(self, db: &dyn Db) -> bool {
-        self.path(db).as_str().ends_with("__init__.pyi")
     }
 
     /// Returns `true` if the file is an `__init__.pyi`
@@ -677,9 +715,13 @@ impl TryFrom<Span> for FileRange {
 
 #[cfg(test)]
 mod tests {
+    use salsa::Setter;
+
+    use crate::Db as _;
     use crate::file_revision::FileRevision;
-    use crate::files::{FileError, system_path_to_file, vendored_path_to_file};
-    use crate::system::DbWithWritableSystem as _;
+    use crate::files::{File, FileError, system_path_to_file, vendored_path_to_file};
+    use crate::source::source_text;
+    use crate::system::{DbWithWritableSystem as _, SystemPath};
     use crate::tests::TestDb;
     use crate::vendored::VendoredFileSystemBuilder;
     use zip::CompressionMethod;
@@ -710,17 +752,53 @@ mod tests {
 
     #[test]
     fn system_normalize_paths() {
-        let db = TestDb::new();
+        #[track_caller]
+        fn assert_normalized_path(db: &TestDb, path: &str, canonical: File) {
+            assert_eq!(system_path_to_file(db, path), Ok(canonical));
+            assert_eq!(
+                db.files().try_system(db, SystemPath::new(path)),
+                Some(canonical)
+            );
+        }
 
-        assert_eq!(
-            system_path_to_file(&db, "test.py"),
-            system_path_to_file(&db, "/test.py")
-        );
+        let mut db = TestDb::new();
+        db.write_file("/foo/bar.py", "x = 1").unwrap();
+        db.write_file("/foo/baz/bar.py", "x = 2").unwrap();
 
-        assert_eq!(
-            system_path_to_file(&db, "/root/.././test.py"),
-            system_path_to_file(&db, "/root/test.py")
-        );
+        let canonical = system_path_to_file(&db, "/foo/bar.py").unwrap();
+        assert_normalized_path(&db, "foo/bar.py", canonical);
+        assert_normalized_path(&db, "/foo//bar.py", canonical);
+        assert_normalized_path(&db, "/foo/./bar.py", canonical);
+        assert_normalized_path(&db, "/foo/baz/../bar.py", canonical);
+
+        let distinct = system_path_to_file(&db, "/foo/baz/bar.py").unwrap();
+        assert_ne!(canonical, distinct);
+    }
+
+    #[test]
+    #[should_panic]
+    fn freeze_applies_to_new_file_overrides() {
+        let mut db = TestDb::new();
+        db.write_file("test.py", "x = 1").unwrap();
+        db.files().freeze();
+
+        let file = system_path_to_file(&db, "test.py").unwrap();
+        let source = source_text(&db, file);
+        file.set_source_text_override(&mut db).to(Some(source));
+    }
+
+    #[test]
+    fn freeze_does_not_change_existing_files() {
+        let mut db = TestDb::new();
+        db.write_file("test.py", "x = 1").unwrap();
+
+        let file = system_path_to_file(&db, "test.py").unwrap();
+        db.files().freeze();
+
+        let source = source_text(&db, file);
+        file.set_source_text_override(&mut db)
+            .to(Some(source.clone()));
+        assert_eq!(file.source_text_override(&db).as_ref(), Some(&source));
     }
 
     #[test]

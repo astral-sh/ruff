@@ -125,13 +125,13 @@ The stdlib API `os.stat` is a commonly used API that returns an instance of a tu
 ```py
 import os
 import stat
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 reveal_type(os.stat("my_file.txt"))  # revealed: stat_result
 reveal_type(os.stat("my_file.txt")[stat.ST_MODE])  # revealed: int
-reveal_type(os.stat("my_file.txt")[stat.ST_ATIME])  # revealed: int | float
+reveal_type(os.stat("my_file.txt")[stat.ST_ATIME])  # revealed: float
 
-# revealed: (<class 'stat_result'>, <class 'structseq[int | float]'>, <class 'tuple[int, int, int, int, int, int, int, int | float, int | float, int | float]'>, <class 'Sequence[int | float]'>, <class 'Reversible[int | float]'>, <class 'Collection[int | float]'>, <class 'Iterable[int | float]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
+# revealed: (<class 'stat_result'>, <class 'structseq[float]'>, <class 'tuple[int, int, int, int, int, int, int, float, float, float]'>, <class 'Sequence[float]'>, <class 'Reversible[float]'>, <class 'Collection[float]'>, <class 'Iterable[float]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
 reveal_mro(os.stat_result)
 
 # There are no specific overloads for the `float` elements in `os.stat_result`,
@@ -139,7 +139,7 @@ reveal_mro(os.stat_result)
 # gives the right result for those elements in the tuple, and we aim to synthesize
 # the minimum number of overloads for any given tuple
 #
-# revealed: Overload[(self, index: Literal[-10, -9, -8, -7, -6, -5, -4, 0, 1, 2, 3, 4, 5, 6], /) -> int, (self, index: SupportsIndex, /) -> int | float, (self, index: slice[SupportsIndex | None, SupportsIndex | None, SupportsIndex | None], /) -> tuple[int | float, ...]]
+# revealed: Overload[(self, index: Literal[-10, -9, -8, -7, -6, -5, -4, 0, 1, 2, 3, 4, 5, 6], /) -> int, (self, index: SupportsIndex, /) -> float, (self, index: slice[SupportsIndex | None, SupportsIndex | None, SupportsIndex | None], /) -> tuple[float, ...]]
 reveal_type(os.stat_result.__getitem__)
 ```
 
@@ -158,7 +158,8 @@ tuples are naturally understood as being subtypes of protocols that have precise
 
 ```py
 from typing import Protocol, Literal
-from ty_extensions import static_assert, is_subtype_of
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
 
 class IntFromZeroSubscript(Protocol):
     def __getitem__(self, index: Literal[0], /) -> int: ...
@@ -277,6 +278,83 @@ def __(t: HeterogeneousTupleSubclass, m: int, n: int):
     reveal_type(tuple_slice)  # revealed: tuple[I0 | I1 | I2 | I3, ...]
 ```
 
+## Slices into mixed tuples
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+class P0: ...
+class P1: ...
+class P2: ...
+class V: ...
+class S0: ...
+class S1: ...
+class S2: ...
+
+def mixed_static_slices(
+    t: tuple[P0, P1, P2, *tuple[V, ...], S0, S1, S2],
+) -> None:
+    reveal_type(t[:])  # revealed: tuple[P0, P1, P2, *tuple[V, ...], S0, S1, S2]
+
+    reveal_type(t[:0])  # revealed: tuple[()]
+    reveal_type(t[5:2])  # revealed: tuple[()]
+    reveal_type(t[0:0:-1])  # revealed: tuple[()]
+    reveal_type(t[0:-1:-1])  # revealed: tuple[()]
+
+    reveal_type(t[:3])  # revealed: tuple[P0, P1, P2]
+    reveal_type(t[:6])  # revealed: tuple[P0, P1, P2, V | S0, V | S0 | S1, V | S0 | S1 | S2]
+    reveal_type(t[1:5:2])  # revealed: tuple[P1, V | S0]
+
+    reveal_type(t[-3:])  # revealed: tuple[S0, S1, S2]
+    reveal_type(t[2:0:-1])  # revealed: tuple[P2, P1]
+    reveal_type(t[-1:-3:-1])  # revealed: tuple[S2, S1]
+
+    reveal_type(t[1:])  # revealed: tuple[P1, P2, *tuple[V, ...], S0, S1, S2]
+    reveal_type(t[3:])  # revealed: tuple[*tuple[V, ...], S0, S1, S2]
+    reveal_type(t[1:-1])  # revealed: tuple[P1, P2, *tuple[V, ...], S0, S1]
+
+    reveal_type(t[3:5])  # revealed: tuple[V | S0, V | S0 | S1]
+    reveal_type(t[2:-1:3])  # revealed: tuple[P2, *tuple[V | S0 | S1, ...]]
+    reveal_type(t[::2])  # revealed: tuple[P0, P2, *tuple[V | S0 | S1 | S2, ...]]
+
+    reveal_type(t[::-1])  # revealed: tuple[S2, S1, S0, *tuple[V, ...], P2, P1, P0]
+    reveal_type(t[:1:-1])  # revealed: tuple[S2, S1, S0, *tuple[V, ...], P2]
+    reveal_type(t[:-9:-1])  # revealed: tuple[S2, S1, S0, *tuple[V | P2 | P1 | P0, ...]]
+    reveal_type(t[-2:0:-1])  # revealed: tuple[S1, S0, *tuple[V, ...], P2, P1]
+
+    reveal_type(t[::-2])  # revealed: tuple[S2, S0, *tuple[V | P2 | P1 | P0, ...]]
+    reveal_type(t[:0:-2])  # revealed: tuple[S2, S0, *tuple[V | P2 | P1, ...]]
+    reveal_type(t[:-9:-2])  # revealed: tuple[S2, S0, *tuple[V | P2 | P1 | P0, ...]]
+    reveal_type(t[-3:1:-2])  # revealed: tuple[S0, *tuple[V | P2, ...]]
+
+    reveal_type(t[-4:])  # revealed: tuple[P2 | V, S0, S1, S2]
+    reveal_type(t[3::-1])  # revealed: tuple[S0 | V, P2, P1, P0]
+    reveal_type(t[-9::-1])  # revealed: tuple[V | P2 | P1 | P0, ...]
+    reveal_type(t[-9:0:-1])  # revealed: tuple[V | P2 | P1, ...]
+    reveal_type(t[-1:-5:-1])  # revealed: tuple[S2, S1, S0, V | P2]
+    reveal_type(t[2147483647::-1])  # revealed: tuple[S2 | S1 | S0 | V | P2 | P1 | P0, ...]
+
+def homogeneous_static_slices(t: tuple[*tuple[V, ...]]) -> None:
+    reveal_type(t[:])  # revealed: tuple[V, ...]
+    reveal_type(t[-1:-1])  # revealed: tuple[()]
+    reveal_type(t[0:-1:-1])  # revealed: tuple[()]
+    reveal_type(t[::-1])  # revealed: tuple[V, ...]
+
+def prefix_only_static_slices(t: tuple[P0, *tuple[V, ...]]) -> None:
+    reveal_type(t[:])  # revealed: tuple[P0, *tuple[V, ...]]
+    reveal_type(t[:-1])  # revealed: tuple[P0 | V, ...]
+    reveal_type(t[::-1])  # revealed: tuple[*tuple[V, ...], P0]
+
+def suffix_only_static_slices(t: tuple[*tuple[V, ...], S0, S1]) -> None:
+    reveal_type(t[:])  # revealed: tuple[*tuple[V, ...], S0, S1]
+    reveal_type(t[1:])  # revealed: tuple[*tuple[V | S0, ...], S1]
+    reveal_type(t[1:3])  # revealed: tuple[V | S0 | S1, ...]
+    reveal_type(t[::-1])  # revealed: tuple[S1, S0, *tuple[V, ...]]
+```
+
 ## Indexes into homogeneous and mixed tuples
 
 ```toml
@@ -356,7 +434,7 @@ python-version = "3.9"
 ```
 
 ```py
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 class A(tuple[int, str]): ...
 
@@ -398,7 +476,7 @@ python-version = "3.9"
 
 ```py
 from typing import Tuple
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 class A(Tuple[int, str]): ...
 
@@ -418,7 +496,7 @@ def test(val: tuple[str] | tuple[int]):
     reveal_type(val[0])  # revealed: str | int
 
 def test2(val: tuple[str, None] | list[int | float]):
-    reveal_type(val[0])  # revealed: str | int | float
+    reveal_type(val[0])  # revealed: str | float
 ```
 
 ## Union subscript access with non-indexable type

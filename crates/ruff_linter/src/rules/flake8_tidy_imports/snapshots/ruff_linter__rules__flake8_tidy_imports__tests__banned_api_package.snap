@@ -29,4 +29,3 @@ TID251 `my_package.sublib.protocol` is banned: The protocol module is deprecated
  9 | from . import logger, models
 10 | from ..protocol.UpperCaseModule import some_function
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |

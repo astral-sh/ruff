@@ -1,7 +1,7 @@
 import sys
 from collections.abc import Awaitable, Callable, Coroutine
 from typing import Any, ParamSpec, TypeGuard, TypeVar, overload
-from typing_extensions import TypeIs, deprecated
+from typing_extensions import Never, TypeIs, deprecated
 
 # Keep asyncio.__all__ updated with any changes to __all__ here
 if sys.version_info >= (3, 11):
@@ -22,22 +22,22 @@ if sys.version_info < (3, 11):
         an error message is logged.
         """
 
-def iscoroutine(obj: object) -> TypeIs[Coroutine[Any, Any, Any]]:
+def iscoroutine(obj: object) -> TypeIs[Coroutine[object, Never, object]]:
     """Return True if obj is a coroutine object."""
 
 if sys.version_info >= (3, 11):
     @overload
-    @deprecated("Deprecated since Python 3.14. Use `inspect.iscoroutinefunction()` instead.")
+    @deprecated("Deprecated; will be removed in Python 3.16. Use `inspect.iscoroutinefunction()` instead.")
     def iscoroutinefunction(func: Callable[..., Coroutine[Any, Any, Any]]) -> bool:
         """Return True if func is a decorated coroutine function."""
     @overload
-    @deprecated("Deprecated since Python 3.14. Use `inspect.iscoroutinefunction()` instead.")
+    @deprecated("Deprecated; will be removed in Python 3.16. Use `inspect.iscoroutinefunction()` instead.")
     def iscoroutinefunction(func: Callable[_P, Awaitable[_T]]) -> TypeGuard[Callable[_P, Coroutine[Any, Any, _T]]]: ...
     @overload
-    @deprecated("Deprecated since Python 3.14. Use `inspect.iscoroutinefunction()` instead.")
+    @deprecated("Deprecated; will be removed in Python 3.16. Use `inspect.iscoroutinefunction()` instead.")
     def iscoroutinefunction(func: Callable[_P, object]) -> TypeGuard[Callable[_P, Coroutine[Any, Any, Any]]]: ...
     @overload
-    @deprecated("Deprecated since Python 3.14. Use `inspect.iscoroutinefunction()` instead.")
+    @deprecated("Deprecated; will be removed in Python 3.16. Use `inspect.iscoroutinefunction()` instead.")
     def iscoroutinefunction(func: object) -> TypeGuard[Callable[..., Coroutine[Any, Any, Any]]]: ...
 else:
     # Sometimes needed in Python < 3.11 due to the fact that it supports @coroutine

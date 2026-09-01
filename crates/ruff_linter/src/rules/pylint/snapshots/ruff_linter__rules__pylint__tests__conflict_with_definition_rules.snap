@@ -9,7 +9,6 @@ PLR1712 [*] Unnecessary temporary variable
 7 | | x = y
 8 | | y = temp
   | |________^
-  |
 help: Use `x, y = y, x` instead
   |
 5 | x, y = 1, 2

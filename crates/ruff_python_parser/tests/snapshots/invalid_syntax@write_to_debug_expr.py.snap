@@ -224,4 +224,3 @@ Module(
 3 | __debug__ = 1
 4 | x, y, __debug__, z = 1, 2, 3, 4
   |       ^^^^^^^^^ Syntax Error: cannot assign to `__debug__`
-  |

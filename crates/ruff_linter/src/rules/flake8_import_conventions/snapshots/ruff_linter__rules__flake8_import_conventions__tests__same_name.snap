@@ -7,7 +7,6 @@ ICN001 [*] `django.conf.settings` should be imported as `settings`
  9 | def unconventional_alias():
 10 |     from django.conf import settings as s
    |                                         ^
-   |
 help: Alias `django.conf.settings` to `settings`
    |
 9  | def unconventional_alias():

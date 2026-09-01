@@ -1,0 +1,9 @@
+# Black will inject a space between a comment hash and tab
+# as if the tab is non-whitespace.
+
+#Flush
+# Normal
+#	Tabbed
+#		Double-tabbed
+pass # Normal missing pre-hash space
+pass #	Tabbed, missing pre-hash space

@@ -43,7 +43,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/generics/scoping.md
 
 ```
 error[invalid-type-variable-default]: Type parameters without defaults cannot follow type parameters with defaults
- --> src/mdtest_snippet.py:9:10
+ --> src/mdtest_snippet.py:9:17
   |
 9 | def f(x: T1, y: T2) -> tuple[T1, T2]:
   |          --     ^^ Type variable `T2` does not have a default
@@ -56,13 +56,12 @@ error[invalid-type-variable-default]: Type parameters without defaults cannot fo
   | ------------------------------- `T1` defined here
 4 | T2 = TypeVar("T2")
   | ------------------ `T2` defined here
-  |
 
 ```
 
 ```
 error[invalid-type-variable-default]: Type parameters without defaults cannot follow type parameters with defaults
-  --> src/mdtest_snippet.py:13:17
+  --> src/mdtest_snippet.py:13:24
    |
 13 | def g(x: T2, y: T1, z: T3) -> tuple[T2, T1, T3]:
    |                 --     ^^ Type variable `T3` does not have a default
@@ -76,13 +75,12 @@ error[invalid-type-variable-default]: Type parameters without defaults cannot fo
  4 | T2 = TypeVar("T2")
  5 | T3 = TypeVar("T3")
    | ------------------ `T3` defined here
-   |
 
 ```
 
 ```
 error[invalid-type-variable-default]: Type parameters without defaults cannot follow type parameters with defaults
-  --> src/mdtest_snippet.py:17:10
+  --> src/mdtest_snippet.py:17:17
    |
 17 | def h(x: T1, y: T2, z: DefaultStrT, w: T3) -> tuple[T1, T2, DefaultStrT, T3]:
    |          --     ^^ Type variables `T2` and `T3` do not have defaults
@@ -95,6 +93,5 @@ error[invalid-type-variable-default]: Type parameters without defaults cannot fo
    | ------------------------------- `T1` defined here
  4 | T2 = TypeVar("T2")
    | ------------------ `T2` defined here
-   |
 
 ```

@@ -279,4 +279,3 @@ Module(
 4 | x += *lambda x: x
 5 | x += y := 1
   |        ^^ Syntax Error: Expected a statement
-  |

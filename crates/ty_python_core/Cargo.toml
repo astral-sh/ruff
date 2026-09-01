@@ -1,6 +1,6 @@
 [package]
 name = "ty_python_core"
-version = "0.0.1"
+version = "0.0.11"
 description = "This is an internal component crate of Ruff"
 authors = { workspace = true }
 edition = { workspace = true }
@@ -16,7 +16,6 @@ ruff_index = { workspace = true, features = ["salsa"] }
 ruff_memory_usage = { workspace = true }
 ruff_python_ast = { workspace = true, features = ["salsa"] }
 ruff_python_parser = { workspace = true }
-ruff_python_trivia = { workspace = true }
 ruff_text_size = { workspace = true }
 ty_module_resolver = { workspace = true }
 ty_vendored = { workspace = true }
@@ -25,6 +24,7 @@ ty_combine = { workspace = true }
 
 bitflags = { workspace = true }
 bitvec = { workspace = true }
+char_str = { workspace = true, features = ["get-size"] }
 get-size2 = { workspace = true, features = ["indexmap", "ordermap", "thin-vec"] }
 hashbrown = { workspace = true }
 itertools = { workspace = true }
@@ -41,13 +41,14 @@ tracing = { workspace = true }
 
 [dev-dependencies]
 ruff_db = { workspace = true, features = ["testing", "os"] }
-ruff_python_parser = { workspace = true }
+ruff_python_trivia = { workspace = true }
 
 anyhow = { workspace = true }
 
 [features]
 serde = ["dep:serde", "dep:ruff_macros"]
 schemars = ["dep:schemars", "dep:serde_json"]
+testing = []
 
 [lints]
 workspace = true

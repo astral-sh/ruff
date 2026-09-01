@@ -37,7 +37,6 @@ error[invalid-await]: `PossiblyUnbound` is not awaitable
   |
 5 |         def __await__(self):
   |             --------------- method defined here
-  |
 info: `__await__` may be missing
 
 ```

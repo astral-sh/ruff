@@ -315,7 +315,7 @@ help: Replace with `Path(...).readlink()`
 26 | stat(p)
    |
 
-PTH116 `os.stat()` should be replaced by `Path.stat()`, `Path.owner()`, or `Path.group()`
+PTH116 [*] `os.stat()` should be replaced by `Path.stat()`, `Path.owner()`, or `Path.group()`
   --> import_from.py:25:1
    |
 23 | bbbbb = islink(p)
@@ -325,6 +325,18 @@ PTH116 `os.stat()` should be replaced by `Path.stat()`, `Path.owner()`, or `Path
 26 | isabs(p)
 27 | join(p, q)
    |
+help: Replace with `Path(...).stat()`
+   |
+4  | from os.path import isabs, join, basename, dirname, samefile, splitext
+5  + import pathlib
+6  |
+--------------------------------------------------------------------------------
+25 | readlink(p)
+   - stat(p)
+26 + pathlib.Path(p).stat()
+27 | isabs(p)
+   |
+note: This is an unsafe fix and may change runtime behavior
 
 PTH117 [*] `os.path.isabs()` should be replaced by `Path.is_absolute()`
   --> import_from.py:26:1
@@ -479,7 +491,6 @@ PTH123 [*] `open()` should be replaced by `Path.open()`
 35 |     fp.read()
 36 | open(p).close()
    | ^^^^
-   |
 help: Replace with `Path.open()`
    |
 4  | from os.path import isabs, join, basename, dirname, samefile, splitext
@@ -499,7 +510,6 @@ PTH123 [*] `open()` should be replaced by `Path.open()`
 42 |
 43 |     with open(p) as _: ...  # Error
    |          ^^^^
-   |
 help: Replace with `Path.open()`
    |
 4  | from os.path import isabs, join, basename, dirname, samefile, splitext
@@ -541,7 +551,7 @@ PTH104 [*] `os.rename()` should be replaced by `Path.rename()`
 54 |
 55 | rename(
    | ^^^^^^
-56 |     # commment 1
+56 |     # comment 1
 57 |     file, # comment 2
    |
 help: Replace with `Path(...).rename(...)`
@@ -552,7 +562,7 @@ help: Replace with `Path(...).rename(...)`
 --------------------------------------------------------------------------------
 55 |
    - rename(
-   -     # commment 1
+   -     # comment 1
    -     file, # comment 2
    -     "file_2.py"
    -     ,

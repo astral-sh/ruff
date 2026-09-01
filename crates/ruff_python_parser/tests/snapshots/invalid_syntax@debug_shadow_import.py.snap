@@ -151,4 +151,3 @@ Module(
 3 | from x import __debug__
 4 | from x import debug as __debug__
   |                        ^^^^^^^^^ Syntax Error: cannot assign to `__debug__`
-  |

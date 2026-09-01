@@ -113,7 +113,6 @@ ICN001 [*] `networkx` should be imported as `nx`
 11 |     import tkinter
 12 |     import networkx
    |            ^^^^^^^^
-   |
 help: Alias `networkx` to `nx`
    |
 11 |     import tkinter
@@ -242,7 +241,6 @@ ICN001 [*] `networkx` should be imported as `nx`
 21 |     import tkinter as tkr
 22 |     import networkx as nxy
    |                        ^^^
-   |
 help: Alias `networkx` to `nx`
    |
 21 |     import tkinter as tkr

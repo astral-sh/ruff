@@ -6,7 +6,6 @@ UP029 [*] Unnecessary builtin import: `int`
   |
 1 | from builtins import str, int
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  |
 help: Remove unnecessary builtin import
   |
   - from builtins import str, int

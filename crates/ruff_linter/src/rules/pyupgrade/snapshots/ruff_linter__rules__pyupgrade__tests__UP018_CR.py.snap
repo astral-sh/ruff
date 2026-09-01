@@ -23,7 +23,6 @@ UP018 [*] Unnecessary `int` call (rewrite as a literal)
 4 | / int(+
 5 | |     1)
   | |______^
-  |
 help: Replace with integer literal
   |
 3 |     1)  - int(+4 + (+5 |     1)

@@ -1,6 +1,8 @@
 use crate::ast_node_ref::AstNodeRef;
 use crate::db::Db;
 use crate::scope::ScopeId;
+use crate::{Program, ProgramFile};
+use ruff_db::PythonFile;
 use ruff_db::files::File;
 use ruff_python_ast as ast;
 use salsa;
@@ -36,6 +38,7 @@ pub struct Expression<'db> {
     ///
     /// Storing the interned scope avoids retaining the file and file-local scope separately, at
     /// the cost of database lookups when either of those values is needed.
+    #[returns(copy)]
     pub scope_id: ScopeId<'db>,
 
     /// The expression node.
@@ -53,9 +56,11 @@ pub struct Expression<'db> {
     /// to the target, and so have `None` for this field.)
     #[no_eq]
     #[tracked]
+    #[returns(clone)]
     pub assigned_to: Option<AstNodeRef<ast::StmtAssign>>,
 
     /// Should this expression be inferred as a normal expression or a type expression?
+    #[returns(copy)]
     pub kind: ExpressionKind,
 }
 
@@ -69,5 +74,17 @@ impl<'db> Expression<'db> {
 
     pub fn file(self, db: &'db dyn Db) -> File {
         self.scope_id(db).file(db)
+    }
+
+    pub fn python_file(self, db: &'db dyn Db) -> PythonFile<'db> {
+        self.scope_id(db).python_file(db)
+    }
+
+    pub fn program_file(self, db: &'db dyn Db) -> ProgramFile<'db> {
+        self.scope_id(db).program_file(db)
+    }
+
+    pub fn program(self, db: &'db dyn Db) -> Program<'db> {
+        self.scope_id(db).program(db)
     }
 }

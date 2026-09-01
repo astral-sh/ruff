@@ -10,7 +10,6 @@ I001 [*] Import block is un-sorted or un-formatted
 4 | |
 5 | | from typing import Any, Sequence
   | |________________________________^
-  |
 help: Organize imports
   |
 2 |
@@ -48,7 +47,6 @@ I001 [*] Import block is un-sorted or un-formatted
 29 | |
 30 | |     from typing_extensions import TypeAlias
    | |___________________________________________^
-   |
 help: Organize imports
    |
 27 |

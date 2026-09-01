@@ -53,7 +53,7 @@ impl Display for BannedAliases {
 
 impl BannedAliases {
     /// Returns an iterator over the banned aliases.
-    pub fn iter(&self) -> impl Iterator<Item = &str> {
+    pub(crate) fn iter(&self) -> impl Iterator<Item = &str> {
         self.0.iter().map(String::as_str)
     }
 }

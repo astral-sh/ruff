@@ -1,7 +1,6 @@
 ## What it does
 
-Checks for attempts to use an out of bounds index to get an item from
-a container.
+Checks for attempts to use an out of bounds index to get an item from a container.
 
 ## Why is this bad?
 

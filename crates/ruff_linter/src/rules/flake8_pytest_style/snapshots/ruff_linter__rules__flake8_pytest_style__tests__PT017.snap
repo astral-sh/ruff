@@ -8,4 +8,3 @@ PT017 Found assertion on exception `e` in `except` block, use `pytest.raises()` 
 18 |     except Exception as e:
 19 |         assert e.message, "blah blah"
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |

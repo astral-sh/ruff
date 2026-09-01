@@ -4,7 +4,7 @@ use lsp_types::{TypeHierarchyItem, TypeHierarchySubtypesParams};
 use crate::server::api::traits::{
     BackgroundRequestHandler, RequestHandler, RetriableRequestHandler,
 };
-use crate::server::api::type_hierarchy::hierarchy_handler;
+use crate::server::api::type_hierarchy::{TypeHierarchyKind, hierarchy_handler};
 use crate::session::SessionSnapshot;
 use crate::session::client::Client;
 
@@ -28,7 +28,7 @@ impl BackgroundRequestHandler for TypeHierarchySubtypesRequestHandler {
         Ok(hierarchy_handler(
             snapshot,
             &params.item,
-            ty_ide::type_hierarchy_subtypes,
+            TypeHierarchyKind::Subtypes,
         ))
     }
 }

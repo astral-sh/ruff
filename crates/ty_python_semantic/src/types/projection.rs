@@ -7,7 +7,9 @@
 
 use std::cell::RefCell;
 
-use super::{DivergentType, KnownClass, TupleSpec, Type, UnionBuilder, UnionType};
+use super::{
+    DivergentType, KnownClass, ProgramEnvironment, TupleSpec, Type, UnionBuilder, UnionType,
+};
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::tuple::TupleType;
 use crate::types::visitor::any_over_type;
@@ -45,8 +47,12 @@ impl<'db> Type<'db> {
     }
 
     /// Inference-time API: returns whether this type still contains a cycle artifact.
-    pub(crate) fn contains_cycle_artifact(self, db: &'db dyn Db) -> bool {
-        self.contains_nested_cycle_artifact(db, true)
+    pub(crate) fn contains_cycle_artifact(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> bool {
+        self.contains_nested_cycle_artifact(db, env, true)
     }
 
     fn has_top_level_cycle_artifact(self, db: &'db dyn Db) -> bool {
@@ -58,8 +64,8 @@ impl<'db> Type<'db> {
     }
 
     /// Returns whether applying a projection operation can observe a cycle artifact.
-    fn needs_projection_operation(self, db: &'db dyn Db) -> bool {
-        self.contains_nested_cycle_artifact(db, true)
+    fn needs_projection_operation(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
+        self.contains_nested_cycle_artifact(db, env, true)
     }
 
     /// Returns `true` if both types originate from the same cycle root, regardless
@@ -84,15 +90,16 @@ impl<'db> Type<'db> {
     pub(crate) fn try_projection_cycle_normalized(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         root: DivergentType,
         evidence: Option<&ProjectionEvidenceSet<'db>>,
     ) -> Option<Self> {
-        let paths = self.projection_ops(db, root);
+        let paths = self.projection_ops(db, env, root);
         if paths.is_empty() {
             return None;
         }
 
-        self.try_container_projection_cycle_normalized(db, root, &paths, evidence)
+        self.try_container_projection_cycle_normalized(db, env, root, &paths, evidence)
     }
 
     /// Cycle-recovery-time API: solves projections explainable by top-level containers.
@@ -132,6 +139,7 @@ impl<'db> Type<'db> {
     fn try_container_projection_cycle_normalized(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         root: DivergentType,
         paths: &[ProjectionPath<'db>],
         evidence: Option<&ProjectionEvidenceSet<'db>>,
@@ -144,7 +152,7 @@ impl<'db> Type<'db> {
                 continue;
             }
 
-            let container = ProjectionContainer::try_from(db, root, *element, evidence)?;
+            let container = ProjectionContainer::try_from(db, env, root, *element, evidence)?;
             containers.push(container);
         }
 
@@ -158,11 +166,11 @@ impl<'db> Type<'db> {
             .map(|path| (path, Vec::new()))
             .collect::<FxIndexMap<_, _>>();
         for container in &containers {
-            container.collect_projection_terms(db, root, evidence, &mut terms_by_op)?;
+            container.collect_projection_terms(db, env, root, evidence, &mut terms_by_op)?;
         }
 
-        let solutions =
-            ProjectionEquationSystem::from_terms_by_op(db, root, &terms_by_op)?.solve(db)?;
+        let solutions = ProjectionEquationSystem::from_terms_by_op(db, env, root, &terms_by_op)?
+            .solve(db, env)?;
         let solved_ops = paths
             .iter()
             .map(|path| {
@@ -170,7 +178,7 @@ impl<'db> Type<'db> {
                     root,
                     path: path.clone(),
                 };
-                Some((path.clone(), solutions.solved_type(db, &var)?))
+                Some((path.clone(), solutions.solved_type(db, env, &var)?))
             })
             .collect::<Option<FxIndexMap<_, _>>>()?;
 
@@ -183,37 +191,43 @@ impl<'db> Type<'db> {
                 Some((
                     element.replace_solved_projection_artifacts(
                         db,
+                        env,
                         root,
                         &solved_ops,
                         evidence,
                     )?,
-                    element.mentions_cycle_artifact_direct(db, root),
+                    element.mentions_cycle_artifact_direct(db, env, root),
                 ))
             })
             .collect::<Option<Vec<_>>>()?;
 
-        let ty = Self::union_projection_cycle_recovery(db, elements);
+        let ty = Self::union_projection_cycle_recovery(db, env, elements);
         debug_assert!(
-            !ty.mentions_projection_artifact_in_roots(db, &CycleRootSet::single(root)),
+            !ty.mentions_projection_artifact_in_roots(db, env, &CycleRootSet::single(root)),
             "projection recovery must not leave unsolved projection artifacts"
         );
         Some(ty)
     }
 
-    fn union_projection_cycle_recovery(db: &'db dyn Db, elements: Vec<(Self, bool)>) -> Self {
-        if let Some(ty) = Self::try_union_fixed_length_tuples_cycle_recovery(db, &elements) {
+    fn union_projection_cycle_recovery(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        elements: Vec<(Self, bool)>,
+    ) -> Self {
+        if let Some(ty) = Self::try_union_fixed_length_tuples_cycle_recovery(db, env, &elements) {
             return ty;
         }
 
-        if let Some(ty) = Self::try_union_direct_instances_cycle_recovery(db, &elements) {
+        if let Some(ty) = Self::try_union_direct_instances_cycle_recovery(db, env, &elements) {
             return ty;
         }
 
-        UnionType::from_elements_cycle_recovery(db, elements.into_iter().map(|(ty, _)| ty))
+        UnionType::from_elements_cycle_recovery(db, env, elements.into_iter().map(|(ty, _)| ty))
     }
 
     fn try_union_fixed_length_tuples_cycle_recovery(
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         elements: &[(Self, bool)],
     ) -> Option<Self> {
         let [(first, _), rest @ ..] = elements else {
@@ -224,7 +238,7 @@ impl<'db> Type<'db> {
         let mut element_builders = first_tuple
             .iter_all_elements()
             .map(|element| {
-                UnionBuilder::new(db)
+                UnionBuilder::new(db, env)
                     .cycle_recovery(true)
                     .recursively_defined(RecursivelyDefined::Yes)
                     .add(element)
@@ -245,18 +259,20 @@ impl<'db> Type<'db> {
 
         Some(Type::heterogeneous_tuple(
             db,
+            env,
             element_builders.into_iter().map(UnionBuilder::build),
         ))
     }
 
     fn try_union_direct_instances_cycle_recovery(
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         elements: &[(Self, bool)],
     ) -> Option<Self> {
         let [(first, first_is_recursive), rest @ ..] = elements else {
             return None;
         };
-        let (class, specialization) = first.direct_class_specialization(db)?;
+        let (class, specialization) = first.direct_class_specialization(db, env)?;
         if class.is_known(db, KnownClass::Tuple) {
             return None;
         }
@@ -266,7 +282,7 @@ impl<'db> Type<'db> {
             .types(db)
             .iter()
             .map(|argument| {
-                UnionBuilder::new(db)
+                UnionBuilder::new(db, env)
                     .cycle_recovery(true)
                     .recursively_defined(RecursivelyDefined::Yes)
                     .add(*argument)
@@ -274,7 +290,7 @@ impl<'db> Type<'db> {
             .collect::<Vec<_>>();
 
         for (element, is_recursive) in rest {
-            let (element_class, specialization) = element.direct_class_specialization(db)?;
+            let (element_class, specialization) = element.direct_class_specialization(db, env)?;
             if element_class != class {
                 return None;
             }
@@ -306,7 +322,7 @@ impl<'db> Type<'db> {
         Type::from(class.apply_specialization(db, |generic_context| {
             generic_context.specialize(db, arguments)
         }))
-        .to_instance(db)
+        .to_instance_approximation(db, env)
     }
 
     fn top_level_projection_union_elements(self, db: &'db dyn Db) -> Vec<Self> {
@@ -319,6 +335,7 @@ impl<'db> Type<'db> {
     /// Solves the candidate terms for one projection path.
     fn solve_projection_terms(
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         root: DivergentType,
         path: &ProjectionPath<'db>,
         terms: &[ProjectionTerm<'db>],
@@ -329,14 +346,19 @@ impl<'db> Type<'db> {
             root,
             path: path.clone(),
         };
-        ProjectionEquationSystem::from_terms_by_op(db, root, &terms_by_op)?
-            .solve(db)?
-            .solved_type(db, &var)
+        ProjectionEquationSystem::from_terms_by_op(db, env, root, &terms_by_op)?
+            .solve(db, env)?
+            .solved_type(db, env, &var)
     }
 
-    fn projection_ops(self, db: &'db dyn Db, root: DivergentType) -> Vec<ProjectionPath<'db>> {
+    fn projection_ops(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        root: DivergentType,
+    ) -> Vec<ProjectionPath<'db>> {
         let mut paths = Vec::new();
-        let demands = self.projection_demands(db);
+        let demands = self.projection_demands(db, env);
         for (candidate_root, path) in demands {
             if candidate_root.same_marker(root) && !paths.contains(&path) {
                 paths.push(path);
@@ -345,9 +367,13 @@ impl<'db> Type<'db> {
         paths
     }
 
-    fn projection_demands(self, db: &'db dyn Db) -> Vec<(DivergentType, ProjectionPath<'db>)> {
+    fn projection_demands(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Vec<(DivergentType, ProjectionPath<'db>)> {
         let demands = RefCell::<Vec<(DivergentType, ProjectionPath<'db>)>>::new(Vec::new());
-        any_over_type(db, self, false, |nested| {
+        any_over_type(db, env, self, false, |nested| {
             if let Type::Projection(projection) = nested {
                 let mut demands = demands.borrow_mut();
                 let root = projection.root(db);
@@ -363,23 +389,32 @@ impl<'db> Type<'db> {
         demands.into_inner()
     }
 
-    fn cycle_artifact_roots(self, db: &'db dyn Db) -> Vec<DivergentType> {
+    fn cycle_artifact_roots(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Vec<DivergentType> {
         let mut roots = Vec::new();
-        self.collect_cycle_artifact_roots(db, &mut roots, true);
+        self.collect_cycle_artifact_roots(db, env, &mut roots, true);
         roots
     }
 
-    fn projection_artifact_roots(self, db: &'db dyn Db) -> Vec<DivergentType> {
+    fn projection_artifact_roots(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Vec<DivergentType> {
         let mut roots = Vec::new();
         // Bare `Divergent` inside containers appears in recursive aliases too. Nested projection
         // recovery only starts from an already-recorded projection demand.
-        self.collect_cycle_artifact_roots(db, &mut roots, false);
+        self.collect_cycle_artifact_roots(db, env, &mut roots, false);
         roots
     }
 
     fn collect_cycle_artifact_roots(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         roots: &mut Vec<DivergentType>,
         include_divergent: bool,
     ) {
@@ -392,17 +427,18 @@ impl<'db> Type<'db> {
             }
             Type::Union(union) => {
                 for element in union.elements(db) {
-                    element.collect_cycle_artifact_roots(db, roots, include_divergent);
+                    element.collect_cycle_artifact_roots(db, env, roots, include_divergent);
                 }
             }
             Type::NominalInstance(_) => {
                 if let Some(spec) = self.exact_tuple_instance_spec(db) {
-                    for element in spec.as_ref().iter_all_elements() {
-                        element.collect_cycle_artifact_roots(db, roots, include_divergent);
+                    for element in spec.as_ref().iter_element_types(db) {
+                        element.collect_cycle_artifact_roots(db, env, roots, include_divergent);
                     }
-                } else if let Some((_, specialization)) = self.direct_class_specialization(db) {
+                } else if let Some((_, specialization)) = self.direct_class_specialization(db, env)
+                {
                     for argument in specialization.types(db) {
-                        argument.collect_cycle_artifact_roots(db, roots, include_divergent);
+                        argument.collect_cycle_artifact_roots(db, env, roots, include_divergent);
                     }
                 }
             }
@@ -410,22 +446,28 @@ impl<'db> Type<'db> {
         }
     }
 
-    fn contains_nested_cycle_artifact(self, db: &'db dyn Db, include_divergent: bool) -> bool {
+    fn contains_nested_cycle_artifact(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        include_divergent: bool,
+    ) -> bool {
         match self {
             Type::Divergent(_) => include_divergent,
             Type::Projection(_) => true,
             Type::Union(union) => union
                 .elements(db)
                 .iter()
-                .any(|element| element.contains_nested_cycle_artifact(db, include_divergent)),
+                .any(|element| element.contains_nested_cycle_artifact(db, env, include_divergent)),
             Type::NominalInstance(_) => {
                 if let Some(spec) = self.exact_tuple_instance_spec(db) {
-                    spec.as_ref().iter_all_elements().any(|element| {
-                        element.contains_nested_cycle_artifact(db, include_divergent)
+                    spec.as_ref().iter_element_types(db).any(|element| {
+                        element.contains_nested_cycle_artifact(db, env, include_divergent)
                     })
-                } else if let Some((_, specialization)) = self.direct_class_specialization(db) {
+                } else if let Some((_, specialization)) = self.direct_class_specialization(db, env)
+                {
                     specialization.types(db).iter().any(|argument| {
-                        argument.contains_nested_cycle_artifact(db, include_divergent)
+                        argument.contains_nested_cycle_artifact(db, env, include_divergent)
                     })
                 } else {
                     false
@@ -441,8 +483,13 @@ impl<'db> Type<'db> {
         }
     }
 
-    fn mentions_cycle_artifact_direct(self, db: &'db dyn Db, root: DivergentType) -> bool {
-        let roots = self.cycle_artifact_roots(db);
+    fn mentions_cycle_artifact_direct(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        root: DivergentType,
+    ) -> bool {
+        let roots = self.cycle_artifact_roots(db, env);
         roots.iter().any(|candidate| candidate.same_marker(root))
     }
 
@@ -456,11 +503,12 @@ impl<'db> Type<'db> {
     fn replace_solved_projection_artifacts(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         root: DivergentType,
         solved_ops: &FxIndexMap<ProjectionPath<'db>, Type<'db>>,
         evidence: Option<&ProjectionEvidenceSet<'db>>,
     ) -> Option<Self> {
-        if !self.mentions_cycle_artifact(db, root) {
+        if !self.mentions_cycle_artifact(db, env, root) {
             return Some(self);
         }
 
@@ -475,17 +523,17 @@ impl<'db> Type<'db> {
                 .elements(db)
                 .iter()
                 .map(|element| {
-                    element.replace_solved_projection_artifacts(db, root, solved_ops, evidence)
+                    element.replace_solved_projection_artifacts(db, env, root, solved_ops, evidence)
                 })
                 .collect::<Option<Vec<_>>>()?;
-            return Some(UnionType::from_elements_cycle_recovery(db, elements));
+            return Some(UnionType::from_elements_cycle_recovery(db, env, elements));
         }
 
-        if let Some(container) = ProjectionContainer::try_from(db, root, self, evidence) {
-            return container.into_type(db, root, solved_ops, evidence);
+        if let Some(container) = ProjectionContainer::try_from(db, env, root, self, evidence) {
+            return container.into_type(db, env, root, solved_ops, evidence);
         }
 
-        let paths = self.projection_ops(db, root);
+        let paths = self.projection_ops(db, env, root);
         match paths.as_slice() {
             [path] => Self::solved_projection_type(solved_ops, path),
             _ => None,
@@ -495,9 +543,10 @@ impl<'db> Type<'db> {
     fn replace_projection_artifacts_with_root(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         root: DivergentType,
     ) -> Option<Self> {
-        let paths = self.projection_ops(db, root);
+        let paths = self.projection_ops(db, env, root);
         if paths.is_empty() {
             return Some(self);
         }
@@ -506,11 +555,16 @@ impl<'db> Type<'db> {
             .into_iter()
             .map(|path| (path, Type::Divergent(root)))
             .collect::<FxIndexMap<_, _>>();
-        self.replace_solved_projection_artifacts(db, root, &solved_ops, None)
+        self.replace_solved_projection_artifacts(db, env, root, &solved_ops, None)
     }
 
-    fn mentions_cycle_artifact(self, db: &'db dyn Db, root: DivergentType) -> bool {
-        any_over_type(db, self, false, |ty| match ty {
+    fn mentions_cycle_artifact(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        root: DivergentType,
+    ) -> bool {
+        any_over_type(db, env, self, false, |ty| match ty {
             Type::Divergent(divergent) => divergent.same_marker(root),
             Type::Projection(projection) => projection.root(db).same_marker(root),
             _ => false,
@@ -520,10 +574,11 @@ impl<'db> Type<'db> {
     fn mentions_matching_projection(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         root: DivergentType,
         path: &ProjectionPath<'db>,
     ) -> bool {
-        any_over_type(db, self, false, |ty| match ty {
+        any_over_type(db, env, self, false, |ty| match ty {
             Type::Projection(projection) => {
                 projection.root(db).same_marker(root) && projection.path(db).eq(path)
             }
@@ -547,6 +602,7 @@ impl<'db> Type<'db> {
     fn matching_projection_narrowing_var_multi(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         roots: &CycleRootSet,
     ) -> Option<ProjectionVar<'db>> {
         let Type::Intersection(intersection) = self else {
@@ -568,13 +624,13 @@ impl<'db> Type<'db> {
                     return None;
                 }
                 dependency = Some(var);
-            } else if positive.mentions_any_cycle_artifact(db) {
+            } else if positive.mentions_any_cycle_artifact(db, env) {
                 return None;
             }
         }
 
         for negative in intersection.negative(db) {
-            if negative.mentions_any_cycle_artifact(db) {
+            if negative.mentions_any_cycle_artifact(db, env) {
                 return None;
             }
         }
@@ -582,31 +638,51 @@ impl<'db> Type<'db> {
         dependency
     }
 
-    fn mentions_cycle_artifact_in_roots(self, db: &'db dyn Db, roots: &CycleRootSet) -> bool {
-        any_over_type(db, self, false, |ty| match ty {
+    fn mentions_cycle_artifact_in_roots(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        roots: &CycleRootSet,
+    ) -> bool {
+        any_over_type(db, env, self, false, |ty| match ty {
             Type::Divergent(root) => roots.contains(root),
             Type::Projection(projection) => roots.contains(projection.root(db)),
             _ => false,
         })
     }
 
-    fn mentions_projection_artifact_in_roots(self, db: &'db dyn Db, roots: &CycleRootSet) -> bool {
-        any_over_type(db, self, false, |ty| match ty {
+    fn mentions_projection_artifact_in_roots(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        roots: &CycleRootSet,
+    ) -> bool {
+        any_over_type(db, env, self, false, |ty| match ty {
             Type::Projection(projection) => roots.contains(projection.root(db)),
             _ => false,
         })
     }
 
-    fn mentions_cycle_artifact_outside_roots(self, db: &'db dyn Db, roots: &CycleRootSet) -> bool {
-        any_over_type(db, self, false, |ty| match ty {
+    fn mentions_cycle_artifact_outside_roots(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        roots: &CycleRootSet,
+    ) -> bool {
+        any_over_type(db, env, self, false, |ty| match ty {
             Type::Divergent(root) => !roots.contains(root),
             Type::Projection(projection) => !roots.contains(projection.root(db)),
             _ => false,
         })
     }
 
-    fn mentions_divergent_in_roots(self, db: &'db dyn Db, roots: &CycleRootSet) -> bool {
-        any_over_type(db, self, false, |ty| match ty {
+    fn mentions_divergent_in_roots(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        roots: &CycleRootSet,
+    ) -> bool {
+        any_over_type(db, env, self, false, |ty| match ty {
             Type::Divergent(root) => roots.contains(root),
             _ => false,
         })
@@ -615,9 +691,10 @@ impl<'db> Type<'db> {
     fn mentions_projection_var_in(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         vars: &FxIndexSet<ProjectionVar<'db>>,
     ) -> bool {
-        any_over_type(db, self, false, |ty| match ty {
+        any_over_type(db, env, self, false, |ty| match ty {
             Type::Projection(projection) => vars.contains(&ProjectionVar {
                 root: projection.root(db),
                 path: projection.path(db),
@@ -629,10 +706,11 @@ impl<'db> Type<'db> {
     pub(crate) fn replace_solved_projection_vars(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         solutions: &ProjectionSolutions<'db>,
     ) -> Option<Self> {
         let roots = solutions.roots();
-        if !self.mentions_cycle_artifact_in_roots(db, &roots) {
+        if !self.mentions_cycle_artifact_in_roots(db, env, &roots) {
             return Some(self);
         }
 
@@ -645,6 +723,7 @@ impl<'db> Type<'db> {
         if let Type::Projection(projection) = self {
             return solutions.solved_type(
                 db,
+                env,
                 &ProjectionVar {
                     root: projection.root(db),
                     path: projection.path(db),
@@ -656,9 +735,9 @@ impl<'db> Type<'db> {
             let elements = union
                 .elements(db)
                 .iter()
-                .map(|element| element.replace_solved_projection_vars(db, solutions))
+                .map(|element| element.replace_solved_projection_vars(db, env, solutions))
                 .collect::<Option<Vec<_>>>()?;
-            return Some(UnionType::from_elements_cycle_recovery(db, elements));
+            return Some(UnionType::from_elements_cycle_recovery(db, env, elements));
         }
 
         if let Some(spec) = self.exact_tuple_instance_spec(db) {
@@ -666,44 +745,45 @@ impl<'db> Type<'db> {
                 TupleSpec::Fixed(tuple) => {
                     let elements = tuple
                         .iter_all_elements()
-                        .map(|element| element.replace_solved_projection_vars(db, solutions))
+                        .map(|element| element.replace_solved_projection_vars(db, env, solutions))
                         .collect::<Option<Vec<_>>>()?;
-                    Type::heterogeneous_tuple(db, elements)
+                    Type::heterogeneous_tuple(db, env, elements)
                 }
                 TupleSpec::Variable(tuple) => {
                     let prefix = tuple
                         .iter_prefix_elements()
-                        .map(|element| element.replace_solved_projection_vars(db, solutions))
+                        .map(|element| element.replace_solved_projection_vars(db, env, solutions))
                         .collect::<Option<Vec<_>>>()?;
                     let variable = tuple
                         .variable()
-                        .replace_solved_projection_vars(db, solutions)?;
+                        .element_type(db)
+                        .replace_solved_projection_vars(db, env, solutions)?;
                     let suffix = tuple
                         .iter_suffix_elements()
-                        .map(|element| element.replace_solved_projection_vars(db, solutions))
+                        .map(|element| element.replace_solved_projection_vars(db, env, solutions))
                         .collect::<Option<Vec<_>>>()?;
-                    Type::tuple(TupleType::mixed(db, prefix, variable, suffix))
+                    Type::tuple(TupleType::mixed(db, env, prefix, variable, suffix))
                 }
             });
         }
 
-        if let Some((class, specialization)) = self.direct_class_specialization(db) {
+        if let Some((class, specialization)) = self.direct_class_specialization(db, env) {
             let arguments = specialization
                 .types(db)
                 .iter()
-                .map(|argument| argument.replace_solved_projection_vars(db, solutions))
+                .map(|argument| argument.replace_solved_projection_vars(db, env, solutions))
                 .collect::<Option<Vec<_>>>()?;
             return Type::from(class.apply_specialization(db, |generic_context| {
                 generic_context.specialize(db, arguments)
             }))
-            .to_instance(db);
+            .to_instance_approximation(db, env);
         }
 
         None
     }
 
-    fn mentions_any_cycle_artifact(self, db: &'db dyn Db) -> bool {
-        any_over_type(db, self, false, |ty| {
+    fn mentions_any_cycle_artifact(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
+        any_over_type(db, env, self, false, |ty| {
             matches!(ty, Type::Divergent(_) | Type::Projection(_))
         })
     }

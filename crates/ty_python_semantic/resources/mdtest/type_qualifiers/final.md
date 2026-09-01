@@ -259,9 +259,13 @@ class Meta(type):
     META_FINAL_A: Final[int] = 1
     META_FINAL_B: Final = 1
 
+    def CLASS_FINAL_SHADOWING_NON_DATA_DESCRIPTOR(cls) -> int:
+        return 1
+
 class C(metaclass=Meta):
     CLASS_FINAL_A: Final[int] = 1
     CLASS_FINAL_B: Final = 1
+    CLASS_FINAL_SHADOWING_NON_DATA_DESCRIPTOR: Final[int] = 1
 
     def __init__(self):
         self.INSTANCE_FINAL_A: Final[int] = 1
@@ -282,6 +286,8 @@ C.CLASS_FINAL_A = 2
 C.CLASS_FINAL_B = 2
 # error: [invalid-assignment] "Cannot assign to final attribute `CLASS_FINAL_A` on type `<class 'C'>`"
 C.CLASS_FINAL_A += 1
+# error: [invalid-assignment] "Cannot assign to final attribute `CLASS_FINAL_SHADOWING_NON_DATA_DESCRIPTOR` on type `<class 'C'>`"
+C.CLASS_FINAL_SHADOWING_NON_DATA_DESCRIPTOR = 2
 
 c = C()
 # error: [invalid-assignment] "Cannot assign to final attribute `CLASS_FINAL_A` on type `C`"
@@ -621,13 +627,11 @@ error[override-of-final-variable]: Cannot override `module_a.Foo.X`
   |
 5 |     X = 2
   |     ^ Overrides a final variable from superclass `module_a.Foo`
-  |
 info: `module_a.Foo.X` is declared as `Final`, forbidding overrides
  --> src/module_a.py:4:5
   |
 4 |     X: Final[int] = 1
   |     - `module_a.Foo.X` defined here
-  |
 ```
 
 ### `Final` declaration without a value
@@ -689,7 +693,7 @@ python-version = "3.12"
 
 ```py
 from typing import Final, ClassVar, Annotated, TypedDict
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 LEGAL_A: Final[int] = 1
 LEGAL_B: Final = 1
@@ -836,6 +840,32 @@ def bar(x: Foo, value: int):
     reveal_type(x.value)  # revealed: int
     # error: [invalid-assignment] "Cannot assign to final attribute `value` on type `Foo`: `Final` attributes can only be assigned in the class body or `__init__`"
     x.value = value
+```
+
+### Protocol members initialized in `__init__`
+
+A protocol may initialize its own `Final` member in `__init__`, even if another method specializes
+the protocol's `self` type. That specialization must not make the initializer appear to belong to a
+different class. Assignments to another instance or outside the initializer remain invalid.
+
+```py
+from __future__ import annotations
+
+from typing import Final, Protocol, TypeVar
+
+T = TypeVar("T")
+
+class Owned(Protocol[T]):
+    owner: Final[T]
+
+    def __init__(self, owner: T, other: Owned[T] | None = None) -> None:
+        self.owner = owner
+        if other is not None:
+            other.owner = owner  # error: [invalid-assignment]
+
+    def progress(self: Owned[int]) -> None: ...
+    def replace(self, owner: T) -> None:
+        self.owner = owner  # error: [invalid-assignment]
 ```
 
 ### Explicit `Final` redeclaration
@@ -1056,6 +1086,38 @@ class D:
         if flag:
             self.y = 1
         # No else: y may be unbound at runtime, but there is still an assignment path
+```
+
+### Assignment in a loop in `__init__`
+
+An assignment in a loop body provides a value for a `Final` attribute declared in the class body.
+
+```py
+from typing import Final
+
+class C:
+    value: Final[int]
+
+    def __init__(self) -> None:
+        for _ in range(2):
+            self.value = 1
+```
+
+### Rebinding `self` does not initialize `Final` attributes
+
+Reading a `Final` attribute before a loop and then rebinding `self` does not assign a value to the
+attribute.
+
+```py
+from typing import Final
+
+class C:
+    value: Final[int]  # error: [final-without-value] "`Final` symbol `value` is not assigned a value"
+
+    def __init__(self, repeat: bool, replacement: "C") -> None:
+        self.value
+        while repeat:
+            self = replacement
 ```
 
 ### Reachable `Final` declaration wins for diagnostics
@@ -1306,7 +1368,6 @@ error[invalid-assignment]: Reassignment of `Final` symbol `MY_CONSTANT` is not a
   |
 3 | MY_CONSTANT: Final[int] = 1
   |              ---------- Symbol declared as `Final` here
-  |
 ```
 
 Imported `Final` symbol:

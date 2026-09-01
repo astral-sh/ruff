@@ -13,6 +13,7 @@ use ruff_text_size::{Ranged, TextRange};
 use smallvec::SmallVec;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -39,7 +40,11 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// ```
 ///
 /// ## Fix safety and availability
-/// This rule's fix is marked as safe unless the literal contains comments.
+/// In Python files, this rule's fix is marked as unsafe because replacing
+/// `Literal[...]` can change runtime-visible annotation objects, such as the
+/// result of `typing.get_args`.
+///
+/// In stub files, the fix is marked as safe unless the literal contains comments.
 ///
 /// There is currently no fix available when applying the fix would lead to
 /// a `TypeError` from an expression of the form `None | None` or when we
@@ -49,7 +54,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Typing documentation: Legal parameters for `Literal` at type check time](https://typing.python.org/en/latest/spec/literal.html#legal-parameters-for-literal-at-type-check-time)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.13.0")]
+#[violation_metadata(stable_since = "0.13.0", category = Category::Style)]
 pub(crate) struct RedundantNoneLiteral {
     union_kind: UnionKind,
 }
@@ -62,10 +67,10 @@ impl Violation for RedundantNoneLiteral {
         match self.union_kind {
             UnionKind::NoUnion => "Use `None` rather than `Literal[None]`".to_string(),
             UnionKind::TypingOptional => {
-                "Use `Optional[Literal[...]]` rather than `Literal[None, ...]` ".to_string()
+                "Use `Optional[Literal[...]]` rather than `Literal[None, ...]`".to_string()
             }
             UnionKind::BitOr => {
-                "Use `Literal[...] | None` rather than `Literal[None, ...]` ".to_string()
+                "Use `Literal[...] | None` rather than `Literal[None, ...]`".to_string()
             }
         }
     }
@@ -192,7 +197,9 @@ fn create_fix(
         }
     }
 
-    let applicability = if checker.comment_ranges().intersects(literal_expr.range()) {
+    let applicability = if checker.comment_ranges().intersects(literal_expr.range())
+        || !checker.source_type.is_stub()
+    {
         Applicability::Unsafe
     } else {
         Applicability::Safe

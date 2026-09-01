@@ -3,7 +3,7 @@
     reason = "Prefer System trait methods over std methods"
 )]
 
-use crate::files::Files;
+use crate::files::{File, Files};
 use crate::system::System;
 use crate::vendored::VendoredFileSystem;
 use ruff_python_ast::PythonVersion;
@@ -25,6 +25,22 @@ pub mod system;
 pub mod testing;
 pub mod vendored;
 
+/// A file paired with the Python version used to parse its contents.
+///
+/// This is the key for [`parsed::parsed_module`]. Including the Python version allows the same
+/// file to be parsed for different versions within a single Salsa revision without sharing an
+/// incompatible AST or syntax diagnostics.
+#[salsa::interned(debug, heap_size = ruff_memory_usage::heap_size)]
+pub struct PythonFile<'db> {
+    #[returns(copy)]
+    pub file: File,
+    #[returns(copy)]
+    pub python_version: PythonVersion,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for PythonFile<'_> {}
+
 #[cfg(not(target_arch = "wasm32"))]
 pub use std::time::{Instant, SystemTime, SystemTimeError};
 
@@ -32,8 +48,6 @@ pub use std::time::{Instant, SystemTime, SystemTimeError};
 pub use web_time::{Instant, SystemTime, SystemTimeError};
 
 pub type FxDashMap<K, V> = dashmap::DashMap<K, V, BuildHasherDefault<FxHasher>>;
-pub type FxDashSet<K> = dashmap::DashSet<K, BuildHasherDefault<FxHasher>>;
-
 static VERSION: std::sync::OnceLock<String> = std::sync::OnceLock::new();
 
 /// Returns the version of the executing program if set.
@@ -63,7 +77,6 @@ pub trait Db: salsa::Database {
     fn vendored(&self) -> &VendoredFileSystem;
     fn system(&self) -> &dyn System;
     fn files(&self) -> &Files;
-    fn python_version(&self) -> PythonVersion;
 }
 
 /// Returns the maximum number of tasks that ty is allowed
@@ -181,10 +194,6 @@ mod tests {
 
         fn files(&self) -> &Files {
             &self.files
-        }
-
-        fn python_version(&self) -> ruff_python_ast::PythonVersion {
-            ruff_python_ast::PythonVersion::latest_ty()
         }
     }
 

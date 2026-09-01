@@ -38,6 +38,20 @@ str(encoding="utf-8", object=b"M\xc3\xbcsli")
 str(b"", errors="replace")
 ```
 
+### `range` as an ordinary `range` value
+
+```py
+reveal_type(list(range(3)))  # revealed: list[int]
+reveal_type([range(0)])  # revealed: list[range]
+
+class Uop:
+    replicated = range(0)
+
+def _(uop: Uop) -> None:
+    uop.replicated = range(1, 3)
+    reveal_type(uop.replicated)  # revealed: range
+```
+
 ### Invalid calls
 
 ```py
@@ -147,6 +161,132 @@ def _(
     reveal_type(isinstance(x_constrained_sub_a, B))  # revealed: bool
 ```
 
+An `isinstance` check against `Callable` is always true when the checked value is known to be
+callable. This applies to both `typing.Callable` and `collections.abc.Callable`, including after a
+preceding `isinstance` check narrows a union.
+
+```py
+from collections.abc import Callable
+from typing import Callable as TypingCallable
+
+def reveal_callable_result(x: Callable[[int], int], y: Callable[[int], int] | dict[str, int]):
+    reveal_type(isinstance(x, Callable))  # revealed: Literal[True]
+    reveal_type(isinstance(x, TypingCallable))  # revealed: Literal[True]
+
+    if isinstance(y, dict):
+        return
+
+    reveal_type(isinstance(y, Callable))  # revealed: Literal[True]
+    reveal_type(isinstance(y, TypingCallable))  # revealed: Literal[True]
+```
+
+An `isinstance` check against a tuple is always true when each possible type of the checked value is
+accepted by at least one class in the tuple. This avoids a false implicit-return error when the
+check is the only path that returns a value. The same applies when the tuple is assigned to a local
+variable.
+
+```py
+def reveal_tuple_result(x: A | B):
+    reveal_type(isinstance(x, (A, B)))  # revealed: Literal[True]
+
+def accepts_a(x: A) -> bool:
+    if isinstance(x, (B, A)):
+        return True
+
+def accepts_a_or_b(x: A | B) -> bool:
+    if isinstance(x, (A, B)):
+        return True
+
+def accepts_object(x: object) -> bool:
+    if isinstance(x, (object,)):
+        return True
+
+def accepts_stored_tuple(x: A | B) -> bool:
+    targets = (A, B)
+    if isinstance(x, targets):
+        return True
+```
+
+The tuple must contain a fixed set of known classes. A partial tuple cannot cover a union, a
+variadic tuple can be empty, and a value annotated as `type[A]` can refer to a subclass of `A`.
+Nested tuples, unions used as tuple elements, and aliases such as `typing.List` are also left as
+`bool`.
+
+```py
+from typing import List
+
+def reveal_unsupported_tuple_results(x: A | B, items: list[int]):
+    reveal_type(isinstance(x, (A, (B, bytes))))  # revealed: bool
+    reveal_type(isinstance(x, (A | B,)))  # revealed: bool
+    reveal_type(isinstance(items, (List,)))  # revealed: bool
+
+def partial_tuple(x: A | B) -> bool:  # error: [invalid-return-type]
+    if isinstance(x, (A, bytes)):
+        return True
+
+def variadic_tuple(x: A, targets: tuple[type[A], ...]) -> bool:  # error: [invalid-return-type]
+    if isinstance(x, targets):
+        return True
+
+def subclass_target(x: A, target: type[A]) -> bool:  # error: [invalid-return-type]
+    if isinstance(x, (target,)):
+        return True
+```
+
+The single-class path already leaves runtime-checkable protocol checks as `bool`. Tuple members use
+the same inference, so a class that only appears structurally compatible does not make the tuple
+check certain.
+
+```py
+from typing import Protocol, runtime_checkable
+
+@runtime_checkable
+class RuntimeProtocol(Protocol):
+    value: int
+
+class StructuralImplementation:
+    value: int
+
+reveal_type(isinstance(StructuralImplementation(), RuntimeProtocol))  # revealed: bool
+reveal_type(isinstance(StructuralImplementation(), (RuntimeProtocol,)))  # revealed: bool
+```
+
+Single-class `isinstance` inference does not account for an overridden `__instancecheck__`. Tuple
+members again use the same inference. Python returns `False` for these checks, while ty infers
+`Literal[True]`.
+
+```py
+class RejectingMeta(type):
+    def __instancecheck__(self, instance: object, /) -> bool:
+        return False
+
+class RejectingBase(metaclass=RejectingMeta): ...
+class RejectingChild(RejectingBase): ...
+
+reveal_type(isinstance(RejectingChild(), RejectingBase))  # revealed: Literal[True]
+reveal_type(isinstance(RejectingChild(), (RejectingBase,)))  # revealed: Literal[True]
+```
+
+The same limitation applies to `type`: `list[int]` is accepted where `type` is expected, but
+`isinstance(list[int], type)` is false at runtime. Single-class and tuple checks both infer
+`Literal[True]` for a bare `type` and a type variable bound to `type`.
+
+```py
+T_bound_type = TypeVar("T_bound_type", bound=type)
+
+def bare_type(x: type):
+    reveal_type(isinstance(x, type))  # revealed: Literal[True]
+    reveal_type(isinstance(x, (type,)))  # revealed: Literal[True]
+
+bare_type(list[int])
+
+def type_variable_bound_to_type(x: T_bound_type):
+    reveal_type(isinstance(x, type))  # revealed: Literal[True]
+    reveal_type(isinstance(x, (type,)))  # revealed: Literal[True]
+
+type_variable_bound_to_type(list[int])
+```
+
 Certain special forms in the typing module are not instances of `type`, so are strictly-speaking
 disallowed as the second argument to `isinstance()` according to typeshed's annotations. However, at
 runtime they work fine as the second argument, and we implement that special case in ty:
@@ -190,6 +330,74 @@ isinstance("", t.Any)  # error: [invalid-argument-type]
 isinstance("", (int, t.Any))  # error: [invalid-argument-type]
 ```
 
+## Calls to `isinstance` with tuple-covered aliases and type variables
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypeVar
+from typing_extensions import TypeAliasType, Union
+
+class A: ...
+class B: ...
+
+type AliasA = A
+type AliasB = B
+type AliasAB = AliasA | AliasB
+
+T_constrained_a_b = TypeVar("T_constrained_a_b", A, B)
+T_bound_a_b = TypeVar("T_bound_a_b", bound=A | B)
+T_bound_alias_a_b = TypeVar("T_bound_alias_a_b", bound=AliasAB)
+
+def accepts_alias(x: AliasAB) -> bool:
+    reveal_type(isinstance(x, (A, B)))  # revealed: Literal[True]
+    if isinstance(x, (A, B)):
+        return True
+
+def accepts_constrained_typevar(x: T_constrained_a_b) -> bool:
+    reveal_type(isinstance(x, (A, B)))  # revealed: Literal[True]
+    if isinstance(x, (A, B)):
+        return True
+
+def accepts_union_bound_typevar(x: T_bound_a_b) -> bool:
+    reveal_type(isinstance(x, (A, B)))  # revealed: Literal[True]
+    if isinstance(x, (A, B)):
+        return True
+
+def accepts_alias_bound_typevar(x: T_bound_alias_a_b) -> bool:
+    reveal_type(isinstance(x, (A, B)))  # revealed: Literal[True]
+    if isinstance(x, (A, B)):
+        return True
+
+def accepts_truthy_constrained_typevar(x: T_constrained_a_b) -> bool:
+    if not x:
+        return False
+
+    reveal_type(x)  # revealed: T_constrained_a_b@accepts_truthy_constrained_typevar & ~AlwaysFalsy
+    reveal_type(isinstance(x, (A, B)))  # revealed: Literal[True]
+    if isinstance(x, (A, B)):
+        return True
+
+# Invalid alias cycles still recover the non-recursive members for narrowing.
+RecursiveA = TypeAliasType("RecursiveA", Union[A, "RecursiveB"])  # error: [cyclic-type-alias-definition]
+RecursiveB = TypeAliasType("RecursiveB", Union[B, "RecursiveA"])  # error: [cyclic-type-alias-definition]
+RecursivePartialA = TypeAliasType("RecursivePartialA", Union[A, "RecursivePartialB"])  # error: [cyclic-type-alias-definition]
+RecursivePartialB = TypeAliasType("RecursivePartialB", Union[bytes, "RecursivePartialA"])  # error: [cyclic-type-alias-definition]
+
+def accepts_mutually_recursive_alias(x: RecursiveA) -> bool:
+    reveal_type(isinstance(x, (A, B)))  # revealed: Literal[True]
+    if isinstance(x, (A, B)):
+        return True
+
+def partial_mutually_recursive_alias(x: RecursivePartialA) -> bool:  # error: [invalid-return-type]
+    reveal_type(isinstance(x, (A, B)))  # revealed: bool
+    if isinstance(x, (A, B)):
+        return True
+```
+
 ## Generic builtins should not overfit upper-bound-only callback constraints
 
 These examples are minimized from ecosystem regressions seen while preserving explicit `Never` and
@@ -199,7 +407,7 @@ result to `Sized` or `object`; ideally the element type would remain `Unknown`, 
 return type would still be used where possible.
 
 ```py
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 def _(xs: Unknown):
     # TODO: should be `list[Unknown]`
@@ -253,7 +461,14 @@ error[call-non-callable]: `NotImplemented` is not callable
   |           --------------^^
   |           |
   |           Did you mean `NotImplementedError`?
+help: Use `NotImplementedError` instead
   |
+2 |     # snapshot: call-non-callable
+  -     raise NotImplemented()
+3 +     raise NotImplementedError()
+4 | def _():
+  |
+note: This is an unsafe fix and may change runtime behavior
 ```
 
 ```py
@@ -270,13 +485,39 @@ error[call-non-callable]: `NotImplemented` is not callable
   |           --------------^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   |           |
   |           Did you mean `NotImplementedError`?
+help: Use `NotImplementedError` instead
   |
+5 |     # snapshot: call-non-callable
+  -     raise NotImplemented("this module is not implemented yet!!!")
+6 +     raise NotImplementedError("this module is not implemented yet!!!")
+7 | def _(NotImplementedError: object):
+  |
+note: This is an unsafe fix and may change runtime behavior
+```
+
+When a local binding shadows `NotImplementedError`, replacing `NotImplemented` with that name would
+not necessarily produce an exception, so we omit the fix.
+
+```py
+def _(NotImplementedError: object):
+    # snapshot: call-non-callable
+    raise NotImplemented()
+```
+
+```snapshot
+error[call-non-callable]: `NotImplemented` is not callable
+ --> src/mdtest_snippet.py:9:11
+  |
+9 |     raise NotImplemented()
+  |           --------------^^
+  |           |
+  |           Did you mean `NotImplementedError`?
 ```
 
 ## `map` with generic callbacks
 
 ```py
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 import re
 
 def _(s: Unknown | str):
@@ -289,4 +530,72 @@ def _(xs: Unknown | list[str]):
     reveal_type(escaped)  # revealed: map[str]
     tokens: list[Unknown | str] = []
     tokens.extend(escaped)
+```
+
+## Failed `map` calls retain their result type
+
+When the argument count identifies a single `map` overload, an incompatible callback still produces
+its usual error. The mapped values retain the callback's return type and do not produce an
+additional error when called.
+
+```py
+class Function:
+    def __init__(self, value: str) -> None: ...
+    def __call__(self) -> None: ...
+
+# error: [invalid-argument-type]
+for function in map(Function, [object()]):
+    function()
+```
+
+## Failed `dict` calls do not expose internal type variables
+
+Several `dict` overloads accept one positional argument. When none matches, an arbitrarily selected
+overload must not make an otherwise compatible return type fail.
+
+```toml
+[analysis]
+strict-generic-narrowing = true
+```
+
+```py
+from collections.abc import Mapping
+
+def copy(value: object) -> dict[str, str]:
+    if isinstance(value, Mapping):
+        return dict(value)  # error: [no-matching-overload]
+    return {}
+```
+
+## Failed `dict` calls preserve narrowed mapping types
+
+An invalid `dict` call must not invalidate an assignment inside a branch where the original value
+has already been narrowed to a mapping.
+
+```toml
+[analysis]
+strict-generic-narrowing = true
+```
+
+```py
+from collections.abc import Mapping
+
+def clean(value: dict[str, int] | str | None) -> None:
+    if isinstance(value, Mapping):
+        value = dict(value)  # error: [no-matching-overload]
+        for key, item in value.items():
+            value[key] = item
+```
+
+## Failed inner `OrderedDict` calls do not invalidate outer constructors
+
+Constructing an `OrderedDict` from a list containing both strings and floats is already rejected.
+That failure must not cause a second error when the resulting value is passed to another
+`OrderedDict` constructor.
+
+```py
+from collections import OrderedDict
+
+items = [OrderedDict([["key", 1.0]])]  # error: [no-matching-overload]
+OrderedDict(zip(["name"], items))
 ```

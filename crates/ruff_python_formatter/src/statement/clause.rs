@@ -46,7 +46,7 @@ impl<'a> ClauseHeader<'a> {
     ///
     /// This is similar to [`ruff_python_ast::AnyNodeRef::last_child_in_body`]
     /// but restricted to the clause.
-    pub(crate) fn last_child_in_clause(self) -> Option<AnyNodeRef<'a>> {
+    fn last_child_in_clause(self) -> Option<AnyNodeRef<'a>> {
         match self {
             ClauseHeader::Class(StmtClassDef { body, .. })
             | ClauseHeader::Function(StmtFunctionDef { body, .. })

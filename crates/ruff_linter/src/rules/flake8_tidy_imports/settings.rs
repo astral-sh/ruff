@@ -11,7 +11,7 @@ use ruff_macros::CacheKey;
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct ApiBan {
     /// The message to display when the API is used.
-    pub msg: String,
+    pub(crate) msg: String,
 }
 
 impl Display for ApiBan {
@@ -201,7 +201,7 @@ pub struct Settings {
 }
 
 impl Settings {
-    pub fn banned_module_level_imports(&self) -> impl Iterator<Item = &str> {
+    pub(crate) fn banned_module_level_imports(&self) -> impl Iterator<Item = &str> {
         self.banned_module_level_imports.iter().map(AsRef::as_ref)
     }
 }

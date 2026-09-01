@@ -1,4 +1,3 @@
-use compact_str::CompactString;
 use std::fmt::{Display, Write};
 
 use ruff_python_ast::name::Name;
@@ -195,13 +194,14 @@ impl<'src> Parser<'src> {
     ///
     /// [Python grammar]: https://docs.python.org/3/reference/grammar.html
     fn parse_simple_statements(&mut self) -> Suite {
-        let mut stmts = Suite::with_capacity(1);
+        let stmts_snapshot = self.stmt_scratch.snapshot();
         let mut progress = ParserProgress::default();
 
         loop {
             progress.assert_progressing(self);
 
-            stmts.push(self.parse_simple_statement());
+            let stmt = self.parse_simple_statement();
+            self.stmt_scratch.push(stmt);
 
             if !self.eat(TokenKind::Semi) {
                 if self.at_simple_stmt() {
@@ -258,8 +258,7 @@ impl<'src> Parser<'src> {
 
         // test_ok simple_stmts_with_semicolons
         // return; import a; from x import y; z; type T = int
-        stmts.shrink_to_fit();
-        stmts
+        self.stmt_scratch.take_thin_vec(stmts_snapshot)
     }
 
     /// Parses a simple statement.
@@ -620,19 +619,18 @@ impl<'src> Parser<'src> {
         // import ,
         // import x, y,
 
-        let mut names = self.parse_comma_separated_list_into_vec_with_capacity(
-            RecoveryContextKind::ImportNames,
-            |p| p.parse_alias(ImportStyle::Import),
-            1,
-        );
+        let names_snapshot = self.alias_scratch.snapshot();
+        self.parse_comma_separated_list(RecoveryContextKind::ImportNames, |parser| {
+            let alias = parser.parse_alias(ImportStyle::Import);
+            parser.alias_scratch.push(alias);
+        });
+        let names: Vec<_> = self.alias_scratch.take(names_snapshot);
 
         if names.is_empty() {
             // test_err import_stmt_empty
             // import
             self.add_error(ParseErrorType::EmptyImportNames, self.current_token_range());
         }
-
-        names.shrink_to_fit();
 
         ast::StmtImport {
             names,
@@ -698,7 +696,7 @@ impl<'src> Parser<'src> {
         self.expect(TokenKind::Import);
 
         let names_start = self.node_start();
-        let mut names = Vec::new();
+        let names_snapshot = self.alias_scratch.snapshot();
         let mut seen_star_import = false;
 
         let parenthesized = Parenthesized::from(self.eat(TokenKind::Lpar));
@@ -716,9 +714,10 @@ impl<'src> Parser<'src> {
                 // from x import a, b.c, d, e.f, g
                 let alias = parser.parse_alias(ImportStyle::ImportFrom);
                 seen_star_import |= alias.name.id == "*";
-                names.push(alias);
+                parser.alias_scratch.push(alias);
             },
         );
+        let names: Vec<_> = self.alias_scratch.take(names_snapshot);
 
         if names.is_empty() {
             // test_err from_import_empty_names
@@ -757,8 +756,6 @@ impl<'src> Parser<'src> {
             // 2 + 2
             self.expect(TokenKind::Rpar);
         }
-
-        names.shrink_to_fit();
 
         ast::StmtImportFrom {
             module,
@@ -831,7 +828,13 @@ impl<'src> Parser<'src> {
     fn parse_dotted_name(&mut self) -> ast::Identifier {
         let start = self.node_start();
 
-        let mut dotted_name: CompactString = self.parse_identifier().id.into();
+        let first = self.parse_identifier();
+        if !self.at(TokenKind::Dot) {
+            return first;
+        }
+
+        let snapshot = self.name_buffer.len();
+        self.name_buffer.push_str(&first.id);
         let mut progress = ParserProgress::default();
 
         while self.eat(TokenKind::Dot) {
@@ -840,15 +843,19 @@ impl<'src> Parser<'src> {
             // test_err dotted_name_multiple_dots
             // import a..b
             // import a...b
-            dotted_name.push('.');
-            dotted_name.push_str(&self.parse_identifier());
+            self.name_buffer.push('.');
+            let identifier = self.parse_identifier();
+            self.name_buffer.push_str(&identifier.id);
         }
+
+        let id = self.name_interner.intern(&self.name_buffer[snapshot..]);
+        self.name_buffer.truncate(snapshot);
 
         // test_ok dotted_name_normalized_spaces
         // import a.b.c
         // import a .  b  . c
         ast::Identifier {
-            id: Name::from(dotted_name),
+            id,
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
         }
@@ -1143,8 +1150,9 @@ impl<'src> Parser<'src> {
                     } else {
                         parser.add_error(
                             ParseErrorType::OtherError(
-                                "Only integer literals are allowed in subscript expressions in help end escape command"
-                                    .to_string()
+                                "Only integer literals are allowed in subscript expressions \
+                                    in help end escape command"
+                                    .to_string(),
                             ),
                             slice.range(),
                         );
@@ -1161,8 +1169,9 @@ impl<'src> Parser<'src> {
                 _ => {
                     parser.add_error(
                         ParseErrorType::OtherError(
-                            "Expected name, subscript or attribute expression in help end escape command"
-                                .to_string()
+                            "Expected name, subscript or attribute expression \
+                                in help end escape command"
+                                .to_string(),
                         ),
                         expr,
                     );
@@ -1452,23 +1461,21 @@ impl<'src> Parser<'src> {
         //     pass
         // else:
         //     pass
-        let mut elif_else_clauses = self.parse_clauses(Clause::ElIf, |p| {
-            p.parse_elif_or_else_clause(ElifOrElse::Elif)
+        let elif_else_snapshot = self.elif_else_scratch.snapshot();
+        self.parse_clauses(Clause::ElIf, |parser| {
+            let clause = parser.parse_elif_or_else_clause(ElifOrElse::Elif);
+            parser.elif_else_scratch.push(clause);
         });
 
         if self.at(TokenKind::Else) {
-            if elif_else_clauses.is_empty() {
-                elif_else_clauses.reserve_exact(1);
-            }
-            elif_else_clauses.push(self.parse_elif_or_else_clause(ElifOrElse::Else));
+            let clause = self.parse_elif_or_else_clause(ElifOrElse::Else);
+            self.elif_else_scratch.push(clause);
         }
-
-        elif_else_clauses.shrink_to_fit();
 
         ast::StmtIf {
             test: Box::new(test.expr),
             body,
-            elif_else_clauses,
+            elif_else_clauses: self.elif_else_scratch.take(elif_else_snapshot),
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
         }
@@ -1560,7 +1567,8 @@ impl<'src> Parser<'src> {
         // except* ExceptionGroup:
         //     pass
         let mut mixed_except_ranges = Vec::new();
-        let mut handlers = self.parse_clauses(Clause::Except, |p| {
+        let mut handlers = Vec::new();
+        self.parse_clauses(Clause::Except, |p| {
             let (handler, kind) = p.parse_except_clause();
             if let ExceptClauseKind::Star(range) = kind {
                 p.add_unsupported_syntax_error(UnsupportedSyntaxErrorKind::ExceptStar, range);
@@ -1570,7 +1578,10 @@ impl<'src> Parser<'src> {
             } else if is_star != Some(kind.is_star()) {
                 mixed_except_ranges.push(handler.range());
             }
-            handler
+            if handlers.is_empty() {
+                handlers.reserve_exact(1);
+            }
+            handlers.push(handler);
         });
         handlers.shrink_to_fit();
 
@@ -2387,11 +2398,13 @@ impl<'src> Parser<'src> {
                 self.add_error(error, &parsed_with_item.item.context_expr);
             }
         } else if self.at(TokenKind::Rpar)
-            // test_err with_items_parenthesized_missing_colon
-            // # `)` followed by a newline
-            // with (item1, item2)
-            //     pass
-            && matches!(self.peek(), TokenKind::Colon | TokenKind::Newline)
+            && (
+                // test_err with_items_parenthesized_missing_colon
+                // # `)` followed by a newline
+                // with (item1, item2)
+                //     pass
+                matches!(self.peek(), TokenKind::Colon | TokenKind::Newline)
+            )
         {
             if parsed_with_items.is_empty() {
                 // No with items, treat it as a parenthesized expression to create an empty
@@ -2870,22 +2883,7 @@ impl<'src> Parser<'src> {
                 // Although this statement is not a valid `async` statement,
                 // we still parse it. Guard the recursive recovery path so
                 // `async async async ...` cannot overflow the parser stack.
-                if let Some(stmt) = self.with_recursion(Self::parse_statement) {
-                    stmt
-                } else {
-                    let range = self.node_range(async_start);
-                    self.add_error(ParseErrorType::RecursionLimitExceeded, range);
-                    Stmt::Expr(ast::StmtExpr {
-                        range,
-                        value: Box::new(Expr::Name(ast::ExprName {
-                            range,
-                            id: Name::new_static("async"),
-                            ctx: ExprContext::Invalid,
-                            node_index: AtomicNodeIndex::NONE,
-                        })),
-                        node_index: AtomicNodeIndex::NONE,
-                    })
-                }
+                self.with_recursion(Self::parse_statement)
             }
         }
     }
@@ -3041,7 +3039,9 @@ impl<'src> Parser<'src> {
                 // x = 1
                 self.add_error(
                     ParseErrorType::OtherError(
-                        "Expected class, function definition or async function definition after decorator".to_string(),
+                        "Expected class, function definition or async function definition \
+                            after decorator"
+                            .to_string(),
                     ),
                     self.current_token_range(),
                 );
@@ -3124,17 +3124,15 @@ impl<'src> Parser<'src> {
     fn parse_block(&mut self) -> Suite {
         self.bump(TokenKind::Indent);
 
-        let statements = if let Some(statements) = self.with_recursion(|parser| {
-            parser.parse_list_into_thin_vec(
-                RecoveryContextKind::BlockStatements,
-                Parser::parse_statement,
-            )
-        }) {
-            statements
-        } else {
-            self.report_recursion_limit_exceeded(self.current_token_range());
-            Suite::new()
-        };
+        let statements = self.with_recursion(|parser| {
+            let snapshot = parser.stmt_scratch.snapshot();
+            parser.parse_list(RecoveryContextKind::BlockStatements, |parser| {
+                let statement = parser.parse_statement();
+                parser.stmt_scratch.push(statement);
+            });
+
+            parser.stmt_scratch.take_thin_vec(snapshot)
+        });
 
         self.expect(TokenKind::Dedent);
 
@@ -3308,6 +3306,9 @@ impl<'src> Parser<'src> {
         // uses `Parameter` (not `ParameterWithDefault`) which means that the parser cannot
         // recover well from `*args=(1, 2)`.
         let mut parameters = ast::Parameters::default();
+        let parameters_snapshot = self.parameter_scratch.snapshot();
+        let mut args_snapshot = None;
+        let mut kwonlyargs_snapshot = None;
 
         let mut seen_default_param = false; // `a=10`
         let mut seen_positional_only_separator = false; // `/`
@@ -3334,8 +3335,14 @@ impl<'src> Parser<'src> {
                     let star_range = parser.current_token_range();
                     parser.bump(TokenKind::Star);
 
+                    kwonlyargs_snapshot.get_or_insert_with(|| parser.parameter_scratch.snapshot());
+
                     if parser.at_name_or_soft_keyword() {
-                        let param = parser.parse_parameter(param_start, function_kind, AllowStarAnnotation::Yes);
+                        let param = parser.parse_parameter(
+                            param_start,
+                            function_kind,
+                            AllowStarAnnotation::Yes,
+                        );
                         let param_star_range = parser.node_range(star_range.start());
 
                         if parser.at(TokenKind::Equal) {
@@ -3387,7 +3394,8 @@ impl<'src> Parser<'src> {
                             // def foo(a, *args, b, c, *): ...
                             parser.add_error(
                                 ParseErrorType::OtherError(
-                                    "Keyword-only parameter separator not allowed after '*' parameter"
+                                    "Keyword-only parameter separator not allowed \
+                                        after '*' parameter"
                                         .to_string(),
                                 ),
                                 star_range,
@@ -3402,7 +3410,8 @@ impl<'src> Parser<'src> {
                     let double_star_range = parser.current_token_range();
                     parser.bump(TokenKind::DoubleStar);
 
-                    let param = parser.parse_parameter(param_start, function_kind, AllowStarAnnotation::No);
+                    let param =
+                        parser.parse_parameter(param_start, function_kind, AllowStarAnnotation::No);
                     let param_double_star_range = parser.node_range(double_star_range.start());
 
                     if parameters.kwarg.is_some() {
@@ -3445,7 +3454,10 @@ impl<'src> Parser<'src> {
                     let slash_range = parser.current_token_range();
                     parser.bump(TokenKind::Slash);
 
-                    if parameters.is_empty() {
+                    if parser.parameter_scratch.is_empty(&parameters_snapshot)
+                        && parameters.vararg.is_none()
+                        && parameters.kwarg.is_none()
+                    {
                         // test_err params_no_arg_before_slash
                         // def foo(/): ...
                         // def foo(/, a): ...
@@ -3485,9 +3497,11 @@ impl<'src> Parser<'src> {
                     }
 
                     if !seen_positional_only_separator {
-                        // We should only swap if we're seeing the separator for the
+                        // We should only split if we're seeing the separator for the
                         // first time, otherwise it's a user error.
-                        std::mem::swap(&mut parameters.args, &mut parameters.posonlyargs);
+                        if kwonlyargs_snapshot.is_none() {
+                            args_snapshot = Some(parser.parameter_scratch.snapshot());
+                        }
                         seen_positional_only_separator = true;
 
                         // test_ok pos_only_py38
@@ -3524,8 +3538,7 @@ impl<'src> Parser<'src> {
 
                         // test_err params_non_default_after_default
                         // def foo(a=10, b, c: int): ...
-                        parser
-                            .add_error(ParseErrorType::NonDefaultParamAfterDefaultParam, &param);
+                        parser.add_error(ParseErrorType::NonDefaultParamAfterDefaultParam, &param);
                     }
 
                     seen_default_param |= param.default.is_some();
@@ -3534,11 +3547,7 @@ impl<'src> Parser<'src> {
                         seen_keyword_only_param_after_separator = true;
                     }
 
-                    if seen_keyword_only_separator || parameters.vararg.is_some() {
-                        parameters.kwonlyargs.push(param);
-                    } else {
-                        parameters.args.push(param);
-                    }
+                    parser.parameter_scratch.push(param);
                     last_keyword_only_separator_range = None;
                 }
                 _ => {
@@ -3562,9 +3571,17 @@ impl<'src> Parser<'src> {
             self.expect(TokenKind::Rpar);
         }
 
-        parameters.args.shrink_to_fit();
-        parameters.kwonlyargs.shrink_to_fit();
-        parameters.posonlyargs.shrink_to_fit();
+        if let Some(kwonlyargs_snapshot) = kwonlyargs_snapshot {
+            parameters.kwonlyargs = self.parameter_scratch.take_thin_vec(kwonlyargs_snapshot);
+        }
+        if let Some(args_snapshot) = args_snapshot {
+            parameters.args = self.parameter_scratch.take_thin_vec(args_snapshot);
+            parameters.posonlyargs = self.parameter_scratch.take_thin_vec(parameters_snapshot);
+        } else if seen_positional_only_separator {
+            parameters.posonlyargs = self.parameter_scratch.take_thin_vec(parameters_snapshot);
+        } else {
+            parameters.args = self.parameter_scratch.take_thin_vec(parameters_snapshot);
+        }
 
         parameters.range = self.node_range(start);
 
@@ -4000,12 +4017,7 @@ impl<'src> Parser<'src> {
     /// For now, don't recover when parsing clause headers, but add the terminator tokens (e.g.
     /// `Else`) to the recovery context so that expression recovery stops when it encounters an
     /// `else` token.
-    fn parse_clauses<T>(
-        &mut self,
-        clause: Clause,
-        mut parse_clause: impl FnMut(&mut Parser<'src>) -> T,
-    ) -> Vec<T> {
-        let mut clauses = Vec::new();
+    fn parse_clauses(&mut self, clause: Clause, mut parse_clause: impl FnMut(&mut Parser<'src>)) {
         let mut progress = ParserProgress::default();
 
         let recovery_kind = match clause {
@@ -4022,15 +4034,10 @@ impl<'src> Parser<'src> {
         while recovery_kind.is_list_element(self) {
             progress.assert_progressing(self);
 
-            if clauses.is_empty() {
-                clauses.reserve_exact(1);
-            }
-            clauses.push(parse_clause(self));
+            parse_clause(self);
         }
 
         self.recovery_context = saved_context;
-
-        clauses
     }
 }
 

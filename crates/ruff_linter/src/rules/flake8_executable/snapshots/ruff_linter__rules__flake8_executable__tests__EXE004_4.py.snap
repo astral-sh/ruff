@@ -7,10 +7,10 @@ EXE004 [*] Avoid whitespace before shebang
 1 | /
 2 | |     #!/usr/bin/env python
   | |____^
-  |
 help: Remove whitespace before shebang
   |
   -
   -     #!/usr/bin/env python
 1 + #!/usr/bin/env python
   |
+note: This is an unsafe fix and may change runtime behavior

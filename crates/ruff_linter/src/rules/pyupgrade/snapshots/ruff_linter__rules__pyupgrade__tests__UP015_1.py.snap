@@ -8,7 +8,6 @@ UP015 [*] Unnecessary mode argument
 2 | # Refer: https://github.com/astral-sh/ruff/issues/11736
 3 | x: 'open("foo", "r")'
   |                 ^^^
-  |
 help: Remove mode argument
   |
 2 | # Refer: https://github.com/astral-sh/ruff/issues/11736

@@ -37,7 +37,8 @@ classes.
 We use `P`, `Q`, `R`, … to denote types that are non-disjoint:
 
 ```py
-from ty_extensions import static_assert, is_disjoint_from
+from ty_extensions import static_assert
+from ty_extensions._internal import is_disjoint_from
 
 class P: ...
 class Q: ...
@@ -58,7 +59,8 @@ We use `Literal[1]`, `Literal[2]`, … as examples of pairwise-disjoint types, a
 supertype of these:
 
 ```py
-from ty_extensions import static_assert, is_disjoint_from, is_subtype_of
+from ty_extensions import static_assert
+from ty_extensions._internal import is_disjoint_from, is_subtype_of
 from typing import Literal
 
 static_assert(is_disjoint_from(Literal[1], Literal[2]))
@@ -75,7 +77,8 @@ static_assert(is_subtype_of(Literal[3], int))
 Finally, we use `A <: B <: C` and `A <: B1`, `A <: B2` to denote hierarchies of (proper) subtypes:
 
 ```py
-from ty_extensions import static_assert, is_subtype_of, is_disjoint_from
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of, is_disjoint_from
 
 class A: ...
 class B(A): ...
@@ -284,7 +287,8 @@ in intersections, and can be eagerly simplified out. `object & P` is equivalent 
 `object & ~P` is equivalent to `~P` for any type `P`.
 
 ```pyi
-from ty_extensions import is_equivalent_to, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
 
 class P: ...
 
@@ -443,6 +447,27 @@ def example_type_bool_type_str(
     i: type[bool] & type[str],
 ) -> None:
     reveal_type(i)  # revealed: Never
+```
+
+Ordinary types accept values with any `NewType` tag, so an integer-based `NewType` can overlap
+`bool`. Distinct `NewType` tags are mutually exclusive even when their runtime values overlap;
+nested `NewType`s retain their relationship with their parent.
+
+```py
+from typing import NewType
+
+UserId = NewType("UserId", int)
+OtherUserId = NewType("OtherUserId", int)
+NestedUserId = NewType("NestedUserId", UserId)
+
+def newtype_intersections(
+    user_bool: UserId & bool,
+    user_nested: UserId & NestedUserId,
+    user_other: UserId & OtherUserId,
+) -> None:
+    reveal_type(user_bool)  # revealed: UserId & bool
+    reveal_type(user_nested)  # revealed: NestedUserId
+    reveal_type(user_other)  # revealed: Never
 ```
 
 #### Positive and negative contributions
@@ -723,7 +748,8 @@ simplified, due to the fact that a `LiteralString` inhabitant is known to have `
 exactly `str` (and not a subclass of `str`):
 
 ```py
-from ty_extensions import AlwaysTruthy, AlwaysFalsy, Unknown
+from ty_extensions import AlwaysTruthy, AlwaysFalsy
+from ty_extensions._internal import Unknown
 from typing_extensions import LiteralString
 
 def f(
@@ -816,13 +842,60 @@ def _(e: (Single | int) & ~Single) -> None:
     reveal_type(e)  # revealed: int
 ```
 
+A `NewType` is preserved when all but one member of its underlying enum are excluded. The resulting
+intersection is also assignable to the remaining member.
+
+```pyi
+from typing import NewType
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to, is_equivalent_to
+
+ColorId = NewType("ColorId", Color)
+NestedColorId = NewType("NestedColorId", ColorId)
+type NestedAlias = NestedColorId
+
+def enum_newtype(value: ColorId & ~(Red | Green), nested: NestedAlias & ~Red & ~Green) -> None:
+    reveal_type(value)  # revealed: ColorId & Literal[Color.BLUE]
+    reveal_type(nested)  # revealed: NestedColorId & Literal[Color.BLUE]
+
+static_assert(is_assignable_to(ColorId & ~(Red | Green), ColorId))
+static_assert(is_assignable_to(ColorId & ~(Red | Green), Blue))
+static_assert(is_equivalent_to(ColorId & ~(Red | Green), ColorId & Blue))
+```
+
+Aliases name the same enum member, while `Flag` members are not exhaustive.
+
+```pyi
+from enum import Flag
+
+class Aliased(Enum):
+    FIRST = 1
+    FIRST_ALIAS = 1
+    LAST = 2
+
+AliasedId = NewType("AliasedId", Aliased)
+
+def aliased_member(value: AliasedId & ~Literal[Aliased.FIRST_ALIAS]) -> None:
+    reveal_type(value)  # revealed: AliasedId & Literal[Aliased.LAST]
+
+class Permission(Flag):
+    READ = 1
+    WRITE = 2
+
+PermissionId = NewType("PermissionId", Permission)
+
+def non_exhaustive(value: PermissionId & ~Literal[Permission.READ]) -> None:
+    reveal_type(value)  # revealed: PermissionId & ~Literal[Permission.READ]
+```
+
 ## Addition of a type to an intersection with many non-disjoint types
 
 This slightly strange-looking test is a regression test for a mistake that was nearly made in a PR:
 <https://github.com/astral-sh/ruff/pull/15475#discussion_r1915041987>.
 
 ```py
-from ty_extensions import AlwaysFalsy, Unknown
+from ty_extensions import AlwaysFalsy
+from ty_extensions._internal import Unknown
 from typing_extensions import Literal
 
 def _(x: str & Unknown & AlwaysFalsy & Literal[""]):
@@ -838,7 +911,7 @@ is still an unknown set of runtime values, so `~Any` is equivalent to `Any`. We 
 simplify `~Any` to `Any` in intersections. The same applies to `Unknown`.
 
 ```py
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 from typing_extensions import Any, Never
 
 class P: ...
@@ -868,7 +941,7 @@ The intersection of an unknown set of runtime values with (another) unknown set 
 still an unknown set of runtime values:
 
 ```py
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 from typing_extensions import Any
 
 class P: ...
@@ -903,7 +976,7 @@ of another unknown set of values is not necessarily empty, so we keep the positi
 
 ```py
 from typing import Any
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 def any(
     i1: Any & ~Any,
@@ -926,7 +999,7 @@ Gradually-equivalent types can be simplified out of intersections:
 
 ```py
 from typing import Any
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 def mixed(
     i1: Any & Unknown,
@@ -999,6 +1072,45 @@ def _(
     # error: [invalid-argument-type]
     # error: [invalid-argument-type]
     x(1.0)
+```
+
+### Constructor intersection diagnostics retain the called class types
+
+When an intersection of class objects rejects a constructor call, the diagnostic should describe the
+original class types instead of reconstructing an intersection from their `__init__` and `__new__`
+methods.
+
+```py
+from typing import Self
+
+class UsesInit:
+    def __init__(self, value: int) -> None: ...
+
+class UsesNew:
+    def __new__(cls, value: str) -> Self:
+        return object.__new__(cls)
+
+def _(cls: type[UsesInit]) -> None:
+    if issubclass(cls, UsesNew):
+        reveal_type(cls)  # revealed: type[UsesInit] & type[UsesNew]
+        # error: [invalid-argument-type] "UsesNew.__new__"
+        # snapshot: invalid-argument-type
+        cls(None)
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to `UsesInit.__init__` is incorrect
+  --> src/mdtest_snippet.py:15:13
+   |
+15 |         cls(None)
+   |             ^^^^ Expected `int`, found `None`
+info: Method defined here
+ --> src/mdtest_snippet.py:4:9
+  |
+4 |     def __init__(self, value: int) -> None: ...
+  |         ^^^^^^^^       ---------- Parameter declared here
+info: Intersection element `bound method UsesInit.__init__(value: int) -> None` is incompatible with this call site
+info: Attempted to call intersection type `type[UsesInit] & type[UsesNew]`
 ```
 
 ### Error priority: binding error over top-callable
@@ -1289,6 +1401,153 @@ def f(c: C):
     reveal_type(c.x)  # revealed: ~AlwaysFalsy
 ```
 
+## Meta-types of intersections
+
+### Positive class constraints
+
+The class of an intersection must satisfy the class constraints supplied by every positive element.
+Instantiating the resulting class intersection recovers the corresponding instance intersection.
+
+```py
+class Left: ...
+class Right: ...
+
+def positive(value: Left & Right) -> None:
+    reveal_type(value.__class__)  # revealed: type[Left] & type[Right]
+    reveal_type(type(value))  # revealed: type[Left] & type[Right]
+    reveal_type(type(value)())  # revealed: Left & Right
+```
+
+### Bounded type variables
+
+Projecting an intersection into its class type preserves a bounded type variable instead of
+replacing it with its upper bound. An unrelated positive class constraint is preserved too.
+
+```py
+class Bound: ...
+class Other: ...
+
+def preserve[T: Bound](value: T & Other) -> None:
+    reveal_type(type(value))  # revealed: type[T@preserve] & type[Other]
+    reveal_type(type(value)())  # revealed: T@preserve & Other
+```
+
+### Excluded alternatives in type-variable bounds
+
+Excluding an alternative from a type variable's union bound can reveal a definite class. Preserve
+both that class constraint and the original type variable in the resulting class type.
+
+```py
+class Bound:
+    label = "bound"
+
+def exclude_none[T: Bound | None](value: T) -> None:
+    if value is not None:
+        reveal_type(type(value))  # revealed: type[T@exclude_none] & type[Bound]
+        reveal_type(type(value).label)  # revealed: str
+```
+
+### Excluded alternatives in class-object bounds
+
+If the remaining bound is a class object, its class is its metaclass. Preserve that metaclass
+constraint alongside the original type variable.
+
+```py
+class Meta(type): ...
+class Bound(metaclass=Meta): ...
+
+def accepts_meta(value: type[Meta]) -> None: ...
+def exclude_none[T: type[Bound] | None](value: T) -> None:
+    if value is not None:
+        reveal_type(type(value))  # revealed: type[T@exclude_none] & type[Meta]
+        accepts_meta(type(value))
+```
+
+For a final class, the metaclass is known exactly. This also holds for a specialized generic class.
+
+```py
+from typing import final
+
+@final
+class FinalBound(metaclass=Meta): ...
+
+@final
+class FinalGenericBound[U](metaclass=Meta): ...
+
+def exclude_none_final[T: type[FinalBound] | None](value: T) -> None:
+    if value is not None:
+        reveal_type(type(value))  # revealed: type[T@exclude_none_final] & <class 'Meta'>
+        accepts_meta(type(value))
+
+def exclude_none_generic[T: type[FinalGenericBound[int]] | None](value: T) -> None:
+    if value is not None:
+        reveal_type(type(value))  # revealed: type[T@exclude_none_generic] & <class 'Meta'>
+        accepts_meta(type(value))
+```
+
+### Truthiness refinements
+
+Whether an individual object is truthy or falsy does not constrain its runtime class. Both positive
+and negative truthiness refinements must therefore disappear from its meta-type.
+
+```py
+from ty_extensions import AlwaysFalsy
+
+class Base: ...
+
+def truthiness(falsy: Base & AlwaysFalsy, not_falsy: Base & ~AlwaysFalsy) -> None:
+    reveal_type(type(falsy))  # revealed: type[Base]
+    reveal_type(type(not_falsy))  # revealed: type[Base]
+```
+
+### Truthiness-narrowed `Self`
+
+Truthiness describes an individual instance, not its class. Narrowing `Self` by truthiness must
+therefore preserve `type[Self]` while discarding the value-only refinement.
+
+```py
+from typing import Self
+
+class Base:
+    def __bool__(self) -> bool:
+        return True
+
+    def clone(self: Self) -> Self:
+        if not self:
+            return self
+
+        reveal_type(self)  # revealed: Self@clone & ~AlwaysFalsy
+        reveal_type(type(self))  # revealed: type[Self@clone]
+        return type(self)()
+```
+
+### Negative value constraints
+
+Excluding particular instance values does not exclude their classes: a nonzero integer can still
+have class `int`.
+
+```py
+from typing import Literal
+
+def nonzero(value: int & ~Literal[0]) -> None:
+    reveal_type(type(value))  # revealed: type[int]
+```
+
+### Intersections without a positive class constraint
+
+A pure negation supplies no positive class bound, and a truthiness constraint describes only an
+instance value. Both conservatively project to the unconstrained class type.
+
+```py
+from ty_extensions import AlwaysTruthy
+
+class Excluded: ...
+
+def unconstrained(negative: ~Excluded, truthy: AlwaysTruthy & ~Excluded) -> None:
+    reveal_type(type(negative))  # revealed: type
+    reveal_type(type(truthy))  # revealed: type
+```
+
 ## Methods on intersections
 
 ### The same method from a common base
@@ -1345,7 +1604,7 @@ For any gradual type `G`, `Invariant[G] & Invariant[Any] = Invariant[G]`.
 
 ```py
 from typing import Any
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 class P: ...
 class Q: ...

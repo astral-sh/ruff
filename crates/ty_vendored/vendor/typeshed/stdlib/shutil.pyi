@@ -9,8 +9,8 @@ import sys
 from _typeshed import BytesPath, ExcInfo, FileDescriptorOrPath, MaybeNone, StrOrBytesPath, StrPath, SupportsRead, SupportsWrite
 from collections.abc import Callable, Iterable, Sequence
 from tarfile import _TarfileFilter
-from typing import Any, AnyStr, NamedTuple, NoReturn, Protocol, TypeAlias, TypeVar, overload, type_check_only
-from typing_extensions import deprecated
+from typing import Any, AnyStr, NamedTuple, Protocol, TypeAlias, TypeVar, overload, type_check_only
+from typing_extensions import Never, deprecated
 
 __all__ = [
     "copyfileobj",
@@ -281,10 +281,14 @@ def move(src: StrPath, dst: _StrPathT, copy_function: _CopyFn = ...) -> _StrPath
     If dst already exists but is not a directory, it may be overwritten
     depending on os.rename() semantics.
 
-    If the destination is on our current filesystem, then rename() is used.
-    Otherwise, src is copied to the destination and then removed. Symlinks are
-    recreated under the new name if os.rename() fails because of cross
-    filesystem renames.
+    os.rename() is preferably used if the source and destination are on the
+    same filesystem. In case os.rename() fails due to OSError (e.g. the user
+    has write permission to *dst* file but not to its parent directory),
+    this method falls back to using *copy_function* silently.
+    Symlinks are also recreated under the new name if os.rename() fails
+    because of cross filesystem renames.
+
+    It's recommended to use os.rename() if atomic move is strictly required.
 
     The optional `copy_function` argument is a callable that will be used
     to copy the source or it will be delegated to `copytree`.
@@ -370,7 +374,7 @@ else:
 if sys.platform == "win32" and sys.version_info < (3, 12):
     @overload
     @deprecated("On Windows before Python 3.12, using a PathLike as `cmd` would always fail or return `None`.")
-    def which(cmd: os.PathLike[str], mode: int = 1, path: StrPath | None = None) -> NoReturn:
+    def which(cmd: os.PathLike[str], mode: int = 1, path: StrPath | None = None) -> Never:
         """Given a command, mode, and a PATH string, return the path which
         conforms to the given mode on the PATH, or None if there is no such
         file.

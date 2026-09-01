@@ -1,18 +1,33 @@
+# /// script
+# requires-python = ">=3.12"
+# dependencies = []
+#
+# [tool.ty.rules]
+# blanket-ignore-comment = "warn"
+# missing-type-argument = "warn"
+# possibly-unresolved-reference = "warn"
+# unsound-return-statement = "warn"
+# unsound-yield = "warn"
+# unsupported-dynamic-base = "warn"
+# division-by-zero = "warn"
+#
+# [tool.uv]
+# no-build = true
+# exclude-newer = "P7D"
+# ///
+
 """
 Run typing conformance tests and compare results between two ty versions.
 
-By default, this script will use `uv` to run the latest version of ty
-as the new version with `uvx ty@latest`. This requires `uv` to be installed
-and available in the system PATH.
+ty versions can be supplied as `uvx ty` or `uvx ty@version`
+for a specific version. This requires `uv` to be installed
+and available on the system PATH.
 
 If CONFORMANCE_SUITE_COMMIT is set, the hash will be used to create
 links to the corresponding line in the conformance repository for each
 diagnostic. Otherwise, it will default to `main'.
 
 Examples:
-    # Compare an older version of ty to latest
-    %(prog)s --old-ty uvx ty@0.0.1a35
-
     # Compare two specific ty versions
     %(prog)s --old-ty uvx ty@0.0.1a35 --new-ty uvx ty@0.0.7
 
@@ -250,7 +265,7 @@ class ExpectedError:
 def diagnostics_are_equivalent(a: list[TyDiagnostic], b: list[TyDiagnostic]) -> bool:
     """Compare two diagnostic lists for equality, ignoring the ``source`` field."""
 
-    def fingerprint(d: TyDiagnostic) -> tuple:
+    def fingerprint(d: TyDiagnostic) -> tuple[str, str, str, str, int, int]:
         return (
             d.check_name,
             d.description,
@@ -501,6 +516,7 @@ def collect_ty_diagnostics(
             f"--python-version={python_version}",
             "--output-format=gitlab",
             "--ignore=assert-type-unspellable-subtype",
+            "--error=ambiguous-protocol-member",
             "--error=invalid-enum-member-annotation",
             "--error=invalid-legacy-positional-parameter",
             "--error=mismatched-type-name",
@@ -727,11 +743,16 @@ def render_test_cases(
     return "\n".join(lines)
 
 
-def collect_file_stats(test_cases: list[TestCase]) -> list[FileStats]:
-    """Compute per-file statistics from grouped test cases."""
-    path_to_cases: dict[Path, list[TestCase]] = {}
+def collect_file_stats(
+    test_cases: list[TestCase], test_files: Sequence[Path]
+) -> list[FileStats]:
+    # `test_cases` only contain files where `ty` generates a diagnostic
+    # We expand this with the full set of `test_files` to ensure we don't undercount
+    path_to_cases: dict[Path, list[TestCase]] = {
+        path.resolve(): [] for path in test_files
+    }
     for tc in test_cases:
-        path_to_cases.setdefault(tc.path, []).append(tc)
+        path_to_cases[tc.path].append(tc)
     return [
         FileStats(
             path=path,
@@ -1018,8 +1039,8 @@ def parse_args():
     parser.add_argument(
         "--new-ty",
         nargs="+",
-        default=["uvx", "ty@latest"],
-        help="Command to run new version of ty (default: uvx ty@latest)",
+        help="Command to run new version of ty",
+        required=True,
     )
 
     parser.add_argument(
@@ -1089,7 +1110,7 @@ def main():
         expected=expected,
     )
 
-    file_stats = collect_file_stats(grouped)
+    file_stats = collect_file_stats(grouped, test_files)
 
     rendered = "\n\n".join(
         filter(

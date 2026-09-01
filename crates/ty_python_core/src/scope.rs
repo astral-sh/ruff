@@ -1,19 +1,21 @@
 use std::ops::Range;
 
-use ruff_db::{files::File, parsed::ParsedModuleRef};
+use ruff_db::{PythonFile, files::File, parsed::ParsedModuleRef};
 use ruff_index::newtype_index;
 use ruff_python_ast::{self as ast, NodeIndex};
 
 use crate::{
-    Db, SemanticIndex, ast_node_ref::AstNodeRef, definition::Definition, node_key::NodeKey,
-    semantic_index,
+    Db, Program, ProgramFile, SemanticIndex, ast_node_ref::AstNodeRef, definition::Definition,
+    node_key::NodeKey, semantic_index,
 };
 
 /// A cross-module identifier of a scope that can be used as a salsa query parameter.
 #[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct ScopeId<'db> {
-    pub file: File,
+    #[returns(copy)]
+    pub program_file: ProgramFile<'db>,
 
+    #[returns(copy)]
     pub file_scope_id: FileScopeId,
 }
 
@@ -21,16 +23,28 @@ pub struct ScopeId<'db> {
 impl get_size2::GetSize for ScopeId<'_> {}
 
 impl<'db> ScopeId<'db> {
+    pub fn file(self, db: &dyn Db) -> File {
+        self.program_file(db).file(db)
+    }
+
+    pub fn python_file(self, db: &'db dyn Db) -> PythonFile<'db> {
+        self.program_file(db).python_file(db)
+    }
+
+    pub fn program(self, db: &'db dyn Db) -> Program<'db> {
+        self.program_file(db).program(db)
+    }
+
     pub fn is_annotation(self, db: &'db dyn Db) -> bool {
         self.node(db).scope_kind().is_annotation()
     }
 
-    pub fn node(self, db: &dyn Db) -> &NodeWithScopeKind {
+    pub fn node(self, db: &'db dyn Db) -> &'db NodeWithScopeKind {
         self.scope(db).node()
     }
 
     /// Returns `true` if this scope may require type context from its parent scope.
-    pub fn accepts_type_context(self, db: &dyn Db) -> bool {
+    pub fn accepts_type_context(self, db: &'db dyn Db) -> bool {
         matches!(
             self.node(db),
             NodeWithScopeKind::Lambda(_)
@@ -41,13 +55,13 @@ impl<'db> ScopeId<'db> {
         )
     }
 
-    pub fn scope(self, db: &dyn Db) -> &Scope {
-        semantic_index(db, self.file(db)).scope(self.file_scope_id(db))
+    pub fn scope(self, db: &'db dyn Db) -> &'db Scope {
+        semantic_index(db, self.program_file(db)).scope(self.file_scope_id(db))
     }
 
     /// Returns the class definition for the enclosing class if this scope is a method body.
-    pub fn class_definition_of_method(self, db: &'db dyn Db) -> Option<Definition<'db>> {
-        semantic_index(db, self.file(db)).class_definition_of_method(self.file_scope_id(db))
+    fn class_definition_of_method(self, db: &'db dyn Db) -> Option<Definition<'db>> {
+        semantic_index(db, self.program_file(db)).class_definition_of_method(self.file_scope_id(db))
     }
 
     pub fn is_method_scope(self, db: &'db dyn Db) -> bool {
@@ -82,7 +96,7 @@ impl<'db> ScopeId<'db> {
 
 /// ID that uniquely identifies a scope inside of a module.
 #[newtype_index]
-#[derive(Ord, PartialOrd, salsa::Update, get_size2::GetSize)]
+#[derive(Ord, PartialOrd, get_size2::GetSize)]
 pub struct FileScopeId;
 
 impl FileScopeId {
@@ -95,7 +109,7 @@ impl FileScopeId {
         self == FileScopeId::global()
     }
 
-    pub fn to_scope_id(self, db: &dyn Db, file: File) -> ScopeId<'_> {
+    pub fn to_scope_id<'db>(self, db: &'db dyn Db, file: ProgramFile<'db>) -> ScopeId<'db> {
         let index = semantic_index(db, file);
         index.scope_ids_by_scope[self]
     }
@@ -103,9 +117,13 @@ impl FileScopeId {
     pub fn is_generator_function(self, index: &SemanticIndex) -> bool {
         index.generator_functions.contains(&self)
     }
+
+    pub fn is_async_comprehension(self, index: &SemanticIndex) -> bool {
+        index.async_comprehensions.contains(&self)
+    }
 }
 
-#[derive(Debug, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, get_size2::GetSize)]
 pub struct Scope {
     /// The parent scope, if any.
     parent: Option<FileScopeId>,
@@ -146,7 +164,7 @@ impl Scope {
         self.kind().visibility()
     }
 
-    pub fn descendants(&self) -> Range<FileScopeId> {
+    pub(crate) fn descendants(&self) -> Range<FileScopeId> {
         self.descendants.clone()
     }
 
@@ -221,7 +239,7 @@ impl ScopeKind {
         }
     }
 
-    pub(crate) const fn visibility(self) -> ScopeVisibility {
+    const fn visibility(self) -> ScopeVisibility {
         match self {
             ScopeKind::Module | ScopeKind::Class => ScopeVisibility::Public,
             ScopeKind::TypeParams
@@ -253,7 +271,7 @@ impl ScopeKind {
         matches!(self, ScopeKind::Module)
     }
 
-    pub const fn is_annotation(self) -> bool {
+    pub(crate) const fn is_annotation(self) -> bool {
         matches!(self, ScopeKind::TypeParams | ScopeKind::TypeAlias)
     }
 
@@ -322,7 +340,7 @@ impl NodeWithScopeRef<'_> {
         }
     }
 
-    pub fn node_key(self) -> NodeWithScopeKey {
+    pub(crate) fn node_key(self) -> NodeWithScopeKey {
         match self {
             NodeWithScopeRef::Module => NodeWithScopeKey::Module,
             NodeWithScopeRef::Class(class) => NodeWithScopeKey::Class(NodeKey::from_node(class)),
@@ -361,7 +379,7 @@ impl NodeWithScopeRef<'_> {
 }
 
 /// Node that introduces a new scope.
-#[derive(Clone, Debug, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Debug, get_size2::GetSize)]
 pub enum NodeWithScopeKind {
     Module,
     Class(AstNodeRef<ast::StmtClassDef>),
@@ -417,7 +435,7 @@ impl NodeWithScopeKind {
         self.as_function().expect("expected function")
     }
 
-    pub fn as_type_alias(&self) -> Option<&AstNodeRef<ast::StmtTypeAlias>> {
+    fn as_type_alias(&self) -> Option<&AstNodeRef<ast::StmtTypeAlias>> {
         match self {
             Self::TypeAlias(type_alias) => Some(type_alias),
             _ => None,

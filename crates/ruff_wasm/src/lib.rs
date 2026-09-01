@@ -21,7 +21,7 @@ use ruff_python_codegen::Stylist;
 use ruff_python_formatter::{PyFormatContext, QuoteStyle, format_module_ast, pretty_comments};
 use ruff_python_index::Indexer;
 use ruff_python_parser::{Mode, ParseOptions, Parsed, parse, parse_unchecked};
-use ruff_python_trivia::CommentRanges;
+use ruff_python_trivia::TriviaRanges;
 use ruff_ranged_value::{ValueSource, ValueSourceGuard};
 use ruff_source_file::{OneIndexed, PositionEncoding as SourcePositionEncoding, SourceLocation};
 use ruff_text_size::Ranged;
@@ -429,7 +429,8 @@ impl Workspace {
                     })
                     .collect();
 
-                let code = if !is_human_readable_names_enabled(self.settings.linter.preview)
+                let code = if (!is_human_readable_names_enabled(self.settings.linter.preview)
+                    || self.settings.output_prefer_rule_codes)
                     && let Some(code) = msg.secondary_code()
                 {
                     code.as_str()
@@ -496,8 +497,8 @@ impl Workspace {
 
     pub fn comments(&self, contents: &str) -> Result<String, Error> {
         let parsed = ParsedModule::from_source(contents)?;
-        let comment_ranges = CommentRanges::from(parsed.parsed.tokens());
-        let comments = pretty_comments(parsed.parsed.syntax(), &comment_ranges, contents);
+        let trivia_ranges = TriviaRanges::from(parsed.parsed.tokens());
+        let comments = pretty_comments(parsed.parsed.syntax(), &trivia_ranges, contents);
         Ok(comments)
     }
 
@@ -522,17 +523,17 @@ pub(crate) fn into_error<E: std::fmt::Display>(err: E) -> Error {
 struct ParsedModule<'a> {
     source_code: &'a str,
     parsed: Parsed<Mod>,
-    comment_ranges: CommentRanges,
+    trivia_ranges: TriviaRanges,
 }
 
 impl<'a> ParsedModule<'a> {
     fn from_source(source_code: &'a str) -> Result<Self, Error> {
         let parsed = parse(source_code, ParseOptions::from(Mode::Module)).map_err(into_error)?;
-        let comment_ranges = CommentRanges::from(parsed.tokens());
+        let trivia_ranges = TriviaRanges::from(parsed.tokens());
         Ok(Self {
             source_code,
             parsed,
-            comment_ranges,
+            trivia_ranges,
         })
     }
 
@@ -543,12 +544,7 @@ impl<'a> ParsedModule<'a> {
             .to_format_options(PySourceType::default(), self.source_code, None)
             .with_source_map_generation(SourceMapGeneration::Enabled);
 
-        format_module_ast(
-            &self.parsed,
-            &self.comment_ranges,
-            self.source_code,
-            options,
-        )
+        format_module_ast(&self.parsed, &self.trivia_ranges, self.source_code, options)
     }
 }
 

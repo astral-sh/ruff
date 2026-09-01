@@ -20,7 +20,7 @@ def contains_triples(t):
     '''(\'''|""")'''
 
 
-# TODO: here should raise D300 for using dobule quotes instead,
+# TODO: here should raise D300 for using double quotes instead,
 # because escaped double quote does allow us.
 def contains_triples(t):
     '''(\""")'''

@@ -82,7 +82,7 @@ pub(crate) fn parse_string_annotation(
                         let mut diagnostic =
                             builder.into_diagnostic("Syntax error in forward annotation");
 
-                        diagnostic.set_primary_message(&error);
+                        diagnostic.set_primary_annotation_message(&error);
 
                         let possible_secondary = string_literal
                             .range()

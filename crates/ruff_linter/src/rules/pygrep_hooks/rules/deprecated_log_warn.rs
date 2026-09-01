@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
-use crate::{FixAvailability, Violation};
+use crate::{FixAvailability, Violation, codes::Category};
 
 /// ## Removed
 /// This rule is identical to [G010] which should be used instead.
@@ -34,7 +34,7 @@ use crate::{FixAvailability, Violation};
 ///
 /// [G010]: https://docs.astral.sh/ruff/rules/logging-warn/
 #[derive(ViolationMetadata)]
-#[violation_metadata(removed_since = "v0.2.0")]
+#[violation_metadata(removed_since = "v0.2.0", category = Category::Suspicious)]
 pub(crate) struct DeprecatedLogWarn;
 
 /// PGH002

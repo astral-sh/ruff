@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for comparisons between constants.
@@ -28,7 +29,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: Comparisons](https://docs.python.org/3/reference/expressions.html#comparisons)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.221")]
+#[violation_metadata(stable_since = "v0.0.221", category = Category::Complexity)]
 pub(crate) struct ComparisonOfConstant {
     left_constant: String,
     op: CmpOp,

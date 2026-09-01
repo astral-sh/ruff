@@ -276,4 +276,3 @@ Module(
 21 | / except* ExceptionGroup:
 22 | |     pass
    | |________^ Syntax Error: Cannot have both 'except' and 'except*' on the same 'try'
-   |

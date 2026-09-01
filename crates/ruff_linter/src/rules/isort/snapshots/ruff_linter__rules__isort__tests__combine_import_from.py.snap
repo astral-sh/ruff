@@ -10,7 +10,6 @@ I001 [*] Import block is un-sorted or un-formatted
 4 | | from collections import ChainMap
 5 | | from collections import MutableSequence, MutableMapping
   | |_______________________________________________________^
-  |
 help: Organize imports
   |
   - from collections import Awaitable

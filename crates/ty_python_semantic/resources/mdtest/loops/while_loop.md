@@ -411,6 +411,74 @@ while x < 10:
     reveal_type(x)  # revealed: Literal[1]
 ```
 
+### Deletions in nested loops reach the outer loop
+
+An inner loop can delete a variable on one iteration, then exit through `break` on a later
+iteration. The variable can therefore be unbound both after the inner loop and at the start of the
+next outer iteration.
+
+```py
+def stop() -> bool:
+    raise NotImplementedError
+
+def f(repeat: bool):
+    x = 0
+    while repeat:
+        x  # error: [possibly-unresolved-reference]
+        while True:
+            if stop():
+                break
+            x = 0
+            del x
+        x  # error: [possibly-unresolved-reference]
+```
+
+### Rebinding after an inner loop restores boundness
+
+An inner loop's deletion does not make a variable possibly unbound on later outer iterations if the
+variable is reassigned before reaching the next iteration.
+
+```py
+def stop() -> bool:
+    raise NotImplementedError
+
+def f(repeat: bool):
+    x = 0
+    while repeat:
+        reveal_type(x)  # revealed: Literal[0]
+        while True:
+            if stop():
+                break
+            x = 0
+            del x
+        x = 0
+```
+
+### Statically unreachable deletions in nested loops preserve boundness
+
+A deletion guarded by an impossible comparison does not make the variable possibly unbound, even
+through several nested loops. Evaluating the loop conditions and comparison depends on bindings from
+the enclosing loops.
+
+```py
+def stop() -> bool:
+    raise NotImplementedError
+
+def f(repeat: bool):
+    x = 1
+    while repeat:
+        reveal_type(x)  # revealed: Literal[1]
+        while x:
+            if stop():
+                break
+            while x:
+                if stop():
+                    break
+                if x == 4:
+                    del x
+        reveal_type(x)  # revealed: Literal[1]
+```
+
 ### Bindings in a loop are possibly-unbound after the loop
 
 ```py
@@ -467,6 +535,90 @@ while random():
         x, y = y, x
     reveal_type(x)  # revealed: Literal[2, 1]
     reveal_type(y)  # revealed: Literal[1, 2]
+```
+
+### Loop increments guarded by chained comparisons converge
+
+A negated comparison chain validates an increment before the loop updates its offset. Inference
+converges even though the guard depends on the value added to the loop variable.
+
+```py
+def advance(data: bytes, offset: int) -> None:
+    while offset < len(data):
+        byte = data[offset]
+        if byte == 0:
+            return
+        step = byte & 15
+        if not 1 <= step <= 8:
+            raise ValueError
+        offset += step
+        # TODO: The offset should retain its `int` type.
+        reveal_type(offset)  # revealed: int | Unknown
+```
+
+### Loop updates guarded by compound conditions converge
+
+Type checks and a negated comparison chain validate a record's size before advancing the offset.
+Combining these checks with `or` preserves the integer type of the updated offset.
+
+```py
+def read_record(offset: int) -> tuple[int | None, int | None]:
+    return 1, 1
+
+def read_records(offset: int, end: int) -> None:
+    while offset < end:
+        value, size = read_record(offset)
+        if not isinstance(value, int) or not isinstance(size, int) or not 0 <= size <= end - offset:
+            raise ValueError
+        offset += size
+        reveal_type(offset)  # revealed: int
+```
+
+### Worklists guarded by chained comparisons converge
+
+A chained comparison guards both extending a worklist and inserting into a set. The set's inferred
+element type remains `str` as entries are added and queued for later loop iterations.
+
+```py
+def visit(start: str, height: int) -> None:
+    columns = "abc"
+    column = columns.index(start[0])
+    row = int(start[1:]) - 1
+    visited = {start}
+    pending = [(column, row)]
+    while pending:
+        current_column, current_row = pending.pop()
+        for x, y in ((current_column, current_row - 1),):
+            if not 0 <= y < height:
+                continue
+            visited.add(f"{columns[x]}{y + 1}")
+            pending.append((x, y))
+            reveal_type(visited)  # revealed: set[str]
+```
+
+### Conditional attribute updates converge
+
+Each batch depends on an instance attribute that is updated from the last item in the batch. The
+condition and the attribute's type depend on each other across loop iterations. Inference converges,
+and the condition narrows the assigned value to a non-empty `str`.
+
+```py
+class Inventory:
+    after: str | None
+
+    def next_batch(self, after: object) -> "list[Inventory]":
+        return []
+
+    def iterate(self):
+        while True:
+            item = None
+            batch = self.next_batch(self.after)
+            assert batch
+            for item in batch:
+                pass
+            if item and item.after:
+                self.after = item.after
+                reveal_type(self.after)  # revealed: str & ~AlwaysFalsy
 ```
 
 ### Monotonic widening can keep stale loopback bindings reachable
@@ -680,7 +832,10 @@ while True:
     x = 1
 ```
 
-### Loop header definitions don't shadow member bindings
+### Rebinding an object before an unconditional `break`
+
+Rebinding an object followed by an unconditional `break` does not affect its members at the start of
+the loop, because the new object never reaches another iteration.
 
 ```py
 class C:
@@ -701,6 +856,167 @@ while True:
     reveal_type(d[0])  # revealed: Literal[1]
     d = []
     break
+```
+
+The same applies to narrowing from a guard before the loop. The condition is always true on the only
+iteration, but the replacement object's attribute is not narrowed after the `break`.
+
+```py
+class Box:
+    value: bool
+
+def f(box: Box):
+    if box.value:
+        return
+
+    while reveal_type(not box.value):  # revealed: Literal[True]
+        box = Box()
+        break
+
+    reveal_type(box.value)  # revealed: bool
+```
+
+### Rebinding an object resets attribute narrowing across iterations
+
+The first iteration sees the initial object's `int` value; later iterations see the replacement's
+`str` value. The type at the start of the body is therefore `int | str`. Rebinding restores the full
+declared attribute type, including `None`, until the replacement is narrowed again.
+
+```py
+class Box:
+    value: int | str | None
+
+def example(box: Box):
+    assert isinstance(box.value, int)
+    reveal_type(box.value)  # revealed: int
+
+    while True:
+        reveal_type(box.value)  # revealed: int | str
+
+        box = Box()
+        reveal_type(box.value)  # revealed: int | str | None
+
+        assert isinstance(box.value, str)
+```
+
+### Rebinding an object affects the loop condition
+
+A guard before the loop only constrains the initial object. Rebinding `box` can make `box.value`
+true on a later iteration, so the loop condition is not always true.
+
+```py
+class Box:
+    value: bool
+
+def condition(box: Box, replacement: Box):
+    if box.value:
+        return
+
+    reveal_type(box.value)  # revealed: Literal[False]
+
+    while reveal_type(not box.value):  # revealed: bool
+        box = replacement
+```
+
+When the loop exits normally, `box.value` is `True`.
+
+```py
+def normal_exit(box: Box, replacement: Box):
+    if box.value:
+        return
+
+    reveal_type(box.value)  # revealed: Literal[False]
+
+    while not box.value:
+        reveal_type(box.value)  # revealed: Literal[False]
+        box = replacement
+        reveal_type(box.value)  # revealed: bool
+
+    reveal_type(box.value)  # revealed: Literal[True]
+```
+
+### Rebinding an object before `continue`
+
+Rebinding also invalidates attribute narrowing when the next iteration is reached through
+`continue`. A replacement whose `value` is `True` can end the loop.
+
+```py
+class Box:
+    value: bool
+
+def f(box: Box, replacement: Box):
+    if box.value:
+        return
+
+    while not box.value:
+        box = replacement
+        continue
+
+    reveal_type(box.value)  # revealed: Literal[True]
+```
+
+### Rebinding in an inner loop reaches the next outer iteration
+
+An inner loop can rebind `box` on one iteration, then exit through a `break` before reaching the
+assignment again. The replacement is visible both after the inner loop and on later outer
+iterations, so the initial guard no longer narrows `box.value`.
+
+```py
+class Box:
+    value: bool
+
+def stop() -> bool:
+    raise NotImplementedError
+
+def f(box: Box, replacement: Box, repeat: bool):
+    if box.value:
+        return
+
+    while repeat:
+        reveal_type(box.value)  # revealed: bool
+        while True:
+            if stop():
+                break
+            box = replacement
+        reveal_type(box.value)  # revealed: bool
+```
+
+### Rebinding a member resets nested attribute narrowing
+
+Replacing `wrapper.box` invalidates narrowing of `wrapper.box.value` on subsequent iterations, even
+though the outer `wrapper` object is unchanged.
+
+```py
+class Box:
+    value: bool
+
+class Wrapper:
+    box: Box
+
+def f(wrapper: Wrapper, replacement: Box):
+    if wrapper.box.value:
+        return
+
+    while not wrapper.box.value:
+        wrapper.box = replacement
+
+    reveal_type(wrapper.box.value)  # revealed: Literal[True]
+```
+
+### Rebinding a collection resets subscript narrowing
+
+A guard on the initial tuple's element does not constrain the corresponding element of a replacement
+tuple. The replacement can therefore end the loop.
+
+```py
+def f(flags: tuple[bool], replacement: tuple[bool]):
+    if flags[0]:
+        return
+
+    while not flags[0]:
+        flags = replacement
+
+    reveal_type(flags[0])  # revealed: Literal[True]
 ```
 
 [divergent_debugging]: https://github.com/astral-sh/ruff/pull/22794#issuecomment-3852095578

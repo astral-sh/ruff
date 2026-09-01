@@ -25,6 +25,7 @@ ty_combine = { workspace = true }
 ty_project = { workspace = true, features = ["zstd", "junit"] }
 ty_python_semantic = { workspace = true, features = ["serde"] }
 ty_server = { workspace = true }
+ty_site_packages = { workspace = true }
 ty_static = { workspace = true }
 
 anyhow = { workspace = true }
@@ -63,9 +64,11 @@ insta-cmd = { workspace = true }
 regex = { workspace = true }
 tempfile = { workspace = true }
 toml = { workspace = true }
+zip = { workspace = true }
 
 [features]
 default = []
+test-uv = ["ty_server/test-uv"]
 
 [lints]
 workspace = true

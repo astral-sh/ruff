@@ -642,6 +642,5 @@ error[invalid-type-form]: Variable of type `Never` is not allowed in a parameter
   |
 4 | def f(x: module.AwesomeAPI): ...
   |          ^^^^^^^^^^^^^^^^^
-  |
 help: The variable may have been inferred as `Never` because its definition was inferred as being unreachable
 ```

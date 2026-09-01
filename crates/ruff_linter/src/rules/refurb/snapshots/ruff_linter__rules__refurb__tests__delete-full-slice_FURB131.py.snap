@@ -1,0 +1,76 @@
+---
+source: crates/ruff_linter/src/rules/refurb/mod.rs
+---
+FURB131 [*] Prefer `clear` over deleting a full slice
+  --> FURB131.py:11:1
+   |
+10 | # FURB131
+11 | del nums[:]
+   | ^^^^^^^^^^^
+help: Replace with `clear()`
+   |
+10 | # FURB131
+   - del nums[:]
+11 + nums.clear()
+12 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+FURB131 Prefer `clear` over deleting a full slice
+  --> FURB131.py:19:1
+   |
+18 | # FURB131
+19 | del x, nums[:]
+   | ^^^^^^^^^^^^^^
+help: Replace with `clear()`
+
+FURB131 [*] Prefer `clear` over deleting a full slice
+  --> FURB131.py:28:5
+   |
+26 | def yes_one(x: list[int]):
+27 |     # FURB131
+28 |     del x[:]
+   |     ^^^^^^^^
+help: Replace with `clear()`
+   |
+27 |     # FURB131
+   -     del x[:]
+28 +     x.clear()
+29 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+FURB131 [*] Prefer `clear` over deleting a full slice
+  --> FURB131.py:38:5
+   |
+36 | def yes_three(x: List[int]):
+37 |     # FURB131
+38 |     del x[:]
+   |     ^^^^^^^^
+help: Replace with `clear()`
+   |
+37 |     # FURB131
+   -     del x[:]
+38 +     x.clear()
+39 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+FURB131 [*] Prefer `clear` over deleting a full slice
+  --> FURB131.py:58:1
+   |
+56 | sneaky = SneakyList()
+57 | # FURB131
+58 | del sneaky[:]
+   | ^^^^^^^^^^^^^
+59 |
+60 | # these should not
+   |
+help: Replace with `clear()`
+   |
+57 | # FURB131
+   - del sneaky[:]
+58 + sneaky.clear()
+59 |
+   |
+note: This is an unsafe fix and may change runtime behavior

@@ -5,11 +5,11 @@ use ruff_benchmark::criterion::{
 };
 
 use ruff_benchmark::{
-    LARGE_DATASET, NUMPY_CTYPESLIB, NUMPY_GLOBALS, PYDANTIC_TYPES, TestCase, UNICODE_PYPINYIN,
+    LARGE_DATASET, NUMPY_CTYPESLIB, NUMPY_GLOBALS, PYDANTIC_TYPES, TestFile, UNICODE_PYPINYIN,
 };
 use ruff_python_formatter::{PreviewMode, PyFormatOptions, format_module_ast};
 use ruff_python_parser::{Mode, ParseOptions, parse};
-use ruff_python_trivia::CommentRanges;
+use ruff_python_trivia::TriviaRanges;
 
 #[cfg(target_os = "windows")]
 #[global_allocator]
@@ -28,13 +28,13 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
-fn create_test_cases() -> Vec<TestCase> {
+fn create_test_cases() -> Vec<TestFile> {
     vec![
-        TestCase::fast(NUMPY_GLOBALS.clone()),
-        TestCase::fast(UNICODE_PYPINYIN.clone()),
-        TestCase::normal(PYDANTIC_TYPES.clone()),
-        TestCase::normal(NUMPY_CTYPESLIB.clone()),
-        TestCase::slow(LARGE_DATASET.clone()),
+        NUMPY_GLOBALS.clone(),
+        UNICODE_PYPINYIN.clone(),
+        PYDANTIC_TYPES.clone(),
+        NUMPY_CTYPESLIB.clone(),
+        LARGE_DATASET.clone(),
     ]
 }
 
@@ -52,13 +52,12 @@ fn benchmark_formatter(criterion: &mut Criterion) {
                 let parsed = parse(case.code(), ParseOptions::from(Mode::Module))
                     .expect("Input should be a valid Python code");
 
-                let comment_ranges = CommentRanges::from(parsed.tokens());
-
                 b.iter(|| {
+                    let trivia_ranges = TriviaRanges::from(parsed.tokens());
                     let options = PyFormatOptions::from_extension(Path::new(case.name()))
                         .with_preview(PreviewMode::Enabled);
                     let formatted =
-                        format_module_ast(&parsed, &comment_ranges, case.code(), options)
+                        format_module_ast(&parsed, &trivia_ranges, case.code(), options)
                             .expect("Formatting to succeed");
 
                     formatted.print().expect("Printing to succeed")

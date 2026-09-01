@@ -5,9 +5,7 @@ use ruff_text_size::Ranged;
 use crate::builders::parenthesize_if_expands;
 use crate::comments::{SourceComment, dangling_comments, leading_comments, trailing_comments};
 use crate::expression::has_own_parentheses;
-use crate::expression::parentheses::{
-    NeedsParentheses, OptionalParentheses, Parentheses, is_expression_parenthesized,
-};
+use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses, Parentheses};
 use crate::other::parameters::ParametersParentheses;
 use crate::prelude::*;
 
@@ -322,9 +320,7 @@ impl Format<PyFormatContext<'_>> for FormatBody<'_> {
             // )
             // ```
             let comments = f.context().comments();
-            if is_expression_parenthesized(body.into(), comments.ranges(), f.context().source())
-                && comments.has_leading(body)
-            {
+            if f.context().is_expression_parenthesized(body.into()) && comments.has_leading(body) {
                 trailing_comments(dangling_header_comments).fmt(f)?;
 
                 // Note that `leading_body_comments` have already been formatted as part of

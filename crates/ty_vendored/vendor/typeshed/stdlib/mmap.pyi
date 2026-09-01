@@ -2,8 +2,8 @@ import os
 import sys
 from _typeshed import ReadableBuffer, Unused
 from collections.abc import Iterator
-from typing import Final, Literal, NoReturn, SupportsIndex, overload
-from typing_extensions import Self, disjoint_base
+from typing import Final, Literal, SupportsIndex, overload
+from typing_extensions import Never, Self, disjoint_base
 
 ACCESS_DEFAULT: Final = 0
 ACCESS_READ: Final = 1
@@ -93,7 +93,10 @@ class mmap:
 
     def close(self) -> None: ...
     if sys.version_info >= (3, 15):
-        def flush(self, offset: int = 0, size: int = ..., /, *, flags: int = 0) -> None: ...
+        def flush(self, offset: int = 0, size: int = -1, /, *, flags: int = 0) -> None: ...
+    elif sys.version_info >= (3, 14):
+        # size default changed in Python 3.14.1
+        def flush(self, offset: int = 0, size: int | None = None, /) -> None: ...
     else:
         def flush(self, offset: int = 0, size: int = ..., /) -> None: ...
 
@@ -120,7 +123,8 @@ class mmap:
         else:
             def madvise(self, option: int, start: int = 0, length: int = ..., /) -> None: ...
 
-    if sys.version_info >= (3, 15):
+    if sys.version_info >= (3, 14):
+        # default values changed in Python 3.14.1
         def find(self, view: ReadableBuffer, start: int | None = None, end: int | None = None, /) -> int: ...
         def rfind(self, view: ReadableBuffer, start: int | None = None, end: int | None = None, /) -> int: ...
 
@@ -139,7 +143,7 @@ class mmap:
     @overload
     def __getitem__(self, key: slice[SupportsIndex | None], /) -> bytes: ...
 
-    def __delitem__(self, key: SupportsIndex | slice[SupportsIndex | None], /) -> NoReturn:
+    def __delitem__(self, key: SupportsIndex | slice[SupportsIndex | None], /) -> Never:
         """Delete self[key]."""
 
     @overload

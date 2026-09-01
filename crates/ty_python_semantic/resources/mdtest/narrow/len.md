@@ -129,6 +129,55 @@ def _(x: Literal[b"", b"a"], y: Literal["a", "ab"]):
         reveal_type(y)  # revealed: Literal["ab"]
 ```
 
+Exact length narrowing projects through type-variable constraints and bounds while preserving the
+type variable:
+
+```py
+from typing import TypeVar, assert_never
+
+ConstrainedTuple = TypeVar(
+    "ConstrainedTuple",
+    tuple[int, int],
+    tuple[int, int, str],
+)
+
+def constrained_tuple(value: ConstrainedTuple) -> ConstrainedTuple:
+    if len(value) == 2:
+        reveal_type(value)  # revealed: ConstrainedTuple@constrained_tuple & tuple[int, int]
+        return value
+    elif len(value) == 3:
+        reveal_type(value)  # revealed: ConstrainedTuple@constrained_tuple & tuple[int, int, str]
+        return value
+    else:
+        assert_never(value)
+
+BoundTuple = TypeVar(
+    "BoundTuple",
+    bound=tuple[int, int] | tuple[int, int, str],
+)
+
+def bounded_tuple(value: BoundTuple) -> BoundTuple:
+    if len(value) == 2:
+        reveal_type(value)  # revealed: BoundTuple@bounded_tuple & tuple[int, int]
+        return value
+    elif len(value) == 3:
+        reveal_type(value)  # revealed: BoundTuple@bounded_tuple & tuple[int, int, str]
+        return value
+    else:
+        assert_never(value)
+
+VariableTuple = TypeVar(
+    "VariableTuple",
+    tuple[int, ...],
+    tuple[str],
+)
+
+def variable_tuple(value: VariableTuple) -> VariableTuple:
+    if len(value) == 2:
+        reveal_type(value)  # revealed: VariableTuple@variable_tuple & tuple[int, int]
+    return value
+```
+
 Tuple subclasses are filtered using their tuple spec while preserving the subclass:
 
 ```py
@@ -199,6 +248,73 @@ def _(value: TrueLength | FalseLength):
         reveal_type(value)  # revealed: TrueLength
     else:
         reveal_type(value)  # revealed: FalseLength
+```
+
+Length narrowing preserves a tuple's shape when a required element has type `Never`:
+
+```py
+from typing import Never
+
+def _(value: tuple[Never, *tuple[int, ...]]) -> None:
+    if len(value) == 1:
+        reveal_type(value)  # revealed: tuple[Never]
+```
+
+## Exact length comparisons with type variable tuples
+
+Narrowing a tuple's length preserves its type variable tuple, so a function can still return its
+input after checking for an empty or nonempty tuple.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+def identity[*Ts](value: tuple[*Ts]) -> tuple[*Ts]:
+    if len(value) == 0:
+        reveal_type(value)  # revealed: tuple[*Ts@identity] & tuple[()]
+        return value
+    elif len(value) == 1:
+        reveal_type(value)  # revealed: tuple[*Ts@identity] & tuple[object]
+        return value
+    return value
+```
+
+Fixed prefix and suffix elements retain their types while the original pack is preserved.
+
+```py
+def with_boundaries[*Ts](value: tuple[int, *Ts, str]) -> tuple[int, *Ts, str]:
+    if len(value) == 2:
+        reveal_type(value)  # revealed: tuple[int, *Ts@with_boundaries, str] & tuple[int, str]
+        return value
+    return value
+```
+
+An alias for the tuple preserves the same pack identity when its length is narrowed.
+
+```py
+type Pack[*Ts] = tuple[*Ts]
+
+def aliased_identity[*Ts](value: Pack[*Ts]) -> Pack[*Ts]:
+    if len(value) == 1:
+        reveal_type(value)  # revealed: tuple[*Ts@aliased_identity] & tuple[object]
+        return value
+    return value
+```
+
+With a required `Never` element, the refined type should be `tuple[Never, *Ts] & tuple[Never]`.
+TODO: [#27920](https://github.com/astral-sh/ruff/pull/27920) addresses the tuple-disjointness checks
+that currently collapse this to `Never` and suppress the invalid-return diagnostic.
+
+```py
+from typing import Never
+
+def never_prefix[*Ts](value: tuple[Never, *Ts]) -> str:
+    if len(value) == 1:
+        reveal_type(value)  # revealed: Never
+        return value
+    return ""
 ```
 
 ## Regression tests

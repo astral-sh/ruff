@@ -20,7 +20,7 @@ We don't parenthesize display of an overloaded callable, since it is already wra
 
 ```py
 from typing import Callable, Literal, overload
-from ty_extensions import RegularCallableTypeOf
+from ty_extensions._internal import RegularCallableTypeOf
 
 @overload
 def f(x: int) -> bool: ...
@@ -75,6 +75,29 @@ def _(x: object):
     if callable(x):
         c = C(x)
         reveal_type(c)  # revealed: C[Top[(...)]]
+```
+
+## Unpacked variadic signatures
+
+Display an unpacked variadic as one parameter, including its fixed prefix and required suffix.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+def mixed(
+    prefix: bytes,
+    /,
+    label: str,
+    *args: *tuple[bool, *tuple[int, ...], bytes, str],
+    flag: bool = False,
+    **kwargs: bytes,
+) -> None: ...
+
+# revealed: def mixed(prefix: bytes, /, label: str, *args: *tuple[bool, *tuple[int, ...], bytes, str], flag: bool = False, **kwargs: bytes) -> None
+reveal_type(mixed)
 ```
 
 ## Type aliases are not expanded unless necessary

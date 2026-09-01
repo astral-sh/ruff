@@ -38,7 +38,7 @@ def _(c: Callable[Concatenate[int, str, ...], bool]):
     reveal_type(c)  # revealed: (int, str, /, *args: Any, **kwargs: Any) -> bool
 
 # revealed: (int, str, /, *args: Any, **kwargs: Any) -> None
-reveal_type(Foo[Concatenate[int, str, ...]].attr)
+reveal_type(Foo[Concatenate[int, str, ...]]().attr)
 ```
 
 ### Complex types inside `Concatenate`
@@ -53,7 +53,7 @@ def _(c: Callable[Concatenate[int | str, list[int], type[str], ...], None]):
     reveal_type(c)  # revealed: (int | str, list[int], type[str], /, *args: Any, **kwargs: Any) -> None
 
 # revealed: (int | str, list[int], type[str], /, *args: Any, **kwargs: Any) -> None
-reveal_type(Foo[Concatenate[int | str, list[int], type[str], ...]].attr)
+reveal_type(Foo[Concatenate[int | str, list[int], type[str], ...]]().attr)
 ```
 
 ### Nested
@@ -68,7 +68,7 @@ def _(c: Callable[Concatenate[int, Callable[Concatenate[str, ...], None], ...], 
     reveal_type(c)  # revealed: (int, (str, /, *args: Any, **kwargs: Any) -> None, /, *args: Any, **kwargs: Any) -> None
 
 # revealed: (int, (str, /, *args: Any, **kwargs: Any) -> None, /, *args: Any, **kwargs: Any) -> None
-reveal_type(Foo[Concatenate[int, Callable[Concatenate[str, ...], None], ...]].attr)
+reveal_type(Foo[Concatenate[int, Callable[Concatenate[str, ...], None], ...]]().attr)
 ```
 
 ### Both `*args` and `**kwargs` are required
@@ -271,24 +271,24 @@ def _(
     reveal_type(c)  # revealed: (...) -> int
 
 # error: [invalid-type-form] "`typing.Concatenate` requires at least 2 arguments when used in a type expression (got 0)"
-reveal_type(Foo[Concatenate[()]].attr)  # revealed: (...) -> None
+reveal_type(Foo[Concatenate[()]]().attr)  # revealed: (...) -> None
 # error: [invalid-type-form] "`typing.Concatenate` requires at least 2 arguments when used in a type expression (got 1)"
-reveal_type(Foo[Concatenate[int]].attr)  # revealed: (...) -> None
+reveal_type(Foo[Concatenate[int]]().attr)  # revealed: (...) -> None
 # error: [invalid-type-form] "`typing.Concatenate` requires at least 2 arguments when used in a type expression (got 1)"
-reveal_type(Foo[Concatenate[(int,)]].attr)  # revealed: (...) -> None
+reveal_type(Foo[Concatenate[(int,)]]().attr)  # revealed: (...) -> None
 # error: [invalid-type-form] "`typing.Concatenate` requires at least two arguments when used in a type expression"
-reveal_type(Foo[Concatenate].attr)  # revealed: (...) -> None
+reveal_type(Foo[Concatenate]().attr)  # revealed: (...) -> None
 # error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a type expression"
-reveal_type(Foo[[Concatenate]].attr)  # revealed: (Unknown, /) -> None
+reveal_type(Foo[[Concatenate]]().attr)  # revealed: (Unknown, /) -> None
 # error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a type expression"
-reveal_type(Foo[[Concatenate, int]].attr)  # revealed: (Unknown, int, /) -> None
+reveal_type(Foo[[Concatenate, int]]().attr)  # revealed: (Unknown, int, /) -> None
 
 # error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a type expression"
-reveal_type(Foo[[Concatenate[int], str]].attr)  # revealed: (Unknown, str, /) -> None
+reveal_type(Foo[[Concatenate[int], str]]().attr)  # revealed: (Unknown, str, /) -> None
 # error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a type expression"
-reveal_type(Foo[[Concatenate[int, str], str]].attr)  # revealed: (Unknown, str, /) -> None
+reveal_type(Foo[[Concatenate[int, str], str]]().attr)  # revealed: (Unknown, str, /) -> None
 # error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a type expression"
-reveal_type(Foo[[Concatenate[()], str]].attr)  # revealed: (Unknown, str, /) -> None
+reveal_type(Foo[[Concatenate[()], str]]().attr)  # revealed: (Unknown, str, /) -> None
 
 # Subscripting a class that does not have "exactly one paramspec" takes a different code path;
 # these tests exercise that code path
@@ -298,10 +298,10 @@ class Bar[**P1, **P2]:
 
 # error: [invalid-type-form] "`typing.Concatenate` requires at least two arguments when used in a type expression"
 # error: [invalid-type-form] "`typing.Concatenate` requires at least two arguments when used in a type expression"
-reveal_type(Bar[Concatenate, Concatenate].a)  # revealed: (...) -> int
+reveal_type(Bar[Concatenate, Concatenate]().a)  # revealed: (...) -> int
 # error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a type expression"
 # error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a type expression"
-reveal_type(Bar[[Concatenate], [Concatenate]].a)  # revealed: (Unknown, /) -> int
+reveal_type(Bar[[Concatenate], [Concatenate]]().a)  # revealed: (Unknown, /) -> int
 ```
 
 ### Last argument must be `ParamSpec` or `...`
@@ -320,19 +320,19 @@ class Foo[**P]:
 def _(c: Callable[Concatenate[int, str], bool]): ...
 
 # error: [invalid-type-arguments] "The last argument to `typing.Concatenate` must be either `...` or a `ParamSpec` type variable: Got `str`"
-reveal_type(Foo[Concatenate[int, str]].attr)  # revealed: (...) -> None
+reveal_type(Foo[Concatenate[int, str]]().attr)  # revealed: (...) -> None
 
 # error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a type expression"
-reveal_type(Foo[Concatenate[int, Concatenate]].attr)  # revealed: (...) -> None
+reveal_type(Foo[Concatenate[int, Concatenate]]().attr)  # revealed: (...) -> None
 
 # error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a type expression"
-reveal_type(Foo[Concatenate[int, Concatenate[()]]].attr)  # revealed: (...) -> None
+reveal_type(Foo[Concatenate[int, Concatenate[()]]]().attr)  # revealed: (...) -> None
 
 # error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a type expression"
-reveal_type(Foo[Concatenate[int, Concatenate[int]]].attr)  # revealed: (...) -> None
+reveal_type(Foo[Concatenate[int, Concatenate[int]]]().attr)  # revealed: (...) -> None
 
 # error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a type expression"
-reveal_type(Foo[Concatenate[int, Concatenate[int, str]]].attr)  # revealed: (...) -> None
+reveal_type(Foo[Concatenate[int, Concatenate[int, str]]]().attr)  # revealed: (...) -> None
 ```
 
 ### `ParamSpec` must be last
@@ -351,7 +351,7 @@ def invalid1[**P2](c: Callable[Concatenate[P2, int], bool]):
     reveal_type(c)  # revealed: (...) -> bool
     # error: [invalid-type-form] "Bare ParamSpec `P2` is not valid in this context"
     # error: [invalid-type-arguments] "The last argument to `typing.Concatenate` must be either `...` or a `ParamSpec` type variable: Got `int`"
-    reveal_type(Foo[Concatenate[P2, int]].attr)  # revealed: (...) -> None
+    reveal_type(Foo[Concatenate[P2, int]]().attr)  # revealed: (...) -> None
 
 # error: [invalid-type-form] "Bare ParamSpec `P2` is not valid in this context"
 def invalid2[**P2](c: Callable[Concatenate[P2, ...], bool]):
@@ -361,13 +361,13 @@ def invalid2[**P2](c: Callable[Concatenate[P2, ...], bool]):
 
     # error: [invalid-type-form] "Bare ParamSpec `P2` is not valid in this context"
     # revealed: (Unknown, /, *args: Any, **kwargs: Any) -> None
-    reveal_type(Foo[Concatenate[P2, ...]].attr)
+    reveal_type(Foo[Concatenate[P2, ...]]().attr)
 
 def valid[**P2](c: Callable[Concatenate[int, P2], bool]):
     reveal_type(c)  # revealed: (int, /, *args: P2@valid.args, **kwargs: P2@valid.kwargs) -> bool
 
     # revealed: (int, /, *args: P2@valid.args, **kwargs: P2@valid.kwargs) -> None
-    reveal_type(Foo[Concatenate[int, P2]].attr)
+    reveal_type(Foo[Concatenate[int, P2]]().attr)
 
 type Alias[**P1] = int
 
@@ -450,7 +450,7 @@ def my_handler(env: str, x: int, y: float) -> bool:
     return True
 
 m = Middleware(my_handler)
-reveal_type(m)  # revealed: Middleware[(x: int, y: int | float), bool]
+reveal_type(m)  # revealed: Middleware[(x: int, y: float), bool]
 ```
 
 ### Specializing `ParamSpec` with `Concatenate`
@@ -564,12 +564,28 @@ def only_variadic(*args: str, **kwargs: int) -> None: ...
 
 reveal_type(only_variadic)  # revealed: (...) -> None
 
-# TODO: This should accept the callable and reveal `(*args: str, **kwargs: int) -> None`.
-# error: [invalid-argument-type]
 @decorator
 def unpack_variadic(*args: *tuple[int, *tuple[str, ...]], **kwargs: int) -> None: ...
 
-reveal_type(unpack_variadic)  # revealed: (...) -> None
+reveal_type(unpack_variadic)  # revealed: (*args: str, **kwargs: int) -> None
+```
+
+### Function with a named prefix and required unpacked suffix
+
+`Concatenate` can remove a named positional prefix without discarding the required suffix of an
+unpacked variadic parameter.
+
+```py
+from typing import Callable, Concatenate
+
+def remove_first[**P](callback: Callable[Concatenate[int, P], None]) -> Callable[P, None]:
+    raise NotImplementedError
+
+def named_prefix_and_suffix(name: int, *args: *tuple[*tuple[int, ...], int]) -> None: ...
+
+# TODO: Preserve the unpacked tuple instead of exposing synthetic comparison parameters.
+# Should reveal `(*args: *tuple[*tuple[int, ...], int]) -> None`.
+reveal_type(remove_first(named_prefix_and_suffix))  # revealed: (*args: int, int, /) -> None
 ```
 
 ## `Concatenate` with `ParamSpec` in generic function calls
@@ -651,12 +667,11 @@ def remove_param[**P, R](func: Callable[Concatenate[int, P], R]) -> Callable[P, 
 def f1(x: int, y: str) -> str: ...
 @overload
 def f1(x: int, y: int) -> int: ...
-@remove_param
 def f1(x: int, y: str | int) -> str | int:
     return y
 
 # TODO: Should reveal `Overloaded[(y: str) -> str, (y: int) -> int]`
-reveal_type(f1)  # revealed: (y: str) -> str | int
+reveal_type(remove_param(f1))  # revealed: (y: str) -> str | int
 ```
 
 But, it's not possible to _add_ a parameter to an overloaded function using `Concatenate` because
@@ -668,18 +683,17 @@ def add_param[**P, R](func: Callable[P, R]) -> Callable[Concatenate[int, P], R]:
         return func(*args, **kwargs)
     return wrapper
 
-# TODO: Raise a diagnostic stating that the signature of the implementation doesn't match the
-# overloads because the overloads don't have the extra `int` parameter.
 @overload
+# error: [invalid-overload] "Implementation does not accept all arguments of this overload"
 def f2(y: str) -> str: ...
 @overload
+# error: [invalid-overload] "Implementation does not accept all arguments of this overload"
 def f2(y: int) -> int: ...
 @add_param
 def f2(y: str | int) -> str | int:
     return y
 
-# TODO: Should this reveal `Overloaded[(int, /, y: str) -> str, (int, /, y: int) -> int]` ?
-reveal_type(f2)  # revealed: Overload[(int, /, y: str) -> str | int, (int, /, y: int) -> str | int]
+reveal_type(f2)  # revealed: Overload[(y: str) -> str, (y: int) -> int]
 ```
 
 But, it's possible to add the additional parameter just to the overload signatures and not the
@@ -694,8 +708,7 @@ def f3(x: int, /, y: int) -> int: ...
 def f3(y: str | int) -> str | int:
     return y
 
-# TODO: Should reveal `Overloaded[(int, /, y: str) -> str, (int, /, y: int) -> int]`
-reveal_type(f3)  # revealed: Overload[(int, x: int, /, y: str) -> str | int, (int, x: int, /, y: int) -> str | int]
+reveal_type(f3)  # revealed: Overload[(x: int, /, y: str) -> str, (x: int, /, y: int) -> int]
 ```
 
 ## `Concatenate` with protocol classes

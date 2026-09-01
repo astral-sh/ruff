@@ -202,6 +202,7 @@ PTH116 `os.stat()` should be replaced by `Path.stat()`, `Path.owner()`, or `Path
 26 | isabs(p)
 27 | join(p, q)
    |
+help: Replace with `Path(...).stat()`
 
 PTH117 `os.path.isabs()` should be replaced by `Path.is_absolute()`
   --> import_from.py:26:1
@@ -314,7 +315,6 @@ PTH123 `open()` should be replaced by `Path.open()`
 35 |     fp.read()
 36 | open(p).close()
    | ^^^^
-   |
 help: Replace with `Path.open()`
 
 PTH123 `open()` should be replaced by `Path.open()`
@@ -324,7 +324,6 @@ PTH123 `open()` should be replaced by `Path.open()`
 42 |
 43 |     with open(p) as _: ...  # Error
    |          ^^^^
-   |
 help: Replace with `Path.open()`
 
 PTH104 `os.rename()` should be replaced by `Path.rename()`
@@ -346,7 +345,7 @@ PTH104 `os.rename()` should be replaced by `Path.rename()`
 54 |
 55 | rename(
    | ^^^^^^
-56 |     # commment 1
+56 |     # comment 1
 57 |     file, # comment 2
    |
 help: Replace with `Path(...).rename(...)`

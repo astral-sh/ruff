@@ -121,4 +121,3 @@ Module(
 1 | f"{}"
 2 | f"{  }"
   |      ^ Syntax Error: Expected an expression
-  |

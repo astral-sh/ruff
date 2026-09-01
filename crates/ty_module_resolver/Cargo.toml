@@ -1,6 +1,6 @@
 [package]
 name = "ty_module_resolver"
-version = "0.0.2"
+version = "0.0.11"
 description = "This is an internal component crate of Ruff"
 authors = { workspace = true }
 edition = { workspace = true }
@@ -20,6 +20,7 @@ anyhow = { workspace = true }
 camino = { workspace = true }
 compact_str = { workspace = true }
 get-size2 = { workspace = true }
+ordermap = { workspace = true }
 regex = { workspace = true }
 regex-syntax = { workspace = true }
 rustc-hash = { workspace = true }
@@ -34,7 +35,6 @@ ruff_db = { workspace = true, features = ["testing", "os"] }
 # Keep this path-only so Cargo strips the unpublished ty dev-dependency when packaging.
 ty_vendored = { path = "../ty_vendored" }
 
-anyhow = { workspace = true }
 insta = { workspace = true, features = ["filters"] }
 tempfile = { workspace = true }
 

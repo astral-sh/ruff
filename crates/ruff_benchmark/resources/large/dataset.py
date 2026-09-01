@@ -479,7 +479,7 @@ def test_select_subset_isel_multiple_idxs():
     assert selds["Foo"].shape == (100, 2, 30)
 
 
-def test_decribe(ds1):
+def test_describe(ds1):
     df = ds1.describe()
     assert df.columns[0] == "Foo"
     assert df.loc["mean"][1] == pytest.approx(0.2)
@@ -1333,7 +1333,7 @@ def test_concat_by_time_2():
     assert ds3.n_timesteps == 109
     assert not ds3.is_equidistant
 
-    # create concatd datasets in 8 chunks of 6 hours
+    # create concat datasets in 8 chunks of 6 hours
     dsall = []
     for j in range(8):
         dsall.append(

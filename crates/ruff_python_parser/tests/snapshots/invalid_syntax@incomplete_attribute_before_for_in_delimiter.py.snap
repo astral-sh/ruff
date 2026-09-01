@@ -398,4 +398,3 @@ Module(
 5 | [item for item. in xs]
 6 | for item. in xs: ...
   |           ^^ Syntax Error: Expected an identifier
-  |

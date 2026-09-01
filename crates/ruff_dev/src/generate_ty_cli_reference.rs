@@ -5,10 +5,9 @@ use std::path::PathBuf;
 use anyhow::{Result, bail};
 use clap::{Command, CommandFactory};
 use itertools::Itertools;
-use pretty_assertions::StrComparison;
 
 use crate::ROOT_DIR;
-use crate::generate_all::{Mode, REGENERATE_ALL_COMMAND};
+use crate::generate_all::{Mode, REGENERATE_ALL_COMMAND, generated_file_diff};
 
 use ty::Cli;
 
@@ -34,7 +33,7 @@ pub(crate) fn main(args: &Args) -> Result<()> {
                 if current == reference_string {
                     println!("Up-to-date: {filename}");
                 } else {
-                    let comparison = StrComparison::new(&current, &reference_string);
+                    let comparison = generated_file_diff(&current, &reference_string);
                     bail!(
                         "{filename} changed, please run `{REGENERATE_ALL_COMMAND}`:\n{comparison}"
                     );
@@ -80,7 +79,11 @@ fn generate() -> String {
 
     let mut parents = Vec::new();
 
-    output.push_str("<!-- WARNING: This file is auto-generated (cargo dev generate-all). Edit the doc comments in 'crates/ty/src/args.rs' if you want to change anything here. -->\n\n");
+    output.push_str(
+        "<!-- WARNING: This file is auto-generated (cargo dev generate-all). \
+        Edit the doc comments in 'crates/ty/src/args.rs' if you want \
+        to change anything here. -->\n\n",
+    );
     output.push_str("# CLI Reference\n\n");
     generate_command(&mut output, &ty, &mut parents);
 

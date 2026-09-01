@@ -6,7 +6,7 @@ pub mod textwrap;
 mod tokenizer;
 mod whitespace;
 
-pub use comment_ranges::CommentRanges;
+pub use comment_ranges::{CommentRanges, ParenthesizedExpressions, TriviaRanges};
 pub use comments::*;
 pub use cursor::*;
 pub use pragmas::*;

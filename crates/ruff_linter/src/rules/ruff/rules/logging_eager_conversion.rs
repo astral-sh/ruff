@@ -10,6 +10,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::flake8_logging_format::rules::{LoggingCallType, find_logging_call};
 
 /// ## What it does
@@ -62,10 +63,10 @@ use crate::rules::flake8_logging_format::rules::{LoggingCallType, find_logging_c
 /// - [Python documentation: `logging`](https://docs.python.org/3/library/logging.html)
 /// - [Python documentation: Optimization](https://docs.python.org/3/howto/logging.html#optimization)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.13.2")]
+#[violation_metadata(preview_since = "0.13.2", category = Category::Performance)]
 pub(crate) struct LoggingEagerConversion {
-    pub(crate) format_conversion: FormatConversion,
-    pub(crate) function_name: Option<&'static str>,
+    format_conversion: FormatConversion,
+    function_name: Option<&'static str>,
 }
 
 impl Violation for LoggingEagerConversion {
@@ -137,7 +138,13 @@ pub(crate) fn logging_eager_conversion(checker: &Checker, call: &ast::ExprCall) 
                 None
             }
         })
-        .zip(call.arguments.args.iter().skip(msg_pos + 1))
+        .zip(
+            call.arguments
+                .args
+                .iter()
+                .skip(msg_pos + 1)
+                .take_while(|arg| !arg.is_starred_expr()),
+        )
     {
         // Check if the argument is a call to eagerly format a value
         if let Expr::Call(ast::ExprCall {

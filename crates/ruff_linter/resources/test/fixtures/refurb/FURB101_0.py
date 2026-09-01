@@ -141,3 +141,7 @@ with open("file.txt", encoding="utf-8") as f:
 with open("file1.txt", encoding="utf-8") as f:
     contents: str = process_contents(f.read())
 
+
+# `open` accepts a file descriptor, but `Path` does not
+with open(3) as f:
+    x = f.read()

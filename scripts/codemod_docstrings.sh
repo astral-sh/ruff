@@ -18,10 +18,14 @@
 
 set -eu
 
-docstring_adder="git+https://github.com/astral-sh/docstring-adder.git@084654f4e9c94481f4a1ebeeb9f5dbc82c1933df"
 stdlib_path="./crates/ty_vendored/vendor/typeshed/stdlib"
 
 for python_version in 3.15 3.14 3.13 3.12 3.11 3.10
 do
-  PYTHONUTF8=1 uvx --python="$python_version" --force-reinstall --from="${docstring_adder}" add-docstrings --stdlib-path="${stdlib_path}"
+  PYTHONUTF8=1 uv run \
+    --locked \
+    --only-group=typeshed-docstrings \
+    --python="$python_version" \
+    add-docstrings \
+    --stdlib-path="${stdlib_path}"
 done

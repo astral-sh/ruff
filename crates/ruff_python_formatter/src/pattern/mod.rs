@@ -1,9 +1,8 @@
 use ruff_formatter::{FormatOwnedWithRule, FormatRefWithRule, FormatRule, FormatRuleWithOptions};
 use ruff_python_ast::{AnyNodeRef, Expr, PatternMatchAs};
 use ruff_python_ast::{MatchCase, Pattern};
-use ruff_python_trivia::CommentRanges;
 use ruff_python_trivia::{
-    BackwardsTokenizer, SimpleToken, SimpleTokenKind, first_non_trivia_token,
+    BackwardsTokenizer, CommentRanges, SimpleToken, SimpleTokenKind, first_non_trivia_token,
 };
 use ruff_text_size::Ranged;
 use std::cmp::Ordering;
@@ -56,7 +55,7 @@ impl FormatRule<Pattern, PyFormatContext<'_>> for FormatPattern {
         let parenthesize = match self.parentheses {
             Parentheses::Preserve => is_pattern_parenthesized(
                 pattern,
-                f.context().comments().ranges(),
+                f.context().trivia().comments(),
                 f.context().source(),
             ),
             Parentheses::Always => true,
@@ -223,10 +222,7 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizePattern<'_> {
 ///
 /// The layout is only applied when the parenthesized pattern is the first or last item in the pattern.
 /// For example, the layout isn't used for `a | [b, c] | d` because that would look weird.
-pub(crate) fn can_pattern_omit_optional_parentheses(
-    pattern: &Pattern,
-    context: &PyFormatContext,
-) -> bool {
+fn can_pattern_omit_optional_parentheses(pattern: &Pattern, context: &PyFormatContext) -> bool {
     let mut visitor = CanOmitOptionalParenthesesVisitor::default();
     visitor.visit_pattern(pattern, context);
 
@@ -261,7 +257,7 @@ pub(crate) fn can_pattern_omit_optional_parentheses(
                 true
             } else {
                 // If the pattern has no own parentheses or it is empty (e.g. ([])), check for surrounding parentheses (that should be preserved).
-                is_pattern_parenthesized(pattern, context.comments().ranges(), context.source())
+                is_pattern_parenthesized(pattern, context.trivia().comments(), context.source())
             }
         }
 
@@ -292,14 +288,18 @@ impl<'a> CanOmitOptionalParenthesesVisitor<'a> {
             }
 
             Pattern::MatchValue(value) => match &*value.value {
-                Expr::StringLiteral(_)  |
-                Expr::BytesLiteral(_) |
-                // F-strings are allowed according to python's grammar but fail with a syntax error at runtime.
-                // That's why we need to support them for formatting.
-                Expr::FString(_)  |
-                Expr::TString(_)|
-                Expr::NumberLiteral(_) | Expr::Attribute(_) | Expr::UnaryOp(_) => {
+                Expr::StringLiteral(_)
+                | Expr::BytesLiteral(_)
+                | Expr::TString(_)
+                | Expr::NumberLiteral(_)
+                | Expr::Attribute(_)
+                | Expr::UnaryOp(_) => {
                     // require no state update other than visit_pattern does.
+                }
+
+                Expr::FString(_) => {
+                    // F-strings are allowed according to python's grammar but fail with a syntax error at runtime.
+                    // That's why we need to support them for formatting.
                 }
 
                 // `case 4+3j:` or `case 4-3j:
@@ -345,7 +345,7 @@ impl<'a> CanOmitOptionalParenthesesVisitor<'a> {
         self.last = Some(pattern);
 
         // Rule only applies for non-parenthesized patterns.
-        if is_pattern_parenthesized(pattern, context.comments().ranges(), context.source()) {
+        if is_pattern_parenthesized(pattern, context.trivia().comments(), context.source()) {
             self.any_parenthesized_expressions = true;
         } else {
             self.visit_pattern(pattern, context);

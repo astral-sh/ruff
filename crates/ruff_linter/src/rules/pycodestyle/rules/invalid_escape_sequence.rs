@@ -9,6 +9,7 @@ use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::Locator;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::pad_start;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
@@ -41,7 +42,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## References
 /// - [Python documentation: String and Bytes literals](https://docs.python.org/3/reference/lexical_analysis.html#string-and-bytes-literals)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.85")]
+#[violation_metadata(stable_since = "v0.0.85", category = Category::Correctness)]
 pub(crate) struct InvalidEscapeSequence {
     ch: char,
     fix_title: FixTitle,
@@ -167,32 +168,32 @@ fn analyze_escape_chars(
 
         // If the next character is a valid escape sequence, skip.
         // See: https://docs.python.org/3/reference/lexical_analysis.html#string-and-bytes-literals.
+        //
+        // N.B. 'N', 'u' and 'U' are escape sequences only recognized in string literals
         if matches!(
             next_char,
-            '\n'
-            | '\\'
-            | '\''
-            | '"'
-            | 'a'
-            | 'b'
-            | 'f'
-            | 'n'
-            | 'r'
-            | 't'
-            | 'v'
-            | '0'
-            | '1'
-            | '2'
-            | '3'
-            | '4'
-            | '5'
-            | '6'
-            | '7'
-            | 'x'
-            // Escape sequences only recognized in string literals
-            | 'N'
-            | 'u'
-            | 'U'
+            '\n' | '\\'
+                | '\''
+                | '"'
+                | 'a'
+                | 'b'
+                | 'f'
+                | 'n'
+                | 'r'
+                | 't'
+                | 'v'
+                | '0'
+                | '1'
+                | '2'
+                | '3'
+                | '4'
+                | '5'
+                | '6'
+                | '7'
+                | 'x'
+                | 'N'
+                | 'u'
+                | 'U'
         ) {
             contains_valid_escape_sequence = true;
             continue;

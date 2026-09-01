@@ -13,12 +13,15 @@ on:
       - "!crates/ty_wasm/**"
       - "crates/ruff_db/**"
       - "crates/ruff_python_ast/**"
+      - "crates/ruff_python_edits/**"
       - "crates/ruff_python_parser/**"
       - "crates/ruff_python_stdlib/**"
       - ".github/workflows/ty-ecosystem-analyzer.yaml"
       - ".github/ty-ecosystem.toml"
       - "crates/ty_python_semantic/resources/primer/**"
       - "Cargo.lock"
+      - "pyproject.toml"
+      - "uv.lock"
       - "!**.md"
       - "!**.snap"
       # It's tempting to skip all Python files in every directory,
@@ -42,29 +45,22 @@ env:
   RUST_BACKTRACE: 1
   # Line-tables-only debug info: faster builds, backtraces still work.
   CARGO_PROFILE_PROFILING_DEBUG: line-tables-only
-  ECOSYSTEM_ANALYZER_COMMIT: e2c5b76149b147fae104a7d8fa0997a9eb7f7754
 
 jobs:
   build-ty:
     name: Build ty (${{ matrix.revision }})
     strategy:
       matrix:
-        include:
-          # For `pull_request`, `github.sha` is GitHub's synthetic merge commit;
-          # pair it with the base revision from the same event payload.
-          - revision: base
-            ref: ${{ github.event.pull_request.base.sha }}
-          - revision: pr
-            ref: ${{ github.sha }}
+        revision: [base, pr]
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-32' || 'ubuntu-latest' }}
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          ref: ${{ matrix.ref }}
+          ref: ${{ github.sha }}
 
-      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           lookup-only: false
 
@@ -78,6 +74,19 @@ jobs:
         env:
           REVISION: ${{ matrix.revision }}
         run: |
+          if [[ "${REVISION}" == "base" ]]; then
+            # Faster to do this separately than to use `fetch-depth: 0` with `actions/checkout`
+            git fetch --no-tags --filter=blob:none --unshallow origin
+
+            # The first parent contains any preceding layers in a stacked pull request.
+            MERGE_BASE="$(git rev-parse "${GITHUB_SHA}^1")"
+            echo "${MERGE_BASE}" > merge-base.txt
+            echo "Merge base: ${MERGE_BASE}"
+            echo "PR commit: ${GITHUB_SHA}"
+
+            git checkout "${MERGE_BASE}"
+          fi
+
           echo "Building ${REVISION} revision $(git rev-parse HEAD)"
           cargo build --package ty --profile profiling
           cp target/profiling/ty "ty-${REVISION}"
@@ -93,7 +102,9 @@ jobs:
         with:
           name: ty-build-base
           compression-level: 1
-          path: ty-base
+          path: |
+            ty-base
+            merge-base.txt
 
       - name: Upload PR ty binary, flaky project list, and config
         if: matrix.revision == 'pr'
@@ -106,6 +117,15 @@ jobs:
             projects_flaky.txt
             ty-ecosystem.toml
 
+      - name: Upload ecosystem-analyzer dependency metadata
+        if: matrix.revision == 'pr'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ty-build-dependencies
+          path: |
+            pyproject.toml
+            uv.lock
+
   analyze-shards:
     needs: [build-ty]
     strategy:
@@ -115,15 +135,23 @@ jobs:
     timeout-minutes: 10
     env:
       EXCLUDE_NEWER: ${{ github.event.pull_request.updated_at }}
-      MERGE_BASE: ${{ github.event.pull_request.base.sha }}
+      # Enable experimental support for installing PEP 723 script dependencies.
+      TY_UV: scripts
     steps:
       - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
-          enable-cache: true
-          version: "0.11.24"
+          version: "0.12.6"
+          ignore-empty-workdir: true
+          # The default of `enable-cache: auto` leads to warnings from setup-uv in this job,
+          # since its cache-invalidation keys aren't available until the build artifacts
+          # are downloaded. But the cache doesn't help us much here anyway, since the
+          # uv binary, Python binary, and all pre-built wheels are excluded from setup-uv's cache.
+          # The cache would only save us from building two Git dependencies which are both
+          # small, pure-Python projects.
+          enable-cache: false
 
-      - name: Download ty binaries, flaky project list, and config
+      - name: Download ty binaries, flaky project list, config, and dependency metadata
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           pattern: ty-build-*
@@ -137,9 +165,12 @@ jobs:
           cp ty-ecosystem.toml ~/.config/ty/ty.toml
 
           chmod +x ty-base ty-pr
+          MERGE_BASE="$(< merge-base.txt)"
+          echo "MERGE_BASE: ${MERGE_BASE}"
 
-          uvx \
-            --from "git+https://github.com/astral-sh/ecosystem-analyzer@${ECOSYSTEM_ANALYZER_COMMIT}" \
+          uv run \
+            --locked \
+            --only-group=ty-ecosystem \
             ecosystem-analyzer \
             --flaky-runs 10 \
             diff \
@@ -169,10 +200,22 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
-          enable-cache: true
-          version: "0.11.24"
+          version: "0.12.6"
+          ignore-empty-workdir: true
+          # The default of `enable-cache: auto` leads to warnings from setup-uv in this job,
+          # since its cache-invalidation keys aren't available until the build artifacts
+          # are downloaded. But the cache doesn't help us much here anyway, since the
+          # uv binary, Python binary, and all pre-built wheels are excluded from setup-uv's cache.
+          # The cache would only save us from building two Git dependencies which are both
+          # small, pure-Python projects.
+          enable-cache: false
+
+      - name: Download ecosystem-analyzer dependency metadata
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ty-build-dependencies
 
       - name: Download shard diagnostics
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -184,40 +227,51 @@ jobs:
         id: generate-reports
         env:
           REF_NAME: ${{ github.ref_name }}
+          BASE_REF_NAME: ${{ github.event.pull_request.base.ref }}
         run: |
           # Merge shard diagnostics
           jq -s '{ outputs: [.[].outputs[]] }' diagnostics-base-*.json > diagnostics-base.json
           jq -s '{ outputs: [.[].outputs[]] }' diagnostics-PR-*.json   > diagnostics-PR.json
 
-          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@$ECOSYSTEM_ANALYZER_COMMIT"
-
           mkdir dist
 
-          ecosystem-analyzer \
+          # Upload a structured JSON report alongside the HTML report to make
+          # ecosystem changes easier for agents to analyze.
+          uv run \
+            --locked \
+            --only-group=ty-ecosystem \
+            ecosystem-analyzer \
             generate-diff \
             diagnostics-base.json \
             diagnostics-PR.json \
-            --old-name "main (merge base)" \
+            --old-name "${BASE_REF_NAME} (merge base)" \
             --new-name "$REF_NAME" \
-            --output-html dist/diff.html
+            --output-html dist/diff.html \
+            --output-json dist/diff.json
 
           set +e
-          ecosystem-analyzer \
+          uv run \
+            --locked \
+            --only-group=ty-ecosystem \
+            ecosystem-analyzer \
             generate-diff-statistics \
             diagnostics-base.json \
             diagnostics-PR.json \
             --fail-on-new-abnormal-exits \
-            --old-name "main (merge base)" \
+            --old-name "${BASE_REF_NAME} (merge base)" \
             --new-name "$REF_NAME" \
             --output diff-statistics.md
           DIFF_STATISTICS_EXIT_CODE=$?
           set -e
 
-          ecosystem-analyzer \
+          uv run \
+            --locked \
+            --only-group=ty-ecosystem \
+            ecosystem-analyzer \
             generate-timing-diff \
             diagnostics-base.json \
             diagnostics-PR.json \
-            --old-name "main (merge base)" \
+            --old-name "${BASE_REF_NAME} (merge base)" \
             --new-name "$REF_NAME" \
             --output-html dist/timing.html
 
@@ -227,8 +281,8 @@ jobs:
 
           echo "diff_statistics_exit_code=$DIFF_STATISTICS_EXIT_CODE" >> "$GITHUB_OUTPUT"
 
-      # NOTE: astral-bot deploys both HTML files in this artifact and uses the
-      # deployed URLs for the report links in its PR comment.
+      # NOTE: astral-bot deploys every file in this artifact and uses the
+      # deployed HTML URLs for the report links in its PR comment.
       # Make sure to update the bot if you rename the artifact.
       - name: "Upload full report"
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

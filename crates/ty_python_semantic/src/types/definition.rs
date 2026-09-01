@@ -33,7 +33,7 @@ impl TypeDefinition<'_> {
             | Self::SpecialForm(definition)
             | Self::NewType(definition)
             | Self::EnumMember(definition) => {
-                let module = parsed_module(db, definition.file(db)).load(db);
+                let module = parsed_module(db, definition.python_file(db)).load(db);
                 Some(definition.focus_range(db, &module))
             }
         }
@@ -54,7 +54,7 @@ impl TypeDefinition<'_> {
             | Self::SpecialForm(definition)
             | Self::NewType(definition)
             | Self::EnumMember(definition) => {
-                let module = parsed_module(db, definition.file(db)).load(db);
+                let module = parsed_module(db, definition.python_file(db)).load(db);
                 Some(definition.full_range(db, &module))
             }
         }

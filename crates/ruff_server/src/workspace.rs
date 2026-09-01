@@ -91,7 +91,7 @@ impl Workspace {
     }
 
     /// Create a new default workspace with the given root URI.
-    pub(crate) fn default(uri: Uri) -> Self {
+    fn default(uri: Uri) -> Self {
         Self {
             uri,
             options: None,
@@ -101,7 +101,7 @@ impl Workspace {
 
     /// Set the client options for this workspace.
     #[must_use]
-    pub(crate) fn with_options(mut self, options: ClientOptions) -> Self {
+    fn with_options(mut self, options: ClientOptions) -> Self {
         self.options = Some(options);
         self
     }

@@ -50,9 +50,10 @@ use crate::ReachabilityConstraintsBuilder;
 use crate::narrowing_constraints::{NarrowingConstraintsBuilder, ScopedNarrowingConstraint};
 use crate::reachability_constraints::ScopedReachabilityConstraintId;
 
-/// A newtype-index for a definition in a particular scope.
+/// An index into a scope's use-def history. A combined definition can have separate declaration
+/// and binding entries when they take effect at different points in control flow.
 #[newtype_index]
-#[derive(Ord, PartialOrd, salsa::Update, get_size2::GetSize)]
+#[derive(Ord, PartialOrd, get_size2::GetSize)]
 pub struct ScopedDefinitionId;
 
 impl ScopedDefinitionId {
@@ -61,7 +62,7 @@ impl ScopedDefinitionId {
     /// unbound or undeclared at a given usage site.
     /// When creating a use-def-map builder, we always add an empty `DefinitionState::Undefined` definition
     /// at index 0, so this ID is always present.
-    pub(crate) const UNBOUND: ScopedDefinitionId = ScopedDefinitionId::from_u32(0);
+    const UNBOUND: ScopedDefinitionId = ScopedDefinitionId::from_u32(0);
 
     pub(crate) fn is_unbound(self) -> bool {
         self == Self::UNBOUND
@@ -70,14 +71,14 @@ impl ScopedDefinitionId {
 
 /// Live declarations for a single place at some point in control flow, with their
 /// corresponding reachability constraints.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub(super) struct Declarations {
     /// A list of live declarations for this place, sorted by their `ScopedDefinitionId`
     live_declarations: SmallVec<[LiveDeclaration; 2]>,
 }
 
 /// One of the live declarations for a single place at some point in control flow.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub(super) struct LiveDeclaration {
     pub(super) declaration: ScopedDefinitionId,
     pub(super) reachability_constraint: ScopedReachabilityConstraintId,
@@ -98,14 +99,14 @@ pub(crate) enum PreviousDefinitions {
 /// `ShadowThisOne` is how normal assignments behave, and it's also how some "synthetic" bindings
 /// behave (loop headers), but there are other synthetic bindings (nested `nonlocal` writes) that
 /// cannot be shadowed.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub(crate) enum FutureDefinitions {
     ShadowThisOne,
     DontShadowThisOne,
 }
 
 impl PreviousDefinitions {
-    pub(super) fn are_shadowed(self) -> bool {
+    fn are_shadowed(self) -> bool {
         matches!(self, PreviousDefinitions::AreShadowed)
     }
 }
@@ -159,7 +160,7 @@ impl Declarations {
     }
 
     /// Add given reachability constraint to all live declarations.
-    pub(super) fn record_reachability_constraint(
+    fn record_reachability_constraint(
         &mut self,
         reachability_constraints: &mut ReachabilityConstraintsBuilder,
         constraint: ScopedReachabilityConstraintId,
@@ -173,6 +174,10 @@ impl Declarations {
     /// Return an iterator over live declarations for this place.
     pub(super) fn iter(&self) -> LiveDeclarationsIterator<'_> {
         self.live_declarations.iter()
+    }
+
+    pub(super) fn as_slice(&self) -> &[LiveDeclaration] {
+        &self.live_declarations
     }
 
     fn merge(&mut self, b: Self, reachability_constraints: &mut ReachabilityConstraintsBuilder) {
@@ -208,7 +213,7 @@ impl Declarations {
 /// Even if it's a class scope (class variables are not visible to nested scopes) or there are no
 /// bindings, the current narrowing constraint is necessary for narrowing, so it's stored in
 /// `Constraint`.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub(super) enum EnclosingSnapshot {
     Constraint(ScopedNarrowingConstraint),
     Bindings(Bindings),
@@ -216,7 +221,7 @@ pub(super) enum EnclosingSnapshot {
 
 /// Live bindings for a single place at some point in control flow. Each live binding comes
 /// with a set of narrowing constraints and a reachability constraint.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub(super) struct Bindings {
     /// The narrowing constraint applicable to the "unbound" binding, if we need access to it even
     /// when it's not visible. This happens in class scopes, where local name bindings are not visible
@@ -258,14 +263,14 @@ impl Bindings {
 }
 
 /// One of the live bindings for a single place at some point in control flow.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub struct LiveBinding {
     binding: PackedDefinitionId,
     narrowing_constraint: ScopedNarrowingConstraint,
     reachability_constraint: ScopedReachabilityConstraintId,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, get_size2::GetSize)]
 struct PackedDefinitionId(u32);
 
 impl PackedDefinitionId {
@@ -382,7 +387,7 @@ impl Bindings {
     }
 
     /// Add given constraint to all live bindings.
-    pub(super) fn record_narrowing_constraint(
+    fn record_narrowing_constraint(
         &mut self,
         narrowing_constraints: &mut NarrowingConstraintsBuilder,
         constraint: ScopedNarrowingConstraint,
@@ -394,7 +399,7 @@ impl Bindings {
     }
 
     /// Add given reachability constraint to all live bindings.
-    pub(super) fn record_reachability_constraint(
+    fn record_reachability_constraint(
         &mut self,
         reachability_constraints: &mut ReachabilityConstraintsBuilder,
         constraint: ScopedReachabilityConstraintId,
@@ -617,7 +622,7 @@ mod tests {
     }
 
     #[track_caller]
-    pub(crate) fn assert_declarations(place: &PlaceState, expected: &[&str]) {
+    fn assert_declarations(place: &PlaceState, expected: &[&str]) {
         let actual = place
             .declarations()
             .iter()

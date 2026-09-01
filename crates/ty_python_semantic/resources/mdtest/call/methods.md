@@ -191,6 +191,39 @@ def f(a_or_b: A | B, any_or_a: Any | A):
     reveal_type(any_or_a.f())  # revealed: Any | int
 ```
 
+## Stored protocol-bound methods
+
+A protocol-bound method stored alongside another callable must not re-check its already-bound
+receiver when the callable union is invoked.
+
+```py
+from collections.abc import Iterator
+from typing import Any
+
+class PeekIterator(Iterator[Any]):
+    def __init__(self, iterator: Iterator[Any]) -> None:
+        self._next = iterator.__next__
+
+    def __next__(self) -> Any:
+        return self._next()
+
+    def use_fallback(self) -> None:
+        self._next = lambda: None
+```
+
+Only a genuine implicit positional receiver can be consumed before call inference. Other parameter
+shapes must continue through the ordinary bound-method call path.
+
+```py
+from typing import Protocol
+
+class Variadic(Protocol):
+    def method(*args: int) -> int: ...
+
+def check_variadic(value: Variadic) -> None:
+    value.method()  # error: [invalid-argument-type]
+```
+
 ## Method calls on `KnownInstance` types
 
 ```toml
@@ -583,13 +616,11 @@ error[missing-argument]: No argument provided for required parameter `arg` of fu
    |
 18 | class MissingArg(RequiresArg): ...
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 info: Parameter declared here
   --> src/mdtest_snippet.py:13:32
    |
 13 |     def __init_subclass__(cls, arg: int): ...
    |                                ^^^^^^^^
-   |
 ```
 
 ```py
@@ -604,13 +635,11 @@ error[invalid-argument-type]: Argument to function `RequiresArg.__init_subclass_
    |
 20 | class InvalidType(RequiresArg, arg="foo"): ...
    |                                ^^^^^^^^^ Expected `int`, found `Literal["foo"]`
-   |
 info: Function defined here
   --> src/mdtest_snippet.py:13:9
    |
 13 |     def __init_subclass__(cls, arg: int): ...
    |         ^^^^^^^^^^^^^^^^^      -------- Parameter declared here
-   |
 ```
 
 ```py
@@ -635,13 +664,11 @@ error[missing-argument]: No argument provided for required parameter `arg` of fu
    |
 24 | class IncorrectArg(RequiresArg, not_arg="foo"):
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 info: Parameter declared here
   --> src/mdtest_snippet.py:13:32
    |
 13 |     def __init_subclass__(cls, arg: int): ...
    |                                ^^^^^^^^
-   |
 
 
 error[unknown-argument]: Argument `not_arg` does not match any known parameter of function `RequiresArg.__init_subclass__`
@@ -649,13 +676,11 @@ error[unknown-argument]: Argument `not_arg` does not match any known parameter o
    |
 24 | class IncorrectArg(RequiresArg, not_arg="foo"):
    |                                 ^^^^^^^^^^^^^
-   |
 info: Function signature here
   --> src/mdtest_snippet.py:13:9
    |
 13 |     def __init_subclass__(cls, arg: int): ...
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 ```
 
 ```py
@@ -671,7 +696,7 @@ class Bad(NotCallableInitSubclass):
 
 ```snapshot
 error[non-callable-init-subclass]: Invalid definition of class `Bad`
-  --> src/mdtest_snippet.py:36:5
+  --> src/mdtest_snippet.py:39:7
    |
 36 |     __init_subclass__ = None
    |     ----------------- `NotCallableInitSubclass.__init_subclass__` has type `None | Unknown`, which may not be callable
@@ -679,7 +704,6 @@ error[non-callable-init-subclass]: Invalid definition of class `Bad`
 38 | # snapshot: non-callable-init-subclass
 39 | class Bad(NotCallableInitSubclass):
    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Superclass `NotCallableInitSubclass` cannot be subclassed
-   |
 info: `__init_subclass__` on a superclass is implicitly called during creation of a class object
 info: See https://docs.python.org/3/reference/datamodel.html#customizing-class-creation
 ```
@@ -803,6 +827,100 @@ class Base(Generic[T]):
 
 class Valid(Base[int], arg=1): ...
 class InvalidType(Base[int], arg="x"): ...  # error: [invalid-argument-type]
+```
+
+#### Generic subclasses
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+##### Type parameter defaults
+
+When checking `cls` for an inherited `__init_subclass__` hook, the generic subclass retains its type
+parameters rather than replacing them with their defaults. `Child[T]` therefore satisfies the
+receiver bound `Base[T]`.
+
+```py
+class Base[T]:
+    def __init_subclass__(cls, *, flag: bool = False) -> None: ...
+
+class NoDefault[T](Base[T]): ...
+class Child[T = int](Base[T]): ...
+class PartialDefault[U, T = int](Base[T]): ...
+```
+
+Class keyword arguments are still checked against the hook's signature.
+
+```py
+class WithKeyword[T = int](Base[T], flag=True): ...
+
+# error: [invalid-argument-type] "Expected `bool`, found"
+class InvalidKeyword[T = int](Base[T], flag="bad"): ...
+```
+
+##### Explicit receiver annotations
+
+The implicit call also accepts an explicit `cls: type[Base[T]]` annotation.
+
+```py
+class Base[T]:
+    def __init_subclass__(cls: type["Base[T]"]) -> None: ...
+
+class Child[T = int](Base[T]): ...
+```
+
+A hook restricted to `RestrictedBase[int]` rejects a subclass that remains generic, even when `int`
+is its default.
+
+```py
+class RestrictedBase[T]:
+    def __init_subclass__(cls: type["RestrictedBase[int]"]) -> None: ...
+
+class Concrete(RestrictedBase[int]): ...
+
+# error: [invalid-argument-type] "Expected `type[RestrictedBase[int]]`"
+class Invalid[T = int](RestrictedBase[T]): ...
+```
+
+##### Legacy type parameter defaults
+
+The same receiver relationship holds for subclasses using legacy type variables with defaults.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U", default=int)
+
+class Base(Generic[T]):
+    def __init_subclass__(cls) -> None: ...
+
+class Child(Base[U]): ...
+```
+
+##### Keyword arguments using subclass type parameters
+
+Keyword arguments can refer to the subclass's type parameters. The argument must be compatible with
+that type parameter, not just its default: `T` can be specialized to a type other than `int`.
+
+```py
+from typing import cast
+
+class Base[T]:
+    def __init_subclass__(cls, *, value: T) -> None: ...
+
+class Valid[T = int](Base[T], value=cast(T, 1)): ...
+
+# error: [invalid-argument-type] "Expected `T@Invalid`, found `Literal[1]`"
+class Invalid[T = int](Base[T], value=1): ...
+```
+
+An explicitly specialized base accepts the concrete argument.
+
+```py
+class AlsoValid(Base[int], value=1): ...
 ```
 
 ## `@staticmethod`
@@ -986,6 +1104,48 @@ class X:
         return self.__new__(type(self))
 ```
 
+Calling `object.__new__` from an overriding `__new__` method preserves `Self`, so an invalid
+attribute access on the result is reported:
+
+```py
+class Item:
+    def __new__(cls) -> Self:
+        result = object.__new__(cls)
+        reveal_type(result)  # revealed: Self@__new__
+        # error: [unresolved-attribute]
+        result.nonexistent()
+        return result
+```
+
+Explicitly marking `__new__` as a static method does not change the inferred result:
+
+```py
+class StaticItem:
+    @staticmethod
+    def __new__(cls) -> Self:
+        result = object.__new__(cls)
+        reveal_type(result)  # revealed: Self@__new__
+        return result
+```
+
+`Self` is also preserved through a chain of inherited `__new__` calls:
+
+```py
+class Foo: ...
+
+class Bar(Foo):
+    def __new__(cls) -> Self:
+        return Foo.__new__(cls)
+
+class Baz(Bar):
+    def __new__(cls) -> Self:
+        result = Bar.__new__(cls)
+        reveal_type(result)  # revealed: Self@__new__
+        # error: [unresolved-attribute]
+        result.nonexistent()
+        return result
+```
+
 ## Bound-method attribute fallback
 
 Bound-method attributes are resolved first on `types.MethodType`, then, if absent, on the underlying
@@ -1010,6 +1170,28 @@ def narrowed_bound_method_attribute():
         reveal_type(method.__globals__)  # revealed: dict[str, Any]
 ```
 
+## Receiver rebinding does not shadow methods
+
+Assigning to `self` does not assign to its method attributes. An empty loop targeting `self`
+therefore leaves method calls bound, both before the loop and outside the method containing it.
+
+This guards against a regression in implicit attribute type inference: synthetic loop-header
+definitions for attribute places such as `self.method` are not attribute assignments and must not be
+considered when inferring instance attribute types.
+
+```py
+class C:
+    def method(self) -> None:
+        pass
+
+    def rebind(self) -> None:
+        self.method()
+        for self in []:
+            pass
+
+C().method()
+```
+
 ## Builtin functions and methods
 
 Some builtin functions and methods are heavily special-cased by ty. This mdtest checks that various
@@ -1018,7 +1200,8 @@ properties are understood correctly for these functions and methods.
 ```py
 import types
 from typing import Any, Callable
-from ty_extensions import static_assert, RegularCallableTypeOf, is_assignable_to, TypeOf
+from ty_extensions import static_assert
+from ty_extensions._internal import RegularCallableTypeOf, TypeOf, is_assignable_to
 
 def f(obj: type) -> None: ...
 

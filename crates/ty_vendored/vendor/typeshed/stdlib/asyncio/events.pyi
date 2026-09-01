@@ -13,7 +13,7 @@ from abc import ABCMeta, abstractmethod
 from collections.abc import Callable, Sequence
 from concurrent.futures import Executor
 from contextvars import Context
-from socket import AddressFamily, AddressInfo, SocketKind, _Address, _RetAddress, socket
+from socket import AddressFamily, AddressInfo, _Address, _GetAddrInfoResult, _RetAddress, socket
 from typing import IO, Any, Literal, Protocol, TypeAlias, TypeVar, overload, type_check_only
 from typing_extensions import Self, TypeVarTuple, Unpack, deprecated
 
@@ -226,7 +226,8 @@ class AbstractEventLoop:
     @abstractmethod
     def create_future(self) -> Future[Any]: ...
     # Tasks methods
-    if sys.version_info >= (3, 14):
+    # `eager_start` is supported as an arbitrary kwarg starting in 3.13.3.
+    if sys.version_info >= (3, 13):
         @abstractmethod
         def create_task(
             self,
@@ -270,7 +271,7 @@ class AbstractEventLoop:
         type: int = 0,
         proto: int = 0,
         flags: int = 0,
-    ) -> list[tuple[AddressFamily, SocketKind, int, str, tuple[str, int] | tuple[str, int, int, int] | tuple[int, bytes]]]: ...
+    ) -> _GetAddrInfoResult: ...
     @abstractmethod
     async def getnameinfo(self, sockaddr: tuple[str, int] | tuple[str, int, int, int], flags: int = 0) -> tuple[str, str]: ...
 
@@ -384,8 +385,8 @@ class AbstractEventLoop:
 
             If host is an empty string or None all interfaces are assumed
             and a list of multiple sockets will be returned (most likely
-            one for IPv4 and another one for IPv6). The host parameter can also be
-            a sequence (e.g. list) of hosts to bind to.
+            one for IPv4 and another one for IPv6). The host parameter can also
+            be a sequence (e.g. list) of hosts to bind to.
 
             family can be set to either AF_INET or AF_INET6 to force the
             socket to use IPv4 or IPv6. If not set it will be determined
@@ -425,8 +426,9 @@ class AbstractEventLoop:
 
             start_serving set to True (default) causes the created server
             to start accepting connections immediately.  When set to False,
-            the user should await Server.start_serving() or Server.serve_forever()
-            to make the server to start accepting connections.
+            the user should await Server.start_serving() or
+            Server.serve_forever() to make the server to start accepting
+            connections.
             """
         @overload
         @abstractmethod
@@ -673,8 +675,9 @@ class AbstractEventLoop:
 
             start_serving set to True (default) causes the created server
             to start accepting connections immediately.  When set to False,
-            the user should await Server.start_serving() or Server.serve_forever()
-            to make the server to start accepting connections.
+            the user should await Server.start_serving() or
+            Server.serve_forever() to make the server to start accepting
+            connections.
             """
     else:
         @abstractmethod
@@ -827,8 +830,8 @@ class AbstractEventLoop:
 
         protocol_factory must be a callable returning a protocol instance.
 
-        socket family AF_INET, socket.AF_INET6 or socket.AF_UNIX depending on
-        host (or family if specified), socket type SOCK_DGRAM.
+        socket family AF_INET, socket.AF_INET6 or socket.AF_UNIX depending
+        on host (or family if specified), socket type SOCK_DGRAM.
 
         reuse_address tells the kernel to reuse a local socket in
         TIME_WAIT state, without waiting for its natural timeout to
@@ -866,7 +869,8 @@ class AbstractEventLoop:
     ) -> tuple[WriteTransport, _ProtocolT]:
         """Register write pipe in event loop.
 
-        protocol_factory should instantiate object with BaseProtocol interface.
+        protocol_factory should instantiate object with BaseProtocol
+        interface.
         Pipe is file-like object already switched to nonblocking.
         Return pair (transport, protocol), where transport support
         WriteTransport interface.
@@ -990,10 +994,10 @@ else:
         def new_event_loop(self) -> AbstractEventLoop: ...
         # Child processes handling (Unix only).
         @abstractmethod
-        @deprecated("Deprecated since Python 3.12; removed in Python 3.14.")
+        @deprecated("Deprecated; removed in Python 3.14.")
         def get_child_watcher(self) -> AbstractChildWatcher: ...
         @abstractmethod
-        @deprecated("Deprecated since Python 3.12; removed in Python 3.14.")
+        @deprecated("Deprecated; removed in Python 3.14.")
         def set_child_watcher(self, watcher: AbstractChildWatcher) -> None: ...
 
     AbstractEventLoopPolicy = _AbstractEventLoopPolicy
@@ -1068,11 +1072,11 @@ if sys.version_info >= (3, 14):
         If policy is None, the default policy is restored.
         """
 
-@deprecated("Deprecated since Python 3.14; will be removed in Python 3.16.")
+@deprecated("Deprecated; will be removed in Python 3.16.")
 def get_event_loop_policy() -> _AbstractEventLoopPolicy:
     """Get the current event loop policy."""
 
-@deprecated("Deprecated since Python 3.14; will be removed in Python 3.16.")
+@deprecated("Deprecated; will be removed in Python 3.16.")
 def set_event_loop_policy(policy: _AbstractEventLoopPolicy | None) -> None:
     """Set the current event loop policy.
 
@@ -1086,11 +1090,11 @@ def new_event_loop() -> AbstractEventLoop:
     """Equivalent to calling get_event_loop_policy().new_event_loop()."""
 
 if sys.version_info < (3, 14):
-    @deprecated("Deprecated since Python 3.12; removed in Python 3.14.")
+    @deprecated("Deprecated; removed in Python 3.14.")
     def get_child_watcher() -> AbstractChildWatcher:
         """Equivalent to calling get_event_loop_policy().get_child_watcher()."""
 
-    @deprecated("Deprecated since Python 3.12; removed in Python 3.14.")
+    @deprecated("Deprecated; removed in Python 3.14.")
     def set_child_watcher(watcher: AbstractChildWatcher) -> None:
         """Equivalent to calling
         get_event_loop_policy().set_child_watcher(watcher).

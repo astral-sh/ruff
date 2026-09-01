@@ -15,6 +15,7 @@ use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits;
 use crate::fix::edits::adjust_indentation;
 use crate::registry::Rule;
@@ -62,7 +63,7 @@ use crate::rules::flake8_return::visitor::{ReturnVisitor, Stack};
 ///
 /// - `lint.pydocstyle.property-decorators`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.154")]
+#[violation_metadata(stable_since = "v0.0.154", category = Category::Style)]
 pub(crate) struct UnnecessaryReturnNone;
 
 impl AlwaysFixableViolation for UnnecessaryReturnNone {
@@ -104,7 +105,7 @@ impl AlwaysFixableViolation for UnnecessaryReturnNone {
 ///     return 1
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.154")]
+#[violation_metadata(stable_since = "v0.0.154", category = Category::Pedantic)]
 pub(crate) struct ImplicitReturnValue;
 
 impl AlwaysFixableViolation for ImplicitReturnValue {
@@ -143,7 +144,7 @@ impl AlwaysFixableViolation for ImplicitReturnValue {
 ///     return None
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.154")]
+#[violation_metadata(stable_since = "v0.0.154", category = Category::Pedantic)]
 pub(crate) struct ImplicitReturn;
 
 impl AlwaysFixableViolation for ImplicitReturn {
@@ -179,7 +180,7 @@ impl AlwaysFixableViolation for ImplicitReturn {
 ///     return 1
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.154")]
+#[violation_metadata(stable_since = "v0.0.154", category = Category::Pedantic)]
 pub(crate) struct UnnecessaryAssign {
     name: String,
 }
@@ -222,7 +223,7 @@ impl AlwaysFixableViolation for UnnecessaryAssign {
 ///     return baz
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.154")]
+#[violation_metadata(stable_since = "v0.0.154", category = Category::Pedantic)]
 pub(crate) struct SuperfluousElseReturn {
     branch: Branch,
 }
@@ -267,7 +268,7 @@ impl Violation for SuperfluousElseReturn {
 ///     raise Exception(baz)
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.154")]
+#[violation_metadata(stable_since = "v0.0.154", category = Category::Pedantic)]
 pub(crate) struct SuperfluousElseRaise {
     branch: Branch,
 }
@@ -314,7 +315,7 @@ impl Violation for SuperfluousElseRaise {
 ///         x = 0
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.154")]
+#[violation_metadata(stable_since = "v0.0.154", category = Category::Pedantic)]
 pub(crate) struct SuperfluousElseContinue {
     branch: Branch,
 }
@@ -361,7 +362,7 @@ impl Violation for SuperfluousElseContinue {
 ///         x = 0
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.154")]
+#[violation_metadata(stable_since = "v0.0.154", category = Category::Pedantic)]
 pub(crate) struct SuperfluousElseBreak {
     branch: Branch,
 }
@@ -568,7 +569,7 @@ pub(crate) fn unnecessary_assign(checker: &Checker, function_stmt: &Stmt) {
     let Some(function_scope) = checker.semantic().function_scope(function_def) else {
         return;
     };
-    for (assign, return_, stmt) in &stack.assignment_return {
+    for (assign, return_, stmt, enclosing_finally) in &stack.assignment_return {
         // Identify, e.g., `return x`.
         let Some(value) = return_.value.as_ref() else {
             continue;
@@ -617,6 +618,22 @@ pub(crate) fn unnecessary_assign(checker: &Checker, function_stmt: &Stmt) {
         else {
             continue;
         };
+        // Ignore assignments whose name is read or deleted in an enclosing `finally`, which runs
+        // after the `return`. A reference resolving to a later rebinding in the `finally` counts
+        // too, so check every binding of the name.
+        if !enclosing_finally.is_empty()
+            && function_scope
+                .get_all(assigned_id)
+                .flat_map(|binding_id| checker.semantic().binding(binding_id).references())
+                .map(|reference_id| checker.semantic().reference(reference_id))
+                .any(|reference| {
+                    enclosing_finally
+                        .iter()
+                        .any(|finally_range| finally_range.contains_range(reference.range()))
+                })
+        {
+            continue;
+        }
         // Check if there's any reference made to `assigned_binding` in another scope, e.g, nested
         // functions. If there is, ignore them.
         if assigned_binding

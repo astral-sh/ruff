@@ -197,7 +197,6 @@ Module(
 4 | | class A:
 5 | |     pass
   | |_________^ Syntax Error: f-string: unterminated triple-quoted string
-  |
 
 
   |
@@ -217,11 +216,9 @@ Module(
 4 | | class A:
 5 | |     pass
   | |_________^ Syntax Error: Expected a statement
-  |
 
 
   |
 4 | class A:
 5 |     pass
   |         ^ Syntax Error: unexpected EOF while parsing
-  |

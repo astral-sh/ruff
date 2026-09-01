@@ -1,8 +1,8 @@
-# `pytest-fixture-autouse` (`RUF076`)
+# `pytest-fixture-autouse`
 
 ```toml
 lint.preview = true
-lint.select = ["RUF076"]
+lint.select = ["pytest-fixture-autouse"]
 ```
 
 ## Basic errors
@@ -11,7 +11,7 @@ lint.select = ["RUF076"]
 import pytest
 
 
-@pytest.fixture(autouse=True)  # snapshot: pytest-fixture-autouse
+@pytest.fixture(autouse=True)  # error: [pytest-fixture-autouse]
 def my_autouse_fixture():
     pass
 
@@ -19,15 +19,6 @@ def my_autouse_fixture():
 @pytest.fixture(scope="module", autouse=True)  # error: [pytest-fixture-autouse]
 def my_scoped_autouse_fixture():
     pass
-```
-
-```snapshot
-error[RUF076]: Avoid using `autouse=True` in `pytest.fixture` decorators
- --> src/mdtest_snippet.py:4:17
-  |
-4 | @pytest.fixture(autouse=True)  # snapshot: pytest-fixture-autouse
-  |                 ^^^^^^^^^^^^
-  |
 ```
 
 ## No errors
@@ -53,5 +44,23 @@ def decorator_no_arguments():
 
 # Not a pytest fixture
 def not_a_fixture(autouse=True):
+    pass
+```
+
+## Inline suppressions
+
+A rule without a legacy code can be suppressed by name or by a blanket `noqa` comment.
+
+```py
+import pytest
+
+
+@pytest.fixture(autouse=True)  # ruff: ignore[pytest-fixture-autouse]
+def ignored_by_name():
+    pass
+
+
+@pytest.fixture(autouse=True)  # noqa
+def ignored_by_blanket_noqa():
     pass
 ```

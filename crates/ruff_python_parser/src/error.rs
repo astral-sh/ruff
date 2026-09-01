@@ -30,7 +30,7 @@ impl std::error::Error for ParseError {
 
 impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{} at byte range {:?}", &self.error, self.location)
+        write!(f, "{} at byte range {:?}", self.error, self.location)
     }
 }
 
@@ -148,9 +148,6 @@ pub enum ParseErrorType {
     /// A default value was found for a `*` or `**` parameter.
     VarParameterWithDefault,
 
-    /// A keyword argument was repeated.
-    DuplicateKeywordArgumentError(String),
-
     /// An invalid expression was found in the assignment target.
     InvalidAssignmentTarget,
     /// An invalid expression was found in the named assignment target.
@@ -205,9 +202,6 @@ pub enum ParseErrorType {
     TStringError(InterpolatedStringErrorType),
     /// Parser encountered an error during lexing.
     Lexical(LexicalErrorType),
-
-    /// Parser aborted because [`crate::ParseOptions::max_recursion_depth`] was exceeded.
-    RecursionLimitExceeded,
 }
 
 impl ParseErrorType {
@@ -324,9 +318,6 @@ impl std::fmt::Display for ParseErrorType {
                 f.write_str("Invalid augmented assignment target")
             }
             ParseErrorType::InvalidDeleteTarget => f.write_str("Invalid delete target"),
-            ParseErrorType::DuplicateKeywordArgumentError(arg_name) => {
-                write!(f, "Duplicate keyword argument {arg_name:?}")
-            }
             ParseErrorType::UnexpectedIpythonEscapeCommand => {
                 f.write_str("IPython escape commands are only allowed in `Mode::Ipython`")
             }
@@ -339,7 +330,6 @@ impl std::fmt::Display for ParseErrorType {
             ParseErrorType::UnexpectedExpressionToken => {
                 write!(f, "Unexpected token at the end of an expression")
             }
-            ParseErrorType::RecursionLimitExceeded => f.write_str("Source is too deeply nested"),
         }
     }
 }

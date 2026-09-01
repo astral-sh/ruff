@@ -108,4 +108,3 @@ Module(
 1 | type __debug__ = list[int]  # visited as an Expr but still flagged
 2 | type Debug[__debug__] = str
   |            ^^^^^^^^^ Syntax Error: cannot assign to `__debug__`
-  |

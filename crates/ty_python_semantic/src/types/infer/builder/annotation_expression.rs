@@ -83,7 +83,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             deferred_state
         };
 
-        let previous_deferred_state = std::mem::replace(&mut self.deferred_state, state);
+        let previous_deferred_state = self.replace_deferred_state(state);
         let previous_check_unbound_typevars = self
             .context
             .inference_flags
@@ -108,7 +108,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         fn infer_name_or_attribute<'db>(
             ty: Type<'db>,
             annotation: &ast::Expr,
-            builder: &TypeInferenceBuilder<'db, '_>,
+            builder: &mut TypeInferenceBuilder<'db, '_>,
             pep_613_policy: PEP613Policy,
         ) -> AnnotationExpressionInference<'db> {
             let special_case = match ty {
@@ -175,7 +175,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 AnnotationExpressionInference::new(annotation_ty)
             }
         }
+        let db = self.db();
 
+        let env = self.program_environment();
         // https://typing.python.org/en/latest/spec/annotations.html#grammar-token-expression-grammar-annotation_expression
         let inferred = match annotation {
             // String annotations: https://typing.python.org/en/latest/spec/annotations.html#string-annotations
@@ -239,12 +241,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             );
                             let in_type_expression = inferred
                                 .inner_type()
-                                .in_type_expression(
-                                    self.db(),
-                                    self.scope(),
-                                    None,
-                                    self.inference_flags(),
-                                )
+                                .in_type_expression(db, self.scope(), None, self.inference_flags())
                                 .unwrap_or_else(|err| {
                                     err.into_fallback_type(
                                         &self.context,
@@ -267,8 +264,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                     PEP613Policy::Disallowed,
                                 );
 
-                                // Emit a diagnostic if ClassVar and Final are combined in a class that is
-                                // not a dataclass, since Final already implies the semantics of ClassVar.
+                                // Emit a diagnostic if ClassVar and Final are combined in a class where
+                                // Final already implies the semantics of ClassVar. Dataclasses and
+                                // protocols treat an unqualified Final declaration as an instance
+                                // attribute, so the combination is meaningful in those classes.
                                 let classvar_and_final = match qualifier {
                                     TypeQualifier::Final => type_and_qualifiers
                                         .qualifiers
@@ -280,7 +279,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 };
                                 if classvar_and_final
                                     && nearest_enclosing_class(self.db(), self.index, self.scope())
-                                        .is_none_or(|class| !class.is_dataclass_like(self.db()))
+                                        .is_none_or(|class| {
+                                            !class.is_dataclass_like(self.db())
+                                                && !class.is_protocol(self.db())
+                                        })
                                     && let Some(builder) = self
                                         .context
                                         .report_lint(&REDUNDANT_FINAL_CLASSVAR, subscript)
@@ -293,7 +295,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 if qualifier == TypeQualifier::ClassVar
                                     && type_and_qualifiers
                                         .inner_type()
-                                        .has_non_self_typevar(self.db())
+                                        .has_non_self_typevar(db, env)
                                     && let Some(builder) =
                                         self.context.report_lint(&INVALID_TYPE_FORM, subscript)
                                 {

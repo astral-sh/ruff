@@ -558,6 +558,80 @@ class StubAbstractImplementation(StubAbstractInterface):
     def method(self) -> int: ...  # error: [missing-override-decorator]
 ```
 
+## Missing `@override` decorator on Python 3.11
+
+```toml
+[environment]
+python-version = "3.11"
+
+[rules]
+missing-override-decorator = "error"
+```
+
+```py
+from typing_extensions import override
+
+class Parent:
+    def method(self) -> None: ...
+
+class Child(Parent):
+    def method(self) -> None: ...  # snapshot: missing-override-decorator
+
+class ExplicitChild(Parent):
+    @override
+    def method(self) -> None: ...
+```
+
+```snapshot
+error[missing-override-decorator]: Method `method` overrides `Parent.method` but is not decorated with `@override`
+ --> src/mdtest_snippet.py:7:9
+  |
+4 |     def method(self) -> None: ...
+  |         ------ `Parent.method` defined here
+5 |
+6 | class Child(Parent):
+7 |     def method(self) -> None: ...  # snapshot: missing-override-decorator
+  |         ^^^^^^
+info: Decorate the method with `@typing_extensions.override` to make the override explicit
+```
+
+## Missing `@override` decorator on Python 3.12
+
+```toml
+[environment]
+python-version = "3.12"
+
+[rules]
+missing-override-decorator = "error"
+```
+
+```py
+from typing import override
+
+class Parent:
+    def method(self) -> None: ...
+
+class Child(Parent):
+    def method(self) -> None: ...  # snapshot: missing-override-decorator
+
+class ExplicitChild(Parent):
+    @override
+    def method(self) -> None: ...
+```
+
+```snapshot
+error[missing-override-decorator]: Method `method` overrides `Parent.method` but is not decorated with `@override`
+ --> src/mdtest_snippet.py:7:9
+  |
+4 |     def method(self) -> None: ...
+  |         ------ `Parent.method` defined here
+5 |
+6 | class Child(Parent):
+7 |     def method(self) -> None: ...  # snapshot: missing-override-decorator
+  |         ^^^^^^
+info: Decorate the method with `@typing.override` to make the override explicit
+```
+
 ## Possibly-unbound definitions
 
 ```py
@@ -783,6 +857,7 @@ class Spam:
 
     @overload
     @override
+    # error: [invalid-overload] "`@override` decorator should be applied only to the overload implementation"
     def quux(self, x: str) -> str: ...
     @overload
     def quux(self, x: int) -> int: ...
@@ -980,10 +1055,12 @@ class MyMapping(MutableMapping[KT, VT]):
     def __len__(self) -> int:
         raise NotImplementedError
     def update(self, arg: MapOrItems[KT, VT] = (), /, **kw: VT) -> None: ...
+```
 
-# TODO: We should emit an `invalid-method-override` diagnostic on
-# `DeferredChild1.method`. The `DeferredChild1`-specific overload applies to
-# this subclass, so its override cannot remove the `extra` parameter.
+The `DeferredChild1`-specific overload applies on that subclass, so its override cannot remove the
+`extra` parameter:
+
+```py
 class DeferredBase:
     @overload
     def method(self) -> None: ...
@@ -992,7 +1069,7 @@ class DeferredBase:
     def method(self, extra: str = "") -> None: ...
 
 class DeferredChild1(DeferredBase):
-    def method(self) -> None: ...
+    def method(self) -> None: ...  # error: [invalid-method-override]
 
 # TODO: A strict Liskov check would emit an `invalid-method-override`
 # diagnostic here too. A subclass could inherit from both `DeferredChild1`

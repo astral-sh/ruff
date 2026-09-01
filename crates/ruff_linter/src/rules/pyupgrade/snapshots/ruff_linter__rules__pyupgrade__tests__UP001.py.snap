@@ -7,7 +7,6 @@ UP001 [*] `__metaclass__ = type` is implied
 1 | class A:
 2 |     __metaclass__ = type
   |     ^^^^^^^^^^^^^^^^^^^^
-  |
 help: Remove `__metaclass__ = type`
   |
 1 | class A:

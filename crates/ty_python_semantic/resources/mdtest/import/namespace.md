@@ -126,7 +126,7 @@ reveal_type(pubsub_v1.PublisherClient)  # revealed: <class 'PublisherClient'>
 
 ## `from` root importing sub-packages
 
-Regresssion test for <https://github.com/astral-sh/ty/issues/375>
+Regression test for <https://github.com/astral-sh/ty/issues/375>
 
 `opentelemetry/trace/__init__.py`:
 

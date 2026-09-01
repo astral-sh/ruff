@@ -9,6 +9,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for three or more consecutive if-statements with direct returns
@@ -32,11 +33,11 @@ use crate::checkers::ast::Checker;
 /// Use instead:
 /// ```python
 /// def find_phrase(x):
-///     phrases = {1: "Hello", 2: "Goodye", 3: "Good morning"}
+///     phrases = {1: "Hello", 2: "Goodbye", 3: "Good morning"}
 ///     return phrases.get(x, "Goodnight")
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.250")]
+#[violation_metadata(stable_since = "v0.0.250", category = Category::Pedantic)]
 pub(crate) struct IfElseBlockInsteadOfDictLookup;
 
 impl Violation for IfElseBlockInsteadOfDictLookup {

@@ -160,4 +160,3 @@ Module(
 2 | x.1.0
 3 | x.[0]
   |   ^ Syntax Error: Expected an identifier
-  |

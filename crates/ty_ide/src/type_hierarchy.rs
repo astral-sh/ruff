@@ -1,12 +1,15 @@
 use crate::Db;
 use crate::goto::find_goto_target;
+use rayon::prelude::*;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use ruff_text_size::{TextRange, TextSize};
-use ty_python_semantic::SemanticModel;
+use ty_project::parallel::ParallelIteratorExt;
+use ty_python_core::ProgramFile;
 use ty_python_semantic::TypeHierarchyClass;
 use ty_python_semantic::types::Type;
+use ty_python_semantic::{ProgramEnvironment, SemanticModel};
 
 /// Represents a type hierarchy item returned by the LSP type hierarchy requests.
 #[derive(Debug, Clone)]
@@ -28,45 +31,57 @@ pub struct TypeHierarchyItem {
 /// Returns `None` if the position is not on a class definition or class reference.
 pub fn prepare_type_hierarchy(
     db: &dyn Db,
-    file: File,
+    file: ProgramFile<'_>,
     offset: TextSize,
 ) -> Option<TypeHierarchyItem> {
-    let module = parsed_module(db, file).load(db);
+    let module = parsed_module(db, file.python_file(db)).load(db);
     let model = SemanticModel::new(db, file);
     let goto_target = find_goto_target(&model, &module, offset)?;
     let ty = goto_target.inferred_type(&model)?;
 
-    let hierarchy_class = ty_python_semantic::type_hierarchy_prepare(db, ty)?;
+    let env = model.program_environment();
+    let hierarchy_class = ty_python_semantic::type_hierarchy_prepare(db, &env, ty)?;
     Some(type_hierarchy_class_to_item(db, hierarchy_class))
 }
 
 /// Get the supertypes (base classes) of a type hierarchy item.
 pub fn type_hierarchy_supertypes(
     db: &dyn Db,
-    file: File,
+    file: ProgramFile<'_>,
     offset: TextSize,
 ) -> Vec<TypeHierarchyItem> {
     let Some(ty) = resolve_type_at(db, file, offset) else {
         return vec![];
     };
-    ty_python_semantic::type_hierarchy_supertypes(db, ty)
+    let env = ProgramEnvironment::from_file(file);
+    ty_python_semantic::type_hierarchy_supertypes(db, &env, ty)
         .into_iter()
         .map(|c| type_hierarchy_class_to_item(db, c))
         .collect()
 }
 
 /// Get the subtypes (derived classes) of a type hierarchy item.
+///
+/// This scans all available modules and can be expensive in large projects.
 pub fn type_hierarchy_subtypes(
     db: &dyn Db,
-    file: File,
+    file: ProgramFile<'_>,
     offset: TextSize,
 ) -> Vec<TypeHierarchyItem> {
     let Some(ty) = resolve_type_at(db, file, offset) else {
         return vec![];
     };
-    ty_python_semantic::type_hierarchy_subtypes(db, ty)
-        .into_iter()
-        .map(|c| type_hierarchy_class_to_item(db, c))
+
+    ty_module_resolver::all_modules(db, file.resolver_environment(db))
+        .into_par_iter()
+        .map_with_db(db, |db, module| {
+            let env = ProgramEnvironment::from_file(file);
+            ty_python_semantic::type_hierarchy_subtypes(db, &env, ty, &[module])
+                .into_iter()
+                .map(|class| type_hierarchy_class_to_item(db, class))
+                .collect::<Vec<_>>()
+        })
+        .flat_map_iter(|items| items)
         .collect()
 }
 
@@ -74,22 +89,29 @@ pub fn type_hierarchy_subtypes(
 ///
 /// If a symbol could not be found at the given offset or its type could
 /// not be inferred, `None` is returned.
-fn resolve_type_at(db: &dyn Db, file: File, offset: TextSize) -> Option<Type<'_>> {
-    let module = parsed_module(db, file).load(db);
+fn resolve_type_at<'db>(
+    db: &'db dyn Db,
+    file: ProgramFile<'db>,
+    offset: TextSize,
+) -> Option<Type<'db>> {
+    let module = parsed_module(db, file.python_file(db)).load(db);
     let model = SemanticModel::new(db, file);
 
     let goto_target = find_goto_target(&model, &module, offset)?;
     goto_target.inferred_type(&model)
 }
 
-fn type_hierarchy_class_to_item(db: &dyn Db, class: TypeHierarchyClass) -> TypeHierarchyItem {
+fn type_hierarchy_class_to_item<'db>(
+    db: &'db dyn Db,
+    class: TypeHierarchyClass<'db>,
+) -> TypeHierarchyItem {
     let detail = ty_module_resolver::file_to_module(db, class.file)
         .map(|module| module.name(db).to_string());
 
     TypeHierarchyItem {
         name: class.name,
         detail,
-        file: class.file,
+        file: class.file.file(db),
         full_range: class.full_range,
         selection_range: class.selection_range,
     }
@@ -210,7 +232,7 @@ mod tests {
         let supertypes = test.supertypes();
         insta::assert_snapshot!(
             snapshot(&test.db, &supertypes),
-            @"vendored://stdlib/builtins.pyi:3609:3615 object :: builtins",
+            @"vendored://stdlib/builtins.pyi:3638:3644 object :: builtins",
         );
     }
 
@@ -324,7 +346,7 @@ mod tests {
         let subtypes = test.subtypes();
         insta::assert_snapshot!(snapshot(&test.db, &subtypes), @"
         vendored://stdlib/email/headerregistry.pyi:703:713 BaseHeader :: email.headerregistry
-        vendored://stdlib/enum.pyi:18348:18355 StrEnum :: enum
+        vendored://stdlib/enum.pyi:18344:18351 StrEnum :: enum
         vendored://stdlib/pdb.pyi:38720:38725 _rstr :: pdb
         vendored://stdlib/xxlimited.pyi:103:106 Str :: xxlimited
         ");
@@ -356,7 +378,7 @@ mod tests {
         let subtypes = test.subtypes();
         insta::assert_snapshot!(snapshot(&test.db, &subtypes), @"
         vendored://stdlib/email/headerregistry.pyi:703:713 BaseHeader :: email.headerregistry
-        vendored://stdlib/enum.pyi:18348:18355 StrEnum :: enum
+        vendored://stdlib/enum.pyi:18344:18351 StrEnum :: enum
         /main.py:77:89 MyEventTypeA :: main
         vendored://stdlib/pdb.pyi:38720:38725 _rstr :: pdb
         vendored://stdlib/xxlimited.pyi:103:106 Str :: xxlimited
@@ -424,12 +446,12 @@ mod tests {
         let item = test.prepare().unwrap();
         insta::assert_snapshot!(
             snapshot(&test.db, &[item]),
-            @"vendored://stdlib/builtins.pyi:8509:8513 type :: builtins",
+            @"vendored://stdlib/builtins.pyi:8538:8542 type :: builtins",
         );
         let supertypes = test.supertypes();
         insta::assert_snapshot!(
             snapshot(&test.db, &supertypes),
-            @"vendored://stdlib/builtins.pyi:3609:3615 object :: builtins",
+            @"vendored://stdlib/builtins.pyi:3638:3644 object :: builtins",
         );
     }
 
@@ -481,7 +503,7 @@ mod tests {
         let supertypes = test.supertypes();
         insta::assert_snapshot!(
             snapshot(&test.db, &supertypes),
-            @"vendored://stdlib/builtins.pyi:104541:104546 tuple :: builtins",
+            @"vendored://stdlib/builtins.pyi:104699:104704 tuple :: builtins",
         );
     }
 
@@ -709,21 +731,33 @@ Public = _Internal
 
     impl CursorTest {
         fn prepare(&self) -> Option<TypeHierarchyItem> {
-            prepare_type_hierarchy(&self.db, self.cursor.file, self.cursor.offset)
+            prepare_type_hierarchy(
+                &self.db,
+                self.program_file(self.cursor.file),
+                self.cursor.offset,
+            )
         }
 
         fn supertypes(&self) -> Vec<TypeHierarchyItem> {
             let Some(item) = self.prepare() else {
                 return vec![];
             };
-            type_hierarchy_supertypes(&self.db, item.file, item.selection_range.start())
+            type_hierarchy_supertypes(
+                &self.db,
+                self.program_file(item.file),
+                item.selection_range.start(),
+            )
         }
 
         fn subtypes(&self) -> Vec<TypeHierarchyItem> {
             let Some(item) = self.prepare() else {
                 return vec![];
             };
-            type_hierarchy_subtypes(&self.db, item.file, item.selection_range.start())
+            type_hierarchy_subtypes(
+                &self.db,
+                self.program_file(item.file),
+                item.selection_range.start(),
+            )
         }
     }
 }

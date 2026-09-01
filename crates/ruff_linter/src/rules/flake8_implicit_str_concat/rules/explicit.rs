@@ -1,11 +1,12 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::token::parenthesized_range;
+use ruff_python_ast::token::{TokenKind, parenthesized_range};
 use ruff_python_ast::{self as ast, Expr, Operator};
 use ruff_python_trivia::is_python_whitespace;
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -40,7 +41,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// - `lint.flake8-implicit-str-concat.allow-multiline`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.201")]
+#[violation_metadata(stable_since = "v0.0.201", category = Category::Restriction)]
 pub(crate) struct ExplicitStringConcatenation;
 
 impl Violation for ExplicitStringConcatenation {
@@ -105,18 +106,30 @@ pub(crate) fn explicit(checker: &Checker, expr: &Expr) {
                     return;
                 }
 
-                diagnostic.set_fix(generate_fix(checker, bin_op));
+                if let Some(fix) = generate_fix(checker, bin_op) {
+                    diagnostic.set_fix(fix);
+                }
             }
         }
     }
 }
 
-fn generate_fix(checker: &Checker, expr_bin_op: &ast::ExprBinOp) -> Fix {
+fn generate_fix(checker: &Checker, expr_bin_op: &ast::ExprBinOp) -> Option<Fix> {
     let ast::ExprBinOp { left, right, .. } = expr_bin_op;
 
     let between_operands_range = TextRange::new(left.end(), right.start());
-    let between_operands = checker.locator().slice(between_operands_range);
-    let (before_plus, after_plus) = between_operands.split_once('+').unwrap();
+    let plus_token = checker
+        .tokens()
+        .in_range(between_operands_range)
+        .iter()
+        .find(|token| token.kind() == TokenKind::Plus)?;
+
+    let before_plus = checker
+        .locator()
+        .slice(TextRange::new(left.end(), plus_token.start()));
+    let after_plus = checker
+        .locator()
+        .slice(TextRange::new(plus_token.end(), right.start()));
 
     let linebreak_before_operator =
         before_plus.contains_line_break(TextRange::at(TextSize::new(0), before_plus.text_len()));
@@ -129,8 +142,8 @@ fn generate_fix(checker: &Checker, expr_bin_op: &ast::ExprBinOp) -> Fix {
         before_plus.trim_end_matches(is_python_whitespace)
     };
 
-    Fix::safe_edit(Edit::range_replacement(
+    Some(Fix::safe_edit(Edit::range_replacement(
         format!("{before_plus}{after_plus}"),
         between_operands_range,
-    ))
+    )))
 }

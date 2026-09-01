@@ -19,7 +19,7 @@ mod server;
 mod session;
 mod system;
 
-pub(crate) const SERVER_NAME: &str = "ty";
+const SERVER_NAME: &str = "ty";
 pub(crate) const DIAGNOSTIC_NAME: &str = "ty";
 
 /// A common result type used in most cases where a

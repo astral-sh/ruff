@@ -1,6 +1,7 @@
 use ruff_python_ast::token::{TokenKind, Tokens};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
+use ruff_python_trivia::tab_offset;
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -26,7 +27,7 @@ pub(crate) fn expand_indent(line: &str, indent_width: IndentWidth) -> usize {
     let tab_size = indent_width.as_usize();
     for c in line.bytes() {
         match c {
-            b'\t' => indent = (indent / tab_size) * tab_size + tab_size,
+            b'\t' => indent += tab_offset(indent, tab_size),
             b' ' => indent += 1,
             _ => break,
         }

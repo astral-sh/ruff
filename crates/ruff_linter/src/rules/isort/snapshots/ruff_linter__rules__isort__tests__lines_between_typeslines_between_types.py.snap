@@ -21,7 +21,6 @@ I001 [*] Import block is un-sorted or un-formatted
 15 | | from . import config
 16 | | from .data import Data
    | |______________________^
-   |
 help: Organize imports
    |
 11 |

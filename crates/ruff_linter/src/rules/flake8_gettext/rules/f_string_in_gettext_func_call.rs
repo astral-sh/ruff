@@ -5,6 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::flake8_gettext::is_ngettext_call;
 
 /// ## What it does
@@ -46,7 +47,7 @@ use crate::rules::flake8_gettext::is_ngettext_call;
 /// ## References
 /// - [Python documentation: `gettext` — Multilingual internationalization services](https://docs.python.org/3/library/gettext.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.260")]
+#[violation_metadata(stable_since = "v0.0.260", category = Category::Suspicious)]
 pub(crate) struct FStringInGetTextFuncCall {
     is_plural: bool,
 }

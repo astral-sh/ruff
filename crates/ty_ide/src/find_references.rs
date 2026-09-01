@@ -1,24 +1,25 @@
 use crate::goto::find_goto_target;
-use crate::references::{ReferencesMode, references};
+use crate::references::{FixtureReferenceTarget, ReferencesMode, references};
 use crate::{Db, ReferenceTarget};
-use ruff_db::files::File;
-use ruff_text_size::TextSize;
-use ty_python_semantic::SemanticModel;
+use ruff_db::parsed::ParsedModuleRef;
+use ruff_python_ast::AnyNodeRef;
+use ruff_python_ast::find_node::covering_node;
+use ruff_python_ast::token::TokenKind;
+use ruff_text_size::{Ranged, TextSize};
+use ty_python_core::ProgramFile;
+use ty_python_semantic::{FixtureNameSource, SemanticModel, fixture_exposures_for_definition};
 
 /// Find all references to a symbol at the given position.
 /// Search for references across all files in the project.
 pub fn find_references(
     db: &dyn Db,
-    file: File,
+    file: ProgramFile<'_>,
     offset: TextSize,
     include_declaration: bool,
 ) -> Option<Vec<ReferenceTarget>> {
-    let parsed = ruff_db::parsed::parsed_module(db, file);
+    let parsed = ruff_db::parsed::parsed_module(db, file.python_file(db));
     let module = parsed.load(db);
     let model = SemanticModel::new(db, file);
-
-    // Get the definitions for the symbol at the cursor position
-    let goto_target = find_goto_target(&model, &module, offset)?;
 
     let mode = if include_declaration {
         ReferencesMode::References
@@ -26,15 +27,102 @@ pub fn find_references(
         ReferencesMode::ReferencesSkipDeclaration
     };
 
+    // A decorator's `name="..."` literal names a fixture without defining a Python symbol.
+    // Start a fixture-only search before the ordinary symbol lookup below.
+    if let Some(target) = explicit_fixture_name_at_offset(&model, &module, offset) {
+        return target.references(db, file, mode);
+    }
+
+    // Get the definitions for the symbol at the cursor position
+    let goto_target = find_goto_target(&model, &module, offset)?;
     references(db, file, &goto_target, mode)
+}
+
+/// Returns a target for the explicit fixture name at `offset`.
+/// Quotes, prefixes, and token boundaries select the name's contents.
+///
+/// This makes it so that an offset within `"public_name"` in the decorator
+/// below will target the test parameter:
+///
+/// ```python
+/// import pytest
+///
+/// @pytest.fixture(name="public_name")
+/// def implementation(): ...
+///
+/// def test_use(public_name): ...
+/// ```
+fn explicit_fixture_name_at_offset<'db>(
+    model: &SemanticModel<'db>,
+    module: &ParsedModuleRef,
+    offset: TextSize,
+) -> Option<FixtureReferenceTarget<'db>> {
+    let token = module
+        .tokens()
+        .at_offset(offset)
+        .find(|token| token.kind() == TokenKind::String)?;
+    let covering = covering_node(module.syntax().into(), token.range());
+    let AnyNodeRef::StringLiteral(literal) = covering.node() else {
+        return None;
+    };
+
+    // Match a string literal in a function decorator's `name` argument:
+    //
+    // @pytest.fixture(name="resource")
+    // def implementation(): ...
+    //
+    // The semantic lookup below verifies that the decorator declares a fixture.
+    let mut ancestors = covering.ancestors();
+    let mut in_name_argument = false;
+    let function = loop {
+        match ancestors.next()? {
+            // The literal must be the value of `name`, not another keyword.
+            AnyNodeRef::Keyword(keyword)
+                if keyword.arg.as_deref() == Some("name")
+                    && keyword.value.is_string_literal_expr() =>
+            {
+                in_name_argument = true;
+            }
+            // The decorator must belong directly to a function, not a class.
+            AnyNodeRef::Decorator(_) if in_name_argument => {
+                let AnyNodeRef::StmtFunctionDef(function) = ancestors.next()? else {
+                    return None;
+                };
+                break function;
+            }
+            // Skip over intermediate nodes that connect the literal, keyword, and decorator.
+            AnyNodeRef::StringLiteral(_)
+            | AnyNodeRef::ExprStringLiteral(_)
+            | AnyNodeRef::Arguments(_)
+            | AnyNodeRef::ExprCall(_) => {}
+            // Reject unrelated syntax, such as return annotations, and failed guards.
+            _ => return None,
+        }
+    };
+    let definition = ty_python_core::semantic_index(model.db(), model.program_file())
+        .expect_single_definition(function);
+    let exposures = fixture_exposures_for_definition(model.db(), definition);
+
+    let exposure = exposures.iter().find(|exposure| {
+        matches!(
+            exposure.name_source(model.db()),
+            FixtureNameSource::Explicit {
+                declaration: Some(declaration), ..
+            } if declaration.file() == model.file()
+                && declaration.range() == literal.content_range()
+        )
+    })?;
+
+    Some(FixtureReferenceTarget::from_exposure(model.db(), exposure))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tests::{CursorTest, IntoDiagnostic, cursor_test};
+    use crate::tests::{CursorTest, IntoDiagnostic, SitePackagesCursorTestBuilder, cursor_test};
     use insta::assert_snapshot;
     use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, LintName, Severity, Span};
+    use ruff_db::source::source_text;
 
     impl CursorTest {
         fn references(&self) -> String {
@@ -48,7 +136,7 @@ mod tests {
         fn references_with_include_declaration(&self, include_declaration: bool) -> String {
             let Some(mut reference_results) = find_references(
                 &self.db,
-                self.cursor.file,
+                self.program_file(self.cursor.file),
                 self.cursor.offset,
                 include_declaration,
             ) else {
@@ -90,6 +178,115 @@ mod tests {
     }
 
     #[test]
+    fn references_do_not_mix_global_and_nonlocal_comprehension_walruses() {
+        let test = cursor_test(
+            "
+last = 0
+
+def outer():
+    last = 1
+
+    def write_global():
+        global last
+        [(last := global_item) for global_item in [2]]
+
+    def write_nonlocal():
+        nonlocal last
+        [(last := nonlocal_item) for nonlocal_item in [3]]
+
+    write_global()
+    write_nonlocal()
+    return la<CURSOR>st
+",
+        );
+
+        assert_snapshot!(test.references(), @"
+        info[references]: Found 4 references
+          --> main.py:5:5
+           |
+         5 |     last = 1
+           |     ----
+           |
+          ::: main.py:12:18
+           |
+        12 |         nonlocal last
+           |                  ----
+        13 |         [(last := nonlocal_item) for nonlocal_item in [3]]
+           |           ----
+        14 |
+        15 |     write_global()
+        16 |     write_nonlocal()
+        17 |     return last
+           |            ----
+        ");
+    }
+
+    #[test]
+    fn comprehension_walrus_references_in_function() {
+        let test = cursor_test(
+            "
+def f(items):
+    [(la<CURSOR>st := item) for item in items]
+    return last
+",
+        );
+
+        assert_snapshot!(test.references(), @"
+        info[references]: Found 2 references
+         --> main.py:3:7
+          |
+        3 |     [(last := item) for item in items]
+          |       ----
+        4 |     return last
+          |            ----
+        ");
+    }
+
+    #[test]
+    fn nested_comprehension_walrus_references_in_function() {
+        let test = cursor_test(
+            "
+def f(items):
+    [[(la<CURSOR>st := item) for item in items] for _ in [1]]
+    return last
+",
+        );
+
+        assert_snapshot!(test.references(), @"
+        info[references]: Found 2 references
+         --> main.py:3:8
+          |
+        3 |     [[(last := item) for item in items] for _ in [1]]
+          |        ----
+        4 |     return last
+          |            ----
+        ");
+    }
+
+    #[test]
+    fn comprehension_walrus_references_across_files() {
+        let test = CursorTest::builder()
+            .source("lib.py", "[(la<CURSOR>st := item) for item in [1]]\n")
+            .source("main.py", "from lib import last\nprint(last)\n")
+            .build();
+
+        assert_snapshot!(test.references(), @"
+        info[references]: Found 3 references
+         --> lib.py:1:3
+          |
+        1 | [(last := item) for item in [1]]
+          |   ----
+          |
+         ::: main.py:1:17
+          |
+        1 | from lib import last
+          |                 ----
+        2 | print(last)
+          |       ----
+        ");
+    }
+
+    #[test]
     fn parameter_references_in_function() {
         let test = cursor_test(
             "
@@ -119,7 +316,6 @@ result = calculate_sum(value=42)
         7 | # Call with keyword argument
         8 | result = calculate_sum(value=42)
           |                        -----
-          |
         ");
     }
 
@@ -180,7 +376,6 @@ def outer_function():
         18 |     decrement()
         19 |     final = counter
            |             -------
-           |
         ");
     }
 
@@ -238,7 +433,6 @@ final_value = global_counter
         17 | decrement_global()
         18 | final_value = global_counter
            |               --------------
-           |
         ");
     }
 
@@ -276,7 +470,6 @@ except ValueError as err:
            |                      ---
         11 |     print(f'Different error: {err}')
            |                               ---
-           |
         ");
     }
 
@@ -303,7 +496,6 @@ match x:
           |                           -------
         5 |         return pattern
           |                -------
-          |
         ");
     }
 
@@ -331,7 +523,6 @@ match data:
           |                 ----
         6 |         return rest
           |                ----
-          |
         ");
     }
 
@@ -378,7 +569,6 @@ value = my_function
            |       -----------
         14 | value = my_function
            |         -----------
-           |
         ");
     }
 
@@ -434,7 +624,6 @@ test("test")
          3 |
          4 | test("test")
            | ----
-           |
         "#);
     }
 
@@ -481,7 +670,6 @@ cls = MyClass
            |
         15 | cls = MyClass
            |       -------
-           |
         ");
     }
 
@@ -505,7 +693,6 @@ cls = MyClass
         3 |
         4 | class MyClass:
           |       -------
-          |
         "#);
     }
 
@@ -526,7 +713,6 @@ cls = MyClass
           |
         2 | a: "MyClass" = 1
           |     -------
-          |
         "#);
     }
 
@@ -550,7 +736,6 @@ cls = MyClass
         3 |
         4 | class MyClass:
           |       -------
-          |
         "#);
     }
 
@@ -588,7 +773,6 @@ cls = MyClass
         3 |
         4 | class MyClass:
           |       -------
-          |
         "#);
     }
 
@@ -640,7 +824,6 @@ cls = MyClass
         3 |
         4 | class MyClass:
           |       -------
-          |
         "#);
     }
 
@@ -672,7 +855,6 @@ cls = MyClass
           |
         2 | ab: "ab"
           | --   --
-          |
         "#);
     }
 
@@ -706,7 +888,6 @@ cls = MyClass
           |                      --
         5 |             x = ab
           |                 --
-          |
         "#);
     }
 
@@ -729,7 +910,6 @@ cls = MyClass
           |                      --
         5 |             x = ab
           |                 --
-          |
         "#);
     }
 
@@ -752,7 +932,6 @@ cls = MyClass
           |                       --
         5 |             x = ab
           |                 --
-          |
         "#);
     }
 
@@ -775,7 +954,6 @@ cls = MyClass
           |                       --
         5 |             x = ab
           |                 --
-          |
         "#);
     }
 
@@ -798,7 +976,6 @@ cls = MyClass
           |                                     --
         5 |             x = ab
           |                 --
-          |
         "#);
     }
 
@@ -821,7 +998,6 @@ cls = MyClass
           |                                     --
         5 |             x = ab
           |                 --
-          |
         "#);
     }
 
@@ -850,7 +1026,6 @@ cls = MyClass
            |                              --
         11 |             x = ab
            |                 --
-           |
         ");
     }
 
@@ -879,7 +1054,6 @@ cls = MyClass
            |                              --
         11 |             x = ab
            |                 --
-           |
         ");
     }
 
@@ -914,7 +1088,6 @@ cls = MyClass
          9 |     match event:
         10 |         case Click(x, button=ab):
            |              -----
-           |
         ");
     }
 
@@ -952,7 +1125,6 @@ cls = MyClass
           |
         2 | type Alias1[AB: int = bool] = tuple[AB, list[AB]]
           |             --                      --       --
-          |
         ");
     }
 
@@ -970,7 +1142,6 @@ cls = MyClass
           |
         2 | type Alias1[AB: int = bool] = tuple[AB, list[AB]]
           |             --                      --       --
-          |
         ");
     }
 
@@ -989,7 +1160,6 @@ cls = MyClass
           |
         3 | type Alias2[**AB = [int, str]] = Callable[AB, tuple[AB]]
           |               --                          --        --
-          |
         ");
     }
 
@@ -1008,7 +1178,6 @@ cls = MyClass
           |
         3 | type Alias2[**AB = [int, str]] = Callable[AB, tuple[AB]]
           |               --                          --        --
-          |
         ");
     }
 
@@ -1026,7 +1195,6 @@ cls = MyClass
           |
         2 | type Alias3[*AB = ()] = tuple[tuple[*AB], tuple[*AB]]
           |              --                      --          --
-          |
         ");
     }
 
@@ -1044,7 +1212,6 @@ cls = MyClass
           |
         2 | type Alias3[*AB = ()] = tuple[tuple[*AB], tuple[*AB]]
           |              --                      --          --
-          |
         ");
     }
 
@@ -1111,7 +1278,6 @@ class DataProcessor:
           |
         2 | def func(x):
           |     ----
-          |
         ");
     }
 
@@ -1161,7 +1327,6 @@ def process_model():
         5 |     def get_attribute(self):
         6 |         return MyModel.attr
           |                        ----
-          |
         ");
     }
 
@@ -1199,7 +1364,6 @@ instance = ExampleClass(old_name="test")
           |                        --------
         4 |         self.old_name = old_name
           |                         --------
-          |
         "#);
     }
 
@@ -1227,7 +1391,6 @@ TD(f=1)
         7 |
         8 | TD(f=1)
           |    -
-          |
         ");
     }
 
@@ -1255,7 +1418,6 @@ TD(f<CURSOR>=1)
         7 |
         8 | TD(f=1)
           |    -
-          |
         ");
     }
 
@@ -1283,7 +1445,6 @@ NT(f=1)
         7 |
         8 | NT(f=1)
           |    -
-          |
         ");
     }
 
@@ -1312,7 +1473,6 @@ DC(f=1)
         8 |
         9 | DC(f=1)
           |    -
-          |
         ");
     }
 
@@ -1349,7 +1509,6 @@ result = func(value=42)
           |          -----
         3 |     return value * 2
           |            -----
-          |
         ");
     }
 
@@ -1391,7 +1550,6 @@ result = func(value=1)
         4 |
         5 | result = func(value=42)
           |               -----
-          |
         ");
     }
 
@@ -1429,7 +1587,6 @@ async def main():
           |                -----
         3 |     return value * 2
           |            -----
-          |
         ");
     }
 
@@ -1460,7 +1617,6 @@ instance = ExampleClass(old_name="test")
           |
         4 |         self.old_name = old_name
           |              --------
-          |
         ");
     }
 
@@ -1498,7 +1654,6 @@ result = func(value=10)
           |               -----
         4 |         return value * 2
           |                -----
-          |
         ");
     }
 
@@ -1540,7 +1695,6 @@ result = instance.method(old_name="world")
           |                        --------
         4 |         self.old_name = old_name
           |                         --------
-          |
         "#);
     }
 
@@ -1577,7 +1731,6 @@ func<CURSOR>_alias()
         3 |
         4 | func_alias()
           | ----------
-          |
         ");
     }
 
@@ -1623,7 +1776,6 @@ func<CURSOR>_alias()
           |
         2 | class Path:
           |       ----
-          |
         "#);
     }
 
@@ -1651,7 +1803,6 @@ func<CURSOR>_alias()
         4 |
         5 | x = abc
           |     ---
-          |
         ");
     }
 
@@ -1679,7 +1830,6 @@ func<CURSOR>_alias()
         4 |
         5 | x = abc
           |     ---
-          |
         ");
     }
 
@@ -1708,7 +1858,6 @@ func<CURSOR>_alias()
         4 |
         5 | y = xyz
           |     ---
-          |
         ");
     }
 
@@ -1737,7 +1886,6 @@ func<CURSOR>_alias()
         4 |
         5 | y = xyz
           |     ---
-          |
         ");
     }
 
@@ -1768,7 +1916,6 @@ func<CURSOR>_alias()
           |
         4 | x = subpkg
           |     ------
-          |
         ");
     }
 
@@ -1901,7 +2048,6 @@ func<CURSOR>_alias()
           |
         2 | subpkg: int = 10
           | ------
-          |
         ");
     }
 
@@ -1938,7 +2084,6 @@ func<CURSOR>_alias()
           |
         2 | subpkg: int = 10
           | ------
-          |
         ");
     }
 
@@ -1970,7 +2115,6 @@ func<CURSOR>_alias()
         5 |
         6 | print(a)
           |       -
-          |
         "#);
     }
 
@@ -1989,7 +2133,6 @@ print(x)
           |
         3 | print(x)
           |       -
-          |
         ");
     }
 
@@ -2011,7 +2154,6 @@ print(x<CURSOR>)
           | -
         4 | print(x)
           |       -
-          |
         ");
     }
 
@@ -2033,7 +2175,6 @@ print(x)
           | -
         4 | print(x)
           |       -
-          |
         ");
     }
 
@@ -2053,7 +2194,6 @@ print(x)
           |
         4 | print(x)
           |       -
-          |
         ");
     }
 
@@ -2072,7 +2212,6 @@ value: Box
           |
         3 | value: Box
           |        ---
-          |
         ");
     }
 
@@ -2096,7 +2235,6 @@ def test(flag: bool):
           |
         8 |     print(x)
           |           -
-          |
         ");
     }
 
@@ -2120,7 +2258,6 @@ def f(flag: bool):
           |     -
         6 |     print(x)
           |           -
-          |
         ");
     }
 
@@ -2142,7 +2279,6 @@ print(x<CURSOR>)
           |
         6 | print(x)
           |       -
-          |
         ");
     }
 
@@ -2165,7 +2301,6 @@ class C:
           |
         7 |         print(self.x)
           |                    -
-          |
         ");
     }
 
@@ -2190,7 +2325,826 @@ class C:
           |
         9 |         print(self.x)
           |                    -
-          |
         ");
+    }
+
+    #[test]
+    fn references_pytest_fixture_relationships_from_default_name() {
+        let request_test = pytest_cursor_test(
+            r#"
+            import pytest
+
+            @pytest.fixture
+            def resource(): ...
+
+            copy = resource
+
+            @pytest.fixture
+            def dependent(resource<CURSOR>):
+                print(resource)
+
+            def test_use(resource):
+                print(resource)
+            "#,
+        );
+        let definition_test = pytest_cursor_test(
+            r#"
+            import pytest
+
+            @pytest.fixture
+            def resource<CURSOR>(): ...
+
+            copy = resource
+
+            @pytest.fixture
+            def dependent(resource):
+                print(resource)
+
+            def test_use(resource):
+                print(resource)
+            "#,
+        );
+
+        let fixture_references = request_test.references();
+        assert_eq!(fixture_references, definition_test.references());
+        assert_snapshot!(fixture_references, @"
+        info[references]: Found 6 references
+          --> src/test_example.py:5:5
+           |
+         5 | def resource(): ...
+           |     --------
+         6 |
+         7 | copy = resource
+           |        --------
+         8 |
+         9 | @pytest.fixture
+        10 | def dependent(resource):
+           |               --------
+        11 |     print(resource)
+           |           --------
+        12 |
+        13 | def test_use(resource):
+           |              --------
+        14 |     print(resource)
+           |           --------
+        ");
+    }
+
+    #[test]
+    fn references_pytest_fixture_relationships_from_explicit_name() {
+        let request_test = pytest_cursor_test(
+            r#"
+            import pytest
+
+            @pytest.fixture(name="resource")
+            def implementation(): ...
+
+            copy = implementation
+
+            @pytest.fixture
+            def dependent(resource<CURSOR>):
+                print(resource)
+
+            def test_use(resource):
+                print(resource)
+            "#,
+        );
+        let decorator_test = pytest_cursor_test(
+            r#"
+            import pytest
+
+            @pytest.fixture(name="<CURSOR>resource")
+            def implementation(): ...
+
+            copy = implementation
+
+            @pytest.fixture
+            def dependent(resource):
+                print(resource)
+
+            def test_use(resource):
+                print(resource)
+            "#,
+        );
+
+        let fixture_references = request_test.references();
+        assert_eq!(fixture_references, decorator_test.references());
+        assert_snapshot!(fixture_references, @r#"
+        info[references]: Found 5 references
+          --> src/test_example.py:4:23
+           |
+         4 | @pytest.fixture(name="resource")
+           |                       --------
+           |
+          ::: src/test_example.py:10:15
+           |
+        10 | def dependent(resource):
+           |               --------
+        11 |     print(resource)
+           |           --------
+        12 |
+        13 | def test_use(resource):
+           |              --------
+        14 |     print(resource)
+           |           --------
+        "#);
+    }
+
+    #[test]
+    fn references_explicit_fixture_name_from_string_token() {
+        let mut test = pytest_cursor_test(
+            r#"
+            import pytest
+
+            @pytest.fixture(name=<CURSOR>r'''resource''')
+            def implementation(): ...
+
+            def test_use(resource):
+                print(resource)
+            "#,
+        );
+        let source = source_text(&test.db, test.cursor.file);
+        let end = source
+            .find(')')
+            .expect("the fixture decorator should have a closing parenthesis");
+        let expected = test.references();
+        assert_snapshot!(expected, @"
+        info[references]: Found 3 references
+         --> src/test_example.py:4:26
+          |
+        4 | @pytest.fixture(name=r'''resource''')
+          |                          --------
+        5 | def implementation(): ...
+        6 |
+        7 | def test_use(resource):
+          |              --------
+        8 |     print(resource)
+          |           --------
+        ");
+
+        // Every position in the prefix, quotes, and contents selects the same name.
+        for offset in usize::from(test.cursor.offset)..=end {
+            test.cursor.offset = TextSize::try_from(offset).expect("the test offset should fit");
+            assert_eq!(test.references(), expected, "cursor offset {offset}");
+        }
+    }
+
+    #[test]
+    fn explicit_fixture_name_matching_python_name_keeps_reference_families_separate() {
+        let definition_test = pytest_cursor_test(
+            r#"
+            import pytest
+
+            @pytest.fixture(name="resource")
+            def resource<CURSOR>(): ...
+
+            copy = resource
+
+            def test_use(resource):
+                print(resource)
+            "#,
+        );
+        let request_test = pytest_cursor_test(
+            r#"
+            import pytest
+
+            @pytest.fixture(name="resource")
+            def resource(): ...
+
+            copy = resource
+
+            def test_use(resource<CURSOR>):
+                print(resource)
+            "#,
+        );
+
+        assert_snapshot!(definition_test.references(), @"
+        info[references]: Found 2 references
+         --> src/test_example.py:5:5
+          |
+        5 | def resource(): ...
+          |     --------
+        6 |
+        7 | copy = resource
+          |        --------
+        ");
+        assert_snapshot!(request_test.references(), @r#"
+        info[references]: Found 3 references
+          --> src/test_example.py:4:23
+           |
+         4 | @pytest.fixture(name="resource")
+           |                       --------
+           |
+          ::: src/test_example.py:9:14
+           |
+         9 | def test_use(resource):
+           |              --------
+        10 |     print(resource)
+           |           --------
+        "#);
+    }
+
+    #[test]
+    fn references_pytest_fixture_respect_conftest_shadowing() {
+        let mut builder = pytest_cursor_test_builder();
+        let test = builder
+            .source(
+                "conftest.py",
+                r#"
+                import pytest
+
+                @pytest.fixture
+                def resource<CURSOR>(): ...
+                "#,
+            )
+            .source(
+                "tests/test_outer.py",
+                r#"
+                def test_outer(resource):
+                    print(resource)
+                "#,
+            )
+            .source(
+                "tests/nested/conftest.py",
+                r#"
+                import pytest
+
+                @pytest.fixture
+                def resource(): ...
+                "#,
+            )
+            .source(
+                "tests/nested/test_inner.py",
+                r#"
+                def test_inner(resource):
+                    print(resource)
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.references(), @"
+        info[references]: Found 3 references
+         --> src/conftest.py:5:5
+          |
+        5 | def resource(): ...
+          |     --------
+          |
+         ::: src/tests/test_outer.py:2:16
+          |
+        2 | def test_outer(resource):
+          |                --------
+        3 |     print(resource)
+          |           --------
+        ");
+    }
+
+    #[test]
+    fn references_pytest_imported_fixture_exposure() {
+        let mut builder = pytest_cursor_test_builder();
+        let test = builder
+            .source(
+                "fixtures.py",
+                r#"
+                import pytest
+
+                @pytest.fixture
+                def resource(): ...
+                "#,
+            )
+            .source(
+                "test_example.py",
+                r#"
+                from fixtures import resource as alias
+
+                def test_use(alias<CURSOR>):
+                    print(alias)
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.references(), @"
+        info[references]: Found 3 references
+         --> src/test_example.py:2:34
+          |
+        2 | from fixtures import resource as alias
+          |                                  -----
+        3 |
+        4 | def test_use(alias):
+          |              -----
+        5 |     print(alias)
+          |           -----
+        ");
+        assert_snapshot!(test.references_without_declaration(), @"
+        info[references]: Found 2 references
+         --> src/test_example.py:4:14
+          |
+        4 | def test_use(alias):
+          |              -----
+        5 |     print(alias)
+          |           -----
+        ");
+    }
+
+    #[test]
+    fn references_pytest_fixture_through_reexport() {
+        let mut builder = pytest_cursor_test_builder();
+        let test = builder
+            .source(
+                "fixtures.py",
+                r#"
+                import pytest
+
+                @pytest.fixture
+                def resource(): ...
+                "#,
+            )
+            .source(
+                "reexports.py",
+                r#"
+                from fixtures import resource as middle
+                "#,
+            )
+            .source(
+                "test_example.py",
+                r#"
+                from reexports import middle<CURSOR>
+
+                def test_use(middle):
+                    print(middle)
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.references(), @"
+        info[references]: Found 4 references
+         --> src/reexports.py:2:34
+          |
+        2 | from fixtures import resource as middle
+          |                                  ------
+          |
+         ::: src/test_example.py:2:23
+          |
+        2 | from reexports import middle
+          |                       ------
+        3 |
+        4 | def test_use(middle):
+          |              ------
+        5 |     print(middle)
+          |           ------
+        ");
+    }
+
+    #[test]
+    fn references_function_local_fixture_import_as_ordinary_alias() {
+        let mut builder = pytest_cursor_test_builder();
+        let test = builder
+            .source(
+                "fixtures.py",
+                r#"
+                import pytest
+
+                @pytest.fixture
+                def resource(): ...
+                "#,
+            )
+            .source(
+                "test_example.py",
+                r#"
+                def helper():
+                    from fixtures import resource as local<CURSOR>
+                    print(local)
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.references(), @"
+        info[references]: Found 2 references
+         --> src/test_example.py:3:38
+          |
+        3 |     from fixtures import resource as local
+          |                                      -----
+        4 |     print(local)
+          |           -----
+        ");
+    }
+
+    #[test]
+    fn references_pytest_fixture_does_not_expand_through_ambiguous_request() {
+        let test = ambiguous_pytest_fixture_cursor_test(
+            r#"
+            import pytest
+
+            @pytest.fixture
+            def first<CURSOR>(): ...
+            "#,
+            r#"
+            flag: bool
+            if flag:
+                from first import first as resource
+            else:
+                from second import second as resource
+
+            def test_ambiguous(resource):
+                print(resource)
+            "#,
+        );
+
+        assert_snapshot!(test.references(), @"
+        info[references]: Found 2 references
+         --> src/first.py:5:5
+          |
+        5 | def first(): ...
+          |     -----
+          |
+         ::: src/test_ambiguous.py:4:23
+          |
+        4 |     from first import first as resource
+          |                       -----
+        ");
+    }
+
+    #[test]
+    fn references_ambiguous_pytest_fixture_request_includes_all_targets() {
+        let test = ambiguous_pytest_fixture_cursor_test(
+            r#"
+            import pytest
+
+            @pytest.fixture
+            def first(): ...
+            "#,
+            r#"
+            flag: bool
+            if flag:
+                from first import first as resource
+            else:
+                from second import second as resource
+
+            def test_ambiguous(resource<CURSOR>):
+                print(resource)
+            "#,
+        );
+
+        assert_snapshot!(test.references(), @"
+        info[references]: Found 4 references
+         --> src/test_ambiguous.py:4:32
+          |
+        4 |     from first import first as resource
+          |                                --------
+        5 | else:
+        6 |     from second import second as resource
+          |                                  --------
+        7 |
+        8 | def test_ambiguous(resource):
+          |                    --------
+        9 |     print(resource)
+          |           --------
+        ");
+    }
+
+    #[test]
+    fn references_pytest_fixture_preserves_non_fixture_ambiguous_target() {
+        let test = pytest_cursor_test(
+            r#"
+            import pytest
+
+            flag: bool
+            if flag:
+                @pytest.fixture
+                def resource(): ...
+            else:
+                def resource(): ...
+
+            resource<CURSOR>()
+            "#,
+        );
+
+        assert_snapshot!(test.references(), @"
+        info[references]: Found 3 references
+          --> src/test_example.py:7:9
+           |
+         7 |     def resource(): ...
+           |         --------
+         8 | else:
+         9 |     def resource(): ...
+           |         --------
+        10 |
+        11 | resource()
+           | --------
+        ");
+    }
+
+    #[test]
+    fn references_pytest_installed_core_fixture() {
+        let test = pytest_cursor_test(
+            r#"
+            def test_use(tmp_path<CURSOR>):
+                print(tmp_path)
+            "#,
+        );
+
+        assert_snapshot!(test.references(), @"
+        info[references]: Found 3 references
+         --> site-packages/_pytest/tmpdir.py:5:5
+          |
+        5 | def tmp_path(): ...
+          |     --------
+          |
+         ::: src/test_example.py:2:14
+          |
+        2 | def test_use(tmp_path):
+          |              --------
+        3 |     print(tmp_path)
+          |           --------
+        ");
+    }
+
+    #[test]
+    fn references_pytest_fixture_declaration_through_external_stub() {
+        let definition_test = external_stub_fixture_definition_cursor_test();
+        let import_test = external_stub_fixture_cursor_test(
+            r#"
+            from third_party_plugin import external_resource<CURSOR> as resource
+
+            def test_use(resource):
+                print(resource)
+            "#,
+        );
+        let parameter_test = external_stub_fixture_cursor_test(
+            r#"
+            from third_party_plugin import external_resource as resource
+
+            def test_use(resource<CURSOR>):
+                print(resource)
+            "#,
+        );
+
+        assert_snapshot!(definition_test.references(), @"
+        info[references]: Found 1 references
+         --> src/third_party_plugin.py:5:5
+          |
+        5 | def external_resource(): ...
+          |     -----------------
+        ");
+        assert_snapshot!(import_test.references(), @"
+        info[references]: Found 2 references
+         --> site-packages/third_party_plugin.pyi:2:5
+          |
+        2 | def external_resource() -> object: ...
+          |     -----------------
+          |
+         ::: src/test_example.py:2:32
+          |
+        2 | from third_party_plugin import external_resource as resource
+          |                                -----------------
+        ");
+        assert_snapshot!(parameter_test.references(), @"
+        info[references]: Found 3 references
+         --> src/test_example.py:2:53
+          |
+        2 | from third_party_plugin import external_resource as resource
+          |                                                     --------
+        3 |
+        4 | def test_use(resource):
+          |              --------
+        5 |     print(resource)
+          |           --------
+        ");
+    }
+
+    #[test]
+    fn references_pytest_fixture_through_annotated_stub() {
+        let test = external_stub_fixture_cursor_test_with_stub(
+            r#"
+            from third_party_plugin import external_resource
+
+            def test_use(external_resource<CURSOR>):
+                print(external_resource)
+            "#,
+            r#"
+            external_resource: object
+            "#,
+        );
+
+        assert_snapshot!(test.references(), @"
+        info[references]: Found 4 references
+         --> site-packages/third_party_plugin.pyi:2:1
+          |
+        2 | external_resource: object
+          | -----------------
+          |
+         ::: src/test_example.py:2:32
+          |
+        2 | from third_party_plugin import external_resource
+          |                                -----------------
+        3 |
+        4 | def test_use(external_resource):
+          |              -----------------
+        5 |     print(external_resource)
+          |           -----------------
+        ");
+    }
+
+    #[test]
+    fn references_explicit_pytest_fixture_stops_at_external_stub() {
+        let test = explicit_external_stub_fixture_cursor_test(
+            r#"
+            from third_party_plugin import implementation
+
+            def test_use(resource<CURSOR>):
+                print(resource)
+            "#,
+        );
+
+        assert_snapshot!(test.references(), @"
+        info[references]: Found 2 references
+         --> src/test_example.py:4:14
+          |
+        4 | def test_use(resource):
+          |              --------
+        5 |     print(resource)
+          |           --------
+        ");
+    }
+
+    fn external_stub_fixture_definition_cursor_test() -> CursorTest {
+        let mut builder = pytest_cursor_test_builder();
+        builder
+            .source(
+                "third_party_plugin.py",
+                r#"
+                import pytest
+
+                @pytest.fixture
+                def external_resource<CURSOR>(): ...
+                "#,
+            )
+            .source(
+                "third_party_plugin.pyi",
+                r#"
+                def external_resource() -> object: ...
+                "#,
+            )
+            .source(
+                "test_example.py",
+                r#"
+                from third_party_plugin import external_resource
+                "#,
+            )
+            .build()
+    }
+
+    fn external_stub_fixture_cursor_test(test_source: &str) -> CursorTest {
+        external_stub_fixture_cursor_test_with_stub(
+            test_source,
+            r#"
+            def external_resource() -> object: ...
+            "#,
+        )
+    }
+
+    fn external_stub_fixture_cursor_test_with_stub(
+        test_source: &str,
+        stub_source: &str,
+    ) -> CursorTest {
+        let mut builder = pytest_cursor_test_builder();
+        builder
+            .site_packages(
+                "third_party_plugin.py",
+                r#"
+                import pytest
+
+                @pytest.fixture
+                def external_resource(): ...
+                "#,
+            )
+            .site_packages("third_party_plugin.pyi", stub_source)
+            .source("test_example.py", test_source)
+            .build()
+    }
+
+    fn explicit_external_stub_fixture_cursor_test(test_source: &str) -> CursorTest {
+        let mut builder = pytest_cursor_test_builder();
+        builder
+            .source(
+                "third_party_plugin.py",
+                r#"
+                import pytest
+
+                @pytest.fixture(name="resource")
+                def implementation(): ...
+                "#,
+            )
+            .source(
+                "third_party_plugin.pyi",
+                r#"
+                def implementation() -> object: ...
+                "#,
+            )
+            .source("test_example.py", test_source)
+            .build()
+    }
+
+    fn ambiguous_pytest_fixture_cursor_test(
+        first_fixture: &str,
+        ambiguous_test: &str,
+    ) -> CursorTest {
+        let mut builder = pytest_cursor_test_builder();
+        builder
+            .source("first.py", first_fixture)
+            .source(
+                "second.py",
+                r#"
+                import pytest
+
+                @pytest.fixture
+                def second(): ...
+                "#,
+            )
+            .source("test_ambiguous.py", ambiguous_test)
+            .source(
+                "test_second.py",
+                r#"
+                from second import second as resource
+
+                def test_second(resource):
+                    print(resource)
+                "#,
+            )
+            .build()
+    }
+
+    fn pytest_cursor_test(source: &str) -> CursorTest {
+        pytest_cursor_test_builder()
+            .source("test_example.py", source)
+            .build()
+    }
+
+    fn pytest_cursor_test_builder() -> SitePackagesCursorTestBuilder {
+        let mut builder = CursorTest::builder().with_site_packages();
+        builder
+            .site_packages(
+                "_pytest/__init__.py",
+                r#"
+                "#,
+            )
+            .site_packages(
+                "_pytest/__init__.pyi",
+                r#"
+                "#,
+            )
+            .site_packages(
+                "_pytest/config/__init__.py",
+                r#"
+                default_plugins = ("tmpdir",)
+                "#,
+            )
+            .site_packages(
+                "_pytest/mark/__init__.pyi",
+                r#"
+                "#,
+            )
+            .site_packages(
+                "_pytest/mark/structures.pyi",
+                r#"
+                class MarkDecorator:
+                    def __call__(self, *args: object, **kwargs: object) -> object: ...
+
+                class _ParametrizeMarkDecorator(MarkDecorator): ...
+
+                class MarkGenerator:
+                    parametrize: _ParametrizeMarkDecorator
+                "#,
+            )
+            .site_packages(
+                "_pytest/fixtures.pyi",
+                r#"
+                from typing import Any, Callable
+
+                def fixture(
+                    function: Callable[..., Any] | None = ...,
+                    *,
+                    name: str | None = ...,
+                ) -> Any: ...
+                "#,
+            )
+            .site_packages(
+                "_pytest/tmpdir.py",
+                r#"
+                from _pytest.fixtures import fixture
+
+                @fixture
+                def tmp_path(): ...
+                "#,
+            )
+            .site_packages(
+                "pytest/__init__.pyi",
+                r#"
+                from _pytest.fixtures import fixture as fixture
+                from _pytest.mark.structures import MarkGenerator
+
+                mark: MarkGenerator
+                "#,
+            );
+        builder
     }
 }

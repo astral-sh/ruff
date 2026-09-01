@@ -43,7 +43,6 @@ TD006 [*] Invalid TODO capitalization: `todo` should be `TODO`
 6 | # todo (evanrittenhouse): another invalid capitalization
 7 | # foo # todo: invalid capitalization
   |         ^^^^
-  |
 help: Replace `todo` with `TODO`
   |
 6 | # todo (evanrittenhouse): another invalid capitalization

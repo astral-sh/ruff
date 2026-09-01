@@ -4,6 +4,7 @@ use ruff_python_trivia::is_python_whitespace;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
@@ -30,7 +31,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#maximum-line-length
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.5.1")]
+#[violation_metadata(preview_since = "0.5.1", category = Category::Formatting)]
 pub(crate) struct WhitespaceAfterDecorator;
 
 impl AlwaysFixableViolation for WhitespaceAfterDecorator {

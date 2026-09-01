@@ -4,16 +4,16 @@ use ruff_python_ast::{
     self as ast, AnyNodeRef, Comprehension, Expr, ModModule, Parameter, Parameters, StringLike,
 };
 use ruff_python_trivia::{
-    BackwardsTokenizer, CommentRanges, SimpleToken, SimpleTokenKind, SimpleTokenizer,
+    BackwardsTokenizer, SimpleToken, SimpleTokenKind, SimpleTokenizer, TriviaRanges,
     find_only_token_in_range, first_non_trivia_token, indentation_at_offset,
 };
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use std::cmp::Ordering;
+use std::debug_assert_matches;
 
 use crate::comments::visitor::{CommentPlacement, DecoratedComment};
 use crate::expression::expr_slice::{ExprSliceCommentSection, assign_comment_in_slice};
-use crate::expression::parentheses::is_expression_parenthesized;
 use crate::other::parameters::{
     assign_argument_separator_comment_placement, find_parameter_separators,
 };
@@ -22,13 +22,13 @@ use crate::pattern::pattern_match_sequence::SequenceType;
 /// Manually attach comments to nodes that the default placement gets wrong.
 pub(super) fn place_comment<'a>(
     comment: DecoratedComment<'a>,
-    comment_ranges: &CommentRanges,
+    trivia: &TriviaRanges,
     source: &str,
 ) -> CommentPlacement<'a> {
     handle_parenthesized_comment(comment, source)
         .or_else(|comment| handle_end_of_line_comment_around_body(comment, source))
         .or_else(|comment| handle_own_line_comment_around_body(comment, source))
-        .or_else(|comment| handle_enclosed_comment(comment, comment_ranges, source))
+        .or_else(|comment| handle_enclosed_comment(comment, trivia, source))
 }
 
 /// Handle parenthesized comments. A parenthesized comment is a comment that appears within a
@@ -191,7 +191,7 @@ fn handle_parenthesized_comment<'a>(
 /// Handle a comment that is enclosed by a node.
 fn handle_enclosed_comment<'a>(
     comment: DecoratedComment<'a>,
-    comment_ranges: &CommentRanges,
+    trivia: &TriviaRanges,
     source: &str,
 ) -> CommentPlacement<'a> {
     match comment.enclosing_node() {
@@ -240,14 +240,14 @@ fn handle_enclosed_comment<'a>(
             .or_else(|comment| handle_bracketed_end_of_line_comment(comment, source)),
         AnyNodeRef::ExprIf(expr_if) => handle_expr_if_comment(comment, expr_if, source),
         AnyNodeRef::ExprSlice(expr_slice) => {
-            handle_slice_comments(comment, expr_slice, comment_ranges, source)
+            handle_slice_comments(comment, expr_slice, trivia, source)
         }
         AnyNodeRef::ExprStarred(starred) => {
             handle_trailing_expression_starred_star_end_of_line_comment(comment, starred, source)
         }
         AnyNodeRef::ExprSubscript(expr_subscript) => {
             if let Expr::Slice(expr_slice) = expr_subscript.slice.as_ref() {
-                return handle_slice_comments(comment, expr_slice, comment_ranges, source);
+                return handle_slice_comments(comment, expr_slice, trivia, source);
             }
 
             // Handle non-slice subscript end-of-line comments coming after the `[`
@@ -357,14 +357,14 @@ fn handle_enclosed_comment<'a>(
             handle_bracketed_end_of_line_comment(comment, source)
         }
         AnyNodeRef::StmtReturn(_) => {
-            handle_trailing_implicit_concatenated_string_comment(comment, comment_ranges, source)
+            handle_trailing_implicit_concatenated_string_comment(comment, trivia, source)
         }
         AnyNodeRef::StmtAssign(assignment)
             if comment.preceding_node().is_some_and(|preceding| {
                 preceding.ptr_eq(AnyNodeRef::from(&*assignment.value))
             }) =>
         {
-            handle_trailing_implicit_concatenated_string_comment(comment, comment_ranges, source)
+            handle_trailing_implicit_concatenated_string_comment(comment, trivia, source)
         }
         AnyNodeRef::StmtAnnAssign(assignment)
             if comment.preceding_node().is_some_and(|preceding| {
@@ -374,21 +374,21 @@ fn handle_enclosed_comment<'a>(
                     .is_some_and(|value| preceding.ptr_eq(value.into()))
             }) =>
         {
-            handle_trailing_implicit_concatenated_string_comment(comment, comment_ranges, source)
+            handle_trailing_implicit_concatenated_string_comment(comment, trivia, source)
         }
         AnyNodeRef::StmtAugAssign(assignment)
             if comment.preceding_node().is_some_and(|preceding| {
                 preceding.ptr_eq(AnyNodeRef::from(&*assignment.value))
             }) =>
         {
-            handle_trailing_implicit_concatenated_string_comment(comment, comment_ranges, source)
+            handle_trailing_implicit_concatenated_string_comment(comment, trivia, source)
         }
         AnyNodeRef::StmtTypeAlias(assignment)
             if comment.preceding_node().is_some_and(|preceding| {
                 preceding.ptr_eq(AnyNodeRef::from(&*assignment.value))
             }) =>
         {
-            handle_trailing_implicit_concatenated_string_comment(comment, comment_ranges, source)
+            handle_trailing_implicit_concatenated_string_comment(comment, trivia, source)
         }
 
         _ => CommentPlacement::Default(comment),
@@ -625,10 +625,9 @@ fn handle_own_line_comment_between_branches<'a>(
         //     pass
         // ```
         || {
-            comment_indentation
-            // This can be any positive number - we just
-            // want to hit the `Less` branch below
-            + TextSize::new(1)
+            // We could use any positive number here, it doesn't have to be `1`
+            // - we just want to hit the `Less` branch below
+            comment_indentation + TextSize::new(1)
         },
         ruff_text_size::TextLen::text_len,
     );
@@ -1134,7 +1133,7 @@ fn handle_module_level_own_line_comment_before_class_or_function_comment<'a>(
 fn handle_slice_comments<'a>(
     comment: DecoratedComment<'a>,
     expr_slice: &'a ast::ExprSlice,
-    comment_ranges: &CommentRanges,
+    trivia: &TriviaRanges,
     source: &str,
 ) -> CommentPlacement<'a> {
     let ast::ExprSlice {
@@ -1147,7 +1146,7 @@ fn handle_slice_comments<'a>(
 
     // Check for `foo[ # comment`, but only if they are on the same line
     let after_lbracket = matches!(
-        BackwardsTokenizer::up_to(comment.start(), source, comment_ranges)
+        BackwardsTokenizer::up_to(comment.start(), source, trivia.comments())
             .skip_trivia()
             .next(),
         Some(SimpleToken {
@@ -1163,11 +1162,7 @@ fn handle_slice_comments<'a>(
         //     1:
         // ]
         // ```
-        debug_assert!(
-            matches!(comment.enclosing_node(), AnyNodeRef::ExprSubscript(_)),
-            "{:?}",
-            comment.enclosing_node()
-        );
+        debug_assert_matches!(comment.enclosing_node(), AnyNodeRef::ExprSubscript(_));
         return CommentPlacement::dangling(comment.enclosing_node(), comment);
     }
 
@@ -1324,10 +1319,10 @@ fn handle_dict_unpacking_comment<'a>(
     comment: DecoratedComment<'a>,
     source: &str,
 ) -> CommentPlacement<'a> {
-    debug_assert!(matches!(
+    debug_assert_matches!(
         comment.enclosing_node(),
         AnyNodeRef::ExprDict(_) | AnyNodeRef::ExprDictComp(_)
-    ));
+    );
 
     // no node after our comment so we can't be between `**` and the name (node)
     let Some(following) = comment.following_node() else {
@@ -1367,10 +1362,10 @@ fn handle_key_value_comment<'a>(
     comment: DecoratedComment<'a>,
     source: &str,
 ) -> CommentPlacement<'a> {
-    debug_assert!(matches!(
+    debug_assert_matches!(
         comment.enclosing_node(),
         AnyNodeRef::ExprDict(_) | AnyNodeRef::ExprDictComp(_)
-    ));
+    );
 
     let (Some(following), Some(preceding)) = (comment.following_node(), comment.preceding_node())
     else {
@@ -2006,10 +2001,10 @@ fn handle_bracketed_end_of_line_comment<'a>(
         let Some(paren) = lexer.next() else {
             return CommentPlacement::Default(comment);
         };
-        debug_assert!(matches!(
+        debug_assert_matches!(
             paren.kind(),
             SimpleTokenKind::LParen | SimpleTokenKind::LBrace | SimpleTokenKind::LBracket
-        ));
+        );
 
         // If there are no additional tokens between the open parenthesis and the comment, then
         // it should be attached as a dangling comment on the brackets, rather than a leading
@@ -2338,7 +2333,7 @@ fn handle_comprehension_comment<'a>(
 /// joining the string literals into a single string literal if it fits on the line.
 fn handle_trailing_implicit_concatenated_string_comment<'a>(
     comment: DecoratedComment<'a>,
-    comment_ranges: &CommentRanges,
+    trivia: &TriviaRanges,
     source: &str,
 ) -> CommentPlacement<'a> {
     if !comment.line_position().is_end_of_line() {
@@ -2359,7 +2354,9 @@ fn handle_trailing_implicit_concatenated_string_comment<'a>(
     };
 
     if source.contains_line_break(TextRange::new(second_last.end(), last.start()))
-        && is_expression_parenthesized(string_like.as_expression_ref(), comment_ranges, source)
+        && trivia
+            .parenthesized()
+            .contains(string_like.as_expression_ref().range())
     {
         let range = TextRange::new(last.end(), comment.start());
 

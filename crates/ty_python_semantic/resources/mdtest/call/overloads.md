@@ -264,6 +264,109 @@ def _(a: A, bc: B | C, cd: C | D):
     reveal_type(f(*(a, cd)))  # revealed: Unknown
 ```
 
+### Expanding a keyword argument after unpacking into a variadic parameter
+
+Valid unpacked positional arguments must not prevent expansion of an unrelated union-typed keyword
+argument. The positional arguments may come from an empty tuple, a fixed-length tuple, a
+variable-length tuple, or a list.
+
+`overloaded.pyi`:
+
+```pyi
+from typing import overload
+
+@overload
+def f(*values: str, kind: int) -> int: ...
+@overload
+def f(*values: str, kind: None) -> str: ...
+```
+
+Expanding `kind` matches one overload when its value is an `int` and the other when its value is
+`None`, independently of how the positional arguments are provided. An incompatible positional
+argument must still fail to match either overload.
+
+```py
+from overloaded import f
+
+def _(one: tuple[str], many: tuple[str, ...], items: list[str], kind: int | None) -> None:
+    reveal_type(f("a", kind=kind))  # revealed: int | str
+    reveal_type(f(*(), kind=kind))  # revealed: int | str
+    reveal_type(f(*one, kind=kind))  # revealed: int | str
+    reveal_type(f(*many, kind=kind))  # revealed: int | str
+    reveal_type(f(*items, kind=kind))  # revealed: int | str
+
+def _(invalid: tuple[int], kind: int | None) -> None:
+    # error: [no-matching-overload]
+    reveal_type(f(*invalid, kind=kind))  # revealed: Unknown
+```
+
+### Expanding a keyword argument with an unpacked variadic annotation
+
+An unpacked variadic annotation can specify a different expected type for each positional argument.
+Unpacked arguments must be checked against their corresponding element types while an unrelated
+union-typed keyword argument is expanded.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+`overloaded.pyi`:
+
+```pyi
+from typing import overload
+
+@overload
+def f(*values: *tuple[str, int], kind: int) -> int: ...
+@overload
+def f(*values: *tuple[str, int], kind: None) -> str: ...
+@overload
+def suffix[T: str, *Parts](*values: *tuple[*Parts, T], kind: int) -> int: ...
+@overload
+def suffix[T: str, *Parts](*values: *tuple[*Parts, T], kind: None) -> str: ...
+```
+
+Both directly supplied arguments and an unpacked tuple satisfy the heterogeneous annotation. A
+generic variadic prefix also permits expansion when the fixed suffix has a compatible type.
+
+```py
+from overloaded import f, suffix
+
+def _(values: tuple[str, int], kind: int | None) -> None:
+    reveal_type(f("a", 1, kind=kind))  # revealed: int | str
+    reveal_type(f(*values, kind=kind))  # revealed: int | str
+
+def _(pair: tuple[int, str], kind: int | None) -> None:
+    reveal_type(suffix(*pair, kind=kind))  # revealed: int | str
+```
+
+### Expanding a keyword argument after unpacking into positional parameters
+
+Expanding a union-typed keyword argument must also work when a fixed-length tuple supplies ordinary
+positional parameters with different types instead of a variadic parameter.
+
+`overloaded.pyi`:
+
+```pyi
+from typing import overload
+
+@overload
+def f(value: str, count: int, *, kind: int) -> int: ...
+@overload
+def f(value: str, count: int, *, kind: None) -> str: ...
+```
+
+Both the direct positional arguments and the unpacked tuple select the same overloads after `kind`
+is expanded.
+
+```py
+from overloaded import f
+
+def _(values: tuple[str, int], kind: int | None) -> None:
+    reveal_type(f("a", 1, kind=kind))  # revealed: int | str
+    reveal_type(f(*values, kind=kind))  # revealed: int | str
+```
+
 ### Generics (legacy)
 
 `overloaded.pyi`:
@@ -718,7 +821,7 @@ def _(ab: A | B, ac: A | C, cd: C | D):
 Argument type expansion could lead to exponential growth of the number of argument lists that needs
 to be evaluated, so ty deploys some heuristics to prevent this from happening.
 
-Heuristic: If an argument type that cannot be expanded and cannot be assighned to any of the
+Heuristic: If an argument type that cannot be expanded and cannot be assigned to any of the
 remaining overloads before argument type expansion, then even with argument type expansion, it won't
 lead to a successful evaluation of the call.
 
@@ -755,7 +858,7 @@ class Foo:
 from overloaded import A, B, C, Foo, f
 from typing_extensions import Any, reveal_type
 
-def _(ab: A | B, a: int | Any):
+def _(ab: A | B, a: int | Any, invalid: tuple[C]):
     reveal_type(f(a1=a, a2=a, a3=a))  # revealed: C
     reveal_type(f(A(), a1=a, a2=a, a3=a))  # revealed: A
     reveal_type(f(B(), a1=a, a2=a, a3=a))  # revealed: B
@@ -803,8 +906,27 @@ def _(ab: A | B, a: int | Any):
         )
     )
 
+    # An incompatible element in a definitely nonempty splat must also prevent expansion of the
+    # nine union-typed keyword arguments.
+    reveal_type(
+        # error: [no-matching-overload]
+        # revealed: Unknown
+        f(
+            *invalid,
+            a1=a,
+            a2=a,
+            a3=a,
+            a4=a,
+            a5=a,
+            a6=a,
+            a7=a,
+            a8=a,
+            a9=a,
+        )
+    )
+
     # Here, the heuristics won't come into play because all arguments can be expanded but expanding
-    # the first argument resutls in a successful evaluation of the call, so there's no exponential
+    # the first argument results in a successful evaluation of the call, so there's no exponential
     # growth of the number of argument lists.
     reveal_type(
         # revealed: A | B
@@ -1030,7 +1152,6 @@ error[no-matching-overload]: No overload of function `f` matches arguments
 39 | |             a30=a,
 40 | |         )
    | |_________^
-   |
 info: Limit of argument type expansion reached at argument 9
 info: First overload defined here
  --> src/overloaded.pyi:7:1
@@ -1038,7 +1159,6 @@ info: First overload defined here
 7 | / @overload
 8 | | def f() -> None: ...
   | |____________________^ First overload defined here
-  |
 info: Possible overloads for function `f`:
 info:   () -> None
 info:   (**kwargs: int) -> C
@@ -1164,6 +1284,22 @@ def _(t: tuple[int, str] | tuple[int, str, int]) -> None:
     # The defaulted third parameter lets the second overload survive provisional arity checking,
     # but argument expansion should still revive the 2-arg overload and combine both return types.
     reveal_type(m(*t))  # revealed: Literal[1, 2]
+```
+
+### Retry from parameter matching with type context
+
+When retrying, arguments are inferred with the correct type context:
+
+```py
+from typing import Callable, overload
+
+@overload
+def n(callback: Callable[[int], int], value: int, /) -> int: ...
+@overload
+def n(callback: Callable[[str], str], first: str, second: str, /) -> str: ...
+def n(*args: object) -> object: ...
+def _(values: tuple[int] | tuple[str, str]):
+    reveal_type(n(lambda value: value, *values))  # revealed: int | str
 ```
 
 ## Filtering based on variadic arguments
@@ -1469,7 +1605,7 @@ def _(int_str: tuple[int, str], int_any: tuple[int, Any], any_any: tuple[Any, An
 
 ```pyi
 from typing_extensions import Iterable, overload, LiteralString, Protocol
-from ty_extensions import Unknown, is_assignable_to
+from ty_extensions._internal import Unknown, is_assignable_to
 
 class Foo:
     @overload
@@ -1744,7 +1880,7 @@ def _(arg: list[Any]):
     reveal_type(f4(*arg))  # revealed: Unknown
 ```
 
-### Varidic argument with generics
+### Variadic argument with generics
 
 `overloaded.pyi`:
 
@@ -1812,7 +1948,7 @@ reveal_type(f3(z=1))  # revealed: dict[str, Any]
 reveal_type(f3(1, 2, x=3))  # revealed: Unknown
 ```
 
-### Varidic argument with generic iterable
+### Variadic argument with generic iterable
 
 `overloaded.pyi`:
 
@@ -2108,6 +2244,21 @@ reveal_type(x)  # revealed: int | str
 f([{"y": 1}], int_or_str())
 ```
 
+An expected return type can specialize a generic overload and provide context for its arguments.
+Overload filtering should preserve that context:
+
+```py
+from typing import Any, overload
+
+@overload
+def f[T](value: T) -> T: ...
+@overload
+def f(value: Any) -> Any: ...
+def f(value: Any) -> Any: ...
+
+values: list[int] = reveal_type(f([]))  # revealed: list[int]
+```
+
 Non-matching overloads do not produce diagnostics:
 
 ```py
@@ -2125,6 +2276,81 @@ def f(a: T | dict[str, int], b: int | str) -> int | str:
 
 x = f({"y": 1}, "a")
 reveal_type(x)  # revealed: str
+```
+
+Only the types and diagnostics produced by inference against matching overloads are preserved:
+
+```py
+from collections.abc import Callable
+from typing import TypedDict, overload
+
+@overload
+def transform(value: str, callback: Callable[[int], str], /) -> str: ...
+@overload
+def transform(value: bytes, callback: Callable[[int], bytes], /) -> bytes: ...
+def transform(value: str | bytes, callback: Callable[..., str | bytes], /) -> str | bytes:
+    return value
+
+string_result = transform(
+    "",
+    reveal_type(lambda x: str(x) * x),  # revealed: (x: int) -> str
+)
+reveal_type(string_result)  # revealed: str
+bytes_result = transform(
+    b"",
+    reveal_type(lambda x: x.to_bytes(1)),  # revealed: (x: int) -> bytes
+)
+reveal_type(bytes_result)  # revealed: bytes
+
+class Payload(TypedDict):
+    name: str
+    count: int
+
+@overload
+def select_payload(payload: Payload, discriminator: int, /) -> int: ...
+@overload
+def select_payload(payload: dict[str, object], discriminator: str, /) -> str: ...
+def select_payload(payload: Payload | dict[str, object], discriminator: int | str, /) -> int | str:
+    return discriminator
+
+# error: [missing-typed-dict-key] "Missing required key 'count' in TypedDict `Payload` constructor"
+# error: [no-matching-overload]
+select_payload({"name": "missing count"}, 1)
+
+# error: [invalid-argument-type]
+# error: [no-matching-overload]
+select_payload({"name": "bad count", "count": "not an int"}, 1)
+
+# error: [invalid-key]
+# error: [no-matching-overload]
+select_payload({"name": "extra key", "count": 1, "extra": None}, 1)
+
+select_payload({"extra": None}, "plain dictionary")
+
+@overload
+def select_generic_payload[T](value: T, payload: Payload, discriminator: int, /) -> T: ...
+@overload
+def select_generic_payload[T](value: T, payload: dict[str, object], discriminator: str, /) -> T: ...
+def select_generic_payload[T](
+    value: T,
+    payload: Payload | dict[str, object],
+    discriminator: int | str,
+    /,
+) -> T:
+    return value
+
+selected_generic_payload = select_generic_payload(
+    1,
+    reveal_type({"name": "generic", "count": 1}),  # revealed: Payload
+    1,
+)
+reveal_type(selected_generic_payload)  # revealed: Literal[1]
+
+# error: [missing-typed-dict-key] "Missing required key 'count' in TypedDict `Payload` constructor"
+# error: [no-matching-overload]
+select_generic_payload(1, {"name": "generic"}, 1)
+
+select_generic_payload(1, {"extra": None}, "plain dictionary")
 ```
 
 ```py

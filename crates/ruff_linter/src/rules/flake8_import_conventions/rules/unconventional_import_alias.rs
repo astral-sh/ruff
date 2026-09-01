@@ -5,6 +5,7 @@ use ruff_python_semantic::{Binding, Imported};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{Fix, FixAvailability, Violation};
 
 use crate::renamer::Renamer;
@@ -35,7 +36,7 @@ use crate::renamer::Renamer;
 /// - `lint.flake8-import-conventions.aliases`
 /// - `lint.flake8-import-conventions.extend-aliases`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.166")]
+#[violation_metadata(stable_since = "v0.0.166", category = Category::Pedantic)]
 pub(crate) struct UnconventionalImportAlias {
     name: String,
     asname: String,
