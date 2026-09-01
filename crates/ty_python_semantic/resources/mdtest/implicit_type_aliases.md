@@ -2160,6 +2160,24 @@ def _(
     reveal_type(annotated_nested_tuple_str)  # revealed: tuple[str, Divergent[str]]
 ```
 
+### Mutually recursive generic implicit type aliases
+
+Generic implicit aliases can form a cycle where each alias nests another specialization of the same
+recursive family. Resolving a specialization must converge instead of repeatedly expanding the other
+alias's recursive body.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+A: object = list[T | "B[T]"]
+B: object = list[T | "A[T]"]
+
+def _(value: B[int]):
+    reveal_type(value)  # revealed: list[int | Divergent[int]]
+```
+
 ### Materialization of self-referential generic implicit type aliases
 
 ```py

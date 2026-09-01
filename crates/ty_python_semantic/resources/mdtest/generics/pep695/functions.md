@@ -1604,12 +1604,11 @@ def _(
     reveal_type(bounded_gradual(unknown_value, list_upper))  # revealed: list[int] & Unknown
 ```
 
-Covariant recursive declared bounds do not introduce `Divergent` into a concrete solution:
+An invariant recursive `list` bound does not introduce `Divergent`, but it also does not retain the
+concrete list shape inferred from the upper bound:
 
 ```py
-from collections.abc import Sequence
-
-Recursive: TypeAlias = int | Sequence["Recursive"]
+Recursive: TypeAlias = int | list["Recursive"]
 
 def bounded_recursive[T: Recursive](value: T, upper: Callable[[T], None]) -> T:
     return value
@@ -1617,6 +1616,26 @@ def bounded_recursive[T: Recursive](value: T, upper: Callable[[T], None]) -> T:
 def _(any_value: Any, unknown_value: Unknown, upper: Callable[[list[int]], None]):
     any_result = bounded_recursive(any_value, upper)
     unknown_result = bounded_recursive(unknown_value, upper)
+
+    reveal_type(any_result)  # revealed: Any
+    reveal_type(any_result[0])  # revealed: Any
+    reveal_type(unknown_result)  # revealed: Unknown
+    reveal_type(unknown_result[0])  # revealed: Unknown
+```
+
+The same inference through the covariant `Sequence` bound preserves that concrete list shape:
+
+```py
+from collections.abc import Sequence
+
+SequenceRecursive: TypeAlias = int | Sequence["SequenceRecursive"]
+
+def bounded_sequence_recursive[T: SequenceRecursive](value: T, upper: Callable[[T], None]) -> T:
+    return value
+
+def _(any_value: Any, unknown_value: Unknown, upper: Callable[[list[int]], None]):
+    any_result = bounded_sequence_recursive(any_value, upper)
+    unknown_result = bounded_sequence_recursive(unknown_value, upper)
 
     reveal_type(any_result)  # revealed: list[int] & Any
     reveal_type(any_result[0])  # revealed: int & Any

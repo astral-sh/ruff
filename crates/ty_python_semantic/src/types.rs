@@ -4,7 +4,7 @@ use ruff_diagnostics::{Edit, Fix};
 use rustc_hash::FxHashMap;
 
 use std::borrow::Cow;
-use std::cell::OnceCell;
+use std::cell::{OnceCell, RefCell};
 use std::iter;
 use std::rc::Rc;
 use std::time::Duration;
@@ -2040,7 +2040,38 @@ impl<'db> Type<'db> {
             UnionType::from_elements_cycle_recovery(db, env, [previous, self])
         };
 
-        stabilized.cycle_fold_recursive(
+        // A seeded union with a recursive element of the same outer class keeps reintroducing
+        // expanded sibling bodies when previous and self are unioned. At that point, every
+        // active head contributes one equation of the same mutually recursive component. Widen
+        // those equations to one recursive upper bound by replacing every sibling variable with
+        // the current binder. This keeps the result structural, so later operations still unfold
+        // and check the recursive type instead of becoming gradual.
+        let normalized = if let Some(binders) =
+            stabilized.seeded_nested_cycle_binders(db, env, previous, binder, cycle)
+        {
+            let mut equations = vec![stabilized];
+            for sibling in &binders {
+                if !sibling.same_marker(binder)
+                    && let Some(recursive) = self
+                        .find_recursive_with_binder(db, env, *sibling)
+                        .or_else(|| previous.find_recursive_with_binder(db, env, *sibling))
+                {
+                    equations.push(*recursive.body(db));
+                }
+            }
+
+            let mut normalized = UnionType::from_elements_cycle_recovery(db, env, equations);
+            for sibling in binders {
+                if !sibling.same_marker(binder) {
+                    normalized = normalized.collapse_recursive_marker(db, env, sibling, binder);
+                }
+            }
+            normalized
+        } else {
+            stabilized
+        };
+
+        normalized.cycle_fold_recursive(
             db,
             env,
             query,
@@ -2079,6 +2110,99 @@ impl<'db> Type<'db> {
             Type::Recursive(recursive) => recursive.binder(db).in_cycle_scc(binders),
             _ => false,
         })
+    }
+
+    /// Returns structural recursive binders that need a common one-variable upper bound.
+    ///
+    /// A nested cycle only needs this widening when a concrete seed and an active recursive
+    /// element repeat the same nominal constructor. Other nested cycles can retain their separate
+    /// binders and converge through the ordinary fold.
+    fn seeded_nested_cycle_binders(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        previous: Self,
+        binder: DivergentType<'db>,
+        cycle: &salsa::Cycle,
+    ) -> Option<Vec<DivergentType<'db>>> {
+        let head_ids = cycle.head_ids().collect::<Vec<_>>();
+        let binders = RefCell::new(vec![binder]);
+
+        for ty in [previous, self] {
+            any_over_type(db, env, ty, false, |ty| {
+                let Type::Recursive(recursive) = ty else {
+                    return false;
+                };
+
+                if matches!(*recursive.origin(db), RecursiveTypeOrigin::Structural)
+                    && head_ids.contains(&recursive.binder(db).id)
+                    && !binders
+                        .borrow()
+                        .iter()
+                        .any(|existing| existing.same_marker(*recursive.binder(db)))
+                {
+                    binders.borrow_mut().push(*recursive.binder(db));
+                }
+                false
+            });
+        }
+
+        let binders = binders.into_inner();
+        if binders.len() <= 1 {
+            return None;
+        }
+
+        self.has_seeded_cycle_union(db, env, &binders)
+            .then_some(binders)
+    }
+
+    fn has_seeded_cycle_union(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        binders: &[DivergentType<'db>],
+    ) -> bool {
+        any_over_type(db, env, self, false, |ty| {
+            let Type::Union(union) = ty else {
+                return false;
+            };
+
+            let nominal_origin = |element| match element {
+                Type::NominalInstance(instance) => Some(instance.class_literal(db, env)),
+                _ => None,
+            };
+            let mut recursive_classes = Vec::new();
+            let mut seed_classes = Vec::new();
+            for element in union.elements(db) {
+                if element.contains_cycle_binder(db, env, binders) {
+                    if !matches!(element, Type::Divergent(_) | Type::Recursive(_))
+                        && let Some(class) = nominal_origin(*element)
+                    {
+                        recursive_classes.push(class);
+                    }
+                } else if let Some(class) = nominal_origin(*element) {
+                    seed_classes.push(class);
+                }
+            }
+            recursive_classes
+                .iter()
+                .any(|recursive| seed_classes.contains(recursive))
+        })
+    }
+
+    fn collapse_recursive_marker(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        from: DivergentType<'db>,
+        to: DivergentType<'db>,
+    ) -> Self {
+        self.apply_type_mapping(
+            db,
+            env,
+            &TypeMapping::Structural(StructuralTypeMapping::CollapseRecursiveMarker { from, to }),
+            TypeContext::default(),
+        )
     }
 
     fn find_recursive_with_binder(
@@ -8437,6 +8561,10 @@ impl<'db> Type<'db> {
             }
 
             Type::Recursive(recursive) => match type_mapping {
+                TypeMapping::Structural(StructuralTypeMapping::CollapseRecursiveMarker {
+                    from,
+                    to,
+                }) if recursive.binder(db).same_marker(*from) => Type::Divergent(*to),
                 TypeMapping::Structural(StructuralTypeMapping::UnfoldRecursive {
                     recursive: target,
                 }) if recursive == *target => self,
@@ -8890,13 +9018,18 @@ impl<'db> Type<'db> {
             }
 
             Type::Divergent(divergent) => match type_mapping {
+                TypeMapping::Structural(StructuralTypeMapping::CollapseRecursiveMarker {
+                    from,
+                    to,
+                }) if divergent.same_marker(*from) => Type::Divergent(*to),
                 TypeMapping::Structural(StructuralTypeMapping::UnfoldRecursive { recursive })
                     if divergent.same_marker(*recursive.binder(db)) =>
                 {
                     Type::Recursive(*recursive)
                 }
                 TypeMapping::Structural(
-                    StructuralTypeMapping::FoldRecursive { .. }
+                    StructuralTypeMapping::CollapseRecursiveMarker { .. }
+                    | StructuralTypeMapping::FoldRecursive { .. }
                     | StructuralTypeMapping::ReplaceRecursiveWithBinder { .. }
                     | StructuralTypeMapping::WidenRecursiveTuples { .. },
                 ) => self,
@@ -10177,6 +10310,11 @@ pub enum StructuralTypeMapping<'db> {
         recursive: RecursiveType<'db>,
         /// Whether the transparent body of `recursive` may be replaced at this node.
         replace_root: bool,
+    },
+    /// Replaces one recursive boundary and its variable with another variable.
+    CollapseRecursiveMarker {
+        from: DivergentType<'db>,
+        to: DivergentType<'db>,
     },
     /// Widens tuple shapes that grow during recursive inference.
     WidenRecursiveTuples {

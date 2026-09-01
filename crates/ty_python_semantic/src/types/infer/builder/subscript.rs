@@ -498,11 +498,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         subscript: &ast::ExprSubscript,
     ) -> Option<Type<'db>> {
         let db = self.db();
-        let binder = match value_ty {
-            Type::Divergent(binder) => binder,
-            Type::Recursive(recursive) => *recursive.binder(db),
-            _ => return None,
-        };
         let definition = self.recursive_type_expression_definition()?;
         let ast::Expr::Name(name) = &*subscript.value else {
             return None;
@@ -513,12 +508,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             DefinitionKind::AnnotatedAssignment(assignment) => assignment.target(self.module()),
             _ => return None,
         };
-        if target
+        let is_current_alias = target
             .as_name_expr()
-            .is_none_or(|target_name| target_name.id != name.id)
-        {
-            return None;
-        }
+            .is_some_and(|target_name| target_name.id == name.id);
+        let binder = match value_ty {
+            Type::Divergent(binder) => binder,
+            Type::Recursive(recursive) => *recursive.binder(db),
+            Type::GenericAlias(_) if !is_current_alias => match self.fallback_type()? {
+                Type::Divergent(binder) => binder,
+                Type::Recursive(recursive) => *recursive.binder(db),
+                _ => return None,
+            },
+            _ => return None,
+        };
 
         let argument_tys = match &*subscript.slice {
             ast::Expr::Tuple(tuple) if !tuple.parenthesized => tuple

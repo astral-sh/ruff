@@ -459,8 +459,7 @@ reveal_type(InitializedCounter().value)  # revealed: Grow[int] | Grow[list[int]]
 #### Augmented assignments with expanding tuple results
 
 Repeatedly nesting an independently initialized tuple must converge instead of exhausting Salsa's
-cycle-iteration limit. The recursive result preserves the nested tuple values observed while the
-type stabilizes.
+cycle-iteration limit.
 
 ```py
 class C:
@@ -4554,8 +4553,7 @@ class C3:
 reveal_type(C3(Sub()).x)  # revealed: list[Sub] | list[Base]
 ```
 
-Cycles between many attributes converge to the concrete type shared by their initial values and
-assignments:
+And cycles between many attributes:
 
 ```py
 class ManyCycles:
@@ -4602,6 +4600,29 @@ class ManyCycles:
         reveal_type(self.x5)  # revealed: int
         reveal_type(self.x6)  # revealed: int
         reveal_type(self.x7)  # revealed: int
+
+class ManyCycles2:
+    def __init__(self: "ManyCycles2"):
+        self.x1 = [0]
+        self.x2 = [1]
+        self.x3 = [1]
+
+    def f1(self: "ManyCycles2"):
+        reveal_type(self.x3)  # revealed: list[int] | list[Divergent] | list[Divergent | int] | list[int | Divergent]
+
+        self.x1 = [self.x2] + [self.x3]
+        self.x2 = [self.x1] + [self.x3]
+        self.x3 = [self.x1] + [self.x2]
+
+    def f2(self: "ManyCycles2"):
+        self.x1 = self.x2 + self.x3
+        self.x2 = self.x1 + self.x3
+        self.x3 = self.x1 + self.x2
+
+    def f3(self: "ManyCycles2"):
+        self.x1 = self.x2 + self.x3
+        self.x2 = self.x1 + self.x3
+        self.x3 = self.x1 + self.x2
 ```
 
 This case additionally tests our union/intersection simplification logic:

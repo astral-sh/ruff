@@ -469,6 +469,27 @@ while random():
     reveal_type(y)  # revealed: Literal[1, 2]
 ```
 
+### Mutually recursive loop variables with nested lists
+
+Loop variables can form a cycle where each iteration nests the other variables inside a new list.
+The fixed point must converge without expanding the nested lists on every iteration.
+
+```py
+def random() -> bool:
+    return False
+
+x1 = [0]
+x2 = [1]
+x3 = [1]
+while random():
+    x1 = [x2] + [x3]
+    x2 = [x1] + [x3]
+    x3 = [x1] + [x2]
+
+# revealed: list[int] | list[list[list[int] | list[Divergent] | Divergent] | list[list[int] | list[list[list[int] | list[Divergent]]] | list[list[int] | list[Divergent]]]]
+reveal_type(x3)
+```
+
 ### Monotonic widening can keep stale loopback bindings reachable
 
 ```py
