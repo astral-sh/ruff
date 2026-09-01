@@ -40,8 +40,7 @@ def test() -> int:
 
 ## Error in preceding decorator
 
-Don't suppress diagnostics for decorator expressions appearing before the `no_type_check`
-decorator.
+Don't suppress diagnostics for decorator expressions appearing before the `no_type_check` decorator.
 
 ```py
 from typing import no_type_check
@@ -82,7 +81,6 @@ def takes_int(value: int) -> int:
 @takes_int
 @no_type_check
 def before() -> None: ...
-
 @no_type_check
 @takes_int
 def after() -> None: ...
