@@ -45,8 +45,7 @@ uv run --only-group dev --locked prek install
 We recommend [nextest](https://nexte.st/) to run ty's test suite (via `uv run --only-dev cargo nextest run`),
 though it's not strictly necessary.
 
-Throughout this guide, any usages of `cargo test` can be replaced with `uv run --only-dev cargo nextest run`,
-if you choose to install `nextest`.
+Throughout this guide, any usages of `cargo test` can be replaced with `uv run --only-dev cargo nextest run`.
 
 ### Development
 
