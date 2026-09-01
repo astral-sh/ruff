@@ -684,6 +684,81 @@ class Sub(Intermediate[T], Base): ...
 reveal_mro(Sub)
 ```
 
+## Generic ancestors shared by multiple inheritance paths
+
+A generic ancestor appears only once in the MRO, even when one inheritance path leaves its type
+arguments unspecified. A concrete override on the other path takes precedence over that ancestor.
+
+```py
+from typing import Generic, TypeVar
+from ty_extensions._internal import reveal_mro
+
+T = TypeVar("T")
+
+class Base(Generic[T]):
+    item: T
+
+    def method(self) -> object: ...
+
+class Unspecified(Base): ...  # error: [missing-type-argument]
+
+class Concrete(Base[int]):
+    def method(self) -> int:
+        return 0
+
+class Child(Unspecified, Concrete): ...
+
+# revealed: (<class 'Child'>, <class 'Unspecified'>, <class 'Concrete'>, <class 'Base[Unknown]'>, typing.Generic, <class 'object'>)
+reveal_mro(Child)
+reveal_type(Child().method())  # revealed: int
+reveal_type(Child().item)  # revealed: Unknown
+```
+
+The same ordering applies when the first path supplies the type argument and the concrete override
+inherits an unspecified specialization. The first path's specialization remains available for
+inherited attributes.
+
+```py
+class Specialized(Base[int]): ...
+
+class UnspecifiedConcrete(Unspecified):
+    def method(self) -> int:
+        return 0
+
+class Other(Specialized, UnspecifiedConcrete): ...
+
+# revealed: (<class 'Other'>, <class 'Specialized'>, <class 'UnspecifiedConcrete'>, <class 'Unspecified'>, <class 'Base[int]'>, typing.Generic, <class 'object'>)
+reveal_mro(Other)
+reveal_type(Other().method())  # revealed: int
+reveal_type(Other().item)  # revealed: int
+```
+
+Classes created with `type()` use the same ordering.
+
+```py
+Dynamic = type("Dynamic", (Unspecified, Concrete), {})
+
+# revealed: (<class 'Dynamic'>, <class 'Unspecified'>, <class 'Concrete'>, <class 'Base[Unknown]'>, typing.Generic, <class 'object'>)
+reveal_mro(Dynamic)
+reveal_type(Dynamic().method())  # revealed: int
+```
+
+## Duplicate generic bases
+
+Different specializations of the same class are still duplicate bases when both appear directly in
+the bases list.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Base(Generic[T]): ...
+
+# error: [duplicate-base]
+class Duplicate(Base[int], Base[str]): ...
+```
+
 ## Unresolvable MROs involving generics have the original bases reported in the error message, not the resolved bases
 
 <!-- snapshot-diagnostics -->

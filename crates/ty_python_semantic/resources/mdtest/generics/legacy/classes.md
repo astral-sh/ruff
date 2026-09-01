@@ -365,6 +365,37 @@ class BadChild8(Parent[T1, T2], Parent3[T2, T1], Parent4): ...
 class BadChild9(Parent[T1, T2], Parent3[T2, T1], Parent4[Any, Any]): ...
 ```
 
+## Inconsistent type arguments through an unspecified ancestor
+
+A class can inherit the same generic ancestor through unspecified and specialized paths. The
+specialized path still constrains its subclasses, even when the MRO retains the unspecified path's
+type arguments.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Base(Generic[T]): ...
+class Unspecified(Base): ...  # error: [missing-type-argument]
+class IntBase(Base[int]): ...
+class Combined(Unspecified, IntBase): ...
+
+# error: [invalid-generic-class] "Inconsistent type arguments: class cannot inherit from both `Base[str]` and `Base[int]`"
+class Conflicting(Combined, Base[str]): ...
+class Compatible(Combined, Base[int]): ...
+class Inherited(Conflicting): ...
+```
+
+Classes constructed with `type()` also account for every inherited specialization.
+
+```py
+class StrBase(Base[str]): ...
+
+# error: [invalid-generic-class] "Inconsistent type arguments: class cannot inherit from both `Base[str]` and `Base[int]`"
+Dynamic = type("Dynamic", (Combined, StrBase), {})
+```
+
 ## Specializing generic classes explicitly
 
 <!-- snapshot-diagnostics -->
