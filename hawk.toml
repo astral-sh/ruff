@@ -871,14 +871,6 @@ level = "expect"
 reason = "consumed by the generated environment-variable reference"
 
 [[override]]
-lint = "hawk::dead_public"
-crate = "ruff_db"
-item = "system::command::Command::arg"
-kind = "inherent_method"
-level = "expect"
-reason = "command descriptions expose a complete argument builder and inspection API"
-
-[[override]]
 lint = "hawk::unnecessary_public"
 crate = "ruff_db"
 item = "system::command::Command::get_current_dir"

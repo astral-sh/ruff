@@ -50,9 +50,9 @@ impl Uv {
 
         match target {
             MetadataTarget::Workspace(path) => {
-                // `uv check` has already selected and synchronized the environment. Keep this
-                // query read-only so package selection and `--isolated` aren't overwritten.
-                command.args(["--frozen", "--active"]).current_dir(path);
+                // Use the environment selected by `uv check` without synchronizing it.
+                // Let uv apply its configured lockfile policy.
+                command.arg("--active").current_dir(path);
             }
             MetadataTarget::Script { path, python } => {
                 command.args(["--sync", "--script", path.as_str()]);
