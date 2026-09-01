@@ -498,9 +498,9 @@ This proves that `BaseProtocol[P] & SubProtocol[object]` is not equivalent to `S
 static_assert(not is_equivalent_to(BaseProtocol[P] & SubProtocol[object], SubProtocol[P]))
 ```
 
-However, there are cases where we this simplification would be helpful. Consider narrowing something
-of type `Iterable[P]` via `isinstance(.., frozenset)`. It would be useful to get a narrowed type
-with a (read) element type `P`.
+However, there are cases where this simplification would be helpful. Consider narrowing something of
+type `Iterable[P]` via `isinstance(.., frozenset)`. It would be useful to get a narrowed type with a
+(read) element type `P`.
 
 ```pyi
 from typing import Iterable
@@ -529,26 +529,30 @@ intersection `Iterable[P] & frozenset[object]`), but not a subtype of `frozenset
 from typing import Iterable, Iterator
 
 class Weird(frozenset[object]):
-    def __iter__(self) -> Iterator[P]:
-        raise NotImplementedError
+    def __iter__(self) -> Iterator[P]: ...
 ```
 
-However, consider what this `__iter__` method would do. It would return an iterator over `P`, even
-though elements of that `frozenset` could be of any type. This would violate the behavioral contract
-of [iterators](https://docs.python.org/3/glossary.html#term-iterator):
-
-> Iterators are required to have an `__iter__()` method that returns the iterator object itself
-
-Therefore, it seems reasonable to make an exception for `Iterable` and its subtypes, and to assume
-that classes like `Weird` do not exist. We therefore implement the following intersection
-simplifications:
+The return type of `Iterator[P]` is compatible with that of `frozenset[object]` due to covariance.
+However, the returned iterator would only yield values of type `P` while the underlying `frozenset`
+may contain other values. Here, we assume that subclasses of built-in containers preserve their
+usual iteration behavior instead: iteration over a `frozenset` exposes its stored elements. Under
+this assumption, knowing the iteration element type also constrains the stored element type. This
+behavioral assumption is not enforced by the type system, so the simplification is unsound:
 
 ```pyi
-static_assert(is_equivalent_to(Iterable[P] & Iterator[object], Iterator[P]))
 static_assert(is_equivalent_to(Iterable[P] & tuple[object, ...], tuple[P, ...]))
 static_assert(is_equivalent_to(Iterable[P] & frozenset[object], frozenset[P]))
 static_assert(is_equivalent_to(Iterable[P] & Top[list[Any]], Top[list[P & Any]]))
 static_assert(is_equivalent_to(Iterable[P] & Top[set[Any]], Top[set[P & Any]]))
+```
+
+A similar justification applies to the following case. `Iterator`s are supposed to follow a
+[behavioral contract](https://docs.python.org/3/library/stdtypes.html#iterator-types): an iterator's
+`__iter__()` returns the iterator itself. Iteration and direct calls to `next()` therefore yield the
+same values. This supports simplifying `Iterable[P] & Iterator[object]` to `Iterator[P]`:
+
+```pyi
+static_assert(is_equivalent_to(Iterable[P] & Iterator[object], Iterator[P]))
 ```
 
 ## Edge cases
