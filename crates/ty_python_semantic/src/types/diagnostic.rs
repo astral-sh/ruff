@@ -1247,7 +1247,7 @@ declare_lint! {
     #[doc = include_str!("../../resources/lint_docs/disjoint-cast.md")]
     pub(crate) static DISJOINT_CAST = {
         summary: "detects `cast` calls between disjoint types",
-        status: LintStatus::stable("0.0.77"),
+        status: LintStatus::stable("0.0.78"),
         default_level: Level::Ignore,
     }
 }

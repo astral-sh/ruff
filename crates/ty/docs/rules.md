@@ -570,7 +570,7 @@ old_func()  # error: [deprecated]
 
 <small>
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'ignore'."><code>ignore</code></a> ·
-Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.77">0.0.77</a> ·
+Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.78">0.0.78</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%22disjoint-cast%22" target="_blank">Related issues</a> ·
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1246" target="_blank">View source</a>
 </small>
@@ -601,13 +601,14 @@ This means that any object of type `int` can never also be of type `str`, and an
 
 
 `cast()` is deliberately designed as an "escape hatch" in the type system that is neither validated
-at runtime nor, by default, by type checkers. While safe uses of `cast()` are possible -- for
-example, upcasting from a subtype to a supertype can be sound -- `cast()` is deliberately designed
-to allow unsound narrowing, and most useful applications of `cast()` in real-world code are unsound.
+at runtime nor, by default, by type checkers. While upcasting to a supertype is always sound, and
+casting to a subtype can be sound in some situations if accompanied by careful validation checks,
+`cast()` is also deliberately designed to allow unsound narrowing, and most useful applications of
+`cast()` in real-world code cannot be fully validated by a type checker.
 
 Nonetheless, even while acknowledging the fact that `cast()` is intentionally designed to allow
 unsoundness, casting a value to an entirely *disjoint* type is especially likely to indicate a
-mistake in your code. Casting from an `int` to a `str`, for example, likely indicates a bug or
+mistake in your code. A cast from an `int` to a `str`, for example, likely indicates a bug or
 misunderstanding.
 
 This rule therefore provides a means for codebases to partially validate their uses of `cast()`
@@ -627,11 +628,14 @@ def parse(value: int) -> str:
 Casts between overlapping (non-disjoint) types are allowed:
 
 ```py
+from collections.abc import Sequence
 from typing import cast
 
 
-def parse(value: int | str) -> str:
-    return cast(str, value)
+def validate(numbers: Sequence[int | None]) -> Sequence[int]:
+    if None in numbers:
+        raise TypeError("must provide a sequence of numbers!")
+    return cast(Sequence[int], numbers)
 ```
 
 Note that disjointness between types can sometimes be surprising. For example, `list[int]` is
@@ -673,7 +677,7 @@ def f(x: Sequence[int]):
 ```
 
 Though if you're able to use covariant types, a type-safe narrowing mechanism that provides runtime
-validation, such as using `TypeIs`, is generally always preferable to `cast`:
+validation, such as using `TypeIs`, is generally preferable to using `cast`:
 
 ```py
 # `Sequence`, unlike `list`, is immutable and covariant
@@ -690,8 +694,8 @@ def f(x: Sequence[int]):
     reveal_type(x)  # revealed: Sequence[bool]
 ```
 
-If you're unable to switch to immutable, covariant generic types, other solutions to this particular
-diagnostic might include assigning a new list altogether:
+If you're unable to switch to an immutable, covariant generic type, other solutions to this
+particular diagnostic might include assigning a new list altogether:
 
 ```py
 def f(x: list[int]):
@@ -701,8 +705,8 @@ def f(x: list[int]):
         y.append(item)
 ```
 
-Or using a `TypeGuard` -- while the "narrowing" below is still unsound, there is at least some
-runtime validation of the element types taking place:
+Or using a `TypeGuard`. While the "narrowing" below is still unsound, there is at least some runtime
+validation of the element types taking place, making it superior to the `cast`:
 
 ```py
 from typing_extensions import TypeGuard, reveal_type
