@@ -4,7 +4,7 @@ use std::ops::ControlFlow;
 use crate::types::constraints::paths::PathAssignments;
 use crate::types::constraints::variables::Constraint;
 use crate::types::constraints::{
-    ALWAYS_FALSE, ALWAYS_TRUE, ConstraintBoundsBuilder, ConstraintId, ConstraintSetStorage, NodeId,
+    ALWAYS_FALSE, ALWAYS_TRUE, ConstraintId, ConstraintSetStorage, NodeId, PathBoundBuilder,
     PathBounds, SolutionLimits,
 };
 use crate::types::{BoundTypeVarInstance, Type};
@@ -107,7 +107,7 @@ impl<'db> SolutionWalker<'db> {
         });
 
         let mut result = Vec::with_capacity(self.sorted_paths.len());
-        let mut mappings: FxIndexMap<BoundTypeVarInstance<'db>, ConstraintBoundsBuilder<'db>> =
+        let mut mappings: FxIndexMap<BoundTypeVarInstance<'db>, PathBoundBuilder<'db>> =
             FxIndexMap::default();
 
         for path in self.sorted_paths {
