@@ -3,7 +3,7 @@
 use std::cell::Cell;
 use std::fmt::{Debug, Display};
 
-use smallvec::SmallVec;
+use smallvec::{SmallVec, smallvec};
 
 use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::variables::{
@@ -14,8 +14,9 @@ use crate::types::constraints::variables::{
     TypeVarEquivalenceBound, TypeVarRangeBound,
 };
 use crate::types::constraints::{
-    ALWAYS_FALSE, ALWAYS_TRUE, ConstraintBound, ConstraintId, ConstraintSetBuilder,
-    ConstraintSetStorage, IntersectionResult, Node, OldConstraint, OwnedConstraintSet,
+    ALWAYS_FALSE, ALWAYS_TRUE, ConstraintBound, ConstraintBounds, ConstraintId,
+    ConstraintSetBuilder, ConstraintSetStorage, InterimConstraint, IntersectionResult, Node,
+    OldConstraint, OwnedConstraintSet,
 };
 use crate::types::typevar::TypeVarSet;
 use crate::types::variance::VarianceInferable;
@@ -1816,6 +1817,7 @@ impl<'db> Constraint<'db> {
 
         let when = lower_bound.when_constraint_set_assignable_to_owned(db, env, upper_bound);
         Self::add_constraint_set_implication(
+            db,
             map,
             lower_constraint,
             upper_constraint,
@@ -1837,6 +1839,7 @@ impl<'db> Constraint<'db> {
 
         let when = lower_bound.when_constraint_set_equivalent_to_owned(db, env, upper_bound);
         Self::add_constraint_set_implication(
+            db,
             map,
             lower_constraint,
             upper_constraint,
@@ -1845,6 +1848,7 @@ impl<'db> Constraint<'db> {
     }
 
     fn add_constraint_set_implication(
+        db: &'db dyn Db,
         map: &mut SequentMap<Constraint<'db>>,
         lower_constraint: Self,
         upper_constraint: Self,
@@ -1904,37 +1908,51 @@ impl<'db> Constraint<'db> {
                 return;
             }
 
+            // XXX: Remove this once we don't have to deal with old constraints.
+            let previous_sequent_count = map.sequents.len();
             loop {
                 match node.node() {
                     Node::AlwaysTrue | Node::AlwaysFalse => break,
                     Node::Interior(interior) => {
                         let interior = storage.interior_node_data(interior.node());
-                        // XXX
-                        let derived = upper_constraint;
-                        /*
                         let derived = storage.constraint_data(interior.constraint);
-                        let derived =
-                            ConstraintId::new_with_bounds(
-                                db,
-                                env,
-                                storage,
-                                derived.typevar,
-                                derived.bounds.lower.map(|bound| {
-                                    bound.with_source_provenance(constraint_data.bounds)
-                                }),
-                                derived.bounds.upper.map(|bound| {
-                                    bound.with_source_provenance(constraint_data.bounds)
-                                }),
-                            );
-                        */
+                        let derived = match derived {
+                            InterimConstraint::Old(derived) => {
+                                let lower = derived
+                                    .stored_lower_bound()
+                                    .map(|bound| bound.with_source_provenance(derived));
+                                let upper = derived
+                                    .stored_upper_bound()
+                                    .map(|bound| bound.with_source_provenance(derived));
+                                let old = InterimConstraint::Old(OldConstraint {
+                                    typevar: derived.typevar,
+                                    bounds: ConstraintBounds::new(lower, upper),
+                                });
+                                old.into_new(db)
+                            }
+                            InterimConstraint::New(derived) => smallvec![derived],
+                        };
                         if interior.if_true != ALWAYS_FALSE {
-                            map.add_pair_implication(lower_constraint, upper_constraint, derived);
+                            for derived in derived {
+                                map.add_pair_implication(
+                                    lower_constraint,
+                                    upper_constraint,
+                                    derived,
+                                );
+                            }
                             node = interior.if_true;
                         } else {
+                            let [derived] = derived.as_slice() else {
+                                // Back out any incomplete sequents we had added before discovering
+                                // this disjunction.
+                                // XXX: Remove this once we don't have to deal with old constraints.
+                                map.sequents.truncate(previous_sequent_count);
+                                return;
+                            };
                             map.add_triple_impossibility(
                                 lower_constraint,
                                 upper_constraint,
-                                derived,
+                                *derived,
                             );
                             node = interior.if_false;
                         }
