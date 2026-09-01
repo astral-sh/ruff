@@ -106,7 +106,7 @@ use ty_static::EnvVars;
 use crate::types::class::GenericAlias;
 use crate::types::constraints::projection::{ProjectionError, SolutionBudget};
 use crate::types::constraints::support::{Support, SupportId};
-use crate::types::typevar::{BoundTypeVarIdentity, TypeVarInstance, TypeVarSet};
+use crate::types::typevar::{BoundTypeVarIdentity, TypeVarDomain, TypeVarInstance, TypeVarSet};
 use crate::types::visitor::{
     TypeCollector, TypeKind, TypeVisitor, walk_non_atomic_type, walk_type_with_recursion_guard,
 };
@@ -126,6 +126,10 @@ mod variables;
 use paths::PathAssignments;
 use sequents::SequentMap;
 use solutions::SolutionWalker;
+use variables::{
+    ConcreteLowerBound, ConcreteUpperBound, Constraint, ConstraintProvenance, ParamSpecLowerBound,
+    ParamSpecUpperBound, TypeVarRangeBound,
+};
 
 /// An extension trait for building constraint sets from [`Option`] values.
 pub(crate) trait OptionConstraintsExtension<T> {
@@ -1975,6 +1979,43 @@ impl<'db> OldConstraint<'db> {
     fn has_concrete_bounds(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
         self.bounds.is_concrete(db, env)
     }
+
+    #[expect(unused)]
+    fn into_new(self, db: &'db dyn Db) -> SmallVec<[Constraint<'db>; 2]> {
+        let mut result = SmallVec::default();
+
+        if let Some(lower) = self.stored_lower_bound() {
+            let (provenance, bound) = lower.into_parts();
+            if let Some(bound) = bound.as_typevar() {
+                result.push(TypeVarRangeBound::new(db, provenance, bound, self.typevar).into());
+            } else {
+                if self.typevar.domain(db) == TypeVarDomain::ParameterSignature {
+                    result
+                        .push(ParamSpecLowerBound::new(db, provenance, self.typevar, bound).into());
+                } else {
+                    result
+                        .push(ConcreteLowerBound::new(db, provenance, self.typevar, bound).into());
+                }
+            }
+        }
+
+        if let Some(upper) = self.stored_upper_bound() {
+            let (provenance, bound) = upper.into_parts();
+            if let Some(bound) = bound.as_typevar() {
+                result.push(TypeVarRangeBound::new(db, provenance, self.typevar, bound).into());
+            } else {
+                if self.typevar.domain(db) == TypeVarDomain::ParameterSignature {
+                    result
+                        .push(ParamSpecUpperBound::new(db, provenance, self.typevar, bound).into());
+                } else {
+                    result
+                        .push(ConcreteUpperBound::new(db, provenance, self.typevar, bound).into());
+                }
+            }
+        }
+
+        result
+    }
 }
 
 /// The lower or upper bound of a constraint, along with its _provenance_
@@ -2001,6 +2042,13 @@ enum ConstraintBound<'db> {
 }
 
 impl<'db> ConstraintBound<'db> {
+    fn into_parts(self) -> (ConstraintProvenance, Type<'db>) {
+        match self {
+            Self::Validity(ty) => (ConstraintProvenance::Validity, ty),
+            Self::Evidence(ty) => (ConstraintProvenance::Evidence, ty),
+        }
+    }
+
     /// The ordinary lower identity used by storage canonicalization and path aggregation.
     const fn missing_lower() -> Self {
         Self::Validity(Type::Never)
