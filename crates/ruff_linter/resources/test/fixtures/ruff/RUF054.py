@@ -30,3 +30,12 @@ def _():
 
 def f():
 	pass 
+
+
+# Multiple form feeds in leading whitespace (errors)
+
+if True:
+  print("!")
+
+if True:
+   print("!")

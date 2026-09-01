@@ -39,3 +39,22 @@ RUF054 Indented form feed
 17 |     ␌print('T')
    |     ^
 help: Remove form feed
+
+RUF054 Indented form feed
+  --> RUF054.py:38:3
+   |
+37 | if True:
+38 | ␌ ␌ print("!")
+   |   ^
+39 |
+40 | if True:
+   |
+help: Remove form feed
+
+RUF054 Indented form feed
+  --> RUF054.py:41:2
+   |
+40 | if True:
+41 |  ␌ ␌ print("!")
+   |  ^
+help: Remove form feed

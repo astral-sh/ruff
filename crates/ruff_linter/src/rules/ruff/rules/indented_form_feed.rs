@@ -52,21 +52,27 @@ const TAB: u8 = b'\t';
 
 /// RUF054
 pub(crate) fn indented_form_feed(line: &Line, context: &LintContext) {
-    let Some(index_relative_to_line) = memchr(FORM_FEED, line.as_bytes()) else {
+    let bytes = line.as_bytes();
+
+    // A run of form feeds at the very start of the line is ignored for indentation
+    // purposes, per the language reference.
+    let leading_form_feeds = bytes.iter().take_while(|byte| **byte == FORM_FEED).count();
+
+    // Any other form feed occurring in the rest of the leading whitespace has an
+    // undefined effect and must be flagged; a non-whitespace byte means the
+    // indentation has ended.
+    let Some(index_in_remainder) = memchr(FORM_FEED, &bytes[leading_form_feeds..]) else {
         return;
     };
 
-    if index_relative_to_line == 0 {
-        return;
-    }
-
-    if line[..index_relative_to_line]
-        .as_bytes()
+    if bytes[leading_form_feeds..][..index_in_remainder]
         .iter()
         .any(|byte| *byte != SPACE && *byte != TAB)
     {
         return;
     }
+
+    let index_relative_to_line = leading_form_feeds + index_in_remainder;
 
     let Ok(relative_index) = u32::try_from(index_relative_to_line) else {
         return;
