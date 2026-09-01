@@ -1331,7 +1331,9 @@ reveal_type(enum_members(Answer))
 
 ### In stubs
 
-Stubs can optionally use `...` for the actual value:
+Stubs can optionally use `...` for the actual value. They should use `cast()` to declare the type of
+the enum member's value in cases where the value type cannot be unambiguously expressed as a static
+assignment without a type annotation:
 
 ```pyi
 from enum import Enum

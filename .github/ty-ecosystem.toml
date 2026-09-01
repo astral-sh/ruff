@@ -4,6 +4,7 @@
 # Enable off-by-default rules.
 [rules]
 blanket-ignore-comment = "warn"
+disjoint-cast = "warn"
 division-by-zero = "warn"
 dynamic-function-decorator-return = "warn"
 missing-type-argument = "warn"

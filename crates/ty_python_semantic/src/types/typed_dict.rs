@@ -1108,9 +1108,12 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
     ) -> ConstraintSet<'db, 'c> {
         let left_items = left.items(db);
         let right_items = right.items(db);
-        let fields_in_common = btreemap_values_with_same_key(left_items, right_items);
+        let fields_in_common = btreemap_items_with_same_key(left_items, right_items);
         let common_fields_disjoint =
-            fields_in_common.when_any(db, self.constraints, |(left_field, right_field)| {
+            fields_in_common.when_any(db, self.constraints, |(name, left_field, right_field)| {
+                if let Some(context) = self.report_context() {
+                    context.take();
+                }
                 // Condition 1 above.
                 if left_field.is_required() || right_field.is_required() {
                     if (!left_field.is_required() && !left_field.is_read_only())
@@ -1118,37 +1121,86 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                     {
                         // One side demands a `Required` source field, while the other side demands a
                         // `NotRequired` one. They must be disjoint.
+                        if let Some(context) = self.report_context() {
+                            let (required, not_required) = if left_field.is_required() {
+                                (left, right)
+                            } else {
+                                (right, left)
+                            };
+                            context.push(ErrorContext::TypedDictRequirednessConflict {
+                                field_name: name.clone(),
+                                required,
+                                not_required,
+                            });
+                        }
                         return self.always();
                     }
                 }
-                if !left_field.is_read_only() && !right_field.is_read_only() {
+                let result = if !left_field.is_read_only() && !right_field.is_read_only() {
                     // Condition 2 above. This field is mutable on both sides, so the so the types must
                     // be compatible, i.e. mutually assignable.
-                    let relation_checker = self.as_relation_checker(TypeRelation::Assignability);
-                    relation_checker
-                        .check_type_pair(db, left_field.declared_ty, right_field.declared_ty)
-                        .and(db, self.constraints, || {
-                            relation_checker.check_type_pair(
+                    self.check_relation_with_context(
+                        db,
+                        self.as_relation_checker(TypeRelation::Assignability),
+                        |relation_checker| {
+                            relation_checker
+                                .check_type_pair(
+                                    db,
+                                    left_field.declared_ty,
+                                    right_field.declared_ty,
+                                )
+                                .and(db, self.constraints, || {
+                                    relation_checker.check_type_pair(
+                                        db,
+                                        right_field.declared_ty,
+                                        left_field.declared_ty,
+                                    )
+                                })
+                        },
+                    )
+                    .negate(db, self.constraints)
+                } else if !left_field.is_read_only() {
+                    // Half of condition 3 above.
+                    self.check_relation_with_context(
+                        db,
+                        self.as_relation_checker(TypeRelation::Assignability),
+                        |checker| {
+                            checker.check_type_pair(
+                                db,
+                                left_field.declared_ty,
+                                right_field.declared_ty,
+                            )
+                        },
+                    )
+                    .negate(db, self.constraints)
+                } else if !right_field.is_read_only() {
+                    // The other half of condition 3 above.
+                    self.check_relation_with_context(
+                        db,
+                        self.as_relation_checker(TypeRelation::Assignability),
+                        |checker| {
+                            checker.check_type_pair(
                                 db,
                                 right_field.declared_ty,
                                 left_field.declared_ty,
                             )
-                        })
-                        .negate(db, self.constraints)
-                } else if !left_field.is_read_only() {
-                    // Half of condition 3 above.
-                    self.as_relation_checker(TypeRelation::Assignability)
-                        .check_type_pair(db, left_field.declared_ty, right_field.declared_ty)
-                        .negate(db, self.constraints)
-                } else if !right_field.is_read_only() {
-                    // The other half of condition 3 above.
-                    self.as_relation_checker(TypeRelation::Assignability)
-                        .check_type_pair(db, right_field.declared_ty, left_field.declared_ty)
-                        .negate(db, self.constraints)
+                        },
+                    )
+                    .negate(db, self.constraints)
                 } else {
                     // Condition 4 above.
                     self.check_type_pair(db, left_field.declared_ty, right_field.declared_ty)
+                };
+                if let Some(context) = self.report_context()
+                    && result.is_always_satisfied(db, self.env)
+                {
+                    context.push(ErrorContext::TypedDictFieldTypeConflict {
+                        field_name: name.clone(),
+                        left: left_field.declared_ty,
+                        right: right_field.declared_ty,
+                    });
                 }
+                result
             });
 
         let required_fields_disjoint = common_fields_disjoint.or(db, self.constraints, || {
@@ -3237,14 +3289,14 @@ bitflags! {
 
 impl get_size2::GetSize for TypedDictFieldFlags {}
 
-/// Yield all the key/val pairs where the same key is present in both `BTreeMap`s. Take advantage
+/// Yield each shared key and its values from both `BTreeMap`s. Take advantage
 /// of the fact that keys are sorted to walk through each map once without doing any lookups. It
 /// would be nice if `BTreeMap` had something like `BTreeSet::intersection` that did this for us,
 /// but as far as I know we have to do it ourselves. Life is hard.
-fn btreemap_values_with_same_key<'a, K, V1, V2>(
+fn btreemap_items_with_same_key<'a, K, V1, V2>(
     left: &'a BTreeMap<K, V1>,
     right: &'a BTreeMap<K, V2>,
-) -> impl Iterator<Item = (&'a V1, &'a V2)>
+) -> impl Iterator<Item = (&'a K, &'a V1, &'a V2)>
 where
     K: Ord,
 {
@@ -3256,10 +3308,10 @@ where
         {
             match left_key.cmp(right_key) {
                 Ordering::Equal => {
-                    // Matching keys. Yield this pair of values and advance both iterators.
+                    // Matching keys. Yield the key and both values, then advance both iterators.
                     left_items.next();
                     right_items.next();
-                    return Some((left_val, right_val));
+                    return Some((left_key, left_val, right_val));
                 }
                 Ordering::Less => {
                     // `left_items` is behind `right_items` in key order. Advance `left_items`.
@@ -3277,30 +3329,22 @@ where
 }
 
 #[test]
-fn test_btreemap_overlapping_items() {
+fn btreemap_overlapping_items() {
     // A case with partial overlap and gaps.
     let left = BTreeMap::from_iter([("a", 1), ("b", 2), ("c", 3), ("d", 4), ("e", 5)]);
     let right = BTreeMap::from_iter([("b", 2.0), ("d", 4.0), ("f", 6.0)]);
     assert_eq!(
-        btreemap_values_with_same_key(&left, &right).collect::<Vec<_>>(),
-        vec![(&2, &2.0), (&4, &4.0)],
+        btreemap_items_with_same_key(&left, &right).collect::<Vec<_>>(),
+        vec![(&"b", &2, &2.0), (&"d", &4, &4.0)],
     );
     assert_eq!(
-        btreemap_values_with_same_key(&right, &left).collect::<Vec<_>>(),
-        vec![(&2.0, &2), (&4.0, &4)],
+        btreemap_items_with_same_key(&right, &left).collect::<Vec<_>>(),
+        vec![(&"b", &2.0, &2), (&"d", &4.0, &4)],
     );
 
     // A case where one side is empty.
     let left = BTreeMap::<i32, i32>::new();
     let right = BTreeMap::<i32, i32>::from_iter([(1, 1), (2, 2)]);
-    assert!(
-        btreemap_values_with_same_key(&left, &right)
-            .next()
-            .is_none()
-    );
-    assert!(
-        btreemap_values_with_same_key(&right, &left)
-            .next()
-            .is_none()
-    );
+    assert!(btreemap_items_with_same_key(&left, &right).next().is_none());
+    assert!(btreemap_items_with_same_key(&right, &left).next().is_none());
 }
