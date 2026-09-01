@@ -5540,7 +5540,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             match ty {
                 Type::Callable(callable) => Some(Type::Callable(CallableType::new(
                     db,
-                    callable.signatures(db),
+                    callable.signatures(db).clone(),
                     kind,
                 ))),
                 Type::Union(union) => union.try_map(db, env, |element| {
