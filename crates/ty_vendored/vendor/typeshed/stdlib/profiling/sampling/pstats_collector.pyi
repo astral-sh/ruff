@@ -14,4 +14,5 @@ class PstatsCollector(Collector):
     def create_stats(self) -> None: ...
     def print_stats(
         self, sort: int = -1, limit: int | None = None, show_summary: bool = True, mode: int | None = None
-    ) -> None: ...
+    ) -> None:
+        """Print formatted statistics to stdout."""
