@@ -29,7 +29,6 @@ use crate::{
             infer_function_default_types, infer_statement_types, nearest_enclosing_function,
             original_class_type,
         },
-        known_instance::{MethodWrapper, MethodWrapperKind},
         relation::TypeRelation,
         signatures::{ReturnCallableTypeVarScope, function_signature_expression_type},
         tuple::{TupleSpecBuilder, TupleType},
@@ -589,24 +588,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         for (decorator_ty, decorator_node) in decorator_types_and_nodes.iter().rev() {
-            // Function types, overload signatures, and method-like callables already retain
-            // binding metadata. Check every callable alternative: a decorator can return a
-            // union whose signatures cannot be represented by a single ParamSpec.
-            if FunctionDecorators::from_decorator_type(db, *decorator_ty)
-                .intersects(FunctionDecorators::CLASSMETHOD | FunctionDecorators::STATICMETHOD)
-                && (is_decorated_overload_implementation
-                    || is_decorated_overload
-                    || matches!(inferred_ty, Type::FunctionLiteral(_))
-                    || inferred_ty
-                        .try_upcast_to_callable(db, self.program_environment())
-                        .is_some_and(|callables| {
-                            callables.iter().all(|callable| callable.is_method_like(db))
-                        }))
-            {
-                continue;
-            }
-
-            let wrapped_ty = inferred_ty;
             if let Type::KnownInstance(KnownInstanceType::Deprecated(deprecated)) = decorator_ty {
                 match inferred_ty {
                     Type::FunctionLiteral(function) => {
@@ -630,29 +611,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 decorator_node,
                 (!is_decorated_overload_implementation).then_some(function),
             );
-
-            if FunctionDecorators::from_decorator_type(db, *decorator_ty)
-                .intersects(FunctionDecorators::CLASSMETHOD | FunctionDecorators::STATICMETHOD)
-                && let Type::NominalInstance(instance) = inferred_ty
-            {
-                let kind = if instance.has_known_class(db, KnownClass::Classmethod) {
-                    Some(MethodWrapperKind::Classmethod)
-                } else if instance.has_known_class(db, KnownClass::Staticmethod) {
-                    Some(MethodWrapperKind::Staticmethod)
-                } else {
-                    None
-                };
-                if let Some(kind) = kind {
-                    // Keep the wrapped object as well as the nominal descriptor: the latter
-                    // exposes only `Callable[P, R]`, losing attributes and overload correlations.
-                    inferred_ty = Type::KnownInstance(KnownInstanceType::MethodWrapper(
-                        MethodWrapper::new(db, wrapped_ty, inferred_ty, kind),
-                    ));
-                }
-            }
         }
 
         if is_decorated_overload_implementation {
+            // Overloads describe the exposed function. The implementation check compares the
+            // unbound callable, before classmethod or staticmethod descriptor binding.
+            let implementation_ty = match inferred_ty {
+                Type::KnownInstance(KnownInstanceType::MethodWrapper(wrapper)) => {
+                    wrapper.wrapped(db)
+                }
+                _ => inferred_ty,
+            };
             let last_definition = match inferred_ty {
                 Type::FunctionLiteral(function) => Some(function.literal(db).last_definition),
                 Type::Callable(callable) => callable.deprecated(db),
@@ -667,7 +636,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             } else {
                 function_type
             };
-            let implementation_callables = inferred_ty
+            let implementation_callables = implementation_ty
                 .try_upcast_to_callable(db, self.program_environment())
                 .map_or_else(Box::default, |callables| {
                     callables.iter().copied().collect()

@@ -512,6 +512,53 @@ static: Callable[[object, int], int] = C.static
 class_method: Callable[[int], int] = C.class_method
 ```
 
+Explicit constructor calls preserve the same attributes and overloads as decorator syntax. A bound
+classmethod exposes its receiver and the original callable through `__self__` and `__func__`.
+
+```py
+class Explicit:
+    static = staticmethod(C.static)
+    class_method = classmethod(C.static)
+
+Explicit.static.reset()
+Explicit().class_method.reset()
+reveal_type(Explicit.static(None, 1))  # revealed: int
+reveal_type(Explicit().static(None, "a"))  # revealed: str
+reveal_type(Explicit.class_method(1))  # revealed: int
+reveal_type(Explicit().class_method("a"))  # revealed: str
+reveal_type(Explicit.class_method.__call__(1))  # revealed: int
+reveal_type(Explicit.class_method.__self__)  # revealed: <class 'Explicit'>
+reveal_type(Explicit.class_method.__func__)  # revealed: Wrapper
+class_method = Explicit.class_method
+
+# error: [no-matching-overload]
+Explicit.class_method(None)
+```
+
+## Decorators returning a different function
+
+An inner decorator can return a function that was defined elsewhere. The outer method decorator
+determines how that replacement function binds, independently of the original function's decorators.
+
+```py
+def replacement(cls: type, value: int) -> int:
+    return value
+
+class C:
+    @classmethod
+    @(lambda original: replacement)
+    def method(cls, value: int) -> int:
+        return value
+
+    assigned = classmethod(replacement)
+
+reveal_type(C.method(1))  # revealed: int
+reveal_type(C().method(1))  # revealed: int
+reveal_type(C.assigned(1))  # revealed: int
+reveal_type(C().assigned(1))  # revealed: int
+reveal_type(C.method.__func__)  # revealed: def replacement(cls: type, value: int) -> int
+```
+
 ## Types are not bound-method descriptors
 
 ```toml

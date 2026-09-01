@@ -1419,7 +1419,7 @@ impl<'db> ClassType<'db> {
             match ty {
                 Type::FunctionLiteral(function) => function.as_abstract_method(db, defining_class),
                 Type::BoundMethod(method) => {
-                    method.function(db).as_abstract_method(db, defining_class)
+                    type_as_abstract_method(db, method.func(db), defining_class)
                 }
                 Type::PropertyInstance(property) => {
                     // A property is abstract if any of its accessors is abstract.
@@ -2361,6 +2361,7 @@ impl<'db> ClassType<'db> {
             ty: Type::BoundMethod(metaclass_dunder_call_function),
             ..
         }) = metaclass_dunder_call_function_symbol
+            && let Some(function) = metaclass_dunder_call_function.function(db)
         {
             // TODO: this intentionally diverges from step 1 in
             // https://typing.python.org/en/latest/spec/constructors.html#converting-a-constructor-to-callable
@@ -2375,10 +2376,13 @@ impl<'db> ClassType<'db> {
             let is_actual_enum = enum_metadata(db, self.class_literal(db)).is_some();
             if !is_actual_enum {
                 let callable = if receiver == lookup_type {
-                    metaclass_dunder_call_function.into_callable_type(db)
+                    function.into_bound_callable(
+                        db,
+                        metaclass_dunder_call_function.signature_receiver(db),
+                        metaclass_dunder_call_function.typing_self_type(db),
+                    )
                 } else {
-                    metaclass_dunder_call_function
-                        .into_callable_type_with_receiver(db, env, receiver, receiver)
+                    function.into_bound_callable_with_receiver(db, env, receiver, receiver)
                 };
                 return CallableTypes::one(callable);
             }
@@ -2523,11 +2527,11 @@ impl<'db> ClassType<'db> {
                         new_function =
                             new_function.with_inherited_generic_context(db, class_generic_context);
                     }
-                    CallableTypes::one(
-                        new_function
-                            .into_bound_method_type(db, instance_type)
-                            .into_callable_type(db),
-                    )
+                    CallableTypes::one(new_function.into_bound_callable(
+                        db,
+                        instance_type,
+                        instance_type,
+                    ))
                 } else {
                     // Fallback if no `object.__new__` is found.
                     CallableTypes::one(CallableType::single(

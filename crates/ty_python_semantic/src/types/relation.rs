@@ -3840,8 +3840,15 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             // A `BoundMethod` type includes instances of the same method bound to a
             // subtype/subclass of the self type.
             (Type::BoundMethod(a), Type::BoundMethod(b)) => {
-                let a_function = a.function(db);
-                let b_function = b.function(db);
+                let (Some(a_function), Some(b_function)) = (a.function(db), b.function(db)) else {
+                    return nontrivial_check(self, || {
+                        self.check_type_pair(db, a.func(db), b.func(db)).or(
+                            db,
+                            self.constraints,
+                            || self.check_type_pair(db, a.self_instance(db), b.self_instance(db)),
+                        )
+                    });
+                };
                 if a_function.name(db) != b_function.name(db) {
                     // We typically ask about `BoundMethod` disjointness when we're looking at a
                     // method call on an intersection type like `A & B`. In that case, the same

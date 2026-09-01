@@ -1233,10 +1233,21 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                 .display_with(db, self.env, self.settings.clone())
                 .fmt_detailed(f),
             Type::BoundMethod(bound_method) => {
-                let function = bound_method.function(db);
+                let Some(function) = bound_method.function(db) else {
+                    f.set_invalid_type_annotation();
+                    write!(
+                        f,
+                        "MethodType[{}]",
+                        bound_method
+                            .func(db)
+                            .display_with(db, self.env, self.settings.clone())
+                    )?;
+                    return Ok(());
+                };
                 let self_ty = bound_method.self_instance(db);
                 let receiver_ty = bound_method.signature_receiver(db);
-                let bound_signatures = bound_method.bound_signatures(db);
+                let bound_signatures =
+                    function.bound_signatures(db, receiver_ty, bound_method.typing_self_type(db));
 
                 match bound_signatures.overloads.as_slice() {
                     [signature] => {

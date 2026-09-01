@@ -9,10 +9,11 @@ use crate::{
         ClassType, GenericContext, InferenceFlags, InvalidTypeExpressionError, KnownClass,
         PromotionKind, PromotionMode, StringLiteralType, Type, TypeAliasType, TypeContext,
         TypeMapping, TypeVarNonce, UnionBuilder, VarianceTerm,
-        callable::CallableTypes,
+        callable::{CallableTypeKind, CallableTypes},
         class::NamedTupleSpec,
         constraints::{OwnedConstraintSet, TypeVarSolution},
         dedicated::pydantic::ConfigBoolean,
+        function::FunctionDecorators,
         generics::{Specialization, walk_generic_context},
         newtype::NewType,
         typevar::TypeVarInstance,
@@ -72,7 +73,7 @@ pub struct FunctoolsPartialInstance<'db> {
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for FunctoolsPartialInstance<'_> {}
 
-/// A method descriptor that retains the object returned by an inner decorator.
+/// A classmethod or staticmethod descriptor that retains the complete wrapped callable.
 ///
 /// The nominal `classmethod[T, P, R]` and `staticmethod[P, R]` types expose only a
 /// callable signature, which cannot preserve the wrapped object's attributes or
@@ -81,28 +82,62 @@ impl get_size2::GetSize for FunctoolsPartialInstance<'_> {}
 pub struct MethodWrapper<'db> {
     #[returns(copy)]
     pub(super) wrapped: Type<'db>,
-    /// The constructor's nominal result, used for the descriptor's own members.
     #[returns(copy)]
-    pub(super) descriptor: Type<'db>,
-    #[returns(copy)]
-    pub(super) kind: MethodWrapperKind<'db>,
+    pub(super) kind: MethodWrapperKind,
 }
 
 impl get_size2::GetSize for MethodWrapper<'_> {}
 
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
-pub enum MethodWrapperKind<'db> {
+pub enum MethodWrapperKind {
     Staticmethod,
     Classmethod,
-    BoundClassmethod(Type<'db>),
 }
 
 impl<'db> MethodWrapper<'db> {
+    /// Construct a method descriptor, retaining precise function and callable representations
+    /// where they already encode descriptor binding.
+    pub(super) fn wrap(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        wrapped: Type<'db>,
+        kind: MethodWrapperKind,
+    ) -> Type<'db> {
+        match wrapped {
+            // Function definitions already record built-in method decorators, including their
+            // consistency across overloads. Keep that representation for overload validation.
+            // A replacement function without this metadata needs its own descriptor.
+            Type::FunctionLiteral(function)
+                if function.has_known_decorator(
+                    db,
+                    match kind {
+                        MethodWrapperKind::Classmethod => FunctionDecorators::CLASSMETHOD,
+                        MethodWrapperKind::Staticmethod => FunctionDecorators::STATICMETHOD,
+                    },
+                ) =>
+            {
+                wrapped
+            }
+            Type::Callable(callable) => Type::Callable(CallableType::new(
+                db,
+                callable.signatures(db),
+                match kind {
+                    MethodWrapperKind::Classmethod => CallableTypeKind::ClassMethodLike,
+                    MethodWrapperKind::Staticmethod => CallableTypeKind::StaticMethodLike,
+                },
+            )),
+            Type::Union(union) => union.map(db, env, |element| Self::wrap(db, env, *element, kind)),
+            Type::TypeAlias(alias) => Self::wrap(db, env, alias.value_type(db), kind),
+            _ => Type::KnownInstance(KnownInstanceType::MethodWrapper(Self::new(
+                db, wrapped, kind,
+            ))),
+        }
+    }
+
     pub(super) fn class(self, db: &'db dyn Db) -> KnownClass {
         match self.kind(db) {
             MethodWrapperKind::Staticmethod => KnownClass::Staticmethod,
             MethodWrapperKind::Classmethod => KnownClass::Classmethod,
-            MethodWrapperKind::BoundClassmethod(_) => KnownClass::MethodType,
         }
     }
 
@@ -111,10 +146,7 @@ impl<'db> MethodWrapper<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Type<'db> {
-        match self.kind(db) {
-            MethodWrapperKind::Staticmethod | MethodWrapperKind::Classmethod => self.descriptor(db),
-            MethodWrapperKind::BoundClassmethod(_) => KnownClass::MethodType.to_instance(db, env),
-        }
+        self.class(db).to_instance(db, env)
     }
 
     pub(super) fn callables(
@@ -125,12 +157,6 @@ impl<'db> MethodWrapper<'db> {
         match self.kind(db) {
             MethodWrapperKind::Staticmethod => self.wrapped(db).try_upcast_to_callable(db, env),
             MethodWrapperKind::Classmethod => None,
-            MethodWrapperKind::BoundClassmethod(receiver) => self
-                .wrapped(db)
-                .try_upcast_to_callable(db, env)
-                .map(|callables| {
-                    callables.map(|callable| callable.bind_self(db, env, Some(receiver)))
-                }),
         }
     }
 
@@ -141,19 +167,11 @@ impl<'db> MethodWrapper<'db> {
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
-        let kind = match self.kind(db) {
-            MethodWrapperKind::BoundClassmethod(receiver) => MethodWrapperKind::BoundClassmethod(
-                receiver.recursive_type_normalized_impl(db, env, div, nested)?,
-            ),
-            kind => kind,
-        };
         Some(Self::new(
             db,
             self.wrapped(db)
                 .recursive_type_normalized_impl(db, env, div, nested)?,
-            self.descriptor(db)
-                .recursive_type_normalized_impl(db, env, div, nested)?,
-            kind,
+            self.kind(db),
         ))
     }
 
@@ -164,19 +182,11 @@ impl<'db> MethodWrapper<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
-        let kind = match self.kind(db) {
-            MethodWrapperKind::BoundClassmethod(receiver) => MethodWrapperKind::BoundClassmethod(
-                receiver.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-            ),
-            kind => kind,
-        };
         Self::new(
             db,
             self.wrapped(db)
                 .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-            self.descriptor(db)
-                .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-            kind,
+            self.kind(db),
         )
     }
 }
@@ -343,10 +353,6 @@ pub(super) fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Size
         }
         KnownInstanceType::MethodWrapper(wrapper) => {
             visitor.visit_type(db, wrapper.wrapped(db));
-            visitor.visit_type(db, wrapper.descriptor(db));
-            if let MethodWrapperKind::BoundClassmethod(receiver) = wrapper.kind(db) {
-                visitor.visit_type(db, receiver);
-            }
         }
     }
 }
@@ -363,12 +369,7 @@ impl<'db> VarianceInferable<'db> for KnownInstanceType<'db> {
                 type_alias.raw_value_type(db).variance_of(db, env, typevar)
             }
             KnownInstanceType::MethodWrapper(wrapper) => {
-                let variance = wrapper.wrapped(db).variance_of(db, env, typevar);
-                if let MethodWrapperKind::BoundClassmethod(receiver) = wrapper.kind(db) {
-                    variance.join(receiver.variance_of(db, env, typevar))
-                } else {
-                    variance
-                }
+                wrapper.wrapped(db).variance_of(db, env, typevar)
             }
             _ => VarianceTerm::BIVARIANT,
         }

@@ -2546,7 +2546,7 @@ pub(super) fn report_dynamic_function_decorator_return<'db>(
 
     let decorator_function = match decorator_binding.signature_type {
         Type::FunctionLiteral(function) => function,
-        Type::BoundMethod(method) => method.function(db),
+        Type::BoundMethod(method) if let Some(function) = method.function(db) => function,
         _ => return,
     };
 
@@ -4895,7 +4895,7 @@ pub(super) fn report_invalid_method_override<'db>(
 
                 let superclass_function_span = match superclass_type {
                     Type::FunctionLiteral(function) => Some(signature_span(function)),
-                    Type::BoundMethod(method) => Some(signature_span(method.function(db))),
+                    Type::BoundMethod(method) => method.function(db).map(signature_span),
                     _ => None,
                 };
 

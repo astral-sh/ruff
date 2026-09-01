@@ -872,7 +872,7 @@ pub(super) fn extract_underlying_functions<'db>(
 ) -> smallvec::SmallVec<[FunctionType<'db>; 1]> {
     match ty {
         Type::FunctionLiteral(function) => smallvec::smallvec_inline![function],
-        Type::BoundMethod(method) => smallvec::smallvec_inline![method.function(db)],
+        Type::BoundMethod(method) => extract_underlying_functions(db, method.func(db)),
         Type::PropertyInstance(property) => property.getter(db).map_or_else(
             || smallvec::smallvec![],
             |getter| extract_underlying_functions(db, getter),
