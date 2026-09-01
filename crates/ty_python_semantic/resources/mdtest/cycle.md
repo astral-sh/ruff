@@ -298,6 +298,26 @@ assert g
 def g(x: object = lambda: g) -> None: ...
 ```
 
+### Diagnostics for self-referential decorated functions
+
+We reject a decorator that expects an integer instead of a function. Displaying the function's
+signature in that diagnostic can infer its self-referential default value. We report the error after
+function inference finishes, so diagnostic formatting does not create a cycle through the
+reachability check for the earlier assertion. This is a regression test for
+<https://github.com/astral-sh/ty/issues/4440>.
+
+```py
+def decorator(value: int) -> int:
+    return value
+
+f = lambda: f
+assert f
+
+# error: [invalid-argument-type] "Expected `int`, found `def f(x=...) -> Unknown`"
+@decorator
+def f(x=lambda: f): ...
+```
+
 ### Self-referential property construction
 
 Constructing a property explicitly has the same behavior as decorator syntax:

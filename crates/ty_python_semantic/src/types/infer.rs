@@ -1341,6 +1341,9 @@ struct OtherDefinitionInferenceExtra<'db> {
     /// For decorated function or class definitions, the type before applying decorators.
     undecorated_type: Option<Type<'db>>,
 
+    /// Input types for failed decorator applications that are checked after inference.
+    deferred_decorator_calls: FrozenMap<ExpressionNodeKey, Type<'db>>,
+
     /// Whether synthesized dictionary-key assignments derived from the right-hand side should be
     /// discarded.
     discards_dict_key_assignments: bool,
@@ -1510,6 +1513,18 @@ impl<'db> DefinitionInference<'db> {
             definition,
         );
 
+        if let Some(DefinitionInferenceExtra::Other(extra)) = self.extra.as_deref_mut() {
+            for (expression, ty) in &mut extra.deferred_decorator_calls {
+                *ty = if let Some(previous_ty) =
+                    previous_inference.deferred_decorator_input_type(*expression)
+                {
+                    ty.cycle_normalized(db, &env, previous_ty, cycle)
+                } else {
+                    ty.recursive_type_normalized(db, &env, cycle)
+                };
+            }
+        }
+
         if cycle.iteration() > crate::TAINTED_CYCLES
             && let Some(previous_constraints) = previous_inference
                 .extra
@@ -1664,6 +1679,19 @@ impl<'db> DefinitionInference<'db> {
                 Some(extra.undecorated_type)
             }
             Some(DefinitionInferenceExtra::Other(extra)) => extra.undecorated_type,
+            Some(_) | None => None,
+        }
+    }
+
+    fn deferred_decorator_input_type(
+        &self,
+        expression: impl Into<ExpressionNodeKey>,
+    ) -> Option<Type<'db>> {
+        match self.extra.as_deref() {
+            Some(DefinitionInferenceExtra::Other(extra)) => extra
+                .deferred_decorator_calls
+                .get(&expression.into())
+                .copied(),
             Some(_) | None => None,
         }
     }
