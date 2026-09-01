@@ -2621,7 +2621,8 @@ def runtime_protocol_pattern_is_exhaustive(value: RuntimeProtocolImplementer) ->
 
 ## Protocol patterns with gradual members
 
-Strict class-pattern narrowing materializes gradual members even when the protocol is non-generic:
+Strict class-pattern narrowing materializes gradual members even when the protocol is non-generic.
+The fallback case excludes the fully materialized protocol:
 
 ```toml
 [analysis]
@@ -2640,6 +2641,8 @@ def from_object(value: object):
         case Reader() as reader:
             reveal_type(value)  # revealed: Top[Reader]
             reveal_type(reader.read())  # revealed: object
+        case _:
+            reveal_type(value)  # revealed: ~Top[Reader]
 ```
 
 ## Members from the subject type
