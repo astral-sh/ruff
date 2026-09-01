@@ -276,14 +276,38 @@ fn create_diagnostic(
     let tokens = checker.tokens();
     let comment_ranges = checker.comment_ranges();
 
-    let range_with_parentheses =
-        parenthesized_range(value.into(), stmt.into(), tokens).unwrap_or(value.range());
+    let parens = parenthesized_range(value.into(), stmt.into(), tokens);
+    let range_with_parentheses = parens.unwrap_or(value.range());
 
-    let content = format!(
-        "type {name}{type_params} = {value}",
-        type_params = DisplayTypeVars { type_vars, source },
-        value = &source[range_with_parentheses]
+    let value_text = &source[range_with_parentheses];
+    let has_implicit_continuation = matches!(
+        value,
+        Expr::Tuple(_)
+            | Expr::List(_)
+            | Expr::Set(_)
+            | Expr::Dict(_)
+            | Expr::Call(_)
+            | Expr::Subscript(_)
+            | Expr::ListComp(_)
+            | Expr::SetComp(_)
+            | Expr::DictComp(_)
+            | Expr::Generator(_)
     );
+    let needs_parentheses = parens.is_none()
+        && !has_implicit_continuation
+        && (value_text.contains('\n') || value_text.contains('\r'));
+
+    let content = if needs_parentheses {
+        format!(
+            "type {name}{type_params} = ({value_text})",
+            type_params = DisplayTypeVars { type_vars, source },
+        )
+    } else {
+        format!(
+            "type {name}{type_params} = {value_text}",
+            type_params = DisplayTypeVars { type_vars, source },
+        )
+    };
     let edit = Edit::range_replacement(content, stmt.range());
 
     let applicability =

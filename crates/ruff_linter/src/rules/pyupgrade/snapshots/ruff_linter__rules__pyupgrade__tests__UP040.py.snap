@@ -436,3 +436,34 @@ help: Use the `type` keyword
 123 |     # comment1
     |
 note: This is an unsafe fix and may change runtime behavior
+
+UP040 [*] Type alias `MultiLineUnion` uses `TypeAliasType` assignment instead of the `type` keyword
+   --> UP040.py:138:1
+    |
+136 |   # Multi-line union inside TypeAliasType must be parenthesized in the fix.
+137 |   # https://github.com/astral-sh/ruff/issues/28102
+138 | / MultiLineUnion = TypeAliasType(
+139 | |     "MultiLineUnion",
+140 | |     int
+141 | |     | str
+142 | |     | float
+143 | |     | bool
+144 | |     | None
+145 | |     | bytes,
+146 | | )
+    | |_^
+help: Use the `type` keyword
+    |
+137 | # https://github.com/astral-sh/ruff/issues/28102
+    - MultiLineUnion = TypeAliasType(
+    -     "MultiLineUnion",
+    -     int
+138 + type MultiLineUnion = (int
+139 |     | str
+140 |     | float
+141 |     | bool
+142 |     | None
+    -     | bytes,
+    - )
+143 +     | bytes)
+    |

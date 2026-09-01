@@ -132,3 +132,15 @@ T: TypeAlias = ( # comment0
 # Test case for TypeVar with default - should be converted when preview mode is enabled
 T_default = TypeVar("T_default", default=int)
 DefaultList: TypeAlias = list[T_default]
+
+# Multi-line union inside TypeAliasType must be parenthesized in the fix.
+# https://github.com/astral-sh/ruff/issues/28102
+MultiLineUnion = TypeAliasType(
+    "MultiLineUnion",
+    int
+    | str
+    | float
+    | bool
+    | None
+    | bytes,
+)
