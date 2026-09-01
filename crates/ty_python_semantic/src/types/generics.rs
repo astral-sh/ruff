@@ -2091,25 +2091,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     is_subtype_of(target_top, source_top)
                 })
             }
-            // The bottom materialization of `source` is a subtype of the top materialization
-            // of `target` if there is some type that is both within the
-            // range of types covered by derived and within the range covered by base, because if such a type
-            // exists, it's a subtype of `Top[target]` and a supertype of `Bottom[source]`.
+            // The ranges overlap when each lower bound is a subtype of the other upper bound.
+            // Their common materialization can lie strictly inside both ranges: neither the
+            // lower bounds nor the upper bounds need to be comparable to each other.
             (MaterializationKind::Bottom, MaterializationKind::Top) => {
-                is_subtype_of(target_bottom, source_bottom)
-                    .and(db, self.constraints, || {
-                        is_subtype_of(source_bottom, target_top)
-                    })
-                    .or(db, self.constraints, || {
-                        is_subtype_of(target_bottom, source_top).and(db, self.constraints, || {
-                            is_subtype_of(source_top, target_top)
-                        })
-                    })
-                    .or(db, self.constraints, || {
-                        is_subtype_of(target_top, source_top).and(db, self.constraints, || {
-                            is_subtype_of(source_bottom, target_top)
-                        })
-                    })
+                is_subtype_of(source_bottom, target_top).and(db, self.constraints, || {
+                    is_subtype_of(target_bottom, source_top)
+                })
             }
             // A top materialization is a subtype of a bottom materialization only if both original
             // un-materialized types are the same fully static type.

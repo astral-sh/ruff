@@ -1273,6 +1273,40 @@ def bounded[T: list[Any]]():
     static_assert(is_disjoint_from(list[str], list[T]))
 ```
 
+### Overlapping invariant materialization ranges
+
+Invariant types are not disjoint when their arguments have a common materialization. For every `T`
+bounded by `int`, the left argument can materialize to `int | str`, which is also a materialization
+of the right argument.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```pyi
+from typing import Any
+from ty_extensions import static_assert
+from ty_extensions._internal import is_disjoint_from
+
+type Left[T] = list[(T | Any) & (int | str | bytes)]
+type Right = list[(str | Any) & (int | str | float)]
+
+def overlap[T: int]():
+    static_assert(not is_disjoint_from(Left[T], Right))
+    static_assert(not is_disjoint_from(Right, Left[T]))
+
+static_assert(not is_disjoint_from(Left[int], Right))
+static_assert(not is_disjoint_from(Right, Left[int]))
+```
+
+If the left argument must include `bytes`, the ranges have no common materialization.
+
+```pyi
+static_assert(is_disjoint_from(Left[bytes], Right))
+static_assert(is_disjoint_from(Right, Left[bytes]))
+```
+
 ### NewTypes and overlapping types
 
 A `NewType` overlaps with any nominal or structural type that overlaps its concrete base. This
