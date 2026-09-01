@@ -1056,7 +1056,7 @@ impl<'db> PlaceAndQualifiers<'db> {
         self.cycle_normalized_with_projection_evidence(db, env, previous_place, cycle, None)
     }
 
-    pub(crate) fn cycle_normalized_with_projection_evidence(
+    fn cycle_normalized_with_projection_evidence(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,

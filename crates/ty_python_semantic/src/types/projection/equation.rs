@@ -43,7 +43,7 @@ impl CycleRootSet {
         }
     }
 
-    pub(super) fn len(&self) -> usize {
+    fn len(&self) -> usize {
         self.roots.len()
     }
 
@@ -181,7 +181,7 @@ pub(super) struct ProjectionEquationSystem<'db> {
 }
 
 impl<'db> ProjectionEquationSystem<'db> {
-    pub(super) fn from_recovery_slots(
+    fn from_recovery_slots(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         roots: &CycleRootSet,

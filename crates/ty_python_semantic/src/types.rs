@@ -2077,7 +2077,7 @@ impl<'db> Type<'db> {
         self.cycle_normalized_with_projection_evidence(db, env, previous, cycle, None)
     }
 
-    pub(crate) fn cycle_normalized_with_projection_evidence(
+    fn cycle_normalized_with_projection_evidence(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -3351,7 +3351,7 @@ impl<'db> Type<'db> {
     /// If this continues, the query will not converge, so this method is called in the cycle recovery function.
     /// Then `tuple[tuple[Divergent, Literal[1]], Literal[1]]` is replaced with `tuple[Divergent, Literal[1]]` and the query converges.
     #[must_use]
-    pub(crate) fn recursive_type_normalized(
+    fn recursive_type_normalized(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -3361,7 +3361,7 @@ impl<'db> Type<'db> {
     }
 
     #[must_use]
-    pub(crate) fn recursive_type_normalized_with_projection_evidence(
+    fn recursive_type_normalized_with_projection_evidence(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,

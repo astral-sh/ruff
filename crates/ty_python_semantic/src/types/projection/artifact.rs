@@ -68,7 +68,7 @@ impl<'db> ProjectionPath<'db> {
         &self.ops
     }
 
-    pub(super) fn append(&self, op: ProjectionOp<'db>) -> Self {
+    fn append(&self, op: ProjectionOp<'db>) -> Self {
         let mut ops = self.ops.to_vec();
         ops.push(op);
         Self {

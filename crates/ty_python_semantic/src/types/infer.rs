@@ -1811,7 +1811,7 @@ impl<'db> DefinitionInference<'db> {
             )
     }
 
-    pub(crate) fn projection_evidence(&self) -> Option<ProjectionEvidenceSet<'db>> {
+    fn projection_evidence(&self) -> Option<ProjectionEvidenceSet<'db>> {
         self.extra
             .as_deref()
             .and_then(DefinitionInferenceExtra::projection_evidence)
