@@ -12,6 +12,11 @@ pub use db::Db;
 pub(crate) use diagnostic::add_inferred_python_version_hint_to_diagnostic;
 pub use diagnostic::inferred_python_version_source_annotation;
 pub use fixes::{fix_all_diagnostics, suppress_all_diagnostics};
+#[allow(
+    dead_code,
+    reason = "definition-resolution metadata is exposed for IDE consumers"
+)]
+pub use place::definitions::DefinitionResolution;
 use ruff_db::PythonFile;
 use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Severity, Span};
 use ruff_db::files::File;

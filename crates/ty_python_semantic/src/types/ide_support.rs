@@ -23,6 +23,7 @@ use ty_module_resolver::{ImportingFile, Module, ResolverFile};
 use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::{ProgramFile, attribute_scopes, semantic_index, use_def_map};
 
+mod name_resolution;
 mod unreachable_code;
 #[path = "ide_support/unused_bindings.rs"]
 mod unused_binding_support;
