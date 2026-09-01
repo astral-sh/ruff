@@ -256,3 +256,44 @@ FURB101 `open` and `read` should be replaced by `Path("file1.txt").read_text(enc
 142 |     contents: str = process_contents(f.read())
     |
 help: Replace with `Path("file1.txt").read_text(encoding="utf-8")`
+
+FURB101 [*] `open` and `read` should be replaced by `Path(b"file.txt").read_text()`
+   --> FURB101_0.py:150:6
+    |
+149 | # FURB101 but fix is unsafe because `Path` does not accept a `bytes` path
+150 | with open(b"file.txt") as f:
+    |      ^^^^^^^^^^^^^^^^^^^^^^
+151 |     x = f.read()
+    |
+help: Replace with `Path(b"file.txt").read_text()`
+    |
+1   + import pathlib
+2   | def foo():
+--------------------------------------------------------------------------------
+150 | # FURB101 but fix is unsafe because `Path` does not accept a `bytes` path
+    - with open(b"file.txt") as f:
+    -     x = f.read()
+151 + x = pathlib.Path(b"file.txt").read_text()
+152 |
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+FURB101 [*] `open` and `read` should be replaced by `Path(b"file.txt").read_bytes()`
+   --> FURB101_0.py:154:6
+    |
+153 | # FURB101 but fix is unsafe because `Path` does not accept a `bytes` path
+154 | with open(b"file.txt", "rb") as f:
+    |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+155 |     x = f.read()
+    |
+help: Replace with `Path(b"file.txt").read_bytes()`
+    |
+1   + import pathlib
+2   | def foo():
+--------------------------------------------------------------------------------
+154 | # FURB101 but fix is unsafe because `Path` does not accept a `bytes` path
+    - with open(b"file.txt", "rb") as f:
+    -     x = f.read()
+155 + x = pathlib.Path(b"file.txt").read_bytes()
+    |
+note: This is an unsafe fix and may change runtime behavior

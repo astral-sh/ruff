@@ -166,6 +166,16 @@ impl OpenArgument<'_> {
     pub(super) fn display<'src>(&self, source: &'src str) -> &'src str {
         &source[self.range()]
     }
+
+    /// Returns `true` if the argument is a `bytes` literal, e.g. `open(b"file.txt")`.
+    /// `pathlib.Path` does not accept `bytes` paths, so replacing this pattern with a
+    /// `Path` method call would raise a `TypeError` at runtime.
+    pub(super) fn is_bytes_literal(&self) -> bool {
+        match self {
+            OpenArgument::Builtin { filename } => filename.is_bytes_literal_expr(),
+            OpenArgument::Pathlib { path } => path.is_bytes_literal_expr(),
+        }
+    }
 }
 
 impl Ranged for OpenArgument<'_> {

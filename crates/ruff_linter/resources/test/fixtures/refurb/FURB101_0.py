@@ -145,3 +145,11 @@ with open("file1.txt", encoding="utf-8") as f:
 # `open` accepts a file descriptor, but `Path` does not
 with open(3) as f:
     x = f.read()
+
+# FURB101 but fix is unsafe because `Path` does not accept a `bytes` path
+with open(b"file.txt") as f:
+    x = f.read()
+
+# FURB101 but fix is unsafe because `Path` does not accept a `bytes` path
+with open(b"file.txt", "rb") as f:
+    x = f.read()

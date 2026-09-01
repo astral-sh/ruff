@@ -167,3 +167,7 @@ with open("tmp_path/pyproject.toml", "w") as f:
 # `open` accepts a file descriptor, but `Path` does not
 with open(3, "w") as f:
     f.write("test")
+
+# FURB103 but fix is unsafe because `Path` does not accept a `bytes` path
+with open(b"file.txt", "wb") as f:
+    f.write(b"data")

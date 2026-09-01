@@ -208,3 +208,24 @@ help: Replace with `Path("tmp_path/pyproject.toml")....`
 159 + pathlib.Path("tmp_path/pyproject.toml").write_text(dedent(
 160 |         """
     |
+
+FURB103 [*] `open` and `write` should be replaced by `Path(b"file.txt").write_bytes(b"data")`
+   --> FURB103_0.py:172:6
+    |
+171 | # FURB103 but fix is unsafe because `Path` does not accept a `bytes` path
+172 | with open(b"file.txt", "wb") as f:
+    |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+173 |     f.write(b"data")
+    |
+help: Replace with `Path(b"file.txt").write_bytes(b"data")`
+    |
+150 | import json
+151 + import pathlib
+152 |
+--------------------------------------------------------------------------------
+172 | # FURB103 but fix is unsafe because `Path` does not accept a `bytes` path
+    - with open(b"file.txt", "wb") as f:
+    -     f.write(b"data")
+173 + pathlib.Path(b"file.txt").write_bytes(b"data")
+    |
+note: This is an unsafe fix and may change runtime behavior

@@ -36,7 +36,9 @@ use crate::{FixAvailability, Violation};
 /// contents = Path("file.txt").read_text()
 /// ```
 /// ## Fix Safety
-/// This rule's fix is marked as unsafe if the replacement would remove comments attached to the original expression.
+/// This rule's fix is marked as unsafe if the replacement would remove comments attached to the
+/// original expression, or if the path argument is a `bytes` literal (`pathlib.Path` does not
+/// accept `bytes` paths, so the fix would change the runtime behavior of the code).
 ///
 /// ## References
 /// - [Python documentation: `Path.read_bytes`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.read_bytes)
@@ -260,7 +262,9 @@ fn generate_fix(
         _ => return None,
     };
 
-    let applicability = if checker.comment_ranges().intersects(with_stmt.range()) {
+    let applicability = if checker.comment_ranges().intersects(with_stmt.range())
+        || open.argument.is_bytes_literal()
+    {
         Applicability::Unsafe
     } else {
         Applicability::Safe
