@@ -14,8 +14,8 @@ use crate::types::constraints::variables::{
     TypeVarEquivalenceBound, TypeVarRangeBound,
 };
 use crate::types::constraints::{
-    ALWAYS_FALSE, ALWAYS_TRUE, Constraint as OldConstraint, ConstraintBound, ConstraintId,
-    ConstraintSetBuilder, ConstraintSetStorage, IntersectionResult, Node, OwnedConstraintSet,
+    ALWAYS_FALSE, ALWAYS_TRUE, ConstraintBound, ConstraintId, ConstraintSetBuilder,
+    ConstraintSetStorage, IntersectionResult, Node, OldConstraint, OwnedConstraintSet,
 };
 use crate::types::typevar::TypeVarSet;
 use crate::types::variance::VarianceInferable;

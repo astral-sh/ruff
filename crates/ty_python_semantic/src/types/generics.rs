@@ -13,7 +13,7 @@ use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
 use crate::types::constraints::projection::{ProjectionError, SolutionBudget, SolutionProjection};
 use crate::types::constraints::{
-    Constraint, ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, PathBound,
+    ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, OldConstraint, PathBound,
     PathBoundSolution, PathBounds, SolutionPaths, Solutions, TypeVarSolution,
 };
 use crate::types::infer::original_class_type;
@@ -3332,7 +3332,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         }
     }
 
-    fn intersect_pending_typevar_constraint(&mut self, constraint: Constraint<'db>) {
+    fn intersect_pending_typevar_constraint(&mut self, constraint: OldConstraint<'db>) {
         let db = self.db;
         let bound_typevar = constraint.typevar();
         let identity = bound_typevar.identity(db);
@@ -3381,11 +3381,13 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         variance: TypeVarVariance,
     ) {
         let constraint = match variance {
-            TypeVarVariance::Covariant => Constraint::from_evidence(bound_typevar, Some(ty), None),
-            TypeVarVariance::Contravariant => {
-                Constraint::from_evidence(bound_typevar, None, Some(ty))
+            TypeVarVariance::Covariant => {
+                OldConstraint::from_evidence(bound_typevar, Some(ty), None)
             }
-            TypeVarVariance::Invariant => Constraint::exact(bound_typevar, ty),
+            TypeVarVariance::Contravariant => {
+                OldConstraint::from_evidence(bound_typevar, None, Some(ty))
+            }
+            TypeVarVariance::Invariant => OldConstraint::exact(bound_typevar, ty),
             TypeVarVariance::Bivariant => return,
         };
         self.intersect_pending_typevar_constraint(constraint);
