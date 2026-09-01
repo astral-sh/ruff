@@ -5579,7 +5579,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn defer_decorator_call(&mut self, decorator: &ast::Decorator, input_ty: Type<'db>) {
-        // The enclosing scope's post-inference context does not have this definition-local flag.
+        // We replay failed decorator applications after inference only to report call errors,
+        // such as incompatible argument types or missing arguments. `@no_type_check` suppresses
+        // these errors. Skip recording the calls here because the enclosing scope's post-inference
+        // diagnostic context does not inherit this definition-local flag.
         if !self
             .inference_flags()
             .contains(InferenceFlags::IN_NO_TYPE_CHECK)
