@@ -509,11 +509,45 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         debug_assert!(std::ptr::eq(self.builder, builder));
     }
 
-    /// Returns whether this constraint set never holds.
+    /// Returns whether this constraint set never holds, without checking the type variables'
+    /// declared bounds or constraints. Use [`Self::has_no_valid_solutions`] to include those.
     pub(crate) fn is_never_satisfied(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
         let mut storage = self.builder.storage.borrow_mut();
         self.node
             .is_never_satisfied(db, env, &mut storage, self.source_order)
+    }
+
+    /// Returns whether no specialization satisfying the type variables' upper bounds and
+    /// constraints can satisfy this constraint set.
+    ///
+    /// Unlike [`Self::is_never_satisfied`], this validates solutions against the type variables'
+    /// upper bounds and constraints. For example, `T = int` is not contradictory by itself, but has
+    /// no valid solution if `T` has an upper bound of `str`.
+    ///
+    /// If the solver reaches its computation limit, we do not know whether a valid solution exists.
+    /// This returns `false` in that case: stopping the search is not proof that there is no solution.
+    pub(crate) fn has_no_valid_solutions(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> bool {
+        if self.is_never_satisfied(db, env) {
+            return true;
+        }
+
+        let inferable = {
+            let storage = self.builder.storage.borrow();
+            let Some(support) = storage.node_support(self.node) else {
+                return false;
+            };
+            // For overlap, every mentioned type variable can choose a valid specialization.
+            TypeVarSet::from_typevars(db, support.iter().map(|id| storage.typevar_data(id)))
+        };
+
+        matches!(
+            self.solutions(db, env, inferable),
+            Ok(Solutions::Unsatisfiable)
+        )
     }
 
     /// Returns whether this constraint set is the `never` terminal.

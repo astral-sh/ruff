@@ -1761,14 +1761,19 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 self.always()
             }
 
-            // Any concrete specialization of a `ParamSpec` is a subtype of the top
-            // materialization of a `ParamSpec` value.
+            // Compare fixed `ParamSpec`s with the endpoints of the materialization range of `...`:
+            // its bottom is below every `ParamSpec`, and its top is above every `ParamSpec`.
             (Type::TypeVar(bound_typevar), Type::Callable(other))
+            | (Type::Callable(other), Type::TypeVar(bound_typevar))
                 if !bound_typevar.is_inferable(db, self.inferable)
                     && bound_typevar.is_paramspec(db)
-                    && Self::is_top_paramspec_value(db, other) =>
+                    && other.kind(db) == CallableTypeKind::ParamSpecValue
+                    && other.signatures(db).iter().all(|signature| {
+                        signature.parameters().is_top() || signature.parameters().is_bottom()
+                    }) =>
             {
-                self.always()
+                let other_is_top = Self::is_top_paramspec_value(db, other);
+                ConstraintSet::from_bool(self.constraints, source.is_type_var() == other_is_top)
             }
 
             // A fully static typevar is a subtype of its upper bound, and to something similar to

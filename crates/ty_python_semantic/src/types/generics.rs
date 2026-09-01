@@ -1706,15 +1706,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 })
             })
         ) && (
-            // Avoid the `self.always()` type-variable shortcut in
-            // `check_subtyping_in_invariant_position`: it would incorrectly conclude
-            // that `Top[Inv[Any]] <: Inv[T]` for an unresolved `T`.
-            // TODO: remove this once that shortcut is removed.
-            target
-                .types(db)
-                .iter()
-                .all(|ty| !ty.has_typevar_or_typevar_instance(db, env))
-        ) && (
             // Only non-pure redundancy needs a target already equal to its top.
             // Materializing the source otherwise loses the bottom needed to
             // simplify `Covariant[Any] | Covariant[Any | str]`. Comparing both
@@ -2085,24 +2076,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             self.materialization_visitor,
         );
 
-        let is_subtype_of = |source: Type<'db>, target: Type<'db>| {
-            // Lazy comparisons must record the bounds imposed on a type variable by each
-            // materialization. Otherwise, for example, `Top[Inv[Any]] <: Top[Inv[T]]` loses
-            // the incompatible requirements `object <: T` and `T <: Never`.
-            // TODO: Remove the eager workaround and handle it in the respective
-            // `(Type::TypeVar(_), _) | (_, Type::TypeVar(_))` branch of
-            // `TypeRelationChecker::check_type_pair`. Right now, we cannot generally
-            // return `self.always()` from that branch, as that leads to union
-            // simplification, which means that we lose track of type variables
-            // without recording the constraints under which the relation holds.
-            if self.typevar_evaluation == TypeVarEvaluation::Eager
-                && (target.is_type_var() || source.is_type_var())
-            {
-                return self.always();
-            }
-
-            self.check_type_pair(db, source, target)
-        };
+        let is_subtype_of = |source, target| self.check_type_pair(db, source, target);
         match (source_materialization, target_materialization) {
             // `source` is a subtype of `target` if the range of materializations covered by `source`
             // is a subset of the range covered by `target`.
@@ -2117,25 +2091,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     is_subtype_of(target_top, source_top)
                 })
             }
-            // The bottom materialization of `source` is a subtype of the top materialization
-            // of `target` if there is some type that is both within the
-            // range of types covered by derived and within the range covered by base, because if such a type
-            // exists, it's a subtype of `Top[target]` and a supertype of `Bottom[source]`.
+            // The ranges overlap when each lower bound is a subtype of the other upper bound.
+            // Their common materialization can lie strictly inside both ranges: neither the
+            // lower bounds nor the upper bounds need to be comparable to each other.
             (MaterializationKind::Bottom, MaterializationKind::Top) => {
-                is_subtype_of(target_bottom, source_bottom)
-                    .and(db, self.constraints, || {
-                        is_subtype_of(source_bottom, target_top)
-                    })
-                    .or(db, self.constraints, || {
-                        is_subtype_of(target_bottom, source_top).and(db, self.constraints, || {
-                            is_subtype_of(source_top, target_top)
-                        })
-                    })
-                    .or(db, self.constraints, || {
-                        is_subtype_of(target_top, source_top).and(db, self.constraints, || {
-                            is_subtype_of(source_bottom, target_top)
-                        })
-                    })
+                is_subtype_of(source_bottom, target_top).and(db, self.constraints, || {
+                    is_subtype_of(target_bottom, source_top)
+                })
             }
             // A top materialization is a subtype of a bottom materialization only if both original
             // un-materialized types are the same fully static type.
@@ -2197,15 +2159,31 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                     // `Bottom[L] <: Top[R]` asks whether the materialization ranges for `L`
                     // and `R` have any common materialization, so this is symmetric despite
                     // using a directional subtyping checker.
-                    self.as_relation_checker(TypeRelation::Subtyping)
-                        .check_subtyping_in_invariant_position(
-                            db,
-                            left_type,
-                            MaterializationKind::Bottom,
-                            right_type,
-                            MaterializationKind::Top,
-                        )
-                        .negate(db, self.constraints)
+                    // Keep type-variable comparisons as constraints: `list[T]` can equal
+                    // `list[int]` when `T = int`, but cannot equal `int` for any `T`. Disjointness
+                    // requires that no valid specialization satisfies the overlap constraints,
+                    // including the type variables' declared bounds and constraints.
+                    // These variables stand for specializations we have yet to choose. Keep
+                    // their declared domains intact: materializing `T: Any` to `T: Never`
+                    // would incorrectly rule out the valid choice `T = str`.
+                    let materialization_visitor = ApplyTypeMappingVisitor {
+                        materialize_typevar_bounds_and_defaults: false,
+                        ..ApplyTypeMappingVisitor::new(self.env)
+                    };
+                    let mut checker = self.as_relation_checker(TypeRelation::Subtyping);
+                    checker.typevar_evaluation = TypeVarEvaluation::Lazy;
+                    checker.materialization_visitor = &materialization_visitor;
+                    let overlap = checker.check_subtyping_in_invariant_position(
+                        db,
+                        left_type,
+                        MaterializationKind::Bottom,
+                        right_type,
+                        MaterializationKind::Top,
+                    );
+                    ConstraintSet::from_bool(
+                        self.constraints,
+                        overlap.has_no_valid_solutions(db, self.env),
+                    )
                 }
 
                 // If `Foo[T]` is covariant in `T`, `Foo[Never]` is a subtype of `Foo[A]` and `Foo[B]`
@@ -3806,8 +3784,33 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         //
         // For example, if `formal` is `list[T]` and `actual` is `list[int] | None`, we want to
         // specialize `T` to `int`, and so ignore the `None`.
-        let actual = actual.filter_disjoint_elements(db, self.env, formal, self.inferable);
-        let formal = formal.filter_disjoint_elements(db, self.env, actual, self.inferable);
+        //
+        // Replace inferable variables with `Unknown` for this filter to avoid solving
+        // specialization constraints separately for each actual union member. Inference below
+        // uses the original formal type to determine the specialization and validate its bounds.
+        //
+        // If no elements survive, keep the original union: inferring from `Never` would discard
+        // its type variables and skip the bound checks that reject the argument.
+        let actual = if actual.resolve_type_alias(db).is_union() {
+            let formal = formal
+                .apply_specialization(db, self.generic_context.unknown_specialization(db, None));
+            actual
+                .discard_disjoint_union_elements(db, self.env, formal, self.inferable)
+                .unless_all_disjoint(actual)
+        } else {
+            actual
+        };
+        // Ignore inferable variables' bounds when deciding which formal members can match.
+        // `list[T]` must survive a comparison with `list[object]` even if `T: str`, so that
+        // inference can report the bound violation. It can still be discarded when the
+        // argument is `str | None`, since no specialization of `list[T]` can match it.
+        let disjoint_constraints = ConstraintSetBuilder::new();
+        let formal = formal.filter_union(db, self.env, |element| {
+            !element
+                .apply_specialization(db, self.generic_context.unknown_specialization(db, None))
+                .when_disjoint_from(db, self.env, actual, &disjoint_constraints, self.inferable)
+                .is_always_satisfied(db, self.env)
+        });
 
         // ParamSpecs and TypeVarTuples still use the forward-only legacy mapping table. Keep
         // their entire inference context on the existing signature path, and use forward

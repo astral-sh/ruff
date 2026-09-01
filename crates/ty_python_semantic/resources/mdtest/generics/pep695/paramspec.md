@@ -463,6 +463,25 @@ takes_int_job(defaulted_job)
 takes_int_job(wrong_job)  # error: [invalid-argument-type]
 ```
 
+A fixed `ParamSpec` can contain required parameters. A wrapper around such a callback cannot be used
+as a wrapper around a callback that accepts no arguments.
+
+```py
+def erase_parameters[**P](job: Job[P]) -> Job[[]]:
+    return job  # error: [invalid-return-type]
+```
+
+The same restriction applies in the other direction when a class consumes callbacks. A consumer of
+callbacks with no parameters cannot accept a callback with arbitrary required parameters.
+
+```py
+class CallbackConsumer[**P]:
+    def consume(self, callback: Callable[P, None]) -> None: ...
+
+def broaden_parameters[**P](consumer: CallbackConsumer[[]]) -> CallbackConsumer[P]:
+    return consumer  # error: [invalid-return-type]
+```
+
 ## `ParamSpec` cannot specialize a `TypeVar`, and vice versa
 
 <!-- snapshot-diagnostics -->
