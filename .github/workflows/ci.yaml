@@ -1286,7 +1286,7 @@ jobs:
     name: "benchmarks walltime (build)"
     # We only run this job if `github.repository == 'astral-sh/ruff'`,
     # so hardcoding depot here is fine
-    runs-on: depot-ubuntu-22.04-arm-4
+    runs-on: depot-ubuntu-24.04-4
     needs: determine_changes
     if: |
       github.repository == 'astral-sh/ruff' &&
@@ -1307,10 +1307,13 @@ jobs:
 
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
-          save-if: ${{ github.ref == 'refs/heads/main' }}
+          prefix-key: v0-rust-walltime-${{ runner.arch }}
+          # Populate this PR's isolated cache for warm-cache runner comparisons.
+          save-if: ${{ github.ref == 'refs/heads/main' || github.event.pull_request.number == 28225 }}
       - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           version: "0.12.6"
+          cache-suffix: walltime-${{ runner.arch }}
 
       - name: "Install Rust toolchain"
         run: rustup show
@@ -1328,30 +1331,13 @@ jobs:
           retention-days: 1
 
   benchmarks-walltime-run:
-    name: "benchmarks walltime (${{ matrix.benchmark.name }})"
-    runs-on: codspeed-macro
+    name: "benchmarks walltime (x86_64)"
+    runs-on: codspeed-macro-x86-ryzen-9950x-ubuntu-24-04
     needs: benchmarks-walltime-build
     timeout-minutes: 20
     permissions:
       contents: read # required for actions/checkout
       id-token: write # required for OIDC authentication with CodSpeed
-    strategy:
-      matrix:
-        benchmark:
-          - name: script
-            target: ty_script
-          - name: sympy
-            target: ty_walltime
-            filter: sympy
-          - name: "pandas|tanjun"
-            target: ty_walltime
-            filter: "pandas|tanjun"
-          - name: "colour_science|static_frame"
-            target: ty_walltime
-            filter: "colour_science|static_frame"
-          - name: "pydantic|freqtrade|multithreaded|altair"
-            target: ty_walltime
-            filter: "pydantic|freqtrade|multithreaded|altair"
     steps:
       - name: "Checkout Branch"
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -1361,6 +1347,7 @@ jobs:
       - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           version: "0.12.6"
+          cache-suffix: walltime-${{ runner.arch }}
 
       - name: "Download benchmark binary"
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -1381,7 +1368,7 @@ jobs:
           CODSPEED_PERF_ENABLED: false
         with:
           mode: walltime
-          run: uv run --only-dev cargo codspeed run --bench "${{ matrix.benchmark.target }}" -m walltime "${{ matrix.benchmark.filter }}"
+          run: uv run --only-dev cargo codspeed run -m walltime
 
   required-checks-passed:
     name: "all required checks passed"
