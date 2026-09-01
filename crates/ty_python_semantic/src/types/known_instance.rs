@@ -9,7 +9,7 @@ use crate::{
         ClassType, GenericContext, InferenceFlags, InvalidTypeExpressionError, KnownClass,
         PromotionKind, PromotionMode, StringLiteralType, Type, TypeAliasType, TypeContext,
         TypeMapping, TypeVarNonce, UnionBuilder, VarianceTerm,
-        callable::{CallableTypeKind, CallableTypes},
+        callable::CallableTypes,
         class::NamedTupleSpec,
         constraints::{OwnedConstraintSet, TypeVarSolution},
         dedicated::pydantic::ConfigBoolean,
@@ -95,8 +95,9 @@ pub enum MethodWrapperKind {
 }
 
 impl<'db> MethodWrapper<'db> {
-    /// Construct a method descriptor, retaining precise function and callable representations
-    /// where they already encode descriptor binding.
+    /// Construct a method descriptor, retaining function and callable representations that
+    /// already encode the matching descriptor binding. Other callables need a separate wrapper
+    /// to expose the descriptor's own attributes.
     pub(super) fn wrap(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -118,14 +119,14 @@ impl<'db> MethodWrapper<'db> {
             {
                 wrapped
             }
-            Type::Callable(callable) => Type::Callable(CallableType::new(
-                db,
-                callable.signatures(db),
-                match kind {
-                    MethodWrapperKind::Classmethod => CallableTypeKind::ClassMethodLike,
-                    MethodWrapperKind::Staticmethod => CallableTypeKind::StaticMethodLike,
-                },
-            )),
+            Type::Callable(callable)
+                if match kind {
+                    MethodWrapperKind::Classmethod => callable.is_classmethod_like(db),
+                    MethodWrapperKind::Staticmethod => callable.is_staticmethod_like(db),
+                } =>
+            {
+                wrapped
+            }
             Type::Union(union) => union.map(db, env, |element| Self::wrap(db, env, *element, kind)),
             Type::TypeAlias(alias) => Self::wrap(db, env, alias.value_type(db), kind),
             _ => Type::KnownInstance(KnownInstanceType::MethodWrapper(Self::new(
