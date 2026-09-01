@@ -71,7 +71,7 @@ def relational_bridge[X, U, V]() -> None:
     quantified = body.exists(tuple[X])
 
     # TODO: revealed: tuple[Solution[V=object, U=object]]
-    # revealed: tuple[Solution[V=U@relational_bridge, U=V@relational_bridge]]
+    # revealed: tuple[Solution[U=V@relational_bridge, V=U@relational_bridge]]
     reveal_type(quantified.solutions(inferable=tuple[U, V]))
 
     # U ≤ V
@@ -102,7 +102,7 @@ def inverse_image[X, A, B]() -> None:
     quantified = body.exists(tuple[X])
 
     # TODO: revealed: tuple[Solution[A=Invariant[object], B=object, X=object]]
-    # revealed: tuple[Solution[A=Invariant[X@inverse_image], B=X@inverse_image, X=B@inverse_image]]
+    # revealed: tuple[Solution[A=Invariant[X@inverse_image], X=B@inverse_image, B=X@inverse_image]]
     reveal_type(body.solutions(inferable=tuple[X, A, B]))
     # TODO: revealed: tuple[Solution[A=Invariant[object], B=object]]
     # revealed: tuple[()]
@@ -237,7 +237,7 @@ def finite_domain[X: (int, str), Y, Z]() -> None:
     quantified = body.exists(tuple[X])
 
     # TODO: revealed: tuple[Solution[X=int, Y=int, Z=Invariant[int]], Solution[X=str, Y=str, Z=Invariant[str]]]
-    # revealed: tuple[Solution[X=Y@finite_domain, Y=X@finite_domain, Z=Invariant[X@finite_domain] | Invariant[Y@finite_domain]]]
+    # revealed: tuple[Solution[Y=X@finite_domain, X=Y@finite_domain, Z=Invariant[X@finite_domain] | Invariant[Y@finite_domain]]]
     reveal_type(body.solutions(inferable=tuple[X, Y, Z]))
     # TODO: revealed: tuple[Solution[Y=int, Z=Invariant[int]], Solution[Y=str, Z=Invariant[str]]]
     # revealed: tuple[Solution[Z=Invariant[Y@finite_domain]]]
