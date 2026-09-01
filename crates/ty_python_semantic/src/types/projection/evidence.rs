@@ -3,6 +3,11 @@
 //! Evidence records projection results that were already observed during normal
 //! inference. Cycle recovery reuses these facts instead of calling inference
 //! queries while solving projection equations.
+//!
+//! Evidence must also be collected during normal inference. Replaying a
+//! projection path can invoke another inference query, for example while
+//! resolving a class decorator. Doing that from a Salsa cycle-recovery callback
+//! introduces a new dependency into the active cycle, which Salsa rejects.
 
 use crate::types::{DivergentType, ProgramEnvironment, StaticClassLiteral, Type};
 use crate::{Db, FxIndexSet};
@@ -188,6 +193,7 @@ impl<'db> ProjectionEvidenceSet<'db> {
     ///
     /// Use this when the projection demand can be introduced after the inference result is
     /// produced, so the result cannot know ahead of time whether evidence will be needed.
+    /// Do not call this from cycle recovery: collecting evidence may invoke inference queries.
     pub(crate) fn from_types(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -206,6 +212,7 @@ impl<'db> ProjectionEvidenceSet<'db> {
     /// that may be introduced later by an external consumer. If an external consumer can later
     /// introduce a new demand for the produced result, use [`ProjectionEvidenceSet::from_types`]
     /// instead.
+    /// Do not call this from cycle recovery: collecting evidence may invoke inference queries.
     pub(crate) fn from_types_if_needed(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,

@@ -64,6 +64,9 @@ impl<'db> ProjectionRecoveryBuilder<'db> {
     }
 
     /// Cycle-recovery-time API: solves all projection variables visible in the recorded slots.
+    ///
+    /// Evidence must be collected before recovery starts because constructing it can invoke
+    /// inference queries and introduce a new dependency into the active Salsa cycle.
     pub(crate) fn finish(
         &self,
         db: &'db dyn Db,
