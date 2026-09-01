@@ -3829,7 +3829,7 @@ struct InteriorNodeData {
 /// determines the effective minimum. Upper clauses retain their individual provenance and stay
 /// factored to avoid distributing intersections over unions.
 #[derive(Default)]
-struct ConstraintBoundsBuilder<'db> {
+struct PathBoundBuilder<'db> {
     evidence_lower: FxIndexSet<Type<'db>>,
     validity_lower: FxIndexSet<Type<'db>>,
     upper: UpperBound<'db>,
@@ -3839,7 +3839,7 @@ struct ConstraintBoundsBuilder<'db> {
     has_static_evidence: bool,
 }
 
-impl<'db> ConstraintBoundsBuilder<'db> {
+impl<'db> PathBoundBuilder<'db> {
     fn classify_evidence(&mut self, db: &'db dyn Db, env: &ProgramEnvironment<'db>, ty: Type<'db>) {
         if ty.has_unspecialized_type_var(db, env) {
             return;
@@ -4453,7 +4453,7 @@ impl<'db> PathBounds<'db> {
             }
         }
 
-        let mut mappings: FxIndexMap<BoundTypeVarInstance<'db>, ConstraintBoundsBuilder<'db>> =
+        let mut mappings: FxIndexMap<BoundTypeVarInstance<'db>, PathBoundBuilder<'db>> =
             FxIndexMap::default();
         constraints.sort_by_key(|(_, source_order)| *source_order);
         for (constraint, _) in constraints {
@@ -6472,7 +6472,7 @@ mod tests {
         let env = db.program_environment();
         let t = create_typevar(db, "T");
         let builder = ConstraintSetBuilder::new();
-        let mut bounds = ConstraintBoundsBuilder::default();
+        let mut bounds = PathBoundBuilder::default();
         bounds.add_lower(
             db,
             &env,
@@ -6582,7 +6582,7 @@ class E: ...
         };
 
         for lower in [None, Some(Type::any())] {
-            let mut bounds = ConstraintBoundsBuilder::default();
+            let mut bounds = PathBoundBuilder::default();
             let (provenance, bound) = lower
                 .map_or_else(ConstraintBound::missing_lower, ConstraintBound::Evidence)
                 .into_parts();
@@ -6623,7 +6623,7 @@ class E: ...
             }
 
             // A later contradiction rejects the entire path, including its exhausted binding.
-            let mut invalid = ConstraintBoundsBuilder::default();
+            let mut invalid = PathBoundBuilder::default();
             invalid.add_lower(db, &env, ConstraintProvenance::Evidence, int);
             invalid.add_upper(db, &env, ConstraintProvenance::Evidence, str);
             let invalid = invalid.finish(db, &env, u);
@@ -6653,7 +6653,7 @@ class E: ...
         let gradual_upper =
             [left, right].map(|upper| UnionType::from_two_elements(db, &env, upper, Type::any()));
         assert!(IntersectionType::bounded_from_elements(db, &env, gradual_upper).is_none());
-        let mut bounds = ConstraintBoundsBuilder::default();
+        let mut bounds = PathBoundBuilder::default();
         for upper in gradual_upper {
             bounds.add_upper(db, &env, ConstraintProvenance::Evidence, upper);
         }
