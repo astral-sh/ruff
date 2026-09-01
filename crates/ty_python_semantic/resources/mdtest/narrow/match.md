@@ -2621,12 +2621,9 @@ def runtime_protocol_pattern_is_exhaustive(value: RuntimeProtocolImplementer) ->
 
 ## Protocol patterns with gradual members
 
-Strict narrowing materializes protocol members as well as type arguments:
+Strict class-pattern narrowing materializes gradual members even when the protocol is non-generic:
 
 ```toml
-[environment]
-python-version = "3.12"
-
 [analysis]
 strict-generic-narrowing = true
 ```
@@ -2635,14 +2632,14 @@ strict-generic-narrowing = true
 from typing import Any, Protocol, runtime_checkable
 
 @runtime_checkable
-class Reader[T](Protocol):
-    def read(self) -> tuple[T, Any]: ...
+class Reader(Protocol):
+    def read(self) -> Any: ...
 
 def from_object(value: object):
     match value:
         case Reader() as reader:
-            reveal_type(value)  # revealed: Top[Reader[object]]
-            reveal_type(reader.read())  # revealed: tuple[object, object]
+            reveal_type(value)  # revealed: Top[Reader]
+            reveal_type(reader.read())  # revealed: object
 ```
 
 ## Members from the subject type

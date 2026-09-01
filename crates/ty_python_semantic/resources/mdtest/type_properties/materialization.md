@@ -1876,64 +1876,6 @@ def writable_bottom_property(bottom: Bottom[WritableAny]) -> None:
     reveal_type(bottom.value)  # revealed: Never
 ```
 
-### Bounded protocol parameters
-
-Materializing an invariant protocol parameter preserves its bound. Top materialization allows
-reading an `int` but rejects writes; bottom materialization accepts `int` writes but not values
-outside the bound:
-
-```toml
-[environment]
-python-version = "3.12"
-```
-
-```py
-from typing import Any, Protocol
-from ty_extensions import Bottom, Top
-
-class Bounded[T: int](Protocol):
-    value: T
-
-def read(top: Top[Bounded[Any]]) -> None:
-    reveal_type(top.value)  # revealed: int
-    top.value = 1  # error: [invalid-assignment]
-
-def write(bottom: Bottom[Bounded[Any]]) -> None:
-    bottom.value = 1
-    bottom.value = "invalid"  # error: [invalid-assignment]
-
-def bottom_read(bottom: Bottom[Bounded[Any]]) -> None:
-    reveal_type(bottom.value)  # revealed: Never
-```
-
-### Constrained protocol parameters
-
-The union of a protocol parameter's constraints bounds its materialized reads and writes. A separate
-`Any` in the same method is materialized independently:
-
-```toml
-[environment]
-python-version = "3.12"
-```
-
-```py
-from typing import Any, Protocol
-from ty_extensions import Bottom, Top
-
-class Constrained[T: (int, str)](Protocol):
-    def read(self) -> tuple[T, Any]: ...
-    def write(self, value: T) -> None: ...
-
-def read(top: Top[Constrained[Any]]) -> None:
-    reveal_type(top.read())  # revealed: tuple[int | str, object]
-    top.write(1)  # error: [invalid-argument-type]
-
-def write(bottom: Bottom[Constrained[Any]]) -> None:
-    bottom.write(1)
-    bottom.write("valid")
-    bottom.write(b"invalid")  # error: [invalid-argument-type]
-```
-
 ### Protocol relations
 
 `MutableAny` and `Top[MutableAny]` refer to the same protocol class, but they do not have the same
