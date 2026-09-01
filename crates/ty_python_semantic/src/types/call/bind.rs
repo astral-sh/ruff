@@ -52,6 +52,7 @@ use crate::types::function::{
 };
 use crate::types::generics::{
     GenericContext, Specialization, SpecializationBuilder, SpecializationError, TypeVarInference,
+    TypeVarInferenceFallback, TypeVarInferenceSolutions,
 };
 use crate::types::infer::original_class_type;
 use crate::types::known_instance::{FieldInstance, InternedConstraintSetSolution};
@@ -3878,6 +3879,7 @@ impl<'db> CallableBinding<'db> {
         }
 
         let snapshotter = CallableBindingSnapshotter::new(overloads_for_expansion);
+        let expansion_nonce_generator = TypeVarNonceGenerator::default();
 
         // State of the bindings _after_ evaluating (type checking) the matching overloads using
         // the non-expanded argument types.
@@ -3904,6 +3906,16 @@ impl<'db> CallableBinding<'db> {
             let mut return_types = Vec::new();
 
             for expanded_arguments in &expanded_argument_lists {
+                let narrow_targets = call_expression_tcx.narrow_call_targets(db, env);
+                let branch_contexts = narrow_targets
+                    .as_deref()
+                    .into_iter()
+                    .flatten()
+                    .copied()
+                    .map(TypeContext::from)
+                    .chain(std::iter::once(call_expression_tcx))
+                    .unique();
+
                 // The spec mentions that each expanded argument list should be re-evaluated from
                 // step 2 but we need to re-evaluate from step 1 because our step 1 does more than
                 // what the spec mentions. Step 1 of the spec means only "eliminate impossible
@@ -3912,76 +3924,85 @@ impl<'db> CallableBinding<'db> {
                 // allows us to correctly handle cases involving a variadic argument that could
                 // expand into different number of arguments with each expansion. Refer to
                 // https://github.com/astral-sh/ty/issues/735 for more details.
+                let expansion_nonce = expansion_nonce_generator.next().value();
                 for overload in &mut self.overloads {
                     // Clear the state of all overloads before re-evaluating from step 1
                     overload.reset(db);
+                    overload.freshen_bound_typevars(db, env, expansion_nonce);
                     overload.match_parameters(db, env, expanded_arguments);
                 }
 
-                tracing::trace!(
-                    target: "ty_python_semantic::types::call::bind",
-                    matching_overload_index = ?self.matching_overload_index(),
-                    "after step 1",
-                );
+                let branch_state = self.clone();
+                let branch_return_type = branch_contexts.into_iter().find_map(|branch_context| {
+                    *self = branch_state.clone();
 
-                for (_, overload) in self.matching_overloads_mut() {
-                    overload.check_types(
-                        db,
-                        env,
-                        constraints,
-                        expanded_arguments,
-                        call_expression_tcx,
+                    let branch_constraints = ConstraintSetBuilder::new();
+
+                    tracing::trace!(
+                        target: "ty_python_semantic::types::call::bind",
+                        matching_overload_index = ?self.matching_overload_index(),
+                        "after step 1",
                     );
-                }
 
-                tracing::trace!(
-                    target: "ty_python_semantic::types::call::bind",
-                    matching_overload_index = ?self.matching_overload_index(),
-                    "after step 2",
-                );
-
-                let return_type = match self.matching_overload_index() {
-                    MatchingOverloadIndex::None => None,
-                    MatchingOverloadIndex::Single(index) => {
-                        Some(self.overloads[index].return_type())
-                    }
-                    MatchingOverloadIndex::Multiple(matching_overload_indexes) => {
-                        self.filter_overloads_containing_variadic(&matching_overload_indexes);
-
-                        tracing::trace!(
-                            target: "ty_python_semantic::types::call::bind",
-                            matching_overload_index = ?self.matching_overload_index(),
-                            "after step 4",
+                    for (_, overload) in self.matching_overloads_mut() {
+                        overload.check_types(
+                            db,
+                            env,
+                            &branch_constraints,
+                            expanded_arguments,
+                            branch_context,
                         );
+                    }
+                    self.reject_unsatisfiable_overloads(db);
+                    tracing::trace!(
+                        target: "ty_python_semantic::types::call::bind",
+                        matching_overload_index = ?self.matching_overload_index(),
+                        "after step 2",
+                    );
 
-                        match self.matching_overload_index() {
-                            MatchingOverloadIndex::None => {
-                                tracing::debug!(
-                                    "All overloads have been filtered out in step 4 during argument type expansion"
-                                );
-                                None
-                            }
-                            MatchingOverloadIndex::Single(_) => Some(self.return_type()),
-                            MatchingOverloadIndex::Multiple(indexes) => {
-                                self.filter_overloads_using_any_or_unknown(
-                                    db,
-                                    env,
-                                    constraints,
-                                    expanded_arguments,
-                                    &indexes,
-                                );
+                    match self.matching_overload_index() {
+                        MatchingOverloadIndex::None => None,
+                        MatchingOverloadIndex::Single(index) => {
+                            Some(self.overloads[index].return_type())
+                        }
+                        MatchingOverloadIndex::Multiple(matching_overload_indexes) => {
+                            self.filter_overloads_containing_variadic(&matching_overload_indexes);
 
-                                tracing::trace!(
-                                    target: "ty_python_semantic::types::call::bind",
-                                    matching_overload_index = ?self.matching_overload_index(),
-                                    "after step 5",
-                                );
+                            tracing::trace!(
+                                target: "ty_python_semantic::types::call::bind",
+                                matching_overload_index = ?self.matching_overload_index(),
+                                "after step 4",
+                            );
 
-                                Some(self.return_type())
+                            match self.matching_overload_index() {
+                                MatchingOverloadIndex::None => {
+                                    tracing::debug!(
+                                        "All overloads have been filtered out in step 4 during argument type expansion"
+                                    );
+                                    None
+                                }
+                                MatchingOverloadIndex::Single(_) => Some(self.return_type()),
+                                MatchingOverloadIndex::Multiple(indexes) => {
+                                    self.filter_overloads_using_any_or_unknown(
+                                        db,
+                                        env,
+                                        &branch_constraints,
+                                        expanded_arguments,
+                                        &indexes,
+                                    );
+
+                                    tracing::trace!(
+                                        target: "ty_python_semantic::types::call::bind",
+                                        matching_overload_index = ?self.matching_overload_index(),
+                                        "after step 5",
+                                    );
+
+                                    Some(self.return_type())
+                                }
                             }
                         }
                     }
-                };
+                });
 
                 // This split between initializing and updating the merged evaluation state is
                 // required because otherwise it's difficult to differentiate between the
@@ -3996,7 +4017,7 @@ impl<'db> CallableBinding<'db> {
                     merged_evaluation_state = Some(snapshotter.take(self));
                 }
 
-                if let Some(return_type) = return_type {
+                if let Some(return_type) = branch_return_type {
                     return_types.push(return_type);
                 } else {
                     // No need to check the remaining argument lists if the current argument list
@@ -4377,6 +4398,28 @@ impl<'db> CallableBinding<'db> {
                 } else {
                     MatchingOverloadIndex::Single(first)
                 }
+            }
+        }
+    }
+
+    /// Rejects unsatisfiable candidates only when resolving overloads.
+    fn reject_unsatisfiable_overloads(&mut self, db: &'db dyn Db) {
+        if self.overloads.len() < 2 {
+            return;
+        }
+
+        for overload in &mut self.overloads {
+            if overload.errors.is_empty()
+                && overload.inference.is_some_and(|inference| {
+                    matches!(
+                        inference.solutions(db),
+                        TypeVarInferenceSolutions::Unavailable(
+                            TypeVarInferenceFallback::Unsatisfiable
+                        )
+                    )
+                })
+            {
+                overload.mark_as_unmatched_overload();
             }
         }
     }

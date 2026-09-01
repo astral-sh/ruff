@@ -5696,7 +5696,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // If the type context is a union, attempt to narrow to a specific element.
         let narrow_targets = call_expression_tcx
-            .narrow_targets(db, env)
+            .narrow_call_targets(db, env)
             // We only need to attempt narrowing on generic calls, otherwise the type
             // context has no effect.
             .filter(|_| has_generic_context)
