@@ -1519,7 +1519,11 @@ impl<'db> SequentMap<Constraint<'db>> {
         left: Constraint<'db>,
         right: Constraint<'db>,
     ) -> &'db Self {
-        #[salsa::tracked(returns(ref))]
+        #[salsa::tracked(
+            returns(ref),
+            cycle_initial=|_, _, _, _, _| SequentMap::default(),
+            heap_size=ruff_memory_usage::heap_size,
+        )]
         fn for_constraint_pair_inner<'db>(
             db: &'db dyn Db,
             program: Program<'db>,
