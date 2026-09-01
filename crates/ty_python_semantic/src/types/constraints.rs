@@ -95,10 +95,10 @@ use std::marker::PhantomData;
 use std::ops::{ControlFlow, Range};
 use std::sync::{Arc, LazyLock};
 
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 use ruff_index::{Idx, IndexVec, newtype_index};
 use rustc_hash::{FxHashMap, FxHashSet};
-use smallvec::SmallVec;
+use smallvec::{SmallVec, smallvec};
 use ty_python_core::Program;
 use ty_python_core::rank::RankBitBox;
 use ty_static::EnvVars;
@@ -264,7 +264,7 @@ pub struct OwnedConstraintSet<'db> {
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 struct OwnedConstraintSetInner<'db> {
-    constraints: Box<[OldConstraint<'db>]>,
+    constraints: Box<[InterimConstraint<'db>]>,
     constraint_supports: Box<[SupportId]>,
     constraint_indices: RankBitBox,
     typevars: IndexVec<TypeVarId, BoundTypeVarInstance<'db>>,
@@ -340,10 +340,7 @@ impl<'db> OwnedConstraintSet<'db> {
                 .map(|node| node.constraint)
                 .unique()
                 .map(|constraint| inner.constraints[inner.retained_constraint_index(constraint)])
-                .flat_map(|constraint| {
-                    iter::once(Type::TypeVar(constraint.typevar))
-                        .chain(constraint.iter_stored_bounds().map(ConstraintBound::ty))
-                })
+                .flat_map(InterimConstraint::types)
         })
     }
 }
@@ -833,49 +830,8 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
             if mapped_constraints.contains_key(&constraint_id) {
                 continue;
             }
-
-            let subject = Type::TypeVar(constraint.typevar).apply_type_mapping_impl(
-                db,
-                type_mapping,
-                tcx,
-                visitor,
-            );
-            let lower = constraint.stored_lower_bound().map(|lower| {
-                lower.map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
-            });
-            let upper = constraint.stored_upper_bound().map(|upper| {
-                upper.map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
-            });
-
-            let env = visitor.env;
-            let mut storage = self.builder.storage.borrow_mut();
-            let mapped = if let Type::TypeVar(typevar) = subject {
-                OldConstraint::new_node_with_bounds(db, env, &mut storage, typevar, lower, upper)
-            } else {
-                let (lower_holds, lower_holds_source_order) = match lower {
-                    Some(lower) => storage.load(
-                        db,
-                        env,
-                        &lower
-                            .ty()
-                            .when_constraint_set_assignable_to_owned(db, env, subject),
-                    ),
-                    None => (ALWAYS_TRUE, None),
-                };
-                let (upper_holds, upper_holds_source_order) = match upper {
-                    Some(upper) => storage.load(
-                        db,
-                        env,
-                        &subject.when_constraint_set_assignable_to_owned(db, env, upper.ty()),
-                    ),
-                    None => (ALWAYS_TRUE, None),
-                };
-                (
-                    lower_holds.and(&mut storage, upper_holds),
-                    storage
-                        .ordered_source_order(lower_holds_source_order, upper_holds_source_order),
-                )
-            };
+            let mapped =
+                constraint.apply_type_mapping_impl(db, self.builder, type_mapping, tcx, visitor);
             mapped_constraints.insert(constraint_id, mapped);
         }
 
@@ -1010,7 +966,7 @@ struct ConstraintSetStorage<'db> {
     /// identity. Constraints are added to this arena as they are encountered when constructing
     /// constraint sets. The ordering within the arena defines the BDD variable ordering in our BDD
     /// structures.
-    constraints: IndexVec<ConstraintId, OldConstraint<'db>>,
+    constraints: IndexVec<ConstraintId, InterimConstraint<'db>>,
 
     /// Typevars are interned so that they have a stable ordering within this builder, which does
     /// not depend on their salsa IDs. (The salsa IDs are not stable, since each typevar can be
@@ -1038,7 +994,7 @@ struct ConstraintSetStorage<'db> {
     source_orders: IndexVec<SourceOrderId, SourceOrder>,
 
     // Everything below are the memoization tables for the arenas and for our BDD operations.
-    constraint_cache: FxHashMap<OldConstraint<'db>, ConstraintId>,
+    constraint_cache: FxHashMap<InterimConstraint<'db>, ConstraintId>,
     typevar_cache: FxHashMap<BoundTypeVarIdentity<'db>, TypeVarId>,
     node_cache: FxHashMap<InteriorNodeData, NodeId>,
     /// Avoid repeatedly walking deep constraint bounds without imposing Salsa-query overhead on
@@ -1401,12 +1357,48 @@ impl<'db> ConstraintSetStorage<'db> {
         &mut self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        constraint: OldConstraint<'db>,
+        constraint: InterimConstraint<'db>,
     ) -> Support {
         let mut support = Support::default();
-        support.insert(self.intern_typevar(db, constraint.typevar()));
-        for bound in constraint.iter_stored_bounds() {
-            self.intern_mentioned_typevars_in_type(db, env, bound.ty(), &mut support);
+        match constraint {
+            InterimConstraint::Old(constraint) => {
+                support.insert(self.intern_typevar(db, constraint.typevar()));
+                for bound in constraint.iter_stored_bounds() {
+                    self.intern_mentioned_typevars_in_type(db, env, bound.ty(), &mut support);
+                }
+            }
+            InterimConstraint::New(Constraint::ConcreteLower(constraint)) => {
+                support.insert(self.intern_typevar(db, constraint.typevar));
+                self.intern_mentioned_typevars_in_type(db, env, constraint.bound, &mut support);
+            }
+            InterimConstraint::New(Constraint::ConcreteUpper(constraint)) => {
+                support.insert(self.intern_typevar(db, constraint.typevar));
+                self.intern_mentioned_typevars_in_type(db, env, constraint.bound, &mut support);
+            }
+            InterimConstraint::New(Constraint::ConcreteEquivalence(constraint)) => {
+                support.insert(self.intern_typevar(db, constraint.typevar));
+                self.intern_mentioned_typevars_in_type(db, env, constraint.bound, &mut support);
+            }
+            InterimConstraint::New(Constraint::ParamSpecLower(constraint)) => {
+                support.insert(self.intern_typevar(db, constraint.typevar));
+                self.intern_mentioned_typevars_in_type(db, env, constraint.bound, &mut support);
+            }
+            InterimConstraint::New(Constraint::ParamSpecUpper(constraint)) => {
+                support.insert(self.intern_typevar(db, constraint.typevar));
+                self.intern_mentioned_typevars_in_type(db, env, constraint.bound, &mut support);
+            }
+            InterimConstraint::New(Constraint::ParamSpecEquivalence(constraint)) => {
+                support.insert(self.intern_typevar(db, constraint.typevar));
+                self.intern_mentioned_typevars_in_type(db, env, constraint.bound, &mut support);
+            }
+            InterimConstraint::New(Constraint::TypeVarRange(constraint)) => {
+                support.insert(self.intern_typevar(db, constraint.left));
+                support.insert(self.intern_typevar(db, constraint.right));
+            }
+            InterimConstraint::New(Constraint::TypeVarEquivalence(constraint)) => {
+                support.insert(self.intern_typevar(db, constraint.left));
+                support.insert(self.intern_typevar(db, constraint.right));
+            }
         }
         support
     }
@@ -1415,7 +1407,7 @@ impl<'db> ConstraintSetStorage<'db> {
         &mut self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        data: OldConstraint<'db>,
+        data: InterimConstraint<'db>,
     ) -> ConstraintId {
         let support = self.intern_constraint_typevars(db, env, data);
 
@@ -1461,7 +1453,7 @@ impl<'db> ConstraintSetStorage<'db> {
             .expect("typevar should be interned before ordering")
     }
 
-    fn constraint_data(&self, constraint: ConstraintId) -> OldConstraint<'db> {
+    fn constraint_data(&self, constraint: ConstraintId) -> InterimConstraint<'db> {
         if let Some(compacted) = &self.compacted {
             let index = constraint.index();
             let split = compacted.constraint_indices.len();
@@ -1749,15 +1741,16 @@ impl<'db> ConstraintSetStorage<'db> {
         let constraints: Box<[_]> = inner
             .constraints
             .iter()
-            .map(|old_constraint| {
-                OldConstraint::new_node_with_bounds(
+            .map(|old_constraint| match old_constraint {
+                InterimConstraint::Old(old_constraint) => OldConstraint::new_node_with_bounds(
                     db,
                     env,
                     self,
                     old_constraint.typevar,
                     old_constraint.stored_lower_bound(),
                     old_constraint.stored_upper_bound(),
-                )
+                ),
+                InterimConstraint::New(old_constraint) => old_constraint.new_node(db, env, self),
             })
             .collect();
 
@@ -1873,6 +1866,129 @@ struct SourceOrderId;
 enum SourceOrder {
     Ordered(SourceOrderId, SourceOrderId),
     Constraint(ConstraintId),
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+enum InterimConstraint<'db> {
+    Old(OldConstraint<'db>),
+    New(Constraint<'db>),
+}
+
+impl<'db> InterimConstraint<'db> {
+    fn into_new(self, db: &'db dyn Db) -> SmallVec<[Constraint<'db>; 2]> {
+        match self {
+            InterimConstraint::Old(constraint) => constraint.into_new(db),
+            InterimConstraint::New(constraint) => smallvec![constraint],
+        }
+    }
+
+    #[track_caller]
+    fn expect_old(self) -> OldConstraint<'db> {
+        match self {
+            InterimConstraint::Old(constraint) => constraint,
+            InterimConstraint::New(_) => panic!("old code path encountered new constraint"),
+        }
+    }
+
+    fn provides_lower(self) -> bool {
+        match self {
+            InterimConstraint::Old(constraint) => constraint.stored_lower_bound().is_some(),
+            InterimConstraint::New(constraint) => constraint.provides_lower(),
+        }
+    }
+
+    fn provides_upper(self) -> bool {
+        match self {
+            InterimConstraint::Old(constraint) => constraint.stored_upper_bound().is_some(),
+            InterimConstraint::New(constraint) => constraint.provides_upper(),
+        }
+    }
+
+    fn as_concrete(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Option<BoundTypeVarInstance<'db>> {
+        match self {
+            InterimConstraint::Old(constraint) => constraint
+                .has_concrete_bounds(db, env)
+                .then_some(constraint.typevar),
+            InterimConstraint::New(constraint) => constraint.as_concrete(db, env),
+        }
+    }
+
+    fn bound_depth(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> (u16, u16) {
+        match self {
+            InterimConstraint::Old(constraint) => constraint.bound_depth(db, env),
+            InterimConstraint::New(constraint) => constraint.bound_depth(db, env),
+        }
+    }
+
+    fn is_bound_projection_of(self, db: &'db dyn Db, antecedent: Self) -> bool {
+        match (self, antecedent) {
+            (InterimConstraint::Old(this), InterimConstraint::Old(antecedent)) => {
+                this.is_bound_projection_of(db, antecedent)
+            }
+            _ => false,
+        }
+    }
+
+    fn apply_type_mapping_impl(
+        self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        type_mapping: &TypeMapping<'_, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> (NodeId, Option<SourceOrderId>) {
+        match self {
+            InterimConstraint::Old(constraint) => {
+                constraint.apply_type_mapping_impl(db, builder, type_mapping, tcx, visitor)
+            }
+            InterimConstraint::New(constraint) => {
+                constraint.apply_type_mapping_impl(db, builder, type_mapping, tcx, visitor)
+            }
+        }
+    }
+
+    fn directly_constrains_inferable_typevar(
+        self,
+        db: &'db dyn Db,
+        inferable: TypeVarSet<'db>,
+    ) -> bool {
+        let is_bare_inferable_typevar = |bound: Option<ConstraintBound<'_>>| {
+            bound.is_some_and(|bound| {
+                matches!(
+                    bound,
+                    ConstraintBound::Evidence(Type::TypeVar(bound_typevar))
+                        if bound_typevar.is_inferable(db, inferable)
+                )
+            })
+        };
+        match self {
+            InterimConstraint::Old(constraint) => {
+                constraint.typevar.is_inferable(db, inferable)
+                    || is_bare_inferable_typevar(constraint.stored_lower_bound())
+                    || is_bare_inferable_typevar(constraint.stored_upper_bound())
+            }
+            InterimConstraint::New(constraint) => {
+                constraint.directly_constrains_inferable_typevar(db, inferable)
+            }
+        }
+    }
+
+    fn types(self) -> impl Iterator<Item = Type<'db>> {
+        match self {
+            InterimConstraint::Old(constraint) => Either::Left(constraint.types()),
+            InterimConstraint::New(constraint) => Either::Right(constraint.types()),
+        }
+    }
+}
+
+impl<'db> From<OldConstraint<'db>> for InterimConstraint<'db> {
+    fn from(constraint: OldConstraint<'db>) -> InterimConstraint<'db> {
+        InterimConstraint::Old(constraint)
+    }
 }
 
 /// An individual constraint in a constraint set. This restricts a single typevar to be within a
@@ -2014,6 +2130,58 @@ impl<'db> OldConstraint<'db> {
         }
 
         result
+    }
+
+    fn apply_type_mapping_impl(
+        self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        type_mapping: &TypeMapping<'_, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> (NodeId, Option<SourceOrderId>) {
+        let subject =
+            Type::TypeVar(self.typevar).apply_type_mapping_impl(db, type_mapping, tcx, visitor);
+        let lower = self.stored_lower_bound().map(|lower| {
+            lower.map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
+        });
+        let upper = self.stored_upper_bound().map(|upper| {
+            upper.map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
+        });
+
+        let env = visitor.env;
+        let mut storage = builder.storage.borrow_mut();
+        if let Type::TypeVar(typevar) = subject {
+            Self::new_node_with_bounds(db, env, &mut storage, typevar, lower, upper)
+        } else {
+            let (lower_holds, lower_holds_source_order) = match lower {
+                Some(lower) => storage.load(
+                    db,
+                    env,
+                    &lower
+                        .ty()
+                        .when_constraint_set_assignable_to_owned(db, env, subject),
+                ),
+                None => (ALWAYS_TRUE, None),
+            };
+            let (upper_holds, upper_holds_source_order) = match upper {
+                Some(upper) => storage.load(
+                    db,
+                    env,
+                    &subject.when_constraint_set_assignable_to_owned(db, env, upper.ty()),
+                ),
+                None => (ALWAYS_TRUE, None),
+            };
+            (
+                lower_holds.and(&mut storage, upper_holds),
+                storage.ordered_source_order(lower_holds_source_order, upper_holds_source_order),
+            )
+        }
+    }
+
+    fn types(self) -> impl Iterator<Item = Type<'db>> {
+        iter::once(Type::TypeVar(self.typevar))
+            .chain(self.iter_stored_bounds().map(ConstraintBound::ty))
     }
 }
 
@@ -2370,7 +2538,11 @@ impl ConstraintId {
         lower: Option<ConstraintBound<'db>>,
         upper: Option<ConstraintBound<'db>>,
     ) -> ConstraintId {
-        storage.intern_constraint(db, env, OldConstraint::new(typevar, lower, upper))
+        storage.intern_constraint(
+            db,
+            env,
+            InterimConstraint::Old(OldConstraint::new(typevar, lower, upper)),
+        )
     }
 }
 
@@ -2607,7 +2779,14 @@ impl<'db> OldConstraint<'db> {
         }
 
         let constraint = OldConstraint::new(typevar, lower, upper);
-        storage.intern_constraint_typevars(db, env, constraint);
+        let mut unused = Support::default();
+        storage.intern_typevar(db, typevar);
+        if let Some(lower) = lower {
+            storage.intern_mentioned_typevars_in_type(db, env, lower.ty(), &mut unused);
+        }
+        if let Some(upper) = upper {
+            storage.intern_mentioned_typevars_in_type(db, env, upper.ty(), &mut unused);
+        }
 
         // If `lower ≰ upper` for every possible assignment of typevars, then the constraint cannot
         // be satisfied, since there is no type that is both greater than `lower`, and less than
@@ -2788,8 +2967,8 @@ impl ConstraintId {
         storage: &mut ConstraintSetStorage<'db>,
         other: Self,
     ) -> bool {
-        let self_constraint = storage.constraint_data(self);
-        let other_constraint = storage.constraint_data(other);
+        let self_constraint = storage.constraint_data(self).expect_old();
+        let other_constraint = storage.constraint_data(other).expect_old();
         if !self_constraint
             .typevar
             .is_same_typevar_as(db, other_constraint.typevar)
@@ -2812,8 +2991,8 @@ impl ConstraintId {
         storage: &mut ConstraintSetStorage<'db>,
         other: Self,
     ) -> IntersectionResult<'db> {
-        let self_constraint = storage.constraint_data(self);
-        let other_constraint = storage.constraint_data(other);
+        let self_constraint = storage.constraint_data(self).expect_old();
+        let other_constraint = storage.constraint_data(other).expect_old();
 
         // A typevar cannot be exactly equal to two different statically eligible types under any
         // specialization. Gradual bounds cannot prove this incompatibility because the resulting
@@ -2909,7 +3088,7 @@ impl ConstraintId {
 /// The index of a BDD node within a [`ConstraintSetBuilder`].
 ///
 /// The "variables" of a constraint set BDD are individual constraints, represented by an interned
-/// [`OldConstraint`].
+/// [`InterimConstraint`].
 ///
 /// Terminal nodes (`false` and `true`) have hard-coded IDs. Interior nodes are stored in a
 /// [`ConstraintSetBuilder`], and are represented by the index into the storage array. By
@@ -3261,8 +3440,8 @@ impl NodeId {
                         }
 
                         let constraint = storage.constraint_data(interior.constraint);
-                        found_lower |= constraint.stored_lower_bound().is_some();
-                        found_upper |= constraint.stored_upper_bound().is_some();
+                        found_lower |= constraint.provides_lower();
+                        found_upper |= constraint.provides_upper();
                         if found_lower && found_upper {
                             // Might be a single conjunction, but doesn't contain _only_
                             // lower-bound-only or upper-bound-only constraints
@@ -5016,15 +5195,6 @@ impl InteriorNode {
         source_order: Option<SourceOrderId>,
         limits: &mut L,
     ) -> ControlFlow<L::Break, (NodeId, Option<SourceOrderId>)> {
-        let is_bare_inferable_typevar = |bound: Option<ConstraintBound<'_>>| {
-            bound.is_some_and(|bound| {
-                matches!(
-                    bound,
-                    ConstraintBound::Evidence(Type::TypeVar(bound_typevar))
-                        if bound_typevar.is_inferable(db, inferable)
-                )
-            })
-        };
         self.abstract_inner(
             db,
             env,
@@ -5042,9 +5212,7 @@ impl InteriorNode {
             // encoding but remove the second.
             &mut |storage: &ConstraintSetStorage<'_>, constraint| {
                 let constraint = storage.constraint_data(constraint);
-                !constraint.typevar.is_inferable(db, inferable)
-                    && !is_bare_inferable_typevar(constraint.stored_lower_bound())
-                    && !is_bare_inferable_typevar(constraint.stored_upper_bound())
+                !constraint.directly_constrains_inferable_typevar(db, inferable)
             },
         )
     }
@@ -5260,8 +5428,8 @@ impl InteriorNode {
         let mut dependent_typevars = FxHashSet::default();
         for constraint_id in &constraints {
             let constraint = storage.constraint_data(*constraint_id);
-            let typevar = storage.typevar_id(db, constraint.typevar);
-            if constraint.has_concrete_bounds(db, env) {
+            if let Some(typevar) = constraint.as_concrete(db, env) {
+                let typevar = storage.typevar_id(db, typevar);
                 independent_typevars.insert(typevar);
             } else {
                 dependent_typevars.extend(storage.constraint_support(*constraint_id).iter());
@@ -5357,14 +5525,21 @@ impl ConstraintAssignment {
         env: &'a ProgramEnvironment<'db>,
         storage: &'a ConstraintSetStorage<'db>,
     ) -> impl Display + 'a {
-        let (equality_sign, range_prefix) = match self {
-            ConstraintAssignment::Positive(_) => ("=", ""),
-            ConstraintAssignment::Negative(_) => ("≠", "¬"),
-            ConstraintAssignment::Unconstrained(_) => ("=?", "?"),
+        let (equality_sign, range_prefix, holds) = match self {
+            ConstraintAssignment::Positive(_) => ("=", "", Some(true)),
+            ConstraintAssignment::Negative(_) => ("≠", "¬", Some(false)),
+            ConstraintAssignment::Unconstrained(_) => ("=?", "?", None),
         };
 
         std::fmt::from_fn(move |f| {
             let constraint_data = storage.constraint_data(self.constraint());
+            let constraint_data = match constraint_data {
+                InterimConstraint::Old(constraint_data) => constraint_data,
+                InterimConstraint::New(constraint_data) => {
+                    return constraint_data.display(db, env, holds).fmt(f);
+                }
+            };
+
             // Render supplied bounds, not the synthetic parameter-list defaults. The ordinary
             // identities below retain the existing shorthand for omitted endpoints.
             let lower = constraint_data
@@ -5926,11 +6101,9 @@ mod tests {
         );
         let actual_bound = KnownClass::List.to_specialized_instance(db, &env, &[Type::TypeVar(u)]);
         let mut storage = ConstraintSetStorage::default();
-        let support = storage.intern_constraint_typevars(
-            db,
-            &env,
-            OldConstraint::from_evidence(t, None, Some(actual_bound)),
-        );
+        let data =
+            InterimConstraint::Old(OldConstraint::from_evidence(t, None, Some(actual_bound)));
+        let support = storage.intern_constraint_typevars(db, &env, data);
         let mentioned = support
             .iter()
             .map(|typevar| storage.typevar_data(typevar))
@@ -5980,11 +6153,12 @@ mod tests {
                 u.freshness(db),
             );
             let mut storage = ConstraintSetStorage::default();
-            let support = storage.intern_constraint_typevars(
-                db,
-                &env,
-                OldConstraint::from_evidence(t, None, Some(Type::TypeVar(u))),
-            );
+            let data = InterimConstraint::Old(OldConstraint::from_evidence(
+                t,
+                None,
+                Some(Type::TypeVar(u)),
+            ));
+            let support = storage.intern_constraint_typevars(db, &env, data);
             let mentioned = support
                 .iter()
                 .map(|typevar| storage.typevar_data(typevar))
@@ -6956,7 +7130,7 @@ class E: ...
                 storage.intern_constraint(
                     db,
                     &env,
-                    OldConstraint::new(typevar, Some(lower), Some(upper)),
+                    InterimConstraint::Old(OldConstraint::new(typevar, Some(lower), Some(upper))),
                 );
             }
 
@@ -6966,7 +7140,7 @@ class E: ...
                 let constraint = storage.intern_constraint(
                     db,
                     &env,
-                    OldConstraint::new(typevar, Some(lower), Some(upper)),
+                    InterimConstraint::Old(OldConstraint::new(typevar, Some(lower), Some(upper))),
                 );
                 let constraint_source_order = storage.constraint_source_order(constraint);
                 storage.ordered_source_order(source_order, Some(constraint_source_order))
