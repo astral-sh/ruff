@@ -490,6 +490,26 @@ impl Parser<'_> {
                             ExpressionContext::default(),
                         );
 
+                        // test_err signed_pattern_non_literal_operand
+                        // # parse_options: {"target-version": "3.15"}
+                        // match value:
+                        //     case -1**2: ...
+                        //     case -1 .real: ...
+                        //     case -1[0]: ...
+                        //     case -1(): ...
+                        //     case {+1**2: _}: ...
+
+                        // Parse the full operand for error recovery, but only numeric literals
+                        // are valid after a sign in a literal pattern.
+                        if !unary_expr.operand.is_number_literal_expr() {
+                            self.add_error(
+                                ParseErrorType::OtherError(
+                                    "Expected a numeric literal after unary operator".to_string(),
+                                ),
+                                unary_expr.operand.range(),
+                            );
+                        }
+
                         // test_ok unary_plus_py315
                         // # parse_options: {"target-version": "3.15"}
                         // match foo:
