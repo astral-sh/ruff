@@ -2957,14 +2957,6 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                                     db, &member, other,
                                 )
                             })
-                            .or(db, self.constraints, || {
-                                ConstraintSet::from_bool(
-                                    self.constraints,
-                                    member.has_incompatible_class_variable_declaration(
-                                        db, env, other,
-                                    ),
-                                )
-                            })
                     })
             })
     }

@@ -14,7 +14,6 @@ use crate::types::attribute_write::{
     descriptor_setter_domain,
 };
 use crate::types::call::{CallArguments, CallDunderError};
-use crate::types::overrides::{VariableKind, effective_superclass_variable_kind};
 use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
 use crate::types::visitor::any_over_type_expanding_aliases;
 use crate::types::{TypeContext, UpcastPolicy};
@@ -1907,65 +1906,6 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         self.data.qualifiers
     }
 
-    /// Returns whether an instance declaration conflicts with a required writable class variable.
-    ///
-    /// An unannotated assignment preserves an inherited `ClassVar`; an explicit instance
-    /// annotation does not:
-    ///
-    /// ```python
-    /// from typing import ClassVar
-    ///
-    /// class Base:
-    ///     value: ClassVar[int]
-    ///
-    /// class Valid(Base):
-    ///     value = 1
-    ///
-    /// class Invalid(Base):
-    ///     value: int = 1
-    /// ```
-    ///
-    /// Inspect declarations before descriptor binding, and ignore synthesized members without
-    /// source provenance.
-    pub(super) fn has_incompatible_class_variable_declaration(
-        &self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        ty: Type<'db>,
-    ) -> bool {
-        let qualifiers = self.qualifiers();
-        qualifiers.contains(TypeQualifiers::CLASS_VAR)
-            && !qualifiers.contains(TypeQualifiers::FINAL)
-            && ty
-                .nominal_class(db, env)
-                .or_else(|| {
-                    if !is_class_object_type(ty) {
-                        return None;
-                    }
-
-                    ty.to_meta_type(db, env)
-                        .to_instance_approximation(db, env)?
-                        .nominal_class(db, env)
-                })
-                .is_some_and(|class| {
-                    effective_superclass_variable_kind(db, class, Name::new(self.name))
-                        == Some(VariableKind::Instance)
-                        && [
-                            class
-                                .class_member(db, env, self.name, MemberLookupPolicy::default())
-                                .place,
-                            class.instance_member(db, env, self.name).place,
-                        ]
-                        .into_iter()
-                        .any(|place| {
-                            matches!(
-                                place,
-                                Place::Defined(defined) if defined.provenance != Provenance::Unknown
-                            )
-                        })
-                })
-    }
-
     fn is_method(&self) -> bool {
         matches!(self.data.kind, ProtocolMemberKind::Method(..))
     }
@@ -2873,18 +2813,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         access: ProtocolMemberAccessMode,
     ) -> ConstraintSet<'db, 'c> {
         if access == ProtocolMemberAccessMode::Class
-            && member.has_incompatible_class_variable_declaration(db, self.env, ty)
-        {
-            if let Some(context) = self.report_context() {
-                context.push(ErrorContext::ProtocolMemberClassVarMismatch {
-                    member_name: member.name.into(),
-                    ty,
-                });
-            }
-            return self.never();
-        }
-
-        if access == ProtocolMemberAccessMode::Class
             && member.is_instance_method()
             && required.read.is_some()
         {
@@ -2957,17 +2885,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let instance_access =
             member.implementation_access(db, env, ty, ProtocolMemberAccessMode::Instance);
         if let Some(context) = self.report_context() {
-            if member.has_incompatible_class_variable_declaration(db, env, ty) {
-                context.push(ErrorContext::ProtocolMemberClassVarMismatch {
-                    member_name: member.name.into(),
-                    ty,
-                });
-                context.push(ErrorContext::ProtocolMemberIncompatible {
-                    member_name: member.name.into(),
-                });
-                return self.never();
-            }
-
             let instance_read_missing = instance_access.read.is_some()
                 && protocol_member_read_type(
                     db,
