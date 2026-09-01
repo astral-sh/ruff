@@ -165,19 +165,58 @@ def cast_union(value: int | str) -> None:
 
 ### Disjoint casts involving generic types
 
-Incompatible generic specializations are rejected, while gradual types remain valid because they may
-overlap with the destination type.
+Incompatible generic specializations are rejected:
 
 ```py
 from typing import Any, cast
+from ty_extensions import Intersection
 
-def cast_generic(integers: list[int], dynamic_values: list[Any], dynamic: Any) -> None:
+def cast_generic(
+    list_of_integers: list[int],
+    list_of_integers_or_any: list[int | Any],
+    dynamic_list_of_integers: Intersection[list[int], Any],
+    list_of_dynamic_integers: list[Intersection[int, Any]],
+) -> None:
     # error: [disjoint-cast] "Cast from `list[int]` to disjoint type `list[str]`"
-    cast(list[str], integers)
+    cast(list[str], list_of_integers)
+    # error: [disjoint-cast]
+    cast(list[str], list_of_integers_or_any)
+    # error: [disjoint-cast]
+    cast(list[str], dynamic_list_of_integers)
+    # error: [disjoint-cast]
+    cast(list[str], list_of_dynamic_integers)
+```
 
-    cast(list[str], dynamic_values)
-    cast(str, dynamic)
-    cast(Any, integers)
+But `cast`s are permitted between two different specializations of the same invariant generic type
+when those two different specializations overlap. This can occur with certain dynamic
+specializations of invariant generics:
+
+```py
+def cast_generic_invalid(
+    list_of_integers: list[int],
+    dynamic_list_of_integers: Intersection[list[int], Any],
+    list_of_dynamic_integers: list[Intersection[int, Any]],
+    list_of_integers_or_any: list[int | Any],
+    any_or_list_of_integers: list[int] | Any,
+    any_or_list_of_integers_or_any: list[int | Any] | Any,
+    list_of_any: list[Any],
+    just_any: Any,
+):
+    cast(Any, list_of_integers)  # no diagnostic
+    cast(list[str], list_of_any)  # no diagnostic
+    cast(str, just_any)  # no diagnostic
+    cast(list[Intersection[int, Any]], list_of_integers)  # no diagnostic
+    cast(list[int], dynamic_list_of_integers)  # no diagnostic
+    cast(list[int], list_of_dynamic_integers)  # no diagnostic
+    cast(list[int], list_of_integers_or_any)  # no diagnostic
+    cast(list[int], any_or_list_of_integers)  # no diagnostic
+
+    # `Any | list[int]` could materialize to `list[str] | list[int]`,
+    # which is not disjoint from `list[str]`
+    cast(list[str], any_or_list_of_integers)  # no diagnostic
+
+    # similarly `Any | list[int | Any]` could also materialize to `list[str] | list[int]`
+    cast(list[str], any_or_list_of_integers_or_any)  # no diagnostic
 ```
 
 ### Disjoint casts between identically named types
