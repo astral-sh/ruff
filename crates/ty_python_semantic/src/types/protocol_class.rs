@@ -2741,6 +2741,24 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         access: ProtocolMemberAccessMode,
     ) -> ConstraintSet<'db, 'c> {
         let env = self.env;
+        // Reading a member as `object` imposes no constraint on its value type. A class
+        // attribute establishes presence without inferring a shadowing instance assignment.
+        if !member.is_method()
+            && required_ty
+                .resolve(db, env)
+                .is_some_and(|required| required.ty().resolve_type_alias(db) == Type::object())
+            && receiver_ty
+                .member_lookup_with_policy(
+                    db,
+                    env,
+                    member.name,
+                    MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                )
+                .place
+                .is_definitely_bound()
+        {
+            return self.always();
+        }
         let Some(attribute_type) =
             protocol_member_read_type(db, env, ty, receiver_ty, member, access)
         else {
@@ -3738,13 +3756,18 @@ pub(super) fn has_all_protocol_members_defined<'db>(
                 })
         }
         _ => target_interface.members(db).all(|member| {
-            matches!(
-                ty.member(db, env, member.name()).place,
-                Place::Defined(DefinedPlace {
-                    definedness: Definedness::AlwaysDefined,
-                    ..
-                })
+            ty.member_lookup_with_policy(
+                db,
+                env,
+                member.name(),
+                MemberLookupPolicy::NO_INSTANCE_FALLBACK,
             )
+            .place
+            .is_definitely_bound()
+                || ty
+                    .member(db, env, member.name())
+                    .place
+                    .is_definitely_bound()
         }),
     }
 }

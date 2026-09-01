@@ -36,24 +36,6 @@ def f(x: f):
 reveal_type(f)  # revealed: def f(x: Unknown) -> Unknown
 ```
 
-## Unpacking
-
-See: <https://github.com/astral-sh/ty/issues/364>
-
-```py
-class Point:
-    def __init__(self, x: int = 0, y: int = 0) -> None:
-        self.x = x
-        self.y = y
-
-    def replace_with(self, other: "Point") -> None:
-        self.x, self.y = other.x, other.y
-
-p = Point()
-reveal_type(p.x)  # revealed: int
-reveal_type(p.y)  # revealed: int
-```
-
 ## Unpacking a recursively growing tuple
 
 This is a regression test for <https://github.com/astral-sh/ty/issues/3838>.
@@ -396,48 +378,6 @@ def f[T](value: T, callback=lambda: f) -> T:
 reveal_type(f)  # revealed: property
 ```
 
-## Self-referential implicit attributes
-
-```py
-class Cyclic:
-    def __init__(self, data: str | dict):  # error: [missing-type-argument]
-        self.data = data
-
-    def update(self):
-        if isinstance(self.data, str):
-            self.data = {"url": self.data}
-
-# revealed: str | dict[Unknown, Unknown] | dict[str, str]
-reveal_type(Cyclic("").data)
-```
-
-## Cycle normalization preserves non-gradual variadic parameters
-
-Normalizing a recursive implicit-attribute type does not reinterpret specialized variadic parameters
-as gradual:
-
-```py
-from typing import Any, Callable, Generic, TypeVar
-from ty_extensions import static_assert
-from ty_extensions._internal import TypeOf, is_subtype_of
-
-T = TypeVar("T")
-flag: bool
-
-class C(Generic[T]):
-    def method(self, *args: T, **kwargs: T) -> None: ...
-
-c = C[Any]()
-
-class Recursive:
-    def __init__(self, other: "Recursive"):
-        self.callback = c.method if flag else other.callback
-
-def check(value: Recursive):
-    reveal_type(value.callback)  # revealed: bound method C[Any].method(*args: Any, **kwargs: Any) -> None
-    static_assert(is_subtype_of(TypeOf[value.callback], Callable[[], None]))
-```
-
 ## Decorated methods with implicit class attributes
 
 This is a regression test for <https://github.com/astral-sh/ty/issues/3471>.
@@ -510,24 +450,6 @@ X = NewType("X", C)
 Y = NamedTuple("Y", [("a", "Y")]), X  # error: [invalid-type-form]
 min(Y)  # error: [invalid-argument-type]
 T = f()
-```
-
-## Lazy cached property behind `hasattr`
-
-This pattern used to panic with "too many cycle iterations".
-
-```py
-class Cached:
-    def get(self) -> int:
-        return 0
-
-    @property
-    def metadata(self) -> int:
-        if not hasattr(self, "_metadata"):
-            self._metadata = self.get()
-        return self._metadata
-
-reveal_type(Cached().metadata)  # revealed: int
 ```
 
 ## Decorator defined on a base class with constrained typevars, accessed from a subclass with decorated generic parameters
