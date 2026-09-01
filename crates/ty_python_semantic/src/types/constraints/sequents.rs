@@ -110,6 +110,7 @@ impl SequentMap<ConstraintId> {
     /// Returns a sequent map containing the sequents that we can infer from a single constraint in
     /// isolation. This method is salsa-tracked so that we only perform this work once per
     /// constraint.
+    #[expect(dead_code)]
     pub(super) fn for_constraint<'db, 'c>(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -136,6 +137,7 @@ impl SequentMap<ConstraintId> {
     /// (Note that this method is _not_ commutative; you should provide `left` and `right` in the
     /// order that they appear in the source code, so that we can construct derived constraints
     /// that retain that ordering.)
+    #[expect(dead_code)]
     pub(super) fn for_constraint_pair<'db, 'c>(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -161,6 +163,7 @@ impl SequentMap<ConstraintId> {
     /// Quickly determines whether two constraints cannot possibly produce any sequents when passed
     /// to [`for_constraint_pair`][Self::for_constraint_pair]. If this returns `true`, it is safe
     /// to skip calling `for_constraint_pair` for this pair of constraints.
+    #[expect(dead_code)]
     pub(super) fn pair_cannot_produce_sequents<'db>(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
