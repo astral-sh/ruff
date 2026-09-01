@@ -52,6 +52,25 @@ impl CycleRootSet {
             .iter()
             .any(|candidate| candidate.same_marker(root))
     }
+
+    /// Returns a structural replay key that ignores growth in projection paths.
+    fn erase_projection_paths<'db>(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        mut ty: Type<'db>,
+    ) -> Option<Type<'db>> {
+        let mut roots = self.roots.clone();
+        for (root, _) in ty.projection_demands(db, env) {
+            if !roots.iter().any(|candidate| candidate.same_marker(root)) {
+                roots.push(root);
+            }
+        }
+        for root in roots {
+            ty = ty.replace_projection_artifacts_with_root(db, env, root)?;
+        }
+        Some(ty)
+    }
 }
 
 /// Solved projection variables for one Salsa cycle recovery step.
@@ -566,78 +585,91 @@ impl<'db> ProjectionEquation<'db> {
         env: &ProgramEnvironment<'db>,
         roots: &CycleRootSet,
         var: &ProjectionVar<'db>,
-        term: ProjectionTerm<'db>,
+        mut term: ProjectionTerm<'db>,
         allow_productive: bool,
     ) -> Option<()> {
-        let wrap_in_list = matches!(term, ProjectionTerm::List(_));
-        match self.wrap_in_list {
-            Some(existing) if existing != wrap_in_list => return None,
-            None => self.wrap_in_list = Some(wrap_in_list),
-            Some(_) => {}
-        }
+        let mut replayed_shapes = FxIndexSet::default();
+        loop {
+            let wrap_in_list = matches!(term, ProjectionTerm::List(_));
+            match self.wrap_in_list {
+                Some(existing) if existing != wrap_in_list => return None,
+                None => self.wrap_in_list = Some(wrap_in_list),
+                Some(_) => {}
+            }
 
-        match term {
-            ProjectionTerm::Exact(term) => {
-                if term.same_divergent_marker(db, Type::Divergent(var.root)) {
-                    self.dependencies.insert(var.clone());
-                    return Some(());
-                }
-
-                if !term.is_matching_projection(db, var.root, &var.path)
-                    && term.mentions_matching_projection(db, env, var.root, &var.path)
-                    && let Some(projected) = ProjectionContainer::project_multi_root_type_path(
-                        db, env, term, var.root, None, &var.path,
-                    )
-                {
-                    if projected
-                        .ty(db, env)
-                        .is_matching_projection(db, var.root, &var.path)
-                    {
-                        self.divergent = true;
+            match term {
+                ProjectionTerm::Exact(exact) => {
+                    if exact.same_divergent_marker(db, Type::Divergent(var.root)) {
+                        self.dependencies.insert(var.clone());
                         return Some(());
                     }
-                    return self.add_projection_term(
+
+                    if !exact.is_matching_projection(db, var.root, &var.path)
+                        && exact.mentions_matching_projection(db, env, var.root, &var.path)
+                        && let Some(projected) = ProjectionContainer::project_multi_root_type_path(
+                            db, env, exact, var.root, None, &var.path,
+                        )
+                    {
+                        if projected
+                            .ty(db, env)
+                            .is_matching_projection(db, var.root, &var.path)
+                        {
+                            self.divergent = true;
+                            return Some(());
+                        }
+
+                        // Projection paths can grow while the surrounding recursive container
+                        // stays unchanged. Erase those paths before detecting a repeated shape;
+                        // once a shape repeats, further replay cannot expose a flatter dependency.
+                        let Some(replay_key) =
+                            roots.erase_projection_paths(db, env, projected.ty(db, env))
+                        else {
+                            self.divergent = true;
+                            return Some(());
+                        };
+                        if !replayed_shapes.insert(replay_key) {
+                            self.divergent = true;
+                            return Some(());
+                        }
+                        term = projected;
+                        continue;
+                    }
+
+                    return self.add_type_term(
                         db,
                         env,
                         roots,
                         var,
-                        projected,
-                        allow_productive,
+                        exact,
+                        TypeTermPolicy::with_dependencies(allow_productive),
                     );
                 }
+                ProjectionTerm::Homogeneous(homogeneous) => {
+                    if homogeneous.same_divergent_marker(db, Type::Divergent(var.root)) {
+                        self.dependencies.insert(var.clone());
+                        return Some(());
+                    }
 
-                self.add_type_term(
-                    db,
-                    env,
-                    roots,
-                    var,
-                    term,
-                    TypeTermPolicy::with_dependencies(allow_productive),
-                )
-            }
-            ProjectionTerm::Homogeneous(term) => {
-                if term.same_divergent_marker(db, Type::Divergent(var.root)) {
-                    self.dependencies.insert(var.clone());
-                    return Some(());
+                    return self.add_type_term(
+                        db,
+                        env,
+                        roots,
+                        var,
+                        homogeneous,
+                        TypeTermPolicy::with_dependencies(allow_productive),
+                    );
                 }
-
-                self.add_type_term(
-                    db,
-                    env,
-                    roots,
-                    var,
-                    term,
-                    TypeTermPolicy::with_dependencies(allow_productive),
-                )
+                ProjectionTerm::List(element) => {
+                    return self.add_type_term(
+                        db,
+                        env,
+                        roots,
+                        var,
+                        element,
+                        TypeTermPolicy::without_dependencies(allow_productive),
+                    );
+                }
             }
-            ProjectionTerm::List(term) => self.add_type_term(
-                db,
-                env,
-                roots,
-                var,
-                term,
-                TypeTermPolicy::without_dependencies(allow_productive),
-            ),
         }
     }
 

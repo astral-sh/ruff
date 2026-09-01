@@ -718,6 +718,20 @@ while box_count < 10:
 reveal_type(box)  # revealed: WhileLoopVarBox[int]
 ```
 
+### Recursive tuple slice unpacking converges
+
+Rebuilding a variadic tuple from its static slice forms a recursive projection orbit. Cycle recovery
+must widen that orbit instead of replaying the same projection indefinitely.
+
+```py
+from collections.abc import Hashable
+
+def rebuild_tuple(value: Hashable, cond: bool) -> None:
+    while cond:
+        if isinstance(value, tuple):
+            value = (*value[:-1], f"{value[-1]}")
+```
+
 ### Bindings in statically unreachable branches are excluded from loopback
 
 ```py
