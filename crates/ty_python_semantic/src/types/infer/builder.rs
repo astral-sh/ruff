@@ -1185,7 +1185,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let ty = ty_and_quals.inner_type();
                 match definition.kind(self.db()) {
                     DefinitionKind::Function(function) => {
-                        post_inference::check_decorator_calls(
+                        post_inference::decorator::check_decorator_calls(
                             &self.context,
                             definition,
                             &function.node(self.module()).decorator_list,
@@ -1211,7 +1211,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         );
                     }
                     DefinitionKind::Class(class_node) => {
-                        post_inference::check_decorator_calls(
+                        post_inference::decorator::check_decorator_calls(
                             &self.context,
                             definition,
                             &class_node.node(self.module()).decorator_list,
