@@ -40,7 +40,8 @@ def test() -> int:
 
 ## Error in preceding decorator
 
-Don't suppress diagnostics for decorators appearing before the `no_type_check` decorator.
+Don't suppress diagnostics for decorator expressions appearing before the `no_type_check`
+decorator.
 
 ```py
 from typing import no_type_check
@@ -53,9 +54,9 @@ def test() -> int:
 
 ## Error in following decorator
 
-Unlike Pyright and mypy, suppress diagnostics appearing after the `no_type_check` decorator. We do
-this because it more closely matches Python's runtime semantics of decorators. For more details, see
-the discussion on the
+Unlike Pyright and mypy, suppress diagnostics in decorator expressions appearing after the
+`no_type_check` decorator. We do this because it more closely matches Python's runtime semantics of
+decorators. For more details, see the discussion on the
 [PR adding `@no_type_check` support](https://github.com/astral-sh/ruff/pull/15122#discussion_r1896869411).
 
 ```py
@@ -65,6 +66,30 @@ from typing import no_type_check
 @unknown_decorator
 def test() -> int:
     return a + 5
+```
+
+## Errors in decorator applications
+
+`no_type_check` suppresses errors from applying decorators to the function, regardless of its
+position in the decorator list. This does not suppress the same error on other functions.
+
+```py
+from typing import no_type_check
+
+def takes_int(value: int) -> int:
+    return value
+
+@takes_int
+@no_type_check
+def before() -> None: ...
+
+@no_type_check
+@takes_int
+def after() -> None: ...
+
+# error: [invalid-argument-type]
+@takes_int
+def checked() -> None: ...
 ```
 
 ## Error in default value
