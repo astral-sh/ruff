@@ -38,22 +38,38 @@ def test() -> int:
             return a + 5
 ```
 
-## Error in preceding decorator
+## Errors in decorator applications
 
-Don't suppress diagnostics for decorator expressions appearing before the `no_type_check` decorator.
+We currently suppress all decorator-application errors on a function decorated with `no_type_check`,
+regardless of whether those errors occur in applying decorators appearing before or after
+`@no_type_check`. TODO: it would be more intuitive and consistent with our behavior for
+decorator-expression errors (see below) if we only suppressed these for decorators located after
+`@no_type_check` in source order.
 
 ```py
 from typing import no_type_check
 
-@unknown_decorator  # error: [unresolved-reference]
+def takes_int(value: int) -> int:
+    return value
+
+# TODO this should be an error:
+@takes_int
 @no_type_check
-def test() -> int:
-    return a + 5
+def before() -> None: ...
+
+# no error, swallowed by `no_type_check`:
+@no_type_check
+@takes_int
+def after() -> None: ...
+
+# error: [invalid-argument-type]
+@takes_int
+def checked() -> None: ...
 ```
 
-## Error in following decorator
+## Error in following decorator expression
 
-Unlike Pyright and mypy, we suppress diagnostics in decorator expressions appearing after the
+Unlike Pyright and mypy, we also suppress diagnostics in decorator expressions appearing after the
 `no_type_check` decorator. We do this because it more closely matches Python's runtime semantics of
 decorators. For more details, see the discussion on the
 [PR adding `@no_type_check` support](https://github.com/astral-sh/ruff/pull/15122#discussion_r1896869411).
@@ -67,27 +83,18 @@ def test() -> int:
     return a + 5
 ```
 
-## Errors in decorator applications
+## Error in preceding decorator expression
 
-`no_type_check` suppresses errors from applying decorators to the function, regardless of its
-position in the decorator list. This does not suppress the same error on other functions.
+We don't suppress diagnostics for decorator expressions appearing before the `no_type_check`
+decorator.
 
 ```py
 from typing import no_type_check
 
-def takes_int(value: int) -> int:
-    return value
-
-@takes_int
+@unknown_decorator  # error: [unresolved-reference]
 @no_type_check
-def before() -> None: ...
-@no_type_check
-@takes_int
-def after() -> None: ...
-
-# error: [invalid-argument-type]
-@takes_int
-def checked() -> None: ...
+def test() -> int:
+    return a + 5
 ```
 
 ## Error in default value
