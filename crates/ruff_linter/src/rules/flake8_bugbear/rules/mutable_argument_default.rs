@@ -185,14 +185,18 @@ fn move_initialization(
     content.push_str(stylist.line_ending().as_str());
     content.push_str(stylist.indentation());
     if is_b006_unsafe_fix_preserve_assignment_expr_enabled(checker.settings()) {
+        let default_source = locator.slice(
+            parenthesized_range(default.into(), parameter.into(), checker.tokens())
+                .unwrap_or(default.range()),
+        );
+        if default_source.contains('\n') || default_source.contains('\r') {
+            return None;
+        }
         let _ = write!(
             &mut content,
             "{} = {}",
             parameter.parameter.name(),
-            locator.slice(
-                parenthesized_range(default.into(), parameter.into(), checker.tokens())
-                    .unwrap_or(default.range())
-            )
+            default_source
         );
     } else {
         let _ = write!(

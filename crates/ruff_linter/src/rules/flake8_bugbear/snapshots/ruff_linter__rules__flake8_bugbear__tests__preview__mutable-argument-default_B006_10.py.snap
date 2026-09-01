@@ -1,0 +1,37 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+---
+B006 Do not use mutable data structures for argument defaults
+ --> B006_10.py:1:14
+  |
+1 |   def f1(value=["""first
+  |  ______________^
+2 | | second"""]):
+  | |__________^
+3 |       return value
+  |
+help: Replace with `None`; initialize within function
+
+B006 Do not use mutable data structures for argument defaults
+ --> B006_10.py:6:14
+  |
+6 |   def f2(value={"key": """first
+  |  ______________^
+7 | | second
+8 | | third"""}):
+  | |_________^
+9 |       return value
+  |
+help: Replace with `None`; initialize within function
+
+B006 Do not use mutable data structures for argument defaults
+  --> B006_10.py:12:14
+   |
+12 |   def f3(value=["""first
+   |  ______________^
+13 | | second"""]):
+   | |__________^
+14 |       """Docstring, insertion happens after this."""
+15 |       return value
+   |
+help: Replace with `None`; initialize within function
