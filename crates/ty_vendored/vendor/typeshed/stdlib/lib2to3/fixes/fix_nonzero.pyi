@@ -1,5 +1,3 @@
-"""Fixer for __nonzero__ -> __bool__ methods."""
-
 from typing import ClassVar, Literal
 
 from .. import fixer_base
