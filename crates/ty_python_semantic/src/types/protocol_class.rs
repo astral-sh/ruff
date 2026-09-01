@@ -2746,7 +2746,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         if !member.is_method()
             && required_ty
                 .resolve(db, env)
-                .is_some_and(|required| required.ty() == Type::object())
+                .is_some_and(|required| required.ty().resolve_type_alias(db) == Type::object())
             && receiver_ty
                 .member_lookup_with_policy(
                     db,
