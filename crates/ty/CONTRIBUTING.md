@@ -32,20 +32,19 @@ We use [Insta](https://insta.rs/docs/) to update snapshot tests. It's already pa
 of the development toolchain:
 
 ```shell
-uv run --only-group dev cargo insta --version
+uv run --only-dev cargo insta --version
 ```
 
 You can optionally install hooks to automatically run the validation checks
 when making a commit:
 
 ```shell
-uv run --only-group dev --locked prek install
+uv run --only-dev --locked prek install
 ```
 
 We recommend [nextest](https://nexte.st/) to run ty's test suite (via `uv run --only-dev cargo nextest run`),
-though it's not strictly necessary.
-
-Throughout this guide, any usages of `cargo test` can be replaced with `uv run --only-dev cargo nextest run`.
+though it's not strictly necessary. Throughout this guide, any usages of `cargo test` can be
+replaced with `uv run --only-dev cargo nextest run`.
 
 ### Development
 
@@ -61,7 +60,7 @@ and that it passes both the lint and test validation checks:
 ```shell
 cargo clippy --workspace --all-targets --all-features -- -D warnings  # Rust linting
 cargo test  # Rust testing
-uv run --only-group dev --locked prek run --all-files  # Rust and Python formatting, Markdown and Python linting, etc.
+uv run --only-dev --locked prek run --all-files  # Rust and Python formatting, Markdown and Python linting, etc.
 ```
 
 These checks will run on GitHub Actions when you open your pull request, but running them locally

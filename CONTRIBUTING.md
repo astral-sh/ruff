@@ -83,9 +83,8 @@ uv run --only-dev --locked prek install
 ```
 
 We recommend [nextest](https://nexte.st/) to run Ruff's test suite (via `uv run --only-dev cargo nextest run`),
-though it's not strictly necessary.
-
-Throughout this guide, any usages of `cargo test` can be replaced with `uv run --only-dev cargo nextest run`.
+though it's not strictly necessary. Throughout this guide, any usages of `cargo test` can be replaced
+with `uv run --only-dev cargo nextest run`.
 
 ### Development
 
