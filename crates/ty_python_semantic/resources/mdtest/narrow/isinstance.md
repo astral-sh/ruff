@@ -1089,6 +1089,9 @@ def _(value: Concrete[int]) -> None:
 ### Strict mode
 
 ```toml
+[environment]
+python-version = "3.12"
+
 [analysis]
 strict-generic-narrowing = true
 ```
@@ -1196,6 +1199,25 @@ def _(xs: list[str] | set[str]) -> str:
         return "it's a list!"
     elif isinstance(xs, set):
         return "it's a set!"
+```
+
+#### Invariance with bounded type variables
+
+A value of a type variable bounded by `str` can also be an instance of a `Box` specialization
+through multiple inheritance. Checking `isinstance(value, Box)` cannot establish that this
+specialization is `Box[T]`, so the intersection with `T` survives and the return is rejected.
+
+```py
+class Box[T]:
+    value: T
+
+def narrow_box[T: str](value: Box[T] | T) -> Box[T]:
+    if isinstance(value, Box):
+        reveal_type(value)  # revealed: Box[T@narrow_box] | (T@narrow_box & Top[Box[Unknown]])
+        return value  # error: [invalid-return-type]
+
+    reveal_type(value)  # revealed: T@narrow_box & ~Top[Box[Unknown]]
+    raise TypeError
 ```
 
 ### Gradual mode
@@ -1310,6 +1332,25 @@ def _(xs: list[str] | set[str]) -> str:
         return "it's a list!"
     elif isinstance(xs, set):
         return "it's a set!"
+```
+
+#### Invariance with bounded type variables
+
+A value of a type variable bounded by `str` can also be an instance of a `Box` specialization
+through multiple inheritance. In gradual mode, `isinstance(value, Box)` preserves this overlap using
+`Box[Unknown]`, which is assignable to `Box[T]`, so the return statement is (unsoundly) accepted.
+
+```py
+class Box[T]:
+    value: T
+
+def narrow_box[T: str](value: Box[T] | T) -> Box[T]:
+    if isinstance(value, Box):
+        reveal_type(value)  # revealed: Box[T@narrow_box] | (T@narrow_box & Box[Unknown])
+        return value
+
+    reveal_type(value)  # revealed: T@narrow_box & ~Top[Box[Unknown]]
+    raise TypeError
 ```
 
 ## Narrowing recursively bounded generics (strict mode)
