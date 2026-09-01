@@ -424,8 +424,8 @@ C().f2(1)
 
 ## Decorators returning unions of callables
 
-Each alternative returned by a callable decorator retains the method's binding behavior.
-`staticmethod` and `classmethod` accept these alternatives even when their signatures differ.
+A decorator can return a union of callables with different signatures. `staticmethod` accepts the
+union and leaves each signature unchanged.
 
 ```py
 from collections.abc import Callable
@@ -433,29 +433,41 @@ from collections.abc import Callable
 def static_decorator(function: object) -> Callable[[int], int] | Callable[[int, str], str]:
     raise NotImplementedError
 
-type ClassCallable = Callable[[type, int], int]
-type ClassCallables = ClassCallable | Callable[[type, int, str], str]
-
-def class_decorator(function: object) -> ClassCallables:
-    raise NotImplementedError
-
 class C:
     @staticmethod
     @static_decorator
     def static() -> None: ...
+
+reveal_type(C.static)  # revealed: ((int, /) -> int) | ((int, str, /) -> str)
+reveal_type(C().static)  # revealed: ((int, /) -> int) | ((int, str, /) -> str)
+```
+
+`classmethod` binds the first parameter of each alternative to the class. This also works when the
+union is expressed through a type alias.
+
+```py
+type ClassCallables = Callable[[type, int], int] | Callable[[type, int, str], str]
+
+def class_decorator(function: object) -> ClassCallables:
+    raise NotImplementedError
+
+class D:
     @classmethod
     @class_decorator
     def class_method(cls) -> None: ...
 
-reveal_type(C.static)  # revealed: ((int, /) -> int) | ((int, str, /) -> str)
-reveal_type(C().static)  # revealed: ((int, /) -> int) | ((int, str, /) -> str)
-reveal_type(C.class_method)  # revealed: ((int, /) -> int) | ((int, str, /) -> str)
-reveal_type(C().class_method)  # revealed: ((int, /) -> int) | ((int, str, /) -> str)
+reveal_type(D.class_method)  # revealed: ((int, /) -> int) | ((int, str, /) -> str)
+reveal_type(D().class_method)  # revealed: ((int, /) -> int) | ((int, str, /) -> str)
 ```
 
-An alternative that is not callable still causes an error when applying `staticmethod`.
+## Decorators returning a possibly non-callable value
+
+A decorator might return a non-callable value. We report an error when `staticmethod` is applied to
+such a return type.
 
 ```py
+from collections.abc import Callable
+
 def maybe_callable(function: object) -> Callable[[], int] | int:
     raise NotImplementedError
 
@@ -468,17 +480,16 @@ class Invalid:
 
 ## Callable wrappers retain attributes and overloads
 
-`staticmethod` returns the wrapped callable unchanged on attribute access. `classmethod` binds the
-class argument, preserving the callable's overloads and forwarding access to its attributes.
+An object returned by a decorator can have attributes and an overloaded `__call__` method. Here,
+`Wrapper` exposes a `reset` method and returns its second argument, with overloads for `int` and
+`str`.
 
 ```py
 from collections.abc import Callable
 from typing import overload
 
 class Wrapper:
-    def __init__(self, function: Callable[..., object]) -> None:
-        self.function = function
-
+    def __init__(self, function: Callable[..., object]) -> None: ...
     def reset(self) -> None: ...
     @overload
     def __call__(self, receiver: object, value: int) -> int: ...
@@ -486,34 +497,39 @@ class Wrapper:
     def __call__(self, receiver: object, value: str) -> str: ...
     def __call__(self, receiver: object, value: int | str) -> int | str:
         return value
+```
 
+Accessing a staticmethod through a class or instance returns the wrapper unchanged. Its attributes
+remain accessible, and each call uses the matching overload's return type.
+
+```py
 class C:
     @staticmethod
     @Wrapper
     def static(receiver: object, value: int | str) -> int | str:
         return value
 
+C.static.reset()
+reveal_type(C.static(None, 1))  # revealed: int
+reveal_type(C().static(None, "a"))  # revealed: str
+```
+
+Accessing a classmethod supplies the class as the wrapper's first argument. The bound method also
+exposes the wrapper's attributes and preserves its overloads.
+
+```py
+class D:
     @classmethod
     @Wrapper
     def class_method(cls, value: int | str) -> int | str:
         return value
 
-C.static.reset()
-C().static.reset()
-reveal_type(C.static(None, 1))  # revealed: int
-reveal_type(C().static(None, "a"))  # revealed: str
-
-C.class_method.reset()
-C().class_method.reset()
-reveal_type(C.class_method(1))  # revealed: int
-reveal_type(C().class_method("a"))  # revealed: str
-
-static: Callable[[object, int], int] = C.static
-class_method: Callable[[int], int] = C.class_method
+D().class_method.reset()
+reveal_type(D.class_method(1))  # revealed: int
+reveal_type(D().class_method("a"))  # revealed: str
 ```
 
-Explicit constructor calls preserve the same attributes and overloads as decorator syntax. A bound
-classmethod exposes its receiver and the original callable through `__self__` and `__func__`.
+Calling `staticmethod` and `classmethod` explicitly has the same effect as using them as decorators.
 
 ```py
 class Explicit:
@@ -526,19 +542,32 @@ reveal_type(Explicit.static(None, 1))  # revealed: int
 reveal_type(Explicit().static(None, "a"))  # revealed: str
 reveal_type(Explicit.class_method(1))  # revealed: int
 reveal_type(Explicit().class_method("a"))  # revealed: str
-reveal_type(Explicit.class_method.__call__(1))  # revealed: int
-reveal_type(Explicit.class_method.__self__)  # revealed: <class 'Explicit'>
-reveal_type(Explicit.class_method.__func__)  # revealed: Wrapper
-class_method = Explicit.class_method
 
 # error: [no-matching-overload]
 Explicit.class_method(None)
 ```
 
+A bound classmethod is assignable to a `Callable` whose signature matches one of its overloads after
+the class argument has been supplied.
+
+```py
+method: Callable[[int], int] = Explicit.class_method
+```
+
+The bound method's `__self__` attribute identifies the class, and `__func__` exposes the wrapper.
+Calling `__call__` explicitly also supplies the class argument.
+
+```py
+reveal_type(Explicit.class_method.__self__)  # revealed: <class 'Explicit'>
+reveal_type(Explicit.class_method.__func__)  # revealed: Wrapper
+reveal_type(Explicit.class_method.__call__(1))  # revealed: int
+```
+
 ## Decorators returning a different function
 
-An inner decorator can return a function that was defined elsewhere. The outer method decorator
-determines how that replacement function binds, independently of the original function's decorators.
+An inner decorator can replace a method with a function defined elsewhere. The outer `classmethod`
+decorator binds that replacement function to the class, even though the replacement's own definition
+has no decorators.
 
 ```py
 def replacement(cls: type, value: int) -> int:
@@ -550,12 +579,13 @@ class C:
     def method(cls, value: int) -> int:
         return value
 
-    assigned = classmethod(replacement)
-
 reveal_type(C.method(1))  # revealed: int
 reveal_type(C().method(1))  # revealed: int
-reveal_type(C.assigned(1))  # revealed: int
-reveal_type(C().assigned(1))  # revealed: int
+```
+
+The bound method's `__func__` refers to the replacement function.
+
+```py
 reveal_type(C.method.__func__)  # revealed: def replacement(cls: type, value: int) -> int
 ```
 

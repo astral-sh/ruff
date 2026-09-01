@@ -142,8 +142,8 @@ reveal_type(foo3.takes_self_or_int(1))  # revealed: int
 
 ## Cached classmethod implementations
 
-Caching an overloaded classmethod's implementation preserves its method binding. The implementation
-remains callable for overload validation, and callers retain the overload-specific return types.
+An overloaded classmethod can cache its implementation with `lru_cache`. Each call uses the return
+type of its matching overload.
 
 ```py
 from functools import lru_cache
