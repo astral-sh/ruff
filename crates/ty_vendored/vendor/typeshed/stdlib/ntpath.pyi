@@ -3,6 +3,7 @@
 Instead of importing this module directly, import os and refer to this
 module as os.path.
 """
+
 import sys
 from _typeshed import BytesPath, StrOrBytesPath, StrPath
 from genericpath import (

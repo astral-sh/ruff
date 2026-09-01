@@ -18,9 +18,9 @@ if sys.version_info < (3, 11):
     def coroutine(func: _FunctionT) -> _FunctionT:
         """Decorator to mark coroutines.
 
-    If the coroutine is not yielded from before it is destroyed,
-    an error message is logged.
-    """
+        If the coroutine is not yielded from before it is destroyed,
+        an error message is logged.
+        """
 
 def iscoroutine(obj: object) -> TypeIs[Coroutine[Any, Any, Any]]:
     """Return True if obj is a coroutine object."""

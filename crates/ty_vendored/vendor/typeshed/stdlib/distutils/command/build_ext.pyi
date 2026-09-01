@@ -4,6 +4,7 @@ Implements the Distutils 'build_ext' command, for building extension
 modules (currently limited to C extensions, should accommodate C++
 extensions ASAP).
 """
+
 from _typeshed import Incomplete, Unused
 from collections.abc import Callable
 from typing import ClassVar
@@ -54,6 +55,7 @@ class build_ext(Command):
         Raise DistutilsSetupError if the structure is invalid anywhere;
         just returns otherwise.
         """
+
     def get_source_files(self): ...
     def get_outputs(self): ...
     def build_extensions(self) -> None: ...
@@ -64,33 +66,39 @@ class build_ext(Command):
         return a modified 'sources' list with SWIG source files replaced
         by the generated C (or C++) files.
         """
+
     def find_swig(self):
         """Return the name of the SWIG executable.  On Unix, this is
         just "swig" -- it should be in the PATH.  Tries a bit harder on
         Windows.
         """
+
     def get_ext_fullpath(self, ext_name: str) -> str:
         """Returns the path of the filename for a given extension.
 
         The file is located in `build_lib` or directly in the package
         (inplace option).
         """
+
     def get_ext_fullname(self, ext_name: str) -> str:
         """Returns the fullname of a given extension name.
 
         Adds the `package.` prefix
-"""
+        """
+
     def get_ext_filename(self, ext_name: str) -> str:
         """Convert the name of an extension (eg. "foo.bar") into the name
         of the file from which it will be loaded (eg. "foo/bar.so", or
         "foo\\bar.pyd").
         """
+
     def get_export_symbols(self, ext):
         """Return the list of symbols that a shared extension has to
         export.  This either uses 'ext.export_symbols' or, if it's not
         provided, "PyInit_" + module_name.  Only relevant on Windows, where
         the .pyd file (DLL) must export the module "PyInit_" function.
         """
+
     def get_libraries(self, ext):
         """Return the list of libraries to link against when building a
         shared extension.  On most platforms, this is just 'ext.libraries';

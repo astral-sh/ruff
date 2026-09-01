@@ -48,6 +48,7 @@ to control pickling: they can define methods called __getinitargs__(),
 __getstate__() and __setstate__().  See the documentation for module
 "pickle" for information on these methods.
 """
+
 import sys
 from typing import Any, Protocol, TypeVar, type_check_only
 
@@ -67,23 +68,23 @@ PyStringMap: Any
 def copy(x: _T) -> _T:
     """Shallow copy operation on arbitrary Python objects.
 
-See the module's __doc__ string for more info.
-"""
+    See the module's __doc__ string for more info.
+    """
 
 if sys.version_info >= (3, 15):
     def deepcopy(x: _T, memo: dict[int, Any] | None = None) -> _T:
         """Deep copy operation on arbitrary Python objects.
 
-See the module's __doc__ string for more info.
-"""
+        See the module's __doc__ string for more info.
+        """
 
 else:
     # Note: memo and _nil are internal kwargs.
     def deepcopy(x: _T, memo: dict[int, Any] | None = None, _nil: Any = []) -> _T:
         """Deep copy operation on arbitrary Python objects.
 
-See the module's __doc__ string for more info.
-"""
+        See the module's __doc__ string for more info.
+        """
 
 if sys.version_info >= (3, 13):
     __all__ += ["replace"]
@@ -91,9 +92,9 @@ if sys.version_info >= (3, 13):
     def replace(obj: _SupportsReplace[_RT_co], /, **changes: Any) -> _RT_co:
         """Return a new object replacing specified fields with new values.
 
-This is especially useful for immutable objects, like named tuples or
-frozen dataclasses.
-"""
+        This is especially useful for immutable objects, like named tuples or
+        frozen dataclasses.
+        """
 
 class Error(Exception): ...
 
