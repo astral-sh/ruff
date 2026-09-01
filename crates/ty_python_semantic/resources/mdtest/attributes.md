@@ -195,6 +195,19 @@ reveal_type(C.inferred_from_value)  # revealed: Unknown
 C.inferred_from_value = "overwritten on class"
 ```
 
+#### Bound methods assigned on narrowed receivers
+
+A bound method keeps the receiver that was used to access it. If `self` is narrowed before the bound
+method is assigned to an inferred instance attribute, the captured receiver remains assignable to
+the receiver used by the inferred attribute type.
+
+```py
+class C:
+    def method(self) -> None:
+        if not isinstance(self, str):
+            self.saved_method = self.method
+```
+
 #### Variable defined in multiple methods
 
 If we see multiple un-annotated assignments to a single attribute (`self.x` below), we build the
