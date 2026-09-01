@@ -58,6 +58,16 @@ def multi_param(t: list[T], c: Callable[[T], None]) -> T:
     return t[1]
 
 
+# Starred constraints can't be converted to PEP 695 syntax.
+# https://github.com/astral-sh/ruff/issues/26954
+constraints = (int, str)
+T_starred = TypeVar("T_starred", *constraints)
+
+
+def starred_constraints(v: T_starred) -> T_starred:
+    return v
+
+
 # these cases are not handled
 
 def outer():

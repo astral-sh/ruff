@@ -138,6 +138,16 @@ class DefaultOnlyTypeVar(Generic[W]):  # -> [W = int]
     var: W
 
 
+# Starred constraints can't be converted to PEP 695 syntax.
+# https://github.com/astral-sh/ruff/issues/26954
+constraints = (int, str)
+T_starred = TypeVar("T_starred", *constraints)
+
+
+class StarredConstraints(Generic[T_starred]):
+    var: T_starred
+
+
 # nested classes and functions are skipped
 class Outer:
     class Inner(Generic[T]):

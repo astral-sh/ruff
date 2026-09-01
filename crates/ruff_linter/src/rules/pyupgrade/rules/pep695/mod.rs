@@ -338,9 +338,12 @@ pub(crate) fn expr_name_to_type_var<'a>(
                 let restriction = if let Some(bound) = arguments.find_keyword("bound") {
                     Some(TypeVarRestriction::Bound(&bound.value))
                 } else if arguments.args.len() > 1 {
-                    Some(TypeVarRestriction::Constraint(
-                        arguments.args.iter().skip(1).collect(),
-                    ))
+                    let constraints: Vec<&Expr> =
+                        arguments.args.iter().skip(1).collect();
+                    if constraints.iter().any(|expr| expr.is_starred_expr()) {
+                        return None;
+                    }
+                    Some(TypeVarRestriction::Constraint(constraints))
                 } else {
                     None
                 };
