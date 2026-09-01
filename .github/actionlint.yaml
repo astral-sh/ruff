@@ -15,4 +15,4 @@ self-hosted-runner:
     - depot-ubuntu-24.04-arm-8
     - github-windows-2025-x86_64-8
     - github-windows-2025-x86_64-16
-    - codspeed-macro
+    - codspeed-macro-x86-ryzen-9950x-ubuntu-24-04
