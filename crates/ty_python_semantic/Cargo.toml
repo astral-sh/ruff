@@ -32,6 +32,7 @@ ty_static = { workspace = true }
 bitflags = { workspace = true }
 char_str = { workspace = true }
 compact_str = { workspace = true }
+derive_more = { workspace = true, features = ["full"] }
 drop_bomb = { workspace = true }
 get-size2 = { workspace = true, features = ["indexmap", "ordermap"] }
 indexmap = { workspace = true }

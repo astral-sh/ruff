@@ -181,7 +181,10 @@ impl InstanceDictionary {
             | KnownClass::PydanticConfigDict
             | KnownClass::PydanticRootModel
             | KnownClass::PydanticStrict
-            | KnownClass::PytestParametrizeMarkDecorator => None,
+            | KnownClass::PytestParametrizeMarkDecorator
+            | KnownClass::PytestMarkDecorator
+            | KnownClass::PytestSkipMarkDecorator
+            | KnownClass::PytestParameterSet => None,
         }
     }
 

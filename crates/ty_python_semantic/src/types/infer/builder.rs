@@ -97,6 +97,7 @@ use crate::types::generics::{
 };
 use crate::types::infer::builder::named_tuple::NamedTupleKind;
 use crate::types::infer::builder::paramspec_validation::validate_paramspec_components;
+use crate::types::infer::builder::post_inference::pytest::is_pytest_available;
 use crate::types::infer::{
     StatementInference, StatementInferenceInner, StatementInferenceInnerExtra, TypeAndRange,
     TypeExpressionFlags, infer_statement_types, nearest_enclosing_class,
@@ -1247,6 +1248,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             post_inference::final_variable::check_final_without_value(&self.context, self.index);
+
+            // If `pytest` is not available, this generates spurious errors.
+            if is_pytest_available(
+                self.db(),
+                self.program_environment().resolver_environment(self.db()),
+            ) {
+                // Pytest checks require a mutable reference to verify function calls.
+                // However, the internal state is not changed.
+                // It is simplest to clone the declarations.
+                for (&definition, ty_and_quals) in &self.declarations.clone() {
+                    let ty = ty_and_quals.inner_type();
+                    if let Some(function) = definition.kind(self.db()).as_function() {
+                        self.post_inference_pytest_check_function(ty, function.node(self.module()));
+                    }
+                }
+            }
         }
     }
 

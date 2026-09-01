@@ -187,6 +187,11 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION);
     registry.register_lint(&INVALID_SYNTAX_IN_FORWARD_ANNOTATION);
     registry.register_lint(&RAW_STRING_TYPE_ANNOTATION);
+
+    // Pytest
+    registry.register_lint(&PYTEST_INVALID_ARGNAMES_LITERAL);
+    registry.register_lint(&PYTEST_REQUEST_KEYWORD);
+    registry.register_lint(&PYTEST_DUPLICATE_ARGNAME);
 }
 
 declare_lint! {
@@ -1357,6 +1362,45 @@ declare_lint! {
         summary: "detects incorrect usage of the legacy convention for specifying positional-only parameters",
         status: LintStatus::stable("0.0.15"),
         default_level: Level::Warn,
+    }
+}
+
+declare_lint! {
+    #[allow(
+        rustdoc::invalid_codeblock_attributes,
+        reason = "`data-mdtest` is an mdtest-specific code-block attribute"
+    )]
+    #[doc = include_str!("../../resources/lint_docs/pytest-invalid-argnames-literal.md")]
+    pub(crate) static PYTEST_INVALID_ARGNAMES_LITERAL = {
+        summary: "Argnames literal is not a comma separated list of valid identifiers",
+        status: LintStatus::stable("unknown"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    #[allow(
+        rustdoc::invalid_codeblock_attributes,
+        reason = "`data-mdtest` is an mdtest-specific code-block attribute"
+    )]
+    #[doc = include_str!("../../resources/lint_docs/pytest-request-keyword.md")]
+    pub(crate) static PYTEST_REQUEST_KEYWORD = {
+        summary: "`request` is reserved by `pytest` as a special argument",
+        status: LintStatus::stable("unknown"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    #[allow(
+        rustdoc::invalid_codeblock_attributes,
+        reason = "`data-mdtest` is an mdtest-specific code-block attribute"
+    )]
+    #[doc = include_str!("../../resources/lint_docs/pytest-duplicate-argname.md")]
+    pub(crate) static PYTEST_DUPLICATE_ARGNAME = {
+        summary: "Same argname used multiple times in `pytest.mark.parametrize`",
+        status: LintStatus::stable("unknown"),
+        default_level: Level::Error,
     }
 }
 

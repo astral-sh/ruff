@@ -977,6 +977,13 @@ impl<'db> DefinitionKind<'db> {
         }
     }
 
+    pub const fn as_function(&self) -> Option<&AstNodeRef<ast::StmtFunctionDef>> {
+        match self {
+            DefinitionKind::Function(fn_def) => Some(fn_def),
+            _ => None,
+        }
+    }
+
     pub fn is_import(&self) -> bool {
         matches!(
             self,

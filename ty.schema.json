@@ -1344,6 +1344,36 @@
             }
           ]
         },
+        "pytest-duplicate-argname": {
+          "title": "Same argname used multiple times in `pytest.mark.parametrize`",
+          "description": "## What it does\n\nChecks that there are no duplicate argnames in `pytest.mark.parametrize`.\nIf there are, the tests will not run.\n\n## Examples\n\n```python {data-mdtest=\"ignore\"}\nimport pytest\n\n\n# It must not be repeated within the same parametrization.\n@pytest.mark.parametrize(\"x, x, y\", [(1, 1, 3)])  # error: [pytest-duplicate-argname]\ndef test_x_and_y(x: int, y: int) -> None: ...\n\n\n# Or between different ones.\n@pytest.mark.parametrize(\"a\", [1])\n@pytest.mark.parametrize(\"b\", [2])\n@pytest.mark.parametrize(\"b\", [3])  # error: [pytest-duplicate-argname]\ndef test_a_anb_y(a: int, b: int) -> None: ...\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "pytest-invalid-argnames-literal": {
+          "title": "Argnames literal is not a comma separated list of valid identifiers",
+          "description": "## What it does\n\nChecks that the argnames passed to `pytest.mark.parametrize` are valid.\nIf not, the tests will not run.\n\n## Examples\n\n```python {data-mdtest=\"ignore\"}\nimport pytest\n\n\n# Here, you should use `\"x, y\"` instead.\n@pytest.mark.parametrize(\"x y\", [(1, -1)])  # error: [pytest-invalid-argnames-literal]\ndef test_x_and_y(x: int, y: int) -> None: ...\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "pytest-request-keyword": {
+          "title": "`request` is reserved by `pytest` as a special argument",
+          "description": "## What it does\n\nEnforces that the `request` keyword is not used during parameterization.\n`pytest` passes the `request` argname to all functions, and raises an error on parameters of\nfixtures.\n\n## Extra Information\n\nFor more information, see the relevant Pytest documentation:\n<https://docs.pytest.org/en/stable/how-to/fixtures.html#fixture-parametrize>.\n\n## Examples\n\n```python {data-mdtest=\"ignore\"}\nimport pytest\nfrom _pytest.fixtures import TopRequest\n\n\n@pytest.mark.parametrize(\"foo, request\", [(1, 2)])  # error: [pytest-request-keyword]\ndef test_foo(foo: int, request: Request) -> None: ...\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "raw-string-type-annotation": {
           "title": "detects raw strings in type annotation positions",
           "description": "## What it does\n\nChecks for raw-strings in type annotation positions.\n\n## Why is this bad?\n\nStatic analysis tools like ty can't analyze type annotations that use raw-string notation.\n\n## Examples\n\n```python\ndef test() -> r\"int\":  # error\n    return 1\n```\n\nUse instead:\n\n```python\ndef test() -> \"int\":\n    return 1\n```",
