@@ -484,7 +484,11 @@ impl ClassInfoConstraintFunction {
         use_generic_filtering: bool,
     ) -> Option<Type<'db>> {
         let constraint_from_class_literal = |class: ClassLiteral<'db>| {
-            let specialization = class.unknown_specialization(db);
+            let specialization = if use_generic_filtering {
+                class.unknown_specialization(db)
+            } else {
+                class.top_materialization(db)
+            };
             let constraint = match self {
                 ClassInfoConstraintFunction::IsInstance => Type::instance(db, env, specialization),
                 ClassInfoConstraintFunction::IsSubclass => {
@@ -492,7 +496,7 @@ impl ClassInfoConstraintFunction {
                 }
             };
 
-            if use_generic_filtering {
+            if is_positive {
                 constraint
             } else {
                 // A negative result excludes every specialization of the class. Materialize the

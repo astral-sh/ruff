@@ -1084,41 +1084,10 @@ def _(value: Concrete[int]) -> None:
         reveal_type(value.read())  # revealed: int
 ```
 
-## Narrowing protocols with gradual members
+## Negative narrowing for protocols with gradual members
 
-### Strict mode
-
-```toml
-[analysis]
-strict-generic-narrowing = true
-```
-
-Strict narrowing materializes gradual protocol members. The `Any` return type of `Reader.read`
-becomes `object`:
-
-```py
-from typing import Any, Protocol, runtime_checkable
-
-@runtime_checkable
-class Reader(Protocol):
-    def read(self) -> Any: ...
-
-def from_object(value: object):
-    if isinstance(value, Reader):
-        reveal_type(value.read())  # revealed: object
-    else:
-        reveal_type(value)  # revealed: ~Top[Reader]
-```
-
-### Gradual mode
-
-Gradual narrowing retains the member's `Any`, including for non-generic protocols. The negative
-branch still excludes the fully materialized protocol:
-
-```toml
-[analysis]
-strict-generic-narrowing = false
-```
+Negative narrowing excludes every materialization of a protocol, including when its members are
+gradual. Positive narrowing preserves the member's explicit `Any`:
 
 ```py
 from typing import Any, Protocol, runtime_checkable
@@ -1134,23 +1103,17 @@ def from_object(value: object):
         reveal_type(value)  # revealed: ~Top[Reader]
 ```
 
-### Awaitable
-
-```toml
-[analysis]
-strict-generic-narrowing = true
-```
-
-Strict narrowing materializes the `Awaitable` protocol. Awaiting the narrowed value produces
-`object`:
+A known implementation cannot reach the negative branch. `IntReader` provides the required `read`
+method, so it is a subtype of the fully materialized protocol:
 
 ```py
-from typing import Awaitable
+class IntReader:
+    def read(self) -> int:
+        return 1
 
-async def from_object(value: object):
-    if isinstance(value, Awaitable):
-        reveal_type(value)  # revealed: Top[Awaitable[object]]
-        reveal_type(await value)  # revealed: object
+def from_reader(value: IntReader):
+    if not isinstance(value, Reader):
+        reveal_type(value)  # revealed: Never
 ```
 
 ## Narrowing iterables to containers and iterators in strict mode

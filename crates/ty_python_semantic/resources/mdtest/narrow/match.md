@@ -2619,15 +2619,10 @@ def runtime_protocol_pattern_is_exhaustive(value: RuntimeProtocolImplementer) ->
             return 1
 ```
 
-## Protocol patterns with gradual members
+## Negative narrowing for protocols with gradual members
 
-Strict class-pattern narrowing materializes gradual members even when the protocol is non-generic.
-The fallback case excludes the fully materialized protocol:
-
-```toml
-[analysis]
-strict-generic-narrowing = true
-```
+The fallback case excludes the fully materialized protocol. A successful pattern preserves the
+member's explicit `Any`:
 
 ```py
 from typing import Any, Protocol, runtime_checkable
@@ -2639,10 +2634,25 @@ class Reader(Protocol):
 def from_object(value: object):
     match value:
         case Reader() as reader:
-            reveal_type(value)  # revealed: Top[Reader]
-            reveal_type(reader.read())  # revealed: object
+            reveal_type(value)  # revealed: Reader
+            reveal_type(reader.read())  # revealed: Any
         case _:
             reveal_type(value)  # revealed: ~Top[Reader]
+```
+
+A known implementation is excluded completely, making the fallback case unreachable:
+
+```py
+class IntReader:
+    def read(self) -> int:
+        return 1
+
+def from_reader(value: IntReader):
+    match value:
+        case Reader():
+            pass
+        case _:
+            reveal_type(value)  # revealed: Never
 ```
 
 ## Members from the subject type
