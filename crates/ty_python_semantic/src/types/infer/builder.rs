@@ -1464,7 +1464,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.setup_dataclass_field_specifiers();
 
         match expression.kind(self.db()) {
-            ExpressionKind::CallTarget => {
+            ExpressionKind::Callee => {
                 self.context.inference_flags |= InferenceFlags::CHECK_UNBOUND_TYPEVARS;
                 self.infer_expression_impl(expression.node_ref(self.db()).node(self.module()), tcx);
             }
@@ -3453,7 +3453,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // If the RHS is not a standalone expression, this is a simple assignment
                     // (single target, no unpackings). That means it's a valid syntactic form
                     // for a legacy TypeVar creation; check for that.
-                    let callable_type = self.infer_call_target(&call_expr.func);
+                    let callable_type = self.infer_callee(&call_expr.func);
 
                     let ty = if let Some(namedtuple_kind) =
                         NamedTupleKind::from_type(self.db(), callable_type)
@@ -8856,7 +8856,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         call_expression: &ast::ExprCall,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
-        let callable_type = self.infer_call_target(&call_expression.func);
+        let callable_type = self.infer_callee(&call_expression.func);
 
         self.infer_call_expression_impl(call_expression, callable_type, tcx)
     }
@@ -8865,7 +8865,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ///
     /// An assignment such as `items = list[T]()` creates an instance, not a generic alias.
     /// Unlike `Items = list[T]`, it requires `T` to be bound in an enclosing generic scope.
-    fn infer_call_target(&mut self, expression: &ast::Expr) -> Type<'db> {
+    fn infer_callee(&mut self, expression: &ast::Expr) -> Type<'db> {
         let previous_binding_context = self.typevar_binding_context.take();
         let previous_check_unbound = self
             .context

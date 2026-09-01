@@ -5409,11 +5409,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             })
                             .is_none()
                     {
-                        let callable = self.add_standalone_expression_impl(
-                            func,
-                            ExpressionKind::CallTarget,
-                            None,
-                        );
+                        let callable =
+                            self.add_standalone_expression_impl(func, ExpressionKind::Callee, None);
                         let call_expr = self.add_standalone_expression(expr);
 
                         let predicate = Predicate {

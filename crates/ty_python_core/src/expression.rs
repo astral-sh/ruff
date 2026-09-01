@@ -24,7 +24,7 @@ pub enum ExpressionKind {
     /// Items = list[T]  # Valid: defines a generic alias.
     /// list[T]()  # Error: no generic context binds T.
     /// ```
-    CallTarget,
+    Callee,
     /// An expression interpreted as a type, such as `int` in `self.x: int = 1`.
     TypeExpression,
 }
