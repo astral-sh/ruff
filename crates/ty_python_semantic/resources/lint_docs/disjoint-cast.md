@@ -25,14 +25,13 @@ at runtime nor, by default, by type checkers. While safe uses of `cast()` are po
 example, upcasting from a subtype to a supertype can be sound -- `cast()` is deliberately designed
 to allow unsound narrowing, and most useful applications of `cast()` in real-world code are unsound.
 
-Nonetheless, while allowing for the fact that `cast()` is intentionally designed to allow
+Nonetheless, even while acknowledging the fact that `cast()` is intentionally designed to allow
 unsoundness, casting a value to an entirely *disjoint* type is especially likely to indicate a
-mistake in your code. Casting from an `int` to a `str`, for example, is extremely suspicious. ty
-provides no mechanism by which you could ever narrow a type from `int` to `str` without using escape
-hatches such as `cast` or `TypeGuard` that allow for unsound uses.
+mistake in your code. Casting from an `int` to a `str`, for example, likely indicates a bug or
+misunderstanding.
 
 This rule therefore provides a means for codebases to partially validate their uses of `cast()`
-without banning the API entirely.
+without banning the API -- or even banning all unsound uses of the API -- entirely.
 
 ## Example
 
@@ -91,8 +90,8 @@ def f(x: Sequence[int]):
     y = cast(Sequence[bool], x)  # no diagnostic
 ```
 
-Although a pattern that provides more soundness and validation is always to avoid `cast()`
-altogether, and instead write a custom `TypeIs` function for this:
+Though if you're able to use covariant types, a type-safe narrowing mechanism that provides runtime
+validation, such as using `TypeIs`, is generally always preferable to `cast`:
 
 ```py
 # `Sequence`, unlike `list`, is immutable and covariant
@@ -120,8 +119,8 @@ def f(x: list[int]):
         y.append(item)
 ```
 
-Or using a `TypeGuard` -- which is still unsound, but, unlike a `cast()`, at least provides the
-opportunity for some runtime validation:
+Or using a `TypeGuard` -- while the "narrowing" below is still unsound, there is at least some
+runtime validation of the element types taking place:
 
 ```py
 from typing_extensions import TypeGuard, reveal_type
