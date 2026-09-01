@@ -285,65 +285,14 @@ fn divergent_type() {
     assert!(div.is_dynamic());
     assert!(div.has_dynamic(db, &env));
     let visitor = ApplyTypeMappingVisitor::new(&env);
-    let top_div = div.materialize(db, MaterializationKind::Top, &visitor);
-    let bottom_div = div.materialize(db, MaterializationKind::Bottom, &visitor);
-
-    assert!(matches!(top_div, Type::Divergent(_)));
-    assert!(matches!(bottom_div, Type::Divergent(_)));
-    assert!(!top_div.is_dynamic());
-    assert!(!bottom_div.is_dynamic());
-    assert!(!top_div.has_dynamic(db, &env));
-    assert!(!bottom_div.has_dynamic(db, &env));
-    assert!(top_div.is_object());
-    assert!(!top_div.is_never());
-    assert!(!bottom_div.is_object());
-    assert!(bottom_div.is_never());
-    assert_eq!(top_div.negate(db, &env), bottom_div);
-    assert_eq!(bottom_div.negate(db, &env), top_div);
+    assert_eq!(div.materialize(db, MaterializationKind::Top, &visitor), div);
     assert_eq!(
-        IntersectionBuilder::new(db, &env).add_negative(div).build(),
+        div.materialize(db, MaterializationKind::Bottom, &visitor),
         div
     );
     assert_eq!(
-        IntersectionBuilder::new(db, &env)
-            .add_negative(top_div)
-            .build(),
-        bottom_div
-    );
-    assert_eq!(
-        IntersectionBuilder::new(db, &env)
-            .add_negative(bottom_div)
-            .build(),
-        top_div
-    );
-    assert!(
-        KnownClass::Int
-            .to_instance(db, &env)
-            .is_assignable_to(db, &env, top_div)
-    );
-    assert!(!top_div.is_assignable_to(db, &env, KnownClass::Int.to_instance(db, &env)));
-    assert!(bottom_div.is_assignable_to(db, &env, KnownClass::Int.to_instance(db, &env)));
-    assert!(
-        !KnownClass::Int
-            .to_instance(db, &env)
-            .is_assignable_to(db, &env, bottom_div)
-    );
-    assert_eq!(
-        top_div.member(db, &env, "__str__").place.expect_type(),
-        Type::object()
-            .member(db, &env, "__str__")
-            .place
-            .expect_type()
-    );
-    assert_eq!(
-        top_div.member(db, &env, "__class__",).place.expect_type(),
-        Type::object().dunder_class(db, &env)
-    );
-    assert!(top_div.try_upcast_to_callable(db, &env).is_none());
-    assert!(
-        top_div
-            .subscript(db, &env, Type::int_literal(0), ast::ExprContext::Load,)
-            .is_err()
+        IntersectionBuilder::new(db, &env).add_negative(div).build(),
+        div
     );
     // The `Divergent` type must not be eliminated in union with other dynamic types,
     // as this would prevent detection of divergent type inference using `Divergent`.

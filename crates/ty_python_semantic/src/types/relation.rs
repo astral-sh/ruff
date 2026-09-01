@@ -511,7 +511,7 @@ impl<'db> Type<'db> {
     /// Returns whether constraint-set assignability is known to be unconditionally satisfied
     /// before constructing the relation checker.
     fn is_trivially_constraint_set_assignable_to(self, db: &'db dyn Db, target: Type<'db>) -> bool {
-        if self.materialized_divergent_fallback().is_none() && self == target {
+        if self == target {
             return true;
         }
 
@@ -524,14 +524,8 @@ impl<'db> Type<'db> {
         match (self, target) {
             (Type::Never | Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => true,
             (_, Type::NominalInstance(target)) if target.is_object() => true,
-            (_, Type::Union(union)) => {
-                self.materialized_divergent_fallback().is_none()
-                    && union.elements(db).contains(&self)
-            }
-            (Type::Intersection(intersection), _) => {
-                target.materialized_divergent_fallback().is_none()
-                    && intersection.positive(db).contains(&target)
-            }
+            (_, Type::Union(union)) => union.elements(db).contains(&self),
+            (Type::Intersection(intersection), _) => intersection.positive(db).contains(&target),
             _ => false,
         }
     }
@@ -1362,14 +1356,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         source: Type<'db>,
         target: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        if let Some(source) = source.materialized_divergent_fallback() {
-            return self.check_type_pair(db, source, target);
-        }
-
-        if let Some(target) = target.materialized_divergent_fallback() {
-            return self.check_type_pair(db, source, target);
-        }
-
         // Subtyping implies assignability, so if subtyping is reflexive and the two types are
         // equal, it is both a subtype and assignable. Assignability is always reflexive.
         //
@@ -3054,14 +3040,6 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             } else {
                 checker.never()
             }
-        }
-
-        if let Some(left) = left.materialized_divergent_fallback() {
-            return self.check_type_pair(db, left, right);
-        }
-
-        if let Some(right) = right.materialized_divergent_fallback() {
-            return self.check_type_pair(db, left, right);
         }
 
         let env = self.env;

@@ -1915,7 +1915,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         !ty.is_union()
                     )
                 {
-                    let ty = ty.materialized_divergent_fallback().unwrap_or(ty);
                     let env = self.env;
                     let (lower, upper) = if self.relation.is_subtyping() {
                         (

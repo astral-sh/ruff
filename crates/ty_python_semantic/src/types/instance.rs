@@ -8,8 +8,8 @@ use std::marker::PhantomData;
 
 use super::protocol_class::{ProtocolInterface, ProtocolInterfaceView, StructuralMemberPriority};
 use super::{
-    BoundTypeVarIdentity, BoundTypeVarInstance, ClassType, DivergentType, KnownClass,
-    MaterializationKind, SubclassOfType, Type, TypeAliasType, TypeVarVariance,
+    BoundTypeVarIdentity, BoundTypeVarInstance, ClassType, KnownClass, MaterializationKind,
+    SubclassOfType, Type, TypeAliasType, TypeVarVariance,
 };
 use crate::place::PlaceAndQualifiers;
 use crate::types::constraints::{
@@ -50,10 +50,6 @@ impl<'db> Type<'db> {
         matches!(
             self,
             Type::NominalInstance(NominalInstanceType(NominalInstanceInner::Object))
-                | Type::Divergent(DivergentType {
-                    materialization: Some(MaterializationKind::Top),
-                    ..
-                })
         )
     }
 

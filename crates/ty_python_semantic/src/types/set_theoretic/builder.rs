@@ -1719,9 +1719,9 @@ impl<'db> InnerIntersectionBuilder<'db> {
             return;
         }
 
-        if let Some(negated_divergent) = new_negative.negated_divergent() {
+        if matches!(new_negative, Type::Divergent(_)) {
             *self = Self::default();
-            self.positive.insert(negated_divergent);
+            self.positive.insert(new_negative);
             return;
         }
 
