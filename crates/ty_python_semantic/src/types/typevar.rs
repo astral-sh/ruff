@@ -1382,7 +1382,6 @@ impl<'db> BoundTypeVarInstance<'db> {
                 }
             }
             TypeMapping::Promote(..)
-            | TypeMapping::ReplaceType { .. }
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::EagerExpansion
