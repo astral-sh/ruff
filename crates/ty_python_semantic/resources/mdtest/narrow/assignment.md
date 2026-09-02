@@ -135,6 +135,51 @@ def assigned_or_raised(item: Item, condition: bool):
     reveal_type(item.value)  # revealed: Literal[1]
 ```
 
+### Presence after deletion in an eager scope
+
+An assignment in an enclosing scope establishes presence in an eager class body. Deleting the
+attribute in that class body invalidates this evidence, so a later read reports the missing
+attribute.
+
+```py
+class Item: ...
+
+item = Item()
+item.value = 1  # error: [unresolved-attribute]
+
+class Inner:
+    reveal_type(item.value)  # revealed: Literal[1]
+    del item.value
+    item.value  # error: [unresolved-attribute]
+```
+
+A conditional deletion also invalidates presence after the branches join. Assigning the attribute
+again establishes presence for subsequent reads.
+
+```py
+def conditional_deletion(item: Item, condition: bool):
+    item.value = 1  # error: [unresolved-attribute]
+
+    class Inner:
+        if condition:
+            del item.value
+        item.value  # error: [unresolved-attribute]
+        item.value = 2  # error: [unresolved-attribute]
+        reveal_type(item.value)  # revealed: Literal[2]
+```
+
+An unreachable deletion does not invalidate presence from the enclosing scope.
+
+```py
+def unreachable_deletion(item: Item):
+    item.value = 1  # error: [unresolved-attribute]
+
+    class Inner:
+        if False:
+            del item.value
+        reveal_type(item.value)  # revealed: Literal[1]
+```
+
 ### Presence after receiver reassignment
 
 Reassigning the receiver discards evidence that an attribute was assigned on the previous object.

@@ -9902,7 +9902,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) -> NarrowedPlace<'db> {
         let db = self.db();
         let env = self.program_environment();
+        // Constraints are ordered from inner to outer scopes. A deletion blocks presence
+        // evidence from enclosing scopes, while preserving later assignments or guards in
+        // the inner scope.
+        let mut deleted_in_inner_scope = false;
         for (enclosing_scope_file_id, constraint_key) in constraint_keys {
+            let inner_known_present = narrowed.known_present;
+            let mut has_deleted_binding = false;
             let use_def = self.index.use_def_map(*enclosing_scope_file_id);
             let place_table = self.index.place_table(*enclosing_scope_file_id);
             let place = place_table.place_id(expr).unwrap();
@@ -9947,6 +9953,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         if static_reachability.is_always_false() {
                             continue;
                         }
+                        has_deleted_binding |= matches!(binding.binding, DefinitionState::Deleted);
                         match binding.binding {
                             DefinitionState::Defined(definition)
                                 if !is_discarded_dict_key_assignment(db, definition) =>
@@ -9992,6 +9999,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     narrowed = union.build();
                 }
             }
+            if deleted_in_inner_scope {
+                narrowed.known_present = inner_known_present;
+            }
+            deleted_in_inner_scope |= has_deleted_binding;
         }
         narrowed
     }
