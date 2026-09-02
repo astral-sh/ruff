@@ -1891,6 +1891,13 @@ impl<'db> InterimConstraint<'db> {
         }
     }
 
+    fn is_reflexive_typevar_relation(self, db: &'db dyn Db) -> bool {
+        match self {
+            InterimConstraint::Old(_) => false,
+            InterimConstraint::New(constraint) => constraint.is_reflexive_typevar_relation(db),
+        }
+    }
+
     fn provides_lower(self) -> bool {
         match self {
             InterimConstraint::Old(constraint) => constraint.stored_lower_bound().is_some(),
