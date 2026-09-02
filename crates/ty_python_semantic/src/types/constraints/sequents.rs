@@ -1502,7 +1502,7 @@ impl<'db> SequentMap<Constraint<'db>> {
                 "add sequents for constraint",
             );
             let mut map = SequentMap::<Constraint<'db>>::default();
-            constraint.add_sequents(db, &mut map);
+            constraint.add_sequents(db, env, &mut map);
             map
         }
 
@@ -1549,16 +1549,21 @@ impl<'db> SequentMap<Constraint<'db>> {
 }
 
 impl<'db> Constraint<'db> {
-    fn add_sequents(self, db: &'db dyn Db, map: &mut SequentMap<Constraint<'db>>) {
+    fn add_sequents(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        map: &mut SequentMap<Constraint<'db>>,
+    ) {
         match self {
-            Constraint::ConcreteLower(this) => this.add_sequents(db, map),
-            Constraint::ConcreteUpper(this) => this.add_sequents(db, map),
-            Constraint::ConcreteEquivalence(this) => this.add_sequents(db, map),
-            Constraint::ParamSpecLower(this) => this.add_sequents(db, map),
-            Constraint::ParamSpecUpper(this) => this.add_sequents(db, map),
-            Constraint::ParamSpecEquivalence(this) => this.add_sequents(db, map),
-            Constraint::TypeVarRange(this) => this.add_sequents(db, map),
-            Constraint::TypeVarEquivalence(this) => this.add_sequents(db, map),
+            Constraint::ConcreteLower(this) => this.add_sequents(db, env, map),
+            Constraint::ConcreteUpper(this) => this.add_sequents(db, env, map),
+            Constraint::ConcreteEquivalence(this) => this.add_sequents(db, env, map),
+            Constraint::ParamSpecLower(this) => this.add_sequents(db, env, map),
+            Constraint::ParamSpecUpper(this) => this.add_sequents(db, env, map),
+            Constraint::ParamSpecEquivalence(this) => this.add_sequents(db, env, map),
+            Constraint::TypeVarRange(this) => this.add_sequents(db, env, map),
+            Constraint::TypeVarEquivalence(this) => this.add_sequents(db, env, map),
         }
     }
 
@@ -2481,7 +2486,12 @@ fn possibly_reversed_union<'db>(
 }
 
 impl<'db> ConcreteLowerBound<'db> {
-    fn add_sequents(self, db: &'db dyn Db, map: &mut SequentMap<Constraint<'db>>) {
+    fn add_sequents(
+        self,
+        db: &'db dyn Db,
+        _env: &ProgramEnvironment<'db>,
+        map: &mut SequentMap<Constraint<'db>>,
+    ) {
         // `Never ≤ T` is always true
         if self.bound.is_never() {
             map.add_single_tautology(self.into());
@@ -2590,8 +2600,8 @@ impl<'db> ConcreteLowerBound<'db> {
         // `(α ≤ T) ∧ (T ≤ β)` simplifies to `T = α` when `α = β`. (We don't need to add the
         // projection implication `(T = α) ⇒ (α ≤ T)`, since anything we can derive from `α ≤ T` we
         // can also derive from `T = α`.)
-        let lower = self.bound;
-        let upper = other.bound;
+        let lower = self.bound.bottom_materialization(db, env);
+        let upper = other.bound.top_materialization(db, env);
         if lower.is_constraint_set_equivalent_to(db, env, upper) {
             let provenance = ConstraintProvenance::derived(self.provenance, other.provenance);
             let simplified = ConcreteEquivalenceBound::new(db, provenance, self.typevar, lower);
@@ -2599,17 +2609,21 @@ impl<'db> ConcreteLowerBound<'db> {
             return;
         }
 
-        // Given constraints `α ≤ T` and `T ≤ β`, `α ≤ β` must also hold. If those bounds contain
-        // other typevars, we can infer additional constraints.
-        Constraint::add_sequents_for_range(
-            db,
-            env,
-            map,
-            self.into(),
-            self.bound,
-            other.into(),
-            other.bound,
-        );
+        // Gradual assignability is not transitive, so only fully static bounds can contribute
+        // additional range sequents.
+        if self.bound.is_static_sequent_eligible(db, env)
+            && other.bound.is_static_sequent_eligible(db, env)
+        {
+            Constraint::add_sequents_for_range(
+                db,
+                env,
+                map,
+                self.into(),
+                lower,
+                other.into(),
+                upper,
+            );
+        }
     }
 
     fn add_sequents_with_concrete_equivalence(
@@ -2740,7 +2754,12 @@ impl<'db> ConcreteLowerBound<'db> {
 }
 
 impl<'db> ConcreteUpperBound<'db> {
-    fn add_sequents(self, db: &'db dyn Db, map: &mut SequentMap<Constraint<'db>>) {
+    fn add_sequents(
+        self,
+        db: &'db dyn Db,
+        _env: &ProgramEnvironment<'db>,
+        map: &mut SequentMap<Constraint<'db>>,
+    ) {
         // `T ≤ object` is always true
         if self.bound.is_object() {
             map.add_single_tautology(self.into());
@@ -2941,7 +2960,12 @@ impl<'db> ConcreteUpperBound<'db> {
 
 impl<'db> ConcreteEquivalenceBound<'db> {
     #[expect(clippy::unused_self)]
-    fn add_sequents(self, _db: &'db dyn Db, _map: &mut SequentMap<Constraint<'db>>) {
+    fn add_sequents(
+        self,
+        _db: &'db dyn Db,
+        _env: &ProgramEnvironment<'db>,
+        _map: &mut SequentMap<Constraint<'db>>,
+    ) {
         // We cannot infer any sequents from `T = α` on its own.
     }
 
@@ -3123,7 +3147,12 @@ impl<'db> ConcreteEquivalenceBound<'db> {
 }
 
 impl<'db> ParamSpecLowerBound<'db> {
-    fn add_sequents(self, db: &'db dyn Db, map: &mut SequentMap<Constraint<'db>>) {
+    fn add_sequents(
+        self,
+        db: &'db dyn Db,
+        _env: &ProgramEnvironment<'db>,
+        map: &mut SequentMap<Constraint<'db>>,
+    ) {
         // `⊥ₚ ≤ P` is always true
         if self.bound.is_bottom_paramspec_value(db) {
             map.add_single_tautology(self.into());
@@ -3233,8 +3262,8 @@ impl<'db> ParamSpecLowerBound<'db> {
         // `(ξ ≤ P) ∧ (P ≤ η)` simplifies to `P = ξ` when `ξ = η`. (We don't need to add the
         // projection implication `(P = ξ) ⇒ (ξ ≤ P)`, since anything we can derive from `ξ ≤ P` we
         // can also derive from `P = ξ`.)
-        let lower = self.bound;
-        let upper = other.bound;
+        let lower = self.bound.bottom_materialization(db, env);
+        let upper = other.bound.top_materialization(db, env);
         if lower.is_constraint_set_equivalent_to(db, env, upper) {
             let provenance = ConstraintProvenance::derived(self.provenance, other.provenance);
             let simplified = ParamSpecEquivalenceBound::new(db, provenance, self.typevar, lower);
@@ -3242,17 +3271,21 @@ impl<'db> ParamSpecLowerBound<'db> {
             return;
         }
 
-        // Given constraints `ξ ≤ P` and `P ≤ η`, `ξ ≤ η` must also hold. If those bounds contain
-        // other typevars, we can infer additional constraints.
-        Constraint::add_sequents_for_range(
-            db,
-            env,
-            map,
-            self.into(),
-            self.bound,
-            other.into(),
-            other.bound,
-        );
+        // Gradual assignability is not transitive, so only fully static bounds can contribute
+        // additional range sequents.
+        if self.bound.is_static_sequent_eligible(db, env)
+            && other.bound.is_static_sequent_eligible(db, env)
+        {
+            Constraint::add_sequents_for_range(
+                db,
+                env,
+                map,
+                self.into(),
+                self.bound,
+                other.into(),
+                other.bound,
+            );
+        }
     }
 
     fn add_sequents_with_paramspec_equivalence(
@@ -3346,7 +3379,12 @@ impl<'db> ParamSpecLowerBound<'db> {
 }
 
 impl<'db> ParamSpecUpperBound<'db> {
-    fn add_sequents(self, db: &'db dyn Db, map: &mut SequentMap<Constraint<'db>>) {
+    fn add_sequents(
+        self,
+        db: &'db dyn Db,
+        _env: &ProgramEnvironment<'db>,
+        map: &mut SequentMap<Constraint<'db>>,
+    ) {
         // `P ≤ ⊤ₚ` is always true
         if self.bound.is_top_paramspec_value(db) {
             map.add_single_tautology(self.into());
@@ -3511,7 +3549,12 @@ impl<'db> ParamSpecUpperBound<'db> {
 
 impl<'db> ParamSpecEquivalenceBound<'db> {
     #[expect(clippy::unused_self)]
-    fn add_sequents(self, _db: &'db dyn Db, _map: &mut SequentMap<Constraint<'db>>) {
+    fn add_sequents(
+        self,
+        _db: &'db dyn Db,
+        _env: &ProgramEnvironment<'db>,
+        _map: &mut SequentMap<Constraint<'db>>,
+    ) {
         // We cannot infer any sequents from `P = ξ` on its own.
     }
 
@@ -3650,7 +3693,12 @@ impl<'db> ParamSpecEquivalenceBound<'db> {
 }
 
 impl<'db> TypeVarRangeBound<'db> {
-    fn add_sequents(self, db: &'db dyn Db, map: &mut SequentMap<Constraint<'db>>) {
+    fn add_sequents(
+        self,
+        db: &'db dyn Db,
+        _env: &ProgramEnvironment<'db>,
+        map: &mut SequentMap<Constraint<'db>>,
+    ) {
         // `T ≤ T` is always true
         if self.left.is_same_typevar_as(db, self.right) {
             map.add_single_tautology(self.into());
@@ -3728,7 +3776,12 @@ impl<'db> TypeVarRangeBound<'db> {
 }
 
 impl<'db> TypeVarEquivalenceBound<'db> {
-    fn add_sequents(self, db: &'db dyn Db, map: &mut SequentMap<Constraint<'db>>) {
+    fn add_sequents(
+        self,
+        db: &'db dyn Db,
+        _env: &ProgramEnvironment<'db>,
+        map: &mut SequentMap<Constraint<'db>>,
+    ) {
         // `T = T` is always true
         if self.left.is_same_typevar_as(db, self.right) {
             map.add_single_tautology(self.into());

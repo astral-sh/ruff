@@ -14,7 +14,7 @@ use crate::types::constraints::sequents::{Sequent, SequentMap};
 use crate::types::constraints::variables::Constraint;
 use crate::types::constraints::{
     ConstraintAssignment, ConstraintId, ConstraintSetStorage, InterimConstraint, Node, NodeId,
-    PathVisitor, SourceOrderId, TypeVarId,
+    OldConstraint, PathVisitor, SourceOrderId, TypeVarId,
 };
 use crate::{Db, FxIndexMap, ProgramEnvironment};
 
@@ -618,9 +618,31 @@ impl PathAssignments {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
-        left: InterimConstraint<'db>,
-        right: InterimConstraint<'db>,
+        left_id: ConstraintId,
+        right_id: ConstraintId,
     ) {
+        let left = storage.constraint_data(left_id);
+        let right = storage.constraint_data(right_id);
+        if let (InterimConstraint::Old(left), InterimConstraint::Old(right)) = (left, right) {
+            let implies = |left: OldConstraint<'db>, right: OldConstraint<'db>| {
+                if !left.typevar.is_same_typevar_as(db, right.typevar) {
+                    return false;
+                }
+                let left_lower = left.lower_bound(db).ty().bottom_materialization(db, env);
+                let left_upper = left.upper_bound(db).ty().top_materialization(db, env);
+                let right_lower = right.lower_bound(db).ty().bottom_materialization(db, env);
+                let right_upper = right.upper_bound(db).ty().top_materialization(db, env);
+                right_lower.is_constraint_set_assignable_to(db, env, left_lower)
+                    && left_upper.is_constraint_set_assignable_to(db, env, right_upper)
+            };
+            if implies(left, right) {
+                self.add_bridge_implication(left_id, right_id);
+            }
+            if implies(right, left) {
+                self.add_bridge_implication(right_id, left_id);
+            }
+        }
+
         let constraints: SmallVec<[Constraint<'db>; 4]> =
             std::iter::chain(left.into_new(db), right.into_new(db)).collect();
         for left in &constraints {
