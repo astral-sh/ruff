@@ -13,6 +13,7 @@ on:
         type: string
 
 env:
+  UV_LOCKED: 1
   ACTIONS_CACHE_MODE: none
   CARGO_INCREMENTAL: 0
   CARGO_NET_RETRY: 10

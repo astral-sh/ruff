@@ -37,6 +37,7 @@ defaults:
 permissions: {}
 
 env:
+  UV_LOCKED: 1
   # Don't set this flag globally for the workflow: it does strange things
   # to the snapshots in the `cargo insta test --accept` step in the snapshot job.
   #
