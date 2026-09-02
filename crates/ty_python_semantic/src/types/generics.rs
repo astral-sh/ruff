@@ -1246,11 +1246,11 @@ impl<'db> Specialization<'db> {
         mapped_types.map_or(Cow::Borrowed(types), Cow::Owned)
     }
 
-    /// Preserves the upper bounds of gradual arguments when exposing protocol members.
+    /// Intersects gradual type arguments with their type parameters' upper bounds.
     ///
-    /// For `P[T: str]`, substituting `Any` for `T` must not erase the fact that a member
-    /// typed as `T` is bounded by `str`. Keep `Any & str` so that structural comparisons
-    /// can materialize the member in either direction without losing that bound.
+    /// For example, in a protocol `P[T: str]`, a member typed as `T` remains bounded by
+    /// `str` when the argument is `Any`. Using `Any & str` lets structural comparisons
+    /// materialize the member in either direction without losing that bound.
     pub(super) fn with_typevar_bounds(self, db: &'db dyn Db) -> Self {
         let env = ProgramEnvironment::from_program(self.generic_context(db).program(db));
         let types = self.map_types(db, |_, typevar, ty| {
