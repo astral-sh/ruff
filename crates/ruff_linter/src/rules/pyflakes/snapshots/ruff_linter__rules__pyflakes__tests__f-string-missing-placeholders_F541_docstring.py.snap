@@ -1,0 +1,185 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+---
+F541 [*] f-string without any placeholders
+ --> F541_docstring.py:3:1
+  |
+1 | # https://github.com/astral-sh/ruff/issues/18807
+2 |
+3 | f"module docstring"
+  | ^^^^^^^^^^^^^^^^^^^
+4 |
+5 | a = 1
+  |
+help: Remove extraneous `f` prefix
+  |
+2 |
+  - f"module docstring"
+3 + "module docstring"
+4 |
+  |
+note: This is an unsafe fix and may change runtime behavior
+
+F541 [*] f-string without any placeholders
+ --> F541_docstring.py:6:1
+  |
+5 | a = 1
+6 | f"attribute docstring"
+  | ^^^^^^^^^^^^^^^^^^^^^^
+7 |
+8 | b: int = 2
+  |
+help: Remove extraneous `f` prefix
+  |
+5 | a = 1
+  - f"attribute docstring"
+6 + "attribute docstring"
+7 |
+  |
+note: This is an unsafe fix and may change runtime behavior
+
+F541 [*] f-string without any placeholders
+  --> F541_docstring.py:9:1
+   |
+ 8 | b: int = 2
+ 9 | f"annotated attribute docstring"
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+10 |
+11 | c = d = 3
+   |
+help: Remove extraneous `f` prefix
+   |
+8  | b: int = 2
+   - f"annotated attribute docstring"
+9  + "annotated attribute docstring"
+10 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+F541 [*] f-string without any placeholders
+  --> F541_docstring.py:12:1
+   |
+11 | c = d = 3
+12 | f"not an attribute docstring: multiple targets"
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+13 |
+14 | e, g = 4, 5
+   |
+help: Remove extraneous `f` prefix
+   |
+11 | c = d = 3
+   - f"not an attribute docstring: multiple targets"
+12 + "not an attribute docstring: multiple targets"
+13 |
+   |
+
+F541 [*] f-string without any placeholders
+  --> F541_docstring.py:15:1
+   |
+14 | e, g = 4, 5
+15 | f"not an attribute docstring: tuple target"
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+16 |
+17 | y = f"not a docstring: assigned"
+   |
+help: Remove extraneous `f` prefix
+   |
+14 | e, g = 4, 5
+   - f"not an attribute docstring: tuple target"
+15 + "not an attribute docstring: tuple target"
+16 |
+   |
+
+F541 [*] f-string without any placeholders
+  --> F541_docstring.py:17:5
+   |
+15 | f"not an attribute docstring: tuple target"
+16 |
+17 | y = f"not a docstring: assigned"
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: Remove extraneous `f` prefix
+   |
+16 |
+   - y = f"not a docstring: assigned"
+17 + y = "not a docstring: assigned"
+18 |
+   |
+
+F541 [*] f-string without any placeholders
+  --> F541_docstring.py:21:5
+   |
+20 | def fn():
+21 |     f"function docstring"
+   |     ^^^^^^^^^^^^^^^^^^^^^
+22 |
+23 |     i = 1
+   |
+help: Remove extraneous `f` prefix
+   |
+20 | def fn():
+   -     f"function docstring"
+21 +     "function docstring"
+22 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+F541 [*] f-string without any placeholders
+  --> F541_docstring.py:24:5
+   |
+23 |     i = 1
+24 |     f"not an attribute docstring: inside a function body"
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: Remove extraneous `f` prefix
+   |
+23 |     i = 1
+   -     f"not an attribute docstring: inside a function body"
+24 +     "not an attribute docstring: inside a function body"
+25 |
+   |
+
+F541 [*] f-string without any placeholders
+  --> F541_docstring.py:28:5
+   |
+27 | class C:
+28 |     f"class docstring"
+   |     ^^^^^^^^^^^^^^^^^^
+29 |
+30 |     h = 1
+   |
+help: Remove extraneous `f` prefix
+   |
+27 | class C:
+   -     f"class docstring"
+28 +     "class docstring"
+29 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+F541 [*] f-string without any placeholders
+  --> F541_docstring.py:31:5
+   |
+30 |     h = 1
+31 |     f"attribute docstring in a class body"
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: Remove extraneous `f` prefix
+   |
+30 |     h = 1
+   -     f"attribute docstring in a class body"
+31 +     "attribute docstring in a class body"
+32 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+F541 [*] f-string without any placeholders
+  --> F541_docstring.py:36:11
+   |
+34 | def nested():
+35 |     x = 1
+36 |     print(f"not a docstring: nested in a call")
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: Remove extraneous `f` prefix
+   |
+35 |     x = 1
+   -     print(f"not a docstring: nested in a call")
+36 +     print("not a docstring: nested in a call")
+   |

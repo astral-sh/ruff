@@ -85,6 +85,7 @@ mod tests {
     #[test_case(Rule::StringDotFormatMissingArguments, Path::new("F524.py"))]
     #[test_case(Rule::StringDotFormatMixingAutomatic, Path::new("F525.py"))]
     #[test_case(Rule::FStringMissingPlaceholders, Path::new("F541.py"))]
+    #[test_case(Rule::FStringMissingPlaceholders, Path::new("F541_docstring.py"))]
     #[test_case(Rule::MultiValueRepeatedKeyLiteral, Path::new("F601.py"))]
     #[test_case(Rule::MultiValueRepeatedKeyVariable, Path::new("F602.py"))]
     #[test_case(Rule::MultipleStarredExpressions, Path::new("F622.py"))]
