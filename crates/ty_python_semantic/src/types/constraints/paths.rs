@@ -6,7 +6,7 @@ use std::fmt::Debug;
 use std::ops::{ControlFlow, Range};
 
 use indexmap::map::Entry;
-use itertools::{Either, Itertools};
+use itertools::Itertools;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::types::constraints::sequents::{Sequent, SequentMap};
@@ -161,18 +161,12 @@ impl PathAssignments {
             && let Some(constraint) = ordered.get_index(index).copied()
         {
             if self.discovered.get(&constraint) == Some(&true) {
-                // XXX: Remove the storage version one we retire the old sequent map logic
-                #[expect(clippy::manual_map)]
-                let consequents = if let Some(map) = storage.single_sequent_cache.get(&constraint) {
-                    Some(Either::Left(map.consequents()))
-                } else if let Some(consequents) = self.single_replay_consequents.get(&constraint) {
-                    Some(Either::Right(consequents.iter().copied()))
-                } else {
-                    None
-                };
-                if let Some(consequents) = consequents {
+                if let Some(consequents) = self.single_replay_consequents.get(&constraint) {
                     ordered.extend(
-                        consequents.filter(|constraint| self.discovered.contains_key(constraint)),
+                        consequents
+                            .iter()
+                            .copied()
+                            .filter(|constraint| self.discovered.contains_key(constraint)),
                     );
                 }
             }
@@ -180,24 +174,17 @@ impl PathAssignments {
                 let earlier = ordered[earlier_index];
                 // Pair rules are not commutative. Replay the orientation used by this walk,
                 // which can differ from the order in which the replay reaches its inputs.
-                let Some(pair) = [(earlier, constraint), (constraint, earlier)]
+                let pair = [(earlier, constraint), (constraint, earlier)]
                     .into_iter()
-                    .find(|pair| self.elaborated_pairs.contains(pair))
-                else {
-                    continue;
-                };
-                // XXX: Remove the storage version one we retire the old sequent map logic
-                #[expect(clippy::manual_map)]
-                let consequents = if let Some(map) = storage.pair_sequent_cache.get(&pair) {
-                    Some(Either::Left(map.consequents()))
-                } else if let Some(consequents) = self.pair_replay_consequents.get(&pair) {
-                    Some(Either::Right(consequents.iter().copied()))
-                } else {
-                    None
-                };
-                if let Some(consequents) = consequents {
+                    .find(|pair| self.elaborated_pairs.contains(pair));
+                if let Some(consequents) =
+                    pair.and_then(|pair| self.pair_replay_consequents.get(&pair))
+                {
                     ordered.extend(
-                        consequents.filter(|constraint| self.discovered.contains_key(constraint)),
+                        consequents
+                            .iter()
+                            .copied()
+                            .filter(|constraint| self.discovered.contains_key(constraint)),
                     );
                 }
             }
@@ -524,7 +511,7 @@ impl PathAssignments {
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         map: &SequentMap<Constraint<'db>>,
-    ) {
+    ) -> Range<usize> {
         let sequents = map.sequents.iter().map(|sequent| match sequent {
             Sequent::SingleTautology { ante } => {
                 let ante = storage.intern_constraint(db, env, *ante);
@@ -561,72 +548,10 @@ impl PathAssignments {
                 Sequent::SingleImplication { ante, post }
             }
         });
+        let start = self.sequents.len();
         self.sequents.extend(sequents);
-    }
-
-    fn discover_single_constraint<'db>(
-        &mut self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        storage: &mut ConstraintSetStorage<'db>,
-        constraint_id: ConstraintId,
-        constraint: Constraint<'db>,
-    ) {
-        let sequent_start = self.sequents.len();
-        let map = SequentMap::<Constraint<'db>>::for_constraint(db, env, constraint);
-        self.add_sequents(db, env, storage, map);
-
-        // `projection_source_order` depends on knowing the order that sequents were discovered for
-        // each constraint. Since we are salsa-caching sequent derivation, we don't have easy
-        // access to that in ConstraintSetStorage, so we need to maintain a local view of that
-        // information here.
-        self.single_replay_consequents.insert(
-            constraint_id,
-            self.sequents[sequent_start..]
-                .iter()
-                .filter_map(|sequent| match sequent {
-                    Sequent::SingleImplication { post, .. }
-                    | Sequent::PairImplication { post, .. } => Some(*post),
-                    _ => None,
-                })
-                .collect(),
-        );
-    }
-
-    fn discover_constraint_pair<'db>(
-        &mut self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        storage: &mut ConstraintSetStorage<'db>,
-        left_id: ConstraintId,
-        right_id: ConstraintId,
-    ) {
-        let sequent_start = self.sequents.len();
-        let left = storage.constraint_data(left_id);
-        let right = storage.constraint_data(right_id);
-
-        if SequentMap::<Constraint>::pair_cannot_produce_sequents(db, env, left, right) {
-            return;
-        }
-
-        let map = SequentMap::<Constraint<'db>>::for_constraint_pair(db, env, left, right);
-        self.add_sequents(db, env, storage, map);
-
-        // `projection_source_order` depends on knowing the order that sequents were discovered for
-        // each constraint. Since we are salsa-caching sequent derivation, we don't have easy
-        // access to that in ConstraintSetStorage, so we need to maintain a local view of that
-        // information here.
-        self.pair_replay_consequents.insert(
-            (left_id, right_id),
-            self.sequents[sequent_start..]
-                .iter()
-                .filter_map(|sequent| match sequent {
-                    Sequent::SingleImplication { post, .. }
-                    | Sequent::PairImplication { post, .. } => Some(*post),
-                    _ => None,
-                })
-                .collect(),
-        );
+        let end = self.sequents.len();
+        start..end
     }
 
     /// Update our sequent map to ensure that it holds all of the sequents that involve the given
@@ -649,7 +574,24 @@ impl PathAssignments {
         }
 
         let constraint_data = storage.constraint_data(constraint);
-        self.discover_single_constraint(db, env, storage, constraint, constraint_data);
+        let map = SequentMap::for_constraint(db, env, constraint_data);
+        let added = self.add_sequents(db, env, storage, map);
+
+        // `projection_source_order` depends on knowing the order that sequents were discovered for
+        // each constraint. Since we are salsa-caching sequent derivation, we don't have easy
+        // access to that in ConstraintSetStorage, so we need to maintain a local view of that
+        // information here.
+        self.single_replay_consequents.insert(
+            constraint,
+            self.sequents[added]
+                .iter()
+                .filter_map(|sequent| match sequent {
+                    Sequent::SingleImplication { post, .. }
+                    | Sequent::PairImplication { post, .. } => Some(*post),
+                    _ => None,
+                })
+                .collect(),
+        );
 
         for existing_index in 0..self.discovered.len() {
             let (existing, _) = self
@@ -660,6 +602,7 @@ impl PathAssignments {
                 continue;
             }
 
+            let existing_data = storage.constraint_data(*existing);
             let existing_support = storage.constraint_support(*existing);
             let constraint_support = storage.constraint_support(constraint);
 
@@ -676,25 +619,38 @@ impl PathAssignments {
                 continue;
             }
 
-            /* XXX
-            if SequentMap::<ConstraintId>::pair_cannot_produce_sequents(
-                db, env, storage, *existing, constraint,
-            ) {
+            if SequentMap::pair_cannot_produce_sequents(db, env, existing_data, constraint_data) {
                 continue;
             }
-            */
 
-            let (a, b) = if existing_index < constraint_index {
-                (*existing, constraint)
+            let (a, a_data, b, b_data) = if existing_index < constraint_index {
+                (*existing, existing_data, constraint, constraint_data)
             } else {
-                (constraint, *existing)
+                (constraint, constraint_data, *existing, existing_data)
             };
             if !self.elaborated_pairs.insert((a, b)) {
                 // We've already elaborated this pair of constraints.
                 continue;
             }
 
-            self.discover_constraint_pair(db, env, storage, a, b);
+            let map = SequentMap::for_constraint_pair(db, env, a_data, b_data);
+            let added = self.add_sequents(db, env, storage, map);
+
+            // `projection_source_order` depends on knowing the order that sequents were discovered for
+            // each constraint. Since we are salsa-caching sequent derivation, we don't have easy
+            // access to that in ConstraintSetStorage, so we need to maintain a local view of that
+            // information here.
+            self.pair_replay_consequents.insert(
+                (a, b),
+                self.sequents[added]
+                    .iter()
+                    .filter_map(|sequent| match sequent {
+                        Sequent::SingleImplication { post, .. }
+                        | Sequent::PairImplication { post, .. } => Some(*post),
+                        _ => None,
+                    })
+                    .collect(),
+            );
         }
     }
 
