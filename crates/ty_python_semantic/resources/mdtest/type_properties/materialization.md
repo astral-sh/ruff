@@ -2544,6 +2544,93 @@ def recursive_materialized_overload_resolution(
     reveal_type(select_specific_recursive_value(valid))  # revealed: Literal["str"]
 ```
 
+### Generic inference through materialized recursive protocol specializations
+
+A recursive requirement can provide the only evidence for one of a materialized protocol's type
+parameters. The finite `first` property determines `First`, but inference still needs
+`recursive_second` to determine `Second`. Both materialization polarities preserve that information.
+
+```py
+from __future__ import annotations
+
+from collections.abc import Callable
+from typing import Any, Protocol
+from ty_extensions import Bottom, Top
+
+class Pair[First, Second](Protocol):
+    marker: Any
+
+    @property
+    def first(self) -> First: ...
+    def recursive_second(self, child: Pair[Any, Any]) -> Second: ...
+
+def infer_second[Second](value: Top[Pair[int, Second]]) -> Second:
+    raise NotImplementedError
+
+def infer_bottom_second[Second](value: Bottom[Pair[int, Second]]) -> Second:
+    raise NotImplementedError
+
+def check(top: Top[Pair[int, str]], bottom: Bottom[Pair[int, str]]) -> None:
+    reveal_type(infer_second(top))  # revealed: str
+    reveal_type(infer_bottom_second(bottom))  # revealed: str
+```
+
+A type alias around the parameter does not remove the recursive member's contribution.
+
+```py
+type Identity[T] = T
+
+def infer_aliased_second[Second](value: Top[Pair[int, Identity[Second]]]) -> Second:
+    raise NotImplementedError
+
+def aliased(top: Top[Pair[int, str]]) -> None:
+    reveal_type(infer_aliased_second(top))  # revealed: str
+```
+
+Comparing callable parameters reverses the protocol comparison: `Pair[int, Second]` becomes the
+source type. The recursive method supplies the upper bound `object`, so `Second` is inferred as
+`object` even though the target specialization has no type variables.
+
+```py
+def infer_source_second[Second](callback: Callable[[Top[Pair[int, Second]]], None]) -> Second:
+    raise NotImplementedError
+
+def accept_pair(value: Top[Pair[int, object]]) -> None: ...
+
+reveal_type(infer_source_second(accept_pair))  # revealed: object
+```
+
+The source's `first` property can itself contain `Pair` while the target's `first` property is
+finite. That source member remains available to establish the valid covariant widening.
+
+```py
+def widen(source: Top[Pair[Pair[int, str], str]]) -> None:
+    widened: Top[Pair[object, str]] = source
+```
+
+### Opposite materializations of recursive protocols
+
+Materialization can change a fixed `Any` inside a recursive method independently of the protocol's
+type parameter. A top-materialized method returning `object` cannot satisfy the bottom-materialized
+requirement to return `Never`, even when the finite `value` property is compatible.
+
+```py
+from __future__ import annotations
+
+from typing import Any, Protocol
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import is_assignable_to
+
+class RecursiveValue[T](Protocol):
+    @property
+    def value(self) -> T: ...
+    def consume(self, child: RecursiveValue[Any]) -> Any: ...
+
+static_assert(not is_assignable_to(Top[RecursiveValue[str]], Bottom[RecursiveValue[object]]))
+static_assert(is_assignable_to(Bottom[RecursiveValue[str]], Top[RecursiveValue[object]]))
+static_assert(is_assignable_to(Top[RecursiveValue[str]], RecursiveValue[object]))
+```
+
 ### Generator delegation
 
 `yield from` uses the same materialized yield and return types as direct generator methods. Applying

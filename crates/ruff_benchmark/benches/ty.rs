@@ -918,6 +918,41 @@ class Chain[T](Protocol):
     }
 }
 
+/// Regression benchmark for ty#4269: materialized recursive protocol comparisons.
+///
+/// Comparing the tuple-specific receiver with the gradual overload can repeatedly expand
+/// `child` into deeper tuple specializations. The finite `value` requirement establishes the
+/// needed constraints without that expansion.
+fn benchmark_materialized_recursive_protocol_overload(criterion: &mut Criterion) {
+    setup_rayon();
+
+    let code = r#"
+from __future__ import annotations
+
+from collections.abc import Callable
+from typing import Any, Protocol, overload
+
+class Chain[T](Protocol):
+    def value(self) -> T: ...
+    def child(self) -> Chain[tuple[T]]: ...
+    @overload
+    def map_star[A, B, R](self: Chain[tuple[A, B]], callback: Callable[[A, B], R]) -> Chain[R]: ...
+    @overload
+    def map_star[R](self: Chain[tuple[Any, ...]], callback: Callable[..., R]) -> Chain[R]: ...
+
+def check(value: Chain[tuple[int, str]]) -> None:
+    value.map_star(lambda first, second: 1)
+"#;
+
+    criterion.bench_function("ty_micro[materialized_recursive_protocol_overload]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(code),
+            |case| assert_eq!(case.db.check().len(), 0),
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 /// Regression benchmark for large calls to a gradual variadic tail.
 ///
 /// Without the gradual-call shortcut, every positional argument type is folded into the same
@@ -1814,6 +1849,7 @@ criterion_group!(
     benchmark_many_enum_members_2,
     benchmark_many_protocol_members_mismatch,
     benchmark_inherited_recursive_protocol,
+    benchmark_materialized_recursive_protocol_overload,
     benchmark_vararg_parameter_type_accumulation,
     benchmark_typed_dict_get_large_literal_union,
     benchmark_very_large_tuple,
