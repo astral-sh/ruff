@@ -1368,8 +1368,12 @@ def check(integer: C[int], string: C[str]):
 
 ## Deprecated constructors
 
-Calling a class implicitly invokes its constructor methods. A deprecated `__init__` or `__new__`
-produces a warning even when the class itself is not deprecated.
+Calling a class can invoke `__new__`, `__init__`, or a custom metaclass's `__call__`. We warn about
+deprecated methods that the call invokes, even when the class itself is not deprecated.
+
+### `__init__`
+
+Calling a class reports the deprecation of its initializer.
 
 ```py
 from typing_extensions import Self, deprecated
@@ -1378,23 +1382,18 @@ class OldInit:
     @deprecated("old init")
     def __init__(self) -> None: ...
 
-class OldNew:
-    @deprecated("old new")
-    def __new__(cls) -> Self:
-        return super().__new__(cls)
-
 OldInit()  # error: [deprecated] "old init"
-OldNew()  # error: [deprecated] "old new"
 ```
 
-Explicit references and calls still report the constructor's deprecation only once.
+An explicit call on an instance also produces only one warning.
 
 ```py
-OldInit.__init__  # error: [deprecated] "old init"
-OldNew.__new__(OldNew)  # error: [deprecated] "old new"
+def explicit_init(value: OldInit):
+    value.__init__()  # error: [deprecated] "old init"
 ```
 
-An active `__new__` does not hide a deprecated `__init__`, including an inherited initializer.
+If a non-deprecated `__new__` returns an instance of the class, Python still calls the inherited
+deprecated initializer.
 
 ```py
 class NewWithOldInit(OldInit):
@@ -1402,33 +1401,6 @@ class NewWithOldInit(OldInit):
         return super().__new__(cls)
 
 NewWithOldInit()  # error: [deprecated] "old init"
-```
-
-If both constructor methods are deprecated, one warning includes both messages.
-
-```py
-class Both(OldNew, OldInit): ...
-
-# snapshot: deprecated
-Both()
-```
-
-```snapshot
-warning[deprecated]: Use of deprecated functions
-  --> src/mdtest_snippet.py:24:1
-   |
-24 | Both()
-   | ^^^^ old new; old init
-   |
-  ::: src/mdtest_snippet.py:5:9
-   |
- 5 |     def __init__(self) -> None: ...
-   |         -------- old init
- 6 |
- 7 | class OldNew:
- 8 |     @deprecated("old new")
- 9 |     def __new__(cls) -> Self:
-   |         ------- old new
 ```
 
 When `__new__` returns an unrelated type, `__init__` does not run and produces no warning.
@@ -1441,9 +1413,73 @@ class ReturnsInt(OldInit):
 ReturnsInt()
 ```
 
-A deprecated metaclass `__call__` also warns when invoked implicitly by constructing a class.
+### `__new__`
+
+Calling a class also reports the deprecation of the method that creates the instance.
 
 ```py
+from typing_extensions import Self, deprecated
+
+class OldNew:
+    @deprecated("old new")
+    def __new__(cls) -> Self:
+        return super().__new__(cls)
+
+OldNew()  # error: [deprecated] "old new"
+```
+
+Calling `__new__` explicitly produces only one warning.
+
+```py
+OldNew.__new__(OldNew)  # error: [deprecated] "old new"
+```
+
+### Both constructor methods
+
+When both methods are deprecated, the class call produces one warning that points to both
+declarations and includes both messages.
+
+```py
+from typing_extensions import Self, deprecated
+
+class Both:
+    @deprecated("old new")
+    def __new__(cls) -> Self:
+        return super().__new__(cls)
+
+    @deprecated("old init")
+    def __init__(self) -> None: ...
+
+# snapshot: deprecated
+Both()
+```
+
+```snapshot
+warning[deprecated]: Possible use of deprecated methods: `Both.__new__`, `Both.__init__`
+  --> src/mdtest_snippet.py:12:1
+   |
+12 | Both()
+   | ^^^^
+info: old new
+ --> src/mdtest_snippet.py:5:9
+  |
+5 |     def __new__(cls) -> Self:
+  |         ^^^^^^^
+info: old init
+ --> src/mdtest_snippet.py:9:9
+  |
+9 |     def __init__(self) -> None: ...
+  |         ^^^^^^^^
+```
+
+### Metaclass `__call__`
+
+Calling a class with a custom metaclass invokes the metaclass's `__call__` method. If that method is
+deprecated, the class call produces a warning.
+
+```py
+from typing_extensions import deprecated
+
 class Meta(type):
     @deprecated("metaclass call")
     def __call__(cls) -> int:
