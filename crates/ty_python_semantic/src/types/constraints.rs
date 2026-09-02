@@ -1991,6 +1991,12 @@ impl<'db> From<OldConstraint<'db>> for InterimConstraint<'db> {
     }
 }
 
+impl<'db> From<&Constraint<'db>> for InterimConstraint<'db> {
+    fn from(constraint: &Constraint<'db>) -> InterimConstraint<'db> {
+        InterimConstraint::New(*constraint)
+    }
+}
+
 /// An individual constraint in a constraint set. This restricts a single typevar to be within a
 /// lower and upper bound.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
