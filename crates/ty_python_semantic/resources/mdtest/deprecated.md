@@ -615,7 +615,7 @@ class AlsoDeprecated:
 
 def deprecated_intersection(value: Deprecated) -> None:
     if isinstance(value, AlsoDeprecated):
-        # error: [deprecated] "old inversion; another old inversion"
+        # error: [deprecated] "Use of 2 deprecated functions"
         ~value
 ```
 
@@ -667,7 +667,7 @@ class Second:
 T = TypeVar("T", First, Second)
 
 def f(value: T) -> None:
-    # error: [deprecated] "first; second"
+    # error: [deprecated] "Use of 2 deprecated functions"
     ~value
 ```
 
@@ -699,7 +699,7 @@ W = TypeVar("W", First | Third, Second)
 
 def nested_union(value: W) -> None:
     # error: [unsupported-operator]
-    # error: [deprecated] "first; second"
+    # error: [deprecated] "Use of 2 deprecated functions"
     ~value
 ```
 
@@ -716,7 +716,7 @@ X = TypeVar("X", Invalid, Second)
 
 def invalid_operator(value: X) -> None:
     # error: [unsupported-operator]
-    # error: [deprecated] "invalid inversion; second"
+    # error: [deprecated] "Use of 2 deprecated functions"
     ~value
 ```
 
@@ -1019,26 +1019,26 @@ def check_both(value: Old):
     if isinstance(value, AlsoOld):
         # snapshot: deprecated
         value.value
-        value.value = 1  # error: [deprecated] "old setter; another setter"
-        del value.value  # error: [deprecated] "old deleter; another deleter"
+        value.value = 1  # error: [deprecated] "Use of 2 deprecated functions"
+        del value.value  # error: [deprecated] "Use of 2 deprecated functions"
 ```
 
 ```snapshot
-warning[deprecated]: Use of deprecated functions
+warning[deprecated]: Use of 2 deprecated functions
   --> src/mdtest_snippet.py:45:15
    |
 45 |         value.value
-   |               ^^^^^ old getter; another getter
-   |
-  ::: src/mdtest_snippet.py:6:9
-   |
- 6 |     def value(self) -> int:
-   |         ----- old getter
-   |
-  ::: src/mdtest_snippet.py:32:9
+   |               ^^^^^
+info: old getter
+ --> src/mdtest_snippet.py:6:9
+  |
+6 |     def value(self) -> int:
+  |         ^^^^^
+info: another getter
+  --> src/mdtest_snippet.py:32:9
    |
 32 |     def value(self) -> int:
-   |         ----- another getter
+   |         ^^^^^
 ```
 
 A non-deprecated getter suppresses the getter warning without hiding deprecated setters.
@@ -1056,7 +1056,7 @@ class ActiveGetter:
 def check_active_getter(value: Old):
     if isinstance(value, ActiveGetter):
         value.value
-        value.value = 1  # error: [deprecated] "old setter; another setter"
+        value.value = 1  # error: [deprecated] "Use of 2 deprecated functions"
 ```
 
 ## Invalid property getter calls
@@ -1527,23 +1527,24 @@ class InPlace(Number):
         return self
 
 def check_mixed(number: First | InPlace, value: int | str):
-    number += value  # error: [deprecated] "addition; in-place addition"
+    number += value  # error: [deprecated] "Use of 2 deprecated functions"
 ```
 
 ## Calls to different deprecated methods
 
-When a call can invoke different deprecated methods, one warning includes both messages and points
-to both method definitions. Inherited copies of the same method are listed only once.
+When a call can invoke different deprecated methods, one warning points to both method definitions.
+Each message appears with its own definition, preserving its punctuation and line breaks. Inherited
+copies of the same method are listed only once.
 
 ```py
 from typing_extensions import deprecated
 
 class First:
-    @deprecated("first message")
+    @deprecated("Direct calls are deprecated. Use `invoke()` instead; support ends in version 2.")
     def __call__(self) -> None: ...
 
 class Second:
-    @deprecated("second message")
+    @deprecated("Use the replacement API.\nDirect calls will be removed in version 3.")
     def __call__(self) -> None: ...
 
 class Inherited(First): ...
@@ -1554,19 +1555,20 @@ def check(value: First | Second | Inherited):
 ```
 
 ```snapshot
-warning[deprecated]: Use of deprecated functions
+warning[deprecated]: Use of 2 deprecated functions
   --> src/mdtest_snippet.py:15:5
    |
 15 |     value()
-   |     ^^^^^ first message; second message
-   |
-  ::: src/mdtest_snippet.py:5:9
-   |
- 5 |     def __call__(self) -> None: ...
-   |         -------- first message
- 6 |
- 7 | class Second:
- 8 |     @deprecated("second message")
- 9 |     def __call__(self) -> None: ...
-   |         -------- second message
+   |     ^^^^^
+info: Direct calls are deprecated. Use `invoke()` instead; support ends in version 2.
+ --> src/mdtest_snippet.py:5:9
+  |
+5 |     def __call__(self) -> None: ...
+  |         ^^^^^^^^
+info: Use the replacement API.
+Direct calls will be removed in version 3.
+ --> src/mdtest_snippet.py:9:9
+  |
+9 |     def __call__(self) -> None: ...
+  |         ^^^^^^^^
 ```

@@ -4,7 +4,7 @@ use std::rc::Rc;
 
 use compact_str::CompactString;
 use itertools::Itertools;
-use ruff_db::diagnostic::{Annotation, Span};
+use ruff_db::diagnostic::{Annotation, Span, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_db::source::source_text;
@@ -10154,8 +10154,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     /// Report the distinct deprecated targets of one operation in a single diagnostic.
-    /// Deduplicate by source function or overload, retaining separate source annotations for
-    /// distinct declarations. Include their messages in the primary annotation for concise output.
+    /// Deduplicate by source function or overload. Put multiple deprecation messages in separate
+    /// subdiagnostics with their declarations so each message's prose and line breaks remain
+    /// readable. Concise output includes only the number of deprecated targets in that case.
     fn report_deprecated_functions(
         &self,
         ranged: impl Ranged,
@@ -10175,37 +10176,35 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             } else {
                 "function"
             };
-            builder.into_diagnostic(format_args!(
+            let mut diagnostic = builder.into_diagnostic(format_args!(
                 "The {kind} `{}` is deprecated",
                 first.name(db)
-            ))
+            ));
+            if let Some(message) = first
+                .deprecated(db)
+                .and_then(|deprecated| deprecated.message)
+            {
+                diagnostic.set_primary_annotation_message(message.value(db));
+            }
+            diagnostic
         } else {
-            let mut diagnostic = builder.into_diagnostic("Use of deprecated functions");
+            let mut diagnostic = builder.into_diagnostic(format_args!(
+                "Use of {} deprecated functions",
+                functions.len()
+            ));
             for function in &functions {
-                let mut annotation = Annotation::secondary(function.spans(db).name);
-                if let Some(message) = function
+                let message = function
                     .deprecated(db)
                     .and_then(|deprecated| deprecated.message)
-                {
-                    annotation = annotation.message(message.value(db));
-                }
-                diagnostic.annotate(annotation);
+                    .map(|message| message.value(db))
+                    .filter(|message| !message.is_empty())
+                    .unwrap_or("Deprecated function defined here");
+                let mut sub = SubDiagnostic::new(SubDiagnosticSeverity::Info, message);
+                sub.annotate(Annotation::primary(function.spans(db).name));
+                diagnostic.sub(sub);
             }
             diagnostic
         };
-        let messages = functions
-            .iter()
-            .filter_map(|function| {
-                function
-                    .deprecated(db)
-                    .and_then(|deprecated| deprecated.message)
-            })
-            .map(|message| message.value(db))
-            .unique()
-            .join("; ");
-        if !messages.is_empty() {
-            diagnostic.set_primary_annotation_message(messages);
-        }
         diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
     }
 
