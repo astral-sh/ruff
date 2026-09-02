@@ -52,7 +52,8 @@ use crate::reachability::{
 use crate::types::add_inferred_python_version_hint_to_diagnostic;
 use crate::types::attribute_write::{AssignmentAttributeMembers, assignment_attribute_members};
 use crate::types::call::bind::{
-    ArgumentTypeContext, CheckTypesMode, OverloadSet, requires_overload_evaluation,
+    ArgumentTypeContext, CallableDescription, CheckTypesMode, OverloadSet,
+    requires_overload_evaluation,
 };
 use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorKind};
 use crate::types::callable::CallableTypeKind;
@@ -10156,7 +10157,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// Report the distinct deprecated targets of one operation in a single diagnostic.
     /// Deduplicate by source function or overload. Put multiple deprecation messages in separate
     /// subdiagnostics with their declarations so each message's prose and line breaks remain
-    /// readable. Concise output includes only the number of deprecated targets in that case.
+    /// readable. The summary names the possible deprecated targets in both output formats.
     fn report_deprecated_functions(
         &self,
         ranged: impl Ranged,
@@ -10188,9 +10189,27 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             diagnostic
         } else {
+            let descriptions: SmallVec<[_; 1]> = functions
+                .iter()
+                .map(|function| CallableDescription::from_overload(db, *function))
+                .collect();
+            let names: SmallVec<[_; 1]> = descriptions
+                .iter()
+                .map(|description| description.name())
+                .unique()
+                .collect();
+            let kind = if descriptions
+                .iter()
+                .all(|description| description.kind() == Some("method"))
+            {
+                "method"
+            } else {
+                "function"
+            };
+            let plural = if names.len() == 1 { "" } else { "s" };
+            let names = names.iter().map(|name| format!("`{name}`")).join(", ");
             let mut diagnostic = builder.into_diagnostic(format_args!(
-                "Use of {} deprecated functions",
-                functions.len()
+                "Possible use of deprecated {kind}{plural}: {names}"
             ));
             for function in &functions {
                 let message = function

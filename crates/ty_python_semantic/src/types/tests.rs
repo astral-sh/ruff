@@ -1,6 +1,7 @@
 use super::*;
 use crate::db::tests::{TestDbBuilder, setup_db};
 use crate::place::{global_symbol, typing_extensions_symbol, typing_symbol};
+use crate::types::call::bind::CallableDescription;
 use crate::types::type_alias::PEP695TypeAliasType;
 use crate::{Db, ProgramEnvironment};
 use ruff_db::files::system_path_to_file;
@@ -47,6 +48,14 @@ fn property_deprecations_do_not_infer_accessor_signatures() -> anyhow::Result<()
             .property_deprecations(&db)
             .ok_or_else(|| anyhow::anyhow!("expected a deprecated getter"))?;
         assert_eq!(deprecations.functions(&db, ast::ExprContext::Load).len(), 1);
+        assert_eq!(
+            CallableDescription::from_overload(
+                &db,
+                deprecations.functions(&db, ast::ExprContext::Load)[0],
+            )
+            .name(),
+            "getter"
+        );
         assert!(
             deprecations
                 .functions(&db, ast::ExprContext::Store)

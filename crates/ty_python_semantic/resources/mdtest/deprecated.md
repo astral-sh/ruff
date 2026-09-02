@@ -615,7 +615,7 @@ class AlsoDeprecated:
 
 def deprecated_intersection(value: Deprecated) -> None:
     if isinstance(value, AlsoDeprecated):
-        # error: [deprecated] "Use of 2 deprecated functions"
+        # error: [deprecated] "Possible use of deprecated methods: `Deprecated.__invert__`, `AlsoDeprecated.__invert__`"
         ~value
 ```
 
@@ -667,7 +667,7 @@ class Second:
 T = TypeVar("T", First, Second)
 
 def f(value: T) -> None:
-    # error: [deprecated] "Use of 2 deprecated functions"
+    # error: [deprecated] "Possible use of deprecated methods: `First.__invert__`, `Second.__invert__`"
     ~value
 ```
 
@@ -699,7 +699,7 @@ W = TypeVar("W", First | Third, Second)
 
 def nested_union(value: W) -> None:
     # error: [unsupported-operator]
-    # error: [deprecated] "Use of 2 deprecated functions"
+    # error: [deprecated] "Possible use of deprecated methods: `First.__invert__`, `Second.__invert__`"
     ~value
 ```
 
@@ -716,7 +716,7 @@ X = TypeVar("X", Invalid, Second)
 
 def invalid_operator(value: X) -> None:
     # error: [unsupported-operator]
-    # error: [deprecated] "Use of 2 deprecated functions"
+    # error: [deprecated] "Possible use of deprecated methods: `Invalid.__invert__`, `Second.__invert__`"
     ~value
 ```
 
@@ -1019,12 +1019,12 @@ def check_both(value: Old):
     if isinstance(value, AlsoOld):
         # snapshot: deprecated
         value.value
-        value.value = 1  # error: [deprecated] "Use of 2 deprecated functions"
-        del value.value  # error: [deprecated] "Use of 2 deprecated functions"
+        value.value = 1  # error: [deprecated] "Possible use of deprecated methods: `Old.value`, `AlsoOld.value`"
+        del value.value  # error: [deprecated] "Possible use of deprecated methods: `Old.value`, `AlsoOld.value`"
 ```
 
 ```snapshot
-warning[deprecated]: Use of 2 deprecated functions
+warning[deprecated]: Possible use of deprecated methods: `Old.value`, `AlsoOld.value`
   --> src/mdtest_snippet.py:45:15
    |
 45 |         value.value
@@ -1056,7 +1056,7 @@ class ActiveGetter:
 def check_active_getter(value: Old):
     if isinstance(value, ActiveGetter):
         value.value
-        value.value = 1  # error: [deprecated] "Use of 2 deprecated functions"
+        value.value = 1  # error: [deprecated] "Possible use of deprecated methods: `Old.value`, `ActiveGetter.value`"
 ```
 
 ## Invalid property getter calls
@@ -1294,6 +1294,29 @@ def check(value: list[Any] | set[Any]):
     convert(value)
 ```
 
+### Several deprecated overloads of one function
+
+When multiple deprecated overloads match, the summary names the function once. The individual
+overload messages remain available in the full diagnostic.
+
+```py
+from typing import overload
+from typing_extensions import deprecated
+
+@overload
+@deprecated("integer overload")
+def convert(value: int) -> str: ...
+@overload
+@deprecated("string overload")
+def convert(value: str) -> str: ...
+def convert(value: int | str) -> str:
+    return str(value)
+
+def check(value: int | str):
+    # error: [deprecated] "Possible use of deprecated function: `convert`"
+    convert(value)
+```
+
 ### Overloads for different receivers
 
 The `self` annotations restrict which overloads each instance can call. A call on `C[str]` reports
@@ -1527,12 +1550,13 @@ class InPlace(Number):
         return self
 
 def check_mixed(number: First | InPlace, value: int | str):
-    number += value  # error: [deprecated] "Use of 2 deprecated functions"
+    # error: [deprecated] "Possible use of deprecated methods: `Number.__add__`, `InPlace.__iadd__`"
+    number += value
 ```
 
 ## Calls to different deprecated methods
 
-When a call can invoke different deprecated methods, one warning points to both method definitions.
+When a call can invoke different deprecated methods, the summary names each method's defining class.
 Each message appears with its own definition, preserving its punctuation and line breaks. Inherited
 copies of the same method are listed only once.
 
@@ -1555,7 +1579,7 @@ def check(value: First | Second | Inherited):
 ```
 
 ```snapshot
-warning[deprecated]: Use of 2 deprecated functions
+warning[deprecated]: Possible use of deprecated methods: `First.__call__`, `Second.__call__`
   --> src/mdtest_snippet.py:15:5
    |
 15 |     value()
@@ -1571,4 +1595,31 @@ Direct calls will be removed in version 3.
   |
 9 |     def __call__(self) -> None: ...
   |         ^^^^^^^^
+```
+
+## Calls to deprecated generic methods
+
+Generic methods retain the defining class in the summary, including when the class is generic too.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing_extensions import deprecated
+
+class First[T]:
+    @deprecated("first method")
+    def __call__[U](self, value: U) -> U:
+        return value
+
+class Second:
+    @deprecated("second method")
+    def __call__[U](self, value: U) -> U:
+        return value
+
+def check(value: First[int] | Second):
+    # error: [deprecated] "Possible use of deprecated methods: `First.__call__`, `Second.__call__`"
+    value(1)
 ```

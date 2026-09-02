@@ -8486,13 +8486,42 @@ impl CallableBindingSnapshotter {
 }
 
 /// Describes a callable for the purposes of diagnostics.
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub(crate) struct CallableDescription<'a> {
     name: Cow<'a, str>,
     kind: Option<&'static str>,
 }
 
+#[salsa::tracked]
 impl<'db> CallableDescription<'db> {
+    /// Describe a function definition without inferring its signature, qualifying methods by
+    /// their defining class. Cache the syntax lookup to avoid direct AST dependencies in callers.
+    #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+    pub(crate) fn from_overload(
+        db: &'db dyn Db,
+        function: OverloadLiteral<'db>,
+    ) -> CallableDescription<'static> {
+        let body_scope = function.body_scope(db);
+        let index = semantic_index(db, body_scope.program_file(db));
+        let class = index.class_definition_of_method(body_scope.file_scope_id(db));
+        let name = class.and_then(|class| class.name(db)).map_or_else(
+            || Cow::Owned(function.name(db).as_str().to_owned()),
+            |class_name| {
+                let mut name = format!("{class_name}.{}", function.name(db));
+                name.shrink_to_fit();
+                Cow::Owned(name)
+            },
+        );
+        CallableDescription {
+            name,
+            kind: Some(if class.is_some() {
+                "method"
+            } else {
+                "function"
+            }),
+        }
+    }
+
     fn defining_class(db: &'db dyn Db, callable_type: Type<'db>) -> Option<ClassLiteral<'db>> {
         let function = match callable_type {
             Type::FunctionLiteral(function) => function,
@@ -8519,6 +8548,10 @@ impl<'db> CallableDescription<'db> {
         &self.name
     }
 
+    pub(crate) fn kind(&self) -> Option<&'static str> {
+        self.kind
+    }
+
     fn new_with_settings(
         db: &'db dyn Db,
         callable_type: Type<'db>,
@@ -8529,22 +8562,20 @@ impl<'db> CallableDescription<'db> {
             function: FunctionType<'db>,
             settings: Option<&DisplaySettings<'db>>,
         ) -> Cow<'db, str> {
-            if let Some(class) =
-                CallableDescription::defining_class(db, Type::FunctionLiteral(function))
+            if let Some(settings) = settings
+                && let Some(class) =
+                    CallableDescription::defining_class(db, Type::FunctionLiteral(function))
             {
-                settings
-                    .map(|settings| {
-                        Cow::Owned(format!(
-                            "{}.{}",
-                            class.display_with(db, settings.clone()),
-                            function.name(db)
-                        ))
-                    })
-                    .unwrap_or_else(|| {
-                        Cow::Owned(format!("{}.{}", class.name(db), function.name(db)))
-                    })
+                Cow::Owned(format!(
+                    "{}.{}",
+                    class.display_with(db, settings.clone()),
+                    function.name(db)
+                ))
             } else {
-                Cow::Borrowed(function.name(db))
+                Cow::Borrowed(
+                    CallableDescription::from_overload(db, function.literal(db).last_definition)
+                        .name(),
+                )
             }
         }
 
