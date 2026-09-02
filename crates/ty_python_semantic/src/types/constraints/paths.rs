@@ -65,6 +65,9 @@ pub(crate) struct PathAssignments {
     /// Constraint pairs that we have already checked and added to `sequents`.
     elaborated_pairs: FxHashSet<(ConstraintId, ConstraintId)>,
 
+    /// Implications that connect an old constraint to its equivalent new representation.
+    bridge_implications: FxHashSet<(ConstraintId, ConstraintId)>,
+
     /// Type variables that only involve concrete constraints and so do not participate in sequent
     /// discovery.
     independent_typevars: FxHashSet<TypeVarId>,
@@ -205,6 +208,7 @@ impl PathAssignments {
             additional_fuels: Vec::default(),
             discovered,
             elaborated_pairs: FxHashSet::default(),
+            bridge_implications: FxHashSet::default(),
             independent_typevars,
             remaining_overall_fuel: OVERALL_FUEL_BUDGET,
             assignment_queue: VecDeque::default(),
@@ -541,6 +545,12 @@ impl PathAssignments {
         self.sequents.extend(sequents);
     }
 
+    fn add_bridge_implication(&mut self, ante: ConstraintId, post: ConstraintId) {
+        self.bridge_implications.insert((ante, post));
+        self.sequents
+            .push(Sequent::SingleImplication { ante, post });
+    }
+
     #[expect(dead_code)]
     fn discover_single_constraint<'db>(
         &mut self,
@@ -569,10 +579,7 @@ impl PathAssignments {
                 .collect();
 
             for &component_id in &component_ids {
-                self.sequents.push(Sequent::SingleImplication {
-                    ante: constraint_id,
-                    post: component_id,
-                });
+                self.add_bridge_implication(constraint_id, component_id);
             }
 
             // The reverse bridge only reconstructs the old constraint's logical truth. Remove
@@ -589,10 +596,7 @@ impl PathAssignments {
                 [] => self.sequents.push(Sequent::SingleTautology {
                     ante: constraint_id,
                 }),
-                &[ante] => self.sequents.push(Sequent::SingleImplication {
-                    ante,
-                    post: constraint_id,
-                }),
+                &[ante] => self.add_bridge_implication(ante, constraint_id),
                 &[ante1, ante2] => self.sequents.push(Sequent::PairImplication {
                     ante1,
                     ante2,
@@ -996,7 +1000,9 @@ impl PathAssignments {
         let (antecedent_constructor_depth, _) =
             storage.cached_constraint_bound_depth(db, env, ante);
         let post_data = storage.constraint_data(post);
-        let fuel_cost = if post_data.is_bound_projection_of(db, ante_data) {
+        let fuel_cost = if self.bridge_implications.contains(&(ante, post))
+            || post_data.is_bound_projection_of(db, ante_data)
+        {
             1
         } else {
             storage.sequent_fuel_cost(db, env, post, antecedent_constructor_depth)
