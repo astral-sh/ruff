@@ -893,28 +893,64 @@ impl<'db> Bindings<'db> {
         self.implicit_dunder_init_is_possibly_unbound
     }
 
-    /// Returns the deprecated functions invoked by each union alternative. An intersection
-    /// only reports deprecations if every member that could implement the call is deprecated.
+    /// Returns the deprecated functions invoked by each union alternative, including downstream
+    /// constructor methods. An intersection only reports deprecations if every member that could
+    /// implement the call is deprecated.
     /// The same source can appear in multiple alternatives; callers deduplicate per expression.
+    ///
+    /// For call-site diagnostics, finalize argument inference first so skipped constructor
+    /// methods have been removed. For example, this call does not invoke the deprecated initializer:
+    ///
+    /// ```python
+    /// from typing_extensions import deprecated
+    ///
+    /// class C:
+    ///     def __new__(cls) -> int:
+    ///         return 0
+    ///
+    ///     @deprecated("old initializer")
+    ///     def __init__(self) -> None: ...
+    ///
+    /// C()  # No initializer deprecation: `__new__` returns an unrelated type.
+    /// ```
     pub(crate) fn deprecated_functions(
         &self,
         db: &'db dyn Db,
     ) -> impl Iterator<Item = (&CallableBinding<'db>, OverloadLiteral<'db>)> {
-        self.elements
-            .iter()
-            .map(BindingsElement::callables)
-            .filter(move |callables| {
-                callables
-                    .clone()
-                    .all(|callable| callable.deprecated_functions(db).next().is_some())
-            })
-            .flat_map(move |callables| {
-                callables.flat_map(move |callable| {
-                    callable
-                        .deprecated_functions(db)
-                        .map(move |function| (callable, function))
-                })
-            })
+        /// Append deprecations without discarding earlier union alternatives when a
+        /// non-deprecated intersection member suppresses the current alternative's warnings.
+        fn collect<'a, 'db>(
+            db: &'db dyn Db,
+            bindings: &'a Bindings<'db>,
+            functions: &mut SmallVec<[(&'a CallableBinding<'db>, OverloadLiteral<'db>); 1]>,
+        ) {
+            for element in &bindings.elements {
+                let start = functions.len();
+                for item in &element.items {
+                    let item_start = functions.len();
+                    let callable = item.callable();
+                    functions.extend(
+                        callable
+                            .deprecated_functions(db)
+                            .map(|function| (callable, function)),
+                    );
+                    if let Some(constructor) = item.as_constructor()
+                        && let Some(downstream) = constructor.downstream_constructor()
+                    {
+                        collect(db, downstream, functions);
+                    }
+                    if functions.len() == item_start {
+                        // This intersection member provides a non-deprecated alternative.
+                        functions.truncate(start);
+                        break;
+                    }
+                }
+            }
+        }
+
+        let mut functions = SmallVec::new();
+        collect(db, self, &mut functions);
+        functions.into_iter()
     }
 
     /// Returns an iterator over all `CallableBinding`s, flattening the two-level structure.
