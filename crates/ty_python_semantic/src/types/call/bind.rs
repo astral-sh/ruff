@@ -2967,12 +2967,11 @@ impl<'db> Bindings<'db> {
                             else {
                                 return ConstraintSet::from_bool(constraints, false);
                             };
-                            ConstraintSet::constrain_typevar(
+                            ConstraintSet::constrain_typevar_equivalence_bound(
                                 db,
                                 env,
                                 constraints,
                                 typevar,
-                                value,
                                 value,
                             )
                         });

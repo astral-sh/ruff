@@ -478,8 +478,30 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         upper: Option<ConstraintBound<'db>>,
     ) -> Self {
         let mut storage = builder.storage.borrow_mut();
-        let (node, source_order) =
-            OldConstraint::new_node_with_bounds(db, env, &mut storage, typevar, lower, upper);
+        if let (Some(lower), Some(upper)) = (lower, upper)
+            && lower == upper
+        {
+            let (provenance, bound) = lower.into_parts();
+            if bound.bottom_materialization(db, env) == bound.top_materialization(db, env) {
+                let constraints =
+                    Constraint::new_equivalence_bound(db, env, provenance, typevar, bound);
+                let (node, source_order) =
+                    Constraint::new_nodes(db, env, &mut storage, constraints);
+                return Self::from_node(builder, node, source_order);
+            }
+        }
+
+        let constraints = iter::chain(
+            lower.into_iter().flat_map(|lower| {
+                let (provenance, bound) = lower.into_parts();
+                Constraint::new_lower_bound(db, provenance, typevar, bound)
+            }),
+            upper.into_iter().flat_map(|upper| {
+                let (provenance, bound) = upper.into_parts();
+                Constraint::new_upper_bound(db, env, provenance, typevar, bound)
+            }),
+        );
+        let (node, source_order) = Constraint::new_nodes(db, env, &mut storage, constraints);
         Self::from_node(builder, node, source_order)
     }
 
@@ -491,12 +513,11 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         typevar: BoundTypeVarInstance<'db>,
         lower: Type<'db>,
     ) -> Self {
-        Self::from_constraint(
-            db,
-            env,
-            builder,
-            OldConstraint::from_evidence(typevar, Some(lower), None),
-        )
+        let mut storage = builder.storage.borrow_mut();
+        let constraints =
+            Constraint::new_lower_bound(db, ConstraintProvenance::Evidence, typevar, lower);
+        let (node, source_order) = Constraint::new_nodes(db, env, &mut storage, constraints);
+        Self::from_node(builder, node, source_order)
     }
 
     /// Returns a constraint set that constrains a typevar to be a subtype of `upper`.
@@ -507,12 +528,41 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         typevar: BoundTypeVarInstance<'db>,
         upper: Type<'db>,
     ) -> Self {
-        Self::from_constraint(
-            db,
-            env,
-            builder,
-            OldConstraint::from_evidence(typevar, None, Some(upper)),
-        )
+        let mut storage = builder.storage.borrow_mut();
+        let constraints =
+            Constraint::new_upper_bound(db, env, ConstraintProvenance::Evidence, typevar, upper);
+        let (node, source_order) = Constraint::new_nodes(db, env, &mut storage, constraints);
+        Self::from_node(builder, node, source_order)
+    }
+
+    /// Returns a constraint set that constrains a typevar to be equivalent to `bound`.
+    pub(crate) fn constrain_typevar_equivalence_bound(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        builder: &'c ConstraintSetBuilder<'db>,
+        typevar: BoundTypeVarInstance<'db>,
+        bound: Type<'db>,
+    ) -> Self {
+        let mut storage = builder.storage.borrow_mut();
+        // We can only create a ConcreteEquivalence constraint for a fully static bound.
+        if bound.bottom_materialization(db, env) == bound.top_materialization(db, env) {
+            let constraints = Constraint::new_equivalence_bound(
+                db,
+                env,
+                ConstraintProvenance::Evidence,
+                typevar,
+                bound,
+            );
+            let (node, source_order) = Constraint::new_nodes(db, env, &mut storage, constraints);
+            return Self::from_node(builder, node, source_order);
+        }
+
+        let constraints = iter::chain(
+            Constraint::new_lower_bound(db, ConstraintProvenance::Evidence, typevar, bound),
+            Constraint::new_upper_bound(db, env, ConstraintProvenance::Evidence, typevar, bound),
+        );
+        let (node, source_order) = Constraint::new_nodes(db, env, &mut storage, constraints);
+        Self::from_node(builder, node, source_order)
     }
 
     /// Verifies that this constraint set was created by `builder`
@@ -2042,13 +2092,6 @@ impl<'db> OldConstraint<'db> {
         )
     }
 
-    pub(crate) fn exact(typevar: BoundTypeVarInstance<'db>, ty: Type<'db>) -> Self {
-        Self {
-            typevar,
-            bounds: ConstraintBounds::exact(ty),
-        }
-    }
-
     pub(crate) fn typevar(self) -> BoundTypeVarInstance<'db> {
         self.typevar
     }
@@ -2252,18 +2295,6 @@ impl<'db> ConstraintBound<'db> {
         }
     }
 
-    /// The ordinary lower identity used by storage canonicalization and path aggregation.
-    #[cfg(test)]
-    const fn missing_lower() -> Self {
-        Self::Validity(Type::Never)
-    }
-
-    /// The ordinary upper identity used by storage canonicalization and path aggregation.
-    #[cfg(test)]
-    const fn missing_upper() -> Self {
-        Self::Validity(Type::object())
-    }
-
     fn ty(self) -> Type<'db> {
         match self {
             Self::Validity(ty) | Self::Evidence(ty) => ty,
@@ -2359,13 +2390,6 @@ impl<'db> ConstraintBounds<'db> {
             lower: lower.filter(|bound| !bound.is_missing_lower()),
             upper: upper.filter(|bound| !bound.is_missing_upper()),
         }
-    }
-
-    fn exact(ty: Type<'db>) -> Self {
-        Self::new(
-            Some(ConstraintBound::Evidence(ty)),
-            Some(ConstraintBound::Evidence(ty)),
-        )
     }
 
     fn as_equality(self) -> Option<Type<'db>> {
@@ -3748,24 +3772,25 @@ impl NodeId {
         // perform. So we have to take the appropriate materialization when translating the check
         // into a constraint.
         let (constraint, constraint_source_order) = match (lhs, rhs) {
-            (Type::TypeVar(bound_typevar), _) => OldConstraint::new_node_with_bounds(
-                db,
-                env,
-                storage,
-                bound_typevar,
-                None,
-                Some(ConstraintBound::Evidence(
+            (Type::TypeVar(bound_typevar), _) => {
+                let constraints = Constraint::new_upper_bound(
+                    db,
+                    env,
+                    ConstraintProvenance::Evidence,
+                    bound_typevar,
                     rhs.bottom_materialization(db, env),
-                )),
-            ),
-            (_, Type::TypeVar(bound_typevar)) => OldConstraint::new_node_with_bounds(
-                db,
-                env,
-                storage,
-                bound_typevar,
-                Some(ConstraintBound::Evidence(lhs.top_materialization(db, env))),
-                None,
-            ),
+                );
+                Constraint::new_nodes(db, env, storage, constraints)
+            }
+            (_, Type::TypeVar(bound_typevar)) => {
+                let constraints = Constraint::new_lower_bound(
+                    db,
+                    ConstraintProvenance::Evidence,
+                    bound_typevar,
+                    lhs.top_materialization(db, env),
+                );
+                Constraint::new_nodes(db, env, storage, constraints)
+            }
             _ => panic!("at least one type should be a typevar"),
         };
 
@@ -6008,7 +6033,7 @@ impl SatisfiedClauses {
 mod tests {
     use std::assert_matches;
 
-    use super::variables::ConstraintProvenance;
+    use super::variables::{ConstraintProvenance, UnsatisfiableBound};
     use super::*;
 
     use indoc::indoc;
@@ -6146,8 +6171,9 @@ mod tests {
         );
         let actual_bound = KnownClass::List.to_specialized_instance(db, &env, &[Type::TypeVar(u)]);
         let mut storage = ConstraintSetStorage::default();
-        let data =
-            InterimConstraint::Old(OldConstraint::from_evidence(t, None, Some(actual_bound)));
+        let data = InterimConstraint::New(
+            ConcreteUpperBound::new(db, ConstraintProvenance::Evidence, t, actual_bound).into(),
+        );
         let support = storage.intern_constraint_typevars(db, &env, data);
         let mentioned = support
             .iter()
@@ -6198,11 +6224,9 @@ mod tests {
                 u.freshness(db),
             );
             let mut storage = ConstraintSetStorage::default();
-            let data = InterimConstraint::Old(OldConstraint::from_evidence(
-                t,
-                None,
-                Some(Type::TypeVar(u)),
-            ));
+            let data = InterimConstraint::New(
+                TypeVarRangeBound::new(db, ConstraintProvenance::Evidence, t, u).into(),
+            );
             let support = storage.intern_constraint_typevars(db, &env, data);
             let mentioned = support
                 .iter()
@@ -6802,10 +6826,9 @@ class E: ...
 
         for lower in [None, Some(Type::any())] {
             let mut bounds = PathBoundBuilder::default();
-            let (provenance, bound) = lower
-                .map_or_else(ConstraintBound::missing_lower, ConstraintBound::Evidence)
-                .into_parts();
-            bounds.add_lower(db, &env, provenance, bound);
+            if let Some(lower) = lower {
+                bounds.add_lower(db, &env, ConstraintProvenance::Evidence, lower);
+            }
             bounds.add_upper(db, &env, ConstraintProvenance::Evidence, left);
             bounds.add_upper(db, &env, ConstraintProvenance::Evidence, right);
             let exhausted = bounds.finish(db, &env, t);
@@ -7119,28 +7142,37 @@ class E: ...
     #[derive(Clone, Copy)]
     struct PermutedConstraint<'db>(
         BoundTypeVarInstance<'db>,
-        ConstraintBound<'db>,
-        ConstraintBound<'db>,
+        ConstraintProvenance,
+        Option<Type<'db>>,
+        Option<Type<'db>>,
     );
 
     impl<'db> PermutedConstraint<'db> {
+        fn constraints(
+            self,
+            db: &'db dyn Db,
+            env: &ProgramEnvironment<'db>,
+        ) -> impl Iterator<Item = Result<Constraint<'db>, UnsatisfiableBound>> {
+            let PermutedConstraint(typevar, provenance, lower, upper) = self;
+            iter::chain(
+                lower.into_iter().flat_map(move |lower| {
+                    Constraint::new_lower_bound(db, provenance, typevar, lower)
+                }),
+                upper.into_iter().flat_map(move |upper| {
+                    Constraint::new_upper_bound(db, env, provenance, typevar, upper)
+                }),
+            )
+        }
+
         fn node(
             self,
             db: &'db dyn Db,
             env: &ProgramEnvironment<'db>,
             storage: &mut ConstraintSetStorage<'db>,
         ) -> NodeId {
-            let PermutedConstraint(typevar, lower, upper) = self;
-            let constraint = OldConstraint::new(typevar, Some(lower), Some(upper));
-            OldConstraint::new_node_with_bounds(
-                db,
-                env,
-                storage,
-                typevar,
-                constraint.stored_lower_bound(),
-                constraint.stored_upper_bound(),
-            )
-            .0
+            let constraints = self.constraints(db, env);
+            let (node, _) = Constraint::new_nodes(db, env, storage, constraints);
+            node
         }
     }
 
@@ -7171,25 +7203,21 @@ class E: ...
                 storage.intern_typevar(db, *typevar);
             }
             for index in constraint_order {
-                let PermutedConstraint(typevar, lower, upper) = atoms[index];
-                storage.intern_constraint(
-                    db,
-                    &env,
-                    InterimConstraint::Old(OldConstraint::new(typevar, Some(lower), Some(upper))),
-                );
+                for constraint in atoms[index].constraints(db, &env).filter_map(Result::ok) {
+                    storage.intern_constraint(db, &env, InterimConstraint::New(constraint));
+                }
             }
 
             let node = build_bdd(&mut storage);
-            let source_order = atoms.iter().fold(None, |source_order, atom| {
-                let PermutedConstraint(typevar, lower, upper) = *atom;
-                let constraint = storage.intern_constraint(
-                    db,
-                    &env,
-                    InterimConstraint::Old(OldConstraint::new(typevar, Some(lower), Some(upper))),
-                );
-                let constraint_source_order = storage.constraint_source_order(constraint);
-                storage.ordered_source_order(source_order, Some(constraint_source_order))
-            });
+            let source_order = atoms
+                .iter()
+                .flat_map(|atom| atom.constraints(db, &env).filter_map(Result::ok))
+                .fold(None, |source_order, constraint| {
+                    let constraint =
+                        storage.intern_constraint(db, &env, InterimConstraint::New(constraint));
+                    let constraint_source_order = storage.constraint_source_order(constraint);
+                    storage.ordered_source_order(source_order, Some(constraint_source_order))
+                });
             drop(storage);
 
             let set = ConstraintSet::from_node(&builder, node, source_order);
@@ -7264,16 +7292,8 @@ class E: ...
         let str = KnownClass::Str.to_instance(db, &env);
         let int = KnownClass::Int.to_instance(db, &env);
         let atoms = [
-            PermutedConstraint(
-                t,
-                ConstraintBound::Evidence(str),
-                ConstraintBound::missing_upper(),
-            ),
-            PermutedConstraint(
-                t,
-                ConstraintBound::Evidence(int),
-                ConstraintBound::missing_upper(),
-            ),
+            PermutedConstraint(t, ConstraintProvenance::Evidence, Some(str), None),
+            PermutedConstraint(t, ConstraintProvenance::Evidence, Some(int), None),
         ];
 
         check_solutions_for_constraint_orderings(
@@ -7310,21 +7330,9 @@ class E: ...
         let bytes = KnownClass::Bytes.to_instance(db, &env);
         let int = KnownClass::Int.to_instance(db, &env);
         let atoms = [
-            PermutedConstraint(
-                t,
-                ConstraintBound::Evidence(str),
-                ConstraintBound::missing_upper(),
-            ),
-            PermutedConstraint(
-                u,
-                ConstraintBound::Evidence(bytes),
-                ConstraintBound::missing_upper(),
-            ),
-            PermutedConstraint(
-                t,
-                ConstraintBound::Evidence(int),
-                ConstraintBound::missing_upper(),
-            ),
+            PermutedConstraint(t, ConstraintProvenance::Evidence, Some(str), None),
+            PermutedConstraint(u, ConstraintProvenance::Evidence, Some(bytes), None),
+            PermutedConstraint(t, ConstraintProvenance::Evidence, Some(int), None),
         ];
 
         check_solutions_for_constraint_orderings(
@@ -7352,21 +7360,9 @@ class E: ...
         let bytes = KnownClass::Bytes.to_instance(db, &env);
         let int = KnownClass::Int.to_instance(db, &env);
         let atoms = [
-            PermutedConstraint(
-                t,
-                ConstraintBound::Evidence(str),
-                ConstraintBound::missing_upper(),
-            ),
-            PermutedConstraint(
-                u,
-                ConstraintBound::Evidence(bytes),
-                ConstraintBound::missing_upper(),
-            ),
-            PermutedConstraint(
-                x,
-                ConstraintBound::Evidence(int),
-                ConstraintBound::missing_upper(),
-            ),
+            PermutedConstraint(t, ConstraintProvenance::Evidence, Some(str), None),
+            PermutedConstraint(u, ConstraintProvenance::Evidence, Some(bytes), None),
+            PermutedConstraint(x, ConstraintProvenance::Evidence, Some(int), None),
         ];
 
         check_solutions_for_constraint_orderings(
@@ -7392,16 +7388,8 @@ class E: ...
         let str = KnownClass::Str.to_instance(db, &env);
         let int = KnownClass::Int.to_instance(db, &env);
         let atoms = [
-            PermutedConstraint(
-                t,
-                ConstraintBound::Evidence(str),
-                ConstraintBound::missing_upper(),
-            ),
-            PermutedConstraint(
-                t,
-                ConstraintBound::Evidence(int),
-                ConstraintBound::missing_upper(),
-            ),
+            PermutedConstraint(t, ConstraintProvenance::Evidence, Some(str), None),
+            PermutedConstraint(t, ConstraintProvenance::Evidence, Some(int), None),
         ];
 
         check_solutions_for_constraint_orderings(
@@ -7431,26 +7419,10 @@ class E: ...
         let list_u = KnownClass::List.to_specialized_instance(db, &env, &[Type::TypeVar(u)]);
         let list_int = KnownClass::List.to_specialized_instance(db, &env, &[int]);
         let atoms = [
-            PermutedConstraint(
-                t,
-                ConstraintBound::missing_lower(),
-                ConstraintBound::Evidence(list_u),
-            ),
-            PermutedConstraint(
-                u,
-                ConstraintBound::missing_lower(),
-                ConstraintBound::Evidence(int),
-            ),
-            PermutedConstraint(
-                t,
-                ConstraintBound::Evidence(list_int),
-                ConstraintBound::missing_upper(),
-            ),
-            PermutedConstraint(
-                v,
-                ConstraintBound::Evidence(bytes),
-                ConstraintBound::missing_upper(),
-            ),
+            PermutedConstraint(t, ConstraintProvenance::Evidence, None, Some(list_u)),
+            PermutedConstraint(u, ConstraintProvenance::Evidence, None, Some(int)),
+            PermutedConstraint(t, ConstraintProvenance::Evidence, Some(list_int), None),
+            PermutedConstraint(v, ConstraintProvenance::Evidence, Some(bytes), None),
         ];
 
         check_solutions_for_constraint_orderings(
@@ -7483,21 +7455,9 @@ class E: ...
         let str = KnownClass::Str.to_instance(db, &env);
         let bytes = KnownClass::Bytes.to_instance(db, &env);
         let atoms = [
-            PermutedConstraint(
-                t,
-                ConstraintBound::missing_lower(),
-                ConstraintBound::Evidence(int),
-            ),
-            PermutedConstraint(
-                t,
-                ConstraintBound::missing_lower(),
-                ConstraintBound::Evidence(str),
-            ),
-            PermutedConstraint(
-                u,
-                ConstraintBound::Evidence(bytes),
-                ConstraintBound::missing_upper(),
-            ),
+            PermutedConstraint(t, ConstraintProvenance::Evidence, None, Some(int)),
+            PermutedConstraint(t, ConstraintProvenance::Evidence, None, Some(str)),
+            PermutedConstraint(u, ConstraintProvenance::Evidence, Some(bytes), None),
         ];
 
         check_solutions_for_constraint_orderings(
@@ -7527,26 +7487,10 @@ class E: ...
         let int = KnownClass::Int.to_instance(db, &env);
         let str = KnownClass::Str.to_instance(db, &env);
         let atoms = [
-            PermutedConstraint(
-                t,
-                ConstraintBound::missing_lower(),
-                ConstraintBound::Evidence(int),
-            ),
-            PermutedConstraint(
-                t,
-                ConstraintBound::missing_lower(),
-                ConstraintBound::Evidence(str),
-            ),
-            PermutedConstraint(
-                t,
-                ConstraintBound::Evidence(int),
-                ConstraintBound::missing_upper(),
-            ),
-            PermutedConstraint(
-                u,
-                ConstraintBound::missing_lower(),
-                ConstraintBound::Evidence(int),
-            ),
+            PermutedConstraint(t, ConstraintProvenance::Evidence, None, Some(int)),
+            PermutedConstraint(t, ConstraintProvenance::Evidence, None, Some(str)),
+            PermutedConstraint(t, ConstraintProvenance::Evidence, Some(int), None),
+            PermutedConstraint(u, ConstraintProvenance::Evidence, None, Some(int)),
         ];
 
         check_solutions_for_constraint_orderings(
