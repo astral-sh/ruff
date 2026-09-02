@@ -41,7 +41,7 @@ impl<'a> FormatInterpolatedStringElement<'a> {
     }
 
     /// Marks this element as belonging to the format spec of an enclosing replacement field.
-    pub(crate) fn in_format_spec(mut self) -> Self {
+    fn in_format_spec(mut self) -> Self {
         self.in_format_spec = true;
         self
     }
@@ -112,7 +112,7 @@ impl<'a> FormatInterpolatedElement<'a> {
     }
 
     /// Marks this replacement field as belonging to the format spec of an enclosing field.
-    pub(crate) fn in_format_spec(mut self) -> Self {
+    fn in_format_spec(mut self) -> Self {
         self.in_format_spec = true;
         self
     }
