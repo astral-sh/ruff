@@ -10189,25 +10189,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             diagnostic
         } else {
-            let descriptions: SmallVec<[_; 1]> = functions
-                .iter()
-                .map(|function| CallableDescription::from_overload(db, *function))
-                .collect();
-            let names: SmallVec<[_; 1]> = descriptions
-                .iter()
-                .map(|description| description.name())
-                .unique()
-                .collect();
-            let kind = if descriptions
-                .iter()
-                .all(|description| description.kind() == Some("method"))
-            {
-                "method"
-            } else {
-                "function"
-            };
+            let mut names = FxOrderSet::default();
+            let mut all_methods = true;
+            for function in &functions {
+                let description = CallableDescription::from_overload(db, *function);
+                names.insert(description.name());
+                all_methods &= description.kind() == Some("method");
+            }
+            let kind = if all_methods { "method" } else { "function" };
             let plural = if names.len() == 1 { "" } else { "s" };
-            let names = names.iter().map(|name| format!("`{name}`")).join(", ");
+            let names = names
+                .iter()
+                .format_with(", ", |name, f| f(&format_args!("`{name}`")));
             let mut diagnostic = builder.into_diagnostic(format_args!(
                 "Possible use of deprecated {kind}{plural}: {names}"
             ));

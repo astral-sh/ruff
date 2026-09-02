@@ -8486,7 +8486,7 @@ impl CallableBindingSnapshotter {
 }
 
 /// Describes a callable for the purposes of diagnostics.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
+#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
 pub(crate) struct CallableDescription<'a> {
     name: Cow<'a, str>,
     kind: Option<&'static str>,
@@ -8504,16 +8504,13 @@ impl<'db> CallableDescription<'db> {
         let body_scope = function.body_scope(db);
         let index = semantic_index(db, body_scope.program_file(db));
         let class = index.class_definition_of_method(body_scope.file_scope_id(db));
-        let name = class.and_then(|class| class.name(db)).map_or_else(
-            || Cow::Owned(function.name(db).as_str().to_owned()),
-            |class_name| {
-                let mut name = format!("{class_name}.{}", function.name(db));
-                name.shrink_to_fit();
-                Cow::Owned(name)
-            },
+        let mut name = class.and_then(|class| class.name(db)).map_or_else(
+            || function.name(db).as_str().to_owned(),
+            |class_name| format!("{class_name}.{}", function.name(db)),
         );
+        name.shrink_to_fit();
         CallableDescription {
-            name,
+            name: Cow::Owned(name),
             kind: Some(if class.is_some() {
                 "method"
             } else {

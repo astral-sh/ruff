@@ -941,12 +941,7 @@ impl<'db> PropertyDeprecations<'db> {
     }
 
     fn getters_only(self, db: &'db dyn Db) -> Self {
-        Self::new(
-            db,
-            self.getters(db).clone(),
-            Box::<[_]>::default(),
-            Box::<[_]>::default(),
-        )
+        Self::new(db, self.getters(db), [].as_slice(), [].as_slice())
     }
 
     /// Retain either alternative's deprecations: a union can invoke either accessor.
