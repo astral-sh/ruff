@@ -2394,6 +2394,7 @@ fn protocol_member_read_type<'db>(
             InstanceFallbackShadowsNonDataDescriptor::No,
         )
         .unwrap_or_else(|error| error.fallback_member(db))
+        .member(db)
         .place
     } else {
         receiver_ty.member(db, env, member.name).place
