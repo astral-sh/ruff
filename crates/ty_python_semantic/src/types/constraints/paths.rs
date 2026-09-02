@@ -6,8 +6,8 @@ use std::fmt::Debug;
 use std::ops::{ControlFlow, Range};
 
 use indexmap::map::Entry;
-use itertools::Itertools;
-use rustc_hash::FxHashSet;
+use itertools::{Either, Itertools};
+use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 
 use crate::types::constraints::sequents::{Sequent, SequentMap};
@@ -64,6 +64,10 @@ pub(crate) struct PathAssignments {
     discovered: FxIndexMap<ConstraintId, bool>,
     /// Constraint pairs that we have already checked and added to `sequents`.
     elaborated_pairs: FxHashSet<(ConstraintId, ConstraintId)>,
+
+    /// Consequents grouped by the discovery call that introduced their sequents.
+    single_replay_consequents: FxHashMap<ConstraintId, Vec<ConstraintId>>,
+    pair_replay_consequents: FxHashMap<(ConstraintId, ConstraintId), Vec<ConstraintId>>,
 
     /// Implications that connect an old constraint to its equivalent new representation.
     bridge_implications: FxHashSet<(ConstraintId, ConstraintId)>,
@@ -160,25 +164,44 @@ impl PathAssignments {
         while !emitted.is_subset(&ordered)
             && let Some(constraint) = ordered.get_index(index).copied()
         {
-            if self.discovered.get(&constraint) == Some(&true)
-                && let Some(map) = storage.single_sequent_cache.get(&constraint)
-            {
-                ordered.extend(
-                    map.consequents()
-                        .filter(|constraint| self.discovered.contains_key(constraint)),
-                );
+            if self.discovered.get(&constraint) == Some(&true) {
+                // XXX: Remove the storage version one we retire the old sequent map logic
+                #[expect(clippy::manual_map)]
+                let consequents = if let Some(map) = storage.single_sequent_cache.get(&constraint) {
+                    Some(Either::Left(map.consequents()))
+                } else if let Some(consequents) = self.single_replay_consequents.get(&constraint) {
+                    Some(Either::Right(consequents.iter().copied()))
+                } else {
+                    None
+                };
+                if let Some(consequents) = consequents {
+                    ordered.extend(
+                        consequents.filter(|constraint| self.discovered.contains_key(constraint)),
+                    );
+                }
             }
             for earlier_index in 0..index {
                 let earlier = ordered[earlier_index];
                 // Pair rules are not commutative. Replay the orientation used by this walk,
                 // which can differ from the order in which the replay reaches its inputs.
-                let pair = [(earlier, constraint), (constraint, earlier)]
+                let Some(pair) = [(earlier, constraint), (constraint, earlier)]
                     .into_iter()
-                    .find(|pair| self.elaborated_pairs.contains(pair));
-                if let Some(map) = pair.and_then(|pair| storage.pair_sequent_cache.get(&pair)) {
+                    .find(|pair| self.elaborated_pairs.contains(pair))
+                else {
+                    continue;
+                };
+                // XXX: Remove the storage version one we retire the old sequent map logic
+                #[expect(clippy::manual_map)]
+                let consequents = if let Some(map) = storage.pair_sequent_cache.get(&pair) {
+                    Some(Either::Left(map.consequents()))
+                } else if let Some(consequents) = self.pair_replay_consequents.get(&pair) {
+                    Some(Either::Right(consequents.iter().copied()))
+                } else {
+                    None
+                };
+                if let Some(consequents) = consequents {
                     ordered.extend(
-                        map.consequents()
-                            .filter(|constraint| self.discovered.contains_key(constraint)),
+                        consequents.filter(|constraint| self.discovered.contains_key(constraint)),
                     );
                 }
             }
@@ -208,6 +231,8 @@ impl PathAssignments {
             additional_fuels: Vec::default(),
             discovered,
             elaborated_pairs: FxHashSet::default(),
+            single_replay_consequents: FxHashMap::default(),
+            pair_replay_consequents: FxHashMap::default(),
             bridge_implications: FxHashSet::default(),
             independent_typevars,
             remaining_overall_fuel: OVERALL_FUEL_BUDGET,
@@ -565,6 +590,7 @@ impl PathAssignments {
         constraint_id: ConstraintId,
         constraint: InterimConstraint<'db>,
     ) {
+        let sequent_start = self.sequents.len();
         let constraints = constraint.into_new(db, env);
         let mut tautologies = SmallVec::<[bool; 2]>::new();
         for constraint in &constraints {
@@ -615,6 +641,22 @@ impl PathAssignments {
             let map = SequentMap::<Constraint<'db>>::for_constraint_pair(db, env, *lower, *upper);
             self.add_sequents(db, env, storage, map);
         }
+
+        // `projection_source_order` depends on knowing the order that sequents were discovered for
+        // each constraint. Since we are salsa-caching sequent derivation, we don't have easy
+        // access to that in ConstraintSetStorage, so we need to maintain a local view of that
+        // information here.
+        self.single_replay_consequents.insert(
+            constraint_id,
+            self.sequents[sequent_start..]
+                .iter()
+                .filter_map(|sequent| match sequent {
+                    Sequent::SingleImplication { post, .. }
+                    | Sequent::PairImplication { post, .. } => Some(*post),
+                    _ => None,
+                })
+                .collect(),
+        );
     }
 
     #[expect(dead_code)]
@@ -626,6 +668,7 @@ impl PathAssignments {
         left_id: ConstraintId,
         right_id: ConstraintId,
     ) {
+        let sequent_start = self.sequents.len();
         let left = storage.constraint_data(left_id);
         let right = storage.constraint_data(right_id);
         if let (InterimConstraint::Old(left), InterimConstraint::Old(right)) = (left, right) {
@@ -660,6 +703,22 @@ impl PathAssignments {
                 self.add_sequents(db, env, storage, map);
             }
         }
+
+        // `projection_source_order` depends on knowing the order that sequents were discovered for
+        // each constraint. Since we are salsa-caching sequent derivation, we don't have easy
+        // access to that in ConstraintSetStorage, so we need to maintain a local view of that
+        // information here.
+        self.pair_replay_consequents.insert(
+            (left_id, right_id),
+            self.sequents[sequent_start..]
+                .iter()
+                .filter_map(|sequent| match sequent {
+                    Sequent::SingleImplication { post, .. }
+                    | Sequent::PairImplication { post, .. } => Some(*post),
+                    _ => None,
+                })
+                .collect(),
+        );
     }
 
     /// Update our sequent map to ensure that it holds all of the sequents that involve the given
