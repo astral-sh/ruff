@@ -551,49 +551,60 @@ impl PathAssignments {
         constraint: InterimConstraint<'db>,
     ) {
         let constraints = constraint.into_new(db);
+        let mut tautologies = SmallVec::<[bool; 2]>::new();
         for constraint in &constraints {
             let map = SequentMap::<Constraint<'db>>::for_constraint(db, env, *constraint);
+            tautologies.push(map.sequents.iter().any(
+                |sequent| matches!(sequent, Sequent::SingleTautology { ante } if ante == constraint),
+            ));
             self.add_sequents(db, env, storage, map);
         }
 
-        match constraints.as_slice() {
-            [single] => {
-                if matches!(constraint, InterimConstraint::Old(_)) {
-                    let single_id = storage.intern_constraint(db, env, single.into());
-                    self.sequents.push(Sequent::SingleImplication {
-                        ante: constraint_id,
-                        post: single_id,
-                    });
-                    self.sequents.push(Sequent::SingleImplication {
-                        ante: single_id,
-                        post: constraint_id,
-                    });
-                }
-            }
-            [lower, upper] => {
-                if matches!(constraint, InterimConstraint::Old(_)) {
-                    let lower_id = storage.intern_constraint(db, env, lower.into());
-                    let upper_id = storage.intern_constraint(db, env, upper.into());
-                    self.sequents.push(Sequent::SingleImplication {
-                        ante: constraint_id,
-                        post: lower_id,
-                    });
-                    self.sequents.push(Sequent::SingleImplication {
-                        ante: constraint_id,
-                        post: upper_id,
-                    });
-                    self.sequents.push(Sequent::PairImplication {
-                        ante1: lower_id,
-                        ante2: upper_id,
-                        post: constraint_id,
-                    });
-                }
+        if matches!(constraint, InterimConstraint::Old(_)) {
+            // Project every component from the old constraint so that an explicit old atom can
+            // still contribute evidence through the new sequent rules.
+            let component_ids: SmallVec<[ConstraintId; 2]> = constraints
+                .iter()
+                .map(|component| storage.intern_constraint(db, env, component.into()))
+                .collect();
 
-                let map =
-                    SequentMap::<Constraint<'db>>::for_constraint_pair(db, env, *lower, *upper);
-                self.add_sequents(db, env, storage, map);
+            for &component_id in &component_ids {
+                self.sequents.push(Sequent::SingleImplication {
+                    ante: constraint_id,
+                    post: component_id,
+                });
             }
-            _ => {}
+
+            // The reverse bridge only reconstructs the old constraint's logical truth. Remove
+            // tautological components from that conjunction instead of requiring them to appear as
+            // positive path assignments.
+            let reverse_antecedents: SmallVec<[ConstraintId; 2]> = component_ids
+                .iter()
+                .zip(&tautologies)
+                .filter_map(|(&component_id, &is_tautology)| {
+                    (!is_tautology).then_some(component_id)
+                })
+                .collect();
+            match reverse_antecedents.as_slice() {
+                [] => self.sequents.push(Sequent::SingleTautology {
+                    ante: constraint_id,
+                }),
+                &[ante] => self.sequents.push(Sequent::SingleImplication {
+                    ante,
+                    post: constraint_id,
+                }),
+                &[ante1, ante2] => self.sequents.push(Sequent::PairImplication {
+                    ante1,
+                    ante2,
+                    post: constraint_id,
+                }),
+                _ => {}
+            }
+        }
+
+        if let [lower, upper] = constraints.as_slice() {
+            let map = SequentMap::<Constraint<'db>>::for_constraint_pair(db, env, *lower, *upper);
+            self.add_sequents(db, env, storage, map);
         }
     }
 
