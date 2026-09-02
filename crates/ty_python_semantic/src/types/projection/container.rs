@@ -7,13 +7,13 @@ use crate::subscript::{PyIndex, PySlice};
 use crate::types::tuple::{Tuple, TupleLength, TupleType};
 use crate::types::{
     DivergentType, KnownClass, MemberLookupPolicy, ProgramEnvironment, TupleSpec, Type, UnionType,
-    call::CallArguments,
 };
 use crate::{Db, FxIndexMap};
 
 use super::ProjectionType;
 use super::artifact::{
-    ProjectionOp, ProjectionPath, ProjectionSubscript, StarUnpackPosition, UnpackProjection,
+    ProjectionCallArguments, ProjectionOp, ProjectionPath, ProjectionSubscript, StarUnpackPosition,
+    UnpackProjection,
 };
 use super::evidence::{ProjectionContainerFact, ProjectionEvidenceSet};
 use super::term::ProjectionTerm;
@@ -312,7 +312,7 @@ impl<'db> ProjectionContainer<'db> {
             }
             ProjectionOp::Subscript(ProjectionSubscript::KeyType(_)) => None,
             ProjectionOp::Member(_)
-            | ProjectionOp::CallMethod0(_)
+            | ProjectionOp::Call(_)
             | ProjectionOp::ContextEnter { .. }
             | ProjectionOp::AwaitResult => None,
         }
@@ -330,7 +330,7 @@ impl<'db> ProjectionContainer<'db> {
             ProjectionOp::Unpack(unpack) => Self::project_unpack(db, env, ty, unpack),
             ProjectionOp::Subscript(subscript) => Self::project_subscript(db, env, ty, subscript),
             ProjectionOp::Member(_)
-            | ProjectionOp::CallMethod0(_)
+            | ProjectionOp::Call(_)
             | ProjectionOp::ContextEnter { .. }
             | ProjectionOp::AwaitResult => None,
         }
@@ -569,34 +569,14 @@ impl<'db> ProjectionContainer<'db> {
         }
     }
 
-    pub(super) fn infer_method_call0_type_for_type(
+    pub(super) fn infer_call_type_for_type(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         ty: Type<'db>,
-        method_name: &Name,
+        arguments: ProjectionCallArguments<'db>,
     ) -> Option<Type<'db>> {
-        let Place::Defined(DefinedPlace {
-            ty: method,
-            definedness: Definedness::AlwaysDefined,
-            ..
-        }) = ty
-            .member_lookup_with_policy(
-                db,
-                env,
-                method_name.as_str(),
-                MemberLookupPolicy::NO_INSTANCE_FALLBACK,
-            )
-            .place
-        else {
-            return None;
-        };
-
-        Some(
-            method
-                .try_call(db, env, &CallArguments::none())
-                .ok()?
-                .return_type(db, env),
-        )
+        let arguments = arguments.to_call_arguments(db);
+        Some(ty.try_call(db, env, &arguments).ok()?.return_type(db, env))
     }
 
     pub(super) fn infer_member_type_for_type(
@@ -648,8 +628,8 @@ impl<'db> ProjectionContainer<'db> {
             ProjectionOp::Member(member) => Some(ProjectionTerm::Exact(
                 Self::infer_member_type_for_type(db, env, ty, member.name(db), member.policy())?,
             )),
-            ProjectionOp::CallMethod0(method) => Some(ProjectionTerm::Exact(
-                Self::infer_method_call0_type_for_type(db, env, ty, method.as_name(db))?,
+            ProjectionOp::Call(arguments) => Some(ProjectionTerm::Exact(
+                Self::infer_call_type_for_type(db, env, ty, arguments)?,
             )),
             ProjectionOp::ContextEnter { is_async } => {
                 let mode = EvaluationMode::from_is_async(is_async);

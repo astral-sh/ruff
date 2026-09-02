@@ -3,13 +3,14 @@ use ruff_python_ast::name::Name;
 use ty_python_core::EvaluationMode;
 
 use crate::Db;
+use crate::types::call::CallArguments;
 use crate::types::{
     DivergentType, MemberLookupPolicy, ProgramEnvironment, Type, UnionType,
     subscript::SubscriptError,
 };
 
 use super::artifact::{
-    ProjectionMember, ProjectionMemberName, ProjectionOp, ProjectionPath, ProjectionSubscript,
+    ProjectionCallArguments, ProjectionMember, ProjectionOp, ProjectionPath, ProjectionSubscript,
     ProjectionType, StarUnpackPosition, UnpackProjection,
 };
 use super::container::ProjectionContainer;
@@ -185,56 +186,23 @@ impl<'db> Type<'db> {
         })
     }
 
-    /// Inference-time API: projects a zero-argument method call.
-    pub(crate) fn try_method_call_projection_result(
+    /// Inference-time API: projects a call while recording cycle projection evidence.
+    pub(crate) fn try_call_projection_result(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        method_name: &Name,
+        arguments: &CallArguments<'_, 'db>,
     ) -> Option<ProjectionResult<'db>> {
         if !self.needs_projection_operation(db, env) {
             return None;
         }
 
-        let op = ProjectionOp::CallMethod0(ProjectionMemberName::new(db, method_name));
+        let call_arguments = ProjectionCallArguments::new(db, arguments);
+        let op = ProjectionOp::Call(call_arguments);
         self.try_projection_with_non_cycle_result(db, env, op, |ty| {
-            ProjectionContainer::infer_method_call0_type_for_type(db, env, ty, method_name)
+            ProjectionContainer::infer_call_type_for_type(db, env, ty, call_arguments)
                 .map(ProjectionTerm::Exact)
         })
-    }
-
-    /// Inference-time API: restores unresolved member projections in method-call callee position.
-    ///
-    /// A method call first infers the attribute access used as its callee. If that intermediate
-    /// callee contains an unresolved `Member` projection, fall back to the pre-projection behavior
-    /// where `Divergent.foo(...)` remains `Divergent`, instead of allowing the intermediate bound
-    /// method object to affect the return type.
-    pub(crate) fn member_projection_callee_fallback(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        method_name: &Name,
-    ) -> Self {
-        if !self.has_top_level_cycle_artifact(db) {
-            return self;
-        }
-
-        match self {
-            Type::Projection(projection)
-                if projection.path(db).ops().last().is_some_and(|op| {
-                    matches!(
-                        op,
-                        ProjectionOp::Member(member) if member.name(db) == method_name
-                    )
-                }) =>
-            {
-                Type::Divergent(projection.root(db))
-            }
-            Type::Union(union) => union.map(db, env, |element| {
-                element.member_projection_callee_fallback(db, env, method_name)
-            }),
-            _ => self,
-        }
     }
 
     /// Inference-time API: projects a context-manager enter operation without replay evidence.

@@ -6,8 +6,11 @@
 use ruff_python_ast::name::Name;
 
 use crate::Db;
+use crate::types::call::{Argument, CallArgumentTypes, CallArguments};
 use crate::types::instance::SliceLiteral;
-use crate::types::{DivergentType, KnownClass, MemberLookupPolicy, ProgramEnvironment, Type};
+use crate::types::{
+    DivergentType, KnownClass, MemberLookupPolicy, ProgramEnvironment, Type, TypeContext,
+};
 
 /// A projected view of a cycle root produced while recovering recursive inference.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::SalsaValue)]
@@ -85,7 +88,7 @@ impl<'db> ProjectionPath<'db> {
     }
 }
 
-/// An interned member name used by attribute and method-call projections.
+/// An interned member name used by attribute projections.
 #[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
 pub(super) struct ProjectionMemberName<'db> {
     #[returns(ref)]
@@ -96,11 +99,11 @@ pub(super) struct ProjectionMemberName<'db> {
 impl get_size2::GetSize for ProjectionMemberName<'_> {}
 
 impl<'db> ProjectionMemberName<'db> {
-    pub(super) fn new(db: &'db dyn Db, name: &Name) -> Self {
+    fn new(db: &'db dyn Db, name: &Name) -> Self {
         Self::new_internal(db, name.clone())
     }
 
-    pub(super) fn as_name(self, db: &'db dyn Db) -> &'db Name {
+    fn as_name(self, db: &'db dyn Db) -> &'db Name {
         self.name(db)
     }
 }
@@ -153,6 +156,102 @@ pub(super) struct ProjectionSubscriptKeyType<'db> {
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for ProjectionSubscriptKeyType<'_> {}
 
+/// An interned snapshot of the arguments supplied to a projected call.
+///
+/// The snapshot retains every argument type inferred under a parameter type context. Replaying a
+/// call from inference-time evidence must use the same call binding inputs as the original call.
+#[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
+pub(super) struct ProjectionCallArguments<'db> {
+    #[returns(ref)]
+    arguments: Box<[ProjectionCallArgument<'db>]>,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for ProjectionCallArguments<'_> {}
+
+impl<'db> ProjectionCallArguments<'db> {
+    pub(super) fn new(db: &'db dyn Db, arguments: &CallArguments<'_, 'db>) -> Self {
+        Self::new_internal(
+            db,
+            arguments
+                .iter()
+                .map(|(argument, types)| ProjectionCallArgument {
+                    kind: ProjectionCallArgumentKind::from_argument(argument),
+                    types: ProjectionCallArgumentTypes::from_call_argument_types(types),
+                })
+                .collect::<Box<[_]>>(),
+        )
+    }
+
+    pub(super) fn to_call_arguments(self, db: &'db dyn Db) -> CallArguments<'db, 'db> {
+        let arguments = self.arguments(db);
+        let mut call_arguments = arguments
+            .iter()
+            .map(|argument| (argument.kind.as_argument(), argument.types.fallback))
+            .collect::<CallArguments<'db, 'db>>();
+
+        for (index, argument) in arguments.iter().enumerate() {
+            for (context, ty) in &argument.types.contextual {
+                call_arguments.insert_type(index, TypeContext::new(Some(*context)), *ty);
+            }
+        }
+
+        call_arguments
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, salsa::SalsaValue, get_size2::GetSize)]
+pub(super) struct ProjectionCallArgument<'db> {
+    kind: ProjectionCallArgumentKind,
+    types: ProjectionCallArgumentTypes<'db>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, salsa::SalsaValue, get_size2::GetSize)]
+enum ProjectionCallArgumentKind {
+    Synthetic,
+    Positional,
+    Variadic,
+    Keyword(Name),
+    Keywords,
+}
+
+impl ProjectionCallArgumentKind {
+    fn from_argument(argument: Argument<'_>) -> Self {
+        match argument {
+            Argument::Synthetic => Self::Synthetic,
+            Argument::Positional => Self::Positional,
+            Argument::Variadic => Self::Variadic,
+            Argument::Keyword(name) => Self::Keyword(Name::new(name)),
+            Argument::Keywords => Self::Keywords,
+        }
+    }
+
+    fn as_argument(&self) -> Argument<'_> {
+        match self {
+            Self::Synthetic => Argument::Synthetic,
+            Self::Positional => Argument::Positional,
+            Self::Variadic => Argument::Variadic,
+            Self::Keyword(name) => Argument::Keyword(name.as_str()),
+            Self::Keywords => Argument::Keywords,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, salsa::SalsaValue, get_size2::GetSize)]
+struct ProjectionCallArgumentTypes<'db> {
+    fallback: Option<Type<'db>>,
+    contextual: Box<[(Type<'db>, Type<'db>)]>,
+}
+
+impl<'db> ProjectionCallArgumentTypes<'db> {
+    fn from_call_argument_types(types: &CallArgumentTypes<'db>) -> Self {
+        Self {
+            fallback: types.fallback_type(),
+            contextual: types.contextual_types().collect(),
+        }
+    }
+}
+
 /// A single operation that can be preserved through cycle recovery.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::SalsaValue, get_size2::GetSize)]
 pub(super) enum ProjectionOp<'db> {
@@ -160,9 +259,7 @@ pub(super) enum ProjectionOp<'db> {
     Unpack(UnpackProjection),
     Subscript(ProjectionSubscript<'db>),
     Member(ProjectionMember<'db>),
-    // There is no reason to target only 0-argument methods.
-    // It would be nice to be able to scale it without compromising performance.
-    CallMethod0(ProjectionMemberName<'db>),
+    Call(ProjectionCallArguments<'db>),
     ContextEnter { is_async: bool },
     AwaitResult,
 }

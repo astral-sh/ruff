@@ -89,6 +89,16 @@ impl<'db> CallArgumentTypes<'db> {
             .unwrap_or(Type::unknown())
     }
 
+    /// Returns the argument type inferred without a parameter type context.
+    pub(crate) const fn fallback_type(&self) -> Option<Type<'db>> {
+        self.fallback_type
+    }
+
+    /// Returns the argument type inferred for each parameter type context.
+    pub(crate) fn contextual_types(&self) -> impl Iterator<Item = (Type<'db>, Type<'db>)> + '_ {
+        self.types.iter().map(|(context, ty)| (*context, *ty))
+    }
+
     /// Insert the type of this argument when inferred with the provided type context.
     fn insert(&mut self, tcx: impl Into<TypeContext<'db>>, ty: Type<'db>) {
         match tcx.into().annotation {

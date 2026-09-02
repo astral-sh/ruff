@@ -5153,6 +5153,15 @@ class MethodBox(Generic[ProjectionT]):
     def unwrap(self) -> ProjectionT:
         return self.value
 
+    def unwrap_with(
+        self,
+        dependency: object,
+        *extras: object,
+        flag: bool,
+        **options: object,
+    ) -> ProjectionT:
+        return self.value
+
 class ProjectionMemberTarget:
     def __init__(self) -> None:
         self.next = self
@@ -5229,7 +5238,54 @@ class ProjectionCustomMethodBridge:
 
         reveal_type(self.x)  # revealed: MethodBox[str | int]
         reveal_type(self.y)  # revealed: MethodBox[int | str]
+```
 
+An argument-bearing method call preserves the same correlation. The arguments include positional,
+starred, keyword, and double-starred forms so each call shape participates in recovery:
+
+```py
+class ProjectionCustomMethodArgumentBridge:
+    def __init__(self) -> None:
+        self.x = MethodBox(0)
+        self.y = MethodBox("")
+
+    def read(self, dependency: object) -> None:
+        pair = MethodPair(self.x, self.y)
+        self.x = MethodBox(pair.right().unwrap_with(dependency, *(), flag=True, **{}))
+        self.y = MethodBox(pair.left().unwrap_with(dependency, *(), flag=True, **{}))
+
+        reveal_type(self.x)  # revealed: MethodBox[str | int]
+        reveal_type(self.y)  # revealed: MethodBox[int | str]
+```
+
+A projected callable can also be invoked after it is returned from a method call. This is an
+ordinary call rather than another method call:
+
+```py
+class CallableBox(Generic[ProjectionT]):
+    def __init__(self, value: ProjectionT) -> None:
+        self.value = value
+
+    def __call__(self, dependency: object) -> ProjectionT:
+        return self.value
+
+class ProjectionCustomCallBridge:
+    def __init__(self) -> None:
+        self.x = CallableBox(0)
+        self.y = CallableBox("")
+
+    def read(self, dependency: object) -> None:
+        pair = MethodPair(self.x, self.y)
+        self.x = CallableBox(pair.right()(dependency))
+        self.y = CallableBox(pair.left()(dependency))
+
+        reveal_type(self.x)  # revealed: CallableBox[str | int]
+        reveal_type(self.y)  # revealed: CallableBox[int | str]
+```
+
+Projection recovery also composes with iteration:
+
+```py
 class ViewBox(Generic[ProjectionT]):
     def __init__(self, value: ProjectionT) -> None:
         self.value = value

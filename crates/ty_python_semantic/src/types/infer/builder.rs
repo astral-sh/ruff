@@ -9105,7 +9105,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn infer_call_expression_impl(
         &mut self,
         call_expression: &ast::ExprCall,
-        mut callable_type: Type<'db>,
+        callable_type: Type<'db>,
         call_expression_tcx: TypeContext<'db>,
     ) -> Type<'db> {
         fn report_missing_implicit_constructor_call<'db>(
@@ -9147,10 +9147,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             func,
             arguments,
         } = call_expression;
-
-        if let ast::Expr::Attribute(ast::ExprAttribute { attr, .. }) = func.as_ref() {
-            callable_type = callable_type.member_projection_callee_fallback(db, env, &attr.id);
-        }
 
         // Semantic indexing recognizes only bare empty constructor calls. Confirm that the name
         // still resolves to the corresponding builtin before using later collection constraints.
@@ -9705,12 +9701,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let db = self.db();
-        let return_ty = if arguments.args.is_empty()
-            && arguments.keywords.is_empty()
-            && let ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref()
-            && let Some(projected) = self
-                .expression_type(value)
-                .try_method_call_projection_result(db, env, &attr.id)
+        let return_ty = if let Some(projected) =
+            callable_type.try_call_projection_result(db, env, &call_arguments)
         {
             self.extend_projection_result(projected);
             projected.ty()
