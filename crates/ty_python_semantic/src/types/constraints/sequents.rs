@@ -2563,6 +2563,27 @@ impl<'db> ConcreteLowerBound<'db> {
         // We can infer sequents from `α ≤ T` and `U ≤ β` if α _contains_ U and/or β contains T.
         if !self.typevar.is_same_typevar_as(db, other.typevar) {
             Constraint::add_contravariant_tightened_sequent(db, env, map, self, other);
+
+            // `(T ≤ pivot) ∧ (pivot ≤ U) → (T ≤ U)` when both constraints use the same
+            // fully static pivot type.
+            if !other.bound.is_never()
+                && !other.bound.is_object()
+                && !self.bound.has_typevar(db, env)
+                && !other.bound.has_typevar(db, env)
+                && self.bound.is_static_sequent_eligible(db, env)
+                && other.bound.is_static_sequent_eligible(db, env)
+                && other
+                    .bound
+                    .is_constraint_set_equivalent_to(db, env, self.bound)
+            {
+                let derived = TypeVarRangeBound::new(
+                    db,
+                    ConstraintProvenance::derived(self.provenance, other.provenance),
+                    other.typevar,
+                    self.typevar,
+                );
+                map.add_pair_implication(self.into(), other.into(), derived.into());
+            }
             return;
         }
 
@@ -3185,6 +3206,27 @@ impl<'db> ParamSpecLowerBound<'db> {
         // We can infer sequents from `ξ ≤ P` and `Q ≤ η` if ξ contains Q and/or η contains P.
         if !self.typevar.is_same_typevar_as(db, other.typevar) {
             Constraint::add_contravariant_tightened_sequent(db, env, map, self, other);
+
+            // `(P ≤ pivot) ∧ (pivot ≤ Q) → (P ≤ Q)` when both constraints use the same
+            // fully static pivot type.
+            if !other.bound.is_bottom_paramspec_value(db)
+                && !other.bound.is_top_paramspec_value(db)
+                && !self.bound.has_typevar(db, env)
+                && !other.bound.has_typevar(db, env)
+                && self.bound.is_static_sequent_eligible(db, env)
+                && other.bound.is_static_sequent_eligible(db, env)
+                && other
+                    .bound
+                    .is_constraint_set_equivalent_to(db, env, self.bound)
+            {
+                let derived = TypeVarRangeBound::new(
+                    db,
+                    ConstraintProvenance::derived(self.provenance, other.provenance),
+                    other.typevar,
+                    self.typevar,
+                );
+                map.add_pair_implication(self.into(), other.into(), derived.into());
+            }
             return;
         }
 
