@@ -4602,6 +4602,21 @@ pub(crate) fn report_invalid_typevar_default_reference<'db>(
     }
 }
 
+/// A type parameter of a generic ancestor, independent of its specialization.
+#[derive(PartialEq, Eq, Hash)]
+struct GenericBaseParameter<'db> {
+    origin: StaticClassLiteral<'db>,
+    parameter_index: usize,
+}
+
+/// A non-dynamic type argument and the inheritance path that supplies it.
+struct GenericBaseConstraint<'db> {
+    argument: Type<'db>,
+    alias: GenericAlias<'db>,
+    /// The index in the class's explicit bases list, used to locate the diagnostic annotation.
+    base_index: usize,
+}
+
 /// Report when separate bases contribute incompatible specializations of a generic ancestor.
 ///
 /// For example, if `A` inherits `G[int]` and `B` inherits `G[str]`, neither
@@ -4624,13 +4639,14 @@ pub(crate) fn report_inconsistent_generic_bases<'db>(
 ) -> bool {
     let db = context.db();
     let env = &context.program_environment();
-    // Maps each generic ancestor's class literal to the first
-    // specialization seen and the index of the explicit base it
-    // came from.
-    let mut ancestor_specs =
-        FxHashMap::<StaticClassLiteral<'db>, (GenericAlias<'db>, usize)>::default();
+    // Track the first non-dynamic argument at each position, along with the alias and explicit
+    // base that supplied it. Compatibility with a gradual argument is not transitive: both
+    // `Base[int, str]` and `Base[int, bytes]` are compatible with `Base[int, Any]`, but conflict
+    // with each other.
+    let mut ancestor_constraints =
+        FxHashMap::<GenericBaseParameter<'db>, GenericBaseConstraint<'db>>::default();
 
-    for (i, base) in explicit_bases.iter().enumerate() {
+    for (base_index, base) in explicit_bases.iter().enumerate() {
         let base_class = match base {
             Type::GenericAlias(alias) => ClassType::Generic(*alias),
             Type::ClassLiteral(class) if class.generic_context(db).is_none() => {
@@ -4639,21 +4655,47 @@ pub(crate) fn report_inconsistent_generic_bases<'db>(
             _ => continue,
         };
 
-        for supercls in base_class.iter_mro(db) {
-            let ClassBase::Class(ClassType::Generic(supercls_alias)) = supercls else {
+        // The MRO contains each class only once, but separate inheritance paths can contribute
+        // different specializations. Visit those paths before comparing their type arguments.
+        let mut pending = vec![base_class];
+        let mut seen = FxHashSet::default();
+        while let Some(supercls) = pending.pop() {
+            if !seen.insert(supercls) || ClassBase::Class(supercls).has_cyclic_mro(db) {
+                continue;
+            }
+            let (literal, specialization) = supercls.class_literal_and_specialization(db);
+            pending.extend(literal.explicit_bases(db).iter().rev().filter_map(|base| {
+                ClassBase::try_from_explicit_base(db, env, *base, Some(literal))?
+                    .apply_optional_specialization(db, specialization)
+                    .into_class()
+            }));
+
+            let ClassType::Generic(supercls_alias) = supercls else {
                 continue;
             };
             let origin = supercls_alias.origin(db);
 
-            if let Some(&(earlier_alias, earlier_idx)) = ancestor_specs.get(&origin) {
-                if earlier_alias
-                    .specialization(db)
-                    .types(db)
-                    .iter()
-                    .zip(supercls_alias.specialization(db).types(db))
-                    .any(|(t1, t2)| !t1.is_dynamic() && !t2.is_dynamic() && t1 != t2)
-                {
-                    if earlier_idx == i {
+            for (parameter_index, &argument) in supercls_alias
+                .specialization(db)
+                .types(db)
+                .iter()
+                .enumerate()
+            {
+                if argument.is_dynamic() {
+                    continue;
+                }
+                let earlier = ancestor_constraints
+                    .entry(GenericBaseParameter {
+                        origin,
+                        parameter_index,
+                    })
+                    .or_insert(GenericBaseConstraint {
+                        argument,
+                        alias: supercls_alias,
+                        base_index,
+                    });
+                if earlier.argument != argument {
+                    if earlier.base_index == base_index {
                         return true;
                     }
                     let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, header_range)
@@ -4670,12 +4712,12 @@ pub(crate) fn report_inconsistent_generic_bases<'db>(
                     );
 
                     if let (Some(earlier_base), Some(later_base)) = (
-                        base_nodes.and_then(|nodes| nodes.get(earlier_idx)),
-                        base_nodes.and_then(|nodes| nodes.get(i)),
+                        base_nodes.and_then(|nodes| nodes.get(earlier.base_index)),
+                        base_nodes.and_then(|nodes| nodes.get(base_index)),
                     ) {
                         diagnostic.annotate(context.secondary(earlier_base).message(format_args!(
                             "Earlier class base inherits from `{}`",
-                            earlier_alias.display(db, env)
+                            earlier.alias.display(db, env)
                         )));
                         let later_annotation = context.secondary(later_base);
                         diagnostic.annotate(if later_is_direct {
@@ -4692,7 +4734,7 @@ pub(crate) fn report_inconsistent_generic_bases<'db>(
                     } else {
                         diagnostic.info(format_args!(
                             "Earlier class base inherits from `{}`",
-                            earlier_alias.display(db, env)
+                            earlier.alias.display(db, env)
                         ));
                         if later_is_direct {
                             diagnostic.info(format_args!(
@@ -4709,17 +4751,10 @@ pub(crate) fn report_inconsistent_generic_bases<'db>(
                     diagnostic.set_concise_message(format_args!(
                         "Inconsistent type arguments: class cannot inherit from both `{}` and `{}`",
                         supercls_alias.display(db, env),
-                        earlier_alias.display(db, env)
+                        earlier.alias.display(db, env)
                     ));
                     return true;
                 }
-            } else if !supercls_alias
-                .specialization(db)
-                .types(db)
-                .iter()
-                .all(Type::is_dynamic)
-            {
-                ancestor_specs.insert(origin, (supercls_alias, i));
             }
         }
     }
