@@ -997,14 +997,16 @@ from typing import Any, Protocol
 from ty_extensions import Bottom, Top, static_assert
 from ty_extensions._internal import is_subtype_of
 
-class Constrained[T: (str, bytes)](Protocol):
+class Unbounded[T](Protocol):
     def read(self) -> T: ...
     def other(self) -> Any: ...
 
-static_assert(is_subtype_of(Constrained[Any], Top[Constrained[Any]]))
-static_assert(is_subtype_of(Bottom[Constrained[Any]], Constrained[Any]))
-static_assert(is_subtype_of(Bottom[Constrained[Any]], Top[Constrained[Any]]))
-static_assert(not is_subtype_of(Constrained[str], Top[Constrained[bytes]]))
+static_assert(is_subtype_of(Unbounded[Any], Top[Unbounded[Any]]))
+static_assert(is_subtype_of(Bottom[Unbounded[Any]], Unbounded[Any]))
+static_assert(is_subtype_of(Bottom[Unbounded[Any]], Top[Unbounded[Any]]))
+static_assert(not is_subtype_of(Unbounded[Any], Bottom[Unbounded[Any]]))
+static_assert(not is_subtype_of(Top[Unbounded[Any]], Unbounded[Any]))
+static_assert(not is_subtype_of(Top[Unbounded[Any]], Bottom[Unbounded[Any]]))
 ```
 
 The same relations hold when the type parameter has a bound:
@@ -1017,7 +1019,25 @@ class Bounded[T: str](Protocol):
 static_assert(is_subtype_of(Bounded[Any], Top[Bounded[Any]]))
 static_assert(is_subtype_of(Bottom[Bounded[Any]], Bounded[Any]))
 static_assert(is_subtype_of(Bottom[Bounded[Any]], Top[Bounded[Any]]))
+static_assert(not is_subtype_of(Bounded[Any], Bottom[Bounded[Any]]))
 static_assert(not is_subtype_of(Top[Bounded[Any]], Bounded[Any]))
+static_assert(not is_subtype_of(Top[Bounded[Any]], Bottom[Bounded[Any]]))
+```
+
+The same relations also hold when the type parameter has constraints:
+
+```py
+class Constrained[T: (str, bytes)](Protocol):
+    def read(self) -> T: ...
+    def other(self) -> Any: ...
+
+static_assert(is_subtype_of(Constrained[Any], Top[Constrained[Any]]))
+static_assert(is_subtype_of(Bottom[Constrained[Any]], Constrained[Any]))
+static_assert(is_subtype_of(Bottom[Constrained[Any]], Top[Constrained[Any]]))
+static_assert(not is_subtype_of(Constrained[Any], Bottom[Constrained[Any]]))
+static_assert(not is_subtype_of(Top[Constrained[Any]], Constrained[Any]))
+static_assert(not is_subtype_of(Top[Constrained[Any]], Bottom[Constrained[Any]]))
+static_assert(not is_subtype_of(Constrained[str], Top[Constrained[bytes]]))
 ```
 
 ## Callable
