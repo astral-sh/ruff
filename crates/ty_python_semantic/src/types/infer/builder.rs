@@ -9960,10 +9960,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             {
                                 let mut binding_ty = binding_type(db, definition);
                                 if definition.kind(db).is_loop_header() {
+                                    let header = loop_header_reachability(db, definition);
+                                    // The loop prepass can conservatively include a member that
+                                    // is only mutated on a class-local receiver. An empty header
+                                    // contributes no path to the join, including for presence.
+                                    if header.reachable_bindings.is_empty()
+                                        && header.deleted_reachability.is_always_false()
+                                    {
+                                        continue;
+                                    }
                                     has_deleted_binding |=
-                                        !loop_header_reachability(db, definition)
-                                            .deleted_reachability
-                                            .is_always_false();
+                                        !header.deleted_reachability.is_always_false();
                                     let fallback_ty = self.loop_header_fallback_type(
                                         definition,
                                         narrowed.ty,

@@ -5,8 +5,8 @@ use crate::place::PlaceExpr;
 use crate::symbol::Symbol;
 
 /// Do a pre-walk of a `while` loop to collect all the places that are bound, prior to visiting the
-/// loop with `SemanticIndexBuilder`. This walk includes bindings in nested loops, but not in
-/// nested scopes. (I.e. we don't descend into function bodies or class definitions.) We need this
+/// loop with `SemanticIndexBuilder`. This walk includes bindings in nested loops and member
+/// mutations in eager class bodies, but not bindings in lazy function bodies. We need this
 /// pre-walk so that we can synthesize "loop header definitions" that are visible to the loop body
 /// (and condition). See `LoopHeader`.
 /// TODO: Handle `nonlocal` bindings from nested scopes somehow.
@@ -27,7 +27,8 @@ pub(crate) fn collect_for_loop_bindings(for_stmt: &ast::StmtFor) -> Vec<PlaceExp
 
 /// The visitor that powers `collect_while_loop_bindings` and `collect_for_loop_bindings`.
 ///
-/// This visitor doesn't walk nested function/class definitions since those are different scopes.
+/// Class-local names stay in their scope, but member mutations can affect later loop iterations.
+/// Function bodies are lazy and are not visited.
 #[derive(Debug, Default)]
 pub(crate) struct LoopBindingsVisitor {
     bound_places: Vec<PlaceExpr>,
@@ -139,7 +140,14 @@ impl<'ast> Visitor<'ast> for LoopBindingsVisitor {
             ast::Stmt::ClassDef(node) => {
                 self.bound_places
                     .push(PlaceExpr::Symbol(Symbol::new(node.name.id.clone())));
-                // Don't descend into class bodies - they're different scopes.
+                let mut nested = Self::default();
+                nested.visit_body(&node.body);
+                self.bound_places.extend(
+                    nested
+                        .bound_places
+                        .into_iter()
+                        .filter(|place| matches!(place, PlaceExpr::Member(_))),
+                );
             }
             ast::Stmt::Match(node) => {
                 self.visit_expr(&node.subject);

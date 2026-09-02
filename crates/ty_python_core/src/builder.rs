@@ -31,7 +31,7 @@ use crate::ast_node_ref::AstNodeRef;
 use crate::definition::{
     AnnotatedAssignmentDefinitionNodeRef, AssignmentDefinitionNodeRef, BindingsOwner,
     ComprehensionDefinitionNodeRef, Definition, DefinitionCategory, DefinitionKind,
-    DefinitionNodeKey, DefinitionNodeRef, Definitions, DictKeyAssignmentNodeRef,
+    DefinitionNodeKey, DefinitionNodeRef, DefinitionState, Definitions, DictKeyAssignmentNodeRef,
     ExceptHandlerDefinitionNodeRef, ForStmtDefinitionNodeRef, ImportDefinitionNodeRef,
     ImportFromDefinitionNodeRef, ImportFromSubmoduleDefinitionNodeRef,
     LambdaParameterDefinitionNodeRef, LoopHeaderDefinitionNodeRef, LoopStmtRef,
@@ -40,7 +40,7 @@ use crate::definition::{
 };
 use crate::expression::{Expression, ExpressionKind};
 use crate::frozen::{FrozenMap, FrozenSet};
-use crate::member::MemberExprBuilder;
+use crate::member::{Member, MemberExprBuilder};
 use crate::place::{
     PlaceExpr, PlaceTableBuilder, PossiblyNarrowedPlacesBuilder, ScopedPlaceId,
     match_subject_place_expressions,
@@ -128,6 +128,8 @@ struct ScopeInfo<'ast> {
     this_scope_global_or_nonlocal_declarations: FxHashMap<Name, TextRange>,
     /// Free symbol uses from nested scopes that may resolve to this scope.
     pending_captures: PendingCaptures,
+    /// Members whose enclosing bindings may be invalidated when this eager scope finishes.
+    eager_scope_mutations: FxHashSet<ScopedPlaceId>,
 }
 
 type NestedGlobalOrNonlocalDeclarations = FxHashMap<Name, SmallVec<[NestedDeclaration; 1]>>;
@@ -572,7 +574,86 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             nested_global_or_nonlocal_declarations: FxHashMap::default(),
             this_scope_global_or_nonlocal_declarations: FxHashMap::default(),
             pending_captures: FxHashMap::default(),
+            eager_scope_mutations: FxHashSet::default(),
         });
+    }
+
+    /// Remember mutations of members whose receiver may come from an enclosing scope.
+    /// Class-local receivers do not affect the same spelling in an enclosing scope.
+    fn record_eager_scope_mutation(&mut self, place: ScopedPlaceId) {
+        let scope = self.current_scope();
+        let scope_kind = self.scopes[scope].kind();
+        if !scope_kind.is_eager()
+            || scope_kind.is_module()
+            || self.current_use_def_map().reachability
+                == ScopedReachabilityConstraintId::ALWAYS_FALSE
+        {
+            return;
+        }
+        let PlaceExprRef::Member(member) = self.place_tables[scope].place(place) else {
+            return;
+        };
+        if let Some(symbol_id) =
+            self.place_tables[scope].symbol_id(member.expression().as_ref().symbol_name())
+            && self.place_tables[scope].symbol(symbol_id).is_local()
+        {
+            let bindings: SmallVec<[_; 1]> = self.use_def_maps[scope]
+                .current_bindings(symbol_id.into())
+                .filter(|binding| {
+                    binding.reachability_constraint()
+                        != ScopedReachabilityConstraintId::ALWAYS_FALSE
+                })
+                .map(|binding| binding.binding())
+                .collect();
+            if bindings.iter().all(|binding| {
+                matches!(
+                    self.use_def_maps[scope].definition(*binding),
+                    DefinitionState::Defined(_)
+                )
+            }) {
+                return;
+            }
+        }
+        self.current_scope_info_mut()
+            .eager_scope_mutations
+            .insert(place);
+    }
+
+    /// Discard stale enclosing member bindings after an eager scope executes.
+    ///
+    /// We do not yet propagate the values assigned by nested class bodies. Treat their mutations
+    /// like receiver reassignment: forget both the member and its descendants, then fall back to
+    /// ordinary member lookup. Snapshots for reads inside the child must be recorded first.
+    fn invalidate_eager_scope_mutations(
+        &mut self,
+        popped_scope: FileScopeId,
+        mutations: FxHashSet<ScopedPlaceId>,
+    ) {
+        if mutations.is_empty()
+            || self.current_use_def_map().reachability
+                == ScopedReachabilityConstraintId::ALWAYS_FALSE
+        {
+            return;
+        }
+        for place in mutations.into_iter().sorted_unstable() {
+            let PlaceExprRef::Member(member) = self.place_tables[popped_scope].place(place) else {
+                continue;
+            };
+            let member = Member::new(member.expression().clone());
+            self.add_symbol(Name::new(member.expression().as_ref().symbol_name()));
+            let place = self.add_place(PlaceExpr::Member(member));
+            self.invalidate_narrowing_aliases_for(place);
+            self.current_use_def_map_mut().delete_binding(place);
+            self.delete_associated_bindings(place);
+
+            // Continue through enclosing eager scopes, stopping at the function whose execution
+            // contains the mutation. A class body can skip a receiver local to another class.
+            if self.scopes[self.current_scope()].kind().is_eager() {
+                self.current_scope_info_mut()
+                    .eager_scope_mutations
+                    .insert(place);
+            }
+        }
     }
 
     // Records snapshots of the place states visible from the current eager scope.
@@ -943,6 +1024,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             mut nested_global_or_nonlocal_declarations,
             this_scope_global_or_nonlocal_declarations,
             pending_captures,
+            eager_scope_mutations,
             ..
         } = self
             .scope_stack
@@ -978,6 +1060,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             debug_assert!(self.scope_stack.is_empty());
             return FxHashMap::default();
         }
+
+        self.invalidate_eager_scope_mutations(popped_scope_id, eager_scope_mutations);
 
         // In the common case where we don't have any nested `global` or `nonlocal` declarations at
         // all, short-circuit so that we don't walk the place table for no reason.
@@ -1585,6 +1669,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     }
 
     fn delete_binding(&mut self, place: ScopedPlaceId) {
+        self.record_eager_scope_mutation(place);
         self.current_use_def_map_mut().delete_binding(place);
     }
 
@@ -1735,6 +1820,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         //     x = 1
         // ```
         if !is_loop_header {
+            self.record_eager_scope_mutation(place);
             self.mark_place_bound(place);
             self.invalidate_narrowing_aliases_for(place);
         }

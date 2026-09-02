@@ -265,6 +265,145 @@ def f(item: Item, other: Item):
     item.value  # error: [unresolved-attribute]
 ```
 
+### Presence after an eager scope exits
+
+A class body executes before the enclosing scope continues. Deleting an attribute in the class body
+invalidates an earlier assignment in the enclosing scope. Assigning it again restores presence.
+
+```py
+class Item: ...
+
+def deleted_in_class(item: Item):
+    item.value = 1  # error: [unresolved-attribute]
+
+    class Inner:
+        reveal_type(item.value)  # revealed: Literal[1]
+        del item.value
+
+    item.value  # error: [unresolved-attribute]
+    [item.value for _ in range(1)]  # error: [unresolved-attribute]
+    item.value = 2  # error: [unresolved-attribute]
+    reveal_type(item.value)  # revealed: Literal[2]
+```
+
+The invalidation also reaches enclosing scopes through nested class bodies.
+
+```py
+def deleted_in_nested_class(item: Item):
+    item.value = 1  # error: [unresolved-attribute]
+
+    class Outer:
+        class Inner:
+            del item.value
+
+        item.value  # error: [unresolved-attribute]
+
+    item.value  # error: [unresolved-attribute]
+```
+
+A conditional deletion can leave the attribute missing. An unreachable deletion preserves the
+earlier assignment.
+
+```py
+def conditionally_deleted_in_class(item: Item, condition: bool):
+    item.value = 1  # error: [unresolved-attribute]
+
+    class Inner:
+        if condition:
+            del item.value
+
+    item.value  # error: [unresolved-attribute]
+
+def unreachable_deletion_in_class(item: Item):
+    item.value = 1  # error: [unresolved-attribute]
+
+    class Inner:
+        if False:
+            del item.value
+
+    reveal_type(item.value)  # revealed: Literal[1]
+```
+
+### Presence after receiver reassignment in an eager scope
+
+Replacing a member invalidates assignments to attributes of the previous object.
+
+```py
+class Item: ...
+
+class Box:
+    item: Item
+
+def replaced_in_class(box: Box):
+    box.item.value = 1  # error: [unresolved-attribute]
+
+    class Inner:
+        box.item = Item()
+
+    box.item.value  # error: [unresolved-attribute]
+```
+
+### Eager mutations across enclosing loop iterations
+
+A class body can delete an attribute before the next iteration reads it.
+
+```py
+class Item: ...
+
+def deleted_in_loop(item: Item):
+    item.value = 1  # error: [unresolved-attribute]
+    for _ in range(2):
+        item.value  # error: [unresolved-attribute]
+
+        class Inner:
+            del item.value  # error: [unresolved-attribute]
+```
+
+### Mutations that do not affect enclosing presence
+
+A class-local receiver refers to a different object, so deleting its attribute leaves the enclosing
+scope's assignment intact.
+
+```py
+class Item: ...
+
+item = Item()
+item.value = 1  # error: [unresolved-attribute]
+
+class Inner:
+    item = Item()
+    item.value = 2  # error: [unresolved-attribute]
+    del item.value
+
+reveal_type(item.value)  # revealed: Literal[1]
+```
+
+A loop around the class body also preserves the enclosing receiver's attribute.
+
+```py
+for _ in range(2):
+    class InLoop:
+        item = Item()
+        item.value = 2  # error: [unresolved-attribute]
+        del item.value
+
+    reveal_type(item.value)  # revealed: Literal[1]
+```
+
+A function body does not execute when the function is defined, including class bodies nested inside
+it.
+
+```py
+def outer(item: Item):
+    item.value = 1  # error: [unresolved-attribute]
+
+    def deferred():
+        class Inner:
+            del item.value  # error: [unresolved-attribute]
+
+    reveal_type(item.value)  # revealed: Literal[1]
+```
+
 ### Narrowing chain
 
 ```py
