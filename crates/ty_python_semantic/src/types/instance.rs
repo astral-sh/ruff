@@ -840,9 +840,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             return None;
         }
 
-        // Assignability chooses Bottom for an unmaterialized source and Top for an unmaterialized
-        // target. An explicit Top -> Bottom comparison is different: materialization can make a
-        // recursive requirement incompatible even when the type arguments are compatible.
+        // Assignability chooses `Bottom` for an unmaterialized source and `Top` for an
+        // unmaterialized target. An explicit `Top -> Bottom` comparison is different:
+        // materialization can make a recursive requirement incompatible even when the type
+        // arguments are compatible.
         //
         // For example, consider:
         //
@@ -850,10 +851,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         //       def value(self) -> T: ...
         //       def consume(self, other: P[Any]) -> Any: ...
         //
-        // Comparing Top[P[str]] with Bottom[P[object]] accepts `value`, since str is a subtype of
-        // object. But `consume` returns object in the source and must return Never in the target.
-        // This fixed Any changes independently of T, so neither the finite member nor the nominal
-        // comparison detects the mismatch. Leave that direction to the full structural check.
+        // Comparing `Top[P[str]]` with `Bottom[P[object]]` accepts `value`, since `str` is a
+        // subtype of `object`. But `consume` returns `object` in the source and must return
+        // `Never` in the target. This fixed `Any` changes independently of `T`, so neither the
+        // finite member nor the nominal comparison detects the mismatch. Leave that direction
+        // to the full structural check.
         let is_materialized = match (
             source_protocol.materialization_kind(db),
             protocol.materialization_kind(db),
@@ -888,9 +890,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
         // Remove recursive requirements only from the target, and keep the complete source as
         // evidence that the remaining requirements are satisfied. For example, when comparing
-        // Chain[Chain[int]] with Chain[object], the target's `value() -> object` is non-recursive,
-        // but the source's `value() -> Chain[int]` refers to Chain. Filtering both interfaces would
-        // remove the source member we need to establish that valid return-type comparison.
+        // `Chain[Chain[int]]` with `Chain[object]`, the target's `value() -> object` is
+        // non-recursive, but the source's `value() -> Chain[int]` refers to `Chain`. Filtering both
+        // interfaces would remove the source member we need to establish that valid return-type
+        // comparison.
         let structurally_satisfied = self.check_protocol_interface_pair(
             db,
             ty,
@@ -910,11 +913,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         //       def first(self) -> First: ...
         //       def recursive_second(self, child: Pair[Any, Any]) -> Second: ...
         //
-        // For Top[Pair[int, str]] -> Top[Pair[int, Second]], checking `first` tells us nothing about
-        // Second; only `recursive_second` supplies str <: Second. Check variables in both source
-        // and target arguments, since contravariant callable parameters can reverse the comparison.
-        // Also look through aliases: given `type Identity[T] = T`, the argument Identity[Second]
-        // still needs evidence for Second.
+        // For `Top[Pair[int, str]] -> Top[Pair[int, Second]]`, checking `first` tells us nothing
+        // about `Second`; only `recursive_second` supplies `str <: Second`. Check variables in both
+        // source and target arguments, since contravariant callable parameters can reverse the
+        // comparison. Also look through aliases: given `type Identity[T] = T`, the argument
+        // `Identity[Second]` still needs evidence for `Second`.
         //
         // Merely mentioning a variable is not enough: a skipped member may add its other bound.
         // For example:
@@ -925,10 +928,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         //       def value(self) -> T: ...
         //       def consume(self, other: Invariant[T]) -> None: ...
         //
-        // Comparing Top[Invariant[str]] with Top[Invariant[T]], `value` supplies str <: T, but
-        // `consume` also requires T <: str. The nominal comparison requires both bounds because
-        // T is invariant. Requiring the finite constraints to imply that comparison catches the
-        // missing bound: allowing every supertype of str is not enough to prove T must equal str.
+        // Comparing `Top[Invariant[str]]` with `Top[Invariant[T]]`, `value` supplies `str <: T`,
+        // but `consume` also requires `T <: str`. The nominal comparison requires both bounds
+        // because `T` is invariant. Requiring the finite constraints to imply that comparison
+        // catches the missing bound: allowing every supertype of `str` is not enough to prove
+        // `T` must equal `str`.
         if is_materialized
             && (target_alias
                 .specialization(db)
