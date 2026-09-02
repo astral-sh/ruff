@@ -9507,20 +9507,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         };
 
+        // Explicit function references already report implementation deprecations.
+        // Other calls reference an object or class, not the implicitly invoked method.
+        let is_function_reference = matches!(
+            callable_type,
+            Type::FunctionLiteral(_) | Type::BoundMethod(_)
+        );
         self.report_deprecated_functions(
             func.as_ref(),
             bindings
                 .deprecated_functions(db)
-                // Explicit function references already report implementation deprecations.
-                // Other calls reference an object or class, not the implicitly invoked method.
-                .filter(|(_, function)| {
-                    function.is_overload(db)
-                        || !matches!(
-                            callable_type,
-                            Type::FunctionLiteral(_) | Type::BoundMethod(_)
-                        )
-                })
-                .map(|(_, function)| function),
+                .map(|(_, function)| function)
+                .filter(|function| function.is_overload(db) || !is_function_reference),
         );
 
         if let Some(class) = class {

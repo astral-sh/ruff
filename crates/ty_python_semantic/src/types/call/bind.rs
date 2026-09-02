@@ -893,14 +893,32 @@ impl<'db> Bindings<'db> {
         self.implicit_dunder_init_is_possibly_unbound
     }
 
-    /// Returns the deprecated functions invoked by each union alternative, including active
-    /// downstream constructor methods. An intersection
-    /// only reports deprecations if every member that could implement the call is deprecated.
+    /// Returns the deprecated functions invoked by each union alternative, including downstream
+    /// constructor methods. An intersection only reports deprecations if every member that could
+    /// implement the call is deprecated.
     /// The same source can appear in multiple alternatives; callers deduplicate per expression.
+    ///
+    /// For call-site diagnostics, finalize argument inference first so skipped constructor
+    /// methods have been removed. For example, this call does not invoke the deprecated initializer:
+    ///
+    /// ```python
+    /// from typing_extensions import deprecated
+    ///
+    /// class C:
+    ///     def __new__(cls) -> int:
+    ///         return 0
+    ///
+    ///     @deprecated("old initializer")
+    ///     def __init__(self) -> None: ...
+    ///
+    /// C()  # No initializer deprecation: `__new__` returns an unrelated type.
+    /// ```
     pub(crate) fn deprecated_functions(
         &self,
         db: &'db dyn Db,
     ) -> impl Iterator<Item = (&CallableBinding<'db>, OverloadLiteral<'db>)> {
+        /// Append deprecations without discarding earlier union alternatives when a
+        /// non-deprecated intersection member suppresses the current alternative's warnings.
         fn collect<'a, 'db>(
             db: &'db dyn Db,
             bindings: &'a Bindings<'db>,
@@ -916,7 +934,6 @@ impl<'db> Bindings<'db> {
                             .deprecated_functions(db)
                             .map(|function| (callable, function)),
                     );
-                    // Finalized bindings retain only downstream constructors that can run.
                     if let Some(constructor) = item.as_constructor()
                         && let Some(downstream) = constructor.downstream_constructor()
                     {
