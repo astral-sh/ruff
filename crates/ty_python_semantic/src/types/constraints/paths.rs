@@ -45,6 +45,9 @@ use crate::{Db, FxIndexMap, ProgramEnvironment};
 pub(crate) struct PathAssignments {
     /// All of the rules that we know for inferring derived constraints on the current path.
     sequents: Vec<Sequent>,
+    /// Constraints that are always true. These satisfy sequent antecedents without being stored as
+    /// assignments on every path.
+    tautologies: FxHashSet<ConstraintId>,
     /// Each assignment's source constraint and the first per-path fuel value with which it was
     /// derived.
     pub(super) assignments: FxIndexMap<ConstraintAssignment, (ConstraintId, u16)>,
@@ -140,6 +143,7 @@ impl PathAssignments {
             .collect();
         Self {
             sequents: Vec::default(),
+            tautologies: FxHashSet::default(),
             assignments: FxIndexMap::default(),
             additional_fuels: Vec::default(),
             discovered,
@@ -411,8 +415,29 @@ impl PathAssignments {
         )
     }
 
+    fn extend_sequents(
+        current: &mut Vec<Sequent>,
+        tautologies: &mut FxHashSet<ConstraintId>,
+        additional: &[Sequent],
+    ) {
+        tautologies.extend(additional.iter().filter_map(|sequent| match sequent {
+            Sequent::SingleTautology { ante } => Some(*ante),
+            Sequent::PairImpossibility { .. }
+            | Sequent::SingleImplication { .. }
+            | Sequent::PairImplication { .. } => None,
+        }));
+        current.extend_from_slice(additional);
+    }
+
+    fn assignment_is_tautology(&self, assignment: ConstraintAssignment) -> bool {
+        let ConstraintAssignment::Positive(constraint) = assignment else {
+            return false;
+        };
+        self.tautologies.contains(&constraint)
+    }
+
     fn assignment_holds(&self, assignment: ConstraintAssignment) -> bool {
-        self.assignments.contains_key(&assignment)
+        self.assignments.contains_key(&assignment) || self.assignment_is_tautology(assignment)
     }
 
     fn contains_constraint(&self, constraint: ConstraintId) -> bool {
@@ -423,6 +448,10 @@ impl PathAssignments {
 
     /// Returns the greatest remaining fuel for any derivation of `assignment` on this path.
     fn max_remaining_fuel_for(&self, assignment: ConstraintAssignment) -> Option<u16> {
+        if self.assignment_is_tautology(assignment) {
+            return Some(PATH_FUEL_BUDGET);
+        }
+
         let (index, _, (_, first_fuel)) = self.assignments.get_full(&assignment)?;
         let max_fuel = self
             .additional_fuels
@@ -453,7 +482,11 @@ impl PathAssignments {
         }
 
         let single_map = SequentMap::for_constraint(db, env, storage, constraint);
-        self.sequents.extend_from_slice(&single_map.sequents);
+        Self::extend_sequents(
+            &mut self.sequents,
+            &mut self.tautologies,
+            &single_map.sequents,
+        );
 
         for (existing_index, (existing, _)) in self.discovered.iter().enumerate() {
             if *existing == constraint {
@@ -491,7 +524,11 @@ impl PathAssignments {
             }
 
             let pair_map = SequentMap::for_constraint_pair(db, env, storage, a, b);
-            self.sequents.extend_from_slice(&pair_map.sequents);
+            Self::extend_sequents(
+                &mut self.sequents,
+                &mut self.tautologies,
+                &pair_map.sequents,
+            );
         }
     }
 
@@ -780,6 +817,7 @@ struct PathAssignmentConflict;
 mod tests {
     use super::super::solutions::SolutionWalker;
     use super::super::*;
+    use super::{AssignmentFuel, Sequent};
 
     use crate::db::tests::{TestDb, setup_db};
     use crate::types::{BoundTypeVarInstance, KnownClass, TypeVarVariance};
@@ -803,6 +841,48 @@ mod tests {
         let env = db.program_environment();
         let ty = bound.to_instance(db, &env);
         ConstraintSet::constrain_typevar(db, &env, builder, bound_typevar, ty, ty)
+    }
+
+    #[test]
+    fn tautologies_satisfy_implication_antecedents() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let t = create_typevar(db, "T");
+        let u = create_typevar(db, "U");
+        let v = create_typevar(db, "V");
+        let builder = ConstraintSetBuilder::new();
+
+        let tautology = create_constraint(db, &builder, t, KnownClass::Int);
+        let antecedent = create_constraint(db, &builder, u, KnownClass::Str);
+        let consequent = create_constraint(db, &builder, v, KnownClass::Bytes);
+
+        let mut storage = builder.storage.borrow_mut();
+        let [tautology, antecedent, consequent] = [tautology, antecedent, consequent]
+            .map(|constraint| storage.interior_node_data(constraint.node).constraint);
+        let mut path =
+            PathAssignments::new([tautology, antecedent, consequent], FxHashSet::default());
+        PathAssignments::extend_sequents(
+            &mut path.sequents,
+            &mut path.tautologies,
+            &[
+                Sequent::SingleTautology { ante: tautology },
+                Sequent::PairImplication {
+                    ante1: tautology,
+                    ante2: antecedent,
+                    post: consequent,
+                },
+            ],
+        );
+        assert!(path.assignment_holds(tautology.when_true()));
+
+        path.assignment_queue
+            .push_back((antecedent.when_true(), AssignmentFuel::origin()));
+        path.drain_assignment_queue(db, &env, &mut storage, antecedent)
+            .unwrap();
+
+        assert!(!path.assignments.contains_key(&tautology.when_true()));
+        assert!(path.assignments.contains_key(&consequent.when_true()));
     }
 
     #[test]
