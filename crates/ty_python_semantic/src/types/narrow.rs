@@ -487,15 +487,21 @@ impl ClassInfoConstraintFunction {
             let specialization = if use_generic_filtering {
                 class.unknown_specialization(db)
             } else {
-                // A negative result excludes every specialization of the class.
                 class.top_materialization(db)
             };
-
-            match self {
+            let constraint = match self {
                 ClassInfoConstraintFunction::IsInstance => Type::instance(db, env, specialization),
                 ClassInfoConstraintFunction::IsSubclass => {
                     SubclassOfType::from(db, env, specialization)
                 }
+            };
+
+            if is_positive {
+                constraint
+            } else {
+                // A negative result excludes every specialization of the class. Materialize the
+                // whole type so that this also covers gradual protocol members.
+                constraint.top_materialization(db, env)
             }
         };
 
