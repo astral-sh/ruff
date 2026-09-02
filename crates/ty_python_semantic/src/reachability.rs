@@ -888,7 +888,7 @@ pub(crate) fn narrow_place_by_constraint<'db>(
     let id = evaluator.constraint();
     match id {
         ScopedNarrowingConstraint::ALWAYS_TRUE => return base_ty,
-        ScopedNarrowingConstraint::ALWAYS_FALSE => return NarrowedPlace::new(Type::Never),
+        ScopedNarrowingConstraint::ALWAYS_FALSE => return NarrowedPlace::unreachable(),
         _ => {}
     }
 
@@ -1003,7 +1003,7 @@ enum ProjectedNarrowingCheckpoint<'db> {
 impl<'db> ProjectedNarrowingCheckpoint<'db> {
     fn place(self, base_ty: NarrowedPlace<'db>) -> NarrowedPlace<'db> {
         match self {
-            Self::Unreachable => NarrowedPlace::new(Type::Never),
+            Self::Unreachable => NarrowedPlace::unreachable(),
             Self::Unconstrained => base_ty,
             Self::Narrowed(ty) => ty,
         }
@@ -1106,7 +1106,7 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
         self.base_ty = base_ty;
         match constraint {
             ScopedNarrowingConstraint::ALWAYS_TRUE => return base_ty,
-            ScopedNarrowingConstraint::ALWAYS_FALSE => return NarrowedPlace::new(Type::Never),
+            ScopedNarrowingConstraint::ALWAYS_FALSE => return NarrowedPlace::unreachable(),
             _ => {}
         }
 
@@ -1132,7 +1132,7 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
             return base_ty;
         }
         if root == ProjectedNarrowingNodeId::ALWAYS_FALSE {
-            return NarrowedPlace::new(Type::Never);
+            return NarrowedPlace::unreachable();
         }
         self.graph.record_reference(root);
 
@@ -1546,7 +1546,7 @@ impl<'db> ProjectedNarrowingContext<'_, 'db> {
     ) -> NarrowedPlace<'db> {
         let db = self.db;
         if id == ProjectedNarrowingNodeId::ALWAYS_FALSE {
-            return NarrowedPlace::new(Type::Never);
+            return NarrowedPlace::unreachable();
         }
 
         if id == ProjectedNarrowingNodeId::ALWAYS_TRUE {

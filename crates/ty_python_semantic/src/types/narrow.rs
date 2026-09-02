@@ -720,8 +720,8 @@ impl ClassInfoConstraintFunction {
 /// A place's value type and positive evidence that it is present.
 ///
 /// `known_present = false` leaves definedness to ordinary member lookup; it does not establish
-/// absence. `Never` represents an unreachable path, which contributes neither a value type nor
-/// presence at a control-flow join.
+/// absence. Unreachable paths have type `Never` and contribute neither a value type nor presence
+/// at a control-flow join.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct NarrowedPlace<'db> {
     pub(crate) ty: Type<'db>,
@@ -736,6 +736,14 @@ impl<'db> NarrowedPlace<'db> {
         }
     }
 
+    /// An unreachable path contributes neither values nor missingness at a control-flow join.
+    pub(crate) fn unreachable() -> Self {
+        Self {
+            ty: Type::Never,
+            known_present: true,
+        }
+    }
+
     /// Apply flow facts after ordinary lookup and write validation, preserving lookup qualifiers.
     ///
     /// An assignment can establish presence for error recovery even when the write is invalid:
@@ -747,16 +755,16 @@ impl<'db> NarrowedPlace<'db> {
     /// c.value      # Does not repeat the missing-attribute error.
     /// ```
     ///
-    /// An unreachable place becomes a defined `Never` to avoid missing-attribute errors there.
+    /// A `Never`-valued member can still be missing; only positive presence evidence changes
+    /// definedness.
     pub(crate) fn apply_to(self, mut member: PlaceAndQualifiers<'db>) -> PlaceAndQualifiers<'db> {
         member = member.map_type(|_| self.ty);
-        member.place = match (self.ty, self.known_present, member.place) {
-            (Type::Never, _, _) => Place::bound(Type::Never),
-            (_, true, Place::Defined(defined)) => {
+        member.place = match (self.known_present, member.place) {
+            (true, Place::Defined(defined)) => {
                 Place::Defined(defined.with_definedness(Definedness::AlwaysDefined))
             }
-            (_, true, Place::Undefined) => Place::bound(self.ty),
-            (_, false, place) => place,
+            (true, Place::Undefined) => Place::bound(self.ty),
+            (false, place) => place,
         };
         member
     }
@@ -772,15 +780,12 @@ impl<'db> NarrowedPlaceBuilder<'db> {
     pub(crate) fn new(db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Self {
         Self {
             types: UnionBuilder::new(db, env),
-            known_present: false,
+            known_present: true,
         }
     }
 
     pub(crate) fn add(&mut self, place: NarrowedPlace<'db>) {
-        if !place.ty.is_never() {
-            self.known_present =
-                (self.types.is_empty() || self.known_present) && place.known_present;
-        }
+        self.known_present &= place.known_present;
         self.types.add_in_place(place.ty);
     }
 
