@@ -15,7 +15,6 @@ use crate::types::equality::{
 };
 use crate::types::signatures::CallableSignature;
 use crate::types::tuple::TupleType;
-use crate::types::visitor::any_over_type;
 use crate::types::{
     CallableType, ClassBase, ClassLiteral, EnumLiteralType, IntersectionBuilder, KnownClass,
     Parameter, Parameters, Signature, SpecialFormType, Type, TypeContext,
@@ -1017,7 +1016,7 @@ fn exact_tuple_sequence_pattern_fallthrough_type<'db>(
     if tuple
         .all_elements()
         .iter()
-        .any(|element| any_over_type(db, env, *element, true, |ty| ty.is_dynamic()))
+        .any(|element| !element.is_fully_static(db, env))
     {
         return Ok(None);
     }

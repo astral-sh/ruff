@@ -35,7 +35,6 @@ use crate::{
         context::InferContext,
         diagnostic::{INVALID_PROTOCOL, report_undeclared_protocol_member},
         generics::Specialization,
-        signatures::walk_signature,
     },
 };
 use ty_python_core::{definition::Definition, place::ScopedPlaceId, place_table, use_def_map};
@@ -706,9 +705,9 @@ pub(super) fn walk_protocol_instance_member<'db, V: super::visitor::TypeVisitor<
             for signature in callable.signatures(db) {
                 if signature.has_implicit_positional_receiver_annotation() {
                     let signature = signature.bind_self(db, env, Some(receiver_ty));
-                    walk_signature(db, &signature, visitor);
+                    visitor.visit_signature(db, &signature);
                 } else {
-                    walk_signature(db, signature, visitor);
+                    visitor.visit_signature(db, signature);
                 }
             }
         }
@@ -2294,7 +2293,7 @@ fn descriptor_decorated_protocol_member<'db>(
     // variable can currently materialize that variable as `Unknown`. Reducing the descriptor to
     // its `__get__` result would then erase the remaining descriptor structure and weaken the
     // protocol member to a bare `Unknown`.
-    if super::visitor::any_over_type(db, env, descriptor_ty, false, |ty| ty.is_unknown()) {
+    if super::visitor::any_over_type(db, env, descriptor_ty, |ty| ty.is_unknown()) {
         return None;
     }
 

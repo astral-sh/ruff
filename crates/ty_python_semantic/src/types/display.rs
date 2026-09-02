@@ -601,10 +601,6 @@ impl<'db> TypeVisitor<'db> for AmbiguousNameCollector<'_, 'db> {
         self.env
     }
 
-    fn should_visit_lazy_type_attributes(&self) -> bool {
-        false
-    }
-
     fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
         match ty {
             Type::ClassLiteral(class) => self.record_class(db, class),

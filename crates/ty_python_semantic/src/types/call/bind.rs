@@ -147,7 +147,11 @@ fn generic_contexts_mentioned_in_type<'db>(
         recursion_guard: TypeCollector<'db>,
     }
 
-    impl<'db> GenericContextCollector<'_, 'db> {
+    impl<'db> TypeVisitor<'db> for GenericContextCollector<'_, 'db> {
+        fn program_environment(&self) -> &ProgramEnvironment<'db> {
+            self.env
+        }
+
         fn visit_signature(&self, db: &'db dyn Db, signature: &Signature<'db>) {
             if let Some(generic_context) = signature.generic_context {
                 self.generic_contexts.borrow_mut().insert(generic_context);
@@ -159,22 +163,6 @@ fn generic_contexts_mentioned_in_type<'db>(
                 }
             }
             self.visit_type(db, signature.return_ty);
-        }
-    }
-
-    impl<'db> TypeVisitor<'db> for GenericContextCollector<'_, 'db> {
-        fn program_environment(&self) -> &ProgramEnvironment<'db> {
-            self.env
-        }
-
-        fn should_visit_lazy_type_attributes(&self) -> bool {
-            false
-        }
-
-        fn visit_callable_type(&self, db: &'db dyn Db, callable: CallableType<'db>) {
-            for signature in &callable.signatures(db).overloads {
-                self.visit_signature(db, signature);
-            }
         }
 
         fn visit_function_type(&self, db: &'db dyn Db, function: FunctionType<'db>) {
@@ -6700,7 +6688,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         let parameters_contain_typevartuple = declared_callables.iter().any(|callable| {
             callable.signatures(db).iter().any(|signature| {
                 signature.parameters().iter().any(|parameter| {
-                    any_over_type(db, self.env, parameter.annotated_type(), false, |ty| {
+                    any_over_type(db, self.env, parameter.annotated_type(), |ty| {
                         matches!(
                             ty,
                             Type::TypeVar(typevar) if typevar.is_typevartuple(db)
@@ -7291,10 +7279,6 @@ fn inferable_typevar_occurrences<'db>(
             self.env
         }
 
-        fn should_visit_lazy_type_attributes(&self) -> bool {
-            false
-        }
-
         fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
             if let Type::TypeVar(typevar) = ty {
                 let identity = if typevar.is_paramspec(db) {
@@ -7621,7 +7605,7 @@ impl<'db> Binding<'db> {
                 parameter_type.apply_specialization(db, specialization)
             });
 
-        (!parameter_type.has_dynamic(db, env)
+        (parameter_type.is_fully_static(db, env)
             && !parameter_type.has_typevar_or_typevar_instance(db, env))
         .then_some(parameter_type)
     }
@@ -7872,7 +7856,7 @@ impl<'db> Binding<'db> {
                 let argument_constraints = self
                     .merged_specialization(db)
                     .and_then(|specialization| specialization.get(db, typevar))
-                    .filter(|ty| !ty.has_dynamic(db, env))
+                    .filter(|ty| ty.is_fully_static(db, env))
                     .map(|ty| ty.promote(db, env));
 
                 // TODO: We should similarly combine both the call expression and argument constraints

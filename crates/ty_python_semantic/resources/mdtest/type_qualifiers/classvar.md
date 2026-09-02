@@ -172,6 +172,24 @@ class D[T]:
     y: ClassVar[dict[str, T]]
 ```
 
+An alias does not hide a type variable from `ClassVar`. An unused argument is permitted because it
+does not affect the alias's value:
+
+```py
+type Alias[T] = T
+type Ignored[T] = int
+type Recursive[T] = list[Recursive[list[T]]]
+
+class Aliased[T]:
+    # error: [invalid-type-form] "`ClassVar` cannot contain type variables"
+    generic: ClassVar[Alias[T]]
+
+    concrete: ClassVar[Ignored[T]]
+
+    # error: [invalid-type-form] "`ClassVar` cannot contain type variables"
+    recursive: ClassVar[Recursive[T]]
+```
+
 ## `ClassVar` can contain `Self`
 
 `Self` is allowed inside `ClassVar`.
@@ -199,6 +217,19 @@ reveal_type(Base.all_instances)  # revealed: list[Base]
 class Sub(Base): ...
 
 reveal_type(Sub.all_instances)  # revealed: list[Sub]
+```
+
+`ClassVar[Self]` is also valid in a generic class. Type parameters in `Self`'s bound do not count as
+type variables in the annotation:
+
+```py
+from typing import Generic, TypeVar
+
+GenericT = TypeVar("GenericT")
+
+class GenericBase(Generic[GenericT]):
+    direct: ClassVar[Self]
+    nested: ClassVar[list[Self]]
 ```
 
 Assignments through class objects should bind `Self` when writing a `ClassVar`, matching read-side
@@ -246,6 +277,120 @@ class DynamicSaved:
 def store_any(cls: type[Any], value: Any) -> None:
     cls.count = value
     reveal_type(cls.count)  # revealed: Any
+```
+
+## Protocols with generic methods
+
+Type variables bound by a protocol's methods do not make the protocol itself generic. A `ClassVar`
+can therefore store a callback with a generic method:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import ClassVar, Protocol
+
+class Callback(Protocol):
+    def __call__[T](self, value: T) -> T: ...
+
+class Holder:
+    callback: ClassVar[Callback]
+```
+
+This remains valid when the protocol is defined inside a class or function:
+
+```py
+class Outer:
+    class Callback(Protocol):
+        def __call__[T](self, value: T) -> T: ...
+
+    callback: ClassVar[Callback]
+
+def _() -> None:
+    class Callback(Protocol):
+        def __call__[T](self, value: T) -> T: ...
+
+    class Holder:
+        callback: ClassVar[Callback]
+```
+
+Legacy type variables used only in a method signature are bound to that method:
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+class LegacyOuter:
+    class Callback(Protocol):
+        def __call__(self, value: T) -> T: ...
+
+    callback: ClassVar[Callback]
+
+def _() -> None:
+    class Callback(Protocol):
+        def __call__(self, value: T) -> T: ...
+
+    class Holder:
+        callback: ClassVar[Callback]
+```
+
+A `ParamSpec` declared by a generic method is also local to that method:
+
+```py
+def _() -> None:
+    class Callback(Protocol):
+        def __call__[**P](self, *args: P.args, **kwargs: P.kwargs) -> None: ...
+
+    class Holder:
+        callback: ClassVar[Callback]
+```
+
+A generic method can return the protocol itself without introducing a free type variable:
+
+```py
+def _() -> None:
+    class Recursive(Protocol):
+        def method[T](self, value: T) -> "Recursive": ...
+
+    class Holder:
+        callback: ClassVar[Recursive]
+```
+
+## Protocols that capture outer type variables
+
+A local protocol that captures an outer type variable depends on the enclosing specialization. It
+cannot be used in a `ClassVar` annotation:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import ClassVar, Protocol
+
+def _[T]() -> None:
+    class Captured(Protocol):
+        value: T
+
+    class Holder:
+        # error: [invalid-type-form] "`ClassVar` cannot contain type variables"
+        value: ClassVar[Captured]
+```
+
+Binding `U` on a method does not hide an outer `T` used in the same signature:
+
+```py
+def _[T]() -> None:
+    class Captured(Protocol):
+        def method[U](self, value: U) -> tuple[U, T]: ...
+
+    class Holder:
+        # error: [invalid-type-form] "`ClassVar` cannot contain type variables"
+        value: ClassVar[Captured]
 ```
 
 ## Assignments through generic aliases

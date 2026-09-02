@@ -877,6 +877,55 @@ def excludes_bounded_generic_subclass(
     return cls
 ```
 
+### Strict narrowing preserves type-variable bounds
+
+Narrowing `Covariant[T]` to `Invariant` does not materialize `T` itself. A value returned as `T`
+keeps its bound.
+
+```toml
+[environment]
+python-version = "3.12"
+
+[analysis]
+strict-generic-narrowing = true
+```
+
+```py
+class Covariant[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+class Invariant[T](Covariant[T]):
+    def set(self, value: T) -> None: ...
+
+def _[T: int](value: Covariant[T]) -> None:
+    if isinstance(value, Invariant):
+        reveal_type(value.get().bit_length())  # revealed: int
+```
+
+This also preserves gradual arguments in the bound. `Invariant[Any]` still accepts writes of any
+type:
+
+```py
+from typing import Any
+
+def _[T: Invariant[Any]](value: Covariant[T]) -> None:
+    if isinstance(value, Invariant):
+        reveal_type(value.get().get())  # revealed: Any
+        value.get().set(1)
+```
+
+The same applies when narrowing a sequence of lists. Each list retains its `Any` element type:
+
+```py
+from collections.abc import Sequence
+
+def _[T: list[Any]](values: Sequence[T]) -> None:
+    if isinstance(values, list):
+        reveal_type(values[0][0])  # revealed: Any
+        values[0].append(1)
+```
+
 ### Gradual mode
 
 ```toml

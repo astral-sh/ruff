@@ -96,7 +96,7 @@ pub use crate::types::method::{BoundMethodType, KnownBoundMethodType, WrapperDes
 use crate::types::mro::{MroIterator, StaticMroError};
 pub(crate) use crate::types::narrow::{NarrowingConstraint, infer_narrowing_constraints};
 use crate::types::newtype::NewType;
-use crate::types::signatures::{ConcatenateTail, walk_signature};
+use crate::types::signatures::ConcatenateTail;
 pub(crate) use crate::types::signatures::{Parameter, Parameters};
 use crate::types::special_form::TypeQualifier;
 use crate::types::tuple::TupleSpec;
@@ -111,9 +111,7 @@ pub use crate::types::typevar::{BoundTypeVarInstance, TypeVarKind};
 use crate::types::typevar::{TypeVarInstance, TypeVarSet};
 pub use crate::types::variance::TypeVarVariance;
 use crate::types::variance::VarianceInferable;
-use crate::types::visitor::{
-    any_over_type, any_over_type_including_alias_arguments, dynamic_content,
-};
+use crate::types::visitor::{any_over_type, dynamic_content};
 use crate::{Db, FxOrderSet, HasType, NameKind, Program, SemanticModel};
 pub(crate) use class::{ClassLiteral, ClassType, GenericAlias, StaticClassLiteral};
 pub use class::{KnownClass, MethodDecorator, SlotDescriptorType};
@@ -2064,6 +2062,9 @@ impl<'db> Type<'db> {
         })
     }
 
+    /// Return whether the type is known to contain no dynamic types. Type variables are opaque.
+    ///
+    /// This does not imply that materialization preserves its type-variable bounds.
     fn is_fully_static(self, db: &'db dyn Db, env: &ProgramEnvironment) -> bool {
         dynamic_content(db, env, self).is_absent()
     }
@@ -2107,7 +2108,7 @@ impl<'db> Type<'db> {
 
         // Type alias bodies cannot declare `Self`, but their explicit type arguments can
         // contain the `Self` from an enclosing method or class.
-        any_over_type_including_alias_arguments(db, env, self, |ty| {
+        any_over_type(db, env, self, |ty| {
             ty.as_typevar().is_some_and(|tv| tv.typevar(db).is_self(db))
         })
     }
@@ -2191,10 +2192,10 @@ impl<'db> Type<'db> {
         // still ensures convergence in cases that are prone to oscillation.
         if cycle.iteration() <= crate::TAINTED_CYCLES {
             let self_degraded_by_overload =
-                any_over_type(db, env, self, false, |ty| {
+                any_over_type(db, env, self, |ty| {
                     matches!(ty, Type::Dynamic(DynamicType::AmbiguousOverload))
-                }) && !any_over_type(db, env, self, false, |ty| ty.is_divergent())
-                    && any_over_type(db, env, previous, false, |ty| ty.is_divergent());
+                }) && !any_over_type(db, env, self, |ty| ty.is_divergent())
+                    && any_over_type(db, env, previous, |ty| ty.is_divergent());
             // Generally, the precision of type inference improves with each iteration.
             // However, overload is an exception; as iterations progress, overload matching may become ambiguous, and a reversal of precision can occur.
             // This kind of precision degradation can be determined by whether the type contains `DynamicType::AmbiguousOverload`.
@@ -2525,8 +2526,9 @@ impl<'db> Type<'db> {
         )
     }
 
+    /// Look for stored dynamic types without expanding lazy attributes.
     fn has_dynamic(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
-        any_over_type(db, env, self, false, |ty| ty.is_dynamic())
+        any_over_type(db, env, self, |ty| ty.is_dynamic())
     }
 
     const fn as_special_form(self) -> Option<SpecialFormType> {

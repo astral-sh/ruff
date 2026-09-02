@@ -5,8 +5,8 @@ use smallvec::SmallVec;
 use strum::IntoEnumIterator;
 
 use super::{ArgumentsIter, TypeInferenceBuilder};
+use crate::TypeQualifiers;
 use crate::types::class::{ClassLiteral, DynamicTypedDictAnchor, DynamicTypedDictLiteral};
-use crate::types::cyclic::ActiveRecursionDetector;
 use crate::types::diagnostic::{
     INVALID_ARGUMENT_TYPE, INVALID_TYPE_FORM, MISSING_ARGUMENT, TOO_MANY_POSITIONAL_ARGUMENTS,
     UNKNOWN_ARGUMENT, report_mismatched_type_name,
@@ -17,37 +17,12 @@ use crate::types::typed_dict::{
     functional_typed_dict_field, infer_unpacked_keyword_types, typed_dict_with_relaxed_keys,
     validate_typed_dict_constructor, validate_typed_dict_dict_literal,
 };
+use crate::types::visitor::any_over_type_expanding_aliases;
 use crate::types::{
     ClassType, IntersectionType, KnownClass, Type, TypeAndQualifiers, TypeContext, TypedDictType,
     TypingModule, any_over_type,
 };
-use crate::{Db, ProgramEnvironment, TypeQualifiers};
 use ty_python_core::definition::Definition;
-
-/// Returns whether a field type contains a `TypedDict` with unresolved type variables.
-///
-/// Structural wrappers and type aliases are traversed. Revisiting an alias definition counts as a
-/// match so aliases that grow with every specialization cannot recurse indefinitely:
-///
-/// ```python
-/// type Growing[T] = T | Growing[list[T]]
-/// ```
-fn contains_generic_typed_dict<'db>(
-    db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
-    ty: Type<'db>,
-    active_aliases: &ActiveRecursionDetector<Definition<'db>>,
-) -> bool {
-    any_over_type(db, env, ty, false, |nested| match nested {
-        Type::TypedDict(_) => nested.has_typevar(db, env),
-        Type::TypeAlias(alias) => active_aliases.visit(
-            &alias.definition(db),
-            || true,
-            || contains_generic_typed_dict(db, env, alias.value_type(db), active_aliases),
-        ),
-        _ => false,
-    })
-}
 
 /// The shape of a `TypedDict` constructor call that affects how we prepare it for inference.
 #[derive(Debug, Clone, Copy)]
@@ -542,7 +517,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             .as_static()
             .zip(call_expression_tcx.annotation)
             .is_some_and(|(class_literal, annotation)| {
-                any_over_type(db, env, annotation.resolve_type_alias(db), false, |ty| {
+                any_over_type(db, env, annotation.resolve_type_alias(db), |ty| {
                     ty.resolve_type_alias(db)
                         .specialization_of(db, env, class_literal)
                         .is_some_and(|specialization| {
@@ -560,12 +535,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             && arguments.keywords.iter().all(|keyword| {
                 let permits_field_inference = |name: &str| {
                     typed_dict.item(db, name).is_none_or(|field| {
-                        !contains_generic_typed_dict(
-                            db,
-                            env,
-                            field.declared_ty,
-                            &ActiveRecursionDetector::default(),
-                        )
+                        !any_over_type_expanding_aliases(db, env, field.declared_ty, |ty| {
+                            ty.is_typed_dict() && ty.has_typevar(db, env)
+                        })
                     })
                 };
 

@@ -1132,6 +1132,30 @@ class Bad[S = T, T = int]: ...
 class AlsoBad[S = list[T], T = int]: ...
 ```
 
+### Defaults referencing later type parameters through aliases
+
+A default cannot depend on a later type parameter through an alias. An alias that ignores its
+argument instead leaves a concrete default, which is valid:
+
+```py
+type Alias[T] = T
+type Ignored[T] = int
+
+# error: [invalid-generic-class] "Default of `S` cannot reference later type parameter `T`"
+class X[S = Alias[T], T = int]: ...
+class Y[S = Ignored[T], T = int]: ...
+```
+
+A recursive alias also retains the dependency, even when each level of recursion changes its type
+argument:
+
+```py
+type Recursive[T] = list[Recursive[list[T]]]
+
+# error: [invalid-generic-class] "Default of `S` cannot reference later type parameter `T`"
+class Z[S = Recursive[T], T = int]: ...
+```
+
 ## Cyclic class definitions
 
 ### F-bounded quantification

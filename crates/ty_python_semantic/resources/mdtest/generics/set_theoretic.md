@@ -813,12 +813,51 @@ type GrowingAlias[T] = T | list[Co[GrowingAlias[list[T]]] & Child[object]]
 class GrowingRecord[T](TypedDict):
     child: Co[GrowingRecord[list[T]]] & Child[object]
 
+class GrowingProtocol[T](Protocol):
+    child: GrowingProtocol[list[T]]
+
 def _(
     alias: Co[GrowingAlias[int]] & Child[object],
     record: Co[GrowingRecord[int]] & Child[object],
+    protocol: Co[GrowingProtocol[int]] & Child[object],
 ):
     reveal_type(alias)  # revealed: Co[GrowingAlias[int]] & Child[object]
     reveal_type(record)  # revealed: Co[GrowingRecord[int]] & Child[object]
+    reveal_type(protocol)  # revealed: Co[GrowingProtocol[int]] & Child[object]
+```
+
+We also leave the intersection unsimplified when a growing specialization appears in a non-generic
+protocol's members or a type variable's bound:
+
+```pyi
+class Wrapper(Protocol):
+    value: GrowingAlias[int]
+
+def _[T: GrowingAlias[int]](
+    protocol: Co[Wrapper] & Child[object],
+    bound: Co[T] & Child[object],
+):
+    reveal_type(protocol)  # revealed: Co[Wrapper] & Child[object]
+    reveal_type(bound)  # revealed: Co[T@_] & Child[object]
+```
+
+A default does not constrain the type variable's current value, so it does not prevent
+simplification:
+
+```pyi
+def _[T = GrowingAlias[int]](value: Co[T] & Child[object]):
+    reveal_type(value)  # revealed: Child[T@_]
+```
+
+Explicit protocol arguments still participate in nominal comparisons. A growing specialization
+prevents simplification even if the protocol's members do not use the argument:
+
+```pyi
+class Unused[T](Protocol):
+    value: int
+
+def _(value: Co[Unused[GrowingAlias[int]]] & Child[object]):
+    reveal_type(value)  # revealed: Co[Unused[GrowingAlias[int]]] & Child[object]
 ```
 
 ### Inherited properties with recursive protocol bounds

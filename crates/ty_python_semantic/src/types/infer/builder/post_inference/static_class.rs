@@ -54,7 +54,7 @@ use crate::{
         tuple::Tuple,
         typevar::TypeVarInstance,
         variance::VarianceInferable,
-        visitor::find_over_type,
+        visitor::find_over_expanded_type,
     },
 };
 use crate::{attribute_assignments, types::diagnostic::abstract_method_span};
@@ -951,7 +951,7 @@ pub(crate) fn check_static_class_definitions<'db>(
                     continue;
                 };
 
-                let first_bad_tvar = find_over_type(db, env, default_ty, false, |t| {
+                let first_bad_tvar = find_over_expanded_type(db, env, default_ty, |t| {
                     let tvar = match t {
                         Type::TypeVar(tvar) => tvar.typevar(db),
                         Type::KnownInstance(KnownInstanceType::TypeVar(tvar)) => tvar,

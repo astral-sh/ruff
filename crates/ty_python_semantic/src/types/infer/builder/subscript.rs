@@ -27,12 +27,13 @@ use crate::types::typed_dict::{
     TypedDictAssignmentKind, TypedDictExtraItems, TypedDictKeyAssignment,
 };
 use crate::types::typevar::{BindingContext, TypeVarSet};
+use crate::types::visitor::any_over_expanded_type;
 use crate::types::{
     BoundTypeVarInstance, CallArguments, CallDunderError, CallableBinding, CycleDetector,
     DisplaySettings, DynamicType, InternedType, KnownClass, KnownInstanceType, LintDiagnosticGuard,
     MemberLookupPolicy, Parameter, Parameters, SpecialFormType, StaticClassLiteral, Type,
     TypeAliasType, TypeAndQualifiers, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
-    UnionType, UnionTypeInstance, any_over_type, todo_type,
+    UnionType, UnionTypeInstance, todo_type,
 };
 use crate::{Db, FxOrderSet, ProgramEnvironment};
 use ty_python_core::definition::Definition;
@@ -2559,9 +2560,9 @@ fn legacy_generic_class_context<'db>(
             )
         {
             return Err(LegacyGenericContextError::TypeVarTupleMustBeUnpacked(None));
-        } else if any_over_type(db, env, argument_ty, true, |inner_ty| match inner_ty {
-            Type::NominalInstance(nominal) => matches!(
-                nominal.known_class(db),
+        } else if any_over_expanded_type(db, env, argument_ty, |ty| match ty {
+            Type::NominalInstance(instance) => matches!(
+                instance.known_class(db),
                 Some(KnownClass::TypeVarTuple | KnownClass::ExtensionsTypeVarTuple)
             ),
             _ => false,

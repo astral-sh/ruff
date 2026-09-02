@@ -183,6 +183,143 @@ def takes_list(value: ListAlias) -> None:
 takes_list([1])
 ```
 
+### Nested specializations of the same alias
+
+`Nested[Nested[int]]` specializes the same alias twice without recursion. A containing legacy alias
+still replaces its own type parameter and preserves the nested specializations:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypeAlias, TypeVar
+
+type Nested[U] = list[U]
+
+T = TypeVar("T")
+Alias: TypeAlias = tuple[T, Nested[Nested[int]]]
+
+def _(x: Alias[str]) -> None:
+    reveal_type(x)  # revealed: tuple[str, Nested[Nested[int]]]
+    y: int = x[0]  # error: [invalid-assignment]
+```
+
+### Specializing aliases containing recursive aliases
+
+A nested PEP 695 alias can be recursive without referring back to the containing legacy alias. We
+can still specialize the legacy alias's type parameter:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypeAlias, TypeVar
+
+type Recursive[U] = list[Recursive[list[U]]]
+
+T = TypeVar("T")
+Alias: TypeAlias = tuple[T, Recursive[int]]
+
+def _(x: Alias[str]) -> None:
+    reveal_type(x)  # revealed: tuple[str, Recursive[int]]
+    y: int = x[0]  # error: [invalid-assignment]
+```
+
+The nested alias can also contain a recursive legacy alias without preventing specialization:
+
+```py
+LegacyRecursive: TypeAlias = int | list["LegacyRecursive"]
+type Nested = LegacyRecursive
+
+NestedAlias: TypeAlias = tuple[T, Nested]
+
+def _(x: NestedAlias[str]) -> None:
+    reveal_type(x)  # revealed: tuple[str, Nested]
+    y: int = x[0]  # error: [invalid-assignment]
+```
+
+### Specializing aliases containing recursive structural types
+
+A protocol's recursive members do not make a containing legacy alias recursive, so they do not
+prevent specializing its type parameter:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Protocol, TypeAlias, TypeVar, TypedDict
+
+class Recursive[U](Protocol):
+    next: Recursive[list[U]]
+
+T = TypeVar("T")
+Alias: TypeAlias = tuple[T, Recursive[int]]
+
+def _(x: Alias[str]) -> None:
+    reveal_type(x)  # revealed: tuple[str, Recursive[int]]
+```
+
+A recursive `TypedDict` field also leaves the containing alias unaffected:
+
+```py
+class Payload[U](TypedDict):
+    child: Payload[list[U]]
+
+PayloadAlias: TypeAlias = tuple[T, Payload[int]]
+
+def _(x: PayloadAlias[str]) -> None:
+    reveal_type(x)  # revealed: tuple[str, Payload[int]]
+```
+
+### Specializing aliases with recursive type-variable bounds
+
+A recursive bound does not make an alias that uses the type variable recursive. Specializing the
+alias preserves the supplied type argument:
+
+```py
+from typing import TypeAlias, TypeVar
+
+Recursive: TypeAlias = int | list["Recursive"]
+T = TypeVar("T", bound=Recursive)
+Alias: TypeAlias = list[T]
+
+def _(x: Alias[int]) -> None:
+    reveal_type(x)  # revealed: list[int]
+    x.append("a")  # error: [invalid-argument-type]
+```
+
+The supplied argument is still checked against the recursive bound:
+
+```py
+def _(x: Alias[str]) -> None: ...  # error: [invalid-type-arguments]
+```
+
+### Specializing aliases containing recursive `NewType` bases
+
+A `NewType` keeps its nominal identity when its base contains a recursive type. That recursion does
+not prevent specializing the containing legacy alias:
+
+```py
+from typing import NewType, TypeAlias, TypeVar
+
+Recursive: TypeAlias = int | list["Recursive"]
+Wrapped = NewType("Wrapped", list[Recursive])
+T = TypeVar("T")
+Alias: TypeAlias = tuple[T, Wrapped]
+
+def _(x: Alias[str]) -> None:
+    reveal_type(x)  # revealed: tuple[str, Wrapped]
+    y: int = x[0]  # error: [invalid-assignment]
+```
+
 ## Class-scoped type variables
 
 ```toml

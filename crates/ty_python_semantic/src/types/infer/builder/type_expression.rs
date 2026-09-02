@@ -22,6 +22,7 @@ use crate::types::signatures::{ConcatenateTail, Signature};
 use crate::types::special_form::{AliasSpec, LegacyStdlibAlias};
 use crate::types::string_annotation::parse_string_annotation;
 use crate::types::tuple::{TupleSpec, TupleSpecBuilder, TupleType};
+use crate::types::visitor::any_over_type;
 use ty_python_core::definition::DefinitionKind;
 use ty_python_core::scope::ScopeKind;
 
@@ -30,7 +31,7 @@ use crate::types::{
     IntersectionType, InvalidTypeExpression, KnownClass, KnownInstanceType, LintDiagnosticGuard,
     LiteralValueTypeKind, Parameter, Parameters, SpecialFormType, SubclassOfType, Type,
     TypeContext, TypeFormType, TypeGuardType, TypeIsType, TypeMapping, TypeVarKind, UnionBuilder,
-    UnionType, any_over_type, todo_type,
+    UnionType, todo_type,
 };
 use crate::{FxOrderSet, SemanticModel, add_inferred_python_version_hint_to_diagnostic};
 
@@ -1582,9 +1583,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // variables with a `@Todo` type (since we don't know which of the type arguments
         // belongs to the remaining type variables).
         //
-        // A lazily inferred class member can contain its own unrelated recursive type, so only
-        // inspect the alias structure and generic arguments when checking whether it is recursive.
-        if any_over_type(db, env, value_ty, false, |ty| ty.is_divergent()) {
+        // Only inspect the stored alias type. Recursion in a lazy attribute does not mean that
+        // this alias lost a type variable during inference.
+        if any_over_type(db, env, value_ty, |ty| ty.is_divergent()) {
             let value_ty = value_ty.apply_specialization(
                 db,
                 generic_context.specialize(

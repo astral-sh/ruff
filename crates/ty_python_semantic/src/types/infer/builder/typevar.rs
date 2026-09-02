@@ -17,7 +17,7 @@ use crate::{
             TypeVarBoundOrConstraintsEvaluation, TypeVarConstraints, TypeVarDefaultEvaluation,
             TypeVarIdentity, TypeVarInstance,
         },
-        visitor::find_over_type,
+        visitor::find_over_expanded_type,
     },
 };
 use ruff_db::{
@@ -490,7 +490,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
         let expected_binding = BindingContext::Definition(expected_binding_def);
 
-        let outer_tv = find_over_type(db, self.program_environment(), default_ty, false, |ty| {
+        let outer_tv = find_over_expanded_type(db, self.program_environment(), default_ty, |ty| {
             if let Type::TypeVar(bound_tv) = ty
                 && bound_tv.binding_context(db) != expected_binding
             {

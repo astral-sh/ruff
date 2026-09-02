@@ -116,6 +116,98 @@ def cast_gradual_tuple_class(value: type[tuple[object, Unknown]]) -> None:
     cast(type[tuple[object, Unknown]], value)
 ```
 
+## Redundant casts with type-variable bounds
+
+A cast back to the same type variable is redundant when its bound is fully static.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import cast
+
+class Box[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+    def set(self, value: T) -> None: ...
+
+def _[T: Box[int]](value: T) -> None:
+    cast(T, value)  # error: [redundant-cast]
+```
+
+`Unknown` in the bound suppresses this diagnostic. In particular, casting `Top[T]` back to `T` can
+restore writes that the materialized bound rejects:
+
+```py
+from ty_extensions import Top
+from ty_extensions._internal import Unknown
+
+def _[T: Box[Unknown]](top: Top[T]) -> None:
+    value = cast(T, top)
+    reveal_type(value.get())  # revealed: Unknown
+    value.set(1)
+
+    reveal_type(top.get())  # revealed: object
+    top.set(1)  # error: [invalid-argument-type]
+```
+
+The same check applies to legacy type-variable bounds and constraints:
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T", bound=Box[Unknown])
+
+def _(value: T) -> None:
+    result = cast(T, value)
+    reveal_type(result.get())  # revealed: Unknown
+    result.set(1)
+
+def _[T: (Box[Unknown], int)](value: T) -> None:
+    cast(T, value)
+```
+
+A recursive bound can introduce new specializations indefinitely. We conservatively omit the
+diagnostic when we cannot establish whether the bound is fully static:
+
+```py
+from typing import Protocol
+
+class Recursive[T](Protocol):
+    next: "Recursive[list[T]]"
+
+def _[T: Recursive[int]](value: T) -> None:
+    cast(T, value)
+```
+
+A default does not affect an already-bound type variable. `Unknown` in an unapplied default
+therefore does not suppress the diagnostic:
+
+```py
+def _[T = Box[Unknown]](value: T) -> None:
+    cast(T, value)  # error: [redundant-cast]
+```
+
+Unlike `Unknown`, an explicit `Any` does not suppress the redundant-cast check. Type-variable
+equivalence currently ignores differences between materialized bounds, producing a false positive
+even though the cast changes which writes are allowed:
+
+```py
+from typing import Any
+
+def _[T: Box[Any]](top: Top[T]) -> None:
+    # TODO: Do not report this cast as redundant; `T` permits writes rejected by `Top[T]`.
+    value = cast(T, top)  # error: [redundant-cast]
+    reveal_type(value.get())  # revealed: Any
+    value.set(1)
+
+    reveal_type(top.get())  # revealed: object
+    top.set(1)  # error: [invalid-argument-type]
+```
+
 ## Disjoint casts
 
 ### Basics

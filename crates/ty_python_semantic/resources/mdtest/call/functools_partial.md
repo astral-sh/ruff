@@ -393,6 +393,66 @@ reveal_type(p(2))  # revealed: tuple[int, int]
 reveal_type(p(2)[1])  # revealed: int
 ```
 
+### Literal promotion through remaining parameter aliases
+
+When a remaining parameter depends on `T`, binding `1` widens `T` to `int` so that later calls can
+pass other integer values. The same applies when that dependency passes through an alias.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from functools import partial
+
+type Alias[T] = T
+
+def f[T](value: T, other: Alias[T]) -> T:
+    return value
+
+p = partial(f, 1)
+reveal_type(p)  # revealed: partial[(other: Alias[int]) -> int]
+reveal_type(p(2))  # revealed: int
+p("string")  # error: [invalid-argument-type]
+```
+
+### Remaining parameters independent of type variables
+
+A remaining parameter that does not depend on `T` cannot constrain it in a later call. The bound
+argument therefore keeps its literal type.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from functools import partial
+from typing import Literal
+
+def f[T](value: T, other: int) -> T:
+    return value
+
+p1 = partial(f, 1)
+reveal_type(p1)  # revealed: partial[(other: int) -> Literal[1]]
+x1: Literal[1] = p1(2)
+```
+
+An alias argument that is not used in the alias's value also introduces no dependency on `T`:
+
+```py
+type Ignored[T] = int
+
+def g[T](value: T, other: Ignored[T]) -> T:
+    return value
+
+p2 = partial(g, 1)
+reveal_type(p2)  # revealed: partial[(other: Ignored[Literal[1]]) -> Literal[1]]
+x2: Literal[1] = p2(2)
+p2("string")  # error: [invalid-argument-type]
+```
+
 ### Variadic generic functions with no bound arguments
 
 A partial with no bound arguments preserves its variadic type parameter until the resulting callable

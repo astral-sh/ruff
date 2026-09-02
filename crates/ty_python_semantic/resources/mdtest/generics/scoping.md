@@ -603,6 +603,21 @@ def outer[T]():
     def ok[U = int](): ...  # OK
 ```
 
+### Aliased defaults referencing outer type parameters
+
+A default cannot depend on an outer type parameter through an alias. Ignoring the argument leaves
+the concrete default `int`, which is valid:
+
+```py
+type Alias[T] = T
+type Ignored[T] = int
+
+def _[T]() -> None:
+    # error: [invalid-type-variable-default] "Type parameter `U` cannot use outer-scope type parameter `T` as its default"
+    def _[U = Alias[T]]() -> None: ...
+    def _[U = Ignored[T]]() -> None: ...
+```
+
 ### Function nested in class
 
 <!-- snapshot-diagnostics -->
@@ -676,6 +691,34 @@ def bad(y: U, z: T) -> tuple[U, T]:
 # OK, because the typevar with the default comes after the one without
 def fine(y: T, z: U) -> tuple[U, T]:
     return z, y
+```
+
+### Aliased defaults referencing later legacy type variables
+
+A legacy type variable's default cannot depend on a later parameter, even through an alias:
+
+```py
+from typing import TypeVar
+
+type Alias[T] = T
+
+T = TypeVar("T", default=int)
+U = TypeVar("U", default=Alias[T])
+
+# error: [invalid-type-variable-default] "Invalid use of type variable `U`: default of `U` refers to later parameter `T`"
+def _(x: U, y: T) -> tuple[U, T]:
+    return x, y
+```
+
+An unused alias argument does not constrain the parameter order:
+
+```py
+type Ignored[T] = int
+
+V = TypeVar("V", default=Ignored[T])
+
+def _(x: V, y: T) -> tuple[V, T]:
+    return x, y
 ```
 
 ### Legacy TypeVar ordering: default before non-default in function

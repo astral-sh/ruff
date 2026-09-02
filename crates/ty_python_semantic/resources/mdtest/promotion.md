@@ -306,6 +306,113 @@ segments: Mapping[str, Any] = {"start": (1, 2), "end": (3, 4, 5)}
 reveal_type(segments)  # revealed: dict[str, tuple[int, ...]]
 ```
 
+## Tuple-size promotion ignores nested tuple types
+
+A nonliteral tuple blocks tuple-size promotion because its shape must be preserved. A non-tuple
+element does not block promotion merely because its type arguments contain a tuple.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+class Box[T]: ...
+
+def _(box: Box[tuple[int, str]]) -> None:
+    # revealed: list[Box[tuple[int, str]] | tuple[int, ...]]
+    reveal_type([(1,), (1, 2), box])
+```
+
+A tuple return type also does not give a callable a tuple shape to preserve:
+
+```py
+from collections.abc import Callable
+
+def _(callback: Callable[[], tuple[int, str]]) -> None:
+    # revealed: list[(() -> tuple[int, str]) | tuple[int, ...]]
+    reveal_type([(1,), (1, 2), callback])
+```
+
+Tuple-valued protocol members and `TypedDict` fields also leave neighboring tuple literals eligible
+for promotion:
+
+```py
+from typing import Protocol, TypedDict
+
+class Proto(Protocol):
+    pair: tuple[int, str]
+
+class Payload(TypedDict):
+    pair: tuple[int, str]
+
+def _(protocol: Proto, payload: Payload) -> None:
+    reveal_type([(1,), (1, 2), protocol])  # revealed: list[Proto | tuple[int, ...]]
+    reveal_type([(1,), (1, 2), payload])  # revealed: list[Payload | tuple[int, ...]]
+```
+
+## Type parameter declarations do not block tuple-size promotion
+
+A class parameter's bound or default does not describe the shape of instances of that class. A tuple
+in either declaration does not prevent promotion of neighboring tuple literals.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T", bound=int | tuple[int, str])
+U = TypeVar("U", default=tuple[int, str])
+
+class Bounded(Generic[T]): ...
+class Defaulted(Generic[U]): ...
+
+def _(x: Bounded[int]) -> None:
+    # revealed: list[Bounded[int] | tuple[int, ...]]
+    reveal_type([(1,), (1, 2), x])
+
+def _(x: Defaulted[int]) -> None:
+    # revealed: list[Defaulted[int] | tuple[int, ...]]
+    reveal_type([(1,), (1, 2), x])
+```
+
+A default also does not fix the type of a value annotated with the type variable:
+
+```py
+def _(x: U) -> None:
+    reveal_type([(1,), (1, 2), x])  # revealed: list[U@_ | tuple[int, ...]]
+```
+
+## Tuple-size promotion uses alias values
+
+An alias does not create a new runtime shape. We use its value to decide whether an element can be a
+tuple, including when the same finite alias is nested inside itself.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+type Alias[T] = T
+
+def _(x: Alias[Alias[str]]) -> None:
+    reveal_type([(1,), (1, 2), x])  # revealed: list[str | tuple[int, ...]]
+```
+
+Even a recursively specialized alias permits promotion when its value is a `list`:
+
+```py
+type Recursive[T] = list[Recursive[list[T]]]
+
+def _(x: Recursive[int]) -> None:
+    # revealed: list[list[Recursive[list[int]]] | tuple[int, ...]]
+    reveal_type([(1,), (1, 2), x])
+```
+
 ## Invariant and contravariant return types are promoted
 
 We promote in non-covariant position in the return type of a generic function, or constructor of a

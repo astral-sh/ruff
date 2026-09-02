@@ -641,6 +641,32 @@ class C(Generic[T]):
         reveal_type(self.foo)  # revealed: T@C
 ```
 
+## `Self` in aliased annotations
+
+Aliased annotations bind `Self` to the concrete class, including when the attribute or method is
+inherited. An alias that ignores `Self` still resolves to its concrete value.
+
+```py
+from typing import Self
+
+type Alias[T] = T
+type Ignored[T] = int
+
+class Parent:
+    attribute: Alias[Self]
+    ignored: Ignored[Self]
+
+    def method(self) -> Alias[Self]:
+        return self
+
+class Child(Parent): ...
+
+def _(child: Child) -> None:
+    reveal_type(child.attribute)  # revealed: Child
+    reveal_type(child.ignored)  # revealed: int
+    reveal_type(child.method())  # revealed: Child
+```
+
 ## Callable attributes that return `Self`
 
 Attributes annotated as callables returning `Self` should bind to the concrete class.

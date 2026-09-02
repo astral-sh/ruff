@@ -7,9 +7,10 @@ use crate::{
         ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
         GenericContext, KnownClass, KnownInstanceType, MaterializationKind, Type, TypeContext,
         TypeMapping, TypeRecursionContext, TypeVarVariance, TypingModule,
+        cyclic::{ActiveRecursionDetector, TypeIdentity},
         definition_expression_type,
         display::qualified_name_components_from_scope,
-        generics::{ApplySpecialization, Specialization, bind_typevar},
+        generics::{ApplySpecialization, Specialization, bind_typevar, walk_specialization},
         variance::VarianceInferable,
         visitor,
     },
@@ -117,14 +118,6 @@ pub struct PEP695TypeAliasType<'db> {
 
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for PEP695TypeAliasType<'_> {}
-
-pub(super) fn walk_pep_695_type_alias<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
-    db: &'db dyn Db,
-    type_alias: PEP695TypeAliasType<'db>,
-    visitor: &V,
-) {
-    visitor.visit_type(db, TypeAliasType::PEP695(type_alias).value_type(db));
-}
 
 #[salsa::tracked]
 impl<'db> PEP695TypeAliasType<'db> {
@@ -237,14 +230,6 @@ pub struct ManualPEP695TypeAliasType<'db> {
 
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for ManualPEP695TypeAliasType<'_> {}
-
-pub(super) fn walk_manual_pep_695_type_alias<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
-    db: &'db dyn Db,
-    type_alias: ManualPEP695TypeAliasType<'db>,
-    visitor: &V,
-) {
-    visitor.visit_type(db, TypeAliasType::ManualPEP695(type_alias).value_type(db));
-}
 
 #[salsa::tracked]
 impl<'db> ManualPEP695TypeAliasType<'db> {
@@ -388,23 +373,44 @@ pub enum TypeAliasType<'db> {
     ManualPEP695(ManualPEP695TypeAliasType<'db>),
 }
 
+/// Visit the type arguments of a type alias without expanding its value.
 pub(super) fn walk_type_alias_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     type_alias: TypeAliasType<'db>,
     visitor: &V,
 ) {
-    if !visitor.should_visit_lazy_type_attributes() {
-        visitor.notify_skipped_lazy_type_attributes();
-        return;
+    visitor.notify_skipped_lazy_type_attributes();
+    if let Some(specialization) = type_alias.specialization(db) {
+        walk_specialization(db, specialization, visitor);
     }
-    match type_alias {
-        TypeAliasType::PEP695(type_alias) => {
-            walk_pep_695_type_alias(db, type_alias, visitor);
-        }
-        TypeAliasType::ManualPEP695(type_alias) => {
-            walk_manual_pep_695_type_alias(db, type_alias, visitor);
-        }
-    }
+}
+
+/// Expand a type alias and visit its value.
+///
+/// The caller must guard against recursive aliases.
+pub(super) fn walk_type_alias_value<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
+    db: &'db dyn Db,
+    type_alias: TypeAliasType<'db>,
+    visitor: &V,
+) {
+    visitor.visit_type(db, type_alias.value_type(db));
+}
+
+/// Visit an alias value, falling back to its type arguments when expansion becomes recursive.
+pub(super) fn walk_type_alias_value_with_recursion_guard<
+    'db,
+    V: visitor::TypeVisitor<'db> + ?Sized,
+>(
+    db: &'db dyn Db,
+    alias: TypeAliasType<'db>,
+    visitor: &V,
+    recursion_guard: &ActiveRecursionDetector<TypeIdentity<'db>>,
+) {
+    recursion_guard.visit(
+        &Type::TypeAlias(alias).to_type_identity(db),
+        || walk_type_alias_type(db, alias, visitor),
+        || walk_type_alias_value(db, alias, visitor),
+    );
 }
 
 #[salsa::tracked]
