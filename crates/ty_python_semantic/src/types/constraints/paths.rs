@@ -8,13 +8,12 @@ use std::ops::{ControlFlow, Range};
 use indexmap::map::Entry;
 use itertools::{Either, Itertools};
 use rustc_hash::{FxHashMap, FxHashSet};
-use smallvec::SmallVec;
 
 use crate::types::constraints::sequents::{Sequent, SequentMap};
 use crate::types::constraints::variables::Constraint;
 use crate::types::constraints::{
-    ConstraintAssignment, ConstraintId, ConstraintSetStorage, InterimConstraint, Node, NodeId,
-    PathVisitor, SourceOrderId, TypeVarId,
+    ConstraintAssignment, ConstraintId, ConstraintSetStorage, Node, NodeId, PathVisitor,
+    SourceOrderId, TypeVarId,
 };
 use crate::{Db, FxIndexMap, ProgramEnvironment};
 
@@ -528,12 +527,12 @@ impl PathAssignments {
     ) {
         let sequents = map.sequents.iter().map(|sequent| match sequent {
             Sequent::SingleTautology { ante } => {
-                let ante = storage.intern_constraint(db, env, ante.into());
+                let ante = storage.intern_constraint(db, env, *ante);
                 Sequent::SingleTautology { ante }
             }
             Sequent::PairImpossibility { ante1, ante2 } => {
-                let ante1 = storage.intern_constraint(db, env, ante1.into());
-                let ante2 = storage.intern_constraint(db, env, ante2.into());
+                let ante1 = storage.intern_constraint(db, env, *ante1);
+                let ante2 = storage.intern_constraint(db, env, *ante2);
                 Sequent::PairImpossibility { ante1, ante2 }
             }
             Sequent::TripleImpossibility {
@@ -541,9 +540,9 @@ impl PathAssignments {
                 ante2,
                 ante3,
             } => {
-                let ante1 = storage.intern_constraint(db, env, ante1.into());
-                let ante2 = storage.intern_constraint(db, env, ante2.into());
-                let ante3 = storage.intern_constraint(db, env, ante3.into());
+                let ante1 = storage.intern_constraint(db, env, *ante1);
+                let ante2 = storage.intern_constraint(db, env, *ante2);
+                let ante3 = storage.intern_constraint(db, env, *ante3);
                 Sequent::TripleImpossibility {
                     ante1,
                     ante2,
@@ -551,14 +550,14 @@ impl PathAssignments {
                 }
             }
             Sequent::PairImplication { ante1, ante2, post } => {
-                let ante1 = storage.intern_constraint(db, env, ante1.into());
-                let ante2 = storage.intern_constraint(db, env, ante2.into());
-                let post = storage.intern_constraint(db, env, post.into());
+                let ante1 = storage.intern_constraint(db, env, *ante1);
+                let ante2 = storage.intern_constraint(db, env, *ante2);
+                let post = storage.intern_constraint(db, env, *post);
                 Sequent::PairImplication { ante1, ante2, post }
             }
             Sequent::SingleImplication { ante, post } => {
-                let ante = storage.intern_constraint(db, env, ante.into());
-                let post = storage.intern_constraint(db, env, post.into());
+                let ante = storage.intern_constraint(db, env, *ante);
+                let post = storage.intern_constraint(db, env, *post);
                 Sequent::SingleImplication { ante, post }
             }
         });
@@ -571,23 +570,11 @@ impl PathAssignments {
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         constraint_id: ConstraintId,
-        constraint: InterimConstraint<'db>,
+        constraint: Constraint<'db>,
     ) {
         let sequent_start = self.sequents.len();
-        let constraints = constraint.into_new(db, env);
-        let mut tautologies = SmallVec::<[bool; 2]>::new();
-        for constraint in &constraints {
-            let map = SequentMap::<Constraint<'db>>::for_constraint(db, env, *constraint);
-            tautologies.push(map.sequents.iter().any(
-                |sequent| matches!(sequent, Sequent::SingleTautology { ante } if ante == constraint),
-            ));
-            self.add_sequents(db, env, storage, map);
-        }
-
-        if let [lower, upper] = constraints.as_slice() {
-            let map = SequentMap::<Constraint<'db>>::for_constraint_pair(db, env, *lower, *upper);
-            self.add_sequents(db, env, storage, map);
-        }
+        let map = SequentMap::<Constraint<'db>>::for_constraint(db, env, constraint);
+        self.add_sequents(db, env, storage, map);
 
         // `projection_source_order` depends on knowing the order that sequents were discovered for
         // each constraint. Since we are salsa-caching sequent derivation, we don't have easy
@@ -618,23 +605,12 @@ impl PathAssignments {
         let left = storage.constraint_data(left_id);
         let right = storage.constraint_data(right_id);
 
-        let left_constraints = left.into_new(db, env);
-        let right_constraints = right.into_new(db, env);
-        for left in &left_constraints {
-            for right in &right_constraints {
-                if *left == *right {
-                    continue;
-                }
-
-                if SequentMap::<Constraint>::pair_cannot_produce_sequents(db, env, *left, *right) {
-                    continue;
-                }
-
-                let map =
-                    SequentMap::<Constraint<'db>>::for_constraint_pair(db, env, *left, *right);
-                self.add_sequents(db, env, storage, map);
-            }
+        if SequentMap::<Constraint>::pair_cannot_produce_sequents(db, env, left, right) {
+            return;
         }
+
+        let map = SequentMap::<Constraint<'db>>::for_constraint_pair(db, env, left, right);
+        self.add_sequents(db, env, storage, map);
 
         // `projection_source_order` depends on knowing the order that sequents were discovered for
         // each constraint. Since we are salsa-caching sequent derivation, we don't have easy
