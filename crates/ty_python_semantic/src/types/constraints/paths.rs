@@ -899,7 +899,7 @@ impl PathAssignments {
                 target: "ty_python_semantic::types::constraints::PathAssignment",
                 ante1 = %ante1.display(db, env, storage),
                 ante2 = %ante2.display(db, env, storage),
-                ante3 = %ante2.display(db, env, storage),
+                ante3 = %ante3.display(db, env, storage),
                 facts = %format_args!(
                     "[{}]",
                     self.assignments.iter().map(|(assignment, _)| {
