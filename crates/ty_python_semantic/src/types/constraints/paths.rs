@@ -565,7 +565,7 @@ impl PathAssignments {
         constraint_id: ConstraintId,
         constraint: InterimConstraint<'db>,
     ) {
-        let constraints = constraint.into_new(db);
+        let constraints = constraint.into_new(db, env);
         let mut tautologies = SmallVec::<[bool; 2]>::new();
         for constraint in &constraints {
             let map = SequentMap::<Constraint<'db>>::for_constraint(db, env, *constraint);
@@ -648,8 +648,8 @@ impl PathAssignments {
             }
         }
 
-        let left_constraints = left.into_new(db);
-        let right_constraints = right.into_new(db);
+        let left_constraints = left.into_new(db, env);
+        let right_constraints = right.into_new(db, env);
         for left in &left_constraints {
             for right in &right_constraints {
                 if *left == *right {

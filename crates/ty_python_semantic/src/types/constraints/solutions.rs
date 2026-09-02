@@ -114,7 +114,7 @@ impl<'db> SolutionWalker<'db> {
             mappings.clear();
             for (constraint, _) in path {
                 let constraint = storage.constraint_data(constraint);
-                for constraint in constraint.into_new(db) {
+                for constraint in constraint.into_new(db, env) {
                     match constraint {
                         Constraint::ConcreteLower(lower) => {
                             let bounds = mappings.entry(lower.typevar).or_default();
