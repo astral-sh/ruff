@@ -1759,11 +1759,9 @@ impl<'db> ProtocolMemberKind<'db> {
                     cycle,
                 );
                 Self::Method(
-                    current.with_ty(Type::Callable(CallableType::new(
-                        db,
-                        signatures,
-                        current_callable.kind(db),
-                    ))),
+                    current.with_ty(Type::Callable(
+                        current_callable.with_signatures(db, signatures),
+                    )),
                     kind,
                 )
             }

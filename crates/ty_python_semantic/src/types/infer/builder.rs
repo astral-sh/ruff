@@ -5490,11 +5490,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             kind: CallableTypeKind,
         ) -> Option<Type<'d>> {
             match ty {
-                Type::Callable(callable) => Some(Type::Callable(CallableType::new(
-                    db,
-                    callable.signatures(db),
-                    kind,
-                ))),
+                Type::Callable(callable) => Some(Type::Callable(callable.with_kind(db, kind))),
                 Type::Union(union) => union.try_map(db, env, |element| {
                     propagate_callable_kind(db, env, *element, kind)
                 }),
@@ -6779,7 +6775,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .with_definition(signature.definition())
                 }),
             );
-            CallableType::new(db, signatures, callable.kind(db))
+            callable.with_signatures(db, signatures)
         });
         let inferable = class_generic_context.inferable_typevars(db);
         let constraints = ConstraintSetBuilder::new();
@@ -9511,7 +9507,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Other calls reference an object or class, not the implicitly invoked method.
         let is_function_reference = matches!(
             callable_type,
-            Type::FunctionLiteral(_) | Type::BoundMethod(_)
+            Type::FunctionLiteral(_) | Type::BoundMethod(_) | Type::Callable(_)
         );
         self.report_deprecated_functions(
             func.as_ref(),
@@ -10103,7 +10099,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     /// Check if the given ty is `@deprecated` or not
-    fn check_deprecated<T: Ranged>(&self, ranged: T, ty: Type) {
+    fn check_deprecated<T: Ranged>(&self, ranged: T, ty: Type<'db>) {
         // First handle classes
         if let Type::ClassLiteral(class_literal) = ty {
             let Some(deprecated) = class_literal.deprecated(self.db()) else {
@@ -10128,6 +10124,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let function = match ty {
             Type::FunctionLiteral(function) => function,
             Type::BoundMethod(bound) => bound.function(self.db()),
+            Type::Callable(callable) => {
+                self.report_deprecated_functions(ranged, callable.deprecated(self.db()));
+                return;
+            }
             _ => return,
         };
 

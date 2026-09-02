@@ -91,10 +91,147 @@ class StaticMethodReplacement:
 StaticMethodReplacement.old()  # error: [deprecated] "use replacement directly"
 ```
 
+## Callable replacements
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+An outer `@deprecated` decorator also applies when an inner decorator returns a `Callable` type.
+Both references and calls report the deprecation, and the decorated signature is preserved.
+
+```py
+from collections.abc import Callable
+from typing_extensions import deprecated
+
+def passthrough[**P, R](function: Callable[P, R]) -> Callable[P, R]:
+    return function
+
+@deprecated("use current instead")
+@passthrough
+def old(value: int) -> str:
+    return str(value)
+
+old  # error: [deprecated] "use current instead"
+# error: [deprecated] "use current instead"
+reveal_type(old(1))  # revealed: str
+# error: [invalid-argument-type]
+old("wrong")  # error: [deprecated] "use current instead"
+```
+
+Replacing the callable with a different function discards the original deprecation. If an outer
+`@deprecated` wraps the replacement, its message is used instead.
+
+```py
+def replace(function: Callable[[int], str]) -> Callable[[int], str]:
+    return lambda value: str(value)
+
+@replace
+@deprecated("discarded deprecation")
+@passthrough
+def replaced(value: int) -> str:
+    return str(value)
+
+replaced(1)
+
+@deprecated("outer deprecation")
+@replace
+@deprecated("inner deprecation")
+@passthrough
+def replaced_again(value: int) -> str:
+    return str(value)
+
+replaced_again(1)  # error: [deprecated] "outer deprecation"
+```
+
+## Callable method replacements
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+Changing a method's descriptor kind or specializing its class preserves the deprecation.
+
+```py
+from collections.abc import Callable
+from typing_extensions import deprecated
+
+def passthrough[**P, R](function: Callable[P, R]) -> Callable[P, R]:
+    return function
+
+class C[T]:
+    @deprecated("old initializer")
+    @passthrough
+    def __init__(self) -> None: ...
+    @deprecated("old method")
+    @passthrough
+    def method(self, value: T) -> T:
+        return value
+
+    @staticmethod
+    @deprecated("old static method")
+    @passthrough
+    def static(value: int) -> int:
+        return value
+
+    @classmethod
+    @deprecated("old class method")
+    @passthrough
+    def class_method(cls, value: int) -> int:
+        return value
+
+c = C[int]()  # error: [deprecated] "old initializer"
+c.__init__  # error: [deprecated] "old initializer"
+# error: [deprecated] "old method"
+reveal_type(c.method(1))  # revealed: int
+# error: [invalid-argument-type]
+c.method("wrong")  # error: [deprecated] "old method"
+C.static(1)  # error: [deprecated] "old static method"
+c.static(1)  # error: [deprecated] "old static method"
+C.class_method(1)  # error: [deprecated] "old class method"
+c.class_method(1)  # error: [deprecated] "old class method"
+```
+
+## Overloaded callable replacements
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+Deprecating a callable replacement for an overload implementation deprecates the whole function,
+while calls still use the declared overload signatures.
+
+```py
+from collections.abc import Callable
+from typing import overload
+from typing_extensions import deprecated
+
+def passthrough[**P, R](function: Callable[P, R]) -> Callable[P, R]:
+    return function
+
+@overload
+def overloaded(value: int) -> int: ...
+@overload
+def overloaded(value: str) -> str: ...
+@deprecated("old implementation")
+@passthrough
+def overloaded(value: int | str) -> int | str:
+    return value
+
+overloaded  # error: [deprecated] "old implementation"
+# error: [deprecated] "old implementation"
+reveal_type(overloaded(1))  # revealed: int
+# error: [deprecated] "old implementation"
+reveal_type(overloaded("one"))  # revealed: str
+```
+
 ## Callable-object replacements
 
-`@deprecated` can also wrap other callable objects at runtime, but we currently only preserve the
-deprecation when an inner decorator returns a function literal.
+`@deprecated` can also wrap callable instances at runtime, but we do not yet preserve the
+deprecation when an inner decorator returns an instance type.
 
 ```py
 from collections.abc import Callable

@@ -583,27 +583,41 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         for (decorator_ty, decorator_node) in decorator_types_and_nodes.iter().rev() {
-            inferred_ty = if let Type::KnownInstance(KnownInstanceType::Deprecated(deprecated)) =
-                decorator_ty
-                && let Type::FunctionLiteral(function) = inferred_ty
-            {
-                Type::FunctionLiteral(function.with_deprecated(db, *deprecated))
-            } else {
-                self.apply_decorator(
-                    *decorator_ty,
-                    inferred_ty,
-                    decorator_node,
-                    (!is_decorated_overload_implementation).then_some(function),
-                )
-            };
+            if let Type::KnownInstance(KnownInstanceType::Deprecated(deprecated)) = decorator_ty {
+                match inferred_ty {
+                    Type::FunctionLiteral(function) => {
+                        inferred_ty =
+                            Type::FunctionLiteral(function.with_deprecated(db, *deprecated));
+                        continue;
+                    }
+                    Type::Callable(callable) => {
+                        inferred_ty = Type::Callable(callable.with_deprecated(
+                            db,
+                            overload_literal.with_deprecated(db, *deprecated),
+                        ));
+                        continue;
+                    }
+                    _ => {}
+                }
+            }
+            inferred_ty = self.apply_decorator(
+                *decorator_ty,
+                inferred_ty,
+                decorator_node,
+                (!is_decorated_overload_implementation).then_some(function),
+            );
         }
 
         if is_decorated_overload_implementation {
-            let function_type = if let Type::FunctionLiteral(function) = inferred_ty {
+            let last_definition = match inferred_ty {
+                Type::FunctionLiteral(function) => Some(function.literal(db).last_definition),
+                Type::Callable(callable) => callable.deprecated(db),
+                _ => None,
+            };
+            let function_type = if let Some(last_definition) = last_definition {
                 FunctionType::new(
                     db,
-                    function_literal
-                        .with_last_definition_metadata(db, function.literal(db).last_definition),
+                    function_literal.with_last_definition_metadata(db, last_definition),
                     None,
                 )
             } else {

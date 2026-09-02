@@ -2346,6 +2346,7 @@ impl<'db> Type<'db> {
     pub fn is_deprecated(&self, db: &'db dyn Db) -> bool {
         match self {
             Type::FunctionLiteral(f) => f.implementation_deprecated(db).is_some(),
+            Type::Callable(callable) => callable.deprecated(db).is_some(),
             Type::ClassLiteral(c) => c.deprecated(db).is_some(),
             _ => false,
         }
