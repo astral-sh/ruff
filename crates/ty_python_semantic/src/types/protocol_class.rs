@@ -90,7 +90,7 @@ impl<'db> ProtocolClass<'db> {
             .is_some_and(|(class, _)| supports_protocol_variance_inference(db, class))
     }
 
-    /// Returns the interface without applying the specialization's materialization marker.
+    /// Returns the interface before an invariant specialization is materialized.
     ///
     /// A materialized generic origin retains its specialization for nominal identity and display.
     /// Building member requirements from that specialization, however, would first materialize an

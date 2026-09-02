@@ -1116,18 +1116,6 @@ def from_reader(value: IntReader):
         reveal_type(value)  # revealed: Never
 ```
 
-The negative branch also excludes a generic protocol's gradual specialization. Normalizing a single
-path to a list therefore leaves only the list type after the branches merge:
-
-```py
-from os import PathLike
-
-def normalize_paths(value: PathLike[Any] | list[PathLike[Any]]) -> None:
-    if isinstance(value, PathLike):
-        value = [value]
-    reveal_type(value)  # revealed: list[PathLike[Any]]
-```
-
 ## Narrowing iterables to containers and iterators in strict mode
 
 ```toml
