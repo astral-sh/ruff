@@ -987,6 +987,37 @@ type RecursiveGradual = Covariant[RecursiveGradual] | Invariant[Any]
 static_assert(is_subtype_of(Covariant[RecursiveGradual], Covariant[object]))
 ```
 
+## Generic protocol materializations
+
+A generic protocol lies between its bottom and top materializations, even when its type parameters
+have constraints:
+
+```py
+from typing import Any, Protocol
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import is_subtype_of
+
+class Constrained[T: (str, bytes)](Protocol):
+    def read(self) -> T: ...
+
+static_assert(is_subtype_of(Constrained[Any], Top[Constrained[Any]]))
+static_assert(is_subtype_of(Bottom[Constrained[Any]], Constrained[Any]))
+static_assert(not is_subtype_of(Constrained[str], Top[Constrained[bytes]]))
+```
+
+Materializing a bounded parameter can replace `Any` with its bound. The same relations hold when the
+protocol also has an explicit `Any` member:
+
+```py
+class Bounded[T: str](Protocol):
+    def read(self) -> T: ...
+    def other(self) -> Any: ...
+
+static_assert(is_subtype_of(Bounded[Any], Top[Bounded[Any]]))
+static_assert(is_subtype_of(Bottom[Bounded[Any]], Bounded[Any]))
+static_assert(not is_subtype_of(Top[Bounded[Any]], Bounded[Any]))
+```
+
 ## Callable
 
 The general principle is that a callable type is a subtype of another if it's more flexible in what

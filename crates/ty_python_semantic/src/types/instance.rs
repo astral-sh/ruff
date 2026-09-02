@@ -523,9 +523,34 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             )
             && let (Some(source_origin), Some(target_origin)) =
                 (source.class_origin(db), protocol.class_origin(db))
-            && source_origin == target_origin
+            && source_origin.class_literal(db) == target_origin.class_literal(db)
         {
-            return self.always();
+            if source_origin == target_origin {
+                return self.always();
+            }
+
+            // Materializing generic arguments can change the specialization: for example,
+            // `P[Any]` with a covariant parameter bounded by `str` becomes `Top[P[str]]`.
+            // Compare top materializations when the target is top-materialized, or bottom
+            // materializations when only the source is bottom-materialized. The nominal
+            // comparison accounts for each parameter's variance, bounds, and constraints.
+            let kind = protocol
+                .materialization_kind(db)
+                .unwrap_or(MaterializationKind::Bottom);
+            let source = Type::NominalInstance(NominalInstanceType::from_class(db, *source_origin))
+                .materialize(db, kind, self.materialization_visitor);
+            let target = Type::NominalInstance(NominalInstanceType::from_class(db, *target_origin))
+                .materialize(db, kind, self.materialization_visitor);
+            if result
+                .union(
+                    db,
+                    self.constraints,
+                    self.check_type_pair(db, source, target),
+                )
+                .is_trivially_always_satisfied()
+            {
+                return result;
+            }
         }
 
         let source_protocol_as_nominal =
