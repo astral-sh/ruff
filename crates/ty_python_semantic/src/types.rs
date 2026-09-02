@@ -945,10 +945,13 @@ impl<'db> PropertyDeprecations<'db> {
         )
     }
 
+    /// Retain either alternative's deprecations: a union can invoke either accessor.
     fn union(self, db: &'db dyn Db, other: Self) -> Self {
         self.combine(db, other, false)
     }
 
+    /// Retain deprecations only for access kinds deprecated in both alternatives. A
+    /// non-deprecated getter can suppress read warnings without suppressing write warnings.
     fn intersection(self, db: &'db dyn Db, other: Self) -> Self {
         self.combine(db, other, true)
     }
@@ -995,7 +998,7 @@ impl<'db> ResolvedMember<'db> {
         }
     }
 
-    /// Transform the member's value type without changing its deprecated property descriptors.
+    /// Transform the member's value type without changing its property accessor deprecations.
     fn map_type(self, db: &'db dyn Db, f: impl FnOnce(Type<'db>) -> Type<'db>) -> Self {
         Self::new(
             db,
@@ -4339,9 +4342,24 @@ impl<'db> Type<'db> {
     }
 
     /// Collect deprecated accessor implementations without inferring their signatures or
-    /// intersecting their function or descriptor types. Overload deprecations require a resolved
-    /// call and do not apply to accessor references.
+    /// intersecting their function or descriptor types. Retain the declarations so callers can
+    /// report deprecations after descriptor lookup replaces the property with its value type:
+    ///
+    /// ```python
+    /// from typing_extensions import deprecated
+    ///
+    /// class C:
+    ///     @property
+    ///     @deprecated("old getter")
+    ///     def value(self) -> int: ...
+    ///
+    /// C().value  # Warn about the getter, even though the attribute has type `int`.
+    /// ```
+    ///
+    /// Overload deprecations require a resolved call and do not apply to accessor references.
     fn property_deprecations(self, db: &'db dyn Db) -> Option<PropertyDeprecations<'db>> {
+        /// Append deprecated implementations, preserving earlier entries if a non-deprecated
+        /// intersection alternative suppresses this accessor's deprecations.
         fn collect<'db>(
             db: &'db dyn Db,
             accessor: Type<'db>,
@@ -4403,17 +4421,11 @@ impl<'db> Type<'db> {
                 .filter_map(|ty| ty.property_deprecations(db))
                 .reduce(|left, right| left.union(db, right)),
             Type::Intersection(intersection) => {
-                let mut properties = None;
-                for ty in intersection.positive(db) {
-                    let deprecated = ty.property_deprecations(db)?;
-                    properties = Some(properties.map_or(
-                        deprecated,
-                        |properties: PropertyDeprecations<'db>| {
-                            properties.intersection(db, deprecated)
-                        },
-                    ));
-                }
-                properties
+                let mut elements = intersection.positive(db).iter();
+                let first = elements.next()?.property_deprecations(db)?;
+                elements.try_fold(first, |properties, ty| {
+                    Some(properties.intersection(db, ty.property_deprecations(db)?))
+                })
             }
             _ => None,
         }

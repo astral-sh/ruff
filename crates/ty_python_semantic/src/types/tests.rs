@@ -53,14 +53,11 @@ fn property_deprecations_do_not_infer_accessor_signatures() -> anyhow::Result<()
                 .is_empty()
         );
 
-        [getter, setter]
-            .into_iter()
-            .map(|ty| {
-                ty.as_function_literal()
-                    .map(|function| function.as_id())
-                    .ok_or_else(|| anyhow::anyhow!("expected an accessor function"))
-            })
-            .collect::<anyhow::Result<Vec<_>>>()?
+        let [Type::FunctionLiteral(getter), Type::FunctionLiteral(setter)] = [getter, setter]
+        else {
+            anyhow::bail!("expected accessor functions");
+        };
+        [getter.as_id(), setter.as_id()]
     };
     let events = db.take_salsa_events();
     for accessor in accessor_ids {
