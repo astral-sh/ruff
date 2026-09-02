@@ -180,6 +180,34 @@ def unreachable_deletion(item: Item):
         reveal_type(item.value)  # revealed: Literal[1]
 ```
 
+### Presence after deletion across eager scopes
+
+A comprehension inside a class body observes deletions made before it runs. An earlier assignment in
+the enclosing function does not establish presence after that deletion.
+
+```py
+class Item: ...
+
+def deleted_before_comprehension(item: Item):
+    item.value = 1  # error: [unresolved-attribute]
+
+    class Inner:
+        del item.value
+        [item.value for _ in range(1)]  # error: [unresolved-attribute]
+```
+
+An unreachable deletion does not prevent the comprehension from using the enclosing assignment.
+
+```py
+def unreachable_deletion_before_comprehension(item: Item):
+    item.value = 1  # error: [unresolved-attribute]
+
+    class Inner:
+        if False:
+            del item.value
+        [reveal_type(item.value) for _ in range(1)]  # revealed: Literal[1]
+```
+
 ### Presence after receiver reassignment
 
 Reassigning the receiver discards evidence that an attribute was assigned on the previous object.
