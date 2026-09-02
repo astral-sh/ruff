@@ -377,16 +377,17 @@ def _(value: tuple[str] | tuple[int, *tuple[bytes, ...], int]):
 
 ## Ordered length comparisons with string and bytes literals
 
-String and bytes literals encode their lengths, so ordered comparisons can select between them:
+String and bytes literals encode their lengths, so ordered comparisons can select between them.
+String lengths count Unicode code points:
 
 ```py
 from typing import Literal
 
-def _(text: Literal["a", "ab"], data: Literal[b"", b"a"]):
+def _(text: Literal["é", "ab"], data: Literal[b"", b"a"]):
     if len(text) >= 2:
         reveal_type(text)  # revealed: Literal["ab"]
     else:
-        reveal_type(text)  # revealed: Literal["a"]
+        reveal_type(text)  # revealed: Literal["é"]
 
     if 0 < len(data):
         reveal_type(data)  # revealed: Literal[b"a"]
