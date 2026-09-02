@@ -8,11 +8,13 @@ use std::ops::{ControlFlow, Range};
 use indexmap::map::Entry;
 use itertools::Itertools;
 use rustc_hash::FxHashSet;
+use smallvec::SmallVec;
 
 use crate::types::constraints::sequents::{Sequent, SequentMap};
+use crate::types::constraints::variables::Constraint;
 use crate::types::constraints::{
-    ConstraintAssignment, ConstraintId, ConstraintSetStorage, Node, NodeId, PathVisitor,
-    SourceOrderId, TypeVarId,
+    ConstraintAssignment, ConstraintId, ConstraintSetStorage, InterimConstraint, Node, NodeId,
+    PathVisitor, SourceOrderId, TypeVarId,
 };
 use crate::{Db, FxIndexMap, ProgramEnvironment};
 
@@ -490,6 +492,95 @@ impl PathAssignments {
             .map(|(_, fuel)| *fuel)
             .fold(*first_fuel, u16::max);
         Some(max_fuel)
+    }
+
+    #[expect(dead_code)]
+    fn add_sequents<'db>(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
+        map: &SequentMap<Constraint<'db>>,
+    ) {
+        let sequents = map.sequents.iter().map(|sequent| match sequent {
+            Sequent::SingleTautology { ante } => {
+                let ante = storage.intern_constraint(db, env, ante.into());
+                Sequent::SingleTautology { ante }
+            }
+            Sequent::PairImpossibility { ante1, ante2 } => {
+                let ante1 = storage.intern_constraint(db, env, ante1.into());
+                let ante2 = storage.intern_constraint(db, env, ante2.into());
+                Sequent::PairImpossibility { ante1, ante2 }
+            }
+            Sequent::TripleImpossibility {
+                ante1,
+                ante2,
+                ante3,
+            } => {
+                let ante1 = storage.intern_constraint(db, env, ante1.into());
+                let ante2 = storage.intern_constraint(db, env, ante2.into());
+                let ante3 = storage.intern_constraint(db, env, ante3.into());
+                Sequent::TripleImpossibility {
+                    ante1,
+                    ante2,
+                    ante3,
+                }
+            }
+            Sequent::PairImplication { ante1, ante2, post } => {
+                let ante1 = storage.intern_constraint(db, env, ante1.into());
+                let ante2 = storage.intern_constraint(db, env, ante2.into());
+                let post = storage.intern_constraint(db, env, post.into());
+                Sequent::PairImplication { ante1, ante2, post }
+            }
+            Sequent::SingleImplication { ante, post } => {
+                let ante = storage.intern_constraint(db, env, ante.into());
+                let post = storage.intern_constraint(db, env, post.into());
+                Sequent::SingleImplication { ante, post }
+            }
+        });
+        self.sequents.extend(sequents);
+    }
+
+    #[expect(dead_code)]
+    fn discover_single_constraint<'db>(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
+        constraint: InterimConstraint<'db>,
+    ) {
+        let constraints = constraint.into_new(db);
+        for constraint in &constraints {
+            let map = SequentMap::<Constraint<'db>>::for_constraint(db, env, *constraint);
+            self.add_sequents(db, env, storage, map);
+        }
+        if let [lower, upper] = constraints.as_slice() {
+            let map = SequentMap::<Constraint<'db>>::for_constraint_pair(db, env, *lower, *upper);
+            self.add_sequents(db, env, storage, map);
+        }
+    }
+
+    #[expect(dead_code)]
+    fn discover_constraint_pair<'db>(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
+        left: InterimConstraint<'db>,
+        right: InterimConstraint<'db>,
+    ) {
+        let constraints: SmallVec<[Constraint<'db>; 4]> =
+            std::iter::chain(left.into_new(db), right.into_new(db)).collect();
+        for left in &constraints {
+            for right in &constraints {
+                if *left == *right {
+                    continue;
+                }
+                let map =
+                    SequentMap::<Constraint<'db>>::for_constraint_pair(db, env, *left, *right);
+                self.add_sequents(db, env, storage, map);
+            }
+        }
     }
 
     /// Update our sequent map to ensure that it holds all of the sequents that involve the given
