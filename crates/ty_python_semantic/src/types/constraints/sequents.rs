@@ -12,8 +12,8 @@ use crate::types::constraints::variables::{
     TypeVarEquivalenceBound, TypeVarRangeBound,
 };
 use crate::types::constraints::{
-    ALWAYS_FALSE, ConstraintId, ConstraintSetBuilder, ConstraintSetStorage, InterimConstraint,
-    Node, OwnedConstraintSet, max_constructor_and_typevar_depth,
+    ALWAYS_FALSE, ConstraintId, ConstraintSetBuilder, ConstraintSetStorage, Node,
+    OwnedConstraintSet, max_constructor_and_typevar_depth,
 };
 use crate::types::typevar::TypeVarSet;
 use crate::types::variance::VarianceInferable;
@@ -690,7 +690,6 @@ impl<'db> Constraint<'db> {
                     Node::Interior(interior) => {
                         let interior = storage.interior_node_data(interior.node());
                         let derived = storage.constraint_data(interior.constraint);
-                        let InterimConstraint::New(derived) = derived;
                         if interior.if_true != ALWAYS_FALSE {
                             map.add_pair_implication(lower_constraint, upper_constraint, derived);
                             node = interior.if_true;
