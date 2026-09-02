@@ -1985,6 +1985,13 @@ impl<'db> Constraint<'db> {
         replacement_typevar: BoundTypeVarInstance<'db>,
         replacement_bound: Type<'db>,
     ) -> Option<Type<'db>> {
+        // Gradual assignability is not transitive. Substituting a dynamic replacement into another
+        // bound would let an uncertain relationship participate in an arbitrarily long sequent
+        // chain.
+        if !replacement_bound.is_static_sequent_eligible(db, env) {
+            return None;
+        }
+
         if let Type::TypeVar(replacement) = replacement_bound
             && (replacement.is_same_typevar_as(db, needle_typevar)
                 || replacement.is_same_typevar_as(db, replacement_typevar))
