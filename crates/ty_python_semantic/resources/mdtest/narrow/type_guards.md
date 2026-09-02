@@ -739,8 +739,8 @@ missing-type-argument = "ignore"
 strict-generic-narrowing = true
 ```
 
-Strict narrowing intersects the subject with the top materialization of the target. This retains
-known specializations but represents all possible specializations when narrowing from `object`:
+Strict narrowing materializes generic type arguments. This retains known specializations but
+represents all possible specializations when narrowing from `object`:
 
 ```py
 from typing import Any
@@ -786,6 +786,70 @@ def f(value: list | int) -> int:
         value = 0
     reveal_type(value)  # revealed: int
     return value
+```
+
+## `TypeIs` narrowing with gradual protocol members
+
+Strict positive narrowing preserves gradual protocol members. The guard establishes that the subject
+has a `value` attribute, but retains the protocol's explicit `Any` for both reads and writes. The
+negative branch still excludes the full top materialization:
+
+```toml
+[environment]
+python-version = "3.12"
+
+[analysis]
+strict-generic-narrowing = true
+```
+
+```py
+from typing import Any, Protocol
+from typing_extensions import TypeIs
+
+class Reader(Protocol):
+    value: Any
+
+def is_reader(value: object) -> TypeIs[Reader]:
+    return True
+
+def from_object(value: object):
+    if is_reader(value):
+        reveal_type(value)  # revealed: Reader
+        reveal_type(value.value)  # revealed: Any
+        value.value = 1
+    else:
+        reveal_type(value)  # revealed: ~Top[Reader]
+```
+
+A generic protocol's type arguments are still materialized, independently of gradual members that do
+not depend on those arguments:
+
+```py
+class GenericReader[T](Protocol):
+    value: Any
+    def read(self) -> T: ...
+
+def is_generic_reader(value: object) -> TypeIs[GenericReader[Any]]:
+    return True
+
+def from_generic(value: object):
+    if is_generic_reader(value):
+        reveal_type(value)  # revealed: GenericReader[object]
+        reveal_type(value.value)  # revealed: Any
+        reveal_type(value.read())  # revealed: object
+```
+
+The same rule applies when an alias combines protocol instances and protocol class objects:
+
+```py
+type ReaderTarget = Reader | type[GenericReader[Any]]
+
+def is_reader_or_class(value: object) -> TypeIs[ReaderTarget]:
+    return True
+
+def from_union(value: object):
+    if is_reader_or_class(value):
+        reveal_type(value)  # revealed: Reader | type[GenericReader[object]]
 ```
 
 ## `TypeIs` narrowing of `NewType` instances

@@ -798,6 +798,42 @@ impl<'db> Conjunctions<'db> {
     }
 }
 
+/// Positive strict `TypeIs` narrowing materializes generic arguments but preserves the gradual
+/// members of a protocol target. Negative branches use full materialization to exclude every
+/// possible implementation of the protocol.
+fn strict_type_is_constraint<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    target: Type<'db>,
+) -> Type<'db> {
+    match target.resolve_type_alias(db) {
+        Type::ProtocolInstance(protocol) => {
+            Type::ProtocolInstance(protocol.top_materialization_of_type_arguments(db, env))
+        }
+        Type::SubclassOf(subclass_of)
+            if let SubclassOfInner::Protocol(protocol) = subclass_of.subclass_of() =>
+        {
+            protocol
+                .top_materialization_of_type_arguments(db, env)
+                .to_meta_type(db, env)
+        }
+        Type::Union(union) => union.map(db, env, |element| {
+            strict_type_is_constraint(db, env, *element)
+        }),
+        Type::Intersection(intersection) => {
+            let mut builder = IntersectionBuilder::new(db, env);
+            for positive in intersection.positive(db) {
+                builder.add_positive_in_place(strict_type_is_constraint(db, env, *positive));
+            }
+            for negative in intersection.negative(db) {
+                builder.add_negative_in_place(negative.bottom_materialization(db, env));
+            }
+            builder.build()
+        }
+        _ => target.top_materialization(db, env),
+    }
+}
+
 /// Preserve known generic arguments when narrowing a specialized base to one of its subclasses.
 ///
 /// For example, filtering `Sequence[int]` with `list[Unknown]` first infers `list[int]` from
@@ -4515,13 +4551,15 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                     place,
                     if use_generic_filtering {
                         NarrowingConstraint::generic_filtering(target)
+                    } else if is_positive {
+                        NarrowingConstraint::intersection(strict_type_is_constraint(
+                            db, &self.env, target,
+                        ))
                     } else {
                         NarrowingConstraint::intersection(
-                            target.top_materialization(db, &self.env).negate_if(
-                                db,
-                                &self.env,
-                                !is_positive,
-                            ),
+                            target
+                                .top_materialization(db, &self.env)
+                                .negate(db, &self.env),
                         )
                     },
                 ))
