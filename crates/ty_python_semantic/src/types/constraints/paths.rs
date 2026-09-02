@@ -468,9 +468,14 @@ impl PathAssignments {
     ) -> impl Iterator<Item = (ConstraintId, ConstraintId)> + '_ {
         self.assignments.iter().filter_map(
             |(assignment, (source_constraint, _))| match assignment {
-                ConstraintAssignment::Positive(constraint) => {
+                ConstraintAssignment::Positive(constraint)
+                    if !self
+                        .bridge_implications
+                        .contains(&(*source_constraint, *constraint)) =>
+                {
                     Some((*constraint, *source_constraint))
                 }
+                ConstraintAssignment::Positive(_) => None,
                 ConstraintAssignment::Negative(_) | ConstraintAssignment::Unconstrained(_) => None,
             },
         )
