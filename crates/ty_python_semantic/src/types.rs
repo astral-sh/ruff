@@ -10,7 +10,7 @@ use std::rc::Rc;
 use std::time::Duration;
 
 use bitflags::bitflags;
-use call::{CallDunderError, CallError, CallErrorKind};
+use call::{CallDunderError, CallDunderResult, CallError, CallErrorKind};
 use context::InferContext;
 pub use context::ProgramEnvironment;
 use ruff_db::Instant;
@@ -5817,7 +5817,7 @@ impl<'db> Type<'db> {
             CallArguments::none(),
             TypeContext::default(),
         ) {
-            Ok(bindings) => bindings.return_type(db, env),
+            Ok(bindings) => bindings.return_type(),
             Err(CallDunderError::PossiblyUnbound { bindings, .. }) => bindings.return_type(db, env),
 
             // TODO: emit a diagnostic
@@ -7064,7 +7064,7 @@ impl<'db> Type<'db> {
         name: &str,
         mut argument_types: CallArguments<'_, 'db>,
         tcx: TypeContext<'db>,
-    ) -> Result<Bindings<'db>, CallDunderError<'db>> {
+    ) -> Result<CallDunderResult<'db>, CallDunderError<'db>> {
         self.try_call_dunder_with_policy(
             db,
             env,
@@ -7090,7 +7090,7 @@ impl<'db> Type<'db> {
         argument_types: &mut CallArguments<'_, 'db>,
         tcx: TypeContext<'db>,
         policy: MemberLookupPolicy,
-    ) -> Result<Bindings<'db>, CallDunderError<'db>> {
+    ) -> Result<CallDunderResult<'db>, CallDunderError<'db>> {
         if let Type::Intersection(intersection) = self {
             return intersection.try_call_dunder_with_policy(
                 db,
@@ -7103,7 +7103,9 @@ impl<'db> Type<'db> {
         }
 
         if let Type::Union(union) = self {
-            return union.try_call_dunder_with_policy(db, env, name, argument_types, tcx, policy);
+            return union
+                .try_call_dunder_with_policy(db, env, name, argument_types, tcx, policy)
+                .map(|bindings| CallDunderResult::new(db, env, bindings));
         }
 
         // Implicit calls to dunder methods never access instance members, so we pass
@@ -7135,7 +7137,7 @@ impl<'db> Type<'db> {
                         unbound_on: None,
                     });
                 }
-                Ok(bindings)
+                Ok(CallDunderResult::new(db, env, bindings))
             }
             Place::Undefined => Err(CallDunderError::MethodNotAvailable),
         }
@@ -7257,7 +7259,7 @@ impl<'db> Type<'db> {
                 CallArguments::positional([name_type]),
                 TypeContext::default(),
             ) {
-                Ok(outcome) => Place::bound(outcome.return_type(db, env)).into(),
+                Ok(outcome) => Place::bound(outcome.return_type()).into(),
                 Err(CallDunderError::CallError(_, bindings, _)) => member_lookup_result(
                     db,
                     Place::bound(bindings.return_type(db, env)).into(),
@@ -7292,7 +7294,7 @@ impl<'db> Type<'db> {
             TypeContext::default(),
             getattribute_policy,
         ) {
-            Ok(bindings) => Place::bound(bindings.return_type(db, env)).into(),
+            Ok(bindings) => Place::bound(bindings.return_type()).into(),
             Err(CallDunderError::CallError(_, bindings, _)) => member_lookup_result(
                 db,
                 Place::bound(bindings.return_type(db, env)).into(),
@@ -7401,9 +7403,12 @@ impl<'db> Type<'db> {
         );
         match await_result {
             Ok(bindings) => {
-                let return_type = bindings.return_type(db, env);
+                let return_type = bindings.return_type();
                 Ok(return_type.generator_return_type(db, env).ok_or_else(|| {
-                    AwaitError::InvalidReturnType(return_type, Box::new(bindings))
+                    AwaitError::InvalidReturnType(
+                        return_type,
+                        Box::new(bindings.into_binding_metadata()),
+                    )
                 })?)
             }
             Err(call_error) => Err(AwaitError::Call(call_error)),
@@ -9503,7 +9508,7 @@ impl<'db> IntersectionType<'db> {
         argument_types: &mut CallArguments<'_, 'db>,
         tcx: TypeContext<'db>,
         policy: MemberLookupPolicy,
-    ) -> Result<Bindings<'db>, CallDunderError<'db>> {
+    ) -> Result<CallDunderResult<'db>, CallDunderError<'db>> {
         if let Some(alternatives) = self.finite_alternative_union(db, env) {
             return alternatives.try_call_dunder_with_policy(
                 db,
@@ -9542,7 +9547,9 @@ impl<'db> IntersectionType<'db> {
                 .with_provenance(error_provenance));
         }
 
-        Ok(Bindings::from_intersection(
+        Ok(CallDunderResult::from_intersection(
+            db,
+            env,
             Type::Intersection(self),
             successful_bindings,
         ))

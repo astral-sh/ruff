@@ -54,7 +54,9 @@ use crate::types::attribute_write::{AssignmentAttributeMembers, assignment_attri
 use crate::types::call::bind::{
     ArgumentTypeContext, CheckTypesMode, OverloadSet, requires_overload_evaluation,
 };
-use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorKind};
+use crate::types::call::{
+    Binding, Bindings, CallArguments, CallDunderResult, CallError, CallErrorKind,
+};
 use crate::types::callable::CallableTypeKind;
 use crate::types::class::{
     ClassLiteral, CodeGeneratorKind, FrozenDataclassDispatch, MethodDecorator,
@@ -3145,7 +3147,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     unbound_on: None,
                                 })
                             }
-                            Ok(bindings) => Ok(bindings),
+                            Ok(bindings) => Ok(CallDunderResult::new(db, env, bindings)),
                             Err(CallError(kind, bindings)) => {
                                 Err(CallDunderError::CallError(kind, bindings, provenance))
                             }
@@ -3167,7 +3169,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     frozen_dataclass_dispatch,
                     Some(FrozenDataclassDispatch::FrozenField)
                 ) || match &delattr_dunder_call_result {
-                    Ok(result) => result.return_type(db, env).is_never(),
+                    Ok(result) => result.return_type().is_never(),
                     Err(err) => err.return_type(db, env).is_some_and(|ty| ty.is_never()),
                 };
                 if returns_never {
@@ -3249,7 +3251,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // value to mutate; it is not a concrete descriptor with a terminal deleter.
                     let deleter_returns_never = !attr_ty.is_never()
                         && match &delete_dunder_call_result {
-                            Ok(bindings) => bindings.return_type(db, env).is_never(),
+                            Ok(bindings) => bindings.return_type().is_never(),
                             Err(error) => {
                                 error.return_type(db, env).is_some_and(|ty| ty.is_never())
                             }
@@ -9790,7 +9792,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     CallArguments::none(),
                     TypeContext::default(),
                 ) {
-                    Ok(bindings) => Some(bindings.return_type(db, env)),
+                    Ok(bindings) => Some(bindings.return_type()),
                     Err(CallDunderError::PossiblyUnbound { .. }) => {
                         // Iteration can fall back to `__getitem__` where `__iter__` is absent.
                         // The available `__iter__` bindings do not describe those alternatives.
@@ -10986,8 +10988,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 TypeContext::default(),
             ) {
                 Ok(outcome) => {
-                    self.check_deprecated_bindings(unary, &outcome);
-                    outcome.return_type(db, env)
+                    self.check_deprecated_bindings(unary, outcome.binding_metadata());
+                    outcome.return_type()
                 }
                 Err(e) => {
                     let bindings = match &e {
@@ -11115,7 +11117,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             .collect();
                         for outcome in &outcomes {
                             let bindings = match outcome {
-                                Ok(bindings) => Some(bindings),
+                                Ok(bindings) => Some(bindings.binding_metadata()),
                                 // A method can be deprecated even if it is missing from some
                                 // union members or its signature rejects the implicit call.
                                 // Preserve those bindings so the deprecation is reported
@@ -11140,7 +11142,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             constraints,
                             |_constraint| {
                                 let outcome = outcomes.next()?.ok()?;
-                                Some(outcome.return_type(db, env))
+                                Some(outcome.return_type())
                             },
                         );
                         match result {
@@ -11164,7 +11166,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     )
                                     .map_or_else(
                                         |e| e.fallback_return_type(db, env),
-                                        |b| b.return_type(db, env),
+                                        |b| b.return_type(),
                                     )
                             }
                         }
@@ -11183,7 +11185,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             CallArguments::none(),
                             TypeContext::default(),
                         ) {
-                            Ok(outcome) => outcome.return_type(db, env),
+                            Ok(outcome) => outcome.return_type(),
                             Err(e) => {
                                 self.report_unsupported_unary_operator(
                                     unary,

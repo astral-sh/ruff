@@ -2515,7 +2515,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
         );
         if match &setattr_result {
-            Ok(bindings) => bindings.return_type(db, env).is_never(),
+            Ok(bindings) => bindings.return_type().is_never(),
             Err(error) => error.return_type(db, env).is_some_and(|ty| ty.is_never()),
         } {
             return self.never();

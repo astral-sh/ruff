@@ -4032,10 +4032,7 @@ pub(crate) fn report_invalid_or_unsupported_base(
         TypeContext::default(),
     ) {
         Ok(ret) => {
-            if ret
-                .return_type(db, env)
-                .is_assignable_to(db, env, tuple_of_types)
-            {
+            if ret.return_type().is_assignable_to(db, env, tuple_of_types) {
                 report_unsupported_base(context, base_node, base_type, class);
             } else {
                 let Some(mut diagnostic) =

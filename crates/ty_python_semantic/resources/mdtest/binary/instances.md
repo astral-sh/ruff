@@ -217,6 +217,36 @@ class C(B): ...
 reveal_type(A() + C())  # revealed: Literal["right", "left"]
 ```
 
+## Conditional reflected methods on intersection operands
+
+A conditionally defined reflected method can have multiple return types. Excluding an unrelated
+class from the right operand preserves those alternatives, along with the left operand's result when
+its regular method takes precedence.
+
+```py
+def enabled() -> bool:
+    return True
+
+class Base:
+    def __add__(self, other) -> bytes:
+        return b"left"
+
+class Child(Base):
+    if enabled():
+        def __radd__(self, other) -> str:
+            return "right"
+
+    else:
+        def __radd__(self, other) -> int:
+            return 42
+
+class Excluded: ...
+
+def add(left: Base, right: Child):
+    if not isinstance(right, Excluded):
+        reveal_type(left + right)  # revealed: str | int | bytes
+```
+
 ## Reflected precedence uses runtime classes
 
 `IntFlag` values are commonly accumulated into a mask that starts at the integer zero. At runtime,

@@ -927,7 +927,7 @@ impl<'db> Type<'db> {
             TypeContext::default(),
         ) {
             Ok(outcome) => {
-                return Ok(outcome.return_type(db, env));
+                return Ok(outcome.return_type());
             }
             Err(CallDunderError::PossiblyUnbound { bindings, .. }) => {
                 return Err(SubscriptError::new(
