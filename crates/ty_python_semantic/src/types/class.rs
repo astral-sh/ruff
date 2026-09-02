@@ -2296,16 +2296,23 @@ impl<'db> ClassType<'db> {
         name: &str,
         target_method_decorator: MethodDecorator,
     ) -> ImplicitAttribute<'db> {
-        let augmented_bindings = self
+        let implicit = self
             .static_class_literal(db)
             .map(|(class, _)| class.implicit_attribute_bindings(db, name, target_method_decorator))
-            .filter(|implicit| member.is_undefined() == implicit.member.is_undefined())
-            .and_then(|implicit| implicit.augmented_bindings);
+            .filter(|implicit| member.is_undefined() == implicit.member.is_undefined());
+        let needs_projection_evidence_from_types =
+            member.inner.needs_projection_evidence_from_types
+                || implicit.is_some_and(|implicit| implicit.needs_projection_evidence_from_types);
 
         ImplicitAttribute {
-            member,
-            augmented_bindings,
-            projection_evidence: None,
+            member: Member {
+                inner: member
+                    .inner
+                    .with_projection_evidence_requirement(needs_projection_evidence_from_types),
+            },
+            augmented_bindings: implicit.and_then(|implicit| implicit.augmented_bindings),
+            projection_evidence: implicit.and_then(|implicit| implicit.projection_evidence),
+            needs_projection_evidence_from_types,
         }
     }
 
@@ -2871,15 +2878,19 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         bindings: &[(ClassType<'db>, AugmentedBindings<'db>)],
-    ) -> (Type<'db>, Provenance<'db>) {
+    ) -> (Type<'db>, Provenance<'db>, bool) {
         let mut union = UnionBuilder::new(db, env);
         let mut provenance = Provenance::Unknown;
+        let mut needs_projection_evidence_from_types = false;
 
         for (class, bindings) in bindings {
             let (_, specialization) = class.class_literal_and_specialization(db);
 
             for definition in bindings.definitions(db) {
-                let inferred_ty = infer_definition_types(db, *definition)
+                let inference = infer_definition_types(db, *definition);
+                needs_projection_evidence_from_types |=
+                    inference.needs_projection_evidence_from_types();
+                let inferred_ty = inference
                     .binding_type(*definition)
                     .apply_optional_specialization(db, specialization);
                 union = union.add(inferred_ty);
@@ -2902,7 +2913,11 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
             inferred_ty
         };
 
-        (inferred_ty, provenance)
+        (
+            inferred_ty,
+            provenance,
+            needs_projection_evidence_from_types,
+        )
     }
 
     /// Look up a class member by iterating through the MRO.
@@ -2984,7 +2999,11 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                         && !pending_augmented_bindings.is_empty()
                     {
                         if !defined.origin.is_declared() {
-                            let (inferred_ty, inferred_provenance) = Self::infer_augmented_bindings(
+                            let (
+                                inferred_ty,
+                                inferred_provenance,
+                                inferred_needs_projection_evidence,
+                            ) = Self::infer_augmented_bindings(
                                 db,
                                 &self.env,
                                 &pending_augmented_bindings,
@@ -2996,6 +3015,8 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                                 inferred_ty,
                             );
                             defined.provenance = defined.provenance.or(inferred_provenance);
+                            member.needs_projection_evidence_from_types |=
+                                inferred_needs_projection_evidence;
                         }
 
                         pending_augmented_bindings.clear();
@@ -3036,6 +3057,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
         let mut definitely_bound_member: Option<PlaceAndQualifiers<'db>> = None;
         let mut provenance = Provenance::Unknown;
         let mut pending_augmented_bindings = Vec::new();
+        let mut needs_projection_evidence_from_types = false;
 
         for superclass in self.mro_iter {
             match superclass {
@@ -3069,8 +3091,11 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                                 ..
                             }),
                         qualifiers,
+                        ..
                     } = implicit.member.inner
                     {
+                        needs_projection_evidence_from_types |=
+                            member.needs_projection_evidence_from_types;
                         if boundness == Definedness::AlwaysDefined {
                             if origin.is_declared() {
                                 if definitely_bound_member.is_some_and(|member| {
@@ -3104,13 +3129,19 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                         union_qualifiers |= qualifiers;
 
                         if !pending_augmented_bindings.is_empty() {
-                            let (inferred_ty, inferred_provenance) = Self::infer_augmented_bindings(
+                            let (
+                                inferred_ty,
+                                inferred_provenance,
+                                inferred_needs_projection_evidence,
+                            ) = Self::infer_augmented_bindings(
                                 db,
                                 &self.env,
                                 &pending_augmented_bindings,
                             );
                             union = union.add(inferred_ty);
                             provenance = provenance.or(inferred_provenance);
+                            needs_projection_evidence_from_types |=
+                                inferred_needs_projection_evidence;
                             union_qualifiers |= TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE;
                             pending_augmented_bindings.clear();
                         }
@@ -3142,17 +3173,25 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                                 return InstanceMemberResult::Done(class_member.inner);
                             }
 
+                            needs_projection_evidence_from_types |=
+                                class_member.inner.needs_projection_evidence_from_types;
                             union = union.add(class_member_ty);
                             provenance = provenance.or(class_member_provenance);
                             union_qualifiers |= class_member.inner.qualifiers;
                         } else {
-                            let (inferred_ty, inferred_provenance) = Self::infer_augmented_bindings(
+                            let (
+                                inferred_ty,
+                                inferred_provenance,
+                                inferred_needs_projection_evidence,
+                            ) = Self::infer_augmented_bindings(
                                 db,
                                 &self.env,
                                 &pending_augmented_bindings,
                             );
                             union = union.add(inferred_ty);
                             provenance = provenance.or(inferred_provenance);
+                            needs_projection_evidence_from_types |=
+                                inferred_needs_projection_evidence;
                             union_qualifiers |= TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE;
                         }
 
@@ -3185,6 +3224,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                 provenance,
             })
             .with_qualifiers(union_qualifiers)
+            .with_projection_evidence_requirement(needs_projection_evidence_from_types)
         };
 
         InstanceMemberResult::Done(result)
@@ -3217,16 +3257,19 @@ impl<'db> CompletedMemberLookup<'db> {
                 PlaceAndQualifiers {
                     place: Place::Defined(DefinedPlace { ty, provenance, .. }),
                     qualifiers,
+                    needs_projection_evidence_from_types,
                 },
                 Some(dynamic),
             ) => Place::bound(IntersectionType::from_two_elements(db, env, ty, dynamic))
                 .with_provenance(provenance)
-                .with_qualifiers(qualifiers),
+                .with_qualifiers(qualifiers)
+                .with_projection_evidence_requirement(needs_projection_evidence_from_types),
 
             (
                 PlaceAndQualifiers {
                     place: Place::Undefined,
                     qualifiers,
+                    ..
                 },
                 Some(dynamic),
             ) => Place::bound(dynamic).with_qualifiers(qualifiers),

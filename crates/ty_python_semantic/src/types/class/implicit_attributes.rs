@@ -66,6 +66,7 @@ impl<'db> StaticClassLiteral<'db> {
                 member: Member::unbound(),
                 augmented_bindings: None,
                 projection_evidence: None,
+                needs_projection_evidence_from_types: false,
             };
         };
 
@@ -89,6 +90,7 @@ impl<'db> StaticClassLiteral<'db> {
             },
             augmented_bindings: None,
             projection_evidence: None,
+            needs_projection_evidence_from_types: true,
         },
         heap_size=ruff_memory_usage::heap_size,
     )]
@@ -120,6 +122,7 @@ impl<'db> StaticClassLiteral<'db> {
         let mut augmented_bindings = Vec::new();
         let mut provenance = Provenance::Unknown;
         let mut projection_evidence = None;
+        let mut needs_projection_evidence_from_types = false;
 
         let module = parsed_module(db, python_file).load(db);
         let index = semantic_index(db, program_file);
@@ -217,6 +220,8 @@ impl<'db> StaticClassLiteral<'db> {
                             projection_evidence,
                             inference.projection_evidence(),
                         );
+                        needs_projection_evidence_from_types |=
+                            inference.needs_projection_evidence_from_types();
                         let inferred_ty = inference.expression_type(value);
                         projection_evidence = ProjectionEvidenceSet::merged(
                             db,
@@ -227,10 +232,14 @@ impl<'db> StaticClassLiteral<'db> {
                             member: Member {
                                 inner: Place::bound(inferred_ty)
                                     .with_definition(declaration)
-                                    .with_qualifiers(all_qualifiers),
+                                    .with_qualifiers(all_qualifiers)
+                                    .with_projection_evidence_requirement(
+                                        needs_projection_evidence_from_types,
+                                    ),
                             },
                             augmented_bindings: None,
                             projection_evidence,
+                            needs_projection_evidence_from_types,
                         };
                     }
 
@@ -240,9 +249,14 @@ impl<'db> StaticClassLiteral<'db> {
                 }
 
                 return ImplicitAttribute {
-                    member: Member { inner: annotation },
+                    member: Member {
+                        inner: annotation.with_projection_evidence_requirement(
+                            needs_projection_evidence_from_types,
+                        ),
+                    },
                     augmented_bindings: None,
                     projection_evidence,
+                    needs_projection_evidence_from_types,
                 };
             }
         }
@@ -310,13 +324,14 @@ impl<'db> StaticClassLiteral<'db> {
                     is_attribute_bound = true;
                 }
 
-                let (inferred_ty, binding_projection_evidence) =
+                let (inferred_ty, binding_projection_evidence, binding_needs_projection_evidence) =
                     implicit_attribute_binding_type(db, binding);
                 projection_evidence = ProjectionEvidenceSet::merged(
                     db,
                     projection_evidence,
                     binding_projection_evidence,
                 );
+                needs_projection_evidence_from_types |= binding_needs_projection_evidence;
 
                 if let Some(inferred_ty) = inferred_ty {
                     provenance = provenance.or(Provenance::SingleDefinition(binding));
@@ -338,7 +353,8 @@ impl<'db> StaticClassLiteral<'db> {
             Member {
                 inner: Place::bound(inferred_ty)
                     .with_provenance(provenance)
-                    .with_qualifiers(qualifiers),
+                    .with_qualifiers(qualifiers)
+                    .with_projection_evidence_requirement(needs_projection_evidence_from_types),
             }
         } else {
             Member::unbound()
@@ -349,6 +365,7 @@ impl<'db> StaticClassLiteral<'db> {
             augmented_bindings: (!augmented_bindings.is_empty())
                 .then(|| AugmentedBindings::new(db, augmented_bindings.into_boxed_slice())),
             projection_evidence,
+            needs_projection_evidence_from_types,
         }
     }
 }
@@ -366,6 +383,8 @@ pub(super) struct ImplicitAttribute<'db> {
     pub(super) augmented_bindings: Option<AugmentedBindings<'db>>,
     /// Projection facts computed while inferring the written values.
     pub(super) projection_evidence: Option<ProjectionEvidenceSet<'db>>,
+    /// Whether the returned member may still contain projection demands.
+    pub(super) needs_projection_evidence_from_types: bool,
 }
 
 /// Augmented assignments deferred until MRO lookup finds the attribute they read.
@@ -395,7 +414,7 @@ impl get_size2::GetSize for ImplicitAttributeName<'_> {}
 fn implicit_attribute_binding_type<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
-) -> (Option<Type<'db>>, Option<ProjectionEvidenceSet<'db>>) {
+) -> (Option<Type<'db>>, Option<ProjectionEvidenceSet<'db>>, bool) {
     let program_file = definition.program_file(db);
     let module = parsed_module(db, program_file.python_file(db)).load(db);
     let index = semantic_index(db, program_file);
@@ -404,7 +423,7 @@ fn implicit_attribute_binding_type<'db>(
     match definition.kind(db) {
         DefinitionKind::AnnotatedAssignment(_) => {
             // Annotated assignments are handled before inferring ordinary attribute bindings.
-            (None, None)
+            (None, None, false)
         }
         DefinitionKind::Assignment(assignment) => match assignment.unpack() {
             Some(unpack) => {
@@ -413,6 +432,7 @@ fn implicit_attribute_binding_type<'db>(
                 (
                     Some(unpacked.expression_type(assignment.target(&module))),
                     unpacked.projection_evidence(),
+                    unpacked.needs_projection_evidence_from_types(),
                 )
             }
             None => {
@@ -423,6 +443,7 @@ fn implicit_attribute_binding_type<'db>(
                 (
                     Some(inference.expression_type(value)),
                     inference.projection_evidence(),
+                    inference.needs_projection_evidence_from_types(),
                 )
             }
         },
@@ -433,6 +454,7 @@ fn implicit_attribute_binding_type<'db>(
                 (
                     Some(unpacked.expression_type(for_stmt.target(&module))),
                     unpacked.projection_evidence(),
+                    unpacked.needs_projection_evidence_from_types(),
                 )
             }
             TargetKind::Single => {
@@ -442,6 +464,8 @@ fn implicit_attribute_binding_type<'db>(
                     infer_expression_types(db, index.expression(iterable), TypeContext::default());
                 let iterable_ty = inference.expression_type(iterable);
                 let mut projection_evidence = inference.projection_evidence();
+                let mut needs_projection_evidence_from_types =
+                    inference.needs_projection_evidence_from_types();
                 // TODO: Potential diagnostics resulting from the iterable are not reported.
                 let mode = EvaluationMode::from_is_async(for_stmt.is_async());
                 let ty = if let Some(projected) =
@@ -452,6 +476,7 @@ fn implicit_attribute_binding_type<'db>(
                         projection_evidence,
                         projected.projection_evidence(),
                     );
+                    needs_projection_evidence_from_types = true;
                     projected.ty()
                 } else {
                     iterable_ty
@@ -459,7 +484,11 @@ fn implicit_attribute_binding_type<'db>(
                         .map(|tuple| tuple.homogeneous_element_type(db, &env))
                         .unwrap_or_else(|err| err.fallback_element_type(db, &env))
                 };
-                (Some(ty), projection_evidence)
+                (
+                    Some(ty),
+                    projection_evidence,
+                    needs_projection_evidence_from_types,
+                )
             }
         },
         DefinitionKind::WithItem(with_item) => match with_item.target_kind() {
@@ -469,6 +498,7 @@ fn implicit_attribute_binding_type<'db>(
                 (
                     Some(unpacked.expression_type(with_item.target(&module))),
                     unpacked.projection_evidence(),
+                    unpacked.needs_projection_evidence_from_types(),
                 )
             }
             TargetKind::Single => {
@@ -481,6 +511,8 @@ fn implicit_attribute_binding_type<'db>(
                 );
                 let context_ty = inference.expression_type(context_expr);
                 let mut projection_evidence = inference.projection_evidence();
+                let mut needs_projection_evidence_from_types =
+                    inference.needs_projection_evidence_from_types();
                 let mode = EvaluationMode::from_is_async(with_item.is_async());
                 let ty = if let Some(projected) =
                     context_ty.try_context_enter_projection_result(db, &env, mode)
@@ -490,13 +522,18 @@ fn implicit_attribute_binding_type<'db>(
                         projection_evidence,
                         projected.projection_evidence(),
                     );
+                    needs_projection_evidence_from_types = true;
                     projected.ty()
                 } else if with_item.is_async() {
                     context_ty.aenter(db, &env)
                 } else {
                     context_ty.enter(db, &env)
                 };
-                (Some(ty), projection_evidence)
+                (
+                    Some(ty),
+                    projection_evidence,
+                    needs_projection_evidence_from_types,
+                )
             }
         },
         DefinitionKind::Comprehension(comprehension) => match comprehension.target_kind() {
@@ -506,6 +543,7 @@ fn implicit_attribute_binding_type<'db>(
                 (
                     Some(unpacked.expression_type(comprehension.target(&module))),
                     unpacked.projection_evidence(),
+                    unpacked.needs_projection_evidence_from_types(),
                 )
             }
             TargetKind::Single => {
@@ -515,6 +553,8 @@ fn implicit_attribute_binding_type<'db>(
                     infer_expression_types(db, index.expression(iterable), TypeContext::default());
                 let iterable_ty = inference.expression_type(iterable);
                 let mut projection_evidence = inference.projection_evidence();
+                let mut needs_projection_evidence_from_types =
+                    inference.needs_projection_evidence_from_types();
                 // TODO: Potential diagnostics resulting from the iterable are not reported.
                 let mode = EvaluationMode::from_is_async(comprehension.is_async());
                 let ty = if let Some(projected) =
@@ -525,6 +565,7 @@ fn implicit_attribute_binding_type<'db>(
                         projection_evidence,
                         projected.projection_evidence(),
                     );
+                    needs_projection_evidence_from_types = true;
                     projected.ty()
                 } else {
                     iterable_ty
@@ -532,11 +573,15 @@ fn implicit_attribute_binding_type<'db>(
                         .map(|tuple| tuple.homogeneous_element_type(db, &env))
                         .unwrap_or_else(|err| err.fallback_element_type(db, &env))
                 };
-                (Some(ty), projection_evidence)
+                (
+                    Some(ty),
+                    projection_evidence,
+                    needs_projection_evidence_from_types,
+                )
             }
         },
         // Named expressions cannot target attributes, and other definitions do not write one.
-        _ => (None, None),
+        _ => (None, None, false),
     }
 }
 
@@ -603,6 +648,7 @@ fn implicit_attribute_cycle_recover<'db>(
     ImplicitAttribute {
         member: Member { inner },
         projection_evidence,
+        needs_projection_evidence_from_types: true,
         ..attribute_member
     }
 }

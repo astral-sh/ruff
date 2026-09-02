@@ -618,6 +618,7 @@ impl<'db> ProtocolInterfaceView<'db> {
                     .unwrap_or(Place::Undefined)
                     .with_provenance(Provenance::from_definition(member.definition())),
                 qualifiers: member.qualifiers(),
+                needs_projection_evidence_from_types: false,
             })
             .unwrap_or_else(|| Type::object().member(db, env, name))
     }
@@ -642,6 +643,7 @@ impl<'db> ProtocolInterfaceView<'db> {
                     .unwrap_or(Place::Undefined)
                     .with_provenance(Provenance::from_definition(member.definition())),
                 qualifiers: member.qualifiers(),
+                needs_projection_evidence_from_types: false,
             }
         })
     }

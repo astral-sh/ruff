@@ -489,8 +489,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         ..
                     }),
                 qualifiers,
+                needs_projection_evidence_from_types,
             } = result.unwrap_or_else(|error| error.fallback_member(db))
             {
+                self.needs_projection_evidence_from_types |= needs_projection_evidence_from_types;
                 if &alias.name != "*" && boundness == Definedness::PossiblyUndefined {
                     // TODO: Consider loading _both_ the attribute and any submodule and unioning them
                     // together if the attribute exists but is possibly-unbound.
@@ -504,7 +506,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 }
                 if qualifiers.contains(TypeQualifiers::FROM_MODULE_GETATTR) {
-                    from_module_getattr = Some((ty, qualifiers, source_provenance, error));
+                    from_module_getattr = Some((
+                        ty,
+                        qualifiers,
+                        source_provenance,
+                        needs_projection_evidence_from_types,
+                        error,
+                    ));
                 } else {
                     self.add_declaration_with_binding(
                         alias.into(),
@@ -515,6 +523,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 origin: TypeOrigin::Declared,
                                 qualifiers,
                                 provenance: source_provenance,
+                                needs_projection_evidence_from_types,
                             },
                             inferred_ty: ty,
                         },
@@ -562,7 +571,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // We've checked for a submodule, so now we can go ahead and use a type from module
         // `__getattr__`.
-        if let Some((ty, qualifiers, source_provenance, error)) = from_module_getattr {
+        if let Some((
+            ty,
+            qualifiers,
+            source_provenance,
+            needs_projection_evidence_from_types,
+            error,
+        )) = from_module_getattr
+        {
             if let Some(error) = error {
                 error.report_module_getattr_import_diagnostic(
                     &self.context,
@@ -580,6 +596,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         origin: TypeOrigin::Declared,
                         qualifiers,
                         provenance: source_provenance,
+                        needs_projection_evidence_from_types,
                     },
                     inferred_ty: ty,
                 },

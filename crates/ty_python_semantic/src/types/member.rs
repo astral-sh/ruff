@@ -80,18 +80,21 @@ pub(super) fn class_member<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str
                         ..
                     }),
                 qualifiers,
+                needs_projection_evidence_from_types: declared_needs_projection_evidence,
             } = place_and_quals
             {
                 // Otherwise, we need to check if the symbol has bindings
                 let use_def = use_def_map(db, scope);
                 let bindings = use_def.end_of_scope_symbol_bindings(symbol_id);
                 let env = ProgramEnvironment::from_scope(scope);
-                let inferred = place_from_bindings(db, &env, bindings).place;
+                let inferred = place_from_bindings(db, &env, bindings);
+                let needs_projection_evidence_from_types = declared_needs_projection_evidence
+                    || inferred.needs_projection_evidence_from_types;
 
                 // TODO: we should not need to calculate inferred type second time. This is a temporary
                 // solution until the notion of Boundness and Declaredness is split. See #16036, #16264
                 Member {
-                    inner: match inferred {
+                    inner: match inferred.place {
                         Place::Undefined => Place::Undefined.with_qualifiers(qualifiers),
                         Place::Defined(place) => Place::Defined(DefinedPlace {
                             ty,
@@ -99,7 +102,8 @@ pub(super) fn class_member<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str
                             ..place
                         })
                         .with_qualifiers(qualifiers),
-                    },
+                    }
+                    .with_projection_evidence_requirement(needs_projection_evidence_from_types),
                 }
             } else {
                 Member::unbound()

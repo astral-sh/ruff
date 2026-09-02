@@ -3974,7 +3974,10 @@ impl<'db> Type<'db> {
             PlaceAndQualifiers {
                 place: Place::Defined(member),
                 qualifiers,
-            } => Place::Defined(member.with_definedness(definedness)).with_qualifiers(qualifiers),
+                needs_projection_evidence_from_types,
+            } => Place::Defined(member.with_definedness(definedness))
+                .with_qualifiers(qualifiers)
+                .with_projection_evidence_requirement(needs_projection_evidence_from_types),
             member => member,
         }
     }
@@ -4103,6 +4106,7 @@ impl<'db> Type<'db> {
         let PlaceAndQualifiers {
             place: Place::Defined(declaration),
             qualifiers,
+            needs_projection_evidence_from_types,
         } = class_member
         else {
             return dynamic_instance_fallback;
@@ -4123,6 +4127,7 @@ impl<'db> Type<'db> {
             ..declaration
         })
         .with_qualifiers(qualifiers)
+        .with_projection_evidence_requirement(needs_projection_evidence_from_types)
         .or_fall_back_to(db, env, || dynamic_instance_fallback)
     }
 
@@ -4553,6 +4558,7 @@ impl<'db> Type<'db> {
                     provenance,
                 }),
             qualifiers,
+            needs_projection_evidence_from_types,
         } = attribute
             && let Some(fallback) = ty.materialized_divergent_fallback()
         {
@@ -4566,7 +4572,8 @@ impl<'db> Type<'db> {
                     public_type_policy,
                     provenance,
                 })
-                .with_qualifiers(qualifiers),
+                .with_qualifiers(qualifiers)
+                .with_projection_evidence_requirement(needs_projection_evidence_from_types),
                 instance,
                 owner,
             );
@@ -4582,7 +4589,7 @@ impl<'db> Type<'db> {
                         ty: Type::Dynamic(_) | Type::Divergent(_) | Type::Never,
                         ..
                     }),
-                qualifiers: _,
+                ..
             } => (attribute, AttributeKind::DataDescriptor, None),
 
             PlaceAndQualifiers {
@@ -4595,6 +4602,7 @@ impl<'db> Type<'db> {
                         provenance: attribute_provenance,
                     }),
                 qualifiers,
+                needs_projection_evidence_from_types,
             } => {
                 let mut all_data_descriptors = true;
                 let mut error = None;
@@ -4625,7 +4633,8 @@ impl<'db> Type<'db> {
                             provenance: attribute_provenance,
                         })
                     })
-                    .with_qualifiers(qualifiers);
+                    .with_qualifiers(qualifiers)
+                    .with_projection_evidence_requirement(needs_projection_evidence_from_types);
 
                 let kind = if all_data_descriptors {
                     AttributeKind::DataDescriptor
@@ -4646,6 +4655,7 @@ impl<'db> Type<'db> {
                         provenance: attribute_provenance,
                     }),
                 qualifiers,
+                needs_projection_evidence_from_types,
             } => {
                 let mut error = None;
                 let place = if intersection.positive(db).is_empty() {
@@ -4669,6 +4679,7 @@ impl<'db> Type<'db> {
                             })
                         })
                         .with_qualifiers(qualifiers)
+                        .with_projection_evidence_requirement(needs_projection_evidence_from_types)
                 };
                 (
                     place,
@@ -4689,6 +4700,7 @@ impl<'db> Type<'db> {
                         provenance,
                     }),
                 qualifiers: _,
+                needs_projection_evidence_from_types,
             } => {
                 let mut error = None;
                 let result = attribute_ty
@@ -4706,7 +4718,8 @@ impl<'db> Type<'db> {
                             public_type_policy,
                             provenance,
                         })
-                        .into(),
+                        .with_qualifiers(TypeQualifiers::empty())
+                        .with_projection_evidence_requirement(needs_projection_evidence_from_types),
                         kind,
                         error,
                     )
@@ -4870,6 +4883,7 @@ impl<'db> Type<'db> {
             PlaceAndQualifiers {
                 place: meta_attr,
                 qualifiers: meta_attr_qualifiers,
+                needs_projection_evidence_from_types: meta_needs_projection_evidence,
             },
             meta_attr_kind,
             meta_attr_error,
@@ -4892,6 +4906,7 @@ impl<'db> Type<'db> {
         let PlaceAndQualifiers {
             place: fallback,
             qualifiers: fallback_qualifiers,
+            needs_projection_evidence_from_types: fallback_needs_projection_evidence,
         } = fallback_member;
 
         match (meta_attr, meta_attr_kind, fallback) {
@@ -4899,7 +4914,9 @@ impl<'db> Type<'db> {
             // no matter if it's data descriptor, a non-data descriptor, or a normal attribute.
             (meta_attr @ Place::Defined(_), _, Place::Undefined) => member_lookup_result(
                 db,
-                meta_attr.with_qualifiers(meta_attr_qualifiers),
+                meta_attr
+                    .with_qualifiers(meta_attr_qualifiers)
+                    .with_projection_evidence_requirement(meta_needs_projection_evidence),
                 meta_attr_error,
             ),
 
@@ -4914,7 +4931,9 @@ impl<'db> Type<'db> {
                 _,
             ) => member_lookup_result(
                 db,
-                meta_attr.with_qualifiers(meta_attr_qualifiers),
+                meta_attr
+                    .with_qualifiers(meta_attr_qualifiers)
+                    .with_projection_evidence_requirement(meta_needs_projection_evidence),
                 meta_attr_error,
             ),
 
@@ -4946,7 +4965,10 @@ impl<'db> Type<'db> {
                     public_type_policy: fallback_public_type_policy,
                     provenance: fallback_provenance.or(meta_attr_provenance),
                 })
-                .with_qualifiers(meta_attr_qualifiers.union(fallback_qualifiers)),
+                .with_qualifiers(meta_attr_qualifiers.union(fallback_qualifiers))
+                .with_projection_evidence_requirement(
+                    meta_needs_projection_evidence || fallback_needs_projection_evidence,
+                ),
                 meta_attr_error.or(fallback_error),
             ),
 
@@ -4967,7 +4989,9 @@ impl<'db> Type<'db> {
                 }),
             ) if policy == InstanceFallbackShadowsNonDataDescriptor::Yes => member_lookup_result(
                 db,
-                fallback.with_qualifiers(fallback_qualifiers),
+                fallback
+                    .with_qualifiers(fallback_qualifiers)
+                    .with_projection_evidence_requirement(fallback_needs_projection_evidence),
                 fallback_error,
             ),
 
@@ -4999,14 +5023,19 @@ impl<'db> Type<'db> {
                     public_type_policy: fallback_public_type_policy,
                     provenance: fallback_provenance.or(meta_attr_provenance),
                 })
-                .with_qualifiers(meta_attr_qualifiers.union(fallback_qualifiers)),
+                .with_qualifiers(meta_attr_qualifiers.union(fallback_qualifiers))
+                .with_projection_evidence_requirement(
+                    meta_needs_projection_evidence || fallback_needs_projection_evidence,
+                ),
                 meta_attr_error.or(fallback_error),
             ),
 
             // If the attribute is not found on the meta-type, we simply return the fallback.
             (Place::Undefined, _, fallback) => member_lookup_result(
                 db,
-                fallback.with_qualifiers(fallback_qualifiers),
+                fallback
+                    .with_qualifiers(fallback_qualifiers)
+                    .with_projection_evidence_requirement(fallback_needs_projection_evidence),
                 fallback_error,
             ),
         }
@@ -10318,6 +10347,8 @@ pub(crate) struct TypeAndQualifiers<'db> {
     origin: TypeOrigin,
     qualifiers: TypeQualifiers,
     provenance: Provenance<'db>,
+    /// Whether the type may carry projection demands observed by an inference result.
+    needs_projection_evidence_from_types: bool,
 }
 
 impl<'db> TypeAndQualifiers<'db> {
@@ -10327,6 +10358,7 @@ impl<'db> TypeAndQualifiers<'db> {
             origin,
             qualifiers,
             provenance: Provenance::Unknown,
+            needs_projection_evidence_from_types: false,
         }
     }
 
@@ -10336,6 +10368,7 @@ impl<'db> TypeAndQualifiers<'db> {
             origin: TypeOrigin::Declared,
             qualifiers: TypeQualifiers::empty(),
             provenance: Provenance::Unknown,
+            needs_projection_evidence_from_types: false,
         }
     }
 
@@ -10346,6 +10379,18 @@ impl<'db> TypeAndQualifiers<'db> {
 
     pub(crate) fn provenance(&self) -> Provenance<'db> {
         self.provenance
+    }
+
+    /// Preserve the requirement to collect projection evidence when this type crosses an
+    /// inference-result boundary.
+    pub(crate) fn with_projection_evidence_requirement(mut self, required: bool) -> Self {
+        self.needs_projection_evidence_from_types |= required;
+        self
+    }
+
+    /// Return whether this type may carry projection demands observed by an inference result.
+    pub(crate) fn needs_projection_evidence_from_types(&self) -> bool {
+        self.needs_projection_evidence_from_types
     }
 
     /// Forget about type qualifiers and only return the inner type.
@@ -10374,6 +10419,7 @@ impl<'db> TypeAndQualifiers<'db> {
             origin: self.origin,
             qualifiers: self.qualifiers,
             provenance: self.provenance,
+            needs_projection_evidence_from_types: self.needs_projection_evidence_from_types,
         }
     }
 }
@@ -10961,6 +11007,7 @@ impl<'db> ModuleLiteralType<'db> {
                         ..place
                     }),
                     qualifiers: TypeQualifiers::FROM_MODULE_GETATTR,
+                    needs_projection_evidence_from_types: false,
                 },
                 error,
             );
@@ -11031,6 +11078,8 @@ impl<'db> ModuleLiteralType<'db> {
                         ..defined
                     }),
                     qualifiers: place_and_qualifiers.qualifiers,
+                    needs_projection_evidence_from_types: place_and_qualifiers
+                        .needs_projection_evidence_from_types,
                 }
                 .into();
             }

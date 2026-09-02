@@ -1553,7 +1553,9 @@ impl<'db> DefinitionInferenceExtra<'db> {
         }
     }
 
-    fn needs_projection_evidence_from_types(&self) -> bool {
+    /// Return whether this result may contain projection demands that need inference-time
+    /// evidence before cycle recovery uses them.
+    pub(crate) fn needs_projection_evidence_from_types(&self) -> bool {
         match self {
             Self::Other(extra) => extra.needs_projection_evidence_from_types,
             _ => false,
@@ -1851,6 +1853,14 @@ impl<'db> DefinitionInference<'db> {
             .copied()
     }
 
+    /// Return whether this result may contain projection demands that need inference-time
+    /// evidence before cycle recovery uses them.
+    pub(crate) fn needs_projection_evidence_from_types(&self) -> bool {
+        self.extra
+            .as_deref()
+            .is_some_and(DefinitionInferenceExtra::needs_projection_evidence_from_types)
+    }
+
     fn bindings(
         &self,
         owner: Definition<'db>,
@@ -1862,7 +1872,8 @@ impl<'db> DefinitionInference<'db> {
         &self,
         definition: Definition<'db>,
     ) -> InferredDeclaration<'db> {
-        self.types
+        let inferred = self
+            .types
             .declarations(definition)
             .find_map(|(def, declaration)| {
                 if def == definition {
@@ -1876,7 +1887,16 @@ impl<'db> DefinitionInference<'db> {
                     .map(TypeAndQualifiers::declared)
                     .map(InferredDeclaration::Declared)
             })
-            .unwrap_or(InferredDeclaration::Rejected)
+            .unwrap_or(InferredDeclaration::Rejected);
+
+        match inferred {
+            InferredDeclaration::Declared(declaration) => {
+                InferredDeclaration::Declared(declaration.with_projection_evidence_requirement(
+                    self.needs_projection_evidence_from_types(),
+                ))
+            }
+            InferredDeclaration::Rejected => InferredDeclaration::Rejected,
+        }
     }
 
     fn declarations(
@@ -2214,6 +2234,14 @@ impl<'db> ExpressionInference<'db> {
             .and_then(|extra| extra.projection_evidence)
     }
 
+    /// Return whether this result may contain projection demands that need inference-time
+    /// evidence before cycle recovery uses them.
+    pub(crate) fn needs_projection_evidence_from_types(&self) -> bool {
+        self.extra
+            .as_ref()
+            .is_some_and(|extra| extra.needs_projection_evidence_from_types)
+    }
+
     fn fallback_type(&self) -> Option<Type<'db>> {
         self.extra.as_ref().and_then(|extra| extra.cycle_recovery)
     }
@@ -2253,6 +2281,22 @@ impl<'db> StatementInference<'db> {
             StatementInference::Other(inference) => {
                 inference.collection_use_constraints(collection_def)
             }
+        }
+    }
+
+    fn projection_evidence(&self) -> Option<ProjectionEvidenceSet<'db>> {
+        match self {
+            Self::Expression(inference) => inference.projection_evidence(),
+            Self::Definition(_, inference) => inference.projection_evidence(),
+            Self::Other(inference) => inference.projection_evidence(),
+        }
+    }
+
+    fn needs_projection_evidence_from_types(&self) -> bool {
+        match self {
+            Self::Expression(inference) => inference.needs_projection_evidence_from_types(),
+            Self::Definition(_, inference) => inference.needs_projection_evidence_from_types(),
+            Self::Other(inference) => inference.needs_projection_evidence_from_types(),
         }
     }
 }
@@ -2318,6 +2362,18 @@ struct StatementInferenceInnerExtra<'db> {
 }
 
 impl<'db> StatementInferenceInner<'db> {
+    fn projection_evidence(&self) -> Option<ProjectionEvidenceSet<'db>> {
+        self.extra
+            .as_deref()
+            .and_then(|extra| extra.projection_evidence)
+    }
+
+    fn needs_projection_evidence_from_types(&self) -> bool {
+        self.extra
+            .as_deref()
+            .is_some_and(|extra| extra.needs_projection_evidence_from_types)
+    }
+
     fn cycle_initial(scope: ScopeId<'db>, cycle_recovery: Type<'db>) -> Self {
         let _ = scope;
 

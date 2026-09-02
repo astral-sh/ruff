@@ -602,6 +602,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn binding_type_with_projection_evidence(&mut self, definition: Definition<'db>) -> Type<'db> {
         let inference = infer_definition_types(self.db(), definition);
         self.extend_projection_evidence(inference.projection_evidence());
+        self.needs_projection_evidence_from_types |=
+            inference.needs_projection_evidence_from_types();
         inference.binding_type(definition)
     }
 
@@ -1639,6 +1641,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let PlaceAndQualifiers {
             place: resolved_place,
             qualifiers,
+            ..
         } = place_and_quals;
 
         let declaration = match resolved_place {
@@ -7852,6 +7855,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.index.constraining_collection_uses(collection_def)
             {
                 let statement_use_types = infer_statement_types(self.db(), statement);
+                self.extend_projection_evidence(statement_use_types.projection_evidence());
+                self.needs_projection_evidence_from_types |=
+                    statement_use_types.needs_projection_evidence_from_types();
 
                 if let Some(divergent) = statement_use_types
                     .expression_type(use_expression)
@@ -10252,6 +10258,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let expr = PlaceExpr::from_expr_name(name_node);
 
         let (resolved, _) = self.infer_place_load(expr, ast::ExprRef::Name(name_node));
+        self.needs_projection_evidence_from_types |= resolved.needs_projection_evidence_from_types;
         let env = self.program_environment();
 
         let ty = resolved.unwrap_with_diagnostic(db, env, |lookup_error| match lookup_error {
@@ -10368,6 +10375,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     let inference = infer_definition_types(db, definition);
                     self.extend_projection_evidence(inference.projection_evidence());
                 }
+                self.needs_projection_evidence_from_types |=
+                    resolved.needs_projection_evidence_from_types;
                 let mut place = resolved.place;
 
                 // Compatibility policy: ty historically treats a possibly-bound module snapshot
@@ -10696,6 +10705,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if let Some(place_expr) = PlaceExpr::try_from_expr(attribute) {
             let (resolved, keys) =
                 self.infer_place_load(place_expr, ast::ExprRef::Attribute(attribute));
+            self.needs_projection_evidence_from_types |=
+                resolved.needs_projection_evidence_from_types;
             constraint_keys.extend(keys);
             if let Place::Defined(DefinedPlace {
                 ty,
@@ -10725,6 +10736,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         .map_type(|ty| {
             self.narrow_expr_with_applicable_constraints(attribute, ty, &constraint_keys)
         });
+        self.needs_projection_evidence_from_types |=
+            fallback_place.needs_projection_evidence_from_types;
 
         // An augmented assignment also loads its target, but its write validation reports this
         // error. Avoid reporting the same invalid access twice.
@@ -10995,6 +11008,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         });
 
+        self.needs_projection_evidence_from_types |=
+            resolved_type.needs_projection_evidence_from_types();
         let resolved_type = resolved_type.inner_type();
 
         self.check_deprecated(attr, resolved_type);
@@ -11650,6 +11665,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = self;
 
         let db = context.db();
+        let needs_projection_evidence_from_types =
+            needs_projection_evidence_from_types || cycle_recovery.is_some();
         let projection_evidence = ProjectionEvidenceSet::merged(
             db,
             nested_projection_evidence,
@@ -11730,6 +11747,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = self;
 
         let db = context.db();
+        let needs_projection_evidence_from_types =
+            needs_projection_evidence_from_types || cycle_recovery.is_some();
         let projection_evidence = ProjectionEvidenceSet::merged(
             db,
             nested_projection_evidence,
@@ -11922,6 +11941,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = self;
 
         let db = context.db();
+        let needs_projection_evidence_from_types =
+            needs_projection_evidence_from_types || cycle_recovery.is_some();
         let projection_evidence = ProjectionEvidenceSet::merged(
             db,
             nested_projection_evidence,
@@ -12090,6 +12111,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = self;
 
         let db = context.db();
+        let needs_projection_evidence_from_types =
+            needs_projection_evidence_from_types || cycle_recovery.is_some();
         let projection_evidence = ProjectionEvidenceSet::merged(
             db,
             nested_projection_evidence,

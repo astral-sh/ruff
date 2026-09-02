@@ -385,12 +385,15 @@ impl<'db> UnionType<'db> {
         let mut possibly_unbound = false;
         let mut origin = TypeOrigin::Declared;
         let mut provenance = Provenance::Unknown;
+        let mut needs_projection_evidence_from_types = false;
         for ty in self.elements(db) {
             let PlaceAndQualifiers {
                 place: ty_member,
                 qualifiers: new_qualifiers,
+                needs_projection_evidence_from_types: new_needs_projection_evidence,
             } = transform_fn(ty);
             qualifiers |= new_qualifiers;
+            needs_projection_evidence_from_types |= new_needs_projection_evidence;
             match ty_member {
                 Place::Undefined => {
                     possibly_unbound = true;
@@ -432,6 +435,7 @@ impl<'db> UnionType<'db> {
                 })
             },
             qualifiers,
+            needs_projection_evidence_from_types,
         }
     }
 
@@ -1133,12 +1137,15 @@ impl<'db> IntersectionType<'db> {
         let mut any_definitely_bound = false;
         let mut origin = TypeOrigin::Declared;
         let mut provenance = Provenance::Unknown;
+        let mut needs_projection_evidence_from_types = false;
         for ty in self.positive_elements_or_object(db) {
             let PlaceAndQualifiers {
                 place: member,
                 qualifiers: new_qualifiers,
+                needs_projection_evidence_from_types: new_needs_projection_evidence,
             } = transform_fn(&ty);
             qualifiers |= new_qualifiers;
+            needs_projection_evidence_from_types |= new_needs_projection_evidence;
             match member {
                 Place::Undefined => {}
                 Place::Defined(DefinedPlace {
@@ -1177,6 +1184,7 @@ impl<'db> IntersectionType<'db> {
                 })
             },
             qualifiers,
+            needs_projection_evidence_from_types,
         }
     }
 
