@@ -507,6 +507,35 @@ def upper_bounds[T]():
     static_assert(intersection_type == intersection_constraint)
 ```
 
+Upper bounds that are unions remain as separate, factored constraints. Eagerly intersecting the
+unions would distribute them into disjunctive normal form. Repeatedly deriving further intersections
+from those expanded bounds can produce a combinatorial number of equivalent constraints. Relating
+`T` to `U` below ensures that solving `T` also considers consequences involving another typevar.
+
+```pyi
+class A: ...
+class B: ...
+class C: ...
+class D: ...
+class E: ...
+class F: ...
+class G: ...
+class H: ...
+class I: ...
+class J: ...
+
+def union_upper_bounds[T, U]() -> None:
+    constraints = (
+        ConstraintSet.upper_bound(T, A | B)
+        & ConstraintSet.upper_bound(T, C | D)
+        & ConstraintSet.upper_bound(T, E | F)
+        & ConstraintSet.upper_bound(T, G | H)
+        & ConstraintSet.upper_bound(T, I | J)
+        & ConstraintSet.equality(T, U)
+    )
+    _ = constraints.solutions_for(T, inferable=tuple[T, U])
+```
+
 For an intersection of two lower bounds constraints (`(Base ≤ T) ∧ (Other ≤ T)`), we union the lower
 bounds. Any type that satisfies both `Base ≤ T` and `Other ≤ T` must necessarily satisfy their union
 `Base | Other ≤ T`, and vice versa.
