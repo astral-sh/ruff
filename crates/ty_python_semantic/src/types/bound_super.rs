@@ -958,7 +958,7 @@ impl<'db> BoundSuperType<'db> {
             descriptor_error.map(MemberLookupErrorKind::DescriptorGet),
             instance
                 .and_then(|_| attribute.place.ignore_possibly_undefined())
-                .and_then(|ty| ty.property_deprecations(db, env))
+                .and_then(|ty| ty.property_deprecations(db))
                 // `super` delegates reads to the owner's descriptors, but not writes or deletions.
                 .map(|properties| properties.getters_only(db)),
         ))

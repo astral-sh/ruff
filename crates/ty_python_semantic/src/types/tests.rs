@@ -1,11 +1,14 @@
 use super::*;
 use crate::db::tests::{TestDbBuilder, setup_db};
-use crate::place::{typing_extensions_symbol, typing_symbol};
+use crate::place::{global_symbol, typing_extensions_symbol, typing_symbol};
 use crate::types::type_alias::PEP695TypeAliasType;
 use crate::{Db, ProgramEnvironment};
+use ruff_db::files::system_path_to_file;
 use ruff_db::system::DbWithWritableSystem as _;
+use ruff_db::testing::assert_function_query_was_not_run_by_name;
 use ruff_python_ast as ast;
 use ruff_python_ast::PythonVersion;
+use salsa::plumbing::AsId;
 use test_case::test_case;
 use ty_python_core::program::Program;
 use ty_python_core::{ProgramFile, TestProgramDb as _};
@@ -17,6 +20,58 @@ fn member_lookup_result_size() {
         size_of::<MemberLookupResult<'_>>(),
         size_of::<Result<PlaceAndQualifiers<'_>, MemberLookupError<'_>>>(),
     );
+}
+
+#[test]
+fn property_deprecations_do_not_infer_accessor_signatures() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_dedented(
+        "/src/accessors.py",
+        r#"
+        from typing_extensions import deprecated
+
+        @deprecated("old getter")
+        def getter(self: object) -> int: ...
+
+        def setter(self: object, value: int) -> None: ...
+        "#,
+    )?;
+    let accessor_ids = {
+        let file = system_path_to_file(&db, "/src/accessors.py")?;
+        let env = db.program_environment();
+        let file = ProgramFile::new(&db, file, env.program(&db));
+        let getter = global_symbol(&db, file, "getter").place.expect_type();
+        let setter = global_symbol(&db, file, "setter").place.expect_type();
+        let property = PropertyInstanceType::new(&db, Some(getter), Some(setter), None);
+        let deprecations = Type::PropertyInstance(property)
+            .property_deprecations(&db)
+            .ok_or_else(|| anyhow::anyhow!("expected a deprecated getter"))?;
+        assert_eq!(deprecations.functions(&db, ast::ExprContext::Load).len(), 1);
+        assert!(
+            deprecations
+                .functions(&db, ast::ExprContext::Store)
+                .is_empty()
+        );
+
+        [getter, setter]
+            .into_iter()
+            .map(|ty| {
+                ty.as_function_literal()
+                    .map(|function| function.as_id())
+                    .ok_or_else(|| anyhow::anyhow!("expected an accessor function"))
+            })
+            .collect::<anyhow::Result<Vec<_>>>()?
+    };
+    let events = db.take_salsa_events();
+    for accessor in accessor_ids {
+        assert_function_query_was_not_run_by_name(
+            &db,
+            "FunctionType < 'db >::signature_",
+            Some(accessor),
+            &events,
+        );
+    }
+    Ok(())
 }
 
 #[test]

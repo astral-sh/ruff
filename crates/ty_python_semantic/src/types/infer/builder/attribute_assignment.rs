@@ -150,7 +150,7 @@ impl<'db> AttributeDeprecation<'db> {
                         ..
                     },
                 ..
-            } if let Some(properties) = descriptor_ty.property_deprecations(db, env) => {
+            } if let Some(properties) = descriptor_ty.property_deprecations(db) => {
                 Self::Deprecated(properties)
             }
             AttributeWriteRequirement::Instance {
