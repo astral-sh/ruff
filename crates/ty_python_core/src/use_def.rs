@@ -503,6 +503,7 @@ impl RetainedBindingsBuilder {
         for binding in &self.live_bindings {
             reachability_constraints.mark_used(binding.reachability_constraint());
             narrowing_constraints.mark_used(binding.narrowing_constraint());
+            narrowing_constraints.mark_used(binding.presence_constraint());
         }
         RetainedBindings {
             ends: self.ends.into(),
@@ -597,6 +598,7 @@ struct DefinitionsAtDefinition<B, D> {
 enum InternedEnclosingSnapshotId {
     Constraint(ScopedNarrowingConstraint),
     Bindings(InternedBindingsId),
+    UnboundBindings(InternedBindingsId),
 }
 
 /// Lookup tables needed to evaluate reachability and narrowing constraints.
@@ -954,12 +956,11 @@ impl<'db> UseDefMap<'db> {
                 })
             }
             ConstraintKey::NestedScope(nested_scope) => {
-                let EnclosingSnapshotResult::FoundBindings(bindings) =
+                let (EnclosingSnapshotResult::FoundBindings(bindings)
+                | EnclosingSnapshotResult::FoundUnboundBindings(bindings)) =
                     index.enclosing_snapshot(enclosing_scope, expr, nested_scope)
                 else {
-                    unreachable!(
-                        "The result of `SemanticIndex::eager_snapshot` must be `FoundBindings`"
-                    )
+                    unreachable!("Expected binding state for a nested-scope constraint")
                 };
                 ApplicableConstraints::ConstrainedBindings(bindings)
             }
@@ -1073,6 +1074,14 @@ impl<'db> UseDefMap<'db> {
             }
             Some(InternedEnclosingSnapshotId::Bindings(bindings_id)) => {
                 EnclosingSnapshotResult::FoundBindings(
+                    self.bindings_iterator(
+                        &self.interned_bindings[*bindings_id],
+                        boundness_analysis,
+                    ),
+                )
+            }
+            Some(InternedEnclosingSnapshotId::UnboundBindings(bindings_id)) => {
+                EnclosingSnapshotResult::FoundUnboundBindings(
                     self.bindings_iterator(
                         &self.interned_bindings[*bindings_id],
                         boundness_analysis,
@@ -1295,6 +1304,11 @@ impl<'map, 'db> Iterator for BindingWithConstraintsIterator<'map, 'db> {
                     constraint: live_binding.narrowing_constraint(),
                     constraint_tables: self.constraint_tables,
                 },
+                presence_constraint: NarrowingEvaluator {
+                    constraint: live_binding.presence_constraint(),
+                    constraint_tables: self.constraint_tables,
+                },
+                inherits_presence: live_binding.inherits_presence(),
                 reachability_constraint: live_binding.reachability_constraint(),
             })
     }
@@ -1307,6 +1321,8 @@ pub struct BindingWithConstraints<'map, 'db> {
     /// Stable binding order within the containing scope.
     pub binding_order: ScopedDefinitionId,
     pub narrowing_constraint: NarrowingEvaluator<'map, 'db>,
+    pub presence_constraint: NarrowingEvaluator<'map, 'db>,
+    pub inherits_presence: bool,
     pub reachability_constraint: ScopedReachabilityConstraintId,
 }
 
@@ -1399,9 +1415,19 @@ pub(super) struct FlowSnapshot {
     checkpoint_flow: ScopedReachabilityConstraintId,
     checkpoint_state: ExceptionCheckpointSnapshot,
     pending_reachability: PendingReachabilityId,
+    presence_checkpoint: bool,
 }
 
 impl FlowSnapshot {
+    pub(super) fn checkpoint_member_presence(&mut self) {
+        self.presence_checkpoint = true;
+        for state in &mut self.member_states {
+            if state.state.needs_presence_checkpoint() {
+                Rc::make_mut(&mut state.state).invalidate_presence();
+            }
+        }
+    }
+
     pub(super) fn is_always_unreachable(&self) -> bool {
         self.reachability == ScopedReachabilityConstraintId::ALWAYS_FALSE
     }
@@ -1826,6 +1852,9 @@ pub(super) struct UseDefMapBuilder<'db> {
     /// Restorable identity of the bindings visible to exception handlers.
     checkpoint_state: ExceptionCheckpointState,
 
+    // New member places also need to know whether an enclosing scope's proof is stale.
+    presence_checkpoint: bool,
+
     /// Live bindings for each so-far-recorded definition and, for binding-only definitions, the
     /// live declarations.
     definitions_by_definition:
@@ -1873,6 +1902,7 @@ impl<'db> UseDefMapBuilder<'db> {
             range_reachability: Vec::new(),
             checkpoint_flow: ScopedReachabilityConstraintId::ALWAYS_TRUE,
             checkpoint_state: ExceptionCheckpointState::default(),
+            presence_checkpoint: false,
             definitions_by_definition: FxHashMap::default(),
             symbol_states: IndexVec::new(),
             member_states: IndexVec::new(),
@@ -1929,8 +1959,12 @@ impl<'db> UseDefMapBuilder<'db> {
                 debug_assert_eq!(symbol, new_place);
             }
             ScopedPlaceId::Member(member) => {
+                let mut state = PlaceState::undefined(self.reachability);
+                if self.presence_checkpoint {
+                    state.invalidate_presence();
+                }
                 let new_place = self.member_states.push(PendingPlaceState::new(
-                    PlaceState::undefined(self.reachability),
+                    state,
                     self.pending_reachability.current,
                 ));
                 debug_assert_eq!(member, new_place);
@@ -1985,6 +2019,11 @@ impl<'db> UseDefMapBuilder<'db> {
             previous_definitions,
             can_be_shadowed,
         );
+        if matches!(previous_definitions, PreviousDefinitions::AreShadowed) {
+            place_state.establish_presence();
+        } else if self.presence_checkpoint && place.is_member() {
+            place_state.invalidate_presence();
+        }
         self.definitions_by_definition
             .insert(binding, definitions_at_definition);
 
@@ -2005,6 +2044,9 @@ impl<'db> UseDefMapBuilder<'db> {
             PreviousDefinitions::AreKept,
             can_be_shadowed,
         );
+        if matches!(previous_definitions, PreviousDefinitions::AreShadowed) {
+            bindings.establish_presence();
+        }
     }
 
     pub(crate) fn bindings_at_use(
@@ -2445,6 +2487,8 @@ impl<'db> UseDefMapBuilder<'db> {
                 PreviousDefinitions::AreKept,
                 FutureDefinitions::ShadowThisOne,
             );
+            place_state.establish_presence();
+            reachable_definitions.bindings.establish_presence();
         }
     }
 
@@ -2468,6 +2512,36 @@ impl<'db> UseDefMapBuilder<'db> {
             PreviousDefinitions::AreShadowed,
             FutureDefinitions::ShadowThisOne,
         );
+        place_state.invalidate_presence();
+    }
+
+    /// Forget member-presence evidence before executing code whose effects are unknown.
+    /// The value constraints are unchanged. Flow snapshots retain both constraint sets, so
+    /// restoring a branch or merging exception entries also restores or joins presence.
+    pub(super) fn checkpoint_member_presence(&mut self) {
+        if self.reachability == ScopedReachabilityConstraintId::ALWAYS_FALSE {
+            return;
+        }
+        let mut changed = !self.presence_checkpoint;
+        self.presence_checkpoint = true;
+        let pending = self.pending_reachability.current;
+        for state in &mut self.member_states {
+            if !state.state.needs_presence_checkpoint() {
+                continue;
+            }
+            changed = true;
+            self.pending_reachability
+                .materialize(
+                    state,
+                    pending,
+                    &mut self.narrowing_constraints,
+                    &mut self.reachability_constraints,
+                )
+                .invalidate_presence();
+        }
+        if changed {
+            self.checkpoint_state.record_binding_change();
+        }
     }
 
     pub(super) fn record_use(&mut self, place: ScopedPlaceId, use_id: ScopedUseId) {
@@ -2621,10 +2695,17 @@ impl<'db> UseDefMapBuilder<'db> {
         let is_forwarding_symbol = enclosing_place_expr
             .as_symbol()
             .is_some_and(|symbol| symbol.is_global() || symbol.is_nonlocal());
-        let stores_visible_bindings = enclosing_place_expr.is_bound()
-            && bindings
-                .iter()
-                .any(|binding| !binding.binding().is_unbound());
+        let has_bindings = bindings
+            .iter()
+            .any(|binding| !binding.binding().is_unbound());
+        let stores_visible_bindings = enclosing_place_expr.is_bound() && has_bindings;
+        // Even an unbound member can carry a presence checkpoint or a guard that must be
+        // applied before consulting an enclosing assignment.
+        if enclosing_place.is_member() && !stores_visible_bindings {
+            return self
+                .enclosing_snapshots
+                .push(EnclosingSnapshot::UnboundBindings(bindings.clone()));
+        }
         // Names bound in class scopes are never visible to nested scopes (but
         // attributes/subscripts are visible), so we never need to save eager scope bindings in a
         // class scope. There is one exception to this rule: annotation scopes can see names
@@ -2663,7 +2744,10 @@ impl<'db> UseDefMapBuilder<'db> {
             .bindings()
             .clone();
         match self.enclosing_snapshots.get_mut(snapshot_id) {
-            Some(EnclosingSnapshot::Bindings(bindings)) => {
+            Some(
+                EnclosingSnapshot::Bindings(bindings)
+                | EnclosingSnapshot::UnboundBindings(bindings),
+            ) => {
                 bindings.merge(
                     new_bindings,
                     &mut self.narrowing_constraints,
@@ -2702,6 +2786,7 @@ impl<'db> UseDefMapBuilder<'db> {
             checkpoint_flow: self.checkpoint_flow,
             checkpoint_state: self.checkpoint_state.snapshot(),
             pending_reachability: self.pending_reachability.current,
+            presence_checkpoint: self.presence_checkpoint,
         }
     }
 
@@ -2742,6 +2827,7 @@ impl<'db> UseDefMapBuilder<'db> {
         self.reachability = snapshot.reachability;
         self.checkpoint_flow = snapshot.checkpoint_flow;
         self.pending_reachability.current = snapshot.pending_reachability;
+        self.presence_checkpoint = snapshot.presence_checkpoint;
 
         // If the snapshot we are restoring is missing some places we've recorded since, we need
         // to fill them in so the place IDs continue to line up. Since they don't exist in the
@@ -2751,7 +2837,11 @@ impl<'db> UseDefMapBuilder<'db> {
             self.pending_reachability.current,
         );
         self.symbol_states.resize(num_symbols, undefined.clone());
-        self.member_states.resize(num_members, undefined);
+        let mut undefined_member = undefined;
+        if self.presence_checkpoint {
+            Rc::make_mut(&mut undefined_member.state).invalidate_presence();
+        }
+        self.member_states.resize(num_members, undefined_member);
     }
 
     /// Merge the given snapshot into the current state, reflecting that we might have taken either
@@ -2774,6 +2864,7 @@ impl<'db> UseDefMapBuilder<'db> {
         }
 
         self.checkpoint_state.merge(snapshot.checkpoint_state);
+        self.presence_checkpoint |= snapshot.presence_checkpoint;
 
         // We never remove places from `place_states` (it's an IndexVec, and the place
         // IDs must line up), so the current number of known places must always be equal to or
@@ -2790,9 +2881,18 @@ impl<'db> UseDefMapBuilder<'db> {
             &mut self.narrowing_constraints,
             &mut self.reachability_constraints,
         );
+        let mut member_states = snapshot.member_states;
+        if snapshot.presence_checkpoint {
+            let mut undefined = PlaceState::undefined(snapshot.reachability);
+            undefined.invalidate_presence();
+            member_states.resize(
+                self.member_states.len(),
+                PendingPlaceState::new(undefined, branch),
+            );
+        }
         self.pending_reachability.merge_place_states(
             &mut self.member_states,
-            snapshot.member_states,
+            member_states,
             branch,
             snapshot.reachability,
             &mut self.narrowing_constraints,
@@ -3103,6 +3203,10 @@ impl<'db> UseDefMapBuilder<'db> {
                 EnclosingSnapshot::Bindings(bindings) => {
                     let interned_bindings_id = place_state_interner.intern_bindings(&bindings);
                     InternedEnclosingSnapshotId::Bindings(interned_bindings_id)
+                }
+                EnclosingSnapshot::UnboundBindings(bindings) => {
+                    let interned_bindings_id = place_state_interner.intern_bindings(&bindings);
+                    InternedEnclosingSnapshotId::UnboundBindings(interned_bindings_id)
                 }
                 EnclosingSnapshot::Constraint(constraint) => {
                     InternedEnclosingSnapshotId::Constraint(constraint)

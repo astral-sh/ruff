@@ -14,6 +14,7 @@ use crate::reachability::{
     NarrowingProjector, ReachabilityEvaluationCache, evaluate_reachability,
     evaluate_reachability_with_cache,
 };
+use crate::types::narrow::NarrowedPlace;
 use crate::types::{
     DynamicType, KnownClass, MemberLookupPolicy, Type, TypeAndQualifiers, TypeQualifiers,
     UnionBuilder, UnionType, binding_type, inferred_declaration, is_discarded_dict_key_assignment,
@@ -1839,19 +1840,22 @@ fn place_from_bindings_impl<'db>(
             let narrowed = match narrowing_constraint.constraint() {
                 ScopedNarrowingConstraint::ALWAYS_TRUE => binding_ty,
                 ScopedNarrowingConstraint::ALWAYS_FALSE => Type::Never,
-                constraint => narrowing_projector
-                    .get_or_insert_with(|| {
-                        NarrowingProjector::new(
-                            db,
-                            env,
-                            narrowing_constraint.narrowing_constraints(),
-                            predicates,
-                            narrowing_constraint.predicate_narrowing_targets(),
-                            binding.place(db),
-                            binding_ty,
-                        )
-                    })
-                    .narrow(constraint, binding_ty),
+                constraint => {
+                    narrowing_projector
+                        .get_or_insert_with(|| {
+                            NarrowingProjector::new(
+                                db,
+                                env,
+                                narrowing_constraint.narrowing_constraints(),
+                                predicates,
+                                narrowing_constraint.predicate_narrowing_targets(),
+                                binding.place(db),
+                                NarrowedPlace::new(binding_ty),
+                            )
+                        })
+                        .narrow(constraint, NarrowedPlace::new(binding_ty))
+                        .ty
+                }
             };
             Some((narrowed, static_reachability))
         },

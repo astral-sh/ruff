@@ -194,6 +194,7 @@
 //! [bdd]: https://en.wikipedia.org/wiki/Binary_decision_diagram
 
 use crate::ProgramEnvironment;
+use crate::types::narrow::{NarrowedPlace, NarrowedPlaceBuilder};
 use std::cell::RefCell;
 
 use crate::{
@@ -877,17 +878,17 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
     }
 }
 
-pub(crate) fn narrow_type_by_constraint<'db>(
+pub(crate) fn narrow_place_by_constraint<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     evaluator: &NarrowingEvaluator<'_, 'db>,
-    base_ty: Type<'db>,
+    base_ty: NarrowedPlace<'db>,
     place: ScopedPlaceId,
-) -> Type<'db> {
+) -> NarrowedPlace<'db> {
     let id = evaluator.constraint();
     match id {
         ScopedNarrowingConstraint::ALWAYS_TRUE => return base_ty,
-        ScopedNarrowingConstraint::ALWAYS_FALSE => return Type::Never,
+        ScopedNarrowingConstraint::ALWAYS_FALSE => return NarrowedPlace::unreachable(),
         _ => {}
     }
 
@@ -906,13 +907,17 @@ pub(crate) fn narrow_type_by_constraint<'db>(
 fn apply_accumulated_narrowing<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
-    base_ty: Type<'db>,
+    base_ty: NarrowedPlace<'db>,
     accumulated: Option<NarrowingConstraint<'db>>,
-) -> Type<'db> {
+) -> NarrowedPlace<'db> {
     match accumulated {
-        Some(constraint) => NarrowingConstraint::intersection(base_ty)
-            .merge_constraint_and(constraint)
-            .evaluate_constraint_type(db, env),
+        Some(constraint) => {
+            let mut narrowed = NarrowingConstraint::intersection(base_ty.ty)
+                .merge_constraint_and(constraint)
+                .evaluate_place(db, env);
+            narrowed.known_present |= base_ty.known_present;
+            narrowed
+        }
         None => base_ty,
     }
 }
@@ -948,7 +953,7 @@ enum ProjectedNarrowingEntry<'db> {
     /// A nonterminal suffix. Constant suffixes use the graph's existing terminal IDs instead.
     Checkpoint {
         constraint: ScopedNarrowingConstraint,
-        ty: Type<'db>,
+        ty: NarrowedPlace<'db>,
     },
 }
 
@@ -984,7 +989,7 @@ impl<'db> ProjectedNarrowingGraph<'db> {
     }
 }
 
-/// A cached type together with the terminal shape of its canonical projected graph.
+/// A cached value type and presence together with the terminal shape of its projected graph.
 ///
 /// Joins need to recognize an unconstrained suffix before applying `TypeGuard` replacement.
 /// Similarly, an unreachable graph must be eliminated before a later predicate can replace `Never`.
@@ -992,13 +997,13 @@ impl<'db> ProjectedNarrowingGraph<'db> {
 enum ProjectedNarrowingCheckpoint<'db> {
     Unreachable,
     Unconstrained,
-    Narrowed(Type<'db>),
+    Narrowed(NarrowedPlace<'db>),
 }
 
 impl<'db> ProjectedNarrowingCheckpoint<'db> {
-    fn ty(self, base_ty: Type<'db>) -> Type<'db> {
+    fn place(self, base_ty: NarrowedPlace<'db>) -> NarrowedPlace<'db> {
         match self {
-            Self::Unreachable => Type::Never,
+            Self::Unreachable => NarrowedPlace::unreachable(),
             Self::Unconstrained => base_ty,
             Self::Narrowed(ty) => ty,
         }
@@ -1008,16 +1013,17 @@ impl<'db> ProjectedNarrowingCheckpoint<'db> {
 /// Evaluates a stable suffix with the canonical projected-graph evaluator.
 ///
 /// The root is projected directly to avoid querying its own checkpoint. Descendant checkpoints
-/// contribute their cached types and terminal shape. Nonterminal suffixes are expanded locally only
+/// contribute their cached types, presence, and terminal shape. Nonterminal suffixes are expanded only
 /// when simplifying a join requires their predicates.
 #[salsa::tracked(
     returns(copy),
-    cycle_initial = |_, id, _, _, _, _| ProjectedNarrowingCheckpoint::Narrowed(Type::divergent(id)),
+    cycle_initial = |_, id, _, _, _, _| ProjectedNarrowingCheckpoint::Narrowed(NarrowedPlace::new(Type::divergent(id))),
     cycle_fn = |db: &'db dyn Db, cycle, previous: &ProjectedNarrowingCheckpoint<'db>, result: ProjectedNarrowingCheckpoint<'db>, scope: ScopeId<'db>, _, _, base_ty| {
         match result {
-            ProjectedNarrowingCheckpoint::Narrowed(ty) => ProjectedNarrowingCheckpoint::Narrowed(
-                ty.cycle_normalized(db, &ProgramEnvironment::from_scope(scope), previous.ty(base_ty), cycle)
-            ),
+            ProjectedNarrowingCheckpoint::Narrowed(narrowed) => ProjectedNarrowingCheckpoint::Narrowed(NarrowedPlace {
+                ty: narrowed.ty.cycle_normalized(db, &ProgramEnvironment::from_scope(scope), previous.place(base_ty).ty, cycle),
+                known_present: narrowed.known_present,
+            }),
             _ => result,
         }
     },
@@ -1028,7 +1034,7 @@ fn evaluate_projected_narrowing_checkpoint<'db>(
     scope: ScopeId<'db>,
     place: ScopedPlaceId,
     constraint: ScopedNarrowingConstraint,
-    base_ty: Type<'db>,
+    base_ty: NarrowedPlace<'db>,
 ) -> ProjectedNarrowingCheckpoint<'db> {
     let env = ProgramEnvironment::from_scope(scope);
     let use_def = use_def_map(db, scope);
@@ -1058,11 +1064,12 @@ pub(crate) struct NarrowingProjector<'a, 'db> {
     predicates: &'a IndexSlice<ScopedPredicateId, Predicate<'db>>,
     predicate_narrowing_targets: &'a PredicateNarrowingTargets,
     place: ScopedPlaceId,
-    base_ty: Type<'db>,
-    /// Checkpoint entries retain narrowed types, so projections are specific to the binding type.
-    project_cache: FxHashMap<(ScopedNarrowingConstraint, Type<'db>), ProjectedNarrowingNodeId>,
+    base_ty: NarrowedPlace<'db>,
+    /// Checkpoints retain types and presence, so both must be part of the projection key.
+    project_cache:
+        FxHashMap<(ScopedNarrowingConstraint, NarrowedPlace<'db>), ProjectedNarrowingNodeId>,
     graph: ProjectedNarrowingGraph<'db>,
-    narrowed_cache: FxHashMap<(ProjectedNarrowingNodeId, Type<'db>), Type<'db>>,
+    narrowed_cache: FxHashMap<(ProjectedNarrowingNodeId, NarrowedPlace<'db>), NarrowedPlace<'db>>,
 }
 
 impl<'a, 'db> NarrowingProjector<'a, 'db> {
@@ -1074,7 +1081,7 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
         predicates: &'a IndexSlice<ScopedPredicateId, Predicate<'db>>,
         predicate_narrowing_targets: &'a PredicateNarrowingTargets,
         place: ScopedPlaceId,
-        base_ty: Type<'db>,
+        base_ty: NarrowedPlace<'db>,
     ) -> Self {
         Self {
             db,
@@ -1094,12 +1101,12 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
     pub(crate) fn narrow(
         &mut self,
         constraint: ScopedNarrowingConstraint,
-        base_ty: Type<'db>,
-    ) -> Type<'db> {
+        base_ty: NarrowedPlace<'db>,
+    ) -> NarrowedPlace<'db> {
         self.base_ty = base_ty;
         match constraint {
             ScopedNarrowingConstraint::ALWAYS_TRUE => return base_ty,
-            ScopedNarrowingConstraint::ALWAYS_FALSE => return Type::Never,
+            ScopedNarrowingConstraint::ALWAYS_FALSE => return NarrowedPlace::unreachable(),
             _ => {}
         }
 
@@ -1119,13 +1126,13 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
     fn narrow_projected(
         &mut self,
         root: ProjectedNarrowingNodeId,
-        base_ty: Type<'db>,
-    ) -> Type<'db> {
+        base_ty: NarrowedPlace<'db>,
+    ) -> NarrowedPlace<'db> {
         if root == ProjectedNarrowingNodeId::ALWAYS_TRUE {
             return base_ty;
         }
         if root == ProjectedNarrowingNodeId::ALWAYS_FALSE {
-            return Type::Never;
+            return NarrowedPlace::unreachable();
         }
         self.graph.record_reference(root);
 
@@ -1486,14 +1493,15 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
     }
 }
 
-/// Evaluates narrowed types over a projected narrowing graph.
+/// Evaluates value types and member presence together over a projected narrowing graph.
 struct ProjectedNarrowingContext<'a, 'db> {
     db: &'db dyn Db,
     env: &'a ProgramEnvironment<'db>,
-    base_ty: Type<'db>,
+    base_ty: NarrowedPlace<'db>,
     graph: &'a ProjectedNarrowingGraph<'db>,
-    /// Caches each shared suffix for the binding type being narrowed.
-    join_cache: &'a mut FxHashMap<(ProjectedNarrowingNodeId, Type<'db>), Type<'db>>,
+    /// Caches each shared suffix for the binding type and presence being narrowed.
+    join_cache:
+        &'a mut FxHashMap<(ProjectedNarrowingNodeId, NarrowedPlace<'db>), NarrowedPlace<'db>>,
 }
 
 impl<'db> ProjectedNarrowingContext<'_, 'db> {
@@ -1501,8 +1509,8 @@ impl<'db> ProjectedNarrowingContext<'_, 'db> {
         !id.is_terminal() && self.graph.joins[id.0]
     }
 
-    /// Evaluates one projected join from its boundary and caches its narrowed suffix type.
-    fn narrow_join(&mut self, id: ProjectedNarrowingNodeId) -> Type<'db> {
+    /// Evaluates one projected join from its boundary and caches its narrowed type and presence.
+    fn narrow_join(&mut self, id: ProjectedNarrowingNodeId) -> NarrowedPlace<'db> {
         let key = (id, self.base_ty);
         if let Some(cached) = self.join_cache.get(&key) {
             return *cached;
@@ -1518,7 +1526,7 @@ impl<'db> ProjectedNarrowingContext<'_, 'db> {
         &mut self,
         id: ProjectedNarrowingNodeId,
         accumulated: Option<NarrowingConstraint<'db>>,
-    ) -> Type<'db> {
+    ) -> NarrowedPlace<'db> {
         let db = self.db;
         if self.is_join(id) {
             // Preserve replacement narrowing order at a join: evaluate the shared suffix once,
@@ -1535,10 +1543,10 @@ impl<'db> ProjectedNarrowingContext<'_, 'db> {
         &mut self,
         id: ProjectedNarrowingNodeId,
         accumulated: Option<NarrowingConstraint<'db>>,
-    ) -> Type<'db> {
+    ) -> NarrowedPlace<'db> {
         let db = self.db;
         if id == ProjectedNarrowingNodeId::ALWAYS_FALSE {
-            return Type::Never;
+            return NarrowedPlace::unreachable();
         }
 
         if id == ProjectedNarrowingNodeId::ALWAYS_TRUE {
@@ -1572,9 +1580,11 @@ impl<'db> ProjectedNarrowingContext<'_, 'db> {
                 let false_accumulated = accumulate_constraint(accumulated, neg_constraint);
                 let false_ty = self.narrow(node.if_false, false_accumulated);
 
-                let true_or_uncertain =
-                    UnionType::from_two_elements(db, self.env, true_ty, uncertain_ty);
-                UnionType::from_two_elements(db, self.env, true_or_uncertain, false_ty)
+                let mut union = NarrowedPlaceBuilder::new(db, self.env);
+                union.add(true_ty);
+                union.add(uncertain_ty);
+                union.add(false_ty);
+                union.build()
             }
         }
     }
@@ -2357,7 +2367,7 @@ class TargetB:
                     &predicates,
                     evaluator.predicate_narrowing_targets(),
                     ScopedPlaceId::Symbol(x),
-                    Type::unknown(),
+                    NarrowedPlace::new(Type::unknown()),
                 );
 
                 assert_eq!(

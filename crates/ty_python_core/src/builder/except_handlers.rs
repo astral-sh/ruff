@@ -130,9 +130,11 @@ impl ExceptionContextStackManager {
                 break;
             }
 
-            if !exception_context_stack
-                .record_exception_checkpoint(use_def_map, &mut has_intervening_finally)
-            {
+            if !exception_context_stack.record_exception_checkpoint(
+                use_def_map,
+                scope_stack_index + 1 < builder.scope_stack.len(),
+                &mut has_intervening_finally,
+            ) {
                 break;
             }
 
@@ -284,9 +286,13 @@ impl ExceptionContextStack {
     fn record_exception_checkpoint(
         &mut self,
         use_def_map: &UseDefMapBuilder<'_>,
+        crosses_scope_boundary: bool,
         has_intervening_finally: &mut bool,
     ) -> bool {
-        let checkpoint_key = use_def_map.exception_checkpoint_key();
+        let checkpoint_key = (
+            use_def_map.exception_checkpoint_key(),
+            crosses_scope_boundary,
+        );
 
         for context in self.0.iter_mut().rev() {
             if *has_intervening_finally && matches!(context.kind, ExceptionContextKind::With) {
@@ -298,7 +304,11 @@ impl ExceptionContextStack {
                 ExceptionHandlers::Propagating(snapshots)
                 | ExceptionHandlers::CatchAll(snapshots) => {
                     if context.last_checkpoint_key != Some(checkpoint_key) {
-                        snapshots.push(use_def_map.snapshot());
+                        let mut snapshot = use_def_map.snapshot();
+                        if crosses_scope_boundary {
+                            snapshot.checkpoint_member_presence();
+                        }
+                        snapshots.push(snapshot);
                         context.last_checkpoint_key = Some(checkpoint_key);
                     }
                     if context.exception_handlers.is_catch_all() {
@@ -349,7 +359,7 @@ enum ExceptionContextKind {
 pub(super) struct ExceptionContext {
     exception_handlers: ExceptionHandlers,
     kind: ExceptionContextKind,
-    last_checkpoint_key: Option<ExceptionCheckpointKey>,
+    last_checkpoint_key: Option<(ExceptionCheckpointKey, bool)>,
     /// Whether an exception escaped this suite and must also propagate after its cleanup.
     has_escaping_exception: bool,
     /// Whether apparently terminal control flow in a nested context-manager body, such as a

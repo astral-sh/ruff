@@ -2675,6 +2675,33 @@ def _(flag1: bool, flag2: bool):
     C().x = 100
 ```
 
+### Never-valued attributes
+
+A `Never`-valued attribute on one union member does not establish that the attribute exists on the
+other members. The receiver can still be an instance of the class without the attribute, so we
+report the missing attribute before the read can produce a value.
+
+```py
+from typing_extensions import Never
+
+class HasValue:
+    value: Never
+
+class Missing: ...
+
+def read(obj: HasValue | Missing):
+    obj.value  # error: [unresolved-attribute]
+```
+
+An assignment on one branch does not establish presence on the other branch.
+
+```py
+def partially_assigned(obj: HasValue | Missing, condition: bool):
+    if condition:
+        obj.value = 1  # error: [invalid-assignment]
+    obj.value  # error: [unresolved-attribute]
+```
+
 ### Possibly-unbound within a class
 
 We raise the same diagnostic if the attribute is possibly-unbound in at least one element of the

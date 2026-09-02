@@ -1,5 +1,7 @@
 # Narrowing using `hasattr()`
 
+## Basic checks
+
 The builtin function `hasattr()` can be used to narrow nominal and structural types. This is
 accomplished using an intersection with a synthesized protocol:
 
@@ -97,4 +99,77 @@ def f(x: object):
 
         # error: [unresolved-attribute] "Object of type `<Protocol with members '__qualname__'>` has no attribute `foo`"
         reveal_type(x.foo)  # revealed: Unknown
+```
+
+## Presence at branch joins
+
+An attribute is available after a guard when it either passed the check or was assigned in the
+missing branch. Assigning an undeclared attribute still reports an error, but the subsequent read
+does not repeat it.
+
+```py
+class Item: ...
+
+def initialized(item: Item):
+    if not hasattr(item, "value"):
+        item.value = 1  # error: [invalid-assignment]
+    reveal_type(item.value)  # revealed: object
+```
+
+A successful guard on only one branch does not establish presence after the conditional. Aliases of
+`hasattr` provide the same presence information as the builtin.
+
+```py
+from builtins import hasattr as has_attribute
+
+def partially_checked(item: Item, condition: bool):
+    if condition:
+        assert has_attribute(item, "value")
+        reveal_type(item.value)  # revealed: object
+    item.value  # error: [unresolved-attribute]
+```
+
+## Receiver reassignment
+
+Reassigning the receiver forgets the successful guard's presence information. The new object does
+not inherit the member established for the previous object.
+
+```py
+class Item: ...
+
+def f(item: Item, other: Item):
+    if hasattr(item, "value"):
+        reveal_type(item.value)  # revealed: object
+        item = other
+        item.value  # error: [unresolved-attribute]
+```
+
+## Negative checks and later narrowing
+
+A failed check retains its negative protocol constraint. Later checks can use that constraint to
+rule out a receiver with the attribute, regardless of the order of the checks.
+
+```py
+class WithValue:
+    value = 1
+
+def f(obj: object):
+    if not hasattr(obj, "value") and isinstance(obj, WithValue):
+        reveal_type(obj)  # revealed: Never
+
+    if isinstance(obj, WithValue) and not hasattr(obj, "value"):
+        reveal_type(obj)  # revealed: Never
+```
+
+The constraint also excludes intersections of a remaining union member with a type that has the
+attribute.
+
+```py
+class Other: ...
+
+def g(obj: WithValue | Other):
+    if not hasattr(obj, "value"):
+        reveal_type(obj)  # revealed: Other & ~<Protocol with members 'value'>
+        if isinstance(obj, WithValue):
+            reveal_type(obj)  # revealed: Never
 ```

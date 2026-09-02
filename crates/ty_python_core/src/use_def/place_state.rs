@@ -212,11 +212,13 @@ impl Declarations {
 /// If there are bindings in a (non-class) scope, they are stored in `Bindings`.
 /// Even if it's a class scope (class variables are not visible to nested scopes) or there are no
 /// bindings, the current narrowing constraint is necessary for narrowing, so it's stored in
-/// `Constraint`.
+/// `Constraint`. An unbound member can also carry deletions, which `UnboundBindings` retains
+/// without making this scope the source of the member's value.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub(super) enum EnclosingSnapshot {
     Constraint(ScopedNarrowingConstraint),
     Bindings(Bindings),
+    UnboundBindings(Bindings),
 }
 
 /// Live bindings for a single place at some point in control flow. Each live binding comes
@@ -240,6 +242,8 @@ impl Bindings {
         self.unbound_narrowing_constraint.is_none()
             && binding.binding() == ScopedDefinitionId::UNBOUND
             && binding.narrowing_constraint == ScopedNarrowingConstraint::ALWAYS_TRUE
+            && binding.presence_constraint == ScopedNarrowingConstraint::ALWAYS_TRUE
+            && binding.inherits_presence()
             && binding.reachability_constraint == ScopedReachabilityConstraintId::ALWAYS_TRUE
             && binding.can_be_shadowed() == FutureDefinitions::ShadowThisOne
     }
@@ -258,6 +262,7 @@ impl Bindings {
         for binding in &self.live_bindings {
             reachability_constraints.mark_used(binding.reachability_constraint);
             narrowing_constraints.mark_used(binding.narrowing_constraint);
+            narrowing_constraints.mark_used(binding.presence_constraint);
         }
     }
 }
@@ -268,23 +273,28 @@ pub struct LiveBinding {
     binding: PackedDefinitionId,
     narrowing_constraint: ScopedNarrowingConstraint,
     reachability_constraint: ScopedReachabilityConstraintId,
+    // Paths on which presence still needs to be established. `ALWAYS_FALSE` means that
+    // every path has evidence; `ALWAYS_TRUE` means that none does. Keeping this separate
+    // lets execution checkpoints forget presence without discarding the inferred value.
+    presence_constraint: ScopedNarrowingConstraint,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, get_size2::GetSize)]
 struct PackedDefinitionId(u32);
 
 impl PackedDefinitionId {
-    // Scope-local definition IDs cannot practically use the high bit, so retain the shadowing
-    // policy there instead of adding a byte plus padding to every `LiveBinding`.
+    // Scope-local definition IDs cannot practically use the high bits, so retain the two
+    // binding policies there instead of adding bytes plus padding to every `LiveBinding`.
     const DONT_SHADOW: u32 = 1 << 31;
-    const DEFINITION_MASK: u32 = !Self::DONT_SHADOW;
+    const LOCAL_PRESENCE: u32 = 1 << 30;
+    const DEFINITION_MASK: u32 = !(Self::DONT_SHADOW | Self::LOCAL_PRESENCE);
 
     fn new(binding: ScopedDefinitionId, can_be_shadowed: FutureDefinitions) -> Self {
         let binding = binding.as_u32();
         assert_eq!(
-            binding & Self::DONT_SHADOW,
+            binding & !Self::DEFINITION_MASK,
             0,
-            "scopes cannot contain more than 2^31 definitions"
+            "scopes cannot contain more than 2^30 definitions"
         );
         Self(
             binding
@@ -319,6 +329,7 @@ impl LiveBinding {
             binding: PackedDefinitionId::new(binding, can_be_shadowed),
             narrowing_constraint,
             reachability_constraint,
+            presence_constraint: narrowing_constraint,
         }
     }
 
@@ -334,12 +345,23 @@ impl LiveBinding {
         self.reachability_constraint
     }
 
+    /// Constraints that establish presence independently of the binding's inferred type.
+    pub const fn presence_constraint(&self) -> ScopedNarrowingConstraint {
+        self.presence_constraint
+    }
+
+    /// Whether an enclosing scope can supply presence evidence for this binding.
+    /// Assignments and checkpoints establish local state that shadows enclosing evidence.
+    pub const fn inherits_presence(&self) -> bool {
+        self.binding.0 & PackedDefinitionId::LOCAL_PRESENCE == 0
+    }
+
     const fn can_be_shadowed(&self) -> FutureDefinitions {
         self.binding.can_be_shadowed()
     }
 }
 
-static_assertions::assert_eq_size!(LiveBinding, [u32; 3]);
+static_assertions::assert_eq_size!(LiveBinding, [u32; 4]);
 
 pub(super) type LiveBindingsIterator<'a> = std::slice::Iter<'a, LiveBinding>;
 
@@ -395,7 +417,30 @@ impl Bindings {
         for binding in &mut self.live_bindings {
             binding.narrowing_constraint =
                 narrowing_constraints.add_and_constraint(binding.narrowing_constraint, constraint);
+            binding.presence_constraint =
+                narrowing_constraints.add_and_constraint(binding.presence_constraint, constraint);
         }
+    }
+
+    pub(super) fn establish_presence(&mut self) {
+        if let Some(binding) = self.live_bindings.last_mut() {
+            binding.presence_constraint = ScopedNarrowingConstraint::ALWAYS_FALSE;
+            binding.binding.0 |= PackedDefinitionId::LOCAL_PRESENCE;
+        }
+    }
+
+    pub(super) fn invalidate_presence(&mut self) {
+        for binding in &mut self.live_bindings {
+            binding.presence_constraint = ScopedNarrowingConstraint::ALWAYS_TRUE;
+            binding.binding.0 |= PackedDefinitionId::LOCAL_PRESENCE;
+        }
+    }
+
+    fn needs_presence_checkpoint(&self) -> bool {
+        self.live_bindings.iter().any(|binding| {
+            binding.inherits_presence()
+                || binding.presence_constraint != ScopedNarrowingConstraint::ALWAYS_TRUE
+        })
     }
 
     /// Add given reachability constraint to all live bindings.
@@ -453,12 +498,18 @@ impl Bindings {
                         .add_or_constraint(a.reachability_constraint, b.reachability_constraint);
 
                     debug_assert_eq!(a.can_be_shadowed(), b.can_be_shadowed());
-                    self.live_bindings.push(LiveBinding::new(
+                    let mut binding = LiveBinding::new(
                         a.binding(),
                         narrowing_constraint,
                         reachability_constraint,
                         a.can_be_shadowed(),
-                    ));
+                    );
+                    binding.presence_constraint = narrowing_constraints
+                        .add_or_constraint(a.presence_constraint, b.presence_constraint);
+                    if !a.inherits_presence() || !b.inherits_presence() {
+                        binding.binding.0 |= PackedDefinitionId::LOCAL_PRESENCE;
+                    }
+                    self.live_bindings.push(binding);
                 }
 
                 EitherOrBoth::Left(binding) | EitherOrBoth::Right(binding) => {
@@ -476,6 +527,18 @@ pub(crate) struct PlaceState {
 }
 
 impl PlaceState {
+    pub(super) fn needs_presence_checkpoint(&self) -> bool {
+        self.bindings.needs_presence_checkpoint()
+    }
+
+    pub(super) fn establish_presence(&mut self) {
+        self.bindings.establish_presence();
+    }
+
+    pub(super) fn invalidate_presence(&mut self) {
+        self.bindings.invalidate_presence();
+    }
+
     /// Return a new [`PlaceState`] representing an unbound, undeclared place.
     pub(super) fn undefined(reachability: ScopedReachabilityConstraintId) -> Self {
         Self {
@@ -529,6 +592,8 @@ impl PlaceState {
             {
                 binding.narrowing_constraint = narrowing_constraints
                     .add_and_constraint(binding.narrowing_constraint, constraint);
+                binding.presence_constraint = narrowing_constraints
+                    .add_and_constraint(binding.presence_constraint, constraint);
             }
         }
     }
@@ -544,6 +609,8 @@ impl PlaceState {
             if bindings.contains(&binding.binding()) {
                 binding.narrowing_constraint = narrowing_constraints
                     .add_and_constraint(binding.narrowing_constraint, constraint);
+                binding.presence_constraint = narrowing_constraints
+                    .add_and_constraint(binding.presence_constraint, constraint);
             }
         }
     }

@@ -439,6 +439,13 @@ impl<'db, 'ast> PlaceLoadResolution<'db, 'ast> {
                             eagerly_undefined = true;
                         }
                     }
+                    EnclosingSnapshotResult::FoundUnboundBindings(_) => {
+                        self.constraints
+                            .push(enclosing_file_scope, ConstraintKey::NestedScope(file_scope));
+                        if scope.scope(db).is_eager() {
+                            eagerly_undefined = true;
+                        }
+                    }
                     EnclosingSnapshotResult::FoundBindings(bindings) => {
                         if forwards_to_global {
                             self.crosses_scope_declaration = true;
@@ -548,6 +555,13 @@ impl<'db, 'ast> PlaceLoadResolution<'db, 'ast> {
                     self.constraints.push(
                         FileScopeId::global(),
                         ConstraintKey::NarrowingConstraint(constraint),
+                    );
+                    return None;
+                }
+                EnclosingSnapshotResult::FoundUnboundBindings(_) => {
+                    self.constraints.push(
+                        FileScopeId::global(),
+                        ConstraintKey::NestedScope(current_scope),
                     );
                     return None;
                 }

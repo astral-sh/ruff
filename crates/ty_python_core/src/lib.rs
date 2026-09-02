@@ -234,6 +234,8 @@ pub fn global_scope<'db>(db: &'db dyn Db, file: ProgramFile<'db>) -> ScopeId<'db
 pub enum EnclosingSnapshotResult<'map, 'db> {
     FoundConstraint(ScopedNarrowingConstraint),
     FoundBindings(BindingWithConstraintsIterator<'map, 'db>),
+    /// Binding state that constrains an enclosing value without supplying a value itself.
+    FoundUnboundBindings(BindingWithConstraintsIterator<'map, 'db>),
     NotFound,
     NoLongerInEagerContext,
 }
