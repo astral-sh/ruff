@@ -4623,6 +4623,31 @@ def get_value[T](obj: HasValue[T]) -> T:
 reveal_type(get_value(values))  # revealed: int
 ```
 
+## Generic protocol inference from an attribute check
+
+After `hasattr` confirms that an attribute exists on an arbitrary object, its type is `object`.
+Passing that object to a generic function preserves the attribute's type.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol
+
+class HasValue[T](Protocol):
+    @property
+    def value(self) -> T: ...
+
+def get_value[T](obj: HasValue[T]) -> T:
+    return obj.value
+
+def f(obj: object):
+    if hasattr(obj, "value"):
+        reveal_type(get_value(obj))  # revealed: object
+```
+
 ## Generic protocol inference through type aliases
 
 An alias for an instance type does not obscure the members that determine a protocol's type

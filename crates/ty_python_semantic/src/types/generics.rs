@@ -4396,19 +4396,13 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     }
                 }
 
-                // Converting the actual protocol to its nominal origin makes the reversed
-                // comparison impossible: a protocol cannot be assignable to a nominal class.
-                if matches!(formal, Type::ProtocolInstance(_)) && !relation_polarity.is_covariant()
-                {
+                // Structural inference also handles synthesized protocols, which have no
+                // nominal origin from which to recover their member types.
+                if matches!(formal, Type::ProtocolInstance(_)) {
                     let when = self.constraint_for_relation(formal, actual, relation_polarity);
                     return self.infer_from_constraint_set(when);
                 }
 
-                // TODO: This will only handle protocol classes that explicit inherit
-                // from other generic protocol classes by listing it as a base class.
-                // To handle classes that implicitly implement a generic protocol, we
-                // will need to check the types of the protocol members to be able to
-                // infer the specialization of the protocol that the class implements.
                 if let Some(actual_nominal) = actual_protocol.nominal_origin_instance(db) {
                     return self.infer_map_impl(
                         formal,
