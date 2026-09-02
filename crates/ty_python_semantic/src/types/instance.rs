@@ -523,31 +523,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             )
             && let (Some(source_origin), Some(target_origin)) =
                 (source.class_origin(db), protocol.class_origin(db))
-            && source_origin.class_literal(db) == target_origin.class_literal(db)
+            && source_origin == target_origin
         {
-            // As a fast path, compare the origins:
-            if source_origin == target_origin {
-                return self.always();
-            }
-
-            // Consider `C[Any] <: Top[C[Any]]` for a protocol `C[T: str]` with covariant `T`.
-            // The target's top materialization replaces `Any` with `T`'s bound, `str`, so the
-            // origins are `C[Any]` and `C[str]`. The equality check above does not catch this
-            // valid subtype relation because those origins have different type arguments.
-            // Instead, compare the top materializations of their nominal instances: here,
-            // that checks `C[str] <: C[str]`. When only the source is bottom-materialized,
-            // compare bottom materializations instead.
-            let kind = protocol
-                .materialization_kind(db)
-                .unwrap_or(MaterializationKind::Bottom);
-            let source = Type::NominalInstance(NominalInstanceType::from_class(db, *source_origin))
-                .materialize(db, kind, self.materialization_visitor);
-            let target = Type::NominalInstance(NominalInstanceType::from_class(db, *target_origin))
-                .materialize(db, kind, self.materialization_visitor);
-            result = self.check_type_pair(db, source, target);
-            if result.is_trivially_always_satisfied() {
-                return result;
-            }
+            return self.always();
         }
 
         let source_protocol_as_nominal =

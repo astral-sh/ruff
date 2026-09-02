@@ -1024,6 +1024,21 @@ static_assert(not is_subtype_of(Top[Bounded[Any]], Bounded[Any]))
 static_assert(not is_subtype_of(Top[Bounded[Any]], Bottom[Bounded[Any]]))
 ```
 
+These relations also hold between distinct protocols with the same members:
+
+```py
+class EquivalentBounded[T: str](Protocol):
+    def read(self) -> T: ...
+    def other(self) -> Any: ...
+
+static_assert(is_subtype_of(Bounded[Any], Top[EquivalentBounded[Any]]))
+static_assert(is_subtype_of(Bottom[Bounded[Any]], EquivalentBounded[Any]))
+static_assert(is_subtype_of(Bottom[Bounded[Any]], Top[EquivalentBounded[Any]]))
+static_assert(not is_subtype_of(Bounded[Any], Bottom[EquivalentBounded[Any]]))
+static_assert(not is_subtype_of(Top[Bounded[Any]], EquivalentBounded[Any]))
+static_assert(not is_subtype_of(Top[Bounded[Any]], Bottom[EquivalentBounded[Any]]))
+```
+
 The same relations also hold when the type parameter has constraints:
 
 ```py
@@ -1038,6 +1053,42 @@ static_assert(not is_subtype_of(Constrained[Any], Bottom[Constrained[Any]]))
 static_assert(not is_subtype_of(Top[Constrained[Any]], Constrained[Any]))
 static_assert(not is_subtype_of(Top[Constrained[Any]], Bottom[Constrained[Any]]))
 static_assert(not is_subtype_of(Constrained[str], Top[Constrained[bytes]]))
+```
+
+A bound also limits the parameter type of a contravariant protocol. The same structural relations
+hold between distinct protocols with this method:
+
+```py
+class Writer[T: str](Protocol):
+    def write(self, value: T) -> None: ...
+
+class EquivalentWriter[T: str](Protocol):
+    def write(self, value: T) -> None: ...
+
+static_assert(is_subtype_of(Writer[Any], Top[EquivalentWriter[Any]]))
+static_assert(is_subtype_of(Bottom[Writer[Any]], EquivalentWriter[Any]))
+static_assert(is_subtype_of(Bottom[Writer[Any]], Top[EquivalentWriter[Any]]))
+static_assert(not is_subtype_of(Writer[Any], Bottom[EquivalentWriter[Any]]))
+static_assert(not is_subtype_of(Top[Writer[Any]], EquivalentWriter[Any]))
+static_assert(not is_subtype_of(Top[Writer[Any]], Bottom[EquivalentWriter[Any]]))
+```
+
+Constraints also limit both the read and write types of a mutable attribute. These protocols are
+invariant, and their structural relations still respect the materialization directions:
+
+```py
+class Cell[T: (str, bytes)](Protocol):
+    value: T
+
+class EquivalentCell[T: (str, bytes)](Protocol):
+    value: T
+
+static_assert(is_subtype_of(Cell[Any], Top[EquivalentCell[Any]]))
+static_assert(is_subtype_of(Bottom[Cell[Any]], EquivalentCell[Any]))
+static_assert(is_subtype_of(Bottom[Cell[Any]], Top[EquivalentCell[Any]]))
+static_assert(not is_subtype_of(Cell[Any], Bottom[EquivalentCell[Any]]))
+static_assert(not is_subtype_of(Top[Cell[Any]], EquivalentCell[Any]))
+static_assert(not is_subtype_of(Top[Cell[Any]], Bottom[EquivalentCell[Any]]))
 ```
 
 ## Callable

@@ -160,6 +160,8 @@ impl<'db> ProtocolClass<'db> {
                 ))
             })
         {
+            let specialization =
+                specialization.map(|specialization| specialization.with_typevar_bounds(db));
             let use_def_map = use_def_map(db, parent_scope);
             let place_table = place_table(db, parent_scope);
             let mut direct_members = FxHashMap::default();

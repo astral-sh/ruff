@@ -1246,6 +1246,34 @@ impl<'db> Specialization<'db> {
         mapped_types.map_or(Cow::Borrowed(types), Cow::Owned)
     }
 
+    /// Preserves the upper bounds of gradual arguments when exposing protocol members.
+    ///
+    /// For `P[T: str]`, substituting `Any` for `T` must not erase the fact that a member
+    /// typed as `T` is bounded by `str`. Keep `Any & str` so that structural comparisons
+    /// can materialize the member in either direction without losing that bound.
+    pub(super) fn with_typevar_bounds(self, db: &'db dyn Db) -> Self {
+        let env = ProgramEnvironment::from_program(self.generic_context(db).program(db));
+        let types = self.map_types(db, |_, typevar, ty| {
+            if ty.is_fully_static(db, &env) {
+                return ty;
+            }
+            let Some(upper_bound) = typevar.top_materialized_upper_bound(db) else {
+                return ty;
+            };
+            IntersectionType::from_two_elements(db, &env, ty, upper_bound)
+        });
+        if matches!(types, Cow::Borrowed(_)) {
+            return self;
+        }
+        Self::new(
+            db,
+            self.generic_context(db),
+            types.into_owned().into_boxed_slice(),
+            self.materialization_kind(db),
+            self.tuple_inner(db),
+        )
+    }
+
     /// Restricts this specialization to only include the typevars in a generic context. If the
     /// specialization does not include all of those typevars, returns `None`.
     pub(crate) fn restrict(
