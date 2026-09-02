@@ -450,7 +450,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "576ba56f6ca18ebb069d0d07260407171712aff4dfe15ee3f8982dc16a455bcf"
 dependencies = [
  "castaway",
- "get-size2",
+ "get-size2 0.10.3",
  "itoa",
  "ryu",
  "serde_core",
@@ -1305,9 +1305,9 @@ dependencies = [
 
 [[package]]
 name = "get-size-derive2"
-version = "0.10.3"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c736d226c32e496b8377813b52269e11ad3a48d8373b68862d0364f04fd1229d"
+checksum = "7efe46d2adb529015748742f1a38594039ce357dbb21e6d178de342cfce468d4"
 dependencies = [
  "attribute-derive",
  "quote",
@@ -1319,6 +1319,12 @@ name = "get-size2"
 version = "0.10.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b411f34418305908ab15a82ff78958c2a9aee9a272b2a2e663836b20a4e4b9d3"
+
+[[package]]
+name = "get-size2"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d4d338de392104417fe6fdbe588c52383b9236956d8afe5654f0077176edc632"
 dependencies = [
  "compact_str",
  "get-size-derive2",
@@ -3222,7 +3228,7 @@ dependencies = [
  "dunce",
  "etcetera",
  "filetime",
- "get-size2",
+ "get-size2 0.11.0",
  "ignore",
  "insta",
  "matchit",
@@ -3305,7 +3311,7 @@ dependencies = [
 name = "ruff_diagnostics"
 version = "0.0.11"
 dependencies = [
- "get-size2",
+ "get-size2 0.11.0",
  "is-macro",
  "ruff_text_size",
  "serde",
@@ -3352,7 +3358,7 @@ dependencies = [
 name = "ruff_index"
 version = "0.0.11"
 dependencies = [
- "get-size2",
+ "get-size2 0.11.0",
  "ruff_macros",
  "salsa",
  "static_assertions",
@@ -3469,7 +3475,7 @@ dependencies = [
 name = "ruff_memory_usage"
 version = "0.0.11"
 dependencies = [
- "get-size2",
+ "get-size2 0.11.0",
 ]
 
 [[package]]
@@ -3504,7 +3510,7 @@ dependencies = [
  "bitflags 2.13.1",
  "char_str",
  "compact_str",
- "get-size2",
+ "get-size2 0.11.0",
  "is-macro",
  "memchr",
  "ruff_cache",
@@ -3632,7 +3638,7 @@ dependencies = [
  "bstr",
  "datatest-stable",
  "drop_bomb",
- "get-size2",
+ "get-size2 0.11.0",
  "insta",
  "itertools 0.15.0",
  "memchr",
@@ -3707,7 +3713,7 @@ dependencies = [
 name = "ruff_ranged_value"
 version = "0.0.11"
 dependencies = [
- "get-size2",
+ "get-size2 0.11.0",
  "ruff_db",
  "ruff_python_ast",
  "ruff_text_size",
@@ -3763,7 +3769,7 @@ dependencies = [
 name = "ruff_source_file"
 version = "0.0.11"
 dependencies = [
- "get-size2",
+ "get-size2 0.11.0",
  "memchr",
  "ruff_text_size",
  "serde",
@@ -3773,7 +3779,7 @@ dependencies = [
 name = "ruff_text_size"
 version = "0.0.11"
 dependencies = [
- "get-size2",
+ "get-size2 0.11.0",
  "schemars",
  "serde",
  "serde_test",
@@ -4739,7 +4745,7 @@ dependencies = [
  "bitflags 2.13.1",
  "camino",
  "compact_str",
- "get-size2",
+ "get-size2 0.11.0",
  "indexmap",
  "insta",
  "itertools 0.15.0",
@@ -4779,7 +4785,7 @@ dependencies = [
  "anyhow",
  "camino",
  "compact_str",
- "get-size2",
+ "get-size2 0.11.0",
  "insta",
  "ordermap",
  "regex",
@@ -4808,7 +4814,7 @@ dependencies = [
  "colored",
  "compact_str",
  "crossbeam",
- "get-size2",
+ "get-size2 0.11.0",
  "globset",
  "insta",
  "notify",
@@ -4856,7 +4862,7 @@ dependencies = [
  "bitflags 2.13.1",
  "bitvec",
  "char_str",
- "get-size2",
+ "get-size2 0.11.0",
  "hashbrown 0.17.1",
  "itertools 0.15.0",
  "ruff_db",
@@ -4893,7 +4899,7 @@ dependencies = [
  "compact_str",
  "datatest-stable",
  "drop_bomb",
- "get-size2",
+ "get-size2 0.11.0",
  "glob",
  "indexmap",
  "indoc",
@@ -4985,7 +4991,7 @@ version = "0.0.11"
 dependencies = [
  "camino",
  "colored",
- "get-size2",
+ "get-size2 0.11.0",
  "indexmap",
  "ruff_annotate_snippets",
  "ruff_db",
