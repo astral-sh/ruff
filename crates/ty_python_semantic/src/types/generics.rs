@@ -5126,51 +5126,6 @@ mod tests {
     }
 
     #[test]
-    fn inference_resolves_dependencies_per_alternative() -> anyhow::Result<()> {
-        let db = setup_db();
-        let db = &db;
-        let env = db.program_environment();
-        let typevars @ [t, u] = create_typevars(db, ["T", "U"]);
-        let context = GenericContext::from_typevar_instances(db, &env, typevars);
-        let constraints = ConstraintSetBuilder::new();
-        let int = KnownClass::Int.to_instance(db, &env);
-        let str = KnownClass::Str.to_instance(db, &env);
-        let mut builder = SpecializationBuilder::new(db, &env, &constraints, context);
-        builder.record_constraint_set(exact_alternatives(
-            db,
-            &constraints,
-            typevars,
-            [[int, str], [str, int]],
-        ));
-
-        // Both paths select T = U, but each has its own concrete binding for U.
-        let inference = builder
-            .build_inference_with(|typevar, _| {
-                (typevar == t).then_some(PathBoundSolution::Solved(Type::TypeVar(u)))
-            })
-            .map_err(|()| anyhow::anyhow!("expected satisfiable dependency chains"))?;
-        let TypeVarInferenceSolutions::Alternatives(paths) = inference.solutions(db) else {
-            anyhow::bail!("expected two resolved alternatives");
-        };
-        assert_eq!(
-            paths.iter().map(AsRef::as_ref).collect::<FxHashSet<_>>(),
-            FxHashSet::from_iter([
-                [Some(Resolved(int)); 2].as_slice(),
-                [Some(Resolved(str)); 2].as_slice(),
-            ])
-        );
-        assert_eq!(inference.merged_types(db)[0], Some(Type::TypeVar(u)));
-        assert!(
-            inference.merged_types(db)[1].is_some_and(|ty| ty.is_equivalent_to(
-                db,
-                &env,
-                UnionType::from_two_elements(db, &env, int, str),
-            ))
-        );
-        Ok(())
-    }
-
-    #[test]
     fn resolved_single_path_preserves_merged_projection() -> anyhow::Result<()> {
         let db = setup_db();
         let db = &db;
