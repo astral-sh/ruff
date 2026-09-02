@@ -9512,9 +9512,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             bindings
                 .deprecated_functions(db)
                 // Explicit function references already report implementation deprecations.
-                // Calling an instance instead references the object, not its `__call__` method.
-                .filter(|(binding, function)| {
-                    function.is_overload(db) || binding.callable_type != binding.signature_type
+                // Other calls reference an object or class, not the implicitly invoked method.
+                .filter(|(_, function)| {
+                    function.is_overload(db)
+                        || !matches!(
+                            callable_type,
+                            Type::FunctionLiteral(_) | Type::BoundMethod(_)
+                        )
                 })
                 .map(|(_, function)| function),
         );

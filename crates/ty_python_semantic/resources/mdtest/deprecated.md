@@ -1156,6 +1156,94 @@ def check(integer: C[int], string: C[str]):
     string.method("one")  # error: [deprecated] "string method"
 ```
 
+## Deprecated constructors
+
+Calling a class implicitly invokes its constructor methods. A deprecated `__init__` or `__new__`
+produces a warning even when the class itself is not deprecated.
+
+```py
+from typing_extensions import Self, deprecated
+
+class OldInit:
+    @deprecated("old init")
+    def __init__(self) -> None: ...
+
+class OldNew:
+    @deprecated("old new")
+    def __new__(cls) -> Self:
+        return super().__new__(cls)
+
+OldInit()  # error: [deprecated] "old init"
+OldNew()  # error: [deprecated] "old new"
+```
+
+Explicit references and calls still report the constructor's deprecation only once.
+
+```py
+OldInit.__init__  # error: [deprecated] "old init"
+OldNew.__new__(OldNew)  # error: [deprecated] "old new"
+```
+
+An active `__new__` does not hide a deprecated `__init__`, including an inherited initializer.
+
+```py
+class NewWithOldInit(OldInit):
+    def __new__(cls) -> Self:
+        return super().__new__(cls)
+
+NewWithOldInit()  # error: [deprecated] "old init"
+```
+
+If both constructor methods are deprecated, one warning includes both messages.
+
+```py
+class Both(OldNew, OldInit): ...
+
+# snapshot: deprecated
+Both()
+```
+
+```snapshot
+warning[deprecated]: Use of deprecated functions
+  --> src/mdtest_snippet.py:24:1
+   |
+24 | Both()
+   | ^^^^ old new; old init
+   |
+  ::: src/mdtest_snippet.py:5:9
+   |
+ 5 |     def __init__(self) -> None: ...
+   |         -------- old init
+ 6 |
+ 7 | class OldNew:
+ 8 |     @deprecated("old new")
+ 9 |     def __new__(cls) -> Self:
+   |         ------- old new
+```
+
+When `__new__` returns an unrelated type, `__init__` does not run and produces no warning.
+
+```py
+class ReturnsInt(OldInit):
+    def __new__(cls) -> int:
+        return 0
+
+ReturnsInt()
+```
+
+A deprecated metaclass `__call__` also warns when invoked implicitly by constructing a class.
+
+```py
+class Meta(type):
+    @deprecated("metaclass call")
+    def __call__(cls) -> int:
+        return 0
+
+class WithMeta(metaclass=Meta): ...
+
+WithMeta()  # error: [deprecated] "metaclass call"
+```
+
 ## Calls to an inherited deprecated method
 
 When both union members inherit the same deprecated method, a call reports that method once.
