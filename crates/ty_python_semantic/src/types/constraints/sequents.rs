@@ -236,6 +236,7 @@ impl<'db> SequentMap<Constraint<'db>> {
             );
             let mut map = SequentMap::<Constraint<'db>>::default();
             constraint.add_sequents(db, env, &mut map);
+            map.sequents.shrink_to_fit();
             map
         }
 
@@ -274,6 +275,7 @@ impl<'db> SequentMap<Constraint<'db>> {
             );
             let mut map = SequentMap::<Constraint<'db>>::default();
             left.add_sequents_with(db, env, &mut map, right);
+            map.sequents.shrink_to_fit();
             map
         }
 
