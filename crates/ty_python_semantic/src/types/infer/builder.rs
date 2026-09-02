@@ -127,12 +127,12 @@ use crate::types::{
     CallableTypes, ClassType, DynamicType, GeneratorTypeMode, InferenceFlags,
     InternedConstraintSet, InternedType, IntersectionBuilder, IntersectionType, KnownClass,
     KnownInstanceType, KnownUnion, LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy,
-    ParamSpecAttrKind, Parameter, Parameters, ProgramEnvironment, SentinelInstance, Signature,
-    SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeAndQualifiers, TypeContext,
-    TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, TypingModule,
-    UnionAccumulator, UnionBuilder, UnionType, any_over_type, binding_type,
-    extract_fixed_length_iterable_element_types, infer_complete_scope_types, infer_scope_types,
-    is_discarded_dict_key_assignment, todo_type,
+    ParamSpecAttrKind, Parameter, Parameters, ProgramEnvironment, PropertyDeprecations,
+    SentinelInstance, Signature, SpecialFormType, SubclassOfType, Type, TypeAliasType,
+    TypeAndQualifiers, TypeContext, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind,
+    TypeVarVariance, TypingModule, UnionAccumulator, UnionBuilder, UnionType, any_over_type,
+    binding_type, extract_fixed_length_iterable_element_types, infer_complete_scope_types,
+    infer_scope_types, is_discarded_dict_key_assignment, todo_type,
 };
 use crate::{AnalysisSettings, Db, DisplaySettings, FxIndexSet, FxOrderSet, SemanticModel};
 use ty_python_core::definition::{
@@ -10220,7 +10220,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         );
     }
 
-    /// Check the accessor invoked by an attribute operation, using the property descriptors
+    /// Check the accessor invoked by an attribute operation, using the deprecations
     /// retained by member lookup or assignment validation. `access` describes the operation,
     /// which may differ from the AST context: an augmented assignment also reads its target.
     ///
@@ -10243,46 +10243,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn check_deprecated_property(
         &self,
         attribute: &ast::ExprAttribute,
-        member: Type<'db>,
+        properties: PropertyDeprecations<'db>,
         access: ExprContext,
     ) {
-        /// Represent absent accessors and non-property members as `Unknown` to retain
-        /// non-deprecated intersection alternatives.
-        fn accessors<'db>(
-            db: &'db dyn Db,
-            env: &ProgramEnvironment<'db>,
-            ty: Type<'db>,
-            access: ExprContext,
-        ) -> Type<'db> {
-            match ty {
-                Type::PropertyInstance(property) => match access {
-                    ExprContext::Load => property.getter(db),
-                    ExprContext::Store => property.setter(db),
-                    ExprContext::Del => property.deleter(db),
-                    ExprContext::Invalid => None,
-                }
-                .unwrap_or_else(Type::unknown),
-                Type::Union(union) => union.map(db, env, |ty| accessors(db, env, *ty, access)),
-                Type::Intersection(intersection) => {
-                    intersection.map_positive(db, env, |ty| accessors(db, env, *ty, access))
-                }
-                _ => Type::unknown(),
-            }
-        }
-
-        if !self.context.is_lint_enabled(&diagnostic::DEPRECATED) {
-            return;
-        }
-        let db = self.db();
-        let env = self.program_environment();
-        let bindings = accessors(db, env, member, access).bindings(db, env);
         self.report_deprecated_functions(
             &attribute.attr,
-            bindings
-                .deprecated_functions(db)
-                .map(|(_, function)| function)
-                // These are accessor references, not resolved overload calls.
-                .filter(|function| !function.is_overload(db)),
+            properties.functions(self.db(), access).iter().copied(),
         );
     }
 

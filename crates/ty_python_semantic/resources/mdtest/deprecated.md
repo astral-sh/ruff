@@ -974,6 +974,9 @@ class Old:
     @value.setter
     @deprecated("old setter")
     def value(self, value: int) -> None: ...
+    @value.deleter
+    @deprecated("old deleter")
+    def value(self) -> None: ...
 
 class Active:
     value: int
@@ -994,6 +997,66 @@ def check_marker(value: Old):
     if isinstance(value, Marker):
         value.value  # error: [deprecated] "old getter"
         value.value = 1  # error: [deprecated] "old setter"
+```
+
+When both members provide deprecated accessors, the warning includes both messages.
+
+```py
+class AlsoOld:
+    @property
+    @deprecated("another getter")
+    def value(self) -> int:
+        return 0
+
+    @value.setter
+    @deprecated("another setter")
+    def value(self, value: int) -> None: ...
+    @value.deleter
+    @deprecated("another deleter")
+    def value(self) -> None: ...
+
+def check_both(value: Old):
+    if isinstance(value, AlsoOld):
+        # snapshot: deprecated
+        value.value
+        value.value = 1  # error: [deprecated] "old setter; another setter"
+        del value.value  # error: [deprecated] "old deleter; another deleter"
+```
+
+```snapshot
+warning[deprecated]: Use of deprecated functions
+  --> src/mdtest_snippet.py:45:15
+   |
+45 |         value.value
+   |               ^^^^^ old getter; another getter
+   |
+  ::: src/mdtest_snippet.py:6:9
+   |
+ 6 |     def value(self) -> int:
+   |         ----- old getter
+   |
+  ::: src/mdtest_snippet.py:32:9
+   |
+32 |     def value(self) -> int:
+   |         ----- another getter
+```
+
+A non-deprecated getter suppresses the getter warning without hiding deprecated setters.
+
+```py
+class ActiveGetter:
+    @property
+    def value(self) -> int:
+        return 0
+
+    @value.setter
+    @deprecated("another setter")
+    def value(self, value: int) -> None: ...
+
+def check_active_getter(value: Old):
+    if isinstance(value, ActiveGetter):
+        value.value
+        value.value = 1  # error: [deprecated] "old setter; another setter"
 ```
 
 ## Invalid property getter calls
