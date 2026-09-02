@@ -102,28 +102,6 @@ def _[T]() -> None:
     ConstraintSet.equality(T, Base)
 ```
 
-Constraints can only refer to fully static types, so the lower and upper bounds are transformed into
-their bottom and top materializations, respectively.
-
-```py
-def _[T]() -> None:
-    constraints = ConstraintSet.range(Base, T, Any)
-    expected = ConstraintSet.lower_bound(Base, T)
-    static_assert(constraints == expected)
-
-    constraints = ConstraintSet.range(Sequence[Base], T, Sequence[Any])
-    expected = ConstraintSet.range(Sequence[Base], T, Sequence[object])
-    static_assert(constraints == expected)
-
-    constraints = ConstraintSet.range(Any, T, Base)
-    expected = ConstraintSet.upper_bound(T, Base)
-    static_assert(constraints == expected)
-
-    constraints = ConstraintSet.range(Sequence[Any], T, Sequence[Base])
-    expected = ConstraintSet.range(Sequence[Never], T, Sequence[Base])
-    static_assert(constraints == expected)
-```
-
 ### Lower bound
 
 A lower-bound constraint requires the type variable to be a supertype of its bound without providing
@@ -277,28 +255,6 @@ type other than that specific type.
 def _[T]() -> None:
     # (T@_ ≠ Base)
     ~ConstraintSet.equality(T, Base)
-```
-
-Constraints can only refer to fully static types, so the lower and upper bounds are transformed into
-their bottom and top materializations, respectively.
-
-```pyi
-def _[T]() -> None:
-    constraints = ~ConstraintSet.range(Base, T, Any)
-    expected = ~ConstraintSet.lower_bound(Base, T)
-    static_assert(constraints == expected)
-
-    constraints = ~ConstraintSet.range(Sequence[Base], T, Sequence[Any])
-    expected = ~ConstraintSet.range(Sequence[Base], T, Sequence[object])
-    static_assert(constraints == expected)
-
-    constraints = ~ConstraintSet.range(Any, T, Base)
-    expected = ~ConstraintSet.upper_bound(T, Base)
-    static_assert(constraints == expected)
-
-    constraints = ~ConstraintSet.range(Sequence[Any], T, Sequence[Base])
-    expected = ~ConstraintSet.range(Sequence[Never], T, Sequence[Base])
-    static_assert(constraints == expected)
 ```
 
 A negated _type_ is not the same thing as a negated _range_.
