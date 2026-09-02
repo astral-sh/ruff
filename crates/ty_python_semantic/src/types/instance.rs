@@ -525,6 +525,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 (source.class_origin(db), protocol.class_origin(db))
             && source_origin.class_literal(db) == target_origin.class_literal(db)
         {
+            // As a fast path, compare the origins:
             if source_origin == target_origin {
                 return self.always();
             }
@@ -535,8 +536,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             // valid subtype relation because those origins have different type arguments.
             // Instead, compare the top materializations of their nominal instances: here,
             // that checks `C[str] <: C[str]`. When only the source is bottom-materialized,
-            // compare bottom materializations instead. These nominal comparisons use the
-            // existing rules for variance, bounds, and constraints.
+            // compare bottom materializations instead.
             let kind = protocol
                 .materialization_kind(db)
                 .unwrap_or(MaterializationKind::Bottom);
