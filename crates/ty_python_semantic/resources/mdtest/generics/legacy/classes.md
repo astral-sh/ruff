@@ -396,6 +396,62 @@ class StrBase(Base[str]): ...
 Dynamic = type("Dynamic", (Combined, StrBase), {})
 ```
 
+## Inconsistent type arguments through partially gradual ancestors
+
+Each non-dynamic type argument constrains later inheritance paths independently. An `Any` in one
+position does not hide a conflict between concrete arguments contributed by other paths.
+
+```py
+from typing import Any, Generic, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Base(Generic[T, U]): ...
+class First(Base[int, Any]): ...
+class Second(Base[Any, str]): ...
+class Combined(First, Second): ...
+class Compatible(Combined, Base[int, str]): ...
+
+# error: [invalid-generic-class] "Inconsistent type arguments: class cannot inherit from both `Base[int, bytes]` and `Base[Any, str]`"
+class Conflicting(Combined, Base[int, bytes]): ...
+
+# error: [invalid-generic-class] "Inconsistent type arguments: class cannot inherit from both `Base[bytes, str]` and `Base[int, Any]`"
+class OtherConflict(Combined, Base[bytes, str]): ...
+class Inherited(Conflicting): ...
+```
+
+Reversing the paths preserves both constraints. Each diagnostic identifies the base that supplied
+the conflicting argument.
+
+```py
+class Reversed(Second, First): ...
+class ReversedCompatible(Reversed, Base[int, str]): ...
+
+# error: [invalid-generic-class] "Inconsistent type arguments: class cannot inherit from both `Base[bytes, str]` and `Base[int, Any]`"
+class ReversedConflict(Reversed, Base[bytes, str]): ...
+```
+
+The same constraints apply when another path contributes a more specialized version of an ancestor.
+
+```py
+class Specific(Base[int, str]): ...
+class Right(Specific, Base[int, Any]): ...
+class Diamond(First, Right): ...
+
+# error: [invalid-generic-class] "Inconsistent type arguments: class cannot inherit from both `Base[int, bytes]` and `Base[int, str]`"
+class DiamondConflict(Diamond, Base[int, bytes]): ...
+```
+
+Classes constructed with `type()` also preserve constraints from partially gradual ancestors.
+
+```py
+class BytesBase(Base[int, bytes]): ...
+
+# error: [invalid-generic-class] "Inconsistent type arguments: class cannot inherit from both `Base[int, bytes]` and `Base[Any, str]`"
+Dynamic = type("Dynamic", (Combined, BytesBase), {})
+```
+
 ## Specializing generic classes explicitly
 
 <!-- snapshot-diagnostics -->
