@@ -966,6 +966,12 @@ impl PathAssignments {
         ante2: ConstraintId,
         post: ConstraintId,
     ) {
+        if storage
+            .constraint_data(post)
+            .is_reflexive_typevar_relation(db)
+        {
+            return;
+        }
         let Some(ante1_fuel) = self.max_remaining_fuel_for(ante1.when_true()) else {
             return;
         };
@@ -993,6 +999,12 @@ impl PathAssignments {
         ante: ConstraintId,
         post: ConstraintId,
     ) {
+        if storage
+            .constraint_data(post)
+            .is_reflexive_typevar_relation(db)
+        {
+            return;
+        }
         let Some(available_fuel) = self.max_remaining_fuel_for(ante.when_true()) else {
             return;
         };
