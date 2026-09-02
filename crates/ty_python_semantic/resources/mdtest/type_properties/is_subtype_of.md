@@ -999,13 +999,15 @@ from ty_extensions._internal import is_subtype_of
 
 class Constrained[T: (str, bytes)](Protocol):
     def read(self) -> T: ...
+    def other(self) -> Any: ...
 
 static_assert(is_subtype_of(Constrained[Any], Top[Constrained[Any]]))
 static_assert(is_subtype_of(Bottom[Constrained[Any]], Constrained[Any]))
+static_assert(is_subtype_of(Bottom[Constrained[Any]], Top[Constrained[Any]]))
 static_assert(not is_subtype_of(Constrained[str], Top[Constrained[bytes]]))
 ```
 
-The same relations hold when the protocol also has an explicit `Any` member:
+The same relations hold when the type parameter has a bound:
 
 ```py
 class Bounded[T: str](Protocol):
@@ -1014,6 +1016,7 @@ class Bounded[T: str](Protocol):
 
 static_assert(is_subtype_of(Bounded[Any], Top[Bounded[Any]]))
 static_assert(is_subtype_of(Bottom[Bounded[Any]], Bounded[Any]))
+static_assert(is_subtype_of(Bottom[Bounded[Any]], Top[Bounded[Any]]))
 static_assert(not is_subtype_of(Top[Bounded[Any]], Bounded[Any]))
 ```
 
