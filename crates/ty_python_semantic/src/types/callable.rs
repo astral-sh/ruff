@@ -7,10 +7,9 @@ use crate::{
     place::Place,
     types::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassType, FindLegacyTypeVarsVisitor,
-        FunctionType, GenericContext, InternedType, KnownBoundMethodType, KnownClass,
-        KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy, Parameter, Parameters,
-        Signature, SubclassOfInner, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
-        UnionType,
+        FunctionType, InternedType, KnownBoundMethodType, KnownClass, KnownInstanceType,
+        LiteralValueTypeKind, MemberLookupPolicy, Parameter, Parameters, Signature,
+        SubclassOfInner, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, UnionType,
         constraints::{ConstraintSet, IteratorConstraintsExtension},
         known_instance::FunctoolsPartialInstance,
         relation::{TypeRelation, TypeRelationChecker},
@@ -405,25 +404,13 @@ impl From<TypeRelation> for UpcastPolicy {
 /// It can be written in type expressions using `typing.Callable`. `lambda` expressions are
 /// inferred directly as `CallableType`s; all function-literal types are subtypes of a
 /// `CallableType`.
-#[salsa::interned(
-    debug,
-    constructor = new_internal,
-    heap_size = ruff_memory_usage::heap_size
-)]
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct CallableType<'db> {
     #[returns(ref)]
     pub(crate) signatures: CallableSignature<'db>,
 
     #[returns(copy)]
     pub(super) kind: CallableTypeKind,
-
-    /// Whether this callable's signature may contain a projection demand.
-    ///
-    /// A false value is only stored when every reachable signature child is an
-    /// atomic, non-projection type or another callable with the same proof. A true
-    /// value is conservative and requires a structural walk.
-    #[returns(copy)]
-    pub(super) may_contain_projection: bool,
 }
 
 pub(super) fn walk_callable_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -440,64 +427,6 @@ pub(super) fn walk_callable_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 impl get_size2::GetSize for CallableType<'_> {}
 
 impl<'db> CallableType<'db> {
-    pub(crate) fn new(
-        db: &'db dyn Db,
-        signatures: CallableSignature<'db>,
-        kind: CallableTypeKind,
-    ) -> Self {
-        let may_contain_projection = Self::signatures_may_contain_projection(db, &signatures);
-        Self::new_internal(db, signatures, kind, may_contain_projection)
-    }
-
-    fn signatures_may_contain_projection(
-        db: &'db dyn Db,
-        signatures: &CallableSignature<'db>,
-    ) -> bool {
-        for signature in signatures {
-            if signature
-                .generic_context
-                .is_some_and(|context| Self::generic_context_may_contain_projection(db, context))
-            {
-                return true;
-            }
-            for ty in signature.receiver_constraint_types() {
-                if Self::type_may_contain_projection(db, ty) {
-                    return true;
-                }
-            }
-            for parameter in signature.parameters() {
-                if Self::type_may_contain_projection(db, parameter.annotated_type()) {
-                    return true;
-                }
-            }
-            if Self::type_may_contain_projection(db, signature.return_ty) {
-                return true;
-            }
-        }
-        false
-    }
-
-    fn generic_context_may_contain_projection(
-        db: &'db dyn Db,
-        context: GenericContext<'db>,
-    ) -> bool {
-        context
-            .variables(db)
-            .any(|bound_typevar| bound_typevar.typevar(db).has_eager_nested_type(db))
-    }
-
-    fn type_may_contain_projection(db: &'db dyn Db, ty: Type<'db>) -> bool {
-        match ty {
-            // Direct callable nesting is acyclic because an interned callable needs its child
-            // handles before it can be constructed. Recursive shapes pass through another
-            // non-atomic type, which conservatively keeps the structural walk.
-            Type::Callable(callable) => callable.may_contain_projection(db),
-            Type::Projection(_) => true,
-            Type::TypeVar(bound_typevar) => bound_typevar.typevar(db).has_eager_nested_type(db),
-            _ => matches!(visitor::TypeKind::from(ty), visitor::TypeKind::NonAtomic(_)),
-        }
-    }
-
     pub(crate) fn single(db: &'db dyn Db, signature: Signature<'db>) -> CallableType<'db> {
         CallableType::new(
             db,
@@ -558,7 +487,7 @@ impl<'db> CallableType<'db> {
     }
 
     pub(crate) fn into_regular(self, db: &'db dyn Db) -> CallableType<'db> {
-        CallableType::new(db, self.signatures(db).clone(), CallableTypeKind::Regular)
+        CallableType::new(db, self.signatures(db), CallableTypeKind::Regular)
     }
 
     /// Returns the reduced callable produced by partially applying selected overloads.
@@ -613,19 +542,11 @@ impl<'db> CallableType<'db> {
     }
 
     pub(crate) fn into_function_like(self, db: &'db dyn Db) -> CallableType<'db> {
-        CallableType::new(
-            db,
-            self.signatures(db).clone(),
-            CallableTypeKind::FunctionLike,
-        )
+        CallableType::new(db, self.signatures(db), CallableTypeKind::FunctionLike)
     }
 
     pub(crate) fn into_dunder_paramspec(self, db: &'db dyn Db) -> CallableType<'db> {
-        CallableType::new(
-            db,
-            self.signatures(db).clone(),
-            CallableTypeKind::DunderParamSpec,
-        )
+        CallableType::new(db, self.signatures(db), CallableTypeKind::DunderParamSpec)
     }
 
     pub(crate) fn apply_self(

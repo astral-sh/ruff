@@ -99,7 +99,7 @@ impl<'db> BoundMethodType<'db> {
     pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> CallableType<'db> {
         CallableType::new(
             db,
-            self.bound_signatures(db).clone(),
+            self.bound_signatures(db),
             CallableTypeKind::FunctionLike,
         )
     }

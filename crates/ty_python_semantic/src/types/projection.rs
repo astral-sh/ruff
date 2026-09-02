@@ -8,15 +8,11 @@
 use std::cell::RefCell;
 
 use super::{
-    CallableType, DivergentType, KnownClass, ProgramEnvironment, TupleSpec, Type, UnionBuilder,
-    UnionType,
+    DivergentType, KnownClass, ProgramEnvironment, TupleSpec, Type, UnionBuilder, UnionType,
 };
-use crate::types::generics::walk_generic_context;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::tuple::TupleType;
-use crate::types::visitor::{
-    TypeCollector, TypeKind, TypeVisitor, any_over_type, walk_type_with_recursion_guard,
-};
+use crate::types::visitor::any_over_type;
 use crate::{Db, FxIndexMap, FxIndexSet};
 
 mod artifact;
@@ -376,82 +372,21 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Vec<(DivergentType, ProjectionPath<'db>)> {
-        struct ProjectionDemandVisitor<'a, 'db> {
-            env: &'a ProgramEnvironment<'db>,
-            demands: RefCell<Vec<(DivergentType, ProjectionPath<'db>)>>,
-            recursion_guard: TypeCollector<'db>,
-        }
-
-        impl<'db> ProjectionDemandVisitor<'_, 'db> {
-            fn type_needs_visit(db: &'db dyn Db, ty: Type<'db>) -> bool {
-                match ty {
-                    Type::Callable(callable) => callable.may_contain_projection(db),
-                    Type::Projection(_) => true,
-                    _ => matches!(TypeKind::from(ty), TypeKind::NonAtomic(_)),
+        let demands = RefCell::<Vec<(DivergentType, ProjectionPath<'db>)>>::new(Vec::new());
+        any_over_type(db, env, self, false, |nested| {
+            if let Type::Projection(projection) = nested {
+                let mut demands = demands.borrow_mut();
+                let root = projection.root(db);
+                let path = projection.path(db);
+                if !demands.iter().any(|(candidate_root, candidate_path)| {
+                    candidate_root.same_marker(root) && candidate_path == &path
+                }) {
+                    demands.push((root, path));
                 }
             }
-
-            fn visit_if_projection_possible(&self, db: &'db dyn Db, ty: Type<'db>) {
-                if Self::type_needs_visit(db, ty) {
-                    self.visit_type(db, ty);
-                }
-            }
-        }
-
-        impl<'db> TypeVisitor<'db> for ProjectionDemandVisitor<'_, 'db> {
-            fn program_environment(&self) -> &ProgramEnvironment<'db> {
-                self.env
-            }
-
-            fn should_visit_lazy_type_attributes(&self) -> bool {
-                false
-            }
-
-            fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
-                if let Type::Projection(projection) = ty {
-                    let mut demands = self.demands.borrow_mut();
-                    let root = projection.root(db);
-                    let path = projection.path(db);
-                    if !demands.iter().any(|(candidate_root, candidate_path)| {
-                        candidate_root.same_marker(root) && candidate_path == &path
-                    }) {
-                        demands.push((root, path));
-                    }
-                    return;
-                }
-
-                walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
-            }
-
-            fn visit_callable_type(&self, db: &'db dyn Db, callable: CallableType<'db>) {
-                for signature in callable.signatures(db) {
-                    if let Some(generic_context) = signature.generic_context {
-                        walk_generic_context(db, generic_context, self);
-                    }
-                    for ty in signature.receiver_constraint_types() {
-                        self.visit_if_projection_possible(db, ty);
-                    }
-                    for parameter in signature.parameters() {
-                        self.visit_if_projection_possible(db, parameter.annotated_type());
-                    }
-                    self.visit_if_projection_possible(db, signature.return_ty);
-                }
-            }
-        }
-
-        if let Type::Callable(callable) = self
-            && !callable.may_contain_projection(db)
-        {
-            return Vec::new();
-        }
-
-        let visitor = ProjectionDemandVisitor {
-            env,
-            demands: RefCell::default(),
-            recursion_guard: TypeCollector::default(),
-        };
-        visitor.visit_type(db, self);
-        visitor.demands.into_inner()
+            false
+        });
+        demands.into_inner()
     }
 
     fn cycle_artifact_roots(

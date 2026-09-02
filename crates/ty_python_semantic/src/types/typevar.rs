@@ -227,16 +227,6 @@ pub(super) fn walk_type_var_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     }
 }
 
-impl<'db> TypeVarInstance<'db> {
-    /// Returns whether a non-lazy type visitor can reach any nested type from this type variable.
-    pub(super) fn has_eager_nested_type(self, db: &'db dyn Db) -> bool {
-        matches!(
-            self._bound_or_constraints(db),
-            Some(TypeVarBoundOrConstraintsEvaluation::Eager(_))
-        ) || matches!(self._default(db), Some(TypeVarDefaultEvaluation::Eager(_)))
-    }
-}
-
 #[salsa::tracked]
 impl<'db> TypeVarInstance<'db> {
     pub(crate) fn with_binding_context(
