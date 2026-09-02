@@ -529,11 +529,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 return self.always();
             }
 
-            // Materializing generic arguments can change the specialization: for example,
-            // `P[Any]` with a covariant parameter bounded by `str` becomes `Top[P[str]]`.
-            // Compare top materializations when the target is top-materialized, or bottom
-            // materializations when only the source is bottom-materialized. The nominal
-            // comparison accounts for each parameter's variance, bounds, and constraints.
+            // A protocol's type arguments can change during materialization. For example,
+            // taking the top materialization replaces `Any` with `str` for a covariant
+            // parameter bounded by `str`. To recognize the relation despite that change,
+            // materialize both origins: use top if the target is top, and bottom otherwise.
+            // Comparing them as ordinary classes lets the existing generic checks handle
+            // variance, bounds, and constraints.
             let kind = protocol
                 .materialization_kind(db)
                 .unwrap_or(MaterializationKind::Bottom);
