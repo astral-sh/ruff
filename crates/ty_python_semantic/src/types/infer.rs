@@ -752,6 +752,29 @@ impl<'db> TypeContext<'db> {
         // explosion of inference attempts, and is rarely needed in practice.
         Some(targets)
     }
+
+    /// Returns the targets used to infer a call against a union type context.
+    pub(super) fn narrow_call_targets(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Option<Cow<'db, [Type<'db>]>> {
+        if let Some(awaitable) =
+            self.annotation?
+                .known_specialization(db, env, KnownClass::Awaitable)
+            && let [inner] = awaitable.types(db)
+        {
+            let targets = TypeContext::from(*inner).narrow_targets(db, env)?;
+            return Some(Cow::Owned(
+                targets
+                    .iter()
+                    .map(|inner| KnownClass::Awaitable.to_specialized_instance(db, env, &[*inner]))
+                    .collect(),
+            ));
+        }
+
+        self.narrow_targets(db, env)
+    }
 }
 
 impl<'db> From<Type<'db>> for TypeContext<'db> {

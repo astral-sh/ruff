@@ -185,6 +185,75 @@ def _(ab: A | B, ac: A | C, bc: B | C):
     reveal_type(f(*(ac,)))  # revealed: A | C
 ```
 
+### Generic overloads with an awaited call
+
+Each expanded union member solves generic constraints independently.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+`generic.pyi`:
+
+```pyi
+from typing import Any, Generic, TypeVar, overload
+
+Single = TypeVar("Single")
+Multiple = TypeVar("Multiple", bound=tuple[Any, Any, *tuple[Any, ...]])
+Ts = TypeVar("Ts", bound=tuple[Any, ...])
+
+class Select(Generic[Ts]): ...
+
+@overload
+async def query(value: Select[tuple[Single]]) -> list[Single]: ...
+@overload
+async def query(value: Select[Multiple]) -> list[Multiple]: ...
+```
+
+```py
+from generic import Multiple, Select, Single, query
+
+async def generic(value: Select[tuple[Single]] | Select[Multiple]) -> list[Single] | list[Multiple]:
+    result: list[Single] | list[Multiple] = await query(value)
+    reveal_type(result)  # revealed: list[Single@generic] | list[Multiple@generic]
+    return await query(value)
+```
+
+### Expansion requires every union member to match
+
+Expansion succeeds only if every member matches an overload, without combining invalid argument pairs.
+
+`guards.pyi`:
+
+```pyi
+from typing import overload
+
+@overload
+def f(x: int) -> int: ...
+@overload
+def f(x: str) -> str: ...
+@overload
+def only_int(x: int) -> int: ...
+@overload
+def only_int(x: bytes) -> bytes: ...
+@overload
+def pair(x: int, y: bytes) -> int: ...
+@overload
+def pair(x: str, y: float) -> str: ...
+```
+
+```py
+from guards import f, only_int, pair
+
+def valid(x: int | str):
+    reveal_type(f(x))  # revealed: int | str
+
+def invalid(x: int | str, y: bytes | float):
+    only_int(x)  # error: [no-matching-overload]
+    pair(x, y)  # error: [no-matching-overload]
+```
+
 ### Expanding first argument
 
 If the set of argument lists created by expanding the first argument evaluates successfully, the
