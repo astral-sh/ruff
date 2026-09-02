@@ -529,12 +529,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 return self.always();
             }
 
-            // A protocol's type arguments can change during materialization. For example,
-            // taking the top materialization replaces `Any` with `str` for a covariant
-            // parameter bounded by `str`. To recognize the relation despite that change,
-            // materialize both origins: use top if the target is top, and bottom otherwise.
-            // Comparing them as ordinary classes lets the existing generic checks handle
-            // variance, bounds, and constraints.
+            // Consider `C[Any] <: Top[C[Any]]` for a protocol `C[T: str]` with covariant `T`.
+            // The target's top materialization replaces `Any` with `T`'s bound, `str`, so the
+            // origins are `C[Any]` and `C[str]`. They differ, but taking the top materialization
+            // of both origins gives `C[str]`, allowing us to recognize the subtype relation.
+            // Use top materializations when the target is top, and bottom otherwise.
+            // Comparing the origins as ordinary classes lets the existing generic checks
+            // handle variance, bounds, and constraints.
             let kind = protocol
                 .materialization_kind(db)
                 .unwrap_or(MaterializationKind::Bottom);
