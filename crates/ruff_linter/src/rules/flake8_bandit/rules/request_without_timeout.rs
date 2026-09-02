@@ -8,13 +8,19 @@ use crate::checkers::ast::Checker;
 use crate::codes::Category;
 
 /// ## What it does
-/// Checks for uses of the Python `requests` or `httpx` module that omit the
-/// `timeout` parameter.
+/// Checks for uses of the Python `requests` module that omit the `timeout`
+/// parameter, and for uses of the `requests` or `httpx` modules that set the
+/// `timeout` parameter to `None`.
 ///
 /// ## Why is this bad?
 /// The `timeout` parameter is used to set the maximum time to wait for a
-/// response from the server. By omitting the `timeout` parameter, the program
-/// may hang indefinitely while awaiting a response.
+/// response from the server. Without a timeout, the program may hang
+/// indefinitely while awaiting a response.
+///
+/// `requests` applies no timeout by default, so omitting the parameter leaves
+/// the request unbounded. `httpx` does apply a default timeout, so omitting
+/// the parameter is not flagged; passing `timeout=None` explicitly disables
+/// the timeout and is flagged for both modules.
 ///
 /// ## Example
 /// ```python
