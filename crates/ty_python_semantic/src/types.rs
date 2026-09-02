@@ -920,28 +920,32 @@ impl get_size2::GetSize for DeprecatedMember<'_> {}
 /// objects are disjoint types, but either can implement an attribute on an intersection.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 struct PropertyDeprecations<'db> {
-    /// Getter, setter, and deleter implementations, in that order.
     #[returns(ref)]
-    accessors: [Box<[OverloadLiteral<'db>]>; 3],
+    getters: Box<[OverloadLiteral<'db>]>,
+    #[returns(ref)]
+    setters: Box<[OverloadLiteral<'db>]>,
+    #[returns(ref)]
+    deleters: Box<[OverloadLiteral<'db>]>,
 }
 
 impl get_size2::GetSize for PropertyDeprecations<'_> {}
 
 impl<'db> PropertyDeprecations<'db> {
     fn functions(self, db: &'db dyn Db, access: ast::ExprContext) -> &'db [OverloadLiteral<'db>] {
-        let index = match access {
-            ast::ExprContext::Load => 0,
-            ast::ExprContext::Store => 1,
-            ast::ExprContext::Del => 2,
-            ast::ExprContext::Invalid => return &[],
-        };
-        &self.accessors(db)[index]
+        match access {
+            ast::ExprContext::Load => self.getters(db),
+            ast::ExprContext::Store => self.setters(db),
+            ast::ExprContext::Del => self.deleters(db),
+            ast::ExprContext::Invalid => &[],
+        }
     }
 
     fn getters_only(self, db: &'db dyn Db) -> Self {
         Self::new(
             db,
-            [self.accessors(db)[0].clone(), Box::new([]), Box::new([])],
+            self.getters(db).clone(),
+            Box::<[_]>::default(),
+            Box::<[_]>::default(),
         )
     }
 
@@ -957,16 +961,19 @@ impl<'db> PropertyDeprecations<'db> {
     }
 
     fn combine(self, db: &'db dyn Db, other: Self, intersection: bool) -> Self {
-        let accessors: [Box<[_]>; 3] = std::array::from_fn(|index| {
-            let left = &self.accessors(db)[index];
-            let right = &other.accessors(db)[index];
+        let combine = |left: &[OverloadLiteral<'db>], right: &[OverloadLiteral<'db>]| {
             if intersection && (left.is_empty() || right.is_empty()) {
                 Box::<[_]>::default()
             } else {
                 left.iter().chain(right).copied().unique().collect()
             }
-        });
-        Self::new(db, accessors)
+        };
+        Self::new(
+            db,
+            combine(self.getters(db), other.getters(db)),
+            combine(self.setters(db), other.setters(db)),
+            combine(self.deleters(db), other.deleters(db)),
+        )
     }
 }
 
@@ -4398,7 +4405,7 @@ impl<'db> Type<'db> {
 
         match self {
             Type::PropertyInstance(property) => {
-                let accessors = [
+                let [getters, setters, deleters] = [
                     property.getter(db),
                     property.setter(db),
                     property.deleter(db),
@@ -4410,10 +4417,11 @@ impl<'db> Type<'db> {
                     }
                     functions.into_iter().unique().collect::<Box<[_]>>()
                 });
-                accessors
-                    .iter()
-                    .any(|functions| !functions.is_empty())
-                    .then(|| PropertyDeprecations::new(db, accessors))
+                if getters.is_empty() && setters.is_empty() && deleters.is_empty() {
+                    None
+                } else {
+                    Some(PropertyDeprecations::new(db, getters, setters, deleters))
+                }
             }
             Type::Union(union) => union
                 .elements(db)
