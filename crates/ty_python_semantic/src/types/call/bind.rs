@@ -10053,6 +10053,7 @@ mod tests {
 
     use crate::db::tests::{TestDb, setup_db};
     use crate::place::global_symbol;
+    use crate::types::constraints::resolution::SolutionType::Resolved;
     use crate::types::generics::TypeVarInferenceSolutions;
 
     fn call_inference<'db>(
@@ -10118,8 +10119,8 @@ def swap(value: int | str) -> int | str:
         assert_eq!(
             paths.iter().map(AsRef::as_ref).collect::<FxHashSet<_>>(),
             FxHashSet::from_iter([
-                [Some(int), Some(str)].as_slice(),
-                [Some(str), Some(int)].as_slice(),
+                [Some(Resolved(int)), Some(Resolved(str))].as_slice(),
+                [Some(Resolved(str)), Some(Resolved(int))].as_slice(),
             ])
         );
         Ok(())
@@ -10164,7 +10165,7 @@ expected: tuple[list[object], A | B, C | D | E]
         };
         assert_eq!(
             paths.iter().map(AsRef::as_ref).collect::<Vec<_>>(),
-            [[Some(Type::object()), None].as_slice()]
+            [[Some(Resolved(Type::object())), None].as_slice()]
         );
         Ok(())
     }
