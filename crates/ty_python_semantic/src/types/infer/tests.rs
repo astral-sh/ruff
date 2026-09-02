@@ -644,6 +644,30 @@ fn redundant_condition_lookup_does_not_reenter_scope_inference() -> anyhow::Resu
     Ok(())
 }
 
+/// Editing an intermediate import's guard invalidates the exemption even when the imported type
+/// stays the same. Check both name and module-attribute lookups, which cache separate summaries.
+#[test]
+fn redundant_condition_import_guard_invalidation() -> anyhow::Result<()> {
+    let guarded = "import sys\nif sys.platform == 'win32':\n    from values import flag\nelse:\n    from values import flag\n";
+    let mut db = TestDbBuilder::new()
+        .with_file("/src/values.py", "flag = 'prefix'\n")
+        .with_file("/src/choice.py", guarded)
+        .with_file("/src/main.py", "import choice\nfrom choice import flag\nif flag:\n    pass\nif choice.flag:\n    pass\n")
+        .build()?;
+    assert_file_diagnostics(&db, "/src/main.py", &[]);
+
+    db.write_file(
+        "/src/choice.py",
+        guarded.replace("sys.platform == 'win32'", "True"),
+    )?;
+    let message = "A nonempty string is always truthy";
+    assert_file_diagnostics(&db, "/src/main.py", &[message, message]);
+
+    db.write_file("/src/choice.py", guarded)?;
+    assert_file_diagnostics(&db, "/src/main.py", &[]);
+    Ok(())
+}
+
 /// Repeated conditions on the same name or attribute share one cached definition summary.
 /// Both fixtures combine many assignments to one place with many conditions that test it.
 /// Each lookup can inspect every assignment, so repeating it for every condition would make

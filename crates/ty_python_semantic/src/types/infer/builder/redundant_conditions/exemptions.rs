@@ -8,12 +8,10 @@
 
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::{self as ast, helpers::any_over_expr, name::Name};
-use rustc_hash::FxHashMap;
 use ty_module_resolver::{KnownModule, file_to_module};
 use ty_python_core::{
     ProgramFile,
     definition::{Definition, DefinitionKind},
-    place::ScopedPlaceId,
     predicate::{PredicateNode, ScopedPredicateId, StatementCall},
     reachability_constraints::ScopedReachabilityConstraintId,
     scope::ScopeId,
@@ -26,8 +24,8 @@ use crate::{
     types::{
         KnownClass, Type, TypeContext,
         definition_resolution::{
-            ImportAliasResolution, ResolvedDefinition, definitions_for_attribute,
-            definitions_for_name,
+            DefinitionProvenance, definition_provenance_for_attribute,
+            definition_provenance_for_name,
         },
         diagnostic::REDUNDANT_CONDITION_STRICT,
         infer::TypeInferenceBuilder,
@@ -471,72 +469,31 @@ struct ConditionDefinitionInfo {
 }
 
 impl ConditionDefinitionInfo {
-    /// Summarizes resolved definitions, following assignments to establish environment provenance.
-    fn from_definitions<'db>(db: &'db dyn Db, definitions: Vec<ResolvedDefinition<'db>>) -> Self {
-        // A place is a variable or attribute, and several definitions can bind the same place.
-        // The outer map identifies the place by its scope and place ID: place IDs are only unique
-        // within a scope. Each inner map associates a definition with the reachability constraint
-        // describing the paths from the start of that scope to its binding.
-        //
-        // For example:
-        //
-        // ```python
-        // import sys
-        //
-        // if sys.platform == "win32":
-        //     prefix = "\n"
-        // else:
-        //     prefix = ""
-        // ```
-        //
-        // There is one outer entry for `prefix` in the module scope. Its inner map has two
-        // entries, one for each assignment: the `"\n"` binding is guarded by the platform
-        // comparison, and the `""` binding by its negation. The constraint IDs refer to those
-        // formulas in the scope's use-def map; they do not store the assigned strings or the
-        // conditions' evaluated truthiness.
-        //
-        // Populate each inner map lazily and reuse it for the rest of this call: scanning all bindings
-        // for each definition would be quadratic for a variable assigned many times. Although building
-        // these indexes may look expensive, `name_condition_definition_info` and
-        // `attribute_condition_definition_info` cache this function's result with Salsa, so repeated
-        // conditions with the same lookup key reuse the summary without rebuilding the maps.
-        type ReachabilityByDefinition<'db> =
-            FxHashMap<Definition<'db>, ScopedReachabilityConstraintId>;
-        type ReachabilityByPlace<'db> =
-            FxHashMap<(ScopeId<'db>, ScopedPlaceId), ReachabilityByDefinition<'db>>;
-        let mut reachability_by_place = ReachabilityByPlace::default();
-
-        let contains_special_cased_condition = definitions
-            .into_iter()
-            .filter_map(|resolved| resolved.definition())
-            .any(|definition| {
-                let scope = definition.scope(db);
-                let place = definition.place(db);
-
-                let reachability_by_definition = reachability_by_place
-                    .entry((scope, place))
-                    .or_insert_with(|| {
-                        use_def_map(db, scope)
-                            .reachable_bindings(place)
-                            .filter_map(|binding| {
-                                Some((
-                                    binding.binding.definition()?,
-                                    binding.reachability_constraint,
-                                ))
-                            })
-                            .collect()
-                    });
-
-                let reachability = reachability_by_definition
-                    .get(&definition)
-                    .copied()
-                    .unwrap_or(ScopedReachabilityConstraintId::ALWAYS_TRUE);
-
-                definition_contains_special_cased_condition(db, definition, reachability)
-            });
+    /// Checks the original binding guards as well as the definitions reached through imports.
+    fn from_provenance<'db>(db: &'db dyn Db, provenance: DefinitionProvenance<'db>) -> Self {
+        // We do not exempt functions, classes, or modules merely because an environment guard
+        // selects their definition. Apply the same policy to guards on imports of those objects.
+        let guards_can_affect_value = provenance.definitions.iter().any(|resolved| {
+            resolved.definition().is_some_and(|definition| {
+                !matches!(
+                    definition.kind(db),
+                    DefinitionKind::Function(_) | DefinitionKind::Class(_)
+                )
+            })
+        });
+        if !guards_can_affect_value {
+            return Self::default();
+        }
 
         Self {
-            contains_special_cased_condition,
+            contains_special_cased_condition: provenance.origins.into_iter().any(|origin| {
+                definition_contains_special_cased_condition(
+                    db,
+                    origin.definition,
+                    origin.scope,
+                    origin.reachability,
+                )
+            }),
         }
     }
 }
@@ -559,10 +516,7 @@ fn name_condition_definition_info<'db>(
     scope: ScopeId<'db>,
     name: Name,
 ) -> ConditionDefinitionInfo {
-    ConditionDefinitionInfo::from_definitions(
-        db,
-        definitions_for_name(db, scope, &name, ImportAliasResolution::ResolveAliases),
-    )
+    ConditionDefinitionInfo::from_provenance(db, definition_provenance_for_name(db, scope, &name))
 }
 
 /// Caches definition information for a member of an already-inferred receiver type.
@@ -584,9 +538,9 @@ fn attribute_condition_definition_info<'db>(
     receiver: Type<'db>,
     name: Name,
 ) -> ConditionDefinitionInfo {
-    ConditionDefinitionInfo::from_definitions(
+    ConditionDefinitionInfo::from_provenance(
         db,
-        definitions_for_attribute(
+        definition_provenance_for_attribute(
             db,
             &ProgramEnvironment::from_program(program),
             receiver,
@@ -606,15 +560,16 @@ fn attribute_condition_definition_info<'db>(
 ///
 /// This Salsa-tracked query reads the definition's AST behind its own incremental boundary, so
 /// callers do not depend directly on another file's syntax tree. Cyclic aliases recover as `false`.
-/// `reachability` belongs to the use-def map of the definition's scope.
+/// Each origin identifies the scope whose use-def map contains its reachability constraint.
 #[salsa::tracked(
     returns(copy),
-    cycle_initial = |_, _, _, _| false,
+    cycle_initial = |_, _, _, _, _| false,
     heap_size = ruff_memory_usage::heap_size
 )]
 fn definition_contains_special_cased_condition<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
+    scope: ScopeId<'db>,
     reachability: ScopedReachabilityConstraintId,
 ) -> bool {
     let module = parsed_module(db, definition.python_file(db)).load(db);
@@ -673,23 +628,33 @@ fn definition_contains_special_cased_condition<'db>(
         | DefinitionKind::LoopHeader(_)
         | DefinitionKind::NestedBindings(_) => None,
     };
-    let Some(source_expression) = source_expression else {
-        return false;
-    };
-
     // A version guard can select a different function signature without changing the fact that
-    // the function object is always truthy. Only definitions with a source expression above
-    // inherit the provenance of their guards.
-    let use_def = use_def_map(db, definition.scope(db));
+    // the function object is always truthy. Bindings with source expressions, and imports,
+    // inherit their guards; function and class declarations do not.
+    if source_expression.is_none()
+        && !matches!(
+            definition_kind,
+            DefinitionKind::Import(_)
+                | DefinitionKind::ImportFrom(_)
+                | DefinitionKind::ImportFromSubmodule(_)
+                | DefinitionKind::StarImport(_)
+        )
+    {
+        return false;
+    }
+
+    let use_def = use_def_map(db, scope);
     if use_def
         .reachability_constraints()
         .predicate_ids(reachability)
-        .any(|predicate| {
-            predicate_contains_special_cased_condition(db, definition.scope(db), predicate)
-        })
+        .any(|predicate| predicate_contains_special_cased_condition(db, scope, predicate))
     {
         return true;
     }
+
+    let Some(source_expression) = source_expression else {
+        return false;
+    };
 
     // Binding inference does not always retain the source expression's types: unpacked targets
     // share a source, and a comprehension's first iterable belongs to the enclosing scope.

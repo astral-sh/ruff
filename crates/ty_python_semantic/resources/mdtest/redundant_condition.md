@@ -1782,6 +1782,122 @@ if fixed:  # error: [redundant-condition] "Object of type `Literal["ready"]` is 
     pass
 ```
 
+## Environment-dependent imports
+
+An imported value can depend on the platform even when its definition in the source module is a
+constant. The conditions selecting the import therefore exempt tests of the imported name:
+
+`empty.py`:
+
+```py
+value = ""
+```
+
+`nonempty.py`:
+
+```py
+value = ">"
+```
+
+`choices.py`:
+
+```py
+import sys
+
+if sys.platform == "win32":
+    from empty import value as prefix
+else:
+    from nonempty import value as prefix
+
+if sys.platform != "win32":
+    from empty import value as suffix
+else:
+    from nonempty import value as suffix
+
+reveal_type(prefix)  # revealed: Literal[">"]
+if prefix:  # no diagnostic
+    pass
+
+reveal_type(suffix)  # revealed: Literal[""]
+if suffix:  # no diagnostic
+    pass
+```
+
+The exemption follows aliases and re-exports, including when the value is accessed as a module
+attribute:
+
+`reexport.py`:
+
+```py
+from choices import prefix as marker, suffix
+```
+
+`star_reexport.py`:
+
+```py
+from reexport import *
+```
+
+`main.py`:
+
+```py
+import reexport
+import star_reexport
+from reexport import marker as renamed, suffix
+
+if renamed:  # no diagnostic
+    pass
+if suffix:  # no diagnostic
+    pass
+if reexport.marker:  # no diagnostic
+    pass
+if star_reexport.marker:  # no diagnostic
+    pass
+```
+
+An import without an environment-dependent guard does not exempt a constant from diagnostics:
+
+```py
+from nonempty import value as fixed
+
+if fixed:  # error: [redundant-condition]
+    pass
+
+def ordinary_guard(enabled: bool):
+    if enabled:
+        from nonempty import value
+    else:
+        from nonempty import value
+    if value:  # error: [redundant-condition]
+        pass
+```
+
+## Environment-dependent function imports
+
+A platform guard can select a different function implementation, but both function objects are
+truthy. Testing the imported function therefore still produces a diagnostic:
+
+`implementations.py`:
+
+```py
+def windows(): ...
+def other(): ...
+```
+
+`main.py`:
+
+```py
+import sys
+
+if sys.platform == "win32":
+    from implementations import windows as function
+else:
+    from implementations import other as function
+
+if function:  # error: [redundant-condition]
+    pass
+```
+
 ## Environment-dependent loop targets
 
 Loop targets inherit the environment-dependent origin of their iterable, including when the target
