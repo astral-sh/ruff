@@ -1317,6 +1317,46 @@ def check(value: int | str):
     convert(value)
 ```
 
+### Shared deprecation messages across overloads
+
+When matching overloads share a deprecation message, the warning includes that message once in both
+full and concise output. The full diagnostic points to each deprecated overload.
+
+```py
+from typing import overload
+from typing_extensions import deprecated
+
+@overload
+@deprecated("Use `parse` instead. Support ends in version 2.")
+def convert(value: int) -> str: ...
+@overload
+@deprecated("Use `parse` instead. Support ends in version 2.")
+def convert(value: str) -> str: ...
+def convert(value: int | str) -> str:
+    return str(value)
+
+def check(value: int | str):
+    # snapshot: deprecated
+    convert(value)
+```
+
+```snapshot
+warning[deprecated]: Possible use of deprecated function: `convert`
+  --> src/mdtest_snippet.py:15:5
+   |
+15 |     convert(value)
+   |     ^^^^^^^ Use `parse` instead. Support ends in version 2.
+   |
+  ::: src/mdtest_snippet.py:6:5
+   |
+ 6 | def convert(value: int) -> str: ...
+   |     -------
+ 7 | @overload
+ 8 | @deprecated("Use `parse` instead. Support ends in version 2.")
+ 9 | def convert(value: str) -> str: ...
+   |     -------
+```
+
 ### Overloads for different receivers
 
 The `self` annotations restrict which overloads each instance can call. A call on `C[str]` reports

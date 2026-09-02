@@ -10155,7 +10155,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     /// Report the distinct deprecated targets of one operation in a single diagnostic.
-    /// Deduplicate by source function or overload. Put multiple deprecation messages in separate
+    /// Deduplicate by source function or overload. Keep a shared deprecation message in the
+    /// primary annotation so it appears in concise output. Put differing messages in separate
     /// subdiagnostics with their declarations so each message's prose and line breaks remain
     /// readable. The summary names the possible deprecated targets in both output formats.
     fn report_deprecated_functions(
@@ -10171,23 +10172,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let Some(builder) = self.context.report_lint(&diagnostic::DEPRECATED, ranged) else {
             return;
         };
+        let shared_message = functions
+            .iter()
+            .filter_map(|function| function.deprecated(db)?.message)
+            .map(|message| message.value(db))
+            .filter(|message| !message.is_empty())
+            .all_equal_value()
+            .ok();
         let mut diagnostic = if functions.len() == 1 {
             let kind = if first.is_overload(db) {
                 "overload of"
             } else {
                 "function"
             };
-            let mut diagnostic = builder.into_diagnostic(format_args!(
+            builder.into_diagnostic(format_args!(
                 "The {kind} `{}` is deprecated",
                 first.name(db)
-            ));
-            if let Some(message) = first
-                .deprecated(db)
-                .and_then(|deprecated| deprecated.message)
-            {
-                diagnostic.set_primary_annotation_message(message.value(db));
-            }
-            diagnostic
+            ))
         } else {
             let mut names = FxOrderSet::default();
             let mut all_methods = true;
@@ -10205,6 +10206,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 "Possible use of deprecated {kind}{plural}: {names}"
             ));
             for function in &functions {
+                if shared_message.is_some() {
+                    diagnostic.annotate(Annotation::secondary(function.spans(db).name));
+                    continue;
+                }
                 let message = function
                     .deprecated(db)
                     .and_then(|deprecated| deprecated.message)
@@ -10217,6 +10222,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             diagnostic
         };
+        if let Some(message) = shared_message {
+            diagnostic.set_primary_annotation_message(message);
+        }
         diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
     }
 
