@@ -6671,8 +6671,6 @@ static_assert(is_assignable_to(FooBar, Bar))
 
 def dictionary_union(u: Foo | dict[Literal["a", "b"], int]):
     if "c" in u:
-        # TODO: This should stop erroring if we prove that the `dict` arm cannot contain `"c"`.
-        # error: [invalid-argument-type]
         reveal_type(u["c"])  # revealed: object
 
 def literal_union(u: Foo | Literal["abc"]):
@@ -6727,8 +6725,7 @@ def _(t: Bar, u: Foo | Intersection[Bar, Any], v: Intersection[Bar, Any], w: Lit
     if "bar" not in u:
         reveal_type(u)  # revealed: Foo
     else:
-        # TODO: This should simplify to `Foo | (Bar & Any)`, since `Foo` is a
-        # subtype of the synthesized protocol.
+        # `Foo` is open, so it may contain an undeclared `"bar"` key.
         reveal_type(u)  # revealed: (Foo & <TypedDict with items 'bar'>) | (Bar & Any)
 
     if "bar" not in v:
