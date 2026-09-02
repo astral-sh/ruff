@@ -705,7 +705,9 @@ impl PathAssignments {
                 continue;
             }
 
-            if SequentMap::pair_cannot_produce_sequents(db, env, storage, *existing, constraint) {
+            if SequentMap::<ConstraintId>::pair_cannot_produce_sequents(
+                db, env, storage, *existing, constraint,
+            ) {
                 continue;
             }
 
