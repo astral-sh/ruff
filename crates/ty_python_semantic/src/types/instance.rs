@@ -718,9 +718,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let source_alias = source_class.into_generic_alias()?;
 
         let source_arguments = source_alias.specialization(db).types(db);
-        if !source_arguments.iter().all(|argument| match argument {
-            Type::TypeVar(typevar) => nominally_satisfied.mentions_typevar(*typevar),
-            argument => !any_over_type_expanding_aliases(db, env, *argument, Type::is_type_var),
+        // Nested variables, such as `T` in `Concrete[T | Iterable[T]]`, can also be
+        // constrained by the nominal relation. Only variables absent from that relation
+        // require structural inference that the nominal proof cannot account for.
+        if source_arguments.iter().any(|argument| {
+            any_over_type_expanding_aliases(db, env, *argument, |nested| {
+                matches!(nested, Type::TypeVar(typevar)
+                    if !nominally_satisfied.mentions_typevar(typevar))
+            })
         }) {
             return None;
         }
