@@ -547,6 +547,7 @@ impl PathAssignments {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
+        constraint_id: ConstraintId,
         constraint: InterimConstraint<'db>,
     ) {
         let constraints = constraint.into_new(db);
@@ -554,9 +555,45 @@ impl PathAssignments {
             let map = SequentMap::<Constraint<'db>>::for_constraint(db, env, *constraint);
             self.add_sequents(db, env, storage, map);
         }
-        if let [lower, upper] = constraints.as_slice() {
-            let map = SequentMap::<Constraint<'db>>::for_constraint_pair(db, env, *lower, *upper);
-            self.add_sequents(db, env, storage, map);
+
+        match constraints.as_slice() {
+            [single] => {
+                if matches!(constraint, InterimConstraint::Old(_)) {
+                    let single_id = storage.intern_constraint(db, env, single.into());
+                    self.sequents.push(Sequent::SingleImplication {
+                        ante: constraint_id,
+                        post: single_id,
+                    });
+                    self.sequents.push(Sequent::SingleImplication {
+                        ante: single_id,
+                        post: constraint_id,
+                    });
+                }
+            }
+            [lower, upper] => {
+                if matches!(constraint, InterimConstraint::Old(_)) {
+                    let lower_id = storage.intern_constraint(db, env, lower.into());
+                    let upper_id = storage.intern_constraint(db, env, upper.into());
+                    self.sequents.push(Sequent::SingleImplication {
+                        ante: constraint_id,
+                        post: lower_id,
+                    });
+                    self.sequents.push(Sequent::SingleImplication {
+                        ante: constraint_id,
+                        post: upper_id,
+                    });
+                    self.sequents.push(Sequent::PairImplication {
+                        ante1: lower_id,
+                        ante2: upper_id,
+                        post: constraint_id,
+                    });
+                }
+
+                let map =
+                    SequentMap::<Constraint<'db>>::for_constraint_pair(db, env, *lower, *upper);
+                self.add_sequents(db, env, storage, map);
+            }
+            _ => {}
         }
     }
 
