@@ -479,18 +479,6 @@ impl<'db> Type<'db> {
             .is_always_satisfied(db, env)
     }
 
-    /// Return true if this type is a subtype of `target` using constraint-set typevar rules.
-    pub(super) fn is_constraint_set_subtype_of(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        target: Type<'db>,
-    ) -> bool {
-        let constraints = ConstraintSetBuilder::new();
-        self.when_constraint_set_subtype_of(db, env, target, &constraints)
-            .is_always_satisfied(db, env)
-    }
-
     pub(super) fn when_assignable_to<'c>(
         self,
         db: &'db dyn Db,
@@ -601,24 +589,6 @@ impl<'db> Type<'db> {
             constraints,
             TypeVarSet::None,
             TypeRelation::Assignability,
-            TypeVarEvaluation::Lazy,
-        )
-    }
-
-    fn when_constraint_set_subtype_of<'c>(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        target: Type<'db>,
-        constraints: &'c ConstraintSetBuilder<'db>,
-    ) -> ConstraintSet<'db, 'c> {
-        self.has_relation_to_with_typevar_evaluation(
-            db,
-            env,
-            target,
-            constraints,
-            TypeVarSet::None,
-            TypeRelation::Subtyping,
             TypeVarEvaluation::Lazy,
         )
     }
@@ -844,21 +814,6 @@ impl<'db> Type<'db> {
 
         self.when_constraint_set_equivalent_to_owned(db, env, other)
             .query(|_constraints, when| when.is_always_satisfied(db, env))
-    }
-
-    /// Returns whether `self` and `other` can be equivalent under some typevar specialization.
-    pub(super) fn can_be_constraint_set_equivalent_to(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        other: Type<'db>,
-    ) -> bool {
-        if self == other {
-            return true;
-        }
-
-        self.when_constraint_set_equivalent_to_owned(db, env, other)
-            .query(|_constraints, when| !when.is_never_satisfied(db, env))
     }
 
     fn when_equivalent_to_with_materialization_visitor<'c>(

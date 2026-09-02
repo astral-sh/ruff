@@ -1052,7 +1052,6 @@ struct ConstraintSetStorage<'db> {
     /// the many shallow bounds that are cheap to walk once.
     constraint_bound_depth_cache: FxHashMap<ConstraintId, (u16, u16)>,
     source_order_cache: FxHashMap<SourceOrder, SourceOrderId>,
-    constraint_implication_cache: FxHashMap<(ConstraintId, ConstraintId), bool>,
     /// Only caches completed top-level results. Recursive results depend on active path
     /// assignments and must not use this cache. A BDD's satisfiability does not depend on the
     /// source order used to traverse it.
@@ -1067,7 +1066,6 @@ struct ConstraintSetStorage<'db> {
 
     single_sequent_cache: FxHashMap<ConstraintId, SequentMap<ConstraintId>>,
     pair_sequent_cache: FxHashMap<(ConstraintId, ConstraintId), SequentMap<ConstraintId>>,
-    constraint_set_subtype_cache: FxHashMap<(Type<'db>, Type<'db>), bool>,
 }
 
 impl<'db> ConstraintSetStorage<'db> {
@@ -1532,40 +1530,6 @@ impl<'db> ConstraintSetStorage<'db> {
         depth
     }
 
-    fn cached_constraint_implies(
-        &mut self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        ante: ConstraintId,
-        post: ConstraintId,
-    ) -> bool {
-        let key = (ante, post);
-        if let Some(result) = self.constraint_implication_cache.get(&key) {
-            return *result;
-        }
-
-        let result = ante.implies(db, env, self, post);
-        self.constraint_implication_cache.insert(key, result);
-        result
-    }
-
-    fn cached_is_constraint_set_subtype_of(
-        &mut self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        source: Type<'db>,
-        target: Type<'db>,
-    ) -> bool {
-        let key = (source, target);
-        if let Some(result) = self.constraint_set_subtype_cache.get(&key) {
-            return *result;
-        }
-
-        let result = source.is_constraint_set_subtype_of(db, env, target);
-        self.constraint_set_subtype_cache.insert(key, result);
-        result
-    }
-
     fn interior_node_data(&self, node: NodeId) -> InteriorNodeData {
         if let Some(compacted) = &self.compacted {
             let index = node.index();
@@ -1891,13 +1855,6 @@ fn wobble_index(index: u64) -> u64 {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
-enum IntersectionResult<'db> {
-    Simplified(OldConstraint<'db>),
-    CannotSimplify,
-    Disjoint,
-}
-
 /// The index of a bound typevar within a [`ConstraintSetStorage`].
 #[newtype_index]
 #[derive(Ord, PartialOrd, get_size2::GetSize)]
@@ -1934,14 +1891,6 @@ impl<'db> InterimConstraint<'db> {
         match self {
             InterimConstraint::Old(constraint) => constraint.into_new(db, env),
             InterimConstraint::New(constraint) => smallvec![constraint],
-        }
-    }
-
-    #[track_caller]
-    fn expect_old(self) -> OldConstraint<'db> {
-        match self {
-            InterimConstraint::Old(constraint) => constraint,
-            InterimConstraint::New(_) => panic!("old code path encountered new constraint"),
         }
     }
 
@@ -2149,10 +2098,6 @@ impl<'db> OldConstraint<'db> {
         iter::chain(self.stored_lower_bound(), self.stored_upper_bound())
     }
 
-    fn as_equality(self) -> Option<Type<'db>> {
-        self.bounds.as_equality()
-    }
-
     fn has_concrete_bounds(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
         self.bounds.is_concrete(db, env)
     }
@@ -2320,38 +2265,6 @@ impl<'db> ConstraintBound<'db> {
         self.map(|_| ty)
     }
 
-    /// Creates a bound produced by mathematically combining `lhs` and `rhs`.
-    ///
-    /// If one operand already equals the result, that operand alone establishes the combined
-    /// bound, so its provenance is retained. Otherwise, the result is validity only if both
-    /// operands are validity.
-    fn from_combination(combined: Type<'db>, lhs: Self, rhs: Self) -> Self {
-        match (combined == lhs.ty(), combined == rhs.ty()) {
-            (true, false) => lhs.with_type(combined),
-            (false, true) => rhs.with_type(combined),
-            _ => match (lhs, rhs) {
-                (Self::Validity(_), Self::Validity(_)) => Self::Validity(combined),
-                _ => Self::Evidence(combined),
-            },
-        }
-    }
-
-    /// Creates a bound derived by transitivity from two constraint bounds.
-    ///
-    /// Unlike a union or intersection on one typevar, neither premise is redundant merely because
-    /// the result has the same type as one of them. For example, deriving `int ≤ S` from
-    /// `int ≤ T` and `T ≤ S` requires both premises even though the resulting bound type is still
-    /// `int`.
-    ///
-    /// The result depends on both premises, so it is validity if both premises are validity and
-    /// evidence otherwise.
-    fn from_transitive_derivation(combined: Type<'db>, lhs: Self, rhs: Self) -> Self {
-        match (lhs, rhs) {
-            (Self::Validity(_), Self::Validity(_)) => Self::Validity(combined),
-            _ => Self::Evidence(combined),
-        }
-    }
-
     /// Applies the source range's provenance to an evidence bound derived by comparing that range.
     /// Bounds not produced by the comparison retain their existing provenance.
     ///
@@ -2392,12 +2305,6 @@ impl<'db> ConstraintBounds<'db> {
         }
     }
 
-    fn as_equality(self) -> Option<Type<'db>> {
-        let lower = self.lower?.ty();
-        let upper = self.upper?.ty();
-        (lower == upper).then_some(lower)
-    }
-
     fn is_concrete(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
         iter::chain(self.lower, self.upper).all(|bound| {
             let bound = bound.ty();
@@ -2428,6 +2335,7 @@ struct UpperBound<'db> {
 }
 
 impl<'db> UpperBound<'db> {
+    #[cfg(test)]
     fn unconstrained() -> Self {
         Self::default()
     }
@@ -2437,10 +2345,6 @@ impl<'db> UpperBound<'db> {
         let mut upper = Self::default();
         upper.evidence.insert(clause);
         upper
-    }
-
-    fn is_empty(&self) -> bool {
-        self.evidence.is_empty() && self.validity.is_empty()
     }
 
     fn iter_evidence(&self) -> impl Iterator<Item = Type<'db>> + Clone + '_ {
@@ -2525,17 +2429,6 @@ impl<'db> UpperBound<'db> {
     fn shrink_to_fit(&mut self) {
         self.evidence.shrink_to_fit();
         self.validity.shrink_to_fit();
-    }
-
-    /// Exact conversion to an ordinary [`Type`]. This may be expensive: if any stored clause is a
-    /// union, [`IntersectionType::from_elements`] converts this factored CNF representation into
-    /// ty's ordinary DNF representation by distributing intersections over unions.
-    fn materialize_exact(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
-        IntersectionType::from_elements(db, env, self.iter_clauses())
-    }
-
-    fn has_visible_union_clause(&self) -> bool {
-        self.iter_clauses().any(Type::is_union)
     }
 
     fn is_satisfied_by(
@@ -3023,125 +2916,6 @@ impl ConstraintId {
     /// order.
     fn ordering(self) -> impl Ord {
         std::cmp::Reverse(wobble_index(self.index() as u64))
-    }
-
-    /// Returns whether this constraint implies another — i.e., whether every type that
-    /// satisfies this constraint also satisfies `other`.
-    ///
-    /// This is used to avoid adding redundant implications to a sequent map.
-    fn implies<'db>(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        storage: &mut ConstraintSetStorage<'db>,
-        other: Self,
-    ) -> bool {
-        let self_constraint = storage.constraint_data(self).expect_old();
-        let other_constraint = storage.constraint_data(other).expect_old();
-        if !self_constraint
-            .typevar
-            .is_same_typevar_as(db, other_constraint.typevar)
-        {
-            return false;
-        }
-        let self_lower = self_constraint.lower_bound(db).ty();
-        let self_upper = self_constraint.upper_bound(db).ty();
-        let other_lower = other_constraint.lower_bound(db).ty();
-        let other_upper = other_constraint.upper_bound(db).ty();
-        other_lower.is_constraint_set_assignable_to(db, env, self_lower)
-            && self_upper.is_constraint_set_assignable_to(db, env, other_upper)
-    }
-
-    /// Returns the intersection of two range constraints, or `None` if the intersection is empty.
-    fn intersect<'db>(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        storage: &mut ConstraintSetStorage<'db>,
-        other: Self,
-    ) -> IntersectionResult<'db> {
-        let self_constraint = storage.constraint_data(self).expect_old();
-        let other_constraint = storage.constraint_data(other).expect_old();
-
-        // A typevar cannot be exactly equal to two different statically eligible types under any
-        // specialization. Gradual bounds cannot prove this incompatibility because the resulting
-        // pair-impossibility sequent participates in transitive closure.
-        if let Some(left) = self_constraint.as_equality()
-            && let Some(right) = other_constraint.as_equality()
-            && left.is_static_sequent_eligible(db, env)
-            && right.is_static_sequent_eligible(db, env)
-            && !left.can_be_constraint_set_equivalent_to(db, env, right)
-        {
-            return IntersectionResult::Disjoint;
-        }
-
-        // (s₁ ≤ α ≤ t₁) ∧ (s₂ ≤ α ≤ t₂) = (s₁ ∪ s₂) ≤ α ≤ (t₁ ∩ t₂))
-        let lower = match (
-            self_constraint.stored_lower_bound(),
-            other_constraint.stored_lower_bound(),
-        ) {
-            (Some(left), Some(right)) => {
-                let combined = UnionType::from_two_elements(db, env, left.ty(), right.ty());
-                Some(ConstraintBound::from_combination(combined, left, right))
-            }
-            (Some(lower), None) | (None, Some(lower)) => Some(lower),
-            (None, None) => None,
-        };
-        let mut merged_upper = UpperBound::unconstrained();
-        if let Some(upper) = self_constraint.stored_upper_bound() {
-            let (provenance, bound) = upper.into_parts();
-            merged_upper.add_clause(provenance, bound);
-        }
-        if let Some(upper) = other_constraint.stored_upper_bound() {
-            let (provenance, bound) = upper.into_parts();
-            merged_upper.add_clause(provenance, bound);
-        }
-        let effective_lower = lower.map_or(Type::Never, ConstraintBound::ty);
-
-        // If `lower ≰ upper` for every possible assignment of typevars, then the intersection is
-        // empty, since there is no type that is both greater than `lower`, and less than `upper`.
-        // We use an existential check here ("is there *some* assignment where `lower ≤ upper`?")
-        // rather than a universal check ("is `lower ≤ upper` for *all* assignments?"), because the
-        // bounds may mention typevars — e.g., `Sequence[int] ≤ A ≤ Sequence[T]` is satisfiable
-        // when `int ≤ T`, even though it's not universally true for all `T`.
-        let (when, source_order) =
-            merged_upper.when_satisfied_by(db, env, storage, effective_lower);
-        if when.is_never_satisfied(db, env, storage, source_order) {
-            return IntersectionResult::Disjoint;
-        }
-
-        // We do not create lower bounds that are unions, or upper bounds that are factored
-        // intersections, since those can be broken apart into BDDs over simpler constraints. If the
-        // merged upper contains a union clause, keep any useful disjointness result from above but
-        // do not try to derive a factored upper-bound constraint.
-        if lower.is_some_and(|bound| bound.ty().is_union())
-            || merged_upper.has_visible_union_clause()
-        {
-            return IntersectionResult::CannotSimplify;
-        }
-
-        let upper = if merged_upper.is_empty() {
-            None
-        } else {
-            let effective_upper = merged_upper.materialize_exact(db, env);
-            if effective_upper.is_nontrivial_intersection(db) {
-                return IntersectionResult::CannotSimplify;
-            }
-            match (
-                self_constraint.stored_upper_bound(),
-                other_constraint.stored_upper_bound(),
-            ) {
-                (Some(left), Some(right)) => Some(ConstraintBound::from_combination(
-                    effective_upper,
-                    left,
-                    right,
-                )),
-                (Some(upper), None) | (None, Some(upper)) => Some(upper.with_type(effective_upper)),
-                (None, None) => None,
-            }
-        };
-
-        IntersectionResult::Simplified(OldConstraint::new(self_constraint.typevar, lower, upper))
     }
 
     fn display<'db, 'a>(
@@ -6291,13 +6065,11 @@ mod tests {
     fn upper_bound_collapses_never() {
         let db = setup_db();
         let db = &db;
-        let env = db.program_environment();
         let int = known_instance(db, KnownClass::Int);
 
         let mut upper = UpperBound::from_clause(int);
         upper.add_clause(ConstraintProvenance::Evidence, Type::Never);
         assert_eq!(upper.evidence, FxOrderSet::from_iter([Type::Never]));
-        assert_eq!(upper.materialize_exact(db, &env), Type::Never);
 
         upper.add_clause(ConstraintProvenance::Evidence, int);
         assert_eq!(upper.evidence, FxOrderSet::from_iter([Type::Never]));
@@ -6366,8 +6138,6 @@ mod tests {
             for clause in clauses {
                 upper.add_clause(ConstraintProvenance::Evidence, clause);
             }
-
-            assert_eq!(upper.materialize_exact(db, &env), int);
             assert_eq!(upper.as_single_bound(db, &env), None);
         }
     }
@@ -6381,12 +6151,6 @@ mod tests {
         let u = Type::TypeVar(create_typevar(db, "U"));
         let mut upper = UpperBound::from_clause(u);
         upper.add_clause(ConstraintProvenance::Evidence, int);
-
-        assert!(
-            upper
-                .materialize_exact(db, &env)
-                .is_nontrivial_intersection(db)
-        );
         assert_eq!(upper.as_single_bound(db, &env), None);
     }
 
@@ -6910,46 +6674,6 @@ class E: ...
             PathBoundSolution::BudgetExceeded { fallback: None }
         );
         Ok(())
-    }
-
-    #[test]
-    fn constraint_intersection_detects_disjoint_union_upper_bounds() {
-        let db = setup_db();
-        let db = &db;
-        let env = db.program_environment();
-        let t = create_typevar(db, "T");
-        let builder = ConstraintSetBuilder::new();
-        let int = known_instance(db, KnownClass::Int);
-        let str = known_instance(db, KnownClass::Str);
-        let bytes = known_instance(db, KnownClass::Bytes);
-        let bytearray = known_instance(db, KnownClass::Bytearray);
-        let int_or_str = UnionType::from_two_elements(db, &env, int, str);
-        let bytes_or_bytearray = UnionType::from_two_elements(db, &env, bytes, bytearray);
-        let mut storage = builder.storage.borrow_mut();
-        let left = ConstraintId::new_with_bounds(
-            db,
-            &env,
-            &mut storage,
-            t,
-            Some(ConstraintBound::Evidence(int)),
-            Some(ConstraintBound::Evidence(int_or_str)),
-        );
-        let right = ConstraintId::new_with_bounds(
-            db,
-            &env,
-            &mut storage,
-            t,
-            None,
-            Some(ConstraintBound::Evidence(bytes_or_bytearray)),
-        );
-
-        // Check satisfiability against each upper clause before punting on the union-bearing
-        // merged upper bound. The old size heuristic returned `CannotSimplify` here before
-        // discovering that `int` cannot satisfy the second upper clause.
-        assert_matches!(
-            left.intersect(db, &env, &mut storage, right),
-            IntersectionResult::Disjoint
-        );
     }
 
     #[test]
