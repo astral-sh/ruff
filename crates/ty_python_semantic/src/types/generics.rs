@@ -1254,7 +1254,7 @@ impl<'db> Specialization<'db> {
     pub(super) fn with_typevar_bounds(self, db: &'db dyn Db) -> Self {
         let env = ProgramEnvironment::from_program(self.generic_context(db).program(db));
         let types = self.map_types(db, |_, typevar, ty| {
-            if ty.is_fully_static(db, &env) {
+            if !any_over_type_expanding_aliases(db, &env, ty, |ty| ty.is_dynamic()) {
                 return ty;
             }
             let Some(upper_bound) = typevar.top_materialized_upper_bound(db) else {
