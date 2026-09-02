@@ -1,3 +1,4 @@
+use crate::ProgramEnvironment;
 use bitflags::bitflags;
 use compact_str::CompactString;
 use ruff_python_ast::name::Name;
@@ -247,15 +248,19 @@ impl<'db> LiteralValueType<'db> {
         matches!(self.kind(), LiteralValueTypeKind::Bytes(..))
     }
 
-    pub(crate) fn fallback_instance(self, db: &'db dyn Db) -> Type<'db> {
+    pub(crate) fn fallback_instance(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Type<'db> {
         match self.kind() {
             LiteralValueTypeKind::String(_) | LiteralValueTypeKind::LiteralString => {
-                KnownClass::Str.to_instance(db)
+                KnownClass::Str.to_instance(db, env)
             }
-            LiteralValueTypeKind::Bool(_) => KnownClass::Bool.to_instance(db),
-            LiteralValueTypeKind::Int(_) => KnownClass::Int.to_instance(db),
-            LiteralValueTypeKind::Bytes(_) => KnownClass::Bytes.to_instance(db),
-            LiteralValueTypeKind::Enum(literal) => literal.enum_class_instance(db),
+            LiteralValueTypeKind::Bool(_) => KnownClass::Bool.to_instance(db, env),
+            LiteralValueTypeKind::Int(_) => KnownClass::Int.to_instance(db, env),
+            LiteralValueTypeKind::Bytes(_) => KnownClass::Bytes.to_instance(db, env),
+            LiteralValueTypeKind::Enum(literal) => literal.enum_class_instance(db, env),
         }
     }
 }
@@ -402,8 +407,12 @@ impl<'db> EnumLiteralType<'db> {
         self.enum_class_literal(db).class_literal(db)
     }
 
-    pub(crate) fn enum_class_instance(self, db: &'db dyn Db) -> Type<'db> {
-        self.enum_class(db).to_non_generic_instance(db)
+    pub(crate) fn enum_class_instance(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Type<'db> {
+        self.enum_class(db).to_non_generic_instance(db, env)
     }
 
     pub(crate) fn definition(self, db: &'db dyn Db) -> Option<Definition<'db>> {

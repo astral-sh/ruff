@@ -44,8 +44,8 @@ from builtins import list as _list  # "list" conflicts with method name
 from collections.abc import Callable, Container, Mapping, MutableMapping
 from reprlib import Repr
 from types import MethodType, ModuleType, TracebackType
-from typing import IO, Any, AnyStr, Final, NoReturn, Protocol, TypeGuard, TypeVar, overload, type_check_only
-from typing_extensions import deprecated
+from typing import IO, Any, AnyStr, Final, Protocol, TypeGuard, TypeVar, overload, type_check_only
+from typing_extensions import Never, deprecated
 
 __all__ = ["help"]
 
@@ -91,7 +91,7 @@ def visiblename(name: str, all: Container[str] | None = None, obj: object = None
 def classify_class_attrs(object: object) -> list[tuple[str, str, type, str]]:
     """Wrap inspect.classify_class_attrs, with fixup for data descriptors and bound methods."""
 
-@deprecated("Deprecated since Python 3.13.")
+@deprecated("Deprecated.")
 def ispackage(path: StrPath) -> bool:  # undocumented
     """Guess whether a path refers to a package directory."""
 
@@ -138,7 +138,7 @@ class Doc:
     def document(self, object: object, name: str | None = None, *args: Any) -> str:
         """Generate documentation for an object."""
 
-    def fail(self, object: object, name: str | None = None, *args: Any) -> NoReturn:
+    def fail(self, object: object, name: str | None = None, *args: Any) -> Never:
         """Raise an exception for unimplemented types."""
 
     @abstractmethod
@@ -189,8 +189,8 @@ class HTMLDoc(Doc):
     """Formatter class for HTML documentation."""
 
     _repr_instance: HTMLRepr
-    repr = _repr_instance.repr
-    escape = _repr_instance.escape
+    repr = _repr_instance.repr  # pyrefly: ignore [unknown-name]
+    escape = _repr_instance.escape  # pyrefly: ignore [unknown-name]
     def page(self, title: str, contents: str) -> str:
         """Format an HTML page."""
 
@@ -353,7 +353,7 @@ class TextDoc(Doc):
     """Formatter class for text documentation."""
 
     _repr_instance: TextRepr
-    repr = _repr_instance.repr
+    repr = _repr_instance.repr  # pyrefly: ignore [unknown-name]
     def bold(self, text: str) -> str:
         """Format a string in bold by overstriking."""
 

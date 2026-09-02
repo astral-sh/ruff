@@ -190,6 +190,11 @@ pub(crate) const fn is_fix_os_makedirs_enabled(settings: &LinterSettings) -> boo
     settings.preview.is_enabled()
 }
 
+// https://github.com/astral-sh/ruff/pull/26460
+pub(crate) const fn is_fix_os_stat_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
 // https://github.com/astral-sh/ruff/pull/20009
 pub(crate) const fn is_fix_os_symlink_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
@@ -314,6 +319,11 @@ pub(crate) const fn is_e402_fix_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }
 
+// https://github.com/astral-sh/ruff/pull/27993
+pub(crate) const fn is_pt020_fix_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
 // https://github.com/astral-sh/ruff/pull/23260
 pub(crate) const fn is_up006_future_annotations_fix_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
@@ -349,5 +359,10 @@ pub const fn is_warn_on_unknown_selectors_enabled(preview: PreviewMode) -> bool 
 
 // https://github.com/astral-sh/ruff/pull/27313
 pub(crate) const fn is_pragma_excluded_from_import_width_enabled(preview: PreviewMode) -> bool {
+    preview.is_enabled()
+}
+
+// https://github.com/astral-sh/ruff/pull/27666
+pub(crate) const fn is_rule_categories_enabled(preview: PreviewMode) -> bool {
     preview.is_enabled()
 }

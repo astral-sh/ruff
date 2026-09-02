@@ -171,13 +171,13 @@ def silence4[T: type[BaseException] | tuple[type[BaseException], ...]](
 
 ```py
 try:
-    pass
+    raise Exception
 # error: [invalid-exception-caught]
 except 3 as e:
     reveal_type(e)  # revealed: Unknown
 
 try:
-    pass
+    raise Exception
 # error: [invalid-exception-caught]
 except (ValueError, OSError, "foo", b"bar") as e:
     reveal_type(e)  # revealed: ValueError | OSError | Unknown

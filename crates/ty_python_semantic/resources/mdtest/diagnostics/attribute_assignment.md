@@ -210,6 +210,44 @@ error[unresolved-attribute]: Unresolved attribute `non_existent` on type `C`
   | ^^^^^^^^^^^^^^^^^^^^^
 ```
 
+## Attributes declared without instance storage
+
+An instance attribute annotation does not create storage. Assigning to an attribute declared on a
+slotted class explains that the class has neither a matching slot nor an instance dictionary.
+
+```py
+class Slotted:
+    value: int
+    __slots__ = ()
+
+Slotted().value = 1  # snapshot: missing-slot
+```
+
+```snapshot
+error[missing-slot]: Cannot assign to attribute `value`: `Slotted` has no slot or instance dictionary
+ --> src/mdtest_snippet.py:5:1
+  |
+5 | Slotted().value = 1  # snapshot: missing-slot
+  | ^^^^^^^^^^^^^^^
+info: Attribute `value` is declared but is not included in `__slots__`
+```
+
+A genuinely undeclared attribute keeps the ordinary unresolved-attribute diagnostic.
+
+```py
+Slotted().missing = 1  # error: [unresolved-attribute] "Unresolved attribute `missing` on type `Slotted`"
+```
+
+An inherited annotation also does not provide storage for a slotted subclass.
+
+```py
+class SlottedChild(Slotted):
+    __slots__ = ()
+
+# error: [missing-slot] "Cannot assign to attribute `value`: `SlottedChild` has no slot or instance dictionary"
+SlottedChild().value = 1
+```
+
 ## Possibly-missing attributes
 
 When trying to set an attribute that is not defined in all branches, we emit errors:

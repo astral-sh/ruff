@@ -5,6 +5,7 @@ use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix;
 use crate::{AlwaysFixableViolation, Fix};
 
@@ -29,7 +30,7 @@ use crate::{AlwaysFixableViolation, Fix};
 ///     print(5)
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.257")]
+#[violation_metadata(stable_since = "v0.0.257", category = Category::Complexity)]
 pub(crate) struct UselessReturn;
 
 impl AlwaysFixableViolation for UselessReturn {

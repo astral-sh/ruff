@@ -1,21 +1,25 @@
+pub(crate) mod definitions;
+
+use crate::ProgramEnvironment;
 use itertools::Either;
-use ruff_db::files::File;
 use ruff_index::IndexSlice;
 use ruff_python_ast::PythonVersion;
+use rustc_hash::FxHashMap;
 use ty_module_resolver::{
     KnownModule, Module, ModuleName, file_to_module, resolve_module_confident,
 };
 
 use crate::dunder_all::dunder_all_names;
 use crate::reachability::{
-    ReachabilityEvaluationCache, evaluate_reachability, evaluate_reachability_with_cache,
+    NarrowingProjector, ReachabilityEvaluationCache, evaluate_reachability,
+    evaluate_reachability_with_cache,
 };
-use crate::types::narrow::NarrowingEvaluatorExtension;
 use crate::types::{
     DynamicType, KnownClass, MemberLookupPolicy, Type, TypeAndQualifiers, TypeQualifiers,
     UnionBuilder, UnionType, binding_type, inferred_declaration, is_discarded_dict_key_assignment,
+    may_exist_at_runtime,
 };
-use crate::{Db, FxIndexSet, FxOrderSet, Program};
+use crate::{Db, FxIndexSet, FxOrderSet};
 use ty_python_core::definition::{Definition, DefinitionKind, DefinitionState};
 use ty_python_core::narrowing_constraints::ScopedNarrowingConstraint;
 use ty_python_core::place::ScopedPlaceId;
@@ -26,8 +30,8 @@ use ty_python_core::reachability_constraints::{
 use ty_python_core::scope::ScopeId;
 use ty_python_core::{
     BindingWithConstraints, BindingWithConstraintsIterator, BoundnessAnalysis,
-    DeclarationWithConstraint, DeclarationsIterator, Truthiness, global_scope, place_table,
-    use_def_map,
+    DeclarationWithConstraint, DeclarationsIterator, ProgramFile, Truthiness, global_scope,
+    place_table, use_def_map,
 };
 
 pub(crate) use implicit_globals::{
@@ -88,16 +92,23 @@ pub(crate) enum PublicTypePolicy {
 
 impl PublicTypePolicy {
     /// Apply the public-type policy to the raw type.
-    fn apply_if_needed<'db>(self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
+    fn apply_if_needed<'db>(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+    ) -> Type<'db> {
         match self {
             Self::Raw => ty,
-            Self::Promote => ty.promote(db).promote_singletons(db),
+            Self::Promote => ty.promote(db, env).promote_singletons(db, env),
         }
     }
 }
 
 /// The source definition provenance for a place.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+#[derive(
+    Debug, Clone, Copy, Default, Hash, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue,
+)]
 pub(crate) enum Provenance<'db> {
     /// No source definition is known.
     #[default]
@@ -136,7 +147,7 @@ impl<'db> Provenance<'db> {
 }
 
 /// A defined place with its raw type, origin, definedness, public-type policy, and provenance.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct DefinedPlace<'db> {
     pub(crate) ty: Type<'db>,
     pub(crate) origin: TypeOrigin,
@@ -215,7 +226,9 @@ impl<'db> DefinedPlace<'db> {
 /// bound_or_declared:   Place::Defined(DefinedPlace { ty: Literal[1], origin: TypeOrigin::Inferred, definedness: Definedness::PossiblyUndefined, .. }),
 /// non_existent:        Place::Undefined,
 /// ```
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+#[derive(
+    Debug, Clone, Copy, Default, Hash, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue,
+)]
 pub(crate) enum Place<'db> {
     Defined(DefinedPlace<'db>),
     #[default]
@@ -297,7 +310,7 @@ impl<'db> Place<'db> {
     }
 
     #[must_use]
-    pub(crate) fn map_type(self, f: impl FnOnce(Type<'db>) -> Type<'db>) -> Place<'db> {
+    fn map_type(self, f: impl FnOnce(Type<'db>) -> Type<'db>) -> Place<'db> {
         match self {
             Place::Defined(defined) => Place::Defined(DefinedPlace {
                 ty: f(defined.ty),
@@ -329,15 +342,21 @@ impl<'db> Place<'db> {
     /// Try to call `__get__(None, owner)` on the type of this place (not on the meta type).
     /// If it succeeds, return the `__get__` return type. Otherwise, returns the original place.
     /// This is used to resolve (potential) descriptor attributes.
-    pub(crate) fn try_call_dunder_get(self, db: &'db dyn Db, owner: Type<'db>) -> Place<'db> {
+    pub(crate) fn try_call_dunder_get(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        owner: Type<'db>,
+    ) -> Place<'db> {
         match self {
             Place::Defined(
                 place @ DefinedPlace {
                     ty: Type::Union(union),
                     ..
                 },
-            ) => union.map_with_boundness(db, |elem| {
-                Place::Defined(DefinedPlace { ty: *elem, ..place }).try_call_dunder_get(db, owner)
+            ) => union.map_with_boundness(db, env, |elem| {
+                Place::Defined(DefinedPlace { ty: *elem, ..place })
+                    .try_call_dunder_get(db, env, owner)
             }),
 
             Place::Defined(
@@ -345,16 +364,19 @@ impl<'db> Place<'db> {
                     ty: Type::Intersection(intersection),
                     ..
                 },
-            ) => intersection.map_with_boundness(db, |elem| {
-                Place::Defined(DefinedPlace { ty: *elem, ..place }).try_call_dunder_get(db, owner)
+            ) => intersection.map_with_boundness(db, env, |elem| {
+                Place::Defined(DefinedPlace { ty: *elem, ..place })
+                    .try_call_dunder_get(db, env, owner)
             }),
 
             Place::Defined(defined) => {
-                if let Some((dunder_get_return_ty, _)) =
-                    defined.ty.try_call_dunder_get(db, None, owner)
-                {
+                let result = defined
+                    .ty
+                    .try_call_dunder_get(db, env, None, owner)
+                    .unwrap_or_else(|error| Some(error.fallback()));
+                if let Some(result) = result {
                     Place::Defined(DefinedPlace {
-                        ty: dunder_get_return_ty,
+                        ty: result.return_type,
                         provenance: Provenance::Unknown,
                         ..defined
                     })
@@ -411,14 +433,15 @@ impl<'db> LookupError<'db> {
     pub(crate) fn or_fall_back_to(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         fallback: PlaceAndQualifiers<'db>,
     ) -> LookupResult<'db> {
-        let fallback = fallback.into_lookup_result(db);
+        let fallback = fallback.into_lookup_result(db, env);
         match (&self, &fallback) {
             (LookupError::Undefined(_), _) => fallback,
             (LookupError::PossiblyUndefined { .. }, Err(LookupError::Undefined(_))) => Err(self),
             (LookupError::PossiblyUndefined(ty), Ok(ty2)) => Ok(TypeAndQualifiers::new(
-                UnionType::from_two_elements(db, ty.inner_type(), ty2.inner_type()),
+                UnionType::from_two_elements(db, env, ty.inner_type(), ty2.inner_type()),
                 ty.origin().merge(ty2.origin()),
                 ty.qualifiers().union(ty2.qualifiers()),
             )
@@ -426,7 +449,7 @@ impl<'db> LookupError<'db> {
             (LookupError::PossiblyUndefined(ty), Err(LookupError::PossiblyUndefined(ty2))) => {
                 Err(LookupError::PossiblyUndefined(
                     TypeAndQualifiers::new(
-                        UnionType::from_two_elements(db, ty.inner_type(), ty2.inner_type()),
+                        UnionType::from_two_elements(db, env, ty.inner_type(), ty2.inner_type()),
                         ty.origin().merge(ty2.origin()),
                         ty.qualifiers().union(ty2.qualifiers()),
                     )
@@ -472,7 +495,7 @@ pub(crate) fn symbol<'db>(
 /// Use [`imported_symbol`] to perform the lookup as seen from outside the file (e.g. via imports).
 pub(crate) fn explicit_global_symbol<'db>(
     db: &'db dyn Db,
-    file: File,
+    file: ProgramFile<'db>,
     name: &str,
 ) -> PlaceAndQualifiers<'db> {
     symbol_impl(
@@ -494,11 +517,13 @@ pub(crate) fn explicit_global_symbol<'db>(
 #[allow(unused)]
 pub(crate) fn global_symbol<'db>(
     db: &'db dyn Db,
-    file: File,
+    file: ProgramFile<'db>,
     name: &str,
 ) -> PlaceAndQualifiers<'db> {
-    explicit_global_symbol(db, file, name)
-        .or_fall_back_to(db, || module_type_implicit_global_symbol(db, file, name))
+    let env = ProgramEnvironment::from_file(file);
+    explicit_global_symbol(db, file, name).or_fall_back_to(db, &env, || {
+        module_type_implicit_global_symbol(db, file, name)
+    })
 }
 
 /// Infers the public type of an imported symbol.
@@ -509,10 +534,15 @@ pub(crate) fn global_symbol<'db>(
 /// `None` should be passed for the `file` parameter if looking up a symbol on a namespace package.
 pub(crate) fn imported_symbol<'db>(
     db: &'db dyn Db,
-    file: Option<File>,
+    env: &ProgramEnvironment<'db>,
+    file: Option<ProgramFile<'db>>,
     name: &str,
     requires_explicit_reexport: Option<RequiresExplicitReExport>,
 ) -> PlaceAndQualifiers<'db> {
+    if let Some(file) = file {
+        debug_assert_eq!(file.program(db), env.program(db));
+    }
+
     // If it's not found in the global scope, check if it's present as an instance on
     // `types.ModuleType` or `builtins.object`.
     //
@@ -530,7 +560,7 @@ pub(crate) fn imported_symbol<'db>(
     // module we're dealing with.
     file.map(|file| {
         let requires_explicit_reexport = requires_explicit_reexport.unwrap_or_else(|| {
-            if file.is_stub(db) {
+            if file.file(db).is_stub(db) {
                 RequiresExplicitReExport::Yes
             } else {
                 RequiresExplicitReExport::No
@@ -546,7 +576,7 @@ pub(crate) fn imported_symbol<'db>(
         )
     })
     .unwrap_or_default()
-    .or_fall_back_to(db, || {
+    .or_fall_back_to(db, env, || {
         match name {
             "__file__" => {
                 // We special-case `__file__` here because we know that for a successfully imported
@@ -561,16 +591,16 @@ pub(crate) fn imported_symbol<'db>(
                 // do not attempt to detect this; we just infer `str` still. This matches the
                 // behaviour of other major type checkers.
                 if file.is_some() {
-                    Place::bound(KnownClass::Str.to_instance(db)).into()
+                    Place::bound(KnownClass::Str.to_instance(db, env)).into()
                 } else {
-                    Place::bound(Type::none(db)).into()
+                    Place::bound(Type::none(db, env)).into()
                 }
             }
             "__getattr__" => Place::Undefined.into(),
             "__builtins__" => Place::bound(Type::any()).into(),
             _ => KnownClass::ModuleType
-                .to_instance(db)
-                .member_lookup_with_policy(db, name, MemberLookupPolicy::NO_GETATTR_LOOKUP),
+                .to_instance(db, env)
+                .member_lookup_with_policy(db, env, name, MemberLookupPolicy::NO_GETATTR_LOOKUP),
         }
     })
 }
@@ -582,31 +612,107 @@ pub(crate) fn imported_symbol<'db>(
 /// Note that this function is only intended for use in the context of the builtins *namespace*
 /// and should not be used when a symbol is being explicitly imported from the `builtins` module
 /// (e.g. `from builtins import int`).
-pub(crate) fn builtins_symbol<'db>(db: &'db dyn Db, symbol: &str) -> PlaceAndQualifiers<'db> {
-    let resolver = |module: Module<'_>| {
-        let file = module.file(db)?;
+pub(crate) fn builtins_symbol<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    symbol: &str,
+) -> PlaceAndQualifiers<'db> {
+    builtins_symbol_impl(db, env, symbol, BuiltinVisibility::All)
+        .map(|(_, symbol)| symbol)
+        .unwrap_or_default()
+}
+
+/// Looks up `symbol` for implicit builtin fallback.
+///
+/// Private type-checking-only definitions are implementation details, but private runtime
+/// definitions from either the standard or project-level builtins remain available.
+///
+/// ```python
+/// # builtins.pyi
+/// _T = TypeVar("_T")  # Not available as an implicit builtin.
+///
+/// # __builtins__.pyi
+/// _custom: int  # Available as an implicit builtin.
+/// ```
+pub(crate) fn implicit_builtins_symbol<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    symbol: &str,
+) -> PlaceAndQualifiers<'db> {
+    builtins_symbol_impl(db, env, symbol, BuiltinVisibility::RuntimeOnly)
+        .map(|(_, symbol)| symbol)
+        .unwrap_or_default()
+}
+
+/// Returns the module scope that supplies `symbol` through implicit builtin fallback.
+///
+/// Uses the same visibility rules as [`implicit_builtins_symbol`] so IDE definition lookup cannot
+/// resolve a private typing-only helper that type inference considers undefined.
+pub(crate) fn implicit_builtins_symbol_scope<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    symbol: &str,
+) -> Option<ScopeId<'db>> {
+    builtins_symbol_impl(db, env, symbol, BuiltinVisibility::RuntimeOnly).map(|(scope, _)| scope)
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum BuiltinVisibility {
+    All,
+    RuntimeOnly,
+}
+
+/// Resolves project-level builtins before standard builtins and optionally hides typing-only names.
+///
+/// Returns the supplying module's scope together with the symbol so inference and IDE lookups can
+/// share the same resolution and visibility policy.
+fn builtins_symbol_impl<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    symbol: &str,
+    visibility: BuiltinVisibility,
+) -> Option<(ScopeId<'db>, PlaceAndQualifiers<'db>)> {
+    let program = env.program(db);
+    let resolver_environment = program.resolver_environment(db);
+    let resolver = |module: Module<'db>| {
+        let file = ProgramFile::new(db, module.file(db)?, program);
+        let scope = global_scope(db, file);
         let found_symbol = symbol_impl(
             db,
-            global_scope(db, file),
+            scope,
             symbol,
             RequiresExplicitReExport::Yes,
             ConsideredDefinitions::EndOfScope,
         )
-        .or_fall_back_to(db, || {
+        .or_fall_back_to(db, env, || {
             // We're looking up in the builtins namespace and not the module, so we should
             // do the normal lookup in `types.ModuleType` and not the special one as in
             // `imported_symbol`.
             module_type_implicit_global_symbol(db, file, symbol)
         });
-        // If this symbol is not present in project-level builtins, search in the default ones.
-        found_symbol
-            .ignore_possibly_undefined()
-            .map(|_| found_symbol)
+        found_symbol.ignore_possibly_undefined()?;
+
+        if matches!(visibility, BuiltinVisibility::RuntimeOnly)
+            && let Place::Defined(defined) = found_symbol.place
+            && let Some(definition) = defined.provenance.definition()
+            && !may_exist_at_runtime(db, definition)
+        {
+            return None;
+        }
+
+        Some((scope, found_symbol))
     };
-    resolve_module_confident(db, &ModuleName::new_static("__builtins__").unwrap())
-        .and_then(&resolver)
-        .or_else(|| resolve_module_confident(db, &KnownModule::Builtins.name()).and_then(resolver))
-        .unwrap_or_default()
+    // If this symbol is not present in project-level builtins, search in the default ones.
+    resolve_module_confident(
+        db,
+        resolver_environment,
+        &ModuleName::new_static("__builtins__").unwrap(),
+    )
+    .and_then(&resolver)
+    .or_else(|| {
+        resolve_module_confident(db, resolver_environment, &KnownModule::Builtins.name())
+            .and_then(resolver)
+    })
 }
 
 /// Lookup the type of `symbol` in a given known module.
@@ -614,13 +720,14 @@ pub(crate) fn builtins_symbol<'db>(db: &'db dyn Db, symbol: &str) -> PlaceAndQua
 /// Returns `Place::Undefined` if the given known module cannot be resolved for some reason.
 pub(crate) fn known_module_symbol<'db>(
     db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
     known_module: KnownModule,
     symbol: &str,
 ) -> PlaceAndQualifiers<'db> {
-    resolve_module_confident(db, &known_module.name())
+    resolve_module_confident(db, env.resolver_environment(db), &known_module.name())
         .and_then(|module| {
-            let file = module.file(db)?;
-            Some(imported_symbol(db, Some(file), symbol, None))
+            let file = ProgramFile::new(db, module.file(db)?, env.program(db));
+            Some(imported_symbol(db, env, Some(file), symbol, None))
         })
         .unwrap_or_default()
 }
@@ -630,8 +737,12 @@ pub(crate) fn known_module_symbol<'db>(
 /// Returns `Place::Undefined` if the `typing` module isn't available for some reason.
 #[inline]
 #[cfg(test)]
-pub(crate) fn typing_symbol<'db>(db: &'db dyn Db, symbol: &str) -> PlaceAndQualifiers<'db> {
-    known_module_symbol(db, KnownModule::Typing, symbol)
+pub(crate) fn typing_symbol<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    symbol: &str,
+) -> PlaceAndQualifiers<'db> {
+    known_module_symbol(db, env, KnownModule::Typing, symbol)
 }
 
 /// Lookup the type of `symbol` in the `typing_extensions` module namespace.
@@ -640,24 +751,36 @@ pub(crate) fn typing_symbol<'db>(db: &'db dyn Db, symbol: &str) -> PlaceAndQuali
 #[inline]
 pub(crate) fn typing_extensions_symbol<'db>(
     db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
     symbol: &str,
 ) -> PlaceAndQualifiers<'db> {
-    known_module_symbol(db, KnownModule::TypingExtensions, symbol)
+    known_module_symbol(db, env, KnownModule::TypingExtensions, symbol)
 }
 
 /// Get the `builtins` module scope.
 ///
 /// Can return `None` if a custom typeshed is used that is missing `builtins.pyi`.
-pub(crate) fn builtins_module_scope(db: &dyn Db) -> Option<ScopeId<'_>> {
-    core_module_scope(db, KnownModule::Builtins)
+pub(crate) fn builtins_module_scope<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+) -> Option<ScopeId<'db>> {
+    core_module_scope(db, env, KnownModule::Builtins)
 }
 
 /// Get the scope of a core stdlib module.
 ///
 /// Can return `None` if a custom typeshed is used that is missing the core module in question.
-fn core_module_scope(db: &dyn Db, core_module: KnownModule) -> Option<ScopeId<'_>> {
-    let module = resolve_module_confident(db, &core_module.name())?;
-    Some(global_scope(db, module.file(db)?))
+fn core_module_scope<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    core_module: KnownModule,
+) -> Option<ScopeId<'db>> {
+    let program = env.program(db);
+    let module = resolve_module_confident(db, env.resolver_environment(db), &core_module.name())?;
+    Some(global_scope(
+        db,
+        ProgramFile::new(db, module.file(db)?, program),
+    ))
 }
 
 /// Infer the combined type from an iterator of bindings, and return it
@@ -666,10 +789,12 @@ fn core_module_scope(db: &dyn Db, core_module: KnownModule) -> Option<ScopeId<'_
 /// The type will be a union if there are multiple bindings with different types.
 pub(super) fn place_from_bindings<'db>(
     db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
     bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
 ) -> PlaceWithDefinition<'db> {
     place_from_bindings_impl(
         db,
+        env,
         bindings_with_constraints,
         RequiresExplicitReExport::No,
         None,
@@ -678,11 +803,13 @@ pub(super) fn place_from_bindings<'db>(
 
 pub(super) fn place_from_bindings_with_reachability_cache<'db>(
     db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
     bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
     reachability_cache: &ReachabilityEvaluationCache<'db>,
 ) -> PlaceWithDefinition<'db> {
     place_from_bindings_impl(
         db,
+        env,
         bindings_with_constraints,
         RequiresExplicitReExport::No,
         Some(reachability_cache),
@@ -699,18 +826,21 @@ pub(super) fn place_from_bindings_with_reachability_cache<'db>(
 /// [`TypeQualifiers`] that have been specified on the declaration(s).
 pub(crate) fn place_from_declarations<'db>(
     db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
     declarations: DeclarationsIterator<'_, 'db>,
 ) -> PlaceFromDeclarationsResult<'db> {
-    place_from_declarations_impl(db, declarations, RequiresExplicitReExport::No, None)
+    place_from_declarations_impl(db, env, declarations, RequiresExplicitReExport::No, None)
 }
 
 pub(crate) fn place_from_declarations_with_reachability_cache<'db>(
     db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
     declarations: DeclarationsIterator<'_, 'db>,
     reachability_cache: &ReachabilityEvaluationCache<'db>,
 ) -> PlaceFromDeclarationsResult<'db> {
     place_from_declarations_impl(
         db,
+        env,
         declarations,
         RequiresExplicitReExport::No,
         Some(reachability_cache),
@@ -773,7 +903,9 @@ impl<'db> PlaceFromDeclarationsResult<'db> {
 /// that this comes with a [`CLASS_VAR`] type qualifier.
 ///
 /// [`CLASS_VAR`]: crate::types::TypeQualifiers::CLASS_VAR
-#[derive(Debug, Clone, Default, Copy, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+#[derive(
+    Debug, Clone, Default, Copy, Hash, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue,
+)]
 pub(crate) struct PlaceAndQualifiers<'db> {
     pub(crate) place: Place<'db>,
     pub(crate) qualifiers: TypeQualifiers,
@@ -849,13 +981,17 @@ impl<'db> PlaceAndQualifiers<'db> {
     ///
     /// For places whose public type differs from their raw stored type, this applies the
     /// public-type policy lazily during lookup.
-    pub(crate) fn into_lookup_result(self, db: &'db dyn Db) -> LookupResult<'db> {
+    pub(crate) fn into_lookup_result(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> LookupResult<'db> {
         match self {
             PlaceAndQualifiers {
                 place: Place::Defined(place),
                 qualifiers,
             } => {
-                let ty = place.public_type_policy.apply_if_needed(db, place.ty);
+                let ty = place.public_type_policy.apply_if_needed(db, env, place.ty);
                 let type_and_qualifiers = TypeAndQualifiers::new(ty, place.origin, qualifiers)
                     .with_provenance(place.provenance);
                 match place.definedness {
@@ -881,9 +1017,11 @@ impl<'db> PlaceAndQualifiers<'db> {
     pub(crate) fn unwrap_with_diagnostic(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         diagnostic_fn: impl FnOnce(LookupError<'db>) -> TypeAndQualifiers<'db>,
     ) -> TypeAndQualifiers<'db> {
-        self.into_lookup_result(db).unwrap_or_else(diagnostic_fn)
+        self.into_lookup_result(db, env)
+            .unwrap_or_else(diagnostic_fn)
     }
 
     /// Fallback (partially or fully) to another place if `self` is partially or fully unbound.
@@ -900,16 +1038,18 @@ impl<'db> PlaceAndQualifiers<'db> {
     pub(crate) fn or_fall_back_to(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         fallback_fn: impl FnOnce() -> PlaceAndQualifiers<'db>,
     ) -> Self {
-        self.into_lookup_result(db)
-            .or_else(|lookup_error| lookup_error.or_fall_back_to(db, fallback_fn()))
+        self.into_lookup_result(db, env)
+            .or_else(|lookup_error| lookup_error.or_fall_back_to(db, env, fallback_fn()))
             .into()
     }
 
     pub(crate) fn cycle_normalized(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         previous_place: Self,
         cycle: &salsa::Cycle,
     ) -> Self {
@@ -924,7 +1064,7 @@ impl<'db> PlaceAndQualifiers<'db> {
             // iteration into the current result; after the first couple iterations, the same
             // applies to boundness and qualifiers.
             (Place::Defined(prev), Place::Defined(current)) => Place::Defined(DefinedPlace {
-                ty: current.ty.cycle_normalized(db, prev.ty, cycle),
+                ty: current.ty.cycle_normalized(db, env, prev.ty, cycle),
                 definedness: if cycle.iteration() <= 1
                     || matches!(
                         (prev.definedness, current.definedness),
@@ -945,7 +1085,7 @@ impl<'db> PlaceAndQualifiers<'db> {
             // However, the handling described above may reduce the exactness of reachability analysis,
             // so it may be better to remove it. In that case, this branch is necessary.
             (Place::Undefined, Place::Defined(current)) => Place::Defined(DefinedPlace {
-                ty: current.ty.recursive_type_normalized(db, cycle),
+                ty: current.ty.recursive_type_normalized(db, env, cycle),
                 definedness: if cycle.iteration() <= 1 {
                     current.definedness
                 } else {
@@ -960,7 +1100,7 @@ impl<'db> PlaceAndQualifiers<'db> {
                     Place::Undefined
                 } else {
                     Place::Defined(DefinedPlace {
-                        ty: prev.ty.recursive_type_normalized(db, cycle),
+                        ty: prev.ty.recursive_type_normalized(db, env, cycle),
                         definedness: Definedness::PossiblyUndefined,
                         ..prev
                     })
@@ -981,8 +1121,9 @@ impl<'db> From<Place<'db>> for PlaceAndQualifiers<'db> {
 #[salsa::tracked(
     returns(copy),
     cycle_initial=|_, id, _, _, _, _| Place::bound(Type::divergent(id)).into(),
-    cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, place: PlaceAndQualifiers<'db>, _, _, _, _| {
-        place.cycle_normalized(db, *previous, cycle)
+    cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, place: PlaceAndQualifiers<'db>, scope: ScopeId<'db>, _, _, _| {
+        let env = ProgramEnvironment::from_scope(scope);
+        place.cycle_normalized(db, &env, *previous, cycle)
     },
     heap_size=ruff_memory_usage::heap_size
 )]
@@ -994,6 +1135,7 @@ pub(crate) fn place_by_id<'db>(
     considered_definitions: ConsideredDefinitions,
 ) -> PlaceAndQualifiers<'db> {
     let use_def = use_def_map(db, scope);
+    let env = ProgramEnvironment::from_scope(scope);
 
     // If the place is declared, the public type is based on declarations; otherwise, it's based
     // on inference from bindings.
@@ -1003,8 +1145,9 @@ pub(crate) fn place_by_id<'db>(
         ConsideredDefinitions::AllReachable => use_def.reachable_declarations(place_id),
     };
 
-    let declared = place_from_declarations_impl(db, declarations, requires_explicit_reexport, None)
-        .ignore_conflicting_declarations();
+    let declared =
+        place_from_declarations_impl(db, &env, declarations, requires_explicit_reexport, None)
+            .ignore_conflicting_declarations();
 
     let all_considered_bindings = || match considered_definitions {
         ConsideredDefinitions::EndOfScope => use_def.end_of_scope_bindings(place_id),
@@ -1015,7 +1158,7 @@ pub(crate) fn place_by_id<'db>(
     // inferred type, without unioning with `Unknown`, because it cannot be modified.
     if let Some(qualifiers) = declared.is_bare_final() {
         let bindings = all_considered_bindings();
-        return place_from_bindings_impl(db, bindings, requires_explicit_reexport, None)
+        return place_from_bindings_impl(db, &env, bindings, requires_explicit_reexport, None)
             .place
             .with_qualifiers(qualifiers);
     }
@@ -1035,7 +1178,9 @@ pub(crate) fn place_by_id<'db>(
             qualifiers,
         } if qualifiers.contains(TypeQualifiers::CLASS_VAR) => {
             let bindings = all_considered_bindings();
-            match place_from_bindings_impl(db, bindings, requires_explicit_reexport, None).place {
+            match place_from_bindings_impl(db, &env, bindings, requires_explicit_reexport, None)
+                .place
+            {
                 Place::Defined(DefinedPlace {
                     ty: inferred,
                     origin,
@@ -1043,7 +1188,7 @@ pub(crate) fn place_by_id<'db>(
                     provenance: inferred_provenance,
                     ..
                 }) => Place::Defined(DefinedPlace {
-                    ty: UnionType::from_two_elements(db, Type::unknown(), inferred),
+                    ty: UnionType::from_two_elements(db, &env, Type::unknown(), inferred),
                     origin,
                     definedness: boundness,
                     public_type_policy: PublicTypePolicy::Raw,
@@ -1083,7 +1228,8 @@ pub(crate) fn place_by_id<'db>(
         } => {
             let bindings = all_considered_bindings();
             let boundness_analysis = bindings.boundness_analysis();
-            let inferred = place_from_bindings_impl(db, bindings, requires_explicit_reexport, None);
+            let inferred =
+                place_from_bindings_impl(db, &env, bindings, requires_explicit_reexport, None);
 
             let place = match inferred.place {
                 // Place is possibly undeclared and definitely unbound
@@ -1107,7 +1253,7 @@ pub(crate) fn place_by_id<'db>(
                     provenance: inferred_provenance,
                     ..
                 }) => Place::Defined(DefinedPlace {
-                    ty: UnionType::from_two_elements(db, inferred_ty, declared_ty),
+                    ty: UnionType::from_two_elements(db, &env, inferred_ty, declared_ty),
                     origin,
                     definedness: if boundness_analysis == BoundnessAnalysis::AssumeBound {
                         Definedness::AlwaysDefined
@@ -1129,7 +1275,8 @@ pub(crate) fn place_by_id<'db>(
             let bindings = all_considered_bindings();
             let boundness_analysis = bindings.boundness_analysis();
             let mut inferred =
-                place_from_bindings_impl(db, bindings, requires_explicit_reexport, None).place;
+                place_from_bindings_impl(db, &env, bindings, requires_explicit_reexport, None)
+                    .place;
 
             if boundness_analysis == BoundnessAnalysis::AssumeBound {
                 if let Place::Defined(defined) = inferred {
@@ -1280,7 +1427,8 @@ fn symbol_impl<'db>(
     let _span = tracing::trace_span!("symbol", ?name).entered();
 
     let is_known_module = |known_module| {
-        file_to_module(db, scope.file(db)).is_some_and(|module| module.is_known(db, known_module))
+        file_to_module(db, scope.program_file(db).resolver_file(db))
+            .is_some_and(|module| module.is_known(db, known_module))
     };
 
     // Check the symbol name first to avoid a module-resolution query for every symbol lookup.
@@ -1289,7 +1437,7 @@ fn symbol_impl<'db>(
             "version_info" => {
                 return Place::bound(Type::sys_version_info()).into();
             }
-            "platform" => match Program::get(db).python_platform(db) {
+            "platform" => match scope.program(db).python_platform(db) {
                 crate::PythonPlatform::Identifier(platform) => {
                     return Place::bound(Type::string_literal(db, platform.as_str())).into();
                 }
@@ -1302,7 +1450,7 @@ fn symbol_impl<'db>(
     }
 
     if name == "name" && is_known_module(KnownModule::Os) {
-        match Program::get(db).python_platform(db) {
+        match scope.program(db).python_platform(db) {
             crate::PythonPlatform::Identifier(platform) => {
                 // In CPython, `os.name` is `"nt"` on Windows and `"posix"` otherwise.
                 let os_name = if platform == "win32" { "nt" } else { "posix" };
@@ -1331,7 +1479,9 @@ fn symbol_impl<'db>(
 /// Pre-computed reachability analysis for loop-back bindings in a loop header.
 #[salsa::tracked(
     returns(clone),
-    cycle_initial=|db, _, definition| loop_header_reachability_impl(db, definition, true),
+    cycle_initial=|db, _, definition: Definition<'db>| {
+        loop_header_reachability_impl(db, definition, Some(&mut FxHashMap::default()))
+    },
     cycle_fn=loop_header_reachability_cycle_recover,
     heap_size = ruff_memory_usage::heap_size,
 )]
@@ -1339,7 +1489,7 @@ pub(crate) fn loop_header_reachability<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
 ) -> LoopHeaderReachability<'db> {
-    loop_header_reachability_impl(db, definition, false)
+    loop_header_reachability_impl(db, definition, None)
 }
 
 fn loop_header_reachability_cycle_recover<'db>(
@@ -1355,7 +1505,7 @@ fn loop_header_reachability_cycle_recover<'db>(
 fn loop_header_reachability_impl<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
-    is_cycle_initial: bool,
+    mut cycle_initial_cache: Option<&mut FxHashMap<Definition<'db>, Truthiness>>,
 ) -> LoopHeaderReachability<'db> {
     // This cutoff was chosen by benchmarking real isort to keep loop analysis
     // overhead minimal while preserving diagnostics.
@@ -1371,13 +1521,13 @@ fn loop_header_reachability_impl<'db>(
     let place = loop_header_definition.place();
 
     let mut deleted_reachability = Truthiness::AlwaysFalse;
+    let mut deleted_narrowing_constraints = FxIndexSet::default();
     let mut reachable_bindings = FxIndexSet::default();
     let live_bindings: Vec<_> = loop_header.bindings_for_place(place).collect();
     let use_exact_reachability = use_def.reachability_constraints().used_interiors().len()
         <= MAX_EXACT_LOOP_HEADER_REACHABILITY_NODES;
-
     for live_binding in live_bindings {
-        let reachability = if is_cycle_initial {
+        let reachability = if cycle_initial_cache.is_some() {
             Truthiness::Ambiguous
         } else if use_exact_reachability {
             evaluate_reachability(db, use_def, live_binding.reachability_constraint())
@@ -1394,11 +1544,42 @@ fn loop_header_reachability_impl<'db>(
         }
 
         match use_def.definition(live_binding.binding()) {
-            DefinitionState::Defined(def) => {
+            // Assignment validity can depend on this header, so avoid inferring it while
+            // initializing a cycle.
+            DefinitionState::Defined(def)
+                if cycle_initial_cache.is_some() || !is_discarded_dict_key_assignment(db, def) =>
+            {
                 debug_assert_ne!(
                     def, definition,
                     "loop headers only include bindings from within the loop"
                 );
+                if def.kind(db).is_loop_header() {
+                    // An inner loop can reach a `break` with a header binding that carries a
+                    // deletion from an earlier iteration. That deletion also affects boundness
+                    // in the enclosing loop.
+                    let nested_deleted_reachability =
+                        if let Some(cache) = cycle_initial_cache.as_deref_mut() {
+                            // Cycle initialization cannot evaluate predicates that could re-enter
+                            // the cycle. Memoize this structural walk because a descendant header
+                            // can be reached through several containing headers.
+                            cache.get(&def).copied().unwrap_or_else(|| {
+                                let deleted_reachability =
+                                    loop_header_reachability_impl(db, def, Some(cache))
+                                        .deleted_reachability;
+                                cache.insert(def, deleted_reachability);
+                                deleted_reachability
+                            })
+                        } else {
+                            loop_header_reachability(db, def).deleted_reachability
+                        };
+                    // This binding is reachable, but a conditional loop-back path can make a
+                    // definitely reachable nested deletion only possibly reachable here.
+                    deleted_reachability =
+                        deleted_reachability.or(match nested_deleted_reachability {
+                            Truthiness::AlwaysTrue => reachability,
+                            other => other,
+                        });
+                }
                 reachable_bindings.insert(ReachableLoopBinding {
                     definition: def,
                     narrowing_constraint: live_binding.narrowing_constraint(),
@@ -1407,8 +1588,11 @@ fn loop_header_reachability_impl<'db>(
             // `del` in the loop body is always visible to code after the loop via the
             // normal control flow merge. Updating `deleted_reachability` here is
             // necessary for prior uses in the loop to see it.
-            DefinitionState::Deleted => {
+            // Discarded dictionary-key bindings also require a fallback to the receiver's
+            // value type instead of contributing their assigned value.
+            DefinitionState::Defined(_) | DefinitionState::Deleted => {
                 deleted_reachability = deleted_reachability.or(reachability);
+                deleted_narrowing_constraints.insert(live_binding.narrowing_constraint());
             }
             DefinitionState::Undefined => {
                 unreachable!("loop headers only include bindings from within the loop")
@@ -1418,6 +1602,7 @@ fn loop_header_reachability_impl<'db>(
 
     LoopHeaderReachability {
         deleted_reachability,
+        deleted_narrowing_constraints: deleted_narrowing_constraints.into_iter().collect(),
         reachable_bindings,
     }
 }
@@ -1425,8 +1610,12 @@ fn loop_header_reachability_impl<'db>(
 /// Result of [`loop_header_reachability`]: pre-computed reachability info for loop-back bindings.
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct LoopHeaderReachability<'db> {
+    /// Reachability of deletions, including those carried by nested loop headers.
     pub(crate) deleted_reachability: Truthiness,
-    /// Reachable loop-back bindings that are not `del`s.
+    /// Constraints established after a deletion, member invalidation, or discarded key assignment.
+    /// These still narrow the fallback type of the member on the next iteration.
+    pub(crate) deleted_narrowing_constraints: Box<[ScopedNarrowingConstraint]>,
+    /// Reachable loop-back bindings whose values contribute to inferred types.
     pub(crate) reachable_bindings: FxIndexSet<ReachableLoopBinding<'db>>,
 }
 
@@ -1438,15 +1627,27 @@ impl<'db> LoopHeaderReachability<'db> {
     ) -> LoopHeaderReachability<'db> {
         // Avoid losing precision for cycles that are soon to converge.
         // See [`Type::cycle_normalized`] for more details.
-        let reachable_bindings = if cycle.iteration() <= crate::TAINTED_CYCLES {
-            self.reachable_bindings
-        } else {
-            let previous_bindings = previous.reachable_bindings.iter().copied();
-            previous_bindings.chain(self.reachable_bindings).collect()
-        };
+        if cycle.iteration() <= crate::TAINTED_CYCLES {
+            return self;
+        }
+
+        let mut reachable_bindings: FxIndexSet<_> = previous
+            .reachable_bindings
+            .iter()
+            .copied()
+            .chain(self.reachable_bindings)
+            .collect();
+        reachable_bindings.shrink_to_fit();
+        let deleted_narrowing_constraints: FxIndexSet<_> = previous
+            .deleted_narrowing_constraints
+            .iter()
+            .copied()
+            .chain(self.deleted_narrowing_constraints)
+            .collect();
 
         LoopHeaderReachability {
             deleted_reachability: self.deleted_reachability,
+            deleted_narrowing_constraints: deleted_narrowing_constraints.into_iter().collect(),
             reachable_bindings,
         }
     }
@@ -1466,6 +1667,7 @@ pub(crate) struct ReachableLoopBinding<'db> {
 /// access any AST nodes from the file containing the declarations.
 fn place_from_bindings_impl<'db>(
     db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
     bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
     requires_explicit_reexport: RequiresExplicitReExport,
     reachability_cache: Option<&ReachabilityEvaluationCache<'db>>,
@@ -1508,6 +1710,7 @@ fn place_from_bindings_impl<'db>(
     let mut provenance = Provenance::Unknown;
     // special handling for synthetic loop header definitions and nested bindings definitions
     let mut only_non_shadowing_bindings = true;
+    let mut narrowing_projector = None;
 
     let mut types = bindings_with_constraints.filter_map(
         |BindingWithConstraints {
@@ -1633,16 +1836,30 @@ fn place_from_bindings_impl<'db>(
             first_definition.get_or_insert(binding);
             provenance = provenance.or(Provenance::SingleDefinition(binding));
             let binding_ty = binding_type(db, binding);
-            Some((
-                narrowing_constraint.narrow(db, binding_ty, binding.place(db)),
-                static_reachability,
-            ))
+            let narrowed = match narrowing_constraint.constraint() {
+                ScopedNarrowingConstraint::ALWAYS_TRUE => binding_ty,
+                ScopedNarrowingConstraint::ALWAYS_FALSE => Type::Never,
+                constraint => narrowing_projector
+                    .get_or_insert_with(|| {
+                        NarrowingProjector::new(
+                            db,
+                            env,
+                            narrowing_constraint.narrowing_constraints(),
+                            predicates,
+                            narrowing_constraint.predicate_narrowing_targets(),
+                            binding.place(db),
+                            binding_ty,
+                        )
+                    })
+                    .narrow(constraint, binding_ty),
+            };
+            Some((narrowed, static_reachability))
         },
     );
 
     let place = if let Some((first, first_reachability)) = types.next() {
         let ty = if let Some((second, second_reachability)) = types.next() {
-            let mut builder = PublicTypeBuilder::new(db);
+            let mut builder = PublicTypeBuilder::new(db, env);
             builder.add(first, first_reachability);
             builder.add(second, second_reachability);
 
@@ -1715,11 +1932,11 @@ struct PublicTypeBuilder<'db> {
 }
 
 impl<'db> PublicTypeBuilder<'db> {
-    fn new(db: &'db dyn Db) -> Self {
+    fn new(db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Self {
         PublicTypeBuilder {
             db,
             queue: None,
-            builder: UnionBuilder::new(db),
+            builder: UnionBuilder::new(db, env),
         }
     }
 
@@ -1734,10 +1951,11 @@ impl<'db> PublicTypeBuilder<'db> {
     }
 
     fn add(&mut self, element: Type<'db>, reachability: Truthiness) -> bool {
+        let db = self.db;
         match element {
             Type::FunctionLiteral(function) => {
-                let last_definition = function.literal(self.db).last_definition;
-                if last_definition.is_overload(self.db) {
+                let last_definition = function.literal(db).last_definition;
+                if last_definition.is_overload(db) {
                     // Distinct overloaded function values can be assigned to the same public
                     // symbol in separate branches. Preserve the queued value unless the next
                     // overload belongs to the same place.
@@ -1745,7 +1963,7 @@ impl<'db> PublicTypeBuilder<'db> {
                         let Type::FunctionLiteral(queued_function) = queued else {
                             return false;
                         };
-                        function.has_same_place_as(self.db, queued_function)
+                        function.has_same_place_as(db, queued_function)
                     }) {
                         self.drain_queue();
                     }
@@ -1761,8 +1979,8 @@ impl<'db> PublicTypeBuilder<'db> {
                             let Type::FunctionLiteral(queued_function) = queued else {
                                 return false;
                             };
-                            let queued_definition = queued_function.last_definition(self.db);
-                            function.contains_definition(self.db, queued_definition)
+                            let queued_definition = queued_function.last_definition(db);
+                            function.contains_definition(db, queued_definition)
                         })
                     {
                         self.queue = None;
@@ -1797,21 +2015,29 @@ struct DeclaredTypeBuilder<'db> {
 }
 
 impl<'db> DeclaredTypeBuilder<'db> {
-    fn new(db: &'db dyn Db) -> Self {
+    fn new(db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Self {
         DeclaredTypeBuilder {
-            inner: PublicTypeBuilder::new(db),
+            inner: PublicTypeBuilder::new(db, env),
             qualifiers: TypeQualifiers::empty(),
             first_type: None,
             conflicting_types: FxOrderSet::default(),
         }
     }
 
-    fn add(&mut self, element: TypeAndQualifiers<'db>, reachability: Truthiness) {
+    fn add(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        element: TypeAndQualifiers<'db>,
+        reachability: Truthiness,
+    ) {
+        debug_assert!(std::ptr::eq(db, self.inner.db));
+
         let element_ty = element.inner_type();
 
         if self.inner.add(element_ty, reachability) {
             if let Some(first_ty) = self.first_type {
-                if !first_ty.is_equivalent_to(self.inner.db, element_ty) {
+                if !first_ty.is_equivalent_to(db, env, element_ty) {
                     self.conflicting_types.insert(element_ty);
                 }
             } else {
@@ -1848,6 +2074,7 @@ impl<'db> DeclaredTypeBuilder<'db> {
 /// access any AST nodes from the file containing the declarations.
 fn place_from_declarations_impl<'db>(
     db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
     declarations_iterator: DeclarationsIterator<'_, 'db>,
     requires_explicit_reexport: RequiresExplicitReExport,
     reachability_cache: Option<&ReachabilityEvaluationCache<'db>>,
@@ -1919,11 +2146,11 @@ fn place_from_declarations_impl<'db>(
 
     if let Some((first, first_reachability)) = types.next() {
         let (declared, conflicting) = if let Some((second, second_reachability)) = types.next() {
-            let mut builder = DeclaredTypeBuilder::new(db);
-            builder.add(first, first_reachability);
-            builder.add(second, second_reachability);
+            let mut builder = DeclaredTypeBuilder::new(db, env);
+            builder.add(db, env, first, first_reachability);
+            builder.add(db, env, second, second_reachability);
             for (element, reachability) in types {
-                builder.add(element, reachability);
+                builder.add(db, env, element, reachability);
             }
             builder.build()
         } else {
@@ -1975,7 +2202,7 @@ fn is_reexported(db: &dyn Db, definition: Definition<'_>) -> bool {
     // At this point, the definition should either be an `import` or `from ... import` statement.
     // This is because the default value of `is_reexported` is `true` for any other kind of
     // definition.
-    let Some(all_names) = dunder_all_names(db, definition.file(db)) else {
+    let Some(all_names) = dunder_all_names(db, definition.program_file(db)) else {
         return false;
     };
     let table = place_table(db, definition.scope(db));
@@ -1985,23 +2212,22 @@ fn is_reexported(db: &dyn Db, definition: Definition<'_>) -> bool {
 }
 
 pub(crate) mod implicit_globals {
-    use ruff_db::files::File;
     use ruff_db::parsed::parsed_module;
     use ruff_python_ast as ast;
     use ruff_python_ast::name::Name;
     use ty_module_resolver::KnownModule;
 
-    use crate::Program;
     use crate::db::Db;
     use crate::module_docstring;
     use crate::place::{Definedness, PlaceAndQualifiers};
     use crate::reachability::evaluate_reachability;
     use crate::types::{KnownClass, MemberLookupPolicy, Parameter, Parameters, Signature, Type};
+    use crate::{Program, ProgramEnvironment};
     use ruff_python_ast::PythonVersion;
     use ty_python_core::definition::{DefinitionKind, DefinitionState};
     use ty_python_core::scope::{NodeWithScopeRef, ScopeId};
     use ty_python_core::symbol::Symbol;
-    use ty_python_core::{place_table, semantic_index, use_def_map};
+    use ty_python_core::{ProgramFile, place_table, semantic_index, use_def_map};
 
     use super::{DefinedPlace, Place, core_module_scope, is_reexported, place_from_declarations};
 
@@ -2014,14 +2240,15 @@ pub(crate) mod implicit_globals {
         module_scope: ScopeId<'db>,
         name: &str,
     ) -> Option<ScopeId<'db>> {
-        let file = module_scope.file(db);
+        let program_file = module_scope.program_file(db);
+        let file = program_file.file(db);
         if !file.path(db).is_vendored_path() {
             return None;
         }
         let symbol_id = place_table(db, module_scope).symbol_id(name)?;
         let use_def = use_def_map(db, module_scope);
-        let module = parsed_module(db, file).load(db);
-        let index = semantic_index(db, file);
+        let module = parsed_module(db, program_file.python_file(db)).load(db);
+        let index = semantic_index(db, program_file);
         let mut body_scope = None;
 
         for binding in use_def.end_of_scope_symbol_bindings(symbol_id) {
@@ -2041,7 +2268,7 @@ pub(crate) mod implicit_globals {
             };
             let class_scope = index
                 .node_scope(NodeWithScopeRef::Class(class.node(&module)))
-                .to_scope_id(db, file);
+                .to_scope_id(db, program_file);
             if body_scope.is_some_and(|body_scope| body_scope != class_scope) {
                 return None;
             }
@@ -2052,27 +2279,39 @@ pub(crate) mod implicit_globals {
     }
 
     /// Return the body scope of the canonical `types.ModuleType` class.
+    fn module_type_body_scope<'db>(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Option<ScopeId<'db>> {
+        module_type_body_scope_inner(db, env.program(db))
+    }
+
     #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
-    fn module_type_body_scope(db: &dyn Db) -> Option<ScopeId<'_>> {
-        let module_scope = core_module_scope(db, KnownModule::Types)?;
+    fn module_type_body_scope_inner<'db>(
+        db: &'db dyn Db,
+        program: Program<'db>,
+    ) -> Option<ScopeId<'db>> {
+        let env = ProgramEnvironment::from_program(program);
+        let module_scope = core_module_scope(db, &env, KnownModule::Types)?;
         try_vendored_class_scope(db, module_scope, "ModuleType").or_else(|| {
             KnownClass::ModuleType
-                .try_to_class_literal(db)
+                .try_to_class_literal(db, &env)
                 .map(|class| class.body_scope(db))
         })
     }
 
     pub(crate) fn module_type_implicit_global_declaration<'db>(
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         name: &str,
     ) -> PlaceAndQualifiers<'db> {
-        if !module_type_symbols(db)
+        if !module_type_symbols(db, env)
             .iter()
             .any(|module_type_member| module_type_member == name)
         {
             return Place::Undefined.into();
         }
-        let Some(module_type_scope) = module_type_body_scope(db) else {
+        let Some(module_type_scope) = module_type_body_scope(db, env) else {
             return Place::Undefined.into();
         };
         let place_table = place_table(db, module_type_scope);
@@ -2081,6 +2320,7 @@ pub(crate) mod implicit_globals {
         };
         place_from_declarations(
             db,
+            env,
             use_def_map(db, module_type_scope).end_of_scope_symbol_declarations(symbol_id),
         )
         .ignore_conflicting_declarations()
@@ -2102,53 +2342,54 @@ pub(crate) mod implicit_globals {
     /// global scope if they're being imported **from a different file**.
     pub(crate) fn module_type_implicit_global_symbol<'db>(
         db: &'db dyn Db,
-        file: File,
+        file: ProgramFile<'db>,
         name: &str,
     ) -> PlaceAndQualifiers<'db> {
+        let env = ProgramEnvironment::from_file(file);
         match name {
             // We special-case `__file__` here because we know that for an internal implicit global
             // lookup in a Python module, it is always a string, even though typeshed says `str |
             // None`.
-            "__file__" => Place::bound(KnownClass::Str.to_instance(db)).into(),
+            "__file__" => Place::bound(KnownClass::Str.to_instance(db, &env)).into(),
 
             // We special-case `__doc__` because a module with a literal docstring has `__doc__`
             // set to that string at runtime. We only narrow when a docstring is present: `__doc__`
             // may be set dynamically, so we fall back to the typeshed's `str | None`.
-            "__doc__" if module_docstring(db, file).is_some() => {
+            "__doc__" if module_docstring(db, file.python_file(db)).is_some() => {
                 // Docstrings are stripped in `-OO` optimized mode, but here we assume that the
                 // existence of an actual docstring AND the usage of `__doc__` is reason enough to
                 // believe that it will exist at runtime.
-                Place::bound(KnownClass::Str.to_instance(db)).into()
+                Place::bound(KnownClass::Str.to_instance(db, &env)).into()
             }
 
             "__builtins__" => Place::bound(Type::any()).into(),
 
-            "__debug__" => Place::bound(KnownClass::Bool.to_instance(db)).into(),
+            "__debug__" => Place::bound(KnownClass::Bool.to_instance(db, &env)).into(),
 
             // Created lazily by the warnings machinery; may be absent.
             // Model as possibly-unbound to avoid false negatives.
-            "__warningregistry__" => {
-                Place::Defined(
-                    DefinedPlace::new(KnownClass::Dict.to_specialized_instance(
-                        db,
-                        &[Type::any(), KnownClass::Int.to_instance(db)],
-                    ))
-                    .with_definedness(Definedness::PossiblyUndefined),
-                )
-                .into()
-            }
+            "__warningregistry__" => Place::Defined(
+                DefinedPlace::new(KnownClass::Dict.to_specialized_instance(
+                    db,
+                    &env,
+                    &[Type::any(), KnownClass::Int.to_instance(db, &env)],
+                ))
+                .with_definedness(Definedness::PossiblyUndefined),
+            )
+            .into(),
 
             // Marked as possibly-unbound as it is only present in the module namespace
             // if at least one global symbol is annotated in the module.
-            "__annotate__" if Program::get(db).python_version(db) >= PythonVersion::PY314 => {
+            "__annotate__" if env.python_version(db) >= PythonVersion::PY314 => {
                 let signature = Signature::new(
                     Parameters::standard([Parameter::positional_only(Some(Name::new_static(
                         "format",
                     )))
-                    .with_annotated_type(KnownClass::Int.to_instance(db))]),
+                    .with_annotated_type(KnownClass::Int.to_instance(db, &env))]),
                     KnownClass::Dict.to_specialized_instance(
                         db,
-                        &[KnownClass::Str.to_instance(db), Type::any()],
+                        &env,
+                        &[KnownClass::Str.to_instance(db, &env), Type::any()],
                     ),
                 );
                 Place::Defined(
@@ -2163,16 +2404,22 @@ pub(crate) mod implicit_globals {
             // type, since it has the same end result. The reason to only call `.member()` on `ModuleType`
             // when absolutely necessary is that this function is used in a very hot path (name resolution
             // in `infer.rs`). We use less idiomatic (and much more verbose) code here as a micro-optimisation.
-            _ if module_type_symbols(db)
-                .iter()
-                .any(|module_type_member| &**module_type_member == name) =>
-            {
+            _ => {
+                if !module_type_symbols(db, &env)
+                    .iter()
+                    .any(|module_type_member| &**module_type_member == name)
+                {
+                    return Place::Undefined.into();
+                }
                 KnownClass::ModuleType
-                    .to_instance(db)
-                    .member_lookup_with_policy(db, name, MemberLookupPolicy::NO_GETATTR_LOOKUP)
+                    .to_instance(db, &env)
+                    .member_lookup_with_policy(
+                        db,
+                        &env,
+                        name,
+                        MemberLookupPolicy::NO_GETATTR_LOOKUP,
+                    )
             }
-
-            _ => Place::Undefined.into(),
         }
     }
 
@@ -2213,13 +2460,24 @@ pub(crate) mod implicit_globals {
             .collect()
     }
 
+    fn module_type_symbols<'db>(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> &'db [ast::name::Name] {
+        module_type_symbols_inner(db, env.program(db))
+    }
+
     #[salsa::tracked(
         returns(deref),
-        cycle_initial=|_, _| smallvec::SmallVec::default(),
+        cycle_initial=|_, _, _| smallvec::SmallVec::default(),
         heap_size=ruff_memory_usage::heap_size
     )]
-    fn module_type_symbols(db: &dyn Db) -> smallvec::SmallVec<[ast::name::Name; 8]> {
-        let Some(module_type_scope) = module_type_body_scope(db) else {
+    fn module_type_symbols_inner<'db>(
+        db: &'db dyn Db,
+        program: Program<'db>,
+    ) -> smallvec::SmallVec<[ast::name::Name; 8]> {
+        let env = ProgramEnvironment::from_program(program);
+        let Some(module_type_scope) = module_type_body_scope(db, &env) else {
             // The most likely way we get here is if a user specified a `--custom-typeshed-dir`
             // without a resolvable `ModuleType` class in the `stdlib/types.pyi` stub.
             return smallvec::SmallVec::default();
@@ -2232,17 +2490,18 @@ pub(crate) mod implicit_globals {
     /// This is used for completions in the global scope of a module. It returns
     /// the correct types for special-cased symbols like `__file__` (which is `str`
     /// for the current module, not `str | None`).
-    pub(crate) fn all_implicit_module_globals(
-        db: &dyn Db,
-        file: File,
-    ) -> impl Iterator<Item = (Name, Type<'_>)> + '_ {
+    pub(crate) fn all_implicit_module_globals<'db>(
+        db: &'db dyn Db,
+        file: ProgramFile<'db>,
+    ) -> impl Iterator<Item = (Name, Type<'db>)> + 'db {
         // Special-cased implicit globals that are not in `module_type_symbols`
         let special_cased = ["__builtins__", "__debug__", "__warningregistry__"]
             .into_iter()
             .map(Name::new_static);
 
         // All symbols from ModuleType (already includes `__file__`, `__name__`, etc.)
-        let module_type_syms = module_type_symbols(db).iter().cloned();
+        let env = ProgramEnvironment::from_file(file);
+        let module_type_syms = module_type_symbols(db, &env).iter().cloned();
 
         // Combine and map to (name, type) pairs
         special_cased
@@ -2262,7 +2521,9 @@ pub(crate) mod implicit_globals {
         #[test]
         fn module_type_symbols_includes_declared_types_but_not_referenced_types() {
             let db = setup_db();
-            let symbol_names = module_type_symbols(&db);
+            let db = &db;
+            let env = db.program_environment();
+            let symbol_names = module_type_symbols(db, &env);
 
             let dunder_name_symbol_name = ast::name::Name::new_static("__name__");
             assert!(symbol_names.contains(&dunder_name_symbol_name));
@@ -2283,21 +2544,23 @@ pub(crate) mod implicit_globals {
 /// See <https://docs.python.org/3/reference/datamodel.html#creating-the-class-object>
 pub(crate) fn class_body_implicit_symbol<'db>(
     db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
     name: &str,
 ) -> PlaceAndQualifiers<'db> {
     match name {
-        "__qualname__" => Place::bound(KnownClass::Str.to_instance(db)).into(),
-        "__module__" => Place::bound(KnownClass::Str.to_instance(db)).into(),
+        "__qualname__" => Place::bound(KnownClass::Str.to_instance(db, env)).into(),
+        "__module__" => Place::bound(KnownClass::Str.to_instance(db, env)).into(),
         // __doc__ is `str` if there's a docstring, `None` if there isn't
         "__doc__" => Place::bound(UnionType::from_two_elements(
             db,
-            KnownClass::Str.to_instance(db),
-            Type::none(db),
+            env,
+            KnownClass::Str.to_instance(db, env),
+            Type::none(db, env),
         ))
         .into(),
         // __firstlineno__ was added in Python 3.13
-        "__firstlineno__" if Program::get(db).python_version(db) >= PythonVersion::PY313 => {
-            Place::bound(KnownClass::Int.to_instance(db)).into()
+        "__firstlineno__" if env.python_version(db) >= PythonVersion::PY313 => {
+            Place::bound(KnownClass::Int.to_instance(db, env)).into()
         }
         _ => Place::Undefined.into(),
     }
@@ -2339,8 +2602,10 @@ pub(crate) enum ConsideredDefinitions {
 
 #[cfg(test)]
 mod tests {
+    use std::assert_matches;
+
     use super::*;
-    use crate::db::tests::setup_db;
+    use crate::db::tests::{TestDb, setup_db};
 
     #[test]
     fn test_symbol_or_fall_back_to() {
@@ -2348,6 +2613,8 @@ mod tests {
         use TypeOrigin::Inferred;
 
         let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
         let ty1 = Type::int_literal(1);
         let ty2 = Type::int_literal(2);
 
@@ -2396,22 +2663,22 @@ mod tests {
         };
 
         // Start from an unbound symbol
-        assert_eq!(unbound().or_fall_back_to(&db, unbound), unbound());
+        assert_eq!(unbound().or_fall_back_to(db, &env, unbound), unbound());
         assert_eq!(
-            unbound().or_fall_back_to(&db, possibly_unbound_ty1),
+            unbound().or_fall_back_to(db, &env, possibly_unbound_ty1),
             possibly_unbound_ty1()
         );
-        assert_eq!(unbound().or_fall_back_to(&db, bound_ty1), bound_ty1());
+        assert_eq!(unbound().or_fall_back_to(db, &env, bound_ty1), bound_ty1());
 
         // Start from a possibly unbound symbol
         assert_eq!(
-            possibly_unbound_ty1().or_fall_back_to(&db, unbound),
+            possibly_unbound_ty1().or_fall_back_to(db, &env, unbound),
             possibly_unbound_ty1()
         );
         assert_eq!(
-            possibly_unbound_ty1().or_fall_back_to(&db, possibly_unbound_ty2),
+            possibly_unbound_ty1().or_fall_back_to(db, &env, possibly_unbound_ty2),
             Place::Defined(DefinedPlace {
-                ty: UnionType::from_elements(&db, [ty1, ty2]),
+                ty: UnionType::from_elements(db, &env, [ty1, ty2]),
                 origin: Inferred,
                 definedness: PossiblyUndefined,
                 public_type_policy: PublicTypePolicy::Raw,
@@ -2420,9 +2687,9 @@ mod tests {
             .into()
         );
         assert_eq!(
-            possibly_unbound_ty1().or_fall_back_to(&db, bound_ty2),
+            possibly_unbound_ty1().or_fall_back_to(db, &env, bound_ty2),
             Place::Defined(DefinedPlace {
-                ty: UnionType::from_elements(&db, [ty1, ty2]),
+                ty: UnionType::from_elements(db, &env, [ty1, ty2]),
                 origin: Inferred,
                 definedness: AlwaysDefined,
                 public_type_policy: PublicTypePolicy::Raw,
@@ -2432,43 +2699,58 @@ mod tests {
         );
 
         // Start from a definitely bound symbol
-        assert_eq!(bound_ty1().or_fall_back_to(&db, unbound), bound_ty1());
+        assert_eq!(bound_ty1().or_fall_back_to(db, &env, unbound), bound_ty1());
         assert_eq!(
-            bound_ty1().or_fall_back_to(&db, possibly_unbound_ty2),
+            bound_ty1().or_fall_back_to(db, &env, possibly_unbound_ty2),
             bound_ty1()
         );
-        assert_eq!(bound_ty1().or_fall_back_to(&db, bound_ty2), bound_ty1());
+        assert_eq!(
+            bound_ty1().or_fall_back_to(db, &env, bound_ty2),
+            bound_ty1()
+        );
     }
 
     #[track_caller]
-    fn assert_bound_string_symbol<'db>(db: &'db dyn Db, symbol: Place<'db>) {
-        assert!(matches!(
+    fn assert_bound_string_symbol<'db>(db: &'db TestDb, symbol: Place<'db>) {
+        assert_matches!(
             symbol,
             Place::Defined(DefinedPlace {
                 ty: Type::NominalInstance(_),
                 definedness: Definedness::AlwaysDefined,
                 ..
             })
-        ));
-        assert_eq!(symbol.expect_type(), KnownClass::Str.to_instance(db));
+        );
+        assert_eq!(
+            symbol.expect_type(),
+            KnownClass::Str.to_instance(db, &db.program_environment())
+        );
     }
 
     #[test]
     fn implicit_builtin_globals() {
         let db = setup_db();
-        assert_bound_string_symbol(&db, builtins_symbol(&db, "__name__").place);
+        assert_bound_string_symbol(
+            &db,
+            builtins_symbol(&db, &db.program_environment(), "__name__").place,
+        );
     }
 
     #[test]
     fn implicit_typing_globals() {
         let db = setup_db();
-        assert_bound_string_symbol(&db, typing_symbol(&db, "__name__").place);
+        assert_bound_string_symbol(
+            &db,
+            typing_symbol(&db, &db.program_environment(), "__name__").place,
+        );
     }
 
     #[test]
     fn implicit_typing_extensions_globals() {
         let db = setup_db();
-        assert_bound_string_symbol(&db, typing_extensions_symbol(&db, "__name__").place);
+        assert_bound_string_symbol(
+            &db,
+            typing_extensions_symbol(&db, &db.program_environment(), "__name__").place,
+        );
     }
 
     #[test]
@@ -2476,7 +2758,7 @@ mod tests {
         let db = setup_db();
         assert_bound_string_symbol(
             &db,
-            known_module_symbol(&db, KnownModule::Sys, "__name__").place,
+            known_module_symbol(&db, &db.program_environment(), KnownModule::Sys, "__name__").place,
         );
     }
 }

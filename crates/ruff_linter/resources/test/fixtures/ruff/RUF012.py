@@ -150,3 +150,42 @@ class S(ctypes.Structure):
         ("propagation", ctypes.c_uint64),
         ("userns_fd", ctypes.c_uint64),
     ]
+
+class LES(ctypes.LittleEndianStructure):
+    test = [""]
+    _fields_ = [
+        ("attr_set", ctypes.c_uint64),
+        ("attr_clr", ctypes.c_uint64),
+        ("propagation", ctypes.c_uint64),
+        ("userns_fd", ctypes.c_uint64),
+    ]
+
+class BES(ctypes.BigEndianStructure):
+    test = [""]
+    _fields_ = [
+        ("attr_set", ctypes.c_uint64),
+        ("attr_clr", ctypes.c_uint64),
+        ("propagation", ctypes.c_uint64),
+        ("userns_fd", ctypes.c_uint64),
+    ]
+
+class U(ctypes.Union):
+    test = [""]
+    _fields_ = [
+        ("a", LES),
+        ("b", BES),
+    ]
+
+class LEU(ctypes.LittleEndianUnion):
+    test = [""]
+    _fields_ = [
+        ("a", LES),
+        ("b", BES),
+    ]
+
+class BEU(ctypes.BigEndianUnion):
+    test = [""]
+    _fields_ = [
+        ("a", LES),
+        ("b", BES),
+    ]

@@ -6,9 +6,8 @@ use std::str::FromStr;
 
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_python_ast::{PythonVersion, PythonVersionDeserializationError};
-use rustc_hash::FxHashMap;
 
-use crate::db::Db;
+use crate::FxOrderMap;
 use crate::module_name::ModuleName;
 
 pub(crate) fn vendored_typeshed_versions(vendored: &VendoredFileSystem) -> TypeshedVersions {
@@ -18,10 +17,6 @@ pub(crate) fn vendored_typeshed_versions(vendored: &VendoredFileSystem) -> Types
             .expect("The vendored typeshed stubs should contain a VERSIONS file"),
     )
     .expect("The VERSIONS file in the vendored typeshed stubs should be well-formed")
-}
-
-pub(crate) fn typeshed_versions(db: &dyn Db) -> &TypeshedVersions {
-    db.search_paths().typeshed_versions()
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -71,8 +66,8 @@ pub enum TypeshedVersionsParseErrorKind {
     VersionParseError(#[from] PythonVersionDeserializationError),
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
-pub struct TypeshedVersions(FxHashMap<ModuleName, PyVersionRange>);
+#[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize)]
+pub struct TypeshedVersions(FxOrderMap<ModuleName, PyVersionRange>);
 
 impl TypeshedVersions {
     #[must_use]
@@ -164,7 +159,7 @@ impl FromStr for TypeshedVersions {
     type Err = TypeshedVersionsParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut map = FxHashMap::default();
+        let mut map = FxOrderMap::default();
 
         for (line_index, line) in s.lines().enumerate() {
             // humans expect line numbers to be 1-indexed
@@ -375,7 +370,12 @@ mod tests {
 
             let relative_path = absolute_path
                 .strip_prefix(&stdlib_stubs_path)
-                .unwrap_or_else(|_| panic!("Expected path to be a child of {stdlib_stubs_path:?} but found {absolute_path:?}"));
+                .unwrap_or_else(|_| {
+                    panic!(
+                        "Expected path to be a child of {stdlib_stubs_path:?} \
+                        but found {absolute_path:?}"
+                    )
+                });
 
             let relative_path_str = relative_path.as_os_str().to_str().unwrap_or_else(|| {
                 panic!("Expected all typeshed paths to be valid UTF-8; got {relative_path:?}")
@@ -386,15 +386,22 @@ mod tests {
 
             let top_level_module = if let Some(extension) = relative_path.extension() {
                 // It was a file; strip off the file extension to get the module name:
-                let extension = extension
-                    .to_str()
-                    .unwrap_or_else(||panic!("Expected all file extensions to be UTF-8; was not true for {relative_path:?}"));
+                let extension = extension.to_str().unwrap_or_else(|| {
+                    panic!(
+                        "Expected all file extensions to be UTF-8; \
+                        was not true for {relative_path:?}"
+                    )
+                });
 
                 relative_path_str
                     .strip_suffix(extension)
-                    .and_then(|string| string.strip_suffix('.')).unwrap_or_else(|| {
-                        panic!("Expected path {relative_path_str:?} to end with computed extension {extension:?}")
-                })
+                    .and_then(|string| string.strip_suffix('.'))
+                    .unwrap_or_else(|| {
+                        panic!(
+                            "Expected path {relative_path_str:?} to end \
+                            with computed extension {extension:?}"
+                        )
+                    })
             } else {
                 // It was a directory; no need to do anything to get the module name
                 relative_path_str

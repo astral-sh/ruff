@@ -13,6 +13,7 @@ on:
       - "!crates/ty_wasm/**"
       - "crates/ruff_db"
       - "crates/ruff_python_ast"
+      - "crates/ruff_python_edits/**"
       - "crates/ruff_python_parser"
       - "scripts/conformance.py"
       - ".github/workflows/typing_conformance.yaml"
@@ -36,7 +37,9 @@ env:
   RUST_BACKTRACE: 1
   # Line-tables-only debug info: faster builds, backtraces still work.
   CARGO_PROFILE_DEV_DEBUG: line-tables-only
-  CONFORMANCE_SUITE_COMMIT: f4f2952f3ac94d7af819c5c71b60a50a100370e0
+  CARGO_PROFILE_DEV_LTO: "false"
+  CARGO_PROFILE_DEV_OPT_LEVEL: 0
+  CONFORMANCE_SUITE_COMMIT: cf943ccbea5596ef969eec6e2260097ff697b7ba
   PYTHON_VERSION: 3.12
 
 jobs:
@@ -61,7 +64,7 @@ jobs:
           path: typing
           persist-credentials: false
 
-      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           workspaces: "ruff"
 
@@ -87,7 +90,8 @@ jobs:
             cargo build --bin ty
             mv target/debug/ty ty-new
 
-            MERGE_BASE="$(git merge-base "$GITHUB_SHA" "origin/$GITHUB_BASE_REF")"
+            # The first parent contains any preceding layers in a stacked pull request.
+            MERGE_BASE="$(git rev-parse "${GITHUB_SHA}^1")"
             git checkout -b old_commit "$MERGE_BASE"
             echo "old commit (merge base)"
             git rev-list --format=%s --max-count=1 old_commit

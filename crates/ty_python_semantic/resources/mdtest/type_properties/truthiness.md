@@ -122,6 +122,18 @@ static_assert(is_subtype_of(types.MethodWrapperType, AlwaysTruthy))
 static_assert(is_subtype_of(types.WrapperDescriptorType, AlwaysTruthy))
 ```
 
+### Subclassable special-cased classes
+
+`Path` and `super` cannot be inferred as always truthy because subclasses can override `__bool__`.
+
+```py
+from pathlib import Path
+
+def _(path: Path, superclass: super):
+    reveal_type(bool(path))  # revealed: bool
+    reveal_type(bool(superclass))  # revealed: bool
+```
+
 ### `Callable` types always have ambiguous truthiness
 
 ```py

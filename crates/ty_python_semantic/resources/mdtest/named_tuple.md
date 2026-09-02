@@ -132,6 +132,33 @@ reveal_type(alice5.id)  # revealed: int
 reveal_type(alice5.name)  # revealed: str
 ```
 
+### Fields declared in stubs
+
+An annotation-only field in a stub remains a required constructor argument. An explicit ellipsis
+assignment represents a default and makes its field optional.
+
+`records.pyi`:
+
+```pyi
+from typing import NamedTuple
+
+class Record(NamedTuple):
+    required: int
+    optional: str = ...
+```
+
+The generated constructor requires the first field but permits omitting the second:
+
+```py
+from records import Record
+
+reveal_type(Record.__new__)  # revealed: [Self](_cls: type[Self], required: int, optional: str = ...) -> Self
+
+Record(1)
+Record(1, "value")
+Record()  # error: [missing-argument]
+```
+
 ### Name mismatch diagnostics
 
 <!-- snapshot-diagnostics -->
@@ -211,7 +238,7 @@ class Point(NamedTuple("Point", [("x", int), ("y", int)])):
 p = Point(3, 4)
 reveal_type(p.x)  # revealed: int
 reveal_type(p.y)  # revealed: int
-reveal_type(p.magnitude())  # revealed: int | float
+reveal_type(p.magnitude())  # revealed: float
 ```
 
 String annotations in dangling calls work correctly for forward references to classes defined in the
@@ -1197,11 +1224,11 @@ class Property[T](NamedTuple):
     name: str
     value: T
 
-reveal_type(Property("height", 3.4))  # revealed: Property[float]
+reveal_type(Property("height", 3.4))  # revealed: Property[float*]
 reveal_type(Property.value)  # revealed: property
 reveal_type(Property.value.fget)  # revealed: (self, /) -> Unknown
 reveal_type(Property[str].value.fget)  # revealed: (self, /) -> str
-reveal_type(Property("height", 3.4).value)  # revealed: float
+reveal_type(Property("height", 3.4).value)  # revealed: float*
 
 T = TypeVar("T")
 
@@ -1213,7 +1240,37 @@ reveal_type(LegacyProperty("height", 42))  # revealed: LegacyProperty[int]
 reveal_type(LegacyProperty.value)  # revealed: property
 reveal_type(LegacyProperty.value.fget)  # revealed: (self, /) -> Unknown
 reveal_type(LegacyProperty[str].value.fget)  # revealed: (self, /) -> str
-reveal_type(LegacyProperty("height", 3.4).value)  # revealed: int | float
+reveal_type(LegacyProperty("height", 3.4).value)  # revealed: float
+```
+
+### Methods with default type parameters
+
+Methods on generic named tuples honor explicit type arguments that override their defaults,
+including when accessed through a subclass. The `_make` class method returns the specialized
+receiver type.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import NamedTuple
+
+class Box[T = int](NamedTuple):
+    value: T
+
+class Child[T = int](Box[T]):
+    pass
+
+def methods(box: Box[str], child: Child[str]) -> None:
+    reveal_type(box._asdict())  # revealed: dict[str, Any]
+    reveal_type(child._asdict())  # revealed: dict[str, Any]
+    reveal_type(Box[str]._make(("value",)))  # revealed: Box[str]
+    reveal_type(Child[str]._make(("value",)))  # revealed: Child[str]
+
+reveal_type(Box._make((1,)))  # revealed: Box[int]
+reveal_type(Child._make((1,)))  # revealed: Child[int]
 ```
 
 ### Functional syntax with generics
@@ -1448,7 +1505,8 @@ satisfy:
 ```py
 def expects_named_tuple(x: typing.NamedTuple):
     reveal_type(x)  # revealed: tuple[object, ...] & NamedTupleLike
-    reveal_type(x._make)  # revealed: bound method type[NamedTupleLike]._make(iterable: Iterable[Any]) -> NamedTupleLike
+    # revealed: bound method (type[tuple[object, ...]] & type[NamedTupleLike])._make(iterable: Iterable[Any]) -> tuple[object, ...] & NamedTupleLike
+    reveal_type(x._make)
     # revealed: bound method (tuple[object, ...] & NamedTupleLike)._replace(...) -> tuple[object, ...] & NamedTupleLike
     reveal_type(x._replace)
     # revealed: Overload[(value: tuple[object, ...], /) -> tuple[object, ...], [_T](value: tuple[_T, ...], /) -> tuple[object, ...]]
@@ -2030,5 +2088,5 @@ class GenericChild(GenericBase[T]):
         reveal_type(instance)  # revealed: Self@__new__
         return instance
 
-reveal_type(GenericChild(x=3.14))  # revealed: GenericChild[int | float]
+reveal_type(GenericChild(x=3.14))  # revealed: GenericChild[float]
 ```

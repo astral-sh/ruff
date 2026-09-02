@@ -1,8 +1,10 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, Operator};
 use ruff_python_semantic::SemanticModel;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::refurb::helpers::replace_with_identity_check;
 use crate::{FixAvailability, Violation};
 
@@ -32,7 +34,7 @@ use crate::{FixAvailability, Violation};
 /// - [Python documentation: `type`](https://docs.python.org/3/library/functions.html#type)
 /// - [Python documentation: Identity comparisons](https://docs.python.org/3/reference/expressions.html#is-not)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.5.0")]
+#[violation_metadata(stable_since = "0.5.0", category = Category::Complexity)]
 pub(crate) struct IsinstanceTypeNone;
 
 impl Violation for IsinstanceTypeNone {
@@ -69,9 +71,9 @@ pub(crate) fn isinstance_type_none(checker: &Checker, call: &ast::ExprCall) {
         return;
     }
 
-    let fix = replace_with_identity_check(expr, call.range, false, checker);
+    let fix = replace_with_identity_check(expr, call.range(), false, checker);
     checker
-        .report_diagnostic(IsinstanceTypeNone, call.range)
+        .report_diagnostic(IsinstanceTypeNone, call.range())
         .set_fix(fix);
 }
 

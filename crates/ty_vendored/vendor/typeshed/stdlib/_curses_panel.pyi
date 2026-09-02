@@ -4,10 +4,16 @@ from typing import Final, final
 __version__: Final[str]
 version: Final[str]
 
-class error(Exception): ...
+class error(Exception):
+    """Exception raised when a curses panel library function returns an error."""
 
 @final
 class panel:
+    """A curses panel.
+
+    Panel objects are returned by new_panel().
+    """
+
     def above(self) -> panel:
         """Return the panel above the current panel."""
 

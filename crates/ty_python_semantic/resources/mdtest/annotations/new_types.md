@@ -13,6 +13,15 @@ def _(user_id: UserId):
     reveal_type(user_id)  # revealed: UserId
 ```
 
+A `NewType` constructor preserves its argument's runtime identity but gives the result its own
+static tag. Applying an unrelated `NewType` constructor replaces the previous tag.
+
+```py
+MediaId = NewType("MediaId", int)
+
+reveal_type(MediaId(UserId(1)))  # revealed: MediaId
+```
+
 ## Subtyping
 
 The basic purpose of `NewType` is that it acts like a subtype of its base, but not the exact same
@@ -306,10 +315,10 @@ from ty_extensions._internal import is_assignable_to
 Foo = NewType("Foo", float)
 Foo(3.14)
 Foo(42)
-Foo("hello")  # error: [invalid-argument-type] "Argument is incorrect: Expected `int | float`, found `Literal["hello"]`"
+Foo("hello")  # error: [invalid-argument-type] "Argument is incorrect: Expected `float`, found `Literal["hello"]`"
 
-reveal_type(Foo(3.14).__class__)  # revealed: type[int | float]
-reveal_type(Foo(42).__class__)  # revealed: type[int | float]
+reveal_type(Foo(3.14).__class__)  # revealed: type[float]
+reveal_type(Foo(42).__class__)  # revealed: type[float]
 static_assert(is_assignable_to(Foo, float))
 static_assert(is_assignable_to(Foo, int | float))
 static_assert(is_assignable_to(Foo, int | float | None))
@@ -326,9 +335,9 @@ Bar(3.14)
 Bar(42)
 Bar("goodbye")  # error: [invalid-argument-type]
 
-reveal_type(Bar(1 + 2j).__class__)  # revealed: type[int | float | complex]
-reveal_type(Bar(3.14).__class__)  # revealed: type[int | float | complex]
-reveal_type(Bar(42).__class__)  # revealed: type[int | float | complex]
+reveal_type(Bar(1 + 2j).__class__)  # revealed: type[complex]
+reveal_type(Bar(3.14).__class__)  # revealed: type[complex]
+reveal_type(Bar(42).__class__)  # revealed: type[complex]
 static_assert(is_assignable_to(Bar, complex))
 static_assert(is_assignable_to(Bar, int | float | complex))
 static_assert(is_assignable_to(Bar, int | float | complex | None))
@@ -340,8 +349,8 @@ static_assert(is_assignable_to(Bar, Bar | None))
 
 ```py
 FooFoo = NewType("FooFoo", Foo)
-reveal_type(FooFoo(Foo(3.14)).__class__)  # revealed: type[int | float]
-reveal_type(FooFoo(Foo(42)).__class__)  # revealed: type[int | float]
+reveal_type(FooFoo(Foo(3.14)).__class__)  # revealed: type[float]
+reveal_type(FooFoo(Foo(42)).__class__)  # revealed: type[float]
 static_assert(is_assignable_to(FooFoo, float))
 static_assert(is_assignable_to(FooFoo, Foo))
 static_assert(is_assignable_to(FooFoo, int | float))
@@ -384,12 +393,12 @@ explicit `Union` on the left side:
 ```py
 reveal_type(Foo(3.14) < Foo(42))  # revealed: bool
 reveal_type(Foo(3.14) == Foo(42))  # revealed: bool
-reveal_type(Foo(3.14) + Foo(42))  # revealed: int | float
-reveal_type(Foo(3.14) / Foo(42))  # revealed: int | float
+reveal_type(Foo(3.14) + Foo(42))  # revealed: float
+reveal_type(Foo(3.14) / Foo(42))  # revealed: float
 reveal_type(FooFoo(Foo(3.14)) < FooFoo(Foo(42)))  # revealed: bool
 reveal_type(FooFoo(Foo(3.14)) == FooFoo(Foo(42)))  # revealed: bool
-reveal_type(FooFoo(Foo(3.14)) + FooFoo(Foo(42)))  # revealed: int | float
-reveal_type(FooFoo(Foo(3.14)) / FooFoo(Foo(42)))  # revealed: int | float
+reveal_type(FooFoo(Foo(3.14)) + FooFoo(Foo(42)))  # revealed: float
+reveal_type(FooFoo(Foo(3.14)) / FooFoo(Foo(42)))  # revealed: float
 ```
 
 But again as above, we can't _always_ lower `Foo` to `int | float`, because there are also binary
@@ -442,16 +451,16 @@ reveal_type(unknown * MyFloat(1.0))  # revealed: Unknown
 Unary operations take a different codepath and need their own test cases:
 
 ```py
-reveal_type(-Foo(3.14))  # revealed: int | float
-reveal_type(+Foo(3.14))  # revealed: int | float
+reveal_type(-Foo(3.14))  # revealed: float
+reveal_type(+Foo(3.14))  # revealed: float
 ~Foo(3.14)  # error: [unsupported-operator]
 reveal_type(not Foo(3.14))  # revealed: bool
-reveal_type(-Bar(1 + 2j))  # revealed: int | float | complex
-reveal_type(+Bar(1 + 2j))  # revealed: int | float | complex
+reveal_type(-Bar(1 + 2j))  # revealed: complex
+reveal_type(+Bar(1 + 2j))  # revealed: complex
 ~Bar(1 + 2j)  # error: [unsupported-operator]
 reveal_type(not Bar(1 + 2j))  # revealed: bool
-reveal_type(-FooFoo(Foo(3.14)))  # revealed: int | float
-reveal_type(+FooFoo(Foo(3.14)))  # revealed: int | float
+reveal_type(-FooFoo(Foo(3.14)))  # revealed: float
+reveal_type(+FooFoo(Foo(3.14)))  # revealed: float
 ~FooFoo(Foo(3.14))  # error: [unsupported-operator]
 reveal_type(not FooFoo(Foo(3.14)))  # revealed: bool
 
@@ -476,13 +485,13 @@ union:
 
 ```py
 def _(x: Foo | float, y: Bar | complex):
-    reveal_type(-x)  # revealed: int | float
-    reveal_type(+x)  # revealed: int | float
+    reveal_type(-x)  # revealed: float
+    reveal_type(+x)  # revealed: float
     ~x  # error: [unsupported-operator]
     reveal_type(not x)  # revealed: bool
 
-    reveal_type(-y)  # revealed: int | float | complex
-    reveal_type(+y)  # revealed: int | float | complex
+    reveal_type(-y)  # revealed: complex
+    reveal_type(+y)  # revealed: complex
     ~y  # error: [unsupported-operator]
     reveal_type(not y)  # revealed: bool
 ```
@@ -644,9 +653,11 @@ info: Perhaps you were looking for: `Foo = NewType('Foo', X)`
 info: Definition of class `Foo` will raise `TypeError` at runtime
 ```
 
-## Don't narrow `NewType`-wrapped `Enum`s inside of match arms
+## `NewType`-wrapped enums match their members
 
-`Literal[Foo.X]` is actually disjoint from `N` here:
+A `NewType` constructor returns its argument unchanged at runtime, and an ordinary literal does not
+restrict `NewType` tags. An enum member can therefore inhabit both its literal type and a `NewType`
+based on the enum. Each arm retains both types, and matching every enum member is exhaustive.
 
 ```py
 from enum import Enum
@@ -661,11 +672,11 @@ N = NewType("N", Foo)
 def f(x: N):
     match x:
         case Foo.X:
-            reveal_type(x)  # revealed: N
+            reveal_type(x)  # revealed: N & Literal[Foo.X]
         case Foo.Y:
-            reveal_type(x)  # revealed: N
+            reveal_type(x)  # revealed: N & Literal[Foo.Y]
         case _:
-            reveal_type(x)  # revealed: N
+            reveal_type(x)  # revealed: Never
 ```
 
 ## The base of a `NewType` can't be a protocol class or a `TypedDict`

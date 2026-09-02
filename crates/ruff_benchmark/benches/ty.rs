@@ -1,16 +1,11 @@
 #![allow(clippy::disallowed_names)]
 use ruff_benchmark::criterion;
-use ruff_benchmark::real_world_projects::{
-    InstalledProject, RealWorldProject, TY_ECOSYSTEM_PIN, copy_directory_recursive,
-    get_project_cache_dir, install_dependencies_to_cache,
-};
+use ruff_benchmark::real_world_projects::{InstalledProject, RealWorldProject, TY_ECOSYSTEM_PIN};
 
 use std::fmt::Write;
 use std::ops::Range;
-use std::path::{Path, PathBuf};
 
 use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
-use rayon::ThreadPoolBuilder;
 use rustc_hash::FxHashSet;
 
 use ruff_benchmark::TestFile;
@@ -19,13 +14,18 @@ use ruff_db::files::{File, system_path_to_file};
 use ruff_db::source::source_text;
 use ruff_db::system::{InMemorySystem, MemoryFileSystem, SystemPath, SystemPathBuf, TestSystem};
 use ruff_ranged_value::RangedValue;
-use ty_project::metadata::options::{AnalysisOptions, EnvironmentOptions, Options};
+use ty_project::metadata::options::{AnalysisOptions, EnvironmentOptions, Options, Rules};
 use ty_project::metadata::python_version::SupportedPythonVersion;
 use ty_project::metadata::value::RelativePathBuf;
 use ty_project::watch::{ChangeEvent, ChangedKind};
 use ty_project::{CheckMode, Db, ProjectDatabase, ProjectMetadata};
+use ty_python_semantic::lint::Level;
 
-struct Case {
+mod ty_shared;
+
+use ty_shared::{Case, setup_micro_case, setup_rayon};
+
+struct FileCase {
     db: ProjectDatabase,
     fs: MemoryFileSystem,
     file: File,
@@ -72,7 +72,7 @@ fn tomllib_path(file: &TestFile) -> SystemPathBuf {
     SystemPathBuf::from("src").join(file.name())
 }
 
-fn setup_tomllib_case() -> Case {
+fn setup_tomllib_case() -> FileCase {
     let system = TestSystem::default();
     let fs = system.memory_file_system().clone();
 
@@ -115,7 +115,7 @@ fn setup_tomllib_case() -> Case {
     db.project().set_open_files(&mut db, tomllib_files);
 
     let re_path = re.path(&db).as_system_path().unwrap().to_owned();
-    Case {
+    FileCase {
         db,
         fs,
         file: re,
@@ -123,24 +123,8 @@ fn setup_tomllib_case() -> Case {
     }
 }
 
-static RAYON_INITIALIZED: std::sync::Once = std::sync::Once::new();
-
-fn setup_rayon() {
-    // Initialize the rayon thread pool outside the benchmark because it has a significant cost.
-    // We limit the thread pool to only one (the current thread) because we're focused on
-    // where ty spends time and less about how well the code runs concurrently.
-    // We might want to add a benchmark focusing on concurrency to detect congestion in the future.
-    RAYON_INITIALIZED.call_once(|| {
-        ThreadPoolBuilder::new()
-            .num_threads(1)
-            .use_current_thread()
-            .build_global()
-            .unwrap();
-    });
-}
-
 fn benchmark_incremental(criterion: &mut Criterion) {
-    fn setup() -> Case {
+    fn setup() -> FileCase {
         let case = setup_tomllib_case();
 
         let result: Vec<_> = case.db.check();
@@ -160,8 +144,8 @@ fn benchmark_incremental(criterion: &mut Criterion) {
         case
     }
 
-    fn incremental(case: &mut Case) {
-        let Case { db, .. } = case;
+    fn incremental(case: &mut FileCase) {
+        let FileCase { db, .. } = case;
 
         db.apply_changes(&[ChangeEvent::Changed {
             path: case.file_path.clone(),
@@ -187,7 +171,7 @@ fn benchmark_cold(criterion: &mut Criterion) {
         b.iter_batched_ref(
             setup_tomllib_case,
             |case| {
-                let Case { db, .. } = case;
+                let FileCase { db, .. } = case;
                 let result: Vec<_> = db.check();
 
                 assert_diagnostics(db, &result, EXPECTED_TOMLLIB_DIAGNOSTICS);
@@ -218,76 +202,6 @@ fn assert_diagnostics(db: &dyn Db, diagnostics: &[Diagnostic], expected: &[KeyDi
         })
         .collect();
     assert_eq!(&normalized, expected);
-}
-
-fn setup_micro_case(code: &str) -> Case {
-    setup_micro_case_inner(code, None)
-}
-
-fn setup_micro_case_venv(name: &str, dependencies: &[&str]) -> PathBuf {
-    let cache_dir = get_project_cache_dir(name).expect("Failed to get cache directory");
-    std::fs::create_dir_all(&cache_dir).expect("Failed to create cache directory");
-
-    let venv_path = cache_dir.join(".venv");
-    install_dependencies_to_cache(
-        name,
-        dependencies,
-        &venv_path,
-        SupportedPythonVersion::Py312,
-        TY_ECOSYSTEM_PIN,
-    )
-    .expect("Failed to install dependencies");
-
-    venv_path
-}
-
-fn setup_micro_case_inner(code: &str, venv_path: Option<&Path>) -> Case {
-    let system = TestSystem::default();
-    let fs = system.memory_file_system().clone();
-
-    let python = venv_path.map(|venv_path| {
-        // Copy the on-disk venv into the in-memory filesystem.
-        // ProjectMetadata::discover walks up from /src and uses / as the project root,
-        // so the venv must be at /.venv for the `python = ".venv"` option to resolve correctly.
-        copy_directory_recursive(&fs, venv_path, SystemPath::new("/.venv"))
-            .expect("Failed to copy venv to memory filesystem");
-
-        RelativePathBuf::cli(SystemPath::new(".venv"))
-    });
-
-    let file_path = "src/test.py";
-    fs.write_file_all(
-        SystemPathBuf::from(file_path),
-        &*ruff_python_trivia::textwrap::dedent(code),
-    )
-    .unwrap();
-
-    let src_root = SystemPath::new("/src");
-    let mut metadata = ProjectMetadata::discover(src_root, &system).unwrap();
-    metadata.apply_override_options(Options {
-        environment: Some(EnvironmentOptions {
-            python_version: Some(RangedValue::cli(SupportedPythonVersion::Py312)),
-            python,
-            ..EnvironmentOptions::default()
-        }),
-        ..Options::default()
-    });
-
-    let mut db = ProjectDatabase::fallible(metadata, system).unwrap();
-    let file = system_path_to_file(&db, SystemPathBuf::from(file_path)).unwrap();
-
-    db.set_check_mode(CheckMode::OpenFiles);
-    db.project()
-        .set_open_files(&mut db, FxHashSet::from_iter([file]));
-
-    let file_path = file.path(&db).as_system_path().unwrap().to_owned();
-
-    Case {
-        db,
-        fs,
-        file,
-        file_path,
-    }
 }
 
 fn benchmark_many_string_assignments(criterion: &mut Criterion) {
@@ -334,7 +248,7 @@ fn benchmark_many_string_assignments(criterion: &mut Criterion) {
                 )
             },
             |case| {
-                let Case { db, .. } = case;
+                let Case { db } = case;
                 let result = db.check();
                 assert_eq!(result.len(), 0);
             },
@@ -380,7 +294,7 @@ fn benchmark_many_tuple_assignments(criterion: &mut Criterion) {
                 )
             },
             |case| {
-                let Case { db, .. } = case;
+                let Case { db } = case;
                 let result = db.check();
                 assert_eq!(result.len(), 0);
             },
@@ -415,7 +329,7 @@ fn benchmark_tuple_implicit_instance_attributes(criterion: &mut Criterion) {
                 )
             },
             |case| {
-                let Case { db, .. } = case;
+                let Case { db } = case;
                 let result = db.check();
                 assert_eq!(result.len(), 0);
             },
@@ -467,7 +381,7 @@ fn benchmark_complex_constrained_attributes_1(criterion: &mut Criterion) {
                 )
             },
             |case| {
-                let Case { db, .. } = case;
+                let Case { db } = case;
                 let result = db.check();
                 assert!(!result.is_empty());
             },
@@ -512,7 +426,7 @@ fn benchmark_complex_constrained_attributes_2(criterion: &mut Criterion) {
                 )
             },
             |case| {
-                let Case { db, .. } = case;
+                let Case { db } = case;
                 let result = db.check();
                 assert_eq!(result.len(), 0);
             },
@@ -556,7 +470,7 @@ fn benchmark_complex_constrained_attributes_3(criterion: &mut Criterion) {
                 )
             },
             |case| {
-                let Case { db, .. } = case;
+                let Case { db } = case;
                 let result = db.check();
                 assert_eq!(result.len(), 0);
             },
@@ -588,7 +502,7 @@ fn benchmark_many_enum_members(criterion: &mut Criterion) {
         b.iter_batched_ref(
             || setup_micro_case(&code),
             |case| {
-                let Case { db, .. } = case;
+                let Case { db } = case;
                 let result = db.check();
                 assert_eq!(result.len(), 0);
             },
@@ -625,7 +539,7 @@ fn benchmark_large_enum_membership(criterion: &mut Criterion) {
         b.iter_batched_ref(
             || setup_micro_case(&code),
             |case| {
-                let Case { db, .. } = case;
+                let Case { db } = case;
                 let result = db.check();
                 assert_eq!(result.len(), 0);
             },
@@ -641,7 +555,7 @@ fn benchmark_enum_comparison(criterion: &mut Criterion, name: &str, code: &str) 
         b.iter_batched_ref(
             || setup_micro_case(code),
             |case| {
-                let Case { db, .. } = case;
+                let Case { db } = case;
                 let result = db.check();
                 assert_eq!(result.len(), 0);
             },
@@ -671,9 +585,12 @@ fn benchmark_narrowed_str_enum_comparison(criterion: &mut Criterion) {
 fn benchmark_optional_str_enum_comparison(criterion: &mut Criterion) {
     const NUM_ENUM_MEMBERS: usize = 256;
 
-    let mut code =
-        "from dataclasses import dataclass\nfrom enum import StrEnum\n\nclass ModelSlug(StrEnum):\n"
-            .to_string();
+    let mut code = "from dataclasses import dataclass
+from enum import StrEnum
+
+class ModelSlug(StrEnum):
+"
+    .to_string();
     for index in 0..NUM_ENUM_MEMBERS {
         writeln!(&mut code, "    M{index} = \"m{index}\"").ok();
     }
@@ -707,9 +624,12 @@ def belongs(slug: ModelSlug, category: Category) -> bool:
 fn benchmark_enum_literal_union_comparison(criterion: &mut Criterion) {
     const NUM_ENUM_MEMBERS: usize = 256;
 
-    let mut code =
-        "from enum import StrEnum\nfrom typing import Literal\n\nclass LargeEnum(StrEnum):\n"
-            .to_string();
+    let mut code = "from enum import StrEnum
+from typing import Literal
+
+class LargeEnum(StrEnum):
+"
+    .to_string();
     for index in 0..NUM_ENUM_MEMBERS {
         writeln!(&mut code, "    VALUE_{index} = \"value_{index}\"").ok();
     }
@@ -755,7 +675,13 @@ fn benchmark_cross_str_enum_comparison(criterion: &mut Criterion) {
         }
     }
     code.push_str(
-        "\n\ndef compare(left: Left, right: Right):\n    if left != right:\n        return\n    return left == right\n",
+        "
+
+def compare(left: Left, right: Right):
+    if left != right:
+        return
+    return left == right
+",
     );
 
     benchmark_enum_comparison(criterion, "ty_micro[cross_str_enum_comparison]", &code);
@@ -787,7 +713,11 @@ fn benchmark_mixed_str_enum_comparison(criterion: &mut Criterion) {
     };
     writeln!(
         &mut code,
-        "\ndef compare(left: {}, right: {}):\n    if left != right:\n        return\n    return left == right",
+        "
+def compare(left: {}, right: {}):
+    if left != right:
+        return
+    return left == right",
         class_union("Left"),
         class_union("Right"),
     )
@@ -830,7 +760,7 @@ for msg in translations_tuple:
         b.iter_batched_ref(
             || setup_micro_case(&code),
             |case| {
-                let Case { db, .. } = case;
+                let Case { db } = case;
                 let result = db.check();
                 assert_eq!(result.len(), 0);
             },
@@ -882,7 +812,7 @@ class E(Enum):
         b.iter_batched_ref(
             || setup_micro_case(&code),
             |case| {
-                let Case { db, .. } = case;
+                let Case { db } = case;
                 let result = db.check();
                 assert_eq!(result.len(), 0);
             },
@@ -925,13 +855,67 @@ fn benchmark_many_protocol_members_mismatch(criterion: &mut Criterion) {
         b.iter_batched_ref(
             || setup_micro_case(&code),
             |case| {
-                let Case { db, .. } = case;
+                let Case { db } = case;
                 let result = db.check();
                 assert_eq!(result.len(), NUM_FUNCTIONS);
             },
             BatchSize::SmallInput,
         );
     });
+}
+
+/// Regression benchmarks for ty#4269: recursive protocol inference and assignment diagnostics.
+///
+/// Explicit receiver annotations can repeatedly expand inherited recursive protocol members
+/// during constructor inference or diagnostic collection.
+fn benchmark_inherited_recursive_protocol(criterion: &mut Criterion) {
+    const NUM_METHODS: usize = 8;
+
+    setup_rayon();
+
+    let mut code = "\
+from __future__ import annotations
+
+from collections.abc import Callable, Iterable
+from typing import Protocol
+
+class Chain[T](Protocol):
+    def value(self) -> T: ...
+"
+    .to_string();
+
+    for i in 0..NUM_METHODS {
+        writeln!(
+            &mut code,
+            "    def method_{i}[A, B](self: Chain[tuple[A, B]], callback: Callable[[A, B], T]) -> Chain[T]: ..."
+        )
+        .ok();
+    }
+
+    code.push_str("\nclass Concrete[T](Chain[T]):\n");
+    code.push_str("    def __init__(self, values: Iterable[T]) -> None: ...\n");
+
+    for (name, scenario, expected_diagnostics) in [
+        (
+            "ty_micro[inherited_recursive_protocol_constructor]",
+            "\nvalue: Chain[int] = Concrete(())\n",
+            0,
+        ),
+        (
+            "ty_micro[inherited_recursive_protocol_diagnostic]",
+            "\ndef diagnose[T](value: Concrete[T]) -> None:\n    invalid: Chain[int] = value\n",
+            1,
+        ),
+    ] {
+        let code = format!("{code}{scenario}");
+        criterion.bench_function(name, |b| {
+            b.iter_batched_ref(
+                || setup_micro_case(&code),
+                |case| assert_eq!(case.db.check().len(), expected_diagnostics),
+                BatchSize::SmallInput,
+            );
+        });
+    }
 }
 
 /// Regression benchmark for large calls to a gradual variadic tail.
@@ -963,7 +947,7 @@ accepts_anything(
         b.iter_batched_ref(
             || setup_micro_case(&code),
             |case| {
-                let Case { db, .. } = case;
+                let Case { db } = case;
                 let result = db.check();
                 assert_eq!(result.len(), 0);
             },
@@ -999,7 +983,7 @@ accepts_objects(
         b.iter_batched_ref(
             || setup_micro_case(&code),
             |case| {
-                let Case { db, .. } = case;
+                let Case { db } = case;
                 let result = db.check();
                 assert_eq!(result.len(), 0);
             },
@@ -1008,70 +992,37 @@ accepts_objects(
     });
 }
 
-/// Regression benchmark for many precise arguments constraining the same type variable.
+/// Regression benchmark for contextual inference of `TypedDict.get` with a large literal union.
 ///
-/// The parameters are distinct to avoid exercising the `*args` parameter-type accumulator. The
-/// important part is that specialization inference should not repeatedly rebuild a growing union
-/// for `T` as each argument adds another solution.
-fn benchmark_typevar_mapping_large_accumulation(criterion: &mut Criterion) {
-    const NUM_ARGUMENTS: usize = 256;
+/// Passing the result to a typed function should not retry inference against each literal in the
+/// expected type: <https://github.com/astral-sh/ty/issues/4419>.
+fn benchmark_typed_dict_get_large_literal_union(criterion: &mut Criterion) {
+    const NUM_LITERAL_MEMBERS: usize = 1024;
 
     setup_rayon();
 
-    let mut code = "def combine[T](\n".to_string();
-    for i in 0..NUM_ARGUMENTS {
-        writeln!(&mut code, "    p{i}: T,").ok();
+    let mut code = "from typing import Literal, TypedDict\n\nIcon = Literal[\n".to_string();
+    for i in 0..NUM_LITERAL_MEMBERS {
+        writeln!(&mut code, r#"    "icon_{i}","#).ok();
     }
-    code.push_str(") -> T:\n    return p0\n\ncombine(\n");
+    code.push_str(
+        r#"]
 
-    for i in 0..NUM_ARGUMENTS {
-        writeln!(&mut code, r#"    ("field_{i}", {i}),"#).ok();
-    }
+class Message(TypedDict, total=False):
+    icon: Icon
 
-    code.push_str(")\n");
+def accept_icon(icon: Icon | None) -> None: ...
 
-    criterion.bench_function("ty_micro[typevar_mapping_accumulation]", |b| {
+def check(message: Message, default: Icon | None) -> None:
+    accept_icon(message.get("icon", default))
+"#,
+    );
+
+    criterion.bench_function("ty_micro[typed_dict_get_large_literal_union]", |b| {
         b.iter_batched_ref(
             || setup_micro_case(&code),
             |case| {
-                let Case { db, .. } = case;
-                let result = db.check();
-                assert_eq!(result.len(), 0);
-            },
-            BatchSize::SmallInput,
-        );
-    });
-}
-
-/// Benchmark for many small type-variable accumulations.
-///
-/// This guards the common case where each type variable only receives a few constraints. Optimizing
-/// the large-accumulation case should not make these small generic calls slower.
-fn benchmark_typevar_mapping_small_accumulations(criterion: &mut Criterion) {
-    const NUM_CALLS: usize = 256;
-
-    setup_rayon();
-
-    let mut code = "\
-def combine[T](first: T, second: T, third: T) -> T:
-    return first
-
-"
-    .to_string();
-
-    for i in 0..NUM_CALLS {
-        writeln!(
-            &mut code,
-            r#"combine(("field_{i}", {i}), ("other_{i}", "{i}"), ("flag_{i}", True))"#
-        )
-        .ok();
-    }
-
-    criterion.bench_function("ty_micro[typevar_mapping_small_accumulations]", |b| {
-        b.iter_batched_ref(
-            || setup_micro_case(&code),
-            |case| {
-                let Case { db, .. } = case;
+                let Case { db } = case;
                 let result = db.check();
                 assert_eq!(result.len(), 0);
             },
@@ -1135,7 +1086,7 @@ fn benchmark_large_union_narrowing(criterion: &mut Criterion) {
         b.iter_batched_ref(
             || setup_micro_case(&code),
             |case| {
-                let Case { db, .. } = case;
+                let Case { db } = case;
                 let result = db.check();
                 assert_eq!(result.len(), 0);
             },
@@ -1189,7 +1140,7 @@ fn benchmark_large_isinstance_narrowing(criterion: &mut Criterion) {
         b.iter_batched_ref(
             || setup_micro_case(&code),
             |case| {
-                let Case { db, .. } = case;
+                let Case { db } = case;
                 let result = db.check();
                 assert_eq!(result.len(), 0);
             },
@@ -1295,7 +1246,14 @@ fn literal_equality_fallthrough_code() -> String {
 }
 
 fn literal_or_pattern_reachability_code() -> String {
-    let mut code = "from typing import Any\n\ndef check(item: Any) -> None:\n    x: int\n    match item:\n        case ".to_string();
+    let mut code = "\
+from typing import Any
+
+def check(item: Any) -> None:
+    x: int
+    match item:
+        case "
+        .to_string();
 
     for index in 0..NUM_LITERAL_OR_PATTERN_ALTERNATIVES {
         if index > 0 {
@@ -1390,6 +1348,39 @@ fn benchmark_literal_equality_fallthrough_guarded_any(criterion: &mut Criterion)
     );
 }
 
+/// Regression benchmark for <https://github.com/astral-sh/ty/issues/4256>.
+///
+/// Excluding rejected gradual string literals must not expand the complement of each intersection
+/// into exponentially many equivalent alternatives.
+fn benchmark_gradual_literal_union_equality(criterion: &mut Criterion) {
+    setup_rayon();
+
+    let mut code = String::from(
+        "from typing import Any, Literal\nfrom ty_extensions import Intersection\n\ndef check(value: (\n",
+    );
+    for index in 0..20 {
+        writeln!(
+            &mut code,
+            "    {}Intersection[Any, Literal[\"{index}\"]]",
+            if index == 0 { "" } else { "| " },
+        )
+        .ok();
+    }
+    code.push_str(")) -> None:\n    assert value == \"0\"\n    repr(value)\n");
+
+    criterion.bench_function("ty_micro[gradual_literal_union_equality]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 /// Regression benchmark for <https://github.com/astral-sh/ty/issues/3880>.
 ///
 /// Reachability analysis for a large literal OR pattern on `Any` used to rebuild the remaining
@@ -1404,7 +1395,7 @@ fn benchmark_literal_or_pattern_reachability(criterion: &mut Criterion) {
         b.iter_batched_ref(
             || setup_micro_case(&code),
             |case| {
-                let Case { db, .. } = case;
+                let Case { db } = case;
                 let result = db.check();
                 assert_eq!(result.len(), 0);
             },
@@ -1420,7 +1411,7 @@ fn benchmark_literal_fallthrough(criterion: &mut Criterion, name: &str, code: &s
         b.iter_batched_ref(
             || setup_micro_case(code),
             |case| {
-                let Case { db, .. } = case;
+                let Case { db } = case;
                 let result = db.check();
                 assert_eq!(result.len(), 0);
             },
@@ -1442,7 +1433,7 @@ fn benchmark_typeis_narrowing(criterion: &mut Criterion) {
         b.iter_batched_ref(
             || setup_micro_case(include_str!("../resources/typeis_narrowing.py")),
             |case| {
-                let Case { db, .. } = case;
+                let Case { db } = case;
                 let result = db.check();
                 assert_eq!(result.len(), 0);
             },
@@ -1486,7 +1477,40 @@ fn benchmark_repeated_statement_calls(criterion: &mut Criterion) {
             b.iter_batched_ref(
                 || setup_micro_case(&code),
                 |case| {
-                    let Case { db, .. } = case;
+                    let Case { db } = case;
+                    let result = db.check();
+                    assert_eq!(result.len(), 0);
+                },
+                BatchSize::SmallInput,
+            );
+        });
+    }
+
+    for (name, parameters, statement) in [
+        (
+            "ty_micro[repeated_statement_calls_in_try]",
+            "value: str",
+            "        value.upper()\n",
+        ),
+        (
+            "ty_micro[repeated_statement_calls_in_try_with_if_branches]",
+            "value: str, flag: bool",
+            "        if flag is True:\n            pass\n        value.upper()\n",
+        ),
+    ] {
+        let mut code = format!("def f({parameters}) -> None:\n");
+        for index in 0..800 {
+            writeln!(&mut code, "    local_{index} = {index}").ok();
+        }
+        code.push_str("    try:\n");
+        code.push_str(&statement.repeat(800));
+        code.push_str("    except Exception:\n        pass\n");
+
+        criterion.bench_function(name, |b| {
+            b.iter_batched_ref(
+                || setup_micro_case(&code),
+                |case| {
+                    let Case { db } = case;
                     let result = db.check();
                     assert_eq!(result.len(), 0);
                 },
@@ -1496,462 +1520,87 @@ fn benchmark_repeated_statement_calls(criterion: &mut Criterion) {
     }
 }
 
-/// Benchmarks solving many union-bearing upper bounds while inferring a generic call.
+/// Exercises repeated control-flow gates with and without interleaved statement-call predicates.
 ///
-/// Each callable argument places a distinct union upper bound on `T` through callable-parameter
-/// contravariance. Fully materializing the conjunction of these bounds would require constructing
-/// the cross product of all union alternatives. Factored path bounds and bounded intersection
-/// keep the work bounded instead.
-fn benchmark_factored_upper_bounds(criterion: &mut Criterion) {
-    const NUM_CLAUSES: usize = 12;
-    const ALTERNATIVES_PER_CLAUSE: usize = 8;
-
+/// Each suppressing context manager merges the old binding with a reassigned binding. Repeating
+/// this pattern can accumulate unnecessary narrowing gates and repeatedly evaluate the same
+/// reachability suffixes, while interleaved calls can make simple checkpoint selection miss every
+/// suppression predicate.
+fn benchmark_repeated_suppressing_context_managers(criterion: &mut Criterion) {
     setup_rayon();
 
-    let mut code = "from collections.abc import Callable\n\n".to_string();
-    for clause in 0..NUM_CLAUSES {
-        for alternative in 0..ALTERNATIVES_PER_CLAUSE {
-            writeln!(&mut code, "class C{clause}_{alternative}: ...").ok();
-        }
-    }
+    let cases = [
+        (
+            "ty_micro[repeated_suppressing_context_managers]",
+            "    with suppress(ValueError):\n        value = may_raise(value)\n",
+            320,
+        ),
+        (
+            "ty_micro[repeated_suppressing_context_managers_interleaved_calls]",
+            "    with suppress(ValueError):\n        value = may_raise(value)\n    may_raise(value)\n",
+            160,
+        ),
+    ];
 
-    code.push_str("\ndef infer[T](\n");
-    for clause in 0..NUM_CLAUSES {
-        writeln!(&mut code, "    consumer{clause}: Callable[[T], None],").ok();
-    }
-    code.push_str(") -> T:\n    raise NotImplementedError\n\n");
-
-    for clause in 0..NUM_CLAUSES {
-        write!(&mut code, "def consume{clause}(value: ").ok();
-        for alternative in 0..ALTERNATIVES_PER_CLAUSE {
-            if alternative > 0 {
-                code.push_str(" | ");
-            }
-            write!(&mut code, "C{clause}_{alternative}").ok();
-        }
-        code.push_str(") -> None: ...\n");
-    }
-
-    code.push_str("\nresult = infer(\n");
-    for clause in 0..NUM_CLAUSES {
-        writeln!(&mut code, "    consume{clause},").ok();
-    }
-    code.push_str(")\n");
-
-    criterion.bench_function("ty_micro[factored_upper_bounds]", |b| {
-        b.iter_batched_ref(
-            || setup_micro_case(&code),
-            |case| {
-                let Case { db, .. } = case;
-                let result = db.check();
-                assert_eq!(result.len(), 0);
-            },
-            BatchSize::SmallInput,
+    for (name, statement, repetitions) in cases {
+        let mut code = String::from(
+            "from contextlib import suppress\n\ndef may_raise(value: int) -> int:\n    return value\n\ndef f() -> int:\n    value = 0\n",
         );
-    });
-}
+        code.push_str(&statement.repeat(repetitions));
+        code.push_str("    return value\n");
 
-/// Guards against quadratic pruning when contravariant callbacks contribute many upper-only bounds.
-fn benchmark_many_upper_bound_callbacks(criterion: &mut Criterion) {
-    const NUM_CALLBACKS: usize = 1_200;
-
-    setup_rayon();
-
-    let mut code = String::from(
-        "from collections.abc import Callable\nfrom typing import Literal\n\ndef accepts[T](\n",
-    );
-    for i in 0..NUM_CALLBACKS {
-        writeln!(&mut code, "    cb{i}: Callable[[T], None],").ok();
-    }
-    code.push_str(") -> None: ...\n\ndef call_many(\n");
-    for i in 0..NUM_CALLBACKS {
-        writeln!(&mut code, "    cb{i}: Callable[[Literal[{i}]], None],").ok();
-    }
-    code.push_str(") -> None:\n    accepts(\n");
-    for i in 0..NUM_CALLBACKS {
-        writeln!(&mut code, "        cb{i},").ok();
-    }
-    code.push_str("    )\n");
-
-    criterion.bench_function("ty_micro[many_upper_bound_callbacks]", |b| {
-        b.iter_batched_ref(
-            || setup_micro_case(&code),
-            |case| {
-                let Case { db, .. } = case;
-                let result = db.check();
-                assert_eq!(result.len(), 0);
-            },
-            BatchSize::SmallInput,
-        );
-    });
-}
-
-fn benchmark_pandas_tdd(criterion: &mut Criterion) {
-    setup_rayon();
-    let venv_path = setup_micro_case_venv("pandas_tdd", &["pandas-stubs"]);
-    let code = r#"
-        import pandas as pd
-
-        df = pd.DataFrame({
-            "a": [1, 2, 3],
-            "b": [4, 5, 6],
-            "c": [7, 8, 9],
-        })
-        df["d"] = df["a"] + df["b"] + df["c"] + 1 + (
-            df["a"] ** 2 + df["b"] ** 2 + df["c"] ** 2)
-        "#;
-
-    // This example was reported in https://github.com/astral-sh/ty/issues/3039.
-    criterion.bench_function("ty_micro[pandas_tdd]", |b| {
-        b.iter_batched_ref(
-            || setup_micro_case_inner(code, Some(&venv_path)),
-            |case| {
-                let Case { db, .. } = case;
-                let result = db.check();
-                assert_eq!(result.len(), 0);
-            },
-            BatchSize::SmallInput,
-        );
-    });
-}
-
-fn benchmark_mixed_typed_dict_union_copy(criterion: &mut Criterion) {
-    const NUM_VARIANTS: usize = 12;
-
-    setup_rayon();
-
-    let mut code = concat!(
-        "from collections import ChainMap, OrderedDict, defaultdict\n",
-        "from collections.abc import Mapping, MutableMapping\n",
-        "from typing import Any, Literal, TypedDict\n\n",
-    )
-    .to_string();
-
-    for i in 0..NUM_VARIANTS {
-        writeln!(
-            &mut code,
-            "class Item{i}(TypedDict):\n    type: Literal[{i}]"
-        )
-        .ok();
-        if i == 0 {
-            code.push_str("    other: Any\n");
-        }
-        code.push('\n');
-    }
-
-    code.push_str("type Item = ");
-    for i in 0..NUM_VARIANTS {
-        if i > 0 {
-            code.push_str(" | ");
-        }
-        write!(&mut code, "Item{i}").ok();
-    }
-
-    code.push_str(
-        r#"
-
-def copy_dict(value: Item | dict[str, Any]) -> dict[str, object]:
-    return dict(value)
-
-def copy_mapping(value: Item | Mapping[str, Any]) -> dict[str, object]:
-    return dict(value)
-
-def copy_mutable_mapping(value: Item | MutableMapping[str, Any]) -> dict[str, object]:
-    return dict(value)
-
-def copy_ordered_dict(value: Item | OrderedDict[str, Any]) -> dict[str, object]:
-    return dict(value)
-
-def copy_default_dict(value: Item | defaultdict[str, Any]) -> dict[str, object]:
-    return dict(value)
-
-def copy_chain_map(value: Item | ChainMap[str, Any]) -> dict[str, object]:
-    return dict(value)
-
-def copy_narrowed_mapping(value: Item | Mapping[str, Any]) -> dict[str, object] | None:
-    if isinstance(value, dict):
-        return dict(value)
-    return None
-"#,
-    );
-
-    criterion.bench_function("ty_micro[mixed_typed_dict_union_copy]", |b| {
-        b.iter_batched_ref(
-            || setup_micro_case(&code),
-            |case| {
-                let Case { db, .. } = case;
-                let result = db.check();
-                assert_eq!(result.len(), 0);
-            },
-            BatchSize::SmallInput,
-        );
-    });
-}
-
-fn benchmark_recursive_typed_dict_union_contextual_inference(criterion: &mut Criterion) {
-    const NUM_BRANCHES: usize = 11;
-
-    setup_rayon();
-
-    // Regression benchmark for https://github.com/astral-sh/ty/issues/3663.
-    let mut code = "from typing import Literal, TypedDict\n\n".to_string();
-    for i in 0..NUM_BRANCHES {
-        writeln!(
-            &mut code,
-            "class Node{i}(TypedDict):\n    type: Literal['node-{i}']\n    children: list['Node']\n"
-        )
-        .ok();
-    }
-    code.push_str("class Leaf(TypedDict):\n    type: Literal['leaf']\n    text: str\n\n");
-    code.push_str("type Node = ");
-    for i in 0..NUM_BRANCHES {
-        if i > 0 {
-            code.push_str(" | ");
-        }
-        write!(&mut code, "Node{i}").ok();
-    }
-    code.push_str(
-        r#" | Leaf
-
-value: list[Node] = [
-    {"type": "node-0", "children": [
-        {"type": "node-1", "children": [
-            {"type": "node-2", "children": [{"type": "leaf", "text": "x"}]},
-            {"type": "node-3", "children": [{"type": "leaf", "text": "y"}]},
-        ]},
-        {"type": "node-4", "children": [
-            {"type": "node-5", "children": [{"type": "leaf", "text": "z"}]},
-            {"type": "node-6", "children": [{"type": "leaf", "text": "w"}]},
-        ]},
-    ]},
-]
-"#,
-    );
-
-    criterion.bench_function(
-        "ty_micro[recursive_typed_dict_union_contextual_inference]",
-        |b| {
+        criterion.bench_function(name, |b| {
             b.iter_batched_ref(
                 || setup_micro_case(&code),
                 |case| {
-                    let Case { db, .. } = case;
+                    let Case { db } = case;
                     let result = db.check();
                     assert_eq!(result.len(), 0);
                 },
                 BatchSize::SmallInput,
             );
-        },
-    );
+        });
+    }
 }
 
-fn benchmark_invariant_generic_return_union(criterion: &mut Criterion) {
-    const NUM_VARIANTS: usize = 21;
-
+/// Exercises overlapping narrowing histories for repeated conditional assignments.
+///
+/// Every `isinstance` check narrows the same place, while each conditional assignment preserves
+/// the earlier binding on another path. Suppressing context managers add additional path gates to
+/// the same narrowing histories.
+fn benchmark_repeated_narrowed_assignments(criterion: &mut Criterion) {
     setup_rayon();
 
-    // Regression benchmark for https://github.com/astral-sh/ty/issues/3896.
-    let mut code = String::new();
-    for i in 0..NUM_VARIANTS {
-        writeln!(&mut code, "class M{i}: pass").ok();
-    }
-    code.push_str("\nAllResults = (\n");
-    for i in 0..NUM_VARIANTS {
-        if i > 0 {
-            code.push_str(" |\n");
-        }
-        write!(&mut code, "    dict[int, M{i}]").ok();
-    }
-    code.push_str("\n)\n\nRows = (\n");
-    for i in 0..NUM_VARIANTS {
-        if i > 0 {
-            code.push_str(" |\n");
-        }
-        write!(&mut code, "    list[tuple[int, M{i}]]").ok();
-    }
-    code.push_str(
-        r#"
-)
+    let cases = [
+        (
+            "ty_micro[repeated_narrowed_assignments]",
+            "    if isinstance(value, int):\n        value = may_raise(value)\n",
+        ),
+        (
+            "ty_micro[repeated_narrowed_assignments_suppressing_context_managers]",
+            "    with suppress(ValueError):\n        if isinstance(value, int):\n            value = may_raise(value)\n",
+        ),
+    ];
 
-def map_rows[T](rows: list[tuple[int, T]]) -> dict[int, T]:
-    return {}
-
-def perform(rows: Rows) -> AllResults:
-    return map_rows(rows)
-"#,
-    );
-
-    criterion.bench_function("ty_micro[invariant_generic_return_union]", |b| {
-        b.iter_batched_ref(
-            || setup_micro_case(&code),
-            |case| {
-                let Case { db, .. } = case;
-                let result = db.check();
-                assert_eq!(result.len(), 0);
-            },
-            BatchSize::SmallInput,
+    for (name, statement) in cases {
+        let mut code = String::from(
+            "from contextlib import suppress\n\ndef may_raise(value: int) -> int:\n    return value\n\ndef f(value: int | str) -> int | str:\n",
         );
-    });
-}
+        code.push_str(&statement.repeat(320));
+        code.push_str("    return value\n");
 
-fn benchmark_sequence_literal_union_access(criterion: &mut Criterion) {
-    const NUM_LITERALS: usize = 1_200;
-
-    setup_rayon();
-
-    // Regression benchmark for https://github.com/astral-sh/ty/issues/4089.
-    let mut code = String::from(
-        "from collections.abc import Sequence\nfrom typing import Literal\n\nItem = Literal[\n",
-    );
-    for i in 0..NUM_LITERALS {
-        writeln!(&mut code, "    'value-{i}',").ok();
+        criterion.bench_function(name, |b| {
+            b.iter_batched_ref(
+                || setup_micro_case(&code),
+                |case| {
+                    let Case { db } = case;
+                    let result = db.check();
+                    assert_eq!(result.len(), 0);
+                },
+                BatchSize::SmallInput,
+            );
+        });
     }
-    code.push_str(
-        r#"]
-
-def iterate(items: Sequence[Item]) -> None:
-    for item in items:
-        pass
-
-def access(items: Sequence[Item]) -> None:
-    items[0]
-"#,
-    );
-
-    criterion.bench_function("ty_micro[sequence_literal_union_access]", |b| {
-        b.iter_batched_ref(
-            || setup_micro_case(&code),
-            |case| {
-                let Case { db, .. } = case;
-                let result = db.check();
-                assert_eq!(result.len(), 0);
-            },
-            BatchSize::SmallInput,
-        );
-    });
-}
-
-fn benchmark_invariant_generic_union_bound(criterion: &mut Criterion) {
-    const NUM_ALIASES: usize = 64;
-
-    setup_rayon();
-
-    let mut code =
-        String::from("from collections.abc import Iterable\nfrom typing import Literal\n\n");
-    for i in 0..NUM_ALIASES {
-        writeln!(
-            &mut code,
-            "type A{i} = Literal[{i}] | int | str | bytes | float"
-        )
-        .ok();
-    }
-    code.push_str("\nALIASES = {\n");
-    for i in 0..NUM_ALIASES {
-        writeln!(&mut code, "    A{i}: {{{i}: A{i}}},").ok();
-    }
-    code.push_str(
-        r#"}
-
-def consume(items: Iterable[object]) -> None: ...
-
-consume(ALIASES.items())
-"#,
-    );
-
-    criterion.bench_function("ty_micro[invariant_generic_union_bound]", |b| {
-        b.iter_batched_ref(
-            || setup_micro_case(&code),
-            |case| {
-                let Case { db, .. } = case;
-                let result = db.check();
-                assert_eq!(result.len(), 0);
-            },
-            BatchSize::SmallInput,
-        );
-    });
-}
-
-fn benchmark_many_invariant_typevars(criterion: &mut Criterion) {
-    setup_rayon();
-
-    // Regression benchmark for https://github.com/astral-sh/ty/issues/3989.
-    let code = r#"
-class Invariant[T]:
-    x: T
-
-def f[T1, T2, T3, T4, T5, T6, T7, T8, T9, T10](
-    box1: Invariant[T1],
-    box2: Invariant[T2],
-    box3: Invariant[T3],
-    box4: Invariant[T4],
-    box5: Invariant[T5],
-    box6: Invariant[T6],
-    box7: Invariant[T7],
-    box8: Invariant[T8],
-    box9: Invariant[T9],
-    box10: Invariant[T10],
-) -> None: ...
-
-x = Invariant[int]()
-f(x, x, x, x, x, x, x, x, x, x)
-"#;
-
-    criterion.bench_function("ty_micro[many_invariant_typevars]", |b| {
-        b.iter_batched_ref(
-            || setup_micro_case(code),
-            |case| {
-                let Case { db, .. } = case;
-                let result = db.check();
-                assert_eq!(result.len(), 0);
-            },
-            BatchSize::SmallInput,
-        );
-    });
-}
-fn benchmark_pydantic_core_schema_dict(criterion: &mut Criterion) {
-    const NUM_CORE_SCHEMA_VARIANTS: usize = 24;
-
-    setup_rayon();
-
-    // Minimized from the pydantic and hydra-zen ecosystem regressions seen during the
-    // SpecializationBuilder pending-constraint-set migration. Pydantic has several empty dict
-    // literals with a type context equivalent to `dict[Hashable, core_schema.CoreSchema]`
-    // (including `schema.setdefault("metadata", {})` and tagged-union choice tables).
-    // `CoreSchema` is a large union of TypedDict schema types; this local `CoreSchema` alias is
-    // derived from pydantic-core's real `CoreSchema`, but reduced to enough variants to show the
-    // regression quickly. Solving the empty-dict specialization creates one lower-bound constraint
-    // per union element for `_VT@dict`. Combined with `_KT@dict = Hashable`,
-    // PathAssignments/SequentMap traversal derives cross-typevar facts like
-    // `TypedDictSchema <= _VT@dict <= Hashable`. This benchmark tracks the cost until constraint
-    // projection / path-bounds solving can avoid that work.
-    let mut code = "from collections.abc import Hashable\nfrom typing import Literal, NotRequired, TypedDict\n\n"
-        .to_string();
-    for i in 0..NUM_CORE_SCHEMA_VARIANTS {
-        writeln!(
-            &mut code,
-            "class Schema{i}(TypedDict):\n    type: Literal['schema-{i}']\n    ref: NotRequired[str]\n    value_{i}: NotRequired[int]\n"
-        )
-        .ok();
-    }
-    code.push_str("type CoreSchema = ");
-    for i in 0..NUM_CORE_SCHEMA_VARIANTS {
-        if i > 0 {
-            code.push_str(" | ");
-        }
-        write!(&mut code, "Schema{i}").ok();
-    }
-    code.push_str("\n\nchoices: dict[Hashable, CoreSchema] = {}\n");
-
-    criterion.bench_function("ty_micro[pydantic_core_schema_dict]", |b| {
-        b.iter_batched_ref(
-            || setup_micro_case(&code),
-            |case| {
-                let Case { db, .. } = case;
-                let result = db.check();
-                assert_eq!(result.len(), 0);
-            },
-            BatchSize::SmallInput,
-        );
-    });
 }
 
 struct ProjectBenchmark<'a> {
@@ -1959,6 +1608,7 @@ struct ProjectBenchmark<'a> {
     fs: MemoryFileSystem,
     max_diagnostics: usize,
     freeze_inputs: bool,
+    rules: Option<Rules>,
 }
 
 impl<'a> ProjectBenchmark<'a> {
@@ -1973,6 +1623,7 @@ impl<'a> ProjectBenchmark<'a> {
             fs,
             max_diagnostics,
             freeze_inputs: false,
+            rules: None,
         }
     }
 
@@ -1993,6 +1644,7 @@ impl<'a> ProjectBenchmark<'a> {
                 python: Some(RelativePathBuf::cli(SystemPath::new(".venv"))),
                 ..EnvironmentOptions::default()
             }),
+            rules: self.rules.clone(),
             ..Options::default()
         });
 
@@ -2038,7 +1690,8 @@ fn bench_project_named(
                 .join("\n  ");
             assert!(
                 diagnostics <= max_diagnostics,
-                "{project_name}: Expected <={max_diagnostics} diagnostics but got {diagnostics}:\n  {details}",
+                "{project_name}: Expected <={max_diagnostics} diagnostics \
+                but got {diagnostics}:\n  {details}",
             );
         }
     }
@@ -2092,6 +1745,18 @@ fn attrs(criterion: &mut Criterion) {
     // Keep one real-world benchmark frozen to catch regressions from newly added inputs.
     let frozen_benchmark = benchmark.freeze_inputs();
     bench_project_named(&frozen_benchmark, criterion, "attrs (frozen inputs)");
+
+    let all_rules_benchmark = ProjectBenchmark {
+        freeze_inputs: false,
+        rules: Some(Rules::from_iter([(
+            RangedValue::cli("all".to_owned()),
+            RangedValue::cli(Level::Error),
+        )])),
+        max_diagnostics: 100,
+        ..frozen_benchmark
+    };
+
+    bench_project_named(&all_rules_benchmark, criterion, "attrs (all rules)");
 }
 
 fn anyio(criterion: &mut Criterion) {
@@ -2148,28 +1813,21 @@ criterion_group!(
     benchmark_mixed_str_enum_comparison,
     benchmark_many_enum_members_2,
     benchmark_many_protocol_members_mismatch,
+    benchmark_inherited_recursive_protocol,
     benchmark_vararg_parameter_type_accumulation,
-    benchmark_typevar_mapping_large_accumulation,
-    benchmark_typevar_mapping_small_accumulations,
+    benchmark_typed_dict_get_large_literal_union,
     benchmark_very_large_tuple,
     benchmark_large_union_narrowing,
     benchmark_large_isinstance_narrowing,
     benchmark_literal_match_fallthrough,
     benchmark_literal_match_fallthrough_guarded_any,
     benchmark_literal_equality_fallthrough_guarded_any,
+    benchmark_gradual_literal_union_equality,
     benchmark_literal_or_pattern_reachability,
     benchmark_typeis_narrowing,
     benchmark_repeated_statement_calls,
-    benchmark_factored_upper_bounds,
-    benchmark_many_upper_bound_callbacks,
-    benchmark_pandas_tdd,
-    benchmark_mixed_typed_dict_union_copy,
-    benchmark_recursive_typed_dict_union_contextual_inference,
-    benchmark_invariant_generic_return_union,
-    benchmark_sequence_literal_union_access,
-    benchmark_invariant_generic_union_bound,
-    benchmark_many_invariant_typevars,
-    benchmark_pydantic_core_schema_dict,
+    benchmark_repeated_suppressing_context_managers,
+    benchmark_repeated_narrowed_assignments,
 );
 criterion_group!(project, anyio, attrs, hydra, datetype);
 criterion_main!(check_file, micro, project);

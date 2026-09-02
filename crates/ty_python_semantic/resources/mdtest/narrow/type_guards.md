@@ -248,7 +248,7 @@ def _(a: object, flag: bool) -> TypeGuard[str]:
 # error: [invalid-return-type] "Function can implicitly return `None`, which is not assignable to return type `TypeIs[str]`"
 def f(a: object, flag: bool) -> TypeIs[str]:
     if flag:
-        # error: [invalid-return-type] "Return type does not match returned value: expected `TypeIs[str]`, found `float`"
+        # error: [invalid-return-type] "Return type does not match returned value: expected `TypeIs[str]`, found `float*`"
         return 1.2
 
 def g(a: Literal["foo", "bar"]) -> TypeIs[Literal["foo"]]:
@@ -257,6 +257,22 @@ def g(a: Literal["foo", "bar"]) -> TypeIs[Literal["foo"]]:
         return False
 
     return False
+```
+
+A valid boolean return must also be accepted when the predicate's return annotation is an alias of
+`TypeIs` or `TypeGuard`, rather than incorrectly producing an `invalid-return-type` diagnostic.
+
+```py
+from typing_extensions import TypeAliasType
+
+TypeIsAlias = TypeAliasType("TypeIsAlias", TypeIs[int])
+TypeGuardAlias = TypeAliasType("TypeGuardAlias", TypeGuard[int])
+
+def aliased_type_is(value: object) -> TypeIsAlias:
+    return True
+
+def aliased_type_guard(value: object) -> TypeGuardAlias:
+    return True
 ```
 
 ## Calls
@@ -517,6 +533,25 @@ def _(x: Unrelated | Invariant[int]):
         reveal_type(x)  # revealed: Unrelated
 ```
 
+## `TypeIs` narrowing of `NewType` instances
+
+`NewType` constructors return their arguments unchanged, so an integer-based `NewType` can contain a
+`bool`. A `TypeIs[bool]` guard preserves both the `NewType` and its runtime class.
+
+```py
+from typing import NewType
+from typing_extensions import TypeIs
+
+UserId = NewType("UserId", int)
+
+def is_bool(value: object) -> TypeIs[bool]:
+    return isinstance(value, bool)
+
+def _(value: UserId):
+    if is_bool(value):
+        reveal_type(value)  # revealed: UserId & bool
+```
+
 ## `TypeGuard` special cases
 
 ```py
@@ -579,6 +614,86 @@ def h(x: object) -> TypeIs[C]:
 def _(x: object):
     if f(x) and g(x) and h(x):
         reveal_type(x)  # revealed: B & C
+```
+
+## TypeGuard narrowing across multiple bindings
+
+A conditional assignment can leave two bindings with the same original type. If a type guard
+replaces the type of only one binding, both the replacement and the original type remain possible.
+
+```py
+from typing_extensions import TypeGuard
+
+def make_int() -> int:
+    return 1
+
+def is_str(value: object) -> TypeGuard[str]:
+    return True
+
+def _(flag: bool):
+    value = make_int()
+    if flag:
+        value = make_int()
+        if not is_str(value):
+            return
+
+    reveal_type(value)  # revealed: int | str
+```
+
+Once both branches of a type guard rejoin, the replacement no longer applies. A call on the negative
+branch must not preserve the positive branch's replacement.
+
+```py
+def _(flag: bool):
+    value = make_int()
+    if flag:
+        value = make_int()
+
+    if is_str(value):
+        pass
+    else:
+        make_int()
+
+    reveal_type(value)  # revealed: int
+```
+
+## TypeGuard joins after repeated suppressed assignments
+
+Conditional assignments inside suppressing context managers preserve several possible bindings.
+After a type guard's branches rejoin, its replacement no longer applies to any of those bindings,
+even when a nested `TypeIs` check rules out the replacement type.
+
+```py
+from contextlib import suppress
+from typing_extensions import TypeGuard, TypeIs
+
+def make_int() -> int:
+    return 1
+
+def is_str(value: object) -> TypeGuard[str]:
+    return True
+
+def is_int(value: object) -> TypeIs[int]:
+    return True
+
+def _(flag: bool, value: int | None) -> None:
+    with suppress(Exception):
+        if flag:
+            value = make_int()
+    with suppress(Exception):
+        if flag:
+            value = make_int()
+    with suppress(Exception):
+        if flag:
+            value = make_int()
+    with suppress(Exception):
+        if flag:
+            value = make_int()
+
+    if is_str(value):
+        if is_int(value):
+            reveal_type(value)  # revealed: Never
+    reveal_type(value)  # revealed: int | None
 ```
 
 ## Boolean logic with TypeGuard and TypeIs

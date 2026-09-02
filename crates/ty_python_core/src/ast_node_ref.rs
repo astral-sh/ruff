@@ -4,6 +4,8 @@ use std::marker::PhantomData;
 #[cfg(debug_assertions)]
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModuleRef;
+#[cfg(debug_assertions)]
+use ruff_python_ast::PythonVersion;
 use ruff_python_ast::{AnyNodeRef, NodeIndex};
 use ruff_python_ast::{AnyRootNodeRef, HasNodeIndex};
 use ruff_text_size::Ranged;
@@ -47,6 +49,8 @@ pub struct AstNodeRef<T> {
     // AST.
     #[cfg(debug_assertions)]
     file: File,
+    #[cfg(debug_assertions)]
+    python_version: PythonVersion,
 
     _node: PhantomData<T>,
 }
@@ -66,7 +70,7 @@ where
     /// Creates a new `AstNodeRef` that references `node`.
     ///
     /// This method may panic or produce unspecified results if the provided module is from a
-    /// different file or Salsa revision than the module to which the node belongs.
+    /// different file, Python version, or Salsa revision than the module to which the node belongs.
     pub(super) fn new(module_ref: &ParsedModuleRef, node: &T) -> Self {
         let index = node.node_index().load();
         debug_assert_eq!(module_ref.get_by_index(index).try_into().ok(), Some(node));
@@ -75,6 +79,8 @@ where
             index,
             #[cfg(debug_assertions)]
             file: module_ref.module().file(),
+            #[cfg(debug_assertions)]
+            python_version: module_ref.module().python_version(),
             #[cfg(debug_assertions)]
             kind: AnyNodeRef::from(node).kind(),
             #[cfg(debug_assertions)]
@@ -86,12 +92,19 @@ where
     /// Returns a reference to the wrapped node.
     ///
     /// This method may panic or produce unspecified results if the provided module is from a
-    /// different file or Salsa revision than the module to which the node belongs.
+    /// different file, Python version, or Salsa revision than the module to which the node belongs.
     #[track_caller]
     pub fn node<'ast>(&self, module_ref: &'ast ParsedModuleRef) -> &'ast T {
         #[cfg(debug_assertions)]
-        assert_eq!(module_ref.module().file(), self.file);
-        // The user guarantees that the module is from the same file and Salsa
+        assert_eq!(
+            (
+                module_ref.module().file(),
+                module_ref.module().python_version()
+            ),
+            (self.file, self.python_version),
+            "an `AstNodeRef` cannot be used with a module parsed for a different file or Python version"
+        );
+        // The user guarantees that the module is from the same file, Python version, and Salsa
         // revision, so the file contents cannot have changed.
         module_ref
             .get_by_index(self.index)
@@ -122,5 +135,37 @@ where
                 f.debug_tuple("AstNodeRef").finish_non_exhaustive()
             },
         }
+    }
+}
+
+#[cfg(all(test, debug_assertions))]
+mod tests {
+    use ruff_db::PythonFile;
+    use ruff_db::files::system_path_to_file;
+    use ruff_db::parsed::parsed_module;
+    use ruff_python_ast::PythonVersion;
+
+    use crate::ast_node_ref::AstNodeRef;
+    use crate::db::tests::TestDbBuilder;
+
+    #[test]
+    #[should_panic(
+        expected = "an `AstNodeRef` cannot be used with a module parsed for a different file or Python version"
+    )]
+    fn rejects_module_parsed_for_different_python_version() {
+        let db = TestDbBuilder::new()
+            .with_file("test.py", "x = 1")
+            .build()
+            .unwrap();
+        let file = system_path_to_file(&db, "test.py").unwrap();
+
+        let parsed_py311 =
+            parsed_module(&db, PythonFile::new(&db, file, PythonVersion::PY311)).load(&db);
+        let parsed_py312 =
+            parsed_module(&db, PythonFile::new(&db, file, PythonVersion::PY312)).load(&db);
+        let assignment = parsed_py311.syntax().body[0].as_assign_stmt().unwrap();
+
+        let node = AstNodeRef::new(&parsed_py311, assignment);
+        node.node(&parsed_py312);
     }
 }

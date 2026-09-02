@@ -3,6 +3,7 @@ use ruff_python_ast::ExprStringLiteral;
 use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::importer::ImportRequest;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
@@ -29,7 +30,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## References
 /// - [Python documentation: String constants](https://docs.python.org/3/library/string.html#string-constants)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.7.0")]
+#[violation_metadata(preview_since = "0.7.0", category = Category::Complexity)]
 pub(crate) struct HardcodedStringCharset {
     name: &'static str,
 }

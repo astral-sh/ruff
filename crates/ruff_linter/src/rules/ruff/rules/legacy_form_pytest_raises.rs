@@ -8,6 +8,7 @@ use ruff_source_file::UniversalNewlines;
 use ruff_text_size::{Ranged, TextRange};
 use std::fmt;
 
+use crate::codes::Category;
 use crate::{FixAvailability, Violation, checkers::ast::Checker};
 
 /// ## What it does
@@ -45,7 +46,7 @@ use crate::{FixAvailability, Violation, checkers::ast::Checker};
 /// - [`pytest` documentation: `pytest.warns`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-warns)
 /// - [`pytest` documentation: `pytest.deprecated_call`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-deprecated-call)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.15.0")]
+#[violation_metadata(stable_since = "0.15.0", category = Category::Style)]
 pub(crate) struct LegacyFormPytestRaises {
     context_type: PytestContextType,
 }
@@ -248,7 +249,7 @@ fn generate_with_statement(
 
     let context_call = ast::ExprCall {
         node_index: AtomicNodeIndex::NONE,
-        range: TextRange::default(),
+        range_start: ruff_text_size::TextSize::default(),
         func: legacy_call.func.clone(),
         arguments: ast::Arguments {
             node_index: AtomicNodeIndex::NONE,
@@ -270,7 +271,7 @@ fn generate_with_statement(
 
     let func_call = ast::ExprCall {
         node_index: AtomicNodeIndex::NONE,
-        range: TextRange::default(),
+        range_start: ruff_text_size::TextSize::default(),
         func: Box::new(func.clone()),
         arguments: ast::Arguments {
             node_index: AtomicNodeIndex::NONE,

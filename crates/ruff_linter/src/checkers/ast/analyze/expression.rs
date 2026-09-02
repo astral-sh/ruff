@@ -101,8 +101,8 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                     if checker.is_rule_enabled(Rule::UnnecessaryLiteralUnion) {
                         flake8_pyi::rules::unnecessary_literal_union(checker, expr);
                     }
+                    // Avoid duplicate checks inside `Optional`.
                     if checker.is_rule_enabled(Rule::DuplicateUnionMember)
-                        // Avoid duplicate checks inside `Optional`
                         && !checker.semantic.inside_optional()
                     {
                         flake8_pyi::rules::duplicate_union_member(checker, expr);
@@ -539,7 +539,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                         range: _,
                         node_index: _,
                     },
-                range: _,
+                range_start: _,
                 node_index: _,
             },
         ) => {
@@ -1102,7 +1102,6 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 flake8_simplify::rules::zip_dict_keys_and_values(checker, call);
             }
             if checker.any_rule_enabled(&[
-                Rule::OsStat,
                 Rule::OsPathJoin,
                 Rule::OsPathSplitext,
                 Rule::PyPath,
@@ -1184,6 +1183,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 }
                 if checker.is_rule_enabled(Rule::OsMakedirs) {
                     flake8_use_pathlib::rules::os_makedirs(checker, call, segments);
+                }
+                if checker.is_rule_enabled(Rule::OsStat) {
+                    flake8_use_pathlib::rules::os_stat(checker, call, segments);
                 }
                 if checker.is_rule_enabled(Rule::OsSymlink) {
                     flake8_use_pathlib::rules::os_symlink(checker, call, segments);
@@ -1469,6 +1471,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                     Rule::PercentFormatPositionalCountMismatch,
                     Rule::PercentFormatStarRequiresSequence,
                     Rule::PercentFormatUnsupportedFormatCharacter,
+                    Rule::BadStringFormatCharacter,
                 ]) {
                     let location = expr.range();
                     match pyflakes::cformat::CFormatSummary::try_from(value.to_str()) {
@@ -1481,6 +1484,11 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                                 pyflakes::rules::PercentFormatUnsupportedFormatCharacter {
                                     char: c,
                                 },
+                                location,
+                            );
+                            // PLE1300
+                            checker.report_diagnostic_if_enabled(
+                                pylint::rules::BadStringFormatCharacter { format_char: c },
                                 location,
                             );
                         }
@@ -1535,13 +1543,6 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 if checker.is_rule_enabled(Rule::PrintfStringFormatting) {
                     pyupgrade::rules::printf_string_formatting(checker, bin_op, format_string);
                 }
-                if checker.is_rule_enabled(Rule::BadStringFormatCharacter) {
-                    pylint::rules::bad_string_format_character::percent(
-                        checker,
-                        expr,
-                        format_string,
-                    );
-                }
                 if checker.is_rule_enabled(Rule::BadStringFormatType) {
                     pylint::rules::bad_string_format_type(checker, bin_op, format_string);
                 }
@@ -1593,9 +1594,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             // Avoid duplicate checks if the parent is a union, since these rules already
             // traverse nested unions.
             if !checker.semantic.in_nested_union() {
+                // Avoid duplicate checks inside `Optional`.
                 if checker.is_rule_enabled(Rule::DuplicateUnionMember)
                     && checker.semantic.in_type_definition()
-                    // Avoid duplicate checks inside `Optional`
                     && !checker.semantic.inside_optional()
                 {
                     flake8_pyi::rules::duplicate_union_member(checker, expr);

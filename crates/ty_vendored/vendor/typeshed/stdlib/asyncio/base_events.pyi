@@ -185,7 +185,8 @@ class BaseEventLoop(AbstractEventLoop):
         """Create a Future object attached to the loop."""
 
     # Tasks methods
-    if sys.version_info >= (3, 14):
+    # `eager_start` is supported as an arbitrary kwarg starting in 3.13.3.
+    if sys.version_info >= (3, 13):
         def create_task(
             self,
             coro: _CoroutineLike[_T],

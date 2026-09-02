@@ -15,7 +15,6 @@ mod tests {
     use crate::assert_diagnostics;
     use crate::registry::Rule;
     use crate::settings::LinterSettings;
-    use crate::settings::types::PreviewMode;
     use crate::test::test_path;
 
     #[test_case(Rule::UnnecessaryCallAroundSorted, Path::new("C413.py"))]
@@ -43,7 +42,7 @@ mod tests {
     #[test_case(Rule::UnnecessaryMap, Path::new("C417_1.py"))]
     #[test_case(Rule::UnnecessarySubscriptReversal, Path::new("C415.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_comprehensions").join(path).as_path(),
             &LinterSettings::for_rule(rule_code),
@@ -60,7 +59,7 @@ mod tests {
     #[test_case(Rule::UnnecessaryLiteralWithinTupleCall, Path::new("C409_py315.py"))]
     #[test_case(Rule::UnnecessaryComprehensionInCall, Path::new("C419_py315.py"))]
     fn rules_py315(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_comprehensions").join(path).as_path(),
             &LinterSettings::for_rule(rule_code).with_target_version(PythonVersion::PY315),
@@ -71,17 +70,10 @@ mod tests {
 
     #[test_case(Rule::UnnecessaryComprehensionInCall, Path::new("C419_1.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!(
-            "preview__{}_{}",
-            rule_code.noqa_code(),
-            path.to_string_lossy()
-        );
+        let snapshot = format!("preview__{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_comprehensions").join(path).as_path(),
-            &LinterSettings {
-                preview: PreviewMode::Enabled,
-                ..LinterSettings::for_rule(rule_code)
-            },
+            &LinterSettings::for_rule(rule_code).with_preview_mode(),
         )?;
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())
@@ -91,7 +83,7 @@ mod tests {
     fn allow_dict_calls_with_keyword_arguments(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "{}_{}_allow_dict_calls_with_keyword_arguments",
-            rule_code.noqa_code(),
+            rule_code.name(),
             path.to_string_lossy()
         );
         let diagnostics = test_path(

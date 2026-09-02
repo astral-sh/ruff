@@ -46,6 +46,7 @@ DEFAULT_TARGETS = [
     Project(repo=Repository(owner="langchain-ai", name="langchain", ref="master")),
     Project(repo=Repository(owner="latchbio", name="latch", ref="main")),
     Project(repo=Repository(owner="lnbits", name="lnbits", ref="main")),
+    Project(repo=Repository(owner="mhammond", name="pywin32", ref="main")),
     Project(repo=Repository(owner="milvus-io", name="pymilvus", ref="master")),
     Project(repo=Repository(owner="mlflow", name="mlflow", ref="master")),
     Project(repo=Repository(owner="model-bakers", name="model_bakery", ref="main")),

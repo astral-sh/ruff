@@ -60,8 +60,8 @@ import builtins
 import sys
 from _typeshed import Unused
 from enum import Enum
-from typing import Final, NoReturn, TypeAlias
-from typing_extensions import LiteralString
+from typing import Final, TypeAlias
+from typing_extensions import LiteralString, Never
 
 _FieldsType: TypeAlias = tuple[int, int, int, int, int, int]
 
@@ -215,7 +215,7 @@ class UUID:
     def __gt__(self, other: UUID) -> bool: ...
     def __ge__(self, other: UUID) -> bool: ...
     def __hash__(self) -> builtins.int: ...
-    def __setattr__(self, name: Unused, value: Unused) -> NoReturn: ...
+    def __setattr__(self, name: Unused, value: Unused) -> Never: ...
 
 def getnode() -> int:
     """Get the hardware address as a 48-bit positive integer.

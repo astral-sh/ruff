@@ -1,13 +1,20 @@
-use crate::AnalysisSettings;
+use crate::dependency::DependencyMetadata;
 use crate::lint::{LintRegistry, RuleSelection};
+use crate::{AnalysisSettings, PythonVersionWithSource};
 use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::File;
-use ty_python_core::Db as PythonCoreDb;
+use ty_python_core::{Db as PythonCoreDb, ProgramFile};
 
 /// Database giving access to semantic information about a Python program.
 #[salsa::db]
 pub trait Db: PythonCoreDb {
     fn check_file(&self, file: File) -> Vec<Diagnostic>;
+
+    /// Returns the program file for `file`.
+    fn program_file(&self, file: File) -> ProgramFile<'_>;
+
+    /// Returns the Python version and its configuration source for `file`.
+    fn python_version_with_source(&self, file: File) -> &PythonVersionWithSource;
 
     /// Resolves the rule selection for a given file.
     fn rule_selection(&self, file: File) -> &RuleSelection;
@@ -15,6 +22,9 @@ pub trait Db: PythonCoreDb {
     fn lint_registry(&self) -> &LintRegistry;
 
     fn analysis_settings(&self, file: File) -> &AnalysisSettings;
+
+    /// Returns the package manager's dependency information for this file.
+    fn dependency_metadata(&self, file: File) -> Option<&DependencyMetadata>;
 
     /// Whether ty is running with logging verbosity INFO or higher (`-v` or more).
     fn verbose(&self) -> bool;
@@ -36,7 +46,7 @@ pub(crate) mod tests {
     use anyhow::Context;
     use ty_python_core::platform::PythonPlatform;
 
-    use crate::{check_file_unwrap, default_lint_registry};
+    use crate::{ProgramEnvironment, check_file_unwrap, default_lint_registry};
     use ruff_db::Db as SourceDb;
     use ruff_db::files::Files;
     use ruff_db::system::{
@@ -44,8 +54,9 @@ pub(crate) mod tests {
     };
     use ruff_db::vendored::VendoredFileSystem;
     use ruff_python_ast::PythonVersion;
-    use ty_module_resolver::{Db as ModuleResolverDb, SearchPathSettings, SearchPaths};
-    use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
+    use ty_module_resolver::{Db as ModuleResolverDb, SearchPathSettings};
+    use ty_python_core::TestProgramDb;
+    use ty_python_core::program::{FallibleStrategy, ProgramSettings};
     use ty_site_packages::{PythonVersionSource, PythonVersionWithSource};
 
     type Events = Arc<Mutex<Vec<salsa::Event>>>;
@@ -61,11 +72,14 @@ pub(crate) mod tests {
         rule_selection: Arc<RuleSelection>,
         analysis_settings: Arc<AnalysisSettings>,
         open_files: rustc_hash::FxHashSet<File>,
+        program_settings: ProgramSettings,
     }
 
     impl TestDb {
         fn new() -> Self {
             let events = Events::default();
+            let vendored = ty_vendored::file_system().clone();
+            let program_settings = ProgramSettings::empty(&vendored);
             Self {
                 storage: salsa::Storage::new(Some(Box::new({
                     let events = events.clone();
@@ -76,13 +90,22 @@ pub(crate) mod tests {
                     }
                 }))),
                 system: TestSystem::default(),
-                vendored: ty_vendored::file_system().clone(),
+                vendored,
                 events,
                 files: Files::default(),
                 rule_selection: Arc::new(RuleSelection::from_registry(default_lint_registry())),
                 analysis_settings: AnalysisSettings::default().into(),
                 open_files: rustc_hash::FxHashSet::default(),
+                program_settings,
             }
+        }
+
+        pub(crate) fn python_version(&self) -> PythonVersion {
+            self.program().python_version(self)
+        }
+
+        pub(crate) fn program_environment(&self) -> ProgramEnvironment<'_> {
+            ProgramEnvironment::from_program(self.program())
         }
 
         /// Marks `file` as open in the editor.
@@ -131,10 +154,6 @@ pub(crate) mod tests {
         fn files(&self) -> &Files {
             &self.files
         }
-
-        fn python_version(&self) -> PythonVersion {
-            Program::get(self).python_version(self)
-        }
     }
 
     #[salsa::db]
@@ -145,13 +164,28 @@ pub(crate) mod tests {
     }
 
     #[salsa::db]
+    impl TestProgramDb for TestDb {
+        fn program_settings(&self) -> &ProgramSettings {
+            &self.program_settings
+        }
+    }
+
+    #[salsa::db]
     impl Db for TestDb {
         fn check_file(&self, file: File) -> Vec<Diagnostic> {
             if !self.should_check_file(file) {
                 return Vec::new();
             }
 
-            check_file_unwrap(self, file)
+            check_file_unwrap(self, self.program_file(file))
+        }
+
+        fn program_file(&self, file: File) -> ProgramFile<'_> {
+            self.program().program_file(self, file)
+        }
+
+        fn python_version_with_source(&self, _file: File) -> &PythonVersionWithSource {
+            &self.program_settings.python_version
         }
 
         fn rule_selection(&self, _file: File) -> &RuleSelection {
@@ -164,6 +198,10 @@ pub(crate) mod tests {
 
         fn analysis_settings(&self, _file: File) -> &AnalysisSettings {
             &self.analysis_settings
+        }
+
+        fn dependency_metadata(&self, _file: File) -> Option<&DependencyMetadata> {
+            None
         }
 
         fn verbose(&self) -> bool {
@@ -180,11 +218,7 @@ pub(crate) mod tests {
     }
 
     #[salsa::db]
-    impl ModuleResolverDb for TestDb {
-        fn search_paths(&self) -> &SearchPaths {
-            Program::get(self).search_paths(self)
-        }
-    }
+    impl ModuleResolverDb for TestDb {}
 
     #[salsa::db]
     impl salsa::Database for TestDb {}
@@ -194,8 +228,12 @@ pub(crate) mod tests {
         python_version: PythonVersion,
         /// Target Python platform
         python_platform: PythonPlatform,
+        /// Roots containing first-party modules.
+        src_roots: Vec<SystemPathBuf>,
         /// Path and content pairs for files that should be present
         files: Vec<(&'a str, &'a str)>,
+        /// Whether module resolution should include packages from the synthetic virtual environment.
+        third_party_packages: bool,
     }
 
     impl<'a> TestDbBuilder<'a> {
@@ -203,7 +241,9 @@ pub(crate) mod tests {
             Self {
                 python_version: PythonVersion::default(),
                 python_platform: PythonPlatform::default(),
+                src_roots: vec![SystemPathBuf::from("/src")],
                 files: vec![],
+                third_party_packages: false,
             }
         }
 
@@ -217,6 +257,11 @@ pub(crate) mod tests {
             self
         }
 
+        pub(crate) fn with_src_roots(mut self, src_roots: Vec<SystemPathBuf>) -> Self {
+            self.src_roots = src_roots;
+            self
+        }
+
         pub(crate) fn with_file(
             mut self,
             path: &'a (impl AsRef<SystemPath> + ?Sized),
@@ -226,28 +271,53 @@ pub(crate) mod tests {
             self
         }
 
+        /// Makes packages installed in the synthetic virtual environment available for imports.
+        ///
+        /// Files under `/.venv/lib/python3.13/site-packages` are treated as third-party modules,
+        /// mirroring the import roots discovered from a project's configured Python environment.
+        pub(crate) fn with_third_party_packages(mut self) -> Self {
+            self.third_party_packages = true;
+            self
+        }
+
         pub(crate) fn build(self) -> anyhow::Result<TestDb> {
             let mut db = TestDb::new();
 
-            let src_root = SystemPathBuf::from("/src");
-            db.memory_file_system().create_directory_all(&src_root)?;
+            for src_root in &self.src_roots {
+                db.memory_file_system().create_directory_all(src_root)?;
+            }
+
+            let site_packages = SystemPathBuf::from("/.venv/lib/python3.13/site-packages");
+            if self.third_party_packages {
+                db.memory_file_system()
+                    .create_directory_all(&site_packages)?;
+            }
 
             db.write_files(self.files)
                 .context("Failed to write test files")?;
 
-            Program::from_settings(
-                &db,
-                ProgramSettings {
-                    python_version: PythonVersionWithSource {
-                        version: self.python_version,
-                        source: PythonVersionSource::default(),
-                    },
-                    python_platform: self.python_platform,
-                    search_paths: SearchPathSettings::new(vec![src_root])
-                        .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
-                        .context("Invalid search path settings")?,
+            let search_path_settings = if self.third_party_packages {
+                SearchPathSettings {
+                    src_roots: self.src_roots,
+                    site_packages_paths: vec![site_packages],
+                    ..SearchPathSettings::empty()
+                }
+            } else {
+                SearchPathSettings::new(self.src_roots)
+            };
+
+            let program_settings = ProgramSettings {
+                python_version: PythonVersionWithSource {
+                    version: self.python_version,
+                    source: PythonVersionSource::default(),
                 },
-            );
+                python_platform: self.python_platform,
+                search_paths: search_path_settings
+                    .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
+                    .context("Invalid search path settings")?,
+            };
+            program_settings.search_paths.try_register_static_roots(&db);
+            db.program_settings = program_settings;
 
             Ok(db)
         }

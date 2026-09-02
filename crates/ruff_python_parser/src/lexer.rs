@@ -123,12 +123,6 @@ impl<'src> Lexer<'src> {
         self.current_range
     }
 
-    /// Returns the current parenthesis, bracket, and brace nesting level.
-    #[inline]
-    pub(crate) const fn nesting(&self) -> u32 {
-        self.nesting
-    }
-
     /// Returns the flags for the current token.
     pub(crate) const fn current_flags(&self) -> TokenFlags {
         self.current_flags
@@ -1054,10 +1048,10 @@ impl<'src> Lexer<'src> {
     /// Lex a hex/octal/decimal/binary number without a decimal point.
     fn lex_number_radix(&mut self, radix: Radix) -> TokenKind {
         #[cfg(debug_assertions)]
-        debug_assert!(matches!(
-            self.cursor.previous().to_ascii_lowercase(),
-            'x' | 'o' | 'b'
-        ));
+        {
+            use std::debug_assert_matches;
+            debug_assert_matches!(self.cursor.previous().to_ascii_lowercase(), 'x' | 'o' | 'b');
+        }
 
         let number = self.radix_run(radix);
         if !number.has_digit {

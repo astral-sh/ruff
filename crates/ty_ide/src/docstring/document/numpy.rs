@@ -28,8 +28,8 @@ use ruff_text_size::{TextRange, TextSize};
 
 use super::preformatted::{PreformattedBlockScanner, starts_preformatted_block};
 use super::syntax::{
-    ParsedLine, container_block_end, is_dotted_identifier, is_markdown_code_span, parsed_lines,
-    split_once_at_top_level_colon, starts_container_block,
+    ParsedLine, container_block_end, is_dotted_identifier, is_wrapped_in_markdown_code_span,
+    parsed_lines, split_once_at_top_level_colon, starts_container_block,
 };
 use super::{DescriptionBuilder, HeaderKind, SectionKind};
 use crate::FxIndexMap;
@@ -652,7 +652,7 @@ impl<'a> ItemLine<'a> {
         }
 
         // A complete code span is an anonymous type even when its contents contain a colon.
-        if is_markdown_code_span(text) {
+        if is_wrapped_in_markdown_code_span(text) {
             return Some(Self::new(ItemBuilder::new(None, Some(text), ""), false));
         }
 
@@ -689,7 +689,7 @@ impl<'a> ItemLine<'a> {
             .map_or((text, ""), |(name, description)| {
                 (name.trim(), description.trim())
             });
-        if !is_item_name(name) && !is_markdown_code_span(name) {
+        if !is_item_name(name) && !is_wrapped_in_markdown_code_span(name) {
             return None;
         }
 

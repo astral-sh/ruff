@@ -1,9 +1,10 @@
 use crate::Db;
+use crate::ProgramEnvironment;
 use crate::types::constraints::ConstraintSet;
 use crate::types::relation::{DisjointnessChecker, TypeRelation, TypeRelationChecker};
 use crate::types::{ClassType, KnownUnion, Type, definition_expression_type, visitor};
 use ruff_db::parsed::parsed_module;
-use ruff_python_ast as ast;
+use ruff_python_ast::{self as ast};
 use rustc_hash::FxHashSet;
 use ty_python_core::definition::{Definition, DefinitionKind};
 
@@ -54,16 +55,22 @@ impl<'db> NewType<'db> {
 
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|db, _, _| NewTypeBase::ClassType(ClassType::object(db)),
+        cycle_initial=|db, _, self_: NewType<'db>| NewTypeBase::ClassType(ClassType::object(
+            db,
+            &ProgramEnvironment::from_definition(self_.definition(db)),
+        )),
         heap_size=ruff_memory_usage::heap_size
     )]
     fn lazy_base(self, db: &'db dyn Db) -> NewTypeBase<'db> {
         // `TypeInferenceBuilder` emits diagnostics for invalid `NewType` definitions that show up
         // in assignments, but invalid definitions still get here, and also `NewType` might show up
         // in places that aren't definitions at all. Fall back to `object` in all error cases.
-        let object_fallback = NewTypeBase::ClassType(ClassType::object(db));
         let definition = self.definition(db);
-        let module = parsed_module(db, definition.file(db)).load(db);
+        let program_file = definition.program_file(db);
+        let python_file = program_file.python_file(db);
+        let env = ProgramEnvironment::from_file(program_file);
+        let object_fallback = NewTypeBase::ClassType(ClassType::object(db, &env));
+        let module = parsed_module(db, python_file).load(db);
         let DefinitionKind::Assignment(assignment) = definition.kind(db) else {
             return object_fallback;
         };
@@ -75,7 +82,7 @@ impl<'db> NewType<'db> {
         };
         match definition_expression_type(db, definition, second_arg) {
             Type::NominalInstance(nominal_instance_type) => {
-                NewTypeBase::ClassType(nominal_instance_type.class(db))
+                NewTypeBase::ClassType(nominal_instance_type.class(db, &env))
             }
             Type::NewTypeInstance(newtype) => NewTypeBase::NewType(newtype),
             // There are exactly two union types allowed as bases for NewType: `int | float` and
@@ -105,7 +112,10 @@ impl<'db> NewType<'db> {
         for base in self.iter_bases(db) {
             match base {
                 NewTypeBase::NewType(_) => continue,
-                concrete => return concrete.instance_type(db),
+                concrete => {
+                    let env = ProgramEnvironment::from_definition(self.definition(db));
+                    return concrete.instance_type(db, &env);
+                }
             }
         }
         Type::object()
@@ -182,11 +192,12 @@ impl<'db> NewType<'db> {
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
         let eager_base = match self.eager_base(db) {
-            Some(base) => Some(base.recursive_type_normalized_impl(db, div, nested)?),
+            Some(base) => Some(base.recursive_type_normalized_impl(db, env, div, nested)?),
             None => None,
         };
 
@@ -233,6 +244,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
         // Two NewTypes are disjoint if they're not equal and neither inherits from the other.
         // NewTypes have single inheritance, and a regular class can't inherit from a NewType, so
         // it's not possible for some third type to multiply-inherit from both.
+
         let relation_checker = self.as_relation_checker(TypeRelation::Subtyping);
         relation_checker
             .check_newtype_pair(db, left, right)
@@ -251,10 +263,14 @@ pub(crate) fn walk_newtype_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Si
     let base = if visitor.should_visit_lazy_type_attributes() {
         Some(newtype.base(db))
     } else {
-        newtype.eager_base(db)
+        let base = newtype.eager_base(db);
+        if base.is_none() {
+            visitor.notify_skipped_lazy_type_attributes();
+        }
+        base
     };
     if let Some(base) = base {
-        visitor.visit_type(db, base.instance_type(db));
+        visitor.visit_type(db, base.instance_type(db, visitor.program_environment()));
     }
 }
 
@@ -272,27 +288,28 @@ pub enum NewTypeBase<'db> {
 }
 
 impl<'db> NewTypeBase<'db> {
-    pub fn instance_type(self, db: &'db dyn Db) -> Type<'db> {
+    pub fn instance_type(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
         match self {
-            NewTypeBase::ClassType(class_type) => Type::instance(db, class_type),
+            NewTypeBase::ClassType(class_type) => Type::instance(db, env, class_type),
             NewTypeBase::NewType(newtype) => Type::NewTypeInstance(newtype),
-            NewTypeBase::Float => KnownUnion::Float.to_type(db),
-            NewTypeBase::Complex => KnownUnion::Complex.to_type(db),
+            NewTypeBase::Float => KnownUnion::Float.to_type(db, env),
+            NewTypeBase::Complex => KnownUnion::Complex.to_type(db, env),
         }
     }
 
     fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
         match self {
             NewTypeBase::ClassType(class_type) => class_type
-                .recursive_type_normalized_impl(db, div, nested)
+                .recursive_type_normalized_impl(db, env, div, nested)
                 .map(NewTypeBase::ClassType),
             NewTypeBase::NewType(newtype) => newtype
-                .recursive_type_normalized_impl(db, div, nested)
+                .recursive_type_normalized_impl(db, env, div, nested)
                 .map(NewTypeBase::NewType),
             NewTypeBase::Float | NewTypeBase::Complex => Some(self),
         }

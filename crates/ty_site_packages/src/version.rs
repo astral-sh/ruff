@@ -10,10 +10,13 @@ use ruff_python_ast::PythonVersion;
 use ruff_text_size::TextRange;
 
 /// The source of the Python version.
-#[derive(Clone, Debug, Eq, PartialEq, Default, get_size2::GetSize)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash, Default, get_size2::GetSize)]
 pub enum PythonVersionSource {
     /// Value loaded from a project's configuration file.
     ConfigFile(PythonVersionFileSource),
+
+    /// Value configured in a standalone script's inline metadata.
+    ScriptMetadata(Span),
 
     /// Value loaded from the `pyvenv.cfg` file of the virtual environment.
     /// The virtual environment might have been configured, activated or inferred.
@@ -39,8 +42,8 @@ pub enum PythonVersionSource {
     /// (e.g., the Python environment)
     Editor,
 
-    /// The value was provided by `uv workspace metadata`.
-    UvWorkspace,
+    /// The value was provided by uv metadata for a project or standalone script.
+    UvMetadata,
 
     /// We fell back to a default value because the value was not specified via the CLI or a config file.
     #[default]
@@ -49,7 +52,7 @@ pub enum PythonVersionSource {
 
 /// Information regarding the file and [`TextRange`] of the configuration
 /// from which we inferred the Python version.
-#[derive(Debug, PartialEq, Eq, Clone, get_size2::GetSize)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, get_size2::GetSize)]
 pub struct PythonVersionFileSource {
     path: Arc<SystemPathBuf>,
     range: Option<TextRange>,
@@ -72,7 +75,7 @@ impl PythonVersionFileSource {
 }
 
 /// A Python version with its source.
-#[derive(Eq, PartialEq, Debug, Clone, get_size2::GetSize)]
+#[derive(Eq, PartialEq, Hash, Debug, Clone, get_size2::GetSize)]
 pub struct PythonVersionWithSource {
     pub version: PythonVersion,
     pub source: PythonVersionSource,

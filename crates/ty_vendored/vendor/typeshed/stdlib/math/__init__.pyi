@@ -250,7 +250,7 @@ def ldexp(x: _SupportsFloatOrIndex, i: int, /) -> float:
 def lgamma(x: _SupportsFloatOrIndex, /) -> float:
     """Natural logarithm of absolute value of Gamma function at x."""
 
-def log(x: _SupportsFloatOrIndex, base: _SupportsFloatOrIndex = ...) -> float:
+def log(x: _SupportsFloatOrIndex, base: _SupportsFloatOrIndex = ..., /) -> float:
     """log(x, [base=math.e])
     Return the logarithm of x to the given base.
 

@@ -1,4 +1,5 @@
 use crate::{SuppressFix, is_unused_ignore_comment_lint, suppress_all};
+use ruff_db::PythonFile;
 use ruff_db::cancellation::{Canceled, CancellationToken};
 use ruff_db::diagnostic::{DisplayDiagnosticConfig, DisplayDiagnostics};
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
@@ -128,13 +129,14 @@ where
             continue;
         };
 
-        let parsed = parsed_module(db, file);
+        let python_file = db.program_file(file).python_file(db);
+        let parsed = parsed_module(db, python_file);
         if parsed.load(db).has_syntax_errors() {
             tracing::warn!("Skipping file `{path}` with syntax errors");
             continue;
         }
 
-        let fixes = fix_mode.fixes(db, file, diagnostics);
+        let fixes = fix_mode.fixes(db, python_file, diagnostics);
 
         if fixes.is_empty() {
             tracing::debug!("Skipping file `{path}` without applicable fixes.");
@@ -379,7 +381,12 @@ impl FixMode {
         }
     }
 
-    fn fixes(self, db: &dyn Db, file: File, file_diagnostics: &[Diagnostic]) -> Vec<ApplicableFix> {
+    fn fixes(
+        self,
+        db: &dyn Db,
+        file: PythonFile<'_>,
+        file_diagnostics: &[Diagnostic],
+    ) -> Vec<ApplicableFix> {
         match self {
             FixMode::Suppress => {
                 let suppressable_diagnostics: Vec<_> = file_diagnostics
@@ -768,7 +775,8 @@ where
 
                     let db = &*db;
 
-                    let parsed = parsed_module(db, file.file);
+                    let python_file = db.program_file(file.file).python_file(db);
+                    let parsed = parsed_module(db, python_file);
                     let parsed = parsed.load(db);
 
                     let result = if parsed.has_syntax_errors() {
@@ -778,7 +786,7 @@ where
                         CheckResult::SyntaxError { diagnostic, file }
                     } else {
                         let diagnostics = check_file(db, file.file);
-                        let fixes = fix_mode.fixes(db, file.file, &diagnostics);
+                        let fixes = fix_mode.fixes(db, python_file, &diagnostics);
 
                         file.applied_fixes += applied_fixes;
                         file.diagnostics = Some(diagnostics);
@@ -797,9 +805,6 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::collections::hash_map::Entry;
-    use std::hash::{DefaultHasher, Hash, Hasher};
-
     use insta::assert_snapshot;
     use ruff_db::cancellation::CancellationTokenSource;
     use ruff_db::diagnostic::{
@@ -813,6 +818,8 @@ mod tests {
     use ruff_diagnostics::{Applicability, Edit, Fix};
     use ruff_text_size::{TextLen as _, TextRange, TextSize};
     use rustc_hash::FxHashMap;
+    use std::collections::hash_map::Entry;
+    use std::hash::{DefaultHasher, Hash, Hasher};
 
     use super::suppress_all_diagnostics;
     use crate::Db;
@@ -1996,7 +2003,7 @@ class B(A):
 
         let file = system_path_to_file(&db, "test.py").unwrap();
 
-        let parsed_before = parsed_module(&db, file);
+        let parsed_before = parsed_module(&db, db.program_file(file).python_file(&db));
         let had_syntax_errors = parsed_before.load(&db).has_syntax_errors();
 
         let diagnostics = db.check_file(file);
@@ -2047,7 +2054,7 @@ class B(A):
 
         let fixed = source_text(&db, file);
 
-        let parsed = parsed_module(&db, file);
+        let parsed = parsed_module(&db, db.program_file(file).python_file(&db));
         let parsed = parsed.load(&db);
 
         let diagnostics_after_applying_fixes = db.check_file(file);

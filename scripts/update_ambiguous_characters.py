@@ -1,7 +1,26 @@
+# /// script
+# requires-python = ">=3.13"
+# dependencies = []
+#
+# [tool.ty.rules]
+# blanket-ignore-comment = "warn"
+# missing-type-argument = "warn"
+# possibly-unresolved-reference = "warn"
+# unsound-return-statement = "warn"
+# unsound-yield = "warn"
+# unsupported-dynamic-base = "warn"
+# division-by-zero = "warn"
+#
+# [tool.uv]
+# no-build = true
+# exclude-newer = "P7D"
+# ///
+
 """Generate the confusables.rs file from the VS Code ambiguous.json file."""
 
 from __future__ import annotations
 
+import itertools
 import json
 import subprocess
 from pathlib import Path
@@ -22,7 +41,7 @@ pub(crate) fn confusable(c: u32) -> Option<char> {
 postlude = """_ => return None, }; Some(result)}"""
 
 
-def get_mapping_data() -> dict:
+def get_mapping_data() -> dict[str, list[int]]:
     """
     Get the ambiguous character mapping data from the vscode-unicode-data repository.
 
@@ -34,7 +53,8 @@ def get_mapping_data() -> dict:
         encoding="utf-8",
     )
     # The content is a JSON object literal wrapped in a JSON string, so double decode:
-    return json.loads(json.loads(content))
+    mapping_data: dict[str, list[int]] = json.loads(json.loads(content))
+    return mapping_data
 
 
 def format_number(number: int) -> str:
@@ -62,10 +82,9 @@ def format_confusables_rs(raw_data: dict[str, list[int]]) -> str:
     """Format the downloaded data into a Rust source file."""
     # The input data contains duplicate entries.
     flattened_items: set[tuple[int, int]] = set()
-    for _category, items in raw_data.items():
+    for items in raw_data.values():
         assert len(items) % 2 == 0, "Expected pairs of items"
-        for i in range(0, len(items), 2):
-            flattened_items.add((items[i], items[i + 1]))
+        flattened_items.update(itertools.batched(items, 2, strict=True))
 
     tuples = [
         f"    {format_number(left)} => '{format_char(right)}',\n"

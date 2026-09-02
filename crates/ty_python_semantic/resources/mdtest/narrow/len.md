@@ -250,6 +250,73 @@ def _(value: TrueLength | FalseLength):
         reveal_type(value)  # revealed: FalseLength
 ```
 
+Length narrowing preserves a tuple's shape when a required element has type `Never`:
+
+```py
+from typing import Never
+
+def _(value: tuple[Never, *tuple[int, ...]]) -> None:
+    if len(value) == 1:
+        reveal_type(value)  # revealed: tuple[Never]
+```
+
+## Exact length comparisons with type variable tuples
+
+Narrowing a tuple's length preserves its type variable tuple, so a function can still return its
+input after checking for an empty or nonempty tuple.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+def identity[*Ts](value: tuple[*Ts]) -> tuple[*Ts]:
+    if len(value) == 0:
+        reveal_type(value)  # revealed: tuple[*Ts@identity] & tuple[()]
+        return value
+    elif len(value) == 1:
+        reveal_type(value)  # revealed: tuple[*Ts@identity] & tuple[object]
+        return value
+    return value
+```
+
+Fixed prefix and suffix elements retain their types while the original pack is preserved.
+
+```py
+def with_boundaries[*Ts](value: tuple[int, *Ts, str]) -> tuple[int, *Ts, str]:
+    if len(value) == 2:
+        reveal_type(value)  # revealed: tuple[int, *Ts@with_boundaries, str] & tuple[int, str]
+        return value
+    return value
+```
+
+An alias for the tuple preserves the same pack identity when its length is narrowed.
+
+```py
+type Pack[*Ts] = tuple[*Ts]
+
+def aliased_identity[*Ts](value: Pack[*Ts]) -> Pack[*Ts]:
+    if len(value) == 1:
+        reveal_type(value)  # revealed: tuple[*Ts@aliased_identity] & tuple[object]
+        return value
+    return value
+```
+
+With a required `Never` element, the refined type should be `tuple[Never, *Ts] & tuple[Never]`.
+TODO: [#27920](https://github.com/astral-sh/ruff/pull/27920) addresses the tuple-disjointness checks
+that currently collapse this to `Never` and suppress the invalid-return diagnostic.
+
+```py
+from typing import Never
+
+def never_prefix[*Ts](value: tuple[Never, *Ts]) -> str:
+    if len(value) == 1:
+        reveal_type(value)  # revealed: Never
+        return value
+    return ""
+```
+
 ## Regression tests
 
 Length constraints must not become stale after mutating a value that does not encode its length:

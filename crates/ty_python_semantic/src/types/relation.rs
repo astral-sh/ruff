@@ -1,3 +1,4 @@
+use crate::ProgramEnvironment;
 use std::borrow::Cow;
 
 use itertools::Itertools;
@@ -12,6 +13,7 @@ use crate::types::constraints::{
 use crate::types::cyclic::{HasIdentity, PairVisitor, TypeIdentity};
 use crate::types::enums::is_single_member_enum;
 use crate::types::function::FunctionDecorators;
+use crate::types::relation_error::ErrorRelation;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::signatures::{ParametersKind, SignatureRelationVisitor};
 use crate::types::tuple::TupleType;
@@ -205,19 +207,6 @@ pub(crate) enum TypeRelation {
     SubtypingAssuming,
 }
 
-/// Determines when comparisons involving type variables are evaluated.
-#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
-pub(crate) enum TypeVarEvaluation {
-    /// Check immediately whether the relation holds for all or any valid specializations,
-    /// depending on whether the type variable is inferable.
-    Eager,
-
-    /// Move comparisons involving a type variable into the constraint set for later evaluation.
-    ///
-    /// This is currently opt-in, but will eventually replace eager type-variable evaluation.
-    Lazy,
-}
-
 impl TypeRelation {
     pub(crate) const fn is_assignability(self) -> bool {
         matches!(self, TypeRelation::Assignability)
@@ -235,6 +224,26 @@ impl TypeRelation {
             }
         }
     }
+
+    pub(super) const fn description(self) -> &'static str {
+        match self {
+            TypeRelation::Assignability => "assignable to",
+            _ => "a subtype of",
+        }
+    }
+}
+
+/// Determines when comparisons involving type variables are evaluated.
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
+pub(crate) enum TypeVarEvaluation {
+    /// Check immediately whether the relation holds for all or any valid specializations,
+    /// depending on whether the type variable is inferable.
+    Eager,
+
+    /// Move comparisons involving a type variable into the constraint set for later evaluation.
+    ///
+    /// This is currently opt-in, but will eventually replace eager type-variable evaluation.
+    Lazy,
 }
 
 #[salsa::tracked]
@@ -257,6 +266,9 @@ impl<'db> Type<'db> {
                 KnownBoundMethodType::FunctionTypeDunderGet(_)
                 | KnownBoundMethodType::FunctionTypeDunderCall(_)
                 | KnownBoundMethodType::StrStartswith(_)
+                | KnownBoundMethodType::ConstraintSetLowerBound
+                | KnownBoundMethodType::ConstraintSetUpperBound
+                | KnownBoundMethodType::ConstraintSetEquality
                 | KnownBoundMethodType::ConstraintSetRange
                 | KnownBoundMethodType::ConstraintSetAlways
                 | KnownBoundMethodType::ConstraintSetNever
@@ -264,7 +276,6 @@ impl<'db> Type<'db> {
                 | KnownBoundMethodType::ConstraintSetSatisfies(_)
                 | KnownBoundMethodType::ConstraintSetExists(_)
                 | KnownBoundMethodType::ConstraintSetForAll(_)
-                | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_)
                 | KnownBoundMethodType::ConstraintSetSolutionsFor(_)
                 | KnownBoundMethodType::ConstraintSetSolutions(_)
                 | KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_),
@@ -276,13 +287,15 @@ impl<'db> Type<'db> {
             | Type::SpecialForm(_)
             | Type::KnownInstance(_)
             | Type::AlwaysFalsy
-            | Type::AlwaysTruthy
+            | Type::AlwaysTruthy => true,
+
             // `T` is always a subtype of itself,
             // and `T` is always a subtype of `T | None`
-            | Type::TypeVar(_)
+            Type::TypeVar(_) => true,
+
             // might inherit `Any`, but subtyping is still reflexive
-            | Type::ClassLiteral(_)
-             => true,
+            Type::ClassLiteral(_) => true,
+
             Type::Dynamic(_)
             | Type::Divergent(_)
             | Type::NominalInstance(_)
@@ -299,6 +312,7 @@ impl<'db> Type<'db> {
                 | KnownBoundMethodType::PropertyDunderDelete(_),
             )
             | Type::PropertyInstance(_)
+            | Type::SlotDescriptor(_)
             | Type::BoundSuper(_)
             | Type::TypeIs(_)
             | Type::TypeGuard(_)
@@ -312,20 +326,33 @@ impl<'db> Type<'db> {
     /// Return true if this type is a subtype of type `target`.
     ///
     /// See [`TypeRelation::Subtyping`] for more details.
-    pub(crate) fn is_subtype_of(self, db: &'db dyn Db, target: Type<'db>) -> bool {
+    pub(crate) fn is_subtype_of(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        target: Type<'db>,
+    ) -> bool {
         let constraints = ConstraintSetBuilder::new();
-        self.when_subtype_of(db, target, &constraints, TypeVarSet::None)
-            .is_always_satisfied(db)
+        self.when_subtype_of(db, env, target, &constraints, TypeVarSet::None)
+            .is_always_satisfied(db, env)
     }
 
     pub(super) fn when_subtype_of<'c>(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         target: Type<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
         inferable: TypeVarSet<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        self.has_relation_to(db, target, constraints, inferable, TypeRelation::Subtyping)
+        self.has_relation_to(
+            db,
+            env,
+            target,
+            constraints,
+            inferable,
+            TypeRelation::Subtyping,
+        )
     }
 
     /// Return the constraints under which this type is a subtype of type `target`, assuming that
@@ -335,6 +362,7 @@ impl<'db> Type<'db> {
     pub(super) fn when_subtype_of_assuming<'c>(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         target: Type<'db>,
         assuming: ConstraintSet<'db, 'c>,
         constraints: &'c ConstraintSetBuilder<'db>,
@@ -343,8 +371,9 @@ impl<'db> Type<'db> {
         let relation_visitor = HasRelationToVisitor::default(constraints);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
         let signature_relation_visitor = SignatureRelationVisitor::default();
-        let materialization_visitor = ApplyTypeMappingVisitor::default();
+        let materialization_visitor = ApplyTypeMappingVisitor::new(env);
         let checker = TypeRelationChecker {
+            env,
             constraints,
             inferable,
             relation: TypeRelation::SubtypingAssuming,
@@ -363,10 +392,15 @@ impl<'db> Type<'db> {
     /// Return true if this type is assignable to type `target`.
     ///
     /// See `TypeRelation::Assignability` for more details.
-    pub fn is_assignable_to(self, db: &'db dyn Db, target: Type<'db>) -> bool {
+    pub fn is_assignable_to(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        target: Type<'db>,
+    ) -> bool {
         let constraints = ConstraintSetBuilder::new();
-        self.when_assignable_to(db, target, &constraints, TypeVarSet::None)
-            .is_always_satisfied(db)
+        self.when_assignable_to(db, env, target, &constraints, TypeVarSet::None)
+            .is_always_satisfied(db, env)
     }
 
     /// Re-run the assignability check with error context collection enabled.
@@ -379,21 +413,54 @@ impl<'db> Type<'db> {
     pub(crate) fn assignability_error_context(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        target: Type<'db>,
+    ) -> ErrorContextTree<'db> {
+        self.relation_error_context(db, env, TypeRelation::Assignability, target)
+    }
+
+    /// Re-run the pure redundancy check with error context collection enabled.
+    ///
+    /// This should normally be called when `is_pure_redundant_with` has returned `false`
+    /// and we are now about to emit a diagnostic where additional context could be
+    /// useful.
+    ///
+    /// This is a separate method so that we can skip this expensive check when diagnostics
+    /// are suppressed.
+    pub(crate) fn pure_redundancy_error_context(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        target: Type<'db>,
+    ) -> ErrorContextTree<'db> {
+        self.relation_error_context(db, env, TypeRelation::Redundancy { pure: true }, target)
+    }
+
+    /// Re-run the relation check with error context collection enabled.
+    ///
+    /// This is a separate method so that we can skip this expensive check when diagnostics
+    /// are suppressed.
+    fn relation_error_context(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        relation: TypeRelation,
         target: Type<'db>,
     ) -> ErrorContextTree<'db> {
         let builder = ConstraintSetBuilder::new();
         let checker = TypeRelationChecker {
+            env,
             constraints: &builder,
             inferable: TypeVarSet::None,
-            relation: TypeRelation::Assignability,
+            relation,
             typevar_evaluation: TypeVarEvaluation::Eager,
-            context_tree: Some(ErrorContextTree::new()),
+            context_tree: Some(ErrorContextTree::new(relation)),
             given: ConstraintSet::from_bool(&builder, false),
             perform_expensive_checks: true,
             relation_visitor: &HasRelationToVisitor::default(&builder),
             disjointness_visitor: &IsDisjointVisitor::default(&builder),
             signature_relation_visitor: &SignatureRelationVisitor::default(),
-            materialization_visitor: &ApplyTypeMappingVisitor::default(),
+            materialization_visitor: &ApplyTypeMappingVisitor::new(env),
         };
         checker.check_type_pair(db, self, target);
         checker.into_error_context()
@@ -403,29 +470,37 @@ impl<'db> Type<'db> {
     pub(crate) fn is_constraint_set_assignable_to(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         target: Type<'db>,
     ) -> bool {
         let constraints = ConstraintSetBuilder::new();
-        self.when_constraint_set_assignable_to(db, target, &constraints)
-            .is_always_satisfied(db)
+        self.when_constraint_set_assignable_to(db, env, target, &constraints)
+            .is_always_satisfied(db, env)
     }
 
     /// Return true if this type is a subtype of `target` using constraint-set typevar rules.
-    pub(super) fn is_constraint_set_subtype_of(self, db: &'db dyn Db, target: Type<'db>) -> bool {
+    pub(super) fn is_constraint_set_subtype_of(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        target: Type<'db>,
+    ) -> bool {
         let constraints = ConstraintSetBuilder::new();
-        self.when_constraint_set_subtype_of(db, target, &constraints)
-            .is_always_satisfied(db)
+        self.when_constraint_set_subtype_of(db, env, target, &constraints)
+            .is_always_satisfied(db, env)
     }
 
     pub(super) fn when_assignable_to<'c>(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         target: Type<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
         inferable: TypeVarSet<'db>,
     ) -> ConstraintSet<'db, 'c> {
         self.has_relation_to(
             db,
+            env,
             target,
             constraints,
             inferable,
@@ -469,6 +544,7 @@ impl<'db> Type<'db> {
     pub(super) fn when_constraint_set_assignable_to_owned(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         target: Type<'db>,
     ) -> Cow<'db, OwnedConstraintSet<'db>> {
         #[salsa::tracked(
@@ -480,6 +556,8 @@ impl<'db> Type<'db> {
             db: &'db dyn Db,
             types: TypePair<'db>,
         ) -> OwnedConstraintSet<'db> {
+            let program = types.program(db);
+            let env = ProgramEnvironment::from_program(program);
             let constraints = ConstraintSetBuilder::new();
             constraints.into_owned(|constraints| {
                 let source = types.first(db);
@@ -487,6 +565,7 @@ impl<'db> Type<'db> {
 
                 source.has_relation_to_with_typevar_evaluation(
                     db,
+                    &env,
                     target,
                     constraints,
                     TypeVarSet::None,
@@ -500,20 +579,23 @@ impl<'db> Type<'db> {
             return Cow::Owned(OwnedConstraintSet::always());
         }
 
+        let program = env.program(db);
         Cow::Borrowed(when_constraint_set_assignable_to_owned_impl(
             db,
-            TypePair::new(db, self, target),
+            TypePair::new(db, program, self, target),
         ))
     }
 
     pub(super) fn when_constraint_set_assignable_to<'c>(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         target: Type<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
     ) -> ConstraintSet<'db, 'c> {
         self.has_relation_to_with_typevar_evaluation(
             db,
+            env,
             target,
             constraints,
             TypeVarSet::None,
@@ -525,11 +607,13 @@ impl<'db> Type<'db> {
     fn when_constraint_set_subtype_of<'c>(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         target: Type<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
     ) -> ConstraintSet<'db, 'c> {
         self.has_relation_to_with_typevar_evaluation(
             db,
+            env,
             target,
             constraints,
             TypeVarSet::None,
@@ -541,31 +625,68 @@ impl<'db> Type<'db> {
     /// Return `true` if it would be redundant to add `self` to a union that already contains `other`.
     ///
     /// See [`TypeRelation::Redundancy`] for more details.
-    pub(super) fn is_redundant_with(self, db: &'db dyn Db, other: Type<'db>) -> bool {
+    pub(super) fn is_redundant_with(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        other: Type<'db>,
+    ) -> bool {
         #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| true, heap_size=ruff_memory_usage::heap_size)]
         fn is_redundant_with_impl<'db>(db: &'db dyn Db, types: TypePair<'db>) -> bool {
+            let program = types.program(db);
+            let env = ProgramEnvironment::from_program(program);
             types
                 .first(db)
                 .has_relation_to(
                     db,
+                    &env,
                     types.second(db),
                     &ConstraintSetBuilder::new(),
                     TypeVarSet::None,
                     TypeRelation::Redundancy { pure: false },
                 )
-                .is_always_satisfied(db)
+                .is_always_satisfied(db, &env)
         }
 
         if self == other {
             return true;
         }
 
-        is_redundant_with_impl(db, TypePair::new(db, self, other))
+        let program = env.program(db);
+        is_redundant_with_impl(db, TypePair::new(db, program, self, other))
     }
 
-    fn has_relation_to<'c>(
+    /// Return `true` if `self` is redundant with `other` under the pure redundancy relation.
+    ///
+    /// Unlike [`Self::is_redundant_with`], this does not apply shortcuts intended for simplifying
+    /// unions.
+    pub(super) fn is_pure_redundant_with(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        other: Type<'db>,
+    ) -> bool {
+        if self == other {
+            return true;
+        }
+
+        let program = env.program(db);
+        let env = ProgramEnvironment::from_program(program);
+        self.has_relation_to(
+            db,
+            &env,
+            other,
+            &ConstraintSetBuilder::new(),
+            TypeVarSet::None,
+            TypeRelation::Redundancy { pure: true },
+        )
+        .is_always_satisfied(db, &env)
+    }
+
+    pub(super) fn has_relation_to<'c>(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         target: Type<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
         inferable: TypeVarSet<'db>,
@@ -573,6 +694,7 @@ impl<'db> Type<'db> {
     ) -> ConstraintSet<'db, 'c> {
         self.has_relation_to_with_typevar_evaluation(
             db,
+            env,
             target,
             constraints,
             inferable,
@@ -581,9 +703,11 @@ impl<'db> Type<'db> {
         )
     }
 
+    #[expect(clippy::too_many_arguments)]
     fn has_relation_to_with_typevar_evaluation<'c>(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         target: Type<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
         inferable: TypeVarSet<'db>,
@@ -593,8 +717,9 @@ impl<'db> Type<'db> {
         let relation_visitor = HasRelationToVisitor::default(constraints);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
         let signature_relation_visitor = SignatureRelationVisitor::default();
-        let materialization_visitor = ApplyTypeMappingVisitor::default();
+        let materialization_visitor = ApplyTypeMappingVisitor::new(env);
         let checker = TypeRelationChecker {
+            env,
             constraints,
             inferable,
             relation,
@@ -622,38 +747,83 @@ impl<'db> Type<'db> {
     /// > &mdash; [Summary of type relations]
     ///
     /// [equivalent to]: https://typing.python.org/en/latest/spec/glossary.html#term-equivalent
-    pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Type<'db>) -> bool {
-        self.when_equivalent_to(db, other, &ConstraintSetBuilder::new())
-            .is_always_satisfied(db)
+    pub(crate) fn is_equivalent_to(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        other: Type<'db>,
+    ) -> bool {
+        self.when_equivalent_to(db, env, other, &ConstraintSetBuilder::new())
+            .is_always_satisfied(db, env)
     }
 
     pub(crate) fn is_equivalent_to_with_materialization_visitor(
         self,
         db: &'db dyn Db,
         other: Type<'db>,
-        materialization_visitor: &ApplyTypeMappingVisitor<'db>,
+        materialization_visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> bool {
         self.when_equivalent_to_with_materialization_visitor(
             db,
             other,
             &ConstraintSetBuilder::new(),
             materialization_visitor,
+            TypeVarEvaluation::Eager,
         )
-        .is_always_satisfied(db)
+        .is_always_satisfied(db, materialization_visitor.env)
     }
 
     pub(crate) fn when_equivalent_to<'c>(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         other: Type<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        let materialization_visitor = ApplyTypeMappingVisitor::default();
+        let materialization_visitor = ApplyTypeMappingVisitor::new(env);
         self.when_equivalent_to_with_materialization_visitor(
             db,
             other,
             constraints,
             &materialization_visitor,
+            TypeVarEvaluation::Eager,
+        )
+    }
+
+    /// Returns whether `self` and `other` can be equivalent under some typevar specialization.
+    pub(super) fn can_be_constraint_set_equivalent_to(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        other: Type<'db>,
+    ) -> bool {
+        #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| true, heap_size=ruff_memory_usage::heap_size)]
+        fn can_be_constraint_set_equivalent_to_impl<'db>(
+            db: &'db dyn Db,
+            types: TypePair<'db>,
+        ) -> bool {
+            let env = ProgramEnvironment::from_program(types.program(db));
+            let constraints = ConstraintSetBuilder::new();
+            let materialization_visitor = ApplyTypeMappingVisitor::new(&env);
+            !types
+                .first(db)
+                .when_equivalent_to_with_materialization_visitor(
+                    db,
+                    types.second(db),
+                    &constraints,
+                    &materialization_visitor,
+                    TypeVarEvaluation::Lazy,
+                )
+                .is_never_satisfied(db, &env)
+        }
+
+        if self == other {
+            return true;
+        }
+
+        can_be_constraint_set_equivalent_to_impl(
+            db,
+            TypePair::new(db, env.program(db), self, other),
         )
     }
 
@@ -662,15 +832,18 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         other: Type<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
-        materialization_visitor: &ApplyTypeMappingVisitor<'db>,
+        materialization_visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+        typevar_evaluation: TypeVarEvaluation,
     ) -> ConstraintSet<'db, 'c> {
         let relation_visitor = HasRelationToVisitor::default(constraints);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
         let signature_relation_visitor = SignatureRelationVisitor::default();
         let checker = EquivalenceChecker {
+            env: materialization_visitor.env,
             constraints,
             given: ConstraintSet::from_bool(constraints, false),
             perform_expensive_checks: true,
+            typevar_evaluation,
             relation_visitor: &relation_visitor,
             disjointness_visitor: &disjointness_visitor,
             signature_relation_visitor: &signature_relation_visitor,
@@ -694,15 +867,21 @@ impl<'db> Type<'db> {
     ///
     /// This function aims to have no false positives, but might return wrong
     /// `false` answers in some cases.
-    pub(crate) fn is_disjoint_from(self, db: &'db dyn Db, other: Type<'db>) -> bool {
+    pub(crate) fn is_disjoint_from(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        other: Type<'db>,
+    ) -> bool {
         let constraints = ConstraintSetBuilder::new();
-        self.when_disjoint_from(db, other, &constraints, TypeVarSet::None)
-            .is_always_satisfied(db)
+        self.when_disjoint_from(db, env, other, &constraints, TypeVarSet::None)
+            .is_always_satisfied(db, env)
     }
 
     pub(crate) fn when_disjoint_from<'c>(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         other: Type<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
         inferable: TypeVarSet<'db>,
@@ -710,10 +889,12 @@ impl<'db> Type<'db> {
         let relation_visitor = HasRelationToVisitor::default(constraints);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
         let signature_relation_visitor = SignatureRelationVisitor::default();
-        let materialization_visitor = ApplyTypeMappingVisitor::default();
+        let materialization_visitor = ApplyTypeMappingVisitor::new(env);
         let checker = DisjointnessChecker {
+            env,
             constraints,
             inferable,
+            context_tree: None,
             given: ConstraintSet::from_bool(constraints, false),
             perform_expensive_checks: true,
             disjointness_visitor: &disjointness_visitor,
@@ -724,12 +905,38 @@ impl<'db> Type<'db> {
         checker.check_type_pair(db, self, other)
     }
 
+    /// Re-run a successful disjointness check with diagnostic context collection enabled.
+    pub(crate) fn disjointness_error_context(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        other: Type<'db>,
+    ) -> ErrorContextTree<'db> {
+        let constraints = ConstraintSetBuilder::new();
+        let context = ErrorContextTree::new(ErrorRelation::Disjointness);
+        let checker = DisjointnessChecker {
+            env,
+            constraints: &constraints,
+            inferable: TypeVarSet::None,
+            context_tree: Some(context.clone()),
+            given: ConstraintSet::from_bool(&constraints, false),
+            perform_expensive_checks: true,
+            relation_visitor: &HasRelationToVisitor::default(&constraints),
+            disjointness_visitor: &IsDisjointVisitor::default(&constraints),
+            signature_relation_visitor: &SignatureRelationVisitor::default(),
+            materialization_visitor: &ApplyTypeMappingVisitor::new(env),
+        };
+        checker.check_type_pair(db, self, other);
+        context
+    }
+
     /// Checks whether `self` is disjoint from `other`, while being more accepting of false
     /// negatives. Use this when you want to _quickly_ check whether two types are _definitely_
     /// disjoint, typically for engaging a fast path in some algorithm.
     pub(crate) fn when_trivially_disjoint_from<'c>(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         other: Type<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
         inferable: TypeVarSet<'db>,
@@ -737,10 +944,12 @@ impl<'db> Type<'db> {
         let relation_visitor = HasRelationToVisitor::default(constraints);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
         let signature_relation_visitor = SignatureRelationVisitor::default();
-        let materialization_visitor = ApplyTypeMappingVisitor::default();
+        let materialization_visitor = ApplyTypeMappingVisitor::new(env);
         let checker = DisjointnessChecker {
+            env,
             constraints,
             inferable,
+            context_tree: None,
             given: ConstraintSet::from_bool(constraints, false),
             perform_expensive_checks: false,
             disjointness_visitor: &disjointness_visitor,
@@ -806,6 +1015,7 @@ impl<'db, 'c> IsDisjointVisitor<'db, 'c> {
 
 #[derive(Clone)]
 pub(super) struct TypeRelationChecker<'a, 'c, 'db> {
+    pub(super) env: &'a ProgramEnvironment<'db>,
     pub(super) constraints: &'c ConstraintSetBuilder<'db>,
     pub(super) inferable: TypeVarSet<'db>,
     pub(super) relation: TypeRelation,
@@ -823,19 +1033,21 @@ pub(super) struct TypeRelationChecker<'a, 'c, 'db> {
     relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
     disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
     pub(super) signature_relation_visitor: &'a SignatureRelationVisitor<'db>,
-    pub(super) materialization_visitor: &'a ApplyTypeMappingVisitor<'db>,
+    pub(super) materialization_visitor: &'a ApplyTypeMappingVisitor<'a, 'db>,
 }
 
 impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
     pub(super) fn subtyping(
+        env: &'a ProgramEnvironment<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
         inferable: TypeVarSet<'db>,
         relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
         disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
         signature_relation_visitor: &'a SignatureRelationVisitor<'db>,
-        materialization_visitor: &'a ApplyTypeMappingVisitor<'db>,
+        materialization_visitor: &'a ApplyTypeMappingVisitor<'a, 'db>,
     ) -> Self {
         Self {
+            env,
             constraints,
             inferable,
             relation: TypeRelation::Subtyping,
@@ -851,13 +1063,15 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
     }
 
     pub(super) fn constraint_set_assignability(
+        env: &'a ProgramEnvironment<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
         relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
         disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
         signature_relation_visitor: &'a SignatureRelationVisitor<'db>,
-        materialization_visitor: &'a ApplyTypeMappingVisitor<'db>,
+        materialization_visitor: &'a ApplyTypeMappingVisitor<'a, 'db>,
     ) -> Self {
         Self {
+            env,
             constraints,
             inferable: TypeVarSet::None,
             relation: TypeRelation::Assignability,
@@ -873,18 +1087,20 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
     }
 
     pub(super) fn constraint_set_assignability_with_context(
+        env: &'a ProgramEnvironment<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
         relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
         disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
         signature_relation_visitor: &'a SignatureRelationVisitor<'db>,
-        materialization_visitor: &'a ApplyTypeMappingVisitor<'db>,
+        materialization_visitor: &'a ApplyTypeMappingVisitor<'a, 'db>,
     ) -> Self {
         Self {
+            env,
             constraints,
             inferable: TypeVarSet::None,
             relation: TypeRelation::Assignability,
             typevar_evaluation: TypeVarEvaluation::Lazy,
-            context_tree: Some(ErrorContextTree::new()),
+            context_tree: Some(ErrorContextTree::new(TypeRelation::Assignability)),
             given: ConstraintSet::from_bool(constraints, false),
             perform_expensive_checks: true,
             relation_visitor,
@@ -895,18 +1111,20 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
     }
 
     pub(super) fn assignability_with_context(
+        env: &'a ProgramEnvironment<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
         relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
         disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
         signature_relation_visitor: &'a SignatureRelationVisitor<'db>,
-        materialization_visitor: &'a ApplyTypeMappingVisitor<'db>,
+        materialization_visitor: &'a ApplyTypeMappingVisitor<'a, 'db>,
     ) -> Self {
         Self {
+            env,
             constraints,
             inferable: TypeVarSet::None,
             relation: TypeRelation::Assignability,
             typevar_evaluation: TypeVarEvaluation::Eager,
-            context_tree: Some(ErrorContextTree::new()),
+            context_tree: Some(ErrorContextTree::new(TypeRelation::Assignability)),
             given: ConstraintSet::from_bool(constraints, false),
             perform_expensive_checks: true,
             relation_visitor,
@@ -930,7 +1148,9 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         source: ClassType<'db>,
         target: ClassType<'db>,
     ) -> bool {
+        let env = self.env;
         Self::subtyping(
+            env,
             self.constraints,
             TypeVarSet::None,
             self.relation_visitor,
@@ -939,7 +1159,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             self.materialization_visitor,
         )
         .check_class_pair(db, source, target)
-        .is_always_satisfied(db)
+        .is_always_satisfied(db, env)
     }
 
     pub(super) const fn is_eager_assignability(&self) -> bool {
@@ -949,7 +1169,8 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
     /// Return the collected error context, or an empty tree if collection was disabled.
     pub(super) fn into_error_context(self) -> ErrorContextTree<'db> {
-        self.context_tree.unwrap_or_else(ErrorContextTree::new)
+        self.context_tree
+            .unwrap_or_else(|| ErrorContextTree::new(self.relation))
     }
 
     pub(super) fn always(&self) -> ConstraintSet<'db, 'c> {
@@ -1024,20 +1245,32 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         target: Type<'db>,
         work: impl FnOnce() -> ConstraintSet<'db, 'c>,
     ) -> ConstraintSet<'db, 'c> {
+        let collect_context = self.is_context_collection_enabled();
         self.relation_visitor
             .try_visit(
                 db,
                 (source, target, self.relation, self.typevar_evaluation),
+                // Cached constraints do not retain explanations. When collecting context,
+                // recompute unsatisfiable comparisons while preserving the active recursion
+                // guards. Satisfiable constraints remain reusable, including those that
+                // constrain type variables.
+                |result| !collect_context || !result.is_never_satisfied(db, self.env),
                 work,
             )
-            .unwrap_or_else(|item| self.recursive_type_pair_fallback(item.0, item.1))
+            .unwrap_or_else(|item| self.recursive_type_pair_fallback(db, item.0, item.1))
     }
 
     fn recursive_type_pair_fallback(
         &self,
-        _source: Type<'db>,
-        _target: Type<'db>,
+        db: &'db dyn Db,
+        source: Type<'db>,
+        target: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        if let Some(nominally_satisfied) = self.try_check_nominal_protocol_cycle(db, source, target)
+        {
+            return nominally_satisfied;
+        }
+
         // TODO: Recursively-specialized structural types can encode context-free languages,
         // whose inclusion and equivalence are undecidable. No complete fallback exists, but
         // more decidable cases can be recognized here before conservatively rejecting the pair.
@@ -1061,14 +1294,17 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
     /// that are unrelated to each other in the regular-class domain (they do not inherit each
     /// other or any other common base), but they are all constrained to have a metaclass that
     /// inherits from `ABCMeta`.
-    fn is_metaclass_instance(db: &'db dyn Db, target: Type<'db>) -> bool {
+    fn is_metaclass_instance(&self, db: &'db dyn Db, target: Type<'db>) -> bool {
         target.as_nominal_instance().is_some_and(|instance| {
+            let env = self.env;
             KnownClass::Type
-                .try_to_class_literal(db)
+                .try_to_class_literal(db, env)
                 .is_some_and(|type_class| {
-                    instance
-                        .class(db)
-                        .is_subclass_of(db, ClassType::NonGeneric(ClassLiteral::Static(type_class)))
+                    instance.class(db, env).is_subclass_of(
+                        db,
+                        env,
+                        ClassType::NonGeneric(ClassLiteral::Static(type_class)),
+                    )
                 })
         })
     }
@@ -1110,17 +1346,19 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         target: Type<'db>,
     ) -> Option<ConstraintSet<'db, 'c>> {
         let source_i = source_subclass.into_type_var()?;
-        let is_exact_upper_bound = source_subclass.exact_typevar_upper_bound(db) == Some(target);
+        let env = self.env;
+        let is_exact_upper_bound =
+            source_subclass.exact_typevar_upper_bound(db, env) == Some(target);
 
-        if Self::is_metaclass_instance(db, target) {
+        if self.is_metaclass_instance(db, target) {
             return Some(self.check_type_pair(
                 db,
-                source_subclass.to_metaclass_instance(db),
+                source_subclass.to_metaclass_instance(db, env),
                 target,
             ));
         }
 
-        let projection = target.to_instance(db)?;
+        let projection = target.to_instance(db, env)?;
         if projection.is_exact() || is_exact_upper_bound {
             return Some(self.check_type_pair(
                 db,
@@ -1131,7 +1369,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
         let source = source_subclass
             .subclass_of()
-            .with_transposed_type_var(db)
+            .with_transposed_type_var(db, env)
             .into_type_var()?;
         Some(self.check_type_pair(db, Type::TypeVar(source), target))
     }
@@ -1160,6 +1398,8 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             return self.always();
         }
 
+        let env = self.env;
+
         // Handle constraint implication first. If either `source` or `target` is a typevar, check
         // the constraint set to see if the corresponding constraint is satisfied.
         if self.relation == TypeRelation::SubtypingAssuming
@@ -1167,7 +1407,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         {
             return self
                 .given
-                .implies_subtype_of(db, self.constraints, source, target);
+                .implies_subtype_of(db, env, self.constraints, source, target);
         }
 
         // With lazy evaluation, comparisons with a type variable are translated directly into a
@@ -1180,24 +1420,26 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // satisfies the upper bound/constraints).
             if let Type::TypeVar(bound_typevar) = source {
                 let upper = if self.relation.is_subtyping() {
-                    target.bottom_materialization(db)
+                    target.bottom_materialization(db, env)
                 } else {
                     target
                 };
                 return ConstraintSet::constrain_typevar_upper_bound(
                     db,
+                    env,
                     self.constraints,
                     bound_typevar,
                     upper,
                 );
             } else if let Type::TypeVar(bound_typevar) = target {
                 let lower = if self.relation.is_subtyping() {
-                    source.top_materialization(db)
+                    source.top_materialization(db, env)
                 } else {
                     source
                 };
                 return ConstraintSet::constrain_typevar_lower_bound(
                     db,
+                    env,
                     self.constraints,
                     bound_typevar,
                     lower,
@@ -1265,7 +1507,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // that depend on multiple elements, such as all members of an enum, are visible.
             (_, Type::Union(union)) if union.has_aliases(db) => {
                 self.with_recursion_guard(db, source, target, || {
-                    self.check_type_pair(db, source, union.expand_aliases(db))
+                    self.check_type_pair(db, source, union.expand_aliases(db, env))
                 })
             }
 
@@ -1281,7 +1523,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             (Type::SubclassOf(source_subclass), Type::TypeForm(target_typeform)) => self
                 .check_type_pair(
                     db,
-                    source_subclass.to_instance(db),
+                    source_subclass.to_instance(db, env),
                     target_typeform.type_argument(db),
                 ),
 
@@ -1294,25 +1536,25 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             (Type::ClassLiteral(source_class), Type::TypeForm(target_typeform)) => self
                 .check_type_pair(
                     db,
-                    Type::instance(db, source_class.default_specialization(db)),
+                    Type::instance(db, env, source_class.default_specialization(db)),
                     target_typeform.type_argument(db),
                 ),
 
             (Type::GenericAlias(source_alias), Type::TypeForm(target_typeform)) => self
                 .check_type_pair(
                     db,
-                    Type::instance(db, ClassType::Generic(source_alias)),
+                    Type::instance(db, env, ClassType::Generic(source_alias)),
                     target_typeform.type_argument(db),
                 ),
 
             (Type::KnownInstance(source_instance), Type::TypeForm(target_typeform))
-                if let Some(source_argument) = source_instance.type_form_argument(db) =>
+                if let Some(source_argument) = source_instance.type_form_argument(db, env) =>
             {
                 self.check_type_pair(db, source_argument, target_typeform.type_argument(db))
             }
 
             (Type::SpecialForm(source_form), Type::TypeForm(target_typeform)) => source_form
-                .type_form_argument(db)
+                .type_form_argument(db, env)
                 .when_some_and(db, self.constraints, |source_argument| {
                     self.check_type_pair(db, source_argument, target_typeform.type_argument(db))
                 }),
@@ -1324,15 +1566,15 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             }
 
             (Type::EnumComplement(complement), Type::LiteralValue(_) | Type::Union(_)) => {
-                self.check_type_pair(db, complement.remaining_literal_union(db), target)
+                self.check_type_pair(db, complement.remaining_literal_union(db, env), target)
             }
 
             (Type::EnumComplement(complement), _) => {
-                self.check_type_pair(db, complement.to_intersection(db), target)
+                self.check_type_pair(db, complement.to_intersection(db, env), target)
             }
 
             (_, Type::EnumComplement(complement)) => {
-                self.check_type_pair(db, source, complement.to_intersection(db))
+                self.check_type_pair(db, source, complement.to_intersection(db, env))
             }
 
             // Field definitions in dataclasses and dataclass-transformers can involve calls to
@@ -1399,10 +1641,10 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 Type::KnownInstance(KnownInstanceType::FunctoolsPartial(partial)),
                 Type::NominalInstance(target_instance),
             ) if target_instance
-                .class(db)
+                .class(db, env)
                 .is_known(db, KnownClass::FunctoolsPartial) =>
             {
-                let specialized = partial.partial(db).into_functools_partial_instance(db);
+                let specialized = partial.partial(db).into_functools_partial_instance(db, env);
                 self.check_type_pair(db, specialized, target)
             }
 
@@ -1497,7 +1739,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // "collapse to 'object'" in this case is a sound over-approximation.)
             (_, Type::SubclassOf(subclass_of))
                 if let Some(type_var) = subclass_of.into_type_var()
-                    && let Some(instance) = source.to_instance_approximation(db) =>
+                    && let Some(instance) = source.to_instance_approximation(db, env) =>
             {
                 self.check_type_pair(db, instance, Type::TypeVar(type_var))
             }
@@ -1512,19 +1754,24 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             {
                 self.check_type_pair(
                     db,
-                    Type::tuple(Some(TupleType::unpacked_typevartuple(db, bound_typevar))),
+                    Type::tuple(TupleType::unpacked_typevartuple(db, env, bound_typevar)),
                     target,
                 )
             }
+            // A fixed tuple cannot satisfy every specialization of a non-inferable TypeVarTuple.
+            // Let it reach the ordinary rejection below; expanding the target would repeat the
+            // same tuple comparison and cause the recursion guard to accept it.
             (source, Type::TypeVar(bound_typevar))
                 if !bound_typevar.is_inferable(db, self.inferable)
                     && bound_typevar.is_typevartuple(db)
-                    && source.exact_tuple_instance_spec(db).is_some() =>
+                    && source
+                        .exact_tuple_instance_spec(db)
+                        .is_some_and(|spec| spec.is_variadic()) =>
             {
                 self.check_type_pair(
                     db,
                     source,
-                    Type::tuple(Some(TupleType::unpacked_typevartuple(db, bound_typevar))),
+                    Type::tuple(TupleType::unpacked_typevartuple(db, env, bound_typevar)),
                 )
             }
 
@@ -1542,14 +1789,19 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 self.always()
             }
 
-            // Any concrete specialization of a `ParamSpec` is a subtype of the top
-            // materialization of a `ParamSpec` value.
+            // Compare fixed `ParamSpec`s with the endpoints of the materialization range of `...`:
+            // its bottom is below every `ParamSpec`, and its top is above every `ParamSpec`.
             (Type::TypeVar(bound_typevar), Type::Callable(other))
+            | (Type::Callable(other), Type::TypeVar(bound_typevar))
                 if !bound_typevar.is_inferable(db, self.inferable)
                     && bound_typevar.is_paramspec(db)
-                    && Self::is_top_paramspec_value(db, other) =>
+                    && other.kind(db) == CallableTypeKind::ParamSpecValue
+                    && other.signatures(db).iter().all(|signature| {
+                        signature.parameters().is_top() || signature.parameters().is_bottom()
+                    }) =>
             {
-                self.always()
+                let other_is_top = Self::is_top_paramspec_value(db, other);
+                ConstraintSet::from_bool(self.constraints, source.is_type_var() == other_is_top)
             }
 
             // A fully static typevar is a subtype of its upper bound, and to something similar to
@@ -1558,7 +1810,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             (Type::TypeVar(bound_typevar), _)
                 if !bound_typevar.is_inferable(db, self.inferable)
                     && let Some(bound_or_constraints) =
-                        bound_typevar.typevar(db).bound_or_constraints(db) =>
+                        bound_typevar.typevar(db).bound_or_constraints(db, env) =>
             {
                 match bound_or_constraints {
                     TypeVarBoundOrConstraints::UpperBound(bound) => {
@@ -1581,13 +1833,13 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 if !bound_typevar.is_inferable(db, self.inferable)
                     && let constraints = bound_typevar
                         .typevar(db)
-                        .constraints(db)
+                        .constraints(db, env)
                         .when_some_and(db, self.constraints, |constraints| {
                             constraints.iter().when_all(db, self.constraints, |c| {
                                 self.check_type_pair(db, source, *c)
                             })
                         })
-                    && !constraints.is_never_satisfied(db) =>
+                    && !constraints.is_never_satisfied(db, env) =>
             {
                 constraints
             }
@@ -1601,16 +1853,20 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 self.always()
             }
 
-            // Fast path for various types that we know `object` is never a subtype of
-            // (`object` can be a subtype of some protocols, or of itself, but those cases are
-            // handled above).
+            // Fast path for various types that we know `object` is never a subtype of.
             (
                 Type::NominalInstance(source),
-                Type::NominalInstance(_)
-                | Type::SubclassOf(_)
-                | Type::Callable(_)
-                | Type::ProtocolInstance(_),
+                Type::NominalInstance(_) | Type::SubclassOf(_) | Type::Callable(_),
             ) if source.is_object() => self.never(),
+
+            // `object` is not a subtype of a non-universal protocol because some subclasses
+            // might not implement it. For assignability, still inspect its actual members:
+            // `object()` is hashable and commonly used as a sentinel for `Hashable` parameters.
+            (Type::NominalInstance(source), Type::ProtocolInstance(_))
+                if source.is_object() && !self.relation.is_assignability() =>
+            {
+                self.never()
+            }
 
             // Fast path: `object` is not a subtype of any non-inferable type variable, since the
             // type variable could be specialized to a type smaller than `object`.
@@ -1625,7 +1881,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             }
 
             (Type::Union(union), _) => {
-                if let Some(supertype) = union.common_literal_supertype(db) {
+                if let Some(supertype) = union.common_literal_supertype(db, env) {
                     // Use the broader supertype only as a positive proof. If it has the requested
                     // relation to the target, then every literal in the union does too. Otherwise,
                     // check each literal individually.
@@ -1642,7 +1898,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     .when_all(db, self.constraints, |&elem_ty| {
                         let constraint_set = self.check_type_pair(db, elem_ty, target);
                         if let Some(context) = self.report_context()
-                            && constraint_set.is_never_satisfied(db)
+                            && constraint_set.is_never_satisfied(db, env)
                         {
                             context.push(ErrorContext::NotAllUnionElementsAssignable {
                                 element: elem_ty,
@@ -1656,7 +1912,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
             (_, Type::Union(union)) => {
                 if let Type::Intersection(intersection) = source
-                    && let Some(alternatives) = intersection.finite_alternative_union(db)
+                    && let Some(alternatives) = intersection.finite_alternative_union(db, env)
                 {
                     return self.check_type_pair(db, alternatives, target);
                 }
@@ -1673,7 +1929,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                         {
                             self.check_type_pair(
                                 db,
-                                intersection.with_expanded_typevars_and_newtypes(db),
+                                intersection.with_expanded_typevars_and_newtypes(db, env),
                                 target,
                             )
                         }
@@ -1698,9 +1954,9 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     .when_any(db, self.constraints, |&elem_ty| {
                         let result = self.check_type_pair(db, source, elem_ty);
                         if let Some(context_tree) = context_tree {
-                            let ctx = context_tree.take();
-                            if !ctx.is_empty() {
-                                elements_context.push(ctx);
+                            let env = context_tree.take();
+                            if !env.is_empty() {
+                                elements_context.push(env);
                             }
                         }
                         result
@@ -1709,16 +1965,16 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
                 if context_tree.is_some()
                     && !elements_context.is_empty()
-                    && result.is_never_satisfied(db)
+                    && result.is_never_satisfied(db, env)
                 {
                     let elements_without_context = elements.len() - elements_context.len();
                     if elements_without_context > 0 && elements_without_context < elements.len() {
-                        elements_context.push(
+                        elements_context.push(ErrorContextTree::from_context(
                             ErrorContext::NotAssignableToNOtherUnionElements {
                                 n: elements_without_context,
-                            }
-                            .into(),
-                        );
+                            },
+                            self.relation,
+                        ));
                     }
                     self.set_context(
                         ErrorContext::NotAssignableToAnyUnionElement {
@@ -1741,7 +1997,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 .when_all(db, self.constraints, |&pos_ty| {
                     let constraint_set = self.check_type_pair(db, source, pos_ty);
                     if let Some(context) = self.report_context()
-                        && constraint_set.is_never_satisfied(db)
+                        && constraint_set.is_never_satisfied(db, env)
                     {
                         context.push(ErrorContext::NotAssignableToIntersectionElement {
                             source,
@@ -1769,7 +2025,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                         TypeRelation::Subtyping
                         | TypeRelation::Redundancy { .. }
                         | TypeRelation::SubtypingAssuming => source,
-                        TypeRelation::Assignability => source.bottom_materialization(db),
+                        TypeRelation::Assignability => source.bottom_materialization(db, env),
                     };
                     intersection
                         .negative(db)
@@ -1779,7 +2035,9 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                                 TypeRelation::Subtyping
                                 | TypeRelation::Redundancy { .. }
                                 | TypeRelation::SubtypingAssuming => neg_ty,
-                                TypeRelation::Assignability => neg_ty.bottom_materialization(db),
+                                TypeRelation::Assignability => {
+                                    neg_ty.bottom_materialization(db, env)
+                                }
                             };
                             self.as_disjointness_checker()
                                 .check_type_pair(db, source_ty, neg_ty)
@@ -1788,7 +2046,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
             (Type::Intersection(intersection), _) => {
                 if matches!(target, Type::LiteralValue(_))
-                    && let Some(alternatives) = intersection.finite_alternative_union(db)
+                    && let Some(alternatives) = intersection.finite_alternative_union(db, env)
                 {
                     return self.check_type_pair(db, alternatives, target);
                 }
@@ -1806,9 +2064,9 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     .when_any(db, self.constraints, |elem_ty| {
                         let result = self.check_type_pair(db, elem_ty, target);
                         if let Some(context_tree) = context_tree {
-                            let ctx = context_tree.take();
-                            if !ctx.is_empty() {
-                                elements_context.push(ctx);
+                            let env = context_tree.take();
+                            if !env.is_empty() {
+                                elements_context.push(env);
                             }
                         }
                         result
@@ -1817,7 +2075,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                         if should_expand_intersection(intersection) {
                             self.check_type_pair(
                                 db,
-                                intersection.with_expanded_typevars_and_newtypes(db),
+                                intersection.with_expanded_typevars_and_newtypes(db, env),
                                 target,
                             )
                         } else {
@@ -1827,7 +2085,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
                 if context_tree.is_some()
                     && !elements_context.is_empty()
-                    && result.is_never_satisfied(db)
+                    && result.is_never_satisfied(db, env)
                 {
                     self.set_context(
                         ErrorContext::NoIntersectionElementAssignableToTarget {
@@ -1859,7 +2117,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             (_, Type::TypeVar(typevar)) if typevar.is_inferable(db, self.inferable) => {
                 if self.is_eager_assignability() {
                     // TODO: record the unification constraints
-                    typevar.typevar(db).upper_bound(db).when_none_or(
+                    typevar.typevar(db).upper_bound(db, env).when_none_or(
                         db,
                         self.constraints,
                         |bound| self.check_type_pair(db, source, bound),
@@ -1885,10 +2143,10 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // Note that the definition of `Type::AlwaysFalsy` depends on the return value of `__bool__`.
             // If `__bool__` always returns True or False, it can be treated as a subtype of `AlwaysTruthy` or `AlwaysFalsy`, respectively.
             (_, Type::AlwaysFalsy) => {
-                ConstraintSet::from_bool(self.constraints, source.bool(db).is_always_false())
+                ConstraintSet::from_bool(self.constraints, source.bool(db, env).is_always_false())
             }
             (_, Type::AlwaysTruthy) => {
-                ConstraintSet::from_bool(self.constraints, source.bool(db).is_always_true())
+                ConstraintSet::from_bool(self.constraints, source.bool(db, env).is_always_true())
             }
             // Currently, the only supertype of `AlwaysFalsy` and `AlwaysTruthy` is the universal set (object instance).
             (Type::AlwaysFalsy | Type::AlwaysTruthy, _) => {
@@ -1980,9 +2238,11 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
             (_, Type::Callable(target_callable)) => {
                 self.with_recursion_guard(db, source, target, || {
-                    let Some(callables) = source
-                        .try_upcast_to_callable_with_policy(db, UpcastPolicy::from(self.relation))
-                    else {
+                    let Some(callables) = source.try_upcast_to_callable_with_policy(
+                        db,
+                        env,
+                        UpcastPolicy::from(self.relation),
+                    ) else {
                         return self.never();
                     };
 
@@ -1990,11 +2250,11 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
                     if let Some(context) = self.report_context()
                         && self.should_provide_callable_upcast_context(source)
-                        && result.is_never_satisfied(db)
+                        && result.is_never_satisfied(db, env)
                     {
                         context.push(ErrorContext::InferredCallableType {
                             source,
-                            callable: callables.into_type(db),
+                            callable: callables.into_type(db, env),
                         });
                     }
 
@@ -2010,9 +2270,9 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // if `type` is a subtype of that protocol.
             (Type::SubclassOf(source_subclass_ty), Type::ProtocolInstance(_))
                 if (source_subclass_ty.is_dynamic() || source_subclass_ty.is_type_var())
-                    && !self.is_eager_assignability() =>
+                    && !self.relation.is_assignability() =>
             {
-                self.check_type_pair(db, KnownClass::Type.to_instance(db), target)
+                self.check_type_pair(db, KnownClass::Type.to_instance(db, env), target)
             }
 
             (_, Type::ProtocolInstance(target_proto)) => {
@@ -2032,30 +2292,85 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
             (Type::TypedDict(typed_dict), _) => {
                 self.with_recursion_guard(db, source, target, || {
-                    let dict_value_type = if self.relation.is_assignability() {
-                        typed_dict.assignable_dict_value_type(db)
-                    } else {
-                        typed_dict.dict_value_type(db)
-                    };
+                    let dict_value_type =
+                        typed_dict.dict_value_type_if(db, |field_ty, extra_ty| {
+                            let result = if self.relation.is_assignability() {
+                                // Mutual assignability lets gradual field types satisfy the mutable
+                                // dict contract. Check the schema without inferring type variables or
+                                // contributing error context, but keep the active recursion guards.
+                                let checker = Self {
+                                    inferable: TypeVarSet::None,
+                                    typevar_evaluation: TypeVarEvaluation::Eager,
+                                    context_tree: None,
+                                    ..self.clone()
+                                };
+                                checker.check_type_pair(db, field_ty, extra_ty).and(
+                                    db,
+                                    self.constraints,
+                                    || checker.check_type_pair(db, extra_ty, field_ty),
+                                )
+                            } else {
+                                self.as_equivalence_checker()
+                                    .check_type_pair(db, field_ty, extra_ty)
+                            };
+                            result.is_always_satisfied(db, env)
+                        });
                     let fallback = if let Some(value_ty) = dict_value_type {
                         KnownClass::Dict.to_specialized_instance(
                             db,
-                            &[KnownClass::Str.to_instance(db), value_ty],
+                            env,
+                            &[KnownClass::Str.to_instance(db, env), value_ty],
                         )
                     } else {
                         KnownClass::Mapping.to_specialized_instance(
                             db,
-                            &[KnownClass::Str.to_instance(db), typed_dict.value_type(db)],
+                            env,
+                            &[
+                                KnownClass::Str.to_instance(db, env),
+                                typed_dict.value_type(db, env),
+                            ],
                         )
                     };
                     let result = self.check_type_pair(db, fallback, target);
+
                     if let Some(context) = self.report_context()
-                        && result.is_never_satisfied(db)
+                        && result.is_never_satisfied(db, env)
                         && let Type::NominalInstance(instance) = target
-                        && instance.class(db).is_known(db, KnownClass::Dict)
                     {
-                        context.push(ErrorContext::TypedDictNotAssignableToDict(typed_dict));
+                        match instance.class(db, env).known(db) {
+                            Some(KnownClass::Dict) => {
+                                context
+                                    .push(ErrorContext::TypedDictNotAssignableToDict(typed_dict));
+                            }
+                            Some(KnownClass::Mapping)
+                                if typed_dict.openness(db).is_implicitly_open() =>
+                            {
+                                let field_types =
+                                    typed_dict.items(db).values().map(|field| field.declared_ty);
+                                let mapping_fallback_spec = &[
+                                    KnownClass::Str.to_instance(db, env),
+                                    UnionType::from_elements(db, env, field_types),
+                                ];
+
+                                let closed_typeddict_fallback = KnownClass::Mapping
+                                    .to_specialized_instance(db, env, mapping_fallback_spec);
+
+                                if self
+                                    .check_type_pair(db, closed_typeddict_fallback, target)
+                                    .is_always_satisfied(db, env)
+                                {
+                                    let context_element =
+                                        ErrorContext::OpenTypedDictNotAssignableToMapping {
+                                            source: typed_dict,
+                                            target,
+                                        };
+                                    context.push(context_element);
+                                }
+                            }
+                            _ => {}
+                        }
                     }
+
                     result
                 })
             }
@@ -2068,13 +2383,13 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             (Type::LiteralValue(literal), Type::NominalInstance(instance))
                 if let Some(value) = literal.as_string() =>
             {
-                let target_class = instance.class(db);
+                let target_class = instance.class(db, env);
 
                 if target_class.is_known(db, KnownClass::Str) {
                     return self.always();
                 }
 
-                if let Some(sequence_class) = KnownClass::Sequence.try_to_class_literal(db)
+                if let Some(sequence_class) = KnownClass::Sequence.try_to_class_literal(db, env)
                     && !sequence_class
                         .iter_mro(db, None)
                         .filter_map(ClassBase::into_class)
@@ -2102,7 +2417,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 };
 
                 KnownClass::Sequence
-                    .to_specialized_class_type(db, &[spec])
+                    .to_specialized_class_type(db, env, &[spec])
                     .when_some_and(db, self.constraints, |sequence| {
                         self.check_class_pair(db, sequence, target_class)
                     })
@@ -2115,13 +2430,13 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             (Type::LiteralValue(literal), Type::NominalInstance(instance))
                 if let Some(value) = literal.as_bytes() =>
             {
-                let target_class = instance.class(db);
+                let target_class = instance.class(db, env);
 
                 if target_class.is_known(db, KnownClass::Bytes) {
                     return self.always();
                 }
 
-                if let Some(sequence_class) = KnownClass::Sequence.try_to_class_literal(db)
+                if let Some(sequence_class) = KnownClass::Sequence.try_to_class_literal(db, env)
                     && !sequence_class
                         .iter_mro(db, None)
                         .filter_map(ClassBase::into_class)
@@ -2148,7 +2463,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 };
 
                 KnownClass::Sequence
-                    .to_specialized_class_type(db, &[spec])
+                    .to_specialized_class_type(db, env, &[spec])
                     .when_some_and(db, self.constraints, |sequence| {
                         self.check_class_pair(db, sequence, target_class)
                     })
@@ -2161,7 +2476,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             (Type::NominalInstance(_), Type::LiteralValue(literal))
                 if let Some(target_enum_literal) = literal.as_enum() =>
             {
-                if target_enum_literal.enum_class_instance(db) != source {
+                if target_enum_literal.enum_class_instance(db, env) != source {
                     self.never()
                 } else {
                     ConstraintSet::from_bool(
@@ -2175,7 +2490,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // most `Literal` types delegate to their instance fallbacks
             // unless `source` is exactly equivalent to `target` (handled above)
             (Type::ModuleLiteral(_) | Type::LiteralValue(_) | Type::FunctionLiteral(_), _) => {
-                source.literal_fallback_instance(db).when_some_and(
+                source.literal_fallback_instance(db, env).when_some_and(
                     db,
                     self.constraints,
                     |source_instance| self.check_type_pair(db, source_instance, target),
@@ -2184,14 +2499,14 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
             // The same reasoning applies for these special callable types:
             (Type::BoundMethod(_), _) => {
-                self.check_type_pair(db, KnownClass::MethodType.to_instance(db), target)
+                self.check_type_pair(db, KnownClass::MethodType.to_instance(db, env), target)
             }
             (Type::KnownBoundMethod(method), _) => {
-                self.check_type_pair(db, method.class().to_instance(db), target)
+                self.check_type_pair(db, method.class().to_instance(db, env), target)
             }
             (Type::WrapperDescriptor(_), _) => self.check_type_pair(
                 db,
-                KnownClass::WrapperDescriptorType.to_instance(db),
+                KnownClass::WrapperDescriptorType.to_instance(db, env),
                 target,
             ),
 
@@ -2217,12 +2532,12 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
             // `TypeIs[T]` and `TypeGuard[T]` are subtypes of `bool`.
             (Type::TypeIs(_) | Type::TypeGuard(_), _) => {
-                self.check_type_pair(db, KnownClass::Bool.to_instance(db), target)
+                self.check_type_pair(db, KnownClass::Bool.to_instance(db, env), target)
             }
 
             // Function-like callables are subtypes of `FunctionType`
             (Type::Callable(callable), _) if callable.is_function_like(db) => {
-                self.check_type_pair(db, KnownClass::FunctionType.to_instance(db), target)
+                self.check_type_pair(db, KnownClass::FunctionType.to_instance(db, env), target)
             }
 
             (Type::Callable(_), _) => self.never(),
@@ -2232,7 +2547,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 .check_bound_super_pair(db, source, target),
 
             (Type::BoundSuper(_), _) => {
-                self.check_type_pair(db, KnownClass::Super.to_instance(db), target)
+                self.check_type_pair(db, KnownClass::Super.to_instance(db, env), target)
             }
 
             (Type::SubclassOf(subclass_of), _) | (_, Type::SubclassOf(subclass_of))
@@ -2252,7 +2567,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                             target_protocol,
                         ),
                     target => target
-                        .into_class(db)
+                        .into_class(db, env)
                         .map(|target_cls| {
                             self.check_class_pair(
                                 db,
@@ -2297,7 +2612,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                             target_protocol,
                         ),
                     target => target
-                        .into_class(db)
+                        .into_class(db, env)
                         .map(|target_cls| {
                             self.check_class_pair(db, ClassType::Generic(source_alias), target_cls)
                         })
@@ -2319,30 +2634,30 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // `Literal[abc.ABC]` is a subtype of `abc.ABCMeta` because the `abc.ABC` class object
             // is an instance of its metaclass `abc.ABCMeta`.
             (Type::ClassLiteral(source_class), _) => {
-                self.check_type_pair(db, source_class.metaclass_instance_type(db), target)
+                self.check_type_pair(db, source_class.metaclass_instance_type(db, env), target)
             }
             (Type::GenericAlias(source_alias), _) => self.check_type_pair(
                 db,
-                ClassType::Generic(source_alias).metaclass_instance_type(db),
+                ClassType::Generic(source_alias).metaclass_instance_type(db, env),
                 target,
             ),
 
             // `type[Any]` is a subtype of `type[object]`, and is assignable to any `type[...]`
-            (Type::SubclassOf(subclass_of_ty), _) if subclass_of_ty.is_dynamic() => {
-                self.check_type_pair(db, KnownClass::Type.to_instance(db), target)
-                    .or(db, self.constraints, || {
-                        ConstraintSet::from_bool(self.constraints, self.is_eager_assignability())
-                            .and(db, self.constraints, || {
-                                self.check_type_pair(db, target, KnownClass::Type.to_instance(db))
-                            })
-                    })
-            }
+            (Type::SubclassOf(subclass_of_ty), _) if subclass_of_ty.is_dynamic() => self
+                .check_type_pair(db, KnownClass::Type.to_instance(db, env), target)
+                .or(db, self.constraints, || {
+                    ConstraintSet::from_bool(self.constraints, self.is_eager_assignability()).and(
+                        db,
+                        self.constraints,
+                        || self.check_type_pair(db, target, KnownClass::Type.to_instance(db, env)),
+                    )
+                }),
 
             // Any `type[...]` type is assignable to `type[Any]`
             (_, Type::SubclassOf(subclass_of_ty))
                 if subclass_of_ty.is_dynamic() && self.is_eager_assignability() =>
             {
-                self.check_type_pair(db, source, KnownClass::Type.to_instance(db))
+                self.check_type_pair(db, source, KnownClass::Type.to_instance(db, env))
             }
 
             // `type[str]` (== `SubclassOf("str")` in ty) describes all possible runtime subclasses
@@ -2352,15 +2667,9 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // Similarly `type[enum.Enum]`  is a subtype of `enum.EnumMeta` because `enum.Enum`
             // is an instance of `enum.EnumMeta`. `type[Any]` and `type[Unknown]` do not participate in subtyping,
             // however, as they are not fully static types.
-            (Type::SubclassOf(subclass_of_ty), _) => self.check_type_pair(
-                db,
-                subclass_of_ty
-                    .subclass_of()
-                    .into_class(db)
-                    .map(|source_class| source_class.metaclass_instance_type(db))
-                    .unwrap_or_else(|| KnownClass::Type.to_instance(db)),
-                target,
-            ),
+            (Type::SubclassOf(subclass_of_ty), _) => {
+                self.check_type_pair(db, subclass_of_ty.to_metaclass_instance(db, env), target)
+            }
 
             (Type::TypeForm(_), _) => self.check_type_pair(db, Type::object(), target),
 
@@ -2368,11 +2677,11 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // because `Type::SpecialForm(SpecialFormType::Type)` is a set with exactly one runtime value in it
             // (the symbol `typing.Type`), and that symbol is known to be an instance of `typing._SpecialForm` at runtime.
             (Type::SpecialForm(source_form), _) => {
-                self.check_type_pair(db, source_form.instance_fallback(db), target)
+                self.check_type_pair(db, source_form.instance_fallback(db, env), target)
             }
 
             (Type::KnownInstance(source), _) => {
-                self.check_type_pair(db, source.instance_fallback(db), target)
+                self.check_type_pair(db, source.instance_fallback(db, env), target)
             }
 
             // `bool` is a subtype of `int`, because `bool` subclasses `int`,
@@ -2388,11 +2697,21 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 }),
 
             (Type::PropertyInstance(property), _) => {
-                self.check_type_pair(db, property.instance_fallback(db), target)
+                self.check_type_pair(db, property.instance_fallback(db, env), target)
             }
             (_, Type::PropertyInstance(property)) => {
-                self.check_type_pair(db, source, property.instance_fallback(db))
+                self.check_type_pair(db, source, property.instance_fallback(db, env))
             }
+            (Type::SlotDescriptor(_), _) => self.check_type_pair(
+                db,
+                KnownClass::MemberDescriptorType.to_instance(db, env),
+                target,
+            ),
+            (_, Type::SlotDescriptor(_)) => self.check_type_pair(
+                db,
+                source,
+                KnownClass::MemberDescriptorType.to_instance(db, env),
+            ),
             // Other than the special cases enumerated above, nominal-instance types are never
             // subtypes of any other variants
             (Type::NominalInstance(_), _) => self.never(),
@@ -2405,6 +2724,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         source: PropertyInstanceType<'db>,
         target: PropertyInstanceType<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        let env = self.env;
         let check_optional_methods = |source, target| match (source, target) {
             (None, None) => self.always(),
             (Some(source), Some(target)) => self.check_type_pair(db, source, target),
@@ -2413,8 +2733,8 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
         self.check_type_pair(
             db,
-            source.instance_fallback(db),
-            target.instance_fallback(db),
+            source.instance_fallback(db, env),
+            target.instance_fallback(db, env),
         )
         .and(db, self.constraints, || {
             check_optional_methods(source.getter(db), target.getter(db)).and(
@@ -2433,9 +2753,11 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
     fn as_equivalence_checker(&self) -> EquivalenceChecker<'_, 'c, 'db> {
         EquivalenceChecker {
+            env: self.env,
             constraints: self.constraints,
             given: self.given,
             perform_expensive_checks: self.perform_expensive_checks,
+            typevar_evaluation: TypeVarEvaluation::Eager,
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
             signature_relation_visitor: self.signature_relation_visitor,
@@ -2445,8 +2767,10 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
     pub(super) fn as_disjointness_checker(&self) -> DisjointnessChecker<'_, 'c, 'db> {
         DisjointnessChecker {
+            env: self.env,
             constraints: self.constraints,
             inferable: self.inferable,
+            context_tree: None,
             given: self.given,
             perform_expensive_checks: self.perform_expensive_checks,
             relation_visitor: self.relation_visitor,
@@ -2485,9 +2809,11 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 }
 
 pub(super) struct EquivalenceChecker<'a, 'c, 'db> {
+    env: &'a ProgramEnvironment<'db>,
     pub(super) constraints: &'c ConstraintSetBuilder<'db>,
     given: ConstraintSet<'db, 'c>,
     perform_expensive_checks: bool,
+    typevar_evaluation: TypeVarEvaluation,
 
     // N.B. these fields are private to reduce the risk of
     // "double-visiting" a given pair of types. You should
@@ -2498,17 +2824,18 @@ pub(super) struct EquivalenceChecker<'a, 'c, 'db> {
     relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
     disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
     signature_relation_visitor: &'a SignatureRelationVisitor<'db>,
-    materialization_visitor: &'a ApplyTypeMappingVisitor<'db>,
+    materialization_visitor: &'a ApplyTypeMappingVisitor<'a, 'db>,
 }
 
 impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
     fn as_relation_checker<'a>(
         &'a self,
-        materialization_visitor: &'a ApplyTypeMappingVisitor<'db>,
+        materialization_visitor: &'a ApplyTypeMappingVisitor<'a, 'db>,
     ) -> TypeRelationChecker<'a, 'c, 'db> {
         TypeRelationChecker {
+            env: self.env,
             relation: TypeRelation::Redundancy { pure: true },
-            typevar_evaluation: TypeVarEvaluation::Eager,
+            typevar_evaluation: self.typevar_evaluation,
             constraints: self.constraints,
             context_tree: None,
             given: self.given,
@@ -2552,8 +2879,10 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
 }
 
 pub(super) struct DisjointnessChecker<'a, 'c, 'db> {
+    pub(super) env: &'a ProgramEnvironment<'db>,
     pub(super) constraints: &'c ConstraintSetBuilder<'db>,
     inferable: TypeVarSet<'db>,
+    context_tree: Option<ErrorContextTree<'db>>,
     given: ConstraintSet<'db, 'c>,
     perform_expensive_checks: bool,
 
@@ -2566,21 +2895,24 @@ pub(super) struct DisjointnessChecker<'a, 'c, 'db> {
     disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
     relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
     signature_relation_visitor: &'a SignatureRelationVisitor<'db>,
-    materialization_visitor: &'a ApplyTypeMappingVisitor<'db>,
+    materialization_visitor: &'a ApplyTypeMappingVisitor<'a, 'db>,
 }
 
 impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
     pub(super) fn new(
+        env: &'a ProgramEnvironment<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
         inferable: TypeVarSet<'db>,
         relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
         disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
         signature_relation_visitor: &'a SignatureRelationVisitor<'db>,
-        materialization_visitor: &'a ApplyTypeMappingVisitor<'db>,
+        materialization_visitor: &'a ApplyTypeMappingVisitor<'a, 'db>,
     ) -> Self {
         Self {
+            env,
             constraints,
             inferable,
+            context_tree: None,
             given: ConstraintSet::from_bool(constraints, false),
             perform_expensive_checks: true,
             disjointness_visitor,
@@ -2595,6 +2927,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
         relation: TypeRelation,
     ) -> TypeRelationChecker<'_, 'c, 'db> {
         TypeRelationChecker {
+            env: self.env,
             relation,
             typevar_evaluation: TypeVarEvaluation::Eager,
             constraints: self.constraints,
@@ -2609,11 +2942,39 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
         }
     }
 
+    pub(super) fn report_context(&self) -> Option<&ErrorContextTree<'db>> {
+        self.context_tree
+            .as_ref()
+            .filter(|context| context.is_enabled())
+    }
+
+    /// Retain a failed subtyping or assignability check that proves disjointness.
+    pub(super) fn check_relation_with_context(
+        &self,
+        db: &'db dyn Db,
+        mut checker: TypeRelationChecker<'_, 'c, 'db>,
+        check: impl FnOnce(&TypeRelationChecker<'_, 'c, 'db>) -> ConstraintSet<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c> {
+        checker.context_tree = self
+            .report_context()
+            .map(|_| ErrorContextTree::new(checker.relation));
+        let result = check(&checker);
+        if let Some(context) = self.report_context() {
+            context.take();
+            if result.is_never_satisfied(db, self.env) {
+                context.replace(&checker.into_error_context());
+            }
+        }
+        result
+    }
+
     fn as_equivalence_checker(&self) -> EquivalenceChecker<'_, 'c, 'db> {
         EquivalenceChecker {
+            env: self.env,
             constraints: self.constraints,
             given: self.given,
             perform_expensive_checks: self.perform_expensive_checks,
+            typevar_evaluation: TypeVarEvaluation::Eager,
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
             signature_relation_visitor: self.signature_relation_visitor,
@@ -2637,22 +2998,59 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
         protocol: ProtocolInstanceType<'db>,
         other: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        let env = self.env;
         protocol
             .interface(db)
             .members(db)
             .when_any(db, self.constraints, |member| {
-                other
-                    .member(db, member.name())
+                if let Some(context) = self.report_context() {
+                    context.take();
+                }
+                let attribute = other
+                    .member(db, env, member.name())
                     .place
-                    .ignore_possibly_undefined()
-                    .when_none_or(db, self.constraints, |attribute_type| {
-                        self.protocol_member_has_disjoint_type_from_ty(db, &member, attribute_type)
-                            .or(db, self.constraints, || {
-                                self.protocol_member_write_is_definitely_missing_from_ty(
-                                    db, &member, other,
-                                )
-                            })
+                    .ignore_possibly_undefined();
+                let Some(attribute_type) = attribute else {
+                    if let Some(context) = self.report_context() {
+                        context.push(ErrorContext::ProtocolMemberNotDefined {
+                            member_name: member.name().into(),
+                            ty: other,
+                        });
+                        if let Type::NominalInstance(nominal) = other
+                            && nominal.class(db, env).is_final(db)
+                        {
+                            context.push(ErrorContext::FinalTypeMissingProtocolMembers {
+                                final_type: other,
+                                protocol: Type::ProtocolInstance(protocol),
+                            });
+                        }
+                    }
+                    return self.always();
+                };
+                let result = self
+                    .protocol_member_has_disjoint_type_from_ty(db, &member, attribute_type)
+                    .or(db, self.constraints, || {
+                        self.protocol_member_write_is_definitely_missing_from_ty(db, &member, other)
                     })
+                    .or(db, self.constraints, || {
+                        let incompatible =
+                            member.has_incompatible_class_variable_declaration(db, env, other);
+                        if incompatible && let Some(context) = self.report_context() {
+                            context.push(ErrorContext::ProtocolMemberClassVarMismatch {
+                                member_name: member.name().into(),
+                                ty: other,
+                            });
+                        }
+                        ConstraintSet::from_bool(self.constraints, incompatible)
+                    });
+                if let Some(context) = self.report_context()
+                    && result.is_always_satisfied(db, env)
+                {
+                    context.push(ErrorContext::ProtocolMemberIncompatible {
+                        member_name: member.name().into(),
+                    });
+                }
+                result
             })
     }
 
@@ -2702,6 +3100,25 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
         left: Type<'db>,
         right: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        if let Some(context) = self.report_context() {
+            context.take();
+        }
+        let result = self.check_type_pair_impl(db, left, right);
+        if let Some(context) = self.report_context()
+            && !result.is_always_satisfied(db, self.env)
+        {
+            // A failed alternative is not evidence for a later successful disjointness check.
+            context.take();
+        }
+        result
+    }
+
+    fn check_type_pair_impl(
+        &self,
+        db: &'db dyn Db,
+        left: Type<'db>,
+        right: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
         /// This lets us clearly mark below which match arms require a non-trivial amount of work
         /// to calculate, without sacrificing match guard exhaustiveness checks. If we are not
         /// performing expensive checks, then we will conservatively report that the two types are
@@ -2725,6 +3142,8 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             return self.check_type_pair(db, left, right);
         }
 
+        let env = self.env;
+
         match (left, right) {
             (Type::Never, _) | (_, Type::Never) => self.always(),
 
@@ -2746,11 +3165,11 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             }),
 
             (Type::EnumComplement(complement), other) => nontrivial_check(self, || {
-                self.check_type_pair(db, complement.remaining_literal_union(db), other)
+                self.check_type_pair(db, complement.remaining_literal_union(db, env), other)
             }),
 
             (other, Type::EnumComplement(complement)) => nontrivial_check(self, || {
-                self.check_type_pair(db, other, complement.remaining_literal_union(db))
+                self.check_type_pair(db, other, complement.remaining_literal_union(db, env))
             }),
 
             // `type[T]` and `TypeForm[S]` overlap whenever their represented instance types do.
@@ -2759,7 +3178,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 nontrivial_check(self, || {
                     self.check_type_pair(
                         db,
-                        subclass_of.to_instance(db),
+                        subclass_of.to_instance(db, env),
                         typeform.type_argument(db),
                     )
                 })
@@ -2775,7 +3194,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 Type::SubclassOf(subclass_of),
             ) if let Some(type_var) = subclass_of
                 .subclass_of()
-                .with_transposed_type_var(db)
+                .with_transposed_type_var(db, env)
                 .into_type_var() =>
             {
                 nontrivial_check(self, || {
@@ -2786,7 +3205,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             // `type[T]` is disjoint from a class object `A` if every instance of `T` is disjoint from an instance of `A`.
             (Type::SubclassOf(subclass_of), other) | (other, Type::SubclassOf(subclass_of))
                 if let Some(type_var) = subclass_of.into_type_var()
-                    && let Some(instance) = other.to_instance_approximation(db) =>
+                    && let Some(instance) = other.to_instance_approximation(db, env) =>
             {
                 nontrivial_check(self, || {
                     self.check_type_pair(db, Type::TypeVar(type_var), instance)
@@ -2819,17 +3238,19 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             (Type::TypeVar(tvar), other) | (other, Type::TypeVar(tvar))
                 if !tvar.is_inferable(db, self.inferable) =>
             {
-                nontrivial_check(self, || match tvar.typevar(db).bound_or_constraints(db) {
-                    None => self.never(),
-                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                        self.check_type_pair(db, bound, other)
-                    }
-                    Some(TypeVarBoundOrConstraints::Constraints(typevar_constraints)) => {
-                        typevar_constraints.elements(db).iter().when_all(
-                            db,
-                            self.constraints,
-                            |constraint| self.check_type_pair(db, *constraint, other),
-                        )
+                nontrivial_check(self, || {
+                    match tvar.typevar(db).bound_or_constraints(db, env) {
+                        None => self.never(),
+                        Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                            self.check_type_pair(db, bound, other)
+                        }
+                        Some(TypeVarBoundOrConstraints::Constraints(typevar_constraints)) => {
+                            typevar_constraints.elements(db).iter().when_all(
+                                db,
+                                self.constraints,
+                                |constraint| self.check_type_pair(db, *constraint, other),
+                            )
+                        }
                     }
                 })
             }
@@ -2839,12 +3260,35 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
 
             (Type::Union(union), other) | (other, Type::Union(union)) => {
                 nontrivial_check(self, || {
-                    union
+                    let mut children = Vec::new();
+                    let result = union
                         .elements(db)
                         .iter()
                         .when_all(db, self.constraints, |e| {
-                            self.check_type_pair(db, *e, other)
-                        })
+                            let result = self.check_type_pair(db, *e, other);
+                            if let Some(context) = self.report_context() {
+                                if context.is_empty() {
+                                    context.push(ErrorContext::DisjointTypes {
+                                        left: *e,
+                                        right: other,
+                                    });
+                                }
+                                children.push(context.take());
+                            }
+                            result
+                        });
+                    if let Some(context) = self.report_context()
+                        && result.is_always_satisfied(db, env)
+                    {
+                        context.set(
+                            ErrorContext::DisjointUnion {
+                                union: Type::Union(union),
+                                other,
+                            },
+                            children,
+                        );
+                    }
+                    result
                 })
             }
 
@@ -2853,10 +3297,11 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             // This is similar to what would happen if we tried to build a new intersection that combines the two
             (Type::Intersection(left_intersection), Type::Intersection(right_intersection)) => {
                 nontrivial_check(self, || {
-                    if let Some(alternatives) = left_intersection.finite_alternative_union(db) {
+                    if let Some(alternatives) = left_intersection.finite_alternative_union(db, env)
+                    {
                         self.check_type_pair(db, alternatives, right)
                     } else if let Some(alternatives) =
-                        right_intersection.finite_alternative_union(db)
+                        right_intersection.finite_alternative_union(db, env)
                     {
                         self.check_type_pair(db, left, alternatives)
                     } else {
@@ -2880,7 +3325,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             }
 
             (Type::Intersection(intersection), other) => nontrivial_check(self, || {
-                if let Some(alternatives) = intersection.finite_alternative_union(db) {
+                if let Some(alternatives) = intersection.finite_alternative_union(db, env) {
                     self.check_type_pair(db, alternatives, other)
                 } else {
                     self.check_intersection_pair_via_elements(db, left, right, intersection, other)
@@ -2888,7 +3333,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             }),
 
             (other, Type::Intersection(intersection)) => nontrivial_check(self, || {
-                if let Some(alternatives) = intersection.finite_alternative_union(db) {
+                if let Some(alternatives) = intersection.finite_alternative_union(db, env) {
                     self.check_type_pair(db, other, alternatives)
                 } else {
                     self.check_intersection_pair_via_elements(db, left, right, intersection, other)
@@ -2981,13 +3426,13 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 // `Truthiness::Ambiguous` may include `AlwaysTrue` as a subset, so it's not guaranteed to be disjoint.
                 // Thus, they are only disjoint if `ty.bool() == AlwaysFalse`.
                 nontrivial_check(self, || {
-                    ConstraintSet::from_bool(self.constraints, ty.bool(db).is_always_false())
+                    ConstraintSet::from_bool(self.constraints, ty.bool(db, env).is_always_false())
                 })
             }
             (Type::AlwaysFalsy, ty) | (ty, Type::AlwaysFalsy) => {
                 // Similarly, they are only disjoint if `ty.bool() == AlwaysTrue`.
                 nontrivial_check(self, || {
-                    ConstraintSet::from_bool(self.constraints, ty.bool(db).is_always_true())
+                    ConstraintSet::from_bool(self.constraints, ty.bool(db, env).is_always_true())
                 })
             }
 
@@ -3006,7 +3451,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                         self.any_protocol_members_absent_or_disjoint(
                             db,
                             protocol,
-                            special_form.instance_fallback(db),
+                            special_form.instance_fallback(db, env),
                         )
                     })
                 })
@@ -3019,7 +3464,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                         self.any_protocol_members_absent_or_disjoint(
                             db,
                             protocol,
-                            known_instance.instance_fallback(db),
+                            known_instance.instance_fallback(db, env),
                         )
                     })
                 })
@@ -3078,7 +3523,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             // (<https://github.com/rust-lang/rust/issues/129967>)
             (Type::ProtocolInstance(protocol), Type::NominalInstance(nominal))
             | (Type::NominalInstance(nominal), Type::ProtocolInstance(protocol))
-                if self.perform_expensive_checks && nominal.class(db).is_final(db) =>
+                if self.perform_expensive_checks && nominal.class(db, env).is_final(db) =>
             {
                 nontrivial_check(self, || {
                     self.with_recursion_guard(db, left, right, || {
@@ -3098,7 +3543,10 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                         .interface(db)
                         .members(db)
                         .when_any(db, self.constraints, |member| {
-                            match other.member(db, member.name()).place {
+                            if let Some(context) = self.report_context() {
+                                context.take();
+                            }
+                            let result = match other.member(db, env, member.name()).place {
                                 Place::Defined(DefinedPlace {
                                     ty: attribute_type, ..
                                 }) => self.protocol_member_has_disjoint_type_from_ty(
@@ -3107,7 +3555,15 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                                     attribute_type,
                                 ),
                                 Place::Undefined => self.never(),
+                            };
+                            if let Some(context) = self.report_context()
+                                && result.is_always_satisfied(db, env)
+                            {
+                                context.push(ErrorContext::ProtocolMemberIncompatible {
+                                    member_name: member.name().into(),
+                                });
                             }
+                            result
                         })
                 })
             }),
@@ -3160,6 +3616,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                             self.constraints,
                             !class_a.could_exist_in_mro_of_with_disjointness_checker(
                                 db,
+                                env,
                                 ClassType::NonGeneric(class_b),
                                 self,
                             ),
@@ -3179,6 +3636,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                             self.constraints,
                             !class_a.could_exist_in_mro_of_with_disjointness_checker(
                                 db,
+                                env,
                                 ClassType::Generic(alias_b),
                                 self,
                             ),
@@ -3197,15 +3655,14 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             (Type::SubclassOf(subclass_of_ty), other)
             | (other, Type::SubclassOf(subclass_of_ty)) => {
                 nontrivial_check(self, || match subclass_of_ty.subclass_of() {
-                    SubclassOfInner::Dynamic(_) => {
-                        self.check_type_pair(db, KnownClass::Type.to_instance(db), other)
+                    SubclassOfInner::Dynamic(_) | SubclassOfInner::Protocol(_) => {
+                        self.check_type_pair(db, KnownClass::Type.to_instance(db, env), other)
                     }
-                    SubclassOfInner::Class(class) => {
-                        self.check_type_pair(db, class.metaclass_instance_type(db), other)
-                    }
-                    SubclassOfInner::Protocol(_) => {
-                        self.check_type_pair(db, KnownClass::Type.to_instance(db), other)
-                    }
+                    SubclassOfInner::Class(_) => self.check_type_pair(
+                        db,
+                        subclass_of_ty.to_metaclass_instance(db, env),
+                        other,
+                    ),
                     SubclassOfInner::TypeVar(_) => unreachable!(),
                 })
             }
@@ -3215,7 +3672,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 nontrivial_check(self, || {
                     ConstraintSet::from_bool(
                         self.constraints,
-                        !special_form.is_instance_of(db, instance.class(db)),
+                        !special_form.is_instance_of(db, env, instance.class(db, env)),
                     )
                 })
             }
@@ -3225,7 +3682,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 nontrivial_check(self, || {
                     ConstraintSet::from_bool(
                         self.constraints,
-                        !known_instance.is_instance_of(db, instance.class(db)),
+                        !known_instance.is_instance_of(db, env, instance.class(db, env)),
                     )
                 })
             }
@@ -3236,31 +3693,35 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                     let positive_relation_holds = match literal.kind() {
                         LiteralValueTypeKind::Int(_) => KnownClass::Int.when_subclass_of(
                             db,
-                            instance.class(db),
+                            env,
+                            instance.class(db, env),
                             self.constraints,
                         ),
                         LiteralValueTypeKind::Bool(_) => KnownClass::Bool.when_subclass_of(
                             db,
-                            instance.class(db),
+                            env,
+                            instance.class(db, env),
                             self.constraints,
                         ),
                         LiteralValueTypeKind::LiteralString | LiteralValueTypeKind::String(_) => {
                             KnownClass::Str.when_subclass_of(
                                 db,
-                                instance.class(db),
+                                env,
+                                instance.class(db, env),
                                 self.constraints,
                             )
                         }
                         LiteralValueTypeKind::Bytes(_) => KnownClass::Bytes.when_subclass_of(
                             db,
-                            instance.class(db),
+                            env,
+                            instance.class(db, env),
                             self.constraints,
                         ),
                         LiteralValueTypeKind::Enum(enum_literal) => self
                             .as_relation_checker(TypeRelation::Subtyping)
                             .check_type_pair(
                                 db,
-                                enum_literal.enum_class_instance(db),
+                                enum_literal.enum_class_instance(db, env),
                                 Type::NominalInstance(instance),
                             ),
                     };
@@ -3274,10 +3735,21 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 // (it cannot be an instance of a `bool` subclass)
                 nontrivial_check(self, || {
                     KnownClass::Bool
-                        .when_subclass_of(db, instance.class(db), self.constraints)
+                        .when_subclass_of(db, env, instance.class(db, env), self.constraints)
                         .negate(db, self.constraints)
                 })
             }
+
+            (
+                Type::NewTypeInstance(newtype),
+                other @ (Type::LiteralValue(_) | Type::TypeIs(_) | Type::TypeGuard(_)),
+            )
+            | (
+                other @ (Type::LiteralValue(_) | Type::TypeIs(_) | Type::TypeGuard(_)),
+                Type::NewTypeInstance(newtype),
+            ) => nontrivial_check(self, || {
+                self.check_type_pair(db, newtype.concrete_base_type(db), other)
+            }),
 
             (Type::TypeIs(_) | Type::TypeGuard(_), _)
             | (_, Type::TypeIs(_) | Type::TypeGuard(_)) => self.always(),
@@ -3291,9 +3763,10 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             | (Type::NominalInstance(instance), Type::ClassLiteral(class)) => {
                 nontrivial_check(self, || {
                     class
-                        .metaclass_instance_type(db)
+                        .metaclass_instance_type(db, env)
                         .when_subtype_of(
                             db,
+                            env,
                             Type::NominalInstance(instance),
                             self.constraints,
                             self.inferable,
@@ -3308,7 +3781,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                     self.as_relation_checker(TypeRelation::Subtyping)
                         .check_type_pair(
                             db,
-                            ClassType::Generic(alias).metaclass_instance_type(db),
+                            ClassType::Generic(alias).metaclass_instance_type(db, env),
                             Type::NominalInstance(instance),
                         )
                         .negate(db, self.constraints)
@@ -3321,7 +3794,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 // (it cannot be an instance of a `types.FunctionType` subclass)
                 nontrivial_check(self, || {
                     KnownClass::FunctionType
-                        .when_subclass_of(db, instance.class(db), self.constraints)
+                        .when_subclass_of(db, env, instance.class(db, env), self.constraints)
                         .negate(db, self.constraints)
                 })
             }
@@ -3384,13 +3857,13 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
 
             (Type::BoundMethod(_), other) | (other, Type::BoundMethod(_)) => {
                 nontrivial_check(self, || {
-                    self.check_type_pair(db, KnownClass::MethodType.to_instance(db), other)
+                    self.check_type_pair(db, KnownClass::MethodType.to_instance(db, env), other)
                 })
             }
 
             (Type::KnownBoundMethod(method), other) | (other, Type::KnownBoundMethod(method)) => {
                 nontrivial_check(self, || {
-                    self.check_type_pair(db, method.class().to_instance(db), other)
+                    self.check_type_pair(db, method.class().to_instance(db, env), other)
                 })
             }
 
@@ -3398,7 +3871,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 nontrivial_check(self, || {
                     self.check_type_pair(
                         db,
-                        KnownClass::WrapperDescriptorType.to_instance(db),
+                        KnownClass::WrapperDescriptorType.to_instance(db, env),
                         other,
                     )
                 })
@@ -3428,11 +3901,12 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             | (
                 Type::NominalInstance(nominal),
                 Type::Callable(_) | Type::DataclassDecorator(_) | Type::DataclassTransformer(_),
-            ) if self.perform_expensive_checks && nominal.class(db).is_final(db) => {
+            ) if self.perform_expensive_checks && nominal.class(db, env).is_final(db) => {
                 nontrivial_check(self, || {
                     Type::NominalInstance(nominal)
                         .member_lookup_with_policy(
                             db,
+                            env,
                             "__call__",
                             MemberLookupPolicy::NO_INSTANCE_FALLBACK,
                         )
@@ -3469,7 +3943,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                     self.check_type_pair(
                         db,
                         Type::NominalInstance(instance),
-                        KnownClass::ModuleType.to_instance(db),
+                        KnownClass::ModuleType.to_instance(db, env),
                     )
                 })
             }
@@ -3493,8 +3967,18 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
 
             (Type::PropertyInstance(property), other)
             | (other, Type::PropertyInstance(property)) => nontrivial_check(self, || {
-                self.check_type_pair(db, property.instance_fallback(db), other)
+                self.check_type_pair(db, property.instance_fallback(db, env), other)
             }),
+
+            (Type::SlotDescriptor(_), other) | (other, Type::SlotDescriptor(_)) => {
+                nontrivial_check(self, || {
+                    self.check_type_pair(
+                        db,
+                        KnownClass::MemberDescriptorType.to_instance(db, env),
+                        other,
+                    )
+                })
+            }
 
             (Type::BoundSuper(left), Type::BoundSuper(right)) => nontrivial_check(self, || {
                 self.as_equivalence_checker()
@@ -3504,7 +3988,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
 
             (Type::BoundSuper(_), other) | (other, Type::BoundSuper(_)) => {
                 nontrivial_check(self, || {
-                    self.check_type_pair(db, KnownClass::Super.to_instance(db), other)
+                    self.check_type_pair(db, KnownClass::Super.to_instance(db, env), other)
                 })
             }
 
@@ -3526,7 +4010,8 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 nontrivial_check(self, || {
                     let dict_str_any = KnownClass::Dict.to_specialized_instance(
                         db,
-                        &[KnownClass::Str.to_instance(db), Type::any()],
+                        env,
+                        &[KnownClass::Str.to_instance(db, env), Type::any()],
                     );
 
                     self.as_relation_checker(TypeRelation::Assignability)

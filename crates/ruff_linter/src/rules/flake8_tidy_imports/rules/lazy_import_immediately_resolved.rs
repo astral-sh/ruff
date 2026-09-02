@@ -7,6 +7,7 @@ use ruff_python_semantic::{Binding, BindingKind, GeneratorKind, ScopeKind, Seman
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -46,7 +47,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// member, since removing `lazy` from a multi-member import would make every
 /// imported member eager, including names that may not be resolved immediately.
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.15.13")]
+#[violation_metadata(preview_since = "0.15.13", category = Category::Correctness)]
 pub(crate) struct LazyImportImmediatelyResolved {
     name: String,
     fixable: bool,

@@ -58,7 +58,7 @@ def f(x: T) -> T:
     return x
 
 reveal_type(f(1))  # revealed: Literal[1]
-reveal_type(f(1.0))  # revealed: float
+reveal_type(f(1.0))  # revealed: float*
 reveal_type(f(True))  # revealed: Literal[True]
 reveal_type(f("string"))  # revealed: Literal["string"]
 ```
@@ -75,9 +75,10 @@ argument _explicitly_ implements the protocol by listing it as a base class.
 from typing import Protocol, TypeVar
 
 T = TypeVar("T")
+T_co = TypeVar("T_co", covariant=True)
 
-class CanIndex(Protocol[T]):
-    def __getitem__(self, index: int, /) -> T: ...
+class CanIndex(Protocol[T_co]):
+    def __getitem__(self, index: int, /) -> T_co: ...
 
 class ExplicitlyImplements(CanIndex[T]):
     def __getitem__(self, index: int, /) -> T:
@@ -121,6 +122,11 @@ def takes_in_type(x: type[T]) -> type[T]:
     return x
 
 reveal_type(takes_in_type(int))  # revealed: type[int]
+
+def takes_in_type_of_list(x: type[list[T]]) -> T:
+    raise NotImplementedError
+
+reveal_type(takes_in_type_of_list(list[int]))  # revealed: int
 ```
 
 This also works when passing in arguments that are subclasses of the parameter type.
@@ -134,6 +140,9 @@ reveal_type(takes_in_protocol(Sub()))  # revealed: int
 
 reveal_type(takes_in_list(GenericSub[str]()))  # revealed: list[str]
 reveal_type(takes_in_protocol(GenericSub[str]()))  # revealed: str
+
+reveal_type(takes_in_type_of_list(Sub))  # revealed: int
+reveal_type(takes_in_type_of_list(GenericSub[str]))  # revealed: str
 
 class ExplicitSub(ExplicitlyImplements[int]): ...
 class ExplicitGenericSub(ExplicitlyImplements[T]): ...
@@ -160,6 +169,113 @@ def pick(x: object) -> str | bool:
     raise NotImplementedError
 
 reveal_type(pick([1]))  # revealed: bool
+```
+
+## Inferring generic typed-dictionary parameters
+
+A type variable that appears only inside a typed dictionary still makes the function generic, so
+specialized typed dictionaries can be passed to it.
+
+```py
+from typing import Generic, TypeVar, TypedDict
+
+T = TypeVar("T")
+
+class Item(TypedDict, Generic[T]):
+    value: T
+
+def accept(value: Item[T]) -> None: ...
+
+item: Item[int] = {"value": 1}
+
+reveal_type(accept)  # revealed: def accept[T](value: Item[T]) -> None
+accept(item)
+```
+
+## Inferring a class-object parameter through a generic factory
+
+A factory can infer its type arguments from a specialized subclass of its class-object parameter.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Base(Generic[T, U]): ...
+class Specialized(Base[int, str]): ...
+
+def create(cls: type[Base[T, U]]) -> tuple[T, U]:
+    raise NotImplementedError
+
+reveal_type(create(Specialized))  # revealed: tuple[int, str]
+```
+
+## Inferring a class-object parameter through a generic method
+
+A method can likewise infer a type argument from the specialized bases of its class-object
+parameter.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Option(Generic[T]): ...
+class StringOption(Option[str]): ...
+
+class Options:
+    def get_value_for(self, option: type[Option[T]]) -> T:
+        raise NotImplementedError
+
+reveal_type(Options().get_value_for(StringOption))  # revealed: str
+```
+
+## Inferring a class-object parameter in a contravariant position
+
+A class-object parameter inside a contravariant generic places an upper bound on its inferred type
+argument. A more specific witness should determine the result, including when the type variable has
+its own declared upper bound.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+StrT = TypeVar("StrT", bound=str)
+T_co = TypeVar("T_co", covariant=True)
+T_contra = TypeVar("T_contra", contravariant=True)
+
+class Covariant(Generic[T_co]): ...
+class Sink(Generic[T_contra]): ...
+
+def infer(sink: Sink[type[Covariant[T]]], witness: T) -> T:
+    return witness
+
+def infer_bounded(sink: Sink[type[Covariant[StrT]]], witness: StrT) -> StrT:
+    return witness
+
+def _(sink: Sink[type[Covariant[object]]]) -> None:
+    reveal_type(infer(sink, 1))  # revealed: Literal[1]
+    reveal_type(infer_bounded(sink, "ok"))  # revealed: Literal["ok"]
+```
+
+## Inferring a class-object parameter for a final generic class
+
+A final generic class has no subclasses, so its class-object parameter is an exact generic alias.
+Its type arguments should still participate in inference.
+
+```py
+from typing import Generic, TypeVar, final
+
+T = TypeVar("T")
+
+@final
+class Final(Generic[T]): ...
+
+def infer(cls: type[Final[T]]) -> T:
+    raise NotImplementedError
+
+reveal_type(infer(Final[int]))  # revealed: int
 ```
 
 ## Inferring tuple parameter types
@@ -205,6 +321,58 @@ def _(x: tuple[str, int], y: tuple[bool, ...], z: tuple[int, str, *tuple[range, 
 
 reveal_type(takes_homogeneous_tuple((42,)))  # revealed: Literal[42]
 reveal_type(takes_homogeneous_tuple((42, 43)))  # revealed: Literal[42, 43]
+```
+
+## Inferring tuple parameter types from unions
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+Every member of a union argument contributes to the inferred element type of a homogeneous tuple
+parameter. Different tuple lengths do not prevent inference, and an empty tuple contributes no
+element types.
+
+```py
+from typing import TypeVar
+
+class A: ...
+class B: ...
+class C: ...
+class D: ...
+
+T = TypeVar("T")
+
+def elements(values: tuple[T, ...]) -> tuple[T, ...]:
+    return values
+
+def _(
+    same: tuple[A, A] | tuple[A, A, A],
+    mixed: tuple[A] | tuple[B, B],
+    possibly_empty: tuple[()] | tuple[A, A],
+):
+    reveal_type(elements(same))  # revealed: tuple[A, ...]
+    reveal_type(elements(mixed))  # revealed: tuple[A | B, ...]
+    reveal_type(elements(possibly_empty))  # revealed: tuple[A, ...]
+```
+
+Fixed-length and mixed tuples infer type parameters from their corresponding element positions.
+
+```py
+U = TypeVar("U")
+
+def swap(values: tuple[U, T]) -> tuple[T, U]:
+    return values[1], values[0]
+
+def _(pairs: tuple[A, B] | tuple[C, D]):
+    reveal_type(swap(pairs))  # revealed: tuple[B | D, A | C]
+
+def tail(values: tuple[A, *tuple[T, ...]]) -> tuple[T, ...]:
+    return values[1:]
+
+def _(tails: tuple[A, B] | tuple[A, C, C]):
+    reveal_type(tail(tails))  # revealed: tuple[B | C, ...]
 ```
 
 ## Inferring a bound typevar
@@ -434,6 +602,34 @@ def consume_callback(callback: Callable[[Row], None]) -> Row:
     raise NotImplementedError
 
 reveal_type(consume_callback(callback))  # revealed: tuple[Any, ...]
+```
+
+## Gradual invariant protocol members
+
+When the same inferred type variable appears in multiple invariant protocol members, fully static
+member types must agree on one exact specialization. Gradual members remain conservative
+alternatives because their equality cannot justify a transitive sequent proof.
+
+```py
+from typing import Any, Generic, Protocol, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Pair(Protocol[T]):
+    first: T
+    second: T
+
+class GradualPair(Generic[U]):
+    first: tuple[U, Any]
+    second: tuple[U, int]
+
+def infer_pair(value: Pair[T]) -> T:
+    raise NotImplementedError
+
+def check_pair(value: GradualPair[U]) -> None:
+    # TODO: error: [invalid-argument-type] "Argument to function `infer_pair` is incorrect"
+    reveal_type(infer_pair(value))  # revealed: tuple[U@check_pair, Any] | tuple[U@check_pair, int]
 ```
 
 ## Prefer specific compatible constraints over gradual constraints
@@ -842,6 +1038,7 @@ def opaque_decorator(f: Any) -> Any:
 def transparent_decorator(f: F) -> F:
     return f
 
+# error: [dynamic-function-decorator-return]
 @opaque_decorator
 def decorated(t: T) -> None:
     # error: [redundant-cast]
@@ -906,6 +1103,30 @@ def union_bound(cls: U) -> None:
     reveal_type(cls.attr)  # revealed: str | int
 ```
 
+## Attribute access on TypeVars constrained to instances and class objects
+
+A constrained type variable can contain both ordinary instances and class objects. Accessing a
+shared attribute must inspect each constraint without treating the entire type variable as a class.
+
+```py
+from typing import TypeVar
+
+class Instance:
+    @staticmethod
+    def keys() -> list[str]:
+        return []
+
+class ClassObject:
+    @staticmethod
+    def keys() -> list[str]:
+        return []
+
+T = TypeVar("T", Instance, type[ClassObject])
+
+def read(value: T) -> list[str]:
+    return value.keys()
+```
+
 ## Solving TypeVars with upper bounds in unions
 
 ```py
@@ -941,6 +1162,71 @@ def NamedTemporaryFile(suffix: T | None, prefix: T | None) -> None:
 
 def f(x: str):
     NamedTemporaryFile(prefix=x, suffix=".tar.gz")  # Fine
+```
+
+## Gradual bounds in generic union members
+
+A gradual bound does not prevent inference from an invariant union member: `str` satisfies `Any`,
+and `list[str]` satisfies `list[Any]`.
+
+```py
+from typing import Any, TypeVar
+
+class Other: ...
+
+T = TypeVar("T", bound=Any)
+
+def infer_any_bound(value: list[T] | Other) -> T:
+    raise NotImplementedError
+
+ListBoundT = TypeVar("ListBoundT", bound=list[Any])
+
+def infer_list_bound(value: list[ListBoundT] | Other) -> ListBoundT:
+    raise NotImplementedError
+
+reveal_type(infer_any_bound(list[str]()))  # revealed: str
+reveal_type(infer_list_bound(list[list[str]]()))  # revealed: list[str]
+```
+
+## Invalid bounds in generic union members
+
+An argument that violates a type variable's bound is rejected even when another union member is not
+disjoint from the argument. `list[object]` and `Other` can have a common subclass, but
+`list[object]` is not assignable to `Other`, and `object` does not satisfy the bound of `T`.
+
+```py
+from typing import TypeVar
+
+class Other: ...
+
+T = TypeVar("T", bound=str)
+
+def accept(value: list[T] | Other) -> None:
+    pass
+
+accept([])
+accept(["valid"])
+accept(Other())
+
+accept([object()])  # error: [invalid-argument-type] "does not satisfy upper bound `str`"
+accept([1])  # error: [invalid-argument-type] "does not satisfy upper bound `str`"
+```
+
+## Disjoint generic union members
+
+The `list[T]` member cannot match a string or `None`. Inference through the remaining `T` member
+rejects `None`, which satisfies neither of its constraints.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T", str, bytes)
+
+def accept(value: T | list[T]) -> None:
+    pass
+
+def _(value: str | None):
+    accept(value)  # error: [invalid-argument-type] "does not satisfy constraints"
 ```
 
 ## Nested functions see typevars bound in outer function

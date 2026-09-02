@@ -6,6 +6,7 @@ use ruff_python_semantic::{SemanticModel, analyze};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{FixAvailability, Violation};
 
 /// ## What it does
@@ -72,7 +73,7 @@ use crate::{FixAvailability, Violation};
 ///
 /// A fix is only available if the integer literal matches a set of common modes.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.15.0")]
+#[violation_metadata(stable_since = "0.15.0", category = Category::Suspicious)]
 pub(crate) struct NonOctalPermissions;
 
 impl Violation for NonOctalPermissions {

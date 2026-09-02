@@ -14,6 +14,7 @@ use ruff_source_file::NewlineWithTrailingNewline;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::docstrings::Docstring;
 use crate::docstrings::sections::{SectionContext, SectionContexts, SectionKind};
 use crate::docstrings::styles::SectionStyle;
@@ -91,7 +92,7 @@ use crate::{Edit, Fix};
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.73")]
+#[violation_metadata(stable_since = "v0.0.73", category = Category::Pedantic)]
 pub(crate) struct OverindentedSection {
     name: String,
 }
@@ -195,7 +196,7 @@ impl AlwaysFixableViolation for OverindentedSection {
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.73")]
+#[violation_metadata(stable_since = "v0.0.73", category = Category::Pedantic)]
 pub(crate) struct OverindentedSectionUnderline {
     name: String,
 }
@@ -279,7 +280,7 @@ impl AlwaysFixableViolation for OverindentedSectionUnderline {
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.71")]
+#[violation_metadata(stable_since = "v0.0.71", category = Category::Pedantic)]
 pub(crate) struct NonCapitalizedSectionName {
     name: String,
 }
@@ -378,7 +379,7 @@ impl AlwaysFixableViolation for NonCapitalizedSectionName {
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.71")]
+#[violation_metadata(stable_since = "v0.0.71", category = Category::Pedantic)]
 pub(crate) struct MissingNewLineAfterSectionName {
     name: String,
 }
@@ -482,7 +483,7 @@ impl AlwaysFixableViolation for MissingNewLineAfterSectionName {
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.71")]
+#[violation_metadata(stable_since = "v0.0.71", category = Category::Pedantic)]
 pub(crate) struct MissingDashedUnderlineAfterSection {
     name: String,
 }
@@ -589,7 +590,7 @@ impl AlwaysFixableViolation for MissingDashedUnderlineAfterSection {
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.71")]
+#[violation_metadata(stable_since = "v0.0.71", category = Category::Pedantic)]
 pub(crate) struct MissingSectionUnderlineAfterName {
     name: String,
 }
@@ -694,7 +695,7 @@ impl AlwaysFixableViolation for MissingSectionUnderlineAfterName {
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.71")]
+#[violation_metadata(stable_since = "v0.0.71", category = Category::Pedantic)]
 pub(crate) struct MismatchedSectionUnderlineLength {
     name: String,
 }
@@ -792,7 +793,7 @@ impl AlwaysFixableViolation for MismatchedSectionUnderlineLength {
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Style Guide](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.71")]
+#[violation_metadata(stable_since = "v0.0.71", category = Category::Pedantic)]
 pub(crate) struct NoBlankLineAfterSection {
     name: String,
 }
@@ -886,7 +887,7 @@ impl AlwaysFixableViolation for NoBlankLineAfterSection {
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.71")]
+#[violation_metadata(stable_since = "v0.0.71", category = Category::Pedantic)]
 pub(crate) struct NoBlankLineBeforeSection {
     name: String,
 }
@@ -982,7 +983,7 @@ impl AlwaysFixableViolation for NoBlankLineBeforeSection {
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.71")]
+#[violation_metadata(stable_since = "v0.0.71", category = Category::Pedantic)]
 pub(crate) struct MissingBlankLineAfterLastSection {
     name: String,
 }
@@ -1076,7 +1077,7 @@ impl AlwaysFixableViolation for MissingBlankLineAfterLastSection {
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Style Guide](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.71")]
+#[violation_metadata(stable_since = "v0.0.71", category = Category::Pedantic)]
 pub(crate) struct EmptyDocstringSection {
     name: String,
 }
@@ -1154,7 +1155,7 @@ impl Violation for EmptyDocstringSection {
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [Google Style Guide](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.74")]
+#[violation_metadata(stable_since = "v0.0.74", category = Category::Pedantic)]
 pub(crate) struct MissingSectionNameColon {
     name: String,
 }
@@ -1244,7 +1245,7 @@ impl AlwaysFixableViolation for MissingSectionNameColon {
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 /// - [Python - Unpack for keyword arguments](https://typing.python.org/en/latest/spec/callables.html#unpack-kwargs)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.73")]
+#[violation_metadata(stable_since = "v0.0.73", category = Category::Pedantic)]
 pub(crate) struct UndocumentedParam {
     /// The name of the function being documented.
     definition: String,
@@ -1331,7 +1332,7 @@ impl Violation for UndocumentedParam {
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.71")]
+#[violation_metadata(stable_since = "v0.0.71", category = Category::Pedantic)]
 pub(crate) struct BlankLinesBetweenHeaderAndContent {
     name: String,
 }
@@ -1428,7 +1429,7 @@ impl AlwaysFixableViolation for BlankLinesBetweenHeaderAndContent {
 /// - [NumPy docstring standard](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Python Style Guide](https://google.github.io/styleguide/pyguide.html#383-functions-and-methods)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.15.3")]
+#[violation_metadata(preview_since = "0.15.3", category = Category::Pedantic)]
 pub(crate) struct IncorrectSectionOrder {
     current: String,
     previous: String,

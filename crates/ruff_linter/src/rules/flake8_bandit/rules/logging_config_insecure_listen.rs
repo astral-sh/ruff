@@ -5,6 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for insecure `logging.config.listen` calls.
@@ -25,7 +26,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: `logging.config.listen()`](https://docs.python.org/3/library/logging.config.html#logging.config.listen)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.231")]
+#[violation_metadata(stable_since = "v0.0.231", category = Category::Security)]
 pub(crate) struct LoggingConfigInsecureListen;
 
 impl Violation for LoggingConfigInsecureListen {

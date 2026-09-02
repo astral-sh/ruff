@@ -266,6 +266,49 @@ def narrow_match(x: str) -> None:
 
 ---
 
+### `strict-generic-narrowing`
+
+Whether ty should use strict narrowing for unspecialized generic classes in
+`isinstance()` and `issubclass()` checks, as well as `match` class patterns.
+
+When enabled, ty narrows to the top materialization of the class. For example,
+`isinstance(value, list)` narrows a value of type `object` to `Top[list[Unknown]]`,
+representing the (infinite) union of all possible `list` specializations. Iterating
+over the list would yield values of type `object`.
+
+When disabled, ty uses gradual generic narrowing, preserving compatible type
+arguments from the original type where possible. For example,
+`isinstance(value, list)` narrows a value of type `Sequence[int]` to `list[int]`.
+If no specialization is available, the same check narrows a value of type `object`
+to `list[Unknown]`; items of any type can then be appended to the list. Class
+patterns such as `case list():` follow the same behavior.
+
+Defaults to `false`.
+
+**Default value**: `false`
+
+**Type**: `bool`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.analysis]
+    # Use the top materialization when narrowing to an unspecialized generic class
+    strict-generic-narrowing = true
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [analysis]
+    # Use the top materialization when narrowing to an unspecialized generic class
+    strict-generic-narrowing = true
+    ```
+
+---
+
 ## `environment`
 
 ### `extra-paths`
@@ -320,6 +363,10 @@ variable to point to your project's virtual environment. ty can also infer the l
 your environment from an activated Conda environment, and will look for a `.venv` directory
 in the project root if none of the above apply. Failing that, ty will look for a `python3`
 or `python` binary available in `PATH`.
+
+Scripts with inline metadata use their own Python environment. They can use an explicitly
+configured environment, an activated environment, or an environment selected by the editor.
+Unlike projects, they do not automatically use a `.venv` directory.
 
 [`sys.prefix`]: https://docs.python.org/3/library/sys.html#sys.prefix
 
@@ -403,6 +450,9 @@ to determine a value:
    and attempt to infer the Python version of that environment
 3. Fall back to the default value (see below)
 
+Scripts with inline metadata use their `requires-python` field instead of
+`project.requires-python`. They do not inherit the Python version of the enclosing project.
+
 For some language features, ty can also understand conditionals based on comparisons
 with `sys.version_info`. These are commonly found in typeshed, for example,
 to reflect the differing contents of the standard library across Python versions.
@@ -442,6 +492,9 @@ if they exist and are not packages (i.e. they do not contain `__init__.py` or `_
 * `./src`
 * `./<project-name>` (if a `./<project-name>/<project-name>` directory exists)
 * `./python`
+
+Scripts with inline metadata have no first-party roots by default because they are
+single-file programs. Set `root = ["."]` to allow importing local modules.
 
 **Default value**: `null`
 
@@ -866,6 +919,49 @@ def narrow_match(x: str) -> None:
 
 ---
 
+#### `strict-generic-narrowing`
+
+Whether ty should use strict narrowing for unspecialized generic classes in
+`isinstance()` and `issubclass()` checks, as well as `match` class patterns.
+
+When enabled, ty narrows to the top materialization of the class. For example,
+`isinstance(value, list)` narrows a value of type `object` to `Top[list[Unknown]]`,
+representing the (infinite) union of all possible `list` specializations. Iterating
+over the list would yield values of type `object`.
+
+When disabled, ty uses gradual generic narrowing, preserving compatible type
+arguments from the original type where possible. For example,
+`isinstance(value, list)` narrows a value of type `Sequence[int]` to `list[int]`.
+If no specialization is available, the same check narrows a value of type `object`
+to `list[Unknown]`; items of any type can then be appended to the list. Class
+patterns such as `case list():` follow the same behavior.
+
+Defaults to `false`.
+
+**Default value**: `false`
+
+**Type**: `bool`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.overrides.analysis]
+    # Use the top materialization when narrowing to an unspecialized generic class
+    strict-generic-narrowing = true
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [overrides.analysis]
+    # Use the top materialization when narrowing to an unspecialized generic class
+    strict-generic-narrowing = true
+    ```
+
+---
+
 ## `src`
 
 ### `exclude`
@@ -1050,43 +1146,6 @@ Enabled by default.
     ```toml
     [src]
     respect-ignore-files = false
-    ```
-
----
-
-### `root`
-
-!!! warning "Deprecated"
-    This option has been deprecated. Use `environment.root` instead.
-
-The root of the project, used for finding first-party modules.
-
-If left unspecified, ty will try to detect common project layouts and initialize `src.root` accordingly.
-The project root (`.`) is always included. Additionally, the following directories are included
-if they exist and are not packages (i.e. they do not contain `__init__.py` or `__init__.pyi` files):
-
-* `./src`
-* `./<project-name>` (if a `./<project-name>/<project-name>` directory exists)
-* `./python`
-
-**Default value**: `null`
-
-**Type**: `str`
-
-**Example usage**:
-
-=== "pyproject.toml"
-
-    ```toml
-    [tool.ty.src]
-    root = "./app"
-    ```
-
-=== "ty.toml"
-
-    ```toml
-    [src]
-    root = "./app"
     ```
 
 ---

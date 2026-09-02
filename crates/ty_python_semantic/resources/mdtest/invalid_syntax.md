@@ -106,6 +106,121 @@ out = (obj.attr := obj).attr
 out = (obj[0] := obj).attr
 ```
 
+## Multiple starred assignment targets
+
+Even when a recovered assignment has more than one starred target, unpacking records types for its
+bindings without panicking.
+
+```py
+first, *left, *right = [1, 2, 3]  # error: [invalid-syntax] "Two starred expressions in assignment"
+first, *left, *right = (1, 2, 3)  # error: [invalid-syntax] "Two starred expressions in assignment"
+```
+
+## Match-pattern alternatives binding different names
+
+A capture present in only one invalid `or` alternative is possibly undefined.
+
+```py
+match 0:
+    case first | second:  # error: [invalid-syntax] "alternative patterns bind different names"
+        first  # error: [possibly-unresolved-reference]
+        second  # error: [possibly-unresolved-reference]
+```
+
+## Match-pattern alternative without a binding
+
+A capture missing from one alternative is possibly undefined, regardless of alternative order.
+
+```py
+match (0,):
+    # error: [invalid-syntax] "alternative patterns bind different names"
+    case [first_value] | []:
+        first_value  # error: [possibly-unresolved-reference]
+```
+
+An alternative without a capture can also occur first.
+
+```py
+match (0,):
+    # error: [invalid-syntax] "alternative patterns bind different names"
+    case [] | [last_value]:
+        last_value  # error: [possibly-unresolved-reference]
+```
+
+A capture limited to the middle of three alternatives also remains possibly undefined.
+
+```py
+match (0,):
+    # error: [invalid-syntax] "alternative patterns bind different names"
+    case [] | [middle_value] | []:
+        middle_value  # error: [possibly-unresolved-reference]
+```
+
+## Previously bound match-pattern captures
+
+A prior binding remains visible on alternatives that do not capture the name.
+
+```py
+value = "previous"
+
+match (0,):
+    case [value] | []:  # error: [invalid-syntax] "alternative patterns bind different names"
+        value
+
+value
+```
+
+## Partially overlapping match-pattern bindings
+
+Shared captures remain definitely bound; branch-specific captures are possibly undefined.
+
+```py
+match (0, 1):
+    # error: [invalid-syntax] "alternative patterns bind different names"
+    case [first, shared] | [second, shared]:
+        first  # error: [possibly-unresolved-reference]
+        second  # error: [possibly-unresolved-reference]
+        shared
+```
+
+## Nested mismatched match-pattern bindings
+
+Syntax checking stops after an outer mismatch, but unchecked nested alternatives must still be
+modeled safely.
+
+```py
+match (0,):
+    # error: [invalid-syntax] "alternative patterns bind different names"
+    case [first] | [second] | [third | fourth]:
+        third  # error: [possibly-unresolved-reference]
+        fourth  # error: [possibly-unresolved-reference]
+```
+
+## Partially bound match-pattern capture in a guard
+
+A guard can observe a name that is bound by only one invalid alternative.
+
+```py
+match (0,):
+    # error: [invalid-syntax] "alternative patterns bind different names"
+    # error: [possibly-unresolved-reference]
+    case [value] | [] if value:
+        pass
+```
+
+## Malformed match-case recovery
+
+Parser recovery treats the trailing name as an annotation-only statement, whose binding lookup must
+not panic.
+
+```py
+match 0:
+    # error: [invalid-syntax] "alternative patterns bind different names"
+    # error: [invalid-syntax] "Expected `:`, found name"
+    # error: [invalid-syntax] "Expected an expression"
+    case first | second first:
+```
+
 ## Invalid annotation
 
 ### `typing.Callable`
@@ -143,6 +258,23 @@ def _(u: InvalidEmptyUnion):
     reveal_type(u)  # revealed: Unknown
 ```
 
+### `typing.Unpack`
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+An empty `Unpack` nested inside a union and a generic specialization should report its syntax error
+without panicking.
+
+```py
+from typing import Union, Unpack
+
+# error: [invalid-syntax] "Expected index or slice expression"
+list[Union[Unpack[], None]]
+```
+
 ### `typing.Annotated`
 
 ```py
@@ -154,4 +286,44 @@ InvalidEmptyAnnotated = Annotated[]
 
 def _(a: InvalidEmptyAnnotated):
     reveal_type(a)  # revealed: Unknown
+```
+
+## Incomplete type parameter lists
+
+A generic protocol with an empty, unclosed type parameter list produces diagnostics without
+panicking while constructing an autofix.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol, TypeVar
+
+T = TypeVar("T")
+
+# error: [invalid-syntax] "Type parameter list cannot be empty"
+# error: [invalid-generic-class]
+class P[(Protocol[T]): ...
+```
+
+## Incomplete type parameter lists with Unicode names
+
+An unclosed type parameter list can also contain a non-ASCII name. The missing closing bracket does
+not cause part of the name to be treated as a delimiter when constructing an autofix.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol, TypeVar
+
+T = TypeVar("T")
+
+# error: [invalid-syntax] "Expected `]`, found `(`"
+# error: [invalid-generic-class]
+class P[Ä(Protocol[T]): ...
 ```

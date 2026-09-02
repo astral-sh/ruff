@@ -33,7 +33,7 @@ where
     FmtStyled { content, style }
 }
 
-pub(super) fn fmt_with_hyperlink<'a, T>(
+pub fn fmt_with_hyperlink<'a, T>(
     content: T,
     url: Option<&'a str>,
     stylesheet: &DiagnosticStylesheet,

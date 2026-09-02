@@ -22,6 +22,8 @@ env:
   RUSTUP_MAX_RETRIES: 10
   # Line-tables-only debug info: faster builds, backtraces still work.
   CARGO_PROFILE_DEV_DEBUG: line-tables-only
+  CARGO_PROFILE_DEV_LTO: "false"
+  CARGO_PROFILE_DEV_OPT_LEVEL: 0
   PACKAGE_NAME: ruff
   FORCE_COLOR: 1
 
@@ -36,14 +38,14 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
-          version: "0.12.0"
+          version: "0.12.9"
       - name: "Install Rust toolchain"
         run: rustup show
       - name: "Install mold"
         uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
-      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
       - name: Build ruff
         # A debug build means the script runs slower once it gets started,
         # but this is outweighed by the fact that a release build takes *much* longer to compile in CI

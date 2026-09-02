@@ -5,6 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for `paramiko` calls.
@@ -26,7 +27,7 @@ use crate::checkers::ast::Checker;
 /// - [Common Weakness Enumeration: CWE-78](https://cwe.mitre.org/data/definitions/78.html)
 /// - [Paramiko documentation: `SSHClient.exec_command()`](https://docs.paramiko.org/en/stable/api/client.html#paramiko.client.SSHClient.exec_command)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.270")]
+#[violation_metadata(stable_since = "v0.0.270", category = Category::Security)]
 pub(crate) struct ParamikoCall;
 
 impl Violation for ParamikoCall {

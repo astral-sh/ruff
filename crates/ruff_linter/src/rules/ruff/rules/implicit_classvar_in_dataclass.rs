@@ -5,6 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::ruff::helpers::{DataclassKind, dataclass_kind};
 
 /// ## What it does
@@ -52,7 +53,7 @@ use crate::rules::ruff::helpers::{DataclassKind, dataclass_kind};
 /// ## Options
 /// - [`lint.dummy-variable-rgx`]
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.9.7")]
+#[violation_metadata(preview_since = "0.9.7", category = Category::Suspicious)]
 pub(crate) struct ImplicitClassVarInDataclass;
 
 impl Violation for ImplicitClassVarInDataclass {

@@ -7,7 +7,7 @@ from typing import IO, Any, Literal, Protocol, overload, runtime_checkable
 from typing_extensions import deprecated
 
 if sys.version_info >= (3, 11):
-    @deprecated("Deprecated since Python 3.12. Use `importlib.resources.abc.TraversableResources` instead.")
+    @deprecated("Deprecated. Use `importlib.resources.abc.TraversableResources` instead.")
     class ResourceReader(metaclass=ABCMeta):
         """Abstract base class for loaders to provide resource reading support."""
 

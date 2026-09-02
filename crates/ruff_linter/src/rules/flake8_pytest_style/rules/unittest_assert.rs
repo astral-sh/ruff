@@ -397,7 +397,7 @@ impl UnittestAssert {
                         range: TextRange::default(),
                         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                     },
-                    range: TextRange::default(),
+                    range_start: ruff_text_size::TextSize::default(),
                     node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 };
                 let isinstance = node1.into();
@@ -446,7 +446,7 @@ impl UnittestAssert {
                         range: TextRange::default(),
                         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                     },
-                    range: TextRange::default(),
+                    range_start: ruff_text_size::TextSize::default(),
                     node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 };
                 let re_search = node2.into();

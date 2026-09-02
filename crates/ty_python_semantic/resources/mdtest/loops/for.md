@@ -66,6 +66,45 @@ for from_count in range(count):
 reveal_type(from_count)  # revealed: int
 ```
 
+Narrowing established by a non-empty loop remains available after the loop.
+
+```py
+def narrowing_after_non_empty_range(value: int | None) -> None:
+    for _ in range(1):
+        if value is None:
+            return
+
+    reveal_type(value)  # revealed: int
+```
+
+The same narrowing is preserved at module scope.
+
+```py
+def get_value() -> int | None:
+    return None
+
+module_value = get_value()
+
+for _ in range(1):
+    if module_value is None:
+        raise RuntimeError
+
+reveal_type(module_value)  # revealed: int
+```
+
+It also works in a class body.
+
+```py
+class Example:
+    value = get_value()
+
+    for _ in range(1):
+        if value is None:
+            raise RuntimeError
+
+    reveal_type(value)  # revealed: int
+```
+
 The emptiness refinement is independent of the order in which range values are assigned:
 
 ```py
@@ -679,14 +718,13 @@ def _(x: Sequence[int], y: object):
         reveal_type(item)  # revealed: int
 
     if isinstance(y, list):
-        reveal_type(y)  # revealed: Top[list[Unknown]]
+        reveal_type(y)  # revealed: list[Unknown]
         for item in y:
-            reveal_type(item)  # revealed: object
+            reveal_type(item)  # revealed: Unknown
 
     if isinstance(x, list):
-        reveal_type(x)  # revealed: Sequence[int] & Top[list[Unknown]]
+        reveal_type(x)  # revealed: list[int]
         for item in x:
-            # int & object simplifies to int
             reveal_type(item)  # revealed: int
 ```
 
@@ -892,6 +930,7 @@ info: Its `__iter__` method has an invalid signature
 info: type `Iterable` is not assignable to protocol `Iterable[Unknown]`
 info: └── protocol member `__iter__` is incompatible
 info:     └── unexpected extra parameter `extra_arg`
+help: Parameter `extra_arg` must have a default value
 info: Expected signature `def __iter__(self): ...`
 ```
 
@@ -970,6 +1009,7 @@ info:     └── incompatible return types: `Iterator1` is not assignable to 
 info:         └── type `Iterator1` is not assignable to protocol `Iterator[Unknown]`
 info:             └── protocol member `__next__` is incompatible
 info:                 └── unexpected extra parameter `extra_arg`
+help: Parameter `extra_arg` must have a default value
 info: Expected signature for `__next__` is `def __next__(self): ...`
 ```
 
@@ -1233,6 +1273,7 @@ info: Its `__iter__` method may have an invalid signature
 info: type `Iterable1` is not assignable to protocol `Iterable[Unknown]`
 info: └── protocol member `__iter__` is incompatible
 info:     └── unexpected extra parameter `invalid_extra_arg`
+help: Parameter `invalid_extra_arg` must have a default value
 info: Type of `__iter__` is `(bound method Iterable1.__iter__() -> Iterator) | (bound method Iterable1.__iter__(invalid_extra_arg) -> Iterator)`
 info: Expected signature for `__iter__` is `def __iter__(self): ...`
 ```
@@ -1308,6 +1349,7 @@ info:     └── incompatible return types: `Iterator1` is not assignable to 
 info:         └── type `Iterator1` is not assignable to protocol `Iterator[Unknown]`
 info:             └── protocol member `__next__` is incompatible
 info:                 └── unexpected extra parameter `invalid_extra_arg`
+help: Parameter `invalid_extra_arg` must have a default value
 info: Expected signature for `__next__` is `def __next__(self): ...`
 ```
 
@@ -1486,8 +1528,8 @@ A class literal can be iterated over if it has `Any` or `Unknown` in its MRO, si
 ```py
 from unresolved_module import SomethingUnknown  # error: [unresolved-import]
 from typing import Any, Iterable
-from ty_extensions import static_assert, Unknown
-from ty_extensions._internal import TypeOf, is_assignable_to, reveal_mro
+from ty_extensions import static_assert
+from ty_extensions._internal import Unknown, TypeOf, is_assignable_to, reveal_mro
 
 class Foo(SomethingUnknown): ...
 
@@ -1537,12 +1579,10 @@ simplify to `Never`, leaving only the iterable parts.
 ```py
 def f[T: tuple[int, ...] | int](x: T):
     if isinstance(x, tuple):
-        reveal_type(x)  # revealed: T@f & tuple[object, ...]
+        reveal_type(x)  # revealed: T@f & tuple[int, ...]
         for item in x:
-            # The intersection `(tuple[int, ...] | int) & tuple[object, ...]` distributes to:
-            # `(tuple[int, ...] & tuple[object, ...]) | (int & tuple[object, ...])`
-            # which simplifies to `tuple[int, ...] | Never` = `tuple[int, ...]`
-            # so iterating gives `int`.
+            # The `int` alternative in the TypeVar bound is disjoint from `tuple`. The
+            # remaining `tuple[int, ...]` alternative supplies the narrowed specialization.
             reveal_type(item)  # revealed: int
 ```
 
@@ -1554,13 +1594,10 @@ constraint, those parts should also simplify to `Never`.
 ```py
 def g[T: tuple[int, ...] | list[str]](x: T):
     if isinstance(x, tuple):
-        reveal_type(x)  # revealed: T@g & tuple[object, ...]
+        reveal_type(x)  # revealed: T@g & tuple[int, ...]
         for item in x:
-            # The intersection `(tuple[int, ...] | list[str]) & tuple[object, ...]` distributes to:
-            # `(tuple[int, ...] & tuple[object, ...]) | (list[str] & tuple[object, ...])`
-            # Since `list[str]` is disjoint from `tuple[object, ...]`, this simplifies to:
-            # `tuple[int, ...] | Never` = `tuple[int, ...]`
-            # so iterating gives `int`, NOT `int | str`.
+            # The `list[str]` alternative in the TypeVar bound is disjoint from `tuple`. The
+            # remaining `tuple[int, ...]` alternative supplies the narrowed specialization.
             reveal_type(item)  # revealed: int
 ```
 
@@ -1721,6 +1758,28 @@ for _ in iterable():
 x
 ```
 
+### Deletions in nested loops reach the outer loop
+
+A deletion followed by `continue` in an inner loop can remain visible after a later `break`. The
+variable can be unbound on the next outer iteration, even when exhausting the inner loop returns
+from the function.
+
+```py
+def f(flags: list[bool]):
+    x = 0
+    for _ in flags:
+        x  # error: [possibly-unresolved-reference]
+        for stop in flags:
+            if stop:
+                break
+            x = 0
+            del x
+            continue
+        else:
+            return
+        x  # error: [possibly-unresolved-reference]
+```
+
 ### Bindings in a loop are possibly-unbound after the loop
 
 ```py
@@ -1751,6 +1810,23 @@ x = 0
 for _ in range(1_000_000):
     x, y = x + 1, None
     reveal_type(x)  # revealed: int
+```
+
+### Unpacking alongside a recursively growing value
+
+The first element remains precise even when its sibling's type grows on each loop iteration. Reading
+each literal element independently preserves that information during cycle recovery.
+
+```py
+x = 0
+for _ in range(10):
+    first, x = (1, (x,))
+    reveal_type(first)  # revealed: Literal[1]
+
+x = 0
+for _ in range(10):
+    first, x = [1, (x,)]
+    reveal_type(first)  # revealed: Literal[1]
 ```
 
 ### Avoid oscillations
@@ -1931,7 +2007,7 @@ for _ in range(1_000_000):
         break
     node = node.next
 reveal_type(node)  # revealed: Node
-reveal_type(node.next)  # revealed: Node | None
+reveal_type(node.next)  # revealed: None | Node
 ```
 
 ### Nested collection cycles do not panic
@@ -1981,7 +2057,10 @@ def _():
             nonlocal y  # error: [invalid-syntax] "name `y` is used prior to nonlocal declaration"
 ```
 
-### Loop header definitions don't shadow member bindings
+### Rebinding an object before an unconditional `break`
+
+Rebinding an object followed by an unconditional `break` does not affect its members at the start of
+the loop, because the new object never reaches another iteration.
 
 ```py
 class C:
@@ -2002,4 +2081,62 @@ for _ in range(1):
     reveal_type(d[0])  # revealed: Literal[1]
     d = []
     break
+```
+
+### Rebinding an object resets attribute narrowing across iterations
+
+The first iteration sees the initial object; later iterations see a replacement narrowed at the end
+of the previous iteration. A replacement's attribute initially has the full declared union.
+
+```py
+class Box:
+    value: int | str | None
+
+def example(box: Box):
+    assert isinstance(box.value, int)
+    reveal_type(box.value)  # revealed: int
+
+    for _ in range(2):
+        # The first iteration sees int; subsequent iterations see str.
+        reveal_type(box.value)  # revealed: int | str
+
+        box = Box()
+        reveal_type(box.value)  # revealed: int | str | None
+
+        assert isinstance(box.value, str)
+
+    # The loop is non-empty, so the current value has been narrowed to str.
+    reveal_type(box.value)  # revealed: str
+```
+
+### Boolean attribute narrowing after rebinding
+
+The loop body can observe either the initial object or a replacement from a previous iteration. A
+guard on the initial object therefore does not narrow `box.value` throughout the loop.
+
+```py
+class Box:
+    value: bool
+
+def f(box: Box, replacement: Box):
+    if box.value:
+        return
+
+    for _ in range(2):
+        reveal_type(box.value)  # revealed: bool
+        box = replacement
+```
+
+Narrowing established on a replacement object also reaches the next iteration. If each replacement
+has `value` narrowed to `False`, the loop body keeps that narrowing.
+
+```py
+def narrowed_replacement(box: Box, replacement: Box):
+    if box.value:
+        return
+
+    for _ in range(2):
+        reveal_type(box.value)  # revealed: Literal[False]
+        box = replacement
+        assert not box.value
 ```

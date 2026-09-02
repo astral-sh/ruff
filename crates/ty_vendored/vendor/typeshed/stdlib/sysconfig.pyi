@@ -105,13 +105,13 @@ elif sys.version_info >= (3, 11):
     @overload
     def is_python_build() -> bool: ...
     @overload
-    @deprecated("The `check_home` parameter is deprecated since Python 3.12; removed in Python 3.15.")
+    @deprecated("The `check_home` parameter is deprecated; removed in Python 3.15.")
     def is_python_build(check_home: object = None) -> bool: ...
 else:
     @overload
     def is_python_build() -> bool: ...
     @overload
-    @deprecated("The `check_home` parameter is deprecated since Python 3.12; removed in Python 3.15.")
+    @deprecated("The `check_home` parameter is deprecated; removed in Python 3.15.")
     def is_python_build(check_home: bool = False) -> bool: ...
 
 def parse_config_h(fp: IO[Any], vars: dict[str, Any] | None = None) -> dict[str, Any]:

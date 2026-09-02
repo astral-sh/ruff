@@ -6,6 +6,7 @@ use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -40,7 +41,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// - `lint.flake8-implicit-str-concat.allow-multiline`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.201")]
+#[violation_metadata(stable_since = "v0.0.201", category = Category::Restriction)]
 pub(crate) struct ExplicitStringConcatenation;
 
 impl Violation for ExplicitStringConcatenation {

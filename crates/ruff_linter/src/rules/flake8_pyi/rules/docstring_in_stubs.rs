@@ -3,6 +3,7 @@ use ruff_python_ast::{ExprStringLiteral, Stmt};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::{Checker, DocstringState, ExpectedDocstringKind};
+use crate::codes::Category;
 use crate::docstrings::extraction::docstring_from;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
@@ -27,7 +28,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// def func(param: int) -> str: ...
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.253")]
+#[violation_metadata(stable_since = "v0.0.253", category = Category::Pedantic)]
 pub(crate) struct DocstringInStub;
 
 impl AlwaysFixableViolation for DocstringInStub {

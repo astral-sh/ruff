@@ -78,7 +78,7 @@ mod tests {
         Path::new("N999/module/invalid_name/import.py")
     )]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("pep8_naming").join(path).as_path(),
             &settings::LinterSettings {
@@ -164,7 +164,7 @@ mod tests {
     #[test_case(Rule::ErrorSuffixOnExceptionName, "N818.py")]
     #[test_case(Rule::InvalidModuleName, "N999/badAllowed/__init__.py")]
     fn ignore_names(rule_code: Rule, path: &str) -> Result<()> {
-        let snapshot = format!("ignore_names_{}_{path}", rule_code.noqa_code());
+        let snapshot = format!("ignore_names_{}_{path}", rule_code.name());
         let diagnostics = test_path(
             PathBuf::from_iter(["pep8_naming", "ignore_names", path]).as_path(),
             &settings::LinterSettings {

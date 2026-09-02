@@ -518,7 +518,7 @@ mod tests {
     use ruff_linter::settings::LinterSettings;
     use ruff_linter::settings::flags;
     use ruff_linter::settings::types::UnsafeFixes;
-    use ruff_python_ast::{PySourceType, PythonVersion};
+    use ruff_python_ast::PySourceType;
     use ruff_workspace::Settings;
 
     use crate::cache::{self, ChangeData, FileCache, FileCacheData, FileCacheKey};
@@ -536,10 +536,7 @@ mod tests {
 
         let settings = Settings {
             cache_dir,
-            linter: LinterSettings {
-                unresolved_target_version: PythonVersion::latest().into(),
-                ..LinterSettings::for_rule(Rule::UnusedVariable)
-            },
+            linter: LinterSettings::for_rule(Rule::UnusedVariable),
             ..Settings::default()
         };
 

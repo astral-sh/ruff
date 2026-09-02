@@ -1,12 +1,12 @@
 ## What it does
 
-Checks for classes decorated with `@functools.total_ordering` that don't
-define any ordering method (`__lt__`, `__le__`, `__gt__`, or `__ge__`).
+Checks for classes decorated with `@functools.total_ordering` that don't define any ordering method
+(`__lt__`, `__le__`, `__gt__`, or `__ge__`).
 
 ## Why is this bad?
 
-The `@total_ordering` decorator requires the class to define at least one
-ordering method. If none is defined, Python raises a `ValueError` at runtime.
+The `@total_ordering` decorator requires the class to define at least one ordering method. If none
+is defined, Python raises a `ValueError` at runtime.
 
 ## Example
 

@@ -1,6 +1,6 @@
 [package]
 name = "ruff_ranged_value"
-version = "0.0.7"
+version = "0.0.11"
 description = "This is an internal component crate of Ruff"
 authors = { workspace = true }
 edition = { workspace = true }
@@ -16,6 +16,7 @@ doctest = false
 
 [dependencies]
 ruff_db = { workspace = true }
+ruff_python_ast = { workspace = true }
 ruff_text_size = { workspace = true }
 
 get-size2 = { workspace = true, optional = true }

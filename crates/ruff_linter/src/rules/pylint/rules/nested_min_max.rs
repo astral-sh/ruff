@@ -5,6 +5,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -75,7 +76,7 @@ pub(crate) enum MinMax {
 /// - [Python documentation: `min`](https://docs.python.org/3/library/functions.html#min)
 /// - [Python documentation: `max`](https://docs.python.org/3/library/functions.html#max)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.266")]
+#[violation_metadata(stable_since = "v0.0.266", category = Category::Pedantic)]
 pub(crate) struct NestedMinMax {
     func: MinMax,
 }
@@ -137,7 +138,7 @@ fn collect_nested_args(min_max: MinMax, args: &[Expr], semantic: &SemanticModel)
                         range: _,
                         node_index: _,
                     },
-                range: _,
+                range_start: _,
                 node_index: _,
             }) = arg
             {
@@ -207,7 +208,7 @@ pub(crate) fn nested_min_max(
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             },
-            range: TextRange::default(),
+            range_start: ruff_text_size::TextSize::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         });
         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(

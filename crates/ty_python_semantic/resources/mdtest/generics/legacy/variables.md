@@ -379,6 +379,74 @@ reveal_type(Valid[int, str, None]())  # revealed: Valid[int, str, None]
 class Invalid(Generic[U]): ...
 ```
 
+### Defaults containing bounded type variables
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+A default can specialize a bounded generic with another type variable whose upper bound is
+compatible. Applying the default substitutes the actual type argument, without replacing it with its
+upper bound.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T", bound=int)
+
+class Box(Generic[T]): ...
+
+B = TypeVar("B", default=Box[T])
+
+class Holder(Generic[T, B]): ...
+
+reveal_type(Holder[bool]())  # revealed: Holder[bool, Box[bool]]
+```
+
+We reject a nested type argument whose upper bound is incompatible with the generic's bound:
+
+```py
+U = TypeVar("U", bound=str)
+
+# error: [invalid-type-arguments]
+Invalid = TypeVar("Invalid", default=Box[U])
+```
+
+### Defaults containing constrained type variables
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+A constrained type variable can appear inside a default when each of its constraints is allowed by
+the nested generic. The selected type argument is preserved in the default.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T", int, str)
+
+class Box(Generic[T]): ...
+
+B = TypeVar("B", default=Box[T])
+
+class Holder(Generic[T, B]): ...
+
+reveal_type(Holder[str]())  # revealed: Holder[str, Box[str]]
+```
+
+We reject a nested type argument if one of its constraints is incompatible with the generic's
+constraints:
+
+```py
+U = TypeVar("U", int, bytes)
+
+# error: [invalid-type-arguments]
+Invalid = TypeVar("Invalid", default=Box[U])
+```
+
 ### Invalid defaults
 
 A TypeVar default must be compatible with its bound or constraints.
@@ -442,7 +510,7 @@ T3 = TypeVar("T3", bound=str)
 # and the upper bound of `T` (`int`) is assignable to `int | float`
 S = TypeVar("S", default=T1, bound=float)
 
-# error: [invalid-type-variable-default] "Default `T3` of TypeVar `U` is not assignable to upper bound `int | float` of `U` because its upper bound `str` is not assignable to `int | float`"
+# error: [invalid-type-variable-default] "Default `T3` of TypeVar `U` is not assignable to upper bound `float` of `U` because its upper bound `str` is not assignable to `float`"
 U = TypeVar("U", default=T3, bound=float)
 ```
 
@@ -576,7 +644,7 @@ T = TypeVar("T", int, bool)
 reveal_type(T.__constraints__)  # revealed: tuple[int, bool]
 
 S = TypeVar("S", float, str)
-reveal_type(S.__constraints__)  # revealed: tuple[int | float, str]
+reveal_type(S.__constraints__)  # revealed: tuple[float, str]
 ```
 
 ### Cannot have only one constraint
@@ -1020,6 +1088,71 @@ reveal_type(D().x)  # revealed: Unknown
 ```
 
 ## Regression
+
+### Specialization cycle recovery preserves concrete defaults
+
+When a generic call uses a type variable's default, cycle recovery must allow the initial `Unknown`
+specialization to resolve to the concrete default.
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+class C:
+    pass
+
+def f(a: T | None = None) -> T:
+    raise NotImplementedError
+
+if f():
+    pass
+
+if f():
+    sum()  # error: [no-matching-overload]
+else:
+    sum()  # error: [no-matching-overload]
+
+from typing import TypeVar
+
+T = TypeVar("T", default=C)
+
+reveal_type(f())  # revealed: C
+```
+
+### Specialization cycle recovery prevents oscillating defaults
+
+A type variable's default can depend on an overloaded call that itself uses the same type variable.
+Specialization must converge even when overload selection changes between cycle iterations.
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from typing import TypeVar, overload
+
+@overload
+def choose(value: int) -> type[int]: ...
+@overload
+def choose(value: object) -> type[str]: ...
+def choose(value: object) -> type[int] | type[str]:
+    return str
+
+def f() -> T:
+    raise NotImplementedError
+
+if f():
+    Default = str
+else:
+    Default = choose(f())
+
+T = TypeVar("T", default=Default)
+
+reveal_type(f())  # revealed: Unknown
+```
 
 ### Use of typevar with default inside a function body that binds it
 

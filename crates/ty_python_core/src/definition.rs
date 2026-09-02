@@ -1,5 +1,6 @@
 use std::ops::Deref;
 
+use ruff_db::PythonFile;
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast::find_node::covering_node;
@@ -10,6 +11,7 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 use smallvec::SmallVec;
 
 use crate::LoopHeaderId;
+use crate::ProgramFile;
 use crate::ast_node_ref::AstNodeRef;
 use crate::member::ScopedMemberId;
 use crate::node_key::NodeKey;
@@ -19,7 +21,7 @@ use crate::scope::{FileScopeId, ScopeId};
 use crate::symbol::ScopedSymbolId;
 use crate::unpack::{Unpack, UnpackPosition};
 use crate::use_def::BindingWithConstraintsIterator;
-use crate::{Db, SemanticIndex};
+use crate::{Db, Program, SemanticIndex};
 
 /// A definition of a place.
 ///
@@ -83,6 +85,18 @@ impl<'db> Definition<'db> {
         self.scope_id(db).file(db)
     }
 
+    pub fn python_file(self, db: &'db dyn Db) -> PythonFile<'db> {
+        self.scope_id(db).python_file(db)
+    }
+
+    pub fn program_file(self, db: &'db dyn Db) -> ProgramFile<'db> {
+        self.scope_id(db).program_file(db)
+    }
+
+    pub fn program(self, db: &'db dyn Db) -> Program<'db> {
+        self.scope_id(db).program(db)
+    }
+
     pub fn file_scope(self, db: &'db dyn Db) -> FileScopeId {
         self.scope_id(db).file_scope_id(db)
     }
@@ -105,8 +119,7 @@ impl<'db> Definition<'db> {
 
     /// Returns the name of the item being defined, if applicable.
     pub fn name(self, db: &'db dyn Db) -> Option<String> {
-        let file = self.file(db);
-        let module = parsed_module(db, file).load(db);
+        let module = parsed_module(db, self.python_file(db)).load(db);
         let kind = self.kind(db);
         match kind {
             DefinitionKind::Function(def) => {
@@ -142,8 +155,7 @@ impl<'db> Definition<'db> {
     /// This method returns a docstring for function, class, and attribute definitions.
     /// The docstring is extracted from the first statement in the body if it's a string literal.
     pub fn docstring(self, db: &'db dyn Db) -> Option<String> {
-        let file = self.file(db);
-        let module = parsed_module(db, file).load(db);
+        let module = parsed_module(db, self.python_file(db)).load(db);
         let kind = self.kind(db);
 
         match kind {
@@ -516,6 +528,7 @@ pub(crate) struct AssignmentDefinitionNodeRef<'ast, 'db> {
     pub(crate) unpack: Option<Unpack<'db>>,
     pub(crate) value: &'ast ast::Expr,
     pub(crate) target: &'ast ast::Expr,
+    pub(crate) owner: BindingsOwner,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -681,15 +694,18 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
                 unpack,
                 value,
                 target,
+                owner,
             }) => DefinitionKind::Assignment(AssignmentDefinitionKind {
                 unpack,
                 value: AstNodeRef::new(parsed, value),
                 target: AstNodeRef::new(parsed, target),
+                owner,
             }),
             DefinitionNodeRef::AnnotatedAssignment(AnnotatedAssignmentDefinitionNodeRef {
                 node,
             }) => DefinitionKind::AnnotatedAssignment(AnnotatedAssignmentDefinitionKind {
                 node: AstNodeRef::new(parsed, node),
+                has_value: node.value.is_some(),
             }),
             DefinitionNodeRef::AugmentedAssignment(augmented_assignment) => {
                 DefinitionKind::AugmentedAssignment(AstNodeRef::new(parsed, augmented_assignment))
@@ -828,6 +844,7 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
                 value: _,
                 unpack: _,
                 target,
+                owner: _,
             }) => DefinitionNodeKey(NodeKey::from_node(target)),
             Self::AnnotatedAssignment(ann_assign) => ann_assign.node.into(),
             Self::AugmentedAssignment(node) => node.into(),
@@ -1130,7 +1147,7 @@ impl<'db> DefinitionKind<'db> {
             // Annotated assignment is always a declaration. It is also a binding if there is a RHS
             // or if we are in a stub file. Unfortunately, it is common for stubs to omit even an `...` value placeholder.
             DefinitionKind::AnnotatedAssignment(ann_assign) => {
-                if in_stub || ann_assign.value(module).is_some() {
+                if in_stub || ann_assign.has_value() {
                     DefinitionCategory::DeclarationAndBinding
                 } else {
                     DefinitionCategory::Declaration
@@ -1409,11 +1426,21 @@ impl ImportFromSubmoduleDefinitionKind {
     }
 }
 
+/// The inference region that owns bindings created while evaluating an assignment's value.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+pub enum BindingsOwner {
+    /// A simple-name assignment is represented by its definition.
+    Definition,
+    /// An assignment with multiple, unpacking, or non-name targets is represented by its statement.
+    Statement,
+}
+
 #[derive(Clone, Debug, get_size2::GetSize, salsa::SalsaValue)]
 pub struct AssignmentDefinitionKind<'db> {
     unpack: Option<Unpack<'db>>,
     value: AstNodeRef<ast::Expr>,
     target: AstNodeRef<ast::Expr>,
+    owner: BindingsOwner,
 }
 
 impl<'db> AssignmentDefinitionKind<'db> {
@@ -1428,11 +1455,16 @@ impl<'db> AssignmentDefinitionKind<'db> {
     pub fn target<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Expr {
         self.target.node(module)
     }
+
+    pub fn owner(&self) -> BindingsOwner {
+        self.owner
+    }
 }
 
 #[derive(Clone, Debug, get_size2::GetSize)]
 pub struct AnnotatedAssignmentDefinitionKind {
     node: AstNodeRef<ast::StmtAnnAssign>,
+    has_value: bool,
 }
 
 impl AnnotatedAssignmentDefinitionKind {
@@ -1442,6 +1474,11 @@ impl AnnotatedAssignmentDefinitionKind {
 
     pub fn value<'ast>(&self, module: &'ast ParsedModuleRef) -> Option<&'ast ast::Expr> {
         self.node(module).value.as_deref()
+    }
+
+    /// Returns whether this annotated assignment has a right-hand-side value.
+    pub const fn has_value(&self) -> bool {
+        self.has_value
     }
 
     pub fn annotation<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Expr {

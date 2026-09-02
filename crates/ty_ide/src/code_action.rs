@@ -1,10 +1,12 @@
 use crate::completion;
 
-use ruff_db::{files::File, parsed::parsed_module};
+use ruff_db::parsed::parsed_module;
+
 use ruff_diagnostics::Edit;
 use ruff_python_ast::find_node::covering_node;
 use ruff_text_size::TextRange;
 use ty_project::Db;
+use ty_python_core::ProgramFile;
 use ty_python_semantic::lint::LintId;
 use ty_python_semantic::suppress_single;
 use ty_python_semantic::types::{UNDEFINED_REVEAL, UNRESOLVED_REFERENCE};
@@ -19,7 +21,7 @@ pub struct QuickFix {
 
 pub fn code_actions(
     db: &dyn Db,
-    file: File,
+    file: ProgramFile<'_>,
     diagnostic_range: TextRange,
     diagnostic_id: &str,
 ) -> Vec<QuickFix> {
@@ -42,7 +44,7 @@ pub fn code_actions(
     // Suggest just suppressing the lint (always a valid option, but never ideal)
     actions.push(QuickFix {
         title: format!("Ignore '{}' for this line", lint_id.name()),
-        edits: suppress_single(db, file, lint_id, diagnostic_range).into_edits(),
+        edits: suppress_single(db, file.python_file(db), lint_id, diagnostic_range).into_edits(),
         preferred: false,
     });
 
@@ -51,13 +53,12 @@ pub fn code_actions(
 
 fn unresolved_fixes(
     db: &dyn Db,
-    file: File,
+    file: ProgramFile<'_>,
     diagnostic_range: TextRange,
 ) -> Option<impl Iterator<Item = QuickFix>> {
-    let parsed = parsed_module(db, file).load(db);
+    let parsed = parsed_module(db, file.python_file(db)).load(db);
     let node = covering_node(parsed.syntax().into(), diagnostic_range).node();
     let symbol = &node.expr_name()?.id;
-
     Some(
         completion::unresolved_fixes(db, file, &parsed, symbol, node)
             .into_iter()
@@ -87,6 +88,7 @@ mod tests {
     use ruff_python_trivia::textwrap::dedent;
     use ruff_text_size::{TextRange, TextSize};
     use ty_project::ProjectMetadata;
+    use ty_python_core::ProgramFile;
     use ty_python_semantic::{
         default_lint_registry,
         lint::LintMetadata,
@@ -662,6 +664,17 @@ mod tests {
         2 |
           |
 
+        info[code-action]: import typing_extensions.reveal_type
+         --> main.py:2:1
+          |
+        2 | reveal_type(1)
+          | ^^^^^^^^^^^
+        help: This is a preferred code action
+          |
+        1 + from typing_extensions import reveal_type
+        2 |
+          |
+
         info[code-action]: Ignore 'undefined-reveal' for this line
          --> main.py:2:1
           |
@@ -693,6 +706,17 @@ mod tests {
         help: This is a preferred code action
           |
         1 + from warnings import deprecated
+        2 |
+          |
+
+        info[code-action]: import typing_extensions.deprecated
+         --> main.py:2:2
+          |
+        2 | @deprecated("do not use")
+          |  ^^^^^^^^^^
+        help: This is a preferred code action
+          |
+        1 + from typing_extensions import deprecated
         2 |
           |
 
@@ -730,6 +754,17 @@ mod tests {
         help: This is a preferred code action
           |
         1 + from warnings import deprecated
+        2 |
+          |
+
+        info[code-action]: import typing_extensions.deprecated
+         --> main.py:4:2
+          |
+        4 | @deprecated("do not use")
+          |  ^^^^^^^^^^
+        help: This is a preferred code action
+          |
+        1 + from typing_extensions import deprecated
         2 |
           |
 
@@ -890,8 +925,6 @@ mod tests {
             let mut db =
                 ty_project::TestDb::new(ProjectMetadata::new("test", SystemPathBuf::from("/")));
 
-            db.init_program().unwrap();
-
             let mut cleansed = dedent(source).to_string();
 
             let start = cleansed
@@ -932,7 +965,16 @@ mod tests {
                 .context(0)
                 .format(DiagnosticFormat::Full);
 
-            for mut action in code_actions(&self.db, self.file, self.diagnostic_range, &lint.name) {
+            for mut action in code_actions(
+                &self.db,
+                ProgramFile::new(
+                    &self.db,
+                    self.file,
+                    self.db.program_environment().program(&self.db),
+                ),
+                self.diagnostic_range,
+                &lint.name,
+            ) {
                 let mut diagnostic = Diagnostic::new(
                     DiagnosticId::Lint(LintName::of("code-action")),
                     ruff_db::diagnostic::Severity::Info,

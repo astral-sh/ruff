@@ -10,8 +10,9 @@ use ruff_db::system::{
     file_time_now,
 };
 use ruff_python_ast::PythonVersion;
+use ruff_python_trivia::textwrap::dedent;
 use ruff_ranged_value::{RangedValue, ValueSource};
-use ty_module_resolver::{Module, ModuleName, resolve_module_confident};
+use ty_module_resolver::{Module, ModuleName};
 use ty_project::metadata::options::{EnvironmentOptions, Options, SrcOptions};
 use ty_project::metadata::pyproject::{PyProject, Tool};
 use ty_project::metadata::python_version::SupportedPythonVersion;
@@ -30,6 +31,17 @@ struct TestCase {
     /// We need to hold on to it in the test case or the temp files get deleted.
     _temp_dir: tempfile::TempDir,
     root_dir: SystemPathBuf,
+}
+
+fn resolve_module_confident<'db>(
+    db: &'db ProjectDatabase,
+    module_name: &ModuleName,
+) -> Option<Module<'db>> {
+    ty_module_resolver::resolve_module_confident(
+        db,
+        db.project().program(db).resolver_environment(db),
+        module_name,
+    )
 }
 
 impl TestCase {
@@ -308,7 +320,7 @@ impl<'a> SetupContext<'a> {
     ) -> anyhow::Result<()> {
         let relative_path = relative_path.as_ref();
         let absolute_path = self.join_project_path(relative_path);
-        Self::write_file_impl(absolute_path, content)
+        Self::write_file_impl(absolute_path, &dedent(content))
     }
 
     fn write_file(
@@ -384,6 +396,14 @@ fn setup<F>(setup_files: F) -> anyhow::Result<TestCase>
 where
     F: Setup,
 {
+    setup_with_system(setup_files, |_| {})
+}
+
+fn setup_with_system<F, C>(setup_files: F, configure_system: C) -> anyhow::Result<TestCase>
+where
+    F: Setup,
+    C: FnOnce(&TestSystem),
+{
     let temp_dir = tempfile::tempdir()?;
 
     let root_path = SystemPath::from_std_path(temp_dir.path()).ok_or_else(|| {
@@ -412,6 +432,7 @@ where
     let user_config_directory_override = os_system.with_user_config_directory(None);
     let system = TestSystem::new(os_system.clone());
     isolate_environment(&system);
+    configure_system(&system);
 
     let mut setup_context = SetupContext {
         system: &os_system,
@@ -532,7 +553,7 @@ fn isolate_environment(system: &TestSystem) {
     }
 }
 
-/// Updates the content of a file and ensures that the last modified file time is updated.
+/// Dedents and updates a file's content, ensuring that its last modified time changes.
 fn update_file(path: impl AsRef<SystemPath>, content: &str) -> anyhow::Result<()> {
     let path = path.as_ref().as_std_path();
 
@@ -544,7 +565,7 @@ fn update_file(path: impl AsRef<SystemPath>, content: &str) -> anyhow::Result<()
         .write(true)
         .truncate(true)
         .open(path)?;
-    file.write_all(content.as_bytes())?;
+    file.write_all(dedent(content).as_bytes())?;
 
     loop {
         file.sync_all()?;
@@ -943,6 +964,138 @@ fn changed_file() -> anyhow::Result<()> {
 
     assert_eq!(source_text(case.db(), foo).as_str(), "print('Version 2')");
     case.assert_indexed_project_files([foo]);
+
+    Ok(())
+}
+
+#[test]
+fn scripts_to_synchronize_after_file_and_directory_changes() -> anyhow::Result<()> {
+    let script = dedent(
+        r"
+        # /// script
+        # dependencies = []
+        # ///
+        ",
+    );
+    let mut case = setup(|context: &mut SetupContext| {
+        context.write_project_file("existing.py", &script)?;
+        context.write_project_file("edited.py", "")?;
+        context.write_file("new/script.py", &script)
+    })?;
+    let edited = case.project_path("edited.py");
+    assert_eq!(
+        case.db().project().script_files(case.db()).iter().count(),
+        1
+    );
+
+    update_file(&edited, &script)?;
+
+    let changes = case.take_watch_changes(event_for_file("edited.py"));
+    let changes = case.apply_changes(&changes);
+    assert_eq!(
+        changes.scripts_to_synchronize(case.db()),
+        vec![case.system_file(&edited)?]
+    );
+
+    std::fs::rename(
+        case.root_path().join("new").as_std_path(),
+        case.project_path("new").as_std_path(),
+    )?;
+    let mut changes = case.take_watch_changes(event_for_file("new"));
+    update_file(&edited, "")?;
+    changes.extend(case.stop_watch(event_for_file("edited.py")));
+
+    // Directory discovery also includes unchanged scripts, but `edited.py` no longer
+    // contains a PEP 723 script metadata block.
+    let changes = case.apply_changes(&changes);
+    assert_eq!(
+        changes
+            .scripts_to_synchronize(case.db())
+            .into_iter()
+            .collect::<HashSet<_>>(),
+        HashSet::from([
+            case.system_file(case.project_path("existing.py"))?,
+            case.system_file(case.project_path("new/script.py"))?,
+        ])
+    );
+
+    Ok(())
+}
+
+#[test]
+fn script_exclusion_tracks_file_creation_and_metadata_edits() -> anyhow::Result<()> {
+    let mut case = setup([(
+        "ty.toml",
+        r"
+        [src]
+        exclude-scripts = true
+        ",
+    )])?;
+    let path = case.project_path("script.py");
+    let script = r"
+        # /// script
+        # dependencies = []
+        # ///
+        missing
+        ";
+    assert!(case.db().check().is_empty());
+
+    std::fs::write(path.as_std_path(), dedent(script).as_ref())?;
+    let changes = case.take_watch_changes(event_for_file("script.py"));
+    let changes = case.apply_changes(&changes);
+    assert!(changes.scripts_to_synchronize(case.db()).is_empty());
+    let file = case.system_file(&path)?;
+    assert!(case.db().check().is_empty());
+    assert!(case.db().check_file(file).is_empty());
+
+    update_file(&path, "missing\n")?;
+    let changes = case.take_watch_changes(event_for_file("script.py"));
+    case.apply_changes(&changes);
+    assert_eq!(case.db().check().len(), 1);
+    assert_eq!(case.db().check_file(file).len(), 1);
+
+    update_file(&path, script)?;
+    let changes = case.take_watch_changes(event_for_file("script.py"));
+    case.apply_changes(&changes);
+    assert!(case.db().check().is_empty());
+    assert!(case.db().check_file(file).is_empty());
+
+    Ok(())
+}
+
+#[test]
+fn explicitly_included_file_remains_checked_when_becoming_a_script() -> anyhow::Result<()> {
+    let mut case = setup([
+        (
+            "ty.toml",
+            r"
+            [src]
+            exclude-scripts = true
+            ",
+        ),
+        ("script.py", "missing\n"),
+    ])?;
+    let path = case.project_path("script.py");
+    let file = case.system_file(&path)?;
+    case.db
+        .project()
+        .set_included_paths(&mut case.db, vec![path.clone()]);
+    assert_eq!(case.db().check().len(), 1);
+    assert_eq!(case.db().check_file(file).len(), 1);
+
+    update_file(
+        &path,
+        r"
+        # /// script
+        # dependencies = []
+        # ///
+        missing
+        ",
+    )?;
+    let changes = case.take_watch_changes(event_for_file("script.py"));
+    case.apply_changes(&changes);
+    assert_eq!(case.db().check().len(), 1);
+    assert_eq!(case.db().check_file(file).len(), 1);
 
     Ok(())
 }
@@ -2470,4 +2623,362 @@ fn submodule_cache_invalidation_after_pyproject_created() -> anyhow::Result<()> 
     );
 
     Ok(())
+}
+
+#[cfg(feature = "test-uv")]
+mod uv_metadata {
+    use std::process::Command;
+    use std::time::Duration;
+
+    use anyhow::Context;
+    use ruff_db::diagnostic::DiagnosticId;
+    use ruff_db::files::File;
+    use ruff_db::system::{OsSystem, System as _};
+    use ty_project::{Db, ScriptEnvironmentAvailability, UseUv, UvSyncChanges};
+    use ty_static::EnvVars;
+
+    use super::{SetupContext, TestCase, event_for_file, setup_with_system, update_file};
+
+    const MANIFEST: &str = r#"
+    [project]
+    name = "example"
+    version = "0.1.0"
+    requires-python = ">=3.8"
+    "#;
+
+    #[test]
+    fn project_refresh_applies_settings_despite_uv_errors() -> anyhow::Result<()> {
+        let mut case = setup_uv(
+            UseUv::On,
+            &[
+                ("pyproject.toml", MANIFEST),
+                ("main.py", "value: int = 'wrong'\n"),
+            ],
+        )?;
+        let project = case.db().project();
+        let program_settings = project.program_settings(case.db()).clone();
+        assert_eq!(case.db().check()[0].id().as_str(), "invalid-assignment");
+
+        // uv rejects this setting, but ty must still apply its rule configuration.
+        update_and_synchronize_project(
+            &mut case,
+            r#"
+            [project]
+            name = "example"
+            version = "0.1.0"
+            requires-python = ">=3.8"
+
+            [tool.uv]
+            package = "invalid"
+
+            [tool.ty.rules]
+            invalid-assignment = "ignore"
+            "#,
+        )?;
+        let diagnostics = case.db().check();
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].id(), DiagnosticId::UvMetadata);
+        assert_eq!(project.program_settings(case.db()), &program_settings);
+
+        // If ordinary discovery also fails, keep the last applied settings and warning.
+        update_and_synchronize_project(&mut case, "[project\n")?;
+        assert_eq!(case.db().check(), diagnostics);
+
+        update_and_synchronize_project(
+            &mut case,
+            r#"
+            [project]
+            name = "example"
+            version = "0.1.0"
+            requires-python = ">=3.8"
+
+            [tool.ty.rules]
+            invalid-assignment = "ignore"
+            "#,
+        )?;
+        assert!(case.db().check().is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn project_refresh_uses_the_returned_workspace_root() -> anyhow::Result<()> {
+        let mut case = setup_uv(
+            UseUv::On,
+            &[
+                (
+                    "../pyproject.toml",
+                    r#"
+                    [tool.uv.workspace]
+                    members = ["project"]
+                    "#,
+                ),
+                (
+                    "pyproject.toml",
+                    r#"
+                    [project]
+                    name = "example"
+                    version = "0.1.0"
+                    requires-python = ">=3.8"
+
+                    [tool.ty]
+                    "#,
+                ),
+            ],
+        )?;
+        let project = case.db().project();
+        assert_eq!(
+            project.root(case.db()),
+            case.root_path().join("project").as_path()
+        );
+
+        // Without its own ty configuration, the member belongs to the enclosing workspace.
+        update_and_synchronize_project(&mut case, MANIFEST)?;
+        assert_eq!(case.db().project(), project);
+        assert_eq!(project.root(case.db()), case.root_path());
+        Ok(())
+    }
+
+    #[test]
+    fn unchanged_script_environment_is_reused_after_source_edits() -> anyhow::Result<()> {
+        let mut case = setup_uv(
+            UseUv::Scripts,
+            &[(
+                "script.py",
+                r#"
+                # /// script
+                # requires-python = ">=3.12"
+                # dependencies = []
+                # ///
+                value = 1
+                "#,
+            )],
+        )?;
+
+        assert!(case.db().check().is_empty());
+
+        assert!(!update_and_synchronize_script(
+            &mut case,
+            r#"
+
+            # /// script
+            # requires-python = ">=3.12"
+            # dependencies = []
+            # ///
+            value = 2
+            "#,
+        )?);
+
+        assert!(case.db().check().is_empty());
+
+        Ok(())
+    }
+
+    #[test]
+    fn metadata_changes_resynchronize_the_script_environment() -> anyhow::Result<()> {
+        let mut case = setup_uv(
+            UseUv::Scripts,
+            &[(
+                "script.py",
+                r#"
+                # /// script
+                # requires-python = ">=3.12"
+                # dependencies = []
+                # ///
+                from attrs import define
+                "#,
+            )],
+        )?;
+
+        let diagnostics = case.db().check();
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].id().as_str(), "unresolved-import");
+
+        let synchronized = update_and_synchronize_script(
+            &mut case,
+            r#"
+            # /// script
+            # requires-python = ">=3.12"
+            # dependencies = ["attrs==25.4.0"]
+            # ///
+            from attrs import define
+            "#,
+        )?;
+        assert!(synchronized);
+
+        assert!(case.db().check().is_empty());
+
+        Ok(())
+    }
+
+    #[test]
+    fn ordinary_files_becoming_scripts_initialize_their_environments() -> anyhow::Result<()> {
+        let mut case = setup_uv(
+            UseUv::Scripts,
+            &[("script.py", "from attrs import define\n")],
+        )?;
+
+        let ordinary = case.db().check();
+        assert!(
+            ordinary
+                .iter()
+                .any(|diagnostic| diagnostic.id().as_str() == "unresolved-import")
+        );
+
+        update_and_synchronize_script(
+            &mut case,
+            r#"
+            # /// script
+            # requires-python = ">=3.12"
+            # dependencies = ["attrs==25.4.0"]
+            # ///
+            from attrs import define
+            "#,
+        )?;
+        let diagnostics = case.db().check();
+        assert!(diagnostics.is_empty(), "{diagnostics:?}");
+
+        Ok(())
+    }
+
+    #[test]
+    fn corrected_script_dependencies_replace_initialization_errors() -> anyhow::Result<()> {
+        let mut case = setup_uv(
+            UseUv::Scripts,
+            &[(
+                "script.py",
+                r#"
+                # /// script
+                # requires-python = ">=3.12"
+                # dependencies = ["not a valid requirement ???"]
+                # ///
+                value = 1
+                "#,
+            )],
+        )?;
+
+        let initial = case.db().check();
+        assert!(
+            initial
+                .iter()
+                .any(|diagnostic| diagnostic.id() == DiagnosticId::UvMetadata)
+        );
+
+        let synchronized = update_and_synchronize_script(
+            &mut case,
+            r#"
+            # /// script
+            # requires-python = ">=3.12"
+            # dependencies = ["attrs==25.4.0"]
+            # ///
+            from attrs import define
+            "#,
+        )?;
+        assert!(synchronized);
+
+        let corrected = case.db().check();
+        assert!(
+            corrected.is_empty(),
+            "unexpected diagnostics: {corrected:?}"
+        );
+
+        Ok(())
+    }
+
+    fn setup_uv(use_uv: UseUv, files: &[(&str, &str)]) -> anyhow::Result<TestCase> {
+        let uv = OsSystem::default().which("uv")?;
+        let mut case = setup_with_system(
+            |context: &mut SetupContext| {
+                for (path, content) in files {
+                    context.write_project_file(path, content)?;
+                }
+                if use_uv == UseUv::On {
+                    let output = Command::new(uv.as_std_path())
+                        .current_dir(context.project_path())
+                        .args(["sync", "--offline"])
+                        .output()?;
+                    anyhow::ensure!(
+                        output.status.success(),
+                        "uv sync failed: {}",
+                        String::from_utf8_lossy(&output.stderr)
+                    );
+                }
+                Ok(())
+            },
+            |system| {
+                system.set_env_var(
+                    EnvVars::TY_UV,
+                    match use_uv {
+                        UseUv::Off => "0",
+                        UseUv::Scripts => "scripts",
+                        UseUv::On => "1",
+                    },
+                );
+                system.set_env_var(EnvVars::UV, uv.as_str());
+            },
+        )?;
+        let scripts: Vec<_> = case.db().project().script_files(case.db()).iter().collect();
+        synchronize_scripts(&mut case, &scripts)?;
+        Ok(case)
+    }
+
+    fn update_and_synchronize_project(case: &mut TestCase, source: &str) -> anyhow::Result<()> {
+        update_file(case.project_path("pyproject.toml"), source)?;
+        let changes = case.take_watch_changes(event_for_file("pyproject.toml"));
+        let changes = case.apply_changes(&changes);
+
+        if let Some(project_path) = changes.project_sync_path() {
+            case.db()
+                .uv_environments()
+                .request_project_sync(case.db(), project_path, &|_, _| None);
+        }
+
+        wait_for_synchronizations(case)?;
+        Ok(())
+    }
+
+    fn update_and_synchronize_script(case: &mut TestCase, source: &str) -> anyhow::Result<bool> {
+        update_file(case.project_path("script.py"), source)?;
+        let changes = case.take_watch_changes(event_for_file("script.py"));
+        let changes = case.apply_changes(&changes);
+        let scripts = changes.scripts_to_synchronize(case.db());
+        let changes = synchronize_scripts(case, &scripts)?;
+        Ok(!changes.scripts.is_empty())
+    }
+
+    fn synchronize_scripts(case: &mut TestCase, scripts: &[File]) -> anyhow::Result<UvSyncChanges> {
+        let environments = case.db().uv_environments().clone();
+        for &file in scripts {
+            environments.request_sync(
+                &mut case.db,
+                file,
+                ScriptEnvironmentAvailability::Pending,
+                &|_, _| None,
+            );
+        }
+
+        wait_for_synchronizations(case)
+    }
+
+    fn wait_for_synchronizations(case: &mut TestCase) -> anyhow::Result<UvSyncChanges> {
+        let environments = case.db().uv_environments().clone();
+        let wakeups = environments.sync_wakeups();
+        let mut changes = UvSyncChanges::default();
+        while environments.has_pending_synchronizations() {
+            wakeups
+                .recv_timeout(Duration::from_secs(30))
+                .context("uv synchronization did not finish")?;
+            let completed = environments.poll_sync(&mut case.db);
+            changes.scripts.extend(completed.scripts);
+            changes.project = completed.project.or(changes.project);
+        }
+
+        if changes.project.is_some()
+            && let Some(watcher) = &mut case.watcher
+        {
+            watcher.update(&case.db);
+            assert!(!watcher.has_errored_paths());
+        }
+
+        Ok(changes)
+    }
 }

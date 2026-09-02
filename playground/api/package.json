@@ -1,6 +1,9 @@
 {
   "name": "api",
   "version": "0.0.0",
+  "engines": {
+    "npm": ">=11.10.0"
+  },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.0.0",
     "miniflare": "^4.20260706.0",

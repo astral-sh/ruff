@@ -44,6 +44,8 @@ env:
 
   CARGO_NET_RETRY: 10
   CARGO_PROFILE_DEV_DEBUG: line-tables-only
+  CARGO_PROFILE_DEV_LTO: "false"
+  CARGO_PROFILE_DEV_OPT_LEVEL: 0
   CARGO_TERM_COLOR: always
   NEXTEST_PROFILE: "ci"
   RUSTUP_MAX_RETRIES: 10
@@ -84,9 +86,9 @@ jobs:
         run: |
           git config --global user.name typeshedbot
           git config --global user.email '<>'
-      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
-          version: "0.12.0"
+          version: "0.12.9"
       - name: Sync typeshed stubs
         run: |
           rm -rf "ruff/${VENDORED_TYPESHED}"
@@ -140,9 +142,9 @@ jobs:
         with:
           persist-credentials: true
           ref: ${{ env.UPSTREAM_BRANCH}}
-      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
-          version: "0.12.0"
+          version: "0.12.9"
       - name: Setup git
         run: |
           git config --global user.name typeshedbot
@@ -182,9 +184,9 @@ jobs:
         with:
           persist-credentials: true
           ref: ${{ env.UPSTREAM_BRANCH}}
-      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
-          version: "0.12.0"
+          version: "0.12.9"
       - name: Setup git
         run: |
           git config --global user.name typeshedbot
@@ -205,10 +207,9 @@ jobs:
           # consistent with the other typeshed stubs around them.
           # Typeshed formats code using black in their CI, so we just invoke
           # black on the stubs the same way that typeshed does.
-          # TODO: Switch to a released version of Black once a release includes
-          # https://github.com/psf/black/commit/f665703258bfa1916f8a6c1cbab0bc384b90cbac.
-          uvx \
-            --from="git+https://github.com/psf/black.git@e34bb1bef70e83410c2816dfd07485ec026959aa" \
+          uv run \
+            --locked \
+            --only-group=typeshed-formatting \
             black "${VENDORED_TYPESHED}/stdlib" \
             --config "${VENDORED_TYPESHED}/pyproject.toml" || true
           git commit -am "Format codemodded docstrings" --allow-empty
@@ -257,7 +258,7 @@ jobs:
         run: |
           git config --global user.name typeshedbot
           git config --global user.email '<>'
-      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           # Reuse the cache populated by the `cargo test (linux)` CI job on `main`.
           shared-key: ruff-linux-debug
@@ -267,12 +268,9 @@ jobs:
         run: rustup show
       - name: "Install mold"
         uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
-      - name: "Install cargo nextest and insta"
-        uses: taiki-e/install-action@a6b2e2dcd845ddd7f509ce4f3ed3d922b80cc5d9 # v2.84.0
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
-          tool: |
-            cargo-nextest
-            cargo-insta
+          version: "0.12.9"
       - name: Update snapshots
         # Snapshot failures are force-passed by cargo-insta, but other tests might still fail
         # in this test, causing the step overall to fail. We want to continue to later steps
@@ -282,7 +280,7 @@ jobs:
           # Work around https://github.com/mitsuhiko/insta/pull/924 until its fix is released.
           CI: "0"
           MDTEST_UPDATE_SNAPSHOTS: "1"
-        run: cargo insta test --accept --all-features --test-runner nextest --disable-nextest-doctest
+        run: uv run --only-dev cargo insta test --accept --all-features --test-runner nextest --disable-nextest-doctest
       - name: Commit and push snapshot changes
         if: ${{ success() }}
         run: |

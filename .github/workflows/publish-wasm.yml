@@ -11,6 +11,9 @@ on:
         required: true
         type: string
 
+env:
+  ACTIONS_CACHE_MODE: none
+
 jobs:
   publish:
     runs-on: ubuntu-latest
@@ -29,7 +32,8 @@ jobs:
           path: pkg
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: 24
+          package-manager-cache: false
+          node-version: 24.19.0
           registry-url: "https://registry.npmjs.org"
       - name: "Publish (dry-run)"
         if: ${{ inputs.plan == '' || fromJson(inputs.plan).announcement_tag_is_implicit }}

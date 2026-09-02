@@ -3,6 +3,7 @@ use ruff_python_ast::Stmt;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
+use crate::codes::Category;
 use crate::{Violation, checkers::ast::Checker};
 
 /// ## What it does
@@ -23,7 +24,7 @@ use crate::{Violation, checkers::ast::Checker};
 /// import pytest
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.208")]
+#[violation_metadata(stable_since = "v0.0.208", category = Category::Pedantic)]
 pub(crate) struct PytestIncorrectPytestImport;
 
 impl Violation for PytestIncorrectPytestImport {

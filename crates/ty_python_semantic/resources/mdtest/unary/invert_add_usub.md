@@ -47,11 +47,11 @@ from typing import TypeVar
 T = TypeVar("T", bound=float)
 
 def neg_float_bound(a: T) -> float:
-    reveal_type(-a)  # revealed: int | float
+    reveal_type(-a)  # revealed: float
     return -a
 
 def pos_float_bound(a: T) -> float:
-    reveal_type(+a)  # revealed: int | float
+    reveal_type(+a)  # revealed: float
     return +a
 ```
 

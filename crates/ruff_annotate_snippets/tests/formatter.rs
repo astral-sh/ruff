@@ -5281,7 +5281,7 @@ error[E0624]: method `five_years` is private
   |    ---------- private method defined here
   |
 help: consider making `bar` public
- --> other.rs:LL:1
+ ::: other.rs:1:1
   |
 1 | pub fn bar(&self) {
   | +++
@@ -5302,7 +5302,7 @@ error[E0624]: method `five_years` is private
   │    ────────── private method defined here
   ╰╴
 help: consider making `bar` public
-  ╭▸ other.rs:LL:1
+  ⸬  other.rs:1:1
   │
 1 │ pub fn bar(&self) {
   ╰╴+++

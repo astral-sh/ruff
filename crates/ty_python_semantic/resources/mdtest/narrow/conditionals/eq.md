@@ -312,8 +312,8 @@ def compare_functional_flags(left: FunctionalPermission, right: FunctionalPermis
     reveal_type(left == right)  # revealed: bool
 ```
 
-An enum with a custom `_missing_` method can create unnamed members, so two values need not be equal
-even when only one member is declared:
+A custom `_missing_` method does not change the enum's static member set, so an enum with one
+declared member remains a singleton:
 
 ```py
 from enum import Enum
@@ -323,13 +323,13 @@ class MissingValueEnum(Enum):
 
     @classmethod
     def _missing_(cls, value: object) -> "MissingValueEnum":
-        return object.__new__(cls)
+        return cls.ONLY
 
-def compare_open_enums(left: MissingValueEnum, right: MissingValueEnum):
-    reveal_type(left == right)  # revealed: bool
+def compare_custom_missing_enums(left: MissingValueEnum, right: MissingValueEnum):
+    reveal_type(left == right)  # revealed: Literal[True]
 
     if left != right:
-        reveal_type(left)  # revealed: MissingValueEnum
+        reveal_type(left)  # revealed: Never
 ```
 
 A custom enum metaclass can add members that do not appear in the class body. Two values of a
@@ -662,23 +662,39 @@ def compare_false_to_integer_enum(left: MixedLeft1 | Literal[False], right: Mixe
         reveal_type(right)  # revealed: Literal[MixedRight0.A]
 ```
 
-An open identity-comparing enum can still be narrowed to all of its declared members. Undeclared
-runtime members are not retained merely because every declared member matches:
+An identity-comparing enum with a custom `_missing_` method remains equivalent to the union of its
+declared members:
 
 ```py
 from enum import Enum
 from typing import Literal
 
-class OpenIdentity(Enum):
+class CustomMissingIdentity(Enum):
     A = "a"
     B = "b"
 
     @classmethod
-    def _missing_(cls, value: object) -> "OpenIdentity":
+    def _missing_(cls, value: object) -> "CustomMissingIdentity":
         raise ValueError
 
 class OtherIdentity(Enum):
     C = "c"
+
+def compare_custom_missing_identity(
+    left: CustomMissingIdentity | OtherIdentity,
+    right: Literal[CustomMissingIdentity.A, CustomMissingIdentity.B],
+):
+    if left == right:
+        reveal_type(left)  # revealed: CustomMissingIdentity
+```
+
+A metaclass can inject undeclared members, leaving an identity-comparing enum genuinely open.
+Comparing against its declared members can still exclude those undeclared members.
+
+```py
+class OpenIdentity(Enum, metaclass=InjectingEnumMeta):
+    A = "a"
+    B = "b"
 
 def compare_open_identity(
     left: OpenIdentity | OtherIdentity,
@@ -709,7 +725,8 @@ reveal_type(IntegerAliases.ZERO == IntegerAliases.FALSE)  # revealed: Literal[Tr
 ```
 
 Plain enum members from different classes use identity comparison, even when their declared values
-are equal. Custom comparison methods and open scalar enums remain ambiguous:
+are equal. Custom comparison methods remain ambiguous, while scalar enums can compare across enum
+classes:
 
 ```py
 from enum import Enum, StrEnum
@@ -746,12 +763,24 @@ class CustomNeLeft(StrEnum):
 reveal_type(CustomNeLeft.MEMBER == CustomRight.MEMBER)  # revealed: Literal[True]
 reveal_type(CustomNeLeft.MEMBER != CustomRight.MEMBER)  # revealed: bool
 
-class OpenLeft(StrEnum):
+class CustomMissingLeft(StrEnum):
     MEMBER = "shared"
 
     @classmethod
-    def _missing_(cls, value: object) -> "OpenLeft":
+    def _missing_(cls, value: object) -> "CustomMissingLeft":
         raise ValueError
+
+def compare_custom_missing(left: CustomMissingLeft, right: CustomRight):
+    if left == right:
+        reveal_type(left)  # revealed: CustomMissingLeft
+```
+
+A metaclass can add undeclared scalar members, so cross-enum comparison must retain the full open
+enum:
+
+```py
+class OpenLeft(StrEnum, metaclass=InjectingEnumMeta):
+    MEMBER = "shared"
 
 def compare_open(left: OpenLeft, right: CustomRight):
     if left == right:
@@ -766,8 +795,17 @@ def compare_optional_custom(left: CustomLeft | None, right: CustomRight):
         reveal_type(left)  # revealed: CustomLeft
 ```
 
-An enum with `_missing_` may have members that do not appear in its definition. Adding `None` must
-not cause the comparison to assume that its declared member is the only possible match:
+A custom `_missing_` method does not affect comparison narrowing, including when the enum is
+combined with `None`:
+
+```py
+def compare_optional_custom_missing(left: CustomMissingLeft | None, right: CustomRight):
+    if left == right:
+        reveal_type(left)  # revealed: CustomMissingLeft
+```
+
+Undeclared members of a genuinely open scalar enum must survive cross-enum comparison even when the
+enum is combined with `None`:
 
 ```py
 def compare_optional_open(left: OpenLeft | None, right: CustomRight):
@@ -1118,7 +1156,9 @@ def _(answer: CoupledInequality):
 
 ## Recursive aliases containing enum domains
 
-Enum domains nested in a recursive alias fall back to general comparison inference:
+Comparisons involving invalid recursive enum aliases still use their non-recursive members.
+Comparing against a specific enum member narrows both branches to their remaining members while
+preserving any `NewType` tag.
 
 ```toml
 [environment]
@@ -1127,15 +1167,100 @@ python-version = "3.12"
 
 ```py
 from enum import Enum
+from typing import NewType
 
 class EnumValue(Enum):
     VALUE = 1
     OTHER = 2
 
-type Recursive = EnumValue | Recursive
+type Recursive = EnumValue | Recursive  # error: [cyclic-type-alias-definition]
 
 def _(left: Recursive, right: EnumValue):
     reveal_type(left == right)  # revealed: bool
+
+BrandedEnumValue = NewType("BrandedEnumValue", EnumValue)
+type RecursiveBrand = BrandedEnumValue | RecursiveBrand  # error: [cyclic-type-alias-definition]
+
+def compare_recursive_brand_to_member(left: RecursiveBrand) -> None:
+    if left == EnumValue.VALUE:
+        reveal_type(left)  # revealed: BrandedEnumValue & Literal[EnumValue.VALUE]
+    else:
+        reveal_type(left)  # revealed: BrandedEnumValue & Literal[EnumValue.OTHER]
+
+    if left != EnumValue.VALUE:
+        reveal_type(left)  # revealed: BrandedEnumValue & Literal[EnumValue.OTHER]
+    else:
+        reveal_type(left)  # revealed: BrandedEnumValue & Literal[EnumValue.VALUE]
+```
+
+A recursive alias with changing type arguments may introduce values outside its original enum
+domain. Here, `True` compares equal to the integer-valued enum member, so the `bool` alternative
+must remain reachable.
+
+```py
+from enum import IntEnum
+
+class Number(IntEnum):
+    ONE = 1
+    TWO = 2
+
+BrandedNumber = NewType("BrandedNumber", Number)
+type Changing[T] = T | Changing[bool]  # error: [cyclic-type-alias-definition]
+
+def compare_changing_specialization(value: Changing[BrandedNumber]) -> None:
+    if value == Number.ONE:
+        reveal_type(value)  # revealed: (BrandedNumber & Literal[Number.ONE]) | bool
+    else:
+        reveal_type(value)  # revealed: (BrandedNumber & Literal[Number.TWO]) | bool
+```
+
+Mutually recursive aliases can likewise admit values outside their enum domain. Intersecting the
+aliases does not remove their shared `bool` alternative.
+
+```py
+from ty_extensions import Intersection
+
+type RecursiveWithBool = RecursiveWithBrand | bool  # error: [cyclic-type-alias-definition]
+type RecursiveWithBrand = RecursiveWithBool | BrandedNumber  # error: [cyclic-type-alias-definition]
+
+def compare_mutually_recursive_intersection(
+    value: Intersection[RecursiveWithBool, RecursiveWithBrand],
+) -> None:
+    if value == Number.ONE:
+        reveal_type(value)  # revealed: bool | BrandedNumber
+    else:
+        reveal_type(value)  # revealed: bool | BrandedNumber
+```
+
+## Recursive aliases containing gradual generic branches
+
+Equality narrowing must terminate when a recursive sequence alias contains a mapping with a gradual
+key.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from collections.abc import Mapping, Sequence
+from typing import Any
+
+type RecursiveMappingKey = Sequence[RecursiveMappingKey] | Mapping[Any, int]
+
+def narrow_recursive_mapping_key(value: RecursiveMappingKey) -> None:
+    assert value == 0
+    _ = value
+```
+
+A gradual mapping value also must not cause recursive materialization to unfold indefinitely.
+
+```py
+type RecursiveMappingValue = Sequence[RecursiveMappingValue] | Mapping[int, Any]
+
+def narrow_recursive_mapping_value(value: RecursiveMappingValue) -> None:
+    assert value == 0
+    _ = value
 ```
 
 ## Known built-in equality behavior
@@ -1190,7 +1315,7 @@ def narrow_final_object_equality(value: A | B, other: A):
         reveal_type(value)  # revealed: A
 ```
 
-Different inherited built-in implementations cannot compare equal:
+Final classes with different inherited built-in equality implementations cannot compare equal:
 
 ```py
 from typing import final
@@ -1542,8 +1667,8 @@ def custom_equality(value: AlwaysEqual | None, other: AlwaysEqual):
 
 ## Narrowing builtin types to literals
 
-Equality with a literal narrows broad `str`, `int`, and `bytes` types to the values that compare
-equal to that literal:
+Equality with a literal narrows broad `str`, `int`, and `bytes` types to that literal. By default,
+integer literals do not introduce the boolean values that compare equal to `0` or `1`:
 
 ```py
 def narrow_string(value: str):
@@ -1558,8 +1683,15 @@ def narrow_reversed_string(value: str):
 
 def narrow_integer(value: int):
     if value == 1:
-        # `True == 1` at runtime.
-        reveal_type(value)  # revealed: Literal[1, True]
+        reveal_type(value)  # revealed: Literal[1]
+
+def narrow_zero(value: int):
+    if value == 0:
+        reveal_type(value)  # revealed: Literal[0]
+
+def narrow_reversed_integer(value: int):
+    if 1 == value:
+        reveal_type(value)  # revealed: Literal[1]
 
 def narrow_bytes(value: bytes):
     if value == b"a":
@@ -1593,6 +1725,59 @@ def preserve_subclass(value: StringSubclass):
 def preserve_custom_comparison(value: str | AlwaysEqual):
     if value == "a":
         reveal_type(value)  # revealed: Literal["a"] | AlwaysEqual
+```
+
+## String-literal origin and exclusions
+
+A string without literal origin can equal a string literal without acquiring the literal's origin.
+The successful branch remains reachable and preserves the original exclusion.
+
+```py
+from typing import Literal
+from typing_extensions import LiteralString
+from ty_extensions import Intersection, Not
+
+def without_literal_origin(value: Intersection[str, Not[LiteralString]]) -> None:
+    if value == "hello":
+        reveal_type(value)  # revealed: str & ~LiteralString
+        value.definitely_missing_attribute  # error: [unresolved-attribute]
+
+    if "hello" == value:
+        reveal_type(value)  # revealed: str & ~LiteralString
+
+    if value != "hello":
+        reveal_type(value)  # revealed: str & ~LiteralString
+    else:
+        reveal_type(value)  # revealed: str & ~LiteralString
+```
+
+Excluding a particular string literal also leaves its runtime value possible when literal origin is
+not known. A different literal can still narrow the string normally.
+
+```py
+def without_literal_value(value: Intersection[str, Not[Literal["hello"]]]) -> None:
+    if value == "hello":
+        reveal_type(value)  # revealed: str & ~Literal["hello"]
+
+    if value == "goodbye":
+        reveal_type(value)  # revealed: Literal["goodbye"]
+```
+
+Optional alternatives that cannot compare equal are still removed without discarding the possible
+string value.
+
+```py
+def optional_without_literal_origin(value: Intersection[str, Not[LiteralString]] | None) -> None:
+    if value == "hello":
+        reveal_type(value)  # revealed: str & ~LiteralString
+```
+
+Once literal origin is known, excluding a string literal really does exclude its runtime value.
+
+```py
+def trusted_value_is_excluded(value: Intersection[LiteralString, Not[Literal["hello"]]]) -> None:
+    if value == "hello":
+        reveal_type(value)  # revealed: Never
 ```
 
 ## `x != y` where `y` is of literal type
@@ -1754,7 +1939,7 @@ import sys
 from enum import Enum, IntEnum
 from typing import Any, Literal, TypeAlias, TypeVar
 
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 from typing_extensions import assert_never, assert_type
 
 T = TypeVar("T", bound=object)
@@ -2000,6 +2185,59 @@ def gradual_enum_union_inequality(value: Color | Any, other: Color):
         reveal_type(value)  # revealed: Color | Any
 ```
 
+## Unions of gradual string literals
+
+Comparing a union of string literals intersected with `Any` keeps the matching alternative for
+equality and removes it for inequality:
+
+```py
+from typing import Any, Literal
+from ty_extensions import Intersection
+
+def equality(value: Intersection[Any, Literal["a"]] | Intersection[Any, Literal["b"]]):
+    if value == "a":
+        reveal_type(value)  # revealed: Any & Literal["a"]
+    else:
+        reveal_type(value)  # revealed: Any & Literal["b"]
+
+    if value != "a":
+        reveal_type(value)  # revealed: Any & Literal["b"]
+    else:
+        reveal_type(value)  # revealed: Any & Literal["a"]
+```
+
+Larger unions must narrow without expanding the complement of every rejected alternative, which
+would make memory use grow exponentially:
+
+```py
+def larger_union(
+    value: (
+        Intersection[Any, Literal["a"]]
+        | Intersection[Any, Literal["b"]]
+        | Intersection[Any, Literal["c"]]
+        | Intersection[Any, Literal["d"]]
+        | Intersection[Any, Literal["e"]]
+        | Intersection[Any, Literal["f"]]
+        | Intersection[Any, Literal["g"]]
+        | Intersection[Any, Literal["h"]]
+        | Intersection[Any, Literal["i"]]
+        | Intersection[Any, Literal["j"]]
+        | Intersection[Any, Literal["k"]]
+        | Intersection[Any, Literal["l"]]
+        | Intersection[Any, Literal["m"]]
+        | Intersection[Any, Literal["n"]]
+        | Intersection[Any, Literal["o"]]
+        | Intersection[Any, Literal["p"]]
+        | Intersection[Any, Literal["q"]]
+        | Intersection[Any, Literal["r"]]
+        | Intersection[Any, Literal["s"]]
+        | Intersection[Any, Literal["t"]]
+    ),
+):
+    if value == "a":
+        reveal_type(value)  # revealed: Any & Literal["a"]
+```
+
 ## Booleans and integers
 
 ```py
@@ -2025,6 +2263,64 @@ def _(b: bool, i: Literal[1, 2]):
         reveal_type(i)  # revealed: Literal[1]
     else:
         reveal_type(i)  # revealed: Literal[2]
+```
+
+## Integers and booleans with non-strict equality semantics
+
+With non-strict equality semantics, broad integers narrow to integer literals, while boolean
+literals that compare equal remain in explicitly annotated literal unions.
+
+```toml
+[analysis]
+strict-equality-semantics = false
+```
+
+```py
+from typing import Literal
+
+reveal_type(1 == True)  # revealed: Literal[True]
+
+def f(x: int, y: Literal[1, True, 2]):
+    if x == 1:
+        reveal_type(x)  # revealed: Literal[1]
+
+    if y == 1:
+        reveal_type(y)  # revealed: Literal[1, True]
+
+    if x in [1, 2]:
+        reveal_type(x)  # revealed: Literal[1, 2]
+
+    if y in [1, True]:
+        reveal_type(y)  # revealed: Literal[1, True]
+```
+
+## Integers and booleans with strict equality semantics
+
+With strict equality semantics, broad integers are preserved, while explicitly annotated literal
+unions still narrow to the integer and boolean literals that compare equal.
+
+```toml
+[analysis]
+strict-equality-semantics = true
+```
+
+```py
+from typing import Literal
+
+reveal_type(1 == True)  # revealed: Literal[True]
+
+def f(x: int, y: Literal[1, True, 2]):
+    if x == 1:
+        reveal_type(x)  # revealed: int
+
+    if y == 1:
+        reveal_type(y)  # revealed: Literal[1, True]
+
+    if x in [1, 2]:
+        reveal_type(x)  # revealed: int
+
+    if y in [1, True]:
+        reveal_type(y)  # revealed: Literal[1, True]
 ```
 
 ## Final subclasses of scalar builtins
@@ -2169,10 +2465,45 @@ def tuple_with_erased_element_identity(value: NeverEqualTupleElement) -> None:
     reveal_type((LeftElement(value),) != (RightElement(value),))  # revealed: bool
 ```
 
+## Comparing sequences with tuples
+
+A `Sequence[object]` can be an empty tuple, so the equality branch remains reachable and we report
+errors inside it:
+
+```py
+from collections.abc import Sequence
+
+def _(value: Sequence[object]):
+    if value == ():
+        reveal_type(value)  # revealed: Sequence[object]
+        1 + "a"  # error: [unsupported-operator]
+```
+
+## Comparing truthy sequences with literals
+
+A truthy sequence can still be a string or bytes object. Comparing a literal on the left with such a
+sequence does not make the equality branch unreachable:
+
+```py
+from collections.abc import Sequence
+
+def _(text: Sequence[str], data: Sequence[int]):
+    if text:
+        reveal_type("x" == text)  # revealed: bool
+        reveal_type("x" != text)  # revealed: bool
+        if "x" == text:
+            1 + "a"  # error: [unsupported-operator]
+
+    if data:
+        reveal_type(b"x" == data)  # revealed: bool
+        reveal_type(b"x" != data)  # revealed: bool
+```
+
 ## Narrowing with NewTypes
 
-`NewType` wrappers erase their distinction at runtime, so comparisons with an identity-based enum
-literal remain ambiguous:
+A `NewType` constructor returns its argument unchanged at runtime. A `WrappedIdentityEnum` value can
+therefore be either `IdentityEnum.A` or `IdentityEnum.B`, so comparing it with `IdentityEnum.A` has
+an unknown result:
 
 ```py
 from enum import Enum
@@ -2187,6 +2518,74 @@ WrappedIdentityEnum = NewType("WrappedIdentityEnum", IdentityEnum)
 def literal_with_erased_identity(value: WrappedIdentityEnum) -> None:
     reveal_type(IdentityEnum.A == value)  # revealed: bool
     reveal_type(IdentityEnum.A != value)  # revealed: bool
+```
+
+When a `WrappedIdentityEnum` value is `IdentityEnum.B`, equality narrows another `IdentityEnum`
+value to the same member. The first value keeps its `WrappedIdentityEnum` type, and both operands
+can be passed to a function accepting `Literal[IdentityEnum.B]`.
+
+```py
+from typing import Literal, TypeAlias
+from ty_extensions import Intersection
+
+def accepts_b(value: Literal[IdentityEnum.B]) -> None: ...
+def compare_branded_member(
+    branded: Intersection[WrappedIdentityEnum, Literal[IdentityEnum.B]],
+    other: IdentityEnum,
+) -> None:
+    if branded == other:
+        reveal_type(branded)  # revealed: WrappedIdentityEnum & Literal[IdentityEnum.B]
+        reveal_type(other)  # revealed: Literal[IdentityEnum.B]
+        accepts_b(branded)
+        accepts_b(other)
+    else:
+        reveal_type(other)  # revealed: Literal[IdentityEnum.A]
+
+NestedIdentityEnum = NewType("NestedIdentityEnum", WrappedIdentityEnum)
+NestedAlias: TypeAlias = NestedIdentityEnum
+
+def compare_nested_brand(value: NestedAlias, other: Literal[IdentityEnum.A]) -> None:
+    if value == other:
+        reveal_type(value)  # revealed: NestedIdentityEnum & Literal[IdentityEnum.A]
+    else:
+        reveal_type(value)  # revealed: NestedIdentityEnum & Literal[IdentityEnum.B]
+```
+
+`NewType` does not change how an `IntEnum` compares: values from different `IntEnum` classes still
+compare by their integer values. A custom enum `__eq__` method likewise still determines the result
+after its value is passed through a `NewType` constructor.
+
+```py
+from enum import IntEnum
+
+class FirstNumber(IntEnum):
+    ONE = 1
+    TWO = 2
+
+class SecondNumber(IntEnum):
+    ONE = 1
+    THREE = 3
+
+BrandedFirstNumber = NewType("BrandedFirstNumber", FirstNumber)
+BrandedSecondNumber = NewType("BrandedSecondNumber", SecondNumber)
+
+def compare_branded_int_enums(left: BrandedFirstNumber, right: BrandedSecondNumber) -> None:
+    if left == right:
+        reveal_type(left)  # revealed: BrandedFirstNumber & Literal[FirstNumber.ONE]
+        reveal_type(right)  # revealed: BrandedSecondNumber & Literal[SecondNumber.ONE]
+
+class NeverEqualEnum(Enum):
+    A = 1
+    B = 2
+
+    def __eq__(self, other: object) -> Literal[False]:
+        return False
+
+BrandedNeverEqual = NewType("BrandedNeverEqual", NeverEqualEnum)
+
+def branded_custom_equality(value: BrandedNeverEqual, other: NeverEqualEnum) -> None:
+    reveal_type(value == other)  # revealed: Literal[False]
+    reveal_type(value != other)  # revealed: bool
 ```
 
 ## Narrowing with enums that have custom `__eq__` methods
@@ -2241,6 +2640,10 @@ class B:
     tag: Literal["b"]
     field_b: str
 
+class C1:
+    tag: Literal["c", 1]
+    field_c1: str
+
 class Marker(Protocol):
     marked: bool
 
@@ -2255,6 +2658,12 @@ class TaggedB(Protocol):
 
     @property
     def tag(self) -> Literal["b"]: ...
+
+class TaggedC1(Protocol):
+    field_c1: str
+
+    @property
+    def tag(self) -> Literal["c", 1]: ...
 
 class Container:
     value: A | B | None
@@ -2276,6 +2685,34 @@ def _(x: A | B):
         reveal_type(x)  # revealed: B
     else:
         reveal_type(x)  # revealed: A
+
+def multiple_tags(x: A | C1):
+    if x.tag == "a":
+        reveal_type(x)  # revealed: A
+        reveal_type(x.field_a)  # revealed: int
+    else:
+        reveal_type(x)  # revealed: C1
+        reveal_type(x.field_c1)  # revealed: str
+
+    if "a" == x.tag:
+        reveal_type(x)  # revealed: A
+    else:
+        reveal_type(x)  # revealed: C1
+
+    if x.tag != "a":
+        reveal_type(x)  # revealed: C1
+    else:
+        reveal_type(x)  # revealed: A
+
+    if x.tag == "c":
+        reveal_type(x)  # revealed: C1
+    else:
+        reveal_type(x)  # revealed: A | C1
+
+    if x.tag != "c":
+        reveal_type(x)  # revealed: A | C1
+    else:
+        reveal_type(x)  # revealed: C1
 
 def truthiness_guard(value: A | B | None):
     if not value:
@@ -2314,6 +2751,14 @@ def protocol_union(value: TaggedA | TaggedB):
     else:
         reveal_type(value)  # revealed: TaggedB
         reveal_type(value.field_b)  # revealed: str
+
+def protocol_union_multiple_tags(value: TaggedA | TaggedC1):
+    if value.tag == "a":
+        reveal_type(value)  # revealed: TaggedA
+        reveal_type(value.field_a)  # revealed: int
+    else:
+        reveal_type(value)  # revealed: TaggedC1
+        reveal_type(value.field_c1)  # revealed: str
 ```
 
 Enum literals are also supported as attribute tags:
@@ -2402,7 +2847,8 @@ strict-equality-semantics = true
 
 ```py
 from enum import IntEnum, StrEnum
-from typing import Any, Literal
+from typing import Any, Literal, LiteralString
+from ty_extensions import Intersection, Not
 
 def broad(value: str):
     if value == "a":
@@ -2410,11 +2856,22 @@ def broad(value: str):
     else:
         reveal_type(value)  # revealed: str & ~Literal["a"]
 
+def broad_integer(value: int):
+    if value == 1:
+        reveal_type(value)  # revealed: int
+
 def inequality(value: str):
     if value != "a":
         reveal_type(value)  # revealed: str & ~Literal["a"]
     else:
         reveal_type(value)  # revealed: str
+
+def without_literal_origin(value: Intersection[str, Not[LiteralString]]):
+    if value == "a":
+        reveal_type(value)  # revealed: str & ~LiteralString
+
+def trusted_value_is_excluded(value: Intersection[LiteralString, Not[Literal["a"]]]):
+    reveal_type(value == "a")  # revealed: Literal[False]
 
 def literal(value: Literal["a", "b"]):
     if value == "a":

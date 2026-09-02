@@ -14,13 +14,13 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/exception/basic.md
 
 ```
  1 | try:
- 2 |     pass
+ 2 |     raise Exception
  3 | # error: [invalid-exception-caught]
  4 | except 3 as e:
  5 |     reveal_type(e)  # revealed: Unknown
  6 | 
  7 | try:
- 8 |     pass
+ 8 |     raise Exception
  9 | # error: [invalid-exception-caught]
 10 | except (ValueError, OSError, "foo", b"bar") as e:
 11 |     reveal_type(e)  # revealed: ValueError | OSError | Unknown

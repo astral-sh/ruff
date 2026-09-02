@@ -210,6 +210,59 @@ error[invalid-assignment]: Object of type `tuple[int, str]` is not assignable to
 info: a tuple of length 2 is not assignable to a tuple of length 3
 ```
 
+## Repeated successful comparisons before a mismatch
+
+Successful comparisons remain memoized while collecting context for a later mismatch. Fully
+expanding the first tuple element below would produce over a million leaves, but the diagnostic can
+identify the incompatible second element without visiting every repeated occurrence.
+
+```py
+type Pair[T] = tuple[T, T]
+type Quad[T] = Pair[Pair[T]]
+type Sixteen[T] = Quad[Quad[T]]
+type Nested[T] = Sixteen[Sixteen[Sixteen[Sixteen[Sixteen[T]]]]]
+
+def check(source: tuple[Nested[int], int]) -> tuple[Nested[object], str]:
+    return source  # snapshot: invalid-return-type
+```
+
+```snapshot
+error[invalid-return-type]: Return type does not match returned value
+ --> src/mdtest_snippet.py:7:12
+  |
+6 | def check(source: tuple[Nested[int], int]) -> tuple[Nested[object], str]:
+  |                                               -------------------------- Expected `tuple[Nested[object], str]` because of return type
+7 |     return source  # snapshot: invalid-return-type
+  |            ^^^^^^ expected `tuple[Nested[object], str]`, found `tuple[Nested[int], int]`
+info: the second tuple element is not compatible: `int` is not assignable to `str`
+```
+
+An explicit receiver can leave successful comparisons conditional on a type variable. Comparing the
+first parameters below produces a satisfiable constraint on `S`. We reuse that result while
+reporting the incompatible `y` parameter.
+
+```py
+from typing import Callable
+
+class Receiver:
+    def method[S](self: S, x: Nested[S], y: int) -> int:
+        return 0
+
+def check_receiver(receiver: Receiver) -> Callable[[Nested[int], str], int]:
+    return receiver.method  # snapshot: invalid-return-type
+```
+
+```snapshot
+error[invalid-return-type]: Return type does not match returned value
+  --> src/mdtest_snippet.py:15:12
+   |
+14 | def check_receiver(receiver: Receiver) -> Callable[[Nested[int], str], int]:
+   |                                           --------------------------------- Expected `(Nested[int], str, /) -> int` because of return type
+15 |     return receiver.method  # snapshot: invalid-return-type
+   |            ^^^^^^^^^^^^^^^ expected `(Nested[int], str, /) -> int`, found `bound method Receiver.method[S](x: Nested[S], y: int) -> int`
+info: the second parameter has an incompatible type: `str` is not assignable to `int`
+```
+
 ## `Callable`
 
 Assigning a function to a `Callable`
@@ -286,6 +339,7 @@ error[invalid-assignment]: Object of type `(int, str, /) -> bool` is not assigna
    |             |
    |             Declared type
 info: unexpected extra parameter
+help: The parameter must have a default value
 ```
 
 Assigning a function with an extra required parameter to a `Callable`:
@@ -306,6 +360,7 @@ error[invalid-assignment]: Object of type `def source(x: int, extra: str) -> boo
    |         |
    |         Declared type
 info: unexpected extra parameter `extra`
+help: Parameter `extra` must have a default value
 ```
 
 Assigning a class to a `Callable`
@@ -350,6 +405,7 @@ error[invalid-argument-type]: Argument to function `accepts_callable` is incorre
    |                  ^^^ Expected `(Any, /) -> Any`, found `<class 'Foo'>`
 info: type `<class 'Foo'>` has inferred callable type `(x: Any, y: Any) -> Foo`
 info: └── unexpected extra parameter `y`
+help: Parameter `y` must have a default value
 info: Function defined here
   --> src/mdtest_snippet.py:23:5
    |
@@ -421,6 +477,134 @@ error[invalid-assignment]: Object of type `partial[(y: str) -> bool]` is not ass
    |                 |
    |                 Declared type
 info: the first parameter has an incompatible type: `bytes` is not assignable to `str`
+```
+
+## Missing unnamed callable parameters
+
+Parameters in a `Callable` type do not have names, so a missing parameter is identified by its
+position.
+
+```py
+from typing import Callable
+
+def assign(source: Callable[[], None]) -> None:
+    target: Callable[[int], None] = source  # snapshot: invalid-assignment
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `() -> None` is not assignable to `(int, /) -> None`
+ --> src/mdtest_snippet.py:4:37
+  |
+4 |     target: Callable[[int], None] = source  # snapshot: invalid-assignment
+  |             ---------------------   ^^^^^^ Incompatible value of type `() -> None`
+  |             |
+  |             Declared type
+info: the first parameter is missing
+```
+
+## Missing parameters in nested generic calls involving `TypeVarTuple`s and `ParamSpec`s
+
+In the following example, the signature of the `callback` function does not satisfy the `fn`
+parameter of `wrapper` in the `accept()` call, because the arguments provided to `accept()`
+following `fn` indicate that it must accept the value `1` as a positional argument, and it does not.
+
+We don't currently add error context in this code path, but we could add it in the future:
+
+```py
+from collections.abc import Callable
+
+def wrapper1[**P](fn: Callable[P, None]) -> Callable[P, None]:
+    return fn
+
+def accept1[**P](fn: Callable[P, None], *args: P.args, **kwargs: P.kwargs) -> None: ...
+def callback1() -> None: ...
+
+accept1(wrapper1(callback1), 1)  # snapshot: invalid-argument-type
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `wrapper1` is incorrect
+ --> src/mdtest_snippet.py:9:18
+  |
+9 | accept1(wrapper1(callback1), 1)  # snapshot: invalid-argument-type
+  |                  ^^^^^^^^^ Expected `(**P@accept1) -> None`, found `def callback1() -> None`
+info: Function defined here
+ --> src/mdtest_snippet.py:3:5
+  |
+3 | def wrapper1[**P](fn: Callable[P, None]) -> Callable[P, None]:
+  |     ^^^^^^^^      --------------------- Parameter declared here
+```
+
+The following case is similar, but exercises a different code path. Here, we could also add error
+context to improve the diagnostic in the future:
+
+```py
+def wrapper2[**P](fn: Callable[P, None]) -> Callable[P, None]:
+    return fn
+
+def accept2[**P](fn: Callable[P, None], *args: P.args, **kwargs: P.kwargs) -> None: ...
+def callback2(**kwargs: int) -> None: ...
+
+accept2(wrapper2(callback2), 1)  # snapshot: invalid-argument-type
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `wrapper2` is incorrect
+  --> src/mdtest_snippet.py:16:18
+   |
+16 | accept2(wrapper2(callback2), 1)  # snapshot: invalid-argument-type
+   |                  ^^^^^^^^^ Expected `(**P@accept2) -> None`, found `def callback2(**kwargs: int) -> None`
+info: Function defined here
+  --> src/mdtest_snippet.py:10:5
+   |
+10 | def wrapper2[**P](fn: Callable[P, None]) -> Callable[P, None]:
+   |     ^^^^^^^^      --------------------- Parameter declared here
+```
+
+And the same applies to the following two examples too, which both use a `TypeVarTuple` instead of a
+`ParamSpec`:
+
+```py
+def wrapper3[*Ts](fn: Callable[[*Ts], None]) -> Callable[[*Ts], None]:
+    return fn
+
+def accept3[*Ts](fn: Callable[[*Ts], None], *args: *Ts) -> None: ...
+def callback3(value: int) -> None: ...
+
+accept3(wrapper3(callback3))  # snapshot: invalid-argument-type
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `wrapper3` is incorrect
+  --> src/mdtest_snippet.py:23:18
+   |
+23 | accept3(wrapper3(callback3))  # snapshot: invalid-argument-type
+   |                  ^^^^^^^^^ Expected `(*int) -> None`, found `def callback3(value: int) -> None`
+info: Function defined here
+  --> src/mdtest_snippet.py:17:5
+   |
+17 | def wrapper3[*Ts](fn: Callable[[*Ts], None]) -> Callable[[*Ts], None]:
+   |     ^^^^^^^^      ------------------------- Parameter declared here
+```
+
+```py
+def accepts4[*Ts](fn: Callable[[*Ts, int], None]) -> None: ...
+def callback4() -> None: ...
+
+accepts4(callback4)  # snapshot: invalid-argument-type
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `accepts4` is incorrect
+  --> src/mdtest_snippet.py:27:10
+   |
+27 | accepts4(callback4)  # snapshot: invalid-argument-type
+   |          ^^^^^^^^^ Expected `(*args: Unknown, int, /) -> None`, found `def callback4() -> None`
+info: Function defined here
+  --> src/mdtest_snippet.py:24:5
+   |
+24 | def accepts4[*Ts](fn: Callable[[*Ts, int], None]) -> None: ...
+   |     ^^^^^^^^      ------------------------------ Parameter declared here
 ```
 
 ## Function assignability and overrides
@@ -529,6 +713,31 @@ error[invalid-method-override]: Invalid override of method `method`
    |         ---------------------------- `Parent.method` defined here
 info: the parameter named `y` does not match `x` (and can be used as a keyword parameter)
 info: This violates the Liskov Substitution Principle
+```
+
+## Uncallable top signatures
+
+A top callable represents every possible callable signature, so no specific call is guaranteed to be
+accepted. It therefore cannot be assigned to a callable that promises to accept an integer.
+
+```py
+from typing import Callable
+from ty_extensions import Top
+
+def assign(source: Top[Callable[..., int]]) -> None:
+    target: Callable[[int], int] = source  # snapshot: invalid-assignment
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `Top[(...) -> int]` is not assignable to `(int, /) -> int`
+ --> src/mdtest_snippet.py:5:36
+  |
+5 |     target: Callable[[int], int] = source  # snapshot: invalid-assignment
+  |             --------------------   ^^^^^^ Incompatible value of type `Top[(...) -> int]`
+  |             |
+  |             Declared type
+info: Object of type `Top[(...) -> int]` is not safe to call; its signature is not known
+help: This type includes all possible parameter sets, so it cannot safely be called because there is no valid set of arguments for it
 ```
 
 ## `TypedDict`
@@ -640,7 +849,7 @@ error[invalid-assignment]: Object of type `PersonWithAge` is not assignable to `
    |             |
    |             Declared type
 info: field "age" is required in TypedDict `PersonWithAge` but not required and mutable in TypedDict `PersonWithOptionalAge`
-help: The required field could be removed through a destructive operation like `del` on the target.
+help: The required field could be removed through a destructive operation like `del` on the target
 ```
 
 Assigning a `TypedDict` to a `dict`
@@ -659,18 +868,78 @@ error[invalid-assignment]: Object of type `Person` is not assignable to `dict[st
    |             |
    |             Declared type
 info: TypedDict `Person` is not assignable to `dict`
-help: A TypedDict is not usually assignable to any `dict[..]` type; `dict` types allow destructive operations like `clear()`.
-help: Consider using `Mapping[..]` instead of `dict[..]`.
+help: A TypedDict is not usually assignable to any `dict[..]` type; `dict` types allow destructive operations like `clear()`
+help: Consider using `Mapping[..]` instead of `dict[..]`
+```
+
+Assigning an open `TypedDict` to a specialized `Mapping`:
+
+```py
+from collections.abc import Mapping
+from typing import TypedDict
+
+class D(TypedDict):
+    a: int
+    b: int
+
+def f(d: D) -> Mapping[str, int]:
+    return d  # snapshot
+```
+
+```snapshot
+error[invalid-return-type]: Return type does not match returned value
+  --> src/mdtest_snippet.py:40:12
+   |
+39 | def f(d: D) -> Mapping[str, int]:
+   |                ----------------- Expected `Mapping[str, int]` because of return type
+40 |     return d  # snapshot
+   |            ^ expected `Mapping[str, int]`, found `D`
+info: TypedDict `D` is not assignable to `Mapping[str, int]`
+help: `D` would be assignable to `Mapping[str, int]` if it were declared with `closed=True`, but TypedDicts are open by default
+help: A subclass of `D` could validly add a new field of an arbitrary type, violating subtyping with `Mapping[str, int]`
+```
+
+## Open `TypedDict` and a union of specialized mappings
+
+Each mapping in a union receives its own explanation when an open `TypedDict` is incompatible with
+every alternative.
+
+```py
+from collections.abc import Mapping
+from typing import TypedDict
+
+class Empty(TypedDict):
+    pass
+
+def _(value: Empty) -> Mapping[str, int] | Mapping[str, str]:
+    return value  # snapshot
+```
+
+```snapshot
+error[invalid-return-type]: Return type does not match returned value
+ --> src/mdtest_snippet.py:8:12
+  |
+7 | def _(value: Empty) -> Mapping[str, int] | Mapping[str, str]:
+  |                        ------------------------------------- Expected `Mapping[str, int] | Mapping[str, str]` because of return type
+8 |     return value  # snapshot
+  |            ^^^^^ expected `Mapping[str, int] | Mapping[str, str]`, found `Empty`
+info: type `Empty` is not assignable to any element of the union `Mapping[str, int] | Mapping[str, str]`
+info: ├── TypedDict `Empty` is not assignable to `Mapping[str, int]`
+info: └── TypedDict `Empty` is not assignable to `Mapping[str, str]`
+help: `Empty` would be assignable to `Mapping[str, int]` if it were declared with `closed=True`, but TypedDicts are open by default
+help: A subclass of `Empty` could validly add a new field of an arbitrary type, violating subtyping with `Mapping[str, int]`
+help: `Empty` would be assignable to `Mapping[str, str]` if it were declared with `closed=True`, but TypedDicts are open by default
+help: A subclass of `Empty` could validly add a new field of an arbitrary type, violating subtyping with `Mapping[str, str]`
 ```
 
 ## Generic `TypedDict` field conflicts in overload diagnostics
 
-A generic `TypedDict` relation can be unsatisfiable without being the `never` terminal. The
-resulting overload diagnostic should still explain which field introduced the conflicting
-constraints.
+A generic `TypedDict` relation can be unsatisfiable without being the `never` terminal. Capturing
+its type variable from an enclosing function keeps the overload non-generic while retaining the
+conflicting constraints. The resulting diagnostic should explain which field introduced them.
 
 ```py
-from typing import Generic, Self, TypeVar, TypedDict, overload
+from typing import Generic, TypeVar, TypedDict, overload
 
 T = TypeVar("T")
 
@@ -682,38 +951,39 @@ class Fixed(TypedDict):
     first: int
     second: str
 
-class OverloadedSelf:
+def outer(value: T) -> None:
     @overload
-    def method(self, value: Fixed) -> None: ...  # snapshot: invalid-overload
+    def inner(value: Fixed) -> None: ...  # snapshot: invalid-overload
     @overload
-    def method(self, value: str) -> None: ...
-    def method(self, value: Pair[Self] | str) -> None: ...
+    def inner(value: str) -> None: ...
+    def inner(value: Pair[T] | str) -> None: ...
 ```
 
 ```snapshot
 error[invalid-overload]: Implementation does not accept all arguments of this overload
   --> src/mdtest_snippet.py:15:9
    |
-15 |     def method(self, value: Fixed) -> None: ...  # snapshot: invalid-overload
-   |         ^^^^^^
+15 |     def inner(value: Fixed) -> None: ...  # snapshot: invalid-overload
+   |         ^^^^^
 16 |     @overload
-17 |     def method(self, value: str) -> None: ...
-18 |     def method(self, value: Pair[Self] | str) -> None: ...
-   |         ------ Implementation defined here
-info: Implementation signature `(self, value: Pair[Self@method] | str) -> None` is not assignable to overload signature `(self, value: Fixed) -> None`
-info: parameter `value` has an incompatible type: `Fixed` is not assignable to `Pair[Self@method] | str`
-info: └── type `Fixed` is not assignable to any element of the union `Pair[Self@method] | str`
-info:     ├── field "second" on TypedDict `Fixed` has type `str` which is not assignable to type `Self@method` expected by TypedDict `Pair`
+17 |     def inner(value: str) -> None: ...
+18 |     def inner(value: Pair[T] | str) -> None: ...
+   |         ----- Implementation defined here
+info: Implementation signature `(value: Pair[T@outer] | str) -> None` is not assignable to overload signature `(value: Fixed) -> None`
+info: parameter `value` has an incompatible type: `Fixed` is not assignable to `Pair[T@outer] | str`
+info: └── type `Fixed` is not assignable to any element of the union `Pair[T@outer] | str`
+info:     ├── field "second" on TypedDict `Fixed` has type `str` which is not assignable to type `T@outer` expected by TypedDict `Pair`
 info:     └── ... omitted 1 union element without additional context
 ```
 
 ## Stop checking callable parameters after incompatible generic constraints
 
 Once earlier parameters produce an unsatisfiable nonterminal constraint set, continuing to a later
-parameter must not replace the diagnostic context that explains the original incompatibility.
+parameter must not replace the diagnostic context that explains the original incompatibility. The
+type variable belongs to the enclosing function, so the overload itself remains non-generic.
 
 ```py
-from typing import Generic, Self, TypeVar, TypedDict, overload
+from typing import Generic, TypeVar, TypedDict, overload
 
 T = TypeVar("T")
 
@@ -725,28 +995,28 @@ class Fixed(TypedDict):
     first: int
     second: str
 
-class OverloadedSelf:
+def outer(value: T) -> None:
     @overload
-    def method(self, value: Fixed, later: int) -> None: ...  # snapshot: invalid-overload
+    def inner(value: Fixed, later: int) -> None: ...  # snapshot: invalid-overload
     @overload
-    def method(self, value: str, later: str) -> None: ...
-    def method(self, value: Pair[Self] | str, later: str) -> None: ...
+    def inner(value: str, later: str) -> None: ...
+    def inner(value: Pair[T] | str, later: str) -> None: ...
 ```
 
 ```snapshot
 error[invalid-overload]: Implementation does not accept all arguments of this overload
   --> src/mdtest_snippet.py:15:9
    |
-15 |     def method(self, value: Fixed, later: int) -> None: ...  # snapshot: invalid-overload
-   |         ^^^^^^
+15 |     def inner(value: Fixed, later: int) -> None: ...  # snapshot: invalid-overload
+   |         ^^^^^
 16 |     @overload
-17 |     def method(self, value: str, later: str) -> None: ...
-18 |     def method(self, value: Pair[Self] | str, later: str) -> None: ...
-   |         ------ Implementation defined here
-info: Implementation signature `(self, value: Pair[Self@method] | str, later: str) -> None` is not assignable to overload signature `(self, value: Fixed, later: int) -> None`
-info: parameter `value` has an incompatible type: `Fixed` is not assignable to `Pair[Self@method] | str`
-info: └── type `Fixed` is not assignable to any element of the union `Pair[Self@method] | str`
-info:     ├── field "second" on TypedDict `Fixed` has type `str` which is not assignable to type `Self@method` expected by TypedDict `Pair`
+17 |     def inner(value: str, later: str) -> None: ...
+18 |     def inner(value: Pair[T] | str, later: str) -> None: ...
+   |         ----- Implementation defined here
+info: Implementation signature `(value: Pair[T@outer] | str, later: str) -> None` is not assignable to overload signature `(value: Fixed, later: int) -> None`
+info: parameter `value` has an incompatible type: `Fixed` is not assignable to `Pair[T@outer] | str`
+info: └── type `Fixed` is not assignable to any element of the union `Pair[T@outer] | str`
+info:     ├── field "second" on TypedDict `Fixed` has type `str` which is not assignable to type `T@outer` expected by TypedDict `Pair`
 info:     └── ... omitted 1 union element without additional context
 ```
 
@@ -1055,6 +1325,216 @@ info: └── protocol member `check` is incompatible
 info:     └── parameter `y` has an incompatible type: `str` is not assignable to `bytes`
 ```
 
+## Recursive protocol diagnostic context
+
+A value-constrained type parameter makes the recursive `child` override valid for each permitted
+specialization. The explicit receiver on `Outer.expose` preserves unresolved type variables while
+diagnostic context is collected, including the incompatible recursive member and its return type.
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+
+class Chain[T](Protocol):
+    def child(self) -> Chain[T]: ...
+    def value(self) -> T: ...
+
+class Outer[T](Protocol):
+    def expose(self: Outer[T]) -> Chain[T]: ...
+
+class Concrete[T: (str, object)](Chain[T], Outer[T]):
+    def child(self) -> Concrete[str]:
+        raise NotImplementedError
+
+    def expose(self: Outer[T]) -> Concrete[T]:
+        raise NotImplementedError
+
+def diagnose[T: (str, object)](value: Concrete[T]) -> None:
+    invalid: Outer[int] = value  # snapshot: invalid-assignment
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `Concrete[T@diagnose]` is not assignable to `Outer[int]`
+  --> src/mdtest_snippet.py:20:27
+   |
+20 |     invalid: Outer[int] = value  # snapshot: invalid-assignment
+   |              ----------   ^^^^^ Incompatible value of type `Concrete[T@diagnose]`
+   |              |
+   |              Declared type
+info: type `Concrete[T@diagnose]` is not assignable to protocol `Chain[int]`
+info: └── protocol member `child` is incompatible
+info:     └── incompatible return types: `Concrete[str]` is not assignable to `Chain[int]`
+info:         └── type `Concrete[str]` is not assignable to protocol `Chain[int]`
+info:             └── protocol member `value` is incompatible
+info:                 └── incompatible return types: `str` is not assignable to `int`
+```
+
+## Recursive protocols in a union after overload comparison
+
+A recursive callable protocol can be incompatible with more than one member of a target union. The
+diagnostic includes the nested `payload` mismatch for `HasPacket[str]`, even if the same member
+types were already compared when checking the callable overloads.
+
+```py
+from __future__ import annotations
+
+from typing import Callable, Protocol, overload
+
+class Packet[T](Protocol):
+    payload: T
+
+class HasPacket[T](Protocol):
+    def packet(self) -> Packet[T]: ...
+
+class Source[T](HasPacket[T], Protocol):
+    @overload
+    def __call__(self, x: int) -> Source[T]: ...
+    @overload
+    def __call__(self, x: str) -> Source[tuple[T]]: ...
+
+def check(source: Source[bytes]) -> Callable[[int], Source[str]] | HasPacket[str]:
+    return source  # snapshot: invalid-return-type
+```
+
+```snapshot
+error[invalid-return-type]: Return type does not match returned value
+  --> src/mdtest_snippet.py:18:12
+   |
+17 | def check(source: Source[bytes]) -> Callable[[int], Source[str]] | HasPacket[str]:
+   |                                     --------------------------------------------- Expected `((int, /) -> Source[str]) | HasPacket[str]` because of return type
+18 |     return source  # snapshot: invalid-return-type
+   |            ^^^^^^ expected `((int, /) -> Source[str]) | HasPacket[str]`, found `Source[bytes]`
+info: type `Source[bytes]` is not assignable to any element of the union `((int, /) -> Source[str]) | HasPacket[str]`
+info: ├── type `Source[bytes]` has inferred callable type `Overload[(x: int) -> Source[bytes], (x: str) -> Source[tuple[bytes]]]`
+info: └── protocol `Source[bytes]` is not assignable to protocol `HasPacket[str]`
+info:     └── protocol member `packet` is incompatible
+info:         └── incompatible return types: `Packet[bytes]` is not assignable to `Packet[str]`
+info:             └── protocol `Packet[bytes]` is not assignable to protocol `Packet[str]`
+info:                 └── protocol member `payload` is incompatible
+info:                     └── read type `bytes` is not assignable to `str`
+```
+
+## Protocol method parameter names
+
+Assignability errors against protocols are often caused because a method in the protocol class
+should have used positional-only parameters, but didn't. In this situation, we point out the likely
+cause of the assignability error in a dedicated `help:` message that points out that the issue may
+be due to the protocol itself rather than the type being assigned to the protocol:
+
+```py
+from typing import Protocol
+
+class Target(Protocol):
+    def run(self, expected: int) -> None: ...
+
+class Source:
+    def run(self, actual: int) -> None: ...
+
+target: Target = Source()  # snapshot
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `Source` is not assignable to `Target`
+ --> src/mdtest_snippet.py:9:18
+  |
+9 | target: Target = Source()  # snapshot
+  |         ------   ^^^^^^^^ Incompatible value of type `Source`
+  |         |
+  |         Declared type
+info: type `Source` is not assignable to protocol `Target`
+info: └── protocol member `run` is incompatible
+info:     └── the parameter named `actual` does not match `expected` (and can be used as a keyword parameter)
+help: `Source` might be assignable to `Target` if the parameter `expected` were made positional-only in `Target.run`
+```
+
+The same suggestion applies for the case where a positional-or-keyword parameter was apparently
+demanded by a protocol member, but only a positional-only parameter was supplied in the type that
+was assigned to the protocol:
+
+```py
+class Target2(Protocol):
+    def run(self, expected: int) -> None: ...
+
+class Source2:
+    def run(self, actual: int, /) -> None: ...
+
+target: Target2 = Source2()  # snapshot
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `Source2` is not assignable to `Target2`
+  --> src/mdtest_snippet.py:16:19
+   |
+16 | target: Target2 = Source2()  # snapshot
+   |         -------   ^^^^^^^^^ Incompatible value of type `Source2`
+   |         |
+   |         Declared type
+info: type `Source2` is not assignable to protocol `Target2`
+info: └── protocol member `run` is incompatible
+info:     └── parameter `actual` is positional-only but must also accept keyword arguments
+help: `Source2` might be assignable to `Target2` if the parameter `expected` were made positional-only in `Target2.run`
+```
+
+Making a parameter positional-only resolves a name mismatch but does not necessarily make the method
+compatible, because its parameter type can still be incorrect. For this reason, we hedge our bets a
+little in our `help:` message (we say "*might* be assignable", rather than "*will* be assignable"):
+
+```py
+class Target3(Protocol):
+    def run(self, expected: int) -> None: ...
+
+class Source3:
+    def run(self, actual: str) -> None: ...
+
+target: Target3 = Source3()  # snapshot
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `Source3` is not assignable to `Target3`
+  --> src/mdtest_snippet.py:23:19
+   |
+23 | target: Target3 = Source3()  # snapshot
+   |         -------   ^^^^^^^^^ Incompatible value of type `Source3`
+   |         |
+   |         Declared type
+info: type `Source3` is not assignable to protocol `Target3`
+info: └── protocol member `run` is incompatible
+info:     └── the parameter named `actual` does not match `expected` (and can be used as a keyword parameter)
+help: `Source3` might be assignable to `Target3` if the parameter `expected` were made positional-only in `Target3.run`
+```
+
+Suggestions for inherited protocol methods name the protocol that actually declares the method.
+
+```py
+from typing import Protocol
+
+class Parent(Protocol):
+    def run(self, expected: int) -> None: ...
+
+class Child(Parent, Protocol):
+    pass
+
+class Source4:
+    def run(self, actual: int) -> None: ...
+
+target: Child = Source4()  # snapshot
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `Source4` is not assignable to `Child`
+  --> src/mdtest_snippet.py:35:17
+   |
+35 | target: Child = Source4()  # snapshot
+   |         -----   ^^^^^^^^^ Incompatible value of type `Source4`
+   |         |
+   |         Declared type
+info: type `Source4` is not assignable to protocol `Child`
+info: └── protocol member `run` is incompatible
+info:     └── the parameter named `actual` does not match `expected` (and can be used as a keyword parameter)
+help: `Source4` might be assignable to `Child` if the parameter `expected` were made positional-only in `Parent.run`
+```
+
 ## Type aliases
 
 Type aliases should be expanded in diagnostics to understand the underlying incompatibilities:
@@ -1258,6 +1738,7 @@ error[invalid-assignment]: Object of type `IncompatibleFoo` is not assignable to
 info: type `IncompatibleFoo` is not assignable to protocol `SupportsFooAndBar`
 info: └── protocol member `foo` is incompatible
 info:     └── the parameter named `name_` does not match `name` (and can be used as a keyword parameter)
+help: `IncompatibleFoo` might be assignable to `SupportsFooAndBar` if the parameter `name` were made positional-only in `SupportsFooAndBar.foo`
 ```
 
 ## Assigning to `Iterable`
@@ -1652,5 +2133,6 @@ info:     └── incompatible return types: `WrongIterator` is not assignable
 info:         └── type `WrongIterator` is not assignable to protocol `Iterator[Unknown]`
 info:             └── protocol member `__next__` is incompatible
 info:                 └── unexpected extra parameter `wrong`
+help: Parameter `wrong` must have a default value
 info: Expected signature for `__next__` is `def __next__(self): ...`
 ```

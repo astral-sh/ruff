@@ -495,7 +495,7 @@ def _(maybe_float: float | None, certain_int: int, flag: bool) -> None:
         if flag:
             x = certain_int
         assert x is not None
-        reveal_type(x)  # revealed: int | float
+        reveal_type(x)  # revealed: float
         +x
 ```
 
@@ -774,6 +774,18 @@ def f(flag: bool):
         flag and (x := 38),
         flag and (x := 36),
         flag and (x := 36),
+        flag and (x := 39),
+        flag and (x := 40),
+        flag and (x := 41),
+        flag and (x := 42),
+        flag and (x := 43),
+        flag and (x := 44),
+        flag and (x := 45),
+        flag and (x := 46),
+        flag and (x := 47),
+        flag and (x := 48),
+        flag and (x := 49),
+        flag and (x := 50),
     )
 
     # Normally this `nonlocal` write would make us infer `int` for `y`, but now we ignore it.

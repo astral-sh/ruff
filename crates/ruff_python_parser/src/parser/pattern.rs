@@ -6,10 +6,10 @@ use ruff_python_ast::{
 };
 use ruff_text_size::{Ranged, TextSize};
 
-use crate::ParseErrorType;
 use crate::parser::progress::ParserProgress;
 use crate::parser::{Parser, RecoveryContextKind, SequenceMatchPatternParentheses, recovery};
 use crate::token_set::TokenSet;
+use crate::{ParseErrorType, UnsupportedSyntaxErrorKind};
 
 use super::expression::ExpressionContext;
 
@@ -23,6 +23,7 @@ const LITERAL_PATTERN_START_SET: TokenSet = TokenSet::new([
     TokenKind::Float,
     TokenKind::Complex,
     TokenKind::Minus, // Unary minus
+    TokenKind::Plus,  // Unary plus
 ]);
 
 /// The set of tokens that can start a pattern.
@@ -88,28 +89,6 @@ impl Parser<'_> {
     ///
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-pattern>
     fn parse_match_pattern(&mut self, allow_star_pattern: AllowStarPattern) -> Pattern {
-        if let Some(result) =
-            self.with_recursion(|parser| parser.parse_match_pattern_inner(allow_star_pattern))
-        {
-            result
-        } else {
-            let range = self.missing_node_range();
-            self.report_recursion_limit_exceeded(self.current_token_range());
-            let invalid_node = Expr::Name(ast::ExprName {
-                range,
-                id: Name::empty(),
-                ctx: ExprContext::Invalid,
-                node_index: AtomicNodeIndex::NONE,
-            });
-            Pattern::MatchValue(ast::PatternMatchValue {
-                range: invalid_node.range(),
-                value: Box::new(invalid_node),
-                node_index: AtomicNodeIndex::NONE,
-            })
-        }
-    }
-
-    fn parse_match_pattern_inner(&mut self, allow_star_pattern: AllowStarPattern) -> Pattern {
         let start = self.node_start();
 
         // We don't yet know if it's an or pattern or an as pattern, so use whatever
@@ -162,33 +141,37 @@ impl Parser<'_> {
     ///
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-closed_pattern>
     fn parse_match_pattern_lhs(&mut self, allow_star_pattern: AllowStarPattern) -> Pattern {
-        let start = self.node_start();
+        self.with_recursion(|parser| {
+            let start = parser.node_start();
 
-        let mut lhs = match self.current_token_kind() {
-            TokenKind::Lbrace => Pattern::MatchMapping(self.parse_match_pattern_mapping()),
-            TokenKind::Star => {
-                let star_pattern = self.parse_match_pattern_star();
-                if allow_star_pattern.is_no() {
-                    self.add_error(ParseErrorType::InvalidStarPatternUsage, &star_pattern);
+            let mut lhs = match parser.current_token_kind() {
+                TokenKind::Lbrace => Pattern::MatchMapping(parser.parse_match_pattern_mapping()),
+                TokenKind::Star => {
+                    let star_pattern = parser.parse_match_pattern_star();
+                    if allow_star_pattern.is_no() {
+                        parser.add_error(ParseErrorType::InvalidStarPatternUsage, &star_pattern);
+                    }
+                    Pattern::MatchStar(star_pattern)
                 }
-                Pattern::MatchStar(star_pattern)
+                TokenKind::Lpar | TokenKind::Lsqb => {
+                    parser.parse_parenthesized_or_sequence_pattern()
+                }
+                _ => parser.parse_match_pattern_literal(),
+            };
+
+            if parser.at(TokenKind::Lpar) {
+                lhs = Pattern::MatchClass(parser.parse_match_pattern_class(lhs, start));
             }
-            TokenKind::Lpar | TokenKind::Lsqb => self.parse_parenthesized_or_sequence_pattern(),
-            _ => self.parse_match_pattern_literal(),
-        };
 
-        if self.at(TokenKind::Lpar) {
-            lhs = Pattern::MatchClass(self.parse_match_pattern_class(lhs, start));
-        }
+            if matches!(
+                parser.current_token_kind(),
+                TokenKind::Plus | TokenKind::Minus
+            ) {
+                lhs = Pattern::MatchValue(parser.parse_complex_literal_pattern(lhs, start));
+            }
 
-        if matches!(
-            self.current_token_kind(),
-            TokenKind::Plus | TokenKind::Minus
-        ) {
-            lhs = Pattern::MatchValue(self.parse_complex_literal_pattern(lhs, start));
-        }
-
-        lhs
+            lhs
+        })
     }
 
     /// Parses a mapping pattern.
@@ -497,7 +480,6 @@ impl Parser<'_> {
                 })
             }
             kind => {
-                // The `+` is only for better error recovery.
                 if let Some(unary_arithmetic_op) = kind.as_unary_arithmetic_operator() {
                     if matches!(
                         self.peek(),
@@ -508,12 +490,42 @@ impl Parser<'_> {
                             ExpressionContext::default(),
                         );
 
-                        if unary_expr.op.is_u_add() {
+                        // test_err signed_pattern_non_literal_operand
+                        // # parse_options: {"target-version": "3.15"}
+                        // match value:
+                        //     case -1**2: ...
+                        //     case -1 .real: ...
+                        //     case -1[0]: ...
+                        //     case -1(): ...
+                        //     case {+1**2: _}: ...
+
+                        // Parse the full operand for error recovery, but only numeric literals
+                        // are valid after a sign in a literal pattern.
+                        if !unary_expr.operand.is_number_literal_expr() {
                             self.add_error(
                                 ParseErrorType::OtherError(
-                                    "Unary '+' is not allowed as a literal pattern".to_string(),
+                                    "Expected a numeric literal after unary operator".to_string(),
                                 ),
-                                &unary_expr,
+                                unary_expr.operand.range(),
+                            );
+                        }
+
+                        // test_ok unary_plus_py315
+                        // # parse_options: {"target-version": "3.15"}
+                        // match foo:
+                        //     case +1: ...
+                        //     # this is also now valid inside more complicated patterns
+                        //     case {+1: 2}: ...
+
+                        // test_err unary_plus_py314
+                        // # parse_options: {"target-version": "3.14"}
+                        // match foo:
+                        //     case +1: ...
+                        //     case {+1: 2}: ...
+                        if unary_expr.op.is_u_add() {
+                            self.add_unsupported_syntax_error(
+                                UnsupportedSyntaxErrorKind::UnaryPlusMatchPattern,
+                                unary_expr.range,
                             );
                         }
 

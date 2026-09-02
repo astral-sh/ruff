@@ -23,6 +23,7 @@ use ruff_text_size::Ranged;
 
 use crate::Locator;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::cst::helpers::negate;
 use crate::cst::matchers::match_indented_block;
 use crate::cst::matchers::match_module;
@@ -70,7 +71,7 @@ use super::unittest_assert::UnittestAssert;
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.208")]
+#[violation_metadata(stable_since = "v0.0.208", category = Category::Pedantic)]
 pub(crate) struct PytestCompositeAssertion;
 
 impl Violation for PytestCompositeAssertion {
@@ -128,7 +129,7 @@ impl Violation for PytestCompositeAssertion {
 /// ## References
 /// - [`pytest` documentation: `pytest.raises`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-raises)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.208")]
+#[violation_metadata(stable_since = "v0.0.208", category = Category::Pedantic)]
 pub(crate) struct PytestAssertInExcept {
     name: String,
 }
@@ -170,7 +171,7 @@ impl Violation for PytestAssertInExcept {
 /// ## References
 /// - [`pytest` documentation: `pytest.fail`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-fail)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.208")]
+#[violation_metadata(stable_since = "v0.0.208", category = Category::Pedantic)]
 pub(crate) struct PytestAssertAlwaysFalse;
 
 impl Violation for PytestAssertAlwaysFalse {
@@ -210,7 +211,7 @@ impl Violation for PytestAssertAlwaysFalse {
 /// ## References
 /// - [`pytest` documentation: Assertion introspection details](https://docs.pytest.org/en/7.1.x/how-to/assert.html#assertion-introspection-details)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.208")]
+#[violation_metadata(stable_since = "v0.0.208", category = Category::Pedantic)]
 pub(crate) struct PytestUnittestAssertion {
     assertion: String,
 }
@@ -365,7 +366,7 @@ pub(crate) fn unittest_assertion(
 /// ## References
 /// - [`pytest` documentation: Assertions about expected exceptions](https://docs.pytest.org/en/latest/how-to/assert.html#assertions-about-expected-exceptions)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.285")]
+#[violation_metadata(stable_since = "v0.0.285", category = Category::Pedantic)]
 pub(crate) struct PytestUnittestRaisesAssertion {
     assertion: String,
 }

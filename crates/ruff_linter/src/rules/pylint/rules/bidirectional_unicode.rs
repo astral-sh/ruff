@@ -1,6 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_source_file::Line;
 
+use crate::codes::Category;
 use crate::{Violation, checkers::ast::LintContext};
 
 const BIDI_UNICODE: [char; 11] = [
@@ -50,7 +51,7 @@ const BIDI_UNICODE: [char; 11] = [
 /// ## References
 /// - [PEP 672: Bidirectional Marks, Embeddings, Overrides and Isolates](https://peps.python.org/pep-0672/#bidirectional-marks-embeddings-overrides-and-isolates)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.244")]
+#[violation_metadata(stable_since = "v0.0.244", category = Category::Suspicious)]
 pub(crate) struct BidirectionalUnicode;
 
 impl Violation for BidirectionalUnicode {

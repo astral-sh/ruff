@@ -8,6 +8,7 @@ use ruff_text_size::{TextRange, TextSize};
 
 use crate::Locator;
 use crate::checkers::ast::LintContext;
+use crate::codes::Category;
 use crate::importer::Importer;
 use crate::settings::LinterSettings;
 use crate::{AlwaysFixableViolation, Fix};
@@ -39,7 +40,7 @@ use crate::{AlwaysFixableViolation, Fix};
 /// ## Options
 /// - `lint.isort.required-imports`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.218")]
+#[violation_metadata(stable_since = "v0.0.218", category = Category::Pedantic)]
 pub(crate) struct MissingRequiredImport(pub String);
 
 impl AlwaysFixableViolation for MissingRequiredImport {

@@ -5,6 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::preview::is_bad_version_info_in_non_stub_enabled;
 use crate::registry::Rule;
 
@@ -51,7 +52,7 @@ use crate::registry::Rule;
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.254")]
+#[violation_metadata(stable_since = "v0.0.254", category = Category::Suspicious)]
 pub(crate) struct BadVersionInfoComparison;
 
 impl Violation for BadVersionInfoComparison {
@@ -101,13 +102,15 @@ impl Violation for BadVersionInfoComparison {
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.8.0")]
+#[violation_metadata(stable_since = "0.8.0", category = Category::Style)]
 pub(crate) struct BadVersionInfoOrder;
 
 impl Violation for BadVersionInfoOrder {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Put branches for newer Python versions first when branching on `sys.version_info` comparisons".to_string()
+        "Put branches for newer Python versions first \
+            when branching on `sys.version_info` comparisons"
+            .to_string()
     }
 }
 
@@ -142,8 +145,11 @@ pub(crate) fn bad_version_info_comparison(checker: &Checker, test: &Expr, has_el
 
     if matches!(op, CmpOp::Lt) {
         if checker.is_rule_enabled(Rule::BadVersionInfoOrder)
-            // See https://github.com/astral-sh/ruff/issues/15347
-            && (checker.source_type.is_stub() || is_bad_version_info_in_non_stub_enabled(checker.settings()))
+            && (
+                // See https://github.com/astral-sh/ruff/issues/15347.
+                checker.source_type.is_stub()
+                    || is_bad_version_info_in_non_stub_enabled(checker.settings())
+            )
         {
             if has_else_clause {
                 checker.report_diagnostic(BadVersionInfoOrder, test.range());

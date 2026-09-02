@@ -1,5 +1,169 @@
 # Changelog
 
+## 0.16.5
+
+Released on 2026-08-27.
+
+### Preview features
+
+- Allow rules without codes ([#28049](https://github.com/astral-sh/ruff/pull/28049))
+- Introduce category selectors ([#27666](https://github.com/astral-sh/ruff/pull/27666))
+- Update preview default rules and categories ([#27877](https://github.com/astral-sh/ruff/pull/27877))
+
+### Bug fixes
+
+- \[`flake8-async`\] Detect blocking generic HTTP requests (`ASYNC210`) ([#28024](https://github.com/astral-sh/ruff/pull/28024))
+- \[`flake8-datetimez`\] Allow timezone-safe `strptime` chains (`DTZ007`) ([#28023](https://github.com/astral-sh/ruff/pull/28023))
+- \[`flake8-simplify`\] Respect side effects in `lambda` defaults (`SIM401`) ([#28000](https://github.com/astral-sh/ruff/pull/28000))
+
+### Server
+
+- Fix duplicated "of" in `ClientOptions` doc comment ([#27978](https://github.com/astral-sh/ruff/pull/27978))
+
+### Documentation
+
+- Document rule acceptance guidelines ([#27910](https://github.com/astral-sh/ruff/pull/27910))
+- Document the new category selectors ([#27906](https://github.com/astral-sh/ruff/pull/27906))
+
+### Contributors
+
+- [@AlexWaygood](https://github.com/AlexWaygood)
+- [@sharkdp](https://github.com/sharkdp)
+- [@jelle-openai](https://github.com/jelle-openai)
+- [@charliermarsh](https://github.com/charliermarsh)
+- [@ntBre](https://github.com/ntBre)
+- [@aarushkandukoori](https://github.com/aarushkandukoori)
+
+## 0.16.4
+
+Released on 2026-08-20.
+
+### Preview features
+
+- \[`flake8-use-pathlib`\] Add autofix for `PTH116` ([#26460](https://github.com/astral-sh/ruff/pull/26460))
+- \[`refurb`\] Restrict `delete-full-slice` to lists (`FURB131`) ([#27711](https://github.com/astral-sh/ruff/pull/27711))
+- \[`refurb`\] Skip `FURB101` and `FURB103` when the `open` argument is a file descriptor ([#27643](https://github.com/astral-sh/ruff/pull/27643))
+
+### Bug fixes
+
+- Fix `InvalidInstruction` on Windows CPUs that do not support `POPCNT` ([#27803](https://github.com/astral-sh/ruff/pull/27803))
+- \[`pyflakes`\] Emit semantic syntax errors in string type definitions as `F722` ([#27835](https://github.com/astral-sh/ruff/pull/27835))
+- \[`pylint`\] Allow `os._exit` imports in `import-private-name` (`PLC2701`) ([#27738](https://github.com/astral-sh/ruff/pull/27738))
+
+### Rule changes
+
+- [syntax-errors] Align mixed t-string/bytes error message with CPython 3.14 ([#27766](https://github.com/astral-sh/ruff/pull/27766))
+- \[`ruff`\] Add `ctypes.LittleEndianStructure` and related types to existing exception (`RUF012`) ([#27753](https://github.com/astral-sh/ruff/pull/27753))
+- [syntax-errors] Detect duplicate keyword arguments ([#17804](https://github.com/astral-sh/ruff/pull/17804))
+- [syntax-errors] Detect parameters declared `nonlocal` ([#27628](https://github.com/astral-sh/ruff/pull/27628))
+
+### Server
+
+- Offer display-only fixes and mark safe fixes preferred ([#27807](https://github.com/astral-sh/ruff/pull/27807))
+- Support pull diagnostics for notebook cells ([#27779](https://github.com/astral-sh/ruff/pull/27779))
+
+### Documentation
+
+- Add default indicator to rules table ([#27724](https://github.com/astral-sh/ruff/pull/27724))
+- Fix broken link to Python docs ([#27757](https://github.com/astral-sh/ruff/pull/27757))
+
+### Other changes
+
+- Fix s390x stacker assembly in release builds ([#27776](https://github.com/astral-sh/ruff/pull/27776))
+- Guarantee minimum stack size when parsing a module, standalone expression, and suites ([#25464](https://github.com/astral-sh/ruff/pull/25464))
+- Reduce configuration deserialization code size ([#27924](https://github.com/astral-sh/ruff/pull/27924))
+- Check packed AST index bounds ([#27849](https://github.com/astral-sh/ruff/pull/27849))
+
+### Contributors
+
+- [@AbhinavMir](https://github.com/AbhinavMir)
+- [@eduardorittner](https://github.com/eduardorittner)
+- [@royb3](https://github.com/royb3)
+- [@MichaReiser](https://github.com/MichaReiser)
+- [@carljm](https://github.com/carljm)
+- [@rosstitmarsh](https://github.com/rosstitmarsh)
+- [@ntBre](https://github.com/ntBre)
+- [@zaniebot](https://github.com/zaniebot)
+- [@ewdurbin](https://github.com/ewdurbin)
+- [@woodruffw](https://github.com/woodruffw)
+- [@Sacrimento](https://github.com/Sacrimento)
+- [@lakshayxi](https://github.com/lakshayxi)
+- [@WhiteFox0-0](https://github.com/WhiteFox0-0)
+- [@baltasarblanco](https://github.com/baltasarblanco)
+
+## 0.16.3
+
+Released on 2026-08-13.
+
+### Preview features
+
+- \[`pylint`\] Fix false negatives on negative numbers (`PLR6104`) ([#27251](https://github.com/astral-sh/ruff/pull/27251))
+- \[`pyupgrade`\] Add rule to replace `while 1` with `while True` (`UP048`) ([#27190](https://github.com/astral-sh/ruff/pull/27190))
+
+### Bug fixes
+
+- \[`flake8-bandit`\] Also check keyword arguments (`S602`, `S603`, `S607`, `S609`) ([#27687](https://github.com/astral-sh/ruff/pull/27687))
+- \[`pylint`\] Allow `continue` in `finally` on Python 3.8 ([#27626](https://github.com/astral-sh/ruff/pull/27626))
+- \[`pylint`\] Fix `PLE1307` false positive with bools ([#27651](https://github.com/astral-sh/ruff/pull/27651))
+- \[`pylint`\] Fix false positives and negatives with `%b` format character (`PLE1300`, `PLE1307`) ([#27560](https://github.com/astral-sh/ruff/pull/27560))
+- \[`pylint`\] Improve handling of concatenated strings (`PLE1300`) ([#27659](https://github.com/astral-sh/ruff/pull/27659))
+
+### Rule changes
+
+- \[`numpy`\] Make `np.chararray` autofix backwards-compatible (`NPY201`) ([#27527](https://github.com/astral-sh/ruff/pull/27527))
+
+### Performance
+
+- Enable PGO for Linux x86-64 Ruff releases ([#27570](https://github.com/astral-sh/ruff/pull/27570))
+- Enable PGO for Linux ARM64 Ruff releases ([#27574](https://github.com/astral-sh/ruff/pull/27574))
+- Enable PGO for Windows x86-64 Ruff releases ([#27573](https://github.com/astral-sh/ruff/pull/27573))
+- Enable PGO for macOS ARM64 Ruff releases ([#27572](https://github.com/astral-sh/ruff/pull/27572))
+- Reduce `Expr` size to 64 bytes ([#27591](https://github.com/astral-sh/ruff/pull/27591))
+
+### CLI
+
+- Hyperlink rule codes in `ruff check --statistics` output ([#27646](https://github.com/astral-sh/ruff/pull/27646))
+
+### Documentation
+
+- \[`ruff`\] Also suggest `asyncio.TaskGroup` (`RUF006`) ([#27461](https://github.com/astral-sh/ruff/pull/27461))
+
+### Other changes
+
+- Use mimalloc v3 ([#27586](https://github.com/astral-sh/ruff/pull/27586))
+
+### Contributors
+
+- [@Andrej730](https://github.com/Andrej730)
+- [@alonfaraj](https://github.com/alonfaraj)
+- [@romero-deshaw](https://github.com/romero-deshaw)
+- [@Avasam](https://github.com/Avasam)
+- [@tjkuson](https://github.com/tjkuson)
+- [@charliermarsh](https://github.com/charliermarsh)
+- [@chirizxc](https://github.com/chirizxc)
+- [@saberoueslati](https://github.com/saberoueslati)
+- [@MichaReiser](https://github.com/MichaReiser)
+
+## 0.16.2
+
+Released on 2026-08-06.
+
+### Bug fixes
+
+- \[`flake8-pyi`\] Avoid false positives on `singledispatch` functions (`PYI041`) ([#27335](https://github.com/astral-sh/ruff/pull/27335))
+
+### Server
+
+- Register formatting capabilities dynamically to exclude TOML files ([#27332](https://github.com/astral-sh/ruff/pull/27332))
+
+### Contributors
+
+- [@MeGaGiGaGon](https://github.com/MeGaGiGaGon)
+- [@charliermarsh](https://github.com/charliermarsh)
+- [@epage](https://github.com/epage)
+- [@sharkdp](https://github.com/sharkdp)
+- [@ntBre](https://github.com/ntBre)
+
 ## 0.16.1
 
 Released on 2026-07-30.

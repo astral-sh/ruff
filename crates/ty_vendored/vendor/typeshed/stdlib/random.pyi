@@ -51,8 +51,8 @@ import sys
 from _typeshed import SupportsLenAndGetItem
 from collections.abc import Callable, Iterable, MutableSequence, Sequence, Set as AbstractSet
 from fractions import Fraction
-from typing import Any, ClassVar, NoReturn, TypeVar, overload
-from typing_extensions import deprecated
+from typing import Any, ClassVar, TypeVar, overload
+from typing_extensions import Never, deprecated
 
 __all__ = [
     "Random",
@@ -435,10 +435,10 @@ class SystemRandom(Random):
     def getrandbits(self, k: int) -> int:  # k can be passed by keyword
         """getrandbits(k) -> x.  Generates an int with k random bits."""
 
-    def getstate(self, *args: Any, **kwds: Any) -> NoReturn:
+    def getstate(self, *args: Any, **kwds: Any) -> Never:
         """Method should not be called for a system random number generator."""
 
-    def setstate(self, *args: Any, **kwds: Any) -> NoReturn:
+    def setstate(self, *args: Any, **kwds: Any) -> Never:
         """Method should not be called for a system random number generator."""
 
 _inst: Random

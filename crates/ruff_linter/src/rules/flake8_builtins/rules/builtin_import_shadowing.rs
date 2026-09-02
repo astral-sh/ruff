@@ -3,6 +3,7 @@ use ruff_python_ast::Alias;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::flake8_builtins::helpers::shadows_builtin;
 
 /// ## What it does
@@ -41,7 +42,7 @@ use crate::rules::flake8_builtins::helpers::shadows_builtin;
 /// - `lint.flake8-builtins.ignorelist`
 /// - `target-version`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.8.0")]
+#[violation_metadata(stable_since = "0.8.0", category = Category::Pedantic)]
 pub(crate) struct BuiltinImportShadowing {
     name: String,
 }

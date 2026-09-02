@@ -60,6 +60,12 @@ impl NameInterner {
     }
 }
 
+// Stack probes access thread-local state, so avoid them while recursive parser calls remain
+// shallow. `STACK_RED_ZONE` must cover the stack used before the first deferred probe.
+const STACK_RED_ZONE: usize = 100 * 1024;
+const STACK_SIZE: usize = 1024 * 1024;
+const MAX_UNCHECKED_RECURSION_DEPTH: usize = 20;
+
 #[derive(Debug)]
 pub(crate) struct Parser<'src> {
     source: &'src str,
@@ -95,11 +101,8 @@ pub(crate) struct Parser<'src> {
     /// The start offset in the source code from which to start parsing at.
     start_offset: TextSize,
 
-    /// Current parser recursion depth remaining before the depth limit is exceeded.
-    depth_remaining: u16,
-
-    /// Maximum lexer nesting depth before postfix calls and subscripts should stop recursing.
-    max_nesting_depth: u32,
+    /// Number of active recursive statement, expression, and pattern parsing operations.
+    recursion_depth: usize,
 
     /// Reusable, nesting-safe scratch storage for expression lists.
     expr_scratch: ScratchBuffer<Expr>,
@@ -133,8 +136,6 @@ impl<'src> Parser<'src> {
         options: ParseOptions,
     ) -> Self {
         let tokens = TokenSource::from_source(source, options.mode, start_offset);
-        let depth_remaining = options.max_recursion_depth;
-        let max_nesting_depth = u32::from(options.max_recursion_depth.saturating_sub(2));
 
         Parser {
             options,
@@ -147,9 +148,8 @@ impl<'src> Parser<'src> {
             recovery_context: RecoveryContext::empty(),
             prev_token_end: TextSize::new(0),
             start_offset,
+            recursion_depth: 0,
             current_token_id: TokenId::default(),
-            depth_remaining,
-            max_nesting_depth,
             expr_scratch: ScratchBuffer::with_capacity(16),
             keyword_scratch: ScratchBuffer::new(),
             parameter_scratch: ScratchBuffer::new(),
@@ -159,44 +159,34 @@ impl<'src> Parser<'src> {
         }
     }
 
-    /// Runs `f` if the recursive parser depth limit has not been hit.
-    ///
-    /// # Note
-    ///
-    /// This recursion guard is a temporary fix for #22930.
-    #[must_use]
+    /// Grows the stack for recursive parser calls only after shallow nesting is exceeded.
     #[inline]
-    fn with_recursion<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> Option<T> {
-        if self.depth_remaining == 0 {
-            return None;
-        }
+    fn with_recursion<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
+        self.recursion_depth += 1;
 
-        self.depth_remaining -= 1;
-        let result = f(self);
-        self.depth_remaining += 1;
-        Some(result)
+        let result = if self.recursion_depth > MAX_UNCHECKED_RECURSION_DEPTH {
+            self.grow_stack(f)
+        } else {
+            f(self)
+        };
+
+        self.recursion_depth -= 1;
+        result
     }
 
     #[cold]
-    #[inline(never)]
-    fn report_recursion_limit_exceeded<R: Ranged>(&mut self, ranged: R) {
-        self.add_error(ParseErrorType::RecursionLimitExceeded, ranged);
-        // Skip to end-of-file so outer parser frames unwind quickly and our
-        // `ParserProgress` infinite-loop guards don't fire when they see the
-        // same `(` / `[` etc. that this frame failed to consume.
-        while self.current_token_kind() != TokenKind::EndOfFile {
-            self.bump_any();
-        }
+    fn grow_stack<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
+        stacker::maybe_grow(STACK_RED_ZONE, STACK_SIZE, || f(self))
     }
 
     /// Consumes the [`Parser`] and returns the parsed [`Parsed`].
     pub(crate) fn parse(mut self) -> Parsed<Mod> {
-        let syntax = match self.options.mode {
+        let syntax = stacker::maybe_grow(STACK_RED_ZONE, STACK_SIZE, || match self.options.mode {
             Mode::Expression | Mode::ParenthesizedExpression => {
                 Mod::Expression(self.parse_single_expression())
             }
             Mode::Module | Mode::Ipython => Mod::Module(self.parse_module()),
-        };
+        });
 
         self.finish(syntax)
     }
@@ -393,16 +383,19 @@ impl<'src> Parser<'src> {
 
     /// Moves the parser to the next token.
     fn do_bump(&mut self, kind: TokenKind) {
-        if !matches!(
-            self.current_token_kind(),
+        if match self.current_token_kind() {
             // TODO explore including everything up to the dedent as part of the body.
-            TokenKind::Dedent
+            TokenKind::Dedent => false,
+
             // Don't include newlines in the body
-            | TokenKind::Newline
+            TokenKind::Newline => false,
+
             // TODO(micha): Including the semi feels more correct but it isn't compatible with lalrpop and breaks the
             // formatters semicolon detection. Exclude it for now
-            | TokenKind::Semi
-        ) {
+            TokenKind::Semi => false,
+
+            _ => true,
+        } {
             self.prev_token_end = self.current_token_range().end();
         }
 
@@ -1230,24 +1223,26 @@ enum RecoveryContextKind {
 impl RecoveryContextKind {
     /// Returns `true` if a trailing comma is allowed in the current context.
     const fn allow_trailing_comma(self) -> bool {
-        matches!(
-            self,
+        match self {
             RecoveryContextKind::Slices
-                | RecoveryContextKind::TupleElements(_)
-                | RecoveryContextKind::SetElements
-                | RecoveryContextKind::ListElements
-                | RecoveryContextKind::DictElements
-                | RecoveryContextKind::Arguments
-                | RecoveryContextKind::MatchPatternMapping
-                | RecoveryContextKind::SequenceMatchPattern(_)
-                | RecoveryContextKind::MatchPatternClassArguments
-                // Only allow a trailing comma if the with item itself is parenthesized
-                | RecoveryContextKind::WithItems(WithItemKind::Parenthesized)
-                | RecoveryContextKind::Parameters(_)
-                | RecoveryContextKind::TypeParams
-                | RecoveryContextKind::DeleteTargets
-                | RecoveryContextKind::ImportFromAsNames(Parenthesized::Yes)
-        )
+            | RecoveryContextKind::TupleElements(_)
+            | RecoveryContextKind::SetElements
+            | RecoveryContextKind::ListElements
+            | RecoveryContextKind::DictElements
+            | RecoveryContextKind::Arguments
+            | RecoveryContextKind::MatchPatternMapping
+            | RecoveryContextKind::SequenceMatchPattern(_)
+            | RecoveryContextKind::MatchPatternClassArguments
+            | RecoveryContextKind::Parameters(_)
+            | RecoveryContextKind::TypeParams
+            | RecoveryContextKind::DeleteTargets
+            | RecoveryContextKind::ImportFromAsNames(Parenthesized::Yes) => true,
+
+            // Only allow a trailing comma if the with item itself is parenthesized
+            RecoveryContextKind::WithItems(WithItemKind::Parenthesized) => true,
+
+            _ => false,
+        }
     }
 
     /// Returns `true` if the parser is at a token that terminates the list as per the context.
@@ -1471,10 +1466,7 @@ impl RecoveryContextKind {
             | RecoveryContextKind::SetElements
             | RecoveryContextKind::TupleElements(_) => p.at_expr(),
             RecoveryContextKind::DictElements => p.at(TokenKind::DoubleStar) || p.at_expr(),
-            RecoveryContextKind::SequenceMatchPattern(_) => {
-                // `+` doesn't start any pattern but is here for better error recovery.
-                p.at(TokenKind::Plus) || p.at_pattern_start()
-            }
+            RecoveryContextKind::SequenceMatchPattern(_) => p.at_pattern_start(),
             RecoveryContextKind::MatchPatternMapping => {
                 // A star pattern is invalid as a mapping key and is here only for
                 // better error recovery.

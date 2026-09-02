@@ -50,8 +50,6 @@ pub use builders::BestFitting;
 pub use source_code::{SourceCode, SourceCodeSlice};
 
 pub use crate::diagnostics::{ActualStart, FormatError, InvalidDocumentError, PrintError};
-#[expect(unused_imports)]
-pub(crate) use format_element::LINE_TERMINATORS;
 pub use format_element::{FormatElement, normalize_newlines};
 pub use group_id::GroupId;
 use ruff_macros::CacheKey;

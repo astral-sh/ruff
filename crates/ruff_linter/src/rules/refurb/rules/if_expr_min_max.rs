@@ -5,6 +5,7 @@ use ruff_python_ast::{self as ast, CmpOp, Expr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::snippet::SourceCodeSnippet;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
@@ -36,10 +37,10 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// This rule's fix is marked as safe, unless the expression contains comments.
 ///
 /// ## References
-/// - [Python documentation: `min`](https://docs.python.org/3.11/library/functions.html#min)
-/// - [Python documentation: `max`](https://docs.python.org/3.11/library/functions.html#max)
+/// - [Python documentation: `min`](https://docs.python.org/3/library/functions.html#min)
+/// - [Python documentation: `max`](https://docs.python.org/3/library/functions.html#max)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.5.0")]
+#[violation_metadata(stable_since = "0.5.0", category = Category::Complexity)]
 pub(crate) struct IfExprMinMax {
     min_max: MinMax,
     expression: SourceCodeSnippet,

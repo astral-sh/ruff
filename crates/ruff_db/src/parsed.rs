@@ -5,16 +5,16 @@ use arc_swap::ArcSwapOption;
 use get_size2::GetSize;
 use ruff_python_ast::{
     AnyRootNodeRef, HasNodeIndex, ModExpression, ModModule, NodeIndex, NodeIndexError,
-    StringLiteral,
+    PythonVersion, StringLiteral,
 };
 use ruff_python_parser::{
     ParseError, ParseErrorType, ParseOptions, Parsed, parse_cells_unchecked,
     parse_string_annotation, parse_unchecked,
 };
 
-use crate::Db;
 use crate::files::File;
 use crate::source::source_text;
+use crate::{Db, PythonFile};
 
 /// Returns the parsed AST of `file`, including its token stream.
 ///
@@ -32,23 +32,24 @@ use crate::source::source_text;
 /// instead it's a wild guess that it should be unlikely that incremental changes involve
 /// more than 200 modules. Parsed ASTs within the same revision are never evicted by Salsa.
 #[salsa::tracked(returns(ref), no_eq, heap_size=ruff_memory_usage::heap_size, lru=200)]
-pub fn parsed_module(db: &dyn Db, file: File) -> ParsedModule {
-    let _span = tracing::trace_span!("parsed_module", ?file).entered();
+pub fn parsed_module(db: &dyn Db, file: PythonFile<'_>) -> ParsedModule {
+    let source_file = file.file(db);
+    let python_version = file.python_version(db);
+    let _span = tracing::trace_span!("parsed_module", ?source_file, %python_version).entered();
 
-    let parsed = parsed_module_impl(db, file);
+    let parsed = parsed_module_impl(db, source_file, python_version);
 
-    ParsedModule::new(file, parsed)
+    ParsedModule::new(source_file, python_version, parsed)
 }
 
 pub(super) fn disable_lru(db: &mut dyn Db) {
     parsed_module::set_lru_capacity(db, 0);
 }
 
-fn parsed_module_impl(db: &dyn Db, file: File) -> Parsed<ModModule> {
+fn parsed_module_impl(db: &dyn Db, file: File, target_version: PythonVersion) -> Parsed<ModModule> {
     let source = source_text(db, file);
     let ty = file.source_type(db);
 
-    let target_version = db.python_version();
     let options = ParseOptions::from(ty).with_target_version(target_version);
 
     // Notebooks parse each cell as an independent module so a syntax error confined to one cell is
@@ -110,14 +111,16 @@ pub fn parsed_string_annotation(
 #[derive(Clone, get_size2::GetSize)]
 pub struct ParsedModule {
     file: File,
+    python_version: PythonVersion,
     #[get_size(size_fn = arc_swap_size)]
     inner: Arc<ArcSwapOption<indexed::IndexedModule>>,
 }
 
 impl ParsedModule {
-    fn new(file: File, parsed: Parsed<ModModule>) -> Self {
+    fn new(file: File, python_version: PythonVersion, parsed: Parsed<ModModule>) -> Self {
         Self {
             file,
+            python_version,
             inner: Arc::new(ArcSwapOption::new(Some(indexed::IndexedModule::new(
                 parsed,
             )))),
@@ -132,7 +135,11 @@ impl ParsedModule {
             Some(parsed) => parsed,
             None => {
                 // Re-parse the file.
-                let parsed = indexed::IndexedModule::new(parsed_module_impl(db, self.file));
+                let parsed = indexed::IndexedModule::new(parsed_module_impl(
+                    db,
+                    self.file,
+                    self.python_version,
+                ));
                 tracing::debug!(
                     "File `{}` was reparsed after being collected in the current Salsa revision",
                     self.file.path(db)
@@ -157,6 +164,11 @@ impl ParsedModule {
     /// Returns the file to which this module belongs.
     pub fn file(&self) -> File {
         self.file
+    }
+
+    /// Returns the Python version used to parse this module.
+    pub fn python_version(&self) -> PythonVersion {
+        self.python_version
     }
 }
 
@@ -485,6 +497,14 @@ mod indexed {
             let chunk_index = index / Self::CHUNK_LEN;
             let entry_index = index % Self::CHUNK_LEN;
             let chunk = &self.chunks[chunk_index];
+
+            // A partial chunk's trailing bits are padding, not indexed nodes.
+            assert!(
+                entry_index < usize::from(chunk.entry_count),
+                "index out of bounds: the len is {} but the index is {index}",
+                chunk_index * Self::CHUNK_LEN + usize::from(chunk.entry_count),
+            );
+
             let words = &self.words[chunk.word_start as usize..];
 
             match chunk.layout {
@@ -794,6 +814,56 @@ mod indexed {
         use super::*;
 
         #[test]
+        #[should_panic(expected = "index out of bounds: the len is 1 but the index is 1")]
+        fn indexed_nodes_relative_tail_bounds() {
+            let index = IndexedNodes {
+                chunks: vec![IndexChunk {
+                    base: 0x1000,
+                    word_start: 0,
+                    entry_bits: IndexedNodes::KIND_BITS,
+                    entry_count: 1,
+                    layout: IndexChunkLayout::Relative,
+                }]
+                .into_boxed_slice(),
+                words: vec![u64::from(RootNodeKind::Stmt as u8)].into_boxed_slice(),
+            };
+
+            assert_eq!(index.get(0), (0x1000, RootNodeKind::Stmt));
+            index.get(1);
+        }
+
+        #[test]
+        #[should_panic(expected = "index out of bounds: the len is 1 but the index is 1")]
+        fn indexed_nodes_wide_tail_bounds() {
+            let index = IndexedNodes {
+                chunks: vec![IndexChunk {
+                    base: 0,
+                    word_start: 0,
+                    entry_bits: IndexedNodes::KIND_BITS,
+                    entry_count: 1,
+                    layout: IndexChunkLayout::Wide,
+                }]
+                .into_boxed_slice(),
+                words: vec![0x1000, u64::from(RootNodeKind::Stmt as u8)].into_boxed_slice(),
+            };
+
+            assert_eq!(index.get(0), (0x1000, RootNodeKind::Stmt));
+            index.get(1);
+        }
+
+        #[test]
+        #[should_panic(expected = "index out of bounds: the len is 65 but the index is 65")]
+        fn indexed_nodes_chunk_boundary() {
+            let parsed = ruff_python_parser::parse_module(&"pass\n".repeat(65)).unwrap();
+            let indexed = IndexedModule::new(parsed);
+
+            assert_eq!(indexed.index.len(), 65);
+            assert_eq!(indexed.index.get(63).1, RootNodeKind::Stmt);
+            assert_eq!(indexed.index.get(64).1, RootNodeKind::Stmt);
+            indexed.index.get(65);
+        }
+
+        #[test]
         fn indexed_nodes_round_trip() {
             let parsed = ruff_python_parser::parse_module(
                 r#"
@@ -864,6 +934,7 @@ class C[T](Base, metaclass=Meta):
 #[cfg(test)]
 mod tests {
     use crate::Db;
+    use crate::PythonFile;
     use crate::files::{system_path_to_file, vendored_path_to_file};
     use crate::parsed::parsed_module;
     use crate::system::{
@@ -871,6 +942,7 @@ mod tests {
     };
     use crate::tests::TestDb;
     use crate::vendored::{VendoredFileSystemBuilder, VendoredPath};
+    use ruff_python_ast::PythonVersion;
     use zip::CompressionMethod;
 
     #[test]
@@ -882,6 +954,7 @@ mod tests {
 
         let file = system_path_to_file(&db, path).unwrap();
 
+        let file = PythonFile::new(&db, file, PythonVersion::latest_ty());
         let parsed = parsed_module(&db, file).load(&db);
 
         assert!(parsed.has_valid_syntax());
@@ -898,6 +971,7 @@ mod tests {
 
         let file = system_path_to_file(&db, path).unwrap();
 
+        let file = PythonFile::new(&db, file, PythonVersion::latest_ty());
         let parsed = parsed_module(&db, file).load(&db);
 
         assert!(parsed.has_valid_syntax());
@@ -914,7 +988,8 @@ mod tests {
 
         let virtual_file = db.files().virtual_file(&db, path);
 
-        let parsed = parsed_module(&db, virtual_file.file()).load(&db);
+        let file = PythonFile::new(&db, virtual_file.file(), PythonVersion::latest_ty());
+        let parsed = parsed_module(&db, file).load(&db);
 
         assert!(parsed.has_valid_syntax());
 
@@ -930,7 +1005,8 @@ mod tests {
 
         let virtual_file = db.files().virtual_file(&db, path);
 
-        let parsed = parsed_module(&db, virtual_file.file()).load(&db);
+        let file = PythonFile::new(&db, virtual_file.file(), PythonVersion::latest_ty());
+        let parsed = parsed_module(&db, file).load(&db);
 
         assert!(parsed.has_valid_syntax());
 
@@ -961,8 +1037,41 @@ else:
 
         let file = vendored_path_to_file(&db, VendoredPath::new("path.pyi")).unwrap();
 
+        let file = PythonFile::new(&db, file, PythonVersion::latest_ty());
         let parsed = parsed_module(&db, file).load(&db);
 
         assert!(parsed.has_valid_syntax());
+    }
+
+    #[test]
+    fn same_file_at_different_python_versions() -> crate::system::Result<()> {
+        let mut db = TestDb::new();
+        db.write_file("test.py", "type Alias = int")?;
+        let file = system_path_to_file(&db, "test.py").unwrap();
+
+        let py311 = PythonFile::new(&db, file, PythonVersion::PY311);
+        let py312 = PythonFile::new(&db, file, PythonVersion::PY312);
+        let parsed_py311 = parsed_module(&db, py311);
+        let parsed_py312 = parsed_module(&db, py312);
+
+        for _ in 0..2 {
+            assert!(
+                !parsed_py311
+                    .load(&db)
+                    .unsupported_syntax_errors()
+                    .is_empty()
+            );
+            assert!(
+                parsed_py312
+                    .load(&db)
+                    .unsupported_syntax_errors()
+                    .is_empty()
+            );
+
+            parsed_py311.clear();
+            parsed_py312.clear();
+        }
+
+        Ok(())
     }
 }

@@ -49,22 +49,20 @@ def _[T]() -> None:
     ConstraintSet.range(Sub, T, Super)
 ```
 
-Every type is a supertype of `Never`, so a lower bound of `Never` is the same as having no lower
-bound.
+Every type is a supertype of `Never`, so `upper_bound` can omit the lower bound.
 
 ```py
 def _[T]() -> None:
     # (T@_ ≤ Base)
-    ConstraintSet.range(Never, T, Base)
+    ConstraintSet.upper_bound(T, Base)
 ```
 
-Similarly, every type is a subtype of `object`, so an upper bound of `object` is the same as having
-no upper bound.
+Similarly, every type is a subtype of `object`, so `lower_bound` can omit the upper bound.
 
 ```py
 def _[T]() -> None:
     # (Base ≤ T@_)
-    ConstraintSet.range(Base, T, object)
+    ConstraintSet.lower_bound(Base, T)
 ```
 
 And a range constraint with a lower bound of `Never` and an upper bound of `object` allows the
@@ -88,13 +86,13 @@ def _[T]() -> None:
     static_assert(not ConstraintSet.range(Base, T, Unrelated))
 ```
 
-The lower and upper bound can be the same type, in which case the typevar can only be specialized to
+When the lower and upper bounds are the same type, `equality` requires the typevar to specialize to
 that specific type.
 
 ```py
 def _[T]() -> None:
     # (T@_ = Base)
-    ConstraintSet.range(Base, T, Base)
+    ConstraintSet.equality(T, Base)
 ```
 
 Constraints can only refer to fully static types, so the lower and upper bounds are transformed into
@@ -103,7 +101,7 @@ their bottom and top materializations, respectively.
 ```py
 def _[T]() -> None:
     constraints = ConstraintSet.range(Base, T, Any)
-    expected = ConstraintSet.range(Base, T, object)
+    expected = ConstraintSet.lower_bound(Base, T)
     static_assert(constraints == expected)
 
     constraints = ConstraintSet.range(Sequence[Base], T, Sequence[Any])
@@ -111,12 +109,71 @@ def _[T]() -> None:
     static_assert(constraints == expected)
 
     constraints = ConstraintSet.range(Any, T, Base)
-    expected = ConstraintSet.range(Never, T, Base)
+    expected = ConstraintSet.upper_bound(T, Base)
     static_assert(constraints == expected)
 
     constraints = ConstraintSet.range(Sequence[Any], T, Sequence[Base])
     expected = ConstraintSet.range(Sequence[Never], T, Sequence[Base])
     static_assert(constraints == expected)
+```
+
+### Lower bound
+
+A lower-bound constraint requires the type variable to be a supertype of its bound without providing
+upper-bound evidence.
+
+```py
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet, is_constraint_set_assignable_to
+
+def _[T]() -> None:
+    expected = is_constraint_set_assignable_to(int, T)
+    static_assert(ConstraintSet.lower_bound(int, T) == expected)
+```
+
+### Upper bound
+
+An upper-bound constraint requires the type variable to be a subtype of its bound without providing
+lower-bound evidence.
+
+```py
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet, is_constraint_set_assignable_to
+
+def _[T]() -> None:
+    expected = is_constraint_set_assignable_to(T, int)
+    static_assert(ConstraintSet.upper_bound(T, int) == expected)
+```
+
+Unlike an explicit two-sided range, an upper-bound constraint does not supply `Never` as lower-bound
+inference evidence.
+
+```py
+from typing import Never
+
+def inferred_solution[T]() -> None:
+    # revealed: tuple[Solution[T=int]]
+    reveal_type(ConstraintSet.upper_bound(T, int).solutions_for(T, inferable=tuple[T]))
+
+    # revealed: tuple[Solution[T=Never]]
+    reveal_type(ConstraintSet.range(Never, T, int).solutions_for(T, inferable=tuple[T]))
+```
+
+### Equality
+
+An equality constraint requires the type variable to specialize exactly to the specified type. It is
+equivalent to an explicit range with that type as both bounds.
+
+```py
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
+
+def _[T]() -> None:
+    equality = ConstraintSet.equality(T, int)
+    static_assert(equality == ConstraintSet.range(int, T, int))
+
+    # revealed: tuple[Solution[T=int]]
+    reveal_type(equality.solutions_for(T, inferable=tuple[T]))
 ```
 
 ### Negated range
@@ -142,22 +199,20 @@ def _[T]() -> None:
     ~ConstraintSet.range(Sub, T, Super)
 ```
 
-Every type is a supertype of `Never`, so a lower bound of `Never` is the same as having no lower
-bound.
+Every type is a supertype of `Never`, so `upper_bound` can omit the lower bound.
 
 ```pyi
 def _[T]() -> None:
     # ¬(T@_ ≤ Base)
-    ~ConstraintSet.range(Never, T, Base)
+    ~ConstraintSet.upper_bound(T, Base)
 ```
 
-Similarly, every type is a subtype of `object`, so an upper bound of `object` is the same as having
-no upper bound.
+Similarly, every type is a subtype of `object`, so `lower_bound` can omit the upper bound.
 
 ```pyi
 def _[T]() -> None:
     # ¬(Base ≤ T@_)
-    ~ConstraintSet.range(Base, T, object)
+    ~ConstraintSet.lower_bound(Base, T)
 ```
 
 And a negated range constraint with _both_ a lower bound of `Never` and an upper bound of `object`
@@ -184,7 +239,7 @@ type other than that specific type.
 ```pyi
 def _[T]() -> None:
     # (T@_ ≠ Base)
-    ~ConstraintSet.range(Base, T, Base)
+    ~ConstraintSet.equality(T, Base)
 ```
 
 Constraints can only refer to fully static types, so the lower and upper bounds are transformed into
@@ -193,7 +248,7 @@ their bottom and top materializations, respectively.
 ```pyi
 def _[T]() -> None:
     constraints = ~ConstraintSet.range(Base, T, Any)
-    expected = ~ConstraintSet.range(Base, T, object)
+    expected = ~ConstraintSet.lower_bound(Base, T)
     static_assert(constraints == expected)
 
     constraints = ~ConstraintSet.range(Sequence[Base], T, Sequence[Any])
@@ -201,7 +256,7 @@ def _[T]() -> None:
     static_assert(constraints == expected)
 
     constraints = ~ConstraintSet.range(Any, T, Base)
-    expected = ~ConstraintSet.range(Never, T, Base)
+    expected = ~ConstraintSet.upper_bound(T, Base)
     static_assert(constraints == expected)
 
     constraints = ~ConstraintSet.range(Sequence[Any], T, Sequence[Base])
@@ -213,9 +268,131 @@ A negated _type_ is not the same thing as a negated _range_.
 
 ```pyi
 def _[T]() -> None:
-    negated_type = ConstraintSet.range(Never, T, ~int)
-    negated_constraint = ~ConstraintSet.range(Never, T, int)
+    negated_type = ConstraintSet.upper_bound(T, ~int)
+    negated_constraint = ~ConstraintSet.upper_bound(T, int)
     static_assert(negated_type != negated_constraint)
+```
+
+## Constraints from materialized types
+
+### Invariant classes
+
+Assignability between fully static specializations of an invariant class determines the type
+variable exactly.
+
+```py
+from typing import Any
+from ty_extensions import Bottom, Top
+from ty_extensions._internal import is_constraint_set_assignable_to
+
+class Invariant[T]:
+    value: T
+
+def inspect_exact[T]() -> None:
+    exact = is_constraint_set_assignable_to(Top[Invariant[str]], Top[Invariant[T]])
+    reveal_type(exact.solutions_for(T, inferable=tuple[T]))  # revealed: tuple[Solution[T=str]]
+```
+
+The top materialization of `Invariant[Any]` covers every static specialization represented by `Any`.
+No single fully static specialization of `T` can cover that range. The reverse
+bottom-materialization comparison is impossible for the same reason. Constraint inference preserves
+both ends of those ranges, so neither comparison has a solution.
+
+```py
+def inspect_gradual[T]() -> None:
+    top = is_constraint_set_assignable_to(Top[Invariant[Any]], Top[Invariant[T]])
+    reveal_type(top.solutions_for(T, inferable=tuple[T]))  # revealed: None
+
+    bottom = is_constraint_set_assignable_to(Bottom[Invariant[T]], Bottom[Invariant[Any]])
+    reveal_type(bottom.solutions_for(T, inferable=tuple[T]))  # revealed: None
+```
+
+### Recursive consuming methods
+
+A recursive consuming method imposes the opposite constraint from a covariant property. Seeing the
+type variable in the property's constraints is not enough to omit that method: both bounds are
+needed to establish the invariant specialization. The `Any` marker keeps the protocol gradual even
+when its type argument is fully static.
+
+```py
+from __future__ import annotations
+
+from typing import Any, Protocol
+from ty_extensions import Top, static_assert
+from ty_extensions._internal import ConstraintSet, is_constraint_set_assignable_to
+
+class RecursiveInvariant[T](Protocol):
+    marker: Any
+
+    @property
+    def value(self) -> T: ...
+    def consume(self, other: RecursiveInvariant[T]) -> None: ...
+
+def inspect[T]() -> None:
+    constraints = is_constraint_set_assignable_to(Top[RecursiveInvariant[str]], Top[RecursiveInvariant[T]])
+    static_assert(constraints == ConstraintSet.equality(T, str))
+```
+
+A top-materialized `Any` also contributes both bounds. Its recursive consuming requirement makes the
+relation impossible for every fully static specialization of `T`.
+
+```py
+def inspect_gradual[T]() -> None:
+    constraints = is_constraint_set_assignable_to(Top[RecursiveInvariant[Any]], Top[RecursiveInvariant[T]])
+    reveal_type(constraints.solutions_for(T, inferable=tuple[T]))  # revealed: None
+```
+
+### Constraints introduced by recursive properties
+
+A recursive property can introduce constraints that the outer properties do not impose. Here, the
+outer `value` properties both return `str | int`, but the children return `bytes | int` and
+`T | int`. The child therefore contributes the lower bound `bytes <: T`. Its specialization stays
+unchanged on subsequent recursive steps.
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import ConstraintSet, is_constraint_set_assignable_to
+
+class Recursive[A, B](Protocol):
+    @property
+    def value(self) -> A | int: ...
+    @property
+    def child(self) -> Recursive[B, B]: ...
+
+def materialized_source[T]() -> None:
+    top = is_constraint_set_assignable_to(Top[Recursive[str | int, bytes]], Recursive[str, T])
+    static_assert(top == ConstraintSet.lower_bound(bytes, T))
+    reveal_type(top.solutions_for(T, inferable=tuple[T]))  # revealed: tuple[Solution[T=bytes]]
+
+    bottom = is_constraint_set_assignable_to(Bottom[Recursive[str | int, bytes]], Recursive[str, T])
+    static_assert(bottom == ConstraintSet.lower_bound(bytes, T))
+```
+
+Materializing the target instead preserves the same bound. These specializations contain no gradual
+types, so neither materialization changes their requirements.
+
+```py
+def materialized_target[T]() -> None:
+    top = is_constraint_set_assignable_to(Recursive[str | int, bytes], Top[Recursive[str, T]])
+    static_assert(top == ConstraintSet.lower_bound(bytes, T))
+
+    bottom = is_constraint_set_assignable_to(Recursive[str | int, bytes], Bottom[Recursive[str, T]])
+    static_assert(bottom == ConstraintSet.lower_bound(bytes, T))
+```
+
+The bound also survives opposite materializations. Combining it with an incompatible upper bound has
+no solution; the recursive comparison does not merely succeed without constraining `T`.
+
+```py
+def incompatible_bound[T]() -> None:
+    constraints = is_constraint_set_assignable_to(Top[Recursive[str | int, bytes]], Bottom[Recursive[str, T]])
+    static_assert(constraints == ConstraintSet.lower_bound(bytes, T))
+
+    incompatible = constraints & ConstraintSet.upper_bound(T, str)
+    reveal_type(incompatible.solutions_for(T, inferable=tuple[T]))  # revealed: None
 ```
 
 ## Intersection
@@ -270,7 +447,7 @@ def _[T]() -> None:
     static_assert(constraints == expected)
 
     constraints = ConstraintSet.range(Sub, T, Base) & ConstraintSet.range(Base, T, Super)
-    expected = ConstraintSet.range(Base, T, Base)
+    expected = ConstraintSet.equality(T, Base)
     static_assert(constraints == expected)
 
     constraints = ConstraintSet.range(Sub, T, Super) & ConstraintSet.range(Sub, T, Super)
@@ -283,7 +460,7 @@ If they don't overlap, the intersection is empty.
 ```pyi
 def _[T]() -> None:
     static_assert(not ConstraintSet.range(SubSub, T, Sub) & ConstraintSet.range(Base, T, Super))
-    static_assert(not ConstraintSet.range(SubSub, T, Sub) & ConstraintSet.range(Unrelated, T, object))
+    static_assert(not ConstraintSet.range(SubSub, T, Sub) & ConstraintSet.lower_bound(Unrelated, T))
 ```
 
 Expanding on this, when intersecting two upper bounds constraints (`(T ≤ Base) ∧ (T ≤ Other)`), we
@@ -291,16 +468,14 @@ intersect the upper bounds. Any type that satisfies both `T ≤ Base` and `T ≤
 satisfy their intersection `T ≤ Base & Other`, and vice versa.
 
 ```pyi
-from typing import Never
-
 # This is not final, so it's possible for a subclass to inherit from both Base and Other.
 class Other: ...
 
 def upper_bounds[T]():
     # (T@upper_bounds ≤ Base & Other)
-    intersection_type = ConstraintSet.range(Never, T, Base & Other)
+    intersection_type = ConstraintSet.upper_bound(T, Base & Other)
     # (T@upper_bounds ≤ Base) ∧ (T@upper_bounds ≤ Other)
-    intersection_constraint = ConstraintSet.range(Never, T, Base) & ConstraintSet.range(Never, T, Other)
+    intersection_constraint = ConstraintSet.upper_bound(T, Base) & ConstraintSet.upper_bound(T, Other)
     static_assert(intersection_type == intersection_constraint)
 ```
 
@@ -311,10 +486,60 @@ bounds. Any type that satisfies both `Base ≤ T` and `Other ≤ T` must necessa
 ```pyi
 def lower_bounds[T]():
     # (Base | Other ≤ T@lower_bounds)
-    union_type = ConstraintSet.range(Base | Other, T, object)
+    union_type = ConstraintSet.lower_bound(Base | Other, T)
     # (Base ≤ T@upper_bounds) ∧ (Other ≤ T@upper_bounds)
-    intersection_constraint = ConstraintSet.range(Base, T, object) & ConstraintSet.range(Other, T, object)
+    intersection_constraint = ConstraintSet.lower_bound(Base, T) & ConstraintSet.lower_bound(Other, T)
     static_assert(union_type == intersection_constraint)
+```
+
+### Intersection of two equality constraints
+
+A type variable cannot be exactly equal to two non-equivalent fully static types. This is stronger
+than checking whether the types are disjoint: two classes can have a common subclass, which makes
+their upper-bound constraints compatible, but that subclass is not exactly equal to either class.
+
+Gradual bounds cannot prove this incompatibility. Sequent maps derive facts via transitivity, but
+gradual assignability is not transitive. That means equality constraints containing dynamic types
+remain conservatively satisfiable. Type variables nested inside a bound are treated as opaque
+symbolic atoms; their declared bounds do not make an otherwise static proof gradual.
+
+```py
+from typing import Any
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
+
+class Left: ...
+class Right: ...
+class Both(Left, Right): ...
+
+def _[T, U: Any, V]() -> None:
+    left = ConstraintSet.equality(T, Left)
+    right = ConstraintSet.equality(T, Right)
+    static_assert(~(left & right))
+
+    equivalent = left & left
+    static_assert(equivalent == left)
+
+    upper_bounds = ConstraintSet.upper_bound(T, Left) & ConstraintSet.upper_bound(T, Right)
+    static_assert(not ~upper_bounds)
+
+    both = ConstraintSet.equality(T, Both)
+    static_assert(both & upper_bounds == both)
+
+    symbolic_static_mismatch = ConstraintSet.equality(T, tuple[U, int]) & ConstraintSet.equality(T, tuple[U, str])
+    static_assert(~symbolic_static_mismatch)
+
+    gradual_mismatch = ConstraintSet.equality(T, list[Any]) & ConstraintSet.equality(T, list[int])
+    static_assert(not ~gradual_mismatch)
+
+    any_mismatch = ConstraintSet.equality(T, Any) & ConstraintSet.equality(T, int)
+    static_assert(not ~any_mismatch)
+
+    symbolic_gradual_mismatch = ConstraintSet.equality(T, tuple[U, Any]) & ConstraintSet.equality(T, tuple[U, int])
+    static_assert(not ~symbolic_gradual_mismatch)
+
+    symbolic_match = ConstraintSet.equality(T, list[U]) & ConstraintSet.equality(T, list[V])
+    static_assert(not ~symbolic_match)
 ```
 
 ### Intersection of a range and a negated range
@@ -324,7 +549,7 @@ the negated range constraint provide a "hole" of types that should not be includ
 the intersection as removing the hole from the range constraint.
 
 ```py
-from typing import final, Never
+from typing import final
 from ty_extensions import static_assert
 from ty_extensions._internal import ConstraintSet
 
@@ -350,7 +575,7 @@ anything; the intersection is the positive range.
 
 ```py
 def _[T]() -> None:
-    constraints = ConstraintSet.range(Sub, T, Base) & ~ConstraintSet.range(Never, T, Unrelated)
+    constraints = ConstraintSet.range(Sub, T, Base) & ~ConstraintSet.upper_bound(T, Unrelated)
     expected = ConstraintSet.range(Sub, T, Base)
     static_assert(constraints == expected)
 
@@ -410,7 +635,7 @@ def _[T]() -> None:
     # ¬(Base ≤ T@_ ≤ Super) ∧ ¬(SubSub ≤ T@_ ≤ Sub))
     ~ConstraintSet.range(SubSub, T, Sub) & ~ConstraintSet.range(Base, T, Super)
     # ¬(SubSub ≤ T@_ ≤ Sub) ∧ ¬(Unrelated ≤ T@_)
-    ~ConstraintSet.range(SubSub, T, Sub) & ~ConstraintSet.range(Unrelated, T, object)
+    ~ConstraintSet.range(SubSub, T, Sub) & ~ConstraintSet.lower_bound(Unrelated, T)
 ```
 
 In particular, the following does not simplify, even though it seems like it could simplify to
@@ -493,7 +718,7 @@ def _[T]() -> None:
     # (Base ≤ T@_ ≤ Super) ∨ (SubSub ≤ T@_ ≤ Sub)
     ConstraintSet.range(SubSub, T, Sub) | ConstraintSet.range(Base, T, Super)
     # (SubSub ≤ T@_ ≤ Sub) ∨ (Unrelated ≤ T@_)
-    ConstraintSet.range(SubSub, T, Sub) | ConstraintSet.range(Unrelated, T, object)
+    ConstraintSet.range(SubSub, T, Sub) | ConstraintSet.lower_bound(Unrelated, T)
 ```
 
 In particular, the following does not simplify, even though it seems like it could simplify to
@@ -518,19 +743,17 @@ as `T = Base | Other`) that satisfy the union type, but not the union constraint
 that satisfies the union constraint satisfies the union type.
 
 ```py
-from typing import Never
-
 # This is not final, so it's possible for a subclass to inherit from both Base and Other.
 class Other: ...
 
 def union[T]():
     # (T@union ≤ Base | Other)
-    union_type = ConstraintSet.range(Never, T, Base | Other)
+    union_type = ConstraintSet.upper_bound(T, Base | Other)
     # (T@union ≤ Base) ∨ (T@union ≤ Other)
-    union_constraint = ConstraintSet.range(Never, T, Base) | ConstraintSet.range(Never, T, Other)
+    union_constraint = ConstraintSet.upper_bound(T, Base) | ConstraintSet.upper_bound(T, Other)
 
     # (T = Base | Other) satisfies (T ≤ Base | Other) but not (T ≤ Base ∨ T ≤ Other)
-    specialization = ConstraintSet.range(Base | Other, T, Base | Other)
+    specialization = ConstraintSet.equality(T, Base | Other)
     static_assert(specialization.satisfies(union_type))
     static_assert(not specialization.satisfies(union_constraint))
 
@@ -546,12 +769,12 @@ satisfies the union constraint (`(Base ≤ T) ∨ (Other ≤ T)`) but not the un
 ```py
 def union[T]():
     # (Base | Other ≤ T@union)
-    union_type = ConstraintSet.range(Base | Other, T, object)
+    union_type = ConstraintSet.lower_bound(Base | Other, T)
     # (Base ≤ T@union) ∨ (Other ≤ T@union)
-    union_constraint = ConstraintSet.range(Base, T, object) | ConstraintSet.range(Other, T, object)
+    union_constraint = ConstraintSet.lower_bound(Base, T) | ConstraintSet.lower_bound(Other, T)
 
     # (T = Base) satisfies (Base ≤ T ∨ Other ≤ T) but not (Base | Other ≤ T)
-    specialization = ConstraintSet.range(Base, T, Base)
+    specialization = ConstraintSet.equality(T, Base)
     static_assert(not specialization.satisfies(union_type))
     static_assert(specialization.satisfies(union_constraint))
 
@@ -567,7 +790,7 @@ the negated range constraint provide a "hole" of types that should not be includ
 the union as filling part of the hole with the types from the range constraint.
 
 ```py
-from typing import final, Never
+from typing import final
 from ty_extensions import static_assert
 from ty_extensions._internal import ConstraintSet
 
@@ -593,7 +816,7 @@ the union is the negative range.
 
 ```py
 def _[T]() -> None:
-    constraints = ~ConstraintSet.range(Sub, T, Base) | ConstraintSet.range(Never, T, Unrelated)
+    constraints = ~ConstraintSet.range(Sub, T, Base) | ConstraintSet.upper_bound(T, Unrelated)
     expected = ~ConstraintSet.range(Sub, T, Base)
     static_assert(constraints == expected)
 
@@ -643,7 +866,7 @@ def _[T]() -> None:
     static_assert(constraints == expected)
 
     constraints = ~ConstraintSet.range(Sub, T, Base) | ~ConstraintSet.range(Base, T, Super)
-    expected = ~ConstraintSet.range(Base, T, Base)
+    expected = ~ConstraintSet.equality(T, Base)
     static_assert(constraints == expected)
 
     constraints = ~ConstraintSet.range(Sub, T, Super) | ~ConstraintSet.range(Sub, T, Super)
@@ -656,7 +879,7 @@ If the holes don't overlap, the union is always satisfied.
 ```py
 def _[T]() -> None:
     static_assert(~ConstraintSet.range(SubSub, T, Sub) | ~ConstraintSet.range(Base, T, Super))
-    static_assert(~ConstraintSet.range(SubSub, T, Sub) | ~ConstraintSet.range(Unrelated, T, object))
+    static_assert(~ConstraintSet.range(SubSub, T, Sub) | ~ConstraintSet.lower_bound(Unrelated, T))
 ```
 
 ## Negation
@@ -676,9 +899,9 @@ def _[T]() -> None:
     # ¬(Sub ≤ T@_ ≤ Base)
     ~ConstraintSet.range(Sub, T, Base)
     # ¬(T@_ ≤ Base)
-    ~ConstraintSet.range(Never, T, Base)
+    ~ConstraintSet.upper_bound(T, Base)
     # ¬(Sub ≤ T@_)
-    ~ConstraintSet.range(Sub, T, object)
+    ~ConstraintSet.lower_bound(Sub, T)
     # (T@_ ≠ *)
     ~ConstraintSet.range(Never, T, object)
 ```
@@ -694,7 +917,7 @@ def _[T]() -> None:
 ### Negation of constraints involving two variables
 
 ```py
-from typing import final, Never
+from typing import final
 from ty_extensions import static_assert
 from ty_extensions._internal import ConstraintSet
 
@@ -705,18 +928,18 @@ class Unrelated: ...
 
 def _[T, U]() -> None:
     # ¬(T@_ ≤ Base) ∨ ¬(U@_ ≤ Base)
-    ~(ConstraintSet.range(Never, T, Base) & ConstraintSet.range(Never, U, Base))
+    ~(ConstraintSet.upper_bound(T, Base) & ConstraintSet.upper_bound(U, Base))
 ```
 
 The union of a constraint and its negation should always be satisfiable.
 
 ```py
 def _[T, U]() -> None:
-    c1 = ConstraintSet.range(Never, T, Base) & ConstraintSet.range(Never, U, Base)
+    c1 = ConstraintSet.upper_bound(T, Base) & ConstraintSet.upper_bound(U, Base)
     static_assert(c1 | ~c1)
     static_assert(~c1 | c1)
 
-    c2 = ConstraintSet.range(Unrelated, T, object) & ConstraintSet.range(Unrelated, U, object)
+    c2 = ConstraintSet.lower_bound(Unrelated, T) & ConstraintSet.lower_bound(Unrelated, U)
     static_assert(c2 | ~c2)
     static_assert(~c2 | c2)
 
@@ -733,20 +956,19 @@ being constrained. The other is then the lower or upper bound of the constraint.
 enforce an arbitrary ordering on typevars, and always place the constraint on the "earlier" typevar.
 
 ```py
-from typing import Never
 from ty_extensions import static_assert
 from ty_extensions._internal import ConstraintSet
 
 def f[S, T]():
     # (S@f ≤ T@f)
-    c1 = ConstraintSet.range(Never, S, T)
-    c2 = ConstraintSet.range(S, T, object)
+    c1 = ConstraintSet.upper_bound(S, T)
+    c2 = ConstraintSet.lower_bound(S, T)
     static_assert(c1 == c2)
 
 def f[T, S]():
     # (S@f ≤ T@f)
-    c1 = ConstraintSet.range(Never, S, T)
-    c2 = ConstraintSet.range(S, T, object)
+    c1 = ConstraintSet.upper_bound(S, T)
+    c2 = ConstraintSet.lower_bound(S, T)
     static_assert(c1 == c2)
 ```
 
@@ -756,14 +978,14 @@ the constraint, and the other the bound.
 ```py
 def f[S, T]():
     # (S@f = T@f)
-    c1 = ConstraintSet.range(T, S, T)
-    c2 = ConstraintSet.range(S, T, S)
+    c1 = ConstraintSet.equality(S, T)
+    c2 = ConstraintSet.equality(T, S)
     static_assert(c1 == c2)
 
 def f[T, S]():
     # (S@f = T@f)
-    c1 = ConstraintSet.range(T, S, T)
-    c2 = ConstraintSet.range(S, T, S)
+    c1 = ConstraintSet.equality(S, T)
+    c2 = ConstraintSet.equality(T, S)
     static_assert(c1 == c2)
 ```
 
@@ -788,17 +1010,16 @@ The ordering of elements in a union or intersection do not affect what types sat
 set.
 
 ```pyi
-from typing import Never
 from ty_extensions import static_assert
 from ty_extensions._internal import ConstraintSet
 
 def f[T]():
-    c1 = ConstraintSet.range(Never, T, str | int)
-    c2 = ConstraintSet.range(Never, T, int | str)
+    c1 = ConstraintSet.upper_bound(T, str | int)
+    c2 = ConstraintSet.upper_bound(T, int | str)
     static_assert(c1 == c2)
 
-    c1 = ConstraintSet.range(Never, T, str & int)
-    c2 = ConstraintSet.range(Never, T, int & str)
+    c1 = ConstraintSet.upper_bound(T, str & int)
+    c2 = ConstraintSet.upper_bound(T, int & str)
     static_assert(c1 == c2)
 ```
 
@@ -815,15 +1036,15 @@ from ty_extensions import static_assert
 from ty_extensions._internal import ConstraintSet
 
 def same_typevar[T]():
-    constraints = ConstraintSet.range(Never, T, T)
+    constraints = ConstraintSet.upper_bound(T, T)
     expected = ConstraintSet.range(Never, T, object)
     static_assert(constraints == expected)
 
-    constraints = ConstraintSet.range(T, T, object)
+    constraints = ConstraintSet.lower_bound(T, T)
     expected = ConstraintSet.range(Never, T, object)
     static_assert(constraints == expected)
 
-    constraints = ConstraintSet.range(T, T, T)
+    constraints = ConstraintSet.equality(T, T)
     expected = ConstraintSet.range(Never, T, object)
     static_assert(constraints == expected)
 ```
@@ -834,11 +1055,11 @@ as shown above.)
 
 ```pyi
 def same_typevar[T]():
-    constraints = ConstraintSet.range(Never, T, T | None)
+    constraints = ConstraintSet.upper_bound(T, T | None)
     expected = ConstraintSet.range(Never, T, object)
     static_assert(constraints == expected)
 
-    constraints = ConstraintSet.range(T & None, T, object)
+    constraints = ConstraintSet.lower_bound(T & None, T)
     expected = ConstraintSet.range(Never, T, object)
     static_assert(constraints == expected)
 
@@ -852,11 +1073,11 @@ constraint set can never be satisfied, since every type is disjoint with its neg
 
 ```pyi
 def same_typevar[T]():
-    constraints = ConstraintSet.range(~T & None, T, object)
+    constraints = ConstraintSet.lower_bound(~T & None, T)
     expected = ~ConstraintSet.range(Never, T, object)
     static_assert(constraints == expected)
 
-    constraints = ConstraintSet.range(~T, T, object)
+    constraints = ConstraintSet.lower_bound(~T, T)
     expected = ~ConstraintSet.range(Never, T, object)
     static_assert(constraints == expected)
 ```
@@ -868,24 +1089,23 @@ do not involve those typevars must remain in the result. The result holds whenev
 valid assignment to the quantified variables satisfies the expression being quantified over.
 
 ```py
-from typing import Never
 from ty_extensions import static_assert
 from ty_extensions._internal import ConstraintSet
 
 def preserves_remaining_conjunct[T, U]() -> None:
-    t_int = ConstraintSet.range(int, T, int)
-    u_str = ConstraintSet.range(str, U, str)
+    t_int = ConstraintSet.equality(T, int)
+    u_str = ConstraintSet.equality(U, str)
     quantified = (t_int & u_str).exists(tuple[U])
     static_assert(quantified == t_int)
 
 def satisfies_uncertain_disjunct[T, U]() -> None:
-    t_int = ConstraintSet.range(int, T, int)
-    u_str = ConstraintSet.range(str, U, str)
+    t_int = ConstraintSet.equality(T, int)
+    u_str = ConstraintSet.equality(U, str)
     quantified = (t_int | u_str).exists(tuple[U])
     static_assert(quantified == ConstraintSet.always())
 
 def no_typevars_is_identity[T]() -> None:
-    constraints = ConstraintSet.range(Never, T, int)
+    constraints = ConstraintSet.upper_bound(T, int)
     static_assert(constraints.exists(tuple[()]) == constraints)
 ```
 
@@ -896,24 +1116,23 @@ not involve those typevars must remain in the result. The result holds whenever 
 assignment to the quantified variables satisfies the expression being quantified over.
 
 ```py
-from typing import Never
 from ty_extensions import static_assert
 from ty_extensions._internal import ConstraintSet
 
 def preserves_uncertain_disjunct[T, U]() -> None:
-    t_int = ConstraintSet.range(int, T, int)
-    u_str = ConstraintSet.range(str, U, str)
+    t_int = ConstraintSet.equality(T, int)
+    u_str = ConstraintSet.equality(U, str)
     quantified = (t_int | u_str).for_all(tuple[U])
     static_assert(quantified == t_int)
 
 def removes_multiple_typevars[T, U]() -> None:
-    t_int = ConstraintSet.range(int, T, int)
-    u_str = ConstraintSet.range(str, U, str)
+    t_int = ConstraintSet.equality(T, int)
+    u_str = ConstraintSet.equality(U, str)
     quantified = (t_int | u_str).for_all(tuple[T, U])
     static_assert(quantified == ConstraintSet.never())
 
 def no_typevars_is_identity[T]() -> None:
-    constraints = ConstraintSet.range(Never, T, int)
+    constraints = ConstraintSet.upper_bound(T, int)
     static_assert(constraints.for_all(tuple[()]) == constraints)
 ```
 
@@ -926,8 +1145,8 @@ from ty_extensions import static_assert
 from ty_extensions._internal import ConstraintSet
 
 def quantifier_order[S, T]() -> None:
-    source_is_int = ConstraintSet.range(int, S, int)
-    target_is_int = ConstraintSet.range(int, T, int)
+    source_is_int = ConstraintSet.equality(S, int)
+    target_is_int = ConstraintSet.equality(T, int)
     equal = source_is_int.satisfies(target_is_int) & target_is_int.satisfies(source_is_int)
 
     # ∀T.∃S.equal(S, T)

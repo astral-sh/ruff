@@ -1,19 +1,24 @@
 use crate::docstring::{Docstring, DocstringFragment};
 use crate::goto::{Definitions, GotoTarget, docstring_for_call_definition, find_goto_target};
 use crate::{Db, MarkupKind, RangedValue};
-use ruff_db::files::{File, FileRange};
+use ruff_db::files::FileRange;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextSize};
-use std::fmt;
-use std::fmt::Formatter;
+use std::fmt::{self, Display};
+use ty_python_core::ProgramFile;
+use ty_python_semantic::ProgramEnvironment;
 use ty_python_semantic::types::ide_support::{resolved_call_signature, typed_dict_key_hover};
 use ty_python_semantic::types::{KnownInstanceType, Type, TypeAliasType, TypeVarVariance};
 
-use ty_python_semantic::{DisplaySettings, SemanticModel, TypeQualifiers};
+use ty_python_semantic::{SemanticModel, TypeQualifiers};
 
-pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Hover<'_>>> {
-    let parsed = parsed_module(db, file).load(db);
+pub fn hover<'db>(
+    db: &'db dyn Db,
+    file: ProgramFile<'db>,
+    offset: TextSize,
+) -> Option<RangedValue<Hover<'db>>> {
+    let parsed = parsed_module(db, file.python_file(db)).load(db);
     let model = SemanticModel::new(db, file);
     let goto_target = find_goto_target(&model, &parsed, offset)?;
 
@@ -23,6 +28,7 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
         }
     }
 
+    let env = model.program_environment();
     let keyword_argument = keyword_argument_hover_contents(db, &model, &goto_target);
 
     let typed_dict_key = match &goto_target {
@@ -78,7 +84,7 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
             contents.push(HoverContent::Docstring(Docstring::new(docstring)));
         }
     } else if let Some(ty) = goto_target.inferred_type(&model) {
-        tracing::debug!("Inferred type of covering node is {}", ty.display(db));
+        tracing::debug!("Inferred type of covering node is {}", ty.display(db, &env));
         let qualifiers = goto_target.type_qualifiers(&model);
         let inferred_type_hover_content = match ty {
             Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => {
@@ -99,10 +105,10 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
             | Type::TypeAlias(alias) => {
                 let value_ty = alias.value_type(db);
 
-                alias_docstring = Definitions::from_ty(db, ty)
+                alias_docstring = Definitions::from_ty(db, &env, ty)
                     .and_then(|def| def.docstring(db))
                     .or_else(|| {
-                        Definitions::from_ty(db, value_ty).and_then(|def| def.docstring(db))
+                        Definitions::from_ty(db, &env, value_ty).and_then(|def| def.docstring(db))
                     });
 
                 HoverContent::TypeAlias { alias, qualifiers }
@@ -133,8 +139,11 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
     }
 
     Some(RangedValue {
-        range: FileRange::new(file, goto_target.range()),
-        value: Hover { contents },
+        range: FileRange::new(file.file(db), goto_target.range()),
+        value: Hover {
+            program_file: file,
+            contents,
+        },
     })
 }
 
@@ -214,17 +223,27 @@ fn documentation_for_parameter(docstring: &Docstring, name: &str) -> Option<Docs
 }
 
 pub struct Hover<'db> {
+    program_file: ProgramFile<'db>,
     contents: Vec<HoverContent<'db>>,
 }
 
 impl<'db> Hover<'db> {
     /// Renders the hover to a string using the specified markup kind.
-    pub const fn display<'a>(&'a self, db: &'db dyn Db, kind: MarkupKind) -> DisplayHover<'db, 'a> {
-        DisplayHover {
-            db,
-            hover: self,
-            kind,
-        }
+    pub const fn display<'a>(&'a self, db: &'db dyn Db, kind: MarkupKind) -> impl Display {
+        std::fmt::from_fn(move |f| {
+            let mut first = true;
+            let env = ProgramEnvironment::from_file(self.program_file);
+            for content in &self.contents {
+                if !first {
+                    kind.horizontal_line().fmt(f)?;
+                }
+
+                content.display(db, &env, kind).fmt(f)?;
+                first = false;
+            }
+
+            Ok(())
+        })
     }
 
     fn iter(&self) -> std::slice::Iter<'_, HoverContent<'db>> {
@@ -247,28 +266,6 @@ impl<'a, 'db> IntoIterator for &'a Hover<'db> {
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
-    }
-}
-
-pub struct DisplayHover<'db, 'a> {
-    db: &'db dyn Db,
-    hover: &'a Hover<'db>,
-    kind: MarkupKind,
-}
-
-impl fmt::Display for DisplayHover<'_, '_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let mut first = true;
-        for content in &self.hover.contents {
-            if !first {
-                self.kind.horizontal_line().fmt(f)?;
-            }
-
-            content.display(self.db, self.kind).fmt(f)?;
-            first = false;
-        }
-
-        Ok(())
     }
 }
 
@@ -300,9 +297,15 @@ pub enum HoverContent<'db> {
 }
 
 impl<'db> HoverContent<'db> {
-    fn display(&self, db: &'db dyn Db, kind: MarkupKind) -> DisplayHoverContent<'_, 'db> {
+    fn display<'a>(
+        &'a self,
+        db: &'db dyn Db,
+        env: &'a ProgramEnvironment<'db>,
+        kind: MarkupKind,
+    ) -> DisplayHoverContent<'a, 'db> {
         DisplayHoverContent {
             db,
+            env,
             content: self,
             kind,
         }
@@ -311,17 +314,17 @@ impl<'db> HoverContent<'db> {
 
 pub(crate) struct DisplayHoverContent<'a, 'db> {
     db: &'db dyn Db,
+    env: &'a ProgramEnvironment<'db>,
     content: &'a HoverContent<'db>,
     kind: MarkupKind,
 }
 
 impl<'db> DisplayHoverContent<'_, 'db> {
     fn ty_string_and_syntax(&self, ty: &Type<'db>) -> (String, &'static str) {
+        let db = self.db;
         // Special types like `<special-form of whatever 'blahblah' with 'florps'>`
         // render poorly with python syntax-highlighting but well as xml
-        let ty_string = ty
-            .display_with(self.db, DisplaySettings::default().multiline())
-            .to_string();
+        let ty_string = ty.display(db, self.env).multiline().to_string();
         let syntax = if ty_string.starts_with('<') {
             "xml"
         } else {
@@ -346,6 +349,7 @@ fn create_qualifier_suffix(qualifiers: TypeQualifiers) -> String {
 
 impl fmt::Display for DisplayHoverContent<'_, '_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let db = self.db;
         match self.content {
             HoverContent::Signature(signature) => {
                 self.kind.fenced_code_block(&signature, "python").fmt(f)
@@ -375,7 +379,7 @@ impl fmt::Display for DisplayHoverContent<'_, '_> {
             }
             HoverContent::TypeAlias { alias, qualifiers } => {
                 let qualifier_suffix = create_qualifier_suffix(*qualifiers);
-                let declaration = alias.display_declaration(self.db);
+                let declaration = alias.display_declaration(db, self.env);
 
                 self.kind
                     .fenced_code_block(format!("{declaration}{qualifier_suffix}"), "python")
@@ -6045,13 +6049,13 @@ def function():
         );
 
         assert_snapshot!(test.hover(), @"
-        int | float
+        float
         ---------------------------------------------
         Convert a string or number to a floating-point number, if possible.
 
         ---------------------------------------------
         ```python
-        int | float
+        float
         ```
         ---
         Convert a string or number to a floating-point number, if possible.
@@ -6064,6 +6068,61 @@ def function():
           |    |
           |    source
         ");
+    }
+
+    #[test]
+    fn hover_shadowed_numeric_builtin() {
+        let test = hover_test(
+            r#"
+            import builtins
+
+            class float: ...
+
+            def f(x: builtins.float | float):
+                x<CURSOR>
+            "#,
+        );
+
+        assert_snapshot!(test.hover());
+    }
+
+    #[test]
+    fn hover_shadowed_numeric_builtin_in_selected_signature() {
+        let test = hover_test(
+            r#"
+            import builtins
+            from typing import overload
+
+            class float: ...
+
+            @overload
+            def choose(value: builtins.float | float) -> None: ...
+            @overload
+            def choose(value: str) -> None: ...
+            def choose(value: object) -> None: ...
+
+            choose<CURSOR>(1.0)
+            "#,
+        );
+
+        assert_snapshot!(test.hover());
+    }
+
+    #[test]
+    fn hover_shadowed_numeric_builtin_in_keyword_parameter() {
+        let test = hover_test(
+            r#"
+            import builtins
+
+            class float: ...
+
+            def choose(*, value: builtins.float | float) -> None: ...
+
+            choose(value<CURSOR>=1.0)
+            "#,
+        );
+
+        assert_snapshot!(test.hover());
     }
 
     #[test]
@@ -6876,7 +6935,11 @@ type U<CURSOR> = MyType
         fn hover(&self) -> String {
             use std::fmt::Write;
 
-            let Some(hover) = hover(&self.db, self.cursor.file, self.cursor.offset) else {
+            let Some(hover) = hover(
+                &self.db,
+                self.program_file(self.cursor.file),
+                self.cursor.offset,
+            ) else {
                 return "Hover provided no content".to_string();
             };
 

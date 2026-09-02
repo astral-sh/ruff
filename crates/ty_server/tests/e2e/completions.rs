@@ -15,7 +15,7 @@ walktr
 ";
 
     let mut server = TestServerBuilder::new()?
-        .with_initialization_options(ClientOptions::default())
+        .with_initialization_options(&ClientOptions::default())
         .with_workspace(workspace_root, None)?
         .with_file(foo, foo_content)?
         .build()
@@ -64,7 +64,7 @@ walktr
 ";
 
     let mut server = TestServerBuilder::new()?
-        .with_initialization_options(ClientOptions::default().with_auto_import(false))
+        .with_initialization_options(&ClientOptions::default().with_auto_import(false))
         .with_workspace(workspace_root, None)?
         .with_file(foo, foo_content)?
         .build()
@@ -90,7 +90,7 @@ complete_parenth
 ";
 
     let mut server = TestServerBuilder::new()?
-        .with_initialization_options(ClientOptions::default())
+        .with_initialization_options(&ClientOptions::default())
         .enable_completion_snippets(true)
         .with_workspace(workspace_root, None)?
         .with_file(foo, foo_content)?
@@ -126,7 +126,54 @@ complete_parenth
 
     let mut server = TestServerBuilder::new()?
         .with_initialization_options(
-            ClientOptions::default().with_complete_function_parentheses(true),
+            &ClientOptions::default().with_complete_function_parentheses(true),
+        )
+        .enable_completion_snippets(true)
+        .with_trigger_parameter_hints_command()
+        .with_workspace(workspace_root, None)?
+        .with_file(foo, foo_content)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(foo, foo_content, 1);
+
+    let completions = server.completion_request(&server.file_uri(foo), Position::new(2, 16));
+    insta::assert_json_snapshot!(completions, @r#"
+    [
+      {
+        "label": "complete_parentheses",
+        "kind": 3,
+        "detail": "def complete_parentheses() -> None",
+        "sortText": "0",
+        "insertText": "complete_parentheses($0)",
+        "insertTextFormat": 2,
+        "command": {
+          "title": "Trigger parameter hints",
+          "command": "ty.triggerParameterHints"
+        }
+      }
+    ]
+    "#);
+
+    Ok(())
+}
+
+/// Tests that the signature-help command is omitted when the client has not
+/// advertised support for it (for example, editors that would surface an
+/// "unsupported command" error).
+#[test]
+fn complete_function_parentheses_without_command_support() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let foo_content = "\
+def complete_parentheses() -> None: ...
+
+complete_parenth
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_initialization_options(
+            &ClientOptions::default().with_complete_function_parentheses(true),
         )
         .enable_completion_snippets(true)
         .with_workspace(workspace_root, None)?
@@ -165,7 +212,7 @@ complete_parenth
 
     let mut server = TestServerBuilder::new()?
         .with_initialization_options(
-            ClientOptions::default().with_complete_function_parentheses(true),
+            &ClientOptions::default().with_complete_function_parentheses(true),
         )
         .with_workspace(workspace_root, None)?
         .with_file(foo, foo_content)?
@@ -202,9 +249,10 @@ is_typedd
 
     let mut server = TestServerBuilder::new()?
         .with_initialization_options(
-            ClientOptions::default().with_complete_function_parentheses(true),
+            &ClientOptions::default().with_complete_function_parentheses(true),
         )
         .enable_completion_snippets(true)
+        .with_trigger_parameter_hints_command()
         .with_workspace(workspace_root, None)?
         .with_file(foo, foo_content)?
         .build()
@@ -220,7 +268,37 @@ is_typedd
         "kind": 3,
         "sortText": "0",
         "insertText": "typing.is_typeddict($0)",
-        "insertTextFormat": 2
+        "insertTextFormat": 2,
+        "command": {
+          "title": "Trigger parameter hints",
+          "command": "ty.triggerParameterHints"
+        }
+      },
+      {
+        "label": "is_typeddict (import typing_extensions)",
+        "kind": 3,
+        "sortText": "1",
+        "insertText": "is_typeddict($0)",
+        "insertTextFormat": 2,
+        "additionalTextEdits": [
+          {
+            "range": {
+              "start": {
+                "line": 0,
+                "character": 0
+              },
+              "end": {
+                "line": 0,
+                "character": 0
+              }
+            },
+            "newText": "from typing_extensions import is_typeddict\n"
+          }
+        ],
+        "command": {
+          "title": "Trigger parameter hints",
+          "command": "ty.triggerParameterHints"
+        }
       }
     ]
     "#);
@@ -243,7 +321,7 @@ TypedDi<CURSOR>
 ";
 
     let mut server = TestServerBuilder::new()?
-        .with_initialization_options(ClientOptions::default())
+        .with_initialization_options(&ClientOptions::default())
         .with_workspace(workspace_root, None)?
         .with_file(foo, foo_content)?
         .build()
@@ -268,9 +346,72 @@ TypedDi<CURSOR>
         "insertText": "typing.is_typeddict"
       },
       {
+        "label": "TypedDict (import typing_extensions)",
+        "kind": 6,
+        "sortText": "2",
+        "insertText": "TypedDict",
+        "additionalTextEdits": [
+          {
+            "range": {
+              "start": {
+                "line": 0,
+                "character": 0
+              },
+              "end": {
+                "line": 0,
+                "character": 0
+              }
+            },
+            "newText": "from typing_extensions import TypedDict\n"
+          }
+        ]
+      },
+      {
+        "label": "TypedDictFallback (import _typeshed._type_checker_internals)",
+        "kind": 7,
+        "sortText": "3",
+        "insertText": "TypedDictFallback",
+        "additionalTextEdits": [
+          {
+            "range": {
+              "start": {
+                "line": 0,
+                "character": 0
+              },
+              "end": {
+                "line": 0,
+                "character": 0
+              }
+            },
+            "newText": "from _typeshed._type_checker_internals import TypedDictFallback\n"
+          }
+        ]
+      },
+      {
+        "label": "is_typeddict (import typing_extensions)",
+        "kind": 3,
+        "sortText": "4",
+        "insertText": "is_typeddict",
+        "additionalTextEdits": [
+          {
+            "range": {
+              "start": {
+                "line": 0,
+                "character": 0
+              },
+              "end": {
+                "line": 0,
+                "character": 0
+              }
+            },
+            "newText": "from typing_extensions import is_typeddict\n"
+          }
+        ]
+      },
+      {
         "label": "_FilterConfigurationTypedDict (import logging.config)",
         "kind": 7,
-        "sortText": "2",
+        "sortText": "5",
         "insertText": "_FilterConfigurationTypedDict",
         "additionalTextEdits": [
           {
@@ -291,7 +432,7 @@ TypedDi<CURSOR>
       {
         "label": "_FormatterConfigurationTypedDict (import logging.config)",
         "kind": 6,
-        "sortText": "3",
+        "sortText": "6",
         "insertText": "_FormatterConfigurationTypedDict",
         "additionalTextEdits": [
           {
@@ -306,6 +447,27 @@ TypedDi<CURSOR>
               }
             },
             "newText": "from logging.config import _FormatterConfigurationTypedDict\n"
+          }
+        ]
+      },
+      {
+        "label": "_typeshed.dbapi (import _typeshed.dbapi)",
+        "kind": 9,
+        "sortText": "7",
+        "insertText": "_typeshed.dbapi",
+        "additionalTextEdits": [
+          {
+            "range": {
+              "start": {
+                "line": 0,
+                "character": 0
+              },
+              "end": {
+                "line": 0,
+                "character": 0
+              }
+            },
+            "newText": "import _typeshed.dbapi\n"
           }
         ]
       }
@@ -327,7 +489,7 @@ TypedDi<CURSOR>
 ";
 
     let mut server = TestServerBuilder::new()?
-        .with_initialization_options(ClientOptions::default())
+        .with_initialization_options(&ClientOptions::default())
         .with_workspace(workspace_root, None)?
         .with_file(foo, foo_content)?
         .build()
@@ -382,9 +544,72 @@ TypedDi<CURSOR>
         ]
       },
       {
+        "label": "TypedDict (import typing_extensions)",
+        "kind": 6,
+        "sortText": "2",
+        "insertText": "TypedDict",
+        "additionalTextEdits": [
+          {
+            "range": {
+              "start": {
+                "line": 0,
+                "character": 0
+              },
+              "end": {
+                "line": 0,
+                "character": 0
+              }
+            },
+            "newText": "from typing_extensions import TypedDict\n"
+          }
+        ]
+      },
+      {
+        "label": "TypedDictFallback (import _typeshed._type_checker_internals)",
+        "kind": 7,
+        "sortText": "3",
+        "insertText": "TypedDictFallback",
+        "additionalTextEdits": [
+          {
+            "range": {
+              "start": {
+                "line": 0,
+                "character": 0
+              },
+              "end": {
+                "line": 0,
+                "character": 0
+              }
+            },
+            "newText": "from _typeshed._type_checker_internals import TypedDictFallback\n"
+          }
+        ]
+      },
+      {
+        "label": "is_typeddict (import typing_extensions)",
+        "kind": 3,
+        "sortText": "4",
+        "insertText": "is_typeddict",
+        "additionalTextEdits": [
+          {
+            "range": {
+              "start": {
+                "line": 0,
+                "character": 0
+              },
+              "end": {
+                "line": 0,
+                "character": 0
+              }
+            },
+            "newText": "from typing_extensions import is_typeddict\n"
+          }
+        ]
+      },
+      {
         "label": "_FilterConfigurationTypedDict (import logging.config)",
         "kind": 7,
-        "sortText": "2",
+        "sortText": "5",
         "insertText": "_FilterConfigurationTypedDict",
         "additionalTextEdits": [
           {
@@ -405,7 +630,7 @@ TypedDi<CURSOR>
       {
         "label": "_FormatterConfigurationTypedDict (import logging.config)",
         "kind": 6,
-        "sortText": "3",
+        "sortText": "6",
         "insertText": "_FormatterConfigurationTypedDict",
         "additionalTextEdits": [
           {
@@ -420,6 +645,27 @@ TypedDi<CURSOR>
               }
             },
             "newText": "from logging.config import _FormatterConfigurationTypedDict\n"
+          }
+        ]
+      },
+      {
+        "label": "_typeshed.dbapi (import _typeshed.dbapi)",
+        "kind": 9,
+        "sortText": "7",
+        "insertText": "_typeshed.dbapi",
+        "additionalTextEdits": [
+          {
+            "range": {
+              "start": {
+                "line": 0,
+                "character": 0
+              },
+              "end": {
+                "line": 0,
+                "character": 0
+              }
+            },
+            "newText": "import _typeshed.dbapi\n"
           }
         ]
       }
@@ -441,7 +687,7 @@ re.match('', '', fla<CURSOR>
 ";
 
     let mut server = TestServerBuilder::new()?
-        .with_initialization_options(ClientOptions::default().with_auto_import(false))
+        .with_initialization_options(&ClientOptions::default().with_auto_import(false))
         .with_workspace(workspace_root, None)?
         .with_file(foo, foo_content)?
         .build()
@@ -511,7 +757,7 @@ x: Literal[\"apple\"] = \"app\"
 ";
 
     let mut server = TestServerBuilder::new()?
-        .with_initialization_options(ClientOptions::default().with_auto_import(false))
+        .with_initialization_options(&ClientOptions::default().with_auto_import(false))
         .with_workspace(workspace_root, None)?
         .with_file(foo, foo_content)?
         .build()
@@ -554,7 +800,7 @@ take({\"\"})
 ";
 
     let mut server = TestServerBuilder::new()?
-        .with_initialization_options(ClientOptions::default().with_auto_import(false))
+        .with_initialization_options(&ClientOptions::default().with_auto_import(false))
         .with_workspace(workspace_root, None)?
         .with_file(foo, foo_content)?
         .build()

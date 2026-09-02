@@ -266,6 +266,224 @@ class ReturnsFactory:
 ReturnsFactory()
 ```
 
+## Recursive constructor signatures
+
+When a constructor refers back to the same receiver type without reaching a callable signature, we
+fall back to an unknown signature with the nominal instance return type.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+### A decorator returning the enclosing class
+
+A decorator can replace `__new__` with the type of its implicit `cls` parameter, making the
+constructor refer back to itself. Regression test for <https://github.com/astral-sh/ty/issues/4347>.
+
+```py
+from collections.abc import Callable
+
+def decorate[T](callback: Callable[[T], None]) -> T:
+    raise NotImplementedError
+
+class C:
+    @decorate
+    def __new__(cls):
+        pass
+
+reveal_type(C.__new__)  # revealed: type[C]
+reveal_type(C())  # revealed: C
+```
+
+### Mutually recursive class objects
+
+The same fallback applies when two classes use each other as their `__new__` method:
+
+```py
+class A:
+    __new__: type["B"]
+
+class B:
+    __new__: type[A]
+
+reveal_type(A())  # revealed: A
+```
+
+### Recursive generic constructors
+
+A constructor can also return to the same generic class with the same specialization:
+
+```py
+class C[T]:
+    __new__: type["C[T]"]
+
+# TODO: Default unsolved class type variables in gradual constructor signatures to `Unknown`.
+reveal_type(C())  # revealed: C[T@C]
+reveal_type(C[int]())  # revealed: C[int]
+```
+
+### Shared constructors in union branches
+
+A constructor that occurs in separate union branches is not recursive. Both branches reach the same
+finite signature:
+
+```py
+class End:
+    def __new__(cls, *args: object) -> int:
+        return 1
+
+class Left:
+    __new__ = End
+
+class Right:
+    __new__ = End
+
+class C:
+    __new__: type[Left] | type[Right]
+
+reveal_type(C())  # revealed: int
+```
+
+### Finite generic constructor chains
+
+Returning to the same generic class is safe when subsequent constructors reach a callable signature.
+Here, each step consumes a nested specialization until it reaches `End.__new__`:
+
+```py
+class End[T]:
+    def __new__(cls, *args: object) -> int:
+        return 1
+
+class C[T]:
+    __new__: type[T]
+
+reveal_type(C[C[End[int]]]())  # revealed: int
+
+type Inner = C[End[int]]
+
+reveal_type(C[Inner]())  # revealed: int
+```
+
+A finite chain can even grow its arguments. `Factory` returns to `C` with a larger argument, but
+`End` does not expand the nested `Factory` type:
+
+```py
+class Factory[T]:
+    __new__: type[C[End["Factory[T]"]]]
+
+reveal_type(C[Factory[int]]())  # revealed: int
+```
+
+### Descriptor-sensitive constructor receivers
+
+An exact class object and a value of `type[C]` can select different descriptor overloads. This
+constructor returns to `C` with a different receiver type before reaching a finite signature:
+
+```py
+from collections.abc import Callable
+from typing import overload
+from ty_extensions._internal import TypeOf
+
+class Descriptor:
+    @overload
+    def __get__(self, obj: None, owner: "TypeOf[C]") -> "type[C]": ...
+    @overload
+    def __get__(self, obj: None, owner: "type[C]") -> Callable[..., int]: ...
+    def __get__(self, obj, owner):
+        raise NotImplementedError
+
+class C:
+    __new__: Descriptor
+
+reveal_type(C())  # revealed: int
+```
+
+### Argument checks after recursive `__new__`
+
+The recursive `__new__` fallback accepts arbitrary arguments, but an ordinary `__init__` still
+validates them against the class's specialization:
+
+```py
+class C[T]:
+    __new__: type["C[T]"]
+
+    def __init__(self, x: T):
+        pass
+
+reveal_type(C[int](1))  # revealed: C[int]
+# error: [invalid-argument-type]
+C[int]("wrong")
+```
+
+### A recursive class object in place of `__init__`
+
+Class-valued `__init__` methods can also lead back to the constructor being expanded:
+
+```py
+class C:
+    __init__: type["C"]
+
+reveal_type(C())  # revealed: C
+```
+
+The fallback does not override a known non-instance return from `__new__`, which bypasses
+`__init__`:
+
+```py
+class ReturnsInt:
+    def __new__(cls) -> int:
+        return 1
+
+    __init__: type["ReturnsInt"]
+
+reveal_type(ReturnsInt())  # revealed: int
+```
+
+### A recursive class object in place of metaclass `__call__`
+
+A metaclass's `__call__` can refer back to the class being constructed:
+
+```py
+class Meta(type):
+    __call__: type["C"]
+
+class C(metaclass=Meta): ...
+
+reveal_type(C())  # revealed: C
+```
+
+### A cycle through a callable instance
+
+Constructor expansion can pass through an instance's `__call__` before returning to the original
+class:
+
+```py
+class C:
+    __new__: "Factory"
+
+class Factory:
+    __call__: type[C]
+
+reveal_type(C())  # revealed: C
+```
+
+### A metaclass bypassing a recursive `__new__`
+
+A metaclass `__call__` that returns an unrelated type bypasses `__new__`. A recursive signature in
+the unused `__new__` does not prevent us from inferring the metaclass method's return type:
+
+```py
+class Meta(type):
+    def __call__(cls) -> int:
+        return 1
+
+class C(metaclass=Meta):
+    __new__: type["C"]
+
+reveal_type(C())  # revealed: int
+```
+
 ## `__new__` is implicitly a static method, but explicitly marking it as one is harmless
 
 ```py
@@ -1510,6 +1728,193 @@ def f(cls: type[T]):
     # error: [invalid-argument-type] "Argument to constructor `C.__new__` is incorrect: Expected `str`, found `Literal[2]`"
     cls(1, 2)
     reveal_type(cls(1, "foo"))  # revealed: T@f
+```
+
+## Intersection constructors
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+### Narrowed bound type variables
+
+Narrowing a bounded class type with `issubclass` must use the subclass constructor while preserving
+both the original type variable and the narrowed subclass in the return type.
+
+```py
+class Base:
+    def __init__(self, value: str) -> None: ...
+
+class IntConstructor(Base):
+    def __init__(self, value: int) -> None: ...
+
+def valid[T: Base](cls: type[T]) -> T:
+    if issubclass(cls, IntConstructor):
+        reveal_type(cls)  # revealed: type[T@valid] & type[IntConstructor]
+        reveal_type(cls(1))  # revealed: T@valid & IntConstructor
+        return cls(1)
+    return cls("ok")
+```
+
+An argument accepted by the bound's constructor must still be rejected by the narrowed subclass.
+Arguments rejected by both constructors produce only the subclass constructor's diagnostic.
+
+```py
+def invalid_arguments[T: Base](cls: type[T]) -> None:
+    if issubclass(cls, IntConstructor):
+        # error: [invalid-argument-type] "Argument to `IntConstructor.__init__` is incorrect: Expected `int`, found `Literal["wrong"]`"
+        cls("wrong")
+        # error: [invalid-argument-type] "Argument to `IntConstructor.__init__` is incorrect: Expected `int`, found `None`"
+        cls(None)
+```
+
+### Narrowed constrained type variables
+
+Narrowing a constrained type variable selects the matching constructor without losing the original
+type variable in the return type.
+
+```py
+class StringConstructor:
+    def __init__(self, value: str) -> None: ...
+
+class IntConstructor:
+    def __init__(self, value: int) -> None: ...
+
+def construct[T: (StringConstructor, IntConstructor)](cls: type[T]) -> None:
+    if issubclass(cls, IntConstructor):
+        reveal_type(cls)  # revealed: type[T@construct] & type[IntConstructor]
+        reveal_type(cls(1))  # revealed: T@construct & IntConstructor
+        # error: [invalid-argument-type] "Argument to `IntConstructor.__init__` is incorrect: Expected `int`, found `Literal["wrong"]`"
+        cls("wrong")
+```
+
+### Narrowed unbounded type variables
+
+The narrowed subclass constructor also determines which arguments are valid when the original type
+variable has no upper bound.
+
+```py
+class IntConstructor:
+    def __init__(self, value: int) -> None: ...
+
+def construct[T](cls: type[T]) -> None:
+    if issubclass(cls, IntConstructor):
+        reveal_type(cls)  # revealed: type[T@construct] & type[IntConstructor]
+        reveal_type(cls(1))  # revealed: T@construct & IntConstructor
+        # error: [invalid-argument-type] "Argument to `IntConstructor.__init__` is incorrect: Expected `int`, found `Literal["wrong"]`"
+        cls("wrong")
+```
+
+### Specialized generic constructors
+
+A generic constructor provider must retain its explicit specialization when validating arguments and
+preserve the original type variable in its return type.
+
+```py
+from ty_extensions import Intersection
+
+class Box[S]:
+    def __init__(self, value: S) -> None: ...
+
+def construct[T](cls: Intersection[type[T], type[Box[int]]]) -> None:
+    reveal_type(cls(1))  # revealed: T@construct & Box[int]
+    # error: [invalid-argument-type] "Argument to `Box.__init__` is incorrect: Expected `int`, found `Literal["wrong"]`"
+    cls("wrong")
+```
+
+### Built-in constructor behavior
+
+Narrowing to a final built-in class must retain its specialized constructor behavior and the
+original type variable.
+
+```py
+def construct[T](cls: type[T]) -> None:
+    if issubclass(cls, bool):
+        reveal_type(cls)  # revealed: type[T@construct] & <class 'bool'>
+        reveal_type(cls(1))  # revealed: T@construct & Literal[True]
+```
+
+### `Self` constructor returns
+
+An explicit `Self` return still represents the constructed instance, so narrowing must preserve the
+original type variable and validate the subclass initializer.
+
+```py
+from typing import Self
+
+class Base:
+    def __init__(self, value: str) -> None: ...
+
+class NewChild(Base):
+    def __new__(cls, value: object) -> Self:
+        return object.__new__(cls)
+
+    def __init__(self, value: int) -> None: ...
+
+def construct[T: Base](cls: type[T]) -> None:
+    if issubclass(cls, NewChild):
+        reveal_type(cls(1))  # revealed: T@construct & NewChild
+        # error: [invalid-argument-type] "Argument to `NewChild.__init__` is incorrect: Expected `int`, found `Literal["wrong"]`"
+        cls("wrong")
+```
+
+### Non-instance `__new__` returns
+
+A constructor explicitly returning a non-instance type must retain that return type instead of
+intersecting it with the original type variable.
+
+```py
+class Base:
+    def __init__(self, value: str) -> None: ...
+
+class ReturnsString(Base):
+    def __new__(cls, value: int) -> str:
+        return str(value)
+
+def construct[T: Base](cls: type[T]) -> None:
+    if issubclass(cls, ReturnsString):
+        reveal_type(cls(1))  # revealed: str
+```
+
+### Non-instance metaclass `__call__` returns
+
+A custom metaclass's explicit non-instance return similarly takes precedence over the original type
+variable.
+
+```py
+class StringFactory(type):
+    def __call__(cls, value: int) -> str:
+        return str(value)
+
+class Base:
+    def __init__(self, value: str) -> None: ...
+
+class Factory(Base, metaclass=StringFactory): ...
+
+def construct[T: Base](cls: type[T]) -> None:
+    if issubclass(cls, Factory):
+        reveal_type(cls(1))  # revealed: str
+```
+
+### Independent metaclass callables
+
+An intersection of a class-object type and a metaclass instance retains both independent callables.
+Arguments accepted by only one callable use that callable's return type.
+
+```py
+from ty_extensions import Intersection
+
+class StringBase:
+    def __init__(self, value: str) -> None: ...
+
+class IntMeta(type):
+    def __call__(cls, value: int) -> str:
+        return str(value)
+
+def construct(cls: Intersection[type[StringBase], IntMeta]) -> None:
+    reveal_type(cls(1))  # revealed: str
+    reveal_type(cls("ok"))  # revealed: StringBase
 ```
 
 ## Union of constructors

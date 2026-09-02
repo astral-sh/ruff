@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for `assertRaises` and `pytest.raises` context managers that catch
@@ -29,7 +30,7 @@ use crate::checkers::ast::Checker;
 /// self.assertRaises(SomeSpecificException, foo)
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.83")]
+#[violation_metadata(stable_since = "v0.0.83", category = Category::Suspicious)]
 pub(crate) struct AssertRaisesException {
     exception: ExceptionKind,
 }
@@ -110,7 +111,7 @@ pub(crate) fn assert_raises_exception(checker: &Checker, items: &[WithItem]) {
         let Expr::Call(ast::ExprCall {
             func,
             arguments,
-            range: _,
+            range_start: _,
             node_index: _,
         }) = &item.context_expr
         else {
@@ -130,15 +131,13 @@ pub(crate) fn assert_raises_exception(checker: &Checker, items: &[WithItem]) {
 }
 
 /// B017 (call form)
-pub(crate) fn assert_raises_exception_call(
-    checker: &Checker,
-    ast::ExprCall {
+pub(crate) fn assert_raises_exception_call(checker: &Checker, call: &ast::ExprCall) {
+    let ast::ExprCall {
         func,
         arguments,
-        range,
+        range_start: _,
         node_index: _,
-    }: &ast::ExprCall,
-) {
+    } = call;
     let semantic = checker.semantic();
 
     if arguments.args.len() < 2 && arguments.find_argument("func", 1).is_none() {
@@ -146,6 +145,6 @@ pub(crate) fn assert_raises_exception_call(
     }
 
     if let Some(exception) = detect_blind_exception(semantic, func.as_ref(), arguments) {
-        checker.report_diagnostic(AssertRaisesException { exception }, *range);
+        checker.report_diagnostic(AssertRaisesException { exception }, call.range());
     }
 }

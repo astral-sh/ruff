@@ -83,6 +83,41 @@ unused-ignore-comment = \"warn\"
 }
 
 #[test]
+fn code_action_unsafe_fix() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    // Removing the suppression is unsafe because it would activate `fmt: off`.
+    let foo_content = "\
+# ty: ignore[division-by-zero] # fmt: off
+x = 20 / 2
+";
+
+    let ty_toml = SystemPath::new("ty.toml");
+    let ty_toml_content = "\
+[rules]
+unused-ignore-comment = \"warn\"
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(workspace_root, None)?
+        .with_file(ty_toml, ty_toml_content)?
+        .with_file(foo, foo_content)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(foo, foo_content, 1);
+
+    let diagnostics = server.document_diagnostic_request(foo, None);
+    let code_action_params = code_actions_at(&server, diagnostics, foo, full_range(foo_content));
+    let code_action_id = server.send_request::<CodeActionRequest>(code_action_params);
+    let code_actions = server.await_response::<CodeActionRequest>(&code_action_id);
+
+    insta::assert_json_snapshot!(code_actions);
+
+    Ok(())
+}
+
+#[test]
 fn no_code_action_for_non_overlapping_range_on_same_line() -> Result<()> {
     let workspace_root = SystemPath::new("src");
     let foo = SystemPath::new("src/foo.py");
