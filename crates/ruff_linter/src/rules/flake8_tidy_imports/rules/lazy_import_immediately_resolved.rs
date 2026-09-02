@@ -105,7 +105,7 @@ pub(crate) fn lazy_import_immediately_resolved(checker: &Checker, name: &ExprNam
             break;
         }
 
-        if require_lazy.find(&policy).is_some() {
+        if node.range().contains_range(binding.range()) && require_lazy.find(&policy).is_some() {
             return;
         }
     }

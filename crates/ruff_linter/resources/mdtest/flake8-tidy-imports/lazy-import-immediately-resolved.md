@@ -34,3 +34,27 @@ help: Convert to a lazy import
   |
 note: This is an unsafe fix and may change runtime behavior
 ```
+
+## Partially required lazy imports
+
+`TID255` still reports immediately resolved names outside `require-lazy`, even when another name in
+the same import is required to be lazy.
+
+```toml
+target-version = "py315"
+
+[lint]
+preview = true
+select = ["TID254", "TID255"]
+flake8-tidy-imports.require-lazy = ["foo", "pkg.Base"]
+```
+
+```py
+lazy import foo as required, bar
+lazy from pkg import Base as RequiredBase, OtherBase
+
+required.value
+RequiredBase()
+bar.value  # error: [lazy-import-immediately-resolved]
+OtherBase()  # error: [lazy-import-immediately-resolved]
+```
