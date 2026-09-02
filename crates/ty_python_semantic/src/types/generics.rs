@@ -1246,31 +1246,48 @@ impl<'db> Specialization<'db> {
         mapped_types.map_or(Cow::Borrowed(types), Cow::Owned)
     }
 
-    /// Intersects gradual type arguments with their type parameters' upper bounds.
+    /// Splits off gradual arguments whose type parameter has an upper bound.
     ///
-    /// For example, in a protocol `P[T: str]`, a member typed as `T` remains bounded by
-    /// `str` when the argument is `Any`. Using `Any & str` lets structural comparisons
-    /// materialize the member in either direction without losing that bound.
-    pub(super) fn with_typevar_bounds(self, db: &'db dyn Db) -> Self {
+    /// The first specialization substitutes the other arguments and leaves these type
+    /// variables in place. The optional second specialization substitutes the deferred
+    /// arguments, allowing specialization and materialization to be applied together.
+    /// For example, a member returning `T` from a protocol `P[T: str]` must retain `T`
+    /// so the top materialization of the argument `Any` can be limited to `str`.
+    pub(super) fn defer_bounded_arguments(self, db: &'db dyn Db) -> (Self, Option<Self>) {
         let env = ProgramEnvironment::from_program(self.generic_context(db).program(db));
-        let types = self.map_types(db, |_, typevar, ty| {
-            if ty.is_fully_static(db, &env) {
-                return ty;
+        let eager = self.map_types(db, |_, typevar, ty| {
+            let identity = Type::TypeVar(typevar);
+            if ty != identity
+                && typevar.typevar(db).bound_or_constraints(db, &env).is_some()
+                && !ty.is_fully_static(db, &env)
+            {
+                identity
+            } else {
+                ty
             }
-            let Some(upper_bound) = typevar.top_materialized_upper_bound(db) else {
-                return ty;
-            };
-            IntersectionType::from_two_elements(db, &env, ty, upper_bound)
         });
-        if matches!(types, Cow::Borrowed(_)) {
-            return self;
-        }
-        Self::new(
-            db,
-            self.generic_context(db),
-            types.into_owned().into_boxed_slice(),
-            self.materialization_kind(db),
-            self.tuple_inner(db),
+        let Cow::Owned(eager) = eager else {
+            return (self, None);
+        };
+        let deferred = self.map_types(db, |index, typevar, ty| {
+            if eager[index] != ty {
+                ty
+            } else {
+                Type::TypeVar(typevar)
+            }
+        });
+        let specialization = |types| {
+            Self::new(
+                db,
+                self.generic_context(db),
+                types,
+                self.materialization_kind(db),
+                self.tuple_inner(db),
+            )
+        };
+        (
+            specialization(eager.into_boxed_slice()),
+            Some(specialization(deferred.into_owned().into_boxed_slice())),
         )
     }
 

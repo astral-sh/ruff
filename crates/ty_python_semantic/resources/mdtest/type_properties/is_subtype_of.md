@@ -1091,6 +1091,45 @@ static_assert(not is_subtype_of(Top[Cell[Any]], EquivalentCell[Any]))
 static_assert(not is_subtype_of(Top[Cell[Any]], Bottom[EquivalentCell[Any]]))
 ```
 
+Property getters and setters use the bound in their respective read and write positions:
+
+```py
+class PropertyCell[T: str](Protocol):
+    @property
+    def value(self) -> T: ...
+    @value.setter
+    def value(self, value: T) -> None: ...
+
+class EquivalentPropertyCell[T: str](Protocol):
+    @property
+    def value(self) -> T: ...
+    @value.setter
+    def value(self, value: T) -> None: ...
+
+static_assert(is_subtype_of(PropertyCell[Any], Top[EquivalentPropertyCell[Any]]))
+static_assert(is_subtype_of(Bottom[PropertyCell[Any]], EquivalentPropertyCell[Any]))
+static_assert(is_subtype_of(Bottom[PropertyCell[Any]], Top[EquivalentPropertyCell[Any]]))
+static_assert(not is_subtype_of(PropertyCell[Any], Bottom[EquivalentPropertyCell[Any]]))
+static_assert(not is_subtype_of(Top[PropertyCell[Any]], EquivalentPropertyCell[Any]))
+static_assert(not is_subtype_of(Top[PropertyCell[Any]], Bottom[EquivalentPropertyCell[Any]]))
+```
+
+A member can use both bounded and unbounded type parameters. Each argument is substituted without
+losing the bound on the other parameter:
+
+```py
+class Pair[T: str, U](Protocol):
+    def read(self) -> tuple[T, U]: ...
+
+class EquivalentPair[T: str, U](Protocol):
+    def read(self) -> tuple[T, U]: ...
+
+static_assert(is_subtype_of(Pair[Any, int], Top[EquivalentPair[Any, int]]))
+static_assert(is_subtype_of(Bottom[Pair[Any, int]], EquivalentPair[Any, int]))
+static_assert(not is_subtype_of(Pair[Any, int], Top[EquivalentPair[Any, str]]))
+static_assert(not is_subtype_of(Top[Pair[Any, int]], Bottom[EquivalentPair[Any, int]]))
+```
+
 ## Callable
 
 The general principle is that a callable type is a subtype of another if it's more flexible in what
