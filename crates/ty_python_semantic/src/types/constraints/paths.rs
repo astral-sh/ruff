@@ -14,7 +14,7 @@ use crate::types::constraints::sequents::{Sequent, SequentMap};
 use crate::types::constraints::variables::Constraint;
 use crate::types::constraints::{
     ConstraintAssignment, ConstraintId, ConstraintSetStorage, InterimConstraint, Node, NodeId,
-    OldConstraint, PathVisitor, SourceOrderId, TypeVarId,
+    PathVisitor, SourceOrderId, TypeVarId,
 };
 use crate::{Db, FxIndexMap, ProgramEnvironment};
 
@@ -68,9 +68,6 @@ pub(crate) struct PathAssignments {
     /// Consequents grouped by the discovery call that introduced their sequents.
     single_replay_consequents: FxHashMap<ConstraintId, Vec<ConstraintId>>,
     pair_replay_consequents: FxHashMap<(ConstraintId, ConstraintId), Vec<ConstraintId>>,
-
-    /// Implications that connect an old constraint to its equivalent new representation.
-    bridge_implications: FxHashSet<(ConstraintId, ConstraintId)>,
 
     /// Type variables that only involve concrete constraints and so do not participate in sequent
     /// discovery.
@@ -233,7 +230,6 @@ impl PathAssignments {
             elaborated_pairs: FxHashSet::default(),
             single_replay_consequents: FxHashMap::default(),
             pair_replay_consequents: FxHashMap::default(),
-            bridge_implications: FxHashSet::default(),
             independent_typevars,
             remaining_overall_fuel: OVERALL_FUEL_BUDGET,
             assignment_queue: VecDeque::default(),
@@ -493,14 +489,9 @@ impl PathAssignments {
     ) -> impl Iterator<Item = (ConstraintId, ConstraintId)> + '_ {
         self.assignments.iter().filter_map(
             |(assignment, (source_constraint, _))| match assignment {
-                ConstraintAssignment::Positive(constraint)
-                    if !self
-                        .bridge_implications
-                        .contains(&(*source_constraint, *constraint)) =>
-                {
+                ConstraintAssignment::Positive(constraint) => {
                     Some((*constraint, *source_constraint))
                 }
-                ConstraintAssignment::Positive(_) => None,
                 ConstraintAssignment::Negative(_) | ConstraintAssignment::Unconstrained(_) => None,
             },
         )
@@ -574,12 +565,6 @@ impl PathAssignments {
         self.sequents.extend(sequents);
     }
 
-    fn add_bridge_implication(&mut self, ante: ConstraintId, post: ConstraintId) {
-        self.bridge_implications.insert((ante, post));
-        self.sequents
-            .push(Sequent::SingleImplication { ante, post });
-    }
-
     fn discover_single_constraint<'db>(
         &mut self,
         db: &'db dyn Db,
@@ -597,42 +582,6 @@ impl PathAssignments {
                 |sequent| matches!(sequent, Sequent::SingleTautology { ante } if ante == constraint),
             ));
             self.add_sequents(db, env, storage, map);
-        }
-
-        if matches!(constraint, InterimConstraint::Old(_)) {
-            // Project every component from the old constraint so that an explicit old atom can
-            // still contribute evidence through the new sequent rules.
-            let component_ids: SmallVec<[ConstraintId; 2]> = constraints
-                .iter()
-                .map(|component| storage.intern_constraint(db, env, component.into()))
-                .collect();
-
-            for &component_id in &component_ids {
-                self.add_bridge_implication(constraint_id, component_id);
-            }
-
-            // The reverse bridge only reconstructs the old constraint's logical truth. Remove
-            // tautological components from that conjunction instead of requiring them to appear as
-            // positive path assignments.
-            let reverse_antecedents: SmallVec<[ConstraintId; 2]> = component_ids
-                .iter()
-                .zip(&tautologies)
-                .filter_map(|(&component_id, &is_tautology)| {
-                    (!is_tautology).then_some(component_id)
-                })
-                .collect();
-            match reverse_antecedents.as_slice() {
-                [] => self.sequents.push(Sequent::SingleTautology {
-                    ante: constraint_id,
-                }),
-                &[ante] => self.add_bridge_implication(ante, constraint_id),
-                &[ante1, ante2] => self.sequents.push(Sequent::PairImplication {
-                    ante1,
-                    ante2,
-                    post: constraint_id,
-                }),
-                _ => {}
-            }
         }
 
         if let [lower, upper] = constraints.as_slice() {
@@ -668,25 +617,6 @@ impl PathAssignments {
         let sequent_start = self.sequents.len();
         let left = storage.constraint_data(left_id);
         let right = storage.constraint_data(right_id);
-        if let (InterimConstraint::Old(left), InterimConstraint::Old(right)) = (left, right) {
-            let implies = |left: OldConstraint<'db>, right: OldConstraint<'db>| {
-                if !left.typevar.is_same_typevar_as(db, right.typevar) {
-                    return false;
-                }
-                let left_lower = left.lower_bound(db).ty().bottom_materialization(db, env);
-                let left_upper = left.upper_bound(db).ty().top_materialization(db, env);
-                let right_lower = right.lower_bound(db).ty().bottom_materialization(db, env);
-                let right_upper = right.upper_bound(db).ty().top_materialization(db, env);
-                right_lower.is_constraint_set_assignable_to(db, env, left_lower)
-                    && left_upper.is_constraint_set_assignable_to(db, env, right_upper)
-            };
-            if implies(left, right) {
-                self.add_bridge_implication(left_id, right_id);
-            }
-            if implies(right, left) {
-                self.add_bridge_implication(right_id, left_id);
-            }
-        }
 
         let left_constraints = left.into_new(db, env);
         let right_constraints = right.into_new(db, env);
@@ -1103,17 +1033,9 @@ impl PathAssignments {
         let Some(available_fuel) = self.max_remaining_fuel_for(ante.when_true()) else {
             return;
         };
-        let ante_data = storage.constraint_data(ante);
         let (antecedent_constructor_depth, _) =
             storage.cached_constraint_bound_depth(db, env, ante);
-        let post_data = storage.constraint_data(post);
-        let fuel_cost = if self.bridge_implications.contains(&(ante, post))
-            || post_data.is_bound_projection_of(db, ante_data)
-        {
-            1
-        } else {
-            storage.sequent_fuel_cost(db, env, post, antecedent_constructor_depth)
-        };
+        let fuel_cost = storage.sequent_fuel_cost(db, env, post, antecedent_constructor_depth);
         if let Some(post_fuel) = available_fuel.checked_sub(fuel_cost) {
             self.enqueue_assignment(
                 post.when_true(),
