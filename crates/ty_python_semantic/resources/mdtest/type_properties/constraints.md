@@ -34,7 +34,7 @@ upper bound.
 
 ```py
 from typing import Any, Callable, final, Never, Sequence
-from ty_extensions import static_assert
+from ty_extensions import Intersection, static_assert
 from ty_extensions._internal import ConstraintSet
 
 class Super: ...
@@ -100,6 +100,17 @@ that specific type.
 def _[T]() -> None:
     # (T@_ = Base)
     ConstraintSet.equality(T, Base)
+```
+
+When the bound includes the constrained type variable in a top-level union or intersection, one half
+of the equality is tautological but the other half must still hold. For example, `T = T | Base`
+requires `T` to be a supertype of `Base`, while `T = T & Base` requires `T` to be a subtype of
+`Base`.
+
+```py
+def self_containing_bound[T]() -> None:
+    static_assert(ConstraintSet.equality(T, T | Base) == ConstraintSet.lower_bound(Base, T))
+    static_assert(ConstraintSet.equality(T, Intersection[T, Base]) == ConstraintSet.upper_bound(T, Base))
 ```
 
 ### Lower bound
