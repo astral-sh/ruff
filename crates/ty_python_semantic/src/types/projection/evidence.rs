@@ -9,6 +9,8 @@
 //! resolving a class decorator. Doing that from a Salsa cycle-recovery callback
 //! introduces a new dependency into the active cycle, which Salsa rejects.
 
+use rustc_hash::FxHashMap;
+
 use crate::types::{DivergentType, ProgramEnvironment, StaticClassLiteral, Type};
 use crate::{Db, FxIndexSet};
 
@@ -28,6 +30,9 @@ impl get_size2::GetSize for ProjectionEvidenceSet<'_> {}
 pub(super) struct ProjectionEvidenceBuilder<'db> {
     projection_facts: FxIndexSet<ProjectionEvidenceFact<'db>>,
     container_facts: FxIndexSet<ProjectionContainerFact<'db>>,
+    // Share operation results across paths only within this collection: cycle approximations can
+    // change between inference runs. Facts are still recorded separately for each root and path.
+    inferred_operations: FxHashMap<(Type<'db>, ProjectionOp<'db>), Option<ProjectionTerm<'db>>>,
 }
 
 impl<'db> ProjectionEvidenceBuilder<'db> {
@@ -74,7 +79,11 @@ impl<'db> ProjectionEvidenceBuilder<'db> {
 
         let ops = path.ops();
         let (&op, tail) = ops.split_first()?;
-        let projected = ProjectionContainer::infer_projection_op(db, env, ty, op)?;
+        let projected = *self
+            .inferred_operations
+            .entry((ty, op))
+            .or_insert_with(|| ProjectionContainer::infer_projection_op(db, env, ty, op));
+        let projected = projected?;
         let term = if tail.is_empty() {
             projected
         } else {
