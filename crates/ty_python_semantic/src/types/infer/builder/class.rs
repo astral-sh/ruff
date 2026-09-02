@@ -317,7 +317,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             let decorated_ty = match decorator_result {
                 Ok(return_ty) => return_ty,
                 Err(CallError(_, bindings)) => {
-                    bindings.report_diagnostics(&self.context, decorator_node.into());
+                    self.defer_decorator_call(decorator_node, inferred_ty);
                     bindings.return_type(db, env)
                 }
             };

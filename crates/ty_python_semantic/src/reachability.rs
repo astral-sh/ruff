@@ -1735,6 +1735,17 @@ fn analyze_single_pattern_predicate_kind<'db>(
 #[salsa::tracked(
     returns(copy),
     cycle_initial = |_, _, _, _, _| Truthiness::AlwaysTrue,
+    cycle_fn = |_, cycle: &salsa::Cycle, previous: &Truthiness, result: Truthiness, _, _, _| {
+        // A call can determine whether its own target is reachable, as with `sys.exit()` before
+        // `import sys` in a loop. Expression inference can lose its previous result when it stops
+        // being a cycle head, so widen the predicate itself to ensure convergence. Delay widening
+        // to allow the optimistic initial value to resolve to a terminal call.
+        if cycle.iteration() > crate::TAINTED_CYCLES {
+            previous.or(result)
+        } else {
+            result
+        }
+    },
     heap_size = get_size2::GetSize::get_heap_size
 )]
 fn analyze_non_terminal_call<'db>(

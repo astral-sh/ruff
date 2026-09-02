@@ -390,12 +390,6 @@ jobs:
         run: rustup show
       - name: "Install mold"
         uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
-      - name: "Install cargo nextest and insta"
-        uses: taiki-e/install-action@cb33e69fad06166ca28a42b2575e4dadabf62ee8 # v2.85.8
-        with:
-          tool: |
-            cargo-nextest
-            cargo-insta
       - name: "Install uv"
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
@@ -410,7 +404,7 @@ jobs:
         # This step is just to get nice GitHub annotations on the PR diff in the files-changed tab.
         run: cargo test -p ty_python_semantic --test mdtest || true
       - name: "Run tests"
-        run: cargo insta test --all-features --unreferenced reject --test-runner nextest --disable-nextest-doctest
+        run: uv run --only-dev cargo insta test --all-features --unreferenced reject --test-runner nextest --disable-nextest-doctest
       - name: "Run doctests"
         run: cargo test --doc --all-features
       - name: Dogfood ty on py-fuzzer
@@ -460,17 +454,13 @@ jobs:
         run: rustup show
       - name: "Install mold"
         uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
-      - name: "Install cargo nextest"
-        uses: taiki-e/install-action@cb33e69fad06166ca28a42b2575e4dadabf62ee8 # v2.85.8
-        with:
-          tool: cargo-nextest
       - name: "Install uv"
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           version: "0.12.6"
           enable-cache: "true"
       - name: "Run tests"
-        run: cargo nextest run --cargo-profile profiling --all-features
+        run: uv run --only-dev cargo nextest run --cargo-profile profiling --all-features
       - name: "Run doctests"
         run: cargo test --doc --profile profiling --all-features
 
@@ -499,10 +489,6 @@ jobs:
           cache-bin: "false"
       - name: "Install Rust toolchain"
         run: rustup show
-      - name: "Install cargo nextest"
-        uses: taiki-e/install-action@cb33e69fad06166ca28a42b2575e4dadabf62ee8 # v2.85.8
-        with:
-          tool: cargo-nextest
       - name: "Install uv"
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
@@ -510,7 +496,7 @@ jobs:
           enable-cache: "true"
       - name: "Run tests"
         run: |
-          cargo nextest run --all-features --profile ci
+          uv run --only-dev cargo nextest run --all-features --profile ci
           cargo test --all-features --doc
 
   cargo-test-wasm:
@@ -973,7 +959,7 @@ jobs:
           echo '```console' > "$GITHUB_STEP_SUMMARY"
           # Enable color output for prek and remove it for the summary
           # Use --hook-stage=manual to enable slower hooks that are skipped by default
-          SKIP=rustfmt uv run --only-group dev --locked prek run --all-files --show-diff-on-failure --color always --hook-stage manual | \
+          SKIP=rustfmt uv run --only-dev --locked prek run --all-files --show-diff-on-failure --color always --hook-stage manual | \
             tee >(sed -E 's/\x1B\[([0-9]{1,2}(;[0-9]{1,2})*)?[mGK]//g' >> "$GITHUB_STEP_SUMMARY") >&1
           exit_code="${PIPESTATUS[0]}"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
@@ -1152,6 +1138,7 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
+
       - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           version: "0.12.6"
@@ -1159,13 +1146,8 @@ jobs:
       - name: "Install Rust toolchain"
         run: rustup show
 
-      - name: "Install codspeed"
-        uses: taiki-e/install-action@cb33e69fad06166ca28a42b2575e4dadabf62ee8 # v2.85.8
-        with:
-          tool: cargo-codspeed
-
       - name: "Build benchmarks"
-        run: cargo codspeed build -m simulation -m memory --features "codspeed,ruff_instrumented" --profile profiling --no-default-features -p ruff_benchmark --bench formatter --bench lexer --bench linter --bench parser
+        run: uv run --only-dev cargo codspeed build -m simulation -m memory --features "codspeed,ruff_instrumented" --profile profiling --no-default-features -p ruff_benchmark --bench formatter --bench lexer --bench linter --bench parser
 
       - name: "Configure apt mirror fallback"
         run: |
@@ -1181,7 +1163,7 @@ jobs:
         uses: CodSpeedHQ/action@0ca9cbbf4623b599a6c3ed4fc8a922942705d9f1 # v5.0.2
         with:
           mode: "simulation,memory"
-          run: cargo codspeed run
+          run: uv run --only-dev cargo codspeed run
 
   benchmarks-instrumented-ty-build:
     name: "benchmarks instrumented ty (build)"
@@ -1205,16 +1187,15 @@ jobs:
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
 
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: "0.12.6"
+
       - name: "Install Rust toolchain"
         run: rustup show
 
-      - name: "Install codspeed"
-        uses: taiki-e/install-action@cb33e69fad06166ca28a42b2575e4dadabf62ee8 # v2.85.8
-        with:
-          tool: cargo-codspeed
-
       - name: "Build benchmarks"
-        run: cargo codspeed build -m simulation -m memory --features "codspeed,module_resolution,ty_instrumented" --profile profiling --no-default-features -p ruff_benchmark --bench module_resolution --bench ty --bench ty_constraint_set
+        run: uv run --only-dev cargo codspeed build -m simulation -m memory --features "codspeed,module_resolution,ty_instrumented" --profile profiling --no-default-features -p ruff_benchmark --bench module_resolution --bench ty --bench ty_constraint_set
 
       - name: "Upload benchmark binary"
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -1274,11 +1255,6 @@ jobs:
         with:
           version: "0.12.6"
 
-      - name: "Install codspeed"
-        uses: taiki-e/install-action@cb33e69fad06166ca28a42b2575e4dadabf62ee8 # v2.85.8
-        with:
-          tool: cargo-codspeed
-
       - name: "Download benchmark binary"
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
@@ -1304,7 +1280,7 @@ jobs:
         uses: CodSpeedHQ/action@0ca9cbbf4623b599a6c3ed4fc8a922942705d9f1 # v5.0.2
         with:
           mode: ${{ matrix.mode }}
-          run: cargo codspeed run --bench "${{ matrix.target }}" "${{ matrix.filter }}"
+          run: uv run --only-dev cargo codspeed run --bench "${{ matrix.target }}" "${{ matrix.filter }}"
 
   benchmarks-walltime-build:
     name: "benchmarks walltime (build)"
@@ -1339,13 +1315,8 @@ jobs:
       - name: "Install Rust toolchain"
         run: rustup show
 
-      - name: "Install codspeed"
-        uses: taiki-e/install-action@cb33e69fad06166ca28a42b2575e4dadabf62ee8 # v2.85.8
-        with:
-          tool: cargo-codspeed
-
       - name: "Build benchmarks"
-        run: cargo codspeed build -m walltime --features "codspeed,ty_walltime" --profile profiling --no-default-features -p ruff_benchmark --bench ty_walltime --bench ty_script
+        run: uv run --only-dev cargo codspeed build -m walltime --features "codspeed,ty_walltime" --profile profiling --no-default-features -p ruff_benchmark --bench ty_walltime --bench ty_script
 
       - name: "Upload benchmark binary"
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -1391,11 +1362,6 @@ jobs:
         with:
           version: "0.12.6"
 
-      - name: "Install codspeed"
-        uses: taiki-e/install-action@cb33e69fad06166ca28a42b2575e4dadabf62ee8 # v2.85.8
-        with:
-          tool: cargo-codspeed
-
       - name: "Download benchmark binary"
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
@@ -1415,7 +1381,7 @@ jobs:
           CODSPEED_PERF_ENABLED: false
         with:
           mode: walltime
-          run: cargo codspeed run --bench "${{ matrix.benchmark.target }}" -m walltime "${{ matrix.benchmark.filter }}"
+          run: uv run --only-dev cargo codspeed run --bench "${{ matrix.benchmark.target }}" -m walltime "${{ matrix.benchmark.filter }}"
 
   required-checks-passed:
     name: "all required checks passed"

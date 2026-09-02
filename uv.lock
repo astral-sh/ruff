@@ -15,7 +15,10 @@ exclude-newer-span = "P7D"
 
 [options.exclude-newer-package]
 astral-dev-toolchain-hyperfine = "2026-08-27T00:00:00Z"
+astral-dev-toolchain-cargo-insta = "2026-08-27T00:00:00Z"
 astral-dev-toolchain-cargo-shear = "2026-08-27T00:00:00Z"
+astral-dev-toolchain-cargo-codspeed = "2026-08-27T00:00:00Z"
+astral-dev-toolchain-cargo-nextest = "2026-08-27T00:00:00Z"
 astral-dev-toolchain-cargo-fuzz = "2026-09-01T00:00:00Z"
 
 [manifest]
@@ -82,6 +85,19 @@ wheels = [
 ]
 
 [[package]]
+name = "astral-dev-toolchain-cargo-codspeed"
+version = "5.0.1"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/69/0e/a7d82d3b80efb376676ad9e08b8d5b397fd2993fe436a012d116480edfe0/astral_dev_toolchain_cargo_codspeed-5.0.1-py3-none-macosx_10_12_x86_64.whl", hash = "sha256:dd304fbc053073e6e8e1b68283d36731788908ce49599e7680582cd87864f11b", size = 962023, upload-time = "2026-08-25T22:20:29.839Z" },
+    { url = "https://files.pythonhosted.org/packages/18/1c/a972d08a06e2646a3642a398a607608510a1ca8e3fae8c609806d783dbd7/astral_dev_toolchain_cargo_codspeed-5.0.1-py3-none-macosx_11_0_arm64.whl", hash = "sha256:4e04158926ee6c6ff6cdaaa6df46c05d7855e00b5b0c1550a747772cdcdc60c2", size = 941050, upload-time = "2026-08-25T22:20:31.607Z" },
+    { url = "https://files.pythonhosted.org/packages/d8/86/e803608dbe08ba83a2361dc21fa4f97c7c6b5e84a478637ddd9269aacb2d/astral_dev_toolchain_cargo_codspeed-5.0.1-py3-none-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:6e7196c632bb0103ebbf60a75ab076677ad03038fe92a88cbe27b1eb56e63d2b", size = 871539, upload-time = "2026-08-25T22:20:33.397Z" },
+    { url = "https://files.pythonhosted.org/packages/23/11/fb3246e194a1699f2a4493ba9501da8d65d3f49074330cce4244e3ded8c7/astral_dev_toolchain_cargo_codspeed-5.0.1-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:15e1005b0a7e4eb750172f2d3d7c6ccb3e78e9b55fa4bcd62f54350181dca6a1", size = 922701, upload-time = "2026-08-25T22:20:34.902Z" },
+    { url = "https://files.pythonhosted.org/packages/c1/d9/bfb2f45e36c1525f0c9810405f605f39d7c8b4dcf250629b141b89eb89e6/astral_dev_toolchain_cargo_codspeed-5.0.1-py3-none-win_amd64.whl", hash = "sha256:ac995814067402b6604c6d8d9ab76700288f015494c53c4e75da09d5bc2ee5f7", size = 824114, upload-time = "2026-08-25T22:20:36.338Z" },
+    { url = "https://files.pythonhosted.org/packages/ce/34/cc139216c71c1bcb67c1623420843646a36748b7ab13d3ae502b5fdbb84d/astral_dev_toolchain_cargo_codspeed-5.0.1-py3-none-win_arm64.whl", hash = "sha256:4bb1b696762454f924a85e0949ab8da1e788124683b644d3b997115d61455700", size = 783231, upload-time = "2026-08-25T22:20:37.889Z" },
+]
+
+[[package]]
 name = "astral-dev-toolchain-cargo-fuzz"
 version = "0.13.2"
 source = { registry = "https://pypi.org/simple" }
@@ -92,6 +108,32 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/37/b6/1ab2d25e68fe1d743adbbd6ec1e20af7411ec8b18dcd7fbce16a61ef3f31/astral_dev_toolchain_cargo_fuzz-0.13.2-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:612108f626b6ee0e5d63b1a0e257c89c13abffbd8fff539ccbffb7205b33093f", size = 882948, upload-time = "2026-08-31T16:45:38.972Z" },
     { url = "https://files.pythonhosted.org/packages/78/d2/a2a182b716dd695d138945446b03bfcd0378928f246f514afceac676d5a4/astral_dev_toolchain_cargo_fuzz-0.13.2-py3-none-win_amd64.whl", hash = "sha256:8c617c6162bea2c77fcce21c07279bd2f2a93e1b5243dabdc5e85c61f66a45fe", size = 763904, upload-time = "2026-08-31T16:45:40.552Z" },
     { url = "https://files.pythonhosted.org/packages/19/9d/e823bd76ae1ae5dd69c4a77c45fbc01c9745a49075a19bb3aa97b75e2652/astral_dev_toolchain_cargo_fuzz-0.13.2-py3-none-win_arm64.whl", hash = "sha256:efda924de1a449026d6b6baa7a52c92638f539965951db86a71b3e79804afae5", size = 732469, upload-time = "2026-08-31T16:45:42.026Z" },
+]
+
+[[package]]
+name = "astral-dev-toolchain-cargo-insta"
+version = "1.48.0"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/fd/80/ab2d6d0093b478b06707ae9511df0ccc933c704102f691a320d5f4b9c5d6/astral_dev_toolchain_cargo_insta-1.48.0-py3-none-macosx_10_12_x86_64.whl", hash = "sha256:b1f56e9f74edaebca156f448fc1d4d7923c1812a5cac40ae13ccdcd0136a83c8", size = 2264457, upload-time = "2026-08-25T20:54:10.226Z" },
+    { url = "https://files.pythonhosted.org/packages/f1/3c/f18198513bd8c2b44ee0cbf85e27952c43150ca02d32e84369125bc31e2c/astral_dev_toolchain_cargo_insta-1.48.0-py3-none-macosx_11_0_arm64.whl", hash = "sha256:d92eedb58b69b8c55f576967e089cd80dc6e7482cf925c694f5373f16c647055", size = 2148611, upload-time = "2026-08-25T20:54:11.705Z" },
+    { url = "https://files.pythonhosted.org/packages/f8/67/fac1dc449054ca3ed39609ff71e919696cc96ee3d35988111159c8a86465/astral_dev_toolchain_cargo_insta-1.48.0-py3-none-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:94745ceb0da64d14fc71dabe34febb84a27f321bf1f9bae5064fa8364a1fee2f", size = 1987021, upload-time = "2026-08-25T20:54:13.304Z" },
+    { url = "https://files.pythonhosted.org/packages/1f/11/d931a49ec49080630a800be4e4a58a8498041b64728a9ee1f6da853f1c38/astral_dev_toolchain_cargo_insta-1.48.0-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:317f5a40d4a074e5dbc6b77203b390120f1a72c226edbf52319d339287ae096f", size = 2145780, upload-time = "2026-08-25T20:54:14.893Z" },
+    { url = "https://files.pythonhosted.org/packages/d3/1a/e37987fb11c7382e417a7de6f2b0a7f6451a94f0b2c45eb89561dc56c14d/astral_dev_toolchain_cargo_insta-1.48.0-py3-none-win_amd64.whl", hash = "sha256:314b2d7e01e281f065d27ef9e311072cfe9dfd6e23eebb1cc36f1cd76ca12b0f", size = 2155460, upload-time = "2026-08-25T20:54:16.34Z" },
+    { url = "https://files.pythonhosted.org/packages/85/df/2de935d19813fef6ce4bb9112912600d8ffe57ad15f849057f0b096d272c/astral_dev_toolchain_cargo_insta-1.48.0-py3-none-win_arm64.whl", hash = "sha256:1fae5bb442cead7d5f125e6f5019d3f4c817d129690439c824851449fc636ff2", size = 1996852, upload-time = "2026-08-25T20:54:17.731Z" },
+]
+
+[[package]]
+name = "astral-dev-toolchain-cargo-nextest"
+version = "0.9.143"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/cc/2e/6091f2ecc6936499edfd82628bc7f6f512d47ad292ed37b2f782f12f7ab9/astral_dev_toolchain_cargo_nextest-0.9.143-py3-none-macosx_10_12_x86_64.whl", hash = "sha256:2a5b4b8629bc71595e6c57bce2463fc0ad98efd2676ae4c2c0aebebe72142b90", size = 7314765, upload-time = "2026-08-26T15:28:18.223Z" },
+    { url = "https://files.pythonhosted.org/packages/a7/a7/edfe750a7e9732a232b4e4ba30b847f067de957966f181d0665f6d46c224/astral_dev_toolchain_cargo_nextest-0.9.143-py3-none-macosx_11_0_arm64.whl", hash = "sha256:d152cb4ce165452a30cc63d92046847210102f9231300d86b4aaf1cfe4f839ad", size = 6995862, upload-time = "2026-08-26T15:28:20.258Z" },
+    { url = "https://files.pythonhosted.org/packages/52/9a/67141069cee76d531d3887e27210c0b16a568585afdd11baf8965cd6b857/astral_dev_toolchain_cargo_nextest-0.9.143-py3-none-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:f6501029b9f9597a720a496997da1aad8e31069a352a80415441eff15d15637d", size = 9880036, upload-time = "2026-08-26T15:28:22.33Z" },
+    { url = "https://files.pythonhosted.org/packages/74/1d/8636da96addb470098a120b55d275d05e8d57925a760515a710d9c2a8245/astral_dev_toolchain_cargo_nextest-0.9.143-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:a58a0dafb1d6a54b4e80b837a7cbcf2999b2dfd133eb6261b3d61c714b295c81", size = 10068151, upload-time = "2026-08-26T15:28:24.628Z" },
+    { url = "https://files.pythonhosted.org/packages/9c/68/7b73566785938b8d09d28ce170c77ed6fbe1d3f5790c481324417b5bf4d7/astral_dev_toolchain_cargo_nextest-0.9.143-py3-none-win_amd64.whl", hash = "sha256:824aec957bf38828671f22e70354b21e95c4a4a1aa8fbaef04f98ae3bee5fe09", size = 6689195, upload-time = "2026-08-26T15:28:26.859Z" },
+    { url = "https://files.pythonhosted.org/packages/e2/30/f2b26fa3111bfac4a5ab59957a431c95a97dba900f894fcf9cbd01299928/astral_dev_toolchain_cargo_nextest-0.9.143-py3-none-win_arm64.whl", hash = "sha256:efdda891201e148c0da299a4f8f26c8a7c7ca510c12d96112ae4d51b1b203ef6", size = 6245567, upload-time = "2026-08-26T15:28:28.754Z" },
 ]
 
 [[package]]
@@ -1545,7 +1587,10 @@ source = { editable = "." }
 
 [package.dev-dependencies]
 dev = [
+    { name = "astral-dev-toolchain-cargo-codspeed", marker = "python_full_version >= '3.12'" },
     { name = "astral-dev-toolchain-cargo-fuzz", marker = "python_full_version >= '3.12'" },
+    { name = "astral-dev-toolchain-cargo-insta", marker = "python_full_version >= '3.12'" },
+    { name = "astral-dev-toolchain-cargo-nextest", marker = "python_full_version >= '3.12'" },
     { name = "astral-dev-toolchain-cargo-shear", marker = "python_full_version >= '3.12'" },
     { name = "astral-dev-toolchain-hyperfine", marker = "python_full_version >= '3.12'" },
     { name = "prek", marker = "python_full_version >= '3.12'" },
@@ -1584,7 +1629,10 @@ typeshed-formatting = [
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "astral-dev-toolchain-cargo-codspeed", marker = "python_full_version >= '3.12'", specifier = ">=5.0.1" },
     { name = "astral-dev-toolchain-cargo-fuzz", marker = "python_full_version >= '3.12'", specifier = ">=0.13.2" },
+    { name = "astral-dev-toolchain-cargo-insta", marker = "python_full_version >= '3.12'", specifier = ">=1.48.0" },
+    { name = "astral-dev-toolchain-cargo-nextest", marker = "python_full_version >= '3.12'", specifier = ">=0.9.143" },
     { name = "astral-dev-toolchain-cargo-shear", marker = "python_full_version >= '3.12'", specifier = ">=1.13.4" },
     { name = "astral-dev-toolchain-hyperfine", marker = "python_full_version >= '3.12'", specifier = ">=1.20.0" },
     { name = "prek", marker = "python_full_version >= '3.12'", specifier = "==0.4.12" },

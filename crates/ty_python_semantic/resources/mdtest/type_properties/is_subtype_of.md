@@ -2412,6 +2412,55 @@ static_assert(not is_subtype_of(TypeOf[A.g], Callable[[], int]))
 static_assert(is_subtype_of(TypeOf[A.f], Callable[[A, int], int]))
 ```
 
+### Bound receivers and `Self`
+
+A bound method exposes its captured receiver through the read-only `__self__` attribute. A method
+bound to a subclass can therefore be a subtype of the same method bound to its base class, but not
+the reverse. A `Self` return type follows the same direction.
+
+```py
+from typing import Self
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_subtype_of
+
+class Base:
+    def plain(self) -> int:
+        return 0
+
+    def returns_self(self) -> Self:
+        return self
+
+    def accepts_self(self, other: Self) -> None: ...
+    @classmethod
+    def make(cls) -> Self:
+        return cls()
+
+class Child(Base): ...
+
+def check(base: Base, child: Child):
+    static_assert(is_subtype_of(TypeOf[child.plain], TypeOf[base.plain]))
+    static_assert(not is_subtype_of(TypeOf[base.plain], TypeOf[child.plain]))
+    static_assert(is_subtype_of(TypeOf[child.returns_self], TypeOf[base.returns_self]))
+    static_assert(not is_subtype_of(TypeOf[base.returns_self], TypeOf[child.returns_self]))
+```
+
+`Self` in a remaining parameter is contravariant: a method that requires a `Child` cannot replace
+one that accepts any `Base`. The reverse substitution still fails the captured-receiver requirement.
+
+```py
+def check_parameters(base: Base, child: Child):
+    static_assert(not is_subtype_of(TypeOf[child.accepts_self], TypeOf[base.accepts_self]))
+    static_assert(not is_subtype_of(TypeOf[base.accepts_self], TypeOf[child.accepts_self]))
+```
+
+Classmethods capture the class object, while `Self` in their return type describes an instance.
+
+```py
+def check_classmethods(base: Base, child: Child):
+    static_assert(is_subtype_of(TypeOf[child.make], TypeOf[base.make]))
+    static_assert(not is_subtype_of(TypeOf[base.make], TypeOf[child.make]))
+```
+
 ### Overloads
 
 #### Subtype overloaded

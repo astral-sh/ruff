@@ -246,6 +246,42 @@ fn indirect_dependencies_use_uv_module_ownership() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Dependency checks reflect changed declarations even before the environment is synchronized
+/// again. A transitive dependency can become direct without changing the installed packages.
+#[cfg(feature = "test-uv")]
+#[test]
+fn indirect_dependencies_use_updated_declarations() -> anyhow::Result<()> {
+    let case = dependency_workspace_case()?;
+    let mut command = uv_sync_command(&case, None)?;
+    // Leave the lockfile stale so ty has to refresh the dependency metadata.
+    let output = uv_command(&case)
+        .args([
+            "add",
+            "--frozen",
+            "--package",
+            "member",
+            "indirect-dependency",
+        ])
+        .output()?;
+    anyhow::ensure!(
+        output.status.success(),
+        "failed to add dependency: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    command.args(["packages/member", "--error", "missing-direct-dependency"]);
+
+    assert_cmd_snapshot!(command, @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
 /// An explicitly selected environment cannot use uv's module ownership, even when it is nested
 /// inside uv's environment. Dependency checks are skipped, but ordinary type checking continues.
 #[cfg(feature = "test-uv")]

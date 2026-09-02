@@ -57,7 +57,10 @@ exclude = [
 
 [dependency-groups]
 dev = [
+    "astral-dev-toolchain-cargo-codspeed>=5.0.1",
     "astral-dev-toolchain-cargo-fuzz>=0.13.2",
+    "astral-dev-toolchain-cargo-insta>=1.48.0",
+    "astral-dev-toolchain-cargo-nextest>=0.9.143",
     "astral-dev-toolchain-cargo-shear>=1.13.4",
     "astral-dev-toolchain-hyperfine>=1.20.0",
     "prek==0.4.12",
@@ -129,6 +132,9 @@ exclude-newer = "P7D"
 [tool.uv.exclude-newer-package]
 astral-dev-toolchain-hyperfine = "2026-08-27T00:00:00Z"
 astral-dev-toolchain-cargo-shear = "2026-08-27T00:00:00Z"
+astral-dev-toolchain-cargo-codspeed = "2026-08-27T00:00:00Z"
+astral-dev-toolchain-cargo-nextest = "2026-08-27T00:00:00Z"
+astral-dev-toolchain-cargo-insta = "2026-08-27T00:00:00Z"
 astral-dev-toolchain-cargo-fuzz = "2026-09-01T00:00:00Z"
 
 [tool.uv.dependency-groups]

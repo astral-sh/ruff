@@ -1477,6 +1477,9 @@ struct OtherDefinitionInferenceExtra<'db> {
     /// For decorated function or class definitions, the type before applying decorators.
     undecorated_type: Option<Type<'db>>,
 
+    /// Input types for failed decorator applications that are checked after inference.
+    deferred_decorator_calls: FrozenMap<ExpressionNodeKey, Type<'db>>,
+
     /// Whether synthesized dictionary-key assignments derived from the right-hand side should be
     /// discarded.
     discards_dict_key_assignments: bool,
@@ -1678,6 +1681,24 @@ impl<'db> DefinitionInference<'db> {
             &mut projection_recovery,
             definition,
         );
+        // Deferred decorator inputs are result slots too. Join them before solving so any
+        // projection they retain participates in the same equations as the other slots.
+        if let Some(DefinitionInferenceExtra::Other(extra)) = self.extra.as_deref_mut() {
+            for (expression, ty) in &mut extra.deferred_decorator_calls {
+                if let Some(previous_ty) =
+                    previous_inference.deferred_decorator_input_type(*expression)
+                {
+                    *ty = projection_recovery.push_candidate(
+                        db,
+                        &env,
+                        Some(previous_ty),
+                        ty.cycle_join_for_recovery(db, &env, previous_ty, cycle),
+                    );
+                } else {
+                    *ty = projection_recovery.push_candidate(db, &env, None, *ty);
+                }
+            }
+        }
         let projection_solutions =
             projection_recovery.finish(db, &env, projection_evidence.as_ref());
         for (_, ty) in &mut self.expressions {
@@ -1697,6 +1718,18 @@ impl<'db> DefinitionInference<'db> {
             projection_evidence.as_ref(),
             definition,
         );
+
+        if let Some(DefinitionInferenceExtra::Other(extra)) = self.extra.as_deref_mut() {
+            for (_, ty) in &mut extra.deferred_decorator_calls {
+                *ty = ty.recursive_type_normalized_with_projection_solutions(
+                    db,
+                    &env,
+                    cycle,
+                    projection_solutions.as_ref(),
+                    projection_evidence.as_ref(),
+                );
+            }
+        }
 
         let previous_constraints = (cycle.iteration() > crate::TAINTED_CYCLES)
             .then(|| {
@@ -1881,6 +1914,19 @@ impl<'db> DefinitionInference<'db> {
                 Some(extra.undecorated_type)
             }
             Some(DefinitionInferenceExtra::Other(extra)) => extra.undecorated_type,
+            Some(_) | None => None,
+        }
+    }
+
+    fn deferred_decorator_input_type(
+        &self,
+        expression: impl Into<ExpressionNodeKey>,
+    ) -> Option<Type<'db>> {
+        match self.extra.as_deref() {
+            Some(DefinitionInferenceExtra::Other(extra)) => extra
+                .deferred_decorator_calls
+                .get(&expression.into())
+                .copied(),
             Some(_) | None => None,
         }
     }

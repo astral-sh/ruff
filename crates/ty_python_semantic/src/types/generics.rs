@@ -34,9 +34,9 @@ use crate::types::visitor::{
 };
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypes,
-    ClassLiteral, FindLegacyTypeVarsVisitor, IntersectionType, KnownClass, KnownInstanceType,
-    MaterializationKind, SubclassOfInner, Type, TypeAliasType, TypeContext, TypeMapping,
-    TypeRecursionContext, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance,
+    ClassLiteral, ErrorContext, FindLegacyTypeVarsVisitor, IntersectionType, KnownClass,
+    KnownInstanceType, MaterializationKind, SubclassOfInner, Type, TypeAliasType, TypeContext,
+    TypeMapping, TypeRecursionContext, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance,
     UnionAccumulator, UnionType, binding_type, infer_definition_types, inferred_declaration,
 };
 use crate::{Db, FxIndexMap, FxOrderMap, FxOrderSet};
@@ -2173,17 +2173,30 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                     let mut checker = self.as_relation_checker(TypeRelation::Subtyping);
                     checker.typevar_evaluation = TypeVarEvaluation::Lazy;
                     checker.materialization_visitor = &materialization_visitor;
-                    let overlap = checker.check_subtyping_in_invariant_position(
-                        db,
-                        left_type,
-                        MaterializationKind::Bottom,
-                        right_type,
-                        MaterializationKind::Top,
-                    );
-                    ConstraintSet::from_bool(
-                        self.constraints,
-                        overlap.has_no_valid_solutions(db, self.env),
-                    )
+                    let result = self
+                        .check_relation_with_context(db, checker, |checker| {
+                            let overlap = checker.check_subtyping_in_invariant_position(
+                                db,
+                                left_type,
+                                MaterializationKind::Bottom,
+                                right_type,
+                                MaterializationKind::Top,
+                            );
+                            ConstraintSet::from_bool(
+                                self.constraints,
+                                !overlap.has_no_valid_solutions(db, self.env),
+                            )
+                        })
+                        .negate(db, self.constraints);
+                    if let Some(context) = self.report_context()
+                        && result.is_always_satisfied(db, self.env)
+                    {
+                        context.push(ErrorContext::InvariantTypeArgument {
+                            left: left_type,
+                            right: right_type,
+                        });
+                    }
+                    result
                 }
 
                 // If `Foo[T]` is covariant in `T`, `Foo[Never]` is a subtype of `Foo[A]` and `Foo[B]`

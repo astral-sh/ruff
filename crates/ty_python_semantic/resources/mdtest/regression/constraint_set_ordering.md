@@ -393,7 +393,7 @@ class Concrete[T]:
         return ""
 
 def convert[T](value: Concrete[T]) -> Array:
-    return cast(Array, value)
+    return cast(Array, value)  # error: [disjoint-cast]
 
 # error: [invalid-assignment]
 invalid: Array = Concrete[int]()

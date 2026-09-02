@@ -374,6 +374,12 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// For decorated function or class definitions, the type before applying decorators.
     undecorated_type: Option<Type<'db>>,
 
+    /// Input types for failed decorator applications, keyed by decorator expression.
+    ///
+    /// Recheck these calls after inference so formatting diagnostics cannot pull deferred
+    /// function defaults into definition inference cycles.
+    deferred_decorator_calls: Vec<(ExpressionNodeKey, Type<'db>)>,
+
     /// The fallback type for missing expressions/bindings/declarations or recursive type inference.
     cycle_recovery: Option<Type<'db>>,
 
@@ -516,6 +522,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             typevar_binding_context: None,
             deferred: VecSet::default(),
             undecorated_type: None,
+            deferred_decorator_calls: Vec::new(),
             cycle_recovery: None,
             projection_evidence: None,
             needs_projection_evidence_from_types: false,
@@ -1245,6 +1252,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let ty = ty_and_quals.inner_type();
                 match definition.kind(self.db()) {
                     DefinitionKind::Function(function) => {
+                        post_inference::decorator::check_decorator_calls(
+                            &self.context,
+                            definition,
+                            &function.node(self.module()).decorator_list,
+                        );
                         post_inference::function::check_function_definition(
                             &self.context,
                             definition,
@@ -1266,6 +1278,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         );
                     }
                     DefinitionKind::Class(class_node) => {
+                        post_inference::decorator::check_decorator_calls(
+                            &self.context,
+                            definition,
+                            &class_node.node(self.module()).decorator_list,
+                        );
                         let original_ty = match self.region {
                             InferenceRegion::Definition(current) if current == definition => {
                                 self.undecorated_type
@@ -1532,6 +1549,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.setup_dataclass_field_specifiers();
 
         match expression.kind(self.db()) {
+            ExpressionKind::Callee => {
+                self.context.inference_flags |= InferenceFlags::CHECK_UNBOUND_TYPEVARS;
+                self.infer_expression_impl(expression.node_ref(self.db()).node(self.module()), tcx);
+            }
             ExpressionKind::Normal => {
                 self.infer_expression_impl(expression.node_ref(self.db()).node(self.module()), tcx);
             }
@@ -3524,10 +3545,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // If the RHS is not a standalone expression, this is a simple assignment
                     // (single target, no unpackings). That means it's a valid syntactic form
                     // for a legacy TypeVar creation; check for that.
-                    let callable_type = self.infer_maybe_standalone_expression(
-                        call_expr.func.as_ref(),
-                        TypeContext::default(),
-                    );
+                    let callable_type = self.infer_callee(&call_expr.func);
 
                     let ty = if let Some(namedtuple_kind) =
                         NamedTupleKind::from_type(self.db(), callable_type)
@@ -5610,7 +5628,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         {
             Ok(bindings) => (bindings.return_type(db, env), Some(bindings)),
             Err(CallError(_, bindings)) => {
-                bindings.report_diagnostics(&self.context, decorator_node.into());
+                self.defer_decorator_call(decorator_node, decorated_ty);
                 (bindings.return_type(db, env), None)
             }
         };
@@ -5652,6 +5670,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         inferred_ty
+    }
+
+    fn defer_decorator_call(&mut self, decorator: &ast::Decorator, input_ty: Type<'db>) {
+        // We replay failed decorator applications after inference only to report call errors,
+        // such as incompatible argument types or missing arguments. `@no_type_check` suppresses
+        // these errors. Skip recording the calls here because the enclosing scope's post-inference
+        // diagnostic context does not inherit this definition-local flag.
+        if !self
+            .inference_flags()
+            .contains(InferenceFlags::IN_NO_TYPE_CHECK)
+        {
+            self.deferred_decorator_calls
+                .push(((&decorator.expression).into(), input_ty));
+        }
     }
 
     #[expect(clippy::too_many_arguments)]
@@ -8962,10 +8994,29 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         call_expression: &ast::ExprCall,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
-        let callable_type =
-            self.infer_maybe_standalone_expression(&call_expression.func, TypeContext::default());
+        let callable_type = self.infer_callee(&call_expression.func);
 
         self.infer_call_expression_impl(call_expression, callable_type, tcx)
+    }
+
+    /// Infer a callable expression without introducing new type variable bindings.
+    ///
+    /// An assignment such as `items = list[T]()` creates an instance, not a generic alias.
+    /// Unlike `Items = list[T]`, it requires `T` to be bound in an enclosing generic scope.
+    fn infer_callee(&mut self, expression: &ast::Expr) -> Type<'db> {
+        let previous_binding_context = self.typevar_binding_context.take();
+        let previous_check_unbound = self
+            .context
+            .inference_flags
+            .replace(InferenceFlags::CHECK_UNBOUND_TYPEVARS, true);
+        let callable_type =
+            self.infer_maybe_standalone_expression(expression, TypeContext::default());
+        self.context.inference_flags.set(
+            InferenceFlags::CHECK_UNBOUND_TYPEVARS,
+            previous_check_unbound,
+        );
+        self.typevar_binding_context = previous_binding_context;
+        callable_type
     }
 
     fn infer_empty_list_or_set_constructor(
@@ -9543,6 +9594,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 overload,
                                 &call_arguments,
                                 call_expression,
+                                self.index,
                             );
                         }
                     }
@@ -11583,6 +11635,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // Ignored; only relevant to definition regions
             undecorated_type: _,
+            deferred_decorator_calls: _,
             discards_dict_key_assignments: _,
 
             // builder only state
@@ -11663,6 +11716,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // Ignored; only relevant to definition regions
             undecorated_type: _,
+            deferred_decorator_calls: _,
             discards_dict_key_assignments: _,
 
             // builder only state
@@ -11799,6 +11853,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             collection_use_constraints: _,
             dataclass_field_specifiers: _,
             undecorated_type: _,
+            deferred_decorator_calls: _,
             discards_dict_key_assignments: _,
             typevar_binding_context: _,
             deferred_state: _,
@@ -11851,6 +11906,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             projection_evidence: nested_projection_evidence,
             needs_projection_evidence_from_types,
             undecorated_type,
+            deferred_decorator_calls,
             discards_dict_key_assignments,
             called_functions,
 
@@ -11878,7 +11934,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .copied()
                     .chain(bindings.iter().map(|(_, ty)| *ty))
                     .chain(declarations.iter().map(|(_, ty)| ty.inner_type()))
-                    .chain(undecorated_type.iter().copied()),
+                    .chain(undecorated_type.iter().copied())
+                    .chain(deferred_decorator_calls.iter().map(|(_, ty)| *ty)),
             ),
         );
         let _ = scope;
@@ -11893,6 +11950,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             + usize::from(needs_projection_evidence_from_types)
             + usize::from(cycle_recovery.is_some())
             + usize::from(!deferred.is_empty())
+            + usize::from(!deferred_decorator_calls.is_empty())
             + usize::from(!diagnostics.is_empty())
             + usize::from(discards_dict_key_assignments)
             + usize::from(!qualifiers.is_empty());
@@ -11953,6 +12011,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     deferred: deferred.into_boxed_slice(),
                     diagnostics,
                     undecorated_type,
+                    deferred_decorator_calls: deferred_decorator_calls.into_iter().collect(),
                     discards_dict_key_assignments,
                     qualifiers: FrozenMap::from(qualifiers),
                 };
@@ -12015,6 +12074,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // Ignored; only relevant to definition regions
             undecorated_type: _,
+            deferred_decorator_calls: _,
             discards_dict_key_assignments: _,
 
             // Builder only state
@@ -12109,6 +12169,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             deferred: _,
             called_functions: _,
             undecorated_type: _,
+            deferred_decorator_calls: _,
             discards_dict_key_assignments: _,
             projection_evidence: _,
             needs_projection_evidence_from_types: _,
@@ -12178,6 +12239,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // Ignored; only relevant to definition regions
             undecorated_type: _,
+            deferred_decorator_calls: _,
             discards_dict_key_assignments: _,
 
             // builder only state
