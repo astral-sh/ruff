@@ -724,7 +724,7 @@ pub struct Member<'db> {
 impl<'db> Member<'db> {
     /// Recover local functions retained in the exposed type, including property accessors.
     /// Unlike [`Self::local_functions`], this does not recover definitions replaced by decorators.
-    fn local_functions_from_type(
+    pub(super) fn local_functions_from_type(
         &self,
         db: &'db dyn Db,
         scope: ScopeId<'db>,
@@ -789,11 +789,11 @@ impl<'db> Member<'db> {
         }
 
         // A property can retain a getter even though only its setter is an end-of-scope binding.
-        let additional_functions: smallvec::SmallVec<[_; 1]> = member_functions
-            .into_iter()
-            .filter(|function| !functions.contains(function))
-            .collect();
-        functions.extend(additional_functions);
+        for function in member_functions {
+            if !functions.contains(&function) {
+                functions.push(function);
+            }
+        }
         functions
     }
 }

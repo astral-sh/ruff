@@ -334,7 +334,7 @@ impl<'db> CallableSignature<'db> {
                         .iter()
                         .map(|param| param.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
                         .collect::<Vec<_>>();
-                    let parameters = if prefix_parameters.is_empty() {
+                    let mut parameters = if prefix_parameters.is_empty() {
                         Parameters::paramspec(db, typevar)
                     } else {
                         Parameters::concatenate(
@@ -343,6 +343,16 @@ impl<'db> CallableSignature<'db> {
                             ConcatenateTail::ParamSpec(typevar),
                         )
                     };
+
+                    // The synthesized ParamSpec parameters still correspond to the original
+                    // `*args` and `**kwargs` annotations. Keep their positions for diagnostics.
+                    for (parameter, source) in Arc::make_mut(&mut parameters.data)
+                        .value
+                        .iter_mut()
+                        .zip(self_signature.parameters.iter())
+                    {
+                        parameter.source_parameter_index = source.source_parameter_index;
+                    }
 
                     let env = visitor.env;
                     Some(CallableSignature::single(Signature {
@@ -6064,6 +6074,46 @@ mod tests {
                 parameter.definition().is_some(),
                 "source-backed parameter should have a definition"
             );
+        }
+    }
+
+    #[test]
+    fn paramspec_identity_specialization_preserves_source_positions() {
+        for prefix in ["", "first: int, "] {
+            let mut db = setup_db();
+            db.write_dedented(
+                "/src/a.py",
+                &format!("def f[**P]({prefix}*args: P.args, **kwargs: P.kwargs) -> None: ..."),
+            )
+            .unwrap();
+            let signature = get_function_f(&db, "/src/a.py")
+                .literal(&db)
+                .last_definition
+                .signature(&db);
+            let generic_context = signature.generic_context.expect("f has a ParamSpec");
+            let expected_positions = (0..signature.parameters.len())
+                .map(Some)
+                .collect::<Vec<_>>();
+            let specialized = CallableSignature::single(signature).apply_type_mapping_impl(
+                &db,
+                &TypeMapping::ApplySpecialization(ApplySpecialization::specialization(
+                    generic_context.identity_specialization(&db),
+                )),
+                TypeContext::default(),
+                &ApplyTypeMappingVisitor::new(&db.program_environment()),
+            );
+
+            assert_eq!(specialized.overloads.len(), 1);
+            for signature in &specialized.overloads {
+                assert_eq!(
+                    signature
+                        .parameters()
+                        .iter()
+                        .map(Parameter::source_parameter_index)
+                        .collect::<Vec<_>>(),
+                    expected_positions,
+                );
+            }
         }
     }
 
