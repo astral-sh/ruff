@@ -1546,6 +1546,36 @@ impl<'db> SequentMap<Constraint<'db>> {
 
         for_constraint_pair_inner(db, env.program(db), left, right)
     }
+
+    /// Quickly determines whether two constraints cannot possibly produce any sequents when passed
+    /// to [`for_constraint_pair`][Self::for_constraint_pair]. If this returns `true`, it is safe
+    /// to skip calling `for_constraint_pair` for this pair of constraints.
+    pub(super) fn pair_cannot_produce_sequents(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        left: Constraint<'db>,
+        right: Constraint<'db>,
+    ) -> bool {
+        // Currently, the only pattern we look for is when two concrete lower-bound constraints
+        // have disjoint bounds. Given `l₁ ≤ T ∧ l₂ ≤ T`, the only sequent we could theoretically
+        // produce is `(l₁ | l₂) ≤ T`. But we don't store that as a single constraint; we always
+        // break that apart into the two smaller constraints that we started with.
+
+        let Constraint::ConcreteLower(left) = left else {
+            return false;
+        };
+        let Constraint::ConcreteLower(right) = right else {
+            return false;
+        };
+        if !left.typevar.is_same_typevar_as(db, right.typevar) {
+            return false;
+        }
+
+        let builder = ConstraintSetBuilder::new();
+        left.bound
+            .when_trivially_disjoint_from(db, env, right.bound, &builder, TypeVarSet::None)
+            .is_trivially_always_satisfied()
+    }
 }
 
 impl<'db> Constraint<'db> {
@@ -4021,39 +4051,27 @@ mod tests {
         let db = setup_db();
         let db = &db;
         let env = db.program_environment();
-        let builder = ConstraintSetBuilder::new();
         let t = create_typevar(db, "T");
         let bool = known_instance(db, KnownClass::Bool);
         let u = create_typevar(db, "U")
             .map_bound_or_constraints(db, |_| Some(TypeVarBoundOrConstraints::UpperBound(bool)));
         let type_of_u = SubclassOfType::from(db, &env, u);
         let bool_class = KnownClass::Bool.to_class_literal(db, &env);
-        let mut storage = builder.storage.borrow_mut();
-        let left = ConstraintId::new_with_bounds(
+        let left = Constraint::from(ConcreteLowerBound::new(
             db,
-            &env,
-            &mut storage,
+            ConstraintProvenance::Evidence,
             t,
-            Some(ConstraintBound::Evidence(type_of_u)),
-            None,
-        );
-        let right = ConstraintId::new_with_bounds(
+            type_of_u,
+        ));
+        let right = Constraint::from(ConcreteLowerBound::new(
             db,
-            &env,
-            &mut storage,
+            ConstraintProvenance::Evidence,
             t,
-            Some(ConstraintBound::Evidence(bool_class)),
-            None,
-        );
+            bool_class,
+        ));
 
         for (left, right) in [(left, right), (right, left)] {
-            let sequents = SequentMap::<ConstraintId>::for_constraint_pair(
-                db,
-                &env,
-                &mut storage,
-                left,
-                right,
-            );
+            let sequents = SequentMap::<Constraint>::for_constraint_pair(db, &env, left, right);
 
             assert!(
                 sequents
@@ -4061,12 +4079,8 @@ mod tests {
                     .iter()
                     .any(|sequent| matches!(sequent, Sequent::SingleImplication { .. }))
             );
-            assert!(!SequentMap::pair_cannot_produce_sequents(
-                db,
-                &env,
-                &mut storage,
-                left,
-                right
+            assert!(!SequentMap::<Constraint>::pair_cannot_produce_sequents(
+                db, &env, left, right
             ));
         }
     }
