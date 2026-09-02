@@ -2621,8 +2621,8 @@ def runtime_protocol_pattern_is_exhaustive(value: RuntimeProtocolImplementer) ->
 
 ## Negative narrowing for protocols with gradual members
 
-The fallback case excludes the fully materialized protocol. A successful pattern preserves the
-member's explicit `Any`:
+The fallback case excludes the fully materialized protocol. `IntReader` is a subtype of the fully
+materialized `Reader` protocol, so the fallback case retains only `None`:
 
 ```py
 from typing import Any, Protocol, runtime_checkable
@@ -2631,28 +2631,16 @@ from typing import Any, Protocol, runtime_checkable
 class Reader(Protocol):
     def read(self) -> Any: ...
 
-def from_object(value: object):
-    match value:
-        case Reader() as reader:
-            reveal_type(value)  # revealed: Reader
-            reveal_type(reader.read())  # revealed: Any
-        case _:
-            reveal_type(value)  # revealed: ~Top[Reader]
-```
-
-A known implementation is excluded completely, making the fallback case unreachable:
-
-```py
 class IntReader:
     def read(self) -> int:
         return 1
 
-def from_reader(value: IntReader):
-    match value:
+def f(reader: IntReader | None):
+    match reader:
         case Reader():
-            pass
+            reveal_type(reader.read())  # revealed: int & Any
         case _:
-            reveal_type(value)  # revealed: Never
+            reveal_type(reader)  # revealed: None
 ```
 
 ## Members from the subject type

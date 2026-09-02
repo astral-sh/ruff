@@ -1087,7 +1087,8 @@ def _(value: Concrete[int]) -> None:
 ## Negative narrowing for protocols with gradual members
 
 Negative narrowing excludes every materialization of a protocol, including when its members are
-gradual. Positive narrowing preserves the member's explicit `Any`:
+gradual. `IntReader` is a subtype of the fully materialized `Reader` protocol, so the negative
+branch retains only `None`:
 
 ```py
 from typing import Any, Protocol, runtime_checkable
@@ -1096,24 +1097,15 @@ from typing import Any, Protocol, runtime_checkable
 class Reader(Protocol):
     def read(self) -> Any: ...
 
-def from_object(value: object):
-    if isinstance(value, Reader):
-        reveal_type(value.read())  # revealed: Any
-    else:
-        reveal_type(value)  # revealed: ~Top[Reader]
-```
-
-A known implementation cannot reach the negative branch. `IntReader` provides the required `read`
-method, so it is a subtype of the fully materialized protocol:
-
-```py
 class IntReader:
     def read(self) -> int:
         return 1
 
-def from_reader(value: IntReader):
-    if not isinstance(value, Reader):
-        reveal_type(value)  # revealed: Never
+def f(reader: IntReader | None):
+    if isinstance(reader, Reader):
+        reveal_type(reader.read())  # revealed: int & Any
+    else:
+        reveal_type(reader)  # revealed: None
 ```
 
 ## Narrowing iterables to containers and iterators in strict mode
