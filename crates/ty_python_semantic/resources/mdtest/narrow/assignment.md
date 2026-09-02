@@ -208,6 +208,49 @@ def unreachable_deletion_before_comprehension(item: Item):
         [reveal_type(item.value) for _ in range(1)]  # revealed: Literal[1]
 ```
 
+### Presence after deletion across loop iterations
+
+A read before a deletion can still observe that deletion on a later iteration. An assignment before
+the class body does not establish that the attribute is present on every iteration.
+
+```py
+class Item: ...
+
+def deleted_on_previous_iteration(item: Item):
+    item.value = 1  # error: [unresolved-attribute]
+
+    class Inner:
+        for _ in range(2):
+            item.value  # error: [unresolved-attribute]
+            del item.value  # error: [unresolved-attribute]
+```
+
+The deletion also affects a read in a comprehension nested inside the loop.
+
+```py
+def deleted_on_previous_iteration_in_comprehension(item: Item):
+    item.value = 1  # error: [unresolved-attribute]
+
+    class Inner:
+        for _ in range(2):
+            [item.value for _ in range(1)]  # error: [unresolved-attribute]
+            del item.value  # error: [unresolved-attribute]
+```
+
+Assigning the attribute before each read establishes presence again, even when the previous
+iteration deleted it.
+
+```py
+def assigned_on_each_iteration(item: Item):
+    item.value = 1  # error: [unresolved-attribute]
+
+    class Inner:
+        for _ in range(2):
+            item.value = 2  # error: [unresolved-attribute]
+            reveal_type(item.value)  # revealed: Literal[2]
+            del item.value
+```
+
 ### Presence after receiver reassignment
 
 Reassigning the receiver discards evidence that an attribute was assigned on the previous object.

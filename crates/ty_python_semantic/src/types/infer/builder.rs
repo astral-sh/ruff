@@ -9960,6 +9960,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             {
                                 let mut binding_ty = binding_type(db, definition);
                                 if definition.kind(db).is_loop_header() {
+                                    has_deleted_binding |=
+                                        !loop_header_reachability(db, definition)
+                                            .deleted_reachability
+                                            .is_always_false();
                                     let fallback_ty = self.loop_header_fallback_type(
                                         definition,
                                         narrowed.ty,
