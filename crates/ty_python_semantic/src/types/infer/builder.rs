@@ -4,7 +4,7 @@ use std::rc::Rc;
 
 use compact_str::CompactString;
 use itertools::Itertools;
-use ruff_db::diagnostic::{Annotation, Span};
+use ruff_db::diagnostic::{Annotation, Span, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_db::source::source_text;
@@ -52,7 +52,8 @@ use crate::reachability::{
 use crate::types::add_inferred_python_version_hint_to_diagnostic;
 use crate::types::attribute_write::{AssignmentAttributeMembers, assignment_attribute_members};
 use crate::types::call::bind::{
-    ArgumentTypeContext, CheckTypesMode, OverloadSet, requires_overload_evaluation,
+    ArgumentTypeContext, CallableDescription, CheckTypesMode, OverloadSet,
+    requires_overload_evaluation,
 };
 use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorKind};
 use crate::types::callable::CallableTypeKind;
@@ -127,12 +128,12 @@ use crate::types::{
     CallableTypes, ClassType, DynamicType, GeneratorTypeMode, InferenceFlags,
     InternedConstraintSet, InternedType, IntersectionBuilder, IntersectionType, KnownClass,
     KnownInstanceType, KnownUnion, LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy,
-    ParamSpecAttrKind, Parameter, Parameters, ProgramEnvironment, SentinelInstance, Signature,
-    SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeAndQualifiers, TypeContext,
-    TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, TypingModule,
-    UnionAccumulator, UnionBuilder, UnionType, any_over_type, binding_type,
-    extract_fixed_length_iterable_element_types, infer_complete_scope_types, infer_scope_types,
-    is_discarded_dict_key_assignment, todo_type,
+    ParamSpecAttrKind, Parameter, Parameters, ProgramEnvironment, PropertyDeprecations,
+    SentinelInstance, Signature, SpecialFormType, SubclassOfType, Type, TypeAliasType,
+    TypeAndQualifiers, TypeContext, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind,
+    TypeVarVariance, TypingModule, UnionAccumulator, UnionBuilder, UnionType, any_over_type,
+    binding_type, extract_fixed_length_iterable_element_types, infer_complete_scope_types,
+    infer_scope_types, is_discarded_dict_key_assignment, todo_type,
 };
 use crate::{AnalysisSettings, Db, DisplaySettings, FxIndexSet, FxOrderSet, SemanticModel};
 use ty_python_core::definition::{
@@ -10154,8 +10155,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     /// Report the distinct deprecated targets of one operation in a single diagnostic.
-    /// Deduplicate by source function or overload, retaining separate source annotations for
-    /// distinct declarations. Include their messages in the primary annotation for concise output.
+    /// Deduplicate by source function or overload. Keep a shared deprecation message in the
+    /// primary annotation so it appears in concise output. Put differing messages in separate
+    /// subdiagnostics with their declarations so each message's prose and line breaks remain
+    /// readable. The summary names the possible deprecated targets in both output formats.
     fn report_deprecated_functions(
         &self,
         ranged: impl Ranged,
@@ -10169,6 +10172,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let Some(builder) = self.context.report_lint(&diagnostic::DEPRECATED, ranged) else {
             return;
         };
+        let shared_message = functions
+            .iter()
+            .filter_map(|function| function.deprecated(db)?.message)
+            .map(|message| message.value(db))
+            .filter(|message| !message.is_empty())
+            .all_equal_value()
+            .ok();
         let mut diagnostic = if functions.len() == 1 {
             let kind = if first.is_overload(db) {
                 "overload of"
@@ -10180,31 +10190,40 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 first.name(db)
             ))
         } else {
-            let mut diagnostic = builder.into_diagnostic("Use of deprecated functions");
+            let mut names = FxOrderSet::default();
+            let mut all_methods = true;
             for function in &functions {
-                let mut annotation = Annotation::secondary(function.spans(db).name);
-                if let Some(message) = function
+                let description = CallableDescription::from_overload(db, *function);
+                names.insert(description.name());
+                all_methods &= description.kind() == Some("method");
+            }
+            let kind = if all_methods { "method" } else { "function" };
+            let plural = if names.len() == 1 { "" } else { "s" };
+            let names = names
+                .iter()
+                .format_with(", ", |name, f| f(&format_args!("`{name}`")));
+            let mut diagnostic = builder.into_diagnostic(format_args!(
+                "Possible use of deprecated {kind}{plural}: {names}"
+            ));
+            for function in &functions {
+                if shared_message.is_some() {
+                    diagnostic.annotate(Annotation::secondary(function.spans(db).name));
+                    continue;
+                }
+                let message = function
                     .deprecated(db)
                     .and_then(|deprecated| deprecated.message)
-                {
-                    annotation = annotation.message(message.value(db));
-                }
-                diagnostic.annotate(annotation);
+                    .map(|message| message.value(db))
+                    .filter(|message| !message.is_empty())
+                    .unwrap_or("Deprecated function defined here");
+                let mut sub = SubDiagnostic::new(SubDiagnosticSeverity::Info, message);
+                sub.annotate(Annotation::primary(function.spans(db).name));
+                diagnostic.sub(sub);
             }
             diagnostic
         };
-        let messages = functions
-            .iter()
-            .filter_map(|function| {
-                function
-                    .deprecated(db)
-                    .and_then(|deprecated| deprecated.message)
-            })
-            .map(|message| message.value(db))
-            .unique()
-            .join("; ");
-        if !messages.is_empty() {
-            diagnostic.set_primary_annotation_message(messages);
+        if let Some(message) = shared_message {
+            diagnostic.set_primary_annotation_message(message);
         }
         diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
     }
@@ -10220,7 +10239,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         );
     }
 
-    /// Check the accessor invoked by an attribute operation, using the property descriptors
+    /// Check the accessor invoked by an attribute operation, using the deprecations
     /// retained by member lookup or assignment validation. `access` describes the operation,
     /// which may differ from the AST context: an augmented assignment also reads its target.
     ///
@@ -10243,46 +10262,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn check_deprecated_property(
         &self,
         attribute: &ast::ExprAttribute,
-        member: Type<'db>,
+        properties: PropertyDeprecations<'db>,
         access: ExprContext,
     ) {
-        /// Represent absent accessors and non-property members as `Unknown` to retain
-        /// non-deprecated intersection alternatives.
-        fn accessors<'db>(
-            db: &'db dyn Db,
-            env: &ProgramEnvironment<'db>,
-            ty: Type<'db>,
-            access: ExprContext,
-        ) -> Type<'db> {
-            match ty {
-                Type::PropertyInstance(property) => match access {
-                    ExprContext::Load => property.getter(db),
-                    ExprContext::Store => property.setter(db),
-                    ExprContext::Del => property.deleter(db),
-                    ExprContext::Invalid => None,
-                }
-                .unwrap_or_else(Type::unknown),
-                Type::Union(union) => union.map(db, env, |ty| accessors(db, env, *ty, access)),
-                Type::Intersection(intersection) => {
-                    intersection.map_positive(db, env, |ty| accessors(db, env, *ty, access))
-                }
-                _ => Type::unknown(),
-            }
-        }
-
-        if !self.context.is_lint_enabled(&diagnostic::DEPRECATED) {
-            return;
-        }
-        let db = self.db();
-        let env = self.program_environment();
-        let bindings = accessors(db, env, member, access).bindings(db, env);
         self.report_deprecated_functions(
             &attribute.attr,
-            bindings
-                .deprecated_functions(db)
-                .map(|(_, function)| function)
-                // These are accessor references, not resolved overload calls.
-                .filter(|function| !function.is_overload(db)),
+            properties.functions(self.db(), access).iter().copied(),
         );
     }
 

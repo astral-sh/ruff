@@ -17,8 +17,8 @@ use crate::types::diagnostic::{
     report_possibly_missing_attribute,
 };
 use crate::types::{
-    CallDunderError, DisplaySettings, IntersectionType, MemberLookupPolicy, Type, TypeContext,
-    TypeQualifiers, UnionType,
+    CallDunderError, DisplaySettings, MemberLookupPolicy, PropertyDeprecations, Type, TypeContext,
+    TypeQualifiers,
 };
 use crate::{Db, ProgramEnvironment};
 
@@ -99,8 +99,8 @@ enum AttributeDeprecation<'db> {
     Missing,
     /// A non-deprecated member can provide the implementation in an intersection.
     NotDeprecated,
-    /// Property descriptors whose accessor deprecations are checked at the assignment site.
-    Deprecated(Type<'db>),
+    /// Accessor deprecations checked at the assignment site.
+    Deprecated(PropertyDeprecations<'db>),
 }
 
 impl<'db> AttributeDeprecation<'db> {
@@ -116,22 +116,15 @@ impl<'db> AttributeDeprecation<'db> {
             AttributeWriteRequirement::All { element_tys, .. } => {
                 element_tys.iter().fold(Self::Missing, |deprecation, ty| {
                     let requirement = attribute_write_requirement(db, env, *ty, attribute);
-                    deprecation.union(
-                        db,
-                        env,
-                        Self::from_requirement(db, env, &requirement, attribute),
-                    )
+                    deprecation.union(db, Self::from_requirement(db, env, &requirement, attribute))
                 })
             }
             AttributeWriteRequirement::Any { intersection, .. } => {
                 let mut deprecation = Self::Missing;
                 for ty in intersection.positive(db) {
                     let requirement = attribute_write_requirement(db, env, *ty, attribute);
-                    deprecation = deprecation.intersection(
-                        db,
-                        env,
-                        Self::from_requirement(db, env, &requirement, attribute),
-                    );
+                    deprecation = deprecation
+                        .intersection(db, Self::from_requirement(db, env, &requirement, attribute));
                     if matches!(deprecation, Self::NotDeprecated) {
                         break;
                     }
@@ -157,7 +150,9 @@ impl<'db> AttributeDeprecation<'db> {
                         ..
                     },
                 ..
-            } if descriptor_ty.has_deprecated_property(db) => Self::Deprecated(*descriptor_ty),
+            } if let Some(properties) = descriptor_ty.property_deprecations(db) => {
+                Self::Deprecated(properties)
+            }
             AttributeWriteRequirement::Instance {
                 member: InstanceAttributeWriteMember::SetAttr,
                 ..
@@ -172,10 +167,10 @@ impl<'db> AttributeDeprecation<'db> {
     }
 
     /// A union can invoke either target, so either target can contribute a deprecation.
-    fn union(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>, other: Self) -> Self {
+    fn union(self, db: &'db dyn Db, other: Self) -> Self {
         match (self, other) {
             (Self::Deprecated(left), Self::Deprecated(right)) => {
-                Self::Deprecated(UnionType::from_two_elements(db, env, left, right))
+                Self::Deprecated(left.union(db, right))
             }
             (deprecated @ Self::Deprecated(_), _) | (_, deprecated @ Self::Deprecated(_)) => {
                 deprecated
@@ -187,11 +182,11 @@ impl<'db> AttributeDeprecation<'db> {
 
     /// An intersection can use a non-deprecated member instead, but an absent member cannot
     /// provide an alternative implementation.
-    fn intersection(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>, other: Self) -> Self {
+    fn intersection(self, db: &'db dyn Db, other: Self) -> Self {
         match (self, other) {
             (Self::NotDeprecated, _) | (_, Self::NotDeprecated) => Self::NotDeprecated,
             (Self::Deprecated(left), Self::Deprecated(right)) => {
-                Self::Deprecated(IntersectionType::from_two_elements(db, env, left, right))
+                Self::Deprecated(left.intersection(db, right))
             }
             (Self::Missing, other) | (other, Self::Missing) => other,
         }
@@ -311,7 +306,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                         deprecation.as_ref().map(|_| &mut current),
                     );
                     if let Some(deprecation) = deprecation.as_deref_mut() {
-                        *deprecation = deprecation.union(db, env, current);
+                        *deprecation = deprecation.union(db, current);
                     }
                     valid
                 });
@@ -319,7 +314,6 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                     *deprecation = requirements.fold(*deprecation, |deprecation, requirement| {
                         deprecation.union(
                             db,
-                            env,
                             AttributeDeprecation::from_requirement(
                                 db,
                                 env,
@@ -358,7 +352,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                         deprecation.as_ref().map(|_| &mut current),
                     );
                     if let Some(deprecation) = deprecation.as_deref_mut() {
-                        *deprecation = deprecation.intersection(db, env, current);
+                        *deprecation = deprecation.intersection(db, current);
                     }
                     valid
                 });
@@ -368,7 +362,6 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                     {
                         *deprecation = deprecation.intersection(
                             db,
-                            env,
                             AttributeDeprecation::from_requirement(
                                 db,
                                 env,

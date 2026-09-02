@@ -84,7 +84,7 @@ pub(crate) use crate::types::enums::{EnumClassLiteral, EnumComplementType, enum_
 pub(crate) use crate::types::equality::{ComparisonSoundnessPolicy, equality_truthiness};
 use crate::types::function::{
     DataclassTransformerFlags, DataclassTransformerParams, FunctionDecorators, FunctionSpans,
-    FunctionType, KnownFunction,
+    FunctionType, KnownFunction, OverloadLiteral,
 };
 pub(crate) use crate::types::generics::GenericContext;
 use crate::types::generics::{ApplySpecialization, Specialization, bind_typevar};
@@ -911,10 +911,66 @@ struct DeprecatedMember<'db> {
     #[returns(copy)]
     member: PlaceAndQualifiers<'db>,
     #[returns(copy)]
-    properties: Type<'db>,
+    properties: PropertyDeprecations<'db>,
 }
 
 impl get_size2::GetSize for DeprecatedMember<'_> {}
+
+/// Deprecated property accessors retained independently of descriptor types. Distinct property
+/// objects are disjoint types, but either can implement an attribute on an intersection.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+struct PropertyDeprecations<'db> {
+    #[returns(ref)]
+    getters: Box<[OverloadLiteral<'db>]>,
+    #[returns(ref)]
+    setters: Box<[OverloadLiteral<'db>]>,
+    #[returns(ref)]
+    deleters: Box<[OverloadLiteral<'db>]>,
+}
+
+impl get_size2::GetSize for PropertyDeprecations<'_> {}
+
+impl<'db> PropertyDeprecations<'db> {
+    fn functions(self, db: &'db dyn Db, access: ast::ExprContext) -> &'db [OverloadLiteral<'db>] {
+        match access {
+            ast::ExprContext::Load => self.getters(db),
+            ast::ExprContext::Store => self.setters(db),
+            ast::ExprContext::Del => self.deleters(db),
+            ast::ExprContext::Invalid => &[],
+        }
+    }
+
+    fn getters_only(self, db: &'db dyn Db) -> Self {
+        Self::new(db, self.getters(db), [].as_slice(), [].as_slice())
+    }
+
+    /// Retain either alternative's deprecations: a union can invoke either accessor.
+    fn union(self, db: &'db dyn Db, other: Self) -> Self {
+        self.combine(db, other, false)
+    }
+
+    /// Retain deprecations only for access kinds deprecated in both alternatives. A
+    /// non-deprecated getter can suppress read warnings without suppressing write warnings.
+    fn intersection(self, db: &'db dyn Db, other: Self) -> Self {
+        self.combine(db, other, true)
+    }
+
+    fn combine(self, db: &'db dyn Db, other: Self, intersection: bool) -> Self {
+        let combine = |left: &[OverloadLiteral<'db>], right: &[OverloadLiteral<'db>]| {
+            if intersection && (left.is_empty() || right.is_empty()) {
+                Box::<[_]>::default()
+            } else {
+                left.iter().chain(right).copied().unique().collect()
+            }
+        };
+        Self::new(
+            db,
+            combine(self.getters(db), other.getters(db)),
+            combine(self.setters(db), other.setters(db)),
+            combine(self.deleters(db), other.deleters(db)),
+        )
+    }
+}
 
 impl<'db> ResolvedMember<'db> {
     fn member(self, db: &'db dyn Db) -> PlaceAndQualifiers<'db> {
@@ -924,7 +980,7 @@ impl<'db> ResolvedMember<'db> {
         }
     }
 
-    fn deprecated_properties(self, db: &'db dyn Db) -> Option<Type<'db>> {
+    fn deprecated_properties(self, db: &'db dyn Db) -> Option<PropertyDeprecations<'db>> {
         match self {
             Self::WithDeprecations(member) => Some(member.properties(db)),
             Self::Plain(_) => None,
@@ -934,7 +990,7 @@ impl<'db> ResolvedMember<'db> {
     fn new(
         db: &'db dyn Db,
         member: PlaceAndQualifiers<'db>,
-        properties: Option<Type<'db>>,
+        properties: Option<PropertyDeprecations<'db>>,
     ) -> Self {
         match properties {
             Some(properties) => {
@@ -944,7 +1000,7 @@ impl<'db> ResolvedMember<'db> {
         }
     }
 
-    /// Transform the member's value type without changing its deprecated property descriptors.
+    /// Transform the member's value type without changing its property accessor deprecations.
     fn map_type(self, db: &'db dyn Db, f: impl FnOnce(Type<'db>) -> Type<'db>) -> Self {
         Self::new(
             db,
@@ -954,16 +1010,15 @@ impl<'db> ResolvedMember<'db> {
     }
 }
 
-/// Combine deprecated descriptors from alternative lookup paths. A non-deprecated path (`None`)
+/// Combine accessor deprecations from alternative lookup paths. A non-deprecated path (`None`)
 /// does not suppress deprecations from another possible path.
 fn union_deprecated_properties<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
-    left: Option<Type<'db>>,
-    right: Option<Type<'db>>,
-) -> Option<Type<'db>> {
+    left: Option<PropertyDeprecations<'db>>,
+    right: Option<PropertyDeprecations<'db>>,
+) -> Option<PropertyDeprecations<'db>> {
     match (left, right) {
-        (Some(left), Some(right)) => Some(UnionType::from_two_elements(db, env, left, right)),
+        (Some(left), Some(right)) => Some(left.union(db, right)),
         _ => left.or(right),
     }
 }
@@ -972,7 +1027,7 @@ fn member_lookup_result<'db>(
     db: &'db dyn Db,
     member: PlaceAndQualifiers<'db>,
     error: Option<MemberLookupErrorKind<'db>>,
-    properties: Option<Type<'db>>,
+    properties: Option<PropertyDeprecations<'db>>,
 ) -> MemberLookupResult<'db> {
     let member = ResolvedMember::new(db, member, properties);
     match error {
@@ -1027,12 +1082,8 @@ fn distribute_member_lookup_over_bound_or_constraints<'db>(
                     });
                 error = error.or_else(|| result.err().map(|error| error.kind(db)));
                 let member = result.unwrap_or_else(|error| error.fallback_member(db));
-                properties = union_deprecated_properties(
-                    db,
-                    env,
-                    properties,
-                    member.deprecated_properties(db),
-                );
+                properties =
+                    union_deprecated_properties(db, properties, member.deprecated_properties(db));
                 member.member(db)
             });
             member_lookup_result(db, member, error, properties)
@@ -1069,7 +1120,6 @@ fn member_lookup_or_fall_back_to<'db>(
                     .or_else(|| fallback.err().map(|error| error.kind(db))),
                 union_deprecated_properties(
                     db,
-                    env,
                     resolved.deprecated_properties(db),
                     fallback_member.deprecated_properties(db),
                 ),
@@ -4293,44 +4343,94 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Whether this descriptor contains a property with a deprecated accessor implementation.
-    /// Overload deprecations require a resolved call and do not apply to accessor references.
+    /// Collect deprecated accessor implementations without inferring their signatures or
+    /// intersecting their function or descriptor types. Retain the declarations so callers can
+    /// report deprecations after descriptor lookup replaces the property with its value type:
     ///
-    /// This determines whether to retain deprecation metadata, not whether to report a diagnostic.
-    /// Reporting also accounts for the access kind and non-deprecated intersection alternatives.
-    fn has_deprecated_property(self, db: &'db dyn Db) -> bool {
-        fn deprecated(db: &dyn Db, ty: Type<'_>) -> bool {
-            match ty {
-                Type::FunctionLiteral(function) => function.implementation_deprecated(db).is_some(),
-                Type::BoundMethod(method) => {
-                    method.function(db).implementation_deprecated(db).is_some()
+    /// ```python
+    /// from typing_extensions import deprecated
+    ///
+    /// class C:
+    ///     @property
+    ///     @deprecated("old getter")
+    ///     def value(self) -> int: ...
+    ///
+    /// C().value  # Warn about the getter, even though the attribute has type `int`.
+    /// ```
+    ///
+    /// Overload deprecations require a resolved call and do not apply to accessor references.
+    fn property_deprecations(self, db: &'db dyn Db) -> Option<PropertyDeprecations<'db>> {
+        /// Append deprecated implementations, preserving earlier entries if a non-deprecated
+        /// intersection alternative suppresses this accessor's deprecations.
+        fn collect<'db>(
+            db: &'db dyn Db,
+            accessor: Type<'db>,
+            functions: &mut Vec<OverloadLiteral<'db>>,
+        ) {
+            match accessor {
+                Type::FunctionLiteral(function) => {
+                    let (_, implementation) = function.overloads_and_implementation(db);
+                    functions.extend(
+                        implementation.filter(|function| function.deprecated(db).is_some()),
+                    );
                 }
-                Type::Union(union) => union.elements(db).iter().any(|ty| deprecated(db, *ty)),
-                Type::Intersection(intersection) => intersection
-                    .positive(db)
-                    .iter()
-                    .any(|ty| deprecated(db, *ty)),
-                _ => false,
+                Type::BoundMethod(method) => {
+                    collect(db, Type::FunctionLiteral(method.function(db)), functions);
+                }
+                Type::Union(union) => {
+                    for element in union.elements(db) {
+                        collect(db, *element, functions);
+                    }
+                }
+                Type::Intersection(intersection) => {
+                    let start = functions.len();
+                    for element in intersection.positive(db) {
+                        let element_start = functions.len();
+                        collect(db, *element, functions);
+                        if functions.len() == element_start {
+                            // A non-deprecated intersection member can supply the accessor.
+                            functions.truncate(start);
+                            break;
+                        }
+                    }
+                }
+                _ => {}
             }
         }
+
         match self {
-            Type::PropertyInstance(property) => [
-                property.getter(db),
-                property.setter(db),
-                property.deleter(db),
-            ]
-            .into_iter()
-            .flatten()
-            .any(|ty| deprecated(db, ty)),
+            Type::PropertyInstance(property) => {
+                let [getters, setters, deleters] = [
+                    property.getter(db),
+                    property.setter(db),
+                    property.deleter(db),
+                ]
+                .map(|accessor| {
+                    let mut functions = Vec::new();
+                    if let Some(accessor) = accessor {
+                        collect(db, accessor, &mut functions);
+                    }
+                    functions.into_iter().unique().collect::<Box<[_]>>()
+                });
+                if getters.is_empty() && setters.is_empty() && deleters.is_empty() {
+                    None
+                } else {
+                    Some(PropertyDeprecations::new(db, getters, setters, deleters))
+                }
+            }
             Type::Union(union) => union
                 .elements(db)
                 .iter()
-                .any(|ty| ty.has_deprecated_property(db)),
-            Type::Intersection(intersection) => intersection
-                .positive(db)
-                .iter()
-                .any(|ty| ty.has_deprecated_property(db)),
-            _ => false,
+                .filter_map(|ty| ty.property_deprecations(db))
+                .reduce(|left, right| left.union(db, right)),
+            Type::Intersection(intersection) => {
+                let mut elements = intersection.positive(db).iter();
+                let first = elements.next()?.property_deprecations(db)?;
+                elements.try_fold(first, |properties, ty| {
+                    Some(properties.intersection(db, ty.property_deprecations(db)?))
+                })
+            }
+            _ => None,
         }
     }
 
@@ -4921,7 +5021,7 @@ impl<'db> Type<'db> {
         ) = Self::try_call_dunder_get_on_attribute(db, env, meta_attr_plain, Some(receiver), owner);
 
         let meta_attr_error = meta_attr_error.map(MemberLookupErrorKind::DescriptorGet);
-        let meta_properties = meta_attr_ty.filter(|ty| ty.has_deprecated_property(db));
+        let meta_properties = meta_attr_ty.and_then(|ty| ty.property_deprecations(db));
         let fallback_error = fallback.err().map(|error| error.kind(db));
         let fallback_member = fallback.unwrap_or_else(|error| error.fallback_member(db));
         let fallback_properties = fallback_member.deprecated_properties(db);
@@ -4998,7 +5098,7 @@ impl<'db> Type<'db> {
                 })
                 .with_qualifiers(meta_attr_qualifiers.union(fallback_qualifiers)),
                 meta_attr_error.or(fallback_error),
-                union_deprecated_properties(db, env, meta_properties, fallback_properties),
+                union_deprecated_properties(db, meta_properties, fallback_properties),
             ),
 
             // `meta_attr` is *not* a data descriptor. This means that the `fallback` type has
@@ -5053,7 +5153,7 @@ impl<'db> Type<'db> {
                 })
                 .with_qualifiers(meta_attr_qualifiers.union(fallback_qualifiers)),
                 meta_attr_error.or(fallback_error),
-                union_deprecated_properties(db, env, meta_properties, fallback_properties),
+                union_deprecated_properties(db, meta_properties, fallback_properties),
             ),
 
             // If the attribute is not found on the meta-type, we simply return the fallback.
@@ -5349,7 +5449,6 @@ impl<'db> Type<'db> {
                         let member = result.unwrap_or_else(|error| error.fallback_member(db));
                         properties = union_deprecated_properties(
                             db,
-                            env,
                             properties,
                             member.deprecated_properties(db),
                         );
@@ -5367,7 +5466,7 @@ impl<'db> Type<'db> {
                     } else {
                         let receiver = Some(receiver.unwrap_or(this));
                         let mut error = None;
-                        let mut properties = IntersectionBuilder::new(db, env);
+                        let mut properties: Option<PropertyDeprecations<'db>> = None;
                         let mut all_deprecated = true;
                         let member =
                             intersection.map_with_boundness_and_qualifiers(db, env, |elem| {
@@ -5378,7 +5477,10 @@ impl<'db> Type<'db> {
                                 let member =
                                     result.unwrap_or_else(|error| error.fallback_member(db));
                                 if let Some(deprecated) = member.deprecated_properties(db) {
-                                    properties.add_positive_in_place(deprecated);
+                                    properties =
+                                        Some(properties.map_or(deprecated, |properties| {
+                                            properties.intersection(db, deprecated)
+                                        }));
                                 } else if !member.member(db).place.is_undefined() {
                                     all_deprecated = false;
                                 }
@@ -5388,8 +5490,7 @@ impl<'db> Type<'db> {
                             db,
                             member,
                             error,
-                            (all_deprecated && !member.place.is_undefined())
-                                .then(|| properties.build()),
+                            properties.filter(|_| all_deprecated && !member.place.is_undefined()),
                         )
                     }
                 }

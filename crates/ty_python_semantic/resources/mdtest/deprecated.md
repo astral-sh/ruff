@@ -615,7 +615,7 @@ class AlsoDeprecated:
 
 def deprecated_intersection(value: Deprecated) -> None:
     if isinstance(value, AlsoDeprecated):
-        # error: [deprecated] "old inversion; another old inversion"
+        # error: [deprecated] "`Deprecated.__invert__`, `AlsoDeprecated.__invert__`"
         ~value
 ```
 
@@ -667,7 +667,7 @@ class Second:
 T = TypeVar("T", First, Second)
 
 def f(value: T) -> None:
-    # error: [deprecated] "first; second"
+    # error: [deprecated] "`First.__invert__`, `Second.__invert__`"
     ~value
 ```
 
@@ -699,7 +699,7 @@ W = TypeVar("W", First | Third, Second)
 
 def nested_union(value: W) -> None:
     # error: [unsupported-operator]
-    # error: [deprecated] "first; second"
+    # error: [deprecated] "`First.__invert__`, `Second.__invert__`"
     ~value
 ```
 
@@ -716,7 +716,7 @@ X = TypeVar("X", Invalid, Second)
 
 def invalid_operator(value: X) -> None:
     # error: [unsupported-operator]
-    # error: [deprecated] "invalid inversion; second"
+    # error: [deprecated] "`Invalid.__invert__`, `Second.__invert__`"
     ~value
 ```
 
@@ -974,6 +974,9 @@ class Old:
     @value.setter
     @deprecated("old setter")
     def value(self, value: int) -> None: ...
+    @value.deleter
+    @deprecated("old deleter")
+    def value(self) -> None: ...
 
 class Active:
     value: int
@@ -994,6 +997,50 @@ def check_marker(value: Old):
     if isinstance(value, Marker):
         value.value  # error: [deprecated] "old getter"
         value.value = 1  # error: [deprecated] "old setter"
+```
+
+When both members define their own deprecated property, reading, assigning, and deleting the
+attribute report the getter, setter, and deleter deprecations, respectively. Each warning names both
+declarations.
+
+```py
+class AlsoOld:
+    @property
+    @deprecated("old getter")
+    def value(self) -> int:
+        return 0
+
+    @value.setter
+    @deprecated("old setter")
+    def value(self, value: int) -> None: ...
+    @value.deleter
+    @deprecated("old deleter")
+    def value(self) -> None: ...
+
+def check_both(value: Old):
+    if isinstance(value, AlsoOld):
+        value.value  # error: [deprecated] "`Old.value`, `AlsoOld.value`: old getter"
+        value.value = 1  # error: [deprecated] "`Old.value`, `AlsoOld.value`: old setter"
+        del value.value  # error: [deprecated] "`Old.value`, `AlsoOld.value`: old deleter"
+```
+
+A non-deprecated getter suppresses the warning on reads. Assignments still warn when both setters
+are deprecated.
+
+```py
+class ActiveGetter:
+    @property
+    def value(self) -> int:
+        return 0
+
+    @value.setter
+    @deprecated("old setter")
+    def value(self, value: int) -> None: ...
+
+def check_active_getter(value: Old):
+    if isinstance(value, ActiveGetter):
+        value.value
+        value.value = 1  # error: [deprecated] "`Old.value`, `ActiveGetter.value`: old setter"
 ```
 
 ## Invalid property getter calls
@@ -1231,6 +1278,69 @@ def check(value: list[Any] | set[Any]):
     convert(value)
 ```
 
+### Calls that select several deprecated overloads
+
+An `int | str` argument selects a different overload for each member of the union. When both
+overloads are deprecated, the warning names the function once.
+
+```py
+from typing import overload
+from typing_extensions import deprecated
+
+@overload
+@deprecated("integer overload")
+def convert(value: int) -> str: ...
+@overload
+@deprecated("string overload")
+def convert(value: str) -> str: ...
+def convert(value: int | str) -> str:
+    return str(value)
+
+def check(value: int | str):
+    # error: [deprecated] "Possible use of deprecated function: `convert`"
+    convert(value)
+```
+
+### Shared deprecation messages across overloads
+
+When selected overloads share a deprecation message, the warning includes that message once in both
+full and concise output. The full diagnostic points to each deprecated overload.
+
+```py
+from typing import overload
+from typing_extensions import deprecated
+
+@overload
+@deprecated("Use `parse` instead. Support ends in version 2.")
+def convert(value: int) -> str: ...
+@overload
+@deprecated("Use `parse` instead. Support ends in version 2.")
+def convert(value: str) -> str: ...
+def convert(value: int | str) -> str:
+    return str(value)
+
+def check(value: int | str):
+    # snapshot: deprecated
+    convert(value)
+```
+
+```snapshot
+warning[deprecated]: Possible use of deprecated function: `convert`
+  --> src/mdtest_snippet.py:15:5
+   |
+15 |     convert(value)
+   |     ^^^^^^^ Use `parse` instead. Support ends in version 2.
+   |
+  ::: src/mdtest_snippet.py:6:5
+   |
+ 6 | def convert(value: int) -> str: ...
+   |     -------
+ 7 | @overload
+ 8 | @deprecated("Use `parse` instead. Support ends in version 2.")
+ 9 | def convert(value: str) -> str: ...
+   |     -------
+```
+
 ### Overloads for different receivers
 
 The `self` annotations restrict which overloads each instance can call. A call on `C[str]` reports
@@ -1258,8 +1368,12 @@ def check(integer: C[int], string: C[str]):
 
 ## Deprecated constructors
 
-Calling a class implicitly invokes its constructor methods. A deprecated `__init__` or `__new__`
-produces a warning even when the class itself is not deprecated.
+Calling a class can invoke `__new__`, `__init__`, or a custom metaclass's `__call__`. We warn about
+deprecated methods that the call invokes, even when the class itself is not deprecated.
+
+### `__init__`
+
+Calling a class reports the deprecation of its initializer.
 
 ```py
 from typing_extensions import Self, deprecated
@@ -1268,23 +1382,18 @@ class OldInit:
     @deprecated("old init")
     def __init__(self) -> None: ...
 
-class OldNew:
-    @deprecated("old new")
-    def __new__(cls) -> Self:
-        return super().__new__(cls)
-
 OldInit()  # error: [deprecated] "old init"
-OldNew()  # error: [deprecated] "old new"
 ```
 
-Explicit references and calls still report the constructor's deprecation only once.
+An explicit call on an instance also produces only one warning.
 
 ```py
-OldInit.__init__  # error: [deprecated] "old init"
-OldNew.__new__(OldNew)  # error: [deprecated] "old new"
+def explicit_init(value: OldInit):
+    value.__init__()  # error: [deprecated] "old init"
 ```
 
-An active `__new__` does not hide a deprecated `__init__`, including an inherited initializer.
+If a non-deprecated `__new__` returns an instance of the class, Python still calls the inherited
+deprecated initializer.
 
 ```py
 class NewWithOldInit(OldInit):
@@ -1292,33 +1401,6 @@ class NewWithOldInit(OldInit):
         return super().__new__(cls)
 
 NewWithOldInit()  # error: [deprecated] "old init"
-```
-
-If both constructor methods are deprecated, one warning includes both messages.
-
-```py
-class Both(OldNew, OldInit): ...
-
-# snapshot: deprecated
-Both()
-```
-
-```snapshot
-warning[deprecated]: Use of deprecated functions
-  --> src/mdtest_snippet.py:24:1
-   |
-24 | Both()
-   | ^^^^ old new; old init
-   |
-  ::: src/mdtest_snippet.py:5:9
-   |
- 5 |     def __init__(self) -> None: ...
-   |         -------- old init
- 6 |
- 7 | class OldNew:
- 8 |     @deprecated("old new")
- 9 |     def __new__(cls) -> Self:
-   |         ------- old new
 ```
 
 When `__new__` returns an unrelated type, `__init__` does not run and produces no warning.
@@ -1331,9 +1413,73 @@ class ReturnsInt(OldInit):
 ReturnsInt()
 ```
 
-A deprecated metaclass `__call__` also warns when invoked implicitly by constructing a class.
+### `__new__`
+
+Calling a class also reports the deprecation of the method that creates the instance.
 
 ```py
+from typing_extensions import Self, deprecated
+
+class OldNew:
+    @deprecated("old new")
+    def __new__(cls) -> Self:
+        return super().__new__(cls)
+
+OldNew()  # error: [deprecated] "old new"
+```
+
+Calling `__new__` explicitly produces only one warning.
+
+```py
+OldNew.__new__(OldNew)  # error: [deprecated] "old new"
+```
+
+### Both constructor methods
+
+When both methods are deprecated, the class call produces one warning that points to both
+declarations and includes both messages.
+
+```py
+from typing_extensions import Self, deprecated
+
+class Both:
+    @deprecated("old new")
+    def __new__(cls) -> Self:
+        return super().__new__(cls)
+
+    @deprecated("old init")
+    def __init__(self) -> None: ...
+
+# snapshot: deprecated
+Both()
+```
+
+```snapshot
+warning[deprecated]: Possible use of deprecated methods: `Both.__new__`, `Both.__init__`
+  --> src/mdtest_snippet.py:12:1
+   |
+12 | Both()
+   | ^^^^
+info: old new
+ --> src/mdtest_snippet.py:5:9
+  |
+5 |     def __new__(cls) -> Self:
+  |         ^^^^^^^
+info: old init
+ --> src/mdtest_snippet.py:9:9
+  |
+9 |     def __init__(self) -> None: ...
+  |         ^^^^^^^^
+```
+
+### Metaclass `__call__`
+
+Calling a class with a custom metaclass invokes the metaclass's `__call__` method. If that method is
+deprecated, the class call produces a warning.
+
+```py
+from typing_extensions import deprecated
+
 class Meta(type):
     @deprecated("metaclass call")
     def __call__(cls) -> int:
@@ -1464,46 +1610,78 @@ class InPlace(Number):
         return self
 
 def check_mixed(number: First | InPlace, value: int | str):
-    number += value  # error: [deprecated] "addition; in-place addition"
+    # error: [deprecated] "`Number.__add__`, `InPlace.__iadd__`"
+    number += value
 ```
 
 ## Calls to different deprecated methods
 
-When a call can invoke different deprecated methods, one warning includes both messages and points
-to both method definitions. Inherited copies of the same method are listed only once.
+Deprecation messages can contain several sentences, semicolons, and line breaks.
 
 ```py
 from typing_extensions import deprecated
 
 class First:
-    @deprecated("first message")
+    @deprecated("Use `invoke` instead. Direct calls are deprecated; support ends in version 2.")
     def __call__(self) -> None: ...
 
 class Second:
-    @deprecated("second message")
+    @deprecated("Use `invoke` instead.\nSupport ends in version 3.")
     def __call__(self) -> None: ...
+```
 
-class Inherited(First): ...
+When either method can be called, the warning names both defining classes. The full diagnostic shows
+each message beside its method's definition, preserving its punctuation and line breaks.
 
-def check(value: First | Second | Inherited):
+```py
+def check(value: First | Second):
     # snapshot: deprecated
     value()
 ```
 
 ```snapshot
-warning[deprecated]: Use of deprecated functions
-  --> src/mdtest_snippet.py:15:5
+warning[deprecated]: Possible use of deprecated methods: `First.__call__`, `Second.__call__`
+  --> src/mdtest_snippet.py:12:5
    |
-15 |     value()
-   |     ^^^^^ first message; second message
-   |
-  ::: src/mdtest_snippet.py:5:9
-   |
- 5 |     def __call__(self) -> None: ...
-   |         -------- first message
- 6 |
- 7 | class Second:
- 8 |     @deprecated("second message")
- 9 |     def __call__(self) -> None: ...
-   |         -------- second message
+12 |     value()
+   |     ^^^^^
+info: Use `invoke` instead. Direct calls are deprecated; support ends in version 2.
+ --> src/mdtest_snippet.py:5:9
+  |
+5 |     def __call__(self) -> None: ...
+  |         ^^^^^^^^
+info: Use `invoke` instead.
+Support ends in version 3.
+ --> src/mdtest_snippet.py:9:9
+  |
+9 |     def __call__(self) -> None: ...
+  |         ^^^^^^^^
+```
+
+## Calls to deprecated generic methods
+
+The warning includes the defining class's name even when both the class and method have type
+parameters.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing_extensions import deprecated
+
+class First[T]:
+    @deprecated("first method")
+    def __call__[U](self, value: U) -> U:
+        return value
+
+class Second:
+    @deprecated("second method")
+    def __call__(self, value: int) -> int:
+        return value
+
+def check(value: First[int] | Second):
+    # error: [deprecated] "Possible use of deprecated methods: `First.__call__`, `Second.__call__`"
+    value(1)
 ```
