@@ -531,11 +531,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
             // Consider `C[Any] <: Top[C[Any]]` for a protocol `C[T: str]` with covariant `T`.
             // The target's top materialization replaces `Any` with `T`'s bound, `str`, so the
-            // origins are `C[Any]` and `C[str]`. They differ, but taking the top materialization
-            // of both origins gives `C[str]`, allowing us to recognize the subtype relation.
-            // Use top materializations when the target is top, and bottom otherwise.
-            // Comparing the origins as ordinary classes lets the existing generic checks
-            // handle variance, bounds, and constraints.
+            // origins are `C[Any]` and `C[str]`. The equality check above does not catch this
+            // valid subtype relation because those origins have different type arguments.
+            // Instead, compare the top materializations of their nominal instances: here,
+            // that checks `C[str] <: C[str]`. When only the source is bottom-materialized,
+            // compare bottom materializations instead. These nominal comparisons use the
+            // existing rules for variance, bounds, and constraints.
             let kind = protocol
                 .materialization_kind(db)
                 .unwrap_or(MaterializationKind::Bottom);
