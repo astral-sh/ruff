@@ -125,7 +125,6 @@ mod support;
 mod variables;
 
 use paths::PathAssignments;
-use sequents::SequentMap;
 use solutions::SolutionWalker;
 use variables::{Constraint, ConstraintProvenance};
 
@@ -1021,9 +1020,6 @@ struct ConstraintSetStorage<'db> {
     /// Existential abstraction derives new constraints in source order and returns their
     /// source-order sidecar, so distinct orderings of the same BDD must not share a cache entry.
     exists_cache: FxHashMap<ExistsCacheKey<'db>, (NodeId, Option<SourceOrderId>)>,
-
-    single_sequent_cache: FxHashMap<ConstraintId, SequentMap<ConstraintId>>,
-    pair_sequent_cache: FxHashMap<(ConstraintId, ConstraintId), SequentMap<ConstraintId>>,
 }
 
 impl<'db> ConstraintSetStorage<'db> {
@@ -5442,119 +5438,6 @@ mod tests {
             bounded_path_bounds(db, set, inferable, 0, complete.visits),
             Err(ProjectionError::PathBudgetExceeded)
         );
-    }
-
-    #[test]
-    fn simple_lower_bound_conjunction_skips_sequent_analysis() {
-        let db = setup_db();
-        let db = &db;
-        let env = db.program_environment();
-        let t = create_typevar(db, "T");
-        let builder = ConstraintSetBuilder::new();
-        let int = KnownClass::Int.to_instance(db, &env);
-        let str = KnownClass::Str.to_instance(db, &env);
-        let set = ConstraintSet::constrain_typevar_lower_bound(db, &env, &builder, t, int).and(
-            db,
-            &builder,
-            || ConstraintSet::constrain_typevar_lower_bound(db, &env, &builder, t, str),
-        );
-        let inferable = TypeVarSet::from_typevars(db, [t]);
-        let (single_sequents, pair_sequents) = {
-            let storage = builder.storage.borrow();
-            (
-                storage.single_sequent_cache.len(),
-                storage.pair_sequent_cache.len(),
-            )
-        };
-
-        let solutions = set.solutions(db, &env, inferable);
-        assert_eq!(
-            solutions,
-            Ok(Solutions::Constrained(SolutionPaths::Complete(vec![vec![
-                TypeVarSolution {
-                    bound_typevar: t,
-                    solution: UnionType::from_elements(db, &env, [int, str]),
-                }
-            ]])))
-        );
-
-        let storage = builder.storage.borrow();
-        assert_eq!(storage.single_sequent_cache.len(), single_sequents);
-        assert_eq!(storage.pair_sequent_cache.len(), pair_sequents);
-    }
-
-    #[test]
-    fn simple_exact_bound_conjunction_skips_sequent_analysis() {
-        let db = setup_db();
-        let db = &db;
-        let env = db.program_environment();
-        let t = create_typevar(db, "T");
-        let u = create_typevar(db, "U");
-        let builder = ConstraintSetBuilder::new();
-        let int = KnownClass::Int.to_instance(db, &env);
-        let set = ConstraintSet::constrain_typevar_equivalence_bound(db, &env, &builder, t, int)
-            .and(db, &builder, || {
-                ConstraintSet::constrain_typevar_equivalence_bound(db, &env, &builder, u, int)
-            });
-        let inferable = TypeVarSet::from_typevars(db, [t, u]);
-        let (single_sequents, pair_sequents) = {
-            let storage = builder.storage.borrow();
-            (
-                storage.single_sequent_cache.len(),
-                storage.pair_sequent_cache.len(),
-            )
-        };
-
-        let Ok(Solutions::Constrained(solutions)) = set.solutions(db, &env, inferable) else {
-            panic!("expected constrained solutions");
-        };
-        let solutions = solutions.into_vec();
-        assert_eq!(solutions.len(), 1);
-        assert_eq!(solutions[0].len(), 2);
-        assert!(solutions[0].contains(&TypeVarSolution {
-            bound_typevar: t,
-            solution: int,
-        }));
-        assert!(solutions[0].contains(&TypeVarSolution {
-            bound_typevar: u,
-            solution: int,
-        }));
-
-        let storage = builder.storage.borrow();
-        assert_eq!(storage.single_sequent_cache.len(), single_sequents);
-        assert_eq!(storage.pair_sequent_cache.len(), pair_sequents);
-    }
-
-    #[test]
-    fn simple_unsatisfiable_exact_bound_conjunction_skips_sequent_analysis() {
-        let db = setup_db();
-        let db = &db;
-        let env = db.program_environment();
-        let t = create_typevar(db, "T");
-        let builder = ConstraintSetBuilder::new();
-        let int = KnownClass::Int.to_instance(db, &env);
-        let str = KnownClass::Str.to_instance(db, &env);
-        let set = ConstraintSet::constrain_typevar_equivalence_bound(db, &env, &builder, t, int)
-            .and(db, &builder, || {
-                ConstraintSet::constrain_typevar_equivalence_bound(db, &env, &builder, t, str)
-            });
-        let inferable = TypeVarSet::from_typevars(db, [t]);
-        let (single_sequents, pair_sequents) = {
-            let storage = builder.storage.borrow();
-            (
-                storage.single_sequent_cache.len(),
-                storage.pair_sequent_cache.len(),
-            )
-        };
-
-        assert_eq!(
-            set.solutions(db, &env, inferable),
-            Ok(Solutions::Unsatisfiable)
-        );
-
-        let storage = builder.storage.borrow();
-        assert_eq!(storage.single_sequent_cache.len(), single_sequents);
-        assert_eq!(storage.pair_sequent_cache.len(), pair_sequents);
     }
 
     #[test]
