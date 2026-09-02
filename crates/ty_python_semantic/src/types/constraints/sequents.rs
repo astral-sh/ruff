@@ -91,17 +91,6 @@ pub(super) enum Sequent<C> {
 }
 
 impl SequentMap<ConstraintId> {
-    pub(super) fn consequents(&self) -> impl Iterator<Item = ConstraintId> + '_ {
-        self.sequents.iter().filter_map(|sequent| match sequent {
-            Sequent::SingleImplication { post, .. } | Sequent::PairImplication { post, .. } => {
-                Some(*post)
-            }
-            Sequent::SingleTautology { .. }
-            | Sequent::PairImpossibility { .. }
-            | Sequent::TripleImpossibility { .. } => None,
-        })
-    }
-
     #[expect(dead_code)] // Keep this around for debugging purposes
     fn display<'db, 'a>(
         &'a self,
