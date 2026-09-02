@@ -16,7 +16,7 @@ use crate::types::constraints::variables::{
 use crate::types::constraints::{
     ALWAYS_FALSE, ALWAYS_TRUE, ConstraintBound, ConstraintBounds, ConstraintId,
     ConstraintSetBuilder, ConstraintSetStorage, InterimConstraint, IntersectionResult, Node,
-    OldConstraint, OwnedConstraintSet,
+    OldConstraint, OwnedConstraintSet, max_constructor_and_typevar_depth,
 };
 use crate::types::typevar::TypeVarSet;
 use crate::types::variance::VarianceInferable;
@@ -1990,6 +1990,30 @@ impl<'db> Constraint<'db> {
         // chain.
         if !replacement_bound.is_static_sequent_eligible(db, env) {
             return None;
+        }
+
+        // A self-referential bound can consume another bound on the same typevar repeatedly. For
+        // example, combining `F[U] ≤ U` with `M ≤ U` would first produce `F[M] ≤ U`, then
+        // `F[F[M]] ≤ U`, and so on.
+        if needle_typevar.is_same_typevar_as(db, replacement_typevar) {
+            return None;
+        }
+
+        // For a concrete replacement nested inside a non-set-theoretic type, require constructor
+        // nesting to decrease. This gives recursive chains a well-founded measure: replacing `U`
+        // in `F[U]` with `F[M]` would otherwise produce `F[F[M]]`, which can be fed back into the
+        // same substitution. Unions and intersections do not add runtime constructor nesting, so
+        // their transitive simplification is unaffected.
+        if !replacement_bound.is_type_var()
+            && !matches!(needle_bound, Type::Union(_) | Type::Intersection(_))
+        {
+            let (needle_constructor_depth, _) =
+                max_constructor_and_typevar_depth(db, env, needle_bound);
+            let (replacement_constructor_depth, _) =
+                max_constructor_and_typevar_depth(db, env, replacement_bound);
+            if replacement_constructor_depth >= needle_constructor_depth {
+                return None;
+            }
         }
 
         if let Type::TypeVar(replacement) = replacement_bound
