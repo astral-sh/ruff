@@ -1074,7 +1074,7 @@ mod tests {
     ) -> ConstraintSet<'db, 'c> {
         let env = db.program_environment();
         let ty = bound.to_instance(db, &env);
-        ConstraintSet::constrain_typevar(db, &env, builder, bound_typevar, ty, ty)
+        ConstraintSet::constrain_typevar_equivalence_bound(db, &env, builder, bound_typevar, ty)
     }
 
     #[test]
