@@ -1514,7 +1514,14 @@ from ty_extensions._internal import ConstraintSet
 def empty[**P]() -> None:
     static_assert(ConstraintSet.range(Callable[..., None], P, Callable[[], None]) != ConstraintSet.never())
     static_assert(ConstraintSet.range(Callable[[], None], P, Callable[..., None]) != ConstraintSet.never())
+    # TODO: These currently fail because we only derive new constraints from fully static
+    # constraints, and so we can't propagate the fact that (Any) is not assignable to ().
+    # Even though the parameter type is dynamic, the arity of the callable should step in and allow
+    # us to compare these two callables via _subtyping_, which would allow us to derive this
+    # information.
+    # error: [static-assert-error]
     static_assert(ConstraintSet.range(Callable[[Any], None], P, Callable[[], None]) == ConstraintSet.never())
+    # error: [static-assert-error]
     static_assert(ConstraintSet.range(Callable[[], None], P, Callable[[Any], None]) == ConstraintSet.never())
 ```
 
@@ -1633,7 +1640,7 @@ def _[T]() -> None:
     reveal_type(ConstraintSet.range(Sub, T, Super))
     # We are not asserting anything specific about what's displayed here, just that it's different
     # from above. If our constraint set rendering changes, update this accordingly.
-    # revealed: ConstraintSet[(Sub ≤ T@_ ≤ Super)]
+    # revealed: ConstraintSet[((Sub ≤ T@_) ∧ (T@_ ≤ Super))]
     reveal_type(ConstraintSet.range(Sub, T, Super).with_detailed_display())
 ```
 
@@ -1645,10 +1652,10 @@ from ty_extensions import Bottom, Top
 
 def explicit_bounds[**P]() -> None:
     lower = ConstraintSet.range(Bottom[Callable[..., Never]], P, Callable[[int], int])
-    # revealed: ConstraintSet[((*args: object, **kwargs: object) ≤ P@explicit_bounds ≤ (int, /))]
+    # revealed: ConstraintSet[(((*args: object, **kwargs: object) ≤ P@explicit_bounds) ∧ (P@explicit_bounds ≤ (int, /)))]
     reveal_type(lower.with_detailed_display())
     upper = ConstraintSet.range(Callable[[int], int], P, Top[Callable[..., object]])
-    # revealed: ConstraintSet[((int, /) ≤ P@explicit_bounds ≤ Top[(...)])]
+    # revealed: ConstraintSet[(((int, /) ≤ P@explicit_bounds) ∧ (P@explicit_bounds ≤ Top[(...)]))]
     reveal_type(upper.with_detailed_display())
 ```
 
@@ -1659,7 +1666,7 @@ def complete(value: int, /, text: str = "", *args: float, flag: bool = False, **
     return 0
 
 def signature[**P]() -> None:
-    constraints = ConstraintSet.range(RegularCallableTypeOf[complete], P, RegularCallableTypeOf[complete])
+    constraints = ConstraintSet.equality(P, RegularCallableTypeOf[complete])
     # revealed: ConstraintSet[(P@signature = (value: int, /, text: str = "", *args: float, flag: bool = False, **kwargs: bytes))]
     reveal_type(constraints.with_detailed_display())
 ```
@@ -1669,7 +1676,7 @@ Generic callable bounds keep their own ParamSpec binder.
 ```py
 def callback[**Q](*args: Q.args, **kwargs: Q.kwargs) -> None: ...
 def generic_signature[**P]() -> None:
-    constraints = ConstraintSet.range(RegularCallableTypeOf[callback], P, RegularCallableTypeOf[callback])
+    constraints = ConstraintSet.equality(P, RegularCallableTypeOf[callback])
     # revealed: ConstraintSet[(P@generic_signature = (**Q@callback))]
     reveal_type(constraints.with_detailed_display())
 ```
@@ -1679,9 +1686,11 @@ The display distinguishes gradual parameter lists from one required `Any` parame
 ```py
 def gradual[**P]() -> None:
     ellipsis = ConstraintSet.range(Callable[..., int], P, Callable[..., str])
-    reveal_type(ellipsis.with_detailed_display())  # revealed: ConstraintSet[(P@gradual = (...))]
+    # revealed: ConstraintSet[(((...) ≤ P@gradual) ∧ (P@gradual ≤ (...)))]
+    reveal_type(ellipsis.with_detailed_display())
     any_parameter = ConstraintSet.range(Callable[[Any], int], P, Callable[[Any], str])
-    reveal_type(any_parameter.with_detailed_display())  # revealed: ConstraintSet[(P@gradual = (Any, /))]
+    # revealed: ConstraintSet[(((Any, /) ≤ P@gradual) ∧ (P@gradual ≤ (Any, /)))]
+    reveal_type(any_parameter.with_detailed_display())
 ```
 
 Omitted bounds stay absent; explicit `...` bounds remain visible.
@@ -1690,10 +1699,10 @@ Omitted bounds stay absent; explicit `...` bounds remain visible.
 def missing_bounds[**P]() -> None:
     # revealed: ConstraintSet[((int, /) ≤ P@missing_bounds)]
     reveal_type(ConstraintSet.lower_bound(Callable[[int], None], P).with_detailed_display())
-    # revealed: ConstraintSet[((int, /) ≤ P@missing_bounds ≤ (...))]
+    # revealed: ConstraintSet[(((int, /) ≤ P@missing_bounds) ∧ (P@missing_bounds ≤ (...)))]
     reveal_type(ConstraintSet.range(Callable[[int], None], P, Callable[..., None]).with_detailed_display())
     # revealed: ConstraintSet[(P@missing_bounds ≤ (int, /))]
     reveal_type(ConstraintSet.upper_bound(P, Callable[[int], None]).with_detailed_display())
-    # revealed: ConstraintSet[((...) ≤ P@missing_bounds ≤ (int, /))]
+    # revealed: ConstraintSet[(((...) ≤ P@missing_bounds) ∧ (P@missing_bounds ≤ (int, /)))]
     reveal_type(ConstraintSet.range(Callable[..., None], P, Callable[[int], None]).with_detailed_display())
 ```
