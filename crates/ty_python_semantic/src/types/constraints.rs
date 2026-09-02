@@ -108,7 +108,8 @@ use crate::types::constraints::projection::{ProjectionError, SolutionBudget};
 use crate::types::constraints::support::{Support, SupportId};
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarDomain, TypeVarInstance, TypeVarSet};
 use crate::types::visitor::{
-    TypeCollector, TypeKind, TypeVisitor, walk_non_atomic_type, walk_type_with_recursion_guard,
+    NonAtomicType, TypeCollector, TypeKind, TypeVisitor, walk_non_atomic_type,
+    walk_type_with_recursion_guard,
 };
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, IntersectionType, Parameters, Type, TypeContext,
@@ -2621,9 +2622,18 @@ fn max_constructor_and_typevar_depth<'db>(
                     return;
                 }
 
-                let TypeKind::NonAtomic(non_atomic) = TypeKind::from(ty) else {
-                    return;
+                let non_atomic = match TypeKind::from(ty) {
+                    TypeKind::Atomic => return,
+                    // A non-generic nominal instance is an opaque leaf. Its class literal
+                    // identifies the leaf but does not add nested type structure.
+                    TypeKind::NonAtomic(NonAtomicType::NominalInstance(instance))
+                        if !instance.class(db, self.env).is_generic() =>
+                    {
+                        return;
+                    }
+                    TypeKind::NonAtomic(non_atomic) => non_atomic,
                 };
+
                 if !self.active.borrow_mut().insert(ty) {
                     return;
                 }
