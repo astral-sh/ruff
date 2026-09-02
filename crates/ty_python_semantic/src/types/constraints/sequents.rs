@@ -4086,6 +4086,58 @@ mod tests {
     }
 
     #[test]
+    fn ground_leaf_can_tighten_nested_lower_bound_without_enabling_deepening() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let s = create_typevar(db, "S");
+        let t = create_typevar(db, "T");
+        let int = known_instance(db, KnownClass::Int);
+
+        let lower = |typevar, bound| {
+            Constraint::from(ConcreteLowerBound::new(
+                db,
+                ConstraintProvenance::Evidence,
+                typevar,
+                bound,
+            ))
+        };
+        let produces = |map: &SequentMap<Constraint<'_>>, expected| {
+            map.sequents.iter().any(|sequent| {
+                matches!(
+                    sequent,
+                    Sequent::PairImplication {
+                        post: Constraint::ConcreteLower(post),
+                        ..
+                    } if post.typevar.is_same_typevar_as(db, t) && post.bound == expected
+                )
+            })
+        };
+
+        let iterator_s =
+            KnownClass::Iterator.to_specialized_instance(db, &env, &[Type::TypeVar(s)]);
+        let iterator_int = KnownClass::Iterator.to_specialized_instance(db, &env, &[int]);
+        let map = SequentMap::<Constraint>::for_constraint_pair(
+            db,
+            &env,
+            lower(s, int),
+            lower(t, iterator_s),
+        );
+        assert!(produces(map, iterator_int));
+
+        let list_s = KnownClass::List.to_specialized_instance(db, &env, &[Type::TypeVar(s)]);
+        let list_int = KnownClass::List.to_specialized_instance(db, &env, &[int]);
+        let list_list_int = KnownClass::List.to_specialized_instance(db, &env, &[list_int]);
+        let map = SequentMap::<Constraint>::for_constraint_pair(
+            db,
+            &env,
+            lower(s, list_int),
+            lower(t, list_s),
+        );
+        assert!(!produces(map, list_list_int));
+    }
+
+    #[test]
     fn constraint_implications_are_cached() {
         let db = setup_db();
         let db = &db;
