@@ -989,8 +989,8 @@ static_assert(is_subtype_of(Covariant[RecursiveGradual], Covariant[object]))
 
 ## Generic protocol materializations
 
-A generic protocol lies between its bottom and top materializations, even when its type parameters
-have constraints:
+Every gradual type is a supertype of its bottom materialization and a subtype of its top
+materialization. Here, we check this for generic protocols:
 
 ```py
 from typing import Any, Protocol
@@ -1005,8 +1005,7 @@ static_assert(is_subtype_of(Bottom[Constrained[Any]], Constrained[Any]))
 static_assert(not is_subtype_of(Constrained[str], Top[Constrained[bytes]]))
 ```
 
-Materializing a bounded parameter can replace `Any` with its bound. The same relations hold when the
-protocol also has an explicit `Any` member:
+The same relations hold when the protocol also has an explicit `Any` member:
 
 ```py
 class Bounded[T: str](Protocol):
