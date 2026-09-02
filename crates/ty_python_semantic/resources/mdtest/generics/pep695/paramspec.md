@@ -1010,6 +1010,107 @@ def with_final[**P](foo: FooWithFinal[P]) -> None:
     reveal_type(foo.kwargs)  # revealed: P@with_final.kwargs
 ```
 
+### `ParamSpec` inference from unions
+
+A `ParamSpec` inferred from a union of protocols can have more than one parameter list. Calling a
+specialized method requires arguments to be accepted by every member of that union:
+
+```py
+from typing import Protocol
+
+class Callback[**P](Protocol):
+    def call(self, *args: P.args, **kwargs: P.kwargs) -> None: ...
+
+def identity[**P](callback: Callback[P]) -> Callback[P]:
+    return callback
+
+def _(callback: Callback[[object, int]] | Callback[[str, object]]) -> None:
+    f = identity(callback)
+    # revealed: (bound method Callback[((object, int, /)) | ((str, object, /))].call(object, int, /) -> None) | (bound method Callback[((object, int, /)) | ((str, object, /))].call(str, object, /) -> None)
+    reveal_type(f.call)
+
+    f.call("value", 1)
+    f.call(1, 1)  # error: [invalid-argument-type]
+    f.call("value", "value")  # error: [invalid-argument-type]
+```
+
+This also applies when returning a `Callable` type:
+
+```py
+from typing import Callable
+
+def as_callable[**P](callback: Callback[P]) -> Callable[P, None]:
+    return callback.call
+
+def _(callback: Callback[[object, int]] | Callback[[str, object]]) -> None:
+    f = as_callable(callback)
+    reveal_type(f)  # revealed: ((object, int, /) -> None) | ((str, object, /) -> None)
+
+    f("value", 1)
+    f(1, 1)  # error: [invalid-argument-type]
+    f("value", "value")  # error: [invalid-argument-type]
+```
+
+A union inferred for `P` is preserved in return position as well:
+
+```py
+type Inner[**P, R] = Callable[P, R]
+
+def nested[**P, R](callback: Callback[P], value: R) -> Callable[P, Inner[P, R]]:
+    raise NotImplementedError
+
+def _(callback: Callback[[object, int]] | Callback[[str, object]], value: int) -> None:
+    outer = nested(callback, value)
+    # revealed: ((object, int, /) -> Inner[(object, int, /), int]) | ((str, object, /) -> Inner[(str, object, /), int])
+    reveal_type(outer)
+
+    inner = outer("value", 1)
+    reveal_type(inner)  # revealed: ((object, int, /) -> int) | ((str, object, /) -> int)
+
+    inner("value", 1)
+    inner(1, 1)  # error: [invalid-argument-type]
+    inner("value", "value")  # error: [invalid-argument-type]
+```
+
+### Bounded expansion of union-valued `ParamSpec`s
+
+Specializing an overloaded method with several union-valued `ParamSpec`s leads to exponential
+blowup, so we bound the expansion to 64 callable types, otherwise falling back to `Unknown`.
+
+```py
+from typing import Literal, Protocol, overload
+
+class Callback[**P](Protocol):
+    def call(self, *args: P.args, **kwargs: P.kwargs) -> None: ...
+
+class Combined[**P, **Q, **R](Protocol):
+    @overload
+    def call(self) -> int: ...
+    @overload
+    def call(self, tag: Literal[0], /, *args: P.args, **kwargs: P.kwargs) -> None: ...
+    @overload
+    def call(self, tag: Literal[1], /, *args: Q.args, **kwargs: Q.kwargs) -> None: ...
+    @overload
+    def call(self, tag: Literal[2], /, *args: R.args, **kwargs: R.kwargs) -> None: ...
+    @overload
+    def call(self, tag: Literal[3], /, *args: P.args, **kwargs: P.kwargs) -> None: ...
+
+def combine[**P, **Q, **R](p: Callback[P], q: Callback[Q], r: Callback[R]) -> Combined[P, Q, R]:
+    raise NotImplementedError
+
+type FourCallbacks = Callback[[int]] | Callback[[str]] | Callback[[bytes]] | Callback[[None]]
+
+def _(x: FourCallbacks) -> None:
+    # The cartesian product produces a union of 64 elements.
+    f = combine(x, x, x).call
+    reveal_type(f())  # revealed: int
+
+def _(x: FourCallbacks, y: FourCallbacks | Callback[[list[int]]]) -> None:
+    # The cartesian product would have produced a union of 80 elements.
+    f = combine(x, x, y).call
+    reveal_type(f)  # revealed: Unknown
+```
+
 ### Specializing `Self` when `ParamSpec` is involved
 
 ```py

@@ -1295,14 +1295,12 @@ impl<'db> BoundTypeVarInstance<'db> {
 
         let possibly_apply_to_self = |specialization: &ApplySpecialization<'a, 'db>| {
             if self.typevar(db).is_self(db)
-                && let ApplySpecialization::Specialization {
-                    specialization,
-                    specialize_self_domain: true,
-                } = specialization
+                && specialization.specialize_self_domain()
+                && let Some(specialization) = specialization.as_specialization(db)
             {
                 Type::TypeVar(self.apply_specialization_to_bound_or_constraints(
                     db,
-                    *specialization,
+                    specialization,
                     visitor.env,
                 ))
             } else {

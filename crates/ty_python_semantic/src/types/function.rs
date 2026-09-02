@@ -81,7 +81,7 @@ use crate::types::diagnostic::{
     report_runtime_check_against_typed_dict,
 };
 use crate::types::display::DisplaySettings;
-use crate::types::generics::{ApplySpecialization, GenericContext, typing_self};
+use crate::types::generics::{GenericContext, typing_self};
 use crate::types::infer::{infer_definition_types, nearest_enclosing_class, original_class_type};
 use crate::types::known_instance::DeprecatedInstance;
 use crate::types::list_members::all_members;
@@ -1164,7 +1164,7 @@ pub(super) fn walk_function_type<'db, V: super::visitor::TypeVisitor<'db> + ?Siz
 
 #[salsa::tracked]
 impl<'db> FunctionType<'db> {
-    fn updated_signature(self, db: &'db dyn Db) -> Option<&'db CallableSignature<'db>> {
+    pub(super) fn updated_signature(self, db: &'db dyn Db) -> Option<&'db CallableSignature<'db>> {
         self.updated_signatures(db)
             .as_deref()
             .and_then(|updated| updated.signature.as_ref())
@@ -1260,13 +1260,9 @@ impl<'db> FunctionType<'db> {
         let literal = self.literal(db);
         let (updated_signature, updated_implementation_callables) = if matches!(
             type_mapping,
-            TypeMapping::ApplySpecialization(
-                ApplySpecialization::ReturnCallables(_) | ApplySpecialization::TypeAlias(_)
-            ) | TypeMapping::ApplySpecializationWithMaterialization {
-                specialization: ApplySpecialization::ReturnCallables(_)
-                    | ApplySpecialization::TypeAlias(_),
-                ..
-            }
+            TypeMapping::ApplySpecialization(specialization)
+                | TypeMapping::ApplySpecializationWithMaterialization { specialization, .. }
+                if specialization.preserves_lazy_signatures()
         ) {
             (
                 self.updated_signature(db).map(|signature| {
