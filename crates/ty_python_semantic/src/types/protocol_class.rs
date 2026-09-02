@@ -3609,6 +3609,8 @@ fn cached_protocol_interface<'db>(
             return;
         }
 
+        let specialization =
+            specialization.map(|specialization| specialization.with_typevar_bounds(db));
         let candidate = candidate.apply_specialization(db, specialization);
         let ProtocolMemberCandidate {
             ty,
