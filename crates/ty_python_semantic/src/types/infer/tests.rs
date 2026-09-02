@@ -3,14 +3,16 @@ use std::fmt::Write;
 
 use super::builder::TypeInferenceBuilder;
 use crate::db::tests::{TestDb, TestDbBuilder, setup_db};
+use crate::lint::{LintSource, RuleSelection};
 use crate::place::symbol;
 use crate::place::{ConsideredDefinitions, Place, PlaceAndQualifiers};
 use crate::types::{KnownClass, KnownInstanceType, check_types};
-use ruff_db::diagnostic::{Diagnostic, DiagnosticId};
+use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
 use ruff_db::files::{File, system_path_to_file};
 use ruff_db::system::DbWithWritableSystem as _;
 use ruff_db::testing::{assert_function_query_was_not_run, assert_function_query_was_run};
 use ruff_python_ast::PythonVersion;
+use salsa::Database as _;
 use salsa::plumbing::AsId;
 use ty_python_core::definition::Definition;
 use ty_python_core::program::{Program, ProgramSettings};
@@ -336,7 +338,14 @@ fn not_literal_string() -> anyhow::Result<()> {
     );
     db.write_dedented("src/a.py", &content)?;
 
-    assert_file_diagnostics(&db, "src/a.py", &[]);
+    assert_file_diagnostics(
+        &db,
+        "src/a.py",
+        &[
+            "An empty string is always falsy",
+            "An empty string is always falsy",
+        ],
+    );
 
     Ok(())
 }
@@ -583,6 +592,126 @@ fn comparison_truthiness_widens_across_sparse_cycle_results() -> anyhow::Result<
         Some(Truthiness::AlwaysFalse)
     );
 
+    Ok(())
+}
+
+/// Resolving environment-guard provenance must not re-enter inference of the scope being checked.
+/// This lookup runs during scope inference; asking for completed use-site types would create a
+/// Salsa cycle. Cycle recovery can hide that mistake in the final diagnostics, so inspect Salsa's
+/// events as well as checking that each condition produces a diagnostic.
+#[test]
+fn redundant_condition_lookup_does_not_reenter_scope_inference() -> anyhow::Result<()> {
+    // Cover builtin names, including the numeric-compatibility special cases for `float` and
+    // `complex`, and attribute lookup using an already-inferred receiver type.
+    for source in [
+        "if isinstance({}, dict):\n    pass\n",
+        "if isinstance(1.0, float):\n    pass\n",
+        "if isinstance(1j, complex):\n    pass\n",
+        "class C:\n    flag = (1, 2)\n\nif C.flag:\n    pass\n",
+    ] {
+        let registry = crate::default_lint_registry();
+        let mut rules = RuleSelection::from_registry(registry);
+        rules.enable(
+            registry.get("redundant-condition-strict")?,
+            Severity::Warning,
+            LintSource::File,
+        );
+        let mut db = TestDbBuilder::new()
+            .with_file("/src/main.py", source)
+            .with_rule_selection(rules)
+            .build()?;
+        let file = system_path_to_file(&db, "/src/main.py")?;
+        let diagnostics = check_types(&db, program_file(&db, file));
+        // Require the diagnostic so the cycle check cannot pass merely because the redundant
+        // condition was never checked.
+        assert_eq!(diagnostics.len(), 1, "{source}\n{diagnostics:#?}");
+
+        let events = db.take_salsa_events();
+        let scope_cycles = salsa::attach(&db, || {
+            events
+                .iter()
+                .filter_map(|event| match event.kind {
+                    salsa::EventKind::WillIterateCycle { database_key, .. } => {
+                        Some(format!("{database_key:?}"))
+                    }
+                    _ => None,
+                })
+                .filter(|query| query.starts_with("infer_scope_types_impl("))
+                .collect::<Vec<_>>()
+        });
+        assert!(scope_cycles.is_empty(), "{source}\n{scope_cycles:#?}");
+    }
+    Ok(())
+}
+
+/// Editing an intermediate import's guard invalidates the exemption even when the imported type
+/// stays the same. Check both name and module-attribute lookups, which cache separate summaries.
+#[test]
+fn redundant_condition_import_guard_invalidation() -> anyhow::Result<()> {
+    let guarded = "import sys\nif sys.platform == 'win32':\n    from values import flag\nelse:\n    from values import flag\n";
+    let mut db = TestDbBuilder::new()
+        .with_file("/src/values.py", "flag = 'prefix'\n")
+        .with_file("/src/choice.py", guarded)
+        .with_file("/src/main.py", "import choice\nfrom choice import flag\nif flag:\n    pass\nif choice.flag:\n    pass\n")
+        .build()?;
+    assert_file_diagnostics(&db, "/src/main.py", &[]);
+
+    db.write_file(
+        "/src/choice.py",
+        guarded.replace("sys.platform == 'win32'", "True"),
+    )?;
+    let message = "A nonempty string is always truthy";
+    assert_file_diagnostics(&db, "/src/main.py", &[message, message]);
+
+    db.write_file("/src/choice.py", guarded)?;
+    assert_file_diagnostics(&db, "/src/main.py", &[]);
+    Ok(())
+}
+
+/// Repeated conditions on the same name or attribute share one cached definition summary.
+/// Both fixtures combine many assignments to one place with many conditions that test it.
+/// Each lookup can inspect every assignment, so repeating it for every condition would make
+/// these examples quadratic even if their diagnostics were unchanged.
+#[test]
+fn repeated_tuple_conditions_share_definition_info() -> anyhow::Result<()> {
+    let repetitions = 100;
+    let names = "value = (1,)\nif value:\n    pass\n".repeat(repetitions);
+    let attributes = format!(
+        "class C:\n{}\n{}",
+        "    value = (1,)\n".repeat(repetitions),
+        "if C.value:\n    pass\n".repeat(repetitions),
+    );
+
+    for (source, query_name) in [
+        (names, "name_condition_definition_info"),
+        (attributes, "attribute_condition_definition_info"),
+    ] {
+        let mut db = TestDbBuilder::new()
+            .with_file("/src/main.py", &source)
+            .build()?;
+        let file = system_path_to_file(&db, "/src/main.py")?;
+        let diagnostics = check_types(&db, program_file(&db, file));
+        // Sharing the definition lookup must still leave a diagnostic on every condition.
+        assert_eq!(diagnostics.len(), repetitions);
+
+        // Count actual query executions, excluding cache hits. This checks reuse deterministically
+        // without a timing threshold, which would depend on the machine running the test.
+        let events = db.take_salsa_events();
+        let lookups = events
+            .iter()
+            .filter(|event| {
+                matches!(
+                    event.kind,
+                    salsa::EventKind::WillExecute { database_key }
+                        if db.ingredient_debug_name(database_key.ingredient_index()) == query_name
+                )
+            })
+            .count();
+        assert_eq!(
+            lookups, 1,
+            "{query_name} should be shared across conditions"
+        );
+    }
     Ok(())
 }
 

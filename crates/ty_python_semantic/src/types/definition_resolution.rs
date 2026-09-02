@@ -19,9 +19,11 @@ use ty_module_resolver::{
 use ty_python_core::definition::{
     Definition, DefinitionCategory, DefinitionKind, NestedBindingExecution,
 };
+use ty_python_core::reachability_constraints::ScopedReachabilityConstraintId;
 use ty_python_core::scope::ScopeId;
 use ty_python_core::{
-    ProgramFile, attribute_scopes, global_scope, place_table, semantic_index, use_def_map,
+    BindingWithConstraints, DeclarationWithConstraint, ProgramFile, attribute_scopes, global_scope,
+    place_table, semantic_index, use_def_map,
 };
 
 use crate::place::implicit_builtins_symbol_scope;
@@ -35,6 +37,82 @@ pub enum ImportAliasResolution {
     ResolveAliases,
     /// Keep import aliases as-is, don't resolve to original definitions
     PreserveAliases,
+}
+
+/// A binding or declaration encountered while resolving a name to its source definitions.
+///
+/// This includes intermediate imports, whose guards can determine the value of a name even when
+/// the final definition is unconditional. The reachability constraint belongs to `scope`'s use-def
+/// map; constraints from different scopes must be inspected separately.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+pub(crate) struct DefinitionOrigin<'db> {
+    pub(crate) definition: Definition<'db>,
+    pub(crate) scope: ScopeId<'db>,
+    pub(crate) reachability: ScopedReachabilityConstraintId,
+}
+
+impl<'db> DefinitionOrigin<'db> {
+    fn from_binding(
+        scope: ScopeId<'db>,
+        binding: &BindingWithConstraints<'_, 'db>,
+    ) -> Option<Self> {
+        Some(Self {
+            definition: binding.binding.definition()?,
+            scope,
+            reachability: binding.reachability_constraint,
+        })
+    }
+
+    fn from_declaration(
+        scope: ScopeId<'db>,
+        declaration: &DeclarationWithConstraint<'db>,
+    ) -> Option<Self> {
+        Some(Self {
+            definition: declaration.declaration.definition()?,
+            scope,
+            reachability: declaration.reachability_constraint,
+        })
+    }
+}
+
+/// Source definitions together with the bindings and declarations encountered while resolving them.
+///
+/// Origins include intermediate imports and retain their reachability constraints. They describe
+/// the lookup as a whole rather than individual paths from an import to its targets.
+#[derive(Debug)]
+pub(crate) struct DefinitionProvenance<'db> {
+    pub(crate) definitions: Vec<ResolvedDefinition<'db>>,
+    pub(crate) origins: Vec<DefinitionOrigin<'db>>,
+}
+
+/// Records origins for diagnostics without allocating provenance for navigation-only callers.
+#[derive(Default)]
+struct OriginCollector<'db> {
+    origins: Option<FxIndexSet<DefinitionOrigin<'db>>>,
+}
+
+impl<'db> OriginCollector<'db> {
+    fn enabled() -> Self {
+        Self {
+            origins: Some(FxIndexSet::default()),
+        }
+    }
+
+    fn record(&mut self, origin: DefinitionOrigin<'db>) {
+        if let Some(origins) = &mut self.origins {
+            origins.insert(origin);
+        }
+    }
+
+    fn into_origins(self) -> Vec<DefinitionOrigin<'db>> {
+        self.origins.into_iter().flatten().collect()
+    }
+}
+
+struct ImportResolution<'a, 'db> {
+    visited: &'a mut FxHashSet<Definition<'db>>,
+    alias_resolution: ImportAliasResolution,
+    origins: &'a mut OriginCollector<'db>,
 }
 
 /// Represents the result of resolving an import to either a specific definition or
@@ -169,13 +247,53 @@ pub(crate) fn definitions_for_name<'db>(
     name: &str,
     alias_resolution: ImportAliasResolution,
 ) -> Vec<ResolvedDefinition<'db>> {
-    let definitions = scoped_definitions_for_name(db, scope, name, alias_resolution);
+    definitions_for_name_impl(
+        db,
+        scope,
+        name,
+        alias_resolution,
+        &mut OriginCollector::default(),
+    )
+}
+
+/// Returns a name's source definitions and the binding origins along its import chains.
+///
+/// Unlike navigation targets, these origins retain the guards on intermediate imports and the
+/// constraints on the final definitions. This uses the same scope and import lookup as
+/// [`definitions_for_name`], so callers can inspect provenance during scope inference.
+pub(crate) fn definition_provenance_for_name<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    name: &str,
+) -> DefinitionProvenance<'db> {
+    let mut origins = OriginCollector::enabled();
+    let definitions = definitions_for_name_impl(
+        db,
+        scope,
+        name,
+        ImportAliasResolution::ResolveAliases,
+        &mut origins,
+    );
+    DefinitionProvenance {
+        definitions,
+        origins: origins.into_origins(),
+    }
+}
+
+fn definitions_for_name_impl<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    name: &str,
+    alias_resolution: ImportAliasResolution,
+    origins: &mut OriginCollector<'db>,
+) -> Vec<ResolvedDefinition<'db>> {
+    let definitions = scoped_definitions_for_name_impl(db, scope, name, alias_resolution, origins);
     if !definitions.is_empty() {
         return definitions;
     }
     let env = ProgramEnvironment::from_scope(scope);
     implicit_builtins_symbol_scope(db, &env, name)
-        .map(|scope| definitions_for_builtin(db, scope, name))
+        .map(|scope| definitions_for_builtin_impl(db, scope, name, origins))
         .unwrap_or_default()
 }
 
@@ -185,6 +303,22 @@ pub(crate) fn scoped_definitions_for_name<'db>(
     scope: ScopeId<'db>,
     name_str: &str,
     alias_resolution: ImportAliasResolution,
+) -> Vec<ResolvedDefinition<'db>> {
+    scoped_definitions_for_name_impl(
+        db,
+        scope,
+        name_str,
+        alias_resolution,
+        &mut OriginCollector::default(),
+    )
+}
+
+fn scoped_definitions_for_name_impl<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    name_str: &str,
+    alias_resolution: ImportAliasResolution,
+    origins: &mut OriginCollector<'db>,
 ) -> Vec<ResolvedDefinition<'db>> {
     let env = ProgramEnvironment::from_scope(scope);
     let file = scope.program_file(db);
@@ -203,6 +337,7 @@ pub(crate) fn scoped_definitions_for_name<'db>(
         };
 
         let use_def_map = index.use_def_map(scope_id);
+        let binding_scope = scope_id.to_scope_id(db, file);
 
         // Check if this place is marked as global or nonlocal
         let place_expr = place_table.symbol(symbol_id);
@@ -212,18 +347,19 @@ pub(crate) fn scoped_definitions_for_name<'db>(
         if is_global || is_nonlocal {
             // Assignments in a forwarding scope remain valid navigation targets, including eager
             // walrus bindings exported from comprehensions.
-            all_definitions.extend(user_visible_definitions(
+            all_definitions.extend(user_visible_origins(
                 db,
                 use_def_map
                     .reachable_symbol_bindings(symbol_id)
-                    .filter_map(|binding| binding.binding.definition())
-                    .filter(|definition| match definition.kind(db) {
+                    .filter_map(|binding| DefinitionOrigin::from_binding(binding_scope, &binding))
+                    .filter(|origin| match origin.definition.kind(db) {
                         DefinitionKind::NamedExpression(_) => true,
                         DefinitionKind::NestedBindings(nested) => {
                             nested.execution == NestedBindingExecution::Eager
                         }
                         _ => false,
                     }),
+                origins,
             ));
         }
 
@@ -240,16 +376,24 @@ pub(crate) fn scoped_definitions_for_name<'db>(
 
             if let Some(global_symbol_id) = global_place_table.symbol_id(name_str) {
                 let global_use_def_map = ty_python_core::use_def_map(db, global_scope_id);
-                all_definitions.extend(user_visible_definitions(
+                all_definitions.extend(user_visible_origins(
                     db,
                     global_use_def_map
                         .reachable_symbol_bindings(global_symbol_id)
-                        .filter_map(|binding| binding.binding.definition())
+                        .filter_map(|binding| {
+                            DefinitionOrigin::from_binding(global_scope_id, &binding)
+                        })
                         .chain(
                             global_use_def_map
                                 .reachable_symbol_declarations(global_symbol_id)
-                                .filter_map(|declaration| declaration.declaration.definition()),
+                                .filter_map(|declaration| {
+                                    DefinitionOrigin::from_declaration(
+                                        global_scope_id,
+                                        &declaration,
+                                    )
+                                }),
                         ),
+                    origins,
                 ));
             }
             break;
@@ -262,16 +406,19 @@ pub(crate) fn scoped_definitions_for_name<'db>(
         }
 
         // Get all definitions (both bindings and declarations) for this place
-        all_definitions.extend(user_visible_definitions(
+        all_definitions.extend(user_visible_origins(
             db,
             use_def_map
                 .reachable_symbol_bindings(symbol_id)
-                .filter_map(|binding| binding.binding.definition())
+                .filter_map(|binding| DefinitionOrigin::from_binding(binding_scope, &binding))
                 .chain(
                     use_def_map
                         .reachable_symbol_declarations(symbol_id)
-                        .filter_map(|declaration| declaration.declaration.definition()),
+                        .filter_map(|declaration| {
+                            DefinitionOrigin::from_declaration(binding_scope, &declaration)
+                        }),
                 ),
+            origins,
         ));
 
         // If we found definitions in this scope, we can stop searching
@@ -284,7 +431,14 @@ pub(crate) fn scoped_definitions_for_name<'db>(
     let mut resolved_definitions = Vec::new();
 
     for definition in &all_definitions {
-        let resolved = resolve_definition(db, &env, *definition, Some(name_str), alias_resolution);
+        let resolved = resolve_definition_impl(
+            db,
+            &env,
+            *definition,
+            Some(name_str),
+            alias_resolution,
+            origins,
+        );
         resolved_definitions.extend(resolved);
     }
 
@@ -297,17 +451,27 @@ pub(crate) fn definitions_for_builtin<'db>(
     scope: ScopeId<'db>,
     name: &str,
 ) -> Vec<ResolvedDefinition<'db>> {
+    definitions_for_builtin_impl(db, scope, name, &mut OriginCollector::default())
+}
+
+fn definitions_for_builtin_impl<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    name: &str,
+    origins: &mut OriginCollector<'db>,
+) -> Vec<ResolvedDefinition<'db>> {
     let env = ProgramEnvironment::from_scope(scope);
-    find_symbol_in_scope(db, scope, name)
+    find_symbol_in_scope_impl(db, scope, name, origins)
         .into_iter()
         .filter(|def| def.is_reexported(db))
         .flat_map(|def| {
-            resolve_definition(
+            resolve_definition_impl(
                 db,
                 &env,
                 def,
                 Some(name),
                 ImportAliasResolution::ResolveAliases,
+                origins,
             )
         })
         .collect()
@@ -335,6 +499,34 @@ pub(crate) fn definitions_for_attribute<'db>(
     env: &ProgramEnvironment<'db>,
     lhs_ty: Type<'db>,
     name_str: &str,
+) -> Vec<ResolvedDefinition<'db>> {
+    definitions_for_attribute_impl(db, env, lhs_ty, name_str, &mut OriginCollector::default())
+}
+
+/// Returns a member's source definitions and origins, including imports and inherited definitions.
+///
+/// The caller supplies the receiver type for the same inference-safety reasons as
+/// [`definitions_for_attribute`].
+pub(crate) fn definition_provenance_for_attribute<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    lhs_ty: Type<'db>,
+    name_str: &str,
+) -> DefinitionProvenance<'db> {
+    let mut origins = OriginCollector::enabled();
+    let definitions = definitions_for_attribute_impl(db, env, lhs_ty, name_str, &mut origins);
+    DefinitionProvenance {
+        definitions,
+        origins: origins.into_origins(),
+    }
+}
+
+fn definitions_for_attribute_impl<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    lhs_ty: Type<'db>,
+    name_str: &str,
+    origins: &mut OriginCollector<'db>,
 ) -> Vec<ResolvedDefinition<'db>> {
     let mut resolved = Vec::new();
 
@@ -373,13 +565,14 @@ pub(crate) fn definitions_for_attribute<'db>(
                 .map(|file| ProgramFile::new(db, file, env.program(db)))
             {
                 let module_scope = global_scope(db, module_file);
-                for def in find_symbol_in_scope(db, module_scope, name_str) {
-                    resolved.extend(resolve_definition(
+                for def in find_symbol_in_scope_impl(db, module_scope, name_str, origins) {
+                    resolved.extend(resolve_definition_impl(
                         db,
                         env,
                         def,
                         Some(name_str),
                         ImportAliasResolution::ResolveAliases,
+                        origins,
                     ));
                 }
             }
@@ -415,6 +608,7 @@ pub(crate) fn definitions_for_attribute<'db>(
             env,
             &class_literal,
             name_str,
+            origins,
         ));
 
         // The metaclass of a derived class must be a subclass of the metaclasses of all of
@@ -439,6 +633,7 @@ pub(crate) fn definitions_for_attribute<'db>(
                 env,
                 &class_literal,
                 name_str,
+                origins,
             ));
         }
     }
@@ -451,6 +646,7 @@ fn definitions_for_attribute_in_class_hierarchy<'db>(
     env: &ProgramEnvironment<'db>,
     class_literal: &ClassLiteral<'db>,
     attribute_name: &str,
+    origins: &mut OriginCollector<'db>,
 ) -> Vec<ResolvedDefinition<'db>> {
     let mut resolved = Vec::new();
     'scopes: for ancestor in class_literal
@@ -470,12 +666,17 @@ fn definitions_for_attribute_in_class_hierarchy<'db>(
                 attribute_name,
                 use_def
                     .reachable_symbol_declarations(place_id)
-                    .filter_map(|declaration| declaration.declaration.definition())
+                    .filter_map(|declaration| {
+                        DefinitionOrigin::from_declaration(class_scope, &declaration)
+                    })
                     .chain(
                         use_def
                             .reachable_symbol_bindings(place_id)
-                            .filter_map(|binding| binding.binding.definition()),
+                            .filter_map(|binding| {
+                                DefinitionOrigin::from_binding(class_scope, &binding)
+                            }),
                     ),
+                origins,
             );
             if !resolved_in_scope.is_empty() {
                 resolved.extend(resolved_in_scope);
@@ -492,19 +693,22 @@ fn definitions_for_attribute_in_class_hierarchy<'db>(
                 .member_id_by_instance_attribute_name(attribute_name)
             {
                 let use_def = index.use_def_map(function_scope_id);
-                let resolved_in_scope = resolve_reachable_definitions(
-                    db,
-                    env,
-                    attribute_name,
-                    use_def
-                        .reachable_member_declarations(place_id)
-                        .filter_map(|declaration| declaration.declaration.definition())
-                        .chain(
-                            use_def
-                                .reachable_member_bindings(place_id)
-                                .filter_map(|binding| binding.binding.definition()),
-                        ),
-                );
+                let binding_scope = function_scope_id.to_scope_id(db, class_scope.program_file(db));
+                let resolved_in_scope =
+                    resolve_reachable_definitions(
+                        db,
+                        env,
+                        attribute_name,
+                        use_def
+                            .reachable_member_declarations(place_id)
+                            .filter_map(|declaration| {
+                                DefinitionOrigin::from_declaration(binding_scope, &declaration)
+                            })
+                            .chain(use_def.reachable_member_bindings(place_id).filter_map(
+                                |binding| DefinitionOrigin::from_binding(binding_scope, &binding),
+                            )),
+                        origins,
+                    );
                 if !resolved_in_scope.is_empty() {
                     resolved.extend(resolved_in_scope);
                     break 'scopes;
@@ -533,7 +737,33 @@ pub(super) fn user_visible_definitions<'db>(
     db: &'db dyn Db,
     definitions: impl IntoIterator<Item = Definition<'db>>,
 ) -> FxIndexSet<Definition<'db>> {
-    let mut pending = definitions.into_iter().collect::<VecDeque<_>>();
+    user_visible_definitions_impl(
+        db,
+        definitions.into_iter().collect(),
+        &mut OriginCollector::default(),
+    )
+}
+
+fn user_visible_origins<'db>(
+    db: &'db dyn Db,
+    definitions: impl IntoIterator<Item = DefinitionOrigin<'db>>,
+    origins: &mut OriginCollector<'db>,
+) -> FxIndexSet<Definition<'db>> {
+    let pending = definitions
+        .into_iter()
+        .map(|origin| {
+            origins.record(origin);
+            origin.definition
+        })
+        .collect();
+    user_visible_definitions_impl(db, pending, origins)
+}
+
+fn user_visible_definitions_impl<'db>(
+    db: &'db dyn Db,
+    mut pending: VecDeque<Definition<'db>>,
+    origins: &mut OriginCollector<'db>,
+) -> FxIndexSet<Definition<'db>> {
     let mut seen = FxHashSet::default();
     let mut result = FxIndexSet::default();
 
@@ -548,13 +778,23 @@ pub(super) fn user_visible_definitions<'db>(
                 let sources = nested
                     .visible_binding_sources(index, definition.file_scope(db))
                     .flatten()
-                    .filter_map(|binding| binding.binding.definition());
+                    .filter_map(|binding| {
+                        let source = binding.binding.definition()?;
+                        if nested.execution != NestedBindingExecution::Eager
+                            && !matches!(source.kind(db), DefinitionKind::NestedBindings(_))
+                        {
+                            return None;
+                        }
+                        origins.record(DefinitionOrigin {
+                            definition: source,
+                            scope: source.scope(db),
+                            reachability: binding.reachability_constraint,
+                        });
+                        Some(source)
+                    });
                 // A lazy function proxy can lead to an eager comprehension proxy. Follow that
                 // proxy-only chain without exposing ordinary lazy nested assignments.
-                pending.extend(sources.filter(|source| {
-                    nested.execution == NestedBindingExecution::Eager
-                        || matches!(source.kind(db), DefinitionKind::NestedBindings(_))
-                }));
+                pending.extend(sources);
             }
             kind if kind.is_user_visible() => {
                 result.insert(definition);
@@ -570,17 +810,19 @@ fn resolve_reachable_definitions<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     symbol_name: &str,
-    definitions: impl IntoIterator<Item = Definition<'db>>,
+    definitions: impl IntoIterator<Item = DefinitionOrigin<'db>>,
+    origins: &mut OriginCollector<'db>,
 ) -> Vec<ResolvedDefinition<'db>> {
-    user_visible_definitions(db, definitions)
+    user_visible_origins(db, definitions, origins)
         .into_iter()
         .flat_map(|definition| {
-            resolve_definition(
+            resolve_definition_impl(
                 db,
                 env,
                 definition,
                 Some(symbol_name),
                 ImportAliasResolution::ResolveAliases,
+                origins,
             )
         })
         .collect()
@@ -597,15 +839,31 @@ pub(crate) fn resolve_definition<'db>(
     symbol_name: Option<&str>,
     alias_resolution: ImportAliasResolution,
 ) -> Vec<ResolvedDefinition<'db>> {
-    let mut visited = FxHashSet::default();
-    let resolved = resolve_definition_recursive(
+    resolve_definition_impl(
         db,
         env,
         definition,
-        &mut visited,
         symbol_name,
         alias_resolution,
-    );
+        &mut OriginCollector::default(),
+    )
+}
+
+fn resolve_definition_impl<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    definition: Definition<'db>,
+    symbol_name: Option<&str>,
+    alias_resolution: ImportAliasResolution,
+    origins: &mut OriginCollector<'db>,
+) -> Vec<ResolvedDefinition<'db>> {
+    let mut visited = FxHashSet::default();
+    let mut resolution = ImportResolution {
+        visited: &mut visited,
+        alias_resolution,
+        origins,
+    };
+    let resolved = resolve_definition_recursive(db, env, definition, symbol_name, &mut resolution);
 
     // If resolution failed, return the original definition as fallback
     if resolved.is_empty() {
@@ -620,15 +878,14 @@ fn resolve_definition_recursive<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     definition: Definition<'db>,
-    visited: &mut FxHashSet<Definition<'db>>,
     symbol_name: Option<&str>,
-    alias_resolution: ImportAliasResolution,
+    resolution: &mut ImportResolution<'_, 'db>,
 ) -> Vec<ResolvedDefinition<'db>> {
     // Prevent infinite recursion if there are circular imports
-    if visited.contains(&definition) {
+    if resolution.visited.contains(&definition) {
         return Vec::new(); // Return empty list for circular imports
     }
-    visited.insert(definition);
+    resolution.visited.insert(definition);
 
     let kind = definition.kind(db);
 
@@ -638,7 +895,8 @@ fn resolve_definition_recursive<'db>(
             let module = parsed_module(db, file.python_file(db)).load(db);
             let alias = import_def.alias(&module);
 
-            if alias.asname.is_some() && alias_resolution == ImportAliasResolution::PreserveAliases
+            if alias.asname.is_some()
+                && resolution.alias_resolution == ImportAliasResolution::PreserveAliases
             {
                 return vec![ResolvedDefinition::Definition(definition)];
             }
@@ -670,21 +928,21 @@ fn resolve_definition_recursive<'db>(
             let import_node = import_from_def.import(&module);
             let alias = import_from_def.alias(&module);
 
-            if alias.asname.is_some() && alias_resolution == ImportAliasResolution::PreserveAliases
+            if alias.asname.is_some()
+                && resolution.alias_resolution == ImportAliasResolution::PreserveAliases
             {
                 return vec![ResolvedDefinition::Definition(definition)];
             }
 
             // For `ImportFrom`, we need to resolve the original imported symbol name
             // (alias.name), not the local alias (symbol_name)
-            resolve_from_import_definitions(
+            resolve_from_import_definitions_impl(
                 db,
                 env,
                 ImportingFile::File(file.file(db), env.resolver_environment(db)),
                 import_node,
                 &alias.name,
-                visited,
-                alias_resolution,
+                resolution,
             )
         }
 
@@ -696,14 +954,13 @@ fn resolve_definition_recursive<'db>(
 
             // If we have a symbol name, use the helper to resolve it in the target module
             if let Some(symbol_name) = symbol_name {
-                resolve_from_import_definitions(
+                resolve_from_import_definitions_impl(
                     db,
                     env,
                     ImportingFile::File(file.file(db), env.resolver_environment(db)),
                     import_node,
                     symbol_name,
-                    visited,
-                    alias_resolution,
+                    resolution,
                 )
             } else {
                 // No symbol context provided, can't resolve star import
@@ -726,7 +983,31 @@ pub(crate) fn resolve_from_import_definitions<'db>(
     visited: &mut FxHashSet<Definition<'db>>,
     alias_resolution: ImportAliasResolution,
 ) -> Vec<ResolvedDefinition<'db>> {
-    if alias_resolution == ImportAliasResolution::PreserveAliases {
+    let mut origins = OriginCollector::default();
+    let mut resolution = ImportResolution {
+        visited,
+        alias_resolution,
+        origins: &mut origins,
+    };
+    resolve_from_import_definitions_impl(
+        db,
+        env,
+        importing_file,
+        import_node,
+        symbol_name,
+        &mut resolution,
+    )
+}
+
+fn resolve_from_import_definitions_impl<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    importing_file: ImportingFile<'db>,
+    import_node: &ast::StmtImportFrom,
+    symbol_name: &str,
+    resolution: &mut ImportResolution<'_, 'db>,
+) -> Vec<ResolvedDefinition<'db>> {
+    if resolution.alias_resolution == ImportAliasResolution::PreserveAliases {
         for alias in &import_node.names {
             if let Some(asname) = &alias.asname {
                 if asname.as_str() == symbol_name {
@@ -762,19 +1043,13 @@ pub(crate) fn resolve_from_import_definitions<'db>(
 
     // Find the definition of this symbol in the imported module's global scope
     let global_scope = global_scope(db, module_file);
-    let definitions_in_module = find_symbol_in_scope(db, global_scope, symbol_name);
+    let definitions_in_module =
+        find_symbol_in_scope_impl(db, global_scope, symbol_name, resolution.origins);
 
     // Recursively resolve any import definitions found in the target module
     let mut resolved_definitions = Vec::new();
     for def in definitions_in_module {
-        let resolved = resolve_definition_recursive(
-            db,
-            env,
-            def,
-            visited,
-            Some(symbol_name),
-            alias_resolution,
-        );
+        let resolved = resolve_definition_recursive(db, env, def, Some(symbol_name), resolution);
         resolved_definitions.extend(resolved);
     }
 
@@ -820,6 +1095,15 @@ pub(crate) fn find_symbol_in_scope<'db>(
     scope: ScopeId<'db>,
     symbol_name: &str,
 ) -> IndexSet<Definition<'db>> {
+    find_symbol_in_scope_impl(db, scope, symbol_name, &mut OriginCollector::default())
+}
+
+fn find_symbol_in_scope_impl<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    symbol_name: &str,
+    origins: &mut OriginCollector<'db>,
+) -> IndexSet<Definition<'db>> {
     let place_table = place_table(db, scope);
     let Some(symbol_id) = place_table.symbol_id(symbol_name) else {
         return IndexSet::new();
@@ -833,18 +1117,20 @@ pub(crate) fn find_symbol_in_scope<'db>(
     let declarations = use_def_map.reachable_symbol_declarations(symbol_id);
 
     for binding in bindings {
-        if let Some(def) = binding.binding.definition() {
-            definitions.insert(def);
+        if let Some(origin) = DefinitionOrigin::from_binding(scope, &binding) {
+            origins.record(origin);
+            definitions.insert(origin.definition);
         }
     }
 
     for declaration in declarations {
-        if let Some(def) = declaration.declaration.definition() {
-            definitions.insert(def);
+        if let Some(origin) = DefinitionOrigin::from_declaration(scope, &declaration) {
+            origins.record(origin);
+            definitions.insert(origin.definition);
         }
     }
 
-    user_visible_definitions(db, definitions)
+    user_visible_definitions_impl(db, definitions.into_iter().collect(), origins)
         .into_iter()
         .collect()
 }
@@ -904,6 +1190,43 @@ mod tests {
             anyhow::bail!("expected one definition for C.flag");
         };
         assert_eq!(definition.name(&db).as_deref(), Some("flag"));
+
+        let events = db.take_salsa_events();
+        assert_function_query_was_not_run_by_name(&db, "infer_scope_types_impl", None, &events);
+        Ok(())
+    }
+
+    #[test]
+    fn import_provenance_preserves_guards_through_cycles() -> anyhow::Result<()> {
+        let mut db = TestDbBuilder::new()
+            .with_file(
+                "/src/first.py",
+                "import sys\nif sys.platform == 'win32':\n    from second import value\n",
+            )
+            .with_file("/src/second.py", "from first import value\n")
+            .build()?;
+        let first = system_path_to_file(&db, "/src/first.py")?;
+        let second = system_path_to_file(&db, "/src/second.py")?;
+        let program = db.program_environment().program(&db);
+        let first_scope = global_scope(&db, ProgramFile::new(&db, first, program));
+        let second_scope = global_scope(&db, ProgramFile::new(&db, second, program));
+        let origins = definition_provenance_for_name(&db, second_scope, "value").origins;
+        assert_eq!(origins.len(), 2);
+        let guarded = origins
+            .iter()
+            .find(|origin| origin.scope == first_scope)
+            .context("expected the guarded import from first.py")?;
+        assert_ne!(
+            guarded.reachability,
+            ScopedReachabilityConstraintId::ALWAYS_TRUE
+        );
+        assert!(
+            use_def_map(&db, guarded.scope)
+                .reachability_constraints()
+                .predicate_ids(guarded.reachability)
+                .next()
+                .is_some()
+        );
 
         let events = db.take_salsa_events();
         assert_function_query_was_not_run_by_name(&db, "infer_scope_types_impl", None, &events);
