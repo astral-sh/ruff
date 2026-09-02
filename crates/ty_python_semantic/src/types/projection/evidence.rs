@@ -179,10 +179,6 @@ impl<'db> ProjectionEvidenceBuilder<'db> {
         self.container_facts.insert(fact);
     }
 
-    fn is_empty(&self) -> bool {
-        self.projection_facts.is_empty() && self.container_facts.is_empty()
-    }
-
     pub(super) fn finish(self, db: &'db dyn Db) -> Option<ProjectionEvidenceSet<'db>> {
         ProjectionEvidenceSet::new(db, self.projection_facts, self.container_facts)
     }
@@ -207,11 +203,10 @@ impl<'db> ProjectionEvidenceSet<'db> {
     /// Inference-time API: conditionally collects projection evidence.
     ///
     /// Use this only when every projection demand that may need facts from these types has already
-    /// been observed before the inference result is produced. The collection still runs if the
-    /// produced types already contain projection demands; `should_collect` controls only demands
-    /// that may be introduced later by an external consumer. If an external consumer can later
-    /// introduce a new demand for the produced result, use [`ProjectionEvidenceSet::from_types`]
-    /// instead.
+    /// been observed before the inference result is produced. `should_collect == false` is a
+    /// promise that the produced types contain no projection demands, so the negative path does
+    /// not walk them. If an external consumer can later introduce a new demand for the produced
+    /// result, use [`ProjectionEvidenceSet::from_types`] instead.
     /// Do not call this from cycle recovery: collecting evidence may invoke inference queries.
     pub(crate) fn from_types_if_needed(
         db: &'db dyn Db,
@@ -219,23 +214,11 @@ impl<'db> ProjectionEvidenceSet<'db> {
         should_collect: bool,
         types: impl IntoIterator<Item = Type<'db>>,
     ) -> Option<Self> {
-        if should_collect {
-            return Self::from_types(db, env, types);
+        if !should_collect {
+            return None;
         }
 
-        let mut builder = ProjectionEvidenceBuilder::default();
-        for ty in types {
-            let demands = ty.projection_demands(db, env);
-            for (root, path) in demands {
-                builder.record_projection_path(db, env, root, ty, &path);
-            }
-        }
-
-        if builder.is_empty() {
-            None
-        } else {
-            builder.finish(db)
-        }
+        Self::from_types(db, env, types)
     }
 
     pub(crate) fn merged(

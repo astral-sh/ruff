@@ -1555,7 +1555,7 @@ impl<'db> DefinitionInferenceExtra<'db> {
 
     /// Return whether this result may contain projection demands that need inference-time
     /// evidence before cycle recovery uses them.
-    pub(crate) fn needs_projection_evidence_from_types(&self) -> bool {
+    fn needs_projection_evidence_from_types(&self) -> bool {
         match self {
             Self::Other(extra) => extra.needs_projection_evidence_from_types,
             _ => false,
