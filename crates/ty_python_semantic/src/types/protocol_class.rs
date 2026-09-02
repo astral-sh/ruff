@@ -160,8 +160,6 @@ impl<'db> ProtocolClass<'db> {
                 ))
             })
         {
-            let specialization =
-                specialization.map(|specialization| specialization.with_typevar_bounds(db));
             let use_def_map = use_def_map(db, parent_scope);
             let place_table = place_table(db, parent_scope);
             let mut direct_members = FxHashMap::default();
@@ -3610,6 +3608,8 @@ fn cached_protocol_interface<'db>(
             return;
         }
 
+        let specialization =
+            specialization.map(|specialization| specialization.with_typevar_bounds(db));
         let candidate = candidate.apply_specialization(db, specialization);
         let ProtocolMemberCandidate {
             ty,
