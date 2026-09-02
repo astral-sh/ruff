@@ -542,14 +542,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 .materialize(db, kind, self.materialization_visitor);
             let target = Type::NominalInstance(NominalInstanceType::from_class(db, *target_origin))
                 .materialize(db, kind, self.materialization_visitor);
-            if result
-                .union(
-                    db,
-                    self.constraints,
-                    self.check_type_pair(db, source, target),
-                )
-                .is_trivially_always_satisfied()
-            {
+            result = self.check_type_pair(db, source, target);
+            if result.is_trivially_always_satisfied() {
                 return result;
             }
         }
