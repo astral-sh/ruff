@@ -4615,11 +4615,14 @@ pub(crate) fn report_inconsistent_generic_bases<'db>(
 ) -> bool {
     let db = context.db();
     let env = &context.program_environment();
-    // Maps each generic ancestor's class literal to the first
-    // specialization seen and the index of the explicit base it
-    // came from.
-    let mut ancestor_specs =
-        FxHashMap::<StaticClassLiteral<'db>, (GenericAlias<'db>, usize)>::default();
+    // Track the first non-dynamic argument at each position, along with the alias and explicit
+    // base that supplied it. Compatibility with a gradual argument is not transitive: both
+    // `Base[int, str]` and `Base[int, bytes]` are compatible with `Base[int, Any]`, but conflict
+    // with each other.
+    let mut ancestor_args = FxHashMap::<
+        (StaticClassLiteral<'db>, usize),
+        (Type<'db>, GenericAlias<'db>, usize),
+    >::default();
 
     for (i, base) in explicit_bases.iter().enumerate() {
         let base_class = match base {
@@ -4650,14 +4653,19 @@ pub(crate) fn report_inconsistent_generic_bases<'db>(
             };
             let origin = supercls_alias.origin(db);
 
-            if let Some(&(earlier_alias, earlier_idx)) = ancestor_specs.get(&origin) {
-                if earlier_alias
-                    .specialization(db)
-                    .types(db)
-                    .iter()
-                    .zip(supercls_alias.specialization(db).types(db))
-                    .any(|(t1, t2)| !t1.is_dynamic() && !t2.is_dynamic() && t1 != t2)
-                {
+            for (argument_idx, &argument) in supercls_alias
+                .specialization(db)
+                .types(db)
+                .iter()
+                .enumerate()
+            {
+                if argument.is_dynamic() {
+                    continue;
+                }
+                let (earlier_argument, earlier_alias, earlier_idx) = *ancestor_args
+                    .entry((origin, argument_idx))
+                    .or_insert((argument, supercls_alias, i));
+                if earlier_argument != argument {
                     if earlier_idx == i {
                         return true;
                     }
@@ -4718,13 +4726,6 @@ pub(crate) fn report_inconsistent_generic_bases<'db>(
                     ));
                     return true;
                 }
-            } else if !supercls_alias
-                .specialization(db)
-                .types(db)
-                .iter()
-                .all(Type::is_dynamic)
-            {
-                ancestor_specs.insert(origin, (supercls_alias, i));
             }
         }
     }
