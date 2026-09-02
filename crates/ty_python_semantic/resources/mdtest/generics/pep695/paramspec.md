@@ -639,6 +639,78 @@ f3(1)
 f3("a", "b")
 ```
 
+### Prefer the declared parameter list
+
+We prefer the declared parameter list of a `ParamSpec` when it is compatible with the callback's
+inferred parameter list:
+
+```py
+from typing import Callable
+
+class Callback[**P]:
+    def __init__(self, callback: Callable[P, None]) -> None: ...
+
+def accepts_object(value: object, /) -> None: ...
+
+x1 = Callback(accepts_object)
+reveal_type(x1)  # revealed: Callback[(value: object, /)]
+
+x2: Callback[[int]] = Callback(accepts_object)
+reveal_type(x2)  # revealed: Callback[(int, /)]
+```
+
+If the parameter lists are incompatible, we ignore the declared type in the invalid assignment
+diagnostic:
+
+```py
+def no_args() -> None: ...
+
+# error: [invalid-assignment] "Object of type `Callback[()]` is not assignable to `Callback[(int, /)]`"
+x3: Callback[[int]] = Callback(no_args)
+reveal_type(x3)  # revealed: Callback[(int, /)]
+```
+
+When no argument constrains the `ParamSpec`, the declared type supplies its parameter list:
+
+```py
+def make[**P]() -> Callback[P]:
+    raise NotImplementedError
+
+reveal_type(make())  # revealed: Callback[(...)]
+
+x4: Callback[[int, str]] = make()
+reveal_type(x4)  # revealed: Callback[(int, str, /)]
+```
+
+### Preserve callback parameters in nested calls
+
+The outer call checks forwarded arguments against the inferred parameter list of the wrapped
+callback:
+
+```py
+from typing import Callable
+
+def wrap[**P](callback: Callable[P, None]) -> Callable[P, None]:
+    return callback
+
+def accept[**P](callback: Callable[P, None], *args: P.args, **kwargs: P.kwargs) -> None: ...
+def no_args() -> None: ...
+
+reveal_type(wrap(no_args))  # revealed: () -> None
+
+accept(wrap(no_args))  # ok
+accept(wrap(no_args), 1)  # error: [too-many-positional-arguments]
+```
+
+Keyword-only parameters are also preserved:
+
+```py
+def keyword_only(*, value: int) -> None: ...
+
+accept(wrap(keyword_only), value=1)
+accept(wrap(keyword_only), value="incorrect")  # error: [invalid-argument-type]
+```
+
 ### Preserve an unpacked required suffix
 
 A `ParamSpec` preserves a named positional prefix and the required suffix of an unpacked variadic
