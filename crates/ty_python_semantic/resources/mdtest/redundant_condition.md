@@ -2044,6 +2044,97 @@ def negated_conditional_contexts(flag: bool):
         break
 ```
 
+In cases where an always-true `if` or `elif` test makes a following branch unreachable, and that
+following branch has a nontrivial body, we warn about this in a secondary diagnostic.
+
+An explicit `else` receives the annotation even when all branches exit and the following statement
+is also unreachable. For a branch with a multiline body, the annotation ends on its first
+statement's first line:
+
+```py
+def f(x: int):
+    if isinstance(x, int):  # snapshot: redundant-condition-strict
+        return
+    else:
+        return
+    print("unreachable")
+
+def g(x: int | str):
+    if isinstance(x, int):
+        print("a")
+    elif isinstance(x, str):  # snapshot: redundant-condition-strict
+        print("b")
+    elif isinstance(x, bytes):
+        for byte in x:
+            print(byte)
+    else:
+        assert False, "unreachable"
+```
+
+```snapshot
+error[redundant-condition-strict]: Condition is always true
+  --> src/mdtest_snippet.py:67:8
+   |
+67 |       if isinstance(x, int):  # snapshot: redundant-condition-strict
+   |          ^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+68 |           return
+69 | /     else:
+70 | |         return
+   | |______________- This following branch is unreachable
+
+
+error[redundant-condition-strict]: Condition is always true
+  --> src/mdtest_snippet.py:76:10
+   |
+76 |       elif isinstance(x, str):  # snapshot: redundant-condition-strict
+   |            ^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+77 |           print("b")
+78 | /     elif isinstance(x, bytes):
+79 | |         for byte in x:
+   | |______________________- This following branch is unreachable
+```
+
+And in cases where an always-false `if` test makes its own nontrivial body unreachable, we also
+issue a subdiagnostic warning:
+
+```py
+def f(x: int):
+    if not isinstance(x, int):  # snapshot: redundant-condition-strict
+        print("not an int")
+```
+
+```snapshot
+error[redundant-condition-strict]: Condition is always false
+  --> src/mdtest_snippet.py:84:8
+   |
+84 |     if not isinstance(x, int):  # snapshot: redundant-condition-strict
+   |        ^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[False]`
+85 |         print("not an int")
+   |         ------------------- This statement is unreachable
+```
+
+We also warn when always-true, always-terminal `if`s make the remaining suite unreachable:
+
+```py
+def f(x: int):
+    if isinstance(x, int):  # snapshot: redundant-condition-strict
+        return
+
+    print("hi")
+```
+
+```snapshot
+error[redundant-condition-strict]: Condition is always true
+  --> src/mdtest_snippet.py:87:8
+   |
+87 |     if isinstance(x, int):  # snapshot: redundant-condition-strict
+   |        ^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+88 |         return
+89 |
+90 |     print("hi")
+   |     ----------- This following statement is unreachable
+```
+
 Outside a statement condition, a `not` expression still tests its operand's truthiness. The strict
 rule reports redundant boolean and integer operands in assignments and return expressions:
 
@@ -2070,6 +2161,76 @@ def compound_truthy(x: str):
     match x:
         case str() if isinstance(x, str) and isinstance(x, str):  # error: [redundant-condition-strict]
             pass
+```
+
+## Reachability after exhaustive `if`/`elif` chains
+
+### Terminal branches
+
+When a final `elif` is always true and every branch exits, the statements after the chain are
+unreachable. We annotate the first nontrivial following statement on the diagnostic to note this,
+since it may be unintentional.
+
+We also do not offer a fix that adds an explicit `else` calling `assert_never` here. It *looks* as
+though the suite after the `if`/`elif`/`else` chain is meant to be reachable here, so adding another
+branch to the chain that is also terminal would just make the user's problems worse.
+
+```py
+def terminal_branches(value: int | str | bytes):
+    if isinstance(value, int):
+        return
+    elif isinstance(value, str):
+        raise ValueError
+    elif isinstance(value, bytes):  # snapshot: redundant-condition-strict
+        return
+    print("unreachable")
+```
+
+```snapshot
+error[redundant-condition-strict]: Condition is always true
+ --> src/mdtest_snippet.py:6:10
+  |
+6 |     elif isinstance(value, bytes):  # snapshot: redundant-condition-strict
+  |          ^^^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+7 |         return
+8 |     print("unreachable")
+  |     -------------------- This following statement is unreachable
+```
+
+### An earlier branch falls through
+
+An earlier branch that falls through keeps the following statements reachable, even if the final
+`elif` is always true and exits. Here, the initial `if` and final `elif` both return, but the middle
+branch continues after the chain if its assertion succeeds.
+
+```py
+def earlier_fallthrough(value: int | str | bytes, enabled: bool):
+    if isinstance(value, int):
+        return
+    elif isinstance(value, str):
+        assert enabled
+    elif isinstance(value, bytes):  # snapshot: redundant-condition-strict
+        return
+    print("reachable")
+```
+
+```snapshot
+error[redundant-condition-strict]: Condition is always true
+ --> src/mdtest_snippet.py:6:10
+  |
+6 |     elif isinstance(value, bytes):  # snapshot: redundant-condition-strict
+  |          ^^^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+help: Add an `else` branch that calls `assert_never`
+   |
+1  + from typing import assert_never
+2  | def earlier_fallthrough(value: int | str | bytes, enabled: bool):
+--------------------------------------------------------------------------------
+8  |         return
+9  +     else:
+10 +         assert_never(value)
+11 |     print("reachable")
+   |
+note: This is an unsafe fix and may change runtime behavior
 ```
 
 ## Redundant boolean operands in ambiguous conditions
@@ -2187,6 +2348,26 @@ def short_circuit(value: object):
     # Short-circuiting means this body is never reached, despite the standalone types above.
     if value and False:  # error: [redundant-condition-strict] "Condition `value and False` is always false"
         pass
+```
+
+## Reachability annotations for compound conditions
+
+Branch reachability annotations accompany diagnostics on complete conditions. A diagnostic on an
+operand does not receive a branch annotation, even when that operand makes the complete condition
+always false:
+
+```py
+def check(empty: tuple[()], enabled: bool):
+    if empty and enabled:  # snapshot: redundant-condition
+        print("unreachable")
+```
+
+```snapshot
+warning[redundant-condition]: An empty tuple is always falsy
+ --> src/mdtest_snippet.py:2:8
+  |
+2 |     if empty and enabled:  # snapshot: redundant-condition
+  |        ^^^^^ Inferred type is `tuple[()]`
 ```
 
 ## Boolean tests inside value expressions
@@ -4373,7 +4554,8 @@ def nested_without_else(value: int, flag: bool):
 
 The first condition's type does not affect whether a later boolean condition is recognized as a
 defensive check. Non-boolean conditions still produce the ordinary diagnostic, even when followed by
-a defensive exit and the strict rule is enabled.
+a defensive exit and the strict rule is enabled. We do not annotate a defensive exit after the chain
+as unreachable:
 
 ```py
 def defensive_elif(items: list[int], value: int):
@@ -4387,11 +4569,25 @@ def predicate() -> bool:
 
 def uncalled_function(flag: bool):
     if flag:
-        pass
-    elif predicate:  # error: [redundant-condition] "Function `predicate` is always truthy: Did you mean to call this function?"
-        pass
-    else:
-        raise AssertionError
+        return
+    elif predicate:  # snapshot: redundant-condition
+        return
+    raise AssertionError
+```
+
+```snapshot
+warning[redundant-condition]: Function `predicate` is always truthy
+   --> src/mdtest_snippet.py:166:10
+    |
+166 |     elif predicate:  # snapshot: redundant-condition
+    |          ^^^^^^^^^ Did you mean to call this function?
+    |
+165 |         return
+    -     elif predicate:  # snapshot: redundant-condition
+166 +     elif predicate():  # snapshot: redundant-condition
+167 |         return
+    |
+note: This is an unsafe fix and may change runtime behavior
 ```
 
 ## Defensive operands in ambiguous conditions
