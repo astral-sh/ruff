@@ -17,7 +17,10 @@ use ruff_notebook::{Notebook, NotebookError};
 use std::num::NonZeroUsize;
 use std::process::Output;
 use std::sync::Arc;
-use std::{any::Any, path::PathBuf};
+use std::{
+    any::Any,
+    path::{Path, PathBuf},
+};
 
 /// A system implementation that uses the OS file system.
 #[derive(Debug, Clone)]
@@ -233,6 +236,12 @@ impl CommandExecutor for OsSystem {
         let directory = command
             .get_current_dir()
             .unwrap_or_else(|| self.current_directory());
+
+        // `posix_spawn` is supposed to surface execve/chdir failures as `spawn`/`output`
+        // errors. Some implementations instead report a successful spawn and a child
+        // exit status of 127, including qemu-user, OpenBSD, and HPPA. Check the
+        // preconditions we already know so those cases stay `io::Error`s.
+        check_spawn_preconditions(command.get_executable(), directory.as_std_path())?;
 
         std::process::Command::new(command.get_executable())
             .args(command.get_args())
@@ -454,6 +463,92 @@ impl From<WalkState> for ::ignore::WalkState {
 
 fn not_found() -> std::io::Error {
     std::io::Error::new(std::io::ErrorKind::NotFound, "No such file or directory")
+}
+
+/// Rejects `current_dir` and program values that would fail `execve`/`chdir`.
+///
+/// Keep the error kinds and messages aligned with a native `Command::output()`
+/// failure so CLI snapshots stay stable across platforms.
+fn check_spawn_preconditions(executable: &str, current_dir: &Path) -> Result<()> {
+    let current_dir_metadata = std::fs::metadata(current_dir)?;
+    if !current_dir_metadata.is_dir() {
+        return Err(not_a_directory());
+    }
+
+    if program_is_path(executable) {
+        ensure_executable_path(Path::new(executable), current_dir)
+    } else if which::which_in(executable, std::env::var_os("PATH"), current_dir).is_ok() {
+        Ok(())
+    } else {
+        Err(program_not_found())
+    }
+}
+
+/// Returns `true` when `program` is a path rather than a `PATH` lookup name.
+///
+/// This matches `execvp(3)`: a slash (or, on Windows, a backslash) skips `PATH`.
+fn program_is_path(program: &str) -> bool {
+    let path = Path::new(program);
+    path.is_absolute() || path.components().nth(1).is_some()
+}
+
+fn ensure_executable_path(program: &Path, current_dir: &Path) -> Result<()> {
+    let path = if program.is_absolute() {
+        program.to_path_buf()
+    } else {
+        current_dir.join(program)
+    };
+    let metadata = std::fs::metadata(&path)?;
+    if !metadata.is_file() || !is_executable(&metadata) {
+        return Err(permission_denied());
+    }
+    Ok(())
+}
+
+#[cfg(unix)]
+fn is_executable(metadata: &std::fs::Metadata) -> bool {
+    use std::os::unix::fs::PermissionsExt;
+
+    metadata.permissions().mode() & 0o111 != 0
+}
+
+#[cfg(not(unix))]
+fn is_executable(_metadata: &std::fs::Metadata) -> bool {
+    true
+}
+
+fn program_not_found() -> std::io::Error {
+    #[cfg(windows)]
+    {
+        std::io::Error::new(std::io::ErrorKind::NotFound, "program not found")
+    }
+    #[cfg(not(windows))]
+    {
+        // Match `Command::output()` on Unix: "No such file or directory (os error 2)".
+        std::io::Error::from_raw_os_error(2)
+    }
+}
+
+fn permission_denied() -> std::io::Error {
+    #[cfg(unix)]
+    {
+        std::io::Error::from_raw_os_error(13)
+    }
+    #[cfg(not(unix))]
+    {
+        std::io::Error::from(std::io::ErrorKind::PermissionDenied)
+    }
+}
+
+fn not_a_directory() -> std::io::Error {
+    #[cfg(unix)]
+    {
+        std::io::Error::from_raw_os_error(20)
+    }
+    #[cfg(not(unix))]
+    {
+        std::io::Error::new(std::io::ErrorKind::NotADirectory, "Not a directory")
+    }
 }
 
 #[cfg(feature = "testing")]
@@ -736,5 +831,83 @@ mod tests {
         );
 
         Ok(())
+    }
+
+    #[test]
+    fn execute_missing_bare_program_is_not_found() {
+        let tempdir = TempDir::new().unwrap();
+        let system = OsSystem::new(SystemPath::from_std_path(tempdir.path()).unwrap());
+        let error = system
+            .run_command(Command::new("missing-ty-uv-executable-7f3a9b2c"))
+            .expect_err("missing programs should fail as spawn errors");
+        assert_eq!(error.kind(), std::io::ErrorKind::NotFound);
+    }
+
+    #[test]
+    fn execute_missing_absolute_program_is_not_found() {
+        let tempdir = TempDir::new().unwrap();
+        let system = OsSystem::new(SystemPath::from_std_path(tempdir.path()).unwrap());
+        let missing = tempdir.path().join("missing-ty-uv-executable-7f3a9b2c");
+        let error = system
+            .run_command(Command::new(missing.to_str().unwrap()))
+            .expect_err("missing programs should fail as spawn errors");
+        assert_eq!(error.kind(), std::io::ErrorKind::NotFound);
+    }
+
+    #[test]
+    fn execute_missing_current_dir_is_not_found() {
+        let tempdir = TempDir::new().unwrap();
+        let system = OsSystem::new(SystemPath::from_std_path(tempdir.path()).unwrap());
+        let missing_path = tempdir.path().join("no-such-dir-7f3a9b2c");
+        let missing_dir = SystemPath::from_std_path(&missing_path).unwrap();
+        let mut command = Command::new("missing-ty-uv-executable-7f3a9b2c");
+        command.current_dir(missing_dir);
+        let error = system
+            .run_command(command)
+            .expect_err("missing current_dir should fail as spawn errors");
+        assert_eq!(error.kind(), std::io::ErrorKind::NotFound);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn execute_file_current_dir_is_not_a_directory() {
+        let tempdir = TempDir::new().unwrap();
+        std::fs::write(tempdir.path().join("not-a-dir"), b"").unwrap();
+        let system = OsSystem::new(SystemPath::from_std_path(tempdir.path()).unwrap());
+        let file_path = tempdir.path().join("not-a-dir");
+        let file_dir = SystemPath::from_std_path(&file_path).unwrap();
+        let mut command = Command::new("missing-ty-uv-executable-7f3a9b2c");
+        command.current_dir(file_dir);
+        let error = system
+            .run_command(command)
+            .expect_err("non-directory current_dir should fail as spawn errors");
+        assert!(error.to_string().contains("Not a directory"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn execute_directory_program_is_permission_denied() {
+        let tempdir = TempDir::new().unwrap();
+        let system = OsSystem::new(SystemPath::from_std_path(tempdir.path()).unwrap());
+        let error = system
+            .run_command(Command::new(tempdir.path().to_str().unwrap()))
+            .expect_err("directory programs should fail as spawn errors");
+        assert_eq!(error.kind(), std::io::ErrorKind::PermissionDenied);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn execute_non_executable_program_is_permission_denied() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let tempdir = TempDir::new().unwrap();
+        let program = tempdir.path().join("not-executable");
+        std::fs::write(&program, b"").unwrap();
+        std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o644)).unwrap();
+        let system = OsSystem::new(SystemPath::from_std_path(tempdir.path()).unwrap());
+        let error = system
+            .run_command(Command::new(program.to_str().unwrap()))
+            .expect_err("non-executable programs should fail as spawn errors");
+        assert_eq!(error.kind(), std::io::ErrorKind::PermissionDenied);
     }
 }
