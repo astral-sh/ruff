@@ -486,6 +486,21 @@ impl<'db> CallableType<'db> {
         CallableType::new(db, self.signatures(db), CallableTypeKind::Regular)
     }
 
+    /// Retain every parameter signature and its generic context, but erase return types
+    /// that do not participate in a `ParamSpec` specialization.
+    pub(crate) fn into_paramspec_value(self, db: &'db dyn Db) -> CallableType<'db> {
+        CallableType::new(
+            db,
+            CallableSignature::from_overloads(
+                self.signatures(db)
+                    .iter()
+                    .cloned()
+                    .map(|signature| signature.with_return_type(Type::unknown())),
+            ),
+            CallableTypeKind::ParamSpecValue,
+        )
+    }
+
     /// Returns the reduced callable produced by partially applying selected overloads.
     pub(crate) fn partially_apply(
         db: &'db dyn Db,
