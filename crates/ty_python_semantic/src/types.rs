@@ -7539,6 +7539,17 @@ impl<'db> Type<'db> {
                 return MemberLookupResult::from(Place::Undefined);
             }
 
+            if matches!(
+                self,
+                Type::KnownInstance(KnownInstanceType::TypeGenericAlias(_))
+            ) {
+                // `GenericAlias.__getattr__` delegates to `__origin__`. For `type[T]`, the
+                // origin is always `type`, not `T`, even when `T` is `Any`.
+                return KnownClass::Type
+                    .to_class_literal(db, env)
+                    .member_lookup_with_policy_and_receiver(db, env, name, policy, None);
+            }
+
             let name_type = Type::string_literal(db, name);
             match self.try_call_dunder(
                 db,
