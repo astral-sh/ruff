@@ -166,7 +166,7 @@ use ty_python_core::{ExpressionNodeKey, Statement};
 
 mod annotation_expression;
 mod attribute_assignment;
-mod binary_expressions;
+pub(super) mod binary_expressions;
 mod class;
 mod dict;
 mod dynamic_class;
@@ -5172,6 +5172,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let target_ty = self
             .infer_augment_assignment(assignment)
             .unwrap_or_else(|recovery_ty| recovery_ty);
+        if let Some(symbolic) = self
+            .symbolic
+            .get(&InferenceSlot::Augmented(assignment.target.as_ref().into()))
+            .copied()
+        {
+            self.symbolic
+                .insert(InferenceSlot::Binding(definition), symbolic);
+        }
         self.add_binding(assignment.target.as_ref().into(), definition)
             .insert(self, target_ty);
     }
@@ -5212,14 +5220,46 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let target_type = target_result.unwrap_or_else(|recovery_ty| recovery_ty);
         let mut state = BinaryInferenceState::default();
+        let mut arguments = CallArguments::positional([Type::unknown()]);
+        arguments.clear_types(0);
         let operation_result = self.infer_augmented_op(
             assignment,
             target_type,
             value,
-            &mut |builder, tcx| builder.infer_expression(value, tcx),
+            &mut |builder, tcx| {
+                let ty = builder.infer_expression(value, tcx);
+                arguments.insert_type(0, tcx, builder.inferred_argument(value, ty));
+                ty
+            },
             &mut state,
         );
         self.report_deprecated_functions(assignment, state.deprecated_functions);
+        let symbolic = self
+            .symbolic
+            .get(&InferenceSlot::Expression(target.as_ref().into()))
+            .copied();
+        if symbolic.is_some() || arguments.has_symbolic_types() {
+            let db = self.db();
+            let env = self.program_environment();
+            let mut constraints = InferenceConstraints::default();
+            let left = symbolic.map_or(target_type, |symbolic| constraints.import(db, symbolic));
+            let arguments = arguments.capture(db, &mut constraints);
+            // The expression at the target denotes the old value; the binding stores the result.
+            let slot = InferenceSlot::Augmented(target.as_ref().into());
+            let result = constraints.apply(
+                db,
+                env,
+                InferenceOwner::Region(self.region),
+                slot,
+                InferenceOperation::Augmented {
+                    left,
+                    arguments,
+                    operator: assignment.op,
+                    context: self.binary_operation_context(),
+                },
+            );
+            self.symbolic.insert(slot, constraints.finish(db, result));
+        }
 
         match (target_result, operation_result) {
             (Ok(_), Ok(result_ty)) => Ok(result_ty),

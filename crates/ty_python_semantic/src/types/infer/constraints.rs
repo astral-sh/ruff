@@ -8,7 +8,7 @@
 use std::cell::{Cell, RefCell};
 use std::hash::Hash;
 
-use ruff_python_ast::ExprContext;
+use ruff_python_ast::{ExprContext, Operator};
 use rustc_hash::{FxHashMap, FxHashSet};
 use salsa::plumbing::AsId;
 use ty_python_core::definition::Definition;
@@ -20,9 +20,10 @@ use ty_python_core::unpack::Unpack;
 use ty_python_core::{EvaluationMode, ExpressionNodeKey, NarrowingEvaluator, Program, use_def_map};
 
 use super::InferenceRegion;
+use super::builder::binary_expressions::BinaryOperationContext;
 use crate::place::{Place, PlaceAndQualifiers, SymbolLookupKey};
 use crate::reachability::predicate_scope;
-use crate::types::call::CapturedCallArguments;
+use crate::types::call::{CallDunderError, CapturedCallArguments};
 use crate::types::class::AugmentedAttribute;
 use crate::types::class::implicit_attributes::ImplicitAttributeName;
 use crate::types::constraints::{
@@ -30,11 +31,13 @@ use crate::types::constraints::{
     projection::{ProjectionError, SolutionBudget, SolutionProjection},
 };
 use crate::types::narrow::NarrowingEvaluatorExtension;
+use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::tuple::{TupleBuilder, TupleLength, TupleType};
 use crate::types::typevar::{BindingContext, BoundTypeVarInstance, TypeVarSet};
 use crate::types::{
-    ApplySpecialization, GenericContext, KnownClass, MemberLookupKey, Specialization, Type,
-    TypeContext, TypeMapping, UnionType, any_over_type, any_over_type_including_alias_arguments,
+    ApplySpecialization, GenericContext, KnownClass, MemberLookupKey, MemberLookupPolicy,
+    Specialization, Type, TypeContext, TypeMapping, UnionBuilder, UnionType, any_over_type,
+    any_over_type_including_alias_arguments,
 };
 use crate::{Db, FxIndexMap, ProgramEnvironment};
 
@@ -88,6 +91,7 @@ pub(crate) enum InferenceSlot<'db> {
     /// A candidate in an ordered public lookup.
     Lookup(usize),
     Expression(ExpressionNodeKey),
+    Augmented(ExpressionNodeKey),
     /// Auxiliary outputs of an expression, such as a mapping spread's key and value types.
     Component(ExpressionNodeKey, usize),
     Binding(Definition<'db>),
@@ -316,6 +320,18 @@ pub(crate) enum InferenceOperation<'db> {
         value: Type<'db>,
         key: Type<'db>,
     },
+    Binary {
+        left: Type<'db>,
+        right: Type<'db>,
+        operator: Operator,
+        context: BinaryOperationContext<'db>,
+    },
+    Augmented {
+        left: Type<'db>,
+        arguments: CapturedCallArguments<'db>,
+        operator: Operator,
+        context: BinaryOperationContext<'db>,
+    },
     Iterate {
         value: Type<'db>,
         mode: EvaluationMode,
@@ -436,6 +452,28 @@ impl<'db> InferenceOperation<'db> {
 
     fn map(self, db: &'db dyn Db, mut f: impl FnMut(Type<'db>) -> Type<'db>) -> Self {
         match self {
+            Self::Binary {
+                left,
+                right,
+                operator,
+                context,
+            } => Self::Binary {
+                left: f(left),
+                right: f(right),
+                operator,
+                context,
+            },
+            Self::Augmented {
+                left,
+                arguments,
+                operator,
+                context,
+            } => Self::Augmented {
+                left: f(left),
+                arguments: arguments.map(db, &mut f),
+                operator,
+                context,
+            },
             Self::Subscript { value, key } => Self::Subscript {
                 value: f(value),
                 key: f(key),
@@ -496,6 +534,63 @@ impl<'db> InferenceOperation<'db> {
         variable: InferenceVariable<'db>,
     ) -> Option<Type<'db>> {
         match self {
+            Self::Binary {
+                left,
+                right,
+                operator,
+                context,
+            } => context.evaluate(db, env, left, right, operator).return_type,
+            Self::Augmented {
+                left,
+                arguments,
+                operator,
+                context,
+            } => {
+                if let Type::Union(union) = left {
+                    return union.try_map(db, env, |left| {
+                        Self::Augmented {
+                            left: *left,
+                            arguments,
+                            operator,
+                            context,
+                        }
+                        .evaluate(db, env, variable)
+                    });
+                }
+                // Updating a TypedDict preserves its schema, including on invalid updates.
+                // The ordinary inference pass validates the patch and emits diagnostics.
+                if matches!((operator, left), (Operator::BitOr, Type::TypedDict(_))) {
+                    return Some(left);
+                }
+                let mut arguments = arguments.to_arguments(db);
+                match left.try_call_dunder_with_policy(
+                    db,
+                    env,
+                    operator.in_place_dunder(),
+                    &mut arguments,
+                    TypeContext::default(),
+                    MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                ) {
+                    Ok(bindings) => Some(bindings.return_type(db, env)),
+                    Err(CallDunderError::MethodNotAvailable) => {
+                        let right = arguments.argument_types(0)?.get_default()?;
+                        context.evaluate(db, env, left, right, operator).return_type
+                    }
+                    Err(CallDunderError::PossiblyUnbound { bindings, .. }) => {
+                        let right = bindings.type_for_argument(&arguments, 0);
+                        let fallback = context
+                            .evaluate(db, env, left, right, operator)
+                            .return_type?;
+                        Some(UnionType::from_two_elements(
+                            db,
+                            env,
+                            bindings.return_type(db, env),
+                            fallback,
+                        ))
+                    }
+                    Err(CallDunderError::CallError(..)) => None,
+                }
+            }
             Self::Subscript { value, key } => value.subscript(db, env, key, ExprContext::Load).ok(),
             Self::Iterate { value, mode } => Some(
                 value
@@ -1427,10 +1522,32 @@ impl<'db> InferenceSolutions<'_, 'db> {
     fn bind_operation(
         &mut self,
         variable: InferenceVariable<'db>,
-        ty: Type<'db>,
+        mut ty: Type<'db>,
         remaining: &mut usize,
     ) -> Option<OperationBinding> {
         let variable = variable.typevar(self.db);
+        let is_literal = |ty| match ty {
+            Type::LiteralValue(_) => true,
+            Type::Union(union) => union
+                .elements(self.db)
+                .iter()
+                .all(|ty| matches!(ty, Type::LiteralValue(_))),
+            _ => false,
+        };
+        if let Some(previous) = self.bindings.get(&variable).copied()
+            && previous != ty
+            && is_literal(ty)
+        {
+            // Repeated arithmetic can generate infinitely many literals. Use the same widening
+            // as ordinary cyclic inference, even when the preceding result was already widened.
+            let mut widened = UnionBuilder::new(self.db, self.env)
+                .recursively_defined(RecursivelyDefined::Yes)
+                .cycle_recovery(true);
+            if is_literal(previous) {
+                widened.add_in_place(previous);
+            }
+            ty = widened.add(ty).build();
+        }
         if self
             .bindings
             .get(&variable)

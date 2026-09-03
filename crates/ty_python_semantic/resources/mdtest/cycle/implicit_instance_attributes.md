@@ -489,6 +489,142 @@ class Dynamic:
         reveal_type(self.items)  # revealed: tuple[Any]
 ```
 
+## Arithmetic on tuple elements
+
+Arithmetic results retain their types when they are stored back into the tuple that supplied an
+operand. Either operand can come from that tuple.
+
+```py
+class Values:
+    def __init__(self, value: int):
+        self.values = (value,)
+
+    def update(self):
+        value = self.values[0] + 1
+        self.values = (value,)
+        reveal_type(self.values)  # revealed: tuple[int]
+
+    def update_from_right(self):
+        value = 1
+        value += self.values[0]
+        self.values = (value,)
+        reveal_type(self.values)  # revealed: tuple[int]
+```
+
+## Reflected arithmetic on unpacked values
+
+An augmented assignment falls back to the reflected operator when the left operand does not
+implement the operation for the right operand.
+
+```py
+class Delta:
+    def __radd__(self, other: int) -> int:
+        return other
+
+class Values:
+    def __init__(self, value: int):
+        self.values = (value,)
+
+    def update(self):
+        (value,) = self.values
+        value += Delta()
+        self.values = (value,)
+        reveal_type(self.values)  # revealed: tuple[int]
+```
+
+## Augmented assignments on generic values
+
+An augmented assignment preserves the type argument of a generic operand, both for an in-place
+operator and for a fallback to the ordinary binary operator. The target can also be an attribute or
+a list element.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+class Add[T]:
+    def __add__(self, other: int) -> "Add[T]":
+        return self
+
+class InPlace[T]:
+    def __iadd__(self, other: int) -> "InPlace[T]":
+        return self
+
+class Values:
+    def __init__(self, first: Add[int], second: InPlace[str]):
+        self.values = (first, second)
+
+    def update(self):
+        first, second = self.values
+        first += 1
+        second += 1
+        self.values = (first, second)
+        reveal_type(self.values)  # revealed: tuple[Add[int], InPlace[str]]
+
+    def read_attribute(self):
+        self.item = self.values[1]
+
+    def update_attribute(self):
+        self.item += 1
+        self.values = (self.values[0], self.item)
+        reveal_type(self.values)  # revealed: tuple[Add[int], InPlace[str]]
+
+    def update_item(self):
+        items = [self.values[0]]
+        items[0] += 1
+        self.values = (items[0], self.values[1])
+        reveal_type(self.values)  # revealed: tuple[Add[int], InPlace[str]]
+```
+
+## Augmented assignments that replace the operand type
+
+An in-place operator can return a different type. After checking the original operand's type, the
+updated tuple contains the operator's result.
+
+```py
+class After: ...
+
+class Before:
+    def __iadd__(self, other: int) -> After:
+        return After()
+
+class Values:
+    def __init__(self, value: Before):
+        self.values = (value,)
+
+    def update(self):
+        value = self.values[0]
+        if isinstance(value, Before):
+            value += 1
+            self.values = (value,)
+            reveal_type(self.values)  # revealed: tuple[After]
+```
+
+## Updating an unpacked typed dictionary
+
+Updating some of a typed dictionary's keys preserves its schema when the dictionary is stored back
+in the tuple.
+
+```py
+from typing import TypedDict
+
+class Data(TypedDict):
+    left: int
+    right: str
+
+class Values:
+    def __init__(self, value: Data):
+        self.values = (value,)
+
+    def update(self):
+        (value,) = self.values
+        value |= {"left": 1}
+        self.values = (value,)
+        reveal_type(self.values)  # revealed: tuple[Data]
+```
+
 ## Mutually dependent tuple attributes
 
 Both attributes have initial values. Their updates swap elements from the other attribute,

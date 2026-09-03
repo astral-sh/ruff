@@ -1,7 +1,10 @@
 use crate::Db;
 use crate::ProgramEnvironment;
+use crate::types::infer::InferenceFlags;
 use compact_str::CompactString;
 use ruff_python_ast::{self as ast, AnyNodeRef};
+use ty_python_core::definition::Definition;
+use ty_python_core::scope::ScopeId;
 
 use super::TypeInferenceBuilder;
 use crate::types::call::CallArguments;
@@ -11,6 +14,9 @@ use crate::types::diagnostic::{
     DIVISION_BY_ZERO, report_unsupported_augmented_assignment, report_unsupported_binary_operation,
 };
 use crate::types::function::OverloadLiteral;
+use crate::types::infer::constraints::{
+    InferenceConstraints, InferenceOperation, InferenceOwner, InferenceSlot,
+};
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::typevar::TypeVarConstraints;
 use crate::types::{
@@ -54,10 +60,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         let (left_ty, right_ty) =
             match self.infer_binary_expression_operand_types(left, *op, right, tcx) {
-                BinaryExpressionOperandTypes::TypedDictResult(ty) => return ty,
+                BinaryExpressionOperandTypes::TypedDictResult(ty) => {
+                    self.store_binary_constraints(
+                        binary,
+                        self.expression_type(left.as_ref()),
+                        self.expression_type(right.as_ref()),
+                    );
+                    return ty;
+                }
                 BinaryExpressionOperandTypes::Inferred(left_ty, right_ty) => (left_ty, right_ty),
             };
 
+        self.store_binary_constraints(binary, left_ty, right_ty);
         let mut state = BinaryInferenceState::default();
         let return_type =
             self.infer_binary_expression_type(binary.into(), left_ty, right_ty, *op, &mut state);
@@ -66,6 +80,45 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             report_unsupported_binary_operation(&self.context, binary, left_ty, right_ty, *op);
             Type::unknown()
         })
+    }
+
+    /// Retain both operands so a later solution uses the same binary operation.
+    fn store_binary_constraints(
+        &mut self,
+        binary: &ast::ExprBinOp,
+        left: Type<'db>,
+        right: Type<'db>,
+    ) {
+        let left_symbolic = self
+            .symbolic
+            .get(&InferenceSlot::Expression(binary.left.as_ref().into()))
+            .copied();
+        let right_symbolic = self
+            .symbolic
+            .get(&InferenceSlot::Expression(binary.right.as_ref().into()))
+            .copied();
+        if left_symbolic.is_none() && right_symbolic.is_none() {
+            return;
+        }
+        let db = self.db();
+        let env = self.program_environment();
+        let mut constraints = InferenceConstraints::default();
+        let left = left_symbolic.map_or(left, |symbolic| constraints.import(db, symbolic));
+        let right = right_symbolic.map_or(right, |symbolic| constraints.import(db, symbolic));
+        let slot = InferenceSlot::Expression(ast::ExprRef::BinOp(binary).into());
+        let result = constraints.apply(
+            db,
+            env,
+            InferenceOwner::Region(self.region),
+            slot,
+            InferenceOperation::Binary {
+                left,
+                right,
+                operator: binary.op,
+                context: self.binary_operation_context(),
+            },
+        );
+        self.symbolic.insert(slot, constraints.finish(db, result));
     }
 
     fn infer_pep_604_union_type_alias(
@@ -295,25 +348,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         })
     }
 
-    /// Collect deprecations from the selected operator methods while reusing cached resolution.
-    fn infer_binary_dunder(
-        &self,
-        state: &mut BinaryInferenceState<'db>,
-        left_ty: Type<'db>,
-        op: ast::Operator,
-        right_ty: Type<'db>,
-    ) -> Option<Type<'db>> {
-        let result = Type::try_call_bin_op_result(
-            self.db(),
-            self.program_environment(),
-            left_ty,
-            op,
-            right_ty,
-        )?;
-        state
-            .deprecated_functions
-            .extend(&result.deprecated_functions);
-        Some(result.return_type)
+    /// Capture the lexical bindings needed to interpret runtime union operands.
+    pub(super) fn binary_operation_context(&self) -> BinaryOperationContext<'db> {
+        BinaryOperationContext {
+            scope: self.scope(),
+            typevar_binding_context: self.typevar_binding_context,
+            flags: self.inference_flags(),
+        }
     }
 
     /// Infer the result type and collect deprecated methods for the enclosing operation.
@@ -326,31 +367,141 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         op: ast::Operator,
         state: &mut BinaryInferenceState<'db>,
     ) -> Option<Type<'db>> {
-        self.infer_binary_expression_type_impl(
-            node,
+        let outcome = self.binary_operation_context().evaluate(
+            self.db(),
+            self.program_environment(),
+            left_ty,
+            right_ty,
+            op,
+        );
+        if !state.emitted_division_by_zero_diagnostic
+            && let Some(left) = outcome.division_by_zero
+        {
+            self.report_division_by_zero(node, op, left);
+            state.emitted_division_by_zero_diagnostic = true;
+        }
+        state
+            .deprecated_functions
+            .extend(outcome.deprecated_functions);
+        outcome.return_type
+    }
+
+    /// Raise a diagnostic if the given type cannot be divided by zero.
+    ///
+    /// Expects the resolved type of the left side of the binary expression.
+    fn report_division_by_zero(
+        &mut self,
+        node: AnyNodeRef<'_>,
+        op: ast::Operator,
+        left: Type<'db>,
+    ) {
+        let db = self.db();
+        let (op, by_zero) = match op {
+            ast::Operator::Div => ("divide", "by zero"),
+            ast::Operator::FloorDiv => ("floor divide", "by zero"),
+            ast::Operator::Mod => ("reduce", "modulo zero"),
+            _ => return,
+        };
+
+        if let Some(builder) = self.context.report_lint(&DIVISION_BY_ZERO, node) {
+            builder.into_diagnostic(format_args!(
+                "Cannot {op} object of type `{}` {by_zero}",
+                left.display(db, self.program_environment())
+            ));
+        }
+    }
+}
+
+/// Lexical context needed when a binary operation constructs a runtime union type.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, get_size2::GetSize, salsa::SalsaValue)]
+pub(crate) struct BinaryOperationContext<'db> {
+    scope: ScopeId<'db>,
+    typevar_binding_context: Option<Definition<'db>>,
+    flags: InferenceFlags,
+}
+
+impl<'db> BinaryOperationContext<'db> {
+    /// Evaluate already-inferred operands without revisiting their expressions.
+    pub(crate) fn evaluate(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        left: Type<'db>,
+        right: Type<'db>,
+        op: ast::Operator,
+    ) -> BinaryOperationOutcome<'db> {
+        let mut evaluator = BinaryOperationEvaluator {
+            db,
+            env,
+            context: self,
+            division_by_zero: None,
+            deprecated_functions: Vec::new(),
+        };
+        let return_type = evaluator.infer(left, right, op);
+        BinaryOperationOutcome {
+            return_type,
+            division_by_zero: evaluator.division_by_zero,
+            deprecated_functions: evaluator.deprecated_functions,
+        }
+    }
+}
+
+/// An inferred result and diagnostics to report at the original expression.
+pub(crate) struct BinaryOperationOutcome<'db> {
+    pub(crate) return_type: Option<Type<'db>>,
+    division_by_zero: Option<Type<'db>>,
+    deprecated_functions: Vec<OverloadLiteral<'db>>,
+}
+
+struct BinaryOperationEvaluator<'a, 'db> {
+    db: &'db dyn Db,
+    env: &'a ProgramEnvironment<'db>,
+    context: BinaryOperationContext<'db>,
+    division_by_zero: Option<Type<'db>>,
+    deprecated_functions: Vec<OverloadLiteral<'db>>,
+}
+
+impl<'db> BinaryOperationEvaluator<'_, 'db> {
+    /// Collect deprecations from the selected operator methods while reusing cached resolution.
+    fn infer_binary_dunder(
+        &mut self,
+        left_ty: Type<'db>,
+        op: ast::Operator,
+        right_ty: Type<'db>,
+    ) -> Option<Type<'db>> {
+        let result = Type::try_call_bin_op_result(self.db, self.env, left_ty, op, right_ty)?;
+        self.deprecated_functions
+            .extend(&result.deprecated_functions);
+        Some(result.return_type)
+    }
+
+    fn infer(
+        &mut self,
+        left_ty: Type<'db>,
+        right_ty: Type<'db>,
+        op: ast::Operator,
+    ) -> Option<Type<'db>> {
+        self.infer_impl(
             left_ty,
             right_ty,
             op,
             &BinaryExpressionVisitor::new(Some(Type::Never)),
-            state,
         )
     }
 
-    fn infer_binary_expression_type_impl(
+    fn infer_impl(
         &mut self,
-        node: AnyNodeRef<'_>,
         left_ty: Type<'db>,
         right_ty: Type<'db>,
         op: ast::Operator,
         visitor: &BinaryExpressionVisitor<'db>,
-        state: &mut BinaryInferenceState<'db>,
     ) -> Option<Type<'db>> {
-        let env = self.program_environment();
-        let db = self.db();
+        let env = self.env;
+        let db = self.db;
 
         // Check for division by zero; this doesn't change the inferred type for the expression, but
         // may emit a diagnostic
-        if !state.emitted_division_by_zero_diagnostic
+        if self.division_by_zero.is_none()
             && matches!(
                 op,
                 ast::Operator::Div | ast::Operator::FloorDiv | ast::Operator::Mod
@@ -359,38 +510,23 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 literal.as_bool() == Some(false) || literal.as_int() == Some(0)
             })
         {
-            state.emitted_division_by_zero_diagnostic =
-                self.check_division_by_zero(node, op, left_ty);
+            self.record_division_by_zero(left_ty);
         }
 
         match (left_ty, right_ty, op) {
             (Type::Union(lhs_union), rhs, _) => lhs_union.try_map(db, env, |lhs_element| {
-                self.infer_binary_expression_type_impl(node, *lhs_element, rhs, op, visitor, state)
+                self.infer_impl(*lhs_element, rhs, op, visitor)
             }),
             (lhs, Type::Union(rhs_union), _) => rhs_union.try_map(db, env, |rhs_element| {
-                self.infer_binary_expression_type_impl(node, lhs, *rhs_element, op, visitor, state)
+                self.infer_impl(lhs, *rhs_element, op, visitor)
             }),
 
             (Type::TypeAlias(alias), rhs, _) => visitor.visit(db, (left_ty, op, right_ty), || {
-                self.infer_binary_expression_type_impl(
-                    node,
-                    alias.value_type(db),
-                    rhs,
-                    op,
-                    visitor,
-                    state,
-                )
+                self.infer_impl(alias.value_type(db), rhs, op, visitor)
             }),
 
             (lhs, Type::TypeAlias(alias), _) => visitor.visit(db, (left_ty, op, right_ty), || {
-                self.infer_binary_expression_type_impl(
-                    node,
-                    lhs,
-                    alias.value_type(db),
-                    op,
-                    visitor,
-                    state,
-                )
+                self.infer_impl(lhs, alias.value_type(db), op, visitor)
             }),
 
             (Type::TypedDict(left_typed_dict), rhs, ast::Operator::BitOr)
@@ -458,20 +594,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             {
                 match left_tvar.typevar(db).bound_or_constraints(db, env) {
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                        Self::map_constrained_typevar_constraints(
+                        TypeInferenceBuilder::map_constrained_typevar_constraints(
                             db,
                             env,
                             left_ty,
                             constraints,
-                            |constraint| {
-                                self.infer_binary_expression_type(
-                                    node, constraint, constraint, op, state,
-                                )
-                            },
+                            |constraint| self.infer(constraint, constraint, op),
                         )
                     }
                     // For bounded TypeVars or unconstrained TypeVars, fall through to the default handling.
-                    _ => self.infer_binary_dunder(state, left_ty, op, right_ty),
+                    _ => self.infer_binary_dunder(left_ty, op, right_ty),
                 }
             }
 
@@ -485,20 +617,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             (Type::TypeVar(left_tvar), rhs, _) if !rhs.is_type_var() => {
                 match left_tvar.typevar(db).bound_or_constraints(db, env) {
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                        Self::map_constrained_typevar_constraints(
+                        TypeInferenceBuilder::map_constrained_typevar_constraints(
                             db,
                             env,
                             left_ty,
                             constraints,
-                            |constraint| {
-                                self.infer_binary_expression_type_impl(
-                                    node, constraint, rhs, op, visitor, state,
-                                )
-                            },
+                            |constraint| self.infer_impl(constraint, rhs, op, visitor),
                         )
                     }
                     // For bounded TypeVars or unconstrained TypeVars, fall through to the default handling.
-                    _ => self.infer_binary_dunder(state, left_ty, op, right_ty),
+                    _ => self.infer_binary_dunder(left_ty, op, right_ty),
                 }
             }
 
@@ -507,20 +635,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             (lhs, Type::TypeVar(right_tvar), _) if !lhs.is_type_var() => {
                 match right_tvar.typevar(db).bound_or_constraints(db, env) {
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                        Self::map_constrained_typevar_constraints(
+                        TypeInferenceBuilder::map_constrained_typevar_constraints(
                             db,
                             env,
                             right_ty,
                             constraints,
-                            |constraint| {
-                                self.infer_binary_expression_type_impl(
-                                    node, lhs, constraint, op, visitor, state,
-                                )
-                            },
+                            |constraint| self.infer_impl(lhs, constraint, op, visitor),
                         )
                     }
                     // For bounded TypeVars or unconstrained TypeVars, fall through to the default handling.
-                    _ => self.infer_binary_dunder(state, left_ty, op, right_ty),
+                    _ => self.infer_binary_dunder(left_ty, op, right_ty),
                 }
             }
 
@@ -531,29 +655,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             // positional arguments get. In those cases we need to explicitly delegate to the base
             // type, so that it hits the `Type::Union` branches above.
             (Type::NewTypeInstance(newtype), rhs, _) => self
-                .infer_binary_dunder(state, left_ty, op, right_ty)
-                .or_else(|| {
-                    self.infer_binary_expression_type_impl(
-                        node,
-                        newtype.concrete_base_type(db),
-                        rhs,
-                        op,
-                        visitor,
-                        state,
-                    )
-                }),
+                .infer_binary_dunder(left_ty, op, right_ty)
+                .or_else(|| self.infer_impl(newtype.concrete_base_type(db), rhs, op, visitor)),
             (lhs, Type::NewTypeInstance(newtype), _) => self
-                .infer_binary_dunder(state, left_ty, op, right_ty)
-                .or_else(|| {
-                    self.infer_binary_expression_type_impl(
-                        node,
-                        lhs,
-                        newtype.concrete_base_type(db),
-                        op,
-                        visitor,
-                        state,
-                    )
-                }),
+                .infer_binary_dunder(left_ty, op, right_ty)
+                .or_else(|| self.infer_impl(lhs, newtype.concrete_base_type(db), op, visitor)),
 
             (todo @ Type::Dynamic(DynamicType::Todo(_)), _, _)
             | (_, todo @ Type::Dynamic(DynamicType::Todo(_)), _) => Some(todo),
@@ -695,7 +801,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         let lhs_value = lhs.value(db);
                         let rhs_value = rhs.value(db);
                         let new_length = lhs_value.len() + rhs_value.len();
-                        let ty = if new_length <= Self::MAX_STRING_LITERAL_SIZE {
+                        let ty = if new_length <= TypeInferenceBuilder::MAX_STRING_LITERAL_SIZE {
                             let mut value = CompactString::with_capacity(new_length);
                             value.push_str(lhs_value);
                             value.push_str(rhs_value);
@@ -727,7 +833,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         } else if let Ok(n) = usize::try_from(n.as_i64())
                             && let value = s.value(db)
                             && n.checked_mul(value.len()).is_some_and(|new_length| {
-                                new_length <= Self::MAX_STRING_LITERAL_SIZE
+                                new_length <= TypeInferenceBuilder::MAX_STRING_LITERAL_SIZE
                             })
                         {
                             let new_literal = value.repeat(n);
@@ -778,22 +884,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         LiteralValueTypeKind::Bool(b1),
                         LiteralValueTypeKind::Bool(_) | LiteralValueTypeKind::Int(_),
                         op,
-                    ) => self.infer_binary_expression_type(
-                        node,
-                        Type::int_literal(i64::from(b1)),
-                        right_ty,
-                        op,
-                        state,
-                    ),
+                    ) => self.infer(Type::int_literal(i64::from(b1)), right_ty, op),
 
-                    (LiteralValueTypeKind::Int(_), LiteralValueTypeKind::Bool(b2), op) => self
-                        .infer_binary_expression_type(
-                            node,
-                            left_ty,
-                            Type::int_literal(i64::from(b2)),
-                            op,
-                            state,
-                        ),
+                    (LiteralValueTypeKind::Int(_), LiteralValueTypeKind::Bool(b2), op) => {
+                        self.infer(left_ty, Type::int_literal(i64::from(b2)), op)
+                    }
 
                     (
                         LiteralValueTypeKind::Int(n),
@@ -848,7 +943,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         Some(result)
                     }
 
-                    _ => self.infer_binary_dunder(state, left_ty, op, right_ty),
+                    _ => self.infer_binary_dunder(left_ty, op, right_ty),
                 };
 
                 result.map(|result| match result {
@@ -929,9 +1024,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     Some(UnionTypeInstance::from_value_expression_types(
                         db,
                         [left_ty, right_ty],
-                        self.scope(),
-                        self.typevar_binding_context,
-                        self.inference_flags(),
+                        self.context.scope,
+                        self.context.typevar_binding_context,
+                        self.context.flags,
                     ))
                 }
             }
@@ -956,9 +1051,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 Some(UnionTypeInstance::from_value_expression_types(
                     db,
                     [left_ty, right_ty],
-                    self.scope(),
-                    self.typevar_binding_context,
-                    self.inference_flags(),
+                    self.context.scope,
+                    self.context.typevar_binding_context,
+                    self.context.flags,
                 ))
             }
 
@@ -988,7 +1083,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             )
             .ok()
             .map(|binding| {
-                state.deprecated_functions.extend(
+                self.deprecated_functions.extend(
                     binding
                         .deprecated_functions(db)
                         .map(|(_, function)| function),
@@ -1056,20 +1151,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 | Type::TypeForm(_)
                 | Type::TypedDict(_),
                 op,
-            ) => self.infer_binary_dunder(state, left_ty, op, right_ty),
+            ) => self.infer_binary_dunder(left_ty, op, right_ty),
         }
     }
 
-    /// Raise a diagnostic if the given type cannot be divided by zero.
-    ///
-    /// Expects the resolved type of the left side of the binary expression.
-    fn check_division_by_zero(
-        &mut self,
-        node: AnyNodeRef<'_>,
-        op: ast::Operator,
-        left: Type<'db>,
-    ) -> bool {
-        let db = self.db();
+    fn record_division_by_zero(&mut self, left: Type<'db>) {
+        let db = self.db;
         match left {
             Type::LiteralValue(literal)
                 if matches!(
@@ -1081,23 +1168,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     instance.known_class(db),
                     Some(KnownClass::Float | KnownClass::Int | KnownClass::Bool)
                 ) => {}
-            _ => return false,
+            _ => return,
         }
 
-        let (op, by_zero) = match op {
-            ast::Operator::Div => ("divide", "by zero"),
-            ast::Operator::FloorDiv => ("floor divide", "by zero"),
-            ast::Operator::Mod => ("reduce", "modulo zero"),
-            _ => return false,
-        };
-
-        if let Some(builder) = self.context.report_lint(&DIVISION_BY_ZERO, node) {
-            builder.into_diagnostic(format_args!(
-                "Cannot {op} object of type `{}` {by_zero}",
-                left.display(db, self.program_environment())
-            ));
-        }
-
-        true
+        self.division_by_zero = Some(left);
     }
 }

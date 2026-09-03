@@ -1829,6 +1829,35 @@ for _ in range(10):
     reveal_type(first)  # revealed: Literal[1]
 ```
 
+### Arithmetic on unpacked generic values
+
+Updating an unpacked element and wrapping it again preserves the wrapper's type argument across loop
+iterations.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from collections.abc import Iterator
+
+class Box[T]:
+    def __init__(self, value: T):
+        self.value = value
+
+    def __iter__(self) -> Iterator[T]:
+        yield self.value
+
+box = Box(1)
+for _ in range(10):
+    (value,) = box
+    value += 1
+    box = Box(value)
+
+reveal_type(box)  # revealed: Box[int]
+```
+
 ### Avoid oscillations
 
 We need to avoid oscillating cycles in cases like the following, where the type of one of these loop

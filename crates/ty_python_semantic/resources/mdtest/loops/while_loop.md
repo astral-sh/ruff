@@ -555,6 +555,39 @@ def copy_in_comprehension(flag: bool, first: int, second: str):
     assert_type(items, tuple[int, str])
 ```
 
+### Arithmetic on unpacked tuple elements
+
+Repeated increments produce integers beyond the initial literal value. Rebuilding the tuple from
+that result preserves its fixed length.
+
+```py
+def update(flag: bool):
+    values = (1,)
+    while flag:
+        (value,) = values
+        value += 1
+        values = (value,)
+    reveal_type(values)  # revealed: tuple[int]
+```
+
+### Conditional counter updates converge
+
+An index can be incremented on one path and reset on another before it is compared with a collection
+length. The loop-carried integer type still converges.
+
+```py
+def advance(values: list[int], flag: bool) -> None:
+    index = 0
+    while flag:
+        if values:
+            index = index + 1
+        else:
+            index = 0
+        if index == len(values):
+            return
+    reveal_type(index)  # revealed: int
+```
+
 ### Avoid oscillations
 
 We need to avoid oscillating cycles in cases like the following, where the type of one of these loop
