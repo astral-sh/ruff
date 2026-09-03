@@ -31,7 +31,6 @@ use equation::{CycleRootSet, ProjectionEquationSystem, ProjectionVar};
 pub(crate) use evidence::ProjectionEvidenceSet;
 pub(crate) use operation::ProjectionResult;
 pub(crate) use recovery::ProjectionRecoveryBuilder;
-use term::ProjectionTerm;
 
 impl<'db> Type<'db> {
     fn top_level_cycle_artifact_root(self, db: &'db dyn Db) -> Option<DivergentType> {
@@ -321,25 +320,6 @@ impl<'db> Type<'db> {
             Type::Union(union) => union.elements(db).to_vec(),
             _ => vec![self],
         }
-    }
-
-    /// Solves the candidate terms for one projection path.
-    fn solve_projection_terms(
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        root: DivergentType,
-        path: &ProjectionPath<'db>,
-        terms: &[ProjectionTerm<'db>],
-    ) -> Option<Self> {
-        let mut terms_by_op = FxIndexMap::default();
-        terms_by_op.insert(path.clone(), terms.to_vec());
-        let var = ProjectionVar {
-            root,
-            path: path.clone(),
-        };
-        ProjectionEquationSystem::from_terms_by_op(db, env, root, &terms_by_op)?
-            .solve(db, env)?
-            .solved_type(db, env, &var)
     }
 
     fn projection_ops(

@@ -489,6 +489,26 @@ class C(Tuple): ...
 reveal_mro(C)
 ```
 
+## Nested tuples with recursive elements
+
+A recursive element does not change the other elements of a tuple. Indexing, slicing, and iteration
+preserve the nested tuple's integer and callable elements.
+
+```py
+from typing import Callable
+
+Recursive = tuple["Recursive", ...]
+
+def access(values: tuple[tuple[Recursive, int, Callable[[], str]], ...]):
+    reveal_type(values[0][1])  # revealed: int
+    values[0][1].missing  # error: [unresolved-attribute]
+    reveal_type(values[0][2]())  # revealed: str
+    reveal_type(values[:1][0][1])  # revealed: int
+
+    for pair in values:
+        reveal_type(pair[1])  # revealed: int
+```
+
 ## Union subscript access
 
 ```py

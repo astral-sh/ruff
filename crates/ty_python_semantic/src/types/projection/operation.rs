@@ -387,7 +387,13 @@ impl<'db> Type<'db> {
 
         let terms = terms.into_iter().collect::<Option<Vec<_>>>()?;
 
-        let ty = Self::solve_projection_terms(db, env, *root, &path, &terms)?;
+        // These are operation results, not equations defining the cycle root. Preserve their
+        // known structure even when some elements still depend on recursive inference.
+        let ty = UnionType::from_elements_cycle_recovery(
+            db,
+            env,
+            terms.into_iter().map(|term| term.ty(db, env)),
+        );
         Some(ProjectionResult {
             ty,
             projection_evidence: evidence,
