@@ -7946,7 +7946,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .origin(self.db())
             .apply_specialization(db, |_| {
                 builder.build_merged_with(|current_typevar, bounds| {
-                    let lower = bounds?.evidence_lower?;
+                    let lower = bounds?.evidence_lower()?;
 
                     let lower = lower.promote_collection_element_type(
                         db,

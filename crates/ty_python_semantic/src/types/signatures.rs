@@ -1324,9 +1324,9 @@ impl<'db> Signature<'db> {
             matches!(receiver_type, Type::ClassLiteral(_) | Type::GenericAlias(_));
         let specialization = builder.build_merged_with(|typevar, bounds| {
             if let Some(bounds) = bounds
-                && let Some(lower) = bounds.evidence_lower
+                && let Some(lower) = bounds.evidence_lower()
                 && bounds.has_upper_evidence()
-                && let Some(upper) = bounds.upper.as_single_bound(db, env)
+                && let Some(upper) = bounds.as_single_upper_bound(db, env)
                 && lower.is_equivalent_to(db, env, upper)
                 && let Some(solution) =
                     PathBounds::default_solve(db, env, &constraints, bounds).as_type()
@@ -1340,7 +1340,9 @@ impl<'db> Signature<'db> {
                     .variance_of(db, env, typevar.identity(db))
                     .evaluate(db)
                     .is_covariant()
-                && bounds.evidence_lower.is_some_and(|lower| !lower.is_never())
+                && bounds
+                    .evidence_lower()
+                    .is_some_and(|lower| !lower.is_never())
                 && let Some(solution) =
                     PathBounds::default_solve(db, env, &constraints, bounds).as_type()
             {
