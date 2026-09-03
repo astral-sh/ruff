@@ -20,11 +20,11 @@ pub(super) use self::typed_dict::{
     DynamicTypedDictAnchor, DynamicTypedDictLiteral, synthesized_typed_dict_class_member,
 };
 use super::dedicated::pydantic;
+use super::display;
 use super::{
     BoundTypeVarIdentity, BoundTypeVarInstance, MemberLookupPolicy, MroIterator, SpecialFormType,
     SubclassOfType, Type, TypeQualifiers, class_base::ClassBase, function::FunctionType,
 };
-use super::{TypeVarVariance, display};
 use crate::place::{DefinedPlace, Provenance, TypeOrigin};
 use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::{
@@ -44,10 +44,11 @@ use crate::types::signatures::{
 };
 use crate::types::tuple::TupleSpec;
 use crate::types::typevar::TypeVarSet;
+use crate::types::variance::VarianceOrigin;
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, CallableTypes, DataclassParams, ErrorContext,
     ErrorContextTree, FindLegacyTypeVarsVisitor, IntersectionType, TypeContext, TypeMapping,
-    TypingModule, UnionBuilder, VarianceInferable,
+    TypingModule, UnionBuilder, VarianceInferable, VarianceTerm,
 };
 use crate::{
     Db, FxIndexMap, FxOrderSet,
@@ -513,23 +514,26 @@ impl<'db> VarianceInferable<'db> for GenericAlias<'db> {
         db: &'db dyn Db,
         _: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
-    ) -> TypeVarVariance {
-        self.variance_of_owner(db, typevar)
+    ) -> VarianceTerm<'db> {
+        VarianceTerm::variable(db, VarianceOrigin::GenericAlias(self), typevar)
     }
 }
 
 #[salsa::tracked]
 impl<'db> GenericAlias<'db> {
+    /// Compose each type argument's variance with its formal parameter's variance. Inferred
+    /// parameters refer to the unspecialized class equation, keeping references such as
+    /// `P[list[T]]` finite without expanding specialized class bodies.
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, _, _, _| TypeVarVariance::Bivariant,
+        cycle_initial=|_, _, _, _| VarianceTerm::BIVARIANT,
         heap_size=ruff_memory_usage::heap_size
     )]
-    fn variance_of_owner(
+    pub(in crate::types) fn variance_equation(
         self,
         db: &'db dyn Db,
         typevar: BoundTypeVarIdentity<'db>,
-    ) -> TypeVarVariance {
+    ) -> VarianceTerm<'db> {
         let origin = self.origin(db);
         let env = ProgramEnvironment::from_file(origin.program_file(db));
 
@@ -537,33 +541,32 @@ impl<'db> GenericAlias<'db> {
 
         // Note that we only care about the variance of the specialized generic alias with respect
         // to the given type variable, not the unspecialized class literal origin.
-        specialization
+        let variances = specialization
             .generic_context(db)
             .variables(db)
             .zip(specialization.types(db))
             .map(|(generic_typevar, ty)| {
-                if let Some(explicit_variance) = generic_typevar.typevar(db).explicit_variance(db) {
-                    ty.with_polarity(explicit_variance)
-                        .variance_of(db, &env, typevar)
-                } else {
-                    // `with_polarity` composes the passed variance with the
-                    // inferred one. The inference is done lazily, as we can
-                    // sometimes determine the result just from the passed
-                    // variance. This operation is commutative, so we could
-                    // infer either first.  We choose to make the `StaticClassLiteral`
-                    // variance lazy, as it is known to be expensive, requiring
-                    // that we traverse all members.
-                    //
-                    // If salsa let us look at the cache, we could check first
-                    // to see if the class literal query was already run.
-
-                    let typevar_variance_in_substituted_type = ty.variance_of(db, &env, typevar);
-                    origin
-                        .with_polarity(typevar_variance_in_substituted_type)
-                        .variance_of(db, &env, generic_typevar.identity(db))
-                }
-            })
-            .collect()
+                // Composition is commutative. Keep the argument on the left so evaluation can
+                // skip the class's potentially expensive equation when the argument is bivariant.
+                ty.variance_of(db, &env, typevar).compose_thunk(db, || {
+                    match generic_typevar.typevar(db).explicit_variance(db) {
+                        Some(explicit_variance)
+                            if generic_typevar.is_paramspec(db)
+                                || generic_typevar.is_typevartuple(db)
+                                || origin.into_protocol_class(db).is_none() =>
+                        {
+                            explicit_variance.into()
+                        }
+                        Some(explicit_variance) => VarianceTerm::variable(
+                            db,
+                            VarianceOrigin::ProtocolParameter(origin, explicit_variance),
+                            generic_typevar.identity(db),
+                        ),
+                        None => origin.variance_of(db, &env, generic_typevar.identity(db)),
+                    }
+                })
+            });
+        VarianceTerm::join(db, variances)
     }
 }
 
@@ -2593,7 +2596,7 @@ impl<'db> VarianceInferable<'db> for ClassType<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
-    ) -> TypeVarVariance {
+    ) -> VarianceTerm<'db> {
         match self {
             Self::NonGeneric(ClassLiteral::Static(class)) => class.variance_of(db, env, typevar),
             Self::NonGeneric(
@@ -2601,7 +2604,7 @@ impl<'db> VarianceInferable<'db> for ClassType<'db> {
                 | ClassLiteral::DynamicNamedTuple(_)
                 | ClassLiteral::DynamicTypedDict(_)
                 | ClassLiteral::DynamicEnum(_),
-            ) => TypeVarVariance::Bivariant,
+            ) => VarianceTerm::BIVARIANT,
             Self::Generic(generic) => generic.variance_of(db, env, typevar),
         }
     }
@@ -2818,13 +2821,13 @@ impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
-    ) -> TypeVarVariance {
+    ) -> VarianceTerm<'db> {
         match self {
             Self::Static(class) => class.variance_of(db, env, typevar),
             Self::Dynamic(_)
             | Self::DynamicNamedTuple(_)
             | Self::DynamicTypedDict(_)
-            | Self::DynamicEnum(_) => TypeVarVariance::Bivariant,
+            | Self::DynamicEnum(_) => VarianceTerm::BIVARIANT,
         }
     }
 }

@@ -9,7 +9,7 @@ use std::marker::PhantomData;
 use super::protocol_class::{ProtocolInterface, ProtocolInterfaceView, StructuralMemberPriority};
 use super::{
     BoundTypeVarIdentity, BoundTypeVarInstance, ClassType, DivergentType, KnownClass,
-    MaterializationKind, SubclassOfType, Type, TypeAliasType, TypeVarVariance,
+    MaterializationKind, SubclassOfType, Type, TypeAliasType,
 };
 use crate::place::PlaceAndQualifiers;
 use crate::types::constraints::{
@@ -36,6 +36,7 @@ use crate::types::visitor::{
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ErrorContext,
     FindLegacyTypeVarsVisitor, LiteralValueTypeKind, TypeContext, TypeMapping, VarianceInferable,
+    VarianceTerm,
 };
 use crate::{Db, FxOrderSet};
 pub(super) use synthesized_protocol::SynthesizedProtocolType;
@@ -1278,7 +1279,7 @@ impl<'db> VarianceInferable<'db> for NominalInstanceType<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
-    ) -> TypeVarVariance {
+    ) -> VarianceTerm<'db> {
         self.class(db, env).variance_of(db, env, typevar)
     }
 }
@@ -1690,7 +1691,7 @@ impl<'db> VarianceInferable<'db> for ProtocolInstanceType<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
-    ) -> TypeVarVariance {
+    ) -> VarianceTerm<'db> {
         self.inner.variance_of(db, env, typevar)
     }
 }
@@ -1763,7 +1764,7 @@ impl<'db> VarianceInferable<'db> for Protocol<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
-    ) -> TypeVarVariance {
+    ) -> VarianceTerm<'db> {
         match self {
             Protocol::FromClass(class_type) => class_type.variance_of(db, env, typevar),
             Protocol::Synthesized(synthesized_protocol_type) => {
@@ -1781,8 +1782,7 @@ mod synthesized_protocol {
     use crate::types::protocol_class::ProtocolInterface;
     use crate::types::{
         ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance,
-        FindLegacyTypeVarsVisitor, Type, TypeContext, TypeMapping, TypeVarVariance,
-        VarianceInferable,
+        FindLegacyTypeVarsVisitor, Type, TypeContext, TypeMapping, VarianceInferable, VarianceTerm,
     };
     use crate::{Db, FxOrderSet, ProgramEnvironment};
     use ty_python_core::definition::Definition;
@@ -1845,7 +1845,7 @@ mod synthesized_protocol {
             db: &'db dyn Db,
             env: &ProgramEnvironment<'db>,
             typevar: BoundTypeVarIdentity<'db>,
-        ) -> TypeVarVariance {
+        ) -> VarianceTerm<'db> {
             self.0.variance_of(db, env, typevar)
         }
     }

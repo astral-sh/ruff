@@ -6,11 +6,10 @@ use crate::{
     types::{
         ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
         GenericContext, KnownClass, KnownInstanceType, MaterializationKind, Type, TypeContext,
-        TypeMapping, TypeRecursionContext, TypeVarVariance, TypingModule,
-        definition_expression_type,
+        TypeMapping, TypeRecursionContext, TypingModule, VarianceTerm, definition_expression_type,
         display::qualified_name_components_from_scope,
         generics::{ApplySpecialization, Specialization, bind_typevar},
-        variance::VarianceInferable,
+        variance::{VarianceInferable, VarianceOrigin},
         visitor,
     },
 };
@@ -641,30 +640,32 @@ impl<'db> VarianceInferable<'db> for TypeAliasType<'db> {
         db: &'db dyn Db,
         _: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
-    ) -> TypeVarVariance {
-        self.variance_of_owner(db, typevar)
+    ) -> VarianceTerm<'db> {
+        VarianceTerm::variable(db, VarianceOrigin::TypeAlias(self), typevar)
     }
 }
 
 #[salsa::tracked]
 impl<'db> TypeAliasType<'db> {
+    /// Measure the alias's own parameters in its raw RHS, and external parameters through its
+    /// specialization arguments. For `type Items[T] = list[T]`, querying `Items[int]` for its
+    /// formal `T` still describes `list[T]`, not the specialized `list[int]`.
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, _, _, _| TypeVarVariance::Bivariant,
+        cycle_initial=|_, _, _, _| VarianceTerm::BIVARIANT,
         heap_size=ruff_memory_usage::heap_size
     )]
-    fn variance_of_owner(
+    pub(in crate::types) fn variance_equation(
         self,
         db: &'db dyn Db,
         typevar: BoundTypeVarIdentity<'db>,
-    ) -> TypeVarVariance {
+    ) -> VarianceTerm<'db> {
         let env = ProgramEnvironment::from_definition(self.definition(db));
         let Some(generic_context) = self.generic_context(db) else {
             return self.value_type(db).variance_of(db, &env, typevar);
         };
 
-        // Infer an alias's own type-parameter variance from the raw RHS. Applying specialization
-        // here would recursively request the same `variance_of` query.
+        // Applying specialization here can re-enter variance inference for the same alias.
         if generic_context
             .variables(db)
             .any(|alias_typevar| alias_typevar.identity(db) == typevar)
@@ -679,15 +680,15 @@ impl<'db> TypeAliasType<'db> {
 
         // For external typevars, variance flows through the specialization arguments. Expanding
         // the specialized alias body here can create ever-larger recursive alias applications.
-        generic_context
+        let variances = generic_context
             .variables(db)
             .zip(specialization.types(db))
             .map(|(alias_typevar, argument_ty)| {
                 raw_value_type
                     .variance_of(db, &env, alias_typevar.identity(db))
-                    .compose_thunk(|| argument_ty.variance_of(db, &env, typevar))
-            })
-            .collect()
+                    .compose_thunk(db, || argument_ty.variance_of(db, &env, typevar))
+            });
+        VarianceTerm::join(db, variances)
     }
 }
 

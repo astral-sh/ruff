@@ -6394,6 +6394,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                             && !self.signature.parameters()[matched.index]
                                 .annotated_type()
                                 .variance_of(db, self.env, typevartuple.identity(db))
+                                .evaluate(db)
                                 .is_covariant()
                     })
             })

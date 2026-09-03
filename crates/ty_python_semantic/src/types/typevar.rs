@@ -1266,7 +1266,10 @@ impl<'db> BoundTypeVarInstance<'db> {
             None => match self.binding_context(db) {
                 BindingContext::Definition(definition) => polarity.compose_thunk(|| {
                     let env = ProgramEnvironment::from_definition(definition);
-                    match binding_type(db, definition).variance_of(db, &env, self.identity(db)) {
+                    match binding_type(db, definition)
+                        .variance_of(db, &env, self.identity(db))
+                        .evaluate(db)
+                    {
                         // When both directions are valid, the typing spec selects covariance.
                         TypeVarVariance::Bivariant => TypeVarVariance::Covariant,
                         variance => variance,

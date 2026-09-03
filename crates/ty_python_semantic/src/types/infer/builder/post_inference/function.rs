@@ -130,7 +130,9 @@ fn check_method_typevar_variance<'db>(
         if declared_variance == TypeVarVariance::Invariant {
             continue;
         }
-        let required_variance = (&signature).variance_of(db, env, typevar.identity(db));
+        let required_variance = (&signature)
+            .variance_of(db, env, typevar.identity(db))
+            .evaluate(db);
         if declared_variance.join(required_variance) == declared_variance {
             continue;
         }
@@ -148,7 +150,8 @@ fn check_method_typevar_variance<'db>(
                 };
                 let variance = parameter_type
                     .with_polarity(TypeVarVariance::Contravariant)
-                    .variance_of(db, env, typevar.identity(db));
+                    .variance_of(db, env, typevar.identity(db))
+                    .evaluate(db);
                 if declared_variance.join(variance) == declared_variance {
                     return None;
                 }
@@ -162,11 +165,12 @@ fn check_method_typevar_variance<'db>(
                 node.returns
                     .as_deref()
                     .filter(|_| {
-                        declared_variance.join(signature.return_ty.variance_of(
-                            db,
-                            env,
-                            typevar.identity(db),
-                        )) != declared_variance
+                        declared_variance.join(
+                            signature
+                                .return_ty
+                                .variance_of(db, env, typevar.identity(db))
+                                .evaluate(db),
+                        ) != declared_variance
                     })
                     .map(Ranged::range)
             })
