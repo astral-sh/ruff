@@ -372,12 +372,18 @@ pub(super) trait ProvidesConcreteBound<'db>: Copy + Into<Constraint<'db>> {
 }
 
 pub(super) trait ProvidesConcreteLowerBound<'db>: ProvidesConcreteBound<'db> {
-    fn into_lower_bound(self) -> ConcreteLowerBound<'db>;
+    type LowerBound: ProvidesConcreteBound<'db>;
+
+    fn into_lower_bound(self) -> Self::LowerBound;
 }
 
 pub(super) trait ProvidesConcreteUpperBound<'db>: ProvidesConcreteBound<'db> {
-    fn into_upper_bound(self) -> ConcreteUpperBound<'db>;
+    type UpperBound: ProvidesConcreteBound<'db>;
+
+    fn into_upper_bound(self) -> Self::UpperBound;
 }
+
+pub(super) trait ProvidesConcreteEquivalenceBound<'db>: ProvidesConcreteBound<'db> {}
 
 pub(super) trait ProvidesTypeVarBound<'db>: Copy + Into<Constraint<'db>> {
     fn provenance(self) -> ConstraintProvenance;
@@ -478,6 +484,8 @@ impl<'db> ProvidesConcreteBound<'db> for ConcreteLowerBound<'db> {
 }
 
 impl<'db> ProvidesConcreteLowerBound<'db> for ConcreteLowerBound<'db> {
+    type LowerBound = ConcreteLowerBound<'db>;
+
     fn into_lower_bound(self) -> ConcreteLowerBound<'db> {
         self
     }
@@ -570,6 +578,8 @@ impl<'db> ProvidesConcreteBound<'db> for ConcreteUpperBound<'db> {
 }
 
 impl<'db> ProvidesConcreteUpperBound<'db> for ConcreteUpperBound<'db> {
+    type UpperBound = ConcreteUpperBound<'db>;
+
     fn into_upper_bound(self) -> ConcreteUpperBound<'db> {
         self
     }
@@ -659,6 +669,8 @@ impl<'db> ProvidesConcreteBound<'db> for ConcreteEquivalenceBound<'db> {
 }
 
 impl<'db> ProvidesConcreteLowerBound<'db> for ConcreteEquivalenceBound<'db> {
+    type LowerBound = ConcreteLowerBound<'db>;
+
     fn into_lower_bound(self) -> ConcreteLowerBound<'db> {
         ConcreteLowerBound {
             provenance: self.provenance,
@@ -670,6 +682,8 @@ impl<'db> ProvidesConcreteLowerBound<'db> for ConcreteEquivalenceBound<'db> {
 }
 
 impl<'db> ProvidesConcreteUpperBound<'db> for ConcreteEquivalenceBound<'db> {
+    type UpperBound = ConcreteUpperBound<'db>;
+
     fn into_upper_bound(self) -> ConcreteUpperBound<'db> {
         ConcreteUpperBound {
             provenance: self.provenance,
@@ -679,6 +693,8 @@ impl<'db> ProvidesConcreteUpperBound<'db> for ConcreteEquivalenceBound<'db> {
         }
     }
 }
+
+impl<'db> ProvidesConcreteEquivalenceBound<'db> for ConcreteEquivalenceBound<'db> {}
 
 /// Restricts a single paramspec so that a concrete lower bound signature is assignable to it. (A
 /// concrete type is not a bare typevar. [`TypeVarRangeBound`] is used to model an assignability
@@ -736,6 +752,37 @@ impl<'db> ParamSpecLowerBound<'db> {
 impl<'db> From<ParamSpecLowerBound<'db>> for Constraint<'db> {
     fn from(bound: ParamSpecLowerBound<'db>) -> Constraint<'db> {
         Constraint::ParamSpecLower(bound)
+    }
+}
+
+impl<'db> ProvidesConcreteBound<'db> for ParamSpecLowerBound<'db> {
+    fn provenance(self) -> ConstraintProvenance {
+        self.provenance
+    }
+
+    fn typevar(self) -> BoundTypeVarInstance<'db> {
+        self.typevar
+    }
+
+    fn bound(self) -> Type<'db> {
+        self.bound
+    }
+
+    fn map(self, provenance: ConstraintProvenance, bound: Type<'db>) -> Self {
+        Self {
+            provenance,
+            typevar: self.typevar,
+            bound,
+            _phantom: PhantomData,
+        }
+    }
+}
+
+impl<'db> ProvidesConcreteLowerBound<'db> for ParamSpecLowerBound<'db> {
+    type LowerBound = ParamSpecLowerBound<'db>;
+
+    fn into_lower_bound(self) -> ParamSpecLowerBound<'db> {
+        self
     }
 }
 
@@ -798,6 +845,37 @@ impl<'db> From<ParamSpecUpperBound<'db>> for Constraint<'db> {
     }
 }
 
+impl<'db> ProvidesConcreteBound<'db> for ParamSpecUpperBound<'db> {
+    fn provenance(self) -> ConstraintProvenance {
+        self.provenance
+    }
+
+    fn typevar(self) -> BoundTypeVarInstance<'db> {
+        self.typevar
+    }
+
+    fn bound(self) -> Type<'db> {
+        self.bound
+    }
+
+    fn map(self, provenance: ConstraintProvenance, bound: Type<'db>) -> Self {
+        Self {
+            provenance,
+            typevar: self.typevar,
+            bound,
+            _phantom: PhantomData,
+        }
+    }
+}
+
+impl<'db> ProvidesConcreteUpperBound<'db> for ParamSpecUpperBound<'db> {
+    type UpperBound = ParamSpecUpperBound<'db>;
+
+    fn into_upper_bound(self) -> ParamSpecUpperBound<'db> {
+        self
+    }
+}
+
 /// Restricts a single paramspec so that it is equivalent to some concrete signature. (A concrete
 /// type is not a bare typevar. [`TypeVarEquivalenceBound`] is used to model an equivalence
 /// relationship between two paramspecs.)
@@ -853,6 +931,57 @@ impl<'db> From<ParamSpecEquivalenceBound<'db>> for Constraint<'db> {
         Constraint::ParamSpecEquivalence(bound)
     }
 }
+
+impl<'db> ProvidesConcreteBound<'db> for ParamSpecEquivalenceBound<'db> {
+    fn provenance(self) -> ConstraintProvenance {
+        self.provenance
+    }
+
+    fn typevar(self) -> BoundTypeVarInstance<'db> {
+        self.typevar
+    }
+
+    fn bound(self) -> Type<'db> {
+        self.bound
+    }
+
+    fn map(self, provenance: ConstraintProvenance, bound: Type<'db>) -> Self {
+        Self {
+            provenance,
+            typevar: self.typevar,
+            bound,
+            _phantom: PhantomData,
+        }
+    }
+}
+
+impl<'db> ProvidesConcreteLowerBound<'db> for ParamSpecEquivalenceBound<'db> {
+    type LowerBound = ParamSpecLowerBound<'db>;
+
+    fn into_lower_bound(self) -> ParamSpecLowerBound<'db> {
+        ParamSpecLowerBound {
+            provenance: self.provenance,
+            typevar: self.typevar,
+            bound: self.bound,
+            _phantom: PhantomData,
+        }
+    }
+}
+
+impl<'db> ProvidesConcreteUpperBound<'db> for ParamSpecEquivalenceBound<'db> {
+    type UpperBound = ParamSpecUpperBound<'db>;
+
+    fn into_upper_bound(self) -> ParamSpecUpperBound<'db> {
+        ParamSpecUpperBound {
+            provenance: self.provenance,
+            typevar: self.typevar,
+            bound: self.bound,
+            _phantom: PhantomData,
+        }
+    }
+}
+
+impl<'db> ProvidesConcreteEquivalenceBound<'db> for ParamSpecEquivalenceBound<'db> {}
 
 /// Restricts two typevars so that `left` must be assignable to `right`. Both typevars must have
 /// the same domain.
