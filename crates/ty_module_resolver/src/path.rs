@@ -284,10 +284,6 @@ impl ModulePath {
             }
         }
     }
-
-    pub(crate) fn into_search_path(self) -> SearchPath {
-        self.search_path
-    }
 }
 
 impl PartialEq<SystemPathBuf> for ModulePath {
@@ -362,6 +358,11 @@ impl<'db> ModuleDirectory<'db> {
     /// Returns the directory's path without permitting it to change.
     pub(crate) fn path(&self) -> &ModulePath {
         &self.path
+    }
+
+    /// Consumes the directory and returns its search root.
+    pub(crate) fn into_search_path(self) -> SearchPath {
+        self.path.search_path
     }
 
     /// Returns the cached listing from [`System`], or `None` for an inaccessible directory
