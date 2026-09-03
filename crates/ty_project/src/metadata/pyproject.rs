@@ -141,7 +141,7 @@ pub enum ResolveRequiresPythonError {
 
 impl ResolveRequiresPythonError {
     /// Returns the error without its optional recovery guidance.
-    pub fn message(&self) -> String {
+    pub(crate) fn message(&self) -> String {
         match self {
             Self::TooLargeMajor(version) => {
                 format!(
@@ -163,7 +163,7 @@ impl ResolveRequiresPythonError {
     }
 
     /// Returns guidance for fixing the invalid Python requirement, when available.
-    pub fn hint(&self) -> Option<&'static str> {
+    pub(crate) fn hint(&self) -> Option<&'static str> {
         match self {
             Self::NoLowerBound(_) => Some(
                 "Add a lower bound to indicate the minimum compatible Python version (e.g., `>=3.13`) or specify a version in `environment.python-version`.",

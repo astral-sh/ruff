@@ -195,6 +195,19 @@ reveal_type(C.inferred_from_value)  # revealed: Unknown
 C.inferred_from_value = "overwritten on class"
 ```
 
+#### Bound methods assigned on narrowed receivers
+
+A bound method keeps the receiver that was used to access it. If `self` is narrowed before the bound
+method is assigned to an inferred instance attribute, the captured receiver remains assignable to
+the receiver used by the inferred attribute type.
+
+```py
+class C:
+    def method(self) -> None:
+        if not isinstance(self, str):
+            self.saved_method = self.method
+```
+
 #### Variable defined in multiple methods
 
 If we see multiple un-annotated assignments to a single attribute (`self.x` below), we build the
@@ -710,7 +723,7 @@ class C:
 
 c_instance = C()
 reveal_type(c_instance.a)  # revealed: int
-reveal_type(c_instance.b)  # revealed: list[Literal[2, 3]]
+reveal_type(c_instance.b)  # revealed: list[int]
 ```
 
 #### Attributes defined in for-loop (unpacking)
@@ -1741,6 +1754,26 @@ class DeclaringBase:
 class InitializedDerived(DeclaringBase, metaclass=DerivedInitializingMeta): ...
 
 reveal_type(InitializedDerived.inherited_attr)  # revealed: int
+```
+
+An attribute initialized by the metaclass also takes precedence over an inherited generic
+declaration. Access through the generic subclass refers to the ordinary `int` attribute installed by
+the metaclass, so reads, writes, and deletion are allowed.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class GenericDeclaringBase(Generic[T]):
+    inherited_attr: T | int
+
+class GenericInitializedDerived(GenericDeclaringBase[T], metaclass=DerivedInitializingMeta): ...
+
+reveal_type(GenericInitializedDerived.inherited_attr)  # revealed: int
+reveal_type(GenericInitializedDerived[str].inherited_attr)  # revealed: int
+GenericInitializedDerived[str].inherited_attr = 2
+del GenericInitializedDerived[str].inherited_attr
 ```
 
 An assignment through `cls` in an arbitrary metaclass method also writes to the constructed class
@@ -4128,6 +4161,26 @@ class Foo: ...
 reveal_type(Foo.__class__)  # revealed: <class 'type'>
 ```
 
+## `__class__` on recursive aliases
+
+For a recursive alias that contains both instances and classes, `value.__class__` agrees with
+`type(value)`. Repeated queries retain both the instance classes and their possible metaclasses.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+type Meta[T] = type[T]
+type Recursive = int | Meta[Recursive]
+
+def recursive_class(value: Recursive):
+    reveal_type(type(value))  # revealed: type[int | type]
+    reveal_type(value.__class__)  # revealed: type[int | type]
+    reveal_type(type(value))  # revealed: type[int | type]
+```
+
 ## Module attributes
 
 ### Basic
@@ -4913,6 +4966,19 @@ class F:
         self.x = make_homogeneous_tuple(other.x)
 
 reveal_type(F().x)  # revealed: tuple[Divergent, ...]
+```
+
+A homogeneous tuple of `Divergent` has gradual length, so it is assignable to a fixed-length tuple.
+This allows a recursively inferred instance attribute to retain an empty tuple as its class default:
+
+```py
+class G:
+    x = ()
+
+    def f(self):
+        self.x = tuple(self.x)
+
+reveal_type(G().x)  # revealed: tuple[Divergent, ...]
 ```
 
 ## Attributes of standard library modules that aren't yet defined

@@ -6,6 +6,7 @@ use ruff_python_semantic::{Modules, SemanticModel, analyze};
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 use crate::rules::flake8_django::helpers;
 
@@ -41,7 +42,7 @@ use crate::rules::flake8_django::helpers;
 ///         return f"{self.field}"
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.246")]
+#[violation_metadata(stable_since = "v0.0.246", category = Category::Style)]
 pub(crate) struct DjangoModelWithoutDunderStr;
 
 impl Violation for DjangoModelWithoutDunderStr {

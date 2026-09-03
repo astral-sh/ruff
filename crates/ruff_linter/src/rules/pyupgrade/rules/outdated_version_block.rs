@@ -11,6 +11,7 @@ use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextLen, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::{adjust_indentation, delete_stmt};
 use crate::{Edit, Fix, FixAvailability, Violation};
 use ruff_python_ast::PythonVersion;
@@ -52,7 +53,7 @@ use ruff_python_semantic::SemanticModel;
 /// ## References
 /// - [Python documentation: `sys.version_info`](https://docs.python.org/3/library/sys.html#sys.version_info)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.240")]
+#[violation_metadata(stable_since = "v0.0.240", category = Category::Suspicious)]
 pub(crate) struct OutdatedVersionBlock {
     reason: Reason,
 }

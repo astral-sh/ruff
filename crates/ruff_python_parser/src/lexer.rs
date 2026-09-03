@@ -7,7 +7,6 @@
 //! [Lexical analysis]: https://docs.python.org/3/reference/lexical_analysis.html
 
 use std::cmp::Ordering;
-use std::debug_assert_matches;
 
 use unicode_ident::{is_xid_continue, is_xid_start};
 
@@ -1049,7 +1048,10 @@ impl<'src> Lexer<'src> {
     /// Lex a hex/octal/decimal/binary number without a decimal point.
     fn lex_number_radix(&mut self, radix: Radix) -> TokenKind {
         #[cfg(debug_assertions)]
-        debug_assert_matches!(self.cursor.previous().to_ascii_lowercase(), 'x' | 'o' | 'b');
+        {
+            use std::debug_assert_matches;
+            debug_assert_matches!(self.cursor.previous().to_ascii_lowercase(), 'x' | 'o' | 'b');
+        }
 
         let number = self.radix_run(radix);
         if !number.has_digit {

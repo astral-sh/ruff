@@ -5,6 +5,7 @@ use ruff_python_semantic::Modules;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::fastapi::rules::is_fastapi_route;
 use crate::{Edit, Fix, FixAvailability, Violation};
 use ruff_python_ast::PythonVersion;
@@ -79,7 +80,7 @@ use ruff_python_ast::PythonVersion;
 /// [typing-annotated]: https://docs.python.org/3/library/typing.html#typing.Annotated
 /// [typing-extensions]: https://typing-extensions.readthedocs.io/en/stable/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.8.0")]
+#[violation_metadata(stable_since = "0.8.0", category = Category::Style)]
 pub(crate) struct FastApiNonAnnotatedDependency {
     py_version: PythonVersion,
 }

@@ -75,6 +75,7 @@ SECTIONS: list[Section] = [
     Section("Integrations", "integrations.md", generated=False),
     Section("FAQ", "faq.md", generated=False),
     Section("Contributing", "contributing.md", generated=True),
+    Section("Proposing Lint Rules", "rule-proposals.md", generated=False),
 ]
 
 LINK_REWRITES: dict[str, str] = {
@@ -131,7 +132,7 @@ def clean_file_content(content: str, title: str) -> str:
 
 
 def generate_rule_metadata(rule_doc: Path) -> None:
-    """Add frontmatter metadata containing a rule's code and description.
+    """Add frontmatter metadata containing a rule's description and optional code.
 
     For example:
     ```yaml
@@ -149,18 +150,21 @@ def generate_rule_metadata(rule_doc: Path) -> None:
     # Get the description and rule code from the rule doc lines.
     rule_code = None
     description = None
+    title_found = False
     what_it_does_found = False
     for line in lines:
         if line == "\n":
             continue
 
-        # Assume that the only first-level heading is the rule title and code.
+        # Assume that the only first-level heading is the rule title and optional code.
         #
         # For example: given `# abstract-base-class-without-abstract-method (B024)`,
         # extract the rule code (`B024`).
         if line.startswith("# "):
-            rule_code = line.strip().rsplit("(", 1)
-            rule_code = rule_code[1][:-1]
+            title_found = True
+            _, separator, code = line.strip().rpartition(" (")
+            if separator and code.endswith(")"):
+                rule_code = code[:-1]
 
         if line.startswith("## What it does"):
             what_it_does_found = True
@@ -169,30 +173,21 @@ def generate_rule_metadata(rule_doc: Path) -> None:
         if what_it_does_found and not description:
             description = line.removesuffix("\n")
 
-        if all([rule_code, description]):
+        if title_found and description:
             break
     else:
-        if not rule_code:
+        if not title_found:
             raise ValueError("Missing title line")
 
         if not what_it_does_found:
             raise ValueError(f"Missing '## What it does' in {rule_doc}")
 
     with rule_doc.open("w", encoding="utf-8") as f:
-        f.writelines(
-            "\n".join(
-                [
-                    "---",
-                    "description: |-",
-                    f"  {description}",
-                    "tags:",
-                    f"- {rule_code}",
-                    "---",
-                    "",
-                    "",
-                ]
-            )
-        )
+        metadata = ["---", "description: |-", f"  {description}"]
+        if rule_code is not None:
+            metadata.extend(["tags:", f"- {rule_code}"])
+        metadata.extend(["---", "", ""])
+        f.write("\n".join(metadata))
         f.writelines(lines)
 
 
@@ -300,6 +295,7 @@ def main() -> None:
                             ),
                         ]
                         for rule in rules
+                        if rule["code"] is not None
                     )
                 ),
             },

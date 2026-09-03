@@ -7,7 +7,7 @@ use serde::{Serialize, Serializer};
 use strum::IntoEnumIterator;
 
 use ruff_linter::FixAvailability;
-use ruff_linter::codes::RuleStatus;
+use ruff_linter::codes::{Category, RuleStatus};
 use ruff_linter::registry::{Linter, Rule, RuleNamespace};
 
 use crate::args::HelpFormat;
@@ -15,8 +15,8 @@ use crate::args::HelpFormat;
 #[derive(Serialize)]
 struct Explanation<'a> {
     name: &'a str,
-    code: String,
-    linter: &'a str,
+    code: Option<String>,
+    linter: Option<&'a str>,
     summary: &'a str,
     message_formats: &'a [&'a str],
     fix: String,
@@ -25,18 +25,22 @@ struct Explanation<'a> {
     explanation: Option<&'a str>,
     preview: bool,
     status: RuleStatus,
+    category: Category,
     source_location: SourceLocation,
 }
 
 impl<'a> Explanation<'a> {
     fn from_rule(rule: &'a Rule) -> Self {
-        let code = rule.noqa_code().to_string();
-        let (linter, _) = Linter::parse_code(&code).unwrap();
+        let code = rule.noqa_code().map(|code| code.to_string());
+        let linter = code
+            .as_deref()
+            .and_then(Linter::parse_code)
+            .map(|(linter, _)| linter.name());
         let fix = rule.fixable().to_string();
         Self {
             name: rule.name().as_str(),
             code,
-            linter: linter.name(),
+            linter,
             summary: rule.message_formats()[0],
             message_formats: rule.message_formats(),
             fix,
@@ -44,6 +48,7 @@ impl<'a> Explanation<'a> {
             explanation: rule.explanation(),
             preview: rule.is_preview(),
             status: rule.status(),
+            category: rule.category(),
             source_location: SourceLocation {
                 file: rule.file(),
                 line: rule.line(),
@@ -54,18 +59,22 @@ impl<'a> Explanation<'a> {
 
 fn format_rule_text(rule: Rule) -> String {
     let mut output = String::new();
-    let _ = write!(&mut output, "# {} ({})", rule.name(), rule.noqa_code());
+    let _ = write!(&mut output, "# {}", rule.name_and_code());
     output.push('\n');
     output.push('\n');
 
-    let (linter, _) = Linter::parse_code(&rule.noqa_code().to_string()).unwrap();
-    let _ = write!(
-        &mut output,
-        "Derived from the **{}** linter.",
-        linter.name()
-    );
-    output.push('\n');
-    output.push('\n');
+    if let Some(linter) = rule
+        .noqa_code()
+        .and_then(|code| Linter::parse_code(&code.to_string()).map(|(linter, _)| linter))
+    {
+        let _ = write!(
+            &mut output,
+            "Derived from the **{}** linter.",
+            linter.name()
+        );
+        output.push('\n');
+        output.push('\n');
+    }
 
     let fix_availability = rule.fixable();
     if matches!(

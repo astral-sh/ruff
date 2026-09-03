@@ -3,6 +3,7 @@ use ruff_source_file::{UniversalNewlineIterator, UniversalNewlines};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::docstrings::Docstring;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
@@ -45,7 +46,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// [PEP 257]: https://peps.python.org/pep-0257/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.68")]
+#[violation_metadata(stable_since = "v0.0.68", category = Category::Pedantic)]
 pub(crate) struct MissingBlankLineAfterSummary {
     num_lines: usize,
 }

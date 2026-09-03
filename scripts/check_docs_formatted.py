@@ -207,8 +207,8 @@ def format_contents(src: str) -> tuple[str, Sequence[CodeBlockError]]:
             code = format_str(code, extension)
         except InvalidInput as e:
             errors.append(CodeBlockError(e))
-        except NotImplementedError as e:
-            raise e
+        except NotImplementedError:
+            raise
 
         code = textwrap.indent(code, match["indent"])
         return f"{match['before']}{code}{match['after']}"

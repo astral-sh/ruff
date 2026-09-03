@@ -6,7 +6,7 @@ use ruff_db::{
 };
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::{self as ast, PythonVersion, name::Name};
-use ruff_text_size::{Ranged, TextRange, TextSize};
+use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 
 use crate::{
@@ -389,11 +389,11 @@ pub(crate) fn check_static_class_definitions<'db>(
                     );
                     if let ast::Expr::Subscript(node) = node {
                         let source = source_text(db, context.file());
-                        let type_params_range = TextRange::new(
-                            type_params.start().saturating_add(TextSize::new(1)),
-                            type_params.end().saturating_sub(TextSize::new(1)),
-                        );
-                        if source[node.slice.range()] == source[type_params_range] {
+                        // The parser can recover a type parameter list without a closing bracket.
+                        if let Some(type_params) = source[type_params.range()].strip_prefix('[')
+                            && let Some(type_params) = type_params.strip_suffix(']')
+                            && type_params == &source[node.slice.range()]
+                        {
                             diagnostic.help("Remove the type parameters from the `Protocol` base");
                             diagnostic.set_fix(Fix::unsafe_edit(Edit::range_deletion(
                                 TextRange::new(node.value.end(), node.end()),
@@ -415,8 +415,9 @@ pub(crate) fn check_static_class_definitions<'db>(
                             if declared_variance == TypeVarVariance::Invariant {
                                 return None;
                             }
-                            let required_variance =
-                                base_alias.variance_of(db, env, typevar.identity(db));
+                            let required_variance = base_alias
+                                .variance_of(db, env, typevar.identity(db))
+                                .evaluate(db);
                             if declared_variance.join(required_variance) != declared_variance {
                                 Some((typevar, declared_variance, required_variance))
                             } else {
@@ -841,7 +842,8 @@ pub(crate) fn check_static_class_definitions<'db>(
                 .ignore_possibly_undefined();
 
             if let Some(init_subclass) = init_subclass_type {
-                let call_args = call_args.with_self(Some(Type::from(class)));
+                let call_args =
+                    call_args.with_self(Some(Type::from(class.identity_specialization(db))));
                 if let Err(call_error) = init_subclass.try_call(db, env, &call_args) {
                     report_subclass_of_class_with_non_callable_init_subclass(
                         context, call_error, class, class_node,
@@ -1142,6 +1144,7 @@ pub(crate) fn check_static_class_definitions<'db>(
 
     if let Some(protocol) = class.into_protocol_class(db) {
         protocol.validate_members(context);
+        protocol.validate_type_parameter_variance(context);
     }
 
     if class.is_typed_dict(db) {

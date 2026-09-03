@@ -5,6 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for functions or methods with too many nested blocks.
@@ -19,7 +20,7 @@ use crate::checkers::ast::Checker;
 /// ## Options
 /// - `lint.pylint.max-nested-blocks`
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.1.15")]
+#[violation_metadata(preview_since = "v0.1.15", category = Category::Pedantic)]
 pub(crate) struct TooManyNestedBlocks {
     nested_blocks: usize,
     max_nested_blocks: usize,

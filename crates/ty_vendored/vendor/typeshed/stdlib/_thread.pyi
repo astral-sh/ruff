@@ -60,7 +60,9 @@ class RLock:
     __enter__ = acquire
     """Lock the lock."""
 
-    def __exit__(self, t: type[BaseException] | None, v: BaseException | None, tb: TracebackType | None) -> None:
+    def __exit__(
+        self, exc_type: type[BaseException] | None, exc_value: BaseException | None, exc_tb: TracebackType | None, /
+    ) -> None:
         """Release the lock."""
 
     if sys.version_info >= (3, 14):
@@ -142,7 +144,7 @@ if sys.version_info >= (3, 13):
             """Lock the lock."""
 
         def __exit__(
-            self, type: type[BaseException] | None, value: BaseException | None, traceback: TracebackType | None
+            self, exc_type: type[BaseException] | None, exc_value: BaseException | None, exc_tb: TracebackType | None, /
         ) -> None:
             """Release the lock."""
 

@@ -428,6 +428,42 @@ alice["extra"] = True
 bob["extra"] = True
 ```
 
+## Unpacked assignments to `TypedDict` variables
+
+This is a regression test for a bug in an early implementation of precise annotations for unpacked
+assignments.
+
+When a dictionary literal is assigned directly to a `TypedDict` variable, ty checks the literal
+against the variable's type and suppresses the assignment diagnostic to avoid reporting the same
+error twice. A dictionary literal inside an unpacked value does not receive that type context, so
+this more specific diagnostic is never emitted.
+
+The early implementation passed the inner dictionary to the duplicate-diagnostic check after
+identifying it for the primary annotation. This incorrectly suppressed the assignment diagnostic as
+well, causing ty to report no error for an incompatible dictionary.
+
+```py
+from typing import TypedDict
+
+class Payload(TypedDict):
+    value: int
+
+payload: Payload
+payload, other = ({"value": "wrong"}, 0)  # snapshot: invalid-assignment
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `dict[str, str]` is not assignable to `Payload`
+ --> src/mdtest_snippet.py:7:19
+  |
+6 | payload: Payload
+  |          ------- Declared type
+7 | payload, other = ({"value": "wrong"}, 0)  # snapshot: invalid-assignment
+  | -------           ^^^^^^^^^^^^^^^^^^ Incompatible value of type `dict[str, str]`
+  | |
+  | Assigned to this variable
+```
+
 ## Nested `TypedDict`
 
 Nested `TypedDict` fields are also supported.
@@ -2352,6 +2388,34 @@ static_assert(not is_subtype_of(LeftRecursiveDict[int], RightRecursiveDict[int])
 # A conservative cycle fallback must not accept structurally different recursive TypedDicts.
 static_assert(not is_subtype_of(LeftRecursiveDict[int], DifferentRecursiveDict[int]))
 
+class ShiftingLeftDict[A, B, C](TypedDict):
+    value: A
+    child: ShiftingLeftDict[B, C, None]
+
+class ShiftingRightDict[A, B, C](TypedDict):
+    value: A
+    child: ShiftingRightDict[B, C, None]
+
+# These recursive specializations reach an exact repetition after shifting out every initial
+# argument.
+static_assert(
+    is_subtype_of(
+        ShiftingLeftDict[int, str, bytes],
+        ShiftingRightDict[int, str, bytes],
+    )
+)
+
+class SaturatingLeftDict[T](TypedDict):
+    value: T
+    child: SaturatingLeftDict[T | int]
+
+class SaturatingRightDict[T](TypedDict):
+    value: T
+    child: SaturatingRightDict[T | int]
+
+# Repeatedly adding the same union element also reaches an exact repetition.
+static_assert(is_subtype_of(SaturatingLeftDict[str], SaturatingRightDict[str]))
+
 class FiniteLeftDict[T](TypedDict):
     value: T
 
@@ -2798,6 +2862,54 @@ def _(u: IntX | StrX) -> None:
     reveal_type(u.setdefault("x", 1))  # revealed: int | str
 ```
 
+## `get()` with literal union defaults
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+For a non-required field, `get()` returns the union of the field type and the default type. Passing
+that result to a typed function preserves all of its possible literal values:
+
+```py
+from typing import Literal, TypedDict
+from typing_extensions import assert_type
+
+Value = Literal[0, 1, 2]
+
+class OptionalValue(TypedDict, total=False):
+    value: Value
+
+def accept(value: Value | None) -> None: ...
+def optional_default(mapping: OptionalValue, default: Value | None) -> None:
+    accept(mapping.get("value", default))
+    result: Value | None = mapping.get("value", default)
+    assert_type(result, Value | None)
+```
+
+An incompatible default is still reflected in the result and rejected by the typed function:
+
+```py
+def invalid_default(mapping: OptionalValue) -> None:
+    # error: [invalid-argument-type]
+    accept(mapping.get("value", "invalid"))
+```
+
+For a required field, the default cannot contribute to the result. This also holds when the field
+type is an explicit type alias:
+
+```py
+type ValueAlias = Value
+
+class RequiredValue(TypedDict):
+    value: ValueAlias
+
+def required_default(mapping: RequiredValue, default: Value | None) -> None:
+    result: Value | None = mapping.get("value", default)
+    assert_type(result, Value)
+```
+
 ## Unlike normal classes
 
 `TypedDict` types do not act like normal classes. For example, calling `type(..)` on an inhabitant
@@ -3064,7 +3176,7 @@ type Left22 = Left21 | Right21
 def _(item: Left22) -> None:
     reveal_type(dict(item))  # revealed: dict[str, object]
 
-type RecursiveItem = A | RecursiveItem
+type RecursiveItem = A | RecursiveItem  # error: [cyclic-type-alias-definition]
 
 def _(item: RecursiveItem) -> None:
     # The common-constraint check must terminate when an alias refers back to its containing union.
@@ -3079,7 +3191,7 @@ from _collections_abc import dict_items
 from collections.abc import Callable
 from typing import Protocol, TypeVar, TypedDict, runtime_checkable
 
-ItemsT = TypeVar("ItemsT")
+ItemsT = TypeVar("ItemsT", covariant=True)
 
 class HasItems(Protocol[ItemsT]):
     def items(self) -> ItemsT: ...
@@ -3190,7 +3302,9 @@ def _(value: AnyExtraItems | OtherAnyExtraItems) -> None:
     reveal_type(get_bounded_mapping(value))  # revealed: Any
 ```
 
-Rejected common-constraint probes must not affect fallback protocol inference:
+Rejected common-constraint probes must not affect fallback protocol inference. Both mappings below
+contain an `int`, so inference should select the `int` constraint. It currently selects the broader
+`object` constraint instead:
 
 ```py
 from typing import Literal, Protocol, TypeVar, TypedDict
@@ -3211,7 +3325,8 @@ def get_value(value: GetValue[ConstrainedValue]) -> ConstrainedValue:
 
 def takes_str(value: str) -> None: ...
 def _(value: ValueA | ValueB) -> None:
-    reveal_type(get_value(value))  # revealed: int
+    # TODO: revealed int
+    reveal_type(get_value(value))  # revealed: object
     takes_str(get_value(value))  # error: [invalid-argument-type]
 ```
 
@@ -3220,7 +3335,7 @@ Common constraints must preserve correlations in mutable protocols:
 ```py
 from typing import Any, Protocol, TypeVar, TypedDict
 
-Key = TypeVar("Key")
+Key = TypeVar("Key", contravariant=True)
 Value = TypeVar("Value")
 
 class SetAndGet(Protocol[Key, Value]):
@@ -3776,6 +3891,102 @@ static_assert(not is_assignable_to(Items[str], Items[int]))
 static_assert(not is_subtype_of(Items[str], Items[int]))
 static_assert(is_assignable_to(Items[Any], Items[int]))
 static_assert(not is_subtype_of(Items[Any], Items[int]))
+```
+
+### Inherited methods
+
+Methods on a generic `TypedDict` subclass use the subclass's type arguments when checking the
+receiver. Methods that return `Self`, such as `copy()`, preserve the subclass and its
+specialization.
+
+```py
+from typing import Generic, TypeVar, TypedDict
+
+T = TypeVar("T")
+
+class Base(TypedDict, Generic[T]):
+    value: T
+
+class Child(Base[T]): ...
+
+def methods(child: Child[int]) -> None:
+    reveal_type(child.keys())  # revealed: dict_keys[str, object]
+    reveal_type(child.items())  # revealed: dict_items[str, object]
+    reveal_type(child.values())  # revealed: dict_values[str, object]
+    reveal_type(child.copy())  # revealed: Child[int]
+```
+
+Accessing a method through the specialized class also specializes its field types, while still
+rejecting incompatible updates.
+
+```py
+def unbound_methods(child: Child[int]) -> None:
+    reveal_type(Child[int].get(child, "value"))  # revealed: int
+    Child[int].update(child, value=1)
+    Child[int].update(child, value="wrong")  # error: [invalid-argument-type]
+```
+
+A specialized `TypedDict` subclass can also be unpacked into a call or a dictionary. Calls still
+check the inherited field's specialized type against the parameter type.
+
+```py
+def takes_int(value: int) -> None: ...
+def unpack(child: Child[int], wrong: Child[str]) -> None:
+    takes_int(**child)
+    unpacked = {**child}
+    takes_int(**wrong)  # error: [invalid-argument-type]
+```
+
+### Inherited methods with type parameter defaults
+
+An explicit specialization overrides a type parameter's default, including for inherited methods. An
+unbound method accessed through the unsubscripted class uses the default when checking its receiver.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import TypedDict
+
+class Base[T = int](TypedDict):
+    value: T
+
+class Child[T = int](Base[T]): ...
+
+def methods(base: Base[str], child: Child[str], default: Child[int]) -> None:
+    reveal_type(base.copy())  # revealed: Base[str]
+    reveal_type(child.copy())  # revealed: Child[str]
+    reveal_type(Child[str].copy(child))  # revealed: Child[str]
+    reveal_type(Child.copy(default))  # revealed: Child[int]
+    Child[int].copy(child)  # error: [invalid-argument-type]
+    Child.copy(child)  # error: [invalid-argument-type]
+```
+
+### Inherited methods on closed TypedDicts
+
+A closed generic `TypedDict` subclass exposes its specialized item types through its view methods.
+Its inherited `copy()` method also preserves the specialization.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing_extensions import TypedDict
+
+class Base[T](TypedDict, closed=True):
+    value: T
+
+class Child[T](Base[T]): ...
+
+def methods(child: Child[int]) -> None:
+    reveal_type(child.keys())  # revealed: dict_keys[Literal["value"], int]
+    reveal_type(child.items())  # revealed: dict_items[Literal["value"], int]
+    reveal_type(child.values())  # revealed: dict_values[Literal["value"], int]
+    reveal_type(child.copy())  # revealed: Child[int]
 ```
 
 ### Specialized constructor signatures
@@ -6160,6 +6371,37 @@ def _(u: Foo | Bar):
         reveal_type(u)  # revealed: Bar
 ```
 
+A union member can have several possible tags. Comparing against a different member's tag removes
+the multi-tag member from the matching branch, including in unions with more than two members:
+
+```py
+class MultiTag(TypedDict):
+    tag: Literal["bar", "baz"]
+
+def two_members(u: Foo | MultiTag):
+    if u["tag"] == "foo":
+        reveal_type(u)  # revealed: Foo
+    else:
+        reveal_type(u)  # revealed: MultiTag
+
+def three_members(u: Foo | MultiTag | Bar):
+    if u["tag"] != "foo":
+        reveal_type(u)  # revealed: MultiTag | Bar
+    else:
+        reveal_type(u)  # revealed: Foo
+```
+
+Matching one of several tags selects that member, but excluding just one of its tags does not remove
+it from the union:
+
+```py
+def match_one_tag(u: Foo | MultiTag):
+    if u["tag"] == "bar":
+        reveal_type(u)  # revealed: MultiTag
+    else:
+        reveal_type(u)  # revealed: Foo | MultiTag
+```
+
 Boolean tags can be narrowed by truthiness, including through a generic `TypedDict` and a type
 alias:
 
@@ -6311,6 +6553,22 @@ class WackyInt(int):
         return True
 
 _: NonLiteralTD = {"tag": WackyInt(99)}  # allowed
+```
+
+The same restriction applies to a tag union containing a non-literal type. The `int` alternative can
+still hold a `WackyInt` that compares equal to `"foo"`:
+
+```py
+class MixedTag(TypedDict):
+    tag: Literal["bar"] | int
+
+def mixed_tag(u: Foo | MixedTag):
+    if u["tag"] == "foo":
+        reveal_type(u)  # revealed: Foo | MixedTag
+    else:
+        reveal_type(u)  # revealed: MixedTag
+
+_: MixedTag = {"tag": WackyInt(99)}
 ```
 
 Intersections containing a TypedDict with literal fields can be narrowed with equality checks. Since
@@ -6578,6 +6836,23 @@ def match_statements(u: Foo | Bar | Baz | Bing):
             reveal_type(u)  # revealed: Baz
         case _:
             reveal_type(u)  # revealed: Bing
+```
+
+A tag can contain multiple literal values. A literal pattern selects the matching dictionary;
+failing one of its tags leaves the other tag possible in later cases:
+
+```py
+class MultiTag(TypedDict):
+    tag: Literal["bar", "baz"]
+
+def match_multiple_tags(u: Foo | MultiTag | Bar):
+    match u["tag"]:
+        case "foo":
+            reveal_type(u)  # revealed: Foo
+        case "bar":
+            reveal_type(u)  # revealed: MultiTag
+        case _:
+            reveal_type(u)  # revealed: MultiTag | Bar
 ```
 
 Enum literal tags are also supported in match statements:

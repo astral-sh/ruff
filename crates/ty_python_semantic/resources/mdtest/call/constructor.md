@@ -76,6 +76,17 @@ reveal_type(Foo())  # revealed: Foo
 reveal_type(Foo(1, 2))  # revealed: Foo
 ```
 
+When `__new__` is a lambda with an unknown return type, constructor calls still infer the class
+instance type:
+
+```py
+class LambdaNew:
+    __new__ = lambda cls: object.__new__(cls)
+
+reveal_type(LambdaNew())  # revealed: LambdaNew
+LambdaNew().missing_attribute  # error: [unresolved-attribute]
+```
+
 ## `__new__` with an invalid decorator and unresolved return annotation
 
 Regression test for <https://github.com/astral-sh/ty/issues/3470>.

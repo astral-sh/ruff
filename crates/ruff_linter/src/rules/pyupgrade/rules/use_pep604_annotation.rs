@@ -8,7 +8,7 @@ use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::codes::Rule;
+use crate::codes::{Category, Rule};
 use crate::fix::edits::pad;
 use crate::preview::is_pep604_future_annotations_fix_enabled;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
@@ -64,7 +64,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// [PEP 604]: https://peps.python.org/pep-0604/
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.155")]
+#[violation_metadata(stable_since = "v0.0.155", category = Category::Style)]
 pub(crate) struct NonPEP604AnnotationUnion;
 
 impl Violation for NonPEP604AnnotationUnion {
@@ -128,7 +128,7 @@ impl Violation for NonPEP604AnnotationUnion {
 /// [PEP 604]: https://peps.python.org/pep-0604/
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.12.0")]
+#[violation_metadata(stable_since = "0.12.0", category = Category::Style)]
 pub(crate) struct NonPEP604AnnotationOptional;
 
 impl Violation for NonPEP604AnnotationOptional {

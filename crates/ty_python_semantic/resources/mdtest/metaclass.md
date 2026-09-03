@@ -1019,6 +1019,32 @@ reveal_type(D)  # revealed: <class 'D'>
 reveal_type(D.__class__)  # revealed: <class 'SignatureMismatch'>
 ```
 
+## Metaclass bounds
+
+With a metaclass annotated as `type[Meta]`, the resulting class and its subclasses are instances of
+`Meta`, and therefore of `type`. Matching a `type[C]` value against `type()` is exhaustive, but
+returning it as `int` is invalid.
+
+```py
+from typing_extensions import assert_never
+
+class Meta(type): ...
+
+def _(meta: type[Meta]):
+    class C(metaclass=meta): ...
+
+    def check(cls: type[C]) -> None:
+        reveal_type(cls.__class__)  # revealed: type[Meta]
+        match cls:
+            case type():
+                pass
+            case _:
+                assert_never(cls)
+
+    def as_int(cls: type[C]) -> int:
+        return cls  # error: [invalid-return-type]
+```
+
 ## Diagnostic range
 
 ```py

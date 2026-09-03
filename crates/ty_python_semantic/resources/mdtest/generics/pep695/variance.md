@@ -411,6 +411,161 @@ static_assert(is_subtype_of(Covariant[int], Covariant[object]))
 static_assert(not is_subtype_of(Covariant[object], Covariant[int]))
 ```
 
+## Nested nonrecursive protocols
+
+Using a generic protocol inside another specialization of the same protocol is not a recursive
+definition, including through a type alias. The nested `Reader` specializations do not prevent
+structural variance inference for `Source`: its writable `_value` attribute makes it invariant.
+Returning `Source[T]` from a nominal wrapper preserves that invariance.
+
+```py
+from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+class Reader[T](Protocol):
+    def read(self) -> T: ...
+
+type NestedReader[T] = Reader[Reader[T]]
+
+class Source[T](Protocol):
+    _value: T
+
+    def reader(self) -> NestedReader[T]: ...
+
+class Wrapper[T]:
+    def source(self) -> Source[T]:
+        raise NotImplementedError
+
+static_assert(not is_subtype_of(Wrapper[int], Wrapper[object]))
+static_assert(not is_subtype_of(Wrapper[object], Wrapper[int]))
+```
+
+## Recursive protocol variance
+
+A recursive protocol that only produces its type parameter is covariant. Returning that protocol
+from a nominal class preserves covariance.
+
+```py
+from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+class Reader[T](Protocol):
+    def read(self) -> T: ...
+    def next(self) -> "Reader[T]": ...
+
+class Source[T]:
+    def reader(self) -> Reader[T]:
+        raise NotImplementedError
+
+static_assert(is_subtype_of(Source[int], Source[object]))
+static_assert(not is_subtype_of(Source[object], Source[int]))
+```
+
+A recursive protocol that consumes its type parameter is contravariant, even when it also returns
+another instance of itself.
+
+```py
+class Writer[T](Protocol):
+    def write(self, value: T) -> None: ...
+    def next(self) -> "Writer[T]": ...
+
+class Sink[T]:
+    def writer(self) -> Writer[T]:
+        raise NotImplementedError
+
+static_assert(is_subtype_of(Sink[object], Sink[int]))
+static_assert(not is_subtype_of(Sink[int], Sink[object]))
+```
+
+Writable attributes make recursive protocols invariant, including underscore-prefixed attributes.
+
+```py
+class Writable[T](Protocol):
+    _value: T
+
+    def next(self) -> "Writable[T]": ...
+
+class Wrapper[T]:
+    def value(self) -> Writable[T]:
+        raise NotImplementedError
+
+static_assert(not is_subtype_of(Wrapper[int], Wrapper[object]))
+static_assert(not is_subtype_of(Wrapper[object], Wrapper[int]))
+```
+
+## Recursive protocol variance with annotated receivers
+
+An explicit receiver annotation does not make a bound method consume its type parameter. `Reader`
+remains covariant when its interface also recurses through the return type of `next`, and returning
+that protocol from `Source` preserves covariance.
+
+```py
+from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+class Reader[T](Protocol):
+    def read(self: "Reader[T]") -> T: ...
+    def next(self) -> "Reader[T]": ...
+
+class Source[T]:
+    def reader(self) -> Reader[T]:
+        raise NotImplementedError
+
+static_assert(is_subtype_of(Source[int], Source[object]))
+static_assert(not is_subtype_of(Source[object], Source[int]))
+```
+
+## Expanding recursive protocol variance
+
+Variance inference terminates when a recursive reference changes the specialization. The mutable
+list in `next` makes `Node` invariant, even though `read` produces `T` directly.
+
+```py
+from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+class Node[T](Protocol):
+    def read(self) -> T: ...
+    def next(self) -> "Node[list[T]]": ...
+
+class Wrapper[T]:
+    def node(self) -> Node[T]:
+        raise NotImplementedError
+
+static_assert(not is_subtype_of(Wrapper[int], Wrapper[object]))
+static_assert(not is_subtype_of(Wrapper[object], Wrapper[int]))
+```
+
+## Mutually recursive protocol variance
+
+A writable attribute constrains every protocol in a recursive cycle. Here, `Left` is invariant
+because it returns a `Right` whose `_value` attribute can be mutated.
+
+```py
+from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+class Left[T](Protocol):
+    def right(self) -> "Right[T]": ...
+
+class Right[T](Protocol):
+    _value: T
+
+    def left(self) -> Left[T]: ...
+
+class Wrapper[T]:
+    def left(self) -> Left[T]:
+        raise NotImplementedError
+
+static_assert(not is_subtype_of(Wrapper[int], Wrapper[object]))
+static_assert(not is_subtype_of(Wrapper[object], Wrapper[int]))
+```
+
 ## Mutual Recursion
 
 This example due to Martin Huschenbett's PyCon 2025 talk,
@@ -536,6 +691,56 @@ static_assert(not is_subtype_of(DescriptorOwner[B], DescriptorOwner[A]))
 static_assert(not is_subtype_of(DescriptorOwner[A], DescriptorOwner[B]))
 ```
 
+### Mutable protocol attributes
+
+Underscore-prefixed protocol attributes remain writable through their structural interface, so their
+inferred type parameters are invariant.
+
+```py
+from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to, is_subtype_of
+
+class WritableProtocol[T](Protocol):
+    _value: T
+
+static_assert(not is_subtype_of(WritableProtocol[int], WritableProtocol[object]))
+static_assert(not is_assignable_to(WritableProtocol[int], WritableProtocol[object]))
+
+def overwrite(value: WritableProtocol[object]) -> None:
+    value._value = object()
+
+def unsound(value: WritableProtocol[int]) -> None:
+    overwrite(value)  # error: [invalid-argument-type]
+```
+
+### Mutable protocol attributes with unrelated protocol members
+
+An unrelated protocol in a member type does not change the invariance of a writable attribute. A
+class that returns this protocol is also invariant, preventing callers from mutating `_value`
+through a wider specialization.
+
+```py
+from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to, is_subtype_of
+
+class Marker(Protocol):
+    def ready(self) -> bool: ...
+
+class WritableProtocol[T](Protocol):
+    _value: T
+
+    def marker(self) -> Marker: ...
+
+class Wrapper[T]:
+    def value(self) -> WritableProtocol[T]:
+        raise NotImplementedError
+
+static_assert(not is_subtype_of(Wrapper[int], Wrapper[object]))
+static_assert(not is_assignable_to(Wrapper[int], Wrapper[object]))
+```
+
 ### Immutable Attributes
 
 Immutable attributes can't be written to, and thus constrain the typevar to covariance, not
@@ -556,6 +761,44 @@ class C[T]:
 
 static_assert(is_subtype_of(C[B], C[A]))
 static_assert(not is_subtype_of(C[A], C[B]))
+```
+
+#### Final attributes in stubs
+
+Stub attributes declared as `Final` are read-only, whether their declarations omit an initializer or
+use an ellipsis placeholder. A type parameter used only in such an attribute is covariant, while one
+used in an ordinary writable attribute is invariant.
+
+`box.pyi`:
+
+```pyi
+from typing import Final
+
+class Box[T]:
+    value: Final[T]
+
+class BoxWithPlaceholder[T]:
+    value: Final[T] = ...
+
+class MutableBox[T]:
+    value: T
+```
+
+`main.py`:
+
+```py
+from box import Box, BoxWithPlaceholder, MutableBox
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+static_assert(is_subtype_of(Box[int], Box[object]))
+static_assert(not is_subtype_of(Box[object], Box[int]))
+
+static_assert(is_subtype_of(BoxWithPlaceholder[int], BoxWithPlaceholder[object]))
+static_assert(not is_subtype_of(BoxWithPlaceholder[object], BoxWithPlaceholder[int]))
+
+static_assert(not is_subtype_of(MutableBox[int], MutableBox[object]))
+static_assert(not is_subtype_of(MutableBox[object], MutableBox[int]))
 ```
 
 #### Underscore-prefixed attributes
@@ -1074,6 +1317,254 @@ static_assert(is_subtype_of(C[B], C[A]))
 static_assert(not is_subtype_of(C[A], C[B]))
 static_assert(is_assignable_to(C[B], C[A]))
 static_assert(not is_assignable_to(C[A], C[B]))
+```
+
+## Typed dictionaries
+
+### Mutable items
+
+A mutable `TypedDict` item can be read and written, so returning a `TypedDict` with an item of type
+`T` makes the enclosing class invariant in `T`.
+
+```py
+from typing import TypedDict
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+class Item[T](TypedDict):
+    value: T
+
+class Producer[T]:
+    def get(self) -> Item[T]:
+        raise NotImplementedError
+
+static_assert(not is_subtype_of(Producer[bool], Producer[int]))
+static_assert(not is_subtype_of(Producer[int], Producer[bool]))
+```
+
+Optional items are still mutable, including items whose names start with an underscore.
+
+```py
+from typing import NotRequired
+
+class OptionalItem[T](TypedDict):
+    _value: NotRequired[T]
+
+class OptionalProducer[T]:
+    def get(self) -> OptionalItem[T]:
+        raise NotImplementedError
+
+static_assert(not is_subtype_of(OptionalProducer[bool], OptionalProducer[int]))
+static_assert(not is_subtype_of(OptionalProducer[int], OptionalProducer[bool]))
+```
+
+### Read-only items
+
+A read-only item is covariant in its value type. Returning this `TypedDict` makes a class covariant,
+while accepting it as a method argument makes a class contravariant. An unrelated mutable item does
+not affect the variance of `T`.
+
+```py
+from typing_extensions import ReadOnly, TypedDict
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+class Item[T](TypedDict):
+    value: ReadOnly[T]
+    tag: str
+
+class Producer[T]:
+    def get(self) -> Item[T]:
+        raise NotImplementedError
+
+class Consumer[T]:
+    def put(self, item: Item[T]) -> None: ...
+
+static_assert(is_subtype_of(Producer[bool], Producer[int]))
+static_assert(not is_subtype_of(Producer[int], Producer[bool]))
+static_assert(is_subtype_of(Consumer[int], Consumer[bool]))
+static_assert(not is_subtype_of(Consumer[bool], Consumer[int]))
+```
+
+### Nested item types
+
+Read-only items preserve the variance of their value types. A callable's argument and return types
+contribute opposite variances; using the same type variable in both positions makes it invariant.
+
+```py
+from typing import Callable
+from typing_extensions import ReadOnly, TypedDict
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+class Callback[P, R](TypedDict):
+    callback: ReadOnly[Callable[[P], R]]
+
+class Consumer[T]:
+    def get(self) -> Callback[T, None]:
+        raise NotImplementedError
+
+class Transformer[T]:
+    def get(self) -> Callback[T, T]:
+        raise NotImplementedError
+
+static_assert(is_subtype_of(Consumer[int], Consumer[bool]))
+static_assert(not is_subtype_of(Consumer[bool], Consumer[int]))
+static_assert(not is_subtype_of(Transformer[bool], Transformer[int]))
+static_assert(not is_subtype_of(Transformer[int], Transformer[bool]))
+```
+
+### Inherited items
+
+Inherited items contribute variance after applying the base class's specialization. Although the
+item itself is read-only, the list it contains is mutable, making the enclosing class invariant.
+
+```py
+from typing_extensions import ReadOnly, TypedDict
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+class Base[T](TypedDict):
+    value: ReadOnly[T]
+
+class Derived[T](Base[list[T]]): ...
+
+class Producer[T]:
+    def get(self) -> Derived[T]:
+        raise NotImplementedError
+
+static_assert(not is_subtype_of(Producer[bool], Producer[int]))
+static_assert(not is_subtype_of(Producer[int], Producer[bool]))
+```
+
+### Legacy type variables
+
+When a `TypedDict` appears in another generic class, its legacy type variables contribute their
+declared variance to the enclosing class's inferred variance, just as they do for protocols. An
+invariant legacy type variable makes the enclosing consumer invariant even when the item is
+read-only; a covariant legacy type variable makes the consumer contravariant even when the item is
+mutable.
+
+```py
+from typing import Generic, TypeVar
+from typing_extensions import ReadOnly, TypedDict
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+T_co = TypeVar("T_co", covariant=True)
+T = TypeVar("T")
+
+class InvariantItem(TypedDict, Generic[T]):
+    # TODO: The variance rules specified for Protocol would suggest an error here: T is
+    # declared invariant but used covariantly. The conformance suite does not specify this
+    # check for TypedDicts, and other type checkers do not implement it.
+    value: ReadOnly[T]
+
+class CovariantItem(TypedDict, Generic[T_co]):
+    # TODO: The variance rules specified for Protocol would suggest an error here: T_co is
+    # declared covariant but used invariantly. The conformance suite does not specify this
+    # check for TypedDicts, and other type checkers do not implement it.
+    value: T_co
+
+class InvariantConsumer[T]:
+    def put(self, item: InvariantItem[T]) -> None: ...
+
+class ContravariantConsumer[T]:
+    def put(self, item: CovariantItem[T]) -> None: ...
+
+static_assert(not is_subtype_of(InvariantConsumer[bool], InvariantConsumer[int]))
+static_assert(not is_subtype_of(InvariantConsumer[int], InvariantConsumer[bool]))
+static_assert(is_subtype_of(ContravariantConsumer[int], ContravariantConsumer[bool]))
+static_assert(not is_subtype_of(ContravariantConsumer[bool], ContravariantConsumer[int]))
+```
+
+### Extra items
+
+Extra items contribute variance just like named items, including when inherited. Mutable extra items
+are invariant in their value type, while read-only extra items are covariant.
+
+```py
+from typing_extensions import ReadOnly, TypedDict
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+class MutableExtras[T](TypedDict, extra_items=T): ...
+class ReadOnlyExtras[T](TypedDict, extra_items=ReadOnly[T]): ...
+class InheritedExtras[T](ReadOnlyExtras[T]): ...
+
+class Producer[T]:
+    def get(self) -> MutableExtras[T]:
+        raise NotImplementedError
+
+class Consumer[T]:
+    def put(self, item: InheritedExtras[T]) -> None: ...
+
+static_assert(not is_subtype_of(Producer[bool], Producer[int]))
+static_assert(not is_subtype_of(Producer[int], Producer[bool]))
+static_assert(is_subtype_of(Consumer[int], Consumer[bool]))
+static_assert(not is_subtype_of(Consumer[bool], Consumer[int]))
+```
+
+### Functional syntax
+
+Items defined with functional syntax can refer to an enclosing class's type parameter. The item
+schema determines variance, including when it contains a recursive reference.
+
+```py
+from typing_extensions import ReadOnly, TypedDict
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+class Consumer[T]:
+    Item = TypedDict("Item", {"child": "ReadOnly[Item | None]", "value": ReadOnly[T]})
+
+    def put(self, item: Item) -> None: ...
+
+static_assert(is_subtype_of(Consumer[int], Consumer[bool]))
+static_assert(not is_subtype_of(Consumer[bool], Consumer[int]))
+```
+
+### Recursive items
+
+A recursive read-only item preserves covariance when every occurrence of the type variable is
+covariant. Accepting the recursive `TypedDict` as a method argument makes the class contravariant.
+
+```py
+from typing_extensions import ReadOnly, TypedDict
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+class Node[T](TypedDict):
+    child: ReadOnly["Node[T] | None"]
+    value: ReadOnly[T]
+
+class Consumer[T]:
+    def put(self, item: Node[T]) -> None: ...
+
+static_assert(is_subtype_of(Consumer[int], Consumer[bool]))
+static_assert(not is_subtype_of(Consumer[bool], Consumer[int]))
+```
+
+### Expanding recursive items
+
+Variance inference terminates even when a recursive item wraps the type argument in another type.
+Here the nested `list[T]` makes `T` invariant despite both items being read-only.
+
+```py
+from typing_extensions import ReadOnly, TypedDict
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+class Node[T](TypedDict):
+    child: ReadOnly["Node[list[T]] | None"]
+    value: ReadOnly[T]
+
+class Producer[T]:
+    def get(self) -> Node[T]:
+        raise NotImplementedError
+
+static_assert(not is_subtype_of(Producer[bool], Producer[int]))
+static_assert(not is_subtype_of(Producer[int], Producer[bool]))
 ```
 
 ## Type aliases

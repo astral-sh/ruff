@@ -10,6 +10,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::pylint::helpers::{
     is_dunder_operator_method, is_underscore_prefixed_public_member,
 };
@@ -58,7 +59,7 @@ use crate::rules::pylint::helpers::{
 /// ## References
 /// - [_What is the meaning of single or double underscores before an object name?_](https://stackoverflow.com/questions/1301346/what-is-the-meaning-of-single-and-double-underscore-before-an-object-name)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.240")]
+#[violation_metadata(stable_since = "v0.0.240", category = Category::Pedantic)]
 pub(crate) struct PrivateMemberAccess {
     access: String,
 }

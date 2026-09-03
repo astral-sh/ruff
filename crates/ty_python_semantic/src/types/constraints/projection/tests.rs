@@ -304,7 +304,7 @@ fn incomplete_solution_discards_the_projection() {
     for alternatives in [[int, str], [str, int]] {
         let set = binary_choice(db, &builder, t, alternatives);
         let choose = |_, bound: &PathBound<'_>| {
-            if bound.lower == Some(str) {
+            if bound.evidence_lower == Some(str) {
                 PathBoundSolution::BudgetExceeded {
                     fallback: Some(str),
                 }
@@ -372,7 +372,7 @@ fn rejected_exhausted_path_does_not_poison_valid_sibling() {
                 let choose = |_, bound: &PathBound<'_>| {
                     if bound.bound_typevar == u {
                         PathBoundSolution::Unsatisfiable
-                    } else if bound.lower == Some(str) {
+                    } else if bound.evidence_lower == Some(str) {
                         rejected_binding
                     } else {
                         PathBoundSolution::Solved(int)

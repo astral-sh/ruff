@@ -355,7 +355,7 @@ function useCheckResult(
     }
     // Monaco document edits mutate the workspace in place. The deferred
     // revision is an invalidation token for this memoized check.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react/exhaustive-deps
   }, [
     files,
     workspace,

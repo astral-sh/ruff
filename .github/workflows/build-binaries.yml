@@ -27,6 +27,7 @@ concurrency:
 permissions: {}
 
 env:
+  UV_LOCKED: 1
   ACTIONS_CACHE_MODE: none
   PACKAGE_NAME: ruff
   MODULE_NAME: ruff

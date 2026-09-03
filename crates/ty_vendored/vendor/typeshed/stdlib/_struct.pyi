@@ -32,14 +32,14 @@ from collections.abc import Iterator
 from typing import Any
 from typing_extensions import disjoint_base
 
-def pack(fmt: str | bytes, /, *v: Any) -> bytes:
+def pack(format: str | bytes, /, *values: Any) -> bytes:
     """Pack values and return the packed bytes.
 
     Return a bytes object containing the provided values packed according
     to the format string.  See help(struct) for more on format strings.
     """
 
-def pack_into(fmt: str | bytes, buffer: WriteableBuffer, offset: int, /, *v: Any) -> None:
+def pack_into(format: str | bytes, buffer: WriteableBuffer, offset: int, /, *values: Any) -> None:
     """Pack values and write the packed bytes into the buffer.
 
     Pack the provided values according to the format string and write the
@@ -91,7 +91,7 @@ class Struct:
         """struct size in bytes"""
 
     def __init__(self, format: str | bytes) -> None: ...
-    def pack(self, *v: Any) -> bytes:
+    def pack(self, *values: Any) -> bytes:
         """Pack values and return the packed bytes.
 
         Return a bytes object containing the provided values packed
@@ -99,7 +99,7 @@ class Struct:
         format strings.
         """
 
-    def pack_into(self, buffer: WriteableBuffer, offset: int, *v: Any) -> None:
+    def pack_into(self, buffer: WriteableBuffer, offset: int, /, *values: Any) -> None:
         """Pack values and write the packed bytes into the buffer.
 
         Pack the provided values according to the struct format string

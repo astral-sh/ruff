@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::linter::float::as_nan_float_string_literal;
 
 /// ## What it does
@@ -33,7 +34,7 @@ use crate::linter::float::as_nan_float_string_literal;
 ///     pass
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.12.0")]
+#[violation_metadata(stable_since = "0.12.0", category = Category::Correctness)]
 pub(crate) struct NanComparison {
     nan: Nan,
 }

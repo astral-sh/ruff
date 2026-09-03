@@ -6,6 +6,7 @@ use std::borrow::Cow;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::flake8_tidy_imports::matchers::{MatchName, MatchNameOrParent, NameMatchPolicy};
 
 /// ## What it does
@@ -43,7 +44,7 @@ use crate::rules::flake8_tidy_imports::matchers::{MatchName, MatchNameOrParent, 
 /// ## Options
 /// - `lint.flake8-tidy-imports.banned-module-level-imports`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.285")]
+#[violation_metadata(stable_since = "v0.0.285", category = Category::Restriction)]
 pub(crate) struct BannedModuleLevelImports {
     name: String,
 }

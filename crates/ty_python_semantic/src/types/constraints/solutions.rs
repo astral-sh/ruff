@@ -1,9 +1,10 @@
 use std::marker::PhantomData;
 use std::ops::ControlFlow;
 
+use crate::types::constraints::paths::PathAssignments;
 use crate::types::constraints::{
     ALWAYS_FALSE, ALWAYS_TRUE, ConstraintBoundsBuilder, ConstraintId, ConstraintSetStorage, NodeId,
-    PathAssignments, PathBounds, SolutionLimits,
+    PathBounds, SolutionLimits,
 };
 use crate::types::{BoundTypeVarInstance, Type};
 use crate::{Db, FxIndexMap, FxIndexSet, ProgramEnvironment};
@@ -113,23 +114,23 @@ impl<'db> SolutionWalker<'db> {
             for (constraint, _) in path {
                 let constraint = storage.constraint_data(constraint);
                 let typevar = constraint.typevar;
-                if let Some(lower) = constraint.bounds.lower {
+                if let Some(lower) = constraint.stored_lower_bound() {
                     let bounds = mappings.entry(typevar).or_default();
                     bounds.add_lower(db, env, lower);
 
-                    if let Type::TypeVar(lower_bound_typevar) = lower {
+                    if let Type::TypeVar(lower_bound_typevar) = lower.ty() {
                         let bounds = mappings.entry(lower_bound_typevar).or_default();
-                        bounds.add_upper(db, env, Type::TypeVar(typevar));
+                        bounds.add_upper(db, env, lower.with_type(Type::TypeVar(typevar)));
                     }
                 }
 
-                if let Some(upper) = constraint.bounds.upper {
+                if let Some(upper) = constraint.stored_upper_bound() {
                     let bounds = mappings.entry(typevar).or_default();
                     bounds.add_upper(db, env, upper);
 
-                    if let Type::TypeVar(upper_bound_typevar) = upper {
+                    if let Type::TypeVar(upper_bound_typevar) = upper.ty() {
                         let bounds = mappings.entry(upper_bound_typevar).or_default();
-                        bounds.add_lower(db, env, Type::TypeVar(typevar));
+                        bounds.add_lower(db, env, upper.with_type(Type::TypeVar(typevar)));
                     }
                 }
             }

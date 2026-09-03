@@ -7,6 +7,7 @@ use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Fix};
 use crate::{Applicability, Edit};
 
@@ -38,7 +39,7 @@ use crate::{Applicability, Edit};
 /// ## References
 /// - [Python documentation: Mapping Types](https://docs.python.org/3/library/stdtypes.html#mapping-types-dict)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.176")]
+#[violation_metadata(stable_since = "v0.0.176", category = Category::Complexity)]
 pub(crate) struct InDictKeys {
     operator: String,
 }

@@ -6,6 +6,7 @@ use ruff_python_ast::name::Name;
 use ruff_python_semantic::ScopeKind;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
@@ -33,7 +34,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## References
 /// - [Python documentation: Comparisons](https://docs.python.org/3/reference/expressions.html#comparisons)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.213")]
+#[violation_metadata(stable_since = "v0.0.213", category = Category::Complexity)]
 pub(crate) struct NegateEqualOp {
     left: String,
     right: String,
@@ -76,7 +77,7 @@ impl AlwaysFixableViolation for NegateEqualOp {
 /// ## References
 /// - [Python documentation: Comparisons](https://docs.python.org/3/reference/expressions.html#comparisons)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.213")]
+#[violation_metadata(stable_since = "v0.0.213", category = Category::Complexity)]
 pub(crate) struct NegateNotEqualOp {
     left: String,
     right: String,
@@ -114,7 +115,7 @@ impl AlwaysFixableViolation for NegateNotEqualOp {
 /// ## References
 /// - [Python documentation: Comparisons](https://docs.python.org/3/reference/expressions.html#comparisons)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.213")]
+#[violation_metadata(stable_since = "v0.0.213", category = Category::Complexity)]
 pub(crate) struct DoubleNegation {
     expr: String,
 }

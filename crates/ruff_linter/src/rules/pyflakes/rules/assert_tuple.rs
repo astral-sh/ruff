@@ -5,6 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for `assert` statements that use non-empty tuples as test
@@ -28,7 +29,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: The `assert` statement](https://docs.python.org/3/reference/simple_stmts.html#the-assert-statement)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.28")]
+#[violation_metadata(stable_since = "v0.0.28", category = Category::Correctness)]
 pub(crate) struct AssertTuple;
 
 impl Violation for AssertTuple {

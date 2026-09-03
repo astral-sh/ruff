@@ -4,6 +4,7 @@ use ruff_python_semantic::analyze::logging;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::flake8_logging::helpers::outside_handlers;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
@@ -69,7 +70,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// [The documentation]: https://docs.python.org/3/library/logging.html#logging.exception
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.16.0")]
+#[violation_metadata(stable_since = "0.16.0", category = Category::Pedantic)]
 pub(crate) struct LogExceptionOutsideExceptHandler;
 
 impl Violation for LogExceptionOutsideExceptHandler {

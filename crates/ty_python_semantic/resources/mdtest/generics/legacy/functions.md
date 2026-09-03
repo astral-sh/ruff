@@ -75,9 +75,10 @@ argument _explicitly_ implements the protocol by listing it as a base class.
 from typing import Protocol, TypeVar
 
 T = TypeVar("T")
+T_co = TypeVar("T_co", covariant=True)
 
-class CanIndex(Protocol[T]):
-    def __getitem__(self, index: int, /) -> T: ...
+class CanIndex(Protocol[T_co]):
+    def __getitem__(self, index: int, /) -> T_co: ...
 
 class ExplicitlyImplements(CanIndex[T]):
     def __getitem__(self, index: int, /) -> T:
@@ -320,6 +321,58 @@ def _(x: tuple[str, int], y: tuple[bool, ...], z: tuple[int, str, *tuple[range, 
 
 reveal_type(takes_homogeneous_tuple((42,)))  # revealed: Literal[42]
 reveal_type(takes_homogeneous_tuple((42, 43)))  # revealed: Literal[42, 43]
+```
+
+## Inferring tuple parameter types from unions
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+Every member of a union argument contributes to the inferred element type of a homogeneous tuple
+parameter. Different tuple lengths do not prevent inference, and an empty tuple contributes no
+element types.
+
+```py
+from typing import TypeVar
+
+class A: ...
+class B: ...
+class C: ...
+class D: ...
+
+T = TypeVar("T")
+
+def elements(values: tuple[T, ...]) -> tuple[T, ...]:
+    return values
+
+def _(
+    same: tuple[A, A] | tuple[A, A, A],
+    mixed: tuple[A] | tuple[B, B],
+    possibly_empty: tuple[()] | tuple[A, A],
+):
+    reveal_type(elements(same))  # revealed: tuple[A, ...]
+    reveal_type(elements(mixed))  # revealed: tuple[A | B, ...]
+    reveal_type(elements(possibly_empty))  # revealed: tuple[A, ...]
+```
+
+Fixed-length and mixed tuples infer type parameters from their corresponding element positions.
+
+```py
+U = TypeVar("U")
+
+def swap(values: tuple[U, T]) -> tuple[T, U]:
+    return values[1], values[0]
+
+def _(pairs: tuple[A, B] | tuple[C, D]):
+    reveal_type(swap(pairs))  # revealed: tuple[B | D, A | C]
+
+def tail(values: tuple[A, *tuple[T, ...]]) -> tuple[T, ...]:
+    return values[1:]
+
+def _(tails: tuple[A, B] | tuple[A, C, C]):
+    reveal_type(tail(tails))  # revealed: tuple[B | C, ...]
 ```
 
 ## Inferring a bound typevar
@@ -1111,6 +1164,71 @@ def f(x: str):
     NamedTemporaryFile(prefix=x, suffix=".tar.gz")  # Fine
 ```
 
+## Gradual bounds in generic union members
+
+A gradual bound does not prevent inference from an invariant union member: `str` satisfies `Any`,
+and `list[str]` satisfies `list[Any]`.
+
+```py
+from typing import Any, TypeVar
+
+class Other: ...
+
+T = TypeVar("T", bound=Any)
+
+def infer_any_bound(value: list[T] | Other) -> T:
+    raise NotImplementedError
+
+ListBoundT = TypeVar("ListBoundT", bound=list[Any])
+
+def infer_list_bound(value: list[ListBoundT] | Other) -> ListBoundT:
+    raise NotImplementedError
+
+reveal_type(infer_any_bound(list[str]()))  # revealed: str
+reveal_type(infer_list_bound(list[list[str]]()))  # revealed: list[str]
+```
+
+## Invalid bounds in generic union members
+
+An argument that violates a type variable's bound is rejected even when another union member is not
+disjoint from the argument. `list[object]` and `Other` can have a common subclass, but
+`list[object]` is not assignable to `Other`, and `object` does not satisfy the bound of `T`.
+
+```py
+from typing import TypeVar
+
+class Other: ...
+
+T = TypeVar("T", bound=str)
+
+def accept(value: list[T] | Other) -> None:
+    pass
+
+accept([])
+accept(["valid"])
+accept(Other())
+
+accept([object()])  # error: [invalid-argument-type] "does not satisfy upper bound `str`"
+accept([1])  # error: [invalid-argument-type] "does not satisfy upper bound `str`"
+```
+
+## Disjoint generic union members
+
+The `list[T]` member cannot match a string or `None`. Inference through the remaining `T` member
+rejects `None`, which satisfies neither of its constraints.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T", str, bytes)
+
+def accept(value: T | list[T]) -> None:
+    pass
+
+def _(value: str | None):
+    accept(value)  # error: [invalid-argument-type] "does not satisfy constraints"
+```
+
 ## Nested functions see typevars bound in outer function
 
 ```py
@@ -1294,6 +1412,15 @@ def list_caller(value: list[Any]) -> None:
     reveal_type(identity(value))  # revealed: int | list[int]
     reveal_type(choose(value, 1))  # revealed: int | list[int]
     reveal_type(choose(value, [1]))  # revealed: int | list[int]
+```
+
+The `Unknown` returned by a lambda without declared parameter types is also gradual evidence:
+
+```py
+lambda_identity = lambda value: value
+
+def lambda_caller(value: Any) -> None:
+    reveal_type(identity(lambda_identity(value)))  # revealed: Unknown
 ```
 
 ## Ambiguous constrained TypeVar inference from a gradual callable return

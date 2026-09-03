@@ -393,6 +393,35 @@ mod tests {
     }
 
     #[test]
+    fn signature_help_paramspec_classmethod_docstring() {
+        let test = cursor_test(
+            r#"
+        from typing import Callable
+
+        class Factory:
+            def __init__(self, value: int) -> None:
+                """Constructor documentation."""
+
+            @classmethod
+            def make[**P](cls: Callable[P, "Factory"], *args: P.args, **kwargs: P.kwargs) -> "Factory":
+                """Factory method documentation."""
+                return cls(*args, **kwargs)
+
+        Factory.make(<CURSOR>)
+        "#,
+        );
+
+        let documentation = test
+            .signature_help()
+            .and_then(|result| result.signatures.into_iter().next())
+            .and_then(|signature| signature.documentation);
+        assert_eq!(
+            documentation.as_ref().map(Docstring::render_plaintext),
+            Some("Factory method documentation.\n".to_string())
+        );
+    }
+
+    #[test]
     fn signature_help_nested_function_calls() {
         let test = cursor_test(
             r#"

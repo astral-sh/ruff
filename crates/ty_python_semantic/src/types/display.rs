@@ -146,7 +146,7 @@ pub struct DisplaySettings<'db> {
 
 impl<'db> DisplaySettings<'db> {
     #[must_use]
-    pub fn multiline(&self) -> Self {
+    fn multiline(&self) -> Self {
         Self {
             multiline: true,
             ..self.clone()
@@ -162,7 +162,7 @@ impl<'db> DisplaySettings<'db> {
     }
 
     #[must_use]
-    pub(crate) fn preserve_long_unions(self) -> Self {
+    fn preserve_long_unions(self) -> Self {
         Self {
             preserve_full_unions: true,
             ..self
@@ -182,7 +182,7 @@ impl<'db> DisplaySettings<'db> {
     }
 
     #[must_use]
-    pub(crate) fn disallow_signature_name(&self) -> Self {
+    fn disallow_signature_name(&self) -> Self {
         Self {
             signature_name_display: SignatureNameDisplay::Disallow,
             ..self.clone()
@@ -198,7 +198,7 @@ impl<'db> DisplaySettings<'db> {
     }
 
     #[must_use]
-    pub(crate) fn hide_return_type(&self) -> Self {
+    fn hide_return_type(&self) -> Self {
         Self {
             hide_return_type: true,
             ..self.clone()
@@ -652,7 +652,7 @@ impl<'db> Type<'db> {
         }
     }
 
-    pub fn display_with<'env>(
+    pub(crate) fn display_with<'env>(
         self,
         db: &'db dyn Db,
         env: &'env ProgramEnvironment<'db>,
@@ -2376,7 +2376,7 @@ impl<'db> Signature<'db> {
         )
     }
 
-    pub(crate) fn display_with<'a>(
+    fn display_with<'a>(
         &'a self,
         db: &'db dyn Db,
         env: &'a ProgramEnvironment<'db>,

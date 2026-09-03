@@ -5,6 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for `return` statements in `try`-`except` and `finally` blocks.
@@ -41,7 +42,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: Defining Clean-up Actions](https://docs.python.org/3/tutorial/errors.html#defining-clean-up-actions)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.211")]
+#[violation_metadata(stable_since = "v0.0.211", category = Category::Correctness)]
 pub(crate) struct ReturnInTryExceptFinally;
 
 impl Violation for ReturnInTryExceptFinally {

@@ -7,6 +7,7 @@ use ruff_python_ast::name::Name;
 use ruff_python_ast::token::parenthesized_range;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -37,7 +38,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: Truth Value Testing](https://docs.python.org/3/library/stdtypes.html#truth-value-testing)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.214")]
+#[violation_metadata(stable_since = "v0.0.214", category = Category::Complexity)]
 pub(crate) struct IfExprWithTrueFalse {
     is_compare: bool,
 }
@@ -86,7 +87,7 @@ impl Violation for IfExprWithTrueFalse {
 /// ## References
 /// - [Python documentation: Truth Value Testing](https://docs.python.org/3/library/stdtypes.html#truth-value-testing)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.214")]
+#[violation_metadata(stable_since = "v0.0.214", category = Category::Complexity)]
 pub(crate) struct IfExprWithFalseTrue;
 
 impl AlwaysFixableViolation for IfExprWithFalseTrue {
@@ -120,7 +121,7 @@ impl AlwaysFixableViolation for IfExprWithFalseTrue {
 /// ## References
 /// - [Python documentation: Truth Value Testing](https://docs.python.org/3/library/stdtypes.html#truth-value-testing)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.214")]
+#[violation_metadata(stable_since = "v0.0.214", category = Category::Pedantic)]
 pub(crate) struct IfExprWithTwistedArms {
     expr_body: String,
     expr_else: String,

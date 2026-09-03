@@ -4,6 +4,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for invalid use of literals in assert message arguments.
@@ -26,7 +27,7 @@ use crate::checkers::ast::Checker;
 /// assert len(fruits) == 2
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.10.0")]
+#[violation_metadata(stable_since = "0.10.0", category = Category::Suspicious)]
 pub(crate) struct InvalidAssertMessageLiteralArgument;
 
 impl Violation for InvalidAssertMessageLiteralArgument {

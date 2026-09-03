@@ -328,6 +328,18 @@ impl TokenKind {
         matches!(self, TokenKind::EndOfFile)
     }
 
+    /// Returns `true` if this is a dot token (`.`).
+    #[inline]
+    pub const fn is_dot(self) -> bool {
+        matches!(self, TokenKind::Dot)
+    }
+
+    /// Returns `true` if this is a left brace token (`{`).
+    #[inline]
+    pub const fn is_lbrace(self) -> bool {
+        matches!(self, TokenKind::Lbrace)
+    }
+
     /// Returns `true` if this is either a newline or non-logical newline token.
     #[inline]
     pub const fn is_any_newline(self) -> bool {

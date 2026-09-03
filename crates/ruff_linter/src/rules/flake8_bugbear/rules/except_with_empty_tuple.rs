@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for exception handlers that catch an empty tuple.
@@ -34,7 +35,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: `except` clause](https://docs.python.org/3/reference/compound_stmts.html#except-clause)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.250")]
+#[violation_metadata(stable_since = "v0.0.250", category = Category::Correctness)]
 pub(crate) struct ExceptWithEmptyTuple {
     is_star: bool,
 }

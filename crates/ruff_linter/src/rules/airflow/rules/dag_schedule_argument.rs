@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for a `DAG()` class or `@dag()` decorator without an explicit
@@ -41,7 +42,7 @@ use crate::checkers::ast::Checker;
 /// dag = DAG(dag_id="my_dag", schedule=timedelta(days=1))
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.13.0")]
+#[violation_metadata(stable_since = "0.13.0", category = Category::Suspicious)]
 pub(crate) struct AirflowDagNoScheduleArgument;
 
 impl Violation for AirflowDagNoScheduleArgument {

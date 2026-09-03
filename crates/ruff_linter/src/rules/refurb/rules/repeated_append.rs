@@ -10,6 +10,7 @@ use ruff_python_semantic::{Binding, BindingId, SemanticModel};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::snippet::SourceCodeSnippet;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
@@ -45,7 +46,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: More on Lists](https://docs.python.org/3/tutorial/datastructures.html#more-on-lists)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.0.287")]
+#[violation_metadata(preview_since = "v0.0.287", category = Category::Performance)]
 pub(crate) struct RepeatedAppend {
     name: String,
     replacement: SourceCodeSnippet,

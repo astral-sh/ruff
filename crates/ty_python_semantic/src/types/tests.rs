@@ -1,14 +1,84 @@
 use super::*;
 use crate::db::tests::{TestDbBuilder, setup_db};
-use crate::place::{typing_extensions_symbol, typing_symbol};
+use crate::place::{global_symbol, typing_extensions_symbol, typing_symbol};
+use crate::types::call::bind::CallableDescription;
 use crate::types::type_alias::PEP695TypeAliasType;
 use crate::{Db, ProgramEnvironment};
+use ruff_db::files::system_path_to_file;
 use ruff_db::system::DbWithWritableSystem as _;
+use ruff_db::testing::assert_function_query_was_not_run_by_name;
 use ruff_python_ast as ast;
 use ruff_python_ast::PythonVersion;
+use salsa::plumbing::AsId;
 use test_case::test_case;
 use ty_python_core::program::Program;
 use ty_python_core::{ProgramFile, TestProgramDb as _};
+
+#[test]
+fn member_lookup_result_size() {
+    // Property diagnostics must not enlarge every cached member lookup.
+    assert_eq!(
+        size_of::<MemberLookupResult<'_>>(),
+        size_of::<Result<PlaceAndQualifiers<'_>, MemberLookupError<'_>>>(),
+    );
+}
+
+#[test]
+fn property_deprecations_do_not_infer_accessor_signatures() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_dedented(
+        "/src/accessors.py",
+        r#"
+        from typing_extensions import deprecated
+
+        @deprecated("old getter")
+        def getter(self: object) -> int: ...
+
+        def setter(self: object, value: int) -> None: ...
+        "#,
+    )?;
+    let accessor_ids = {
+        let file = system_path_to_file(&db, "/src/accessors.py")?;
+        let env = db.program_environment();
+        let file = ProgramFile::new(&db, file, env.program(&db));
+        let getter = global_symbol(&db, file, "getter").place.expect_type();
+        let setter = global_symbol(&db, file, "setter").place.expect_type();
+        let property = PropertyInstanceType::new(&db, Some(getter), Some(setter), None);
+        let deprecations = Type::PropertyInstance(property)
+            .property_deprecations(&db)
+            .ok_or_else(|| anyhow::anyhow!("expected a deprecated getter"))?;
+        assert_eq!(deprecations.functions(&db, ast::ExprContext::Load).len(), 1);
+        assert_eq!(
+            CallableDescription::from_overload(
+                &db,
+                deprecations.functions(&db, ast::ExprContext::Load)[0],
+            )
+            .name(),
+            "getter"
+        );
+        assert!(
+            deprecations
+                .functions(&db, ast::ExprContext::Store)
+                .is_empty()
+        );
+
+        let [Type::FunctionLiteral(getter), Type::FunctionLiteral(setter)] = [getter, setter]
+        else {
+            anyhow::bail!("expected accessor functions");
+        };
+        [getter.as_id(), setter.as_id()]
+    };
+    let events = db.take_salsa_events();
+    for accessor in accessor_ids {
+        assert_function_query_was_not_run_by_name(
+            &db,
+            "FunctionType < 'db >::signature_",
+            Some(accessor),
+            &events,
+        );
+    }
+    Ok(())
+}
 
 #[test]
 fn bounded_intersection_preserves_late_union_elements() {
@@ -594,88 +664,73 @@ type RecursiveAlias2[T] = None | list[T] | list[RecursiveAlias2[T]]
     let env = db.program_environment();
     let covariant = get_type_alias(db, "CovariantAlias");
     assert_eq!(
-        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(covariant)).variance_of(
-            db,
-            &env,
-            get_bound_typevar(db, covariant)
-        ),
+        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(covariant))
+            .variance_of(db, &env, get_bound_typevar(db, covariant))
+            .evaluate(db),
         TypeVarVariance::Covariant
     );
 
     let contravariant = get_type_alias(db, "ContravariantAlias");
     assert_eq!(
-        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(contravariant)).variance_of(
-            db,
-            &env,
-            get_bound_typevar(db, contravariant)
-        ),
+        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(contravariant))
+            .variance_of(db, &env, get_bound_typevar(db, contravariant))
+            .evaluate(db),
         TypeVarVariance::Contravariant
     );
 
     let invariant = get_type_alias(db, "InvariantAlias");
     assert_eq!(
-        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(invariant)).variance_of(
-            db,
-            &env,
-            get_bound_typevar(db, invariant)
-        ),
+        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(invariant))
+            .variance_of(db, &env, get_bound_typevar(db, invariant))
+            .evaluate(db),
         TypeVarVariance::Invariant
     );
 
     let bivariant = get_type_alias(db, "BivariantAlias");
     assert_eq!(
-        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(bivariant)).variance_of(
-            db,
-            &env,
-            get_bound_typevar(db, bivariant)
-        ),
+        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(bivariant))
+            .variance_of(db, &env, get_bound_typevar(db, bivariant))
+            .evaluate(db),
         TypeVarVariance::Bivariant
     );
 
     let covariant_alias = get_type_alias(db, "CovariantAliasAlias");
     assert_eq!(
-        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(covariant_alias)).variance_of(
-            db,
-            &env,
-            get_bound_typevar(db, covariant_alias)
-        ),
+        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(covariant_alias))
+            .variance_of(db, &env, get_bound_typevar(db, covariant_alias))
+            .evaluate(db),
         TypeVarVariance::Covariant
     );
 
     let contravariant_alias = get_type_alias(db, "ContravariantAliasAlias");
     assert_eq!(
-        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(contravariant_alias)).variance_of(
-            db,
-            &env,
-            get_bound_typevar(db, contravariant_alias)
-        ),
+        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(contravariant_alias))
+            .variance_of(db, &env, get_bound_typevar(db, contravariant_alias))
+            .evaluate(db),
         TypeVarVariance::Contravariant
     );
 
     let invariant_alias = get_type_alias(db, "InvariantAliasAlias");
     assert_eq!(
-        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(invariant_alias)).variance_of(
-            db,
-            &env,
-            get_bound_typevar(db, invariant_alias)
-        ),
+        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(invariant_alias))
+            .variance_of(db, &env, get_bound_typevar(db, invariant_alias))
+            .evaluate(db),
         TypeVarVariance::Invariant
     );
 
     let bivariant_alias = get_type_alias(db, "BivariantAliasAlias");
     assert_eq!(
-        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(bivariant_alias)).variance_of(
-            db,
-            &env,
-            get_bound_typevar(db, bivariant_alias)
-        ),
+        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(bivariant_alias))
+            .variance_of(db, &env, get_bound_typevar(db, bivariant_alias))
+            .evaluate(db),
         TypeVarVariance::Bivariant
     );
 
     let paramspec_contravariant = get_type_alias(db, "ParamSpecContravariantAlias");
     assert_eq!(
         KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(paramspec_contravariant))
-            .variance_of(db, &env, get_bound_typevar(db, paramspec_contravariant)),
+            .variance_of(db, &env, get_bound_typevar(db, paramspec_contravariant))
+            .evaluate(db),
         TypeVarVariance::Contravariant
     );
 
@@ -686,47 +741,40 @@ type RecursiveAlias2[T] = None | list[T] | list[RecursiveAlias2[T]]
                 db,
                 &env,
                 get_bound_typevar(db, paramspec_default_contravariant)
-            ),
+            )
+            .evaluate(db),
         TypeVarVariance::Contravariant
     );
 
     let paramspec_concatenate = get_type_alias(db, "ParamSpecConcatenateAlias");
     assert_eq!(
-        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(paramspec_concatenate)).variance_of(
-            db,
-            &env,
-            get_bound_typevar(db, paramspec_concatenate)
-        ),
+        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(paramspec_concatenate))
+            .variance_of(db, &env, get_bound_typevar(db, paramspec_concatenate))
+            .evaluate(db),
         TypeVarVariance::Contravariant
     );
 
     let paramspec_bivariant = get_type_alias(db, "ParamSpecBivariantAlias");
     assert_eq!(
-        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(paramspec_bivariant)).variance_of(
-            db,
-            &env,
-            get_bound_typevar(db, paramspec_bivariant)
-        ),
+        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(paramspec_bivariant))
+            .variance_of(db, &env, get_bound_typevar(db, paramspec_bivariant))
+            .evaluate(db),
         TypeVarVariance::Bivariant
     );
 
     let recursive = get_type_alias(db, "RecursiveAlias");
     assert_eq!(
-        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(recursive)).variance_of(
-            db,
-            &env,
-            get_bound_typevar(db, recursive)
-        ),
+        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(recursive))
+            .variance_of(db, &env, get_bound_typevar(db, recursive))
+            .evaluate(db),
         TypeVarVariance::Bivariant
     );
 
     let recursive2 = get_type_alias(db, "RecursiveAlias2");
     assert_eq!(
-        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(recursive2)).variance_of(
-            db,
-            &env,
-            get_bound_typevar(db, recursive2)
-        ),
+        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(recursive2))
+            .variance_of(db, &env, get_bound_typevar(db, recursive2))
+            .evaluate(db),
         TypeVarVariance::Invariant
     );
 

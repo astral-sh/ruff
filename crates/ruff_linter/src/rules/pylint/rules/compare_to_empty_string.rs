@@ -7,6 +7,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for comparisons to empty strings.
@@ -41,7 +42,7 @@ use crate::checkers::ast::Checker;
 ///
 /// [#4282]: https://github.com/astral-sh/ruff/issues/4282
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.0.255")]
+#[violation_metadata(preview_since = "v0.0.255", category = Category::Pedantic)]
 pub(crate) struct CompareToEmptyString {
     existing: String,
     replacement: String,

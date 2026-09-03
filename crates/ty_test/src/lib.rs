@@ -306,6 +306,12 @@ fn run_test(
 
     db.update_program(settings);
     db.update_analysis_options(configuration.analysis.as_ref());
+    db.update_dependency_metadata(
+        configuration
+            .dependency_metadata
+            .as_ref()
+            .map(|fixture| &fixture.metadata),
+    );
     db.update_mdtest_rule_selection(configuration.rules.as_ref(), options.default_error_rule);
     db.set_verbosity(test.configuration().verbose());
 

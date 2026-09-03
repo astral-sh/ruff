@@ -17,3 +17,10 @@ def test_error():
         something()
     except Exception as e:
         assert e.message, "blah blah"
+
+
+def test_error_with_multiple_exception_references():
+    try:
+        something()
+    except Exception as e:
+        assert len(e.args) == 1, e.args

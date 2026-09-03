@@ -70,7 +70,7 @@ def rustfmt(code: str) -> str:
 
 def to_snake_case(node: str) -> str:
     """Converts CamelCase to snake_case"""
-    return re.sub("([A-Z])", r"_\1", node).lower().lstrip("_")
+    return re.sub(r"([A-Z])", r"_\1", node).lower().lstrip("_")
 
 
 def write_rustdoc(out: list[str], doc: str) -> None:
@@ -180,7 +180,6 @@ class Node:
                 if field.skip_source_order():
                     continue
                 if field.name == field_name:
-                    field = field
                     break
             fields.append(field)
         return fields

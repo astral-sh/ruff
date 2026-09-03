@@ -303,6 +303,29 @@ reveal_type(infer_from_callbacks(accepts_p, accepts_q))
 reveal_type(infer_from_callbacks(accepts_q, accepts_p))
 ```
 
+## Generic callback inference through a type alias
+
+Relating a generic function to a generic callback consistently infers the same union, but the
+union's displayed element order currently depends on the constraint ordering.
+
+```py
+from collections.abc import Callable
+
+type Items = tuple[int] | tuple[str]
+
+def identity[T](value: T) -> T:
+    return value
+
+def extract[T](callback: Callable[[Items], tuple[T]]) -> T:
+    raise NotImplementedError
+
+result = extract(identity)
+
+# TODO: sometimes: revealed int | str
+# revealed: str | int
+reveal_type(result)
+```
+
 ## Generic-callable and protocol relation constraints
 
 Relations can introduce fresh typevars and nested invariant constraints before those typevars are
@@ -339,8 +362,8 @@ def get_value(value: GetValue[ConstrainedValue]) -> ConstrainedValue:
     raise NotImplementedError
 
 def typed_dict_union(value: ValueA | ValueB) -> None:
-    # TODO: sometimes: revealed object
-    # revealed: int
+    # TODO: revealed int
+    # revealed: object
     reveal_type(get_value(value))
 ```
 
@@ -370,7 +393,7 @@ class Concrete[T]:
         return ""
 
 def convert[T](value: Concrete[T]) -> Array:
-    return cast(Array, value)
+    return cast(Array, value)  # error: [disjoint-cast]
 
 # error: [invalid-assignment]
 invalid: Array = Concrete[int]()

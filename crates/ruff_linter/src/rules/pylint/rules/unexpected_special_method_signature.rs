@@ -8,6 +8,7 @@ use ruff_python_semantic::analyze::visibility::is_staticmethod;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 #[derive(Debug, Eq, PartialEq)]
 pub(crate) enum ExpectedParams {
@@ -110,7 +111,7 @@ impl ExpectedParams {
 /// ## References
 /// - [Python documentation: Data model](https://docs.python.org/3/reference/datamodel.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.263")]
+#[violation_metadata(stable_since = "v0.0.263", category = Category::Pedantic)]
 pub(crate) struct UnexpectedSpecialMethodSignature {
     method_name: String,
     expected_params: ExpectedParams,

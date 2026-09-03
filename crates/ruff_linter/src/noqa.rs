@@ -9,7 +9,7 @@ use anyhow::Result;
 use itertools::Itertools;
 use log::warn;
 
-use ruff_db::diagnostic::{Diagnostic, SecondaryCode};
+use ruff_db::diagnostic::{Diagnostic, LintName};
 use ruff_python_trivia::PythonWhitespace;
 use ruff_python_trivia::{CommentRanges, Cursor, indentation_at_offset};
 use ruff_source_file::{LineEnding, LineRanges};
@@ -24,6 +24,7 @@ use crate::registry::Rule;
 use crate::rule_redirects::get_redirect_target;
 use crate::settings::types::PreviewMode;
 use crate::suppression::{self, Suppressions};
+use crate::warn_user_once;
 
 /// Generates an array of edits that matches the length of `diagnostics`.
 /// Each potential edit in the array is paired, in order, with the associated diagnostic.
@@ -169,7 +170,7 @@ pub(crate) fn rule_is_ignored(
         Ok(Some(NoqaLexerOutput {
             directive: Directive::Codes(codes),
             ..
-        })) => codes.includes(&code.noqa_code()),
+        })) => code.noqa_code().is_some_and(|code| codes.includes(&code)),
         _ => false,
     }
 }
@@ -184,19 +185,19 @@ pub(crate) enum FileExemption {
 }
 
 impl FileExemption {
-    /// Returns `true` if the file is exempt from the given rule, as identified by its noqa code.
-    pub(crate) fn contains_secondary_code(&self, needle: &SecondaryCode) -> bool {
-        match self {
-            FileExemption::All(_) => true,
-            FileExemption::Codes(codes) => codes.iter().any(|code| *needle == code.noqa_code()),
-        }
-    }
-
     /// Returns `true` if the file is exempt from the given rule.
     pub(crate) fn includes(&self, needle: Rule) -> bool {
         match self {
             FileExemption::All(_) => true,
             FileExemption::Codes(codes) => codes.contains(&needle),
+        }
+    }
+
+    /// Returns `true` if the file is exempt from the rule with the given name.
+    pub(crate) fn includes_name(&self, needle: LintName) -> bool {
+        match self {
+            FileExemption::All(_) => true,
+            FileExemption::Codes(rules) => rules.iter().any(|rule| rule.name() == needle),
         }
     }
 
@@ -969,12 +970,12 @@ fn find_suppression_comments<'a>(
 
     // Mark any non-ignored diagnostics.
     for message in diagnostics {
-        let Some(code) = message.secondary_code() else {
+        let Some(name) = message.id().as_lint() else {
             comments_by_line.push(None);
             continue;
         };
 
-        if exemption.contains_secondary_code(code) {
+        if exemption.includes_name(name) {
             comments_by_line.push(None);
             continue;
         }
@@ -996,7 +997,10 @@ fn find_suppression_comments<'a>(
                         continue;
                     }
                     Directive::Codes(codes) => {
-                        if codes.includes(code) {
+                        if message
+                            .secondary_code()
+                            .is_some_and(|code| codes.includes(code))
+                        {
                             comments_by_line.push(None);
                             continue;
                         }
@@ -1019,7 +1023,10 @@ fn find_suppression_comments<'a>(
                         continue;
                     }
                     Directive::Codes(codes) => {
-                        if codes.includes(code) {
+                        if message
+                            .secondary_code()
+                            .is_some_and(|code| codes.includes(code))
+                        {
                             comments_by_line.push(None);
                             continue;
                         }
@@ -1039,9 +1046,18 @@ fn find_suppression_comments<'a>(
         };
 
         let identifier = match suppression_kind {
-            SuppressionKind::Noqa => code.as_str(),
             SuppressionKind::Ignore if is_human_readable_names_enabled(preview) => message.name(),
-            SuppressionKind::Ignore => code.as_str(),
+            SuppressionKind::Ignore => message.secondary_code_or_id(),
+            SuppressionKind::Noqa => {
+                let Some(code) = message.secondary_code() else {
+                    warn_user_once!(
+                        "Cannot add `noqa` comments for rules without codes; use `--add-ignore` instead."
+                    );
+                    comments_by_line.push(None);
+                    continue;
+                };
+                code.as_str()
+            }
         };
 
         comments_by_line.push(Some(SuppressionComment {

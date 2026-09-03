@@ -1,11 +1,10 @@
 ## What it does
 
-Detects assignments that unsoundly assign a type that is not a [subtype] of the target's declared
-type.
+Detects variable assignments that unsoundly assign a type that is not a [subtype] of a variable's
+declared type.
 
-This rule is a stricter version of `invalid-assignment`. The rule currently only flags unsound
-assignments to variables (excluding attributes and subscripts), but its scope may be expanded in
-the future.
+This rule is a stricter version of `invalid-assignment`. Whereas that rule also flags assignments to
+attributes and subscripts, however, this rule is only applied to variable assignments.
 
 This rule has no effect on stub files.
 
@@ -33,9 +32,9 @@ my_integer + 42
 
 This rule treats ["fully static"][fully-static] declared types as "typed boundaries" for your code.
 With this rule enabled, ty would emit an error on the `my_integer: int = returns_any()` assignment,
-since the `returns_any()` call is inferred as having type `Any`, and `Any` is not a subtype of `int`.
-This helps prevent the unsoundness from spreading far from its original source (in this case, the
-return type of the `returns_any` function).
+since the `returns_any()` call is inferred as having type `Any`, and `Any` is not a subtype of
+`int`. This helps prevent the unsoundness from spreading far from its original source (in this case,
+the return type of the `returns_any` function).
 
 Note that this rule is only applied to assignments where the declared type is
 [fully static][fully-static]. It will not trigger if `Any` or `Unknown` appear anywhere in the
@@ -59,8 +58,7 @@ also_dynamic: list[Any] = returns_any()  # no error
 implicitly_dynamic: list = returns_any()
 ```
 
-This rule works especially well when combined with ty's
-`missing-type-argument` rule.
+This rule works especially well when combined with ty's `missing-type-argument` rule.
 
 ## Examples
 
@@ -104,8 +102,10 @@ Python code.
 
 ## See also
 
-- `unsound-return-statement` is a similar rule that triggers on unsound `return` statements rather than unsound assignments
-- `unsound-yield` is a similar rule that triggers on unsound `yield` expressions rather than unsound assignments
+- `unsound-return-statement` is a similar rule that triggers on unsound `return` statements rather
+    than unsound assignments
+- `unsound-yield` is a similar rule that triggers on unsound `yield` expressions rather than unsound
+    assignments
 
 [assignable]: https://typing.python.org/en/latest/spec/glossary.html#term-assignable
 [fully-static]: https://typing.python.org/en/latest/spec/glossary.html#term-fully-static-type

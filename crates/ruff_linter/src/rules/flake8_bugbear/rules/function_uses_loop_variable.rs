@@ -7,6 +7,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for function definitions that use a loop variable.
@@ -42,7 +43,7 @@ use crate::checkers::ast::Checker;
 /// - [The Hitchhiker's Guide to Python: Late Binding Closures](https://docs.python-guide.org/writing/gotchas/#late-binding-closures)
 /// - [Python documentation: `functools.partial`](https://docs.python.org/3/library/functools.html#functools.partial)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.139")]
+#[violation_metadata(stable_since = "v0.0.139", category = Category::Suspicious)]
 pub(crate) struct FunctionUsesLoopVariable {
     name: String,
 }

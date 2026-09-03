@@ -13,6 +13,7 @@ use crate::types::constraints::{
 use crate::types::cyclic::{HasIdentity, PairVisitor, TypeIdentity};
 use crate::types::enums::is_single_member_enum;
 use crate::types::function::FunctionDecorators;
+use crate::types::relation_error::ErrorRelation;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::signatures::{ParametersKind, SignatureRelationVisitor};
 use crate::types::tuple::TupleType;
@@ -439,7 +440,7 @@ impl<'db> Type<'db> {
     ///
     /// This is a separate method so that we can skip this expensive check when diagnostics
     /// are suppressed.
-    pub(crate) fn relation_error_context(
+    fn relation_error_context(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -893,6 +894,7 @@ impl<'db> Type<'db> {
             env,
             constraints,
             inferable,
+            context_tree: None,
             given: ConstraintSet::from_bool(constraints, false),
             perform_expensive_checks: true,
             disjointness_visitor: &disjointness_visitor,
@@ -901,6 +903,31 @@ impl<'db> Type<'db> {
             materialization_visitor: &materialization_visitor,
         };
         checker.check_type_pair(db, self, other)
+    }
+
+    /// Re-run a successful disjointness check with diagnostic context collection enabled.
+    pub(crate) fn disjointness_error_context(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        other: Type<'db>,
+    ) -> ErrorContextTree<'db> {
+        let constraints = ConstraintSetBuilder::new();
+        let context = ErrorContextTree::new(ErrorRelation::Disjointness);
+        let checker = DisjointnessChecker {
+            env,
+            constraints: &constraints,
+            inferable: TypeVarSet::None,
+            context_tree: Some(context.clone()),
+            given: ConstraintSet::from_bool(&constraints, false),
+            perform_expensive_checks: true,
+            relation_visitor: &HasRelationToVisitor::default(&constraints),
+            disjointness_visitor: &IsDisjointVisitor::default(&constraints),
+            signature_relation_visitor: &SignatureRelationVisitor::default(),
+            materialization_visitor: &ApplyTypeMappingVisitor::new(env),
+        };
+        checker.check_type_pair(db, self, other);
+        context
     }
 
     /// Checks whether `self` is disjoint from `other`, while being more accepting of false
@@ -922,6 +949,7 @@ impl<'db> Type<'db> {
             env,
             constraints,
             inferable,
+            context_tree: None,
             given: ConstraintSet::from_bool(constraints, false),
             perform_expensive_checks: false,
             disjointness_visitor: &disjointness_visitor,
@@ -1217,20 +1245,32 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         target: Type<'db>,
         work: impl FnOnce() -> ConstraintSet<'db, 'c>,
     ) -> ConstraintSet<'db, 'c> {
+        let collect_context = self.is_context_collection_enabled();
         self.relation_visitor
             .try_visit(
                 db,
                 (source, target, self.relation, self.typevar_evaluation),
+                // Cached constraints do not retain explanations. When collecting context,
+                // recompute unsatisfiable comparisons while preserving the active recursion
+                // guards. Satisfiable constraints remain reusable, including those that
+                // constrain type variables.
+                |result| !collect_context || !result.is_never_satisfied(db, self.env),
                 work,
             )
-            .unwrap_or_else(|item| self.recursive_type_pair_fallback(item.0, item.1))
+            .unwrap_or_else(|item| self.recursive_type_pair_fallback(db, item.0, item.1))
     }
 
     fn recursive_type_pair_fallback(
         &self,
-        _source: Type<'db>,
-        _target: Type<'db>,
+        db: &'db dyn Db,
+        source: Type<'db>,
+        target: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        if let Some(nominally_satisfied) = self.try_check_nominal_protocol_cycle(db, source, target)
+        {
+            return nominally_satisfied;
+        }
+
         // TODO: Recursively-specialized structural types can encode context-free languages,
         // whose inclusion and equivalence are undecidable. No complete fallback exists, but
         // more decidable cases can be recognized here before conservatively rejecting the pair.
@@ -1718,10 +1758,15 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     target,
                 )
             }
+            // A fixed tuple cannot satisfy every specialization of a non-inferable TypeVarTuple.
+            // Let it reach the ordinary rejection below; expanding the target would repeat the
+            // same tuple comparison and cause the recursion guard to accept it.
             (source, Type::TypeVar(bound_typevar))
                 if !bound_typevar.is_inferable(db, self.inferable)
                     && bound_typevar.is_typevartuple(db)
-                    && source.exact_tuple_instance_spec(db).is_some() =>
+                    && source
+                        .exact_tuple_instance_spec(db)
+                        .is_some_and(|spec| spec.is_variadic()) =>
             {
                 self.check_type_pair(
                     db,
@@ -1744,14 +1789,19 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 self.always()
             }
 
-            // Any concrete specialization of a `ParamSpec` is a subtype of the top
-            // materialization of a `ParamSpec` value.
+            // Compare fixed `ParamSpec`s with the endpoints of the materialization range of `...`:
+            // its bottom is below every `ParamSpec`, and its top is above every `ParamSpec`.
             (Type::TypeVar(bound_typevar), Type::Callable(other))
+            | (Type::Callable(other), Type::TypeVar(bound_typevar))
                 if !bound_typevar.is_inferable(db, self.inferable)
                     && bound_typevar.is_paramspec(db)
-                    && Self::is_top_paramspec_value(db, other) =>
+                    && other.kind(db) == CallableTypeKind::ParamSpecValue
+                    && other.signatures(db).iter().all(|signature| {
+                        signature.parameters().is_top() || signature.parameters().is_bottom()
+                    }) =>
             {
-                self.always()
+                let other_is_top = Self::is_top_paramspec_value(db, other);
+                ConstraintSet::from_bool(self.constraints, source.is_type_var() == other_is_top)
             }
 
             // A fully static typevar is a subtype of its upper bound, and to something similar to
@@ -2720,6 +2770,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             env: self.env,
             constraints: self.constraints,
             inferable: self.inferable,
+            context_tree: None,
             given: self.given,
             perform_expensive_checks: self.perform_expensive_checks,
             relation_visitor: self.relation_visitor,
@@ -2758,7 +2809,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 }
 
 pub(super) struct EquivalenceChecker<'a, 'c, 'db> {
-    pub(super) env: &'a ProgramEnvironment<'db>,
+    env: &'a ProgramEnvironment<'db>,
     pub(super) constraints: &'c ConstraintSetBuilder<'db>,
     given: ConstraintSet<'db, 'c>,
     perform_expensive_checks: bool,
@@ -2831,6 +2882,7 @@ pub(super) struct DisjointnessChecker<'a, 'c, 'db> {
     pub(super) env: &'a ProgramEnvironment<'db>,
     pub(super) constraints: &'c ConstraintSetBuilder<'db>,
     inferable: TypeVarSet<'db>,
+    context_tree: Option<ErrorContextTree<'db>>,
     given: ConstraintSet<'db, 'c>,
     perform_expensive_checks: bool,
 
@@ -2860,6 +2912,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             env,
             constraints,
             inferable,
+            context_tree: None,
             given: ConstraintSet::from_bool(constraints, false),
             perform_expensive_checks: true,
             disjointness_visitor,
@@ -2887,6 +2940,32 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             signature_relation_visitor: self.signature_relation_visitor,
             materialization_visitor: self.materialization_visitor,
         }
+    }
+
+    pub(super) fn report_context(&self) -> Option<&ErrorContextTree<'db>> {
+        self.context_tree
+            .as_ref()
+            .filter(|context| context.is_enabled())
+    }
+
+    /// Retain a failed subtyping or assignability check that proves disjointness.
+    pub(super) fn check_relation_with_context(
+        &self,
+        db: &'db dyn Db,
+        mut checker: TypeRelationChecker<'_, 'c, 'db>,
+        check: impl FnOnce(&TypeRelationChecker<'_, 'c, 'db>) -> ConstraintSet<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c> {
+        checker.context_tree = self
+            .report_context()
+            .map(|_| ErrorContextTree::new(checker.relation));
+        let result = check(&checker);
+        if let Some(context) = self.report_context() {
+            context.take();
+            if result.is_never_satisfied(db, self.env) {
+                context.replace(&checker.into_error_context());
+            }
+        }
+        result
     }
 
     fn as_equivalence_checker(&self) -> EquivalenceChecker<'_, 'c, 'db> {
@@ -2924,26 +3003,54 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             .interface(db)
             .members(db)
             .when_any(db, self.constraints, |member| {
-                other
+                if let Some(context) = self.report_context() {
+                    context.take();
+                }
+                let attribute = other
                     .member(db, env, member.name())
                     .place
-                    .ignore_possibly_undefined()
-                    .when_none_or(db, self.constraints, |attribute_type| {
-                        self.protocol_member_has_disjoint_type_from_ty(db, &member, attribute_type)
-                            .or(db, self.constraints, || {
-                                self.protocol_member_write_is_definitely_missing_from_ty(
-                                    db, &member, other,
-                                )
-                            })
-                            .or(db, self.constraints, || {
-                                ConstraintSet::from_bool(
-                                    self.constraints,
-                                    member.has_incompatible_class_variable_declaration(
-                                        db, env, other,
-                                    ),
-                                )
-                            })
+                    .ignore_possibly_undefined();
+                let Some(attribute_type) = attribute else {
+                    if let Some(context) = self.report_context() {
+                        context.push(ErrorContext::ProtocolMemberNotDefined {
+                            member_name: member.name().into(),
+                            ty: other,
+                        });
+                        if let Type::NominalInstance(nominal) = other
+                            && nominal.class(db, env).is_final(db)
+                        {
+                            context.push(ErrorContext::FinalTypeMissingProtocolMembers {
+                                final_type: other,
+                                protocol: Type::ProtocolInstance(protocol),
+                            });
+                        }
+                    }
+                    return self.always();
+                };
+                let result = self
+                    .protocol_member_has_disjoint_type_from_ty(db, &member, attribute_type)
+                    .or(db, self.constraints, || {
+                        self.protocol_member_write_is_definitely_missing_from_ty(db, &member, other)
                     })
+                    .or(db, self.constraints, || {
+                        let incompatible =
+                            member.has_incompatible_class_variable_declaration(db, env, other);
+                        if incompatible && let Some(context) = self.report_context() {
+                            context.push(ErrorContext::ProtocolMemberClassVarMismatch {
+                                member_name: member.name().into(),
+                                ty: other,
+                            });
+                        }
+                        ConstraintSet::from_bool(self.constraints, incompatible)
+                    });
+                if let Some(context) = self.report_context()
+                    && result.is_always_satisfied(db, env)
+                {
+                    context.push(ErrorContext::ProtocolMemberIncompatible {
+                        member_name: member.name().into(),
+                    });
+                }
+                result
             })
     }
 
@@ -2988,6 +3095,25 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
     }
 
     pub(super) fn check_type_pair(
+        &self,
+        db: &'db dyn Db,
+        left: Type<'db>,
+        right: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        if let Some(context) = self.report_context() {
+            context.take();
+        }
+        let result = self.check_type_pair_impl(db, left, right);
+        if let Some(context) = self.report_context()
+            && !result.is_always_satisfied(db, self.env)
+        {
+            // A failed alternative is not evidence for a later successful disjointness check.
+            context.take();
+        }
+        result
+    }
+
+    fn check_type_pair_impl(
         &self,
         db: &'db dyn Db,
         left: Type<'db>,
@@ -3134,12 +3260,35 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
 
             (Type::Union(union), other) | (other, Type::Union(union)) => {
                 nontrivial_check(self, || {
-                    union
+                    let mut children = Vec::new();
+                    let result = union
                         .elements(db)
                         .iter()
                         .when_all(db, self.constraints, |e| {
-                            self.check_type_pair(db, *e, other)
-                        })
+                            let result = self.check_type_pair(db, *e, other);
+                            if let Some(context) = self.report_context() {
+                                if context.is_empty() {
+                                    context.push(ErrorContext::DisjointTypes {
+                                        left: *e,
+                                        right: other,
+                                    });
+                                }
+                                children.push(context.take());
+                            }
+                            result
+                        });
+                    if let Some(context) = self.report_context()
+                        && result.is_always_satisfied(db, env)
+                    {
+                        context.set(
+                            ErrorContext::DisjointUnion {
+                                union: Type::Union(union),
+                                other,
+                            },
+                            children,
+                        );
+                    }
+                    result
                 })
             }
 
@@ -3394,7 +3543,10 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                         .interface(db)
                         .members(db)
                         .when_any(db, self.constraints, |member| {
-                            match other.member(db, env, member.name()).place {
+                            if let Some(context) = self.report_context() {
+                                context.take();
+                            }
+                            let result = match other.member(db, env, member.name()).place {
                                 Place::Defined(DefinedPlace {
                                     ty: attribute_type, ..
                                 }) => self.protocol_member_has_disjoint_type_from_ty(
@@ -3403,7 +3555,15 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                                     attribute_type,
                                 ),
                                 Place::Undefined => self.never(),
+                            };
+                            if let Some(context) = self.report_context()
+                                && result.is_always_satisfied(db, env)
+                            {
+                                context.push(ErrorContext::ProtocolMemberIncompatible {
+                                    member_name: member.name().into(),
+                                });
                             }
+                            result
                         })
                 })
             }),

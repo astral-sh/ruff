@@ -56,7 +56,7 @@ impl<'db> Module<'db> {
     }
 
     /// The resolver environment used to resolve this module.
-    pub fn resolver_environment(self, db: &'db dyn Database) -> ResolverEnvironment<'db> {
+    fn resolver_environment(self, db: &'db dyn Database) -> ResolverEnvironment<'db> {
         match self {
             Module::File(module) => module.resolver_environment(db),
             Module::Namespace(module) => module.resolver_environment(db),
@@ -402,6 +402,8 @@ pub enum KnownModule {
     #[strum(serialize = "pydantic.types")]
     PydanticTypes,
     Pytest,
+    #[strum(serialize = "_pytest.config")]
+    PytestConfig,
     #[strum(serialize = "_pytest.fixtures")]
     PytestFixtures,
     #[strum(serialize = "_pytest.mark.structures")]
@@ -451,6 +453,7 @@ impl KnownModule {
             Self::PydanticSettingsMain => "pydantic_settings.main",
             Self::PydanticTypes => "pydantic.types",
             Self::Pytest => "pytest",
+            Self::PytestConfig => "_pytest.config",
             Self::PytestFixtures => "_pytest.fixtures",
             Self::PytestMarkStructures => "_pytest.mark.structures",
         }
@@ -484,6 +487,7 @@ impl KnownModule {
             | Self::PydanticSettingsMain
             | Self::PydanticTypes
             | Self::Pytest
+            | Self::PytestConfig
             | Self::PytestFixtures
             | Self::PytestMarkStructures => true,
             Self::Builtins
