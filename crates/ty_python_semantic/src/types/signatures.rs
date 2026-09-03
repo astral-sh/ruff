@@ -20,7 +20,7 @@ use itertools::{Either, EitherOrBoth, Itertools};
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::{SmallVec, smallvec_inline};
 
-use super::{DynamicType, Type, TypeVarVariance, UnionType, semantic_index};
+use super::{DynamicType, Type, TypeVarVariance, UnionType, any_over_type, semantic_index};
 use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, OwnedConstraintSet,
@@ -2267,9 +2267,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         self.without_context_collection(|| {
                             source_overloads
                                 .iter()
-                                .map(|signature| signature.return_ty)
-                                .when_any(db, self.constraints, |source_return| {
-                                    self.check_type_pair(db, source_return, target_return)
+                                .when_any(db, self.constraints, |signature| {
+                                    self.check_paramspec_return_pair(db, signature, target_return)
                                 })
                         })
                     };
@@ -2448,6 +2447,35 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // this branch and the result is not memoized.
         self.signature_relation_visitor
             .visit(&key, || self.always(), work)
+    }
+
+    fn check_paramspec_return_pair(
+        &self,
+        db: &'db dyn Db,
+        source: &Signature<'db>,
+        target: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        if self.relation.is_assignability()
+            && self.typevar_evaluation == TypeVarEvaluation::Lazy
+            && target.resolve_type_alias(db).is_dynamic()
+            && let Type::TypeVar(typevar) = source.return_ty.resolve_type_alias(db)
+            && source.parameters().iter().any(|parameter| {
+                any_over_type(db, self.env, parameter.annotated_type(), false, |ty| {
+                    matches!(ty, Type::TypeVar(other) if other.is_same_typevar_as(db, typevar))
+                })
+            })
+        {
+            // Comparing the generic callable `(value: T) -> T` against the declared type
+            // `Callable[P, Any]` contributes the constraint `T <= Any`, despite the gradual return
+            // type not constraining the callable-scoped type variable, so we ignore the constraints
+            // in this case.
+            //
+            // TODO: Remove this special case once `ParamSpec` inference correctly handles captured
+            // type variables when solving return-type constraints.
+            self.always()
+        } else {
+            self.check_type_pair(db, source.return_ty, target)
+        }
     }
 
     fn check_signature_pair_inner(
@@ -2685,7 +2713,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // Avoid returning early after checking the return types in case there is a `ParamSpec` type
         // variable in either signature to ensure that the `ParamSpec` binding is still applied even
         // if the return types are incompatible.
-        let return_type_constraints = self.check_type_pair(db, source.return_ty, target.return_ty);
+        let return_type_constraints = if target_parameters.as_paramspec_with_prefix().is_some() {
+            self.check_paramspec_return_pair(db, source, target.return_ty)
+        } else {
+            self.check_type_pair(db, source.return_ty, target.return_ty)
+        };
         let return_type_checks = !result
             .intersect(db, self.constraints, return_type_constraints)
             .is_never_satisfied(db, env);
