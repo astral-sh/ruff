@@ -106,23 +106,27 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
         };
 
-        // Collection inference checks the values even if it cannot specialize `dict`. Return
-        // its fallback type so ordinary call inference does not infer the values again.
-        Some(
-            self.infer_collection_literal(
-                KnownClass::Dict,
-                collection_expr,
-                &items,
-                &mut infer_elt_ty,
-                call_expression_tcx,
-            )
-            .unwrap_or_else(|| {
-                KnownClass::Dict.to_specialized_instance(
-                    db,
-                    self.program_environment(),
-                    &[Type::unknown(), Type::unknown()],
-                )
-            }),
+        self.infer_collection_literal(
+            KnownClass::Dict,
+            collection_expr,
+            &items,
+            &mut infer_elt_ty,
+            call_expression_tcx,
         )
+        .or_else(|| {
+            // Empty calls still need constructor validation and have no inferred values to preserve.
+            if arguments.is_empty() {
+                return None;
+            }
+
+            // Without generic definitions, collection inference still checks all values. Return
+            // `Unknown` in that case to avoid inferring them again. Specialization failures need
+            // ordinary call checking to report argument errors.
+            KnownClass::Dict
+                .try_to_class_literal(db, self.program_environment())
+                .and_then(|class| class.generic_context(db))
+                .is_none()
+                .then(Type::unknown)
+        })
     }
 }
