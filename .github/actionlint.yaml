@@ -16,3 +16,10 @@ self-hosted-runner:
     - github-windows-2025-x86_64-8
     - github-windows-2025-x86_64-16
     - codspeed-macro
+
+paths:
+  .github/workflows/ci.yaml:
+    ignore:
+      # actionlint does not yet support GitHub's `$/` syntax for same-repository workflows.
+      # https://github.com/rhysd/actionlint/issues/711
+      - '^reusable workflow call "\$/\.github/workflows/check-lock\.yml" at "uses" is not following the format '
