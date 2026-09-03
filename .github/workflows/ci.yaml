@@ -271,6 +271,12 @@ jobs:
               echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
 
+  check-lock:
+    name: "Check that all uv lockfiles are updated"
+    uses: $/.github/workflows/check-lock.yml
+    permissions:
+      contents: read
+
   cargo-fmt:
     name: "cargo fmt"
     runs-on: ubuntu-latest
