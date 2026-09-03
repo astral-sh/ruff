@@ -31,8 +31,8 @@ use crate::types::typed_dict::{
 };
 use crate::types::typevar::{BindingContext, TypeVarSet};
 use crate::types::{
-    BoundTypeVarInstance, CallArguments, CallDunderError, CallableBinding, CycleDetector,
-    DisplaySettings, DynamicType, InternedType, KnownClass, KnownInstanceType, LintDiagnosticGuard,
+    BoundTypeVarInstance, CallArguments, CallDunderError, CycleDetector, DisplaySettings,
+    DynamicType, InternedType, KnownClass, KnownInstanceType, LintDiagnosticGuard,
     MemberLookupPolicy, Parameter, Parameters, SpecialFormType, StaticClassLiteral, Type,
     TypeAliasType, TypeAndQualifiers, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
     UnionType, UnionTypeInstance, any_over_type, todo_type,
@@ -1702,41 +1702,33 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         ArgumentsIter::synthesized(&ast_arguments),
                         &mut call_arguments,
                         &mut |builder, (_, expr, tcx)| {
-                            // TODO: The argument types have already been inferred and stored in `call_arguments`.
-                            // However, `object` would have been inferred to a be a collection with `Divergent`
-                            // element types, meaning the type context for a given argument, by which the inferred
-                            // type is keyed, may not be the same as the type context we get here. It is not immediately
-                            // clear how to retrieve those types, and so we just re-infer the argument expressions
-                            // for simplicity.
-                            builder.infer_maybe_standalone_expression(expr, tcx).into()
+                            // The identity receiver supplies different parameter contexts from
+                            // those used to validate the assignment above.
+                            let ty = builder.infer_maybe_standalone_expression(expr, tcx);
+                            builder.inferred_argument(expr, ty)
                         },
                         &mut identity_bindings,
                         TypeContext::default(),
                     );
 
                 if call_result.is_ok() && boundness == Definedness::AlwaysDefined {
-                    for call_specialization in identity_bindings
-                        .iter_flat()
-                        .flat_map(CallableBinding::matching_overloads)
-                        .filter_map(|(_, identity_overload)| {
-                            identity_overload.merged_specialization(db)
-                        })
-                    {
-                        // Record the constraints on the receiver's generic context formed by
-                        // the arguments to this dunder call.
-                        let Some(constraints) = self.collection_use_constraint_from_specialization(
+                    self.collection_use_constraints
+                        .entry(collection_def)
+                        .or_default()
+                        .extend(identity_bindings.inferred_receiver_types(
+                            db,
+                            env,
                             identity_instance,
-                            collection_generic_context,
-                            call_specialization,
-                        ) else {
-                            continue;
-                        };
-
-                        self.collection_use_constraints
-                            .entry(collection_def)
-                            .or_default()
-                            .insert(constraints);
-                    }
+                        ));
+                }
+                if boundness == Definedness::AlwaysDefined {
+                    self.store_collection_receiver_constraints(
+                        collection_def,
+                        identity_instance,
+                        dunder_callable,
+                        &call_arguments,
+                        TypeContext::default(),
+                    );
                 }
             }
         }

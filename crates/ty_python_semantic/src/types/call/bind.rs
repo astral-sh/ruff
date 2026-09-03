@@ -993,6 +993,33 @@ impl<'db> Bindings<'db> {
         self.elements.iter().flat_map(BindingsElement::callables)
     }
 
+    /// Infer receiver arguments from matched overloads without retaining method-local variables.
+    pub(crate) fn inferred_receiver_types<'a>(
+        &'a self,
+        db: &'db dyn Db,
+        env: &'a ProgramEnvironment<'db>,
+        receiver: Type<'db>,
+    ) -> impl Iterator<Item = Type<'db>> + 'a {
+        let context = receiver
+            .class_specialization(db, env)
+            .and_then(|(class, _)| class.generic_context(db));
+        self.iter_flat()
+            .flat_map(CallableBinding::matching_overloads)
+            .filter_map(move |(_, overload)| {
+                let specialization = overload.merged_specialization(db)?;
+                let inferred = receiver.apply_specialization(db, specialization);
+                if let Some(context) = context
+                    && any_over_type(db, env, inferred, false, |ty| {
+                        ty.as_typevar()
+                            .is_some_and(|variable| !context.contains(db, variable.identity(db)))
+                    })
+                {
+                    return None;
+                }
+                Some(inferred)
+            })
+    }
+
     /// Returns a mutable iterator over all `CallableBinding`s, flattening the two-level structure.
     ///
     /// Note: This loses the union/intersection distinction. Use only when you need to

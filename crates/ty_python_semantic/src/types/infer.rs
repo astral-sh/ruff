@@ -43,6 +43,7 @@
 //! of iterations, so if we fail to converge, Salsa will eventually panic. (This should of course
 //! be considered a bug.)
 
+use self::constraints::{InferenceOwner, InferenceSlot, SymbolicType};
 use crate::ProgramEnvironment;
 use crate::place::Place;
 use itertools::Either;
@@ -66,7 +67,6 @@ use crate::{Db, FxIndexSet};
 
 use builder::TypeInferenceBuilder;
 pub(super) use comparisons::UnsupportedComparisonError;
-use constraints::SymbolicType;
 use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::expression::Expression;
 use ty_python_core::scope::ScopeId;
@@ -2016,6 +2016,39 @@ pub(crate) enum StatementInference<'db> {
 }
 
 impl<'db> StatementInference<'db> {
+    /// Retain collection constraints, including uses whose receiver is not yet known.
+    fn symbolic_collection_use(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        owner: InferenceOwner<'db>,
+        definition: Definition<'db>,
+        expression: ExpressionNodeKey,
+    ) -> Option<SymbolicType<'db>> {
+        let slot = InferenceSlot::CollectionUse(definition);
+        let symbolic = match self {
+            Self::Expression(inference) => inference
+                .extra
+                .as_ref()
+                .and_then(|extra| extra.symbolic.get(&slot))
+                .copied(),
+            Self::Definition(_, inference) => match inference.extra.as_deref() {
+                Some(DefinitionInferenceExtra::Other(extra)) => extra.symbolic.get(&slot).copied(),
+                _ => None,
+            },
+            Self::Other(inference) => inference
+                .extra
+                .as_ref()
+                .and_then(|extra| extra.symbolic.get(&slot))
+                .copied(),
+        };
+        symbolic.or_else(|| {
+            self.expression_type(expression)
+                .as_divergent()
+                .map(|_| SymbolicType::initial(db, env.program(db), owner, slot))
+        })
+    }
+
     fn expression_type(&self, expression: impl Into<ExpressionNodeKey>) -> Type<'db> {
         match self {
             StatementInference::Expression(inference) => inference.expression_type(expression),

@@ -2901,6 +2901,126 @@ x24[1] = "b"
 reveal_type(x24)  # revealed: dict[int | str, str | int]
 ```
 
+## Lists updated from their own elements
+
+Appending a tuple made from an existing element preserves the tuple's shape. The initial values
+determine its element types, including when iteration uses a shallow copy of the list.
+
+```py
+from copy import copy
+from typing_extensions import assert_type
+
+def append_to_copy():
+    items = list()
+    for _ in range(2):
+        for value in copy(items):
+            items.append((value[0], 1))
+        items.append(("a", 1))
+    assert_type(items, list[tuple[str, int]])
+```
+
+Extending the list with an iterable of these tuples gives the same element type.
+
+```py
+def extend_from_copy():
+    items = []
+    for _ in range(2):
+        for value in copy(items):
+            items.extend([(value[0], 1)])
+        items.extend([("a", 1)])
+    assert_type(items, list[tuple[str, int]])
+```
+
+Replacing individual elements or assigning an iterable to a slice also preserves this type.
+
+```py
+def replace_element():
+    items = []
+    for _ in range(2):
+        for value in copy(items):
+            items[0] = (value[0], 1)
+        items.append(("a", 1))
+    assert_type(items, list[tuple[str, int]])
+
+def replace_slice():
+    items = []
+    for _ in range(2):
+        for value in copy(items):
+            items[:] = [(value[0], 1)]
+        items.append(("a", 1))
+    assert_type(items, list[tuple[str, int]])
+```
+
+## Sets updated from their own elements
+
+Adding tuples derived from existing set elements preserves their types. Iterating a copy allows the
+original set to be updated during iteration.
+
+```py
+from copy import copy
+from typing_extensions import assert_type
+
+def update_set():
+    items = set()
+    for _ in range(2):
+        for value in copy(items):
+            items.add((value[0], 1))
+        items.add(("a", 1))
+    assert_type(items, set[tuple[str, int]])
+```
+
+## Dictionaries updated from their own entries
+
+Both the key type and the value type are preserved when a dictionary's entries are replaced with
+values derived from existing entries.
+
+```py
+from copy import copy
+from typing_extensions import assert_type
+
+def replace_entry():
+    items = {}
+    for _ in range(2):
+        for key in copy(items):
+            items[key] = (items[key][0], 1)
+        items["a"] = ("b", 1)
+    assert_type(items, dict[str, tuple[str, int]])
+```
+
+Passing those entries to `update` preserves the same types.
+
+```py
+def update_entries():
+    items = {}
+    for _ in range(2):
+        for key in copy(items):
+            items.update({key: (items[key][0], 1)})
+        items.update({"a": ("b", 1)})
+    assert_type(items, dict[str, tuple[str, int]])
+```
+
+## Mutually dependent collection updates
+
+Two lists exchange the first elements of their tuples. Each list can contain either initial type in
+that position, while the second elements retain distinct types.
+
+```py
+from typing_extensions import assert_type
+
+def exchange_elements():
+    left = []
+    right = []
+    for _ in range(2):
+        for item in right:
+            left.append((item[0], 1))
+        for item in left:
+            right.append((item[0], "a"))
+        left.append(("seed", 0))
+        right.append((b"seed", "a"))
+    assert_type(left, list[tuple[str | bytes, int]])
+    assert_type(right, list[tuple[str | bytes, str]])
+```
+
 ## Multi-inference diagnostics
 
 Diagnostics unrelated to the type-context are only reported once:

@@ -27,8 +27,8 @@ use ty_python_core::ast_ids::HasScopedUseId;
 use ty_python_core::statement::StatementInner;
 
 use super::constraints::{
-    InferenceConstraints, InferenceOperation, InferenceOwner, InferencePromotion, InferenceSlot,
-    InferenceVariable, SymbolicType,
+    InferenceCallOutput, InferenceConstraints, InferenceOperation, InferenceOwner,
+    InferencePromotion, InferenceSlot, InferenceVariable, SymbolicType,
 };
 use super::{
     CollectionUseConstraints, DeferredAndUndecorated, DefinitionInference,
@@ -139,9 +139,8 @@ use crate::types::{
     ProgramEnvironment, PropertyDeprecations, SentinelInstance, Signature, SpecialFormType,
     SubclassOfType, Type, TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers,
     TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, TypingModule, UnionAccumulator,
-    UnionBuilder, UnionType, any_over_type, binding_type,
-    extract_fixed_length_iterable_element_types, infer_complete_scope_types, infer_scope_types,
-    is_discarded_dict_key_assignment, todo_type,
+    UnionBuilder, UnionType, binding_type, extract_fixed_length_iterable_element_types,
+    infer_complete_scope_types, infer_scope_types, is_discarded_dict_key_assignment, todo_type,
 };
 use crate::{AnalysisSettings, Db, DisplaySettings, FxIndexSet, FxOrderSet, SemanticModel};
 use ty_python_core::definition::{
@@ -220,6 +219,14 @@ fn should_preserve_inferred_binding_type(ty: Type<'_>) -> bool {
 /// uses 7 field specifiers. We could probably store more inline if this turns out to be a
 /// performance problem. For now, we optimize for memory usage.
 const NUM_FIELD_SPECIFIERS_INLINE: usize = 1;
+
+/// Constraints contributed by one statement using an unannotated collection initializer.
+struct CollectionUseInput<'db> {
+    owner: InferenceOwner<'db>,
+    definition: Definition<'db>,
+    types: Vec<Type<'db>>,
+    symbolic: Option<SymbolicType<'db>>,
+}
 
 /// Builder to infer all types in a region.
 ///
@@ -7612,6 +7619,82 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         })
     }
 
+    /// Collect the statement constraints already needed to infer an unannotated collection.
+    fn collection_use_inputs(
+        &self,
+        collection_class: KnownClass,
+        collection_expr: Option<ast::ExprRef<'_>>,
+        tcx: TypeContext<'db>,
+    ) -> Vec<CollectionUseInput<'db>> {
+        let db = self.db();
+        let env = self.program_environment();
+        let Some(collection_expr) = collection_expr else {
+            return Vec::new();
+        };
+        let InferenceRegion::Expression(current_expr, _) = self.region else {
+            return Vec::new();
+        };
+        if tcx.annotation.is_some()
+            || current_expr.node_ref(db).index() != *collection_expr.node_index()
+        {
+            return Vec::new();
+        }
+        let Some(assignment) = current_expr.assigned_to(db) else {
+            return Vec::new();
+        };
+        let Ok(key) =
+            DefinitionNodeKey::from_assignment(assignment.node(self.module())).exactly_one()
+        else {
+            return Vec::new();
+        };
+        let Some(definition) = self.index.try_definition(key) else {
+            return Vec::new();
+        };
+        self.index
+            .constraining_collection_uses(definition)
+            .map(|(statement, expression)| {
+                let inference = infer_statement_types(db, statement);
+                let region = match statement {
+                    Statement::Expression(expression) => {
+                        InferenceRegion::Expression(expression, TypeContext::default())
+                    }
+                    Statement::Definition(definition) => InferenceRegion::Definition(definition),
+                    Statement::Other(statement) => InferenceRegion::Statement(statement),
+                };
+                let owner = InferenceOwner::Region(region);
+                let symbolic =
+                    inference.symbolic_collection_use(db, env, owner, definition, expression);
+                let types =
+                    if let Some(divergent) = inference.expression_type(expression).as_divergent() {
+                        collection_class
+                            .try_to_class_literal(db, env)
+                            .map(|class| {
+                                let class = class.apply_specialization(db, |context| {
+                                    context.repeat_specialization(db, Type::Divergent(divergent))
+                                });
+                                Type::instance(db, env, class)
+                            })
+                            .into_iter()
+                            .collect()
+                    } else {
+                        inference
+                            .collection_use_constraints(definition)
+                            .into_iter()
+                            .flatten()
+                            .copied()
+                            .filter(|ty| !ty.has_unspecialized_type_var(db, env))
+                            .collect()
+                    };
+                CollectionUseInput {
+                    owner,
+                    definition,
+                    types,
+                    symbolic,
+                }
+            })
+            .collect()
+    }
+
     // Infer the type of a collection literal expression.
     fn infer_collection_literal<'expr, const N: usize>(
         &mut self,
@@ -7623,13 +7706,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) -> Option<Type<'db>> {
         let db = self.db();
         let env = self.program_environment();
+        let uses = self.collection_use_inputs(collection_class, collection_expr, tcx);
+        let use_constraints: Vec<_> = uses
+            .iter()
+            .flat_map(|input| input.types.iter().copied())
+            .collect();
         let mut try_narrow = |narrowed_ty| {
             let mut speculative_builder = self.speculate();
 
             // Attempt to infer the collection literal using the narrowed type context.
             let inferred_ty = speculative_builder.infer_collection_literal_impl(
                 collection_class,
-                collection_expr,
+                &use_constraints,
                 elts,
                 infer_elt_expression,
                 TypeContext::new(Some(narrowed_ty)),
@@ -7661,7 +7749,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (
                 self.infer_collection_literal_impl(
                     collection_class,
-                    collection_expr,
+                    &use_constraints,
                     elts,
                     infer_elt_expression,
                     tcx,
@@ -7680,11 +7768,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .copied()
         };
         if let Some(collection_expr) = collection_expr
-            && elts
-                .iter()
-                .flatten()
-                .flatten()
-                .any(|elt| symbolic_input(elt).is_some())
+            && (uses.iter().any(|input| input.symbolic.is_some())
+                || elts
+                    .iter()
+                    .flatten()
+                    .flatten()
+                    .any(|elt| symbolic_input(elt).is_some()))
         {
             let mut constraints = InferenceConstraints::default();
             let mut changed = false;
@@ -7722,13 +7811,58 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     (key, symbolic)
                 })
                 .collect();
+            // Import all uses before closing their references: one use can depend on another.
+            let use_values: Vec<_> = uses
+                .iter()
+                .map(|input| {
+                    input.symbolic.map_or_else(
+                        || UnionType::from_elements(db, env, input.types.iter().copied()),
+                        |symbolic| constraints.import(db, symbolic),
+                    )
+                })
+                .collect();
+            let mut symbolic_uses = Vec::new();
+            for (input, value) in uses.iter().zip(use_values) {
+                let value = constraints.define(
+                    db,
+                    env.program(db),
+                    input.owner,
+                    InferenceSlot::CollectionUse(input.definition),
+                    value,
+                );
+                if input.symbolic.is_none() {
+                    symbolic_uses.extend(input.types.iter().copied());
+                    continue;
+                }
+                changed = true;
+                if let Some(class) = collection_class.try_to_class_literal(db, env)
+                    && let Some(context) = class.generic_context(db)
+                {
+                    let types: Vec<_> = context
+                        .variables(db)
+                        .map(|parameter| {
+                            constraints.apply(
+                                db,
+                                env,
+                                input.owner,
+                                InferenceSlot::TypeArgument(
+                                    collection_expr.into(),
+                                    parameter.as_id().as_bits(),
+                                ),
+                                InferenceOperation::TypeArgument { value, parameter },
+                            )
+                        })
+                        .collect();
+                    symbolic_uses.push(collection_class.to_specialized_instance(db, env, &types));
+                }
+            }
             // Reuse collection specialization with the symbolic elements. Their expressions
             // have already been inferred with the selected context.
             let symbolic_ty = if changed {
                 self.speculate_without_diagnostics()
                     .infer_collection_literal_impl(
                         collection_class,
-                        Some(collection_expr),
+                        &symbolic_uses,
                         elts,
                         &mut |_, (_, elt, _)| element_types[&elt.into()],
                         tcx,
@@ -7762,7 +7896,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn infer_collection_literal_impl<'expr, const N: usize>(
         &mut self,
         collection_class: KnownClass,
-        collection_expr: Option<ast::ExprRef<'_>>,
+        use_constraints: &[Type<'db>],
         elts: &[[Option<&'expr ast::Expr>; N]],
         infer_elt_expression: &mut dyn FnMut(&mut Self, ArgExpr<'db, 'expr>) -> Type<'db>,
         tcx: TypeContext<'db>,
@@ -8055,52 +8189,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        if tcx.annotation.is_none()
-            && let Some(collection_expr) = collection_expr
-            && let InferenceRegion::Expression(current_expr, _) = self.region
-            && current_expr.node_ref(self.db()).index() == *collection_expr.node_index()
-            && let Some(assignment) = current_expr.assigned_to(self.db())
-            && let Ok(collection_def) =
-                DefinitionNodeKey::from_assignment(assignment.node(self.module())).exactly_one()
-            && let Some(collection_def) = self.index.try_definition(collection_def)
-        {
-            // For unannotated collection literals, collect any constraints created by later uses
-            // of this definition in the scope.
-            for (statement, use_expression) in
-                self.index.constraining_collection_uses(collection_def)
-            {
-                let statement_use_types = infer_statement_types(self.db(), statement);
-
-                if let Some(divergent) = statement_use_types
-                    .expression_type(use_expression)
-                    .as_divergent()
-                {
-                    // Infer `collection[Divergent]` for the initial cycle result.
-                    let divergent_instance = collection_alias
-                        .origin(self.db())
-                        .apply_specialization(db, |generic_context| {
-                            generic_context
-                                .repeat_specialization(self.db(), Type::Divergent(divergent))
-                        });
-
-                    builder
-                        .infer(
-                            identity_instance,
-                            Type::instance(db, env, divergent_instance),
-                        )
-                        .ok()?;
-                } else if let Some(constraints) =
-                    statement_use_types.collection_use_constraints(collection_def)
-                {
-                    for constraint in constraints {
-                        if constraint.has_unspecialized_type_var(db, env) {
-                            continue;
-                        }
-
-                        builder.infer(identity_instance, *constraint).ok()?;
-                    }
-                }
-            }
+        for constraint in use_constraints {
+            builder.infer(identity_instance, *constraint).ok()?;
         }
 
         for (elts_index, elts) in elts.iter().enumerate() {
@@ -9199,6 +9289,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 callable,
                 arguments,
                 context,
+                output: InferenceCallOutput::Return,
             },
         );
         self.symbolic.insert(slot, constraints.finish(db, result));
@@ -9270,35 +9361,36 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         call_arguments
     }
 
-    // TODO: This should not be needed once we use constraint sets to track the usages of each
-    // container literal across a scope.
-    // https://github.com/astral-sh/ty/issues/3507
-    fn collection_use_constraint_from_specialization(
-        &self,
-        identity_instance: Type<'db>,
-        receiver_generic_context: Option<GenericContext<'db>>,
-        call_specialization: Specialization<'db>,
-    ) -> Option<Type<'db>> {
+    /// Retain the receiver specialization learned from cyclic call arguments.
+    fn store_collection_receiver_constraints(
+        &mut self,
+        definition: Definition<'db>,
+        receiver: Type<'db>,
+        callable: Type<'db>,
+        arguments: &CallArguments<'_, 'db>,
+        context: TypeContext<'db>,
+    ) {
+        if !arguments.has_symbolic_types() {
+            return;
+        }
         let db = self.db();
         let env = self.program_environment();
-        let constraint = identity_instance.apply_specialization(db, call_specialization);
-        let Some(receiver_generic_context) = receiver_generic_context else {
-            return Some(constraint);
-        };
-
-        // Method-local typevars describe requirements imposed by the method, not concrete element
-        // types learned for the collection. Until collection-use constraints are represented as
-        // projected constraint sets, avoid leaking those method-local typevars into the inferred
-        // collection literal type.
-        if any_over_type(db, env, constraint, false, |ty| {
-            ty.as_typevar().is_some_and(|typevar| {
-                !receiver_generic_context.contains(self.db(), typevar.identity(self.db()))
-            })
-        }) {
-            return None;
-        }
-
-        Some(constraint)
+        let mut constraints = InferenceConstraints::default();
+        let arguments = arguments.capture(db, &mut constraints);
+        let slot = InferenceSlot::CollectionUse(definition);
+        let value = constraints.apply(
+            db,
+            env,
+            InferenceOwner::Region(self.region),
+            slot,
+            InferenceOperation::Call {
+                callable,
+                arguments,
+                context,
+                output: InferenceCallOutput::Receiver(receiver),
+            },
+        );
+        self.symbolic.insert(slot, constraints.finish(db, value));
     }
 
     fn infer_call_expression(
@@ -9996,9 +10088,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let identity_instance =
                     Type::instance(db, env, collection_literal.identity_specialization(db));
                 let collection_generic_context = collection_literal.generic_context(db);
-                let mut identity_bindings = self
+                // Contexts from the provisional receiver must not constrain its own inference.
+                // Splatted arguments have no parameter context and retain their inferred types.
+                let mut call_arguments = call_arguments.clone();
+                for index in 0..call_arguments.len() {
+                    if !call_arguments.is_variadic(index) {
+                        call_arguments.clear_types(index);
+                    }
+                }
+                let identity_callable = self
                     .infer_attribute_load_impl(attribute, identity_instance)
-                    .unwrap_or_else(|recovery_ty| recovery_ty)
+                    .unwrap_or_else(|recovery_ty| recovery_ty);
+                let mut identity_bindings = identity_callable
                     .bindings(db, env)
                     .match_parameters(db, env, &call_arguments)
                     // Perform inference against the type variables on the receiver's generic context.
@@ -10009,42 +10110,31 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .infer_and_check_argument_types(
                         ArgumentsIter::from_ast(arguments),
                         &mut call_arguments,
-                        // TODO: The argument types have already been inferred and stored in `call_arguments`.
-                        // However, `value` would have been inferred to a be a collection with `Divergent`
-                        // element types, meaning the type context for a given argument, by which the inferred
-                        // type is keyed, may not be the same as the type context we get here. It is not immediately
-                        // clear how to retrieve those types, and so we just re-infer the argument expressions
-                        // for simplicity.
-                        &mut |builder, (_, expr, tcx)| builder.infer_expression(expr, tcx).into(),
+                        &mut |builder, (_, expr, tcx)| {
+                            let ty = builder.infer_expression(expr, tcx);
+                            builder.inferred_argument(expr, ty)
+                        },
                         &mut identity_bindings,
                         call_expression_tcx,
                     );
 
                 if call_result.is_ok() {
-                    let db = self.db();
-                    for call_specialization in identity_bindings
-                        .iter_flat()
-                        .flat_map(CallableBinding::matching_overloads)
-                        .filter_map(|(_, identity_overload)| {
-                            identity_overload.merged_specialization(db)
-                        })
-                    {
-                        // Record the constraints on the receiver's generic context formed by
-                        // the arguments to this bound method call.
-                        let Some(constraints) = self.collection_use_constraint_from_specialization(
+                    self.collection_use_constraints
+                        .entry(collection_def)
+                        .or_default()
+                        .extend(identity_bindings.inferred_receiver_types(
+                            db,
+                            env,
                             identity_instance,
-                            collection_generic_context,
-                            call_specialization,
-                        ) else {
-                            continue;
-                        };
-
-                        self.collection_use_constraints
-                            .entry(collection_def)
-                            .or_default()
-                            .insert(constraints);
-                    }
+                        ));
                 }
+                self.store_collection_receiver_constraints(
+                    collection_def,
+                    identity_instance,
+                    identity_callable,
+                    &call_arguments,
+                    call_expression_tcx,
+                );
             }
         }
 

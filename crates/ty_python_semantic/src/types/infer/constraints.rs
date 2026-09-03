@@ -95,6 +95,8 @@ pub(crate) enum InferenceSlot<'db> {
     /// Auxiliary outputs of an expression, such as a mapping spread's key and value types.
     Component(ExpressionNodeKey, usize),
     Binding(Definition<'db>),
+    /// Type arguments learned from a collection's uses in one statement.
+    CollectionUse(Definition<'db>),
     /// One result per collection parameter, identified by its full interned ID.
     TypeArgument(ExpressionNodeKey, u64),
     /// Reaching assignments can share a predicate while supplying different types.
@@ -353,9 +355,14 @@ pub(crate) enum InferenceOperation<'db> {
         callable: Type<'db>,
         arguments: CapturedCallArguments<'db>,
         context: TypeContext<'db>,
+        output: InferenceCallOutput<'db>,
     },
     MappingKey(Type<'db>),
     MappingValue(Type<'db>),
+    TypeArgument {
+        value: Type<'db>,
+        parameter: BoundTypeVarInstance<'db>,
+    },
     Unpack {
         value: Type<'db>,
         length: TupleLength,
@@ -366,6 +373,13 @@ pub(crate) enum InferenceOperation<'db> {
         right: Type<'db>,
         right_length: Option<usize>,
     },
+}
+
+/// Select the inferred return type or the specialization of a generic receiver.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, get_size2::GetSize, salsa::SalsaValue)]
+pub(crate) enum InferenceCallOutput<'db> {
+    Return,
+    Receiver(Type<'db>),
 }
 
 impl<'db> InferenceOperation<'db> {
@@ -500,12 +514,23 @@ impl<'db> InferenceOperation<'db> {
                 callable,
                 arguments,
                 context,
+                output,
             } => Self::Call {
                 callable: f(callable),
                 arguments: arguments.map(db, &mut f),
-                context: context.map(f),
+                context: context.map(&mut f),
+                output: match output {
+                    InferenceCallOutput::Return => output,
+                    InferenceCallOutput::Receiver(receiver) => {
+                        InferenceCallOutput::Receiver(f(receiver))
+                    }
+                },
             },
             Self::MappingValue(value) => Self::MappingValue(f(value)),
+            Self::TypeArgument { value, parameter } => Self::TypeArgument {
+                value: f(value),
+                parameter,
+            },
             Self::Unpack {
                 value,
                 length,
@@ -631,21 +656,44 @@ impl<'db> InferenceOperation<'db> {
                 callable,
                 arguments,
                 context,
+                output,
             } => {
                 let arguments = arguments.to_arguments(db);
                 let constraints = ConstraintSetBuilder::new();
-                let bindings = callable
+                let mut bindings = callable
                     .bindings(db, env)
-                    .match_parameters(db, env, &arguments)
+                    .match_parameters(db, env, &arguments);
+                if let InferenceCallOutput::Receiver(receiver) = output {
+                    let context = receiver
+                        .class_specialization(db, env)
+                        .and_then(|(class, _)| class.generic_context(db));
+                    bindings = bindings.with_generic_context(db, context);
+                }
+                let bindings = bindings
                     .check_types(db, env, &constraints, &arguments, context, &[])
                     .ok()?;
-                Some(arguments.bind_type_guard_return_type(
-                    db,
-                    bindings.return_type(db, env),
-                    &bindings,
-                ))
+                match output {
+                    InferenceCallOutput::Return => Some(arguments.bind_type_guard_return_type(
+                        db,
+                        bindings.return_type(db, env),
+                        &bindings,
+                    )),
+                    InferenceCallOutput::Receiver(receiver) => {
+                        let mut types = bindings
+                            .inferred_receiver_types(db, env, receiver)
+                            .peekable();
+                        types.peek()?;
+                        Some(UnionType::from_elements(db, env, types))
+                    }
+                }
             }
             Self::MappingValue(value) => Some(value.unpack_keys_and_items(db, env)?.1),
+            Self::TypeArgument { value, parameter } => match value {
+                Type::Union(union) => union.try_map(db, env, |value| {
+                    value.class_specialization(db, env)?.1.get(db, parameter)
+                }),
+                value => value.class_specialization(db, env)?.1.get(db, parameter),
+            },
             Self::Unpack {
                 value,
                 length,
