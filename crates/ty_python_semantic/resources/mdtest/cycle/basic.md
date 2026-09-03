@@ -146,6 +146,78 @@ def solve(maxiter, a, b, c, d, e):
     return stop
 ```
 
+## String accumulation in nested loops
+
+Repeated string updates in nested loops converge to `str`, without retaining recursion placeholders.
+This is a reduced regression test from Pylint's similarity report.
+
+```py
+def concatenate(lines: list[str]) -> str:
+    result = ""
+    for _ in lines:
+        result += ""
+        for _ in lines:
+            result += ""
+        for _ in lines:
+            result += "\n"
+    reveal_type(result)  # revealed: str
+    return result
+```
+
+## Runtime union accumulation in nested loops
+
+Runtime union values can also be accumulated in loops. Their presence does not make the result a
+recursive alias: each value returned here is a `UnionType`, with no unresolved recursion
+placeholders.
+
+```toml
+[rules]
+unsound-return-statement = "error"
+```
+
+```py
+from types import UnionType
+
+def accumulate_unions(iterations: list[int]) -> UnionType:
+    result = int | str
+    for _ in iterations:
+        result |= bytes
+        for _ in iterations:
+            result |= bytes
+        for _ in iterations:
+            result |= bytes
+    return result
+```
+
+## Runtime unions containing unrelated recursion markers
+
+A runtime union can contain a recursion marker from an already inferred alias. That marker belongs
+to the alias, not to the loop, and does not prevent the loop's own placeholders from being removed.
+
+```toml
+[rules]
+unsound-return-statement = "error"
+```
+
+```py
+from typing import Union
+from types import UnionType
+
+D = Union["D", "D"]
+R = Union[D, int]
+reveal_type(R)  # revealed: <types.UnionType special-form 'Divergent | int'>
+
+def accumulate_unions(iterations: list[int]) -> UnionType:
+    result = R
+    for _ in iterations:
+        result |= bytes
+        for _ in iterations:
+            result |= bytes
+        for _ in iterations:
+            result |= bytes
+    return result
+```
+
 ## Self-referential bare type alias
 
 ```toml
