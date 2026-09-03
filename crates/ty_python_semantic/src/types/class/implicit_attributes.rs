@@ -472,17 +472,31 @@ fn implicit_attribute_binding_type<'db>(
             }
             TargetKind::Single => {
                 // with <context_manager> as self.name:
-                let context_ty = infer_expression_type(
+                let context_expr = with_item.context_expr(&module);
+                let inference = infer_expression_types(
                     db,
-                    index.expression(with_item.context_expr(&module)),
+                    index.expression(context_expr),
                     TypeContext::default(),
                 );
+                let context_ty = inference.expression_type(context_expr);
                 let ty = if with_item.is_async() {
                     context_ty.aenter(db, &env)
                 } else {
                     context_ty.enter(db, &env)
                 };
-                Some((ty, None))
+                let symbolic = inference.symbolic_type(context_expr).map(|symbolic| {
+                    symbolic.apply(
+                        db,
+                        &env,
+                        InferenceOwner::Region(InferenceRegion::Definition(definition)),
+                        with_item.target(&module).into(),
+                        |value| InferenceOperation::Enter {
+                            value,
+                            mode: EvaluationMode::from_is_async(with_item.is_async()),
+                        },
+                    )
+                });
+                Some((ty, symbolic))
             }
         },
         DefinitionKind::Comprehension(comprehension) => match comprehension.target_kind() {

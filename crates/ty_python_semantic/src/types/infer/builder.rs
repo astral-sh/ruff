@@ -12,8 +12,8 @@ use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::helpers::is_dotted_name;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{
-    self as ast, AnyNodeRef, ArgOrKeyword, ArgumentsSourceOrder, ExprContext, HasNodeIndex,
-    PythonVersion,
+    self as ast, AnyNodeRef, ArgOrKeyword, ArgumentsSourceOrder, ExprContext, ExprRef,
+    HasNodeIndex, PythonVersion,
 };
 use ruff_python_stdlib::builtins::version_builtin_was_added;
 use ruff_python_stdlib::typing::as_pep_585_generic;
@@ -2399,6 +2399,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             TargetKind::Single => {
                 let context_expr_ty =
                     self.infer_standalone_expression(context_expr, TypeContext::default());
+                if let Some(symbolic) = self
+                    .symbolic
+                    .get(&InferenceSlot::Expression(context_expr.into()))
+                    .copied()
+                {
+                    let symbolic = symbolic.apply(
+                        self.db(),
+                        self.program_environment(),
+                        InferenceOwner::Region(self.region),
+                        target.into(),
+                        |value| InferenceOperation::Enter {
+                            value,
+                            mode: EvaluationMode::from_is_async(with_item.is_async()),
+                        },
+                    );
+                    self.symbolic
+                        .insert(InferenceSlot::Expression(target.into()), symbolic);
+                    self.symbolic
+                        .insert(InferenceSlot::Binding(definition), symbolic);
+                }
                 self.infer_context_expression(context_expr, context_expr_ty, with_item.is_async())
             }
         };
@@ -10216,6 +10236,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             value,
             tcx.map(|tcx| KnownClass::Awaitable.to_specialized_instance(db, env, &[tcx])),
         );
+        if let Some(symbolic) = self
+            .symbolic
+            .get(&InferenceSlot::Expression(value.as_ref().into()))
+            .copied()
+        {
+            let expression = ExprRef::Await(await_expression).into();
+            let symbolic = symbolic.apply(
+                db,
+                env,
+                InferenceOwner::Region(self.region),
+                expression,
+                InferenceOperation::Await,
+            );
+            self.symbolic
+                .insert(InferenceSlot::Expression(expression), symbolic);
+        }
 
         expr_type.try_await(db, env).unwrap_or_else(|err| {
             err.report_diagnostic(&self.context, expr_type, value.as_ref().into());

@@ -189,6 +189,170 @@ class Values:
         reveal_type(self.values)  # revealed: list[int]
 ```
 
+## Rebuilding a tuple from a context manager
+
+A context manager can return itself together with another value. Unpacking that result and storing
+both elements back in the original tuple preserves their types.
+
+```py
+class Context:
+    def __enter__(self) -> tuple["Context", int]:
+        return self, 0
+
+    def __exit__(self, *args: object) -> None: ...
+
+class Values:
+    def __init__(self, context: Context):
+        self.state = (context, 0)
+
+    def copy(self):
+        with self.state[0] as (context, item):
+            self.state = (context, item)
+            reveal_type(self.state)  # revealed: tuple[Context, int]
+```
+
+## Rebuilding a tuple from an async context manager
+
+An async context manager preserves the types of its unpacked result in the same way.
+
+```py
+class Context:
+    async def __aenter__(self) -> tuple["Context", int]:
+        return self, 0
+
+    async def __aexit__(self, *args: object) -> None: ...
+
+class Values:
+    def __init__(self, context: Context):
+        self.state = (context, 0)
+
+    async def copy(self):
+        async with self.state[0] as (context, item):
+            self.state = (context, item)
+            reveal_type(self.state)  # revealed: tuple[Context, int]
+```
+
+## Reusing a context manager
+
+A context manager that returns itself can be stored back in the tuple it came from.
+
+```py
+from typing_extensions import Self
+
+class Context:
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(self, *args: object) -> None: ...
+
+class Values:
+    def __init__(self, value: Context):
+        self.values = (value,)
+
+    def update(self):
+        with self.values[0] as value:
+            self.values = (value,)
+            reveal_type(self.values)  # revealed: tuple[Context]
+```
+
+## Reusing an async context manager
+
+An async context manager that returns itself also preserves the tuple's element type.
+
+```py
+from typing_extensions import Self
+
+class Context:
+    async def __aenter__(self) -> Self:
+        return self
+
+    async def __aexit__(self, *args: object) -> None: ...
+
+class Values:
+    def __init__(self, value: Context):
+        self.values = (value,)
+
+    async def update(self):
+        async with self.values[0] as value:
+            self.values = (value,)
+            reveal_type(self.values)  # revealed: tuple[Context]
+```
+
+## Storing a context manager result in an attribute
+
+A `with` target can be an attribute. Copying it back into the source tuple preserves its type.
+
+```py
+from typing_extensions import Self
+
+class Context:
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(self, *args: object) -> None: ...
+
+class Values:
+    def __init__(self, value: Context):
+        self.values = (value,)
+
+    def load(self):
+        with self.values[0] as self.current:
+            pass
+
+    def update(self):
+        self.values = (self.current,)
+        reveal_type(self.values)  # revealed: tuple[Context]
+```
+
+## Storing an async context manager result in an attribute
+
+An `async with` target can also connect two attributes through a context manager's return type.
+
+```py
+from typing_extensions import Self
+
+class Context:
+    async def __aenter__(self) -> Self:
+        return self
+
+    async def __aexit__(self, *args: object) -> None: ...
+
+class Values:
+    def __init__(self, value: Context):
+        self.values = (value,)
+
+    async def load(self):
+        async with self.values[0] as self.current:
+            pass
+
+    def update(self):
+        self.values = (self.current,)
+        reveal_type(self.values)  # revealed: tuple[Context]
+```
+
+## Reusing an awaited value
+
+Awaiting an object that returns itself preserves its type when the result is stored back in a tuple.
+
+```py
+from collections.abc import Generator
+from typing_extensions import Self
+
+class Awaitable:
+    def __await__(self) -> Generator[None, None, Self]:
+        yield None
+        return self
+
+class Values:
+    def __init__(self, value: Awaitable):
+        self.values = (value,)
+
+    async def update(self):
+        value = await self.values[0]
+        self.values = (value,)
+        reveal_type(self.values)  # revealed: tuple[Awaitable]
+```
+
 ## Copying tuple elements
 
 Copying each element preserves its type, including when the tuple's type includes the assignments

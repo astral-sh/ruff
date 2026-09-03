@@ -319,6 +319,11 @@ pub(crate) enum InferenceOperation<'db> {
         value: Type<'db>,
         mode: EvaluationMode,
     },
+    Enter {
+        value: Type<'db>,
+        mode: EvaluationMode,
+    },
+    Await(Type<'db>),
     Promote {
         value: Type<'db>,
         promotion: InferencePromotion,
@@ -434,6 +439,11 @@ impl<'db> InferenceOperation<'db> {
                 mode,
             },
             Self::MappingKey(value) => Self::MappingKey(f(value)),
+            Self::Enter { value, mode } => Self::Enter {
+                value: f(value),
+                mode,
+            },
+            Self::Await(value) => Self::Await(f(value)),
             Self::Promote { value, promotion } => Self::Promote {
                 value: f(value),
                 promotion,
@@ -479,6 +489,8 @@ impl<'db> InferenceOperation<'db> {
                     .homogeneous_element_type(db, env),
             ),
             Self::MappingKey(value) => Some(value.unpack_keys_and_items(db, env)?.0),
+            Self::Enter { value, mode } => value.try_enter_with_mode(db, env, mode).ok(),
+            Self::Await(value) => value.try_await(db, env).ok(),
             Self::Promote { value, promotion } => {
                 // Wait for a value to promote; forwarding an unresolved reference creates mutable
                 // aliases that can repeatedly unfold recursive types.

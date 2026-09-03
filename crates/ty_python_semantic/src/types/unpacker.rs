@@ -149,7 +149,15 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
             }
             UnpackKind::ContextManager { mode } => {
                 let env = self.context.program_environment();
-                symbolic = None;
+                symbolic = symbolic.map(|symbolic| {
+                    symbolic.apply(
+                        db,
+                        env,
+                        InferenceOwner::Unpack(self.unpack),
+                        value_expr.into(),
+                        |value| InferenceOperation::Enter { value, mode },
+                    )
+                });
                 value_type
                     .try_enter_with_mode(db, env, mode)
                     .unwrap_or_else(|err| {
