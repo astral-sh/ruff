@@ -1,6 +1,6 @@
 [package]
 name = "ruff_wasm"
-version = "0.16.5"
+version = "0.16.6"
 description = "WebAssembly bindings for Ruff"
 authors = { workspace = true }
 edition = { workspace = true }

@@ -191,15 +191,10 @@ uv run scripts/generate-crate-readmes.py
 cargo publish --workspace --dry-run
 ```
 
-Before merging a publishable crate, ask a crates.io owner to bootstrap it by running:
-
-```shell
-CARGO_REGISTRY_TOKEN=<token> uv run --no-config scripts/setup-crates-io-publish.py
-```
-
-The bootstrap script reserves the crate name, configures the release workflow as its trusted
-publisher, requires trusted publishing for future versions, and adds the crate to `.known-crates`.
-Commit the generated README and `.known-crates` update with the new crate.
+Before merging a publishable crate, register it in
+[astral-sh/crates-policies](https://github.com/astral-sh/crates-policies#readme) and follow the
+instructions there to bootstrap the crate and configure trusted publishing. Commit the generated
+README with the new crate.
 
 ### Example: Adding a new lint rule
 

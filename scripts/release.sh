@@ -25,4 +25,7 @@ cargo update -p ruff
 uv lock
 
 echo "Checking crates.io publish setup..."
-uv run --script "$project_root/scripts/setup-crates-io-publish.py" --quiet
+crates_policies="$(mktemp -d)"
+trap 'rm -rf "$crates_policies"' EXIT
+git clone --depth=1 --quiet https://github.com/astral-sh/crates-policies.git "$crates_policies"
+uv run --script "$crates_policies/check.py" "$project_root"

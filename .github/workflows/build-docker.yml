@@ -18,6 +18,7 @@ on:
       - .github/workflows/build-docker.yml
 
 env:
+  UV_LOCKED: 1
   ACTIONS_CACHE_MODE: none
   RUFF_BASE_IMG: ghcr.io/${{ github.repository_owner }}/ruff
 

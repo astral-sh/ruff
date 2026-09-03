@@ -918,6 +918,43 @@ class Chain[T](Protocol):
     }
 }
 
+/// Regression benchmark for ty#4269: inherited receiver binding with nested type variables.
+///
+/// The nominal relation constrains `T` inside the source's union argument. Ignoring that
+/// evidence repeatedly expands the recursive overloads while binding `chain`.
+fn benchmark_nested_recursive_protocol_receiver(criterion: &mut Criterion) {
+    setup_rayon();
+
+    let code = r#"
+from __future__ import annotations
+
+from typing import Protocol, overload
+
+class Chain[T](Protocol):
+    def value(self) -> T: ...
+    @overload
+    def chain[S, O1](self: Chain[S], o1: O1, /) -> Chain[S | O1]: ...
+    @overload
+    def chain[S, O1, O2](self: Chain[S], o1: O1, o2: O2, /) -> Chain[S | O1 | O2]: ...
+    @overload
+    def chain[S, O1, O2, O3](self: Chain[S], o1: O1, o2: O2, o3: O3, /) -> Chain[S | O1 | O2 | O3]: ...
+    def chain[S, O](self: Chain[S], *others: O) -> Chain[S | O]: ...
+
+class Concrete[T](Chain[T]): ...
+
+def check[T, S](base: Concrete[T | list[T]], *others: S) -> None:
+    base.chain(*others)
+"#;
+
+    criterion.bench_function("ty_micro[nested_recursive_protocol_receiver]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(code),
+            |case| assert_eq!(case.db.check().len(), 0),
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 /// Regression benchmark for ty#4269: materialized recursive protocol comparisons.
 ///
 /// Comparing the tuple-specific receiver with the gradual overload can repeatedly expand
@@ -1849,6 +1886,7 @@ criterion_group!(
     benchmark_many_enum_members_2,
     benchmark_many_protocol_members_mismatch,
     benchmark_inherited_recursive_protocol,
+    benchmark_nested_recursive_protocol_receiver,
     benchmark_materialized_recursive_protocol_overload,
     benchmark_vararg_parameter_type_accumulation,
     benchmark_typed_dict_get_large_literal_union,

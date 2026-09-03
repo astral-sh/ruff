@@ -8,6 +8,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
+use crate::rules::flake8_tidy_imports::rules::BannedModuleImportPolicies;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -46,6 +47,12 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// The fix is only available when the lazy import statement imports a single
 /// member, since removing `lazy` from a multi-member import would make every
 /// imported member eager, including names that may not be resolved immediately.
+///
+/// ## Options
+///
+/// The rule ignores imports required to be lazy by the following setting:
+///
+/// - [`lint.flake8-tidy-imports.require-lazy`]
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "0.15.13", category = Category::Correctness)]
 pub(crate) struct LazyImportImmediatelyResolved {
@@ -89,6 +96,19 @@ pub(crate) fn lazy_import_immediately_resolved(checker: &Checker, name: &ExprNam
     let Some(import) = lazy_import_statement(binding, semantic) else {
         return;
     };
+
+    // Ignore imports that are required to be lazy.
+    let require_lazy = &checker.settings().flake8_tidy_imports.require_lazy;
+    for (policy, node) in &BannedModuleImportPolicies::new(import, checker) {
+        // An `all` selector matches a `from` import's module, not its individual members.
+        if require_lazy.includes_all() && import.is_import_from_stmt() && node.is_alias() {
+            break;
+        }
+
+        if node.range().contains_range(binding.range()) && require_lazy.find(&policy).is_some() {
+            return;
+        }
+    }
 
     let fix_range = if is_single_member_import(import) {
         lazy_import_prefix_range(import, checker.source_tokens())

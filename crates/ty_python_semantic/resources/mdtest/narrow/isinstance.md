@@ -1084,6 +1084,30 @@ def _(value: Concrete[int]) -> None:
         reveal_type(value.read())  # revealed: int
 ```
 
+## Negative narrowing for protocols with gradual members
+
+Negative narrowing excludes every materialization of a protocol, including when its members are
+gradual. `IntReader` is a subtype of the fully materialized `Reader` protocol, so the negative
+branch retains only `None`:
+
+```py
+from typing import Any, Protocol, runtime_checkable
+
+@runtime_checkable
+class Reader(Protocol):
+    def read(self) -> Any: ...
+
+class IntReader:
+    def read(self) -> int:
+        return 1
+
+def f(reader: IntReader | None):
+    if isinstance(reader, Reader):
+        reveal_type(reader.read())  # revealed: int & Any
+    else:
+        reveal_type(reader)  # revealed: None
+```
+
 ## Narrowing iterables to containers and iterators in strict mode
 
 ```toml

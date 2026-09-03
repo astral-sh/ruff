@@ -11,6 +11,7 @@ use crate::{
         LiteralValueTypeKind, MemberLookupPolicy, Parameter, Parameters, Signature,
         SubclassOfInner, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, UnionType,
         constraints::{ConstraintSet, IteratorConstraintsExtension},
+        function::OverloadLiteral,
         known_instance::FunctoolsPartialInstance,
         relation::{TypeRelation, TypeRelationChecker},
         signatures::{CallableSignature, PartialSignatureApplication},
@@ -186,10 +187,9 @@ impl<'db> Type<'db> {
                                     .signatures(db)
                                     .into_iter()
                                     .map(|sig| sig.clone().with_return_type(Type::TypeVar(tvar)));
-                                CallableType::new(
+                                callable.with_signatures(
                                     db,
                                     CallableSignature::from_overloads(signatures),
-                                    callable.kind(db),
                                 )
                             }))
                         }
@@ -206,10 +206,9 @@ impl<'db> Type<'db> {
                                         callable.signatures(db).into_iter().map(|sig| {
                                             sig.clone().with_return_type(Type::TypeVar(tvar))
                                         });
-                                    callables.push(CallableType::new(
+                                    callables.push(callable.with_signatures(
                                         db,
                                         CallableSignature::from_overloads(signatures),
-                                        callable.kind(db),
                                     ));
                                 }
                             }
@@ -324,31 +323,277 @@ impl<'db> CallableUpcastContext<'db> {
     }
 }
 
+/// The behavior we assume for a [`CallableType`] beyond its call signatures.
+///
+/// A callable's signature alone does not determine its runtime class, attributes, truthiness,
+/// or whether it can act as a descriptor. The `CallableTypeKind` records which of these
+/// properties we know or assume. Calls use the stored signature without reference to the
+/// `CallableTypeKind`. Accessing `__call__`, however, returns the original callable type,
+/// preserving both its signatures and its kind.
+///
+/// For [`Self::FunctionLike`], [`Self::StaticMethodLike`], and [`Self::ClassMethodLike`], the
+/// LSP server emits method semantic tokens on attribute access, allowing editors to highlight
+/// these attributes as methods. We also preserve these kinds when a decorator returns a
+/// `Callable`, assuming that the decorator preserves the decorated function's descriptor behavior.
+///
+/// For example, `decorate` below returns a new function whose signature matches the original
+/// method. We give the result the [`Self::FunctionLike`] kind, so `Example().method` still
+/// binds `self`, even though the `Callable` return annotation does not guarantee that behavior:
+///
+/// ```python
+/// from collections.abc import Callable
+///
+/// def decorate[**P, R](function: Callable[P, R]) -> Callable[P, R]:
+///     def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+///         return function(*args, **kwargs)
+///     return wrapper
+///
+/// class Example:
+///     @decorate
+///     def method(self, value: int) -> str:
+///         return str(value)
+///
+/// Example().method(1)  # Returns "1"; no explicit self argument is needed.
+/// ```
+///
+/// [`Self::ParamSpecValue`] is different to the other variants in that it does not describe
+/// a runtime callable object. Instead, it uses the callable representation to store parameter
+/// lists for type inference.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub enum CallableTypeKind {
-    /// Represents regular callable objects.
+    /// Arbitrary callable objects, as described by a `typing.Callable` annotation.
+    ///
+    /// These can be functions, bound methods, classes, or instances with a `__call__` method.
+    /// We know their call signatures but do not assume a particular runtime class: truthiness
+    /// is ambiguous, the metatype is `type`, and member lookup exposes only `object` attributes
+    /// and `__call__`. In particular, function attributes such as `__name__` are not guaranteed.
+    ///
+    /// We do not bind a receiver when these callables are accessed as attributes. In this
+    /// example, `Calculator().add` still requires both integer arguments: accessing `add`
+    /// through the instance does not supply that instance as its first argument.
+    ///
+    /// ```python
+    /// from collections.abc import Callable
+    ///
+    /// class Add:
+    ///     def __call__(self, left: int, right: int) -> int:
+    ///         return left + right
+    ///
+    /// class Calculator:
+    ///     add: Callable[[int, int], int] = Add()
+    ///
+    /// Calculator.add(1, 2)  # Returns 3.
+    /// Calculator().add(1, 2)  # Returns 3; both arguments are still required.
+    /// ```
+    ///
+    /// As a heuristic, class-member lookup converts dunder attributes of this kind to
+    /// [`Self::FunctionLike`] if their signatures can accept parameters. See
+    /// [`Self::DunderParamSpec`] for the exception for `Callable[P, R]` attributes.
+    ///
+    /// For example, `len(Sized())` implicitly calls `__len__` on the `Sized` instance. We
+    /// treat the `Callable`-typed `__len__` as a function, so accessing `Sized().__len__`
+    /// binds the `instance` parameter and gives it the signature `() -> int`:
+    ///
+    /// ```python
+    /// from collections.abc import Callable
+    ///
+    /// def length(instance: "Sized") -> int:
+    ///     return 1
+    ///
+    /// class Sized:
+    ///     __len__: Callable[["Sized"], int] = length
+    ///
+    /// len(Sized())  # Returns 1.
+    /// ```
     Regular,
 
-    /// Represents function-like objects, like the synthesized methods of dataclasses or
-    /// `NamedTuples`. These callables act like real functions when accessed as attributes on
-    /// instances, i.e. they bind `self`.
+    /// Callable objects modeled as instances of Python's `types.FunctionType`.
+    ///
+    /// A [`Type::FunctionLiteral`] identifies a particular function definition. This kind
+    /// represents functions with the given signatures without requiring that identity. It is
+    /// also used for lambdas and synthesized methods of dataclasses and named tuples.
+    ///
+    /// We model these callables as follows:
+    ///
+    /// - These callables are always truthy.
+    /// - Member lookup uses `types.FunctionType`, exposing attributes such as `__name__`,
+    ///   `__qualname__`, `__module__`, `__code__`, `__defaults__`, and `__annotations__`.
+    ///   `__call__` retains the callable's precise signatures.
+    /// - Their metatype is the `types.FunctionType` class literal.
+    /// - They are subtypes of `types.FunctionType`. They can also satisfy a
+    ///   [`Self::Regular`] callable type with a compatible signature, but a regular callable
+    ///   cannot satisfy a function-like callable type merely by having a compatible signature.
+    /// - They use `types.FunctionType` as their owner type when constructing `super()`.
+    /// - They act as [non-data descriptors][descriptor-protocol]: access through a class leaves
+    ///   the signature unchanged, while access through an instance binds the first parameter
+    ///   to that instance. The resulting callable remains function-like.
+    ///   TODO: Model the result as a bound method. Its runtime type is `types.MethodType`,
+    ///   so retaining the `types.FunctionType` behavior listed above is inaccurate.
+    /// - Like function literals, they defer binding `typing.Self` until the receiver is known
+    ///   from the call's arguments, as illustrated below.
+    ///
+    /// In this example, `Base.identity` is function-like because of the decorator. Retrieving
+    /// it from `Base` does not fix `Self` to `Base`: the subsequent call passes a `Child`
+    /// instance, so both the receiver's type and the return type are `Child`.
+    ///
+    /// ```python
+    /// from collections.abc import Callable
+    /// from typing import Self, reveal_type
+    ///
+    /// def preserve[**P, R](function: Callable[P, R]) -> Callable[P, R]:
+    ///     return function
+    ///
+    /// class Base:
+    ///     @preserve
+    ///     def identity(self) -> Self:
+    ///         return self
+    ///
+    /// class Child(Base):
+    ///     pass
+    ///
+    /// identity = Base.identity
+    /// reveal_type(identity(Child()))  # Child
+    /// ```
+    ///
+    /// When inferring a mutable collection's element type, we generalize function literals to
+    /// function-like callables. This allows the list below to contain other functions with
+    /// compatible signatures, rather than restricting it to the single function `first`:
+    ///
+    /// ```python
+    /// def first(value: int) -> str:
+    ///     return str(value)
+    ///
+    /// def second(value: int) -> str:
+    ///     return f"{value}!"
+    ///
+    /// callbacks = [first]  # Inferred as list[(value: int) -> str].
+    /// callbacks.append(second)
+    /// ```
+    ///
+    /// [descriptor-protocol]: https://docs.python.org/3/howto/descriptor.html#descriptor-protocol
     FunctionLike,
 
-    /// Represents a `Callable[P, R]`-typed dunder attribute.
+    /// A `Callable[P, R]`-typed dunder attribute whose parameters come from a `ParamSpec`.
     ///
-    /// This is distinct from [`Self::Regular`] so that the dunder descriptor heuristic does not
-    /// turn the callable into a function-like object after `P` is specialized.
+    /// This has the runtime assumptions of [`Self::Regular`]: truthiness is ambiguous,
+    /// member lookup exposes `object` attributes, and we do not treat these callables as
+    /// descriptors. The separate kind prevents the dunder descriptor heuristic from turning
+    /// it into [`Self::FunctionLike`] after `P` is specialized: the specialized parameters
+    /// already describe the callable's arguments.
+    /// Calling [`CallableType::bind_self`] removes this marker without removing a parameter.
+    ///
+    /// In the example below, specializing `P` to `[str]` gives `callback.__call__` the signature
+    /// `(str, /) -> int`. Binding a receiver would incorrectly remove its `str` parameter:
+    ///
+    /// ```python
+    /// from collections.abc import Callable
+    ///
+    /// class Callback[**P]:
+    ///     __call__: Callable[P, int]
+    ///
+    /// class Length(Callback[[str]]):
+    ///     def __call__(self, text: str) -> int:
+    ///         return len(text)
+    ///
+    /// def invoke(callback: Callback[[str]]) -> int:
+    ///     return callback("hello")
+    ///
+    /// invoke(Length())  # Returns 5.
+    /// ```
+    ///
+    /// This variant is used to represent the callable object itself; [`Self::ParamSpecValue`]
+    /// represents the parameter list substituted for `P`.
     DunderParamSpec,
 
-    /// A callable type that represents a staticmethod. These callables do not bind `self`
-    /// when accessed as attributes on instances - they return the underlying function as-is.
+    /// A callable with the descriptor behavior of `staticmethod`.
+    ///
+    /// These are [non-data descriptors][descriptor-protocol] that return the callable unchanged
+    /// on both class and instance access, without binding a receiver.
+    ///
+    /// TODO: Distinguish the `staticmethod` descriptor from the wrapped function returned by
+    /// descriptor access. Currently, this kind is retained after access, and member lookup
+    /// and type relations lack both nominal types: truthiness is ambiguous, the metatype is
+    /// `type`, and only `object` attributes plus `__call__` are exposed.
+    ///
+    /// In the example below, `Example.method` is an always-truthy `types.FunctionType` instance
+    /// at runtime. After the `Callable`-returning decorator is applied, ty incorrectly rejects
+    /// its `__name__` attribute and the assignment, and loses precision for `type` and `bool`:
+    ///
+    /// ```python
+    /// from collections.abc import Callable
+    /// from types import FunctionType
+    /// from typing import reveal_type
+    ///
+    /// def preserve[**P, R](function: Callable[P, R]) -> Callable[P, R]:
+    ///     return function
+    ///
+    /// class Example:
+    ///     @preserve
+    ///     @staticmethod
+    ///     def method(value: int) -> str:
+    ///         return str(value)
+    ///
+    /// Example.method.__name__  # ty reports unresolved-attribute; Python returns "method".
+    /// function: FunctionType = Example.method  # ty reports invalid-assignment.
+    /// reveal_type(type(Example.method))  # ty reveals type; Python returns FunctionType.
+    /// reveal_type(bool(Example.method))  # ty reveals bool; the result is always True.
+    /// ```
+    ///
+    /// [descriptor-protocol]: https://docs.python.org/3/howto/descriptor.html#descriptor-protocol
     StaticMethodLike,
 
-    /// A callable type that we believe represents a classmethod (i.e. it will unconditionally bind
-    /// the first argument on `__get__`).
+    /// A callable with the descriptor behavior of `classmethod`.
+    ///
+    /// These are [non-data descriptors][descriptor-protocol] that bind the first parameter on
+    /// both class and instance access, using the owner when no instance is supplied.
+    ///
+    /// TODO: Distinguish the `classmethod` descriptor from the bound method returned by
+    /// descriptor access. Currently, this kind is retained after binding. Neither the
+    /// descriptor's `classmethod` type nor the bound method's `types.MethodType` is reflected
+    /// in member lookup or type relations: truthiness is ambiguous, the metatype is `type`,
+    /// and only `object` attributes plus `__call__` are exposed.
+    ///
+    /// In the example below, `Example.method` is an always-truthy `types.MethodType` instance
+    /// at runtime. After the `Callable`-returning decorator is applied, ty incorrectly rejects
+    /// its `__name__` attribute and the assignment, and loses precision for `type` and `bool`:
+    ///
+    /// ```python
+    /// from collections.abc import Callable
+    /// from types import MethodType
+    /// from typing import reveal_type
+    ///
+    /// def preserve[**P, R](function: Callable[P, R]) -> Callable[P, R]:
+    ///     return function
+    ///
+    /// class Example:
+    ///     @preserve
+    ///     @classmethod
+    ///     def method(cls, value: int) -> str:
+    ///         return str(value)
+    ///
+    /// Example.method.__name__  # ty reports unresolved-attribute; Python returns "method".
+    /// method: MethodType = Example.method  # ty reports invalid-assignment.
+    /// reveal_type(type(Example.method))  # ty reveals type; Python returns MethodType.
+    /// reveal_type(bool(Example.method))  # ty reveals bool; the result is always True.
+    /// ```
+    ///
+    /// [descriptor-protocol]: https://docs.python.org/3/howto/descriptor.html#descriptor-protocol
     ClassMethodLike,
 
-    /// Represents the value bound to a `typing.ParamSpec` type variable.
+    /// An internal representation of the value bound to a `typing.ParamSpec` type variable.
+    ///
+    /// Unlike the other variants, this does not represent a callable object in its entirety:
+    /// it represents only the parameter lists substituted for a `ParamSpec`.
+    ///
+    /// We reuse callable signatures to store the parameter lists, including overloads, with
+    /// `Unknown` return types as placeholders. Specialization extracts these parameters into
+    /// `Callable[P, R]`, `Concatenate`, or paired `P.args`/`P.kwargs` annotations while preserving
+    /// the enclosing callable's return type. A single signature is displayed as a parameter
+    /// list, without a return type.
+    ///
+    /// This kind also distinguishes gradual `...` parameter lists and their top and bottom
+    /// materializations from ordinary callable types in type-relation checks. It does not
+    /// carry the runtime `typing.ParamSpec` instance behavior of a `ParamSpec` declaration.
     ParamSpecValue,
 }
 
@@ -400,13 +645,18 @@ impl From<TypeRelation> for UpcastPolicy {
 /// It can be written in type expressions using `typing.Callable`. `lambda` expressions are
 /// inferred directly as `CallableType`s; all function-literal types are subtypes of a
 /// `CallableType`.
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
 pub struct CallableType<'db> {
     #[returns(ref)]
     pub(crate) signatures: CallableSignature<'db>,
 
     #[returns(copy)]
     pub(super) kind: CallableTypeKind,
+
+    /// The declaration on which `@deprecated` wrapped this callable. Retain the declaration
+    /// for diagnostic names, source annotations, and deduplication, independently of binding kind.
+    #[returns(copy)]
+    pub(crate) deprecated: Option<OverloadLiteral<'db>>,
 }
 
 pub(super) fn walk_callable_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -423,6 +673,31 @@ pub(super) fn walk_callable_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 impl get_size2::GetSize for CallableType<'_> {}
 
 impl<'db> CallableType<'db> {
+    pub(crate) fn new<S>(db: &'db dyn Db, signatures: S, kind: CallableTypeKind) -> Self
+    where
+        S: salsa::Lookup<CallableSignature<'db>> + std::hash::Hash,
+        CallableSignature<'db>: salsa::HashEqLike<S>,
+    {
+        Self::new_internal(db, signatures, kind, None)
+    }
+
+    pub(crate) fn with_deprecated(self, db: &'db dyn Db, deprecated: OverloadLiteral<'db>) -> Self {
+        Self::new_internal(db, self.signatures(db), self.kind(db), Some(deprecated))
+    }
+
+    /// Replace the signatures without losing binding behavior or deprecation metadata.
+    pub(crate) fn with_signatures<S>(self, db: &'db dyn Db, signatures: S) -> Self
+    where
+        S: salsa::Lookup<CallableSignature<'db>> + std::hash::Hash,
+        CallableSignature<'db>: salsa::HashEqLike<S>,
+    {
+        Self::new_internal(db, signatures, self.kind(db), self.deprecated(db))
+    }
+
+    pub(crate) fn with_kind(self, db: &'db dyn Db, kind: CallableTypeKind) -> Self {
+        Self::new_internal(db, self.signatures(db), kind, self.deprecated(db))
+    }
+
     pub(crate) fn single(db: &'db dyn Db, signature: Signature<'db>) -> CallableType<'db> {
         CallableType::new(
             db,
@@ -483,7 +758,22 @@ impl<'db> CallableType<'db> {
     }
 
     pub(crate) fn into_regular(self, db: &'db dyn Db) -> CallableType<'db> {
-        CallableType::new(db, self.signatures(db), CallableTypeKind::Regular)
+        self.with_kind(db, CallableTypeKind::Regular)
+    }
+
+    /// Retain every parameter signature and its generic context, but erase return types
+    /// that do not participate in a `ParamSpec` specialization.
+    pub(crate) fn into_paramspec_value(self, db: &'db dyn Db) -> CallableType<'db> {
+        CallableType::new(
+            db,
+            CallableSignature::from_overloads(
+                self.signatures(db)
+                    .iter()
+                    .cloned()
+                    .map(|signature| signature.with_return_type(Type::unknown())),
+            ),
+            CallableTypeKind::ParamSpecValue,
+        )
     }
 
     /// Returns the reduced callable produced by partially applying selected overloads.
@@ -530,19 +820,15 @@ impl<'db> CallableType<'db> {
             return self.into_regular(db);
         }
 
-        CallableType::new(
-            db,
-            self.signatures(db).bind_self(db, env, self_type),
-            self.kind(db),
-        )
+        self.with_signatures(db, self.signatures(db).bind_self(db, env, self_type))
     }
 
     pub(crate) fn into_function_like(self, db: &'db dyn Db) -> CallableType<'db> {
-        CallableType::new(db, self.signatures(db), CallableTypeKind::FunctionLike)
+        self.with_kind(db, CallableTypeKind::FunctionLike)
     }
 
     pub(crate) fn into_dunder_paramspec(self, db: &'db dyn Db) -> CallableType<'db> {
-        CallableType::new(db, self.signatures(db), CallableTypeKind::DunderParamSpec)
+        self.with_kind(db, CallableTypeKind::DunderParamSpec)
     }
 
     pub(crate) fn apply_self(
@@ -561,11 +847,10 @@ impl<'db> CallableType<'db> {
         receiver_type: Type<'db>,
         self_type: Type<'db>,
     ) -> CallableType<'db> {
-        CallableType::new(
+        self.with_signatures(
             db,
             self.signatures(db)
                 .apply_self_with_receiver(db, env, receiver_type, self_type),
-            self.kind(db),
         )
     }
 
@@ -584,12 +869,13 @@ impl<'db> CallableType<'db> {
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
-        Some(CallableType::new(
-            db,
-            self.signatures(db)
-                .recursive_type_normalized_impl(db, env, div, nested)?,
-            self.kind(db),
-        ))
+        Some(
+            self.with_signatures(
+                db,
+                self.signatures(db)
+                    .recursive_type_normalized_impl(db, env, div, nested)?,
+            ),
+        )
     }
 
     pub(super) fn apply_type_mapping_impl<'a>(
@@ -603,11 +889,10 @@ impl<'db> CallableType<'db> {
             return replacements.get(&self).copied().unwrap_or(self);
         }
 
-        CallableType::new(
+        self.with_signatures(
             db,
             self.signatures(db)
                 .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-            self.kind(db),
         )
     }
 

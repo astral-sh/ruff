@@ -1,5 +1,55 @@
 # Changelog
 
+## 0.16.6
+
+Released on 2026-09-03.
+
+### Preview features
+
+- Move `pytest-fixture-autouse` to the `restriction` category ([#28219](https://github.com/astral-sh/ruff/pull/28219))
+- \[`flake8-pytest-style`\] Add an autofix for `PT020` ([#27993](https://github.com/astral-sh/ruff/pull/27993))
+- \[`flake8-tidy-imports`\] Prevent fix loop between `TID254` and `TID255` ([#28262](https://github.com/astral-sh/ruff/pull/28262))
+- \[`isort`\] Exclude pragma comments from line length calculation (`I001`) ([#27313](https://github.com/astral-sh/ruff/pull/27313))
+
+### Bug fixes
+
+- Validate unary expressions when parsing ([#28233](https://github.com/astral-sh/ruff/pull/28233))
+- \[`flake8-async`, `pylint`\] Recognize `builtins.open` (`ASYNC230`, `PLW1514`) ([#28021](https://github.com/astral-sh/ruff/pull/28021))
+- \[`flake8-bugbear`\] Fix panic on `match` subjects (`B031`) ([#27781](https://github.com/astral-sh/ruff/pull/27781))
+- \[`flake8-datetimez`\] Reject `tzinfo=None` for `datetime` bounds (`DTZ901`) ([#28022](https://github.com/astral-sh/ruff/pull/28022))
+- \[`flake8-pytest-style`\] Avoid duplicate `PT017` diagnostics ([#27918](https://github.com/astral-sh/ruff/pull/27918))
+- \[`ruff`\] Remove `lint.external` hint for Ruff-specific suppressions (`RUF102`) ([#27923](https://github.com/astral-sh/ruff/pull/27923))
+
+### Rule changes
+
+- \[`flake8-use-pathlib`\] Add display-only fix for `os.listdir` (`PTH208`) ([#28027](https://github.com/astral-sh/ruff/pull/28027))
+
+### Documentation
+
+- Add another example and glob reference for `lint.per-file-ignores` ([#28106](https://github.com/astral-sh/ruff/pull/28106))
+- Add duplicate work guidance ([#28229](https://github.com/astral-sh/ruff/pull/28229))
+- \[`flake8-async`\] Document thread offloading (`ASYNC240`) ([#28008](https://github.com/astral-sh/ruff/pull/28008))
+- \[`pyupgrade`\] Clarify default `encoding` argument handling (`UP012`) ([#27315](https://github.com/astral-sh/ruff/pull/27315))
+
+### Other changes
+
+- Allow unary plus in match patterns on Python 3.15 ([#28231](https://github.com/astral-sh/ruff/pull/28231))
+
+### Contributors
+
+- [@flying-sheep](https://github.com/flying-sheep)
+- [@pikammmmm](https://github.com/pikammmmm)
+- [@fly1d](https://github.com/fly1d)
+- [@waterWang](https://github.com/waterWang)
+- [@Pierre-Sassoulas](https://github.com/Pierre-Sassoulas)
+- [@ntBre](https://github.com/ntBre)
+- [@jelle-openai](https://github.com/jelle-openai)
+- [@ericbuehl](https://github.com/ericbuehl)
+- [@tjkuson](https://github.com/tjkuson)
+- [@AbhinavMir](https://github.com/AbhinavMir)
+- [@Whning0513](https://github.com/Whning0513)
+- [@chirizxc](https://github.com/chirizxc)
+
 ## 0.16.5
 
 Released on 2026-08-27.

@@ -72,6 +72,7 @@ impl<'db> ClassBase<'db> {
             ClassBase::Dynamic(
                 DynamicType::Unknown
                 | DynamicType::UnknownGeneric(_)
+                | DynamicType::UnknownLambdaParameter
                 | DynamicType::InvalidConcatenateUnknown
                 | DynamicType::AmbiguousOverload,
             ) => "Unknown",

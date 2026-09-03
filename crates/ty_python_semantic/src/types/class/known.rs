@@ -1195,7 +1195,15 @@ impl KnownClass {
             "Use `Type::heterogeneous_tuple` or `Type::homogeneous_tuple` to create `tuple` instances"
         );
 
-        #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
+        #[salsa::tracked(
+            returns(copy),
+            cycle_initial=|_, id, _| Type::divergent(id),
+            cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, argument: KnownClassArgument<'db>| {
+                let env = ProgramEnvironment::from_program(argument.program(db));
+                result.cycle_normalized(db, &env, *previous, cycle)
+            },
+            heap_size=ruff_memory_usage::heap_size,
+        )]
         fn known_class_to_instance<'db>(
             db: &'db dyn Db,
             argument: KnownClassArgument<'db>,
