@@ -164,6 +164,37 @@ def concatenate(lines: list[str]) -> str:
     return result
 ```
 
+## Tuple nesting in a loop
+
+Repeatedly wrapping a type in `tuple[...]` can grow the tuple nesting without a fixed bound.
+Inference collapses that nesting to a recursion placeholder and still includes the initial `int`
+type.
+
+```py
+def nest_tuples(iterations: list[int]):
+    result = int
+    for _ in iterations:
+        result = tuple[result]
+    reveal_type(result)  # revealed: <class 'int'> | <class 'tuple[Divergent]'>
+```
+
+## Tuple nesting in nested loops
+
+Nested loops can each add tuple layers. Their recursion placeholders also converge to a single
+recursive tuple alongside the initial `int` type.
+
+```py
+def nest_tuples(iterations: list[int]):
+    result = int
+    for _ in iterations:
+        result = tuple[result]
+        for _ in iterations:
+            result = tuple[result]
+        for _ in iterations:
+            result = tuple[result]
+    reveal_type(result)  # revealed: <class 'int'> | <class 'tuple[Divergent]'>
+```
+
 ## Runtime union accumulation in nested loops
 
 Runtime union values can also be accumulated in loops. Their presence does not make the result a
@@ -187,6 +218,106 @@ def accumulate_unions(iterations: list[int]) -> UnionType:
         for _ in iterations:
             result |= bytes
     return result
+```
+
+## Legacy union accumulation in nested loops
+
+Repeatedly combining `int` with itself through `typing.Union` still produces `int`. Using the result
+as an annotation does not admit unrelated types, even after updates in nested loops.
+
+```py
+from typing import Union
+
+def accumulate_unions(iterations: list[int]):
+    result = int
+    for _ in iterations:
+        result = Union[result, int]
+        for _ in iterations:
+            result = Union[result, int]
+        for _ in iterations:
+            result = Union[result, int]
+
+    def consume(value: result):
+        reveal_type(value)  # revealed: int
+
+    consume(1)
+    consume("")  # error: [invalid-argument-type]
+```
+
+## Conditional legacy union accumulation in nested loops
+
+A conditional update in a nested loop does not change the meaning of `Union[int, int]`. Both paths
+produce an annotation that accepts integers and rejects strings.
+
+```py
+from typing import Union
+
+def accumulate_unions(iterations: list[int], flag: bool):
+    result = int
+    for _ in iterations:
+        result = Union[result, int]
+        for _ in iterations:
+            result = Union[result, int]
+        for _ in iterations:
+            if flag:
+                result = Union[result, int]
+
+    def consume(value: result):
+        reveal_type(value)  # revealed: int
+
+    consume(1)
+    consume("")  # error: [invalid-argument-type]
+```
+
+## Simultaneous legacy union updates in nested loops
+
+Updating two union values in one assignment preserves their concrete members without introducing
+recursion placeholders. The accumulated union accepts integers and strings, but rejects bytes.
+
+```py
+from typing import Union
+
+def accumulate_unions(iterations: list[int]):
+    a = int
+    b = str
+    for _ in iterations:
+        a, b = Union[a, b], Union[b, a]
+        for _ in iterations:
+            a, b = Union[a, b], Union[b, a]
+        for _ in iterations:
+            a, b = Union[a, b], Union[b, a]
+
+    def consume(value: a):
+        reveal_type(value)  # revealed: int | str
+
+    consume(1)
+    consume("")
+    consume(b"")  # error: [invalid-argument-type]
+```
+
+## Optional accumulation in nested loops
+
+Repeatedly applying `Optional` to `int` produces `int | None`. The resulting annotation accepts
+integers and `None`, but rejects strings.
+
+```py
+from typing import Optional
+
+def accumulate_optional(iterations: list[int]):
+    result = int
+    for _ in iterations:
+        result = Optional[result]
+        for _ in iterations:
+            result = Optional[result]
+        for _ in iterations:
+            result = Optional[result]
+
+    def consume(value: result):
+        reveal_type(value)  # revealed: int | None
+
+    consume(1)
+    consume(None)
+    consume("")  # error: [invalid-argument-type]
 ```
 
 ## Runtime unions containing unrelated recursion markers
@@ -286,8 +417,8 @@ def f(x: b):
 
 ## Conditional recursive union values
 
-A conditional expression can initially infer a union of a runtime union value and another class.
-These alternatives preserve the recursive references until the tuple alias is inferred.
+Mutually recursive aliases also converge when a conditional expression produces a union value on one
+branch.
 
 ```py
 from typing import Union
@@ -298,8 +429,8 @@ b = Union["a", "b", int] if a else str
 
 ## Mutually recursive aliases through two unions
 
-The initial recursive references also survive a chain of two unions before reaching the tuple alias.
-Inference converges without expanding the tuple on every pass through the chain.
+Aliases can form a chain through multiple unions. Inference converges without expanding the tuple on
+every pass through the chain.
 
 ```py
 from typing import Union
@@ -307,6 +438,85 @@ from typing import Union
 a = tuple["b"]
 b = Union["c", "b", int]
 c = Union["a", "c", str]
+```
+
+## Recursive tuple aliases with concrete elements
+
+Normalizing the recursive tuple element preserves the other element's type and the tuple's length.
+
+```py
+from typing import Union
+
+a = tuple[str, "b"]
+b = Union["a", "b", int]
+
+def f(x: b):
+    reveal_type(x)  # revealed: tuple[str, Divergent] | int
+```
+
+## Recursive tuple aliases containing another recursive alias
+
+A tuple element can refer to an already inferred recursive alias. Normalizing a different recursive
+element preserves that alias's tuple structure, so an integer is still invalid in its place.
+
+```py
+from typing import Union
+
+Other = tuple["Other"]
+a = tuple[Other, "b"]
+b = Union["a", "b", int]
+
+def consume(x: b):
+    reveal_type(x)  # revealed: tuple[tuple[Divergent], Divergent] | int
+
+consume((1, 1))  # error: [invalid-argument-type]
+```
+
+## Recursive aliases using legacy tuples
+
+`typing.Tuple` supports the same recursive aliases as `tuple`, including homogeneous tuples.
+
+```py
+from typing import Tuple, Union
+
+a = Tuple["b", ...]
+b = Union["a", "b", int]
+
+def f(x: b):
+    reveal_type(x)  # revealed: tuple[Divergent, ...] | int
+```
+
+## Recursive aliases using imported tuple constructors
+
+An imported alias for the built-in tuple constructor has the same behavior as `tuple`.
+
+```py
+from builtins import tuple as TupleConstructor
+from typing import Union
+
+a = TupleConstructor["b"]
+b = Union["a", "b", int]
+
+def f(x: b):
+    reveal_type(x)  # revealed: tuple[Divergent] | int
+```
+
+## Recursive generic tuple aliases
+
+A recursive generic tuple alias can be specialized without rejecting the resulting alias as an
+invalid type form. Specialized recursive generic aliases are not yet fully supported, so the type
+parameter currently falls back to a `@Todo` type.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+Callee = tuple[T, "A"]
+A = Callee[int]
+
+def f(x: A):
+    # revealed: tuple[@Todo(specialized recursive generic type alias), Divergent]
+    reveal_type(x)
 ```
 
 ## Self-referential union aliases

@@ -4442,6 +4442,75 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         declared
     }
 
+    pub(super) fn infer_tuple_alias_cycle_initial(
+        mut self,
+        definition: Definition<'db>,
+        subscript: &ast::ExprSubscript,
+        cycle_recovery: Type<'db>,
+    ) -> Option<Type<'db>> {
+        fn contains_bare_divergent(db: &dyn Db, ty: Type<'_>) -> bool {
+            match ty {
+                Type::Divergent(_) => true,
+                Type::Union(union) => union
+                    .elements(db)
+                    .iter()
+                    .any(|ty| contains_bare_divergent(db, *ty)),
+                Type::Intersection(intersection) => intersection
+                    .positive(db)
+                    .iter()
+                    .chain(intersection.negative(db))
+                    .any(|ty| contains_bare_divergent(db, *ty)),
+                _ => false,
+            }
+        }
+
+        // The full definition inference collects diagnostics and expression metadata.
+        self.context.defuse();
+        self.context.suppress_diagnostics();
+        self.typevar_binding_context = Some(definition);
+        let origin = self.infer_expression(&subscript.value, TypeContext::default());
+        let is_tuple = match origin {
+            Type::ClassLiteral(class) => class.is_tuple(self.db()),
+            Type::SpecialForm(SpecialFormType::Tuple) => true,
+            _ => false,
+        };
+        if !is_tuple {
+            return None;
+        }
+        let inferred_tuple = self.infer_tuple_type_expression(subscript);
+        // Preserve nominal element types, even if they contain their own recursive aliases.
+        // Only bare markers (possibly in a union or intersection) are replaced with this
+        // definition's marker, so another query's approximation cannot prevent reduction of
+        // this definition's tuple nesting.
+        let normalize_element = |ty| {
+            if contains_bare_divergent(self.db(), ty) {
+                cycle_recovery
+            } else {
+                ty
+            }
+        };
+        let tuple = match inferred_tuple.tuple(self.db()) {
+            Tuple::Fixed(elements) => TupleType::heterogeneous(
+                self.db(),
+                self.program_environment(),
+                elements.iter_all_elements().map(normalize_element),
+            ),
+            Tuple::Variable(elements) => TupleType::mixed_with_segment(
+                self.db(),
+                self.program_environment(),
+                elements.iter_prefix_elements().map(normalize_element),
+                match elements.variable() {
+                    VariableSegment::Homogeneous(ty) => {
+                        VariableSegment::Homogeneous(normalize_element(ty))
+                    }
+                    segment @ VariableSegment::TypeVarTuple(_) => segment,
+                },
+                elements.iter_suffix_elements().map(normalize_element),
+            ),
+        };
+        Some(tuple.to_class_type(self.db()).into())
+    }
+
     /// Initialize a declaration cycle without discarding its annotation diagnostics or metadata.
     pub(super) fn infer_annotated_assignment_cycle_initial(
         mut self,

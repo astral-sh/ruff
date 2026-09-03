@@ -1411,6 +1411,39 @@ impl<'db> DefinitionInferenceExtra<'db> {
     }
 }
 
+/// Resolving a tuple alias's constructor or elements can recurse while initializing its definition.
+/// Use a separate query so that this recursion falls back to the definition's marker.
+#[salsa::tracked(returns(copy), cycle_initial=|_, _, _, cycle_recovery| Some(cycle_recovery))]
+fn infer_tuple_alias_cycle_initial<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+    cycle_recovery: Type<'db>,
+) -> Option<Type<'db>> {
+    let DefinitionKind::Assignment(assignment) = definition.kind(db) else {
+        return None;
+    };
+    if assignment.unpack().is_some() {
+        return None;
+    }
+    let program_file = definition.program_file(db);
+    let python_file = program_file.python_file(db);
+    let module = parsed_module(db, python_file).load(db);
+    let ast::Expr::Subscript(subscript) = assignment.value(&module) else {
+        return None;
+    };
+    let env = ProgramEnvironment::from_definition(definition);
+    TypeInferenceBuilder::new(
+        db,
+        &env,
+        InferenceRegion::Definition(definition),
+        python_file.file(db),
+        program_file,
+        semantic_index(db, program_file),
+        &module,
+    )
+    .infer_tuple_alias_cycle_initial(definition, subscript, cycle_recovery)
+}
+
 impl<'db> DefinitionInference<'db> {
     fn cycle_initial(
         db: &'db dyn Db,
@@ -1443,6 +1476,14 @@ impl<'db> DefinitionInference<'db> {
                     types =
                         DefinitionTypes::Binding(Type::instance(db, &env, divergent_collection));
                 }
+            } else if assignment.value(&module).is_subscript_expr()
+                && let Some(ty) = infer_tuple_alias_cycle_initial(db, definition, cycle_recovery)
+            {
+                // For `A = tuple["B"]; B = Union["A", "B", int]`, a bare marker for A would
+                // disappear along with B's direct self-reference. Starting with the tuple's shape
+                // lets recursive reduction recognize the nesting instead of adding a tuple layer
+                // on each iteration.
+                types = DefinitionTypes::Binding(ty);
             }
         } else if let DefinitionKind::AnnotatedAssignment(assignment) = definition.kind(db) {
             let program_file = definition.program_file(db);

@@ -3298,34 +3298,6 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         cycle: &salsa::Cycle,
     ) -> Self {
-        // Runtime union values can initially contain this cycle's placeholders for other aliases. For
-        // `A = tuple["B"]` and `B = Union["A", "B", int]`, removing both markers on
-        // the first pass would start `A` at `tuple[int]`, which then grows on every pass.
-        // Let dependent aliases embed the markers in their structure before reducing
-        // these values, including alternatives in a conditional expression. Other unions
-        // still need immediate normalization so loop inference does not retain placeholders.
-        // Later iterations remove direct self-references normally.
-        let has_union_placeholders = |ty: &Type<'db>| {
-            if let Type::KnownInstance(KnownInstanceType::UnionType(instance)) = ty
-                && let Ok(Type::Union(union)) = instance.union_type(db)
-            {
-                union.elements(db).iter().any(|element| {
-                    cycle
-                        .head_ids()
-                        .any(|id| element.same_divergent_marker(Type::divergent(id)))
-                })
-            } else {
-                false
-            }
-        };
-        if cycle.iteration() == 0
-            && match self {
-                Type::Union(union) => union.elements(db).iter().any(has_union_placeholders),
-                _ => has_union_placeholders(&self),
-            }
-        {
-            return self;
-        }
         cycle.head_ids().fold(self, |ty, id| {
             ty.recursive_type_normalized_impl(db, env, Type::divergent(id), false)
                 .unwrap_or(Type::divergent(id))
