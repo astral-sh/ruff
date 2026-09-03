@@ -5825,7 +5825,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                             .unwrap_or_else(|| parameter.annotated_type());
                         let argument_type = matched_parameter
                             .argument_type
-                            .unwrap_or_else(|| argument_types.get_for_declared_type(declared_type));
+                            .or_else(|| argument_types.try_get_for_declared_type(declared_type))?;
 
                         Some(ArgumentRelation::new(
                             argument_index,

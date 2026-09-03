@@ -970,6 +970,37 @@ to_thread_like(
 )
 ```
 
+This also applies when the parameter type is a bare type variable:
+
+```py
+from ty_extensions._internal import Unknown
+
+class Payload(TypedDict):
+    x: int
+
+def forward[**P](function: Callable[P, None], /, *args: P.args, **kwargs: P.kwargs) -> None:
+    function(*args, **kwargs)
+
+def pair[T](first: T, second: T) -> None: ...
+def _(payload: Payload):
+    forward(pair, reveal_type({"x": 1}), payload)  # revealed: Payload
+    forward(pair, payload, reveal_type({"x": 1}))  # revealed: Payload
+
+def triple[T](first: T, second: T, third: T) -> None: ...
+def _(payload: Payload, unknown: Unknown):
+    # TODO: This should reveal `Payload`.
+    forward(triple, reveal_type({"x": 1}), payload, unknown)  # revealed: dict[str, int]
+```
+
+We use a type-variable default as type context when the forwarded arguments do not otherwise
+constrain it:
+
+```py
+def default[T = Callable[[int], int]](callback: T) -> None: ...
+
+forward(default, lambda x: reveal_type(x))  # revealed: int
+```
+
 ### Specializing `ParamSpec` with another `ParamSpec`
 
 ```py
