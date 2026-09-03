@@ -328,9 +328,9 @@ impl<'db> CallableUpcastContext<'db> {
 ///
 /// A callable's signature alone does not determine its runtime class, attributes, truthiness,
 /// or whether it can act as a descriptor. The `CallableTypeKind` records which of these
-/// properties we know or assume. The `CallableTypeKind` is irrelevant to calls to the function
-/// and inferred types from `__call__` access; these are always inferred using the stored
-/// signature of a callable type.
+/// properties we know or assume. Calls use the stored signature without reference to the
+/// `CallableTypeKind`. Accessing `__call__`, however, returns the original callable type,
+/// preserving both its signatures and its kind.
 ///
 /// For [`Self::FunctionLike`], [`Self::StaticMethodLike`], and [`Self::ClassMethodLike`], the
 /// LSP server emits method semantic tokens on attribute access, allowing editors to highlight
