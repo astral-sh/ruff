@@ -521,3 +521,52 @@ reveal_mro(GenericBase["Foo", "Bar"])
 class Foo: ...
 class Bar: ...
 ```
+
+## Known class instances with a shadowed typing module
+
+String members retain their types when a local `typing.py` introduces an inference cycle. Resolving
+`str`'s bases looks up `Sequence` in that module. Determining whether the assignment is reachable
+requires inferring `trigger`'s return annotation. Resolving `C.attribute` requires determining `C`'s
+metaclass. Checking a call to that unknown metaclass constructs a class namespace with `str` keys,
+completing the cycle. The consumer is checked before the shadowing module.
+
+This is a regression test for <https://github.com/astral-sh/ty/issues/4456>.
+
+`m.py`:
+
+```py
+reveal_type("a".encode())  # revealed: bytes
+```
+
+`typing.py`:
+
+```py
+class C(metaclass=missing): ...  # error: [unresolved-reference]
+
+def trigger() -> C.attribute: ...
+
+trigger()
+Sequence = object
+```
+
+## Known class instances after checking the shadowing module
+
+String members retain their types when the shadowing module is checked first, as they do when the
+consumer is checked first.
+
+`typing.py`:
+
+```py
+class C(metaclass=missing): ...  # error: [unresolved-reference]
+
+def trigger() -> C.attribute: ...
+
+trigger()
+Sequence = object
+```
+
+`m.py`:
+
+```py
+reveal_type("a".encode())  # revealed: bytes
+```
