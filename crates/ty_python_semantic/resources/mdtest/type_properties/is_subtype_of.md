@@ -1039,23 +1039,7 @@ static_assert(not is_subtype_of(Top[Bounded[Any]], EquivalentBounded[Any]))
 static_assert(not is_subtype_of(Top[Bounded[Any]], Bottom[EquivalentBounded[Any]]))
 ```
 
-Explicit inheritance establishes subtyping even when a subclass overrides a member incompatibly.
-Taking the top materialization of the base protocol weakens its requirements, so this nominal
-relationship still holds:
-
-```py
-class BoundedSub(Bounded[str]):
-    read = None
-
-static_assert(is_subtype_of(BoundedSub, Bounded[str]))
-static_assert(is_subtype_of(BoundedSub, Top[Bounded[str]]))
-static_assert(is_subtype_of(BoundedSub, Top[Bounded[Any]]))
-static_assert(not is_subtype_of(BoundedSub, Bottom[Bounded[str]]))
-static_assert(not is_subtype_of(BoundedSub, Bottom[Bounded[Any]]))
-static_assert(not is_subtype_of(BoundedSub, Top[EquivalentBounded[Any]]))
-```
-
-Protocols with constrained type parameters also lie between their bottom and top materializations:
+The same relations also hold when the type parameter has constraints:
 
 ```py
 class Constrained[T: (str, bytes)](Protocol):
@@ -1105,6 +1089,21 @@ static_assert(is_subtype_of(Bottom[Cell[Any]], Top[EquivalentCell[Any]]))
 static_assert(not is_subtype_of(Cell[Any], Bottom[EquivalentCell[Any]]))
 static_assert(not is_subtype_of(Top[Cell[Any]], EquivalentCell[Any]))
 static_assert(not is_subtype_of(Top[Cell[Any]], Bottom[EquivalentCell[Any]]))
+```
+
+If a class inherits from the protocol explicitly, we treat it as a subtype, even if it has invalid
+overrides:
+
+```py
+class InvalidOverride(Bounded[str]):
+    read = None
+
+static_assert(is_subtype_of(InvalidOverride, Bounded[str]))
+static_assert(is_subtype_of(InvalidOverride, Top[Bounded[str]]))
+static_assert(is_subtype_of(InvalidOverride, Top[Bounded[Any]]))
+static_assert(not is_subtype_of(InvalidOverride, Bottom[Bounded[str]]))
+static_assert(not is_subtype_of(InvalidOverride, Bottom[Bounded[Any]]))
+static_assert(not is_subtype_of(InvalidOverride, Top[EquivalentBounded[Any]]))
 ```
 
 ## Callable

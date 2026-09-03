@@ -503,8 +503,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         protocol: ProtocolInstanceType<'db>,
     ) -> ConstraintSet<'db, 'c> {
         // Explicit protocol inheritance establishes subtyping even when a subclass overrides
-        // members incompatibly. This also holds for a top-materialized base protocol, whose
-        // requirements are weaker. Other materializations can invalidate the nominal shortcut.
+        // members incompatibly.
         let mut result = self.never();
         let source_protocol = ty.as_protocol_instance();
 
