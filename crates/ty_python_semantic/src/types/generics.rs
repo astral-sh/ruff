@@ -1187,32 +1187,49 @@ impl<'db> Specialization<'db> {
     pub(super) fn merge_cycle_recovery(self, db: &'db dyn Db, previous: Self) -> Option<Self> {
         if self.generic_context(db) != previous.generic_context(db)
             || self.materialization_kind(db) != previous.materialization_kind(db)
-            || self.tuple_inner(db) != previous.tuple_inner(db)
         {
             return None;
         }
 
-        let types: Box<[_]> = previous
-            .types(db)
-            .iter()
-            .zip(self.types(db))
-            .map(|(previous, current)| match (*previous, *current) {
-                (previous, current) if previous == current => Some(current),
-                (previous, current)
-                    if previous == Type::unknown() || current == Type::unknown() =>
-                {
-                    Some(Type::unknown())
-                }
-                _ => None,
-            })
-            .collect::<Option<Box<[_]>>>()?;
+        // Specialty tuples store their structure in `tuple_inner`. When that differs across
+        // cycle iterations (often because a recursive `typing.Union` dropped `Divergent` and
+        // the nest grew), prefer the current iteration's specialty tuple. Nest reduction then
+        // collapses `Divergent` markers. Unioning the GenericAliases instead grows without bound
+        // (ty#4443).
+        let tuple_inner = match (self.tuple_inner(db), previous.tuple_inner(db)) {
+            (None, None) => None,
+            (Some(current), Some(previous_tuple)) if current == previous_tuple => Some(current),
+            (Some(current), Some(_)) => Some(current),
+            _ => return None,
+        };
+
+        let types: Box<[_]> = if tuple_inner.is_some() {
+            // Type arguments are derived from `tuple_inner` for specialty tuples; keep them
+            // aligned with the chosen current specialization.
+            self.types(db).to_vec().into_boxed_slice()
+        } else {
+            previous
+                .types(db)
+                .iter()
+                .zip(self.types(db))
+                .map(|(previous, current)| match (*previous, *current) {
+                    (previous, current) if previous == current => Some(current),
+                    (previous, current)
+                        if previous == Type::unknown() || current == Type::unknown() =>
+                    {
+                        Some(Type::unknown())
+                    }
+                    _ => None,
+                })
+                .collect::<Option<Box<[_]>>>()?
+        };
 
         Some(Self::new(
             db,
             self.generic_context(db),
             types,
             self.materialization_kind(db),
-            self.tuple_inner(db),
+            tuple_inner,
         ))
     }
 

@@ -14,6 +14,7 @@ use crate::{
         dedicated::pydantic::ConfigBoolean,
         generics::{Specialization, walk_generic_context},
         newtype::NewType,
+        set_theoretic::UnionType,
         typevar::TypeVarInstance,
         variance::VarianceInferable,
         visitor,
@@ -775,14 +776,60 @@ impl<'db> UnionTypeInstance<'db> {
             None => None,
         };
         let union_type = match self.union_type(db).clone() {
-            Ok(ty) if nested => Ok(ty.recursive_type_normalized_impl(db, env, div, nested)?),
-            Ok(ty) => Ok(ty
-                .recursive_type_normalized_impl(db, env, div, nested)
-                .unwrap_or(div)),
+            Ok(ty) => {
+                // Top-level `Type::Union` normalization drops `Divergent` members
+                // (`T | Divergent == T`). That is correct for bare unions, but this
+                // `typing.Union[...]` special-form is often nested inside specialty
+                // tuples (`tuple[Union["a", "b", int]]`). Dropping `Divergent` there
+                // leaves no marker for nest reduction, so mutually recursive
+                // tuple/union aliases grow without bound (ty#4443).
+                let had_divergent_marker = union_type_has_divergent_marker(db, ty, div);
+                let normalized = if nested {
+                    ty.recursive_type_normalized_impl(db, env, div, nested)?
+                } else {
+                    ty.recursive_type_normalized_impl(db, env, div, nested)
+                        .unwrap_or(div)
+                };
+                if nested && normalized.same_divergent_marker(div) {
+                    // Collapse `UnionType[Divergent]` so enclosing specialty tuples
+                    // can nest-reduce the same way they do for bare `Divergent`.
+                    return None;
+                }
+                if !nested
+                    && had_divergent_marker
+                    && !union_type_has_divergent_marker(db, normalized, div)
+                {
+                    Ok(UnionType::from_two_elements(db, env, normalized, div))
+                } else {
+                    Ok(normalized)
+                }
+            }
             Err(err) => Err(err),
         };
 
         Some(Self::new(db, value_expr_types, union_type))
+    }
+}
+
+/// Returns `true` if `ty` is `Divergent` with `div`'s marker, or a union that still
+/// carries that marker / recursive-definition flag from cycle recovery.
+fn union_type_has_divergent_marker<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    div: Type<'db>,
+) -> bool {
+    if ty.same_divergent_marker(div) {
+        return true;
+    }
+    match ty {
+        Type::Union(union) => {
+            union.recursively_defined(db).is_yes()
+                || union
+                    .elements(db)
+                    .iter()
+                    .any(|element| union_type_has_divergent_marker(db, *element, div))
+        }
+        _ => false,
     }
 }
 

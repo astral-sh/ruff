@@ -171,6 +171,18 @@ def _(x: JSONValue):
     reveal_type(x)  # revealed: Sequence[JSONValue] | float | None | Mapping[str, JSONValue]
 ```
 
+## Mutually recursive tuple and union aliases
+
+This is a regression test for <https://github.com/astral-sh/ty/issues/4443>. Inferring these
+assignments used to panic with `infer_definition_types: execute: too many cycle iterations`.
+
+```py
+from typing import Union
+
+a = tuple["b"]
+b = Union["a", "b", int]
+```
+
 ## Self-referential legacy type variables
 
 ```py
