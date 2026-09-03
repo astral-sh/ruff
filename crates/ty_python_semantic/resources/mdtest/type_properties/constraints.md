@@ -1256,7 +1256,6 @@ P = ParamSpec("P")
 
 def legacy_range(callback: Callable[P, None]) -> None:
     constraints = ConstraintSet.range(Callable[[int, str], None], P, Callable[[int, str], None])
-    reveal_type(constraints)  # revealed: ConstraintSet[bool]
     different_returns = ConstraintSet.range(Callable[[int, str], int], P, Callable[[int, str], str])
     static_assert(constraints == different_returns)
 
@@ -1278,7 +1277,6 @@ An empty parameter list is an exact bound, distinct from a one-parameter list.
 ```py
 def empty[**P]() -> None:
     constraints = ConstraintSet.range(Callable[[], None], P, Callable[[], None])
-    reveal_type(constraints)  # revealed: ConstraintSet[bool]
     static_assert(constraints != ConstraintSet.range(Callable[[int], None], P, Callable[[int], None]))
 ```
 
@@ -1304,7 +1302,6 @@ type Callback[**Q, R] = Callable[Q, R]
 
 def aliases[**P]() -> None:
     constraints = ConstraintSet.range(Callback[[int, str, bool], int], P, Callback[[int, str, bool], str])
-    reveal_type(constraints)  # revealed: ConstraintSet[bool]
     expected = ConstraintSet.range(Callable[[int, str, bool], None], P, Callable[[int, str, bool], None])
     static_assert(constraints == expected)
 ```
@@ -1316,7 +1313,6 @@ type Prefixed[**Q, R] = Callable[Concatenate[int, str, Q], R]
 
 def concatenate[**P]() -> None:
     constraints = ConstraintSet.range(Prefixed[[bool], int], P, Prefixed[[bool], str])
-    reveal_type(constraints)  # revealed: ConstraintSet[bool]
     expected = ConstraintSet.range(Callable[[int, str, bool], None], P, Callable[[int, str, bool], None])
     static_assert(constraints == expected)
 ```
@@ -1339,7 +1335,6 @@ class Unrelated: ...
 
 def two_sided[**P]() -> None:
     constraints = ConstraintSet.range(Callable[[Super], None], P, Callable[[Sub], None])
-    reveal_type(constraints)  # revealed: ConstraintSet[bool]
     lower = ConstraintSet.lower_bound(Callable[[Super], int], P)
     upper = ConstraintSet.upper_bound(P, Callable[[Sub], str])
     static_assert(constraints == (lower & upper))
@@ -1457,7 +1452,7 @@ from ty_extensions._internal import ConstraintSet, RegularCallableTypeOf
 def named(value: int) -> None: ...
 def positional_only[**P]() -> None:
     constraints = ConstraintSet.range(RegularCallableTypeOf[named], P, Callable[[int], None])
-    reveal_type(constraints)  # revealed: ConstraintSet[bool]
+    static_assert(constraints != ConstraintSet.never())
     reverse = ConstraintSet.range(Callable[[int], None], P, RegularCallableTypeOf[named])
     static_assert(reverse == ConstraintSet.never())
 ```
@@ -1468,7 +1463,7 @@ Named parameters also accept keyword-only calls; the reverse range is invalid.
 def keyword(*, value: int) -> None: ...
 def keyword_only[**P]() -> None:
     constraints = ConstraintSet.range(RegularCallableTypeOf[named], P, RegularCallableTypeOf[keyword])
-    reveal_type(constraints)  # revealed: ConstraintSet[bool]
+    static_assert(constraints != ConstraintSet.never())
     reverse = ConstraintSet.range(RegularCallableTypeOf[keyword], P, RegularCallableTypeOf[named])
     static_assert(reverse == ConstraintSet.never())
 ```
@@ -1479,7 +1474,7 @@ An optional parameter accepts every call to a required parameter, but not the re
 def optional(value: int = ...) -> None: ...
 def defaults[**P]() -> None:
     constraints = ConstraintSet.range(RegularCallableTypeOf[optional], P, RegularCallableTypeOf[named])
-    reveal_type(constraints)  # revealed: ConstraintSet[bool]
+    static_assert(constraints != ConstraintSet.never())
     reverse = ConstraintSet.range(RegularCallableTypeOf[named], P, RegularCallableTypeOf[optional])
     static_assert(reverse == ConstraintSet.never())
 ```
@@ -1490,7 +1485,7 @@ Variadic positional parameters accept fixed positional lists, but not the revers
 def args(*args: int) -> None: ...
 def positional_variadics[**P]() -> None:
     constraints = ConstraintSet.range(RegularCallableTypeOf[args], P, Callable[[int, int], None])
-    reveal_type(constraints)  # revealed: ConstraintSet[bool]
+    static_assert(constraints != ConstraintSet.never())
     reverse = ConstraintSet.range(Callable[[int, int], None], P, RegularCallableTypeOf[args])
     static_assert(reverse == ConstraintSet.never())
 ```
@@ -1501,7 +1496,7 @@ Variadic keyword parameters likewise accept a fixed keyword-only parameter, but 
 def kwargs(**kwargs: int) -> None: ...
 def keyword_variadics[**P]() -> None:
     constraints = ConstraintSet.range(RegularCallableTypeOf[kwargs], P, RegularCallableTypeOf[keyword])
-    reveal_type(constraints)  # revealed: ConstraintSet[bool]
+    static_assert(constraints != ConstraintSet.never())
     reverse = ConstraintSet.range(RegularCallableTypeOf[keyword], P, RegularCallableTypeOf[kwargs])
     static_assert(reverse == ConstraintSet.never())
 ```
@@ -1526,7 +1521,6 @@ def swapped_returns(*, value: str) -> int: ...
 def keyword(*, value: str) -> None: ...
 def overloads[**P]() -> None:
     constraints = ConstraintSet.range(RegularCallableTypeOf[overloaded], P, RegularCallableTypeOf[swapped_returns])
-    reveal_type(constraints)  # revealed: ConstraintSet[bool]
     static_assert(constraints == ConstraintSet.range(RegularCallableTypeOf[overloaded], P, RegularCallableTypeOf[overloaded]))
     static_assert(constraints != ConstraintSet.range(Callable[[int], None], P, Callable[[int], None]))
     static_assert(constraints != ConstraintSet.range(RegularCallableTypeOf[keyword], P, RegularCallableTypeOf[keyword]))
@@ -1537,7 +1531,7 @@ An overloaded lower bound can satisfy a single signature; an overloaded upper bo
 ```pyi
 def asymmetric[**P]() -> None:
     constraints = ConstraintSet.range(RegularCallableTypeOf[overloaded], P, Callable[[int], None])
-    reveal_type(constraints)  # revealed: ConstraintSet[bool]
+    static_assert(constraints != ConstraintSet.never())
     reverse = ConstraintSet.range(Callable[[int], None], P, RegularCallableTypeOf[overloaded])
     static_assert(reverse == ConstraintSet.never())
 ```
@@ -1547,7 +1541,7 @@ The string overload accepts only a keyword argument, not a positional argument.
 ```pyi
 def parameter_kinds[**P]() -> None:
     constraints = ConstraintSet.range(RegularCallableTypeOf[overloaded], P, RegularCallableTypeOf[keyword])
-    reveal_type(constraints)  # revealed: ConstraintSet[bool]
+    static_assert(constraints != ConstraintSet.never())
     positional = ConstraintSet.range(RegularCallableTypeOf[overloaded], P, Callable[[str], None])
     static_assert(positional == ConstraintSet.never())
 ```
@@ -1562,8 +1556,8 @@ from ty_extensions import static_assert
 from ty_extensions._internal import ConstraintSet
 
 def empty[**P]() -> None:
-    reveal_type(ConstraintSet.range(Callable[..., None], P, Callable[[], None]))  # revealed: ConstraintSet[bool]
-    reveal_type(ConstraintSet.range(Callable[[], None], P, Callable[..., None]))  # revealed: ConstraintSet[bool]
+    static_assert(ConstraintSet.range(Callable[..., None], P, Callable[[], None]) != ConstraintSet.never())
+    static_assert(ConstraintSet.range(Callable[[], None], P, Callable[..., None]) != ConstraintSet.never())
     static_assert(ConstraintSet.range(Callable[[Any], None], P, Callable[[], None]) == ConstraintSet.never())
     static_assert(ConstraintSet.range(Callable[[], None], P, Callable[[Any], None]) == ConstraintSet.never())
 ```
@@ -1642,8 +1636,8 @@ ParamSpec components keep their ordinary bounds.
 def components[**P]() -> None:
     args = ConstraintSet.range(tuple[int], P.args, tuple[object, ...])
     kwargs = ConstraintSet.range(dict[str, object], P.kwargs, dict[str, object])
-    reveal_type(args)  # revealed: ConstraintSet[bool]
-    reveal_type(kwargs)  # revealed: ConstraintSet[bool]
+    static_assert(args != ConstraintSet.never())
+    static_assert(kwargs != ConstraintSet.never())
 ```
 
 Bare TypeVarTuples remain invalid subjects.
