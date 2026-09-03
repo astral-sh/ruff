@@ -106,12 +106,23 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
         };
 
-        self.infer_collection_literal(
-            KnownClass::Dict,
-            collection_expr,
-            &items,
-            &mut infer_elt_ty,
-            call_expression_tcx,
+        // Collection inference checks the values even if it cannot specialize `dict`. Return
+        // its fallback type so ordinary call inference does not infer the values again.
+        Some(
+            self.infer_collection_literal(
+                KnownClass::Dict,
+                collection_expr,
+                &items,
+                &mut infer_elt_ty,
+                call_expression_tcx,
+            )
+            .unwrap_or_else(|| {
+                KnownClass::Dict.to_specialized_instance(
+                    db,
+                    self.program_environment(),
+                    &[Type::unknown(), Type::unknown()],
+                )
+            }),
         )
     }
 }
