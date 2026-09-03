@@ -6,7 +6,8 @@ use crate::{
     place::{Place, Provenance},
     reachability::binding_reachability,
     types::{
-        KnownClass, Truthiness, Type, TypeContext, UnionBuilder, definition_expression_type,
+        CycleOwner, KnownClass, Truthiness, Type, TypeContext, UnionBuilder,
+        definition_expression_type,
         function::{is_implicit_classmethod, is_implicit_staticmethod},
         infer::{
             InferenceRegion,
@@ -90,7 +91,7 @@ impl<'db> StaticClassLiteral<'db> {
         cycle_fn=implicit_attribute_cycle_recover,
         cycle_initial=|db, id, attribute: ImplicitAttributeName<'db>| ImplicitAttribute {
             member: Member {
-                inner: Place::bound(Type::divergent(id)).with_symbolic(Some(SymbolicType::initial(db, attribute.class_body_scope(db).program(db), attribute.owner(), InferenceSlot::Root))).into(),
+                inner: Place::bound(Type::divergent_root(db, id, CycleOwner::Attribute(attribute))).with_symbolic(Some(SymbolicType::initial(db, attribute.class_body_scope(db).program(db), attribute.owner(), InferenceSlot::Root))).into(),
             },
             augmented_bindings: None,
         },

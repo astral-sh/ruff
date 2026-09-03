@@ -4,7 +4,7 @@ use ruff_diagnostics::{Edit, Fix};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use std::borrow::Cow;
-use std::cell::OnceCell;
+use std::cell::{Cell, OnceCell};
 use std::iter;
 use std::rc::Rc;
 use std::time::Duration;
@@ -138,6 +138,8 @@ mod class_base;
 mod constraints;
 mod context;
 mod context_manager;
+mod cycle_variable;
+pub(crate) use cycle_variable::{CycleOwner, CycleVariable};
 mod cyclic;
 mod dedicated;
 mod diagnostic;
@@ -1781,7 +1783,7 @@ pub enum Type<'db> {
     /// The dynamic type: a statically unknown set of values
     Dynamic(DynamicType<'db>),
     /// A cycle marker used during recursive type inference.
-    Divergent(DivergentType),
+    Divergent(DivergentType<'db>),
     /// The empty set of values
     Never,
     /// A specific function object
@@ -2066,15 +2068,57 @@ impl<'db> Type<'db> {
         Self::Dynamic(DynamicType::Unknown)
     }
 
-    pub(crate) fn divergent(id: salsa::Id) -> Self {
-        Self::Divergent(DivergentType::new(id))
+    /// A cycle marker for a query that only approximates its result during a cycle.
+    pub(crate) fn divergent(db: &'db dyn Db, id: salsa::Id) -> Self {
+        Self::divergent_root(db, id, CycleOwner::Query(id))
+    }
+
+    /// A cycle marker standing for the result of the query identified by `owner`.
+    pub(crate) fn divergent_root(db: &'db dyn Db, id: salsa::Id, owner: CycleOwner<'db>) -> Self {
+        Self::Divergent(DivergentType::new(CycleVariable::root(db, id, owner)))
+    }
+
+    /// Returns `true` if this type is the unmaterialized cycle marker of the cycle head `id`.
+    pub(crate) fn is_cycle_head_marker(self, db: &'db dyn Db, id: salsa::Id) -> bool {
+        matches!(
+            self,
+            Type::Divergent(divergent)
+                if divergent.is_root_of(db, id) && divergent.materialization_kind().is_none()
+        )
+    }
+
+    /// The marker of the cycle head `id` as it occurs in this type.
+    ///
+    /// The head's marker can have been created for the head query itself or for one of its
+    /// outputs. Normalization reuses the occurrence so that a rebuilt type stays equal to the
+    /// original. When the head does not occur in this type, a fresh marker is used instead.
+    fn cycle_head_marker(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        id: salsa::Id,
+    ) -> Type<'db> {
+        let found = Cell::new(None);
+        any_over_type(db, env, self, false, |ty| {
+            if let Type::Divergent(divergent) = ty
+                && divergent.is_root_of(db, id)
+            {
+                found.set(Some(divergent.unmaterialized()));
+                true
+            } else {
+                false
+            }
+        });
+        found
+            .get()
+            .map_or_else(|| Type::divergent(db, id), Type::Divergent)
     }
 
     const fn is_divergent(&self) -> bool {
         matches!(self, Type::Divergent(_))
     }
 
-    const fn as_divergent(self) -> Option<DivergentType> {
+    const fn as_divergent(self) -> Option<DivergentType<'db>> {
         match self {
             Type::Divergent(divergent) => Some(divergent),
             _ => None,
@@ -2082,10 +2126,10 @@ impl<'db> Type<'db> {
     }
 
     /// Returns `true` if both `self` and `other` are `Divergent` types originating from the
-    /// same cycle (i.e., sharing the same query ID), regardless of materialization state.
-    fn same_divergent_marker(self, other: Type<'db>) -> bool {
+    /// same cycle, regardless of materialization state.
+    fn same_divergent_marker(self, db: &'db dyn Db, other: Type<'db>) -> bool {
         match (self, other) {
-            (Type::Divergent(left), Type::Divergent(right)) => left.same_marker(right),
+            (Type::Divergent(left), Type::Divergent(right)) => left.same_marker(db, right),
             _ => false,
         }
     }
@@ -2506,8 +2550,11 @@ impl<'db> Type<'db> {
 
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, id, _, _, materialization_kind| {
-            Type::Divergent(DivergentType::new(id).materialized(materialization_kind))
+        cycle_initial=|db, id, _, _, materialization_kind| {
+            Type::Divergent(
+                DivergentType::new(CycleVariable::root(db, id, CycleOwner::Query(id)))
+                    .materialized(materialization_kind),
+            )
         },
         cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _, program, _| {
             value.cycle_normalized_impl(db, &ProgramEnvironment::from_program(program), *previous, cycle)
@@ -3300,8 +3347,9 @@ impl<'db> Type<'db> {
         cycle: &salsa::Cycle,
     ) -> Self {
         cycle.head_ids().fold(self, |ty, id| {
-            ty.recursive_type_normalized_impl(db, env, Type::divergent(id), false)
-                .unwrap_or(Type::divergent(id))
+            let div = ty.cycle_head_marker(db, env, id);
+            ty.recursive_type_normalized_impl(db, env, div, false)
+                .unwrap_or(div)
         })
     }
 
@@ -3328,7 +3376,7 @@ impl<'db> Type<'db> {
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
-        if nested && self.same_divergent_marker(div) {
+        if nested && self.same_divergent_marker(db, div) {
             return None;
         }
         match self {
@@ -3828,7 +3876,7 @@ impl<'db> Type<'db> {
 
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, id, _| Place::bound(Type::divergent(id)).into(),
+        cycle_initial=|db, id, _| Place::bound(Type::divergent(db, id)).into(),
         cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, member: PlaceAndQualifiers<'db>, key: MemberLookupKey<'db>| {
             member.cycle_normalized(db, &ProgramEnvironment::from_program(key.program(db)), *previous, cycle)
         },
@@ -5334,7 +5382,7 @@ impl<'db> Type<'db> {
     ) -> MemberLookupResult<'db> {
         #[salsa::tracked(
             returns(copy),
-            cycle_initial=|db, id, key: MemberLookupKey<'db>| Place::bound(Type::divergent(id)).with_symbolic(Some(SymbolicType::initial(db, key.program(db), InferenceOwner::Member(key, None), InferenceSlot::Root))).into(),
+            cycle_initial=|db, id, key: MemberLookupKey<'db>| Place::bound(Type::divergent_root(db, id, CycleOwner::Member(key, None))).with_symbolic(Some(SymbolicType::initial(db, key.program(db), InferenceOwner::Member(key, None), InferenceSlot::Root))).into(),
             cycle_fn=|db, cycle, previous: &MemberLookupResult<'db>, member: MemberLookupResult<'db>, key: MemberLookupKey<'db>| {
                 cycle_normalized_member_lookup(db, &ProgramEnvironment::from_program(key.program(db)), member, *previous, cycle)
             },
@@ -5363,7 +5411,7 @@ impl<'db> Type<'db> {
 
         #[salsa::tracked(
             returns(copy),
-            cycle_initial=|db, id, key: MemberLookupKey<'db>, receiver: Type<'db>| Place::bound(Type::divergent(id)).with_symbolic(Some(SymbolicType::initial(db, key.program(db), InferenceOwner::Member(key, Some(receiver)), InferenceSlot::Root))).into(),
+            cycle_initial=|db, id, key: MemberLookupKey<'db>, receiver: Type<'db>| Place::bound(Type::divergent_root(db, id, CycleOwner::Member(key, Some(receiver)))).with_symbolic(Some(SymbolicType::initial(db, key.program(db), InferenceOwner::Member(key, Some(receiver)), InferenceSlot::Root))).into(),
             cycle_fn=|db, cycle, previous: &MemberLookupResult<'db>, member: MemberLookupResult<'db>, key: MemberLookupKey<'db>, _| {
                 cycle_normalized_member_lookup(db, &ProgramEnvironment::from_program(key.program(db)), member, *previous, cycle)
             },
@@ -8707,7 +8755,7 @@ impl<'db> Type<'db> {
 
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, id, _, _, _| Type::divergent(id),
+        cycle_initial=|db, id, _, _, _| Type::divergent(db, id),
         cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _, specialization: Specialization<'db>, _| {
             let env = ProgramEnvironment::from_program(
                 specialization.generic_context(db).program(db),
@@ -9597,7 +9645,7 @@ impl<'db> Type<'db> {
 
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, id, _, _| Type::divergent(id),
+        cycle_initial=|db, id, _, _| Type::divergent(db, id),
         cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _, program| {
             value.cycle_normalized_impl(db, &ProgramEnvironment::from_program(program), *previous, cycle)
         },
@@ -10529,33 +10577,50 @@ impl<'db> TypeMapping<'_, 'db> {
 /// (e.g. `Divergent` is assignable to `@Todo`, but `@Todo | Divergent` must not be reduced to `@Todo`).
 /// Otherwise, type inference cannot converge properly.
 /// For detailed properties of this type, see the unit test at the end of the file.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct DivergentType {
-    /// The query ID that caused the cycle.
-    id: salsa::Id,
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::SalsaValue)]
+pub struct DivergentType<'db> {
+    /// The value this marker stands for.
+    variable: CycleVariable<'db>,
     /// If this divergent marker has been materialized, preserve whether it should behave like the
     /// top (`object`) or bottom (`Never`) bound while still remaining recognizable as divergent.
     materialization: Option<MaterializationKind>,
 }
 
 // The Salsa heap is tracked separately.
-impl get_size2::GetSize for DivergentType {}
+impl get_size2::GetSize for DivergentType<'_> {}
 
-impl DivergentType {
-    const fn new(id: salsa::Id) -> Self {
+impl<'db> DivergentType<'db> {
+    const fn new(variable: CycleVariable<'db>) -> Self {
         Self {
-            id,
+            variable,
             materialization: None,
         }
     }
 
-    fn same_marker(self, other: Self) -> bool {
-        self.id == other.id
+    /// Returns `true` if both markers stand for the result of the same cycle head, regardless
+    /// of materialization state. Queries keyed by the same value share a cycle head.
+    fn same_marker(self, db: &'db dyn Db, other: Self) -> bool {
+        self.variable == other.variable
+            || (self.variable.is_root(db)
+                && other.variable.is_root(db)
+                && self.variable.head(db) == other.variable.head(db))
+    }
+
+    /// Returns `true` if this marker stands for the result of the cycle head `id`.
+    fn is_root_of(self, db: &'db dyn Db, id: salsa::Id) -> bool {
+        self.variable.is_root(db) && self.variable.head(db).id() == id
+    }
+
+    const fn unmaterialized(self) -> Self {
+        Self {
+            variable: self.variable,
+            materialization: None,
+        }
     }
 
     const fn materialized(self, kind: MaterializationKind) -> Self {
         Self {
-            id: self.id,
+            variable: self.variable,
             materialization: Some(kind),
         }
     }

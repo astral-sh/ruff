@@ -85,7 +85,7 @@ impl<'db> UnionType<'db> {
     ) -> Type<'db> {
         #[salsa::tracked(
             returns(copy),
-            cycle_initial=|_, id, _| Type::divergent(id),
+            cycle_initial=|db, id, _| Type::divergent(db, id),
             cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, types: TypePair<'db>| {
                 result.cycle_normalized(db, &ProgramEnvironment::from_program(types.program(db)), *previous, cycle)
             },
@@ -459,7 +459,7 @@ impl<'db> UnionType<'db> {
             if nested {
                 // list[T | Divergent] => list[Divergent]
                 let ty = ty.recursive_type_normalized_impl(db, env, div, nested)?;
-                if ty.same_divergent_marker(div) {
+                if ty.same_divergent_marker(db, div) {
                     return Some(ty);
                 }
                 builder.add_in_place(ty);
@@ -467,7 +467,7 @@ impl<'db> UnionType<'db> {
             } else {
                 // `Divergent` in a union type does not mean true divergence, so we skip it if not nested.
                 // e.g. T | Divergent == T | (T | (T | (T | ...))) == T
-                if (*ty).same_divergent_marker(div) {
+                if (*ty).same_divergent_marker(db, div) {
                     builder = builder.recursively_defined(RecursivelyDefined::Yes);
                     continue;
                 }
@@ -967,7 +967,7 @@ impl<'db> IntersectionType<'db> {
     ) -> Type<'db> {
         #[salsa::tracked(
             returns(copy),
-            cycle_initial=|_, id, _| Type::divergent(id),
+            cycle_initial=|db, id, _| Type::divergent(db, id),
             cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, types: TypePair<'db>| {
                 result.cycle_normalized(db, &ProgramEnvironment::from_program(types.program(db)), *previous, cycle)
             },

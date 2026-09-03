@@ -46,6 +46,7 @@
 use self::constraints::{InferenceOwner, InferenceSlot, SymbolicType};
 use crate::ProgramEnvironment;
 use crate::place::Place;
+use crate::types::CycleOwner;
 use itertools::Either;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
@@ -130,7 +131,7 @@ fn extend_collection_use_constraints<'db>(
 #[salsa::tracked(
     returns(ref),
     cycle_initial=|db, id, definition: Definition<'db>| {
-        DefinitionInference::cycle_initial(db, definition, InferenceRegion::Definition(definition), Type::divergent(id))
+        DefinitionInference::cycle_initial(db, definition, InferenceRegion::Definition(definition), Type::divergent_root(db, id, CycleOwner::Region(InferenceRegion::Definition(definition))))
     },
     cycle_fn=|db: &'db dyn Db, cycle, previous: &DefinitionInference<'db>, inference: DefinitionInference<'db>, definition: Definition<'db>| {
         inference.cycle_normalized(db, previous, cycle, definition)
@@ -282,7 +283,7 @@ impl<'db> FunctionDecoratorInference<'db> {
 #[salsa::tracked(
     returns(ref),
     cycle_initial=|db, id, definition: Definition<'db>| {
-        DefinitionInference::cycle_initial(db, definition, InferenceRegion::Deferred(definition), Type::divergent(id))
+        DefinitionInference::cycle_initial(db, definition, InferenceRegion::Deferred(definition), Type::divergent_root(db, id, CycleOwner::Region(InferenceRegion::Deferred(definition))))
     },
     cycle_fn=|db: &'db dyn Db, cycle, previous: &DefinitionInference<'db>, inference: DefinitionInference<'db>, definition: Definition<'db>| {
         inference.cycle_normalized(db, previous, cycle, definition)
@@ -328,7 +329,7 @@ pub(crate) fn infer_deferred_types<'db>(
 #[salsa::tracked(
     returns(ref),
     cycle_initial=|db, id, definition: Definition<'db>| {
-        DefinitionInference::cycle_initial(db, definition, InferenceRegion::FunctionDefaults(definition), Type::divergent(id))
+        DefinitionInference::cycle_initial(db, definition, InferenceRegion::FunctionDefaults(definition), Type::divergent_root(db, id, CycleOwner::Region(InferenceRegion::FunctionDefaults(definition))))
     },
     cycle_fn=|db: &'db dyn Db, cycle, previous: &DefinitionInference<'db>, inference: DefinitionInference<'db>, definition: Definition<'db>| {
         inference.cycle_normalized(db, previous, cycle, definition)
@@ -401,7 +402,10 @@ pub(crate) fn infer_scope_types<'db>(
 
 #[salsa::tracked(
     returns(ref),
-    cycle_initial=|_, id, _| ScopeInference::cycle_initial(Type::divergent(id)),
+    cycle_initial=|db, id, input: InferScope<'db>| {
+        let (scope, tcx) = input.into_inner(db);
+        ScopeInference::cycle_initial(Type::divergent_root(db, id, CycleOwner::Region(InferenceRegion::Scope(scope, tcx))))
+    },
     cycle_fn=|db, cycle, previous: &ScopeInference<'db>, inference: ScopeInference<'db>, input: InferScope<'db>| {
         let (scope, _) = input.into_inner(db);
         let env = ProgramEnvironment::from_scope(scope);
@@ -500,7 +504,11 @@ fn expression_cycle_initial<'db>(
     input: InferExpression<'db>,
 ) -> ExpressionInference<'db> {
     let (expression, tcx) = input.into_inner(db);
-    let cycle_recovery = Type::divergent(id);
+    let cycle_recovery = Type::divergent_root(
+        db,
+        id,
+        CycleOwner::Region(InferenceRegion::Expression(expression, tcx)),
+    );
     ExpressionInference::cycle_initial(db, expression, tcx, cycle_recovery)
 }
 
@@ -535,7 +543,10 @@ pub(crate) fn infer_expression_type<'db>(
 
 #[salsa::tracked(
     returns(copy),
-    cycle_initial=|_, id, _| Type::divergent(id),
+    cycle_initial=|db, id, input: InferExpression<'db>| {
+        let (expression, tcx) = input.into_inner(db);
+        Type::divergent_root(db, id, CycleOwner::Region(InferenceRegion::Expression(expression, tcx)))
+    },
     cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, input: InferExpression<'db>| {
         let (expression, _) = input.into_inner(db);
         let env = ProgramEnvironment::from_scope(expression.scope(db));
@@ -575,8 +586,8 @@ pub(super) fn infer_statement_types<'db>(
 
 #[salsa::tracked(
     returns(ref),
-    cycle_initial=|db, id, statement: StatementInner<'db>| {
-        StatementInferenceInner::cycle_initial(statement.scope(db), Type::divergent(id))
+    cycle_initial=|db: &'db dyn Db, id, statement: StatementInner<'db>| {
+        StatementInferenceInner::cycle_initial(statement.scope(db), Type::divergent_root(db, id, CycleOwner::Region(InferenceRegion::Statement(statement))))
     },
     cycle_fn=|db, cycle, previous: &StatementInferenceInner<'db>, inference: StatementInferenceInner<'db>, statement: StatementInner<'db>| {
         let env = ProgramEnvironment::from_file(statement.program_file(db));
@@ -771,7 +782,7 @@ impl<'db> From<Type<'db>> for TypeContext<'db> {
 /// during this unpacking.
 #[salsa::tracked(
     returns(ref),
-    cycle_initial=|_, id, unpack| UnpackResult::cycle_initial(unpack, Type::divergent(id)),
+    cycle_initial=|db, id, unpack| UnpackResult::cycle_initial(unpack, Type::divergent_root(db, id, CycleOwner::Unpack(unpack))),
     cycle_fn=|db, cycle, previous: &UnpackResult<'db>, result: UnpackResult<'db>, unpack: Unpack<'db>| {
         let env = ProgramEnvironment::from_file(unpack.program_file(db));
         result.cycle_normalized(db, &env, previous, cycle)

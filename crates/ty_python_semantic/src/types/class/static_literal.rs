@@ -3561,7 +3561,7 @@ fn explicit_bases_cycle_initial<'db>(
     // Try to produce a list of `Divergent` types of the right length. However, if one or more of
     // the bases is a starred expression, we don't know how many entries that will eventually
     // expand to.
-    vec![Type::divergent(id); class_stmt.bases().len()].into_boxed_slice()
+    vec![Type::divergent(db, id); class_stmt.bases().len()].into_boxed_slice()
 }
 
 fn explicit_bases_cycle_fn<'db>(

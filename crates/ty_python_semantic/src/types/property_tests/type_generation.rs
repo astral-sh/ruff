@@ -366,7 +366,7 @@ fn divergent<'db>(
     id_bits: u64,
     materialization: Option<MaterializationKind>,
 ) -> Type<'db> {
-    let divergent = Type::divergent(salsa::plumbing::Id::from_bits(id_bits));
+    let divergent = Type::divergent(db, salsa::plumbing::Id::from_bits(id_bits));
 
     match materialization {
         Some(materialization_kind) => {
