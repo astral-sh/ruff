@@ -60,7 +60,7 @@ jobs:
           command: sdist
           args: --out dist
       - name: "Test sdist"
-        uses: astral-sh/github-actions/release-smoke-test@e6a0d38509bf35a70619cb422858000b0fb2930c
+        uses: astral-sh/github-actions/release-smoke-test@3994daa59cb9d97f991f8196a17218a2641fce4b
         with:
           image: python:3.13-bookworm@sha256:933b46a028fd786c9c3d426ebabc237e29a15912231ea8de576e95f0e4f41a4c
           artifacts: dist
@@ -322,7 +322,7 @@ jobs:
           args: --release --locked --out dist --compatibility pypi
       - name: "Test wheel"
         if: ${{ startsWith(matrix.target, 'x86_64') }}
-        uses: astral-sh/github-actions/release-smoke-test@e6a0d38509bf35a70619cb422858000b0fb2930c
+        uses: astral-sh/github-actions/release-smoke-test@3994daa59cb9d97f991f8196a17218a2641fce4b
         with:
           image: python:3.13-bookworm@sha256:933b46a028fd786c9c3d426ebabc237e29a15912231ea8de576e95f0e4f41a4c
           artifacts: dist
@@ -394,7 +394,7 @@ jobs:
           docker-options: -e JEMALLOC_SYS_WITH_LG_PAGE=16
           args: --release --locked --out dist --compatibility pypi
       - name: "Test wheel"
-        uses: astral-sh/github-actions/release-smoke-test@e6a0d38509bf35a70619cb422858000b0fb2930c
+        uses: astral-sh/github-actions/release-smoke-test@3994daa59cb9d97f991f8196a17218a2641fce4b
         with:
           image: python:3.13-bookworm@sha256:933b46a028fd786c9c3d426ebabc237e29a15912231ea8de576e95f0e4f41a4c
           platform: linux/arm64
@@ -481,7 +481,7 @@ jobs:
           args: --release --locked --out dist --compatibility pypi
       - name: "Test wheel"
         if: ${{ matrix.platform.target != 'powerpc64le-unknown-linux-gnu' }}
-        uses: astral-sh/github-actions/release-smoke-test@e6a0d38509bf35a70619cb422858000b0fb2930c
+        uses: astral-sh/github-actions/release-smoke-test@3994daa59cb9d97f991f8196a17218a2641fce4b
         with:
           image: ${{ matrix.platform.test_image }}
           platform: ${{ matrix.platform.test_platform }}
@@ -548,7 +548,7 @@ jobs:
           args: --release --locked --out dist --compatibility pypi
       - name: "Test wheel"
         if: matrix.target == 'x86_64-unknown-linux-musl'
-        uses: astral-sh/github-actions/release-smoke-test@e6a0d38509bf35a70619cb422858000b0fb2930c
+        uses: astral-sh/github-actions/release-smoke-test@3994daa59cb9d97f991f8196a17218a2641fce4b
         with:
           image: alpine:latest@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
           artifacts: dist
@@ -616,7 +616,7 @@ jobs:
           args: --release --locked --out dist --compatibility pypi
           docker-options: ${{ matrix.platform.maturin_docker_options }}
       - name: "Test wheel"
-        uses: astral-sh/github-actions/release-smoke-test@e6a0d38509bf35a70619cb422858000b0fb2930c
+        uses: astral-sh/github-actions/release-smoke-test@3994daa59cb9d97f991f8196a17218a2641fce4b
         with:
           image: alpine:latest@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
           platform: ${{ matrix.platform.test_platform }}
