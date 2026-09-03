@@ -1239,67 +1239,6 @@ def quantifier_order[S, T]() -> None:
     static_assert(exists_source_forall_target == ConstraintSet.never())
 ```
 
-## Displaying constraints
-
-The `with_detailed_display` method can be used to print out the boolean formula that a constraint
-set represents. However, this method is only intended for debugging purposes, and we reserve the
-right to change the rendering at any time! We therefore do _not_ have a battery of mdtests printing
-out all of the different kinds of constraints described above. Here we just test that the method
-exists, and provides more detail than otherwise.
-
-```py
-from ty_extensions._internal import ConstraintSet, RegularCallableTypeOf
-
-class Super: ...
-class Base(Super): ...
-class Sub(Base): ...
-
-def _[T]() -> None:
-    # revealed: ConstraintSet[bool]
-    reveal_type(ConstraintSet.range(Sub, T, Super))
-    # We are not asserting anything specific about what's displayed here, just that it's different
-    # from above. If our constraint set rendering changes, update this accordingly.
-    # revealed: ConstraintSet[(Sub ≤ T@_ ≤ Super)]
-    reveal_type(ConstraintSet.range(Sub, T, Super).with_detailed_display())
-```
-
-Explicit bottom and top parameter-list bounds are shown in the constraint.
-
-```py
-from typing import Callable, Never
-from ty_extensions import Bottom, Top
-
-def explicit_bounds[**P]() -> None:
-    lower = ConstraintSet.range(Bottom[Callable[..., Never]], P, Callable[[int], int])
-    # revealed: ConstraintSet[((*args: object, **kwargs: object) ≤ P@explicit_bounds ≤ (int, /))]
-    reveal_type(lower.with_detailed_display())
-    upper = ConstraintSet.range(Callable[[int], int], P, Top[Callable[..., object]])
-    # revealed: ConstraintSet[((int, /) ≤ P@explicit_bounds ≤ Top[(...)])]
-    reveal_type(upper.with_detailed_display())
-```
-
-ParamSpec bounds display the full parameter list without the callable return type.
-
-```py
-def complete(value: int, /, text: str = "", *args: float, flag: bool = False, **kwargs: bytes) -> int:
-    return 0
-
-def signature[**P]() -> None:
-    constraints = ConstraintSet.range(RegularCallableTypeOf[complete], P, RegularCallableTypeOf[complete])
-    # revealed: ConstraintSet[(P@signature = (value: int, /, text: str = "", *args: float, flag: bool = False, **kwargs: bytes))]
-    reveal_type(constraints.with_detailed_display())
-```
-
-Generic callable bounds keep their own ParamSpec binder.
-
-```py
-def callback[**Q](*args: Q.args, **kwargs: Q.kwargs) -> None: ...
-def generic_signature[**P]() -> None:
-    constraints = ConstraintSet.range(RegularCallableTypeOf[callback], P, RegularCallableTypeOf[callback])
-    # revealed: ConstraintSet[(P@generic_signature = (**Q@callback))]
-    reveal_type(constraints.with_detailed_display())
-```
-
 ## ParamSpec
 
 A ParamSpec constraint describes parameter lists; callable returns are ignored.
@@ -1615,23 +1554,13 @@ def parameter_kinds[**P]() -> None:
 
 ### Gradual parameter lists
 
-Ellipsis describes gradual parameters; `Any` annotates one required positional-only parameter.
+An empty parameter list is compatible with ellipsis, but not with one required `Any` parameter.
 
 ```py
 from typing import Any, Callable
 from ty_extensions import static_assert
 from ty_extensions._internal import ConstraintSet
 
-def gradual[**P]() -> None:
-    ellipsis = ConstraintSet.range(Callable[..., int], P, Callable[..., str])
-    reveal_type(ellipsis.with_detailed_display())  # revealed: ConstraintSet[(P@gradual = (...))]
-    any_parameter = ConstraintSet.range(Callable[[Any], int], P, Callable[[Any], str])
-    reveal_type(any_parameter.with_detailed_display())  # revealed: ConstraintSet[(P@gradual = (Any, /))]
-```
-
-Only ellipsis is compatible with an empty parameter list in either bound.
-
-```py
 def empty[**P]() -> None:
     reveal_type(ConstraintSet.range(Callable[..., None], P, Callable[[], None]))  # revealed: ConstraintSet[bool]
     reveal_type(ConstraintSet.range(Callable[[], None], P, Callable[..., None]))  # revealed: ConstraintSet[bool]
@@ -1661,20 +1590,6 @@ def missing_upper_bound[**P]() -> None:
     constraints = ConstraintSet.lower_bound(Callable[[int], int], P)
     expected = ConstraintSet.range(Callable[[int], int], P, Top[Callable[..., object]])
     static_assert(constraints == expected)
-```
-
-Omitted bounds stay absent; explicit `...` bounds remain visible.
-
-```py
-def missing_bounds[**P]() -> None:
-    # revealed: ConstraintSet[((int, /) ≤ P@missing_bounds)]
-    reveal_type(ConstraintSet.lower_bound(Callable[[int], None], P).with_detailed_display())
-    # revealed: ConstraintSet[((int, /) ≤ P@missing_bounds ≤ (...))]
-    reveal_type(ConstraintSet.range(Callable[[int], None], P, Callable[..., None]).with_detailed_display())
-    # revealed: ConstraintSet[(P@missing_bounds ≤ (int, /))]
-    reveal_type(ConstraintSet.upper_bound(P, Callable[[int], None]).with_detailed_display())
-    # revealed: ConstraintSet[((...) ≤ P@missing_bounds ≤ (int, /))]
-    reveal_type(ConstraintSet.range(Callable[..., None], P, Callable[[int], None]).with_detailed_display())
 ```
 
 ### Invalid forms and preservation controls
@@ -1741,4 +1656,89 @@ def legacy_typevartuple_subject(value: tuple[*Ts]) -> None:
 
 def typevartuple_subject[*Us]() -> None:
     ConstraintSet.range(Callable[[int], None], Us, Callable[[int], None])  # error: [invalid-type-form]
+```
+
+## Displaying constraints
+
+The `with_detailed_display` method can be used to print out the boolean formula that a constraint
+set represents. However, this method is only intended for debugging purposes, and we reserve the
+right to change the rendering at any time! We therefore do _not_ have a battery of mdtests printing
+out all of the different kinds of constraints described above. Here we just test that the method
+exists, and provides more detail than otherwise.
+
+```py
+from ty_extensions._internal import ConstraintSet, RegularCallableTypeOf
+
+class Super: ...
+class Base(Super): ...
+class Sub(Base): ...
+
+def _[T]() -> None:
+    # revealed: ConstraintSet[bool]
+    reveal_type(ConstraintSet.range(Sub, T, Super))
+    # We are not asserting anything specific about what's displayed here, just that it's different
+    # from above. If our constraint set rendering changes, update this accordingly.
+    # revealed: ConstraintSet[(Sub ≤ T@_ ≤ Super)]
+    reveal_type(ConstraintSet.range(Sub, T, Super).with_detailed_display())
+```
+
+Explicit bottom and top parameter-list bounds are shown in the constraint.
+
+```py
+from typing import Any, Callable, Never
+from ty_extensions import Bottom, Top
+
+def explicit_bounds[**P]() -> None:
+    lower = ConstraintSet.range(Bottom[Callable[..., Never]], P, Callable[[int], int])
+    # revealed: ConstraintSet[((*args: object, **kwargs: object) ≤ P@explicit_bounds ≤ (int, /))]
+    reveal_type(lower.with_detailed_display())
+    upper = ConstraintSet.range(Callable[[int], int], P, Top[Callable[..., object]])
+    # revealed: ConstraintSet[((int, /) ≤ P@explicit_bounds ≤ Top[(...)])]
+    reveal_type(upper.with_detailed_display())
+```
+
+ParamSpec bounds display the full parameter list without the callable return type.
+
+```py
+def complete(value: int, /, text: str = "", *args: float, flag: bool = False, **kwargs: bytes) -> int:
+    return 0
+
+def signature[**P]() -> None:
+    constraints = ConstraintSet.range(RegularCallableTypeOf[complete], P, RegularCallableTypeOf[complete])
+    # revealed: ConstraintSet[(P@signature = (value: int, /, text: str = "", *args: float, flag: bool = False, **kwargs: bytes))]
+    reveal_type(constraints.with_detailed_display())
+```
+
+Generic callable bounds keep their own ParamSpec binder.
+
+```py
+def callback[**Q](*args: Q.args, **kwargs: Q.kwargs) -> None: ...
+def generic_signature[**P]() -> None:
+    constraints = ConstraintSet.range(RegularCallableTypeOf[callback], P, RegularCallableTypeOf[callback])
+    # revealed: ConstraintSet[(P@generic_signature = (**Q@callback))]
+    reveal_type(constraints.with_detailed_display())
+```
+
+The display distinguishes gradual parameter lists from one required `Any` parameter.
+
+```py
+def gradual[**P]() -> None:
+    ellipsis = ConstraintSet.range(Callable[..., int], P, Callable[..., str])
+    reveal_type(ellipsis.with_detailed_display())  # revealed: ConstraintSet[(P@gradual = (...))]
+    any_parameter = ConstraintSet.range(Callable[[Any], int], P, Callable[[Any], str])
+    reveal_type(any_parameter.with_detailed_display())  # revealed: ConstraintSet[(P@gradual = (Any, /))]
+```
+
+Omitted bounds stay absent; explicit `...` bounds remain visible.
+
+```py
+def missing_bounds[**P]() -> None:
+    # revealed: ConstraintSet[((int, /) ≤ P@missing_bounds)]
+    reveal_type(ConstraintSet.lower_bound(Callable[[int], None], P).with_detailed_display())
+    # revealed: ConstraintSet[((int, /) ≤ P@missing_bounds ≤ (...))]
+    reveal_type(ConstraintSet.range(Callable[[int], None], P, Callable[..., None]).with_detailed_display())
+    # revealed: ConstraintSet[(P@missing_bounds ≤ (int, /))]
+    reveal_type(ConstraintSet.upper_bound(P, Callable[[int], None]).with_detailed_display())
+    # revealed: ConstraintSet[((...) ≤ P@missing_bounds ≤ (int, /))]
+    reveal_type(ConstraintSet.range(Callable[..., None], P, Callable[[int], None]).with_detailed_display())
 ```
