@@ -60,6 +60,38 @@ from .inner import *
 from pkg.sub import A
 ```
 
+### Re-exported generic classes in annotations
+
+A generic class re-exported by a package remains valid in annotations when the package's modules
+import one another.
+
+`main.py`:
+
+```py
+from pkg import utils
+
+def get_map() -> utils.ChainMap[str, int]:
+    return utils.ChainMap({"value": 1})
+```
+
+`pkg/__init__.py`:
+
+```py
+from .abc import *
+```
+
+`pkg/abc.py`:
+
+```py
+from . import utils
+```
+
+`pkg/utils.py`:
+
+```py
+from collections import ChainMap
+```
+
 ### Actual cycle
 
 The following example fails at runtime. Ideally, we would emit a diagnostic here. For now, we only
