@@ -771,7 +771,7 @@ impl<'db> From<Type<'db>> for TypeContext<'db> {
 /// during this unpacking.
 #[salsa::tracked(
     returns(ref),
-    cycle_initial=|_, id, _| UnpackResult::cycle_initial(Type::divergent(id)),
+    cycle_initial=|_, id, unpack| UnpackResult::cycle_initial(unpack, Type::divergent(id)),
     cycle_fn=|db, cycle, previous: &UnpackResult<'db>, result: UnpackResult<'db>, unpack: Unpack<'db>| {
         let env = ProgramEnvironment::from_file(unpack.program_file(db));
         result.cycle_normalized(db, &env, previous, cycle)
@@ -790,7 +790,7 @@ pub(super) fn infer_unpack_types<'db>(db: &'db dyn Db, unpack: Unpack<'db>) -> U
     .entered();
 
     let env = ProgramEnvironment::from_file(program_file);
-    let mut unpacker = Unpacker::new(db, &env, unpack.target_scope(db), program_file, &module);
+    let mut unpacker = Unpacker::new(db, &env, unpack, &module);
     unpacker.unpack(unpack.target(db, &module), unpack.value(db));
     unpacker.finish()
 }

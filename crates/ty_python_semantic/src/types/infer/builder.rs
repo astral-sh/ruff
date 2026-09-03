@@ -2394,7 +2394,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if unpack_position == UnpackPosition::First {
                     self.context.extend(unpacked.diagnostics());
                 }
-                unpacked.expression_type(target)
+                self.infer_unpacked_binding(unpacked, target, definition)
             }
             TargetKind::Single => {
                 let context_expr_ty =
@@ -3049,6 +3049,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
+    /// Retain the dependencies of an unpacked target alongside its ordinary type.
+    fn infer_unpacked_binding(
+        &mut self,
+        unpacked: &UnpackResult<'db>,
+        target: &ast::Expr,
+        definition: Definition<'db>,
+    ) -> Type<'db> {
+        if let Some(symbolic) = unpacked.symbolic_type(self.db(), target) {
+            self.symbolic
+                .insert(InferenceSlot::Expression(target.into()), symbolic);
+            self.symbolic
+                .insert(InferenceSlot::Binding(definition), symbolic);
+        }
+        unpacked.expression_type(target)
+    }
+
     /// Infer the (definition) types involved in a `target` expression.
     ///
     /// This is used for assignment statements, for statements, etc. with a single or multiple
@@ -3518,7 +3534,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // The assignment statement owns unpacking diagnostics so that targets without a
                 // name definition are still checked, and each diagnostic is reported only once.
                 let unpacked = infer_unpack_types(self.db(), unpack);
-                unpacked.expression_type(target)
+                self.infer_unpacked_binding(unpacked, target, definition)
             }
             None => {
                 // This could be an implicit type alias (OptionalList = list[T] | None). Use the definition
@@ -5277,7 +5293,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     self.context.extend(unpacked.diagnostics());
                 }
 
-                unpacked.expression_type(target)
+                self.infer_unpacked_binding(unpacked, target, definition)
             }
             TargetKind::Single => {
                 let iterable_type =
@@ -7271,35 +7287,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             },
             &|builder, unpacked| builder.concat(db, env, unpacked),
         );
-        if elts.iter().all(|element| !element.is_starred_expr())
-            && elts.iter().any(|element| {
-                self.symbolic
-                    .contains_key(&InferenceSlot::Expression(element.into()))
-            })
-        {
-            let mut constraints = InferenceConstraints::default();
-            let promote = tuple_literal_needs_promotion(elts);
-            let mut elements = Vec::with_capacity(elts.len());
-            for element in elts {
-                let mut value = self
-                    .symbolic
-                    .get(&InferenceSlot::Expression(element.into()))
-                    .map_or_else(
-                        || self.expression_type(element),
-                        |symbolic| constraints.import(db, *symbolic),
-                    );
-                if promote {
-                    let input = InferenceVariable::new(
-                        db,
-                        env.program(db),
-                        InferenceOwner::Region(self.region),
-                        InferenceSlot::Expression(element.into()),
-                    );
-                    value = constraints.promote(db, env, input, value, InferencePromotion::Regular);
-                }
-                elements.push(value);
-            }
-            let symbolic = constraints.finish(db, Type::heterogeneous_tuple(db, env, elements));
+        if let Some(symbolic) = SymbolicType::from_sequence(
+            db,
+            env,
+            InferenceOwner::Region(self.region),
+            ast::ExprRef::Tuple(tuple),
+            |expression| {
+                (
+                    self.expression_type(expression),
+                    self.symbolic
+                        .get(&InferenceSlot::Expression(expression.into()))
+                        .copied(),
+                )
+            },
+        ) {
             self.symbolic.insert(
                 InferenceSlot::Expression(ast::ExprRef::Tuple(tuple).into()),
                 symbolic,
@@ -8677,7 +8678,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     self.context.extend(unpacked.diagnostics());
                 }
 
-                unpacked.expression_type(target)
+                self.infer_unpacked_binding(unpacked, target, definition)
             }
             TargetKind::Single => {
                 let (iterable_type, element_type) = infer_iterable_type();

@@ -39,7 +39,7 @@ use ty_python_core::definition::Definition;
 
 pub(crate) mod promotion;
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) enum TupleLength {
     Fixed(usize),
     Variable(usize, usize),

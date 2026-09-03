@@ -413,7 +413,10 @@ fn implicit_attribute_binding_type<'db>(
             Some(unpack) => {
                 // (..., self.name, ...) = <value>
                 let unpacked = infer_unpack_types(db, unpack);
-                Some((unpacked.expression_type(assignment.target(&module)), None))
+                Some((
+                    unpacked.expression_type(assignment.target(&module)),
+                    unpacked.symbolic_type(db, assignment.target(&module)),
+                ))
             }
             None => {
                 // self.name = <value>
@@ -429,7 +432,10 @@ fn implicit_attribute_binding_type<'db>(
             TargetKind::Sequence(_, unpack) => {
                 // for ..., self.name, ... in <iterable>:
                 let unpacked = infer_unpack_types(db, unpack);
-                Some((unpacked.expression_type(for_stmt.target(&module)), None))
+                Some((
+                    unpacked.expression_type(for_stmt.target(&module)),
+                    unpacked.symbolic_type(db, for_stmt.target(&module)),
+                ))
             }
             TargetKind::Single => {
                 // for self.name in <iterable>:
@@ -459,7 +465,10 @@ fn implicit_attribute_binding_type<'db>(
             TargetKind::Sequence(_, unpack) => {
                 // with <context_manager> as ..., self.name, ...:
                 let unpacked = infer_unpack_types(db, unpack);
-                Some((unpacked.expression_type(with_item.target(&module)), None))
+                Some((
+                    unpacked.expression_type(with_item.target(&module)),
+                    unpacked.symbolic_type(db, with_item.target(&module)),
+                ))
             }
             TargetKind::Single => {
                 // with <context_manager> as self.name:
@@ -482,7 +491,7 @@ fn implicit_attribute_binding_type<'db>(
                 let unpacked = infer_unpack_types(db, unpack);
                 Some((
                     unpacked.expression_type(comprehension.target(&module)),
-                    None,
+                    unpacked.symbolic_type(db, comprehension.target(&module)),
                 ))
             }
             TargetKind::Single => {

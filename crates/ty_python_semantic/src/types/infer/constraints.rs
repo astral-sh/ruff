@@ -16,6 +16,7 @@ use ty_python_core::frozen::FrozenMap;
 use ty_python_core::narrowing_constraints::ScopedNarrowingConstraint;
 use ty_python_core::place::ScopedPlaceId;
 use ty_python_core::scope::ScopeId;
+use ty_python_core::unpack::Unpack;
 use ty_python_core::{EvaluationMode, ExpressionNodeKey, NarrowingEvaluator, Program, use_def_map};
 
 use super::InferenceRegion;
@@ -28,6 +29,7 @@ use crate::types::constraints::{
     projection::{ProjectionError, SolutionBudget, SolutionProjection},
 };
 use crate::types::narrow::NarrowingEvaluatorExtension;
+use crate::types::tuple::{TupleBuilder, TupleLength, TupleType};
 use crate::types::typevar::{BindingContext, BoundTypeVarInstance, TypeVarSet};
 use crate::types::{
     ApplySpecialization, GenericContext, KnownClass, MemberLookupKey, Specialization, Type,
@@ -71,6 +73,7 @@ pub(crate) enum InferenceOwner<'db> {
     Symbol(SymbolLookupKey<'db>),
     Attribute(ImplicitAttributeName<'db>),
     AugmentedAttribute(AugmentedAttribute<'db>),
+    Unpack(Unpack<'db>),
     Narrowing(InferenceVariable<'db>, InferenceNarrowing<'db>),
     Promotion(InferenceVariable<'db>),
     Lookup(InferenceVariable<'db>),
@@ -326,6 +329,16 @@ pub(crate) enum InferenceOperation<'db> {
     },
     MappingKey(Type<'db>),
     MappingValue(Type<'db>),
+    Unpack {
+        value: Type<'db>,
+        length: TupleLength,
+        index: usize,
+    },
+    Concatenate {
+        left: Type<'db>,
+        right: Type<'db>,
+        right_length: Option<usize>,
+    },
 }
 
 impl<'db> InferenceOperation<'db> {
@@ -430,6 +443,24 @@ impl<'db> InferenceOperation<'db> {
                 narrowing,
             },
             Self::MappingValue(value) => Self::MappingValue(f(value)),
+            Self::Unpack {
+                value,
+                length,
+                index,
+            } => Self::Unpack {
+                value: f(value),
+                length,
+                index,
+            },
+            Self::Concatenate {
+                left,
+                right,
+                right_length,
+            } => Self::Concatenate {
+                left: f(left),
+                right: f(right),
+                right_length,
+            },
         }
     }
 
@@ -475,6 +506,27 @@ impl<'db> InferenceOperation<'db> {
                 ))
             }
             Self::MappingValue(value) => Some(value.unpack_keys_and_items(db, env)?.1),
+            Self::Unpack {
+                value,
+                length,
+                index,
+            } => value.unpacked_target(db, env, length, index),
+            Self::Concatenate {
+                left,
+                right,
+                right_length,
+            } => {
+                let left = left.try_iterate(db, env).ok()?;
+                let mut right = right.try_iterate(db, env).ok()?.into_owned();
+                if let Some(length) = right_length {
+                    right = right.resize(db, env, TupleLength::Fixed(length)).ok()?;
+                }
+                let tuple = TupleBuilder::with_capacity(0)
+                    .concat(db, env, &left)
+                    .concat(db, env, &right)
+                    .build();
+                Some(Type::tuple(TupleType::new(db, env, &tuple)))
+            }
         }
     }
 }

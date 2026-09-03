@@ -18,6 +18,177 @@ reveal_type(p.x)  # revealed: int
 reveal_type(p.y)  # revealed: int
 ```
 
+## Rebuilding an unpacked tuple
+
+Unpacking a tuple preserves the type at each position when the values are stored back in the same
+attribute.
+
+```py
+class Pair:
+    def __init__(self):
+        self.values = (0, "")
+
+    def copy(self):
+        first, second = self.values
+        self.values = (first, second)
+        reveal_type(self.values)  # revealed: tuple[int, str]
+```
+
+## Rebuilding a tuple with a starred target
+
+A starred target collects the middle elements into a list. The fixed targets retain their own types
+when the tuple is rebuilt from all three parts.
+
+```py
+class Values:
+    def __init__(self):
+        self.values = (0, "", b"")
+
+    def copy(self):
+        first, *middle, last = self.values
+        self.values = (first, middle[0], last)
+        reveal_type(first)  # revealed: int
+        reveal_type(middle)  # revealed: list[str]
+        reveal_type(last)  # revealed: bytes
+        reveal_type(self.values)  # revealed: tuple[int, str, bytes]
+```
+
+## Rebuilding a nested tuple
+
+Nested targets preserve the type of each inner element independently of its siblings.
+
+```py
+class Values:
+    def __init__(self):
+        self.values = (0, ("", b""))
+
+    def copy(self):
+        first, (second, third) = self.values
+        self.values = (first, (second, third))
+        reveal_type(self.values)  # revealed: tuple[int, tuple[str, bytes]]
+```
+
+## Rebuilding a collection from unpacked loop variables
+
+A loop can unpack each tuple and use its elements to build a replacement collection.
+
+```py
+from collections.abc import Iterable
+
+class Values:
+    def __init__(self, values: Iterable[tuple[int, str]]):
+        self.values = values
+
+    def copy(self):
+        for first, second in self.values:
+            self.values = [(first, second)]
+            reveal_type(self.values)  # revealed: list[tuple[int, str]]
+```
+
+## Rebuilding a tuple from unpacked attributes
+
+The unpacked elements can be stored in separate attributes before another method rebuilds the tuple.
+
+```py
+class Values:
+    def __init__(self):
+        self.values = (0, "")
+
+    def load(self):
+        self.first, self.second = self.values
+
+    def copy(self):
+        self.values = (self.first, self.second)
+        reveal_type(self.values)  # revealed: tuple[int, str]
+```
+
+## Unpacking an expanded sequence
+
+Expanding a tuple into a list preserves its positions for an unpacking assignment, including
+expansions inside another literal. The values retain their types when stored back in the tuple.
+
+```py
+class Values:
+    def __init__(self):
+        self.values = (0, "")
+
+    def copy(self):
+        first, second = [*self.values]
+        self.values = (first, second)
+        reveal_type(self.values)  # revealed: tuple[int, str]
+
+class Nested:
+    def __init__(self):
+        self.values = (0, "")
+
+    def copy(self):
+        first, second, last = [*(*self.values,), b""]
+        self.values = (first, second)
+        reveal_type(self.values)  # revealed: tuple[int, str]
+        reveal_type(last)  # revealed: Literal[b""]
+```
+
+## Copying an expanded tuple
+
+Copying a tuple through an expansion preserves its length and element types when the result is
+assigned back to the same attribute.
+
+```py
+class Values:
+    def __init__(self):
+        self.values = (0, "")
+
+    def copy(self):
+        self.values = (*self.values,)
+        reveal_type(self.values)  # revealed: tuple[int, str]
+```
+
+## Mutually dependent expanded tuples
+
+Copying between three attributes allows each tuple to contain any of the initial element types.
+Every copy still contains exactly one element.
+
+```py
+from typing_extensions import assert_type
+
+class Rotation:
+    def __init__(self):
+        self.left = (0,)
+        self.middle = ("",)
+        self.right = (b"",)
+
+    def update_left(self):
+        self.left = (*self.middle,)
+
+    def update_middle(self):
+        self.middle = (*self.right,)
+
+    def update_right(self):
+        self.right = (*self.left,)
+
+    def inspect(self):
+        assert_type(self.left, tuple[int | str | bytes])
+        assert_type(self.middle, tuple[int | str | bytes])
+        assert_type(self.right, tuple[int | str | bytes])
+```
+
+## Reusing a starred target
+
+Removing the first element and storing the remaining list preserves the element type.
+
+```py
+class Values:
+    def __init__(self):
+        self.values = [0]
+
+    def trim(self):
+        first, *rest = self.values
+        self.values = rest
+        reveal_type(first)  # revealed: int
+        reveal_type(rest)  # revealed: list[int]
+        reveal_type(self.values)  # revealed: list[int]
+```
+
 ## Copying tuple elements
 
 Copying each element preserves its type, including when the tuple's type includes the assignments
