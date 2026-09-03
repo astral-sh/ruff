@@ -1091,6 +1091,22 @@ static_assert(not is_subtype_of(Top[Cell[Any]], EquivalentCell[Any]))
 static_assert(not is_subtype_of(Top[Cell[Any]], Bottom[EquivalentCell[Any]]))
 ```
 
+If a class inherits from the protocol explicitly, we treat it as a subtype, even if it has invalid
+overrides:
+
+```py
+class InvalidOverride(Bounded[str]):
+    # TODO: this should be an invalid-override error (https://github.com/astral-sh/ty/issues/2156)
+    read = None
+
+static_assert(is_subtype_of(InvalidOverride, Bounded[str]))
+static_assert(is_subtype_of(InvalidOverride, Top[Bounded[str]]))
+static_assert(is_subtype_of(InvalidOverride, Top[Bounded[Any]]))
+static_assert(not is_subtype_of(InvalidOverride, Bottom[Bounded[str]]))
+static_assert(not is_subtype_of(InvalidOverride, Bottom[Bounded[Any]]))
+static_assert(not is_subtype_of(InvalidOverride, Top[EquivalentBounded[Any]]))
+```
+
 ## Callable
 
 The general principle is that a callable type is a subtype of another if it's more flexible in what

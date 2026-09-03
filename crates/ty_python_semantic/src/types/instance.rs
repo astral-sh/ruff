@@ -502,9 +502,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         ty: Type<'db>,
         protocol: ProtocolInstanceType<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        // Explicit protocol inheritance is nominal, but materializing a protocol can change
-        // the requirements represented by that same class. The nominal shortcut is therefore
-        // valid only when materialization leaves the target's members unchanged.
+        // Explicit protocol inheritance establishes subtyping even when a subclass overrides
+        // members incompatibly.
         let mut result = self.never();
         let source_protocol = ty.as_protocol_instance();
 
@@ -558,14 +557,16 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
             let env = self.env;
             // `result` combines nominal and structural ways to satisfy the protocol. Including the
-            // nominal constraints directly is safe when materialization leaves the required members
-            // unchanged, or when the nominal relation has no solutions to add to `result`.
+            // nominal constraints directly is safe when the target's requirements are unchanged or
+            // weakened by top materialization, and the source's requirements are unchanged. It is
+            // also safe when the nominal relation has no solutions to add to `result`.
             //
             // Check that inexpensive case first: comparing every requirement of an unrelated
             // recursive protocol can expand its interface before structural member ordering gets
             // a chance to reject an incompatible finite member.
             let can_use_nominal_result_directly = nominally_satisfied.is_never_satisfied(db, env)
-                || (!protocol.materialization_changes_requirements(db, env, protocol)
+                || ((protocol.materialization_kind(db) == Some(MaterializationKind::Top)
+                    || !protocol.materialization_changes_requirements(db, env, protocol))
                     && !source_protocol.is_some_and(|source| {
                         source.materialization_changes_requirements(db, env, protocol)
                     }));
