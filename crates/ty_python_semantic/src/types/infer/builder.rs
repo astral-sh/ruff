@@ -7509,8 +7509,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let Some((collection_alias, generic_context, elt_tys)) = elt_tys(collection_class) else {
             // Infer the element types without type context, and fallback to `Unknown` for
             // custom typesheds.
-            for (i, elt) in elts.iter().flatten().flatten().enumerate() {
-                infer_elt_expression(self, (i, elt, TypeContext::default()));
+            for elts in elts {
+                for (i, elt) in elts.iter().enumerate() {
+                    let Some(elt) = elt else { continue };
+                    infer_elt_expression(self, (i, elt, TypeContext::default()));
+                }
             }
 
             return None;
