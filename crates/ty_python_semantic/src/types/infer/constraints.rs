@@ -8,7 +8,7 @@
 use std::cell::{Cell, RefCell};
 use std::hash::Hash;
 
-use ruff_python_ast::{ExprContext, Operator};
+use ruff_python_ast::{ExprContext, Operator, UnaryOp};
 use rustc_hash::{FxHashMap, FxHashSet};
 use salsa::plumbing::AsId;
 use ty_python_core::definition::Definition;
@@ -373,6 +373,10 @@ pub(crate) enum InferenceOperation<'db> {
         right: Type<'db>,
         right_length: Option<usize>,
     },
+    Unary {
+        operand: Type<'db>,
+        operator: UnaryOp,
+    },
 }
 
 /// Select the inferred return type or the specialization of a generic receiver.
@@ -466,6 +470,10 @@ impl<'db> InferenceOperation<'db> {
 
     fn map(self, db: &'db dyn Db, mut f: impl FnMut(Type<'db>) -> Type<'db>) -> Self {
         match self {
+            Self::Unary { operand, operator } => Self::Unary {
+                operand: f(operand),
+                operator,
+            },
             Self::Binary {
                 left,
                 right,
@@ -559,6 +567,9 @@ impl<'db> InferenceOperation<'db> {
         variable: InferenceVariable<'db>,
     ) -> Option<Type<'db>> {
         match self {
+            Self::Unary { operand, operator } => operand
+                .try_unary_operation(db, env, operator, &mut |_| {})
+                .ok(),
             Self::Binary {
                 left,
                 right,

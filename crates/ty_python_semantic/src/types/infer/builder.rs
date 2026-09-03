@@ -132,15 +132,15 @@ use crate::types::unpacker::{
 };
 use crate::types::{
     BindingContext, BoundTypeVarInstance, CallDunderError, CallableBinding, CallableType,
-    CallableTypes, ClassType, DynamicType, GeneratorTypeMode, InferenceFlags,
-    InternedConstraintSet, InternedType, IntersectionBuilder, IntersectionType,
-    KnownBoundMethodType, KnownClass, KnownInstanceType, KnownUnion, LiteralValueType,
-    LiteralValueTypeKind, MemberLookupPolicy, ParamSpecAttrKind, Parameter, Parameters,
-    ProgramEnvironment, PropertyDeprecations, SentinelInstance, Signature, SpecialFormType,
-    SubclassOfType, Type, TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers,
-    TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, TypingModule, UnionAccumulator,
-    UnionBuilder, UnionType, binding_type, extract_fixed_length_iterable_element_types,
-    infer_complete_scope_types, infer_scope_types, is_discarded_dict_key_assignment, todo_type,
+    CallableTypes, ClassType, DynamicType, GeneratorTypeMode, InferenceFlags, InternedType,
+    IntersectionBuilder, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
+    KnownUnion, LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy, ParamSpecAttrKind,
+    Parameter, Parameters, ProgramEnvironment, PropertyDeprecations, SentinelInstance, Signature,
+    SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeAndQualifiers, TypeContext,
+    TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, TypingModule,
+    UnionAccumulator, UnionBuilder, UnionType, binding_type,
+    extract_fixed_length_iterable_element_types, infer_complete_scope_types, infer_scope_types,
+    is_discarded_dict_key_assignment, todo_type,
 };
 use crate::{AnalysisSettings, Db, DisplaySettings, FxIndexSet, FxOrderSet, SemanticModel};
 use ty_python_core::definition::{
@@ -183,7 +183,9 @@ mod type_expression;
 mod type_form;
 mod typed_dict;
 mod typevar;
+mod unary_expressions;
 
+use self::unary_expressions::UnaryOperationDiagnostic;
 use super::comparisons;
 
 /// A helper to track if we already know that declared and inferred types are the same.
@@ -10779,17 +10781,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
     }
 
-    /// Report a deprecated callable only when its union alternative has no non-deprecated
-    /// intersection member that could provide the implementation instead.
-    fn check_deprecated_bindings<T: Ranged>(&self, ranged: &T, bindings: &Bindings<'db>) {
-        self.report_deprecated_functions(
-            ranged,
-            bindings
-                .deprecated_functions(self.db())
-                .map(|(_, function)| function),
-        );
-    }
-
     /// Check the accessor invoked by an attribute operation, using the deprecations
     /// retained by member lookup or assignment validation. `access` describes the operation,
     /// which may differ from the AST context: an augmented assignment also reads its target.
@@ -11796,96 +11787,49 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let operand_type = self.infer_expression(operand, TypeContext::default());
 
-        self.infer_unary_expression_type(*op, operand_type, unary)
-    }
+        if let Some(symbolic) = self
+            .symbolic
+            .get(&InferenceSlot::Expression(operand.as_ref().into()))
+            .copied()
+        {
+            let expression = ast::ExprRef::UnaryOp(unary).into();
+            let symbolic = symbolic.apply(
+                self.db(),
+                self.program_environment(),
+                InferenceOwner::Region(self.region),
+                expression,
+                |operand| InferenceOperation::Unary {
+                    operand,
+                    operator: *op,
+                },
+            );
+            self.symbolic
+                .insert(InferenceSlot::Expression(expression), symbolic);
+        }
 
-    fn infer_unary_expression_type(
-        &mut self,
-        op: ast::UnaryOp,
-        operand_type: Type<'db>,
-        unary: &ast::ExprUnaryOp,
-    ) -> Type<'db> {
-        let db = self.db();
-        let env = self.program_environment();
-        let fallback_unary_expression_type = || {
-            let unary_dunder_method = match op {
-                ast::UnaryOp::Invert => "__invert__",
-                ast::UnaryOp::UAdd => "__pos__",
-                ast::UnaryOp::USub => "__neg__",
-                ast::UnaryOp::Not => {
-                    unreachable!("Not operator is handled in its own case");
-                }
-            };
-
-            match operand_type.try_call_dunder(
-                db,
-                env,
-                unary_dunder_method,
-                CallArguments::none(),
-                TypeContext::default(),
-            ) {
-                Ok(outcome) => {
-                    self.check_deprecated_bindings(unary, &outcome);
-                    outcome.return_type(db, env)
-                }
-                Err(e) => {
-                    let bindings = match &e {
-                        CallDunderError::PossiblyUnbound { bindings, .. } => Some(bindings),
-                        CallDunderError::CallError(_, bindings, _) => Some(bindings),
-                        CallDunderError::MethodNotAvailable => None,
-                    };
-                    if let Some(bindings) = bindings {
-                        self.check_deprecated_bindings(unary, bindings);
-                    }
-                    self.report_unsupported_unary_operator(
-                        unary,
-                        op,
-                        operand_type,
-                        unary_dunder_method,
-                        Some(&e),
+        let mut deprecated_functions = Vec::new();
+        let result = operand_type.try_unary_operation(
+            self.db(),
+            self.program_environment(),
+            *op,
+            &mut |diagnostic| match diagnostic {
+                UnaryOperationDiagnostic::DeprecatedBindings(bindings) => {
+                    deprecated_functions.extend(
+                        bindings
+                            .deprecated_functions(self.db())
+                            .map(|(_, function)| function),
                     );
-                    e.fallback_return_type(db, env)
                 }
-            }
-        };
-
-        match (op, operand_type) {
-            (ast::UnaryOp::Invert | ast::UnaryOp::UAdd | ast::UnaryOp::USub, Type::Dynamic(_))
-            | (_, Type::Divergent(_)) => operand_type,
-            (_, Type::Never) => Type::Never,
-
-            (_, Type::TypeAlias(alias)) => {
-                self.infer_unary_expression_type(op, alias.value_type(db), unary)
-            }
-
-            (ast::UnaryOp::UAdd, Type::LiteralValue(literal)) => match literal.kind() {
-                LiteralValueTypeKind::Int(value) => Type::int_literal(value.as_i64()),
-                LiteralValueTypeKind::Bool(value) => Type::int_literal(i64::from(value)),
-                _ => fallback_unary_expression_type(),
-            },
-
-            (ast::UnaryOp::USub, Type::LiteralValue(literal)) => match literal.kind() {
-                LiteralValueTypeKind::Int(value) => value
-                    .as_i64()
-                    .checked_neg()
-                    .map(Type::int_literal)
-                    .unwrap_or_else(|| KnownClass::Int.to_instance(db, env)),
-                LiteralValueTypeKind::Bool(value) => Type::int_literal(-i64::from(value)),
-                _ => fallback_unary_expression_type(),
-            },
-
-            (ast::UnaryOp::Invert, Type::LiteralValue(literal)) => match literal.kind() {
-                LiteralValueTypeKind::Int(value) => Type::int_literal(!value.as_i64()),
-                LiteralValueTypeKind::Bool(value) => {
+                UnaryOperationDiagnostic::InvertedBool(literal) => {
                     // `~bool` is currently deprecated in typeshed. Technically we should
                     // similarly check for deprecation of dunder methods on all our literal
                     // type fast paths, but we choose not to pay that extra cost, since it is
                     // implausible that e.g. `int.__neg__` would ever be deprecated.
                     if let Some(dunder) = literal
-                        .fallback_instance(db, env)
+                        .fallback_instance(self.db(), self.program_environment())
                         .member_lookup_with_policy(
-                            db,
-                            env,
+                            self.db(),
+                            self.program_environment(),
                             "__invert__",
                             MemberLookupPolicy::NO_INSTANCE_FALLBACK,
                         )
@@ -11894,183 +11838,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     {
                         self.check_deprecated(unary, dunder);
                     }
-                    Type::int_literal(!i64::from(value))
                 }
-                _ => fallback_unary_expression_type(),
+                UnaryOperationDiagnostic::Unsupported {
+                    operand,
+                    dunder,
+                    error,
+                } => self.report_unsupported_unary_operator(unary, *op, operand, dunder, error),
+                UnaryOperationDiagnostic::Bool(error) => {
+                    error.report_diagnostic(&self.context, unary);
+                }
             },
-
-            (ast::UnaryOp::Invert, Type::KnownInstance(KnownInstanceType::ConstraintSet(set))) => {
-                let constraints = ConstraintSetBuilder::new();
-                let result = constraints.into_owned(|constraints| {
-                    let set = constraints.load(db, env, set.constraints(self.db()));
-                    set.negate(self.db(), constraints)
-                });
-                Type::KnownInstance(KnownInstanceType::ConstraintSet(
-                    InternedConstraintSet::new(self.db(), result),
-                ))
-            }
-
-            (ast::UnaryOp::Not, ty) => Type::from_truthiness(
-                db,
-                env,
-                ty.try_bool(db, env)
-                    .unwrap_or_else(|err| {
-                        err.report_diagnostic(&self.context, unary);
-                        err.fallback_truthiness()
-                    })
-                    .negate(),
-            ),
-            // Handle constrained TypeVars specially: check each constraint individually.
-            //
-            // TODO: We expect to replace this with more general support once we migrate to the new
-            // solver.
-            (
-                op @ (ast::UnaryOp::UAdd | ast::UnaryOp::USub | ast::UnaryOp::Invert),
-                Type::TypeVar(tvar),
-            ) => {
-                let unary_dunder_method = match op {
-                    ast::UnaryOp::Invert => "__invert__",
-                    ast::UnaryOp::UAdd => "__pos__",
-                    ast::UnaryOp::USub => "__neg__",
-                    ast::UnaryOp::Not => unreachable!(),
-                };
-
-                match tvar.typevar(self.db()).bound_or_constraints(db, env) {
-                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                        // Call the dunder method for every constraint up front so deprecation
-                        // reporting doesn't depend on whether any constraint fails.
-                        let outcomes: Vec<_> = constraints
-                            .elements(db)
-                            .iter()
-                            .map(|constraint| {
-                                constraint.try_call_dunder(
-                                    db,
-                                    env,
-                                    unary_dunder_method,
-                                    CallArguments::none(),
-                                    TypeContext::default(),
-                                )
-                            })
-                            .collect();
-                        self.report_deprecated_functions(
-                            unary,
-                            outcomes
-                                .iter()
-                                .filter_map(|outcome| match outcome {
-                                    Ok(bindings) => Some(bindings),
-                                    // A method can be deprecated even if it is missing from some
-                                    // union members or its signature rejects the implicit call.
-                                    // Preserve those bindings so the deprecation is reported
-                                    // alongside the unsupported-operator diagnostic.
-                                    Err(
-                                        CallDunderError::PossiblyUnbound { bindings, .. }
-                                        | CallDunderError::CallError(_, bindings, _),
-                                    ) => Some(bindings.as_ref()),
-                                    // A completely missing method has no bindings to inspect.
-                                    Err(CallDunderError::MethodNotAvailable) => None,
-                                })
-                                .flat_map(|bindings| bindings.deprecated_functions(db))
-                                .map(|(_, function)| function),
-                        );
-
-                        let mut outcomes = outcomes.into_iter();
-                        let result = Self::map_constrained_typevar_constraints(
-                            db,
-                            env,
-                            operand_type,
-                            constraints,
-                            |_constraint| {
-                                let outcome = outcomes.next()?.ok()?;
-                                Some(outcome.return_type(db, env))
-                            },
-                        );
-                        match result {
-                            Some(ty) => ty,
-                            None => {
-                                // At least one constraint failed; report error.
-                                self.report_unsupported_unary_operator(
-                                    unary,
-                                    op,
-                                    operand_type,
-                                    unary_dunder_method,
-                                    None,
-                                );
-                                operand_type
-                                    .try_call_dunder(
-                                        db,
-                                        env,
-                                        unary_dunder_method,
-                                        CallArguments::none(),
-                                        TypeContext::default(),
-                                    )
-                                    .map_or_else(
-                                        |e| e.fallback_return_type(db, env),
-                                        |b| b.return_type(db, env),
-                                    )
-                            }
-                        }
-                    }
-                    // For bounded TypeVars with union bounds (like `bound=float` which becomes
-                    // `int | float`), we need to delegate to the bound type.
-                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                        self.infer_unary_expression_type(op, bound, unary)
-                    }
-                    // For unconstrained TypeVars, fall through to default handling.
-                    None => {
-                        match operand_type.try_call_dunder(
-                            db,
-                            env,
-                            unary_dunder_method,
-                            CallArguments::none(),
-                            TypeContext::default(),
-                        ) {
-                            Ok(outcome) => outcome.return_type(db, env),
-                            Err(e) => {
-                                self.report_unsupported_unary_operator(
-                                    unary,
-                                    op,
-                                    operand_type,
-                                    unary_dunder_method,
-                                    Some(&e),
-                                );
-                                e.fallback_return_type(db, env)
-                            }
-                        }
-                    }
-                }
-            }
-
-            (
-                ast::UnaryOp::UAdd | ast::UnaryOp::USub | ast::UnaryOp::Invert,
-                Type::FunctionLiteral(_)
-                | Type::Callable(..)
-                | Type::WrapperDescriptor(_)
-                | Type::KnownBoundMethod(_)
-                | Type::DataclassDecorator(_)
-                | Type::DataclassTransformer(_)
-                | Type::BoundMethod(_)
-                | Type::ModuleLiteral(_)
-                | Type::ClassLiteral(_)
-                | Type::GenericAlias(_)
-                | Type::SubclassOf(_)
-                | Type::NominalInstance(_)
-                | Type::ProtocolInstance(_)
-                | Type::SpecialForm(_)
-                | Type::KnownInstance(_)
-                | Type::PropertyInstance(_)
-                | Type::SlotDescriptor(_)
-                | Type::Union(_)
-                | Type::Intersection(_)
-                | Type::EnumComplement(_)
-                | Type::AlwaysTruthy
-                | Type::AlwaysFalsy
-                | Type::BoundSuper(_)
-                | Type::TypeIs(_)
-                | Type::TypeGuard(_)
-                | Type::TypeForm(_)
-                | Type::TypedDict(_)
-                | Type::NewTypeInstance(_),
-            ) => fallback_unary_expression_type(),
+        );
+        self.report_deprecated_functions(unary, deprecated_functions);
+        match result {
+            Ok(ty) | Err(ty) => ty,
         }
     }
 

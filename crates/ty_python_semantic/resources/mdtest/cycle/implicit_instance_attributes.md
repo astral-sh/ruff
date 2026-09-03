@@ -511,6 +511,115 @@ class Values:
         reveal_type(self.values)  # revealed: tuple[int]
 ```
 
+## Unary arithmetic on tuple elements
+
+Unary arithmetic preserves the integer element type when its result is stored back into the tuple.
+
+```py
+class Values:
+    def __init__(self, value: int):
+        self.values = (value,)
+
+    def positive(self):
+        self.values = (+self.values[0],)
+        reveal_type(self.values)  # revealed: tuple[int]
+
+    def negative(self):
+        self.values = (-self.values[0],)
+        reveal_type(self.values)  # revealed: tuple[int]
+
+    def invert(self):
+        self.values = (~self.values[0],)
+        reveal_type(self.values)  # revealed: tuple[int]
+```
+
+## Unary arithmetic on generic values
+
+Custom unary methods preserve the type argument of their return type through nested operations.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+class Box[T]:
+    def __pos__(self) -> "Box[T]":
+        return self
+
+    def __neg__(self) -> "Box[T]":
+        return self
+
+    def __invert__(self) -> "Box[T]":
+        return self
+
+class Values:
+    def __init__(self, value: Box[int]):
+        self.values = (value,)
+
+    def update(self):
+        self.values = (~-+self.values[0],)
+        reveal_type(self.values)  # revealed: tuple[Box[int]]
+```
+
+## Unary arithmetic replaces the operand type
+
+A unary method can return a different type from its operand. Subsequent updates apply the operator
+to that new type.
+
+```py
+class Value:
+    def __neg__(self) -> int:
+        return 0
+
+class Values:
+    def __init__(self, value: Value):
+        self.values = (value,)
+
+    def update(self):
+        self.values = (-self.values[0],)
+        reveal_type(self.values)  # revealed: tuple[int]
+```
+
+## Unary arithmetic on constrained type variables
+
+Negation preserves a constrained type variable when it preserves each of its constraints.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+class Values[T: (int, float)]:
+    def __init__(self, value: T):
+        self.values = (value,)
+
+    def update(self):
+        self.values = (-self.values[0],)
+        reveal_type(self.values)  # revealed: tuple[T@Values]
+```
+
+## Unary arithmetic on bounded type variables
+
+A subclass of `float` can inherit negation that returns `float`, so negation need not preserve the
+bounded type variable.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+class Values[T: float]:
+    def __init__(self, value: T):
+        self.values = (value,)
+
+    def update(self):
+        self.values = (-self.values[0],)
+        reveal_type(self.values)  # revealed: tuple[float]
+```
+
 ## Reflected arithmetic on unpacked values
 
 An augmented assignment falls back to the reflected operator when the left operand does not
