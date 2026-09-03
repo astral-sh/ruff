@@ -252,7 +252,7 @@ impl TestCase {
     fn sorted_submodule_names(&self, parent_module_name: &str) -> Vec<String> {
         let mut names = self
             .module(parent_module_name)
-            .all_submodules(self.db())
+            .children(self.db())
             .iter()
             .map(|submodule| submodule.name(self.db()).to_string())
             .collect::<Vec<String>>();

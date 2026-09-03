@@ -1132,8 +1132,7 @@ pub(crate) fn dynamic_resolution_paths<'db>(
             // (Most importantly, don't register a root for editable installations from the project
             // directory as that would change the durability of files within those folders).
             // Not having an exact file root for editable installs just means that
-            // some queries (like `list_modules_in`) will run slightly more frequently
-            // than they would otherwise.
+            // some queries will run slightly more frequently than they would otherwise.
             if files.root(db, path).is_none() {
                 files.try_add_root(db, path, FileRootKind::SearchPath);
             }
@@ -1189,7 +1188,7 @@ impl FusedIterator for SearchPathIterator<'_> {}
 ///
 /// This is needed because Salsa requires that all query arguments are salsa ingredients.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-struct ModuleNameIngredient<'db> {
+pub(crate) struct ModuleNameIngredient<'db> {
     #[returns(ref)]
     pub(super) name: ModuleName,
     #[returns(copy)]
@@ -1539,10 +1538,6 @@ pub(crate) struct SubmoduleEnumeration<'resolver, 'db> {
 
 impl<'resolver, 'db> SubmoduleEnumeration<'resolver, 'db> {
     /// Starts at a name prefix using configured search paths, or at the roots for `None`.
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "Enumeration is not yet used by module listings")
-    )]
     pub(crate) fn for_prefix(
         resolver: &'resolver NameResolver<'db>,
         prefix: Option<&ModuleName>,
@@ -1555,10 +1550,6 @@ impl<'resolver, 'db> SubmoduleEnumeration<'resolver, 'db> {
 
     /// Starts beneath a resolved module, preserving packages found outside configured paths
     /// and allowing enumeration beneath an already resolved package reached through symlinks.
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "Enumeration is not yet used by module listings")
-    )]
     pub(crate) fn for_module(
         resolver: &'resolver NameResolver<'db>,
         module: Module<'db>,
@@ -1579,10 +1570,6 @@ impl<'resolver, 'db> SubmoduleEnumeration<'resolver, 'db> {
     }
 
     /// Collects resolved immediate children and unresolved overlay prefixes to explore.
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "Enumeration is not yet used by module listings")
-    )]
     pub(crate) fn collect(&self) -> EnumeratedChildren<'db> {
         let db = self.search.resolver.context.db;
         let mut children = EnumeratedChildren::default();
@@ -2538,12 +2525,12 @@ fn resolve_component<'db>(
 
     // Last resort, check if a folder with the given name exists. If so,
     // then this is a namespace package. We need to skip this check for
-    // typeshed because the `resolve_file_module` can also return `None` if the
+    // typeshed because `resolve_file_module_with_filter` can also return `None` if the
     // `__init__.py` exists but isn't available for the current Python version.
     // Let's assume that the `xml` module is only available on Python 3.11+ and
     // we're resolving for Python 3.10:
     //
-    // * `resolve_file_module("xml/__init__.pyi")` returns `None` even though
+    // * Looking up `xml/__init__.pyi` returns `None` even though
     //   the file exists but the module isn't available for the current Python
     //   version.
     // * The check here would now return `true` because the `xml` directory
@@ -2586,24 +2573,6 @@ fn candidate_may_exist<'db>(
 }
 
 type ResolvedNames<'db> = Vec<ModuleResolutionCandidate<'db>>;
-
-/// If `module` exists on disk with an extension permitted by the resolver's mode, return its
-/// [`File`].
-///
-/// Typing resolution prefers `.pyi` over `.py`; runtime resolution only considers `.py`.
-pub(super) fn resolve_file_module(
-    module: &ModulePath,
-    resolver_state: &ResolverContext,
-) -> Option<File> {
-    let mut parent = module.clone();
-    parent.pop();
-    resolve_file_module_with_filter(
-        module,
-        resolver_state,
-        ModuleDirectory::new(resolver_state, &parent),
-        ComponentFileFilter::ByMode,
-    )
-}
 
 fn resolve_file_module_with_filter(
     module: &ModulePath,

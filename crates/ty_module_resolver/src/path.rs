@@ -40,26 +40,6 @@ impl ModulePath {
         )
     }
 
-    /// Returns true if this is a path to a "stub file."
-    ///
-    /// i.e., A module whose file extension is `pyi`.
-    #[must_use]
-    pub(crate) fn is_stub_file(&self) -> bool {
-        self.relative_path.extension() == Some("pyi")
-    }
-
-    /// Returns true if this is a path to a "stub package."
-    ///
-    /// i.e., A module whose top-most parent package corresponds to a
-    /// directory with a `-stubs` suffix in its name.
-    #[must_use]
-    pub(crate) fn is_stub_package(&self) -> bool {
-        let Some(first) = self.relative_path.components().next() else {
-            return false;
-        };
-        first.as_str().ends_with("-stubs")
-    }
-
     pub(crate) fn push(&mut self, component: &str) {
         if let Some(component_extension) = camino::Utf8Path::new(component).extension() {
             assert!(
@@ -125,54 +105,6 @@ impl ModulePath {
                     | TypeshedVersionsQueryResult::MaybeExists => resolver
                         .vendored()
                         .is_directory(stdlib_root.join(relative_path)),
-                }
-            }
-        }
-    }
-
-    #[must_use]
-    pub(super) fn is_regular_package(&self, resolver: &ResolverContext) -> bool {
-        let ModulePath {
-            search_path,
-            relative_path,
-        } = self;
-
-        match &*search_path.0 {
-            SearchPathInner::Extra(search_path)
-            | SearchPathInner::FirstParty(search_path)
-            | SearchPathInner::SitePackages(search_path)
-            | SearchPathInner::Editable(search_path) => {
-                let absolute_path = search_path.join(relative_path);
-
-                directory_contains_file(
-                    resolver.db,
-                    &absolute_path,
-                    &["__init__.py", "__init__.pyi"],
-                )
-            }
-            SearchPathInner::StandardLibraryReal(search_path) => {
-                let absolute_path = search_path.join(relative_path);
-
-                directory_contains_file(resolver.db, &absolute_path, &["__init__.py"])
-            }
-            SearchPathInner::StandardLibraryCustom(search_path) => {
-                match query_stdlib_version(relative_path, resolver) {
-                    TypeshedVersionsQueryResult::DoesNotExist => false,
-                    TypeshedVersionsQueryResult::Exists
-                    | TypeshedVersionsQueryResult::MaybeExists => directory_contains_file(
-                        resolver.db,
-                        &search_path.join(relative_path),
-                        &["__init__.pyi"],
-                    ),
-                }
-            }
-            SearchPathInner::StandardLibraryVendored(search_path) => {
-                match query_stdlib_version(relative_path, resolver) {
-                    TypeshedVersionsQueryResult::DoesNotExist => false,
-                    TypeshedVersionsQueryResult::Exists
-                    | TypeshedVersionsQueryResult::MaybeExists => resolver
-                        .vendored()
-                        .exists(search_path.join(relative_path).join("__init__.pyi")),
                 }
             }
         }
@@ -850,30 +782,6 @@ impl<'db> SystemOrVendoredPathRef<'db> {
         }
     }
 
-    pub(super) fn file_name(&self) -> Option<&str> {
-        match self {
-            Self::System(system) => system.file_name(),
-            Self::Vendored(vendored) => vendored.file_name(),
-        }
-    }
-
-    pub(super) fn extension(&self) -> Option<&str> {
-        match self {
-            Self::System(system) => system.extension(),
-            Self::Vendored(vendored) => vendored.extension(),
-        }
-    }
-
-    pub(super) fn parent<'a>(&'a self) -> Option<SystemOrVendoredPathRef<'a>>
-    where
-        'a: 'db,
-    {
-        match self {
-            Self::System(system) => system.parent().map(Self::System),
-            Self::Vendored(vendored) => vendored.parent().map(Self::Vendored),
-        }
-    }
-
     fn as_system_path(&self) -> Option<&'db SystemPath> {
         match self {
             SystemOrVendoredPathRef::System(path) => Some(path),
@@ -1190,7 +1098,6 @@ mod tests {
 
         let asyncio_regular_package = stdlib_path.join("asyncio");
         assert!(asyncio_regular_package.is_directory(&resolver));
-        assert!(asyncio_regular_package.is_regular_package(&resolver));
         // Paths to directories don't resolve to VfsFiles
         assert_eq!(asyncio_regular_package.to_file(&resolver), None);
         assert!(
@@ -1205,7 +1112,6 @@ mod tests {
         let asyncio_tasks_module = stdlib_path.join("asyncio/tasks.pyi");
         assert_eq!(asyncio_tasks_module.to_file(&resolver), None);
         assert!(!asyncio_tasks_module.is_directory(&resolver));
-        assert!(!asyncio_tasks_module.is_regular_package(&resolver));
     }
 
     #[test]
@@ -1226,12 +1132,10 @@ mod tests {
         assert!(xml_namespace_package.is_directory(&resolver));
         // Paths to directories don't resolve to VfsFiles
         assert_eq!(xml_namespace_package.to_file(&resolver), None);
-        assert!(!xml_namespace_package.is_regular_package(&resolver));
 
         let xml_etree = stdlib_path.join("xml/etree.pyi");
         assert!(!xml_etree.is_directory(&resolver));
         assert!(xml_etree.to_file(&resolver).is_some());
-        assert!(!xml_etree.is_regular_package(&resolver));
     }
 
     #[test]
@@ -1251,7 +1155,6 @@ mod tests {
         let functools_module = stdlib_path.join("functools.pyi");
         assert!(functools_module.to_file(&resolver).is_some());
         assert!(!functools_module.is_directory(&resolver));
-        assert!(!functools_module.is_regular_package(&resolver));
     }
 
     #[test]
@@ -1271,7 +1174,6 @@ mod tests {
         let collections_regular_package = stdlib_path.join("collections");
         assert_eq!(collections_regular_package.to_file(&resolver), None);
         assert!(!collections_regular_package.is_directory(&resolver));
-        assert!(!collections_regular_package.is_regular_package(&resolver));
     }
 
     #[test]
@@ -1291,12 +1193,10 @@ mod tests {
         let importlib_namespace_package = stdlib_path.join("importlib");
         assert_eq!(importlib_namespace_package.to_file(&resolver), None);
         assert!(!importlib_namespace_package.is_directory(&resolver));
-        assert!(!importlib_namespace_package.is_regular_package(&resolver));
 
         let importlib_abc = stdlib_path.join("importlib/abc.pyi");
         assert_eq!(importlib_abc.to_file(&resolver), None);
         assert!(!importlib_abc.is_directory(&resolver));
-        assert!(!importlib_abc.is_regular_package(&resolver));
     }
 
     #[test]
@@ -1316,7 +1216,6 @@ mod tests {
         let non_existent = stdlib_path.join("doesnt_even_exist");
         assert_eq!(non_existent.to_file(&resolver), None);
         assert!(!non_existent.is_directory(&resolver));
-        assert!(!non_existent.is_regular_package(&resolver));
     }
 
     #[test]
@@ -1349,7 +1248,6 @@ mod tests {
         // `collections` should now exist as a directory, according to VERSIONS...
         let collections_regular_package = stdlib_path.join("collections");
         assert!(collections_regular_package.is_directory(&resolver));
-        assert!(collections_regular_package.is_regular_package(&resolver));
         // (This is still `None`, as directories don't resolve to `Vfs` files)
         assert_eq!(collections_regular_package.to_file(&resolver), None);
         assert!(
@@ -1363,7 +1261,6 @@ mod tests {
         let asyncio_tasks_module = stdlib_path.join("asyncio/tasks.pyi");
         assert!(asyncio_tasks_module.to_file(&resolver).is_some());
         assert!(!asyncio_tasks_module.is_directory(&resolver));
-        assert!(!asyncio_tasks_module.is_regular_package(&resolver));
     }
 
     #[test]
@@ -1383,14 +1280,12 @@ mod tests {
         // The `importlib` directory now also exists
         let importlib_namespace_package = stdlib_path.join("importlib");
         assert!(importlib_namespace_package.is_directory(&resolver));
-        assert!(!importlib_namespace_package.is_regular_package(&resolver));
         // (This is still `None`, as directories don't resolve to `Vfs` files)
         assert_eq!(importlib_namespace_package.to_file(&resolver), None);
 
         // Submodules in the `importlib` namespace package also now exist:
         let importlib_abc = importlib_namespace_package.join("abc.pyi");
         assert!(!importlib_abc.is_directory(&resolver));
-        assert!(!importlib_abc.is_regular_package(&resolver));
         assert!(importlib_abc.to_file(&resolver).is_some());
     }
 
@@ -1412,12 +1307,10 @@ mod tests {
         let xml_namespace_package = stdlib_path.join("xml");
         assert_eq!(xml_namespace_package.to_file(&resolver), None);
         assert!(!xml_namespace_package.is_directory(&resolver));
-        assert!(!xml_namespace_package.is_regular_package(&resolver));
 
         let xml_etree = xml_namespace_package.join("etree.pyi");
         assert_eq!(xml_etree.to_file(&resolver), None);
         assert!(!xml_etree.is_directory(&resolver));
-        assert!(!xml_etree.is_regular_package(&resolver));
     }
 
     #[test]
