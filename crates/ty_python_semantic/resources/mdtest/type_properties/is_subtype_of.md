@@ -1039,7 +1039,23 @@ static_assert(not is_subtype_of(Top[Bounded[Any]], EquivalentBounded[Any]))
 static_assert(not is_subtype_of(Top[Bounded[Any]], Bottom[EquivalentBounded[Any]]))
 ```
 
-The same relations also hold when the type parameter has constraints:
+Explicit inheritance establishes subtyping even when a subclass overrides a member incompatibly.
+Taking the top materialization of the base protocol weakens its requirements, so this nominal
+relationship still holds:
+
+```py
+class BoundedSub(Bounded[str]):
+    read = None
+
+static_assert(is_subtype_of(BoundedSub, Bounded[str]))
+static_assert(is_subtype_of(BoundedSub, Top[Bounded[str]]))
+static_assert(is_subtype_of(BoundedSub, Top[Bounded[Any]]))
+static_assert(not is_subtype_of(BoundedSub, Bottom[Bounded[str]]))
+static_assert(not is_subtype_of(BoundedSub, Bottom[Bounded[Any]]))
+static_assert(not is_subtype_of(BoundedSub, Top[EquivalentBounded[Any]]))
+```
+
+Protocols with constrained type parameters also lie between their bottom and top materializations:
 
 ```py
 class Constrained[T: (str, bytes)](Protocol):
