@@ -9,6 +9,7 @@ use crate::{
         KnownClass, Truthiness, Type, TypeContext, UnionBuilder, definition_expression_type,
         function::{is_implicit_classmethod, is_implicit_staticmethod},
         infer::{
+            InferenceRegion,
             constraints::{
                 InferenceConstraints, InferenceOperation, InferenceOwner, InferencePromotion,
                 InferenceSlot, SymbolicType,
@@ -442,7 +443,16 @@ fn implicit_attribute_binding_type<'db>(
                     .try_iterate_with_mode(db, &env, mode)
                     .map(|tuple| tuple.homogeneous_element_type(db, &env))
                     .unwrap_or_else(|error| error.fallback_element_type(db, &env));
-                Some((ty, None))
+                let symbolic = inference.symbolic_type(iterable).map(|symbolic| {
+                    symbolic.apply(
+                        db,
+                        &env,
+                        InferenceOwner::Region(InferenceRegion::Definition(definition)),
+                        for_stmt.target(&module).into(),
+                        |value| InferenceOperation::Iterate { value, mode },
+                    )
+                });
+                Some((ty, symbolic))
             }
         },
         DefinitionKind::WithItem(with_item) => match with_item.target_kind() {
@@ -487,7 +497,16 @@ fn implicit_attribute_binding_type<'db>(
                     .try_iterate_with_mode(db, &env, mode)
                     .map(|tuple| tuple.homogeneous_element_type(db, &env))
                     .unwrap_or_else(|error| error.fallback_element_type(db, &env));
-                Some((ty, None))
+                let symbolic = inference.symbolic_type(iterable).map(|symbolic| {
+                    symbolic.apply(
+                        db,
+                        &env,
+                        InferenceOwner::Region(InferenceRegion::Definition(definition)),
+                        comprehension.target(&module).into(),
+                        |value| InferenceOperation::Iterate { value, mode },
+                    )
+                });
+                Some((ty, symbolic))
             }
         },
         // Named expressions cannot target attributes, and other definitions do not write one.

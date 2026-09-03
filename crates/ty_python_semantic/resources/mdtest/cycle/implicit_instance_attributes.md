@@ -300,6 +300,212 @@ def inspect_partial(first: Partial[int], second: Partial[str]):
     reveal_type((first.items[1], second.items[1]))  # revealed: tuple[int, str]
 ```
 
+## Rebuilding dictionaries from mappings
+
+Reading a value from a mapping and storing it in a new dictionary preserves the value type, even
+when the same attribute can hold either mapping.
+
+```py
+from collections.abc import Mapping
+
+class Values:
+    def __init__(self, items: Mapping[str, int]):
+        self.items = items
+
+    def copy(self):
+        value = self.items["value"]
+        self.items = {"value": value}
+        reveal_type(self.items)  # revealed: dict[str, int]
+```
+
+## Rebuilding collections by iteration
+
+A sequence of integers can be replaced with a list or set built from its elements. Subsequent
+iterations still yield integers.
+
+```py
+from collections.abc import Sequence
+
+class Lists:
+    def __init__(self, items: Sequence[int]):
+        self.items = items
+
+    def copy(self):
+        for value in self.items:
+            self.items = [value]
+            reveal_type(self.items)  # revealed: list[int]
+
+class Sets:
+    def __init__(self, items: Sequence[int]):
+        self.items = items
+
+    def copy(self):
+        for value in self.items:
+            self.items = {value}
+            reveal_type(self.items)  # revealed: set[int]
+```
+
+## Rebuilding collections with comprehensions
+
+Comprehensions preserve the element types when they replace the collection they read from. A
+dictionary comprehension preserves both the keys and the corresponding values.
+
+```py
+from collections.abc import Mapping, Sequence
+
+class Lists:
+    def __init__(self, items: Sequence[int]):
+        self.items = items
+
+    def copy(self):
+        self.items = [value for value in self.items]
+        reveal_type(self.items)  # revealed: list[int]
+
+class Dictionaries:
+    def __init__(self, items: Mapping[str, int]):
+        self.items = items
+
+    def copy(self):
+        self.items = {key: self.items[key] for key in self.items}
+        reveal_type(self.items)  # revealed: dict[str, int]
+```
+
+## Rebuilding collections with unpacking expressions
+
+Expanding a sequence into a list preserves its element type. Expanding a mapping into a dictionary
+preserves its key and value types.
+
+```py
+from collections.abc import Mapping, Sequence
+
+class Lists:
+    def __init__(self, items: Sequence[int]):
+        self.items = items
+
+    def copy(self):
+        self.items = [*self.items]
+        reveal_type(self.items)  # revealed: list[int]
+
+class Dictionaries:
+    def __init__(self, items: Mapping[str, int]):
+        self.items = items
+
+    def copy(self):
+        self.items = {**self.items}
+        reveal_type(self.items)  # revealed: dict[str, int]
+```
+
+## Assigning comprehension elements to an attribute
+
+A comprehension can store each element in an instance attribute. Reading that attribute to build the
+replacement collection preserves the element type.
+
+```py
+from collections.abc import Sequence
+
+class Values:
+    def __init__(self, items: Sequence[int]):
+        self.items = items
+
+    def copy(self):
+        self.items = [self.item for self.item in self.items]
+        reveal_type(self.items)  # revealed: list[int]
+```
+
+The comprehension assigns an instance attribute, so it does not create an attribute on the class.
+
+```py
+Values.item  # error: [unresolved-attribute]
+```
+
+## Rebuilding a collection from an attribute assigned by a loop
+
+An attribute assigned by iteration retains its element type when another method reads it to replace
+the original collection.
+
+```py
+from collections.abc import Sequence
+
+class Values:
+    def __init__(self, items: Sequence[int]):
+        self.items = items
+
+    def load(self):
+        for self.item in self.items:
+            pass
+
+    def copy(self):
+        self.items = [self.item]
+        reveal_type(self.items)  # revealed: list[int]
+```
+
+## Rebuilding a collection from an attribute assigned by asynchronous iteration
+
+An asynchronous iterable supplies the type of the attribute assigned by `async for`. Another method
+can use that attribute to rebuild a collection stored alongside the iterable.
+
+```py
+from collections.abc import AsyncIterable
+
+class Values:
+    def __init__(self, items: AsyncIterable[int]):
+        self.state = (items, [0])
+
+    async def load(self):
+        async for self.item in self.state[0]:
+            pass
+
+    def copy(self):
+        self.state = (self.state[0], [self.item])
+        reveal_type(self.state)  # revealed: tuple[AsyncIterable[int], list[int]]
+```
+
+## Rebuilding a collection from an attribute assigned by a comprehension
+
+The same dependency can cross a comprehension scope and a method boundary.
+
+```py
+from collections.abc import Sequence
+
+class Values:
+    def __init__(self, items: Sequence[int]):
+        self.items = items
+
+    def load(self):
+        [None for self.item in self.items]
+
+    def copy(self):
+        self.items = [self.item]
+        reveal_type(self.items)  # revealed: list[int]
+```
+
+## Rotating elements between collections
+
+Repeated calls can move any of the three initial element types into each collection. Capturing the
+collections in a tuple before reading their elements preserves those dependencies.
+
+```py
+from typing_extensions import assert_type
+
+class Values:
+    def __init__(self):
+        self.x = [0]
+        self.y = [""]
+        self.z = [b""]
+
+    def rotate(self):
+        previous = (self.x, self.y, self.z)
+        x = previous[0][0]
+        y = previous[1][0]
+        z = previous[2][0]
+        self.x = [y]
+        self.y = [z]
+        self.z = [x]
+        assert_type(self.x, list[int | str | bytes])
+        assert_type(self.y, list[int | str | bytes])
+        assert_type(self.z, list[int | str | bytes])
+```
+
 ## Self-referential implicit attributes
 
 ```py

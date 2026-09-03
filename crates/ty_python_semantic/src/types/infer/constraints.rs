@@ -16,7 +16,7 @@ use ty_python_core::frozen::FrozenMap;
 use ty_python_core::narrowing_constraints::ScopedNarrowingConstraint;
 use ty_python_core::place::ScopedPlaceId;
 use ty_python_core::scope::ScopeId;
-use ty_python_core::{ExpressionNodeKey, NarrowingEvaluator, Program, use_def_map};
+use ty_python_core::{EvaluationMode, ExpressionNodeKey, NarrowingEvaluator, Program, use_def_map};
 
 use super::InferenceRegion;
 use crate::place::{Place, PlaceAndQualifiers, SymbolLookupKey};
@@ -30,8 +30,8 @@ use crate::types::constraints::{
 use crate::types::narrow::NarrowingEvaluatorExtension;
 use crate::types::typevar::{BindingContext, BoundTypeVarInstance, TypeVarSet};
 use crate::types::{
-    ApplySpecialization, GenericContext, MemberLookupKey, Specialization, Type, TypeContext,
-    TypeMapping, UnionType, any_over_type, any_over_type_including_alias_arguments,
+    ApplySpecialization, GenericContext, KnownClass, MemberLookupKey, Specialization, Type,
+    TypeContext, TypeMapping, UnionType, any_over_type, any_over_type_including_alias_arguments,
 };
 use crate::{Db, FxIndexMap, ProgramEnvironment};
 
@@ -84,7 +84,11 @@ pub(crate) enum InferenceSlot<'db> {
     /// A candidate in an ordered public lookup.
     Lookup(usize),
     Expression(ExpressionNodeKey),
+    /// Auxiliary outputs of an expression, such as a mapping spread's key and value types.
+    Component(ExpressionNodeKey, usize),
     Binding(Definition<'db>),
+    /// One result per collection parameter, identified by its full interned ID.
+    TypeArgument(ExpressionNodeKey, u64),
     /// Reaching assignments can share a predicate while supplying different types.
     NarrowedBinding(ExpressionNodeKey, Definition<'db>),
 }
@@ -308,6 +312,10 @@ pub(crate) enum InferenceOperation<'db> {
         value: Type<'db>,
         key: Type<'db>,
     },
+    Iterate {
+        value: Type<'db>,
+        mode: EvaluationMode,
+    },
     Promote {
         value: Type<'db>,
         promotion: InferencePromotion,
@@ -316,6 +324,8 @@ pub(crate) enum InferenceOperation<'db> {
         value: Type<'db>,
         narrowing: InferenceNarrowing<'db>,
     },
+    MappingKey(Type<'db>),
+    MappingValue(Type<'db>),
 }
 
 impl<'db> InferenceOperation<'db> {
@@ -327,15 +337,40 @@ impl<'db> InferenceOperation<'db> {
         previous: Self,
         cycle: &salsa::Cycle,
     ) -> Self {
-        if self == previous {
-            return self;
+        let (current, previous) = match (self, previous) {
+            (
+                Self::Promote {
+                    value: current_value,
+                    promotion: current_promotion,
+                },
+                Self::Promote {
+                    value: previous_value,
+                    promotion: previous_promotion,
+                },
+            ) => {
+                let promotion = current_promotion.cycle_normalized(previous_promotion);
+                (
+                    Self::Promote {
+                        value: current_value,
+                        promotion,
+                    },
+                    Self::Promote {
+                        value: previous_value,
+                        promotion,
+                    },
+                )
+            }
+            operations => operations,
+        };
+        if current == previous {
+            return current;
         }
-        let shape = self.map(|_| Type::Never);
+        let shape = current.map(|_| Type::Never);
         let previous_shape = previous.map(|_| Type::Never);
         if shape != previous_shape {
             // Only corresponding type fields can be normalized. A different non-type shape can
             // give those fields different meanings, so do not pair unrelated inputs.
-            return self;
+            return current;
         }
         let mut previous_types = Vec::new();
         previous.map(|ty| {
@@ -343,7 +378,7 @@ impl<'db> InferenceOperation<'db> {
             ty
         });
         let mut index = 0;
-        self.map(|ty| {
+        current.map(|ty| {
             let previous = previous_types[index];
             index += 1;
             ty.cycle_normalized(db, env, previous, cycle)
@@ -381,6 +416,11 @@ impl<'db> InferenceOperation<'db> {
                 value: f(value),
                 key: f(key),
             },
+            Self::Iterate { value, mode } => Self::Iterate {
+                value: f(value),
+                mode,
+            },
+            Self::MappingKey(value) => Self::MappingKey(f(value)),
             Self::Promote { value, promotion } => Self::Promote {
                 value: f(value),
                 promotion,
@@ -389,6 +429,7 @@ impl<'db> InferenceOperation<'db> {
                 value: f(value),
                 narrowing,
             },
+            Self::MappingValue(value) => Self::MappingValue(f(value)),
         }
     }
 
@@ -400,6 +441,13 @@ impl<'db> InferenceOperation<'db> {
     ) -> Option<Type<'db>> {
         match self {
             Self::Subscript { value, key } => value.subscript(db, env, key, ExprContext::Load).ok(),
+            Self::Iterate { value, mode } => Some(
+                value
+                    .try_iterate_with_mode(db, env, mode)
+                    .ok()?
+                    .homogeneous_element_type(db, env),
+            ),
+            Self::MappingKey(value) => Some(value.unpack_keys_and_items(db, env)?.0),
             Self::Promote { value, promotion } => {
                 // Wait for a value to promote; forwarding an unresolved reference creates mutable
                 // aliases that can repeatedly unfold recursive types.
@@ -426,6 +474,7 @@ impl<'db> InferenceOperation<'db> {
                     variable.0.specialization(db),
                 ))
             }
+            Self::MappingValue(value) => Some(value.unpack_keys_and_items(db, env)?.1),
         }
     }
 }
@@ -542,9 +591,33 @@ impl InferenceGraph {
 pub(crate) enum InferencePromotion {
     Regular,
     Attribute,
+    Collection {
+        tuple_size: bool,
+        unconstrained: bool,
+    },
 }
 
 impl InferencePromotion {
+    /// Keep the stricter collection widening rule seen in either cycle iteration.
+    fn cycle_normalized(self, previous: Self) -> Self {
+        match (self, previous) {
+            (
+                Self::Collection {
+                    tuple_size,
+                    unconstrained,
+                },
+                Self::Collection {
+                    tuple_size: previous_tuple_size,
+                    unconstrained: previous_unconstrained,
+                },
+            ) => Self::Collection {
+                tuple_size: tuple_size && previous_tuple_size,
+                unconstrained: unconstrained && previous_unconstrained,
+            },
+            (current, _) => current,
+        }
+    }
+
     pub(crate) fn apply<'db>(
         self,
         db: &'db dyn Db,
@@ -554,6 +627,10 @@ impl InferencePromotion {
         match self {
             Self::Regular => value.promote(db, env),
             Self::Attribute => value.promote(db, env).promote_singletons(db, env),
+            Self::Collection {
+                tuple_size,
+                unconstrained,
+            } => value.promote_collection_element_type(db, env, tuple_size, unconstrained),
         }
     }
 }
@@ -689,6 +766,27 @@ impl<'db> SymbolicType<'db> {
     /// The equations retained alongside this output.
     fn equations(self, db: &'db dyn Db) -> &'db [(InferenceVariable<'db>, Equation<'db>)] {
         self.graph(db).equations(db)
+    }
+
+    /// Apply an operation to this value while retaining its dependencies.
+    pub(crate) fn apply(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        owner: InferenceOwner<'db>,
+        expression: ExpressionNodeKey,
+        operation: impl FnOnce(Type<'db>) -> InferenceOperation<'db>,
+    ) -> Self {
+        let mut constraints = InferenceConstraints::default();
+        let value = constraints.import(db, self);
+        let result = constraints.apply(
+            db,
+            env,
+            owner,
+            InferenceSlot::Expression(expression),
+            operation(value),
+        );
+        constraints.finish(db, result)
     }
 
     pub(crate) fn initial(
@@ -1068,6 +1166,31 @@ impl<'db> InferenceConstraints<'db> {
         self.equations
             .insert(variable, Equation::Operation(operation));
         result
+    }
+
+    /// Represent a mapping spread by a dictionary with the same key and value types.
+    pub(crate) fn unpack_mapping(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        owner: InferenceOwner<'db>,
+        expression: ExpressionNodeKey,
+        value: Type<'db>,
+    ) -> Type<'db> {
+        let elements = [
+            (0, InferenceOperation::MappingKey(value)),
+            (1, InferenceOperation::MappingValue(value)),
+        ]
+        .map(|(index, operation)| {
+            self.apply(
+                db,
+                env,
+                owner,
+                InferenceSlot::Component(expression, index),
+                operation,
+            )
+        });
+        KnownClass::Dict.to_specialized_instance(db, env, &elements)
     }
 
     /// Freeze the equations so they can be retained by Salsa query results.

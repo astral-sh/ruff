@@ -19,6 +19,7 @@ use ruff_python_stdlib::builtins::version_builtin_was_added;
 use ruff_python_stdlib::typing::as_pep_585_generic;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxHashMap, FxHashSet};
+use salsa::plumbing::AsId;
 use smallvec::SmallVec;
 use strum::IntoEnumIterator;
 use ty_module_resolver::{ImportingFile, ModuleName, resolve_module};
@@ -26,8 +27,8 @@ use ty_python_core::ast_ids::HasScopedUseId;
 use ty_python_core::statement::StatementInner;
 
 use super::constraints::{
-    InferenceConstraints, InferenceOwner, InferencePromotion, InferenceSlot, InferenceVariable,
-    SymbolicType,
+    InferenceConstraints, InferenceOperation, InferenceOwner, InferencePromotion, InferenceSlot,
+    InferenceVariable, SymbolicType,
 };
 use super::{
     CollectionUseConstraints, DeferredAndUndecorated, DefinitionInference,
@@ -5306,6 +5307,27 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         };
 
+        if let TargetKind::Single = for_stmt.target_kind()
+            && let Some(symbolic) = self
+                .symbolic
+                .get(&InferenceSlot::Expression(iterable.into()))
+                .copied()
+        {
+            let symbolic = symbolic.apply(
+                db,
+                self.program_environment(),
+                InferenceOwner::Region(self.region),
+                target.into(),
+                |value| InferenceOperation::Iterate {
+                    value,
+                    mode: EvaluationMode::from_is_async(for_stmt.is_async()),
+                },
+            );
+            self.symbolic
+                .insert(InferenceSlot::Expression(target.into()), symbolic);
+            self.symbolic
+                .insert(InferenceSlot::Binding(definition), symbolic);
+        }
         self.store_expression_type(target, loop_var_value_type);
         self.add_binding(target.into(), definition)
             .insert(self, loop_var_value_type);
@@ -7549,6 +7571,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 elts,
                 infer_elt_expression,
                 TypeContext::new(Some(narrowed_ty)),
+                &mut |_, ty, promotion| promotion.apply(db, env, ty),
             )?;
 
             // Ensure the inferred return type is assignable to the narrowed declared type.
@@ -7562,25 +7585,115 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         // If the type context is a union, attempt to narrow to a specific element.
-        for narrowed_ty in tcx
+        let narrowed = tcx
             .narrow_targets(db, env)
             .as_deref()
             .into_iter()
             .flatten()
             .filter(|ty| ty.class_specialization(db, env).is_some())
+            .find_map(|ty| try_narrow(*ty).map(|inferred| (inferred, TypeContext::new(Some(*ty)))));
+
+        let (inferred, tcx) = if let Some(narrowed) = narrowed {
+            narrowed
+        } else {
+            (
+                self.infer_collection_literal_impl(
+                    collection_class,
+                    collection_expr,
+                    elts,
+                    infer_elt_expression,
+                    tcx,
+                    &mut |_, ty, promotion| promotion.apply(db, env, ty),
+                )?,
+                tcx,
+            )
+        };
+
+        let symbolic_input = |elt: &ast::Expr| {
+            let source = elt
+                .as_starred_expr()
+                .map_or(elt, |starred| starred.value.as_ref());
+            self.symbolic
+                .get(&InferenceSlot::Expression(source.into()))
+                .copied()
+        };
+        if let Some(collection_expr) = collection_expr
+            && elts
+                .iter()
+                .flatten()
+                .flatten()
+                .any(|elt| symbolic_input(elt).is_some())
         {
-            if let Some(result) = try_narrow(*narrowed_ty) {
-                return Some(result);
+            let mut constraints = InferenceConstraints::default();
+            let mut changed = false;
+            let element_types: FxHashMap<ExpressionNodeKey, Type<'db>> = elts
+                .iter()
+                .flat_map(|elts| {
+                    let mapping = matches!(elts.as_slice(), [None, Some(_)]);
+                    elts.iter().flatten().map(move |elt| (*elt, mapping))
+                })
+                .map(|(elt, mapping)| {
+                    let key = ExpressionNodeKey::from(elt);
+                    let ordinary = self.expression_type(elt);
+                    let symbolic = symbolic_input(elt).map_or(ordinary, |symbolic| {
+                        let source = constraints.import(db, symbolic);
+                        let owner = InferenceOwner::Region(self.region);
+                        if mapping {
+                            constraints.unpack_mapping(db, env, owner, key, source)
+                        } else if elt.is_starred_expr() {
+                            let element = constraints.apply(
+                                db,
+                                env,
+                                owner,
+                                InferenceSlot::Component(key, 0),
+                                InferenceOperation::Iterate {
+                                    value: source,
+                                    mode: EvaluationMode::Sync,
+                                },
+                            );
+                            Type::homogeneous_tuple(db, env, element)
+                        } else {
+                            source
+                        }
+                    });
+                    changed |= symbolic != ordinary;
+                    (key, symbolic)
+                })
+                .collect();
+            // Reuse collection specialization with the symbolic elements. Their expressions
+            // have already been inferred with the selected context.
+            let symbolic_ty = if changed {
+                self.speculate_without_diagnostics()
+                    .infer_collection_literal_impl(
+                        collection_class,
+                        Some(collection_expr),
+                        elts,
+                        &mut |_, (_, elt, _)| element_types[&elt.into()],
+                        tcx,
+                        &mut |parameter, value, promotion| {
+                            constraints.apply(
+                                db,
+                                env,
+                                InferenceOwner::Region(self.region),
+                                InferenceSlot::TypeArgument(
+                                    collection_expr.into(),
+                                    parameter.as_id().as_bits(),
+                                ),
+                                InferenceOperation::Promote { value, promotion },
+                            )
+                        },
+                    )
+            } else {
+                Some(inferred)
+            };
+            if let Some(symbolic_ty) = symbolic_ty {
+                self.symbolic.insert(
+                    InferenceSlot::Expression(collection_expr.into()),
+                    constraints.finish(db, symbolic_ty),
+                );
             }
         }
-
-        self.infer_collection_literal_impl(
-            collection_class,
-            collection_expr,
-            elts,
-            infer_elt_expression,
-            tcx,
-        )
+        Some(inferred)
     }
 
     // Infer the type of a collection literal expression.
@@ -7591,6 +7704,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         elts: &[[Option<&'expr ast::Expr>; N]],
         infer_elt_expression: &mut dyn FnMut(&mut Self, ArgExpr<'db, 'expr>) -> Type<'db>,
         tcx: TypeContext<'db>,
+        promote: &mut dyn FnMut(
+            BoundTypeVarInstance<'db>,
+            Type<'db>,
+            InferencePromotion,
+        ) -> Type<'db>,
     ) -> Option<Type<'db>> {
         let db = self.db();
         let env = self.program_environment();
@@ -8052,11 +8170,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 builder.build_merged_with(|current_typevar, bounds| {
                     let lower = bounds?.evidence_lower()?;
 
-                    let lower = lower.promote_collection_element_type(
-                        db,
-                        env,
-                        tuple_size_promotion_constraints.allow(current_typevar.identity(self.db())),
-                        is_empty_collection_type_context(tcx),
+                    let lower = promote(
+                        current_typevar,
+                        lower,
+                        InferencePromotion::Collection {
+                            tuple_size: tuple_size_promotion_constraints
+                                .allow(current_typevar.identity(self.db())),
+                            unconstrained: is_empty_collection_type_context(tcx),
+                        },
                     );
 
                     Some(lower)
@@ -8521,11 +8642,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
         let iterable = comprehension.iterable(self.module());
         let target = comprehension.target(self.module());
+        let mut symbolic_iterable = None;
 
         let mut infer_iterable_type = || {
             let expression = self.index.expression(iterable);
             let result = infer_expression_types(self.db(), expression, TypeContext::default());
             let iterable_type = result.expression_type(iterable);
+            symbolic_iterable = result.symbolic_type(iterable);
             let element_type = if comprehension.is_async() {
                 None
             } else {
@@ -8578,6 +8701,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         };
 
+        if let Some(symbolic) = symbolic_iterable {
+            let symbolic = symbolic.apply(
+                db,
+                self.program_environment(),
+                InferenceOwner::Region(self.region),
+                target.into(),
+                |value| InferenceOperation::Iterate {
+                    value,
+                    mode: EvaluationMode::from_is_async(comprehension.is_async()),
+                },
+            );
+            self.symbolic
+                .insert(InferenceSlot::Expression(target.into()), symbolic);
+            self.symbolic
+                .insert(InferenceSlot::Binding(definition), symbolic);
+        }
         self.expressions.insert(target.into(), target_type);
         self.add_binding(target.into(), definition)
             .insert(self, target_type);
