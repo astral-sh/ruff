@@ -3466,10 +3466,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             self.types = LegacyTypeMappings::Unsupported;
             return;
         }
-        if matches!(
-            self.types,
-            LegacyTypeMappings::BudgetExceeded | LegacyTypeMappings::Unsupported
-        ) {
+        if !matches!(self.types, LegacyTypeMappings::Available(_)) {
             return;
         }
         let ConstraintSetAnalysis::Constrained(solutions) = analysis else {
