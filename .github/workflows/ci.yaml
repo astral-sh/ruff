@@ -17,6 +17,7 @@ defaults:
     shell: bash
 
 env:
+  UV_LOCKED: 1
   CARGO_INCREMENTAL: 0
   CARGO_NET_RETRY: 10
   CARGO_PROFILE_DEV_LTO: "false"
@@ -404,7 +405,10 @@ jobs:
         # This step is just to get nice GitHub annotations on the PR diff in the files-changed tab.
         run: cargo test -p ty_python_semantic --test mdtest || true
       - name: "Run tests"
-        run: uv run --only-dev cargo insta test --all-features --unreferenced reject --test-runner nextest --disable-nextest-doctest
+        env:
+          # Tests create disposable uv projects that must be resolved without a lockfile.
+          UV_LOCKED: 0
+        run: uv run --locked --only-dev cargo insta test --all-features --unreferenced reject --test-runner nextest --disable-nextest-doctest
       - name: "Run doctests"
         run: cargo test --doc --all-features
       - name: Dogfood ty on py-fuzzer
@@ -460,7 +464,10 @@ jobs:
           version: "0.12.9"
           enable-cache: "true"
       - name: "Run tests"
-        run: uv run --only-dev cargo nextest run --cargo-profile profiling --all-features
+        env:
+          # Tests create disposable uv projects that must be resolved without a lockfile.
+          UV_LOCKED: 0
+        run: uv run --locked --only-dev cargo nextest run --cargo-profile profiling --all-features
       - name: "Run doctests"
         run: cargo test --doc --profile profiling --all-features
 
@@ -495,8 +502,11 @@ jobs:
           version: "0.12.9"
           enable-cache: "true"
       - name: "Run tests"
+        env:
+          # Tests create disposable uv projects that must be resolved without a lockfile.
+          UV_LOCKED: 0
         run: |
-          uv run --only-dev cargo nextest run --all-features --profile ci
+          uv run --locked --only-dev cargo nextest run --all-features --profile ci
           cargo test --all-features --doc
 
   cargo-test-wasm:
@@ -1379,9 +1389,11 @@ jobs:
           # appear to provide much useful insight for our walltime benchmarks right now
           # (see https://github.com/astral-sh/ruff/pull/20419)
           CODSPEED_PERF_ENABLED: false
+          # Benchmarks manage any disposable uv environments they create.
+          UV_LOCKED: 0
         with:
           mode: walltime
-          run: uv run --only-dev cargo codspeed run --bench "${{ matrix.benchmark.target }}" -m walltime "${{ matrix.benchmark.filter }}"
+          run: uv run --locked --only-dev cargo codspeed run --bench "${{ matrix.benchmark.target }}" -m walltime "${{ matrix.benchmark.filter }}"
 
   required-checks-passed:
     name: "all required checks passed"

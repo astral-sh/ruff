@@ -13,6 +13,7 @@ on:
     - cron: 0 5 * * 3
 
 env:
+  UV_LOCKED: 1
   CARGO_INCREMENTAL: 0
   CARGO_NET_RETRY: 10
   CARGO_TERM_COLOR: always
