@@ -495,6 +495,29 @@ static_assert(not is_subtype_of(Wrapper[int], Wrapper[object]))
 static_assert(not is_subtype_of(Wrapper[object], Wrapper[int]))
 ```
 
+## Recursive protocol variance with annotated receivers
+
+An explicit receiver annotation does not make a bound method consume its type parameter. `Reader`
+remains covariant when its interface also recurses through the return type of `next`, and returning
+that protocol from `Source` preserves covariance.
+
+```py
+from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+class Reader[T](Protocol):
+    def read(self: "Reader[T]") -> T: ...
+    def next(self) -> "Reader[T]": ...
+
+class Source[T]:
+    def reader(self) -> Reader[T]:
+        raise NotImplementedError
+
+static_assert(is_subtype_of(Source[int], Source[object]))
+static_assert(not is_subtype_of(Source[object], Source[int]))
+```
+
 ## Expanding recursive protocol variance
 
 Variance inference terminates when a recursive reference changes the specialization. The mutable

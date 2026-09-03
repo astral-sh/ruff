@@ -870,10 +870,11 @@ class Sink(Protocol[T_contra]):
     def write(self, reader: NestedReader[T_contra]) -> None: ...
 ```
 
-## Declared variance of independent protocols
+## Unused parameters of independent protocols
 
-An independent protocol retains its declared variance even if its type parameter is unused.
-Accepting a covariant `Marker[T]` makes `Sink` contravariant in `T`.
+`Marker`'s unused type parameter is inferred as bivariant, which falls back to covariance. Accepting
+`Marker[T]` therefore makes `Sink` contravariant in `T`, even though `Marker`'s members never use
+that parameter.
 
 ```py
 from typing import Protocol, TypeVar

@@ -184,13 +184,22 @@ impl<'db> VarianceVariable<'db> {
         }
     }
 
-    /// Return the defining expression without substituting this parameter's declared variance.
+    /// Return the defining expression, or declared variance for an unsupported protocol.
     /// Recursive references remain symbolic, allowing the same equation to serve
     /// ordinary evaluation and declaration validation.
     #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| VarianceTerm::BIVARIANT, heap_size=ruff_memory_usage::heap_size)]
     fn equation(self, db: &'db dyn Db) -> VarianceTerm<'db> {
         let typevar = self.typevar(db);
         match self.origin(db) {
+            // Checking structural support opens the protocol's interface. Defer that work until
+            // validation needs the equation; ordinary evaluation only needs the declaration.
+            VarianceOrigin::ProtocolParameter(class, declared)
+                if class
+                    .into_protocol_class(db)
+                    .is_none_or(|protocol| !protocol.supports_variance_inference(db)) =>
+            {
+                declared.into()
+            }
             VarianceOrigin::Class(class) | VarianceOrigin::ProtocolParameter(class, _) => {
                 class.variance_equation(db, typevar)
             }

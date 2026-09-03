@@ -553,9 +553,7 @@ impl<'db> GenericAlias<'db> {
                         Some(explicit_variance)
                             if generic_typevar.is_paramspec(db)
                                 || generic_typevar.is_typevartuple(db)
-                                || origin.into_protocol_class(db).is_none_or(|protocol| {
-                                    !protocol.supports_variance_inference(db)
-                                }) =>
+                                || origin.into_protocol_class(db).is_none() =>
                         {
                             explicit_variance.into()
                         }
