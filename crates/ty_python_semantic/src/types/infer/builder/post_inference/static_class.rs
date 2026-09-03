@@ -415,8 +415,9 @@ pub(crate) fn check_static_class_definitions<'db>(
                             if declared_variance == TypeVarVariance::Invariant {
                                 return None;
                             }
-                            let required_variance =
-                                base_alias.variance_of(db, env, typevar.identity(db));
+                            let required_variance = base_alias
+                                .variance_of(db, env, typevar.identity(db))
+                                .evaluate(db);
                             if declared_variance.join(required_variance) != declared_variance {
                                 Some((typevar, declared_variance, required_variance))
                             } else {
@@ -841,7 +842,8 @@ pub(crate) fn check_static_class_definitions<'db>(
                 .ignore_possibly_undefined();
 
             if let Some(init_subclass) = init_subclass_type {
-                let call_args = call_args.with_self(Some(Type::from(class)));
+                let call_args =
+                    call_args.with_self(Some(Type::from(class.identity_specialization(db))));
                 if let Err(call_error) = init_subclass.try_call(db, env, &call_args) {
                     report_subclass_of_class_with_non_callable_init_subclass(
                         context, call_error, class, class_node,

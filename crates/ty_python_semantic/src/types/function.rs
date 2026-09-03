@@ -60,9 +60,8 @@ use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_db::source::source_text;
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::find_node::covering_node;
-use ruff_python_ast::token::parenthesized_range;
-use ruff_python_ast::{self as ast, OperatorPrecedence, ParameterWithDefault};
-use ruff_source_file::LineRanges;
+use ruff_python_ast::{self as ast, ParameterWithDefault};
+use ruff_python_edits::unwrapped_call_argument;
 use ruff_text_size::Ranged;
 use salsa::plumbing::AsId;
 use ty_module_resolver::{ImportingFile, KnownModule, ModuleName, file_to_module, resolve_module};
@@ -74,15 +73,15 @@ use crate::types::constraints::ConstraintSet;
 use crate::types::context::InferContext;
 use crate::types::cyclic::ActiveRecursionDetector;
 use crate::types::diagnostic::{
-    ASSERT_TYPE_UNSPELLABLE_SUBTYPE, INVALID_ARGUMENT_TYPE, REDUNDANT_CAST, STATIC_ASSERT_ERROR,
-    TYPE_ASSERTION_FAILURE, report_bad_argument_to_get_protocol_members,
+    ASSERT_TYPE_UNSPELLABLE_SUBTYPE, DISJOINT_CAST, INVALID_ARGUMENT_TYPE, REDUNDANT_CAST,
+    STATIC_ASSERT_ERROR, TYPE_ASSERTION_FAILURE, report_bad_argument_to_get_protocol_members,
     report_bad_argument_to_protocol_interface, report_invalid_total_ordering_call,
     report_issubclass_check_against_protocol_with_non_method_members,
     report_runtime_check_against_non_runtime_checkable_protocol,
     report_runtime_check_against_typed_dict,
 };
 use crate::types::display::DisplaySettings;
-use crate::types::generics::{ApplySpecialization, GenericContext, typing_self};
+use crate::types::generics::{GenericContext, typing_self};
 use crate::types::infer::{infer_definition_types, nearest_enclosing_class, original_class_type};
 use crate::types::known_instance::DeprecatedInstance;
 use crate::types::list_members::all_members;
@@ -90,7 +89,7 @@ use crate::types::narrow::ClassInfoConstraintFunction;
 use crate::types::relation::TypeRelationChecker;
 use crate::types::signatures::{CallableSignature, ReturnCallableTypeVarScope, Signature};
 use crate::types::tuple::TupleSpec;
-use crate::types::variance::{TypeVarVariance, VarianceInferable};
+use crate::types::variance::{VarianceInferable, VarianceOrigin, VarianceTerm};
 use crate::types::visitor::non_any_dynamic_content;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundMethodType, BoundTypeVarIdentity, BoundTypeVarInstance,
@@ -99,9 +98,9 @@ use crate::types::{
     SubclassOfType, Truthiness, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
     UnionBuilder, UnionType, binding_type, definition_expression_type, walk_signature,
 };
-use crate::{Db, FxOrderSet, ProgramEnvironment};
+use crate::{Db, FxIndexMap, FxOrderSet, ProgramEnvironment};
 use ty_python_core::ast_ids::HasScopedUseId;
-use ty_python_core::definition::Definition;
+use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::scope::ScopeId;
 use ty_python_core::{FileScopeId, ProgramFile, SemanticIndex, semantic_index};
 
@@ -298,7 +297,11 @@ impl get_size2::GetSize for OverloadLiteral<'_> {}
 
 #[salsa::tracked]
 impl<'db> OverloadLiteral<'db> {
-    fn with_deprecated(self, db: &'db dyn Db, deprecated: DeprecatedInstance<'db>) -> Self {
+    pub(super) fn with_deprecated(
+        self,
+        db: &'db dyn Db,
+        deprecated: DeprecatedInstance<'db>,
+    ) -> Self {
         Self::new(
             db,
             self.name(db),
@@ -1165,7 +1168,7 @@ pub(super) fn walk_function_type<'db, V: super::visitor::TypeVisitor<'db> + ?Siz
 
 #[salsa::tracked]
 impl<'db> FunctionType<'db> {
-    fn updated_signature(self, db: &'db dyn Db) -> Option<&'db CallableSignature<'db>> {
+    pub(super) fn updated_signature(self, db: &'db dyn Db) -> Option<&'db CallableSignature<'db>> {
         self.updated_signatures(db)
             .as_deref()
             .and_then(|updated| updated.signature.as_ref())
@@ -1229,12 +1232,11 @@ impl<'db> FunctionType<'db> {
             self.implementation_callables(db)
                 .iter()
                 .map(|callable| {
-                    CallableType::new(
+                    callable.with_signatures(
                         db,
                         callable
                             .signatures(db)
                             .with_inherited_generic_context(db, inherited_generic_context),
-                        callable.kind(db),
                     )
                 })
                 .collect()
@@ -1261,13 +1263,9 @@ impl<'db> FunctionType<'db> {
         let literal = self.literal(db);
         let (updated_signature, updated_implementation_callables) = if matches!(
             type_mapping,
-            TypeMapping::ApplySpecialization(
-                ApplySpecialization::ReturnCallables(_) | ApplySpecialization::TypeAlias(_)
-            ) | TypeMapping::ApplySpecializationWithMaterialization {
-                specialization: ApplySpecialization::ReturnCallables(_)
-                    | ApplySpecialization::TypeAlias(_),
-                ..
-            }
+            TypeMapping::ApplySpecialization(specialization)
+                | TypeMapping::ApplySpecializationWithMaterialization { specialization, .. }
+                if specialization.preserves_lazy_signatures()
         ) {
             (
                 self.updated_signature(db).map(|signature| {
@@ -1583,20 +1581,27 @@ impl<'db> FunctionType<'db> {
             .unwrap_or_else(|| self.literal(db).signature(db))
     }
 
-    /// Infer the variance of a type variable within this function's signature.
-    ///
-    /// This is tracked because signatures can contain recursive `TypeOf` references back to the
-    /// function itself. Class and generic-alias variance use the same `Bivariant` cycle fallback.
-    #[salsa::tracked(
-        returns(copy),
-        cycle_initial=|_, _, _, _| TypeVarVariance::Bivariant,
-        heap_size=ruff_memory_usage::heap_size,
-    )]
+    /// Refer to this signature's equation, including recursive `TypeOf` references to itself.
     pub(crate) fn variance_of(
         self,
         db: &'db dyn Db,
         typevar: BoundTypeVarIdentity<'db>,
-    ) -> TypeVarVariance {
+    ) -> VarianceTerm<'db> {
+        VarianceTerm::variable(db, VarianceOrigin::Function(self), typevar)
+    }
+
+    /// Build the signature's equation in the function's defining environment, independent of
+    /// the caller's environment. Recursive `TypeOf` annotations remain named references.
+    #[salsa::tracked(
+        returns(copy),
+        cycle_initial=|_, _, _, _| VarianceTerm::BIVARIANT,
+        heap_size=ruff_memory_usage::heap_size,
+    )]
+    pub(in crate::types) fn variance_equation(
+        self,
+        db: &'db dyn Db,
+        typevar: BoundTypeVarIdentity<'db>,
+    ) -> VarianceTerm<'db> {
         let env = ProgramEnvironment::from_scope(self.literal(db).last_definition.body_scope(db));
         self.signature(db).variance_of(db, &env, typevar)
     }
@@ -2479,6 +2484,7 @@ impl KnownFunction {
         overload: &mut Binding<'db>,
         call_arguments: &CallArguments<'_, 'db>,
         call_expression: &ast::ExprCall,
+        caller_semantic_index: &SemanticIndex<'db>,
     ) {
         let db = context.db();
         let parameter_types = overload.parameter_types();
@@ -2691,36 +2697,17 @@ impl KnownFunction {
                         if let Some(value) = call_expression.arguments.find_argument_value("val", 1)
                         {
                             let source = source_text(db, context.file());
-                            let replacement = if let Some(range) = parenthesized_range(
-                                value.into(),
-                                (&call_expression.arguments).into(),
+                            let covering = covering_node(
+                                context.module().syntax().into(),
+                                call_expression.range(),
+                            );
+                            let replacement = unwrapped_call_argument(
+                                call_expression,
+                                value,
+                                covering.parent(),
                                 context.module().tokens(),
-                            ) {
-                                source[range].to_string()
-                            } else {
-                                let covering = covering_node(
-                                    context.module().syntax().into(),
-                                    call_expression.range(),
-                                );
-                                // A multiline value can rely on the call's parentheses for
-                                // line continuation, independently of operator precedence.
-                                let needs_parens = source.contains_line_break(value.range())
-                                    || covering
-                                        .parent()
-                                        .and_then(ast::AnyNodeRef::as_expr_ref)
-                                        .is_some_and(|parent| {
-                                            let value_precedence =
-                                                OperatorPrecedence::from_expr(value);
-                                            OperatorPrecedence::from_expr_ref(parent)
-                                                >= value_precedence
-                                        });
-                                let value_text = &source[value.range()];
-                                if needs_parens {
-                                    format!("({value_text})")
-                                } else {
-                                    value_text.to_string()
-                                }
-                            };
+                                &source,
+                            );
                             diagnostic.help("Remove the redundant `cast`");
                             diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                                 replacement,
@@ -2728,6 +2715,99 @@ impl KnownFunction {
                             )));
                         }
                     }
+                } else if context.is_lint_enabled(&DISJOINT_CAST)
+                    && !context.file().is_stub(db)
+                    && !caller_semantic_index.is_in_type_checking_block(
+                        context.scope().file_scope_id(db),
+                        call_expression.range(),
+                    )
+                    && source_type.is_disjoint_from(db, env, casted_type)
+                    && !casted_type.is_equivalent_to(db, env, Type::Never)
+                    && !source_type.is_equivalent_to(db, env, Type::Never)
+                    && let Some(builder) = context.report_lint(&DISJOINT_CAST, call_expression)
+                {
+                    let types = [*source_type, casted_type];
+                    let settings = DisplaySettings::from_possibly_ambiguous_types(db, env, types);
+                    let source_display = source_type.display_with(db, env, settings.clone());
+                    let casted_display = casted_type.display_with(db, env, settings.clone());
+                    let mut diagnostic = builder.into_diagnostic("Cast to a disjoint type");
+                    diagnostic.set_concise_message(format_args!(
+                        "Cast from `{source_display}` to disjoint type `{casted_display}`",
+                    ));
+                    if let Some(arg) = call_expression.arguments.find_argument_value("typ", 0) {
+                        diagnostic.annotate(
+                            context
+                                .secondary(arg)
+                                .message("Disjoint from the inferred type"),
+                        );
+                    }
+                    if let Some(arg) = call_expression.arguments.find_argument_value("val", 1) {
+                        diagnostic.annotate(
+                            context
+                                .secondary(arg)
+                                .message(format_args!("Inferred as `{source_display}`")),
+                        );
+                    }
+
+                    // deduplicate definitions before attaching a subdiagnostic to each definition,
+                    // or we'd have multiple subdiagnostics pointing to a single definition
+                    // if the two types are specializations of the same generic class.
+                    let definitions: FxIndexMap<Definition<'db>, String> = types
+                        .into_iter()
+                        .filter_map(|ty| ty.definition(db, env))
+                        .filter_map(|definition| definition.definition())
+                        .filter_map(|definition| Some((definition, definition.name(db)?)))
+                        .collect();
+
+                    for (definition, name) in definitions {
+                        let file = definition.python_file(db);
+                        let module = parsed_module(db, file).load(db);
+                        let mut range = definition.focus_range(db, &module);
+                        if let DefinitionKind::Class(class) = definition.kind(db) {
+                            let definition_types = infer_definition_types(db, definition);
+                            if let Some(decorator) =
+                                class.node(&module).decorator_list.iter().find(|decorator| {
+                                    definition_types
+                                        .expression_type(&decorator.expression)
+                                        .as_function_literal()
+                                        .is_some_and(|func| func.is_known(db, KnownFunction::Final))
+                                })
+                            {
+                                range = range.cover_range(decorator.range());
+                            }
+                        }
+                        diagnostic.annotate(
+                            Annotation::secondary(Span::from(range))
+                                .message(format_args!("`{name}` defined here")),
+                        );
+                    }
+
+                    if casted_type.is_protocol_instance() {
+                        if source_type.is_protocol_instance() {
+                            diagnostic.info(format_args!(
+                                "protocol `{casted_display}` is disjoint \
+                                from protocol `{source_display}`"
+                            ));
+                        } else {
+                            diagnostic.info(format_args!(
+                                "protocol `{casted_display}` is disjoint \
+                                from `{source_display}`"
+                            ));
+                        }
+                    } else if source_type.is_protocol_instance() {
+                        diagnostic.info(format_args!(
+                            "`{casted_display}` is disjoint \
+                            from protocol `{source_display}`"
+                        ));
+                    } else {
+                        diagnostic.info(format_args!(
+                            "`{casted_display}` is disjoint from `{source_display}`"
+                        ));
+                    }
+
+                    source_type
+                        .disjointness_error_context(db, env, casted_type)
+                        .attach_to(db, env, &mut diagnostic);
                 }
             }
 

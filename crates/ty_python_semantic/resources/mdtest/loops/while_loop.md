@@ -411,6 +411,74 @@ while x < 10:
     reveal_type(x)  # revealed: Literal[1]
 ```
 
+### Deletions in nested loops reach the outer loop
+
+An inner loop can delete a variable on one iteration, then exit through `break` on a later
+iteration. The variable can therefore be unbound both after the inner loop and at the start of the
+next outer iteration.
+
+```py
+def stop() -> bool:
+    raise NotImplementedError
+
+def f(repeat: bool):
+    x = 0
+    while repeat:
+        x  # error: [possibly-unresolved-reference]
+        while True:
+            if stop():
+                break
+            x = 0
+            del x
+        x  # error: [possibly-unresolved-reference]
+```
+
+### Rebinding after an inner loop restores boundness
+
+An inner loop's deletion does not make a variable possibly unbound on later outer iterations if the
+variable is reassigned before reaching the next iteration.
+
+```py
+def stop() -> bool:
+    raise NotImplementedError
+
+def f(repeat: bool):
+    x = 0
+    while repeat:
+        reveal_type(x)  # revealed: Literal[0]
+        while True:
+            if stop():
+                break
+            x = 0
+            del x
+        x = 0
+```
+
+### Statically unreachable deletions in nested loops preserve boundness
+
+A deletion guarded by an impossible comparison does not make the variable possibly unbound, even
+through several nested loops. Evaluating the loop conditions and comparison depends on bindings from
+the enclosing loops.
+
+```py
+def stop() -> bool:
+    raise NotImplementedError
+
+def f(repeat: bool):
+    x = 1
+    while repeat:
+        reveal_type(x)  # revealed: Literal[1]
+        while x:
+            if stop():
+                break
+            while x:
+                if stop():
+                    break
+                if x == 4:
+                    del x
+        reveal_type(x)  # revealed: Literal[1]
+```
+
 ### Bindings in a loop are possibly-unbound after the loop
 
 ```py
@@ -467,6 +535,90 @@ while random():
         x, y = y, x
     reveal_type(x)  # revealed: Literal[2, 1]
     reveal_type(y)  # revealed: Literal[1, 2]
+```
+
+### Loop increments guarded by chained comparisons converge
+
+A negated comparison chain validates an increment before the loop updates its offset. Inference
+converges even though the guard depends on the value added to the loop variable.
+
+```py
+def advance(data: bytes, offset: int) -> None:
+    while offset < len(data):
+        byte = data[offset]
+        if byte == 0:
+            return
+        step = byte & 15
+        if not 1 <= step <= 8:
+            raise ValueError
+        offset += step
+        # TODO: The offset should retain its `int` type.
+        reveal_type(offset)  # revealed: int | Unknown
+```
+
+### Loop updates guarded by compound conditions converge
+
+Type checks and a negated comparison chain validate a record's size before advancing the offset.
+Combining these checks with `or` preserves the integer type of the updated offset.
+
+```py
+def read_record(offset: int) -> tuple[int | None, int | None]:
+    return 1, 1
+
+def read_records(offset: int, end: int) -> None:
+    while offset < end:
+        value, size = read_record(offset)
+        if not isinstance(value, int) or not isinstance(size, int) or not 0 <= size <= end - offset:
+            raise ValueError
+        offset += size
+        reveal_type(offset)  # revealed: int
+```
+
+### Worklists guarded by chained comparisons converge
+
+A chained comparison guards both extending a worklist and inserting into a set. The set's inferred
+element type remains `str` as entries are added and queued for later loop iterations.
+
+```py
+def visit(start: str, height: int) -> None:
+    columns = "abc"
+    column = columns.index(start[0])
+    row = int(start[1:]) - 1
+    visited = {start}
+    pending = [(column, row)]
+    while pending:
+        current_column, current_row = pending.pop()
+        for x, y in ((current_column, current_row - 1),):
+            if not 0 <= y < height:
+                continue
+            visited.add(f"{columns[x]}{y + 1}")
+            pending.append((x, y))
+            reveal_type(visited)  # revealed: set[str]
+```
+
+### Conditional attribute updates converge
+
+Each batch depends on an instance attribute that is updated from the last item in the batch. The
+condition and the attribute's type depend on each other across loop iterations. Inference converges,
+and the condition narrows the assigned value to a non-empty `str`.
+
+```py
+class Inventory:
+    after: str | None
+
+    def next_batch(self, after: object) -> "list[Inventory]":
+        return []
+
+    def iterate(self):
+        while True:
+            item = None
+            batch = self.next_batch(self.after)
+            assert batch
+            for item in batch:
+                pass
+            if item and item.after:
+                self.after = item.after
+                reveal_type(self.after)  # revealed: str & ~AlwaysFalsy
 ```
 
 ### Monotonic widening can keep stale loopback bindings reachable

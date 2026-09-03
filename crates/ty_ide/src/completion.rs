@@ -6672,6 +6672,49 @@ from sys import (
     }
 
     #[test]
+    fn from_import_with_bare_annotation() {
+        let builder = CursorTest::builder()
+            .source("module.py", "declared: int\nvalue = 1")
+            .source("main.py", "from module import val<CURSOR>")
+            .completion_test_builder();
+
+        builder.build().contains("value");
+    }
+
+    #[test]
+    fn from_import_with_separate_annotation_and_assignment() {
+        let builder = CursorTest::builder()
+            .source("module.py", "value: int\nvalue = 1")
+            .source("main.py", "from module import val<CURSOR>")
+            .completion_test_builder();
+
+        let test = builder.build();
+        assert!(
+            test.completions()
+                .iter()
+                .any(|completion| completion.name == "value" && !completion.is_type_check_only)
+        );
+    }
+
+    #[test]
+    fn from_import_with_type_checking_annotation() {
+        let builder = CursorTest::builder()
+            .source(
+                "module.py",
+                "from typing import TYPE_CHECKING\nif TYPE_CHECKING:\n    value: int",
+            )
+            .source("main.py", "from module import val<CURSOR>")
+            .completion_test_builder();
+
+        let test = builder.build();
+        assert!(
+            test.completions()
+                .iter()
+                .any(|completion| completion.name == "value" && completion.is_type_check_only)
+        );
+    }
+
+    #[test]
     fn from_import_unknown_in_module() {
         let builder = completion_test_builder(
             "\

@@ -489,7 +489,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         ..
                     }),
                 qualifiers,
-            } = result.unwrap_or_else(|error| error.fallback_member(db))
+            } = result
+                .unwrap_or_else(|error| error.fallback_member(db))
+                .member(db)
             {
                 if &alias.name != "*" && boundness == Definedness::PossiblyUndefined {
                     // TODO: Consider loading _both_ the attribute and any submodule and unioning them

@@ -1,11 +1,12 @@
 ## What it does
 
-Checks for type alias definitions that (directly or mutually) refer to themselves.
+Checks for circular type alias definitions.
 
 ## Why is it bad?
 
-Although it is permitted to define a recursive type alias, it is not meaningful to have a type alias
-whose expansion can only result in itself, and is therefore not allowed.
+Recursive aliases are valid when recursive references occur inside another type, such as
+`list[Tree]`. An alias cannot expand directly to itself or include itself as a union member. This
+applies to both `type` statements and aliases created with `TypeAliasType`.
 
 ## Examples
 
@@ -15,8 +16,16 @@ python-version = "3.12"
 ```
 
 ```python
+from typing import TypeAliasType
+
 type Itself = Itself  # error
 
 type A = B  # error
 type B = A  # error
+
+type IntOr = int | IntOr  # error
+
+Cycle = TypeAliasType("Cycle", "Cycle")  # error
+
+type Tree = int | list[Tree]  # valid recursive alias
 ```

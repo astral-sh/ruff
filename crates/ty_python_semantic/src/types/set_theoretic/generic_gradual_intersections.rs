@@ -1,7 +1,6 @@
-use crate::types::cyclic::TypeIdentity;
 use crate::types::generics::specialization_variance;
 use crate::types::tuple::TupleSpec;
-use crate::types::visitor::any_over_type;
+use crate::types::visitor::contains_growing_type;
 use crate::types::{
     ClassBase, ClassType, IntersectionType, KnownClass, MaterializationKind, Type, TypeVarVariance,
     UnionType,
@@ -34,8 +33,7 @@ pub(super) enum GenericIntersection<'db> {
     Recursive,
 }
 
-/// Simplify the intersection of two generic specializations when one is a gradual
-/// generalization of the other.
+/// Simplify same-class gradual intersections and intersections with top-materialized subclasses.
 ///
 /// For example, `list[int] & list[Any]` simplifies to `list[int]`, while
 /// `Sequence[int] & Sequence[Any]` simplifies to `Sequence[int & Any]`.
@@ -49,8 +47,8 @@ pub(super) fn generic_gradual_intersection<'db>(
     dynamic_generalization_intersection(db, env, left, right)
         .or_else(|| dynamic_generalization_intersection(db, env, right, left))
         .map(GenericIntersection::Simplified)
-        .or_else(|| nominal_top_intersection(db, env, left, right))
-        .or_else(|| nominal_top_intersection(db, env, right, left))
+        .or_else(|| base_top_intersection(db, env, left, right))
+        .or_else(|| base_top_intersection(db, env, right, left))
 }
 
 /// Intersect a fully static nominal base with a generic subclass.
@@ -60,18 +58,35 @@ pub(super) fn generic_gradual_intersection<'db>(
 /// materializations instead of incorrectly collapsing, for example,
 /// `Sequence[int] & Top[list[Any]]` to `list[int]`.
 /// Subclass arguments that do not specialize the base retain their gradualness.
-fn nominal_top_intersection<'db>(
+fn base_top_intersection<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     base: Type<'db>,
     subclass: Type<'db>,
 ) -> Option<GenericIntersection<'db>> {
-    if !base.is_nominal_instance() || !subclass.is_nominal_instance() || base.has_dynamic(db, env) {
+    if !matches!(base, Type::NominalInstance(_) | Type::ProtocolInstance(_))
+        || !matches!(
+            subclass,
+            Type::NominalInstance(_) | Type::ProtocolInstance(_)
+        )
+        || base.has_dynamic(db, env)
+    {
         return None;
     }
 
     let (base_class, base_specialization) = base.class_specialization(db, env)?;
     let (subclass_class, subclass_specialization) = subclass.class_specialization(db, env)?;
+
+    // As a deliberately unsound exception, allow `Iterable` as the base when the subclass is
+    // nominal or is the `Iterator` protocol. We assume containers and iterators obey their
+    // behavioral contracts, including agreement between iteration and indexing.
+    let is_iterable_special_case = base_class.known(db) == Some(KnownClass::Iterable)
+        && (subclass.is_nominal_instance()
+            || subclass_class.known(db) == Some(KnownClass::Iterator));
+    if !is_iterable_special_case && (!base.is_nominal_instance() || !subclass.is_nominal_instance())
+    {
+        return None;
+    }
 
     if base_class == subclass_class {
         return None;
@@ -89,28 +104,8 @@ fn nominal_top_intersection<'db>(
 
     // Inspect lazy attributes only after establishing that the classes are related. Expanding a
     // recursive generic alias or member can re-enter intersection simplification with ever-growing
-    // type arguments. Non-generic recursion cannot grow its specialization and can still be checked.
-    if any_over_type(db, env, base, true, |ty| {
-        let is_generic = match ty {
-            Type::TypeAlias(alias) => alias.generic_context(db).is_some(),
-            Type::ProtocolInstance(protocol) => protocol
-                .class_origin(db)
-                .and_then(|class| class.class_literal(db).generic_context(db))
-                .is_some(),
-            Type::TypedDict(typed_dict) => typed_dict
-                .defining_class()
-                .and_then(|class| class.class_literal(db).generic_context(db))
-                .is_some(),
-            _ => false,
-        };
-        is_generic
-            && matches!(
-                ty.to_type_identity(db),
-                TypeIdentity::GrowingTypeAlias(_)
-                    | TypeIdentity::GrowingProtocol(_)
-                    | TypeIdentity::GrowingTypedDict(_)
-            )
-    }) {
+    // type arguments. Exact recursive specializations can still be checked.
+    if contains_growing_type(db, env, base) {
         return Some(GenericIntersection::Recursive);
     }
     if base_specialization.materialization_kind(db).is_some()

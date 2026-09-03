@@ -37,6 +37,7 @@ defaults:
 permissions: {}
 
 env:
+  UV_LOCKED: 1
   # Don't set this flag globally for the workflow: it does strange things
   # to the snapshots in the `cargo insta test --accept` step in the snapshot job.
   #
@@ -88,7 +89,7 @@ jobs:
           git config --global user.email '<>'
       - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
-          version: "0.12.6"
+          version: "0.12.9"
       - name: Sync typeshed stubs
         run: |
           rm -rf "ruff/${VENDORED_TYPESHED}"
@@ -144,7 +145,7 @@ jobs:
           ref: ${{ env.UPSTREAM_BRANCH}}
       - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
-          version: "0.12.6"
+          version: "0.12.9"
       - name: Setup git
         run: |
           git config --global user.name typeshedbot
@@ -186,7 +187,7 @@ jobs:
           ref: ${{ env.UPSTREAM_BRANCH}}
       - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
-          version: "0.12.6"
+          version: "0.12.9"
       - name: Setup git
         run: |
           git config --global user.name typeshedbot
@@ -268,12 +269,9 @@ jobs:
         run: rustup show
       - name: "Install mold"
         uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
-      - name: "Install cargo nextest and insta"
-        uses: taiki-e/install-action@cb33e69fad06166ca28a42b2575e4dadabf62ee8 # v2.85.8
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
-          tool: |
-            cargo-nextest
-            cargo-insta
+          version: "0.12.9"
       - name: Update snapshots
         # Snapshot failures are force-passed by cargo-insta, but other tests might still fail
         # in this test, causing the step overall to fail. We want to continue to later steps
@@ -283,7 +281,7 @@ jobs:
           # Work around https://github.com/mitsuhiko/insta/pull/924 until its fix is released.
           CI: "0"
           MDTEST_UPDATE_SNAPSHOTS: "1"
-        run: cargo insta test --accept --all-features --test-runner nextest --disable-nextest-doctest
+        run: uv run --only-dev cargo insta test --accept --all-features --test-runner nextest --disable-nextest-doctest
       - name: Commit and push snapshot changes
         if: ${{ success() }}
         run: |

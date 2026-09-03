@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::cmp::Ordering;
 use std::collections::{BTreeMap, btree_map::Entry as BTreeEntry, hash_map::Entry};
 
 use crate::place::loop_header_reachability;
@@ -487,15 +488,21 @@ impl ClassInfoConstraintFunction {
             let specialization = if use_generic_filtering {
                 class.unknown_specialization(db)
             } else {
-                // A negative result excludes every specialization of the class.
                 class.top_materialization(db)
             };
-
-            match self {
+            let constraint = match self {
                 ClassInfoConstraintFunction::IsInstance => Type::instance(db, env, specialization),
                 ClassInfoConstraintFunction::IsSubclass => {
                     SubclassOfType::from(db, env, specialization)
                 }
+            };
+
+            if is_positive {
+                constraint
+            } else {
+                // A negative result excludes every specialization of the class. Materialize the
+                // whole type so that this also covers gradual protocol members.
+                constraint.top_materialization(db, env)
             }
         };
 
@@ -1484,6 +1491,63 @@ fn necessary_sequence_pattern_type<'db>(
 enum NominalAttributeComparison {
     Equality,
     Identity,
+}
+
+/// A comparison with an integer length, expressed as a required or excluded ordering.
+/// For example, `<=` excludes `Ordering::Greater`.
+#[derive(Clone, Copy)]
+struct LengthComparison {
+    ordering: Ordering,
+    is_positive: bool,
+}
+
+impl LengthComparison {
+    fn from_op(op: ast::CmpOp, is_positive: bool) -> Option<Self> {
+        let (ordering, matches_ordering) = match op {
+            ast::CmpOp::Eq => (Ordering::Equal, true),
+            ast::CmpOp::NotEq => (Ordering::Equal, false),
+            ast::CmpOp::Lt => (Ordering::Less, true),
+            ast::CmpOp::LtE => (Ordering::Greater, false),
+            ast::CmpOp::Gt => (Ordering::Greater, true),
+            ast::CmpOp::GtE => (Ordering::Less, false),
+            _ => return None,
+        };
+        Some(Self {
+            ordering,
+            is_positive: matches_ordering == is_positive,
+        })
+    }
+
+    fn reflected(self) -> Self {
+        Self {
+            ordering: self.ordering.reverse(),
+            ..self
+        }
+    }
+
+    fn is_equality(self) -> bool {
+        self.ordering == Ordering::Equal && self.is_positive
+    }
+
+    fn matches(self, actual: i128, expected: i64) -> bool {
+        (actual.cmp(&i128::from(expected)) == self.ordering) == self.is_positive
+    }
+
+    fn matches_tuple_length(self, actual: TupleLength, expected: i64) -> bool {
+        match actual {
+            TupleLength::Fixed(actual) => self.matches(actual as i128, expected),
+            TupleLength::Variable(..) => {
+                let minimum = actual.minimum() as i128;
+                let expected = i128::from(expected);
+                match (self.ordering, self.is_positive) {
+                    (Ordering::Equal, true) | (Ordering::Greater, false) => minimum <= expected,
+                    (Ordering::Less, true) => minimum < expected,
+                    // An unbounded tuple can exceed any upper bound or differ from any exact length.
+                    _ => true,
+                }
+            }
+        }
+    }
 }
 
 struct NarrowingConstraintsBuilder<'db, 'ast> {
@@ -3377,26 +3441,26 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         }
     }
 
-    /// Filter a type based on an equality or inequality comparison against an exact length.
+    /// Filter a type based on a comparison against an integer length.
     ///
-    /// Exact tuple types are specialized to the observed length. Other types that encode their
-    /// possible lengths are filtered. Unknown-length types are left unchanged because persisting
-    /// an observed length would become stale after mutation.
-    fn narrow_type_by_exact_len(
+    /// Equality comparisons specialize exact tuple types to the observed length. Other comparisons
+    /// filter types that encode their possible lengths. Unknown-length types are left unchanged
+    /// because persisting an observed length would become stale after mutation.
+    fn narrow_type_by_len_comparison(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         ty: Type<'db>,
-        length: usize,
-        is_equality: bool,
+        length: i64,
+        comparison: LengthComparison,
     ) -> Type<'db> {
         let resolved = ty.resolve_type_alias(db);
 
         let narrowed = match resolved {
             Type::Union(union) => union.map(db, env, |element| {
-                Self::narrow_type_by_exact_len(db, env, *element, length, is_equality)
+                Self::narrow_type_by_len_comparison(db, env, *element, length, comparison)
             }),
             Type::Intersection(intersection) => intersection.map_positive(db, env, |element| {
-                Self::narrow_type_by_exact_len(db, env, *element, length, is_equality)
+                Self::narrow_type_by_len_comparison(db, env, *element, length, comparison)
             }),
             Type::TypeVar(typevar) => {
                 let Some(bound_or_constraints) = typevar.typevar(db).bound_or_constraints(db, env)
@@ -3407,19 +3471,19 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                 let upper_bound = bound_or_constraints.as_type(db, env);
                 let narrowed_upper_bound = match bound_or_constraints {
                     TypeVarBoundOrConstraints::UpperBound(bound) => {
-                        Self::narrow_type_by_exact_len(db, env, bound, length, is_equality)
+                        Self::narrow_type_by_len_comparison(db, env, bound, length, comparison)
                     }
                     TypeVarBoundOrConstraints::Constraints(constraints) => {
                         UnionType::from_elements(
                             db,
                             env,
                             constraints.elements(db).iter().map(|constraint| {
-                                Self::narrow_type_by_exact_len(
+                                Self::narrow_type_by_len_comparison(
                                     db,
                                     env,
                                     *constraint,
                                     length,
-                                    is_equality,
+                                    comparison,
                                 )
                             }),
                         )
@@ -3433,7 +3497,10 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                 }
             }
             _ => {
-                if is_equality && let Some(tuple) = resolved.exact_tuple_instance_spec(db) {
+                if comparison.is_equality()
+                    && let Ok(length) = usize::try_from(length)
+                    && let Some(tuple) = resolved.exact_tuple_instance_spec(db)
+                {
                     match tuple.resize(db, env, TupleLength::Fixed(length)) {
                         Ok(resized) => {
                             let narrowed = Type::tuple(TupleType::new(db, env, &resized));
@@ -3454,8 +3521,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                     let satisfies_comparison = |length_type: Type<'db>| {
                         length_type
                             .as_int_literal()
-                            .and_then(|actual| usize::try_from(actual).ok())
-                            .is_some_and(|actual| (actual == length) == is_equality)
+                            .is_some_and(|actual| comparison.matches(i128::from(actual), length))
                     };
                     let comparison_possible = resolved
                         .len(db, env)
@@ -3468,19 +3534,13 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                         })
                         .or_else(|| {
                             tuple_length
-                                .and_then(TupleLength::into_fixed_length)
-                                .map(|actual| (actual == length) == is_equality)
+                                .map(|actual| comparison.matches_tuple_length(actual, length))
                         });
 
-                    match comparison_possible {
-                        Some(false) => Type::Never,
-                        None if is_equality
-                            && tuple_length
-                                .is_some_and(|tuple_length| length < tuple_length.minimum()) =>
-                        {
-                            Type::Never
-                        }
-                        _ => resolved,
+                    if comparison_possible == Some(false) {
+                        Type::Never
+                    } else {
+                        resolved
                     }
                 }
             }
@@ -3920,6 +3980,60 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             }
         }
 
+        if let [op] = &**ops
+            && let Some(comparison) = LengthComparison::from_op(*op, is_positive)
+        {
+            let mut narrow_len_call =
+                |call: &ast::ExprCall, length_type: Type<'db>, comparison: LengthComparison| {
+                    let Type::FunctionLiteral(function_type) =
+                        inference.expression_type(&*call.func)
+                    else {
+                        return;
+                    };
+                    if function_type.known(db) != Some(KnownFunction::Len)
+                        || !call.arguments.keywords.is_empty()
+                    {
+                        return;
+                    }
+                    let [arg] = &*call.arguments.args else {
+                        return;
+                    };
+                    let Some(length) = length_type.resolve_type_alias(db).as_int_like_literal()
+                    else {
+                        return;
+                    };
+                    let Some(target) = PlaceExpr::try_from_expr(arg) else {
+                        return;
+                    };
+
+                    let arg_type = inference.expression_type(arg);
+                    let narrowed = Self::narrow_type_by_len_comparison(
+                        db, &self.env, arg_type, length, comparison,
+                    );
+                    if narrowed != arg_type {
+                        insert_narrowing_constraint(
+                            &mut constraints,
+                            self.expect_place(&target),
+                            NarrowingConstraint::replacement(narrowed),
+                        );
+                    }
+                };
+
+            // E.g., `len(items) == 2`
+            if let ast::Expr::Call(call) = left.expression_value() {
+                narrow_len_call(call, inference.expression_type(&comparators[0]), comparison);
+            }
+
+            // E.g., `2 == len(items)`
+            if let ast::Expr::Call(call) = comparators[0].expression_value() {
+                narrow_len_call(
+                    call,
+                    inference.expression_type(&**left),
+                    comparison.reflected(),
+                );
+            }
+        }
+
         // Narrow tagged unions of `TypedDict`s with `Literal` keys, for example:
         //
         //     class Foo(TypedDict):
@@ -3936,52 +4050,6 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             // For `==`, we use equality semantics on the `if` branch (is_positive=true).
             // For `!=`, we use equality semantics on the `else` branch (is_positive=false).
             let is_equality = is_positive == (ops[0] == ast::CmpOp::Eq);
-
-            let mut narrow_len_call = |call: &ast::ExprCall, length_type: Type<'db>| {
-                let Type::FunctionLiteral(function_type) = inference.expression_type(&*call.func)
-                else {
-                    return;
-                };
-                if function_type.known(db) != Some(KnownFunction::Len)
-                    || !call.arguments.keywords.is_empty()
-                {
-                    return;
-                }
-                let [arg] = &*call.arguments.args else {
-                    return;
-                };
-                let Some(length_literal) = length_type.resolve_type_alias(db).as_int_like_literal()
-                else {
-                    return;
-                };
-                let Ok(length) = usize::try_from(length_literal) else {
-                    return;
-                };
-                let Some(target) = PlaceExpr::try_from_expr(arg) else {
-                    return;
-                };
-
-                let arg_type = inference.expression_type(arg);
-                let narrowed =
-                    Self::narrow_type_by_exact_len(db, &self.env, arg_type, length, is_equality);
-                if narrowed != arg_type {
-                    insert_narrowing_constraint(
-                        &mut constraints,
-                        self.expect_place(&target),
-                        NarrowingConstraint::replacement(narrowed),
-                    );
-                }
-            };
-
-            // E.g., `len(items) == 2`
-            if let ast::Expr::Call(call) = left.expression_value() {
-                narrow_len_call(call, inference.expression_type(&comparators[0]));
-            }
-
-            // E.g., `2 == len(items)`
-            if let ast::Expr::Call(call) = comparators[0].expression_value() {
-                narrow_len_call(call, inference.expression_type(&**left));
-            }
 
             let mut narrow_subscript = |subscript: &ast::ExprSubscript, other_type: Type<'db>| {
                 let value_type = inference.expression_type(&*subscript.value);

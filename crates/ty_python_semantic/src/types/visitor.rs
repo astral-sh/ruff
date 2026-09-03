@@ -644,6 +644,109 @@ fn dynamic_content_impl<'db>(
     visitor.content.get()
 }
 
+/// Whether inspecting `ty` can encounter recursive types with changing specializations.
+///
+/// Exact recursive types are safe to inspect once. For protocol methods, conservatively treat
+/// a new specialization of an active protocol definition as potentially growing: their signatures
+/// are not included in the specialization-flow analysis used by [`TypeIdentity`].
+pub(super) fn contains_growing_type<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+) -> bool {
+    struct GrowingTypeVisitor<'a, 'db> {
+        env: &'a ProgramEnvironment<'db>,
+        recursion_guard: TypeCollector<'db>,
+        active_class_protocols: ActiveRecursionDetector<StaticClassLiteral<'db>>,
+        found: Cell<bool>,
+    }
+
+    impl<'db> TypeVisitor<'db> for GrowingTypeVisitor<'_, 'db> {
+        fn program_environment(&self) -> &ProgramEnvironment<'db> {
+            self.env
+        }
+
+        fn should_visit_lazy_type_attributes(&self) -> bool {
+            true
+        }
+
+        fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+            if self.found.get() {
+                return;
+            }
+
+            let is_generic = match ty {
+                Type::TypeAlias(alias) => alias.generic_context(db).is_some(),
+                Type::ProtocolInstance(protocol) => protocol
+                    .class_origin(db)
+                    .and_then(|class| class.class_literal(db).generic_context(db))
+                    .is_some(),
+                Type::TypedDict(typed_dict) => typed_dict
+                    .defining_class()
+                    .and_then(|class| class.class_literal(db).generic_context(db))
+                    .is_some(),
+                _ => false,
+            };
+            if is_generic
+                && matches!(
+                    ty.to_type_identity(db),
+                    TypeIdentity::GrowingTypeAlias(_)
+                        | TypeIdentity::GrowingProtocol(_)
+                        | TypeIdentity::GrowingTypedDict(_)
+                )
+            {
+                self.found.set(true);
+                return;
+            }
+
+            walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+        }
+
+        fn visit_protocol_instance_type(
+            &self,
+            db: &'db dyn Db,
+            protocol: ProtocolInstanceType<'db>,
+        ) {
+            let protocol_ty = Type::ProtocolInstance(protocol);
+            let Some((origin, specialization)) = protocol
+                .class_origin(db)
+                .and_then(|class| class.static_class_literal(db))
+            else {
+                walk_protocol_instance_interface(db, protocol.interface(db), protocol_ty, self);
+                return;
+            };
+
+            if let Some(specialization) = specialization {
+                // Inspect arguments before activating the definition so finite nesting such as
+                // `P[P[int]]` does not look like an expanding recursive declaration.
+                walk_specialization_types(db, specialization, self);
+                if self.found.get() {
+                    return;
+                }
+            }
+
+            self.active_class_protocols.visit(
+                &origin,
+                || self.found.set(true),
+                || {
+                    // Bind implicit receivers so they do not introduce recursive edges of their
+                    // own. Explicitly recursive method signatures still need to be inspected.
+                    walk_protocol_instance_interface(db, protocol.interface(db), protocol_ty, self);
+                },
+            );
+        }
+    }
+
+    let visitor = GrowingTypeVisitor {
+        env,
+        recursion_guard: TypeCollector::default(),
+        active_class_protocols: ActiveRecursionDetector::default(),
+        found: Cell::new(false),
+    };
+    visitor.visit_type(db, ty);
+    visitor.found.get()
+}
+
 #[derive(Clone, Copy)]
 enum TypeSearchMode {
     SkipLazyAttributes,

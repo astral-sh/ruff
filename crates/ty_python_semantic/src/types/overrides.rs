@@ -17,7 +17,6 @@ use crate::{
     Db, ProgramEnvironment,
     lint::LintId,
     place::{DefinedPlace, Place, PlaceAndQualifiers, TypeOrigin},
-    reachability::ReachabilityConstraintsExtension,
     types::{
         CallableType, ClassBase, ClassLiteral, ClassType, IntersectionType, KnownClass, Parameter,
         Parameters, Signature, StaticClassLiteral, Type, TypeContext, TypeQualifiers,
@@ -35,8 +34,9 @@ use crate::{
         },
         enums::{EnumMetadata, enum_metadata, is_enum_class_by_inheritance},
         function::{FunctionDecorators, FunctionType, KnownFunction, OverloadLiteral},
-        infer::infer_definition_types,
-        list_members::{Member, MemberWithDefinition, all_end_of_scope_members},
+        list_members::{
+            Member, MemberWithDefinition, all_end_of_scope_members, extract_underlying_functions,
+        },
         tuple::Tuple,
     },
 };
@@ -1633,141 +1633,23 @@ fn missing_override_definition<'db>(
         .find(|definition| !definition.focus_definition_has_override_decorator)
 }
 
-/// Extract function definitions that can carry an `@override` decorator for the class member
-/// currently being checked.
-///
-/// Use functions recovered from the member type when possible, because this preserves overload and
-/// property accessor handling. If decorators replaced some subclass definitions with functions from
-/// another class or file, recover the local function type from the binding definition so overload
-/// metadata is still preserved.
 fn extract_local_override_definitions<'db>(
     context: &InferContext<'db, '_>,
     member: &Member<'db>,
     subclass_scope: ScopeId<'db>,
 ) -> smallvec::SmallVec<[LocalOverrideDefinition; 1]> {
-    let db = context.db();
-    let in_stub = context.in_stub();
-    let module = context.module();
-    let member_functions =
-        extract_member_functions_from_type(db, member.ty, &member.name, subclass_scope);
-    let mut candidates = smallvec::smallvec![];
-    let mut seen_function_types = smallvec::SmallVec::<[FunctionType<'db>; 1]>::new();
-    for definition in end_of_scope_function_definitions(db, subclass_scope, &member.name) {
-        let function = member_functions
-            .iter()
-            .copied()
-            .find(|function| function.contains_definition(db, definition))
-            .or_else(|| infer_definition_types(db, definition).function_type(definition));
-
-        let Some(function) = function else {
-            continue;
-        };
-
-        if seen_function_types.contains(&function) {
-            continue;
-        }
-        candidates.push(LocalOverrideDefinition::from_function(
-            db, function, in_stub, module,
-        ));
-        seen_function_types.push(function);
-    }
-
-    // A property with a setter can keep the getter in the member type even though the setter is the
-    // end-of-scope binding. Preserve any type-derived functions that the syntactic pass did not see.
-    for function in member_functions {
-        if !seen_function_types.contains(&function) {
-            candidates.push(LocalOverrideDefinition::from_function(
-                db, function, in_stub, module,
-            ));
-        }
-    }
-
-    candidates
-}
-
-/// Return reachable function definitions that bind `member_name` at the end of `subclass_scope`.
-fn end_of_scope_function_definitions<'db>(
-    db: &'db dyn Db,
-    subclass_scope: ScopeId<'db>,
-    member_name: &Name,
-) -> smallvec::SmallVec<[Definition<'db>; 1]> {
-    let table = place_table(db, subclass_scope);
-    let Some(symbol_id) = table.symbol_id(member_name) else {
-        return smallvec::smallvec![];
-    };
-
-    let use_def = use_def_map(db, subclass_scope);
-    let predicates = use_def.predicates();
-    let reachability_constraints = use_def.reachability_constraints();
-    use_def
-        .end_of_scope_symbol_bindings(symbol_id)
-        .filter_map(|binding| {
-            let definition = binding.binding.definition()?;
-            let reachability =
-                reachability_constraints.evaluate(db, predicates, binding.reachability_constraint);
-            if reachability.is_always_false() || !definition.kind(db).is_function_def() {
-                return None;
-            }
-
-            Some(definition)
+    member
+        .local_functions(context.db(), subclass_scope)
+        .into_iter()
+        .map(|function| {
+            LocalOverrideDefinition::from_function(
+                context.db(),
+                function,
+                context.in_stub(),
+                context.module(),
+            )
         })
         .collect()
-}
-
-/// Extract functions represented by a member type that belong to the member currently being
-/// checked. Decorators can replace a function with a function from another class or file, so
-/// callers must not use unfiltered functions as diagnostic anchors.
-///
-/// The same is true for property accessors: a setter or deleter can reuse a getter defined by
-/// another class, but override diagnostics should only point at accessors defined by the subclass
-/// member under analysis.
-fn extract_member_functions_from_type<'db>(
-    db: &'db dyn Db,
-    ty: Type<'db>,
-    member_name: &Name,
-    member_scope: ScopeId<'db>,
-) -> smallvec::SmallVec<[FunctionType<'db>; 1]> {
-    let mut functions = smallvec::SmallVec::<[FunctionType<'db>; 1]>::new();
-    let mut types: smallvec::SmallVec<[Type<'db>; 1]> = smallvec::smallvec![ty];
-    let mut index = 0;
-
-    while let Some(ty) = types.get(index).copied() {
-        index += 1;
-        match ty {
-            Type::PropertyInstance(property) => {
-                for accessor in [
-                    property.getter(db),
-                    property.setter(db),
-                    property.deleter(db),
-                ]
-                .into_iter()
-                .flatten()
-                {
-                    functions.extend(extract_underlying_functions(db, accessor));
-                }
-            }
-            Type::Union(union) => {
-                types.extend(union.elements(db).iter().copied());
-            }
-            _ => functions.extend(extract_underlying_functions(db, ty)),
-        }
-    }
-
-    functions
-        .into_iter()
-        .filter(|function| is_local_member_function(db, *function, member_name, member_scope))
-        .collect()
-}
-
-fn is_local_member_function<'db>(
-    db: &'db dyn Db,
-    function: FunctionType<'db>,
-    member_name: &Name,
-    member_scope: ScopeId<'db>,
-) -> bool {
-    function.python_file(db) == member_scope.python_file(db)
-        && function.definition(db).scope(db) == member_scope
-        && function.name(db) == member_name
 }
 
 fn overriding_definition<'db>(
@@ -1780,30 +1662,6 @@ fn overriding_definition<'db>(
         implementation
     } else {
         function.first_overload_or_implementation(db)
-    }
-}
-
-/// Extract callable functions represented by a type.
-/// These may be defined in files other than the one being checked.
-fn extract_underlying_functions<'db>(
-    db: &'db dyn Db,
-    ty: Type<'db>,
-) -> smallvec::SmallVec<[FunctionType<'db>; 1]> {
-    match ty {
-        Type::FunctionLiteral(function) => smallvec::smallvec_inline![function],
-        Type::BoundMethod(method) => smallvec::smallvec_inline![method.function(db)],
-        Type::PropertyInstance(property) => property.getter(db).map_or_else(
-            || smallvec::smallvec![],
-            |getter| extract_underlying_functions(db, getter),
-        ),
-        Type::Union(union) => {
-            let mut functions = smallvec::smallvec![];
-            for member in union.elements(db) {
-                functions.extend(extract_underlying_functions(db, *member));
-            }
-            functions
-        }
-        _ => smallvec::smallvec![],
     }
 }
 

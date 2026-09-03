@@ -1,8 +1,9 @@
 # Unsound assignments
 
 In addition to `invalid-assignment`, we also offer a disabled-by-default stricter rule
-`unsound-assignment`. This rule forbids assigning a value of type `A` to a fully static declared
-type `B` unless `A` is a *subtype* of `B`.
+`unsound-assignment`. This rule forbids assigning a value of type `A` to a variable with a fully
+static declared type `B` unless `A` is a *subtype* of `B`. Assignments to attributes and subscripts
+are outside its scope.
 
 ```toml
 [rules]
@@ -585,6 +586,36 @@ error[unsound-assignment]: Unsound assignment
    | ^^^^^^^^^^^^ Augmented assignment produces a value of type `Any`
 info: `Any` is assignable to `Counter`, but not a subtype of `Counter`
 help: Consider using an `assert` to narrow the type before assigning it
+```
+
+## Assignments to attributes
+
+The rule does not check assignments to attributes, even when the attribute has a fully static
+declared type. This includes annotated assignments and augmented assignments.
+
+```py
+from typing import Any
+
+class Example:
+    def __init__(self, value: Any) -> None:
+        self.value: int = value
+
+    def update(self, value: Any) -> None:
+        self.value = value
+        self.value += value
+```
+
+## Assignments to subscripts
+
+The rule does not check assignments to subscripts, including augmented assignments, even when the
+container's element type is fully static.
+
+```py
+from typing import Any
+
+def update(values: list[int], value: Any) -> None:
+    values[0] = value
+    values[0] += value
 ```
 
 ## Assignments in dataclass bodies

@@ -195,8 +195,9 @@ strict-generic-narrowing = true
 ```
 
 ```py
-from typing import Any
+from typing import Any, final
 
+@final
 class Box[T: str = str]:
     value: T
 
@@ -208,7 +209,7 @@ def box_with_default[T: str = str](value: Box[T] | T) -> Box[T]:
             reveal_type(value)  # revealed: Box[T@box_with_default]
             return value
         case remaining:
-            reveal_type(remaining)  # revealed: T@box_with_default & ~Top[Box[Unknown]]
+            reveal_type(remaining)  # revealed: T@box_with_default
             return Box[T](remaining)
 ```
 
@@ -2618,6 +2619,30 @@ def runtime_protocol_pattern_is_exhaustive(value: RuntimeProtocolImplementer) ->
             return 1
 ```
 
+## Negative narrowing for protocols with gradual members
+
+The fallback case excludes the fully materialized protocol. `IntReader` is a subtype of the fully
+materialized `Reader` protocol, so the fallback case retains only `None`:
+
+```py
+from typing import Any, Protocol, runtime_checkable
+
+@runtime_checkable
+class Reader(Protocol):
+    def read(self) -> Any: ...
+
+class IntReader:
+    def read(self) -> int:
+        return 1
+
+def f(reader: IntReader | None):
+    match reader:
+        case Reader():
+            reveal_type(reader.read())  # revealed: int & Any
+        case _:
+            reveal_type(reader)  # revealed: None
+```
+
 ## Members from the subject type
 
 A keyword pattern reads the attribute from the matched value. The subject type can therefore provide
@@ -3886,8 +3911,8 @@ def test_match_alias_ignores_custom_ne(flag: bool) -> str:
 
 ## Recursive enum aliases in value patterns
 
-An enum value pattern narrows a recursive alias to the matching member while preserving its
-`NewType` tag.
+An enum value pattern uses the non-recursive members of an invalid recursive alias, narrowing to the
+matching member while preserving its `NewType` tag.
 
 ```toml
 [environment]
@@ -3903,7 +3928,7 @@ class Number(IntEnum):
     TWO = 2
 
 BrandedNumber = NewType("BrandedNumber", Number)
-type RecursiveNumber = BrandedNumber | RecursiveNumber
+type RecursiveNumber = BrandedNumber | RecursiveNumber  # error: [cyclic-type-alias-definition]
 
 def match_recursive_branded_enum(value: RecursiveNumber) -> None:
     match value:
@@ -3917,7 +3942,7 @@ A recursive alias that changes its specialization can also contain values outsid
 `True` compares equal to `Number.ONE`, both branches preserve the possible boolean values.
 
 ```py
-type Changing[T] = T | Changing[bool]
+type Changing[T] = T | Changing[bool]  # error: [cyclic-type-alias-definition]
 
 def match_changing_specialization(value: Changing[BrandedNumber]) -> None:
     match value:
