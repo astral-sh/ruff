@@ -49,8 +49,8 @@ pub use types::ide_support::{
 };
 pub use types::{
     DisplaySettings, FixtureBinding, FixtureExposure, FixtureNameSource, ProgramEnvironment,
-    TypeQualifiers, fixture_bindings_for_parameter, fixture_exposures_for_definition,
-    pytest_global_plugin_files,
+    PytestTest, TypeQualifiers, fixture_bindings_for_parameter, fixture_exposures_for_definition,
+    pytest_global_plugin_files, pytest_tests_in_file,
 };
 
 mod db;
