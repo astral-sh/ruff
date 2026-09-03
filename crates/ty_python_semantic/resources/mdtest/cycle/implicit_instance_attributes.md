@@ -18,6 +18,288 @@ reveal_type(p.x)  # revealed: int
 reveal_type(p.y)  # revealed: int
 ```
 
+## Copying tuple elements
+
+Copying each element preserves its type, including when the tuple's type includes the assignments
+made by the copying method. Negative indices select the same elements as their positive equivalents.
+
+```py
+class Pair:
+    def __init__(self, first: int, second: str):
+        self.pair = (first, second)
+
+    def copy(self):
+        self.pair = (self.pair[0], self.pair[-1])
+        reveal_type(self.pair)  # revealed: tuple[int, str]
+```
+
+## Copying tuple slices
+
+A full slice preserves a tuple's length and the type at each position. Reading elements from a
+reversed slice also preserves their individual types when the tuple is reassigned.
+
+```py
+class Sliced:
+    def __init__(self, first: int, second: str):
+        self.items = (first, second)
+
+    def copy(self):
+        self.items = self.items[:]
+        reveal_type(self.items)  # revealed: tuple[int, str]
+
+class Reversed:
+    def __init__(self, first: int, second: str):
+        self.items = (first, second)
+
+    def copy(self):
+        self.items = (self.items[::-1][1], self.items[::-1][0])
+        reveal_type(self.items)  # revealed: tuple[int, str]
+```
+
+## Copying tuple elements through attributes
+
+An attribute can provide another tuple to index. Repeated attribute and subscript accesses preserve
+the element type when that element is used to rebuild the original tuple.
+
+```py
+class Node:
+    @property
+    def pair(self) -> tuple["Node"]:
+        return (self,)
+
+class Holder:
+    def __init__(self, node: Node):
+        self.items = (node,)
+
+    def update(self):
+        self.items = (self.items[0].pair[0].pair[0],)
+        reveal_type(self.items)  # revealed: tuple[Node]
+```
+
+## Copying tuple elements through local variables
+
+A local alias preserves the element types when an attribute is read and then reassigned. Chained
+assignments can provide separate aliases for the same tuple.
+
+```py
+class Local:
+    def __init__(self, first: int, second: str):
+        self.items = (first, second)
+
+    def copy(self):
+        items = self.items
+        first = items[0]
+        second = items[1]
+        self.items = (first, second)
+        reveal_type(self.items)  # revealed: tuple[int, str]
+
+class Chained:
+    def __init__(self, first: int, second: str):
+        self.items = (first, second)
+
+    def copy(self):
+        left = right = self.items
+        self.items = (left[0], right[1])
+        reveal_type(self.items)  # revealed: tuple[int, str]
+```
+
+## Copying tuple elements with union types
+
+Each tuple element can include several types. Local aliases preserve these alternatives when the
+same union is written in a different order for another element.
+
+```py
+from typing_extensions import assert_type
+
+class Alternatives:
+    def __init__(self, first: int | str, second: str | int):
+        self.items = (first, second)
+
+    def copy(self):
+        items = self.items
+        left = items[0]
+        right = items[1]
+        self.items = (left, right)
+        assert_type(self.items, tuple[int | str, str | int])
+```
+
+## Copying tuple elements with an assignment expression
+
+An assignment expression makes the same tuple available to subsequent element reads.
+
+```py
+class Named:
+    def __init__(self, first: int, second: str):
+        self.items = (first, second)
+
+    def copy(self):
+        self.items = ((items := self.items)[0], items[1])
+        reveal_type(self.items)  # revealed: tuple[int, str]
+```
+
+## Copying a dynamic tuple element
+
+An element annotated as `Any` retains that type when copied. Reading it does not supply a more
+specific type.
+
+```py
+from typing import Any
+
+class Dynamic:
+    def __init__(self, value: Any):
+        self.items = (value,)
+
+    def copy(self):
+        self.items = (self.items[0],)
+        reveal_type(self.items)  # revealed: tuple[Any]
+```
+
+## Mutually dependent tuple attributes
+
+Both attributes have initial values. Their updates swap elements from the other attribute,
+preserving the initial element types. The methods can be declared before the initializer.
+
+```py
+class Mutual:
+    def update_left(self):
+        self.left = (self.right[1], self.right[0])
+
+    def update_right(self):
+        self.right = (self.left[1], self.left[0])
+
+    def __init__(self, number: int, text: str):
+        self.left = (number, text)
+        self.right = (text, number)
+
+    def inspect(self):
+        reveal_type(self.left)  # revealed: tuple[int, str]
+        reveal_type(self.right)  # revealed: tuple[str, int]
+```
+
+## Copies around a cycle with distinct initial types
+
+Each attribute starts with a different element type. Repeated updates can move every initial value
+around the cycle, so each attribute admits all of those types.
+
+```py
+from typing_extensions import assert_type
+
+class V0: ...
+class V1: ...
+class V2: ...
+class V3: ...
+class V4: ...
+class V5: ...
+class V6: ...
+class V7: ...
+
+class Chain:
+    def __init__(self):
+        self.a0 = (V0(),)
+        self.a1 = (V1(),)
+        self.a2 = (V2(),)
+        self.a3 = (V3(),)
+        self.a4 = (V4(),)
+        self.a5 = (V5(),)
+        self.a6 = (V6(),)
+        self.a7 = (V7(),)
+
+    def update0(self):
+        self.a0 = (self.a1[0],)
+
+    def update1(self):
+        self.a1 = (self.a2[0],)
+
+    def update2(self):
+        self.a2 = (self.a3[0],)
+
+    def update3(self):
+        self.a3 = (self.a4[0],)
+
+    def update4(self):
+        self.a4 = (self.a5[0],)
+
+    def update5(self):
+        self.a5 = (self.a6[0],)
+
+    def update6(self):
+        self.a6 = (self.a7[0],)
+
+    def update7(self):
+        self.a7 = (self.a0[0],)
+
+    def inspect(self):
+        assert_type(self.a0, tuple[V0 | V1 | V2 | V3 | V4 | V5 | V6 | V7])
+        assert_type(self.a7, tuple[V0 | V1 | V2 | V3 | V4 | V5 | V6 | V7])
+```
+
+## Reading properties while updating a tuple
+
+An update can read properties of the existing elements. Their declared return types determine the
+new element types, even though the update contributes to the type of the tuple being read. A missing
+attribute is still an error.
+
+```py
+class Item:
+    @property
+    def next(self) -> "Item":
+        return self
+
+    @property
+    def value(self) -> int:
+        return 1
+
+class Items:
+    def __init__(self, item: Item, value: int):
+        self.items = (item, value)
+
+    def copy(self):
+        self.items = (self.items[0].next, self.items[0].value)
+        reveal_type(self.items)  # revealed: tuple[Item, int]
+        self.items[0].missing  # error: [unresolved-attribute] "Object of type `Item` has no attribute `missing`"
+        self.items[0].value = "wrong"  # error: [invalid-assignment] "Cannot assign to read-only property `value`"
+```
+
+## Generic tuple attributes
+
+The same generic class can be used with different type arguments. Copying a tuple does not mix these
+specializations, including when the generic class is inherited.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+S = TypeVar("S")
+
+class Box(Generic[T]):
+    def __init__(self, value: T):
+        self.items = (value,)
+
+    def copy(self):
+        self.items = (self.items[0],)
+
+class Derived(Box[tuple[S, S]]): ...
+
+def inspect(first: Derived[int], second: Derived[str]):
+    reveal_type(first.items)  # revealed: tuple[tuple[int, int]]
+    reveal_type(second.items)  # revealed: tuple[tuple[str, str]]
+    reveal_type((first.items[0], second.items[0]))  # revealed: tuple[tuple[int, int], tuple[str, str]]
+```
+
+A tuple element without an initial value remains unresolved. Its sibling still uses the owner's type
+argument, and cannot share the type argument of a different specialization.
+
+```py
+class Partial(Generic[T]):
+    def update(self, item: T):
+        self.items = (self.items[0], item)
+
+def inspect_partial(first: Partial[int], second: Partial[str]):
+    reveal_type(first.items[1])  # revealed: int
+    reveal_type(second.items[1])  # revealed: str
+    reveal_type((first.items[1], second.items[1]))  # revealed: tuple[int, str]
+```
+
 ## Self-referential implicit attributes
 
 ```py

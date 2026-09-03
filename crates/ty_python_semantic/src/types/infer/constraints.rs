@@ -8,6 +8,7 @@
 use std::cell::{Cell, RefCell};
 use std::hash::Hash;
 
+use ruff_python_ast::ExprContext;
 use rustc_hash::{FxHashMap, FxHashSet};
 use salsa::plumbing::AsId;
 use ty_python_core::definition::Definition;
@@ -303,6 +304,10 @@ impl<'db> Equation<'db> {
 /// An operation evaluated from its inferred inputs in the ordinary query body.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) enum InferenceOperation<'db> {
+    Subscript {
+        value: Type<'db>,
+        key: Type<'db>,
+    },
     Promote {
         value: Type<'db>,
         promotion: InferencePromotion,
@@ -372,6 +377,10 @@ impl<'db> InferenceOperation<'db> {
 
     fn map(self, mut f: impl FnMut(Type<'db>) -> Type<'db>) -> Self {
         match self {
+            Self::Subscript { value, key } => Self::Subscript {
+                value: f(value),
+                key: f(key),
+            },
             Self::Promote { value, promotion } => Self::Promote {
                 value: f(value),
                 promotion,
@@ -390,6 +399,7 @@ impl<'db> InferenceOperation<'db> {
         variable: InferenceVariable<'db>,
     ) -> Option<Type<'db>> {
         match self {
+            Self::Subscript { value, key } => value.subscript(db, env, key, ExprContext::Load).ok(),
             Self::Promote { value, promotion } => {
                 // Wait for a value to promote; forwarding an unresolved reference creates mutable
                 // aliases that can repeatedly unfold recursive types.

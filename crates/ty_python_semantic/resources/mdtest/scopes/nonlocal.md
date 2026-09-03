@@ -821,3 +821,24 @@ def _():
             # scope.
             reveal_type(x)  # revealed: Literal["f2"] | int
 ```
+
+## Rebuilding a nonlocal tuple
+
+A nested function can read a tuple's elements into local variables and assign them back to the
+nonlocal tuple. The tuple retains each element's type.
+
+```py
+from typing_extensions import assert_type
+
+def outer(first: int, second: str):
+    items = (first, second)
+
+    def copy():
+        nonlocal items
+        left = items[0]
+        right = items[1]
+        items = (left, right)
+
+    assert_type(items, tuple[int, str])
+    copy()
+```

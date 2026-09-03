@@ -517,6 +517,44 @@ while random():
     reveal_type(x)  # revealed: int
 ```
 
+### Rebuilding tuples through local variables
+
+Reading the elements into separate variables and rebuilding a tuple preserves their types across
+loop iterations. An assignment expression can also hold the tuple being copied.
+
+```py
+from typing_extensions import assert_type
+
+def copy_elements(flag: bool, first: int, second: str):
+    items = (first, second)
+    while flag:
+        a = items[0]
+        b = items[1]
+        items = (a, b)
+    assert_type(items, tuple[int, str])
+
+def copy_with_assignment_expression(flag: bool, first: int, second: str):
+    items = (first, second)
+    while flag:
+        items = ((other := items)[0], other[1])
+    assert_type(items, tuple[int, str])
+```
+
+### Rebuilding a tuple in a comprehension
+
+An assignment expression in a comprehension can update the tuple from the enclosing scope. Copies
+made in either loop preserve the element types.
+
+```py
+from typing_extensions import assert_type
+
+def copy_in_comprehension(flag: bool, first: int, second: str):
+    items = (first, second)
+    while flag:
+        [(items := (items[0], items[1])) for _ in range(2)]
+    assert_type(items, tuple[int, str])
+```
+
 ### Avoid oscillations
 
 We need to avoid oscillating cycles in cases like the following, where the type of one of these loop

@@ -19,6 +19,9 @@ use crate::types::diagnostic::{
 use crate::types::generics::{GenericContext, bind_typevar};
 use crate::types::infer::builder::annotation_expression::PEP613Policy;
 use crate::types::infer::builder::{ArgExpr, ArgumentsIter, MultiInferenceGuard};
+use crate::types::infer::constraints::{
+    InferenceConstraints, InferenceOperation, InferenceOwner, InferenceSlot,
+};
 use crate::types::infer::{InferenceFlags, TypeExpressionFlags};
 use crate::types::special_form::AliasSpec;
 use crate::types::subscript::{LegacyGenericOrigin, SubscriptError, SubscriptErrorKind};
@@ -183,14 +186,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return Ok(self.infer_explicit_type_alias_specialization(subscript, value_ty, false));
         }
 
-        self.infer_subscript_load_impl(value_ty, subscript)
-    }
-
-    fn infer_subscript_load_impl(
-        &mut self,
-        value_ty: Type<'db>,
-        subscript: &ast::ExprSubscript,
-    ) -> Result<Type<'db>, Type<'db>> {
         let env = self.program_environment();
         let db = self.db();
 
@@ -214,12 +209,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if let Place::Defined(DefinedPlace {
                     ty,
                     definedness: Definedness::AlwaysDefined,
+                    symbolic,
                     ..
                 }) = place.place
                 {
                     // Even if we can obtain the subscript type based on the assignments, we still perform default type inference
                     // (to store the expression type and to report errors).
                     let slice_ty = self.infer_expression(slice, TypeContext::default());
+                    if let Some(symbolic) = symbolic {
+                        self.symbolic.insert(
+                            InferenceSlot::Expression(ast::ExprRef::Subscript(subscript).into()),
+                            symbolic,
+                        );
+                    }
                     return self
                         .infer_subscript_expression_types(
                             subscript,
@@ -481,7 +483,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let slice_ty = self.infer_expression(slice, TypeContext::default());
-        self.infer_subscript_expression_types(subscript, value_ty, slice_ty, ExprContext::Load)
+        let ordinary = self
+            .infer_subscript_expression_types(subscript, value_ty, slice_ty, ExprContext::Load)
             .map(|ty| self.narrow_expr_with_applicable_constraints(subscript, ty, &constraint_keys))
             .map_err(|recovery_ty| {
                 self.narrow_expr_with_applicable_constraints(
@@ -489,7 +492,43 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     recovery_ty,
                     &constraint_keys,
                 )
-            })
+            });
+        if let Some(source) = self
+            .symbolic
+            .get(&InferenceSlot::Expression(subscript.value.as_ref().into()))
+            .copied()
+        {
+            let mut constraints = InferenceConstraints::default();
+            let source = constraints.import(db, source);
+            let result = constraints.apply(
+                db,
+                env,
+                InferenceOwner::Region(self.region),
+                InferenceSlot::Expression(ast::ExprRef::Subscript(subscript).into()),
+                InferenceOperation::Subscript {
+                    value: source,
+                    key: slice_ty,
+                },
+            );
+            // Narrow the result, not just its ordinary approximation: later operations use it.
+            let symbolic = self.narrow_symbolic_expr(
+                subscript,
+                constraints.finish(db, result),
+                &constraint_keys,
+            );
+            if let Some(resolved) = symbolic.resolve(db, env) {
+                self.symbolic.insert(
+                    InferenceSlot::Expression(ast::ExprRef::Subscript(subscript).into()),
+                    symbolic,
+                );
+                return ordinary.map(|_| resolved).map_err(|_| resolved);
+            }
+            self.symbolic.insert(
+                InferenceSlot::Expression(ast::ExprRef::Subscript(subscript).into()),
+                symbolic,
+            );
+        }
+        ordinary
     }
 
     pub(super) fn infer_explicit_class_specialization(
