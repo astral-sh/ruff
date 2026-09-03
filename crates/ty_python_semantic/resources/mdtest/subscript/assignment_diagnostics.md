@@ -151,3 +151,46 @@ def _(config: dict[str, int] | dict[str, str]) -> None:
     # error: [invalid-assignment]
     config["retries"] = 3.0
 ```
+
+## Recursive element types
+
+A collection's element type can grow recursively in a loop. Its subscript assignments must still
+respect the key and value types declared by `__setitem__`.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+def recursive_list():
+    values = [0]
+    while True:
+        values = [values]
+        values["bad"] = "bad"  # error: [invalid-assignment]
+
+class Container[T]:
+    def __init__(self, value: T):
+        pass
+
+    def __setitem__(self, key: int, value: str) -> None:
+        pass
+
+def recursive_generic():
+    value = Container(0)
+    while True:
+        value = Container(value)
+        value["bad"] = "valid"  # error: [invalid-assignment]
+        value[0] = 1  # error: [invalid-assignment]
+        value[0] = "valid"
+```
+
+Recursively nested tuples remain immutable.
+
+```py
+def recursive_tuple():
+    value = (0,)
+    while True:
+        value = (value,)
+        value[0] = 0  # error: [invalid-assignment]
+```

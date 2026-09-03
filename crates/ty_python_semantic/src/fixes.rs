@@ -1006,7 +1006,7 @@ mod tests {
                 "#
         ),
          @r#"
-        Added 3 suppressions
+        Added 4 suppressions
 
         ## Fixed source
 
@@ -1049,7 +1049,7 @@ mod tests {
                     ); missing  # ty: ignore[unresolved-reference]
                 "#),
             @r#"
-        Added 3 suppressions
+        Added 4 suppressions
 
         ## Fixed source
 

@@ -46,15 +46,6 @@ impl<'db> Type<'db> {
         matches!(self, Type::Divergent(_) | Type::Projection(_))
     }
 
-    /// Inference-time API: returns whether this type still contains a cycle artifact.
-    pub(crate) fn contains_cycle_artifact(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-    ) -> bool {
-        self.contains_nested_cycle_artifact(db, env, true)
-    }
-
     fn has_top_level_cycle_artifact(self, db: &'db dyn Db) -> bool {
         match self {
             Type::Divergent(_) | Type::Projection(_) => true,

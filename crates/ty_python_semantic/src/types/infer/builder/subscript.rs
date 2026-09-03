@@ -1929,15 +1929,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             _ => {
-                if object_ty.contains_cycle_artifact(db, self.program_environment()) {
-                    // A recursive receiver can feed a growing type context back into the
-                    // subscript and RHS expressions. Infer them once without that context;
-                    // cycle recovery will widen the receiver if the shape keeps growing.
-                    infer_slice_ty(self, TypeContext::default());
-                    infer_rhs_value(self, TypeContext::default());
-                    return true;
-                }
-
                 let ast_arguments = [
                     ArgOrKeyword::Arg(&target.slice),
                     ArgOrKeyword::Arg(rhs_value_node),
