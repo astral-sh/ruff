@@ -1483,7 +1483,10 @@ impl<'db, 'name> NameResolver<'db, 'name> {
     /// packages as parents, but its final module must come from a stub file.
     fn resolve_typing(&self, stub_packages: &StubPackageIndex) -> Option<ResolvedNames<'db>> {
         if self.name.components().nth(1).is_none() {
-            let candidates = self.discover_roots(
+            let candidates = discover_roots(
+                &self.context,
+                self.name.first_component(),
+                self.is_non_shadowable,
                 search_paths(
                     self.context.db,
                     self.context.resolver_environment,
@@ -1498,7 +1501,10 @@ impl<'db, 'name> NameResolver<'db, 'name> {
         // be shadowed before the resolver reaches the requested stub. Reuse those roots for the
         // normal fallback so that each extra path is probed only once.
         let (overlay_stub_packages, remaining_stub_packages) = stub_packages.split_overlay();
-        let mut candidates = self.discover_roots(
+        let mut candidates = discover_roots(
+            &self.context,
+            self.name.first_component(),
+            self.is_non_shadowable,
             search_paths(
                 self.context.db,
                 self.context.resolver_environment,
@@ -1513,7 +1519,10 @@ impl<'db, 'name> NameResolver<'db, 'name> {
             return Some(resolved);
         }
 
-        let remaining_candidates = self.discover_roots(
+        let remaining_candidates = discover_roots(
+            &self.context,
+            self.name.first_component(),
+            self.is_non_shadowable,
             search_paths(
                 self.context.db,
                 self.context.resolver_environment,
@@ -1535,7 +1544,13 @@ impl<'db, 'name> NameResolver<'db, 'name> {
     fn resolve_desperate_typing(&self, search_paths: &[SearchPath]) -> Option<ResolvedNames<'db>> {
         let stub_packages =
             StubPackageIndex::from_search_paths(self.context.db, search_paths.iter());
-        let candidates = self.discover_roots(search_paths.iter(), stub_packages.all());
+        let candidates = discover_roots(
+            &self.context,
+            self.name.first_component(),
+            self.is_non_shadowable,
+            search_paths.iter(),
+            stub_packages.all(),
+        );
         self.resolve_remaining(candidates, ComponentFileFilter::ByMode)
     }
 
@@ -1547,77 +1562,14 @@ impl<'db, 'name> NameResolver<'db, 'name> {
         &self,
         search_paths: impl Iterator<Item = &'a SearchPath>,
     ) -> Option<ResolvedNames<'db>> {
-        let candidates = self.discover_roots(search_paths, StubPackagePaths::default());
+        let candidates = discover_roots(
+            &self.context,
+            self.name.first_component(),
+            self.is_non_shadowable,
+            search_paths,
+            StubPackagePaths::default(),
+        );
         self.resolve_remaining(candidates, ComponentFileFilter::ByMode)
-    }
-
-    fn discover_roots<'a>(
-        &self,
-        search_paths: impl Iterator<Item = &'a SearchPath>,
-        stub_paths: StubPackagePaths<'_>,
-    ) -> ResolvedNames<'db> {
-        let root_component = self.name.first_component();
-        let mut cur_candidates = Vec::new();
-        let stub_name = (!stub_paths.is_empty() && !self.is_non_shadowable)
-            .then(|| format!("{root_component}-stubs"));
-        let mut pending_stub_paths = Vec::new();
-
-        if let Some(stub_name) = &stub_name {
-            cur_candidates.extend(stub_paths.before_stdlib.iter().filter_map(|search_path| {
-                resolve_stub_package_in_search_path(&self.context, search_path, stub_name)
-            }));
-            // Defer file probes after stdlib until we know that stdlib does not win.
-            pending_stub_paths.extend(stub_paths.after_stdlib.iter().filter(|search_path| {
-                candidate_may_exist(
-                    &self.context,
-                    &ModuleResolutionCandidate::stub(search_path),
-                    stub_name,
-                )
-            }));
-        }
-
-        for search_path in search_paths {
-            // When a builtin module is imported, standard module resolution is bypassed:
-            // the module name always resolves to the stdlib module,
-            // even if there's a module of the same name in the first-party root
-            // (which would normally result in the stdlib module being overridden).
-            // TODO: offer a diagnostic if there is a first-party module of the same name
-            if self.is_non_shadowable && !search_path.is_standard_library() {
-                continue;
-            }
-
-            let is_stdlib = search_path.is_standard_library();
-            // A terminal candidate can stop the search unless a matching post-stdlib stub package
-            // could still override it. A terminal stdlib candidate always stops the search.
-            let can_stop = is_stdlib || pending_stub_paths.is_empty();
-            let mut candidate = ModuleResolutionCandidate::root(search_path);
-            let resolved = resolve_component(
-                &self.context,
-                &mut candidate,
-                root_component,
-                ComponentFileFilter::ByMode,
-            )
-            .is_ok();
-            let terminal = candidate.missing_submodule_is_terminal();
-            if resolved {
-                cur_candidates.push(candidate);
-            }
-            // A terminal candidate shadows all later search paths. Earlier candidates remain in
-            // play because they already shadow this candidate.
-            if terminal && can_stop {
-                break;
-            }
-
-            // Reaching this point for stdlib means that it did not provide a terminal candidate.
-            // The deferred post-stdlib stub packages are therefore eligible, so resolve them now.
-            if is_stdlib && let Some(stub_name) = &stub_name {
-                cur_candidates.extend(pending_stub_paths.drain(..).filter_map(|search_path| {
-                    resolve_stub_package_in_search_path(&self.context, search_path, stub_name)
-                }));
-            }
-        }
-
-        cur_candidates
     }
 
     fn resolve_remaining(
@@ -1625,50 +1577,125 @@ impl<'db, 'name> NameResolver<'db, 'name> {
         mut cur_candidates: ResolvedNames<'db>,
         final_filter: ComponentFileFilter,
     ) -> Option<ResolvedNames<'db>> {
-        if cur_candidates.is_empty() {
-            return None;
-        }
-
         let mut components = self.name.components().skip(1).peekable();
+        cur_candidates =
+            normalize_candidates(self.context.db, cur_candidates, components.peek().is_some());
 
-        loop {
-            // Keep a partial stub package's namespace while resolving the next part of the module
-            // name. Once the complete name is resolved, a concrete package or module shadows that
-            // namespace.
+        while let Some(component) = components.next() {
+            if cur_candidates.is_empty() {
+                return None;
+            }
             let has_remaining_components = components.peek().is_some();
-            cur_candidates =
-                normalize_candidates(self.context.db, cur_candidates, has_remaining_components);
-
-            let Some(component) = components.next() else {
-                return Some(cur_candidates);
-            };
-            let file_filter = if components.peek().is_some() {
+            let file_filter = if has_remaining_components {
                 ComponentFileFilter::ByMode
             } else {
                 final_filter
             };
+            cur_candidates = advance_candidates(
+                &self.context,
+                cur_candidates,
+                component,
+                file_filter,
+                has_remaining_components,
+            );
+        }
 
-            let mut remaining_are_shadowed = false;
-            cur_candidates.retain_mut(|candidate| {
-                if remaining_are_shadowed {
-                    return false;
-                }
+        (!cur_candidates.is_empty()).then_some(cur_candidates)
+    }
+}
 
-                let resolved =
-                    resolve_component(&self.context, candidate, component, file_filter).is_ok();
+/// Finds candidates for a top-level name across the supplied search paths and stub packages.
+fn discover_roots<'a, 'db>(
+    context: &ResolverContext<'db>,
+    root_component: &str,
+    is_non_shadowable: bool,
+    search_paths: impl Iterator<Item = &'a SearchPath>,
+    stub_paths: StubPackagePaths<'_>,
+) -> ResolvedNames<'db> {
+    let mut cur_candidates = Vec::new();
+    let stub_name =
+        (!stub_paths.is_empty() && !is_non_shadowable).then(|| format!("{root_component}-stubs"));
+    let mut pending_stub_paths = Vec::new();
 
-                // A terminal candidate shadows every lower-priority candidate, even if resolving
-                // this component fails. Higher-priority candidates remain in play.
-                remaining_are_shadowed = candidate.missing_submodule_is_terminal();
+    if let Some(stub_name) = &stub_name {
+        cur_candidates.extend(stub_paths.before_stdlib.iter().filter_map(|search_path| {
+            resolve_stub_package_in_search_path(context, search_path, stub_name)
+        }));
+        // Defer file probes after stdlib until we know that stdlib does not win.
+        pending_stub_paths.extend(stub_paths.after_stdlib.iter().filter(|search_path| {
+            candidate_may_exist(
+                context,
+                &ModuleResolutionCandidate::stub(search_path),
+                stub_name,
+            )
+        }));
+    }
 
-                resolved
-            });
+    for search_path in search_paths {
+        // When a builtin module is imported, standard module resolution is bypassed:
+        // the module name always resolves to the stdlib module,
+        // even if there's a module of the same name in the first-party root
+        // (which would normally result in the stdlib module being overridden).
+        // TODO: offer a diagnostic if there is a first-party module of the same name
+        if is_non_shadowable && !search_path.is_standard_library() {
+            continue;
+        }
 
-            if cur_candidates.is_empty() {
-                return None;
-            }
+        let is_stdlib = search_path.is_standard_library();
+        // A terminal candidate can stop the search unless a matching post-stdlib stub package
+        // could still override it. A terminal stdlib candidate always stops the search.
+        let can_stop = is_stdlib || pending_stub_paths.is_empty();
+        let mut candidate = ModuleResolutionCandidate::root(search_path);
+        let resolved = resolve_component(
+            context,
+            &mut candidate,
+            root_component,
+            ComponentFileFilter::ByMode,
+        )
+        .is_ok();
+        let terminal = candidate.missing_submodule_is_terminal();
+        if resolved {
+            cur_candidates.push(candidate);
+        }
+        // A terminal candidate shadows all later search paths. Earlier candidates remain in
+        // play because they already shadow this candidate.
+        if terminal && can_stop {
+            break;
+        }
+
+        // Reaching this point for stdlib means that it did not provide a terminal candidate.
+        // The deferred post-stdlib stub packages are therefore eligible, so resolve them now.
+        if is_stdlib && let Some(stub_name) = &stub_name {
+            cur_candidates.extend(pending_stub_paths.drain(..).filter_map(|search_path| {
+                resolve_stub_package_in_search_path(context, search_path, stub_name)
+            }));
         }
     }
+
+    cur_candidates
+}
+
+/// Advances normalized prefix candidates, preserving terminal shadowing even on a failed probe.
+///
+/// With `for_descendants`, retain partial stub-package namespaces for the next component.
+/// At the final component, concrete packages and modules shadow those namespaces.
+fn advance_candidates<'db>(
+    context: &ResolverContext<'db>,
+    mut candidates: ResolvedNames<'db>,
+    component: &str,
+    filter: ComponentFileFilter,
+    for_descendants: bool,
+) -> ResolvedNames<'db> {
+    let mut remaining_are_shadowed = false;
+    candidates.retain_mut(|candidate| {
+        if remaining_are_shadowed {
+            return false;
+        }
+        let resolved = resolve_component(context, candidate, component, filter).is_ok();
+        remaining_are_shadowed = candidate.missing_submodule_is_terminal();
+        resolved
+    });
+    normalize_candidates(context.db, candidates, for_descendants)
 }
 
 fn resolve_stub_package_in_search_path<'db>(
