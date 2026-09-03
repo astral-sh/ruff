@@ -1799,8 +1799,8 @@ impl<'db> BoundTypeVarInstance<'db> {
         storage: &mut ConstraintSetStorage<'db>,
         typevar: Self,
     ) -> bool {
-        wobble_index(storage.typevar_id(db, self).index())
-            < wobble_index(storage.typevar_id(db, typevar).index())
+        wobble_index(storage.typevar_id(db, self).index() as u64)
+            < wobble_index(storage.typevar_id(db, typevar).index() as u64)
     }
 }
 
@@ -1813,12 +1813,12 @@ impl<'db> BoundTypeVarInstance<'db> {
 /// Our results _shouldn't_ depend on the BDD variable ordering that we choose. You can use the
 /// `TY_CONSTRAINT_SET_ORDER` environment variable to artificially choose different permutations of
 /// the "natural" variable ordering, to ensure that results are consistent.
-fn wobble_index(index: usize) -> usize {
+fn wobble_index(index: u64) -> u64 {
     #[derive(Clone, Copy)]
     enum Order {
         Normal,
         Reverse,
-        Xor(usize),
+        Xor(u64),
     }
 
     static ORDER: LazyLock<Order> = LazyLock::new(|| {
@@ -1830,7 +1830,7 @@ fn wobble_index(index: usize) -> usize {
         }
         value
             .to_str()
-            .and_then(|value| value.parse::<usize>().ok())
+            .and_then(|value| value.parse::<u64>().ok())
             .map_or(Order::Normal, Order::Xor)
     });
 
@@ -2725,7 +2725,7 @@ impl ConstraintId {
     /// empirically that we get smaller BDDs with an ordering that is more aligned with source
     /// order.
     fn ordering(self) -> impl Ord {
-        std::cmp::Reverse(wobble_index(self.index()))
+        std::cmp::Reverse(wobble_index(self.index() as u64))
     }
 
     /// Returns whether this constraint implies another — i.e., whether every type that
