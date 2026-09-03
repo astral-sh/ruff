@@ -3298,6 +3298,19 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         cycle: &salsa::Cycle,
     ) -> Self {
+        // Initial union members can still be placeholders for other aliases. For
+        // `A = tuple["B"]` and `B = Union["A", "B", int]`, removing both markers on
+        // the first pass would start `A` at `tuple[int]`, which then grows on every pass.
+        // Let dependent aliases embed the markers in their structure before reducing
+        // these unions. Later iterations remove direct self-references normally.
+        if cycle.iteration() == 0
+            && matches!(
+                self,
+                Type::Union(_) | Type::KnownInstance(KnownInstanceType::UnionType(_))
+            )
+        {
+            return self;
+        }
         cycle.head_ids().fold(self, |ty, id| {
             ty.recursive_type_normalized_impl(db, env, Type::divergent(id), false)
                 .unwrap_or(Type::divergent(id))
