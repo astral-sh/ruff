@@ -15,6 +15,7 @@ ruff_notebook
 ruff_options_metadata
 ruff_python_ast
 ruff_python_codegen
+ruff_python_edits
 ruff_python_formatter
 ruff_python_importer
 ruff_python_index
