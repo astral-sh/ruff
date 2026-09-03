@@ -86,6 +86,11 @@ impl ModulePath {
         self.relative_path.pop()
     }
 
+    /// The last path component without its extension, such as `tools` or `__init__`.
+    pub(super) fn file_stem(&self) -> Option<&str> {
+        self.relative_path.file_stem()
+    }
+
     pub(super) fn search_path(&self) -> &SearchPath {
         &self.search_path
     }
@@ -226,6 +231,19 @@ impl ModulePath {
         }
     }
 
+    /// Returns the path within the vendored filesystem, if this is a vendored module.
+    pub(crate) fn to_vendored_path(&self) -> Option<VendoredPathBuf> {
+        Some(
+            self.search_path
+                .as_vendored_path()?
+                .join(&self.relative_path),
+        )
+    }
+
+    /// Converts a candidate path to a file, checking its status and typeshed availability.
+    ///
+    /// For system paths, callers must first check the containing directory's listing.
+    /// This avoids interning absent paths without repeating that lookup here.
     #[must_use]
     pub(super) fn to_file(&self, resolver: &ResolverContext) -> Option<File> {
         let db = resolver.db;
@@ -238,17 +256,17 @@ impl ModulePath {
             | SearchPathInner::FirstParty(search_path)
             | SearchPathInner::SitePackages(search_path)
             | SearchPathInner::Editable(search_path) => {
-                system_path_to_file_if_listed(db, &search_path.join(relative_path))
+                system_path_to_file(db, search_path.join(relative_path)).ok()
             }
             SearchPathInner::StandardLibraryReal(search_path) => {
-                system_path_to_file_if_listed(db, &search_path.join(relative_path))
+                system_path_to_file(db, search_path.join(relative_path)).ok()
             }
             SearchPathInner::StandardLibraryCustom(stdlib_root) => {
                 match query_stdlib_version(relative_path, resolver) {
                     TypeshedVersionsQueryResult::DoesNotExist => None,
                     TypeshedVersionsQueryResult::Exists
                     | TypeshedVersionsQueryResult::MaybeExists => {
-                        system_path_to_file_if_listed(db, &stdlib_root.join(relative_path))
+                        system_path_to_file(db, stdlib_root.join(relative_path)).ok()
                     }
                 }
             }
@@ -393,19 +411,6 @@ fn directory_contains_file(db: &dyn Db, directory: &SystemPath, names: &[&str]) 
     names
         .iter()
         .any(|name| listing.entry_is_file(db, directory, name))
-}
-
-fn system_path_to_file_if_listed(db: &dyn Db, path: &SystemPath) -> Option<File> {
-    let Some((parent, name)) = path.parent().zip(path.file_name()) else {
-        return system_path_to_file(db, path).ok();
-    };
-
-    let listing = directory_listing(db, parent).ok()?;
-    if listing.entry_is_file(db, parent, name) {
-        system_path_to_file(db, path).ok()
-    } else {
-        None
-    }
 }
 
 fn system_path_is_directory(db: &dyn Db, path: &SystemPath) -> bool {
