@@ -521,3 +521,91 @@ reveal_mro(GenericBase["Foo", "Bar"])
 class Foo: ...
 class Bar: ...
 ```
+
+## Known class instances with shadowed standard-library modules
+
+String members retain their types when local `typing.py` and `_collections_abc.py` modules contain
+unresolved names. Inferring the bases of `str` reaches these modules, and resolving their
+metaclasses requests `str` again for the class namespace. The consumer is checked first so that the
+local modules have not already been inferred.
+
+This is a regression test for <https://github.com/astral-sh/ty/issues/4456>.
+
+`m.py`:
+
+```py
+reveal_type("a".encode())  # revealed: bytes
+```
+
+`typing.py`:
+
+```py
+import copyreg
+
+# error: [unresolved-reference]
+# error: [unresolved-reference]
+copyreg.pickle(ParamSpecKwargs, _pickle_pskwargs)
+# error: [unresolved-reference]
+# error: [unresolved-reference]
+Sequence = _alias(collections.abc.Sequence, 1)
+```
+
+`_collections_abc.py`:
+
+```py
+class Container(metaclass=ABCMeta): ...  # error: [unresolved-reference]
+
+# error: [unresolved-reference]
+# error: [unresolved-reference]
+class Collection(Sized, Iterable, Container): ...
+class Callable(metaclass=ABCMeta): ...  # error: [unresolved-reference]
+
+# error: [inconsistent-mro]
+# error: [unresolved-reference]
+class Sequence(Reversible, Collection): ...
+class MutableSequence(Sequence): ...
+
+MutableSequence.register(bytearray)
+```
+
+## Known class instances after checking shadowing modules
+
+String members retain their types when the local modules are checked first, as they do when the
+consumer is checked first.
+
+`_collections_abc.py`:
+
+```py
+class Container(metaclass=ABCMeta): ...  # error: [unresolved-reference]
+
+# error: [unresolved-reference]
+# error: [unresolved-reference]
+class Collection(Sized, Iterable, Container): ...
+class Callable(metaclass=ABCMeta): ...  # error: [unresolved-reference]
+
+# error: [inconsistent-mro]
+# error: [unresolved-reference]
+class Sequence(Reversible, Collection): ...
+class MutableSequence(Sequence): ...
+
+MutableSequence.register(bytearray)
+```
+
+`typing.py`:
+
+```py
+import copyreg
+
+# error: [unresolved-reference]
+# error: [unresolved-reference]
+copyreg.pickle(ParamSpecKwargs, _pickle_pskwargs)
+# error: [unresolved-reference]
+# error: [unresolved-reference]
+Sequence = _alias(collections.abc.Sequence, 1)
+```
+
+`m.py`:
+
+```py
+reveal_type("a".encode())  # revealed: bytes
+```
