@@ -35,6 +35,10 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// )
 /// ```
 ///
+/// ## Fix safety
+///
+/// The fix is marked as unsafe when it would create a docstring.
+///
 /// ## Options
 ///
 /// Setting `lint.flake8-implicit-str-concat.allow-multiline = false` will disable this rule because
@@ -180,8 +184,6 @@ fn generate_fix(checker: &Checker, expr_bin_op: &ast::ExprBinOp) -> Option<Fix> 
     };
 
     let applicability = if fix_creates_docstring(checker, expr_bin_op) {
-        // The fix would turn the enclosing expression statement into a
-        // docstring, which changes the program's behavior. See #27979.
         Applicability::Unsafe
     } else {
         Applicability::Safe

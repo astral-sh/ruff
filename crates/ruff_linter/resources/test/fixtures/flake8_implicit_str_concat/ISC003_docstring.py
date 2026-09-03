@@ -1,8 +1,4 @@
-# ISC003 fix-safety tests.
-# The first statement of a module, function, or class body is a docstring
-# position: there, the fix is unsafe, as it changes the program's behavior
-# (e.g., by setting `__doc__`).
-# See https://github.com/astral-sh/ruff/issues/27979
+# Regression tests for https://github.com/astral-sh/ruff/issues/27979.
 
 # Module docstring position: fix is unsafe.
 (
