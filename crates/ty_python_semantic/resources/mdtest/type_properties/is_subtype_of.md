@@ -1096,6 +1096,7 @@ overrides:
 
 ```py
 class InvalidOverride(Bounded[str]):
+    # TODO: this should be an invalid-override error (https://github.com/astral-sh/ty/issues/2156)
     read = None
 
 static_assert(is_subtype_of(InvalidOverride, Bounded[str]))
