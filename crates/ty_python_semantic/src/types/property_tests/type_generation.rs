@@ -1,3 +1,4 @@
+use crate::types::cycle_variable::CycleQuery;
 use std::debug_assert_matches;
 
 use crate::Db;
@@ -366,7 +367,11 @@ fn divergent<'db>(
     id_bits: u64,
     materialization: Option<MaterializationKind>,
 ) -> Type<'db> {
-    let divergent = Type::divergent(salsa::plumbing::Id::from_bits(id_bits));
+    let divergent = Type::divergent(
+        db,
+        salsa::plumbing::Id::from_bits(id_bits),
+        CycleQuery::Test,
+    );
 
     match materialization {
         Some(materialization_kind) => {

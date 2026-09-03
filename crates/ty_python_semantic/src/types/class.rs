@@ -2895,7 +2895,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
 
             for definition in bindings.definitions(db) {
                 let inferred = infer_definition_types(db, *definition)
-                    .binding_place(*definition)
+                    .binding_place(db, *definition)
                     .with_qualifiers(TypeQualifiers::empty())
                     .apply_owner_specialization(db, specialization)
                     .place;

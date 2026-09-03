@@ -2,6 +2,7 @@ use super::*;
 use crate::db::tests::{TestDbBuilder, setup_db};
 use crate::place::{global_symbol, typing_extensions_symbol, typing_symbol};
 use crate::types::call::bind::CallableDescription;
+use crate::types::cycle_variable::CycleQuery;
 use crate::types::type_alias::PEP695TypeAliasType;
 use crate::{Db, ProgramEnvironment};
 use ruff_db::files::system_path_to_file;
@@ -188,7 +189,7 @@ fn oscillating_generic_alias_cycle_recover<'db>(
 
 #[salsa::tracked(
     returns(copy),
-    cycle_initial=|_, id, _| Type::divergent(id),
+    cycle_initial=|db, id, _| Type::divergent(db, id, CycleQuery::Test),
     cycle_fn=oscillating_generic_alias_cycle_recover,
 )]
 fn oscillating_generic_alias<'db>(db: &'db dyn Db, program: Program<'db>) -> Type<'db> {
@@ -278,7 +279,8 @@ fn divergent_type() {
     let db = setup_db();
     let db = &db;
     let env = db.program_environment();
-    let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
+    let head_id = salsa::plumbing::Id::from_bits(1);
+    let div = Type::divergent(db, head_id, CycleQuery::Test);
     assert!(div.is_dynamic());
     assert!(div.has_dynamic(db, &env));
     let visitor = ApplyTypeMappingVisitor::new(&env);
@@ -556,7 +558,8 @@ fn unrestricted_tuple_materialization_absorbs_divergent_approximations() {
     let db = setup_db();
     let db = &db;
     let env = db.program_environment();
-    let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
+    let head_id = salsa::plumbing::Id::from_bits(1);
+    let div = Type::divergent(db, head_id, CycleQuery::Test);
     let list_of = |tuple| KnownClass::List.to_specialized_instance(db, &env, &[tuple]);
     let approximation = |element| list_of(Type::heterogeneous_tuple(db, &env, [element]));
     let top = list_of(Type::homogeneous_tuple(db, &env, Type::any())).top_materialization(db, &env);

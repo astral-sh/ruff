@@ -26,6 +26,7 @@ use ty_module_resolver::{
 
 pub(crate) use self::callable::UpcastPolicy;
 use self::class::ClassInstanceFlags;
+use self::cycle_variable::{CycleOrigin, CycleOutput, CycleQuery, CycleVariable};
 pub use self::cyclic::CycleDetector;
 pub(crate) use self::cyclic::TypeTransformer;
 use self::cyclic::{ActiveRecursionDetector, TypeIdentity};
@@ -138,6 +139,7 @@ mod class_base;
 mod constraints;
 mod context;
 mod context_manager;
+pub(crate) mod cycle_variable;
 mod cyclic;
 mod dedicated;
 mod diagnostic;
@@ -235,7 +237,7 @@ pub fn check_types(db: &dyn Db, file: ProgramFile<'_>) -> Vec<Diagnostic> {
 /// Infer the type of a binding.
 pub(crate) fn binding_type<'db>(db: &'db dyn Db, definition: Definition<'db>) -> Type<'db> {
     let inference = infer_definition_types(db, definition);
-    inference.binding_type(definition)
+    inference.binding_type(db, definition)
 }
 
 /// Returns whether a definition may represent a value that exists at runtime.
@@ -273,7 +275,7 @@ pub(crate) fn may_exist_at_runtime<'db>(db: &'db dyn Db, definition: Definition<
     }
 
     let inference = infer_definition_types(db, definition);
-    let ty = inference.binding_type(definition);
+    let ty = inference.binding_type(db, definition);
 
     // A class or function decorated with `@type_check_only` never exists at runtime.
     if ty.is_type_check_only(db)
@@ -346,7 +348,7 @@ pub(crate) fn inferred_declaration<'db>(
     definition: Definition<'db>,
 ) -> InferredDeclaration<'db> {
     let inference = infer_definition_types(db, definition);
-    inference.inferred_declaration(definition)
+    inference.inferred_declaration(db, definition)
 }
 
 /// Infer the type of a (possibly deferred) sub-expression of a [`Definition`].
@@ -367,20 +369,20 @@ fn definition_expression_type<'db>(
     if scope == definition.scope(db) {
         // expression is in the definition scope
         let inference = infer_definition_types(db, definition);
-        if let Some(ty) = inference.try_expression_type(expression) {
+        if let Some(ty) = inference.try_expression_type(db, expression) {
             ty
         } else if let Some(ty) =
-            infer_deferred_types(db, definition).try_expression_type(expression)
+            infer_deferred_types(db, definition).try_expression_type(db, expression)
         {
             ty
         } else if matches!(definition.kind(db), DefinitionKind::Function(_)) {
-            infer_function_default_types(db, definition).expression_type(expression)
+            infer_function_default_types(db, definition).expression_type(db, expression)
         } else {
             Type::unknown()
         }
     } else {
         // expression is in a type-params sub-scope
-        infer_complete_scope_types(db, scope).expression_type(expression)
+        infer_complete_scope_types(db, scope).expression_type(db, expression)
     }
 }
 
@@ -400,14 +402,14 @@ fn definition_expression_annotation<'db>(
     if scope == definition.scope(db) {
         let inference = infer_deferred_types(db, definition);
         TypeAndQualifiers::new(
-            inference.expression_type(expression),
+            inference.expression_type(db, expression),
             TypeOrigin::Declared,
             inference.qualifiers(expression),
         )
     } else {
         let inference = infer_complete_scope_types(db, scope);
         TypeAndQualifiers::new(
-            inference.expression_type(expression),
+            inference.expression_type(db, expression),
             TypeOrigin::Declared,
             inference.qualifiers(expression),
         )
@@ -1781,7 +1783,7 @@ pub enum Type<'db> {
     /// The dynamic type: a statically unknown set of values
     Dynamic(DynamicType<'db>),
     /// A cycle marker used during recursive type inference.
-    Divergent(DivergentType),
+    Divergent(DivergentType<'db>),
     /// The empty set of values
     Never,
     /// A specific function object
@@ -1968,7 +1970,7 @@ impl<T> InstanceProjection<T> {
 /// An ordered pair of types and their Python version shared by type-relation and set-theoretic
 /// queries.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-struct TypePair<'db> {
+pub(crate) struct TypePair<'db> {
     #[returns(copy)]
     program: Program<'db>,
     #[returns(copy)]
@@ -2066,28 +2068,92 @@ impl<'db> Type<'db> {
         Self::Dynamic(DynamicType::Unknown)
     }
 
-    pub(crate) fn divergent(id: salsa::Id) -> Self {
-        Self::Divergent(DivergentType::new(id))
+    /// The initial value supplied by a particular query during cycle recovery.
+    pub(crate) fn divergent(db: &'db dyn Db, id: salsa::Id, query: CycleQuery<'db>) -> Self {
+        Self::Divergent(DivergentType::new(CycleVariable::new(
+            db,
+            id,
+            CycleOrigin::Query {
+                query,
+                output: CycleOutput::Type,
+            },
+        )))
+    }
+
+    /// Selects an output of a query's initial cycle value when that output is read.
+    fn with_cycle_output(self, db: &'db dyn Db, output: CycleOutput<'db>) -> Self {
+        if let Self::Divergent(divergent) = self
+            && let CycleOrigin::Query { query, .. } = divergent.variable.origin(db)
+        {
+            return Self::Divergent(DivergentType {
+                variable: CycleVariable::new(
+                    db,
+                    divergent.variable.head_id(db),
+                    CycleOrigin::Query { query, output },
+                ),
+                ..divergent
+            });
+        }
+        self
+    }
+
+    /// Preserve cycle dependence when no particular output of the source query is known.
+    fn cycle_fallback(self, db: &'db dyn Db) -> Self {
+        match self {
+            Self::Divergent(divergent) => Self::Divergent(DivergentType {
+                variable: CycleVariable::new(
+                    db,
+                    divergent.variable.head_id(db),
+                    CycleOrigin::RecursiveType,
+                ),
+                ..divergent
+            }),
+            Self::Union(union) => {
+                let elements: Box<[_]> = union
+                    .elements(db)
+                    .iter()
+                    .map(|ty| ty.cycle_fallback(db))
+                    .collect::<FxOrderSet<_>>()
+                    .into_iter()
+                    .collect();
+                match &*elements {
+                    [] => Self::Never,
+                    [element] => *element,
+                    _ => Self::Union(UnionType::new(db, elements, union.recursively_defined(db))),
+                }
+            }
+            _ => self,
+        }
     }
 
     const fn is_divergent(&self) -> bool {
         matches!(self, Type::Divergent(_))
     }
 
-    const fn as_divergent(self) -> Option<DivergentType> {
+    const fn as_divergent(self) -> Option<DivergentType<'db>> {
         match self {
             Type::Divergent(divergent) => Some(divergent),
             _ => None,
         }
     }
 
-    /// Returns `true` if both `self` and `other` are `Divergent` types originating from the
-    /// same cycle (i.e., sharing the same query ID), regardless of materialization state.
-    fn same_divergent_marker(self, other: Type<'db>) -> bool {
+    /// Tests a root against Salsa's cycle head, independently of its output and materialization.
+    fn same_divergent_marker(self, db: &'db dyn Db, other: Type<'db>) -> bool {
         match (self, other) {
-            (Type::Divergent(left), Type::Divergent(right)) => left.same_marker(right),
+            (Type::Divergent(left), Type::Divergent(right)) => {
+                left.variable.head_id(db) == right.variable.head_id(db)
+            }
             _ => false,
         }
+    }
+
+    /// Whether this is an unmaterialized initial query output for a cycle head.
+    pub(crate) fn is_cycle_initial(self, db: &'db dyn Db, head_id: salsa::Id) -> bool {
+        self.as_divergent().is_some_and(|divergent| {
+            divergent.materialization.is_none()
+                && divergent.variable.head_id(db) == head_id
+                && matches!(divergent.variable.origin(db), CycleOrigin::Query { .. })
+        })
     }
 
     /// If `self` is a materialized `Divergent` type, returns the concrete type it should
@@ -2506,8 +2572,10 @@ impl<'db> Type<'db> {
 
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, id, _, _, materialization_kind| {
-            Type::Divergent(DivergentType::new(id).materialized(materialization_kind))
+        cycle_initial=|db, id, ty, program, materialization_kind| {
+            Type::Divergent(DivergentType::new(CycleVariable::new(
+                db, id, CycleOrigin::Query { query: CycleQuery::Materialization(ty, program, materialization_kind), output: CycleOutput::Type },
+            )).materialized(materialization_kind))
         },
         cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _, program, _| {
             value.cycle_normalized_impl(db, &ProgramEnvironment::from_program(program), *previous, cycle)
@@ -3300,8 +3368,11 @@ impl<'db> Type<'db> {
         cycle: &salsa::Cycle,
     ) -> Self {
         cycle.head_ids().fold(self, |ty, id| {
-            ty.recursive_type_normalized_impl(db, env, Type::divergent(id), false)
-                .unwrap_or(Type::divergent(id))
+            // A cut recursive component no longer denotes a particular query output.
+            // Retaining output identities here would let mutually recursive outputs oscillate.
+            let div = Type::Divergent(DivergentType::recursive(db, id));
+            ty.recursive_type_normalized_impl(db, env, div, false)
+                .unwrap_or(div)
         })
     }
 
@@ -3328,7 +3399,7 @@ impl<'db> Type<'db> {
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
-        if nested && self.same_divergent_marker(div) {
+        if nested && self.same_divergent_marker(db, div) {
             return None;
         }
         match self {
@@ -3828,7 +3899,7 @@ impl<'db> Type<'db> {
 
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, id, _| Place::bound(Type::divergent(id)).into(),
+        cycle_initial=|db, id, key| Place::bound(Type::divergent(db, id, CycleQuery::ClassMember(key))).into(),
         cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, member: PlaceAndQualifiers<'db>, key: MemberLookupKey<'db>| {
             member.cycle_normalized(db, &ProgramEnvironment::from_program(key.program(db)), *previous, cycle)
         },
@@ -5334,7 +5405,7 @@ impl<'db> Type<'db> {
     ) -> MemberLookupResult<'db> {
         #[salsa::tracked(
             returns(copy),
-            cycle_initial=|db, id, key: MemberLookupKey<'db>| Place::bound(Type::divergent(id)).with_symbolic(Some(SymbolicType::initial(db, key.program(db), InferenceOwner::Member(key, None), InferenceSlot::Root))).into(),
+            cycle_initial=|db, id, key: MemberLookupKey<'db>| Place::bound(Type::divergent(db, id, CycleQuery::Member(key))).with_symbolic(Some(SymbolicType::initial(db, key.program(db), InferenceOwner::Member(key, None), InferenceSlot::Root))).into(),
             cycle_fn=|db, cycle, previous: &MemberLookupResult<'db>, member: MemberLookupResult<'db>, key: MemberLookupKey<'db>| {
                 cycle_normalized_member_lookup(db, &ProgramEnvironment::from_program(key.program(db)), member, *previous, cycle)
             },
@@ -5363,7 +5434,7 @@ impl<'db> Type<'db> {
 
         #[salsa::tracked(
             returns(copy),
-            cycle_initial=|db, id, key: MemberLookupKey<'db>, receiver: Type<'db>| Place::bound(Type::divergent(id)).with_symbolic(Some(SymbolicType::initial(db, key.program(db), InferenceOwner::Member(key, Some(receiver)), InferenceSlot::Root))).into(),
+            cycle_initial=|db, id, key: MemberLookupKey<'db>, receiver: Type<'db>| Place::bound(Type::divergent(db, id, CycleQuery::MemberWithReceiver(key, receiver))).with_symbolic(Some(SymbolicType::initial(db, key.program(db), InferenceOwner::Member(key, Some(receiver)), InferenceSlot::Root))).into(),
             cycle_fn=|db, cycle, previous: &MemberLookupResult<'db>, member: MemberLookupResult<'db>, key: MemberLookupKey<'db>, _| {
                 cycle_normalized_member_lookup(db, &ProgramEnvironment::from_program(key.program(db)), member, *previous, cycle)
             },
@@ -8707,7 +8778,7 @@ impl<'db> Type<'db> {
 
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, id, _, _, _| Type::divergent(id),
+        cycle_initial=|db, id, ty, specialization, specialize_self_domain| Type::divergent(db, id, CycleQuery::Specialization(ty, specialization, specialize_self_domain)),
         cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _, specialization: Specialization<'db>, _| {
             let env = ProgramEnvironment::from_program(
                 specialization.generic_context(db).program(db),
@@ -9597,7 +9668,7 @@ impl<'db> Type<'db> {
 
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, id, _, _| Type::divergent(id),
+        cycle_initial=|db, id, ty, program| Type::divergent(db, id, CycleQuery::EagerExpansion(ty, program)),
         cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _, program| {
             value.cycle_normalized_impl(db, &ProgramEnvironment::from_program(program), *previous, cycle)
         },
@@ -10529,33 +10600,34 @@ impl<'db> TypeMapping<'_, 'db> {
 /// (e.g. `Divergent` is assignable to `@Todo`, but `@Todo | Divergent` must not be reduced to `@Todo`).
 /// Otherwise, type inference cannot converge properly.
 /// For detailed properties of this type, see the unit test at the end of the file.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct DivergentType {
-    /// The query ID that caused the cycle.
-    id: salsa::Id,
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::SalsaValue)]
+pub struct DivergentType<'db> {
+    /// An unresolved query output or a terminal approximation of a cycle.
+    variable: CycleVariable<'db>,
     /// If this divergent marker has been materialized, preserve whether it should behave like the
     /// top (`object`) or bottom (`Never`) bound while still remaining recognizable as divergent.
     materialization: Option<MaterializationKind>,
 }
 
 // The Salsa heap is tracked separately.
-impl get_size2::GetSize for DivergentType {}
+impl get_size2::GetSize for DivergentType<'_> {}
 
-impl DivergentType {
-    const fn new(id: salsa::Id) -> Self {
+impl<'db> DivergentType<'db> {
+    const fn new(variable: CycleVariable<'db>) -> Self {
         Self {
-            id,
+            variable,
             materialization: None,
         }
     }
 
-    fn same_marker(self, other: Self) -> bool {
-        self.id == other.id
+    /// A terminal approximation for structural recursion without an unresolved query output.
+    fn recursive(db: &'db dyn Db, head_id: salsa::Id) -> Self {
+        Self::new(CycleVariable::new(db, head_id, CycleOrigin::RecursiveType))
     }
 
     const fn materialized(self, kind: MaterializationKind) -> Self {
         Self {
-            id: self.id,
+            variable: self.variable,
             materialization: Some(kind),
         }
     }

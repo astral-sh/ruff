@@ -194,6 +194,7 @@
 //! [bdd]: https://en.wikipedia.org/wiki/Binary_decision_diagram
 
 use crate::ProgramEnvironment;
+use crate::types::cycle_variable::CycleQuery;
 use std::cell::RefCell;
 
 use crate::{
@@ -241,7 +242,7 @@ use ty_python_core::{
 /// same intersections.
 #[salsa::tracked(
     returns(copy),
-    cycle_initial = |_, id, _, _| Type::divergent(id),
+    cycle_initial = |db, id, predicate, subject_ty| Type::divergent(db, id, CycleQuery::PreviousPatterns(predicate, subject_ty)),
     cycle_fn = |db: &'db dyn Db, cycle, previous: &Type<'db>, result: Type<'db>, predicate: PatternPredicate<'db>, _| {
         let env = ProgramEnvironment::from_scope(predicate.subject(db).scope(db));
         result.cycle_normalized(db, &env, *previous, cycle)
@@ -272,7 +273,7 @@ pub(crate) fn type_narrowed_by_previous_patterns<'db>(
 /// This result is also the preceding-pattern prefix for the next unguarded case.
 #[salsa::tracked(
     returns(copy),
-    cycle_initial = |_, id, _, _| Type::divergent(id),
+    cycle_initial = |db, id, predicate, subject_ty| Type::divergent(db, id, CycleQuery::Pattern(predicate, subject_ty)),
     cycle_fn = |db: &'db dyn Db, cycle, previous: &Type<'db>, result: Type<'db>, predicate: PatternPredicate<'db>, _| {
         let env = ProgramEnvironment::from_scope(predicate.subject(db).scope(db));
         result.cycle_normalized(db, &env, *previous, cycle)
@@ -1012,7 +1013,7 @@ impl<'db> ProjectedNarrowingCheckpoint<'db> {
 /// when simplifying a join requires their predicates.
 #[salsa::tracked(
     returns(copy),
-    cycle_initial = |_, id, _, _, _, _| ProjectedNarrowingCheckpoint::Narrowed(Type::divergent(id)),
+    cycle_initial = |db, id, scope, place, constraint, base_ty| ProjectedNarrowingCheckpoint::Narrowed(Type::divergent(db, id, CycleQuery::NarrowingCheckpoint(scope, place, constraint, base_ty))),
     cycle_fn = |db: &'db dyn Db, cycle, previous: &ProjectedNarrowingCheckpoint<'db>, result: ProjectedNarrowingCheckpoint<'db>, scope: ScopeId<'db>, _, _, base_ty| {
         match result {
             ProjectedNarrowingCheckpoint::Narrowed(ty) => ProjectedNarrowingCheckpoint::Narrowed(
@@ -1891,9 +1892,11 @@ fn analyze_condition<'db>(db: &'db dyn Db, expression: Expression<'db>) -> Truth
     let module = parsed_module(db, expression.python_file(db)).load(db);
     let inference = infer_expression_types(db, expression, TypeContext::default());
     analyze_condition_expression(expression.node_ref(db).node(&module), &|node| {
-        inference
-            .comparison_truthiness(node)
-            .or_else(|| inference.expression_type(node).bool_if_inhabited(db, &env))
+        inference.comparison_truthiness(node).or_else(|| {
+            inference
+                .expression_type(db, node)
+                .bool_if_inhabited(db, &env)
+        })
     })
     .unwrap_or(Truthiness::Ambiguous)
 }
@@ -1915,7 +1918,7 @@ fn analyze_single(db: &dyn Db, env: &ProgramEnvironment<'_>, predicate: &Predica
             let expression = test_expr.node_ref(db);
             inference
                 .comparison_truthiness(expression)
-                .unwrap_or_else(|| inference.expression_type(expression).bool(db, env))
+                .unwrap_or_else(|| inference.expression_type(db, expression).bool(db, env))
                 .negate_if(!predicate.is_positive)
         }
         PredicateNode::ContextManagerSuppresses {

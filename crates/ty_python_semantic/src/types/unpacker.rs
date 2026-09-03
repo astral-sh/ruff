@@ -11,6 +11,7 @@ use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::Ranged;
 
 use crate::Db;
+use crate::types::cycle_variable::CycleOutput;
 use crate::types::infer::constraints::{
     InferenceConstraints, InferenceOperation, InferenceOwner, InferenceSlot, InferenceVariable,
     SymbolicType,
@@ -97,7 +98,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
         );
         let value_expr = value.expression().node_ref(self.db()).node(self.module());
 
-        let value_type = value_inference.expression_type(value_expr);
+        let value_type = value_inference.expression_type(db, value_expr);
         let mut symbolic = if matches!(value.kind(), UnpackKind::Assign) {
             SymbolicType::from_sequence(
                 db,
@@ -106,7 +107,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                 value_expr.into(),
                 |expression| {
                     (
-                        value_inference.expression_type(expression),
+                        value_inference.expression_type(db, expression),
                         value_inference.symbolic_type(expression),
                     )
                 },
@@ -249,7 +250,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                 expression.into(),
                 value.promote_literals,
                 &|expression, promote| {
-                    let ty = value_inference.expression_type(expression);
+                    let ty = value_inference.expression_type(db, expression);
                     UnpackElement {
                         ty: if promote { ty.promote(db, env) } else { ty },
                         expression: Some(expression),
@@ -260,7 +261,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                     // The starred expression's inference has already reported iteration errors.
                     // For `a, *rest = [1, *items]`, retain the shape of `items`' iterator even
                     // though the enclosing list's type has erased positions and length.
-                    let ty = value_inference.expression_type(expression);
+                    let ty = value_inference.expression_type(db, expression);
                     let ty = if promote { ty.promote(db, env) } else { ty };
                     let mut tuple = ty.iterate(db, env);
                     if let Some(length) = known_length
@@ -488,18 +489,27 @@ impl<'db> UnpackResult<'db> {
     /// May panic if a scoped expression ID is passed in that does not correspond to a sub-
     /// expression of the target.
     #[track_caller]
-    pub(crate) fn expression_type(&self, expr_id: impl Into<ExpressionNodeKey>) -> Type<'db> {
-        self.try_expression_type(expr_id).expect(
+    pub(crate) fn expression_type(
+        &self,
+        db: &'db dyn Db,
+        expr_id: impl Into<ExpressionNodeKey>,
+    ) -> Type<'db> {
+        self.try_expression_type(db, expr_id).expect(
             "expression should belong to this `UnpackResult` and \
             `Unpacker` should have inferred a type for it",
         )
     }
 
-    fn try_expression_type(&self, expr: impl Into<ExpressionNodeKey>) -> Option<Type<'db>> {
-        self.targets
-            .get(&expr.into())
-            .copied()
-            .or(self.cycle_recovery)
+    fn try_expression_type(
+        &self,
+        db: &'db dyn Db,
+        expr: impl Into<ExpressionNodeKey>,
+    ) -> Option<Type<'db>> {
+        let expr = expr.into();
+        self.targets.get(&expr).copied().or_else(|| {
+            self.cycle_recovery
+                .map(|ty| ty.with_cycle_output(db, CycleOutput::UnpackTarget(expr)))
+        })
     }
 
     /// Returns the diagnostics in this unpacking assignment.
@@ -525,7 +535,7 @@ impl<'db> UnpackResult<'db> {
         cycle: &salsa::Cycle,
     ) -> Self {
         for (expr, ty) in &mut self.targets {
-            let previous_ty = previous_cycle_result.expression_type(*expr);
+            let previous_ty = previous_cycle_result.expression_type(db, *expr);
             *ty = ty.cycle_normalized(db, env, previous_ty, cycle);
         }
         self.symbolic = SymbolicType::cycle_normalized_map(

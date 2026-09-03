@@ -18,6 +18,21 @@ reveal_type(p.x)  # revealed: int
 reveal_type(p.y)  # revealed: int
 ```
 
+## Swapping attributes without an initial value
+
+Swapping two attributes does not establish a type for either attribute if neither has an independent
+initial value. Both attributes have the same divergent type.
+
+```py
+class C:
+    def swap(self):
+        self.a, self.b = self.b, self.a
+
+def check(value: C):
+    reveal_type(value.a)  # revealed: Divergent
+    reveal_type(value.b)  # revealed: Divergent
+```
+
 ## Rebuilding an unpacked tuple
 
 Unpacking a tuple preserves the type at each position when the values are stored back in the same

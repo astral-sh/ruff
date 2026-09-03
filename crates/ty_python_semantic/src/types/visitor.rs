@@ -933,6 +933,7 @@ where
 
 #[cfg(test)]
 mod tests {
+    use crate::types::cycle_variable::CycleQuery;
     use ruff_db::files::system_path_to_file;
     use ruff_db::system::DbWithWritableSystem as _;
     use ty_python_core::ProgramFile;
@@ -991,7 +992,7 @@ mod tests {
     fn materialization_noop_rejects_divergent_markers() {
         let db = setup_db();
         let env = db.program_environment();
-        let divergent = Type::divergent(salsa::plumbing::Id::from_bits(1));
+        let divergent = Type::divergent(&db, salsa::plumbing::Id::from_bits(1), CycleQuery::Test);
 
         for ty in [
             divergent,

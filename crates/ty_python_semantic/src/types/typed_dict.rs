@@ -1437,7 +1437,7 @@ pub(super) fn deferred_functional_typed_dict_schema<'db>(
                 return TypedDictSchema::default();
             };
 
-            let field_ty = deferred_inference.expression_type(&item.value);
+            let field_ty = deferred_inference.expression_type(db, &item.value);
             let qualifiers = deferred_inference.qualifiers(&item.value);
 
             schema.insert(
@@ -1482,7 +1482,7 @@ pub(super) fn deferred_functional_typed_dict_openness<'db>(
         let deferred_inference = infer_deferred_types(db, definition);
         return TypedDictOpenness::extra(
             db,
-            deferred_inference.expression_type(&extra_items.value),
+            deferred_inference.expression_type(db, &extra_items.value),
             deferred_inference
                 .qualifiers(&extra_items.value)
                 .contains(TypeQualifiers::READ_ONLY),

@@ -1421,7 +1421,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.db(),
             self.index.enclosing_lambda_statement(lambda.into())?,
         );
-        let callable = enclosing_stmt.expression_type(lambda).as_callable()?;
+        let callable = enclosing_stmt.expression_type(db, lambda).as_callable()?;
         let [signature] = callable.signatures(self.db()).overloads.as_slice() else {
             // TODO: If there are multiple applicable overloads, we could attempt multi-inference.
             return None;

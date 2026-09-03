@@ -26,6 +26,7 @@ use crate::subscript::{
 };
 use crate::types::class::{ClassType, KnownClass};
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
+use crate::types::cycle_variable::{CycleOutput, CycleQuery};
 use crate::types::relation::{DisjointnessChecker, TypeRelationChecker, TypeVarEvaluation};
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::visitor::any_over_type_expanding_aliases;
@@ -879,7 +880,12 @@ fn to_class_type_cycle_initial<'db>(
 
     tuple_class.apply_specialization(db, |generic_context| {
         if generic_context.variables(db).len() == 1 {
-            generic_context.specialize_tuple(db, Type::divergent(id), self_)
+            generic_context.specialize_tuple(
+                db,
+                Type::divergent(db, id, CycleQuery::TupleClass(self_))
+                    .with_cycle_output(db, CycleOutput::TupleElement),
+                self_,
+            )
         } else {
             generic_context.default_specialization(db, Some(KnownClass::Tuple))
         }

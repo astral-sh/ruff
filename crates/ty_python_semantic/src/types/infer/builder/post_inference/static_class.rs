@@ -1453,7 +1453,7 @@ fn check_final_class_abstract_methods<'db>(
             .iter()
             .find(|decorator| {
                 definition_types
-                    .expression_type(&decorator.expression)
+                    .expression_type(db, &decorator.expression)
                     .as_function_literal()
                     .is_some_and(|function| function.is_known(db, KnownFunction::Final))
             })
@@ -1546,7 +1546,7 @@ fn check_final_class_abstract_methods<'db>(
         // for it to be implicitly abstract; add a clarificatory note:
         if kind.is_implicit_due_to_stub_body() && db.should_check_file(definition.file(db)) {
             let function_type_as_callable = infer_definition_types(db, *definition)
-                .binding_type(*definition)
+                .binding_type(db, *definition)
                 .try_upcast_to_callable(db, env);
 
             if let Some(callables) = function_type_as_callable

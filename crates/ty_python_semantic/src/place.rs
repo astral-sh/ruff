@@ -15,6 +15,7 @@ use crate::reachability::{
     NarrowingProjector, ReachabilityEvaluationCache, evaluate_reachability,
     evaluate_reachability_with_cache,
 };
+use crate::types::cycle_variable::CycleQuery;
 use crate::types::{
     DynamicType, InferencePromotion, InferenceVariable, KnownClass, MemberLookupKey,
     MemberLookupPolicy, SymbolicType, Type, TypeAndQualifiers, TypeQualifiers, UnionBuilder,
@@ -1192,7 +1193,7 @@ impl<'db> PlaceAndQualifiers<'db> {
             // If a `Place` that was `Defined(Divergent)` in the previous cycle is actually found to be unreachable in the current cycle,
             // it is set to `Undefined` (because the cycle initial value does not include meaningful reachability information).
             (Place::Defined(prev), Place::Undefined) => {
-                if cycle.head_ids().any(|id| prev.ty == Type::divergent(id)) {
+                if cycle.head_ids().any(|id| prev.ty.is_cycle_initial(db, id)) {
                     Place::Undefined
                 } else {
                     Place::Defined(DefinedPlace {
@@ -1216,7 +1217,7 @@ impl<'db> From<Place<'db>> for PlaceAndQualifiers<'db> {
 
 #[salsa::tracked(
     returns(copy),
-    cycle_initial=|_, id, _, _, _, _| Place::bound(Type::divergent(id)).into(),
+    cycle_initial=|db, id, scope, place, reexport, definitions| Place::bound(Type::divergent(db, id, CycleQuery::PublicPlace(scope, place, reexport, definitions))).into(),
     cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, place: PlaceAndQualifiers<'db>, scope: ScopeId<'db>, _, _, _| {
         let env = ProgramEnvironment::from_scope(scope);
         place.cycle_normalized(db, &env, *previous, cycle)
@@ -1937,7 +1938,7 @@ fn place_from_bindings_impl<'db>(
             first_definition.get_or_insert(binding);
             provenance = provenance.or(Provenance::SingleDefinition(binding));
             let binding_inference = infer_definition_types(db, binding);
-            let binding_ty = binding_inference.binding_type(binding);
+            let binding_ty = binding_inference.binding_type(db, binding);
             let mut narrow = |binding_ty| match narrowing_constraint.constraint() {
                 ScopedNarrowingConstraint::ALWAYS_TRUE => binding_ty,
                 ScopedNarrowingConstraint::ALWAYS_FALSE => Type::Never,
@@ -1957,7 +1958,7 @@ fn place_from_bindings_impl<'db>(
             };
             let narrowed = narrow(binding_ty);
             let symbolic = binding_inference
-                .binding_place(binding)
+                .binding_place(db, binding)
                 .symbolic()
                 .map(|symbolic| symbolic.narrow_binding(db, env, binding, &narrowing_constraint));
             symbolic_values.push((narrowed, symbolic));

@@ -310,7 +310,7 @@ impl<'db> ResolvedSuperOwner<'db> {
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub enum SuperOwnerKind<'db> {
     Dynamic(DynamicType<'db>),
-    Divergent(DivergentType),
+    Divergent(DivergentType<'db>),
     Resolved(ResolvedSuperOwner<'db>),
 }
 

@@ -941,14 +941,14 @@ fn function_inference_regions_are_disjoint() -> anyhow::Result<()> {
     };
 
     let annotations = infer_deferred_types(&db, definition);
-    assert!(annotations.try_expression_type(annotation).is_some());
-    assert!(annotations.try_expression_type(default).is_none());
+    assert!(annotations.try_expression_type(&db, annotation).is_some());
+    assert!(annotations.try_expression_type(&db, default).is_none());
     let defaults = infer_function_default_types(&db, definition);
-    assert!(defaults.try_expression_type(default).is_some());
-    assert!(defaults.try_expression_type(annotation).is_none());
+    assert!(defaults.try_expression_type(&db, default).is_some());
+    assert!(defaults.try_expression_type(&db, annotation).is_none());
     assert_eq!(
         crate::types::definition_expression_type(&db, definition, default),
-        defaults.expression_type(default)
+        defaults.expression_type(&db, default)
     );
     Ok(())
 }

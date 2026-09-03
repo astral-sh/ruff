@@ -582,6 +582,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn extend_cycle_recovery(&mut self, other: Option<Type<'db>>) {
         let db = self.db();
         if let Some(other) = other {
+            // A missing expression need not belong to the imported query's output map.
+            let other = other.cycle_fallback(db);
             match self.cycle_recovery {
                 Some(existing) => {
                     self.cycle_recovery = Some(UnionType::from_two_elements(
@@ -1033,7 +1035,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// Get the already-inferred type of an expression node, or Unknown.
     fn expression_type(&self, expr: &ast::Expr) -> Type<'db> {
         self.try_expression_type(expr)
-            .or(self.fallback_type())
+            .or_else(|| self.fallback_type())
             .unwrap_or_else(Type::unknown)
     }
 
@@ -1102,7 +1104,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             InferenceRegion::Scope(scope, _) if scope == expr_scope => {
                 self.expression_type(expression)
             }
-            _ => infer_complete_scope_types(self.db(), expr_scope).expression_type(expression),
+            _ => infer_complete_scope_types(self.db(), expr_scope)
+                .expression_type(self.db(), expression),
         }
     }
 
@@ -2116,7 +2119,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn function_type(&self, function: &ast::StmtFunctionDef) -> Option<FunctionType<'db>> {
         let definition = self.index.expect_single_definition(function);
-        infer_definition_types(self.db(), definition).function_type(definition)
+        infer_definition_types(self.db(), definition).function_type(self.db(), definition)
     }
 
     fn current_function_type(&self) -> Option<FunctionType<'db>> {
@@ -2131,10 +2134,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let definition_types = infer_definition_types(self.db(), definition);
 
-        function
-            .decorator_list
-            .iter()
-            .map(move |decorator| definition_types.expression_type(&decorator.expression))
+        function.decorator_list.iter().map(move |decorator| {
+            definition_types.expression_type(self.db(), &decorator.expression)
+        })
     }
 
     /// Returns `true` if the current scope is the function body scope of a function overload (that
@@ -2679,11 +2681,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         for reachable_binding in &loop_header.reachable_bindings {
             let inference = infer_definition_types(db, reachable_binding.definition);
-            let binding_ty = inference.binding_type(reachable_binding.definition);
+            let binding_ty = inference.binding_type(self.db(), reachable_binding.definition);
             let evaluator = use_def.narrowing_evaluator(reachable_binding.narrowing_constraint);
             let narrowed_ty = evaluator.narrow(db, env, binding_ty, place);
             let symbolic = inference
-                .binding_place(reachable_binding.definition)
+                .binding_place(self.db(), reachable_binding.definition)
                 .symbolic()
                 .map(|symbolic| {
                     symbolic.narrow_binding(db, env, reachable_binding.definition, &evaluator)
@@ -2749,12 +2751,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             .narrowing_constraint
                             .narrow(db, env, ty, source.place(db))
                     };
-                    let ty = narrow(inference.binding_type(source));
+                    let ty = narrow(inference.binding_type(self.db(), source));
                     symbolic_values.push((
                         ty,
-                        inference.binding_place(source).symbolic().map(|symbolic| {
-                            symbolic.narrow_binding(db, env, source, &binding.narrowing_constraint)
-                        }),
+                        inference
+                            .binding_place(self.db(), source)
+                            .symbolic()
+                            .map(|symbolic| {
+                                symbolic.narrow_binding(
+                                    db,
+                                    env,
+                                    source,
+                                    &binding.narrowing_constraint,
+                                )
+                            }),
                     ));
                     union.add_in_place(ty);
                 }
@@ -2829,8 +2839,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         predicate: PatternPredicate<'db>,
         definition: Definition<'db>,
     ) {
-        let ty =
-            pattern_success_types(self.db(), predicate).binding_type(definition.place(self.db()));
+        let ty = pattern_success_types(self.db(), predicate)
+            .binding_type(self.db(), definition.place(self.db()));
         self.add_binding(pattern.into(), definition)
             .insert(self, ty);
     }
@@ -3050,7 +3060,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.infer_target(target, value, &|builder, tcx| {
                     let inference = infer_expression_types(builder.db(), shared_value, tcx);
                     builder.extend_expression_without_bindings(inference);
-                    inference.expression_type(value.as_ref())
+                    inference.expression_type(builder.db(), value.as_ref())
                 });
             }
         }
@@ -3073,7 +3083,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
             _ => {
-                let assigned_ty = unpacked.expression_type(target);
+                let assigned_ty = unpacked.expression_type(self.db(), target);
                 self.infer_target_impl(target, value, Some(&|_, _| assigned_ty));
             }
         }
@@ -3092,7 +3102,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.symbolic
                 .insert(InferenceSlot::Binding(definition), symbolic);
         }
-        unpacked.expression_type(target)
+        unpacked.expression_type(self.db(), target)
     }
 
     /// Infer the (definition) types involved in a `target` expression.
@@ -3584,7 +3594,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             self.extend_expression_without_bindings(inference);
                         }
                     }
-                    inference.expression_type(value)
+                    inference.expression_type(self.db(), value)
                 } else if let ast::Expr::Call(call_expr) = value {
                     // If the RHS is not a standalone expression, this is a simple assignment
                     // (single target, no unpackings). That means it's a valid syntactic form
@@ -5283,7 +5293,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         assignment: Definition<'db>,
         definition: Definition<'db>,
     ) {
-        let value_ty = infer_definition_types(self.db(), assignment).expression_type(value);
+        let value_ty =
+            infer_definition_types(self.db(), assignment).expression_type(self.db(), value);
         self.add_binding(key.into(), definition)
             .insert(self, value_ty);
     }
@@ -6692,7 +6703,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // the result from `types` directly because we might be in cycle recovery where
         // `types.cycle_fallback_type` is `Some(fallback_ty)`, which we can retrieve by
         // using `expression_type` on `types`:
-        types.expression_type(expression)
+        types.expression_type(self.db(), expression)
     }
 
     /// Infer the type of an expression.
@@ -7666,27 +7677,29 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let owner = InferenceOwner::Region(region);
                 let symbolic =
                     inference.symbolic_collection_use(db, env, owner, definition, expression);
-                let types =
-                    if let Some(divergent) = inference.expression_type(expression).as_divergent() {
-                        collection_class
-                            .try_to_class_literal(db, env)
-                            .map(|class| {
-                                let class = class.apply_specialization(db, |context| {
-                                    context.repeat_specialization(db, Type::Divergent(divergent))
-                                });
-                                Type::instance(db, env, class)
-                            })
-                            .into_iter()
-                            .collect()
-                    } else {
-                        inference
-                            .collection_use_constraints(definition)
-                            .into_iter()
-                            .flatten()
-                            .copied()
-                            .filter(|ty| !ty.has_unspecialized_type_var(db, env))
-                            .collect()
-                    };
+                let types = if let Some(divergent) = inference
+                    .expression_type(self.db(), expression)
+                    .as_divergent()
+                {
+                    collection_class
+                        .try_to_class_literal(db, env)
+                        .map(|class| {
+                            let class = class.apply_specialization(db, |context| {
+                                context.repeat_specialization(db, Type::Divergent(divergent))
+                            });
+                            Type::instance(db, env, class)
+                        })
+                        .into_iter()
+                        .collect()
+                } else {
+                    inference
+                        .collection_use_constraints(definition)
+                        .into_iter()
+                        .flatten()
+                        .copied()
+                        .filter(|ty| !ty.has_unspecialized_type_var(db, env))
+                        .collect()
+                };
                 CollectionUseInput {
                     owner,
                     definition,
@@ -8466,7 +8479,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) -> Type<'db> {
         let db = self.db();
         let env = self.program_environment();
-        let element_type = inference.expression_type(element);
+        let element_type = inference.expression_type(self.db(), element);
         if element.is_starred_expr() {
             element_type
                 .iterate(db, env)
@@ -8487,7 +8500,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         tcx: TypeContext<'db>,
     ) -> Option<Type<'db>> {
         let mut infer_element_ty =
-            |_builder: &mut Self, (_, elt, _)| inference.expression_type(elt);
+            |builder: &mut Self, (_, elt, _)| inference.expression_type(builder.db(), elt);
 
         self.infer_collection_literal(
             collection_class,
@@ -8801,13 +8814,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut infer_iterable_type = || {
             let expression = self.index.expression(iterable);
             let result = infer_expression_types(self.db(), expression, TypeContext::default());
-            let iterable_type = result.expression_type(iterable);
+            let iterable_type = result.expression_type(self.db(), iterable);
             symbolic_iterable = result.symbolic_type(iterable);
             let element_type = if comprehension.is_async() {
                 None
             } else {
                 self.fixed_length_iterable_element_type(iterable, |expr| {
-                    result.expression_type(expr)
+                    result.expression_type(self.db(), expr)
                 })
             };
 
@@ -8882,13 +8895,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let definition = self.index.expect_single_definition(named);
             let result = infer_definition_types(self.db(), definition);
             self.extend_definition(definition, result);
-            if let Some(symbolic) = result.binding_place(definition).symbolic() {
+            if let Some(symbolic) = result.binding_place(self.db(), definition).symbolic() {
                 self.symbolic.insert(
                     InferenceSlot::Expression(ast::ExprRef::Named(named).into()),
                     symbolic,
                 );
             }
-            result.binding_type(definition)
+            result.binding_type(self.db(), definition)
         } else {
             // String annotations have no indexed definitions, and syntactically invalid targets
             // cannot define a name. Both sides still need inference to preserve their diagnostics.
@@ -9128,7 +9141,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let inference = infer_scope_types(self.db(), scope, return_tcx);
         self.extend_scope(inference);
 
-        let return_ty = inference.expression_type(lambda_expression.body.as_ref());
+        let return_ty = inference.expression_type(self.db(), lambda_expression.body.as_ref());
         Type::Callable(CallableType::new(
             self.db(),
             CallableSignature::single(Signature::new(parameters, return_ty)),
@@ -11246,7 +11259,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             value,
             constraint_keys,
             &mut |definition| {
-                let binding = infer_definition_types(db, definition).binding_place(definition);
+                let binding = infer_definition_types(db, definition).binding_place(db, definition);
                 binding.symbolic().map_or_else(
                     || {
                         binding

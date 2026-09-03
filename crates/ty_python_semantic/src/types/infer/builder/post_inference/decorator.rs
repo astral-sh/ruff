@@ -21,7 +21,7 @@ pub(crate) fn check_decorator_calls<'db>(
         let Some(input_ty) = inference.deferred_decorator_input_type(&decorator.expression) else {
             continue;
         };
-        let decorator_ty = inference.expression_type(&decorator.expression);
+        let decorator_ty = inference.expression_type(db, &decorator.expression);
         let arguments = CallArguments::positional([input_ty]);
         if let Err(CallError(_, bindings)) = decorator_ty.try_call(db, env, &arguments) {
             bindings.report_diagnostics(context, decorator.into());

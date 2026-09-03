@@ -505,6 +505,20 @@ while random():
     reveal_type(y)  # revealed: Literal[1, 2]
 ```
 
+### Mutually nested lists in a loop
+
+Wrapping each variable in a list produces unbounded nesting. Both variables retain the empty list's
+unknown element type and a single approximation for the recursively nested list.
+
+```py
+def mutually_nested_lists(flag: bool):
+    a = b = []
+    while flag:
+        a, b = [b], [a]
+    reveal_type(a)  # revealed: list[Unknown] | list[Divergent]
+    reveal_type(b)  # revealed: list[Unknown] | list[Divergent]
+```
+
 ### Tuple assignments are inferred correctly
 
 ```py

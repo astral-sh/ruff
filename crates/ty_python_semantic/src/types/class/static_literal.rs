@@ -1,4 +1,5 @@
 use crate::ProgramEnvironment;
+use crate::types::cycle_variable::{CycleOutput, CycleQuery};
 use itertools::{Either, Itertools};
 use ruff_db::{
     PythonFile,
@@ -3561,7 +3562,10 @@ fn explicit_bases_cycle_initial<'db>(
     // Try to produce a list of `Divergent` types of the right length. However, if one or more of
     // the bases is a starred expression, we don't know how many entries that will eventually
     // expand to.
-    vec![Type::divergent(id); class_stmt.bases().len()].into_boxed_slice()
+    let divergent = Type::divergent(db, id, CycleQuery::ExplicitBases(literal));
+    (0..class_stmt.bases().len())
+        .map(|index| divergent.with_cycle_output(db, CycleOutput::ExplicitBase(index)))
+        .collect()
 }
 
 fn explicit_bases_cycle_fn<'db>(

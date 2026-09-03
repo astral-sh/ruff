@@ -1,6 +1,7 @@
 //! Implicit instance and class attributes inferred from method assignments.
 
 use super::{MethodDecorator, static_literal::StaticClassLiteral};
+use crate::types::cycle_variable::CycleQuery;
 use crate::{
     Db, ProgramEnvironment, TypeQualifiers, attribute_assignments, attribute_declarations,
     place::{Place, Provenance},
@@ -90,7 +91,7 @@ impl<'db> StaticClassLiteral<'db> {
         cycle_fn=implicit_attribute_cycle_recover,
         cycle_initial=|db, id, attribute: ImplicitAttributeName<'db>| ImplicitAttribute {
             member: Member {
-                inner: Place::bound(Type::divergent(id)).with_symbolic(Some(SymbolicType::initial(db, attribute.class_body_scope(db).program(db), attribute.owner(), InferenceSlot::Root))).into(),
+                inner: Place::bound(Type::divergent(db, id, CycleQuery::ImplicitAttribute(attribute))).with_symbolic(Some(SymbolicType::initial(db, attribute.class_body_scope(db).program(db), attribute.owner(), InferenceSlot::Root))).into(),
             },
             augmented_bindings: None,
         },
@@ -414,7 +415,7 @@ fn implicit_attribute_binding_type<'db>(
                 // (..., self.name, ...) = <value>
                 let unpacked = infer_unpack_types(db, unpack);
                 Some((
-                    unpacked.expression_type(assignment.target(&module)),
+                    unpacked.expression_type(db, assignment.target(&module)),
                     unpacked.symbolic_type(db, assignment.target(&module)),
                 ))
             }
@@ -423,7 +424,7 @@ fn implicit_attribute_binding_type<'db>(
                 let expression = index.expression(assignment.value(&module));
                 let inference = infer_expression_types(db, expression, TypeContext::default());
                 Some((
-                    inference.expression_type(expression.node_ref(db)),
+                    inference.expression_type(db, expression.node_ref(db)),
                     inference.symbolic_type(expression.node_ref(db)),
                 ))
             }
@@ -433,7 +434,7 @@ fn implicit_attribute_binding_type<'db>(
                 // for ..., self.name, ... in <iterable>:
                 let unpacked = infer_unpack_types(db, unpack);
                 Some((
-                    unpacked.expression_type(for_stmt.target(&module)),
+                    unpacked.expression_type(db, for_stmt.target(&module)),
                     unpacked.symbolic_type(db, for_stmt.target(&module)),
                 ))
             }
@@ -442,7 +443,7 @@ fn implicit_attribute_binding_type<'db>(
                 let iterable = for_stmt.iterable(&module);
                 let inference =
                     infer_expression_types(db, index.expression(iterable), TypeContext::default());
-                let iterable_ty = inference.expression_type(iterable);
+                let iterable_ty = inference.expression_type(db, iterable);
                 let mode = EvaluationMode::from_is_async(for_stmt.is_async());
                 // TODO: Potential diagnostics resulting from the iterable are not reported.
                 let ty = iterable_ty
@@ -466,7 +467,7 @@ fn implicit_attribute_binding_type<'db>(
                 // with <context_manager> as ..., self.name, ...:
                 let unpacked = infer_unpack_types(db, unpack);
                 Some((
-                    unpacked.expression_type(with_item.target(&module)),
+                    unpacked.expression_type(db, with_item.target(&module)),
                     unpacked.symbolic_type(db, with_item.target(&module)),
                 ))
             }
@@ -478,7 +479,7 @@ fn implicit_attribute_binding_type<'db>(
                     index.expression(context_expr),
                     TypeContext::default(),
                 );
-                let context_ty = inference.expression_type(context_expr);
+                let context_ty = inference.expression_type(db, context_expr);
                 let ty = if with_item.is_async() {
                     context_ty.aenter(db, &env)
                 } else {
@@ -504,7 +505,7 @@ fn implicit_attribute_binding_type<'db>(
                 // [... for ..., self.name, ... in <iterable>]
                 let unpacked = infer_unpack_types(db, unpack);
                 Some((
-                    unpacked.expression_type(comprehension.target(&module)),
+                    unpacked.expression_type(db, comprehension.target(&module)),
                     unpacked.symbolic_type(db, comprehension.target(&module)),
                 ))
             }
@@ -513,7 +514,7 @@ fn implicit_attribute_binding_type<'db>(
                 let iterable = comprehension.iterable(&module);
                 let inference =
                     infer_expression_types(db, index.expression(iterable), TypeContext::default());
-                let iterable_ty = inference.expression_type(iterable);
+                let iterable_ty = inference.expression_type(db, iterable);
                 let mode = EvaluationMode::from_is_async(comprehension.is_async());
                 // TODO: Potential diagnostics resulting from the iterable are not reported.
                 let ty = iterable_ty

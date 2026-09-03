@@ -71,6 +71,7 @@ use crate::types::call::{Binding, CallArguments};
 use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::ConstraintSet;
 use crate::types::context::InferContext;
+use crate::types::cycle_variable::CycleQuery;
 use crate::types::cyclic::ActiveRecursionDetector;
 use crate::types::diagnostic::{
     ASSERT_TYPE_UNSPELLABLE_SUBTYPE, DISJOINT_CAST, INVALID_ARGUMENT_TYPE, REDUNDANT_CAST,
@@ -487,7 +488,7 @@ impl<'db> OverloadLiteral<'db> {
             Type::Callable(_) => {
                 let definition = provenance.definition()?;
                 infer_definition_types(db, definition)
-                    .function_type(definition)?
+                    .function_type(db, definition)?
                     .literal(db)
             }
             _ => return None,
@@ -1565,7 +1566,11 @@ impl<'db> FunctionType<'db> {
             let env = ProgramEnvironment::from_scope(
                 function.literal(db).last_definition.body_scope(db),
             );
-            CallableSignature::cycle_initial(db, &env, id)
+            CallableSignature::cycle_initial(
+                db,
+                &env,
+                Type::divergent(db, id, CycleQuery::FunctionSignature(function)),
+            )
         },
         cycle_fn=|db, cycle, previous, value: CallableSignature<'db>, function: FunctionType<'db>| {
             let env = ProgramEnvironment::from_scope(
@@ -2768,7 +2773,7 @@ impl KnownFunction {
                             if let Some(decorator) =
                                 class.node(&module).decorator_list.iter().find(|decorator| {
                                     definition_types
-                                        .expression_type(&decorator.expression)
+                                        .expression_type(db, &decorator.expression)
                                         .as_function_literal()
                                         .is_some_and(|func| func.is_known(db, KnownFunction::Final))
                                 })
