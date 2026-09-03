@@ -79,7 +79,10 @@ use crate::types::{
 
 /// Returns the tests that pytest collects from `file` under the default collection conventions.
 #[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
-fn pytest_tests_in_file<'db>(db: &'db dyn Db, file: ProgramFile<'db>) -> Box<[PytestTest<'db>]> {
+pub fn pytest_tests_in_file<'db>(
+    db: &'db dyn Db,
+    file: ProgramFile<'db>,
+) -> Box<[PytestTest<'db>]> {
     if !is_default_pytest_test_file(db, file) {
         return Box::default();
     }
@@ -117,14 +120,19 @@ fn pytest_tests_in_file<'db>(db: &'db dyn Db, file: ProgramFile<'db>) -> Box<[Py
 
 /// A function that pytest collects as a test.
 #[derive(Debug, Clone, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
-pub(crate) struct PytestTest<'db> {
+pub struct PytestTest<'db> {
     binding: Definition<'db>,
     function: Definition<'db>,
     kind: PytestTestKind,
     enclosing_class: Option<Definition<'db>>,
 }
 
-impl PytestTest<'_> {
+impl<'db> PytestTest<'db> {
+    /// Returns the definition that binds the test's collected name.
+    pub fn binding(&self) -> Definition<'db> {
+        self.binding
+    }
+
     /// Returns the collection mechanism responsible for this test.
     pub(crate) fn kind(&self) -> PytestTestKind {
         self.kind
