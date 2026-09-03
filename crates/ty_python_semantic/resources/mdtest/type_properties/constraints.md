@@ -1621,11 +1621,16 @@ def typevartuple_bounds[**P, *Us]() -> None:
     ConstraintSet.range(Callable[[int], None], P, Us)  # error: [invalid-type-form] "TypeVarTuple `Us`"
 ```
 
-Allowing ParamSpecs in a constructor does not affect subsequent unrelated TypeForm calls.
+Nested callable annotations and unrelated TypeForm calls retain normal ParamSpec validation.
 
 ```py
-def accepts_type_form(form: TypeForm[object]) -> None: ...
+def accepts_type_form(form: TypeForm[object]) -> TypeForm[object]:
+    return form
+
 def invalid_forms[**P]() -> None:
+    ConstraintSet.equality(P, Callable[[P], None])  # error: [invalid-type-form]
+    ConstraintSet.equality(P, Callable[..., P])  # error: [invalid-type-form]
+    ConstraintSet.equality(P, accepts_type_form(P))  # error: [invalid-type-form]
     ConstraintSet.equality(P, Callable[[int], None])
     accepts_type_form(P)  # error: [invalid-type-form]
 ```

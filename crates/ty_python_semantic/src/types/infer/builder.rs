@@ -9495,36 +9495,39 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             &bindings,
         );
 
-        // The internal constraint constructors accept ParamSpecs as well as ordinary types.
-        let previously_allowed_paramspec = matches!(
-            callable_type,
-            Type::KnownBoundMethod(
-                KnownBoundMethodType::ConstraintSetLowerBound
-                    | KnownBoundMethodType::ConstraintSetUpperBound
-                    | KnownBoundMethodType::ConstraintSetEquality
-                    | KnownBoundMethodType::ConstraintSetRange
-            )
-        )
-        .then(|| {
-            self.context
-                .inference_flags
-                .replace(InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR, true)
-        });
-
         let bindings_result = self.infer_and_check_argument_types(
             ArgumentsIter::from_ast(arguments),
             &mut call_arguments,
-            &mut |builder, (_, expr, tcx)| builder.infer_expression(expr, tcx),
+            &mut |builder, (_, expr, tcx)| {
+                // Permit bare ParamSpecs only in direct names and dotted attributes, so nested
+                // type expressions and calls retain their ordinary validation.
+                if matches!(
+                    callable_type,
+                    Type::KnownBoundMethod(
+                        KnownBoundMethodType::ConstraintSetLowerBound
+                            | KnownBoundMethodType::ConstraintSetUpperBound
+                            | KnownBoundMethodType::ConstraintSetEquality
+                            | KnownBoundMethodType::ConstraintSetRange
+                    )
+                ) && is_dotted_name(expr)
+                {
+                    let previously_allowed = builder
+                        .context
+                        .inference_flags
+                        .replace(InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR, true);
+                    let ty = builder.infer_expression(expr, tcx);
+                    builder.context.inference_flags.set(
+                        InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR,
+                        previously_allowed,
+                    );
+                    ty
+                } else {
+                    builder.infer_expression(expr, tcx)
+                }
+            },
             &mut bindings,
             call_expression_tcx,
         );
-
-        if let Some(previously_allowed_paramspec) = previously_allowed_paramspec {
-            self.context.inference_flags.set(
-                InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR,
-                previously_allowed_paramspec,
-            );
-        }
 
         let mut bindings = match bindings_result {
             Ok(()) => bindings,
