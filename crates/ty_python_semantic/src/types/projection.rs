@@ -500,6 +500,12 @@ impl<'db> Type<'db> {
             return Some(UnionType::from_elements_cycle_recovery(db, env, elements));
         }
 
+        if let Type::Intersection(intersection) = self {
+            return intersection.try_map_cycle_recovery(db, |element| {
+                element.replace_solved_projection_artifacts(db, env, root, solved_ops, evidence)
+            });
+        }
+
         if let Some(container) = ProjectionContainer::try_from(db, env, root, self, evidence) {
             return container.into_type(db, env, root, solved_ops, evidence);
         }
@@ -709,6 +715,12 @@ impl<'db> Type<'db> {
                 .map(|element| element.replace_solved_projection_vars(db, env, solutions))
                 .collect::<Option<Vec<_>>>()?;
             return Some(UnionType::from_elements_cycle_recovery(db, env, elements));
+        }
+
+        if let Type::Intersection(intersection) = self {
+            return intersection.try_map_cycle_recovery(db, |element| {
+                element.replace_solved_projection_vars(db, env, solutions)
+            });
         }
 
         if let Some(spec) = self.exact_tuple_instance_spec(db) {
