@@ -86,6 +86,14 @@ impl ModulePath {
         self.relative_path.pop()
     }
 
+    /// Returns the last path component without its extension.
+    ///
+    /// For example, `acme/tools` and `acme/tools.py` yield `tools`,
+    /// while `acme/__init__.pyi` yields `__init__`.
+    pub(super) fn file_stem(&self) -> Option<&str> {
+        self.relative_path.file_stem()
+    }
+
     pub(super) fn search_path(&self) -> &SearchPath {
         &self.search_path
     }
@@ -226,6 +234,26 @@ impl ModulePath {
         }
     }
 
+    /// Returns the path within the vendored filesystem, if this is a vendored module.
+    pub(crate) fn to_vendored_path(&self) -> Option<VendoredPathBuf> {
+        Some(
+            self.search_path
+                .as_vendored_path()?
+                .join(&self.relative_path),
+        )
+    }
+
+    /// Returns the file at this path, if it exists and is available for the
+    /// configured Python version.
+    ///
+    /// For filesystem paths, as opposed to bundled typeshed paths, this can
+    /// create a database entry even when the file is missing. Callers should
+    /// use an available directory listing to reject absent filenames and
+    /// directory entries before calling this method.
+    ///
+    /// That precheck only improves performance; omitting it does not affect
+    /// correctness. This method still validates the file's status, including
+    /// symlink targets, without consulting the containing directory's listing.
     #[must_use]
     pub(super) fn to_file(&self, resolver: &ResolverContext) -> Option<File> {
         let db = resolver.db;
@@ -238,17 +266,17 @@ impl ModulePath {
             | SearchPathInner::FirstParty(search_path)
             | SearchPathInner::SitePackages(search_path)
             | SearchPathInner::Editable(search_path) => {
-                system_path_to_file_if_listed(db, &search_path.join(relative_path))
+                system_path_to_file(db, search_path.join(relative_path)).ok()
             }
             SearchPathInner::StandardLibraryReal(search_path) => {
-                system_path_to_file_if_listed(db, &search_path.join(relative_path))
+                system_path_to_file(db, search_path.join(relative_path)).ok()
             }
             SearchPathInner::StandardLibraryCustom(stdlib_root) => {
                 match query_stdlib_version(relative_path, resolver) {
                     TypeshedVersionsQueryResult::DoesNotExist => None,
                     TypeshedVersionsQueryResult::Exists
                     | TypeshedVersionsQueryResult::MaybeExists => {
-                        system_path_to_file_if_listed(db, &stdlib_root.join(relative_path))
+                        system_path_to_file(db, stdlib_root.join(relative_path)).ok()
                     }
                 }
             }
@@ -393,19 +421,6 @@ fn directory_contains_file(db: &dyn Db, directory: &SystemPath, names: &[&str]) 
     names
         .iter()
         .any(|name| listing.entry_is_file(db, directory, name))
-}
-
-fn system_path_to_file_if_listed(db: &dyn Db, path: &SystemPath) -> Option<File> {
-    let Some((parent, name)) = path.parent().zip(path.file_name()) else {
-        return system_path_to_file(db, path).ok();
-    };
-
-    let listing = directory_listing(db, parent).ok()?;
-    if listing.entry_is_file(db, parent, name) {
-        system_path_to_file(db, path).ok()
-    } else {
-        None
-    }
 }
 
 fn system_path_is_directory(db: &dyn Db, path: &SystemPath) -> bool {
