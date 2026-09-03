@@ -813,11 +813,7 @@ impl<'db> UnionTypeInstance<'db> {
 
 /// Returns `true` if `ty` is `Divergent` with `div`'s marker, or a union that still
 /// carries that marker / recursive-definition flag from cycle recovery.
-fn union_type_has_divergent_marker<'db>(
-    db: &'db dyn Db,
-    ty: Type<'db>,
-    div: Type<'db>,
-) -> bool {
+fn union_type_has_divergent_marker<'db>(db: &'db dyn Db, ty: Type<'db>, div: Type<'db>) -> bool {
     if ty.same_divergent_marker(div) {
         return true;
     }
