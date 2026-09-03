@@ -408,6 +408,11 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
         value_ty: Type<'db>,
         targets: &[ast::Expr],
     ) -> Option<Vec<Type<'db>>> {
+        // With no elements to project, iteration and length still need ordinary validation.
+        if targets.is_empty() {
+            return None;
+        }
+
         let original_evidence = self.projection_evidence;
         if let Some(projected) = self.try_unpack_projections_for_element(value_ty, targets) {
             return Some(projected);
