@@ -357,6 +357,11 @@ pub const fn is_warn_on_unknown_selectors_enabled(preview: PreviewMode) -> bool 
     preview.is_enabled()
 }
 
+// https://github.com/astral-sh/ruff/pull/27313
+pub(crate) const fn is_pragma_excluded_from_import_width_enabled(preview: PreviewMode) -> bool {
+    preview.is_enabled()
+}
+
 // https://github.com/astral-sh/ruff/pull/27666
 pub(crate) const fn is_rule_categories_enabled(preview: PreviewMode) -> bool {
     preview.is_enabled()

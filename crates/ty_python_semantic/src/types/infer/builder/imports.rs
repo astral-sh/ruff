@@ -490,7 +490,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }),
                 qualifiers,
                 needs_projection_evidence_from_types,
-            } = result.unwrap_or_else(|error| error.fallback_member(db))
+            } = result
+                .unwrap_or_else(|error| error.fallback_member(db))
+                .member(db)
             {
                 self.needs_projection_evidence_from_types |= needs_projection_evidence_from_types;
                 if &alias.name != "*" && boundness == Definedness::PossiblyUndefined {

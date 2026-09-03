@@ -1084,6 +1084,62 @@ def _(value: Concrete[int]) -> None:
         reveal_type(value.read())  # revealed: int
 ```
 
+## Negative narrowing for protocols with gradual members
+
+Negative narrowing excludes every materialization of a protocol, including when its members are
+gradual. `IntReader` is a subtype of the fully materialized `Reader` protocol, so the negative
+branch retains only `None`:
+
+```py
+from typing import Any, Protocol, runtime_checkable
+
+@runtime_checkable
+class Reader(Protocol):
+    def read(self) -> Any: ...
+
+class IntReader:
+    def read(self) -> int:
+        return 1
+
+def f(reader: IntReader | None):
+    if isinstance(reader, Reader):
+        reveal_type(reader.read())  # revealed: int & Any
+    else:
+        reveal_type(reader)  # revealed: None
+```
+
+## Narrowing iterables to containers and iterators in strict mode
+
+```toml
+[analysis]
+strict-generic-narrowing = true
+```
+
+Narrowing an `Iterable[T]` to an `Iterator`, or to a container type, retains its element type. See
+`generics/set_theoretic.md` for more details on the assumptions behind this, and for an explanation
+of the behavior of invariant containers:
+
+```py
+from typing import Iterable, Iterator
+
+def f(values: Iterable[int]):
+    if isinstance(values, Iterator):
+        reveal_type(values)  # revealed: Iterator[int]
+        reveal_type(next(values))  # revealed: int
+    if isinstance(values, tuple):
+        reveal_type(values)  # revealed: tuple[int, ...]
+        reveal_type(values[0])  # revealed: int
+    if isinstance(values, frozenset):
+        reveal_type(values)  # revealed: frozenset[int]
+        reveal_type(next(iter(values)))  # revealed: int
+    if isinstance(values, list):
+        reveal_type(values)  # revealed: Top[list[Unknown & int]]
+        reveal_type(values[0])  # revealed: int
+    if isinstance(values, set):
+        reveal_type(values)  # revealed: Top[set[Unknown & int]]
+        reveal_type(next(iter(values)))  # revealed: int
+```
+
 ## Use cases: `isinstance` narrowing and generics
 
 ### Strict mode

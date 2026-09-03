@@ -33,8 +33,7 @@ pub(super) enum GenericIntersection<'db> {
     Recursive,
 }
 
-/// Simplify the intersection of two generic specializations when one is a gradual
-/// generalization of the other.
+/// Simplify same-class gradual intersections and intersections with top-materialized subclasses.
 ///
 /// For example, `list[int] & list[Any]` simplifies to `list[int]`, while
 /// `Sequence[int] & Sequence[Any]` simplifies to `Sequence[int & Any]`.
@@ -48,8 +47,8 @@ pub(super) fn generic_gradual_intersection<'db>(
     dynamic_generalization_intersection(db, env, left, right)
         .or_else(|| dynamic_generalization_intersection(db, env, right, left))
         .map(GenericIntersection::Simplified)
-        .or_else(|| nominal_top_intersection(db, env, left, right))
-        .or_else(|| nominal_top_intersection(db, env, right, left))
+        .or_else(|| base_top_intersection(db, env, left, right))
+        .or_else(|| base_top_intersection(db, env, right, left))
 }
 
 /// Intersect a fully static nominal base with a generic subclass.
@@ -59,18 +58,35 @@ pub(super) fn generic_gradual_intersection<'db>(
 /// materializations instead of incorrectly collapsing, for example,
 /// `Sequence[int] & Top[list[Any]]` to `list[int]`.
 /// Subclass arguments that do not specialize the base retain their gradualness.
-fn nominal_top_intersection<'db>(
+fn base_top_intersection<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     base: Type<'db>,
     subclass: Type<'db>,
 ) -> Option<GenericIntersection<'db>> {
-    if !base.is_nominal_instance() || !subclass.is_nominal_instance() || base.has_dynamic(db, env) {
+    if !matches!(base, Type::NominalInstance(_) | Type::ProtocolInstance(_))
+        || !matches!(
+            subclass,
+            Type::NominalInstance(_) | Type::ProtocolInstance(_)
+        )
+        || base.has_dynamic(db, env)
+    {
         return None;
     }
 
     let (base_class, base_specialization) = base.class_specialization(db, env)?;
     let (subclass_class, subclass_specialization) = subclass.class_specialization(db, env)?;
+
+    // As a deliberately unsound exception, allow `Iterable` as the base when the subclass is
+    // nominal or is the `Iterator` protocol. We assume containers and iterators obey their
+    // behavioral contracts, including agreement between iteration and indexing.
+    let is_iterable_special_case = base_class.known(db) == Some(KnownClass::Iterable)
+        && (subclass.is_nominal_instance()
+            || subclass_class.known(db) == Some(KnownClass::Iterator));
+    if !is_iterable_special_case && (!base.is_nominal_instance() || !subclass.is_nominal_instance())
+    {
+        return None;
+    }
 
     if base_class == subclass_class {
         return None;

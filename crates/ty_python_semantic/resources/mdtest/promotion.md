@@ -668,21 +668,6 @@ def _(upper: Callable[[int], None]):
     reveal_type(f("x", upper))  # revealed: list[str | int]
 ```
 
-This also applies when multiple inheritance contributes both static and gradual specializations:
-
-```py
-from typing import Any
-
-class Base[T]: ...
-class Specialized(Base[str]): ...
-class Mixed(Specialized, Base[Any]): ...
-
-def g[T](values: list[T], base: Base[T]) -> list[T]:
-    return values
-
-g([1], Mixed())  # error: [invalid-argument-type]
-```
-
 ## Literal annotations from declaration are respected
 
 Literal types that are explicitly annotated when declared will not be promoted, even if they are

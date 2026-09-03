@@ -1,0 +1,23 @@
+---
+source: crates/ruff_linter/src/rules/isort/mod.rs
+expression: transformed.source_code()
+---
+# Separate statement-level and alias-level comments that isort merges onto one line
+# when collapsing. The merged comment token is 89 columns with the `# explain` prefix
+# counted, so the import must not end up on an overlong single line.
+from aaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaa import (  # explain
+    x,  # noqa: TID251
+)
+
+# A single mixed comment on an already-collapsed 102-column line. The code plus the
+# non-pragma prefix is 86 columns.
+from bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb import (
+    x,  # explain  # noqa: TID251
+)
+
+# Separate comments with the pragma first: when isort collapses this import in preview,
+# the merged comment token is pragma-prefixed, so E501 strips it entirely and the
+# collapsed 104-column line is fine.
+from ccccccccccccccccccccccccccccccc.ccccccccccccccccccccccccccccccc import (  # noqa: TID251
+    x,  # explain
+)

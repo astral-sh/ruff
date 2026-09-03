@@ -30,12 +30,13 @@ use crate::{
         GenericContext, InstanceFallbackShadowsNonDataDescriptor, KnownFunction, KnownInstanceType,
         MaterializationKind, MemberLookupKey, MemberLookupPolicy, Parameter, PropertyInstanceType,
         ProtocolInstanceType, SelfBinding, Signature, StaticClassLiteral, Type, TypeMapping,
-        TypeQualifiers, TypeVarVariance, UnionType, VarianceInferable,
+        TypeQualifiers, TypeVarVariance, UnionType, VarianceInferable, VarianceTerm,
         constraints::{ConstraintSet, IteratorConstraintsExtension, OptionConstraintsExtension},
         context::InferContext,
         diagnostic::{INVALID_PROTOCOL, report_undeclared_protocol_member},
         generics::Specialization,
         signatures::walk_signature,
+        variance::infer_protocol_variance,
     },
 };
 use ty_python_core::{definition::Definition, place::ScopedPlaceId, place_table, use_def_map};
@@ -79,12 +80,11 @@ impl<'db> ProtocolClass<'db> {
         cached_protocol_interface(db, *self)
     }
 
-    /// Structural variance inference currently excludes recursive protocol and type-alias
-    /// dependencies: validating a cycle requires inferring variance independently of the
-    /// declarations being checked. Descriptor writes are also excluded when their accepted values
-    /// cannot be represented by a single type, leaving no write domain to use contravariantly.
+    /// Structural variance inference currently excludes recursive type aliases and descriptor
+    /// writes whose accepted values cannot be represented by a single type, leaving no write
+    /// domain to use contravariantly.
     ///
-    /// TODO: Support these recursive dependencies and descriptor write domains.
+    /// TODO: Support recursive type aliases and descriptor writes with unrepresentable domains.
     pub(super) fn supports_variance_inference(self, db: &'db dyn Db) -> bool {
         self.static_class_literal(db)
             .is_some_and(|(class, _)| supports_protocol_variance_inference(db, class))
@@ -341,10 +341,11 @@ impl<'db> ProtocolClass<'db> {
                 continue;
             };
 
-            let inferred_variance = match class.variance_of(db, &env, typevar.identity(db)) {
-                TypeVarVariance::Bivariant => TypeVarVariance::Covariant,
-                variance => variance,
-            };
+            let inferred_variance =
+                match infer_protocol_variance(db, class, typevar.identity(db), declared_variance) {
+                    TypeVarVariance::Bivariant => TypeVarVariance::Covariant,
+                    variance => variance,
+                };
 
             if inferred_variance == declared_variance {
                 continue;
@@ -1224,10 +1225,12 @@ impl<'db> VarianceInferable<'db> for ProtocolInterface<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
-    ) -> TypeVarVariance {
-        self.variance_types(db, env)
-            .map(|(ty, variance)| ty.with_polarity(variance).variance_of(db, env, typevar))
-            .collect()
+    ) -> VarianceTerm<'db> {
+        VarianceTerm::join(
+            db,
+            self.variance_types(db, env)
+                .map(|(ty, variance)| ty.with_polarity(variance).variance_of(db, env, typevar)),
+        )
     }
 }
 
@@ -1761,11 +1764,9 @@ impl<'db> ProtocolMemberKind<'db> {
                     cycle,
                 );
                 Self::Method(
-                    current.with_ty(Type::Callable(CallableType::new(
-                        db,
-                        signatures,
-                        current_callable.kind(db),
-                    ))),
+                    current.with_ty(Type::Callable(
+                        current_callable.with_signatures(db, signatures),
+                    )),
                     kind,
                 )
             }
@@ -2396,6 +2397,7 @@ fn protocol_member_read_type<'db>(
             InstanceFallbackShadowsNonDataDescriptor::No,
         )
         .unwrap_or_else(|error| error.fallback_member(db))
+        .member(db)
         .place
     } else {
         receiver_ty.member(db, env, member.name).place
@@ -3539,10 +3541,12 @@ fn non_object_protocol_member_count<'db>(
 }
 
 /// Check variance dependencies by definition, so expanding specializations such as `P[list[T]]`
-/// cannot hide a cycle. Nonrecursive protocol references do not prevent variance inference.
+/// do not produce an unbounded number of queries. A recursive dependency is supported unless
+/// some member in the cycle has an unsupported type; variance itself is inferred by a separate
+/// fixed-point computation starting from bivariance.
 #[salsa::tracked(
     returns(copy),
-    cycle_initial=|_, _, _| false,
+    cycle_initial=|_, _, _| true,
     heap_size=ruff_memory_usage::heap_size,
 )]
 fn supports_protocol_variance_inference<'db>(
@@ -3610,6 +3614,8 @@ fn cached_protocol_interface<'db>(
             return;
         }
 
+        let specialization =
+            specialization.map(|specialization| specialization.with_typevar_bounds(db));
         let candidate = candidate.apply_specialization(db, specialization);
         let ProtocolMemberCandidate {
             ty,

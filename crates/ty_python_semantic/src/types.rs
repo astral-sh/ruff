@@ -1,7 +1,7 @@
 use compact_str::{CompactString, ToCompactString};
 use itertools::Itertools;
 use ruff_diagnostics::{Edit, Fix};
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use std::borrow::Cow;
 use std::cell::OnceCell;
@@ -53,12 +53,12 @@ pub(crate) use self::match_pattern::{
 };
 pub use self::projection::ProjectionType;
 pub(crate) use self::relation_error::{ErrorContext, ErrorContextTree, ParameterDescription};
-use self::set_theoretic::KnownUnion;
 use self::set_theoretic::NegativeIntersectionElements;
 pub(crate) use self::set_theoretic::builder::{
     IntersectionBuilder, UnionAccumulator, UnionBuilder,
 };
 pub use self::set_theoretic::{IntersectionType, UnionType};
+use self::set_theoretic::{KnownUnion, RecursivelyDefined};
 pub(crate) use self::signatures::Signature;
 pub use self::signatures::{ParameterDefault, ParameterKind};
 pub(crate) use self::subclass_of::{SubclassOfInner, SubclassOfType};
@@ -85,7 +85,7 @@ pub(crate) use crate::types::enums::{EnumClassLiteral, EnumComplementType, enum_
 pub(crate) use crate::types::equality::{ComparisonSoundnessPolicy, equality_truthiness};
 use crate::types::function::{
     DataclassTransformerFlags, DataclassTransformerParams, FunctionDecorators, FunctionSpans,
-    FunctionType, KnownFunction,
+    FunctionType, KnownFunction, OverloadLiteral,
 };
 pub(crate) use crate::types::generics::GenericContext;
 use crate::types::generics::{ApplySpecialization, Specialization, bind_typevar};
@@ -111,7 +111,7 @@ pub(crate) use crate::types::typevar::{
 pub use crate::types::typevar::{BoundTypeVarInstance, TypeVarKind};
 use crate::types::typevar::{TypeVarInstance, TypeVarSet};
 pub use crate::types::variance::TypeVarVariance;
-use crate::types::variance::VarianceInferable;
+use crate::types::variance::{VarianceInferable, VarianceTerm};
 use crate::types::visitor::{
     any_over_type, any_over_type_including_alias_arguments, dynamic_content,
 };
@@ -774,7 +774,7 @@ enum MemberLookupErrorKind<'db> {
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 struct MemberLookupError<'db> {
     #[returns(copy)]
-    fallback_member: PlaceAndQualifiers<'db>,
+    fallback_member: ResolvedMember<'db>,
     #[returns(copy)]
     kind: MemberLookupErrorKind<'db>,
 }
@@ -900,13 +900,142 @@ impl<'db> MemberLookupError<'db> {
 ///
 /// Unlike [`crate::place::LookupResult`], errors here describe failed attribute-access operations,
 /// not undefined or possibly undefined places.
-type MemberLookupResult<'db> = Result<PlaceAndQualifiers<'db>, MemberLookupError<'db>>;
+type MemberLookupResult<'db> = Result<ResolvedMember<'db>, MemberLookupError<'db>>;
+
+/// A member and the property accessors needed to report deprecations at its use site.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
+enum ResolvedMember<'db> {
+    /// A member with no deprecated property accessors.
+    Plain(PlaceAndQualifiers<'db>),
+    /// A member with deprecated property accessors, stored separately to keep ordinary lookups compact.
+    WithDeprecations(DeprecatedMember<'db>),
+}
+
+/// Only members with deprecated property accessors need this additional storage.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+struct DeprecatedMember<'db> {
+    #[returns(copy)]
+    member: PlaceAndQualifiers<'db>,
+    #[returns(copy)]
+    properties: PropertyDeprecations<'db>,
+}
+
+impl get_size2::GetSize for DeprecatedMember<'_> {}
+
+/// Deprecated property accessors retained independently of descriptor types. Distinct property
+/// objects are disjoint types, but either can implement an attribute on an intersection.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+struct PropertyDeprecations<'db> {
+    #[returns(ref)]
+    getters: Box<[OverloadLiteral<'db>]>,
+    #[returns(ref)]
+    setters: Box<[OverloadLiteral<'db>]>,
+    #[returns(ref)]
+    deleters: Box<[OverloadLiteral<'db>]>,
+}
+
+impl get_size2::GetSize for PropertyDeprecations<'_> {}
+
+impl<'db> PropertyDeprecations<'db> {
+    fn functions(self, db: &'db dyn Db, access: ast::ExprContext) -> &'db [OverloadLiteral<'db>] {
+        match access {
+            ast::ExprContext::Load => self.getters(db),
+            ast::ExprContext::Store => self.setters(db),
+            ast::ExprContext::Del => self.deleters(db),
+            ast::ExprContext::Invalid => &[],
+        }
+    }
+
+    fn getters_only(self, db: &'db dyn Db) -> Self {
+        Self::new(db, self.getters(db), [].as_slice(), [].as_slice())
+    }
+
+    /// Retain either alternative's deprecations: a union can invoke either accessor.
+    fn union(self, db: &'db dyn Db, other: Self) -> Self {
+        self.combine(db, other, false)
+    }
+
+    /// Retain deprecations only for access kinds deprecated in both alternatives. A
+    /// non-deprecated getter can suppress read warnings without suppressing write warnings.
+    fn intersection(self, db: &'db dyn Db, other: Self) -> Self {
+        self.combine(db, other, true)
+    }
+
+    fn combine(self, db: &'db dyn Db, other: Self, intersection: bool) -> Self {
+        let combine = |left: &[OverloadLiteral<'db>], right: &[OverloadLiteral<'db>]| {
+            if intersection && (left.is_empty() || right.is_empty()) {
+                Box::<[_]>::default()
+            } else {
+                left.iter().chain(right).copied().unique().collect()
+            }
+        };
+        Self::new(
+            db,
+            combine(self.getters(db), other.getters(db)),
+            combine(self.setters(db), other.setters(db)),
+            combine(self.deleters(db), other.deleters(db)),
+        )
+    }
+}
+
+impl<'db> ResolvedMember<'db> {
+    fn member(self, db: &'db dyn Db) -> PlaceAndQualifiers<'db> {
+        match self {
+            Self::Plain(member) => member,
+            Self::WithDeprecations(member) => member.member(db),
+        }
+    }
+
+    fn deprecated_properties(self, db: &'db dyn Db) -> Option<PropertyDeprecations<'db>> {
+        match self {
+            Self::WithDeprecations(member) => Some(member.properties(db)),
+            Self::Plain(_) => None,
+        }
+    }
+
+    fn new(
+        db: &'db dyn Db,
+        member: PlaceAndQualifiers<'db>,
+        properties: Option<PropertyDeprecations<'db>>,
+    ) -> Self {
+        match properties {
+            Some(properties) => {
+                Self::WithDeprecations(DeprecatedMember::new(db, member, properties))
+            }
+            None => Self::Plain(member),
+        }
+    }
+
+    /// Transform the member's value type without changing its property accessor deprecations.
+    fn map_type(self, db: &'db dyn Db, f: impl FnOnce(Type<'db>) -> Type<'db>) -> Self {
+        Self::new(
+            db,
+            self.member(db).map_type(f),
+            self.deprecated_properties(db),
+        )
+    }
+}
+
+/// Combine accessor deprecations from alternative lookup paths. A non-deprecated path (`None`)
+/// does not suppress deprecations from another possible path.
+fn union_deprecated_properties<'db>(
+    db: &'db dyn Db,
+    left: Option<PropertyDeprecations<'db>>,
+    right: Option<PropertyDeprecations<'db>>,
+) -> Option<PropertyDeprecations<'db>> {
+    match (left, right) {
+        (Some(left), Some(right)) => Some(left.union(db, right)),
+        _ => left.or(right),
+    }
+}
 
 fn member_lookup_result<'db>(
     db: &'db dyn Db,
     member: PlaceAndQualifiers<'db>,
     error: Option<MemberLookupErrorKind<'db>>,
+    properties: Option<PropertyDeprecations<'db>>,
 ) -> MemberLookupResult<'db> {
+    let member = ResolvedMember::new(db, member, properties);
     match error {
         Some(kind) => Err(MemberLookupError::new(db, member, kind)),
         None => Ok(member),
@@ -919,10 +1048,10 @@ fn map_member_lookup_type<'db>(
     f: impl FnOnce(Type<'db>) -> Type<'db>,
 ) -> MemberLookupResult<'db> {
     match result {
-        Ok(member) => Ok(member.map_type(f)),
+        Ok(member) => Ok(member.map_type(db, f)),
         Err(error) => Err(MemberLookupError::new(
             db,
-            error.fallback_member(db).map_type(f),
+            error.fallback_member(db).map_type(db, f),
             error.kind(db),
         )),
     }
@@ -941,6 +1070,7 @@ fn distribute_member_lookup_over_bound_or_constraints<'db>(
             .member_lookup_with_policy_and_receiver(db, env, name, policy, Some(symbolic_receiver)),
         TypeVarBoundOrConstraints::Constraints(constraints) => {
             let mut error = None;
+            let mut properties = None;
             let member = constraints.map_with_boundness_and_qualifiers(db, env, |constraint| {
                 let result = constraint.member_lookup_with_policy_and_receiver(
                     db,
@@ -957,9 +1087,12 @@ fn distribute_member_lookup_over_bound_or_constraints<'db>(
                         _ => ty,
                     });
                 error = error.or_else(|| result.err().map(|error| error.kind(db)));
-                result.unwrap_or_else(|error| error.fallback_member(db))
+                let member = result.unwrap_or_else(|error| error.fallback_member(db));
+                properties =
+                    union_deprecated_properties(db, properties, member.deprecated_properties(db));
+                member.member(db)
             });
-            member_lookup_result(db, member, error)
+            member_lookup_result(db, member, error, properties)
         }
     }
 }
@@ -970,7 +1103,8 @@ fn member_lookup_or_fall_back_to<'db>(
     result: MemberLookupResult<'db>,
     fallback_fn: impl FnOnce() -> MemberLookupResult<'db>,
 ) -> MemberLookupResult<'db> {
-    let member = result.unwrap_or_else(|error| error.fallback_member(db));
+    let resolved = result.unwrap_or_else(|error| error.fallback_member(db));
+    let member = resolved.member(db);
     match member.place {
         Place::Undefined => fallback_fn(),
         Place::Defined(DefinedPlace {
@@ -985,11 +1119,16 @@ fn member_lookup_or_fall_back_to<'db>(
             let fallback_member = fallback.unwrap_or_else(|error| error.fallback_member(db));
             member_lookup_result(
                 db,
-                member.or_fall_back_to(db, env, || fallback_member),
+                member.or_fall_back_to(db, env, || fallback_member.member(db)),
                 result
                     .err()
                     .map(|error| error.kind(db))
                     .or_else(|| fallback.err().map(|error| error.kind(db))),
+                union_deprecated_properties(
+                    db,
+                    resolved.deprecated_properties(db),
+                    fallback_member.deprecated_properties(db),
+                ),
             )
         }
     }
@@ -1008,18 +1147,25 @@ fn cycle_normalized_member_lookup<'db>(
         .filter(|_| cycle.iteration() <= crate::TAINTED_CYCLES || previous.is_err());
     let member = result.unwrap_or_else(|error| error.fallback_member(db));
     let previous = previous.unwrap_or_else(|error| error.fallback_member(db));
-    member_lookup_result(db, member.cycle_normalized(db, env, previous, cycle), error)
+    member_lookup_result(
+        db,
+        member
+            .member(db)
+            .cycle_normalized(db, env, previous.member(db), cycle),
+        error,
+        member.deprecated_properties(db),
+    )
 }
 
 impl<'db> From<PlaceAndQualifiers<'db>> for MemberLookupResult<'db> {
     fn from(member: PlaceAndQualifiers<'db>) -> Self {
-        Ok(member)
+        Ok(ResolvedMember::Plain(member))
     }
 }
 
 impl<'db> From<Place<'db>> for MemberLookupResult<'db> {
     fn from(place: Place<'db>) -> Self {
-        Ok(place.into())
+        Ok(ResolvedMember::Plain(place.into()))
     }
 }
 
@@ -1984,6 +2130,7 @@ impl<'db> Type<'db> {
             Type::Dynamic(
                 DynamicType::Unknown
                     | DynamicType::UnknownGeneric(_)
+                    | DynamicType::UnknownLambdaParameter
                     | DynamicType::AmbiguousOverload
             )
         )
@@ -2175,6 +2322,7 @@ impl<'db> Type<'db> {
             | DynamicType::InvalidConcatenateUnknown
             | DynamicType::UnknownGeneric(_)
             | DynamicType::UnspecializedTypeVar
+            | DynamicType::UnknownLambdaParameter
             | DynamicType::AmbiguousOverload => false,
             DynamicType::Todo(_) => true,
         })
@@ -2276,6 +2424,7 @@ impl<'db> Type<'db> {
     pub fn is_deprecated(&self, db: &'db dyn Db) -> bool {
         match self {
             Type::FunctionLiteral(f) => f.implementation_deprecated(db).is_some(),
+            Type::Callable(callable) => callable.deprecated(db).is_some(),
             Type::ClassLiteral(c) => c.deprecated(db).is_some(),
             _ => false,
         }
@@ -2977,6 +3126,7 @@ impl<'db> Type<'db> {
                 DynamicType::Unknown
                 | DynamicType::UnknownGeneric(_)
                 | DynamicType::UnspecializedTypeVar
+                | DynamicType::UnknownLambdaParameter
                 | DynamicType::Todo(_)
                 | DynamicType::InvalidConcatenateUnknown
                 | DynamicType::AmbiguousOverload => false,
@@ -4281,7 +4431,7 @@ impl<'db> Type<'db> {
         if let Type::ModuleLiteral(module) = self {
             module
                 .static_member(db, env, name)
-                .map_or(Place::Undefined, |member| member.place)
+                .map_or(Place::Undefined, |member| member.member(db).place)
         } else if let place @ Place::Defined(_) = self.class_member(db, env, name).place {
             place
         } else if let Some(place @ Place::Defined(_)) = self
@@ -4291,6 +4441,97 @@ impl<'db> Type<'db> {
             place
         } else {
             self.instance_member(db, env, name).place
+        }
+    }
+
+    /// Collect deprecated accessor implementations without inferring their signatures or
+    /// intersecting their function or descriptor types. Retain the declarations so callers can
+    /// report deprecations after descriptor lookup replaces the property with its value type:
+    ///
+    /// ```python
+    /// from typing_extensions import deprecated
+    ///
+    /// class C:
+    ///     @property
+    ///     @deprecated("old getter")
+    ///     def value(self) -> int: ...
+    ///
+    /// C().value  # Warn about the getter, even though the attribute has type `int`.
+    /// ```
+    ///
+    /// Overload deprecations require a resolved call and do not apply to accessor references.
+    fn property_deprecations(self, db: &'db dyn Db) -> Option<PropertyDeprecations<'db>> {
+        /// Append deprecated implementations, preserving earlier entries if a non-deprecated
+        /// intersection alternative suppresses this accessor's deprecations.
+        fn collect<'db>(
+            db: &'db dyn Db,
+            accessor: Type<'db>,
+            functions: &mut Vec<OverloadLiteral<'db>>,
+        ) {
+            match accessor {
+                Type::FunctionLiteral(function) => {
+                    let (_, implementation) = function.overloads_and_implementation(db);
+                    functions.extend(
+                        implementation.filter(|function| function.deprecated(db).is_some()),
+                    );
+                }
+                Type::BoundMethod(method) => {
+                    collect(db, Type::FunctionLiteral(method.function(db)), functions);
+                }
+                Type::Union(union) => {
+                    for element in union.elements(db) {
+                        collect(db, *element, functions);
+                    }
+                }
+                Type::Intersection(intersection) => {
+                    let start = functions.len();
+                    for element in intersection.positive(db) {
+                        let element_start = functions.len();
+                        collect(db, *element, functions);
+                        if functions.len() == element_start {
+                            // A non-deprecated intersection member can supply the accessor.
+                            functions.truncate(start);
+                            break;
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        match self {
+            Type::PropertyInstance(property) => {
+                let [getters, setters, deleters] = [
+                    property.getter(db),
+                    property.setter(db),
+                    property.deleter(db),
+                ]
+                .map(|accessor| {
+                    let mut functions = Vec::new();
+                    if let Some(accessor) = accessor {
+                        collect(db, accessor, &mut functions);
+                    }
+                    functions.into_iter().unique().collect::<Box<[_]>>()
+                });
+                if getters.is_empty() && setters.is_empty() && deleters.is_empty() {
+                    None
+                } else {
+                    Some(PropertyDeprecations::new(db, getters, setters, deleters))
+                }
+            }
+            Type::Union(union) => union
+                .elements(db)
+                .iter()
+                .filter_map(|ty| ty.property_deprecations(db))
+                .reduce(|left, right| left.union(db, right)),
+            Type::Intersection(intersection) => {
+                let mut elements = intersection.positive(db).iter();
+                let first = elements.next()?.property_deprecations(db)?;
+                elements.try_fold(first, |properties, ty| {
+                    Some(properties.intersection(db, ty.property_deprecations(db)?))
+                })
+            }
+            _ => None,
         }
     }
 
@@ -4890,8 +5131,11 @@ impl<'db> Type<'db> {
         ) = Self::try_call_dunder_get_on_attribute(db, env, meta_attr_plain, Some(receiver), owner);
 
         let meta_attr_error = meta_attr_error.map(MemberLookupErrorKind::DescriptorGet);
+        let meta_properties = meta_attr_ty.and_then(|ty| ty.property_deprecations(db));
         let fallback_error = fallback.err().map(|error| error.kind(db));
         let fallback_member = fallback.unwrap_or_else(|error| error.fallback_member(db));
+        let fallback_properties = fallback_member.deprecated_properties(db);
+        let fallback_member = fallback_member.member(db);
 
         // A slot stores the same instance attribute described by the receiver's declarations.
         // Unlike an arbitrary data descriptor, its inherited getter must not hide a more precise
@@ -4900,7 +5144,7 @@ impl<'db> Type<'db> {
             && matches!(meta_attr_ty, Some(Type::SlotDescriptor(_)))
             && !fallback_member.place.is_undefined()
         {
-            return member_lookup_result(db, fallback_member, fallback_error);
+            return fallback;
         }
 
         let PlaceAndQualifiers {
@@ -4918,6 +5162,7 @@ impl<'db> Type<'db> {
                     .with_qualifiers(meta_attr_qualifiers)
                     .with_projection_evidence_requirement(meta_needs_projection_evidence),
                 meta_attr_error,
+                meta_properties,
             ),
 
             // `meta_attr` is the return type of a data descriptor and definitely bound, so we
@@ -4935,6 +5180,7 @@ impl<'db> Type<'db> {
                     .with_qualifiers(meta_attr_qualifiers)
                     .with_projection_evidence_requirement(meta_needs_projection_evidence),
                 meta_attr_error,
+                meta_properties,
             ),
 
             // `meta_attr` is the return type of a data descriptor, but the attribute on the
@@ -4970,6 +5216,7 @@ impl<'db> Type<'db> {
                     meta_needs_projection_evidence || fallback_needs_projection_evidence,
                 ),
                 meta_attr_error.or(fallback_error),
+                union_deprecated_properties(db, meta_properties, fallback_properties),
             ),
 
             // `meta_attr` is *not* a data descriptor. This means that the `fallback` type has
@@ -4993,6 +5240,7 @@ impl<'db> Type<'db> {
                     .with_qualifiers(fallback_qualifiers)
                     .with_projection_evidence_requirement(fallback_needs_projection_evidence),
                 fallback_error,
+                fallback_properties,
             ),
 
             // `meta_attr` is *not* a data descriptor. The `fallback` symbol is either possibly
@@ -5028,6 +5276,7 @@ impl<'db> Type<'db> {
                     meta_needs_projection_evidence || fallback_needs_projection_evidence,
                 ),
                 meta_attr_error.or(fallback_error),
+                union_deprecated_properties(db, meta_properties, fallback_properties),
             ),
 
             // If the attribute is not found on the meta-type, we simply return the fallback.
@@ -5037,6 +5286,7 @@ impl<'db> Type<'db> {
                     .with_qualifiers(fallback_qualifiers)
                     .with_projection_evidence_requirement(fallback_needs_projection_evidence),
                 fallback_error,
+                fallback_properties,
             ),
         }
     }
@@ -5055,6 +5305,7 @@ impl<'db> Type<'db> {
     ) -> PlaceAndQualifiers<'db> {
         self.try_member_lookup(db, env, name)
             .unwrap_or_else(|error| error.fallback_member(db))
+            .member(db)
     }
 
     /// Performs member lookup while retaining errors from implicit attribute-access methods.
@@ -5142,7 +5393,8 @@ impl<'db> Type<'db> {
                 // Variance accounts for aliases without expanding recursive specializations,
                 // and ignores alias arguments that do not affect the resulting type.
                 && generic_context.variables(db).any(|typevar| {
-                    ty.variance_of(db, env, typevar.identity(db)) != TypeVarVariance::Bivariant
+                    ty.variance_of(db, env, typevar.identity(db)).evaluate(db)
+                        != TypeVarVariance::Bivariant
                 })
         })
     }
@@ -5158,6 +5410,7 @@ impl<'db> Type<'db> {
     ) -> PlaceAndQualifiers<'db> {
         self.member_lookup_with_policy_and_receiver(db, env, name, policy, None)
             .unwrap_or_else(|error| error.fallback_member(db))
+            .member(db)
     }
 
     /// Perform member lookup while optionally binding descriptors and `Self` to a more precise
@@ -5175,7 +5428,7 @@ impl<'db> Type<'db> {
     ) -> MemberLookupResult<'db> {
         #[salsa::tracked(
             returns(copy),
-            cycle_initial=|_, id, _| Ok(Place::bound(Type::divergent(id)).into()),
+            cycle_initial=|_, id, _| Place::bound(Type::divergent(id)).into(),
             cycle_fn=|db, cycle, previous: &MemberLookupResult<'db>, member: MemberLookupResult<'db>, key: MemberLookupKey<'db>| {
                 cycle_normalized_member_lookup(db, &ProgramEnvironment::from_program(key.program(db)), member, *previous, cycle)
             },
@@ -5190,7 +5443,7 @@ impl<'db> Type<'db> {
 
         #[salsa::tracked(
             returns(copy),
-            cycle_initial=|_, id, _, _| Ok(Place::bound(Type::divergent(id)).into()),
+            cycle_initial=|_, id, _, _| Place::bound(Type::divergent(id)).into(),
             cycle_fn=|db, cycle, previous: &MemberLookupResult<'db>, member: MemberLookupResult<'db>, key: MemberLookupKey<'db>, _| {
                 cycle_normalized_member_lookup(db, &ProgramEnvironment::from_program(key.program(db)), member, *previous, cycle)
             },
@@ -5214,7 +5467,9 @@ impl<'db> Type<'db> {
                 env: &ProgramEnvironment<'db>,
                 result: MemberLookupResult<'db>,
             ) -> MemberLookupResult<'db> {
-                let member = result.unwrap_or_else(|error| error.fallback_member(db));
+                let member = result
+                    .unwrap_or_else(|error| error.fallback_member(db))
+                    .member(db);
                 let should_promote = matches!(
                     member.place,
                     Place::Defined(DefinedPlace {
@@ -5273,6 +5528,7 @@ impl<'db> Type<'db> {
 
                 if result
                     .unwrap_or_else(|error| error.fallback_member(db))
+                    .member(db)
                     .is_class_var()
                     && this.is_typed_dict()
                 {
@@ -5310,14 +5566,21 @@ impl<'db> Type<'db> {
             match this {
                 Type::Union(union) => {
                     let mut error = None;
+                    let mut properties = None;
                     let member = union.map_with_boundness_and_qualifiers(db, env, |elem| {
                         let result = elem.member_lookup_with_policy_and_receiver(
                             db, env, name_str, policy, receiver,
                         );
                         error = error.or_else(|| result.err().map(|error| error.kind(db)));
-                        result.unwrap_or_else(|error| error.fallback_member(db))
+                        let member = result.unwrap_or_else(|error| error.fallback_member(db));
+                        properties = union_deprecated_properties(
+                            db,
+                            properties,
+                            member.deprecated_properties(db),
+                        );
+                        member.member(db)
                     });
-                    member_lookup_result(db, member, error)
+                    member_lookup_result(db, member, error, properties)
                 }
 
                 Type::Intersection(intersection) => {
@@ -5329,15 +5592,32 @@ impl<'db> Type<'db> {
                     } else {
                         let receiver = Some(receiver.unwrap_or(this));
                         let mut error = None;
+                        let mut properties: Option<PropertyDeprecations<'db>> = None;
+                        let mut all_deprecated = true;
                         let member =
                             intersection.map_with_boundness_and_qualifiers(db, env, |elem| {
                                 let result = elem.member_lookup_with_policy_and_receiver(
                                     db, env, name_str, policy, receiver,
                                 );
                                 error = error.or_else(|| result.err().map(|error| error.kind(db)));
-                                result.unwrap_or_else(|error| error.fallback_member(db))
+                                let member =
+                                    result.unwrap_or_else(|error| error.fallback_member(db));
+                                if let Some(deprecated) = member.deprecated_properties(db) {
+                                    properties =
+                                        Some(properties.map_or(deprecated, |properties| {
+                                            properties.intersection(db, deprecated)
+                                        }));
+                                } else if !member.member(db).place.is_undefined() {
+                                    all_deprecated = false;
+                                }
+                                member.member(db)
                             });
-                        member_lookup_result(db, member, error)
+                        member_lookup_result(
+                            db,
+                            member,
+                            error,
+                            properties.filter(|_| all_deprecated && !member.place.is_undefined()),
+                        )
                     }
                 }
 
@@ -5736,6 +6016,7 @@ impl<'db> Type<'db> {
                     if name_str == "func" {
                         match nominal_lookup
                             .unwrap_or_else(|error| error.fallback_member(db))
+                            .member(db)
                             .place
                         {
                             Place::Defined(DefinedPlace {
@@ -5830,6 +6111,7 @@ impl<'db> Type<'db> {
                             db,
                             class_attr_fallback,
                             class_attr_error.map(MemberLookupErrorKind::DescriptorGet),
+                            None,
                         ),
                         InstanceFallbackShadowsNonDataDescriptor::Yes,
                     );
@@ -5931,6 +6213,16 @@ impl<'db> Type<'db> {
                 }),
                 _ => None,
             }
+        }
+
+        if let Type::LiteralValue(literal) = self
+            && let Some(length) = match literal.kind() {
+                LiteralValueTypeKind::String(string) => Some(string.python_len(db)),
+                LiteralValueTypeKind::Bytes(bytes) => Some(bytes.python_len(db)),
+                _ => None,
+            }
+        {
+            return i64::try_from(length).ok().map(Type::int_literal);
         }
 
         let return_ty = match self.try_call_dunder(
@@ -7345,13 +7637,12 @@ impl<'db> Type<'db> {
             return false;
         }
 
-        !matches!(
-            result,
-            Ok(PlaceAndQualifiers {
-                place: Place::Defined(place),
-                ..
-            }) if place.is_definitely_defined()
-        )
+        !result.is_ok_and(|member| {
+            matches!(
+                member.member(db).place,
+                Place::Defined(place) if place.is_definitely_defined()
+            )
+        })
     }
 
     /// Apply `__getattr__` / `__getattribute__` fallback to an attribute-lookup result.
@@ -7372,6 +7663,17 @@ impl<'db> Type<'db> {
                 return MemberLookupResult::from(Place::Undefined);
             }
 
+            if matches!(
+                self,
+                Type::KnownInstance(KnownInstanceType::TypeGenericAlias(_))
+            ) {
+                // `GenericAlias.__getattr__` delegates to `__origin__`. For `type[T]`, the
+                // origin is always `type`, not `T`, even when `T` is `Any`.
+                return KnownClass::Type
+                    .to_class_literal(db, env)
+                    .member_lookup_with_policy_and_receiver(db, env, name, policy, None);
+            }
+
             let name_type = Type::string_literal(db, name);
             match self.try_call_dunder(
                 db,
@@ -7388,6 +7690,7 @@ impl<'db> Type<'db> {
                         receiver: self,
                         name: name_type,
                     }),
+                    None,
                 ),
                 Err(
                     CallDunderError::PossiblyUnbound { .. } | CallDunderError::MethodNotAvailable,
@@ -7423,6 +7726,7 @@ impl<'db> Type<'db> {
                     receiver: self,
                     name: name_type,
                 }),
+                None,
             ),
             Err(CallDunderError::PossiblyUnbound { .. }) => Place::Undefined.into(),
             Err(CallDunderError::MethodNotAvailable) => {
@@ -7432,11 +7736,14 @@ impl<'db> Type<'db> {
 
         if let Err(error) = custom_getattribute {
             let member = result.unwrap_or_else(|error| error.fallback_member(db));
-            return Err(MemberLookupError::new(
+            return member_lookup_result(
                 db,
-                member.or_fall_back_to(db, env, || error.fallback_member(db)),
-                error.kind(db),
-            ));
+                member
+                    .member(db)
+                    .or_fall_back_to(db, env, || error.fallback_member(db).member(db)),
+                Some(error.kind(db)),
+                member.deprecated_properties(db),
+            );
         }
 
         // A custom override runs before the descriptor and might return without invoking it.
@@ -8513,6 +8820,98 @@ impl<'db> Type<'db> {
             return SubclassOfType::from(db, visitor.env, class.default_specialization(db));
         }
 
+        // Expand union-valued `ParamSpec`s before specializing a given callable.
+        if let TypeMapping::ApplySpecialization(specialization)
+        | TypeMapping::ApplySpecializationWithMaterialization { specialization, .. } =
+            type_mapping
+        {
+            let function_signatures = |function: FunctionType<'db>| {
+                if specialization.preserves_lazy_signatures() {
+                    function.updated_signature(db)
+                } else {
+                    Some(function.signature(db))
+                }
+            };
+
+            let signatures = match self {
+                Type::FunctionLiteral(function) => function_signatures(function),
+                Type::BoundMethod(method) => function_signatures(method.function(db)),
+                Type::Callable(callable) => Some(callable.signatures(db)),
+                _ => None,
+            };
+
+            let mut seen = FxHashSet::default();
+            let union_paramspecs = signatures
+                .into_iter()
+                .flat_map(|signatures| signatures.iter())
+                .filter_map(|signature| {
+                    let (_, typevar) = signature.parameters().as_paramspec_with_prefix()?;
+                    let Type::Union(union) = specialization.get(db, typevar)? else {
+                        return None;
+                    };
+
+                    Some((typevar, union))
+                })
+                .filter(|(typevar, _)| seen.insert(typevar.identity(db)))
+                .collect::<Vec<_>>();
+
+            if !union_paramspecs.is_empty() {
+                // Independent union-valued `ParamSpec`s produce a Cartesian product. Bound
+                // the expansion to avoid exponential blowup.
+                const MAX_PARAMSPEC_EXPANSION: usize = 64;
+
+                let mut expanded_callables = UnionBuilder::new(db, visitor.env);
+                let mut expansion_size = 1usize;
+                for (_, union) in &union_paramspecs {
+                    expansion_size = expansion_size.saturating_mul(union.elements(db).len());
+                    if expansion_size > MAX_PARAMSPEC_EXPANSION {
+                        return Type::unknown();
+                    }
+
+                    if union.recursively_defined(db).is_yes() {
+                        expanded_callables =
+                            expanded_callables.recursively_defined(RecursivelyDefined::Yes);
+                    }
+                }
+
+                return visitor.visit(db, self, type_mapping, || {
+                    let expanded_paramspecs = union_paramspecs
+                        .iter()
+                        .map(|(typevar, union)| {
+                            union.elements(db).iter().map(move |ty| (*typevar, *ty))
+                        })
+                        .multi_cartesian_product();
+
+                    for bindings in expanded_paramspecs {
+                        // Override the specialization with a specific parameter-list assigned to
+                        // each `ParamSpec` from the union expansion.
+                        let specialization = ApplySpecialization::WithBindings {
+                            specialization,
+                            bindings: &bindings,
+                        };
+
+                        let mapping = match type_mapping {
+                            TypeMapping::ApplySpecializationWithMaterialization {
+                                materialization_kind,
+                                ..
+                            } => TypeMapping::ApplySpecializationWithMaterialization {
+                                specialization,
+                                materialization_kind: *materialization_kind,
+                            },
+                            _ => TypeMapping::ApplySpecialization(specialization),
+                        };
+
+                        // Use a fresh visitor, as the visitor cache does not distinguish
+                        // between these specialization bindings.
+                        let callable = self.apply_type_mapping(db, visitor.env, &mapping, tcx);
+                        expanded_callables.add_in_place(callable);
+                    }
+
+                    expanded_callables.build()
+                });
+            }
+        }
+
         match self {
             Type::TypeVar(bound_typevar) => {
                 bound_typevar.apply_type_mapping_impl(db, type_mapping, visitor)
@@ -8745,15 +9144,9 @@ impl<'db> Type<'db> {
                     TypeMapping::ApplySpecialization(specialization)
                     | TypeMapping::ApplySpecializationWithMaterialization {
                         specialization, ..
-                    } if matches!(
-                        specialization,
-                        ApplySpecialization::Specialization { .. }
-                            | ApplySpecialization::TypeAlias(_)
-                            | ApplySpecialization::Partial { .. }
-                    ) =>
+                    } if let Some(mut current_specialization) =
+                        specialization.as_specialization(db) =>
                     {
-                        let mut current_specialization =
-                            specialization.as_specialization(db).unwrap();
                         if let TypeMapping::ApplySpecializationWithMaterialization {
                             materialization_kind,
                             ..
@@ -9447,6 +9840,7 @@ impl<'db> Type<'db> {
             Self::Dynamic(
                 DynamicType::Unknown
                 | DynamicType::UnknownGeneric(_)
+                | DynamicType::UnknownLambdaParameter
                 | DynamicType::AmbiguousOverload,
             ) => Type::SpecialForm(SpecialFormType::Unknown).definition(db, env),
             Self::Divergent(_) => Type::SpecialForm(SpecialFormType::Divergent).definition(db, env),
@@ -9776,7 +10170,7 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
-    ) -> TypeVarVariance {
+    ) -> VarianceTerm<'db> {
         tracing::trace!(
             "Checking variance of '{tvar}' in `{ty:?}`",
             tvar = typevar.identity.name(db),
@@ -9806,18 +10200,20 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
             // A type variable is always covariant in itself.
             Type::TypeVar(other_typevar) if other_typevar.identity(db) == typevar => {
                 // type variables are covariant in themselves
-                TypeVarVariance::Covariant
+                TypeVarVariance::Covariant.into()
             }
             Type::ProtocolInstance(protocol_instance_type) => {
                 protocol_instance_type.variance_of(db, env, typevar)
             }
             Type::TypedDict(typed_dict) => typed_dict.variance_of(db, env, typevar),
             // unions are covariant in their disjuncts
-            Type::Union(union_type) => union_type
-                .elements(db)
-                .iter()
-                .map(|ty| ty.variance_of(db, env, typevar))
-                .collect(),
+            Type::Union(union_type) => VarianceTerm::join(
+                db,
+                union_type
+                    .elements(db)
+                    .iter()
+                    .map(|ty| ty.variance_of(db, env, typevar)),
+            ),
 
             // Products are covariant in their conjuncts. For negative
             // conjuncts, they're contravariant. To see this, suppose we have
@@ -9825,28 +10221,32 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
             // `A`, and so is not assignable to `~A`. On the other hand, a value
             // of type `~A` excludes all `A`s, and thus all `B`s, and so _is_
             // assignable to `~B`.
-            Type::Intersection(intersection_type) => intersection_type
-                .positive(db)
-                .iter()
-                .map(|ty| ty.variance_of(db, env, typevar))
-                .chain(intersection_type.negative(db).iter().map(|ty| {
-                    ty.with_polarity(TypeVarVariance::Contravariant)
-                        .variance_of(db, env, typevar)
-                }))
-                .collect(),
+            Type::Intersection(intersection_type) => VarianceTerm::join(
+                db,
+                intersection_type
+                    .positive(db)
+                    .iter()
+                    .map(|ty| ty.variance_of(db, env, typevar))
+                    .chain(intersection_type.negative(db).iter().map(|ty| {
+                        ty.with_polarity(TypeVarVariance::Contravariant)
+                            .variance_of(db, env, typevar)
+                    })),
+            ),
             Type::EnumComplement(complement) => complement
                 .to_intersection(db, env)
                 .variance_of(db, env, typevar),
-            Type::PropertyInstance(property_instance_type) => [
-                Some(property_instance_type.instance_fallback(db, env)),
-                property_instance_type.getter(db),
-                property_instance_type.setter(db),
-                property_instance_type.deleter(db),
-            ]
-            .into_iter()
-            .flatten()
-            .map(|ty| ty.variance_of(db, env, typevar))
-            .collect(),
+            Type::PropertyInstance(property_instance_type) => VarianceTerm::join(
+                db,
+                [
+                    Some(property_instance_type.instance_fallback(db, env)),
+                    property_instance_type.getter(db),
+                    property_instance_type.setter(db),
+                    property_instance_type.deleter(db),
+                ]
+                .into_iter()
+                .flatten()
+                .map(|ty| ty.variance_of(db, env, typevar)),
+            ),
             // A generic class can store another class's slot descriptor directly:
             //
             //     class Owner[T]:
@@ -9878,7 +10278,7 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
             | Type::AlwaysTruthy
             | Type::BoundSuper(_)
             | Type::TypeVar(_)
-            | Type::NewTypeInstance(_) => TypeVarVariance::Bivariant,
+            | Type::NewTypeInstance(_) => VarianceTerm::BIVARIANT,
         };
 
         tracing::trace!(
@@ -10225,6 +10625,8 @@ pub enum DynamicType<'db> {
     /// calls. For now, we replace unspecialized type variables with this marker type, and ignore them
     /// during generic inference.
     UnspecializedTypeVar,
+    /// A provisional marker inferred for a lambda parameter before access to its declared type.
+    UnknownLambdaParameter,
     /// A special variant that represents that `Unknown` was inferred due to an invalid use of
     /// `Concatenate` in a type expression.
     ///
@@ -10254,6 +10656,13 @@ impl DynamicType<'_> {
     fn is_todo(&self) -> bool {
         matches!(self, Self::Todo(_))
     }
+
+    const fn is_provisional_marker(self) -> bool {
+        matches!(
+            self,
+            Self::UnspecializedTypeVar | Self::UnknownLambdaParameter
+        )
+    }
 }
 
 impl std::fmt::Display for DynamicType<'_> {
@@ -10262,6 +10671,7 @@ impl std::fmt::Display for DynamicType<'_> {
             DynamicType::Any => f.write_str("Any"),
             DynamicType::Unknown
             | DynamicType::UnknownGeneric(_)
+            | DynamicType::UnknownLambdaParameter
             | DynamicType::InvalidConcatenateUnknown
             | DynamicType::AmbiguousOverload => f.write_str("Unknown"),
             DynamicType::UnspecializedTypeVar => f.write_str("UnspecializedTypeVar"),
@@ -11010,6 +11420,7 @@ impl<'db> ModuleLiteralType<'db> {
                     needs_projection_evidence_from_types: false,
                 },
                 error,
+                None,
             );
         }
 
@@ -11176,7 +11587,7 @@ impl<'db> VarianceInferable<'db> for TypeIsType<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
-    ) -> TypeVarVariance {
+    ) -> VarianceTerm<'db> {
         self.type_argument(db)
             .with_polarity(TypeVarVariance::Invariant)
             .variance_of(db, env, typevar)
@@ -11248,7 +11659,7 @@ impl<'db> VarianceInferable<'db> for TypeGuardType<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
-    ) -> TypeVarVariance {
+    ) -> VarianceTerm<'db> {
         self.return_type(db).variance_of(db, env, typevar)
     }
 }

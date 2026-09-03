@@ -466,6 +466,95 @@ Base[P] & Top[Sub[Any]] = Top[Sub[P & Any]]    (Base: covariant, Sub: invariant)
 Base[P] & Top[Sub[Any]] = Top[Sub[P | Any]]    (Base: contravariant, Sub: invariant)
 ```
 
+Above, we made the assumption that `Base` and `Sub` are nominal types. In general, these results do
+not hold for structural types. Consider for example:
+
+```pyi
+from typing import Protocol
+
+class BaseProtocol[T](Protocol):
+    def get1(self) -> T: ...
+
+class SubProtocol[T](BaseProtocol[T], Protocol):
+    def get2(self) -> T: ...
+```
+
+The intersection `BaseProtocol[P] & SubProtocol[object]` is not equivalent to `SubProtocol[P]`.
+Consider the following `CounterExample` class which is a subtype of the intersection, but not a
+subtype of `SubProtocol[P]`.
+
+```pyi
+class CounterExample:
+    def get1(self) -> P: ...
+    def get2(self) -> object: ...
+
+static_assert(is_subtype_of(CounterExample, BaseProtocol[P] & SubProtocol[object]))
+static_assert(not is_subtype_of(CounterExample, SubProtocol[P]))
+```
+
+This proves that `BaseProtocol[P] & SubProtocol[object]` is not equivalent to `SubProtocol[P]`:
+
+```pyi
+static_assert(not is_equivalent_to(BaseProtocol[P] & SubProtocol[object], SubProtocol[P]))
+```
+
+However, there are cases where this simplification would be helpful. Consider narrowing something of
+type `Iterable[P]` via `isinstance(.., frozenset)`. It would be useful to get a narrowed type with a
+(read) element type `P`.
+
+```pyi
+from typing import Iterable
+
+def f(xs: Iterable[P]) -> None:
+    if isinstance(xs, frozenset):
+        for x in xs:
+            x  # we would like this to be of type `P`
+```
+
+Let's look at the (simplified) definitions of `Iterable` and `frozenset`:
+
+```ignore
+class Iterable[T_co](Protocol):
+    def __iter__(self) -> Iterator[T_co]: ...
+
+class frozenset[T_co](AbstractSet[T_co]):
+    def __iter__(self) -> Iterator[T_co]: ...
+```
+
+Just like in the counterexample above, we could construct a class that is a (nominal) subtype of
+`frozenset[object]` and a (structural) subtype of `Iterable[P]` (and therefore a subtype of the
+intersection `Iterable[P] & frozenset[object]`), but not a subtype of `frozenset[P]`:
+
+```pyi
+from typing import Iterable, Iterator
+
+class Weird(frozenset[object]):
+    def __iter__(self) -> Iterator[P]: ...
+```
+
+The return type of `Iterator[P]` is compatible with that of `frozenset[object]` due to covariance.
+However, the returned iterator would only yield values of type `P` while the underlying `frozenset`
+may contain other values. Here, we assume that subclasses of built-in containers preserve their
+usual iteration behavior instead: iteration over a `frozenset` exposes its stored elements. Under
+this assumption, knowing the iteration element type also constrains the stored element type. This
+behavioral assumption is not enforced by the type system, so the simplification is unsound:
+
+```pyi
+static_assert(is_equivalent_to(Iterable[P] & tuple[object, ...], tuple[P, ...]))
+static_assert(is_equivalent_to(Iterable[P] & frozenset[object], frozenset[P]))
+static_assert(is_equivalent_to(Iterable[P] & Top[list[Any]], Top[list[P & Any]]))
+static_assert(is_equivalent_to(Iterable[P] & Top[set[Any]], Top[set[P & Any]]))
+```
+
+A similar justification applies to the following case. `Iterator`s are supposed to follow a
+[behavioral contract](https://docs.python.org/3/library/stdtypes.html#iterator-types): an iterator's
+`__iter__()` returns the iterator itself. Iteration and direct calls to `next()` therefore yield the
+same values. This supports simplifying `Iterable[P] & Iterator[object]` to `Iterator[P]`:
+
+```pyi
+static_assert(is_equivalent_to(Iterable[P] & Iterator[object], Iterator[P]))
+```
+
 ## Edge cases
 
 ### Multi-parameter and mixed-variance generics

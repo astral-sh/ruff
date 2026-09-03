@@ -11,6 +11,7 @@ use crate::{
         LiteralValueTypeKind, MemberLookupPolicy, Parameter, Parameters, Signature,
         SubclassOfInner, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, UnionType,
         constraints::{ConstraintSet, IteratorConstraintsExtension},
+        function::OverloadLiteral,
         known_instance::FunctoolsPartialInstance,
         relation::{TypeRelation, TypeRelationChecker},
         signatures::{CallableSignature, PartialSignatureApplication},
@@ -190,10 +191,9 @@ impl<'db> Type<'db> {
                                     .signatures(db)
                                     .into_iter()
                                     .map(|sig| sig.clone().with_return_type(Type::TypeVar(tvar)));
-                                CallableType::new(
+                                callable.with_signatures(
                                     db,
                                     CallableSignature::from_overloads(signatures),
-                                    callable.kind(db),
                                 )
                             }))
                         }
@@ -210,10 +210,9 @@ impl<'db> Type<'db> {
                                         callable.signatures(db).into_iter().map(|sig| {
                                             sig.clone().with_return_type(Type::TypeVar(tvar))
                                         });
-                                    callables.push(CallableType::new(
+                                    callables.push(callable.with_signatures(
                                         db,
                                         CallableSignature::from_overloads(signatures),
-                                        callable.kind(db),
                                     ));
                                 }
                             }
@@ -404,13 +403,18 @@ impl From<TypeRelation> for UpcastPolicy {
 /// It can be written in type expressions using `typing.Callable`. `lambda` expressions are
 /// inferred directly as `CallableType`s; all function-literal types are subtypes of a
 /// `CallableType`.
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
 pub struct CallableType<'db> {
     #[returns(ref)]
     pub(crate) signatures: CallableSignature<'db>,
 
     #[returns(copy)]
     pub(super) kind: CallableTypeKind,
+
+    /// The declaration on which `@deprecated` wrapped this callable. Retain the declaration
+    /// for diagnostic names, source annotations, and deduplication, independently of binding kind.
+    #[returns(copy)]
+    pub(crate) deprecated: Option<OverloadLiteral<'db>>,
 }
 
 pub(super) fn walk_callable_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -427,6 +431,31 @@ pub(super) fn walk_callable_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 impl get_size2::GetSize for CallableType<'_> {}
 
 impl<'db> CallableType<'db> {
+    pub(crate) fn new<S>(db: &'db dyn Db, signatures: S, kind: CallableTypeKind) -> Self
+    where
+        S: salsa::Lookup<CallableSignature<'db>> + std::hash::Hash,
+        CallableSignature<'db>: salsa::HashEqLike<S>,
+    {
+        Self::new_internal(db, signatures, kind, None)
+    }
+
+    pub(crate) fn with_deprecated(self, db: &'db dyn Db, deprecated: OverloadLiteral<'db>) -> Self {
+        Self::new_internal(db, self.signatures(db), self.kind(db), Some(deprecated))
+    }
+
+    /// Replace the signatures without losing binding behavior or deprecation metadata.
+    pub(crate) fn with_signatures<S>(self, db: &'db dyn Db, signatures: S) -> Self
+    where
+        S: salsa::Lookup<CallableSignature<'db>> + std::hash::Hash,
+        CallableSignature<'db>: salsa::HashEqLike<S>,
+    {
+        Self::new_internal(db, signatures, self.kind(db), self.deprecated(db))
+    }
+
+    pub(crate) fn with_kind(self, db: &'db dyn Db, kind: CallableTypeKind) -> Self {
+        Self::new_internal(db, self.signatures(db), kind, self.deprecated(db))
+    }
+
     pub(crate) fn single(db: &'db dyn Db, signature: Signature<'db>) -> CallableType<'db> {
         CallableType::new(
             db,
@@ -487,7 +516,22 @@ impl<'db> CallableType<'db> {
     }
 
     pub(crate) fn into_regular(self, db: &'db dyn Db) -> CallableType<'db> {
-        CallableType::new(db, self.signatures(db), CallableTypeKind::Regular)
+        self.with_kind(db, CallableTypeKind::Regular)
+    }
+
+    /// Retain every parameter signature and its generic context, but erase return types
+    /// that do not participate in a `ParamSpec` specialization.
+    pub(crate) fn into_paramspec_value(self, db: &'db dyn Db) -> CallableType<'db> {
+        CallableType::new(
+            db,
+            CallableSignature::from_overloads(
+                self.signatures(db)
+                    .iter()
+                    .cloned()
+                    .map(|signature| signature.with_return_type(Type::unknown())),
+            ),
+            CallableTypeKind::ParamSpecValue,
+        )
     }
 
     /// Returns the reduced callable produced by partially applying selected overloads.
@@ -534,19 +578,15 @@ impl<'db> CallableType<'db> {
             return self.into_regular(db);
         }
 
-        CallableType::new(
-            db,
-            self.signatures(db).bind_self(db, env, self_type),
-            self.kind(db),
-        )
+        self.with_signatures(db, self.signatures(db).bind_self(db, env, self_type))
     }
 
     pub(crate) fn into_function_like(self, db: &'db dyn Db) -> CallableType<'db> {
-        CallableType::new(db, self.signatures(db), CallableTypeKind::FunctionLike)
+        self.with_kind(db, CallableTypeKind::FunctionLike)
     }
 
     pub(crate) fn into_dunder_paramspec(self, db: &'db dyn Db) -> CallableType<'db> {
-        CallableType::new(db, self.signatures(db), CallableTypeKind::DunderParamSpec)
+        self.with_kind(db, CallableTypeKind::DunderParamSpec)
     }
 
     pub(crate) fn apply_self(
@@ -565,11 +605,10 @@ impl<'db> CallableType<'db> {
         receiver_type: Type<'db>,
         self_type: Type<'db>,
     ) -> CallableType<'db> {
-        CallableType::new(
+        self.with_signatures(
             db,
             self.signatures(db)
                 .apply_self_with_receiver(db, env, receiver_type, self_type),
-            self.kind(db),
         )
     }
 
@@ -588,12 +627,13 @@ impl<'db> CallableType<'db> {
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
-        Some(CallableType::new(
-            db,
-            self.signatures(db)
-                .recursive_type_normalized_impl(db, env, div, nested)?,
-            self.kind(db),
-        ))
+        Some(
+            self.with_signatures(
+                db,
+                self.signatures(db)
+                    .recursive_type_normalized_impl(db, env, div, nested)?,
+            ),
+        )
     }
 
     pub(super) fn apply_type_mapping_impl<'a>(
@@ -607,11 +647,10 @@ impl<'db> CallableType<'db> {
             return replacements.get(&self).copied().unwrap_or(self);
         }
 
-        CallableType::new(
+        self.with_signatures(
             db,
             self.signatures(db)
                 .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-            self.kind(db),
         )
     }
 

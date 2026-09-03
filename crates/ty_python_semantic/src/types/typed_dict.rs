@@ -19,7 +19,7 @@ use super::diagnostic::{
 use super::infer::{TypeExpressionFlags, infer_deferred_types};
 use super::{
     ApplyTypeMappingVisitor, BoundTypeVarIdentity, ErrorContext, IntersectionType, Type,
-    TypeMapping, TypeQualifiers, TypeVarVariance, UnionBuilder, VarianceInferable,
+    TypeMapping, TypeQualifiers, TypeVarVariance, UnionBuilder, VarianceInferable, VarianceTerm,
     definition_expression_annotation, definition_expression_type, visitor,
 };
 use crate::types::TypeContext;
@@ -27,6 +27,7 @@ use crate::types::TypeDefinition;
 use crate::types::class::FieldKind;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::relation::{DisjointnessChecker, TypeRelation, TypeRelationChecker};
+use crate::types::variance::VarianceOrigin;
 use crate::{Db, ProgramEnvironment};
 use ty_python_core::Truthiness;
 use ty_python_core::definition::Definition;
@@ -557,8 +558,9 @@ impl<'db> TypedDictType<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
-    ) -> TypeVarVariance {
-        self.items(db)
+    ) -> VarianceTerm<'db> {
+        let variances = self
+            .items(db)
             .values()
             .map(|field| (field.declared_ty, field.is_read_only()))
             .chain(
@@ -572,8 +574,8 @@ impl<'db> TypedDictType<'db> {
                     TypeVarVariance::Invariant
                 };
                 ty.with_polarity(polarity).variance_of(db, env, typevar)
-            })
-            .collect()
+            });
+        VarianceTerm::join(db, variances)
     }
 
     pub(crate) fn apply_type_mapping_impl<'a>(
@@ -1373,7 +1375,7 @@ impl<'db> VarianceInferable<'db> for TypedDictType<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
-    ) -> TypeVarVariance {
+    ) -> VarianceTerm<'db> {
         match self {
             Self::Class(class) if class.static_class_literal(db).is_some() => {
                 // Compose each type parameter's variance with its type argument. Inferred variance
@@ -1382,22 +1384,7 @@ impl<'db> VarianceInferable<'db> for TypedDictType<'db> {
                 class.variance_of(db, env, typevar)
             }
             Self::Class(class) => {
-                #[salsa::tracked(
-                    returns(copy),
-                    cycle_initial=|_, _, _, _| TypeVarVariance::Bivariant,
-                    heap_size=ruff_memory_usage::heap_size
-                )]
-                fn functional_variance<'db>(
-                    db: &'db dyn Db,
-                    class: ClassType<'db>,
-                    typevar: BoundTypeVarIdentity<'db>,
-                ) -> TypeVarVariance {
-                    let env =
-                        ProgramEnvironment::from_file(class.class_literal(db).program_file(db));
-                    TypedDictType::new(class).variance_of_items(db, &env, typevar)
-                }
-
-                functional_variance(db, class, typevar)
+                VarianceTerm::variable(db, VarianceOrigin::TypedDict(class), typevar)
             }
             Self::Synthesized(_) => self.variance_of_items(db, env, typevar),
         }
