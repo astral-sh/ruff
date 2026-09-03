@@ -60,7 +60,9 @@ use crate::types::call::bind::{
     ArgumentTypeContext, CallableDescription, CheckTypesMode, OverloadSet,
     requires_overload_evaluation,
 };
-use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorKind};
+use crate::types::call::{
+    Binding, Bindings, CallArguments, CallError, CallErrorKind, InferredArgument,
+};
 use crate::types::callable::CallableTypeKind;
 use crate::types::class::{
     ClassLiteral, CodeGeneratorKind, FrozenDataclassDispatch, MethodDecorator,
@@ -181,7 +183,6 @@ mod type_call;
 mod type_expression;
 mod type_form;
 mod typed_dict;
-mod typeguard;
 mod typevar;
 
 use super::comparisons;
@@ -5780,7 +5781,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if let Err(call_error) = self.infer_and_check_argument_types(
                     ast_arguments,
                     argument_types,
-                    infer_argument_ty,
+                    &mut |builder, argument| infer_argument_ty(builder, argument).into(),
                     &mut bindings,
                     call_expression_tcx,
                 ) {
@@ -5807,7 +5808,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         &mut self,
         ast_arguments: ArgumentsIter<'_>,
         argument_types: &mut CallArguments<'_, 'db>,
-        infer_argument_ty: &mut dyn FnMut(&mut Self, ArgExpr<'db, '_>) -> Type<'db>,
+        infer_argument_ty: &mut dyn FnMut(&mut Self, ArgExpr<'db, '_>) -> InferredArgument<'db>,
         bindings: &mut Bindings<'db>,
         call_expression_tcx: TypeContext<'db>,
     ) -> Result<(), CallErrorKind> {
@@ -6039,7 +6040,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         ast_arguments: ArgumentsIter<'_>,
         argument_types: &mut CallArguments<'call, 'db>,
         baseline_argument_types: &CallArguments<'call, 'db>,
-        infer_argument_ty: &mut dyn FnMut(&mut Self, ArgExpr<'db, '_>) -> Type<'db>,
+        infer_argument_ty: &mut dyn FnMut(&mut Self, ArgExpr<'db, '_>) -> InferredArgument<'db>,
         bindings: &mut Bindings<'db>,
         constraints: &ConstraintSetBuilder<'db>,
         call_expression_tcx: TypeContext<'db>,
@@ -6132,7 +6133,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         &mut self,
         ast_arguments: &ArgumentsIter<'_>,
         argument_types: &mut CallArguments<'_, 'db>,
-        infer_argument_ty: &mut dyn FnMut(&mut Self, ArgExpr<'db, '_>) -> Type<'db>,
+        infer_argument_ty: &mut dyn FnMut(&mut Self, ArgExpr<'db, '_>) -> InferredArgument<'db>,
         bindings: &mut Bindings<'db>,
         constraints: &ConstraintSetBuilder<'db>,
         call_expression_tcx: TypeContext<'db>,
@@ -6394,7 +6395,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         ast_arguments: ArgumentsIter<'_>,
         argument_types: &mut CallArguments<'_, 'db>,
         arguments_tcx: &[Option<MatchingArgumentTypeContext<'db>>],
-        infer_argument_ty: &mut dyn FnMut(&mut Self, ArgExpr<'db, '_>) -> Type<'db>,
+        infer_argument_ty: &mut dyn FnMut(&mut Self, ArgExpr<'db, '_>) -> InferredArgument<'db>,
         mode: CallArgumentInferenceMode,
     ) {
         let insert_argument_ty =
@@ -9111,6 +9112,58 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         ))
     }
 
+    /// Capture dependencies before another inference context replaces the expression's result.
+    fn inferred_argument(&self, expression: &ast::Expr, ty: Type<'db>) -> InferredArgument<'db> {
+        InferredArgument {
+            ty,
+            symbolic: self
+                .symbolic
+                .get(&InferenceSlot::Expression(expression.into()))
+                .copied(),
+        }
+    }
+
+    /// Retain a call using its already-inferred callable and argument types.
+    fn store_call_constraints(
+        &mut self,
+        expression: &ast::ExprCall,
+        callable: Type<'db>,
+        arguments: &CallArguments<'_, 'db>,
+        context: TypeContext<'db>,
+    ) {
+        let symbolic = self
+            .symbolic
+            .get(&InferenceSlot::Expression(expression.func.as_ref().into()))
+            .copied();
+        // Dynamic callables, including unmaterialized `Divergent`, use a signature whose return
+        // type is the callable itself, regardless of its arguments. If a symbolic callable later
+        // resolves to a concrete signature, the next cycle iteration records that call instead.
+        if callable.is_dynamic() {
+            return;
+        }
+        if symbolic.is_none() && !arguments.has_symbolic_types() {
+            return;
+        }
+        let db = self.db();
+        let env = self.program_environment();
+        let mut constraints = InferenceConstraints::default();
+        let callable = symbolic.map_or(callable, |symbolic| constraints.import(db, symbolic));
+        let arguments = arguments.capture(db, &mut constraints);
+        let slot = InferenceSlot::Expression(ExprRef::Call(expression).into());
+        let result = constraints.apply(
+            db,
+            env,
+            InferenceOwner::Region(self.region),
+            slot,
+            InferenceOperation::Call {
+                callable,
+                arguments,
+                context,
+            },
+        );
+        self.symbolic.insert(slot, constraints.finish(db, result));
+    }
+
     /// Infer the variadic argument types needed for call binding and emit the shared diagnostics
     /// for invalid `*args` and `**kwargs` inputs.
     fn prepare_call_arguments<'a>(
@@ -9119,19 +9172,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) -> CallArguments<'a, 'db> {
         let db = self.db();
         let env = self.program_environment();
-        let call_arguments =
-            CallArguments::from_arguments(arguments, |arg_or_keyword, splatted_value| {
-                let ty = self.get_or_infer_expression(splatted_value, TypeContext::default());
+        let call_arguments = CallArguments::from_arguments(
+            db,
+            self.scope(),
+            arguments,
+            |arg_or_keyword, splatted_value| {
+                let mut ty = self.get_or_infer_expression(splatted_value, TypeContext::default());
                 if let ast::ArgOrKeyword::Arg(argument) = arg_or_keyword
                     && argument.is_starred_expr()
                 {
                     self.store_expression_type(argument, ty);
-                } else if let Some(ty) = self.try_narrow_dict_kwargs(ty, arg_or_keyword) {
-                    return ty;
+                } else if let Some(narrowed) = self.try_narrow_dict_kwargs(ty, arg_or_keyword) {
+                    ty = narrowed;
                 }
 
-                ty
-            });
+                self.inferred_argument(splatted_value, ty)
+            },
+        );
 
         for arg in &arguments.args {
             if let ast::Expr::Starred(ast::ExprStarred { value, .. }) = arg {
@@ -9780,7 +9837,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             &mut |builder, (_, expr, tcx)| {
                 // Permit bare ParamSpecs only in direct names and dotted attributes, so nested
                 // type expressions and calls retain their ordinary validation.
-                if matches!(
+                let ty = if matches!(
                     callable_type,
                     Type::KnownBoundMethod(
                         KnownBoundMethodType::ConstraintSetLowerBound
@@ -9802,9 +9859,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     ty
                 } else {
                     builder.infer_expression(expr, tcx)
-                }
+                };
+                builder.inferred_argument(expr, ty)
             },
             &mut bindings,
+            call_expression_tcx,
+        );
+        self.store_call_constraints(
+            call_expression,
+            callable_type,
+            &call_arguments,
             call_expression_tcx,
         );
 
@@ -9911,7 +9975,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         // type is keyed, may not be the same as the type context we get here. It is not immediately
                         // clear how to retrieve those types, and so we just re-infer the argument expressions
                         // for simplicity.
-                        &mut |builder, (_, expr, tcx)| builder.infer_expression(expr, tcx),
+                        &mut |builder, (_, expr, tcx)| builder.infer_expression(expr, tcx).into(),
                         &mut identity_bindings,
                         call_expression_tcx,
                     );
@@ -9970,7 +10034,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             _ => return_ty,
         };
 
-        typeguard::bind_type_guard_return_type(db, self.scope(), return_ty, &bindings, arguments)
+        call_arguments.bind_type_guard_return_type(db, return_ty, &bindings)
     }
 
     fn infer_starred_expression(

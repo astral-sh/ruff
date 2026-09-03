@@ -1708,7 +1708,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             // type is keyed, may not be the same as the type context we get here. It is not immediately
                             // clear how to retrieve those types, and so we just re-infer the argument expressions
                             // for simplicity.
-                            builder.infer_maybe_standalone_expression(expr, tcx)
+                            builder.infer_maybe_standalone_expression(expr, tcx).into()
                         },
                         &mut identity_bindings,
                         TypeContext::default(),

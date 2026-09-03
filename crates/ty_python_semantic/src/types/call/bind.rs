@@ -31,7 +31,9 @@ use crate::lint::LintMetadata;
 use crate::place::{DefinedPlace, Definedness, Place};
 use crate::subscript::PyIndex;
 use crate::types::ProgramEnvironment;
-use crate::types::call::arguments::{CallArgumentTypes, Expansion, is_expandable_type};
+use crate::types::call::arguments::{
+    CallArgumentTypes, Expansion, InferredArgument, is_expandable_type,
+};
 use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, PathBound, PathBoundSolution, PathBounds, SolutionPaths,
@@ -7319,7 +7321,7 @@ impl<'db> ArgumentTypeContext<'db> {
         self,
         arguments_types: &mut CallArguments<'_, 'db>,
         argument_index: usize,
-        inferred_ty: Type<'db>,
+        inferred_ty: InferredArgument<'db>,
     ) {
         match self {
             Self::Standard {

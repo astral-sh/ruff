@@ -22,6 +22,7 @@ use ty_python_core::{EvaluationMode, ExpressionNodeKey, NarrowingEvaluator, Prog
 use super::InferenceRegion;
 use crate::place::{Place, PlaceAndQualifiers, SymbolLookupKey};
 use crate::reachability::predicate_scope;
+use crate::types::call::CapturedCallArguments;
 use crate::types::class::AugmentedAttribute;
 use crate::types::class::implicit_attributes::ImplicitAttributeName;
 use crate::types::constraints::{
@@ -290,7 +291,7 @@ impl<'db> Equation<'db> {
         }
     }
 
-    fn visit_types(self, mut visit: impl FnMut(Type<'db>)) {
+    fn visit_types(self, db: &'db dyn Db, mut visit: impl FnMut(Type<'db>)) {
         match self {
             Self::Pending => {}
             Self::Value(ty) => visit(ty),
@@ -299,7 +300,7 @@ impl<'db> Equation<'db> {
                 visit(target);
             }
             Self::Operation(operation) => {
-                operation.map(|ty| {
+                operation.map(db, |ty| {
                     visit(ty);
                     ty
                 });
@@ -331,6 +332,11 @@ pub(crate) enum InferenceOperation<'db> {
     Narrow {
         value: Type<'db>,
         narrowing: InferenceNarrowing<'db>,
+    },
+    Call {
+        callable: Type<'db>,
+        arguments: CapturedCallArguments<'db>,
+        context: TypeContext<'db>,
     },
     MappingKey(Type<'db>),
     MappingValue(Type<'db>),
@@ -383,20 +389,20 @@ impl<'db> InferenceOperation<'db> {
         if current == previous {
             return current;
         }
-        let shape = current.map(|_| Type::Never);
-        let previous_shape = previous.map(|_| Type::Never);
+        let shape = current.map(db, |_| Type::Never);
+        let previous_shape = previous.map(db, |_| Type::Never);
         if shape != previous_shape {
             // Only corresponding type fields can be normalized. A different non-type shape can
             // give those fields different meanings, so do not pair unrelated inputs.
             return current;
         }
         let mut previous_types = Vec::new();
-        previous.map(|ty| {
+        previous.map(db, |ty| {
             previous_types.push(ty);
             ty
         });
         let mut index = 0;
-        current.map(|ty| {
+        current.map(db, |ty| {
             let previous = previous_types[index];
             index += 1;
             ty.cycle_normalized(db, env, previous, cycle)
@@ -412,7 +418,7 @@ impl<'db> InferenceOperation<'db> {
     ) -> Result<(), ProjectionError> {
         let mut terms = 0usize;
         let mut comparisons = 0usize;
-        self.map(|ty| {
+        self.map(db, |ty| {
             let count = Cell::new(0usize);
             any_over_type(db, env, ty, false, |_| {
                 count.set(count.get().saturating_add(1));
@@ -428,7 +434,7 @@ impl<'db> InferenceOperation<'db> {
         Ok(())
     }
 
-    fn map(self, mut f: impl FnMut(Type<'db>) -> Type<'db>) -> Self {
+    fn map(self, db: &'db dyn Db, mut f: impl FnMut(Type<'db>) -> Type<'db>) -> Self {
         match self {
             Self::Subscript { value, key } => Self::Subscript {
                 value: f(value),
@@ -451,6 +457,15 @@ impl<'db> InferenceOperation<'db> {
             Self::Narrow { value, narrowing } => Self::Narrow {
                 value: f(value),
                 narrowing,
+            },
+            Self::Call {
+                callable,
+                arguments,
+                context,
+            } => Self::Call {
+                callable: f(callable),
+                arguments: arguments.map(db, &mut f),
+                context: context.map(f),
             },
             Self::MappingValue(value) => Self::MappingValue(f(value)),
             Self::Unpack {
@@ -517,6 +532,24 @@ impl<'db> InferenceOperation<'db> {
                     variable.0.specialization(db),
                 ))
             }
+            Self::Call {
+                callable,
+                arguments,
+                context,
+            } => {
+                let arguments = arguments.to_arguments(db);
+                let constraints = ConstraintSetBuilder::new();
+                let bindings = callable
+                    .bindings(db, env)
+                    .match_parameters(db, env, &arguments)
+                    .check_types(db, env, &constraints, &arguments, context, &[])
+                    .ok()?;
+                Some(arguments.bind_type_guard_return_type(
+                    db,
+                    bindings.return_type(db, env),
+                    &bindings,
+                ))
+            }
             Self::MappingValue(value) => Some(value.unpack_keys_and_items(db, env)?.1),
             Self::Unpack {
                 value,
@@ -562,7 +595,7 @@ impl InferenceGraph {
         let mut graph = vec![Vec::new(); equations.len()];
         for (index, (_, equation)) in equations.iter().enumerate() {
             let mut dependencies = Vec::new();
-            equation.visit_types(|ty| {
+            equation.visit_types(db, |ty| {
                 let Some(context) = ty.inference_variable_context(db, env.program(db)) else {
                     return;
                 };
@@ -901,7 +934,7 @@ impl<'db> SymbolicType<'db> {
                         source: apply(*source),
                         target: apply(*target),
                     },
-                    Equation::Operation(operation) => Equation::Operation(operation.map(apply)),
+                    Equation::Operation(operation) => Equation::Operation(operation.map(db, apply)),
                 };
                 (variable.specialized(db, specialization), equation)
             })
@@ -1327,10 +1360,10 @@ impl<'db> InferenceSolutions<'_, 'db> {
         let mut deferred = Vec::new();
         for (variable, operation) in operations {
             self.active.push(variable.typevar(self.db));
-            let operation = operation.map(|ty| self.operation_input(ty));
+            let operation = operation.map(self.db, |ty| self.operation_input(ty));
             self.active.pop();
             let mut operation_complete = true;
-            let productive = operation.map(|ty| {
+            let productive = operation.map(self.db, |ty| {
                 self.productive_type(ty).unwrap_or_else(|| {
                     complete = false;
                     operation_complete = false;

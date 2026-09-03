@@ -473,13 +473,20 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ArgumentsIter::from_ast(arguments),
             &mut call_arguments,
             &mut |builder, (_, expr, tcx)| {
-                if can_infer {
+                let ty = if can_infer {
                     builder.infer_expression(expr, tcx)
                 } else {
                     builder.get_or_infer_expression(expr, tcx)
-                }
+                };
+                builder.inferred_argument(expr, ty)
             },
             &mut bindings,
+            call_expression_tcx,
+        );
+        self.store_call_constraints(
+            call_expression,
+            binding_callable,
+            &call_arguments,
             call_expression_tcx,
         );
 

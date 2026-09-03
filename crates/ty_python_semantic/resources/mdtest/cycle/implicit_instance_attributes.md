@@ -635,6 +635,471 @@ def inspect_partial(first: Partial[int], second: Partial[str]):
     reveal_type((first.items[1], second.items[1]))  # revealed: tuple[int, str]
 ```
 
+## Calling a generic function
+
+A generic function preserves a tuple element's type when its result is stored back in the tuple.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def identity(value: T) -> T:
+    return value
+
+class Values:
+    def __init__(self, value: int):
+        self.values = (value,)
+
+    def update(self):
+        self.values = (identity(self.values[0]),)
+        reveal_type(self.values)  # revealed: tuple[int]
+```
+
+## Calling a function returning a type alias
+
+An attribute can be initialized outside the class and copied through a generic function. A type
+alias in the return annotation preserves the assigned value's type.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+type Identity[T] = T
+
+def identity[T](value: T) -> Identity[T]:
+    return value
+
+class Values:
+    def update(self):
+        self.value = identity(self.value)
+
+values = Values()
+values.value = 1
+values.update()
+reveal_type(values.value)  # revealed: Literal[1]
+reveal_type(values.value.bit_length())  # revealed: int
+```
+
+## Calling a function returning nested type aliases
+
+Nested aliases preserve the same relationship between a function's argument and return type.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+type Identity[T] = T
+
+def identity[T](value: T) -> Identity[Identity[T]]:
+    return value
+
+class Values:
+    def update(self):
+        self.value = identity(self.value)
+
+values = Values()
+values.value = 1
+values.update()
+reveal_type(values.value)  # revealed: Literal[1]
+reveal_type(values.value.bit_length())  # revealed: int
+```
+
+## Calling a function returning a manually constructed type alias
+
+An alias created with `TypeAliasType` also preserves the assigned attribute's type.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypeAliasType, TypeVar
+
+T = TypeVar("T")
+Identity = TypeAliasType("Identity", T, type_params=(T,))
+
+def identity[T](value: T) -> Identity[T]:
+    return value
+
+class Values:
+    def update(self):
+        self.value = identity(self.value)
+
+values = Values()
+values.value = 1
+values.update()
+reveal_type(values.value)  # revealed: Literal[1]
+reveal_type(values.value.bit_length())  # revealed: int
+```
+
+## Calling with a keyword argument
+
+Matching the tuple element to a keyword-only parameter preserves the same relationship.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def identity(*, value: T) -> T:
+    return value
+
+class Values:
+    def __init__(self, value: int):
+        self.values = (value,)
+
+    def update(self):
+        self.values = (identity(value=self.values[0]),)
+        reveal_type(self.values)  # revealed: tuple[int]
+```
+
+## Calling with expanded positional arguments
+
+Expanding the tuple into a call preserves the element type when the result is stored back.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def identity(value: T) -> T:
+    return value
+
+class Values:
+    def __init__(self, value: int):
+        self.values = (value,)
+
+    def update(self):
+        self.values = (identity(*self.values),)
+        reveal_type(self.values)  # revealed: tuple[int]
+```
+
+## Calling with expanded keyword arguments
+
+The element type is also preserved when the argument is passed through a dictionary expansion.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def identity(*, value: T) -> T:
+    return value
+
+class Values:
+    def __init__(self, value: int):
+        self.values = (value,)
+
+    def update(self):
+        self.values = (identity(**{"value": self.values[0]}),)
+        reveal_type(self.values)  # revealed: tuple[int]
+```
+
+## Calling an overloaded function
+
+Overload order still applies when an argument comes from the attribute receiving the result. The
+first overload accepts `int`, so the broader `object` overload does not contribute `str`.
+
+```py
+from typing import overload
+
+@overload
+def choose(value: int) -> int: ...
+@overload
+def choose(value: object) -> int | str: ...
+def choose(value: object) -> int | str:
+    return value if isinstance(value, int) else ""
+
+class Values:
+    def __init__(self, value: int):
+        self.values = (value,)
+
+    def update(self):
+        self.values = (choose(self.values[0]),)
+        reveal_type(self.values)  # revealed: tuple[int]
+```
+
+## Rebuilding a generic instance
+
+An iterable's element type determines the type argument of a new instance stored in the same
+attribute.
+
+```py
+from collections.abc import Iterator
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Box(Generic[T]):
+    def __init__(self, value: T):
+        self.value = value
+
+    def __iter__(self) -> Iterator[T]:
+        yield self.value
+
+class Values:
+    def __init__(self, value: int):
+        self.box = Box(value)
+
+    def update(self):
+        for value in self.box:
+            self.box = Box(value)
+        reveal_type(self.box)  # revealed: Box[int]
+```
+
+## Rebuilding a generic typed dictionary
+
+Constructing a new typed dictionary from an existing item's value preserves its type argument.
+
+```py
+from typing import Generic, TypeVar
+from typing_extensions import TypedDict
+
+T = TypeVar("T")
+
+class Record(TypedDict, Generic[T]):
+    value: T
+
+class Values:
+    def __init__(self, value: int):
+        self.records = (Record(value=value),)
+
+    def update(self):
+        self.records = (Record(value=self.records[0]["value"]),)
+        reveal_type(self.records)  # revealed: tuple[Record[int]]
+```
+
+## Narrowing a tuple element with a type predicate
+
+Type predicates narrow an element before it is stored back in its source attribute. Keyword
+arguments select the same narrowing target as positional arguments, and `TypeIs` also narrows the
+negative branch.
+
+```py
+from typing_extensions import TypeGuard, TypeIs
+
+def is_str(value: object) -> TypeIs[str]:
+    return isinstance(value, str)
+
+def guard_str(value: object) -> TypeGuard[str]:
+    return isinstance(value, str)
+
+class WithTypeIs:
+    def __init__(self, value: object):
+        self.values = [value]
+
+    def update(self):
+        (value,) = self.values
+        if is_str(value=value):
+            reveal_type(value)  # revealed: str
+            value.upper()
+            self.values = (value,)
+        else:
+            reveal_type(value)  # revealed: ~str
+            self.values = (value,)
+
+class WithTypeGuard:
+    def __init__(self, value: object):
+        self.values = [value]
+
+    def update(self):
+        (value,) = self.values
+        if guard_str(value=value):
+            reveal_type(value)  # revealed: str
+            value.upper()
+            self.values = (value,)
+```
+
+## Narrowing a generic tuple element
+
+Checking a tuple element against a generic class preserves its type argument. Rebuilding the
+instance from its contents keeps the attribute's original type.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import final
+from typing_extensions import assert_type
+
+@final
+class Box[T]:
+    def __init__(self, value: T):
+        self.value = value
+
+    def unwrap(self) -> T:
+        return self.value
+
+class Values:
+    def __init__(self, value: int | Box[int]):
+        self.value = value
+
+    def update(self):
+        pair = (self.value,)
+        if isinstance(pair[0], Box):
+            assert_type(pair[0], Box[int])
+            self.value = Box(pair[0].unwrap())
+        assert_type(self.value, int | Box[int])
+```
+
+## Collecting a narrowed generic member
+
+An attribute check also preserves the contained type argument. A subsequent falsiness check does not
+specialize a mutable list to falsy integers: the list can still receive other integers.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import final
+from typing_extensions import assert_type
+
+@final
+class Box[T]:
+    def __init__(self, value: T):
+        self.value = value
+
+    def unwrap(self) -> T:
+        return self.value
+
+class Values:
+    def __init__(self, value: int | Box[int]):
+        self.value = value
+
+    def update(self):
+        box = Box(self.value)
+        if isinstance(box.value, Box):
+            value = box.value.unwrap()
+            if not value:
+                items = [value]
+                reveal_type(items)  # revealed: list[int]
+                self.value = Box(items[0])
+        assert_type(self.value, int | Box[int])
+```
+
+## Narrowing a member after a conditional assignment
+
+A member can retain its original value or receive one from another attribute. Narrowing it after the
+branches join keeps both sources when its contents are stored back in those attributes.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import assert_type, final
+
+@final
+class Box[T]:
+    def __init__(self, value: T):
+        self.value = value
+
+    def unwrap(self) -> T:
+        return self.value
+
+class Values:
+    def __init__(self, value: int | str | Box[int | str], other: int | str | Box[int | str]):
+        self.value = value
+        self.other = other
+
+    def update(self, flag: bool):
+        box = Box(self.value)
+        other = Box(self.other)
+        if flag:
+            box.value = other.value
+        if isinstance(box.value, Box):
+            self.value = Box(box.value.unwrap())
+            self.other = Box(box.value.unwrap())
+        assert_type(self.value, int | str | Box[int | str])
+        assert_type(self.other, int | str | Box[int | str])
+```
+
+## Narrowing a recursive generic alias
+
+A recursive alias can describe nested boxes. Unwrapping and rebuilding a box preserves that alias,
+including when the value is first stored in a tuple.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import assert_type, final
+
+@final
+class Box[T]:
+    def __init__(self, value: T):
+        self.value = value
+
+    def unwrap(self) -> T:
+        return self.value
+
+type Tree[T] = T | Box[Tree[T]]
+
+class Values:
+    def __init__(self, value: Tree[int]):
+        self.value = value
+
+    def update(self):
+        pair = (self.value,)
+        if isinstance(pair[0], Box):
+            self.value = Box(pair[0].unwrap())
+        assert_type(self.value, Tree[int])
+```
+
+## Calling a callable tuple element
+
+A callable object returning itself can be stored back in its source tuple. All argument forms
+participate in the call normally.
+
+```py
+from typing_extensions import Self
+
+class Callable:
+    def __call__(self, dependency: object, *, flag: bool) -> Self:
+        return self
+
+class Values:
+    def __init__(self, value: Callable):
+        self.values = (value,)
+
+    def update(self):
+        self.values = (self.values[0](None, *(), flag=True, **{}),)
+        reveal_type(self.values)  # revealed: tuple[Callable]
+```
+
+## Calling a tuple element's method
+
+A bound method preserves its receiver's type when it returns `Self`.
+
+```py
+from typing_extensions import Self
+
+class Item:
+    def get(self, dependency: object, *, flag: bool) -> Self:
+        return self
+
+class Values:
+    def __init__(self, value: Item):
+        self.values = (value,)
+
+    def update(self):
+        self.values = (self.values[0].get(None, *(), flag=True, **{}),)
+        reveal_type(self.values)  # revealed: tuple[Item]
+```
+
 ## Rebuilding dictionaries from mappings
 
 Reading a value from a mapping and storing it in a new dictionary preserves the value type, even
