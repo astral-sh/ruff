@@ -368,14 +368,71 @@ pub(crate) enum InferenceOperation<'db> {
         length: TupleLength,
         index: usize,
     },
-    Concatenate {
-        left: Type<'db>,
-        right: Type<'db>,
-        right_length: Option<usize>,
-    },
+    TupleLiteral(TupleLiteral<'db>),
     Unary {
         operand: Type<'db>,
         operator: UnaryOp,
+    },
+}
+
+/// A literal's fixed elements and iterable expansions, retained in syntax order.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+pub(crate) struct TupleLiteral<'db> {
+    #[returns(ref)]
+    parts: Box<[TupleLiteralPart<'db>]>,
+}
+
+impl get_size2::GetSize for TupleLiteral<'_> {}
+
+impl<'db> TupleLiteral<'db> {
+    fn map(self, db: &'db dyn Db, mut f: impl FnMut(Type<'db>) -> Type<'db>) -> Self {
+        Self::new(
+            db,
+            self.parts(db)
+                .iter()
+                .map(|part| match *part {
+                    TupleLiteralPart::Fixed(value) => TupleLiteralPart::Fixed(f(value)),
+                    TupleLiteralPart::Starred {
+                        value,
+                        known_length,
+                    } => TupleLiteralPart::Starred {
+                        value: f(value),
+                        known_length,
+                    },
+                })
+                .collect::<Box<[_]>>(),
+        )
+    }
+
+    fn evaluate(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Option<Type<'db>> {
+        let parts = self.parts(db);
+        let mut builder = TupleBuilder::with_capacity(parts.len());
+        for part in parts {
+            match *part {
+                TupleLiteralPart::Fixed(value) => builder.push(value),
+                TupleLiteralPart::Starred {
+                    value,
+                    known_length,
+                } => {
+                    let mut tuple = value.try_iterate(db, env).ok()?.into_owned();
+                    if let Some(length) = known_length {
+                        tuple = tuple.resize(db, env, TupleLength::Fixed(length)).ok()?;
+                    }
+                    builder = builder.concat(db, env, &tuple);
+                }
+            }
+        }
+        Some(Type::tuple(TupleType::new(db, env, &builder.build())))
+    }
+}
+
+/// One literal element or the iterable expanded by a starred element.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, get_size2::GetSize, salsa::SalsaValue)]
+pub(crate) enum TupleLiteralPart<'db> {
+    Fixed(Type<'db>),
+    Starred {
+        value: Type<'db>,
+        known_length: Option<usize>,
     },
 }
 
@@ -548,15 +605,7 @@ impl<'db> InferenceOperation<'db> {
                 length,
                 index,
             },
-            Self::Concatenate {
-                left,
-                right,
-                right_length,
-            } => Self::Concatenate {
-                left: f(left),
-                right: f(right),
-                right_length,
-            },
+            Self::TupleLiteral(literal) => Self::TupleLiteral(literal.map(db, f)),
         }
     }
 
@@ -710,22 +759,7 @@ impl<'db> InferenceOperation<'db> {
                 length,
                 index,
             } => value.unpacked_target(db, env, length, index),
-            Self::Concatenate {
-                left,
-                right,
-                right_length,
-            } => {
-                let left = left.try_iterate(db, env).ok()?;
-                let mut right = right.try_iterate(db, env).ok()?.into_owned();
-                if let Some(length) = right_length {
-                    right = right.resize(db, env, TupleLength::Fixed(length)).ok()?;
-                }
-                let tuple = TupleBuilder::with_capacity(0)
-                    .concat(db, env, &left)
-                    .concat(db, env, &right)
-                    .build();
-                Some(Type::tuple(TupleType::new(db, env, &tuple)))
-            }
+            Self::TupleLiteral(literal) => literal.evaluate(db, env),
         }
     }
 }

@@ -14,7 +14,7 @@ use crate::Db;
 use crate::types::cycle_variable::CycleOutput;
 use crate::types::infer::constraints::{
     InferenceConstraints, InferenceOperation, InferenceOwner, InferenceSlot, InferenceVariable,
-    SymbolicType,
+    SymbolicType, TupleLiteral, TupleLiteralPart,
 };
 use crate::types::infer::{ExpressionInference, FrozenMap};
 use crate::types::tuple::promotion::TupleSizePromotionConstraints;
@@ -768,13 +768,13 @@ impl<'db> SymbolicType<'db> {
             return None;
         }
         let mut constraints = InferenceConstraints::default();
-        let mut left = Type::empty_tuple(db, env);
-        for (index, (element, promote, right_length)) in parts.into_iter().enumerate() {
+        let mut captured = Vec::with_capacity(parts.len());
+        for (element, promote, known_length) in parts {
             let source = element
                 .as_starred_expr()
                 .map_or(element, |starred| &starred.value);
             let (ty, symbolic) = inferred(source);
-            let mut right = symbolic.map_or(ty, |symbolic| constraints.import(db, symbolic));
+            let mut value = symbolic.map_or(ty, |symbolic| constraints.import(db, symbolic));
             if promote {
                 let input = InferenceVariable::new(
                     db,
@@ -782,24 +782,25 @@ impl<'db> SymbolicType<'db> {
                     owner,
                     InferenceSlot::Expression(source.into()),
                 );
-                right = constraints.promote(db, env, input, right, InferencePromotion::Regular);
+                value = constraints.promote(db, env, input, value, InferencePromotion::Regular);
             }
-            if !element.is_starred_expr() {
-                right = Type::heterogeneous_tuple(db, env, [right]);
-            }
-            left = constraints.apply(
-                db,
-                env,
-                owner,
-                InferenceSlot::Component(expression.into(), index),
-                InferenceOperation::Concatenate {
-                    left,
-                    right,
-                    right_length,
-                },
-            );
+            captured.push(if element.is_starred_expr() {
+                TupleLiteralPart::Starred {
+                    value,
+                    known_length,
+                }
+            } else {
+                TupleLiteralPart::Fixed(value)
+            });
         }
-        Some(constraints.finish(db, left))
+        let value = constraints.apply(
+            db,
+            env,
+            owner,
+            InferenceSlot::Expression(expression.into()),
+            InferenceOperation::TupleLiteral(TupleLiteral::new(db, captured.into_boxed_slice())),
+        );
+        Some(constraints.finish(db, value))
     }
 }
 
