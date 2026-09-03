@@ -171,6 +171,91 @@ def _(x: JSONValue):
     reveal_type(x)  # revealed: Sequence[JSONValue] | float | None | Mapping[str, JSONValue]
 ```
 
+## Mutually recursive tuple and union aliases
+
+Mutually recursive tuple and union aliases converge even when the union also references itself. This
+is a regression test for <https://github.com/astral-sh/ty/issues/4443>.
+
+```py
+from typing import Union
+
+a = tuple["b"]
+b = Union["a", "b", int]
+```
+
+## Mutually recursive tuple and union aliases with multiple concrete members
+
+Adding another concrete member to the recursive union also converges. The union keeps both concrete
+members when its recursive part is normalized.
+
+```py
+from typing import Union
+
+a = tuple["b"]
+b = Union["a", "b", int, str]
+
+def f(x: b):
+    reveal_type(x)  # revealed: tuple[Divergent] | int | str
+```
+
+## Mutually recursive union and tuple aliases in reverse order
+
+The recursive union also converges when it is defined before the tuple alias.
+
+```py
+from typing import Union
+
+b = Union["a", "b", int, str]
+a = tuple["b"]
+
+def f(x: b):
+    reveal_type(x)  # revealed: tuple[Divergent] | int | str
+```
+
+## Conditional recursive union values
+
+A conditional expression can initially infer a union of a runtime union value and another class.
+These alternatives preserve the recursive references until the tuple alias is inferred.
+
+```py
+from typing import Union
+
+a = tuple["b"]
+b = Union["a", "b", int] if a else str
+```
+
+## Mutually recursive aliases through two unions
+
+The initial recursive references also survive a chain of two unions before reaching the tuple alias.
+Inference converges without expanding the tuple on every pass through the chain.
+
+```py
+from typing import Union
+
+a = tuple["b"]
+b = Union["c", "b", int]
+c = Union["a", "c", str]
+```
+
+## Self-referential union aliases
+
+A direct self-reference contributes no additional members to a union. Removing it keeps both
+single-member and multi-member unions precise.
+
+```py
+from typing import Union
+
+One = Union["One", int]
+Many = Union["Many", int, str]
+
+def f(x: One, y: Many):
+    reveal_type(x)  # revealed: int
+    reveal_type(y)  # revealed: int | str
+
+f("", 0)  # error: [invalid-argument-type]
+f(0, b"")  # error: [invalid-argument-type]
+```
+
 ## Self-referential legacy type variables
 
 ```py
