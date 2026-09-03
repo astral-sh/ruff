@@ -6053,21 +6053,20 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                         }
 
                         // Filter out inferable typevars (cross-typevar references from
-                        // SequentMap transitivity) and unspecialized typevars (from partially
-                        // specialized contexts).
+                        // SequentMap transitivity) and provisional markers.
                         let inferred_ty = builder
                             .remove_inferable_typevar_artifacts_from_solution(
                                 binding.bound_typevar,
                                 binding.solution,
                             )
                             .filter_union(db, self.env, |ty| {
-                                if ty.has_unspecialized_type_var(db, self.env) {
+                                if ty.has_provisional_marker(db, self.env) {
                                     partially_specialized_declared_type.insert(identity);
                                     return false;
                                 }
                                 true
                             });
-                        if inferred_ty.has_unspecialized_type_var(db, self.env) {
+                        if inferred_ty.has_provisional_marker(db, self.env) {
                             continue;
                         }
 
@@ -7899,6 +7898,15 @@ impl<'db> Binding<'db> {
             }
         }
 
+        // The marker distinguishes unsolved type variables without defaults from gradual types
+        // inferred from arguments. Only the former are ignored during fixpoint iteration.
+        let argument_specialization = self.inference.map(|inference| {
+            inference.merged_specialization_with(db, |typevar, inferred| {
+                (inferred.is_none() && typevar.default_type(db).is_none())
+                    .then_some(Type::Dynamic(DynamicType::UnspecializedTypeVar))
+            })
+        });
+
         // TODO: Note that specializing parameter types for type context using this specialization is
         // not strictly correct, as it requires eagerly choosing a solution for a given type variable,
         // which may conflate upper and lower bounds when applied transitively to parameter types
@@ -7912,10 +7920,9 @@ impl<'db> Binding<'db> {
                 let identity = typevar.identity(db);
 
                 let call_expression_constraints = return_type_solutions.get(&identity).copied();
-                let argument_constraints = self
-                    .merged_specialization(db)
+                let argument_constraints = argument_specialization
                     .and_then(|specialization| specialization.get(db, typevar))
-                    .filter(|ty| !ty.has_dynamic(db, env))
+                    .filter(|ty| !ty.has_provisional_marker(db, env))
                     .map(|ty| ty.promote(db, env));
 
                 // TODO: We should similarly combine both the call expression and argument constraints

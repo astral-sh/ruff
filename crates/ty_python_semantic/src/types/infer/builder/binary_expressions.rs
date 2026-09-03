@@ -426,8 +426,20 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             (unknown @ Type::Dynamic(DynamicType::UnknownGeneric(_)), _, _)
             | (_, unknown @ Type::Dynamic(DynamicType::UnknownGeneric(_)), _) => Some(unknown),
 
-            (typevar @ Type::Dynamic(DynamicType::UnspecializedTypeVar), _, _)
-            | (_, typevar @ Type::Dynamic(DynamicType::UnspecializedTypeVar), _) => Some(typevar),
+            (
+                placeholder @ Type::Dynamic(
+                    DynamicType::UnspecializedTypeVar | DynamicType::UnknownLambdaParameter,
+                ),
+                _,
+                _,
+            )
+            | (
+                _,
+                placeholder @ Type::Dynamic(
+                    DynamicType::UnspecializedTypeVar | DynamicType::UnknownLambdaParameter,
+                ),
+                _,
+            ) => Some(placeholder),
 
             // When both operands are the same constrained TypeVar (e.g., `T: (int, str)`),
             // we check if the operation is valid for each constraint paired with itself.
