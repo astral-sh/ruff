@@ -6,7 +6,7 @@ Released on 2026-09-03.
 
 ### Preview features
 
-- Move `pytest-fixture-autouse` to `restriction` ([#28219](https://github.com/astral-sh/ruff/pull/28219))
+- Move `pytest-fixture-autouse` to the `restriction` category ([#28219](https://github.com/astral-sh/ruff/pull/28219))
 - \[`flake8-pytest-style`\] Add an autofix for `PT020` ([#27993](https://github.com/astral-sh/ruff/pull/27993))
 - \[`flake8-tidy-imports`\] Prevent fix loop between `TID254` and `TID255` ([#28262](https://github.com/astral-sh/ruff/pull/28262))
 - \[`isort`\] Exclude pragma comments from line length calculation (`I001`) ([#27313](https://github.com/astral-sh/ruff/pull/27313))
@@ -16,7 +16,7 @@ Released on 2026-09-03.
 - Validate unary expressions when parsing ([#28233](https://github.com/astral-sh/ruff/pull/28233))
 - \[`flake8-async`, `pylint`\] Recognize `builtins.open` (`ASYNC230`, `PLW1514`) ([#28021](https://github.com/astral-sh/ruff/pull/28021))
 - \[`flake8-bugbear`\] Fix panic on `match` subjects (`B031`) ([#27781](https://github.com/astral-sh/ruff/pull/27781))
-- \[`flake8-datetimez`\] Reject `tzinfo=None` for datetime bounds (`DTZ901`) ([#28022](https://github.com/astral-sh/ruff/pull/28022))
+- \[`flake8-datetimez`\] Reject `tzinfo=None` for `datetime` bounds (`DTZ901`) ([#28022](https://github.com/astral-sh/ruff/pull/28022))
 - \[`flake8-pytest-style`\] Avoid duplicate `PT017` diagnostics ([#27918](https://github.com/astral-sh/ruff/pull/27918))
 - \[`ruff`\] Remove `lint.external` hint for Ruff-specific suppressions (`RUF102`) ([#27923](https://github.com/astral-sh/ruff/pull/27923))
 
