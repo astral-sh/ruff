@@ -383,38 +383,11 @@ info: `Any` is assignable to `int`, but not a subtype of `int`
 help: Consider using an `assert` to narrow the type before assigning it
 ```
 
-## Unsound assignments to starred unpacking targets
+## Starred captures with dynamic elements
 
-A starred unpacking target identifies the dynamic expression collected into the assigned list.
-
-```py
-from typing import Any
-
-def returns_any() -> Any:
-    return "not an integer"
-
-middle: list[int]
-first, *middle, last = (0, returns_any(), 1)  # snapshot: unsound-assignment
-```
-
-```snapshot
-error[unsound-assignment]: Unsound assignment
- --> src/mdtest_snippet.py:7:28
-  |
-6 | middle: list[int]
-  |         --------- Expected a subtype of `list[int]` because of this annotation
-7 | first, *middle, last = (0, returns_any(), 1)  # snapshot: unsound-assignment
-  |         ------             ^^^^^^^^^^^^^ Iterable element inferred as `Any` (expected a subtype of `int`)
-  |         |
-  |         Assigned to this variable
-info: `list[Any]` is assignable to `list[int]`, but not a subtype of `list[int]`
-help: Consider using an `assert` to narrow the type before assigning it
-```
-
-## Multiple unsound values assigned to starred unpacking targets
-
-When a starred target collects multiple values, the unsound-assignment diagnostic covers the entire
-collected slice without including the surrounding unpacked values.
+A starred target receives a new list, whose type is inferred using the target's annotation. As with
+an ordinary list literal, `list[int]` context produces `list[int]` even when an element has type
+`Any`. Neither form emits `unsound-assignment`.
 
 ```py
 from typing import Any
@@ -422,23 +395,51 @@ from typing import Any
 def returns_any() -> Any:
     return "not an integer"
 
-middle: list[int]
-first, *middle, last = (0, 1, returns_any(), 2, 3)  # snapshot: unsound-assignment
+middle: list[int] = [returns_any()]
+reveal_type(middle)  # revealed: list[int]
+
+first, *middle, last = (0, returns_any(), 1)
+reveal_type(first)  # revealed: Literal[0]
+reveal_type(middle)  # revealed: list[int]
+reveal_type(last)  # revealed: Literal[1]
+
+first, *middle, last = [0, returns_any(), 1]
+reveal_type(first)  # revealed: Literal[0]
+reveal_type(middle)  # revealed: list[int]
+reveal_type(last)  # revealed: Literal[1]
 ```
 
-```snapshot
-error[unsound-assignment]: Unsound assignment
- --> src/mdtest_snippet.py:7:28
-  |
-6 | middle: list[int]
-  |         --------- Expected a subtype of `list[int]` because of this annotation
-7 | first, *middle, last = (0, 1, returns_any(), 2, 3)  # snapshot: unsound-assignment
-  |         ------             ^^^^^^^^^^^^^^^^^^^ Iterable element inferred as `int | Any` (expected a subtype of `int`)
-  |         |
-  |         Assigned to this variable
-info: `list[int | Any]` is assignable to `list[int]`, but not a subtype of `list[int]`
-info: element `Any` of union `int | Any` is not a subtype of `int`
-help: Consider using an `assert` to narrow the type before assigning it
+Capturing elements from an existing tuple also creates a new list. The annotation supplies context
+for that list without changing the source tuple's type.
+
+```py
+values = (0, returns_any(), 1)
+first, *middle, last = values
+
+reveal_type(first)  # revealed: Literal[0]
+reveal_type(middle)  # revealed: list[int]
+reveal_type(last)  # revealed: Literal[1]
+reveal_type(values)  # revealed: tuple[Literal[0], Any, Literal[1]]
+```
+
+## Multiple captured elements with dynamic types
+
+Mixing integers with an `Any` element uses the same `list[int]` context for list literals and
+starred captures. Both infer `list[int]` without emitting `unsound-assignment`.
+
+```py
+from typing import Any
+
+def returns_any() -> Any:
+    return "not an integer"
+
+middle: list[int] = [1, returns_any(), 2]
+reveal_type(middle)  # revealed: list[int]
+
+first, *middle, last = (0, 1, returns_any(), 2, 3)
+reveal_type(first)  # revealed: Literal[0]
+reveal_type(middle)  # revealed: list[int]
+reveal_type(last)  # revealed: Literal[3]
 ```
 
 ## Unsound assignments to for-loop targets

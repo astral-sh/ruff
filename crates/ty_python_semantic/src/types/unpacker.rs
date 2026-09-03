@@ -4,14 +4,14 @@ use std::debug_assert_matches;
 
 use ruff_db::parsed::ParsedModuleRef;
 
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_python_ast::visitor::{self, Visitor};
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::Ranged;
 
 use crate::Db;
-use crate::types::infer::{ExpressionInference, FrozenMap};
+use crate::types::infer::{ExpressionInference, FrozenMap, FrozenSet};
 use crate::types::tuple::promotion::TupleSizePromotionConstraints;
 use crate::types::tuple::{
     ResizeTupleError, Tuple, TupleBuilder, TupleElement, TupleLength, TupleSpec,
@@ -23,16 +23,37 @@ use crate::types::{
 };
 use ty_python_core::ExpressionNodeKey;
 use ty_python_core::ProgramFile;
+use ty_python_core::expression::Expression;
 use ty_python_core::scope::ScopeId;
 use ty_python_core::unpack::{UnpackKind, UnpackValue};
 
 use super::context::InferContext;
 use super::diagnostic::INVALID_ASSIGNMENT;
 
-/// Unpacks the value expression type to their respective targets.
-pub(crate) struct Unpacker<'db, 'ast> {
-    context: InferContext<'db, 'ast>,
-    targets: FxHashMap<ExpressionNodeKey, Type<'db>>,
+/// Context for the fresh lists created by starred assignment targets.
+pub(super) struct UnpackCaptureContext<'db, 'ast, 'infer> {
+    /// Captures whose literal elements have already been inferred with context.
+    pub(super) starred_types: FxHashMap<ExpressionNodeKey, Type<'db>>,
+    /// Infer one source alternative's capture, retaining element types and source expressions.
+    pub(super) infer_from_elements:
+        &'infer mut dyn FnMut(&ast::Expr, &[UnpackElement<'db, 'ast>]) -> Option<Type<'db>>,
+}
+
+struct InferredUnpackTarget<'db, 'ast> {
+    ty: UnionBuilder<'db>,
+    expression: Option<&'ast ast::Expr>,
+    promote_literals: bool,
+    /// Keep contextual types separate so any invalid union arm can trigger ordinary recovery
+    /// for all targets.
+    contextual_capture_ty: Option<UnionBuilder<'db>>,
+}
+
+/// Whether target annotations may affect captures at this unpacking level and below.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ContextualInference {
+    Allowed,
+    /// Preserve ordinary recovery after an iteration or length error.
+    Disallowed,
 }
 
 /// Records an `Unknown` type for every expression in a malformed unpack target subtree.
@@ -47,13 +68,21 @@ impl<'ast> Visitor<'ast> for UnknownTargetCollector<'_, '_> {
     }
 }
 
-impl<'db, 'ast> Unpacker<'db, 'ast> {
+/// Unpacks the value expression type to their respective targets.
+pub(crate) struct Unpacker<'db, 'ast, 'infer> {
+    context: InferContext<'db, 'ast>,
+    targets: FxHashMap<ExpressionNodeKey, Type<'db>>,
+    capture_context: Option<UnpackCaptureContext<'db, 'ast, 'infer>>,
+}
+
+impl<'db, 'ast, 'infer> Unpacker<'db, 'ast, 'infer> {
     pub(crate) fn new(
         db: &'db dyn Db,
         env: &'ast ProgramEnvironment<'db>,
         target_scope: ScopeId<'db>,
         program_file: ProgramFile<'db>,
         module: &'ast ParsedModuleRef,
+        capture_context: Option<UnpackCaptureContext<'db, 'ast, 'infer>>,
     ) -> Self {
         Self {
             context: InferContext::new(
@@ -65,6 +94,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                 module,
             ),
             targets: FxHashMap::default(),
+            capture_context,
         }
     }
 
@@ -77,7 +107,12 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
     }
 
     /// Unpack the value to the target expression.
-    pub(crate) fn unpack(&mut self, target: &ast::Expr, value: UnpackValue<'db>) {
+    pub(crate) fn unpack(
+        &mut self,
+        target: &ast::Expr,
+        value: UnpackValue<'db>,
+        value_inference: &ExpressionInference<'db>,
+    ) {
         let db = self.db();
         debug_assert_matches!(
             target,
@@ -85,11 +120,6 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
             "Unpacking target must be a list or tuple expression"
         );
 
-        let value_inference = infer_expression_types(
-            self.context.db(),
-            value.expression(),
-            TypeContext::default(),
-        );
         let value_expr = value.expression().node_ref(self.db()).node(self.module());
 
         let value_type = value_inference.expression_type(value_expr);
@@ -140,6 +170,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                 promote_literals: false,
             },
             value_inference,
+            ContextualInference::Allowed,
         );
     }
 
@@ -176,6 +207,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
         value_expr: AnyNodeRef<'_>,
         value: UnpackElement<'db, 'ast>,
         value_inference: &ExpressionInference<'db>,
+        mut contextual_inference: ContextualInference,
     ) {
         let db = self.db();
         let env = self.context.program_environment();
@@ -185,7 +217,13 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                 return;
             }
             ast::Expr::Starred(starred) => {
-                self.unpack_inner(&starred.value, value_expr, value, value_inference);
+                self.unpack_inner(
+                    &starred.value,
+                    value_expr,
+                    value,
+                    value_inference,
+                    contextual_inference,
+                );
                 return;
             }
             ast::Expr::List(ast::ExprList { elts, .. })
@@ -244,6 +282,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                 .iter()
                 .map(|ty| {
                     let tuple = ty.try_iterate(db, env).unwrap_or_else(|err| {
+                        contextual_inference = ContextualInference::Disallowed;
                         err.report_diagnostic(&self.context, *ty, value_expr);
                         Cow::Owned(TupleSpec::homogeneous(err.fallback_element_type(db, env)))
                     });
@@ -254,12 +293,11 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
 
         let mut inferred_targets: Vec<_> = targets
             .iter()
-            .map(|_| {
-                (
-                    UnionBuilder::new(db, env).unpack_aliases(false),
-                    None,
-                    false,
-                )
+            .map(|_| InferredUnpackTarget {
+                ty: UnionBuilder::new(db, env).unpack_aliases(false),
+                expression: None,
+                promote_literals: false,
+                contextual_capture_ty: None,
             })
             .collect();
         for sequence in sequences {
@@ -272,8 +310,9 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
             });
             match matched {
                 Ok(matched) => {
-                    for ((inferred, expression, promote_literals), element) in inferred_targets
-                        .iter_mut()
+                    for ((target, inferred), element) in targets
+                        .iter()
+                        .zip(&mut inferred_targets)
                         .zip(matched.into_all_elements_with_kind())
                     {
                         let element = match element {
@@ -281,26 +320,57 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                             | TupleElement::Prefix(value)
                             | TupleElement::Suffix(value) => value,
                             TupleElement::Variable(values) => {
-                                UnpackElement::from_type(collected_list_type(
+                                // Use only the elements matched to this capture: in
+                                // `first, *rest = [0, *strings]`, `0` belongs to `first`.
+                                // Each union arm constructs its own list. For a source typed
+                                // `tuple[int] | tuple[str]`, infer `list[int] | list[str]`;
+                                // combining elements first would infer `list[int | str]`.
+                                let ty = collected_list_type(
                                     db,
                                     env,
-                                    values.into_iter().map(|value| (value.ty, value.expression)),
-                                ))
+                                    values.iter().map(|value| (value.ty, value.expression)),
+                                );
+
+                                if contextual_inference == ContextualInference::Allowed
+                                    && let ast::Expr::Starred(starred) = target
+                                    && let Some(capture_context) = &mut self.capture_context
+                                {
+                                    let contextual_ty = capture_context
+                                        .starred_types
+                                        .get(&starred.value.as_ref().into())
+                                        .copied()
+                                        .or_else(|| {
+                                            (capture_context.infer_from_elements)(
+                                                &starred.value,
+                                                &values,
+                                            )
+                                        })
+                                        .unwrap_or(ty);
+                                    inferred
+                                        .contextual_capture_ty
+                                        .get_or_insert_with(|| {
+                                            UnionBuilder::new(db, env).unpack_aliases(false)
+                                        })
+                                        .add_in_place(contextual_ty);
+                                }
+
+                                UnpackElement::from_type(ty)
                             }
                         };
-                        inferred.add_in_place(element.ty);
+                        inferred.ty.add_in_place(element.ty);
                         // Literal sources contribute exactly one sequence. Only the type-based
                         // path combines multiple union arms, and those have no source expressions.
-                        *expression = element.expression;
-                        *promote_literals = element.promote_literals;
+                        inferred.expression = element.expression;
+                        inferred.promote_literals = element.promote_literals;
                     }
                 }
                 Err(err) => {
+                    contextual_inference = ContextualInference::Disallowed;
                     // A length mismatch has no valid correspondence, e.g. `a, *b, c = [1]`.
                     // Recover every target at this level, without discarding sibling literals
                     // handled by the enclosing recursive call.
-                    for (target, (inferred, _, _)) in targets.iter().zip(&mut inferred_targets) {
-                        inferred.add_in_place(if target.is_starred_expr() {
+                    for (target, inferred) in targets.iter().zip(&mut inferred_targets) {
+                        inferred.ty.add_in_place(if target.is_starred_expr() {
                             KnownClass::List.to_specialized_instance(db, env, &[Type::unknown()])
                         } else {
                             Type::unknown()
@@ -332,25 +402,43 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
             }
         }
 
-        for (target, (ty, expression, promote_literals)) in targets.iter().zip(inferred_targets) {
+        for (target, inferred) in targets.iter().zip(inferred_targets) {
+            let ty = if contextual_inference == ContextualInference::Allowed
+                && let Some(contextual_ty) = inferred.contextual_capture_ty
+            {
+                contextual_ty.build()
+            } else {
+                inferred.ty.build()
+            };
+
             self.unpack_inner(
                 target,
-                expression.map(AnyNodeRef::from).unwrap_or(value_expr),
+                inferred
+                    .expression
+                    .map(AnyNodeRef::from)
+                    .unwrap_or(value_expr),
                 UnpackElement {
-                    ty: ty.build(),
-                    expression,
-                    promote_literals,
+                    ty,
+                    expression: inferred.expression,
+                    promote_literals: inferred.promote_literals,
                 },
                 value_inference,
+                contextual_inference,
             );
         }
     }
 
-    pub(crate) fn finish(self) -> UnpackResult<'db> {
+    pub(crate) fn finish(
+        self,
+        value_inference: Option<ExpressionInference<'db>>,
+        contextual_expressions: FxHashSet<ExpressionNodeKey>,
+    ) -> UnpackResult<'db> {
         UnpackResult {
             diagnostics: self.context.finish(),
             targets: FrozenMap::from(self.targets),
             cycle_recovery: None,
+            value_inference,
+            contextual_expressions: FrozenSet::from(contextual_expressions),
         }
     }
 }
@@ -359,6 +447,12 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
 pub(crate) struct UnpackResult<'db> {
     targets: FrozenMap<ExpressionNodeKey, Type<'db>>,
     diagnostics: TypeCheckDiagnostics,
+    /// Only contextual inference needs a separate expression map. When no target supplies
+    /// context, reuse the cached result of `infer_expression_types`.
+    value_inference: Option<ExpressionInference<'db>>,
+    /// Expressions that were inferred with their target's annotation. Diagnostic
+    /// deduplication must not assume that every structurally matched value received context.
+    contextual_expressions: FrozenSet<ExpressionNodeKey>,
 
     /// The fallback type for missing expressions.
     ///
@@ -367,6 +461,22 @@ pub(crate) struct UnpackResult<'db> {
 }
 
 impl<'db> UnpackResult<'db> {
+    pub(super) fn has_contextual_expression(&self, expression: &ast::Expr) -> bool {
+        self.contextual_expressions.contains(&expression.into())
+    }
+
+    /// Return the contextual results, or reuse ordinary inference when no target supplies context.
+    /// `value` must be the expression that was unpacked.
+    pub(crate) fn value_inference(
+        &self,
+        db: &'db dyn Db,
+        value: Expression<'db>,
+    ) -> &ExpressionInference<'db> {
+        self.value_inference
+            .as_ref()
+            .unwrap_or_else(|| infer_expression_types(db, value, TypeContext::default()))
+    }
+
     /// Returns the inferred type for a given sub-expression of the left-hand side target
     /// of an unpacking assignment.
     ///
@@ -394,11 +504,13 @@ impl<'db> UnpackResult<'db> {
         &self.diagnostics
     }
 
-    pub(crate) fn cycle_initial(cycle_recovery: Type<'db>) -> Self {
+    pub(crate) fn cycle_initial(scope: ScopeId<'db>, cycle_recovery: Type<'db>) -> Self {
         Self {
             targets: FrozenMap::default(),
             diagnostics: TypeCheckDiagnostics::default(),
             cycle_recovery: Some(cycle_recovery),
+            value_inference: Some(ExpressionInference::cycle_initial(scope, cycle_recovery)),
+            contextual_expressions: FrozenSet::default(),
         }
     }
 
@@ -413,6 +525,14 @@ impl<'db> UnpackResult<'db> {
             let previous_ty = previous_cycle_result.expression_type(*expr);
             *ty = ty.cycle_normalized(db, env, previous_ty, cycle);
         }
+
+        self.value_inference = self.value_inference.map(|inference| {
+            if let Some(previous) = previous_cycle_result.value_inference.as_ref() {
+                inference.cycle_normalized(db, env, previous, cycle)
+            } else {
+                inference
+            }
+        });
 
         self
     }
@@ -495,21 +615,7 @@ fn assignment_values_for_target<'ast>(
     }
 
     let targets = sequence_elts(unpack_target)?;
-    let values = literal_sequence(
-        value,
-        false,
-        &|expression, _| Some(expression),
-        &|_, _, known_length| {
-            if let Some(length) = known_length {
-                Tuple::heterogeneous(std::iter::repeat_n(None, length))
-            } else {
-                VariableLengthTuple::mixed([], vec![None], [])
-            }
-        },
-    )?;
-    let matched = values
-        .unpack(target_length(targets), Clone::clone, |_| None)
-        .ok()?;
+    let matched = unpack_literal_values(targets, value)?;
     let (target, source) = targets
         .iter()
         .zip(matched.into_all_elements_with_kind())
@@ -534,6 +640,28 @@ fn assignment_values_for_target<'ast>(
     }
 }
 
+/// Match literal source expressions to targets without inferring their types.
+/// An ambiguous position has no expression; a starred target retains its individual sources.
+pub(super) fn unpack_literal_values<'ast>(
+    targets: &[ast::Expr],
+    value: &'ast ast::Expr,
+) -> Option<Tuple<Option<&'ast ast::Expr>, Vec<Option<&'ast ast::Expr>>>> {
+    literal_sequence(
+        value,
+        false,
+        &|expression, _| Some(expression),
+        &|_, _, known_length| {
+            if let Some(length) = known_length {
+                Tuple::heterogeneous(std::iter::repeat_n(None, length))
+            } else {
+                VariableLengthTuple::mixed([], vec![None], [])
+            }
+        },
+    )?
+    .unpack(target_length(targets), Clone::clone, |_| None)
+    .ok()
+}
+
 fn target_length(targets: &[ast::Expr]) -> TupleLength {
     match targets.iter().position(ast::Expr::is_starred_expr) {
         Some(index) => TupleLength::Variable(index, targets.len() - index - 1),
@@ -544,9 +672,9 @@ fn target_length(targets: &[ast::Expr]) -> TupleLength {
 /// A source expression accompanies a type only when its position is unambiguous. We keep this
 /// transient information while unpacking, without giving mutable lists fixed-length types.
 #[derive(Clone, Copy)]
-struct UnpackElement<'db, 'ast> {
-    ty: Type<'db>,
-    expression: Option<&'ast ast::Expr>,
+pub(super) struct UnpackElement<'db, 'ast> {
+    pub(super) ty: Type<'db>,
+    pub(super) expression: Option<&'ast ast::Expr>,
     /// Widening a large tuple also widens nested tuple elements. Do not undo that widening
     /// when following the source expression during nested unpacking.
     promote_literals: bool,
@@ -708,7 +836,7 @@ fn literal_iterable_length(expression: &ast::Expr) -> Option<usize> {
 }
 
 /// Extract the element slice from a list or tuple expression.
-fn sequence_elts(expr: &ast::Expr) -> Option<&[ast::Expr]> {
+pub(super) fn sequence_elts(expr: &ast::Expr) -> Option<&[ast::Expr]> {
     match expr {
         ast::Expr::List(list) => Some(&list.elts),
         ast::Expr::Tuple(tuple) => Some(&tuple.elts),

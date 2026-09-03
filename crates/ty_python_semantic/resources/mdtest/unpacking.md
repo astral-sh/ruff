@@ -436,7 +436,7 @@ An incompatible element still causes an error for its corresponding target.
 
 ```py
 first: int
-# error: [invalid-assignment] "Object of type `Literal["wrong"]` is not assignable to `int`"
+# error: [invalid-assignment] "Object of type `Literal["wrong"]` is not assignable to `int` (declared type of variable `first`)"
 first, *rest = ["wrong", 1]
 reveal_type(rest)  # revealed: list[int]
 ```
@@ -445,7 +445,7 @@ The starred target is checked against the list of collected elements.
 
 ```py
 numbers: list[int]
-# error: [invalid-assignment] "Object of type `list[str]` is not assignable to `list[int]`"
+# error: [invalid-assignment] "Object of type `list[int | str]` is not assignable to `list[int]` (declared type of variable `numbers`)"
 first, *numbers = [1, "wrong"]
 ```
 
@@ -512,6 +512,26 @@ reveal_type(first)  # revealed: tuple[Literal[1]]
 reveal_type(rest)  # revealed: list[tuple[int, ...]]
 ```
 
+An `object` annotation accepts a list without constraining its element type. Tuple literals still
+promote to a variable-length tuple, whether collected directly or through a literal expansion.
+
+```py
+unconstrained: object
+first, *unconstrained = (0, (1,), (2, 3))
+reveal_type(first)  # revealed: Literal[0]
+reveal_type(unconstrained)  # revealed: list[tuple[int, ...]]
+
+first, *unconstrained = (0, *((1,), (2, 3)))
+reveal_type(first)  # revealed: Literal[0]
+reveal_type(unconstrained)  # revealed: list[tuple[int, ...]]
+
+first, *unconstrained = [0, *[(1,), (2, 3)]]
+reveal_type(first)  # revealed: Literal[0]
+reveal_type(unconstrained)  # revealed: list[tuple[int, ...]]
+
+accepted: list[tuple[int, ...]] = unconstrained
+```
+
 A tuple from a variable retains its annotated shape and prevents tuple-size promotion for the
 collected elements.
 
@@ -520,6 +540,24 @@ def annotated_tuple(value: tuple[int, int]):
     first, *rest = [0, (1,), value]
     reveal_type(rest)  # revealed: list[tuple[int] | tuple[int, int]]
     first, *rest = (0, (1,), value)
+    reveal_type(rest)  # revealed: list[tuple[int] | tuple[int, int]]
+```
+
+An `object` annotation does not change this restriction, even when the variable occurs inside a
+literal expansion. Elements unpacked from an existing sequence also retain their tuple shapes.
+
+```py
+def existing_tuples(value: tuple[int, int], source: tuple[tuple[int], tuple[int, int]]):
+    rest: object
+    first, *rest = (0, (1,), value)
+    reveal_type(first)  # revealed: Literal[0]
+    reveal_type(rest)  # revealed: list[tuple[int] | tuple[int, int]]
+
+    first, *rest = (0, *((1,), value))
+    reveal_type(first)  # revealed: Literal[0]
+    reveal_type(rest)  # revealed: list[tuple[int] | tuple[int, int]]
+
+    (*rest,) = source
     reveal_type(rest)  # revealed: list[tuple[int] | tuple[int, int]]
 ```
 
@@ -1602,6 +1640,449 @@ class Iterable:
 def _(arg: tuple[tuple[int, str], Iterable]):
     # revealed: tuple[int | bytes, str | bytes]
     [reveal_type((a, b)) for a, b in arg]
+```
+
+## Type context
+
+### Starred captures
+
+A starred target receives a new list. Its annotation provides context for the captured elements,
+whether the source is a tuple or a list literal.
+
+```py
+rest: list[int]
+first, *rest = (0, 1, 2)
+reveal_type(first)  # revealed: Literal[0]
+reveal_type(rest)  # revealed: list[int]
+
+first, *rest = [0, 1, 2]
+reveal_type(first)  # revealed: Literal[0]
+reveal_type(rest)  # revealed: list[int]
+```
+
+A literal union in the annotation prevents widening the captured integers to `int`. The trailing
+string is assigned separately and does not contribute to the list's element type.
+
+```py
+from typing import Literal
+
+x: list[Literal[1, 2, 3]]
+*x, y = (1, 2, 3, "foo")
+reveal_type(x)  # revealed: list[Literal[1, 2, 3]]
+reveal_type(y)  # revealed: Literal["foo"]
+
+*x, y = [1, 2, 3, "foo"]
+reveal_type(x)  # revealed: list[Literal[1, 2, 3]]
+reveal_type(y)  # revealed: Literal["foo"]
+```
+
+An empty capture also uses the annotation, just as an empty list literal does.
+
+```py
+first, *rest, last = (0, 1)
+reveal_type(first)  # revealed: Literal[0]
+reveal_type(rest)  # revealed: list[int]
+reveal_type(last)  # revealed: Literal[1]
+
+first, *rest, last = [0, 1]
+reveal_type(first)  # revealed: Literal[0]
+reveal_type(rest)  # revealed: list[int]
+reveal_type(last)  # revealed: Literal[1]
+```
+
+### Ordinary and nested targets
+
+Each target supplies context only to its corresponding value. Nested unpacking propagates that
+context to the inner literal, including mutable values collected by a starred target.
+
+```py
+from typing import Literal
+
+numbers: list[object]
+literal: list[Literal[1]]
+numbers, literal = ([1], [1])
+reveal_type(numbers)  # revealed: list[object]
+reveal_type(literal)  # revealed: list[Literal[1]]
+
+[numbers, (literal,)] = [[1], ([1],)]
+reveal_type(numbers)  # revealed: list[object]
+reveal_type(literal)  # revealed: list[Literal[1]]
+
+rest: list[list[object]]
+(first, *rest), (literal,) = ((0, [1], [2]), [[1]])
+reveal_type(rest)  # revealed: list[list[object]]
+reveal_type(literal)  # revealed: list[Literal[1]]
+```
+
+An unannotated outer capture does not discard context for a nested annotated capture. The outer
+capture widens its integer element to `int`.
+
+```py
+(first, *rest), *outer = ((0, [1], [2]), 3)
+reveal_type(first)  # revealed: Literal[0]
+reveal_type(rest)  # revealed: list[list[object]]
+reveal_type(outer)  # revealed: list[int]
+```
+
+### Contextual calls and dictionary literals
+
+Unpacked values use the same contextual inference as ordinary assignments, including generic calls
+and `TypedDict` literals.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypedDict
+
+class Record(TypedDict):
+    value: int
+
+def empty[T]() -> list[T]:
+    return []
+
+items: list[int]
+record: Record
+items, record = (empty(), {"value": 1})
+reveal_type(items)  # revealed: list[int]
+reveal_type(record)  # revealed: Record
+```
+
+### Member targets
+
+Annotations on attributes and container element types also provide context for unpacked values.
+
+```py
+class Holder:
+    values: list[object]
+
+def assign(holder: Holder, rows: list[list[object]]):
+    holder.values, rows[0] = ([1], [2])
+    first, *holder.values = (0, 1, 2)
+    first, *rows[0] = [0, 1, 2]
+```
+
+Slots are descriptors, but their declared types describe both reads and writes. Their annotations
+provide context for unpacked values: the assignments below use `list[object]` instead of inferring
+`list[int]` or `list[Literal[1, 2]]`, which would be incompatible with the slot's type.
+
+```py
+class SlottedHolder:
+    __slots__ = ("values",)
+    values: list[object]
+
+def assign_slot(holder: SlottedHolder):
+    holder.values, other = ([1], 0)
+    first, *holder.values = (0, 1, 2)
+```
+
+Reading a property can return a different type from the one its setter accepts. The getter's return
+annotation does not supply context for the assignment. The setter accepts a list of integers and
+rejects a list of strings, even though the getter returns a list of strings.
+
+```py
+class Property:
+    @property
+    def value(self) -> list[str]:
+        return []
+
+    @value.setter
+    def value(self, value: list[int]) -> None:
+        pass
+
+def assign_property(holder: Property):
+    holder.value, other = ([1], 0)
+    # error: [invalid-assignment]
+    holder.value, other = (["foo"], 0)
+```
+
+### Nonliteral sources
+
+Capturing elements from an existing iterable creates a new list, whose element type uses the
+target's annotation. The source retains its original type.
+
+```py
+source = (0, 1, 2)
+rest: list[int]
+first, *rest = source
+reveal_type(rest)  # revealed: list[int]
+reveal_type(source)  # revealed: tuple[Literal[0], Literal[1], Literal[2]]
+
+first, *rest = (0, *(1, 2))
+reveal_type(rest)  # revealed: list[int]
+
+def copy_values(source: list[int]):
+    objects: list[object]
+    (*objects,) = source
+    reveal_type(objects)  # revealed: list[object]
+    reveal_type(source)  # revealed: list[int]
+```
+
+A captured mutable element is not itself copied. Context cannot widen the element type of an
+existing list.
+
+```py
+rows = ([1],)
+copied: list[list[object]]
+# error: [invalid-assignment]
+(*copied,) = rows
+```
+
+### Starred source expressions
+
+Context for a starred target uses only the values it captures. Expanding an existing iterable into a
+list or tuple does not include the surrounding fixed values in that capture.
+
+```py
+def expanded(strings: list[str]):
+    rest: list[str]
+    first, *rest, last = [0, *strings, 1]
+    reveal_type(first)  # revealed: Literal[0]
+    reveal_type(rest)  # revealed: list[str]
+    reveal_type(last)  # revealed: Literal[1]
+
+    first, *rest = (0, *strings)
+    reveal_type(first)  # revealed: Literal[0]
+    reveal_type(rest)  # revealed: list[str]
+
+    (first, *rest), last = [[0, *strings], 1]
+    reveal_type(first)  # revealed: Literal[0]
+    reveal_type(rest)  # revealed: list[str]
+    reveal_type(last)  # revealed: Literal[1]
+```
+
+Literal expansions retain their individual element types, even when the enclosing list's type has
+widened them.
+
+```py
+from typing import Literal
+
+rest: list[Literal["x"]]
+first, *rest = [0, *["x"]]
+reveal_type(first)  # revealed: Literal[0]
+reveal_type(rest)  # revealed: list[Literal["x"]]
+```
+
+An empty expansion produces an empty capture, with the same inference as an empty list literal.
+
+```py
+empty: object
+(*empty,) = [*[]]
+reveal_type(empty)  # revealed: list[Unknown]
+
+source: tuple[()] = ()
+(*empty,) = source
+reveal_type(empty)  # revealed: list[Unknown]
+```
+
+An ordinary target that extends into an unknown-length expansion can receive a trailing value when
+the expansion is empty. Context must not make that position appear unambiguous.
+
+```py
+def ambiguous(values: list[int]):
+    rest: list[int | str]
+    first, second, *rest = [0, *values, "last"]
+    reveal_type(first)  # revealed: Literal[0]
+    reveal_type(second)  # revealed: int | Literal["last"]
+    reveal_type(rest)  # revealed: list[int | str]
+```
+
+The capture creates a new outer list, but the mutable elements supplied by an existing iterable
+retain their types.
+
+```py
+def mutable_elements(rows: list[list[int]]):
+    rest: list[list[object]]
+    # error: [invalid-assignment]
+    first, *rest = [0, *rows]
+    reveal_type(first)  # revealed: Literal[0]
+    reveal_type(rest)  # revealed: list[list[object]]
+```
+
+### Union sources
+
+Each source alternative produces its own captured list. A tuple containing an integer or a tuple
+containing a string produces `list[int] | list[str]`, rather than a list that can contain both
+types.
+
+```py
+def alternatives(source: tuple[int] | tuple[str]):
+    rest: list[int] | list[str]
+    (*rest,) = source
+    reveal_type(rest)  # revealed: list[int] | list[str]
+```
+
+A `list[int | str]` annotation supplies the same element-type context to both alternatives, so each
+capture has type `list[int | str]`.
+
+```py
+def union_elements(source: tuple[int] | tuple[str]):
+    rest: list[int | str]
+    (*rest,) = source
+    reveal_type(rest)  # revealed: list[int | str]
+```
+
+The alternatives also remain separate when the annotation does not constrain the list's element
+type.
+
+```py
+def unconstrained_alternatives(source: tuple[int] | tuple[str]):
+    rest: object
+    (*rest,) = source
+    reveal_type(rest)  # revealed: list[int] | list[str]
+```
+
+Fixed targets are matched within each alternative before the remaining elements are collected.
+
+```py
+def fixed_prefix(source: tuple[int, int] | tuple[str, str, str]):
+    rest: list[int] | list[str]
+    first, *rest = source
+    reveal_type(first)  # revealed: int | str
+    reveal_type(rest)  # revealed: list[int] | list[str]
+```
+
+A conditional expression also supplies mutually exclusive source alternatives.
+
+```py
+def conditional(flag: bool):
+    rest: list[int] | list[str]
+    (*rest,) = (1,) if flag else ("one",)
+    reveal_type(rest)  # revealed: list[int] | list[str]
+```
+
+An attribute declaration supplies the same context for each captured list.
+
+```py
+class Holder:
+    values: list[int] | list[str]
+
+def attribute(holder: Holder, source: tuple[int] | tuple[str]):
+    (*holder.values,) = source
+    reveal_type(holder.values)  # revealed: list[int] | list[str]
+```
+
+An alternative containing both an integer and a string cannot produce either `list[int]` or
+`list[str]`, so the union annotation does not accept it.
+
+```py
+def mixed_elements(source: tuple[int, str] | tuple[str]):
+    rest: list[int] | list[str]
+    # error: [invalid-assignment] "Object of type `list[int | str] | list[str]` is not assignable to `list[int] | list[str]`"
+    (*rest,) = source
+```
+
+Each alternative is unpacked separately before inferring the captured list. The two-element tuple
+contributes no elements to `rest`, so its strings do not affect the list's element type.
+
+```py
+def capture(source: tuple[int, int, int] | tuple[str, str]):
+    rest: list[int]
+    first, *rest, last = source
+    reveal_type(first)  # revealed: int | str
+    reveal_type(rest)  # revealed: list[int]
+    reveal_type(last)  # revealed: int | str
+```
+
+If a tuple alternative is too short, the assignment reports a length error and infers the capture
+without context. The valid alternative contributes `list[int]`, which is incompatible with
+`list[object]`.
+
+```py
+def invalid_length(source: tuple[int, int, int] | tuple[int]):
+    rest: list[object]
+    # error: [invalid-assignment] "Not enough values to unpack: Expected at least 2"
+    # error: [invalid-assignment] "Object of type `list[int] | list[Unknown]` is not assignable to `list[object]`"
+    first, *rest, last = source
+    reveal_type(first)  # revealed: int | Unknown
+    reveal_type(rest)  # revealed: list[object]
+    reveal_type(last)  # revealed: int | Unknown
+```
+
+A non-iterable alternative also prevents contextual inference of the capture.
+
+```py
+def non_iterable(source: tuple[int, int, int] | int):
+    rest: list[object]
+    # error: [not-iterable] "Object of type `int` is not iterable"
+    # error: [invalid-assignment] "Object of type `list[int] | list[Unknown]` is not assignable to `list[object]`"
+    first, *rest, last = source
+    reveal_type(first)  # revealed: int | Unknown
+    reveal_type(rest)  # revealed: list[object]
+    reveal_type(last)  # revealed: int | Unknown
+```
+
+### Context for a generic source
+
+The combined annotations provide tuple context for a generic call that produces the entire unpacked
+value.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+def pair[T]() -> tuple[list[T], int]:
+    return [], 0
+
+items: list[int]
+items, last = pair()
+reveal_type(items)  # revealed: list[int]
+reveal_type(last)  # revealed: int
+```
+
+### Non-iterable annotations on starred targets
+
+A non-iterable annotation on a starred target supplies no element-type context. An annotation of
+`object` still accepts the inferred capture list.
+
+```py
+rest: object
+first, *rest = (0, 1, 2)
+reveal_type(first)  # revealed: Literal[0]
+reveal_type(rest)  # revealed: list[int]
+```
+
+An annotation of `int` cannot accept a list. We report the incompatible assignment without trying to
+use `int` as the source's element type. After the invalid assignment, `invalid` retains its declared
+type.
+
+```py
+invalid: int
+# error: [invalid-assignment] "Object of type `list[int]` is not assignable to `int` (declared type of variable `invalid`)"
+first, *invalid = (0, 1, 2)
+reveal_type(first)  # revealed: Literal[0]
+reveal_type(invalid)  # revealed: int
+```
+
+### Cyclic assignments
+
+An annotated target can also appear on the right-hand side. The annotation remains available while
+resolving the cycle.
+
+```py
+def update(flag: bool):
+    rest: list[int] = [1]
+    while flag:
+        first, *rest = (rest[0], 1, 2)
+        reveal_type(first)  # revealed: int
+        reveal_type(rest)  # revealed: list[int]
+```
+
+### Invalid contextual assignments
+
+Context does not make incompatible values assignable. An ordinary target still rejects a list with
+an incorrect element type.
+
+```py
+numbers: list[int]
+# error: [invalid-assignment]
+numbers, other = (["wrong"], 0)
+reveal_type(numbers)  # revealed: list[int]
+reveal_type(other)  # revealed: Literal[0]
 ```
 
 ## Empty

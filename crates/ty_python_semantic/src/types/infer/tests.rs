@@ -498,6 +498,34 @@ fn pep695_type_params() {
 }
 
 #[test]
+fn unannotated_unpacking_reuses_value_inference() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_dedented("src/a.py", r#"first, second = (third, *rest) = [1, "two"]"#)?;
+
+    let file = program_file(&db, system_path_to_file(&db, "src/a.py")?);
+    let module = parsed_module(&db, file.python_file(&db)).load(&db);
+    let index = semantic_index(&db, file);
+    let ast::Stmt::Assign(assignment) = &module.syntax().body[0] else {
+        anyhow::bail!("expected an assignment statement");
+    };
+    let value = index.expression(&assignment.value);
+    let inference = infer_expression_types(&db, value, TypeContext::default());
+
+    for target in &assignment.targets {
+        let Some(unpack) = index.try_unpack(target) else {
+            anyhow::bail!("expected an unpacking target");
+        };
+        let unpacked = infer_unpack_types(&db, unpack);
+        assert!(std::ptr::eq(
+            inference,
+            unpacked.value_inference(&db, value)
+        ));
+    }
+
+    Ok(())
+}
+
+#[test]
 fn simple_assignment_does_not_enter_salsa_cycle() {
     let mut db = setup_db();
     db.write_dedented("src/a.py", "x = 1; y = x + 1").unwrap();

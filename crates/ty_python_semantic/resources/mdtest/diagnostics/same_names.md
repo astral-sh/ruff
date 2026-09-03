@@ -47,6 +47,20 @@ def _(dfs: list[b.DataFrame]):
     dataframes: list[a.DataFrame] = dfs
 ```
 
+A starred capture also distinguishes classes from different modules in its inferred and annotated
+list types.
+
+`starred.py`:
+
+```py
+import a
+import b
+
+dataframes: list[a.DataFrame]
+# error: [invalid-assignment] "Object of type `list[a.DataFrame | b.DataFrame]` is not assignable to `list[a.DataFrame]` (declared type of variable `dataframes`)"
+first, *dataframes = (0, b.DataFrame())
+```
+
 `a.py`:
 
 ```py

@@ -113,7 +113,51 @@ bindings without panicking.
 
 ```py
 first, *left, *right = [1, 2, 3]  # error: [invalid-syntax] "Two starred expressions in assignment"
+reveal_type(first)  # revealed: Literal[1]
+reveal_type(left)  # revealed: list[int]
+# TODO: recovering to a `list` type of some kind would probably be better?
+reveal_type(right)  # revealed: Literal[3]
+
 first, *left, *right = (1, 2, 3)  # error: [invalid-syntax] "Two starred expressions in assignment"
+reveal_type(first)  # revealed: Literal[1]
+reveal_type(left)  # revealed: list[int]
+# TODO: recovering to a `list` type of some kind would probably be better?
+reveal_type(right)  # revealed: Literal[3]
+```
+
+An annotation on a starred target does not make it possible to distribute the source values between
+two starred targets.
+
+```py
+left: list[int]
+first, *left, *right = (1, 2, 3)  # error: [invalid-syntax] "Two starred expressions in assignment"
+
+reveal_type(first)  # revealed: Literal[1]
+reveal_type(left)  # revealed: list[int]
+# TODO: recovering to a `list` type of some kind would probably be better?
+reveal_type(right)  # revealed: Literal[3]
+```
+
+An invalid nested target does not prevent an independent target from providing type context. We
+still infer the list assigned to `items` as `list[object]`.
+
+```py
+items: list[object]
+# error: [invalid-syntax] "Two starred expressions in assignment"
+items, (*left, *right) = ([1], (2, 3, 4))
+
+reveal_type(items)  # revealed: list[object]
+reveal_type(left)  # revealed: list[int]
+# TODO: recovering to a `list` type of some kind would probably be better?
+reveal_type(right)  # revealed: Literal[4]
+
+# error: [invalid-syntax] "Two starred expressions in assignment"
+[items, [*left, *right]] = [[1], [2, 3, 4]]
+
+reveal_type(items)  # revealed: list[object]
+reveal_type(left)  # revealed: list[int]
+# TODO: recovering to a `list` type of some kind would probably be better?
+reveal_type(right)  # revealed: Literal[4]
 ```
 
 ## Match-pattern alternatives binding different names

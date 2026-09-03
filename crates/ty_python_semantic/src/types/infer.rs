@@ -48,7 +48,7 @@ use itertools::Either;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextRange};
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use salsa;
 use salsa::plumbing::AsId;
 use std::borrow::Cow;
@@ -69,7 +69,7 @@ use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::expression::Expression;
 use ty_python_core::scope::ScopeId;
 use ty_python_core::statement::StatementInner;
-use ty_python_core::unpack::Unpack;
+use ty_python_core::unpack::{Unpack, UnpackKind};
 use ty_python_core::{ExpressionNodeKey, SemanticIndex, Statement, Truthiness, semantic_index};
 
 mod builder;
@@ -768,7 +768,7 @@ impl<'db> From<Type<'db>> for TypeContext<'db> {
 /// during this unpacking.
 #[salsa::tracked(
     returns(ref),
-    cycle_initial=|_, id, _| UnpackResult::cycle_initial(Type::divergent(id)),
+    cycle_initial=|db, id, unpack: Unpack<'db>| UnpackResult::cycle_initial(unpack.value(db).expression().scope(db), Type::divergent(id)),
     cycle_fn=|db, cycle, previous: &UnpackResult<'db>, result: UnpackResult<'db>, unpack: Unpack<'db>| {
         let env = ProgramEnvironment::from_file(unpack.program_file(db));
         result.cycle_normalized(db, &env, previous, cycle)
@@ -787,9 +787,32 @@ pub(super) fn infer_unpack_types<'db>(db: &'db dyn Db, unpack: Unpack<'db>) -> U
     .entered();
 
     let env = ProgramEnvironment::from_file(program_file);
-    let mut unpacker = Unpacker::new(db, &env, unpack.target_scope(db), program_file, &module);
-    unpacker.unpack(unpack.target(db, &module), unpack.value(db));
-    unpacker.finish()
+    let value = unpack.value(db);
+    if matches!(value.kind(), UnpackKind::Assign)
+        && let Some(inference) = TypeInferenceBuilder::new(
+            db,
+            &env,
+            InferenceRegion::Expression(value.expression(), TypeContext::default()),
+            python_file.file(db),
+            program_file,
+            semantic_index(db, program_file),
+            &module,
+        )
+        .finish_unpack(unpack)
+    {
+        return inference;
+    }
+    let mut unpacker = Unpacker::new(
+        db,
+        &env,
+        unpack.target_scope(db),
+        program_file,
+        &module,
+        None,
+    );
+    let value_inference = infer_expression_types(db, value.expression(), TypeContext::default());
+    unpacker.unpack(unpack.target(db, &module), value, value_inference);
+    unpacker.finish(None, FxHashSet::default())
 }
 
 /// Returns the type of the nearest enclosing class for the given scope.
@@ -1780,7 +1803,7 @@ struct ExpressionInferenceExtra<'db> {
 }
 
 impl<'db> ExpressionInference<'db> {
-    fn cycle_initial(scope: ScopeId<'db>, cycle_recovery: Type<'db>) -> Self {
+    pub(super) fn cycle_initial(scope: ScopeId<'db>, cycle_recovery: Type<'db>) -> Self {
         let _ = scope;
         Self {
             extra: Some(Box::new(ExpressionInferenceExtra {
@@ -1793,7 +1816,7 @@ impl<'db> ExpressionInference<'db> {
         }
     }
 
-    fn cycle_normalized(
+    pub(super) fn cycle_normalized(
         mut self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,

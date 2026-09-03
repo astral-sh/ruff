@@ -19,7 +19,7 @@ use crate::types::class::{
     CodeGeneratorKind, DisjointBase, DisjointBaseKind, ExpandedClassBaseEntry, MethodDecorator,
 };
 use crate::types::function::{FunctionDecorators, FunctionType, KnownFunction, OverloadLiteral};
-use crate::types::infer::UnsupportedComparisonError;
+use crate::types::infer::{UnsupportedComparisonError, infer_unpack_types};
 use crate::types::overrides::MethodKind;
 use crate::types::protocol_class::ProtocolMember;
 use crate::types::special_form::TypeQualifier;
@@ -1848,15 +1848,24 @@ fn assignment_value_node<'db, 'ast>(
     }
 }
 
-/// Return the range of an assignment's value, including any surrounding parentheses.
+/// Return the range of an assignment's value or the values collected by a starred target.
 fn assignment_diagnostic_range(
     context: &InferContext,
     target_node: AnyNodeRef,
     value_node: Option<&ast::Expr>,
-    starred_element: Option<&StarredAssignmentElement>,
+    definition_kind: &DefinitionKind,
 ) -> TextRange {
-    if let Some(starred_element) = starred_element {
-        return starred_element.collected_range;
+    let module = context.module();
+    if let DefinitionKind::Assignment(assignment) = definition_kind
+        && let Some(unpack) = assignment.unpack()
+        && let Some(collected) = starred_assignment_values(
+            unpack.target(context.db(), module),
+            assignment.value(module),
+            assignment.target(module),
+        )
+        && let (Some(first), Some(last)) = (collected.first(), collected.last())
+    {
+        return first.range().cover(last.range());
     }
 
     value_node
@@ -1875,10 +1884,9 @@ fn assignment_diagnostic_range(
         .unwrap_or_else(|| target_node.range())
 }
 
-/// The incompatible element type and source range collected into a starred unpacking target.
+/// The incompatible element type collected into a starred unpacking target.
 #[derive(Debug)]
 struct StarredAssignmentElement<'db> {
-    collected_range: TextRange,
     actual_type: Type<'db>,
     expected_type: Type<'db>,
 }
@@ -1918,14 +1926,32 @@ fn starred_assignment_element<'db>(
         assignment.value(module),
         assignment.target(module),
     )?;
+    if collected.is_empty() {
+        return None;
+    }
     let expected_type = target_type
         .try_iterate(db, env)
         .ok()?
         .homogeneous_element_type(db, env);
-    let actual_type = value_type
-        .try_iterate(db, env)
-        .ok()?
-        .homogeneous_element_type(db, env);
+    let actual_type = match diagnostic_kind {
+        AssignmentDiagnosticKind::Invalid => {
+            // The collected list's element type can include both contextual types and
+            // promotion. Describe the captured source values using their own inferred types.
+            let inference =
+                infer_unpack_types(db, unpack).value_inference(db, unpack.value(db).expression());
+            UnionType::from_elements_leave_aliases(
+                db,
+                env,
+                collected
+                    .iter()
+                    .map(|value| inference.expression_type(*value)),
+            )
+        }
+        AssignmentDiagnosticKind::Unsound => value_type
+            .try_iterate(db, env)
+            .ok()?
+            .homogeneous_element_type(db, env),
+    };
 
     let compatible = match diagnostic_kind {
         AssignmentDiagnosticKind::Invalid => actual_type.is_assignable_to(db, env, expected_type),
@@ -1938,7 +1964,6 @@ fn starred_assignment_element<'db>(
     }
 
     Some(StarredAssignmentElement {
-        collected_range: collected.first()?.range().cover(collected.last()?.range()),
         actual_type,
         expected_type,
     })
@@ -2002,9 +2027,15 @@ pub(super) fn report_invalid_assignment<'db>(
     let db = context.db();
     let definition_kind = definition.kind(context.db());
     let value_node = assignment_value_node(context, definition_kind);
-    let original_value_node = definition_kind.value(context.module()).or(value_node);
+    let contextual_value_node = match definition_kind {
+        DefinitionKind::Assignment(assignment) if let Some(unpack) = assignment.unpack() => {
+            value_node
+                .filter(|value| infer_unpack_types(db, unpack).has_contextual_expression(value))
+        }
+        _ => definition_kind.value(context.module()).or(value_node),
+    };
 
-    if let Some(value_node) = original_value_node
+    if let Some(value_node) = contextual_value_node
         && is_invalid_typed_dict_literal(
             db,
             context.program_environment(),
@@ -2027,7 +2058,7 @@ pub(super) fn report_invalid_assignment<'db>(
         assignment_display_settings(context, target_ty, value_ty, invalid_element.as_ref());
 
     let diagnostic_range =
-        assignment_diagnostic_range(context, target_node, value_node, invalid_element.as_ref());
+        assignment_diagnostic_range(context, target_node, value_node, definition_kind);
     let Some(mut diag) = report_invalid_assignment_with_message(
         context,
         diagnostic_range,
@@ -2076,6 +2107,10 @@ pub(super) fn report_invalid_assignment<'db>(
         )));
     }
 
+    let (actual_ty, expected_ty) = invalid_element
+        .as_ref()
+        .map(|element| (element.actual_type, element.expected_type))
+        .unwrap_or((value_ty, target_ty));
     let has_primary_annotation = if let Some(element) = invalid_element {
         diag.set_primary_annotation_message(format_args!(
             "Incompatible iterable element of type `{}` (expected `{}`)",
@@ -2096,19 +2131,29 @@ pub(super) fn report_invalid_assignment<'db>(
     };
 
     if value_node.is_some() {
-        let error_context = value_ty.assignability_error_context(db, env, target_ty);
+        let error_context = actual_ty.assignability_error_context(db, env, expected_ty);
         error_context.attach_to(db, env, &mut diag);
     }
 
     if has_primary_annotation {
         // Overwrite the concise message to avoid showing the value type twice
         let message = diag.headline_message().to_string();
-        diag.set_concise_message(message);
+        if let AnyNodeRef::ExprName(name) = target_node
+            && let DefinitionKind::Assignment(assignment) = definition_kind
+            && assignment.unpack().is_some()
+        {
+            diag.set_concise_message(format_args!(
+                "{message} (declared type of variable `{}`)",
+                name.id
+            ));
+        } else {
+            diag.set_concise_message(message);
+        }
     }
 
     // special case message
-    note_numbers_module_not_supported(db, env, &mut diag, target_ty, value_ty);
-    add_invariant_generic_hints(db, env, &mut diag, target_ty, value_ty);
+    note_numbers_module_not_supported(db, env, &mut diag, expected_ty, actual_ty);
+    add_invariant_generic_hints(db, env, &mut diag, expected_ty, actual_ty);
 }
 
 /// Report an assignment whose value is not a subtype of its declared type.
@@ -2145,7 +2190,7 @@ pub(super) fn report_unsound_assignment<'db>(
         AssignmentDiagnosticKind::Unsound,
     );
     let diagnostic_range =
-        assignment_diagnostic_range(context, target_node, value_node, unsound_element.as_ref());
+        assignment_diagnostic_range(context, target_node, value_node, definition_kind);
 
     let Some(builder) = context.report_lint(&UNSOUND_ASSIGNMENT, diagnostic_range) else {
         return;
