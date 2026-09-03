@@ -7604,7 +7604,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // produces an unsatisfiable result. In that case, we simply proceed without
                     // type context constraints rather than aborting the entire collection literal
                     // inference.
-                    Solutions::Unsatisfiable | Solutions::Unconstrained => {}
+                    Solutions::Unsatisfiable
+                    | Solutions::Unconstrained
+                    | Solutions::Unsupported => {}
                     Solutions::Constrained(solutions) => {
                         for solution in solutions.as_slice() {
                             for binding in solution {
@@ -8925,6 +8927,123 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         Some(constraint)
     }
 
+    /// Finds solution query arguments whose syntax can admit bare `ParamSpec` type variables.
+    fn paramspec_solution_arguments(
+        callable_type: Type<'db>,
+        bindings: &Bindings<'db>,
+        arguments: &ast::Arguments,
+    ) -> [Option<usize>; 2] {
+        if !matches!(
+            callable_type,
+            Type::KnownBoundMethod(
+                KnownBoundMethodType::ConstraintSetSolutionsFor(_)
+                    | KnownBoundMethodType::ConstraintSetSolutions(_)
+            )
+        ) {
+            return [None; 2];
+        }
+        let Some(binding) = bindings.single_element() else {
+            return [None; 2];
+        };
+        let Ok((_, overload)) = binding.matching_overloads().exactly_one() else {
+            return [None; 2];
+        };
+
+        let argument_for_parameter = |name: &str| {
+            let parameter_index = overload
+                .signature
+                .parameters()
+                .iter()
+                .position(|parameter| parameter.name().is_some_and(|value| value == name))?;
+            let (argument_index, matched) = overload
+                .argument_matches()
+                .iter()
+                .enumerate()
+                .filter(|(_, argument)| {
+                    argument
+                        .parameters
+                        .iter()
+                        .any(|parameter| parameter.index == parameter_index)
+                })
+                .exactly_one()
+                .ok()?;
+            if !matched.matched || matched.parameters.len() != 1 {
+                return None;
+            }
+            let argument_index =
+                argument_index.checked_sub(usize::from(binding.bound_type.is_some()))?;
+            let argument = arguments.iter_source_order().nth(argument_index)?;
+            (!argument.is_variadic()).then_some((argument_index, argument.value()))
+        };
+
+        let subject = argument_for_parameter("typevar")
+            .and_then(|(index, expression)| is_dotted_name(expression).then_some(index));
+
+        let inferable = argument_for_parameter("inferable").and_then(|(index, expression)| {
+            let ast::Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = expression else {
+                return None;
+            };
+            let elements = match slice.as_ref() {
+                ast::Expr::Tuple(tuple) => tuple.elts.as_ref(),
+                element => std::slice::from_ref(element),
+            };
+            (is_dotted_name(value) && elements.iter().all(is_dotted_name)).then_some(index)
+        });
+
+        [subject, inferable]
+    }
+
+    fn infer_paramspec_solution_argument(
+        &mut self,
+        expression: &ast::Expr,
+        tcx: TypeContext<'db>,
+        is_subject: bool,
+    ) -> Type<'db> {
+        let db = self.db();
+        let env = self.program_environment();
+        // A failed permissive attempt must not be reused by ordinary inference through the
+        // expression cache shared by speculative builders.
+        let mut speculative_builder = self.speculate();
+        speculative_builder.teardown_expression_cache();
+        speculative_builder
+            .context
+            .inference_flags
+            .insert(InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR);
+        let ty = speculative_builder.infer_expression(expression, tcx);
+        let projected = ty.project_type_form(db, env);
+        let valid = if is_subject {
+            projected.as_typevar().is_some_and(|typevar| {
+                typevar.is_paramspec(db) && typevar.paramspec_attr(db).is_none()
+            })
+        } else if let Some(subscript) = expression.as_subscript_expr()
+            && speculative_builder
+                .expression_type(subscript.value.as_ref())
+                .as_class_literal()
+                .is_some_and(|class| class.is_known(db, KnownClass::Tuple))
+            && let Some(tuple) = projected.exact_tuple_instance_spec(db)
+            && !tuple.is_variadic()
+        {
+            let mut has_paramspec = false;
+            let valid = tuple.fixed_elements().all(|ty| {
+                let Some(typevar) = ty.as_typevar() else {
+                    return false;
+                };
+                has_paramspec |= typevar.is_paramspec(db);
+                !typevar.is_typevartuple(db) && typevar.paramspec_attr(db).is_none()
+            });
+            valid && has_paramspec
+        } else {
+            false
+        };
+
+        if valid {
+            self.extend(speculative_builder);
+            ty
+        } else {
+            self.infer_expression(expression, tcx)
+        }
+    }
+
     fn infer_call_expression(
         &mut self,
         call_expression: &ast::ExprCall,
@@ -9495,10 +9614,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             &bindings,
         );
 
+        let paramspec_solution_arguments =
+            Self::paramspec_solution_arguments(callable_type, &bindings, arguments);
+
         let bindings_result = self.infer_and_check_argument_types(
             ArgumentsIter::from_ast(arguments),
             &mut call_arguments,
-            &mut |builder, (_, expr, tcx)| {
+            &mut |builder, (index, expr, tcx)| {
+                if paramspec_solution_arguments.contains(&Some(index)) {
+                    return builder.infer_paramspec_solution_argument(
+                        expr,
+                        tcx,
+                        paramspec_solution_arguments[0] == Some(index),
+                    );
+                }
+
                 // Permit bare ParamSpecs only in direct names and dotted attributes, so nested
                 // type expressions and calls retain their ordinary validation.
                 if matches!(

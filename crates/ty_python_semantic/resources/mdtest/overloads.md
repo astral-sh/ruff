@@ -562,6 +562,43 @@ bad_producer_callback: Callable[[int], int] = ProducerImplementation().method  #
 reveal_type(ProducerImplementation().method(1))  # revealed: str | Literal[1]
 ```
 
+## Compatible ParamSpec constraints from protocol receivers
+
+Different method signatures can satisfy a protocol for some parameter lists.
+
+When no supported list is selected, binding keeps the method's original generic signature.
+
+The method still binds `P`, which restricts the returned callback's parameters.
+
+Callback assignments check both the receiver constraints and the return types.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Callable, Never, Protocol
+
+class Pair[**P](Protocol):
+    def first(self, *args: P.args, **kwargs: P.kwargs) -> None: ...
+    def second(self, *args: P.args, **kwargs: P.kwargs) -> None: ...
+
+class Receiver:
+    def first(self, value: int, /) -> None: ...
+    def second(self, value: str, /) -> None: ...
+    def method[**P](self: Pair[P]) -> Callable[P, bool]:
+        raise NotImplementedError
+
+reveal_type(Receiver().method)  # revealed: bound method Receiver.method[**P]() -> ((**P) -> bool)
+callback: Callable[[], Callable[[Never], bool]] = Receiver().method
+wrong_parameters: Callable[[], Callable[[bytes], bool]] = Receiver().method  # error: [invalid-assignment]
+wrong_return: Callable[[], Callable[[Never], str]] = Receiver().method  # error: [invalid-assignment]
+
+valid_witness: Pair[[Never]] = Receiver()
+invalid_witness: Pair[[bytes]] = Receiver()  # error: [invalid-assignment]
+```
+
 ## Constructor
 
 ```py

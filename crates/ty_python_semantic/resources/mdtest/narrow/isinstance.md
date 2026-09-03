@@ -1084,6 +1084,149 @@ def _(value: Concrete[int]) -> None:
         reveal_type(value.read())  # revealed: int
 ```
 
+### ParamSpec inference in gradual mode
+
+```toml
+[environment]
+python-version = "3.12"
+
+[analysis]
+strict-generic-narrowing = false
+```
+
+#### A single callback signature
+
+A specialized base can determine a subclass's `ParamSpec`.
+
+Both the inherited callback and the forwarding method retain that parameter list.
+
+```py
+from typing import Callable
+
+class Base[T]:
+    def callback(self) -> T:
+        raise NotImplementedError
+
+class Child[**P](Base[Callable[P, None]]):
+    def invoke(self, *args: P.args, **kwargs: P.kwargs) -> None:
+        self.callback()(*args, **kwargs)
+
+def check(value: Base[Callable[[int], None]]) -> None:
+    if isinstance(value, Child):
+        reveal_type(value)  # revealed: Child[(int, /)]
+        reveal_type(value.callback())  # revealed: (int, /) -> None
+        value.callback()(1)
+        value.callback()("wrong")  # error: [invalid-argument-type]
+        value.invoke(1)
+        value.invoke("wrong")  # error: [invalid-argument-type]
+```
+
+#### Intersected base classes
+
+Both bases constrain `P`, but their combined bounds do not select a supported parameter list.
+
+Narrowing keeps both callback types and the runtime class's top materialization.
+
+Members independent of `P` remain available; calls that forward `P` are conservatively rejected.
+
+```py
+from typing import Callable
+from ty_extensions import Intersection
+
+class Left[T]:
+    def left(self) -> T:
+        raise NotImplementedError
+
+class Right[T]:
+    def right(self) -> T:
+        raise NotImplementedError
+
+class Both[**P](Left[Callable[P, None]], Right[Callable[P, None]]):
+    def invoke(self, *args: P.args, **kwargs: P.kwargs) -> None:
+        self.left()(*args, **kwargs)
+        self.right()(*args, **kwargs)
+
+    def marker(self) -> bytes:
+        return b""
+
+def left_first(value: Intersection[Left[Callable[[int], None]], Right[Callable[[str], None]]]) -> None:
+    if isinstance(value, Both):
+        # revealed: Left[(int, /) -> None] & Right[(str, /) -> None] & Both[Top[(...)]]
+        reveal_type(value)
+        reveal_type(value.left())  # revealed: (int, /) -> None
+        reveal_type(value.right())  # revealed: (str, /) -> None
+        reveal_type(value.marker())  # revealed: bytes
+        value.left()(1)
+        value.right()("valid")
+        value.left()("wrong")  # error: [invalid-argument-type]
+        value.right()(1)  # error: [invalid-argument-type]
+        value.invoke(1)  # error: [call-top-callable]
+        value.invoke(b"wrong")  # error: [call-top-callable]
+```
+
+Reversing the bases does not select a parameter list from only one of them.
+
+```py
+def right_first(value: Intersection[Right[Callable[[str], None]], Left[Callable[[int], None]]]) -> None:
+    if isinstance(value, Both):
+        reveal_type(value.left())  # revealed: (int, /) -> None
+        reveal_type(value.right())  # revealed: (str, /) -> None
+        reveal_type(value.marker())  # revealed: bytes
+        value.left()(1)
+        value.right()("valid")
+        value.left()("wrong")  # error: [invalid-argument-type]
+        value.right()(1)  # error: [invalid-argument-type]
+        value.invoke("valid")  # error: [call-top-callable]
+        value.invoke(b"wrong")  # error: [call-top-callable]
+```
+
+A parameter list accepting `int | str` satisfies both bases; one accepting only `bytes` does not.
+
+```py
+def witnesses(valid: Both[[int | str]], invalid: Both[[bytes]]) -> None:
+    compatible: Intersection[Left[Callable[[int], None]], Right[Callable[[str], None]]] = valid
+    # error: [invalid-assignment]
+    incompatible: Intersection[Left[Callable[[int], None]], Right[Callable[[str], None]]] = invalid
+```
+
+#### Multiple type arguments of one base
+
+One specialized base can contribute both callback signatures.
+
+Narrowing preserves its callable requirements without choosing an unsupported `ParamSpec`.
+
+```py
+from typing import Callable
+
+class Pair[L, R]:
+    def left(self) -> L:
+        raise NotImplementedError
+
+    def right(self) -> R:
+        raise NotImplementedError
+
+class Both[**P](Pair[Callable[P, None], Callable[P, None]]):
+    def invoke(self, *args: P.args, **kwargs: P.kwargs) -> None:
+        self.left()(*args, **kwargs)
+        self.right()(*args, **kwargs)
+
+    def marker(self) -> bytes:
+        return b""
+
+def check(value: Pair[Callable[[int], None], Callable[[str], None]]) -> None:
+    if isinstance(value, Both):
+        reveal_type(value)  # revealed: Pair[(int, /) -> None, (str, /) -> None] & Both[Top[(...)]]
+        reveal_type(value.left())  # revealed: (int, /) -> None
+        reveal_type(value.right())  # revealed: (str, /) -> None
+        reveal_type(value.marker())  # revealed: bytes
+        value.left()(1)
+        value.right()("valid")
+        value.left()("wrong")  # error: [invalid-argument-type]
+        value.right()(1)  # error: [invalid-argument-type]
+        value.invoke(1)  # error: [call-top-callable]
+        value.invoke(b"wrong")  # error: [call-top-callable]
+```
+
 ## Negative narrowing for protocols with gradual members
 
 Negative narrowing excludes every materialization of a protocol, including when its members are

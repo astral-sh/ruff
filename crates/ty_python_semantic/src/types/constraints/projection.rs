@@ -2,7 +2,10 @@
 
 use rustc_hash::FxHashSet;
 
-use super::{ConstraintSet, PathBound, PathBoundSolution, PathBounds, Solutions, TypeVarSolution};
+use super::{
+    ConstraintSet, PathBound, PathBoundSolution, PathBounds, Solutions, TypeVarSolution,
+    UnsupportedPath,
+};
 use crate::types::typevar::TypeVarSet;
 use crate::types::{Type, TypeVarVariance};
 use crate::{Db, ProgramEnvironment};
@@ -40,6 +43,8 @@ pub(crate) enum ProjectionError {
     TraversalBudgetExceeded,
     TypeBudgetExceeded,
     IncompleteSolution,
+    /// Compatible evidence has no supported solution; returning a partial family loses constraints.
+    UnsupportedSolution,
 }
 
 /// An exact projection of all retained solution paths.
@@ -163,12 +168,16 @@ impl<'db> ConstraintSet<'db, '_> {
     ) -> Result<Solutions<'db>, ProjectionError> {
         let path_bounds = self.bounded_path_bounds(db, env, inferable, budget)?;
         let mut type_budget = ProjectionTypeBudget::new(budget.type_terms);
-        path_bounds.try_solve_with(choose, |solution| {
+        let solutions = path_bounds.try_solve_with(choose, |solution| {
             for binding in solution {
                 type_budget.charge_type(db, binding.solution)?;
             }
             Ok(())
-        })
+        })?;
+        match solutions {
+            Solutions::Unsupported => Err(ProjectionError::UnsupportedSolution),
+            solutions => Ok(solutions),
+        }
     }
 
     /// Folds complete, correlated solutions without first allocating every solved path.
@@ -230,10 +239,12 @@ impl<'db> PathBounds<'db> {
 
         let mut retained = false;
         for path in paths {
-            let Some((solution, incomplete)) = Self::solve_path_with(path, &mut choose) else {
+            let Some((solution, exceeded_budget)) = Self::solve_path_with(path, &mut choose)
+                .map_err(|UnsupportedPath| ProjectionError::UnsupportedSolution)?
+            else {
                 continue;
             };
-            if incomplete {
+            if exceeded_budget {
                 return Err(ProjectionError::IncompleteSolution);
             }
             accumulated = fold(accumulated, &solution, budget)?;

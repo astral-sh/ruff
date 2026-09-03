@@ -1335,6 +1335,43 @@ x10: Callable[[list[int]], MultiPath[int] | MultiPath[list[int]]] = reveal_type(
 # fmt: on
 ```
 
+## Implicit class specialization with compatible ParamSpec bounds
+
+A callable context can constrain one `ParamSpec` through two constructor arguments.
+
+Without a supported parameter list, the class remains unspecialized.
+
+We do not keep a partial inference for `T` or replace the unavailable `P` with its default.
+
+```py
+from typing import Callable, Never
+
+class Capture[T, **P]:
+    def __init__(self, value: T, first: Callable[P, None], second: Callable[P, None]) -> None: ...
+
+class CaptureDefault[T, **P = [bytes]]:
+    def __init__(self, value: T, first: Callable[P, None], second: Callable[P, None]) -> None: ...
+
+type Factory = Callable[[int, Callable[[int], None], Callable[[str], None]], object]
+
+# error: [invalid-assignment]
+plain: Factory = reveal_type(Capture)  # revealed: <class 'Capture'>
+# error: [invalid-assignment]
+defaulted: Factory = reveal_type(CaptureDefault)  # revealed: <class 'CaptureDefault'>
+```
+
+An explicit `[Never]` satisfies the context, but `[bytes]` does not.
+
+Matching argument signatures determine `P` without using its default.
+
+```py
+valid: Factory = Capture[int, [Never]]
+invalid: Factory = Capture[int, [bytes]]  # error: [invalid-assignment]
+
+type SameFactory = Callable[[int, Callable[[int], None], Callable[[int], None]], object]
+same: SameFactory = reveal_type(CaptureDefault)  # revealed: <class 'CaptureDefault[int, (int, /)]'>
+```
+
 ## Narrow union declared type for generic calls
 
 When a generic call is checked against a union declared type, the union is narrowed to the first

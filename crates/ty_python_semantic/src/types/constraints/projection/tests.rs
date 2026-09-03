@@ -329,7 +329,7 @@ fn incomplete_solution_discards_the_projection() {
 }
 
 #[test]
-fn rejected_exhausted_path_does_not_poison_valid_sibling() {
+fn rejected_incomplete_path_does_not_poison_valid_sibling() {
     let db = setup_db();
     let db = &db;
     let env = db.program_environment();
@@ -368,6 +368,7 @@ fn rejected_exhausted_path_does_not_poison_valid_sibling() {
                 PathBoundSolution::BudgetExceeded {
                     fallback: Some(str),
                 },
+                PathBoundSolution::Unsupported,
             ] {
                 let choose = |_, bound: &PathBound<'_>| {
                     if bound.bound_typevar == u {
@@ -403,6 +404,88 @@ fn rejected_exhausted_path_does_not_poison_valid_sibling() {
                     Ok(SolutionProjection::Constrained(vec![vec![binding(t, int)]]))
                 );
             }
+        }
+    }
+}
+
+#[test]
+fn unsupported_solution_discards_the_projection() {
+    let db = setup_db();
+    let db = &db;
+    let env = db.program_environment();
+    let t = create_typevar(db, "T");
+    let int = known_instance(db, KnownClass::Int);
+    let str = known_instance(db, KnownClass::Str);
+    let builder = ConstraintSetBuilder::new();
+    let inferable = TypeVarSet::from_typevars(db, [t]);
+
+    for alternatives in [[int, str], [str, int]] {
+        let choose = |_, bound: &PathBound<'_>| {
+            if bound.evidence_lower == Some(str) {
+                PathBoundSolution::Unsupported
+            } else {
+                PathBoundSolution::Solved(int)
+            }
+        };
+        let paths = PathBounds::Constrained(
+            alternatives
+                .map(|ty| Box::from([PathBound::exact(t, ty)]))
+                .into(),
+        );
+        assert_eq!(paths.solve_with(choose), Solutions::Unsupported);
+
+        let set = binary_choice(db, &builder, t, alternatives);
+        assert_eq!(
+            set.solutions_with(db, &env, inferable, SolutionBudget::default(), choose),
+            Err(ProjectionError::UnsupportedSolution)
+        );
+        assert_eq!(
+            set.try_fold_solutions(
+                db,
+                &env,
+                inferable,
+                SolutionBudget::default(),
+                choose,
+                0,
+                |count, _, _| Ok(count + 1),
+            ),
+            Err(ProjectionError::UnsupportedSolution)
+        );
+    }
+}
+
+#[test]
+fn unsupported_path_does_not_become_a_budget_fallback() {
+    let db = setup_db();
+    let db = &db;
+    let t = create_typevar(db, "T");
+    let u = create_typevar(db, "U");
+    let int = known_instance(db, KnownClass::Int);
+
+    for reverse in [false, true] {
+        let mut path = vec![PathBound::exact(t, int), PathBound::exact(u, int)];
+        if reverse {
+            path.reverse();
+        }
+        let paths = PathBounds::Constrained(Box::new([path.into_boxed_slice()]));
+        for fallback in [None, Some(int)] {
+            let choose = |_, bound: &PathBound<'_>| {
+                if bound.bound_typevar == t {
+                    PathBoundSolution::Unsupported
+                } else {
+                    PathBoundSolution::BudgetExceeded { fallback }
+                }
+            };
+            assert_eq!(paths.solve_with(choose), Solutions::Unsupported);
+            assert_eq!(
+                paths.try_fold_with(
+                    choose,
+                    0,
+                    &mut ProjectionTypeBudget::new(0),
+                    |count, _, _| Ok(count + 1),
+                ),
+                Err(ProjectionError::UnsupportedSolution)
+            );
         }
     }
 }
