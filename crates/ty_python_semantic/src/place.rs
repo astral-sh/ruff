@@ -4,6 +4,7 @@ use crate::ProgramEnvironment;
 use itertools::Either;
 use ruff_index::IndexSlice;
 use ruff_python_ast::PythonVersion;
+use ruff_python_ast::name::Name;
 use rustc_hash::FxHashMap;
 use ty_module_resolver::{
     KnownModule, Module, ModuleName, file_to_module, resolve_module_confident,
@@ -15,8 +16,9 @@ use crate::reachability::{
     evaluate_reachability_with_cache,
 };
 use crate::types::{
-    DynamicType, KnownClass, MemberLookupPolicy, Type, TypeAndQualifiers, TypeQualifiers,
-    UnionBuilder, UnionType, binding_type, inferred_declaration, is_discarded_dict_key_assignment,
+    DynamicType, InferencePromotion, InferenceVariable, KnownClass, MemberLookupKey,
+    MemberLookupPolicy, SymbolicType, Type, TypeAndQualifiers, TypeQualifiers, UnionBuilder,
+    UnionType, infer_definition_types, inferred_declaration, is_discarded_dict_key_assignment,
     may_exist_at_runtime,
 };
 use crate::{Db, FxIndexSet, FxOrderSet};
@@ -97,10 +99,17 @@ impl PublicTypePolicy {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         ty: Type<'db>,
-    ) -> Type<'db> {
+        symbolic: Option<SymbolicType<'db>>,
+        lookup: InferenceVariable<'db>,
+    ) -> (Type<'db>, Option<SymbolicType<'db>>) {
         match self {
-            Self::Raw => ty,
-            Self::Promote => ty.promote(db, env).promote_singletons(db, env),
+            Self::Raw => (ty, symbolic),
+            Self::Promote => (
+                InferencePromotion::Attribute.apply(db, env, ty),
+                symbolic.map(|symbolic| {
+                    symbolic.promote(db, env, lookup, InferencePromotion::Attribute)
+                }),
+            ),
         }
     }
 }
@@ -150,6 +159,8 @@ impl<'db> Provenance<'db> {
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct DefinedPlace<'db> {
     pub(crate) ty: Type<'db>,
+    /// Pending equations for `ty`; their variables are confined to this separate representation.
+    pub(crate) symbolic: Option<SymbolicType<'db>>,
     pub(crate) origin: TypeOrigin,
     pub(crate) definedness: Definedness,
     pub(crate) public_type_policy: PublicTypePolicy,
@@ -160,6 +171,7 @@ impl<'db> DefinedPlace<'db> {
     fn new(ty: Type<'db>) -> Self {
         Self {
             ty,
+            symbolic: None,
             origin: TypeOrigin::Inferred,
             definedness: Definedness::AlwaysDefined,
             public_type_policy: PublicTypePolicy::Raw,
@@ -236,6 +248,20 @@ pub(crate) enum Place<'db> {
 }
 
 impl<'db> Place<'db> {
+    pub(crate) fn symbolic(self) -> Option<SymbolicType<'db>> {
+        match self {
+            Self::Defined(place) => place.symbolic,
+            Self::Undefined => None,
+        }
+    }
+
+    pub(crate) fn with_symbolic(mut self, symbolic: Option<SymbolicType<'db>>) -> Self {
+        if let Place::Defined(defined) = &mut self {
+            defined.symbolic = symbolic;
+        }
+        self
+    }
+
     /// Constructor that creates a [`Place`] with type origin [`TypeOrigin::Inferred`] and definedness [`Definedness::AlwaysDefined`].
     pub(crate) fn bound(ty: impl Into<Type<'db>>) -> Self {
         Place::Defined(DefinedPlace::new(ty.into()))
@@ -310,10 +336,11 @@ impl<'db> Place<'db> {
     }
 
     #[must_use]
-    fn map_type(self, f: impl FnOnce(Type<'db>) -> Type<'db>) -> Place<'db> {
+    fn map_type(self, db: &'db dyn Db, mut f: impl FnMut(Type<'db>) -> Type<'db>) -> Place<'db> {
         match self {
             Place::Defined(defined) => Place::Defined(DefinedPlace {
                 ty: f(defined.ty),
+                symbolic: defined.symbolic.map(|value| value.map(db, &mut f)),
                 ..defined
             }),
             Place::Undefined => Place::Undefined,
@@ -408,6 +435,7 @@ impl<'db> From<LookupResult<'db>> for PlaceAndQualifiers<'db> {
                     .with_origin(type_and_qualifiers.origin())
                     .with_provenance(type_and_qualifiers.provenance()),
             )
+            .with_symbolic(type_and_qualifiers.symbolic)
             .with_qualifiers(type_and_qualifiers.qualifiers()),
             Err(LookupError::Undefined(qualifiers)) => Place::Undefined.with_qualifiers(qualifiers),
             Err(LookupError::PossiblyUndefined(type_and_qualifiers)) => Place::Defined(
@@ -416,6 +444,7 @@ impl<'db> From<LookupResult<'db>> for PlaceAndQualifiers<'db> {
                     .with_definedness(Definedness::PossiblyUndefined)
                     .with_provenance(type_and_qualifiers.provenance()),
             )
+            .with_symbolic(type_and_qualifiers.symbolic)
             .with_qualifiers(type_and_qualifiers.qualifiers()),
         }
     }
@@ -434,27 +463,16 @@ impl<'db> LookupError<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        lookup: InferenceVariable<'db>,
         fallback: PlaceAndQualifiers<'db>,
     ) -> LookupResult<'db> {
-        let fallback = fallback.into_lookup_result(db, env);
+        let fallback = fallback.into_lookup_result(db, env, lookup);
         match (&self, &fallback) {
             (LookupError::Undefined(_), _) => fallback,
             (LookupError::PossiblyUndefined { .. }, Err(LookupError::Undefined(_))) => Err(self),
-            (LookupError::PossiblyUndefined(ty), Ok(ty2)) => Ok(TypeAndQualifiers::new(
-                UnionType::from_two_elements(db, env, ty.inner_type(), ty2.inner_type()),
-                ty.origin().merge(ty2.origin()),
-                ty.qualifiers().union(ty2.qualifiers()),
-            )
-            .with_provenance(ty.provenance().or(ty2.provenance()))),
+            (LookupError::PossiblyUndefined(ty), Ok(ty2)) => Ok(ty.union(db, env, *ty2)),
             (LookupError::PossiblyUndefined(ty), Err(LookupError::PossiblyUndefined(ty2))) => {
-                Err(LookupError::PossiblyUndefined(
-                    TypeAndQualifiers::new(
-                        UnionType::from_two_elements(db, env, ty.inner_type(), ty2.inner_type()),
-                        ty.origin().merge(ty2.origin()),
-                        ty.qualifiers().union(ty2.qualifiers()),
-                    )
-                    .with_provenance(ty.provenance().or(ty2.provenance())),
-                ))
+                Err(LookupError::PossiblyUndefined(ty.union(db, env, *ty2)))
             }
         }
     }
@@ -466,6 +484,17 @@ impl<'db> LookupError<'db> {
 /// Note that this type is exactly isomorphic to [`Place`].
 /// In the future, we could possibly consider removing `Place` and using this type everywhere instead.
 pub(crate) type LookupResult<'db> = Result<TypeAndQualifiers<'db>, LookupError<'db>>;
+
+/// The inputs that distinguish public symbol lookups.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+pub(crate) struct SymbolLookupKey<'db> {
+    pub(crate) scope: ScopeId<'db>,
+    name: Name,
+    requires_explicit_reexport: RequiresExplicitReExport,
+    considered_definitions: ConsideredDefinitions,
+}
+
+impl get_size2::GetSize for SymbolLookupKey<'_> {}
 
 /// Infer the public type of a symbol (its type as seen from outside its scope) in the given
 /// `scope`.
@@ -521,7 +550,15 @@ pub(crate) fn global_symbol<'db>(
     name: &str,
 ) -> PlaceAndQualifiers<'db> {
     let env = ProgramEnvironment::from_file(file);
-    explicit_global_symbol(db, file, name).or_fall_back_to(db, &env, || {
+    let lookup = SymbolLookupKey::new(
+        db,
+        global_scope(db, file),
+        name,
+        RequiresExplicitReExport::No,
+        ConsideredDefinitions::AllReachable,
+    )
+    .inference_variable(db);
+    explicit_global_symbol(db, file, name).or_fall_back_to(db, &env, lookup, || {
         module_type_implicit_global_symbol(db, file, name)
     })
 }
@@ -558,6 +595,35 @@ pub(crate) fn imported_symbol<'db>(
     // ignore `__getattr__`. Typeshed has a fake `__getattr__` on `types.ModuleType` to help out with
     // dynamic imports; we shouldn't use it for `ModuleLiteral` types where we know exactly which
     // module we're dealing with.
+    let lookup = file.map_or_else(
+        || {
+            MemberLookupKey::new(
+                db,
+                env.program(db),
+                KnownClass::ModuleType.to_instance(db, env),
+                name,
+                MemberLookupPolicy::NO_GETATTR_LOOKUP,
+            )
+            .inference_variable(db)
+        },
+        |file| {
+            let requires_explicit_reexport = requires_explicit_reexport.unwrap_or_else(|| {
+                if file.file(db).is_stub(db) {
+                    RequiresExplicitReExport::Yes
+                } else {
+                    RequiresExplicitReExport::No
+                }
+            });
+            SymbolLookupKey::new(
+                db,
+                global_scope(db, file),
+                name,
+                requires_explicit_reexport,
+                ConsideredDefinitions::EndOfScope,
+            )
+            .inference_variable(db)
+        },
+    );
     file.map(|file| {
         let requires_explicit_reexport = requires_explicit_reexport.unwrap_or_else(|| {
             if file.file(db).is_stub(db) {
@@ -576,7 +642,7 @@ pub(crate) fn imported_symbol<'db>(
         )
     })
     .unwrap_or_default()
-    .or_fall_back_to(db, env, || {
+    .or_fall_back_to(db, env, lookup, || {
         match name {
             "__file__" => {
                 // We special-case `__file__` here because we know that for a successfully imported
@@ -677,6 +743,14 @@ fn builtins_symbol_impl<'db>(
     let resolver = |module: Module<'db>| {
         let file = ProgramFile::new(db, module.file(db)?, program);
         let scope = global_scope(db, file);
+        let lookup = SymbolLookupKey::new(
+            db,
+            scope,
+            symbol,
+            RequiresExplicitReExport::Yes,
+            ConsideredDefinitions::EndOfScope,
+        )
+        .inference_variable(db);
         let found_symbol = symbol_impl(
             db,
             scope,
@@ -684,7 +758,7 @@ fn builtins_symbol_impl<'db>(
             RequiresExplicitReExport::Yes,
             ConsideredDefinitions::EndOfScope,
         )
-        .or_fall_back_to(db, env, || {
+        .or_fall_back_to(db, env, lookup, || {
             // We're looking up in the builtins namespace and not the module, so we should
             // do the normal lookup in `types.ModuleType` and not the special one as in
             // `imported_symbol`.
@@ -967,10 +1041,11 @@ impl<'db> PlaceAndQualifiers<'db> {
     #[must_use]
     pub(crate) fn map_type(
         self,
-        f: impl FnOnce(Type<'db>) -> Type<'db>,
+        db: &'db dyn Db,
+        f: impl FnMut(Type<'db>) -> Type<'db>,
     ) -> PlaceAndQualifiers<'db> {
         PlaceAndQualifiers {
-            place: self.place.map_type(f),
+            place: self.place.map_type(db, f),
             qualifiers: self.qualifiers,
         }
     }
@@ -985,15 +1060,23 @@ impl<'db> PlaceAndQualifiers<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        lookup: InferenceVariable<'db>,
     ) -> LookupResult<'db> {
         match self {
             PlaceAndQualifiers {
                 place: Place::Defined(place),
                 qualifiers,
             } => {
-                let ty = place.public_type_policy.apply_if_needed(db, env, place.ty);
-                let type_and_qualifiers = TypeAndQualifiers::new(ty, place.origin, qualifiers)
+                let (ty, symbolic) = place.public_type_policy.apply_if_needed(
+                    db,
+                    env,
+                    place.ty,
+                    place.symbolic,
+                    lookup,
+                );
+                let mut type_and_qualifiers = TypeAndQualifiers::new(ty, place.origin, qualifiers)
                     .with_provenance(place.provenance);
+                type_and_qualifiers.symbolic = symbolic;
                 match place.definedness {
                     Definedness::AlwaysDefined => Ok(type_and_qualifiers),
                     Definedness::PossiblyUndefined => {
@@ -1018,9 +1101,10 @@ impl<'db> PlaceAndQualifiers<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        lookup: InferenceVariable<'db>,
         diagnostic_fn: impl FnOnce(LookupError<'db>) -> TypeAndQualifiers<'db>,
     ) -> TypeAndQualifiers<'db> {
-        self.into_lookup_result(db, env)
+        self.into_lookup_result(db, env, lookup)
             .unwrap_or_else(diagnostic_fn)
     }
 
@@ -1039,10 +1123,13 @@ impl<'db> PlaceAndQualifiers<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        lookup: InferenceVariable<'db>,
         fallback_fn: impl FnOnce() -> PlaceAndQualifiers<'db>,
     ) -> Self {
-        self.into_lookup_result(db, env)
-            .or_else(|lookup_error| lookup_error.or_fall_back_to(db, env, fallback_fn()))
+        self.into_lookup_result(db, env, lookup.lookup_part(db, 0))
+            .or_else(|lookup_error| {
+                lookup_error.or_fall_back_to(db, env, lookup.lookup_part(db, 1), fallback_fn())
+            })
             .into()
     }
 
@@ -1065,6 +1152,15 @@ impl<'db> PlaceAndQualifiers<'db> {
             // applies to boundness and qualifiers.
             (Place::Defined(prev), Place::Defined(current)) => Place::Defined(DefinedPlace {
                 ty: current.ty.cycle_normalized(db, env, prev.ty, cycle),
+                // Keep dependency identities from both iterations so a cycle cannot alternate
+                // between partial symbolic graphs. Normalize shared equation payloads before
+                // Salsa compares the retained graph.
+                symbolic: match (current.symbolic, prev.symbolic) {
+                    (Some(current), Some(previous)) => {
+                        Some(current.cycle_normalized(db, env, previous, cycle))
+                    }
+                    (current, previous) => current.or(previous),
+                },
                 definedness: if cycle.iteration() <= 1
                     || matches!(
                         (prev.definedness, current.definedness),
@@ -1188,6 +1284,7 @@ pub(crate) fn place_by_id<'db>(
                     provenance: inferred_provenance,
                     ..
                 }) => Place::Defined(DefinedPlace {
+                    symbolic: None,
                     ty: UnionType::from_two_elements(db, &env, Type::unknown(), inferred),
                     origin,
                     definedness: boundness,
@@ -1196,6 +1293,7 @@ pub(crate) fn place_by_id<'db>(
                 })
                 .with_qualifiers(qualifiers),
                 Place::Undefined => Place::Defined(DefinedPlace {
+                    symbolic: None,
                     ty: Type::unknown(),
                     origin,
                     definedness,
@@ -1238,6 +1336,7 @@ pub(crate) fn place_by_id<'db>(
                     // design work though as we might want a different behavior for stubs and for
                     // normal modules.
                     Place::Defined(DefinedPlace {
+                        symbolic: None,
                         ty: declared_ty,
                         origin,
                         definedness: Definedness::AlwaysDefined,
@@ -1253,6 +1352,7 @@ pub(crate) fn place_by_id<'db>(
                     provenance: inferred_provenance,
                     ..
                 }) => Place::Defined(DefinedPlace {
+                    symbolic: None,
                     ty: UnionType::from_two_elements(db, &env, inferred_ty, declared_ty),
                     origin,
                     definedness: if boundness_analysis == BoundnessAnalysis::AssumeBound {
@@ -1712,6 +1812,7 @@ fn place_from_bindings_impl<'db>(
     let mut only_non_shadowing_bindings = true;
     let mut narrowing_projector = None;
 
+    let mut symbolic_values = Vec::new();
     let mut types = bindings_with_constraints.filter_map(
         |BindingWithConstraints {
              binding,
@@ -1835,8 +1936,9 @@ fn place_from_bindings_impl<'db>(
 
             first_definition.get_or_insert(binding);
             provenance = provenance.or(Provenance::SingleDefinition(binding));
-            let binding_ty = binding_type(db, binding);
-            let narrowed = match narrowing_constraint.constraint() {
+            let binding_inference = infer_definition_types(db, binding);
+            let binding_ty = binding_inference.binding_type(binding);
+            let mut narrow = |binding_ty| match narrowing_constraint.constraint() {
                 ScopedNarrowingConstraint::ALWAYS_TRUE => binding_ty,
                 ScopedNarrowingConstraint::ALWAYS_FALSE => Type::Never,
                 constraint => narrowing_projector
@@ -1853,6 +1955,12 @@ fn place_from_bindings_impl<'db>(
                     })
                     .narrow(constraint, binding_ty),
             };
+            let narrowed = narrow(binding_ty);
+            let symbolic = binding_inference
+                .binding_place(binding)
+                .symbolic()
+                .map(|symbolic| symbolic.narrow_binding(db, env, binding, &narrowing_constraint));
+            symbolic_values.push((narrowed, symbolic));
             Some((narrowed, static_reachability))
         },
     );
@@ -1909,7 +2017,7 @@ fn place_from_bindings_impl<'db>(
     };
 
     PlaceWithDefinition {
-        place,
+        place: place.with_symbolic(SymbolicType::from_union(db, env, symbolic_values)),
         first_definition,
     }
 }
@@ -2566,7 +2674,7 @@ pub(crate) fn class_body_implicit_symbol<'db>(
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub(crate) enum RequiresExplicitReExport {
     Yes,
     No,
@@ -2591,7 +2699,7 @@ impl RequiresExplicitReExport {
 ///     if flag():
 ///         x = 3
 /// ```
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub(crate) enum ConsideredDefinitions {
     /// Consider only the definitions that are "live" at the end of the scope, i.e. those
     /// that have not been shadowed or deleted.
@@ -2617,11 +2725,20 @@ mod tests {
         let env = db.program_environment();
         let ty1 = Type::int_literal(1);
         let ty2 = Type::int_literal(2);
+        let lookup = MemberLookupKey::new(
+            db,
+            env.program(db),
+            ty1,
+            "member",
+            MemberLookupPolicy::default(),
+        )
+        .inference_variable(db);
 
         let unbound = || PlaceAndQualifiers::default();
 
         let possibly_unbound_ty1 = || {
             Place::Defined(DefinedPlace {
+                symbolic: None,
                 ty: ty1,
                 origin: Inferred,
                 definedness: PossiblyUndefined,
@@ -2632,6 +2749,7 @@ mod tests {
         };
         let possibly_unbound_ty2 = || {
             Place::Defined(DefinedPlace {
+                symbolic: None,
                 ty: ty2,
                 origin: Inferred,
                 definedness: PossiblyUndefined,
@@ -2643,6 +2761,7 @@ mod tests {
 
         let bound_ty1 = || {
             Place::Defined(DefinedPlace {
+                symbolic: None,
                 ty: ty1,
                 origin: Inferred,
                 definedness: AlwaysDefined,
@@ -2653,6 +2772,7 @@ mod tests {
         };
         let bound_ty2 = || {
             Place::Defined(DefinedPlace {
+                symbolic: None,
                 ty: ty2,
                 origin: Inferred,
                 definedness: AlwaysDefined,
@@ -2663,21 +2783,28 @@ mod tests {
         };
 
         // Start from an unbound symbol
-        assert_eq!(unbound().or_fall_back_to(db, &env, unbound), unbound());
         assert_eq!(
-            unbound().or_fall_back_to(db, &env, possibly_unbound_ty1),
+            unbound().or_fall_back_to(db, &env, lookup, unbound),
+            unbound()
+        );
+        assert_eq!(
+            unbound().or_fall_back_to(db, &env, lookup, possibly_unbound_ty1),
             possibly_unbound_ty1()
         );
-        assert_eq!(unbound().or_fall_back_to(db, &env, bound_ty1), bound_ty1());
+        assert_eq!(
+            unbound().or_fall_back_to(db, &env, lookup, bound_ty1),
+            bound_ty1()
+        );
 
         // Start from a possibly unbound symbol
         assert_eq!(
-            possibly_unbound_ty1().or_fall_back_to(db, &env, unbound),
+            possibly_unbound_ty1().or_fall_back_to(db, &env, lookup, unbound),
             possibly_unbound_ty1()
         );
         assert_eq!(
-            possibly_unbound_ty1().or_fall_back_to(db, &env, possibly_unbound_ty2),
+            possibly_unbound_ty1().or_fall_back_to(db, &env, lookup, possibly_unbound_ty2),
             Place::Defined(DefinedPlace {
+                symbolic: None,
                 ty: UnionType::from_elements(db, &env, [ty1, ty2]),
                 origin: Inferred,
                 definedness: PossiblyUndefined,
@@ -2687,8 +2814,9 @@ mod tests {
             .into()
         );
         assert_eq!(
-            possibly_unbound_ty1().or_fall_back_to(db, &env, bound_ty2),
+            possibly_unbound_ty1().or_fall_back_to(db, &env, lookup, bound_ty2),
             Place::Defined(DefinedPlace {
+                symbolic: None,
                 ty: UnionType::from_elements(db, &env, [ty1, ty2]),
                 origin: Inferred,
                 definedness: AlwaysDefined,
@@ -2699,13 +2827,16 @@ mod tests {
         );
 
         // Start from a definitely bound symbol
-        assert_eq!(bound_ty1().or_fall_back_to(db, &env, unbound), bound_ty1());
         assert_eq!(
-            bound_ty1().or_fall_back_to(db, &env, possibly_unbound_ty2),
+            bound_ty1().or_fall_back_to(db, &env, lookup, unbound),
             bound_ty1()
         );
         assert_eq!(
-            bound_ty1().or_fall_back_to(db, &env, bound_ty2),
+            bound_ty1().or_fall_back_to(db, &env, lookup, possibly_unbound_ty2),
+            bound_ty1()
+        );
+        assert_eq!(
+            bound_ty1().or_fall_back_to(db, &env, lookup, bound_ty2),
             bound_ty1()
         );
     }

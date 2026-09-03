@@ -1106,11 +1106,10 @@ fn typed_dict_inherited_class_member<'db>(
     name: &str,
     new_upper_bound: impl FnOnce() -> Type<'db>,
 ) -> PlaceAndQualifiers<'db> {
+    let new_upper_bound = new_upper_bound();
     let fallback_member = typed_dict_fallback_class_member(db, env, module, lookup_policy, name)
-        .map_type(|ty| {
-            let mapping = TypeMapping::ReplaceSelf {
-                new_upper_bound: new_upper_bound(),
-            };
+        .map_type(db, |ty| {
+            let mapping = TypeMapping::ReplaceSelf { new_upper_bound };
             ty.apply_type_mapping(db, env, &mapping, TypeContext::default())
         });
     if !fallback_member.is_undefined() {

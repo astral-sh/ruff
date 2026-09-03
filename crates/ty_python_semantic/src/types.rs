@@ -148,6 +148,8 @@ mod function;
 mod generics;
 pub mod ide_support;
 mod infer;
+use infer::constraints::{InferenceOwner, InferenceSlot};
+pub(crate) use infer::constraints::{InferencePromotion, InferenceVariable, SymbolicType};
 mod instance;
 mod iteration;
 mod known_instance;
@@ -1001,10 +1003,10 @@ impl<'db> ResolvedMember<'db> {
     }
 
     /// Transform the member's value type without changing its property accessor deprecations.
-    fn map_type(self, db: &'db dyn Db, f: impl FnOnce(Type<'db>) -> Type<'db>) -> Self {
+    fn map_type(self, db: &'db dyn Db, f: impl FnMut(Type<'db>) -> Type<'db>) -> Self {
         Self::new(
             db,
-            self.member(db).map_type(f),
+            self.member(db).map_type(db, f),
             self.deprecated_properties(db),
         )
     }
@@ -1039,7 +1041,7 @@ fn member_lookup_result<'db>(
 fn map_member_lookup_type<'db>(
     db: &'db dyn Db,
     result: MemberLookupResult<'db>,
-    f: impl FnOnce(Type<'db>) -> Type<'db>,
+    f: impl FnMut(Type<'db>) -> Type<'db>,
 ) -> MemberLookupResult<'db> {
     match result {
         Ok(member) => Ok(member.map_type(db, f)),
@@ -1094,6 +1096,7 @@ fn distribute_member_lookup_over_bound_or_constraints<'db>(
 fn member_lookup_or_fall_back_to<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
+    lookup: InferenceVariable<'db>,
     result: MemberLookupResult<'db>,
     fallback_fn: impl FnOnce() -> MemberLookupResult<'db>,
 ) -> MemberLookupResult<'db> {
@@ -1113,7 +1116,7 @@ fn member_lookup_or_fall_back_to<'db>(
             let fallback_member = fallback.unwrap_or_else(|error| error.fallback_member(db));
             member_lookup_result(
                 db,
-                member.or_fall_back_to(db, env, || fallback_member.member(db)),
+                member.or_fall_back_to(db, env, lookup, || fallback_member.member(db)),
                 result
                     .err()
                     .map(|error| error.kind(db))
@@ -1264,7 +1267,7 @@ impl Default for MemberLookupPolicy {
 
 /// The common key for class-member and instance-member lookup.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-struct MemberLookupKey<'db> {
+pub(crate) struct MemberLookupKey<'db> {
     #[returns(copy)]
     program: Program<'db>,
     #[returns(copy)]
@@ -1274,6 +1277,8 @@ struct MemberLookupKey<'db> {
     #[returns(copy)]
     policy: MemberLookupPolicy,
 }
+
+impl get_size2::GetSize for MemberLookupKey<'_> {}
 
 /// Meta data for `Type::Todo`, which represents a known limitation in ty.
 #[cfg(debug_assertions)]
@@ -3168,7 +3173,7 @@ impl<'db> Type<'db> {
     /// Note that this function tries to promote literals to a more user-friendly form than their
     /// fallback instance type. For example, `def _() -> int` is promoted to `Callable[[], int]`,
     /// as opposed to `FunctionType`.
-    pub(crate) fn promote(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
+    fn promote(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
         self.apply_type_mapping(
             db,
             env,
@@ -3208,11 +3213,7 @@ impl<'db> Type<'db> {
     }
 
     /// Promote a top-level singleton type (like `None`, `EllipsisType`) to `T | Unknown`.
-    pub(crate) fn promote_singletons(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-    ) -> Type<'db> {
+    fn promote_singletons(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
         self.promote_singletons_impl(db, env)
     }
 
@@ -3696,7 +3697,9 @@ impl<'db> Type<'db> {
                     _ => Some(
                         class
                             .class_member(db, env, name, policy)
-                            .map_type(|member| property_wrapper_descriptor(db, env, name, member)),
+                            .map_type(db, |member| {
+                                property_wrapper_descriptor(db, env, name, member)
+                            }),
                     ),
                 }
             }
@@ -3714,7 +3717,9 @@ impl<'db> Type<'db> {
             Type::GenericAlias(alias) => Some(
                 ClassType::from(*alias)
                     .class_member(db, env, name, policy)
-                    .map_type(|member| property_wrapper_descriptor(db, env, name, member)),
+                    .map_type(db, |member| {
+                        property_wrapper_descriptor(db, env, name, member)
+                    }),
             ),
 
             Type::SubclassOf(subclass_of_ty) => {
@@ -3970,6 +3975,8 @@ impl<'db> Type<'db> {
         name: &str,
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
+        let lookup =
+            MemberLookupKey::new(db, env.program(db), self, name, policy).inference_variable(db);
         let class_attr = self
             .find_name_in_mro_with_policy(db, env, name, policy)
             .expect(
@@ -4020,9 +4027,9 @@ impl<'db> Type<'db> {
         if own_declaration_definedness.is_some() {
             // A conditionally-declared attribute is a contract only on paths where that
             // declaration is present; the metaclass value is the fallback on other paths.
-            class_attr.or_fall_back_to(db, env, || metaclass_attr)
+            class_attr.or_fall_back_to(db, env, lookup, || metaclass_attr)
         } else {
-            metaclass_attr.or_fall_back_to(db, env, || class_attr)
+            metaclass_attr.or_fall_back_to(db, env, lookup, || class_attr)
         }
     }
 
@@ -4068,6 +4075,8 @@ impl<'db> Type<'db> {
         name: &str,
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
+        let lookup =
+            MemberLookupKey::new(db, env.program(db), self, name, policy).inference_variable(db);
         let class_attr = self
             .find_name_in_mro_with_policy(db, env, name, policy)
             .expect("The meta-type of an instance-like type should always have an MRO");
@@ -4092,6 +4101,7 @@ impl<'db> Type<'db> {
             env,
             name,
             policy,
+            lookup.lookup_part(db, 0),
             class.iter_mro(db).take(1),
         );
         // A non-ClassVar declaration-only member describes instance storage but does not add a
@@ -4120,6 +4130,7 @@ impl<'db> Type<'db> {
             env,
             name,
             policy,
+            lookup.lookup_part(db, 1),
             class.iter_mro(db).skip(1),
         );
 
@@ -4129,8 +4140,10 @@ impl<'db> Type<'db> {
             metaclass_member
         };
         let class_member = own_class_member
-            .or_fall_back_to(db, env, || metaclass_member)
-            .or_fall_back_to(db, env, || inherited_class_member);
+            .or_fall_back_to(db, env, lookup.lookup_part(db, 2), || metaclass_member)
+            .or_fall_back_to(db, env, lookup.lookup_part(db, 3), || {
+                inherited_class_member
+            });
         let class_member = if metaclass_member_is_implicit {
             // Preserve the existing convention that an inferred instance member is assumed to be
             // available even when no lower-precedence fallback exists.
@@ -4183,7 +4196,9 @@ impl<'db> Type<'db> {
             ..declaration
         })
         .with_qualifiers(qualifiers)
-        .or_fall_back_to(db, env, || dynamic_instance_fallback)
+        .or_fall_back_to(db, env, lookup.lookup_part(db, 4), || {
+            dynamic_instance_fallback
+        })
     }
 
     /// This function roughly corresponds to looking up an attribute in the `__dict__` of an object.
@@ -4695,6 +4710,7 @@ impl<'db> Type<'db> {
         if let PlaceAndQualifiers {
             place:
                 Place::Defined(DefinedPlace {
+                    symbolic: _,
                     ty,
                     origin,
                     definedness,
@@ -4709,6 +4725,7 @@ impl<'db> Type<'db> {
                 db,
                 env,
                 Place::Defined(DefinedPlace {
+                    symbolic: None,
                     ty: fallback,
                     origin,
                     definedness,
@@ -4737,6 +4754,7 @@ impl<'db> Type<'db> {
             PlaceAndQualifiers {
                 place:
                     Place::Defined(DefinedPlace {
+                        symbolic: _,
                         ty: Type::Union(union),
                         origin,
                         definedness: boundness,
@@ -4767,6 +4785,7 @@ impl<'db> Type<'db> {
                         };
 
                         Place::Defined(DefinedPlace {
+                            symbolic: None,
                             ty,
                             origin,
                             definedness: boundness,
@@ -4788,6 +4807,7 @@ impl<'db> Type<'db> {
             attribute @ PlaceAndQualifiers {
                 place:
                     Place::Defined(DefinedPlace {
+                        symbolic: _,
                         ty: Type::Intersection(intersection),
                         origin,
                         definedness,
@@ -4810,6 +4830,7 @@ impl<'db> Type<'db> {
                                 })
                                 .map_or(*elem, |result| result.return_type);
                             Place::Defined(DefinedPlace {
+                                symbolic: None,
                                 ty,
                                 origin,
                                 definedness,
@@ -4831,6 +4852,7 @@ impl<'db> Type<'db> {
             PlaceAndQualifiers {
                 place:
                     Place::Defined(DefinedPlace {
+                        symbolic: _,
                         ty: attribute_ty,
                         origin,
                         definedness: boundness,
@@ -4849,6 +4871,7 @@ impl<'db> Type<'db> {
                 if let Some(DescriptorGetResult { return_type, kind }) = result {
                     (
                         Place::Defined(DefinedPlace {
+                            symbolic: None,
                             ty: return_type,
                             origin,
                             definedness: boundness,
@@ -5085,6 +5108,7 @@ impl<'db> Type<'db> {
                 }),
                 AttributeKind::DataDescriptor,
                 Place::Defined(DefinedPlace {
+                    symbolic: _,
                     ty: fallback_ty,
                     origin: fallback_origin,
                     definedness: fallback_boundness,
@@ -5094,6 +5118,7 @@ impl<'db> Type<'db> {
             ) => member_lookup_result(
                 db,
                 Place::Defined(DefinedPlace {
+                    symbolic: None,
                     ty: UnionType::from_two_elements(db, env, meta_attr_ty, fallback_ty),
                     origin: meta_origin.merge(fallback_origin),
                     definedness: fallback_boundness,
@@ -5140,6 +5165,7 @@ impl<'db> Type<'db> {
                 }),
                 AttributeKind::NormalOrNonDataDescriptor,
                 Place::Defined(DefinedPlace {
+                    symbolic: _,
                     ty: fallback_ty,
                     origin: fallback_origin,
                     definedness: fallback_boundness,
@@ -5149,6 +5175,7 @@ impl<'db> Type<'db> {
             ) => member_lookup_result(
                 db,
                 Place::Defined(DefinedPlace {
+                    symbolic: None,
                     ty: UnionType::from_two_elements(db, env, meta_attr_ty, fallback_ty),
                     origin: meta_origin.merge(fallback_origin),
                     definedness: meta_attr_boundness.max(fallback_boundness),
@@ -5307,7 +5334,7 @@ impl<'db> Type<'db> {
     ) -> MemberLookupResult<'db> {
         #[salsa::tracked(
             returns(copy),
-            cycle_initial=|_, id, _| Place::bound(Type::divergent(id)).into(),
+            cycle_initial=|db, id, key: MemberLookupKey<'db>| Place::bound(Type::divergent(id)).with_symbolic(Some(SymbolicType::initial(db, key.program(db), InferenceOwner::Member(key, None), InferenceSlot::Root))).into(),
             cycle_fn=|db, cycle, previous: &MemberLookupResult<'db>, member: MemberLookupResult<'db>, key: MemberLookupKey<'db>| {
                 cycle_normalized_member_lookup(db, &ProgramEnvironment::from_program(key.program(db)), member, *previous, cycle)
             },
@@ -5317,12 +5344,26 @@ impl<'db> Type<'db> {
             db: &'db dyn Db,
             key: MemberLookupKey<'db>,
         ) -> MemberLookupResult<'db> {
-            member_lookup_with_policy_impl(db, key, None)
+            let result = member_lookup_with_policy_impl(db, key, None);
+            let resolved = result.unwrap_or_else(|error| error.fallback_member(db));
+            let mut member = resolved.member(db);
+            member.place = SymbolicType::bind_place(
+                db,
+                &ProgramEnvironment::from_program(key.program(db)),
+                InferenceOwner::Member(key, None),
+                member.place,
+            );
+            member_lookup_result(
+                db,
+                member,
+                result.err().map(|error| error.kind(db)),
+                resolved.deprecated_properties(db),
+            )
         }
 
         #[salsa::tracked(
             returns(copy),
-            cycle_initial=|_, id, _, _| Place::bound(Type::divergent(id)).into(),
+            cycle_initial=|db, id, key: MemberLookupKey<'db>, receiver: Type<'db>| Place::bound(Type::divergent(id)).with_symbolic(Some(SymbolicType::initial(db, key.program(db), InferenceOwner::Member(key, Some(receiver)), InferenceSlot::Root))).into(),
             cycle_fn=|db, cycle, previous: &MemberLookupResult<'db>, member: MemberLookupResult<'db>, key: MemberLookupKey<'db>, _| {
                 cycle_normalized_member_lookup(db, &ProgramEnvironment::from_program(key.program(db)), member, *previous, cycle)
             },
@@ -5333,7 +5374,21 @@ impl<'db> Type<'db> {
             key: MemberLookupKey<'db>,
             receiver: Type<'db>,
         ) -> MemberLookupResult<'db> {
-            member_lookup_with_policy_impl(db, key, Some(receiver))
+            let result = member_lookup_with_policy_impl(db, key, Some(receiver));
+            let resolved = result.unwrap_or_else(|error| error.fallback_member(db));
+            let mut member = resolved.member(db);
+            member.place = SymbolicType::bind_place(
+                db,
+                &ProgramEnvironment::from_program(key.program(db)),
+                InferenceOwner::Member(key, Some(receiver)),
+                member.place,
+            );
+            member_lookup_result(
+                db,
+                member,
+                result.err().map(|error| error.kind(db)),
+                resolved.deprecated_properties(db),
+            )
         }
 
         fn member_lookup_with_policy_impl<'db>(
@@ -5670,16 +5725,22 @@ impl<'db> Type<'db> {
                             .member_lookup_with_policy_and_receiver(
                                 db, env, name_str, policy, receiver,
                             );
-                        member_lookup_or_fall_back_to(db, env, result, || {
-                            // If an attribute is not available on the bound method object,
-                            // it will be looked up on the underlying function object. This
-                            // changes the lookup object, so do not forward the bound-method
-                            // receiver.
-                            Type::FunctionLiteral(bound_method.function(db))
-                                .member_lookup_with_policy_and_receiver(
-                                    db, env, name_str, policy, None,
-                                )
-                        })
+                        member_lookup_or_fall_back_to(
+                            db,
+                            env,
+                            key.inference_variable(db),
+                            result,
+                            || {
+                                // If an attribute is not available on the bound method object,
+                                // it will be looked up on the underlying function object. This
+                                // changes the lookup object, so do not forward the bound-method
+                                // receiver.
+                                Type::FunctionLiteral(bound_method.function(db))
+                                    .member_lookup_with_policy_and_receiver(
+                                        db, env, name_str, policy, None,
+                                    )
+                            },
+                        )
                     }
                 },
                 Type::KnownBoundMethod(method) => method
@@ -5903,6 +5964,7 @@ impl<'db> Type<'db> {
                                 provenance,
                                 ..
                             }) => Place::Defined(DefinedPlace {
+                                symbolic: None,
                                 ty: wrapped,
                                 origin,
                                 definedness,
@@ -5968,7 +6030,7 @@ impl<'db> Type<'db> {
                         "The receiver for a class-object lookup should always be instantiable",
                     );
                     let class_attr_plain = class_attr_plain
-                        .map_type(|ty| ty.bind_self_typevars(db, env, self_instance));
+                        .map_type(db, |ty| ty.bind_self_typevars(db, env, self_instance));
 
                     let (class_attr_fallback, _, class_attr_error) =
                         Type::try_call_dunder_get_on_attribute(
@@ -7535,6 +7597,8 @@ impl<'db> Type<'db> {
         result: MemberLookupResult<'db>,
         policy: MemberLookupPolicy,
     ) -> MemberLookupResult<'db> {
+        let lookup =
+            MemberLookupKey::new(db, env.program(db), self, name, policy).inference_variable(db);
         let custom_getattr_result = || {
             if policy.no_getattr_lookup() {
                 return MemberLookupResult::from(Place::Undefined);
@@ -7583,7 +7647,13 @@ impl<'db> Type<'db> {
                 .place
                 .is_undefined()
         {
-            return member_lookup_or_fall_back_to(db, env, result, custom_getattr_result);
+            return member_lookup_or_fall_back_to(
+                db,
+                env,
+                lookup.lookup_part(db, 0),
+                result,
+                custom_getattr_result,
+            );
         }
 
         let name_type = Type::string_literal(db, name);
@@ -7607,7 +7677,13 @@ impl<'db> Type<'db> {
             ),
             Err(CallDunderError::PossiblyUnbound { .. }) => Place::Undefined.into(),
             Err(CallDunderError::MethodNotAvailable) => {
-                return member_lookup_or_fall_back_to(db, env, result, custom_getattr_result);
+                return member_lookup_or_fall_back_to(
+                    db,
+                    env,
+                    lookup.lookup_part(db, 0),
+                    result,
+                    custom_getattr_result,
+                );
             }
         };
 
@@ -7617,7 +7693,9 @@ impl<'db> Type<'db> {
                 db,
                 member
                     .member(db)
-                    .or_fall_back_to(db, env, || error.fallback_member(db).member(db)),
+                    .or_fall_back_to(db, env, lookup.lookup_part(db, 1), || {
+                        error.fallback_member(db).member(db)
+                    }),
                 Some(error.kind(db)),
                 member.deprecated_properties(db),
             );
@@ -7633,8 +7711,17 @@ impl<'db> Type<'db> {
             result
         };
 
-        let result = member_lookup_or_fall_back_to(db, env, result, || custom_getattribute);
-        member_lookup_or_fall_back_to(db, env, result, custom_getattr_result)
+        let result =
+            member_lookup_or_fall_back_to(db, env, lookup.lookup_part(db, 2), result, || {
+                custom_getattribute
+            });
+        member_lookup_or_fall_back_to(
+            db,
+            env,
+            lookup.lookup_part(db, 3),
+            result,
+            custom_getattr_result,
+        )
     }
 
     /// Flatten typevars in a union or intersection by resolving them to their upper bounds
@@ -10626,15 +10713,32 @@ impl TypeQualifiers {
 #[derive(Clone, Debug, Copy, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct TypeAndQualifiers<'db> {
     inner: Type<'db>,
+    /// Pending inference constraints, separate from the ordinary type exposed by `inner_type`.
+    pub(crate) symbolic: Option<infer::constraints::SymbolicType<'db>>,
     origin: TypeOrigin,
     qualifiers: TypeQualifiers,
     provenance: Provenance<'db>,
 }
 
 impl<'db> TypeAndQualifiers<'db> {
+    pub(crate) fn union(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>, other: Self) -> Self {
+        Self {
+            inner: UnionType::from_two_elements(db, env, self.inner, other.inner),
+            symbolic: SymbolicType::from_union(
+                db,
+                env,
+                [(self.inner, self.symbolic), (other.inner, other.symbolic)],
+            ),
+            origin: self.origin.merge(other.origin),
+            qualifiers: self.qualifiers.union(other.qualifiers),
+            provenance: self.provenance.or(other.provenance),
+        }
+    }
+
     pub(crate) fn new(inner: Type<'db>, origin: TypeOrigin, qualifiers: TypeQualifiers) -> Self {
         Self {
             inner,
+            symbolic: None,
             origin,
             qualifiers,
             provenance: Provenance::Unknown,
@@ -10644,6 +10748,7 @@ impl<'db> TypeAndQualifiers<'db> {
     fn declared(inner: Type<'db>) -> Self {
         Self {
             inner,
+            symbolic: None,
             origin: TypeOrigin::Declared,
             qualifiers: TypeQualifiers::empty(),
             provenance: Provenance::Unknown,
@@ -10679,9 +10784,14 @@ impl<'db> TypeAndQualifiers<'db> {
         self.qualifiers
     }
 
-    fn map_type(&self, f: impl FnOnce(Type<'db>) -> Type<'db>) -> TypeAndQualifiers<'db> {
+    fn map_type(
+        &self,
+        db: &'db dyn Db,
+        mut f: impl FnMut(Type<'db>) -> Type<'db>,
+    ) -> TypeAndQualifiers<'db> {
         TypeAndQualifiers {
             inner: f(self.inner),
+            symbolic: self.symbolic.map(|value| value.map(db, &mut f)),
             origin: self.origin,
             qualifiers: self.qualifiers,
             provenance: self.provenance,

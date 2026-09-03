@@ -257,6 +257,27 @@ class C:
 reveal_type(C().x)  # revealed: None | int
 ```
 
+#### Attributes reassigned after reading their previous value
+
+An inferred attribute can store different strings after a method reads and updates its previous
+value. Its type includes `str`, rather than only the string literal assigned by that method.
+
+```py
+class C:
+    def __init__(self):
+        self.value = None
+
+    def update(self):
+        value = self.value
+        if value is None:
+            value = "initial"
+        self.value = value
+
+def replace(c: C):
+    reveal_type(c.value)  # revealed: None | str
+    c.value = "replacement"
+```
+
 #### Attributes defined in multi-target assignments
 
 ```py

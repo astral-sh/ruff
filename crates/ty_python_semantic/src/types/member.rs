@@ -3,7 +3,7 @@ use crate::place::{
     ConsideredDefinitions, DefinedPlace, Place, PlaceAndQualifiers, RequiresExplicitReExport,
     place_by_id, place_from_bindings,
 };
-use crate::types::{ProgramEnvironment, Type};
+use crate::types::{ProgramEnvironment, Specialization, Type};
 use ty_python_core::{place_table, scope::ScopeId, use_def_map};
 
 /// The return type of certain member-lookup operations. Contains information
@@ -15,6 +15,16 @@ pub(super) struct Member<'db> {
 }
 
 impl<'db> Member<'db> {
+    pub(super) fn apply_owner_specialization(
+        self,
+        db: &'db dyn Db,
+        specialization: Option<Specialization<'db>>,
+    ) -> Self {
+        Self {
+            inner: self.inner.apply_owner_specialization(db, specialization),
+        }
+    }
+
     pub(super) fn unbound() -> Self {
         Self {
             inner: PlaceAndQualifiers::unbound(),
@@ -44,9 +54,9 @@ impl<'db> Member<'db> {
 
     /// Map a type transformation function over the type of this member.
     #[must_use]
-    pub(super) fn map_type(self, f: impl FnOnce(Type<'db>) -> Type<'db>) -> Self {
+    pub(super) fn map_type(self, db: &'db dyn Db, f: impl FnMut(Type<'db>) -> Type<'db>) -> Self {
         Self {
-            inner: self.inner.map_type(f),
+            inner: self.inner.map_type(db, f),
         }
     }
 }

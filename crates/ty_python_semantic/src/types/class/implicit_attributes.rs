@@ -8,7 +8,13 @@ use crate::{
     types::{
         KnownClass, Truthiness, Type, TypeContext, UnionBuilder, definition_expression_type,
         function::{is_implicit_classmethod, is_implicit_staticmethod},
-        infer::infer_unpack_types,
+        infer::{
+            constraints::{
+                InferenceConstraints, InferenceOperation, InferenceOwner, InferencePromotion,
+                InferenceSlot, SymbolicType,
+            },
+            infer_expression_types, infer_unpack_types,
+        },
         infer_expression_type, inferred_declaration,
         member::Member,
     },
@@ -16,7 +22,7 @@ use crate::{
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use ty_python_core::{
-    attribute_scopes,
+    EvaluationMode, attribute_scopes,
     definition::{Definition, DefinitionKind, DefinitionState, TargetKind},
     place_table,
     scope::{Scope, ScopeId},
@@ -81,9 +87,9 @@ impl<'db> StaticClassLiteral<'db> {
     #[salsa::tracked(
         returns(copy),
         cycle_fn=implicit_attribute_cycle_recover,
-        cycle_initial=|_, id, _| ImplicitAttribute {
+        cycle_initial=|db, id, attribute: ImplicitAttributeName<'db>| ImplicitAttribute {
             member: Member {
-                inner: Place::bound(Type::divergent(id)).into(),
+                inner: Place::bound(Type::divergent(id)).with_symbolic(Some(SymbolicType::initial(db, attribute.class_body_scope(db).program(db), attribute.owner(), InferenceSlot::Root))).into(),
             },
             augmented_bindings: None,
         },
@@ -93,7 +99,14 @@ impl<'db> StaticClassLiteral<'db> {
         db: &'db dyn Db,
         attribute: ImplicitAttributeName<'db>,
     ) -> ImplicitAttribute<'db> {
-        Self::implicit_attribute_impl(db, attribute)
+        let mut result = Self::implicit_attribute_impl(db, attribute);
+        result.member.inner.place = SymbolicType::bind_place(
+            db,
+            &ProgramEnvironment::from_scope(attribute.class_body_scope(db)),
+            attribute.owner(),
+            result.member.inner.place,
+        );
+        result
     }
 
     fn implicit_attribute_impl(
@@ -111,6 +124,7 @@ impl<'db> StaticClassLiteral<'db> {
         // any method, we build a union of the raw types inferred from all bindings of that
         // attribute, then apply public-type promotion to the final union.
         let mut union_of_inferred_types = UnionBuilder::new(db, env);
+        let mut symbolic_values = Vec::new();
         let mut qualifiers = TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE;
 
         let mut is_attribute_bound = false;
@@ -121,6 +135,16 @@ impl<'db> StaticClassLiteral<'db> {
         let index = semantic_index(db, program_file);
         let class_map = use_def_map(db, class_body_scope);
         let class_table = place_table(db, class_body_scope);
+        // A comprehension writes to the same receiver as its enclosing method.
+        let enclosing_method_scope = |scope_id| {
+            let mut scope = index.scope(scope_id);
+            while scope.is_eager()
+                && let Some(parent) = scope.parent()
+            {
+                scope = index.scope(parent);
+            }
+            scope
+        };
         let is_valid_scope = |method_scope: &Scope| {
             let Some(method_def) = method_scope.node().as_function() else {
                 return true;
@@ -167,7 +191,7 @@ impl<'db> StaticClassLiteral<'db> {
         for (attribute_declarations, method_scope_id) in
             attribute_declarations(db, class_body_scope, name)
         {
-            let method_scope = index.scope(method_scope_id);
+            let method_scope = enclosing_method_scope(method_scope_id);
             if !is_valid_scope(method_scope) {
                 continue;
             }
@@ -233,44 +257,27 @@ impl<'db> StaticClassLiteral<'db> {
         for (attribute_assignments, attribute_binding_scope_id) in
             attribute_assignments(db, class_body_scope, name)
         {
-            let binding_scope = index.scope(attribute_binding_scope_id);
+            let binding_scope = enclosing_method_scope(attribute_binding_scope_id);
             if !is_valid_scope(binding_scope) {
                 continue;
             }
 
-            let scope_for_reachability_analysis = {
-                if binding_scope.node().as_function().is_some() {
-                    binding_scope
-                } else if binding_scope.is_eager() {
-                    let mut eager_scope_parent = binding_scope;
-                    while eager_scope_parent.is_eager()
-                        && let Some(parent) = eager_scope_parent.parent()
-                    {
-                        eager_scope_parent = index.scope(parent);
-                    }
-                    eager_scope_parent
-                } else {
-                    binding_scope
-                }
-            };
-
             // The attribute assignment inherits the reachability of the method which contains it
-            let is_method_reachable =
-                if let Some(method_def) = scope_for_reachability_analysis.node().as_function() {
-                    let method = index.expect_single_definition(method_def);
-                    let method_place = class_table
-                        .symbol_id(&method_def.node(&module).name)
-                        .unwrap();
-                    class_map
-                        .reachable_symbol_bindings(method_place)
-                        .find_map(|bind| {
-                            (bind.binding.is_defined_and(|def| def == method))
-                                .then(|| binding_reachability(db, class_map, &bind))
-                        })
-                        .unwrap_or(Truthiness::AlwaysFalse)
-                } else {
-                    Truthiness::AlwaysFalse
-                };
+            let is_method_reachable = if let Some(method_def) = binding_scope.node().as_function() {
+                let method = index.expect_single_definition(method_def);
+                let method_place = class_table
+                    .symbol_id(&method_def.node(&module).name)
+                    .unwrap();
+                class_map
+                    .reachable_symbol_bindings(method_place)
+                    .find_map(|bind| {
+                        (bind.binding.is_defined_and(|def| def == method))
+                            .then(|| binding_reachability(db, class_map, &bind))
+                    })
+                    .unwrap_or(Truthiness::AlwaysFalse)
+            } else {
+                Truthiness::AlwaysFalse
+            };
             if is_method_reachable.is_always_false() {
                 continue;
             }
@@ -295,7 +302,8 @@ impl<'db> StaticClassLiteral<'db> {
 
                 let inferred_ty = implicit_attribute_binding_type(db, binding);
 
-                if let Some(inferred_ty) = inferred_ty {
+                if let Some((inferred_ty, symbolic)) = inferred_ty {
+                    symbolic_values.push((inferred_ty, symbolic));
                     provenance = provenance.or(Provenance::SingleDefinition(binding));
                     union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
                 }
@@ -309,6 +317,24 @@ impl<'db> StaticClassLiteral<'db> {
                         .build()
                         .promote(db, env)
                         .promote_singletons(db, env),
+                )
+                .with_symbolic(
+                    SymbolicType::from_union(db, env, symbolic_values).map(|symbolic| {
+                        let mut constraints = InferenceConstraints::default();
+                        let value = constraints.import(db, symbolic);
+                        // Types learned through a cycle need the same promotion as known bindings.
+                        let result = constraints.apply(
+                            db,
+                            env,
+                            attribute.owner(),
+                            InferenceSlot::Root,
+                            InferenceOperation::Promote {
+                                value,
+                                promotion: InferencePromotion::Attribute,
+                            },
+                        );
+                        constraints.finish(db, result)
+                    }),
                 )
                 .with_provenance(provenance)
                 .with_qualifiers(qualifiers),
@@ -349,7 +375,7 @@ pub(super) struct AugmentedBindings<'db> {
 impl get_size2::GetSize for AugmentedBindings<'_> {}
 
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-struct ImplicitAttributeName<'db> {
+pub(crate) struct ImplicitAttributeName<'db> {
     #[returns(copy)]
     class_body_scope: ScopeId<'db>,
     #[returns(ref)]
@@ -361,11 +387,17 @@ struct ImplicitAttributeName<'db> {
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for ImplicitAttributeName<'_> {}
 
+impl<'db> ImplicitAttributeName<'db> {
+    fn owner(self) -> InferenceOwner<'db> {
+        InferenceOwner::Attribute(self)
+    }
+}
+
 /// Infer the value written by an attribute definition, including unpacked and iteration targets.
 fn implicit_attribute_binding_type<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
-) -> Option<Type<'db>> {
+) -> Option<(Type<'db>, Option<SymbolicType<'db>>)> {
     let program_file = definition.program_file(db);
     let module = parsed_module(db, program_file.python_file(db)).load(db);
     let index = semantic_index(db, program_file);
@@ -380,14 +412,15 @@ fn implicit_attribute_binding_type<'db>(
             Some(unpack) => {
                 // (..., self.name, ...) = <value>
                 let unpacked = infer_unpack_types(db, unpack);
-                Some(unpacked.expression_type(assignment.target(&module)))
+                Some((unpacked.expression_type(assignment.target(&module)), None))
             }
             None => {
                 // self.name = <value>
-                Some(infer_expression_type(
-                    db,
-                    index.expression(assignment.value(&module)),
-                    TypeContext::default(),
+                let expression = index.expression(assignment.value(&module));
+                let inference = infer_expression_types(db, expression, TypeContext::default());
+                Some((
+                    inference.expression_type(expression.node_ref(db)),
+                    inference.symbolic_type(expression.node_ref(db)),
                 ))
             }
         },
@@ -395,28 +428,28 @@ fn implicit_attribute_binding_type<'db>(
             TargetKind::Sequence(_, unpack) => {
                 // for ..., self.name, ... in <iterable>:
                 let unpacked = infer_unpack_types(db, unpack);
-                Some(unpacked.expression_type(for_stmt.target(&module)))
+                Some((unpacked.expression_type(for_stmt.target(&module)), None))
             }
             TargetKind::Single => {
                 // for self.name in <iterable>:
-                let iterable_ty = infer_expression_type(
-                    db,
-                    index.expression(for_stmt.iterable(&module)),
-                    TypeContext::default(),
-                );
+                let iterable = for_stmt.iterable(&module);
+                let inference =
+                    infer_expression_types(db, index.expression(iterable), TypeContext::default());
+                let iterable_ty = inference.expression_type(iterable);
+                let mode = EvaluationMode::from_is_async(for_stmt.is_async());
                 // TODO: Potential diagnostics resulting from the iterable are not reported.
-                Some(
-                    iterable_ty
-                        .iterate(db, &env)
-                        .homogeneous_element_type(db, &env),
-                )
+                let ty = iterable_ty
+                    .try_iterate_with_mode(db, &env, mode)
+                    .map(|tuple| tuple.homogeneous_element_type(db, &env))
+                    .unwrap_or_else(|error| error.fallback_element_type(db, &env));
+                Some((ty, None))
             }
         },
         DefinitionKind::WithItem(with_item) => match with_item.target_kind() {
             TargetKind::Sequence(_, unpack) => {
                 // with <context_manager> as ..., self.name, ...:
                 let unpacked = infer_unpack_types(db, unpack);
-                Some(unpacked.expression_type(with_item.target(&module)))
+                Some((unpacked.expression_type(with_item.target(&module)), None))
             }
             TargetKind::Single => {
                 // with <context_manager> as self.name:
@@ -425,32 +458,36 @@ fn implicit_attribute_binding_type<'db>(
                     index.expression(with_item.context_expr(&module)),
                     TypeContext::default(),
                 );
-                Some(if with_item.is_async() {
+                let ty = if with_item.is_async() {
                     context_ty.aenter(db, &env)
                 } else {
                     context_ty.enter(db, &env)
-                })
+                };
+                Some((ty, None))
             }
         },
         DefinitionKind::Comprehension(comprehension) => match comprehension.target_kind() {
             TargetKind::Sequence(_, unpack) => {
                 // [... for ..., self.name, ... in <iterable>]
                 let unpacked = infer_unpack_types(db, unpack);
-                Some(unpacked.expression_type(comprehension.target(&module)))
+                Some((
+                    unpacked.expression_type(comprehension.target(&module)),
+                    None,
+                ))
             }
             TargetKind::Single => {
                 // [... for self.name in <iterable>]
-                let iterable_ty = infer_expression_type(
-                    db,
-                    index.expression(comprehension.iterable(&module)),
-                    TypeContext::default(),
-                );
+                let iterable = comprehension.iterable(&module);
+                let inference =
+                    infer_expression_types(db, index.expression(iterable), TypeContext::default());
+                let iterable_ty = inference.expression_type(iterable);
+                let mode = EvaluationMode::from_is_async(comprehension.is_async());
                 // TODO: Potential diagnostics resulting from the iterable are not reported.
-                Some(
-                    iterable_ty
-                        .iterate(db, &env)
-                        .homogeneous_element_type(db, &env),
-                )
+                let ty = iterable_ty
+                    .try_iterate_with_mode(db, &env, mode)
+                    .map(|tuple| tuple.homogeneous_element_type(db, &env))
+                    .unwrap_or_else(|error| error.fallback_element_type(db, &env));
+                Some((ty, None))
             }
         },
         // Named expressions cannot target attributes, and other definitions do not write one.

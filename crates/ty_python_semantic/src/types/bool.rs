@@ -5,9 +5,10 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::types::{
     CallArguments, CallDunderError, ClassType, CycleDetector, KnownClass, KnownInstanceType,
-    LiteralValueTypeKind, PropertyInstanceClass, SubclassOfInner, Type, TypeContext,
-    TypeVarBoundOrConstraints, UnionType, call::CallErrorKind, constraints::ConstraintSetBuilder,
-    context::InferContext, diagnostic::UNSUPPORTED_BOOL_CONVERSION, typed_dict::TypedDictField,
+    LiteralValueTypeKind, MemberLookupKey, MemberLookupPolicy, PropertyInstanceClass,
+    SubclassOfInner, Type, TypeContext, TypeVarBoundOrConstraints, UnionType, call::CallErrorKind,
+    constraints::ConstraintSetBuilder, context::InferContext,
+    diagnostic::UNSUPPORTED_BOOL_CONVERSION, typed_dict::TypedDictField,
 };
 use ty_python_core::Truthiness;
 
@@ -478,7 +479,18 @@ impl<'db> BoolError<'db> {
                 );
                 if let Some((func_span, parameter_span)) = not_boolable_type
                     .member(db, env, "__bool__")
-                    .into_lookup_result(db, env)
+                    .into_lookup_result(
+                        db,
+                        env,
+                        MemberLookupKey::new(
+                            db,
+                            env.program(db),
+                            *not_boolable_type,
+                            "__bool__",
+                            MemberLookupPolicy::default(),
+                        )
+                        .inference_variable(db),
+                    )
                     .ok()
                     .and_then(|quals| quals.inner_type().parameter_span(context.db(), None))
                 {
@@ -506,7 +518,18 @@ impl<'db> BoolError<'db> {
                 );
                 if let Some((func_span, return_type_span)) = not_boolable_type
                     .member(db, env, "__bool__")
-                    .into_lookup_result(db, env)
+                    .into_lookup_result(
+                        db,
+                        env,
+                        MemberLookupKey::new(
+                            db,
+                            env.program(db),
+                            *not_boolable_type,
+                            "__bool__",
+                            MemberLookupPolicy::default(),
+                        )
+                        .inference_variable(db),
+                    )
                     .ok()
                     .and_then(|quals| quals.inner_type().function_spans(context.db()))
                     .and_then(|spans| Some((spans.name, spans.return_type?)))

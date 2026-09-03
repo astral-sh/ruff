@@ -513,6 +513,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         definition,
                         &DeclaredAndInferredType::MightBeDifferent {
                             declared_ty: TypeAndQualifiers {
+                                symbolic: None,
                                 inner: ty,
                                 origin: TypeOrigin::Declared,
                                 qualifiers,
@@ -578,6 +579,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 definition,
                 &DeclaredAndInferredType::MightBeDifferent {
                     declared_ty: TypeAndQualifiers {
+                        symbolic: None,
                         inner: ty,
                         origin: TypeOrigin::Declared,
                         qualifiers,

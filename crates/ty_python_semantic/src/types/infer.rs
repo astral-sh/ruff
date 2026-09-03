@@ -44,6 +44,7 @@
 //! be considered a bug.)
 
 use crate::ProgramEnvironment;
+use crate::place::Place;
 use itertools::Either;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
@@ -65,6 +66,7 @@ use crate::{Db, FxIndexSet};
 
 use builder::TypeInferenceBuilder;
 pub(super) use comparisons::UnsupportedComparisonError;
+use constraints::SymbolicType;
 use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::expression::Expression;
 use ty_python_core::scope::ScopeId;
@@ -74,6 +76,7 @@ use ty_python_core::{ExpressionNodeKey, SemanticIndex, Statement, Truthiness, se
 
 mod builder;
 mod comparisons;
+pub(crate) mod constraints;
 #[cfg(test)]
 mod tests;
 
@@ -127,7 +130,7 @@ fn extend_collection_use_constraints<'db>(
 #[salsa::tracked(
     returns(ref),
     cycle_initial=|db, id, definition: Definition<'db>| {
-        DefinitionInference::cycle_initial(db, definition, Type::divergent(id))
+        DefinitionInference::cycle_initial(db, definition, InferenceRegion::Definition(definition), Type::divergent(id))
     },
     cycle_fn=|db: &'db dyn Db, cycle, previous: &DefinitionInference<'db>, inference: DefinitionInference<'db>, definition: Definition<'db>| {
         inference.cycle_normalized(db, previous, cycle, definition)
@@ -279,7 +282,7 @@ impl<'db> FunctionDecoratorInference<'db> {
 #[salsa::tracked(
     returns(ref),
     cycle_initial=|db, id, definition: Definition<'db>| {
-        DefinitionInference::cycle_initial(db, definition, Type::divergent(id))
+        DefinitionInference::cycle_initial(db, definition, InferenceRegion::Deferred(definition), Type::divergent(id))
     },
     cycle_fn=|db: &'db dyn Db, cycle, previous: &DefinitionInference<'db>, inference: DefinitionInference<'db>, definition: Definition<'db>| {
         inference.cycle_normalized(db, previous, cycle, definition)
@@ -325,7 +328,7 @@ pub(crate) fn infer_deferred_types<'db>(
 #[salsa::tracked(
     returns(ref),
     cycle_initial=|db, id, definition: Definition<'db>| {
-        DefinitionInference::cycle_initial(db, definition, Type::divergent(id))
+        DefinitionInference::cycle_initial(db, definition, InferenceRegion::FunctionDefaults(definition), Type::divergent(id))
     },
     cycle_fn=|db: &'db dyn Db, cycle, previous: &DefinitionInference<'db>, inference: DefinitionInference<'db>, definition: Definition<'db>| {
         inference.cycle_normalized(db, previous, cycle, definition)
@@ -496,9 +499,9 @@ fn expression_cycle_initial<'db>(
     id: salsa::Id,
     input: InferExpression<'db>,
 ) -> ExpressionInference<'db> {
-    let (expression, _) = input.into_inner(db);
+    let (expression, tcx) = input.into_inner(db);
     let cycle_recovery = Type::divergent(id);
-    ExpressionInference::cycle_initial(expression.scope(db), cycle_recovery)
+    ExpressionInference::cycle_initial(db, expression, tcx, cycle_recovery)
 }
 
 /// Infers the type of an `expression` that is guaranteed to be in the same file as the calling query.
@@ -863,7 +866,7 @@ pub(crate) fn nearest_enclosing_function<'db>(
 }
 
 /// A region within which we can infer types.
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) enum InferenceRegion<'db> {
     // infer types for a [`Statement`].
     Statement(StatementInner<'db>),
@@ -907,6 +910,8 @@ pub(crate) struct ScopeInference<'db> {
 
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, Default, salsa::SalsaValue)]
 struct ScopeInferenceExtra<'db> {
+    symbolic: FrozenMap<constraints::InferenceSlot<'db>, constraints::SymbolicType<'db>>,
+
     /// String annotations found in this region
     string_annotations: FrozenSet<ExpressionNodeKey>,
 
@@ -950,6 +955,17 @@ impl<'db> ScopeInference<'db> {
         self.expressions.map_values(|expr, ty| {
             ty.cycle_normalized(db, env, previous_inference.expression_type(expr), cycle)
         });
+        if let Some(extra) = self.extra.as_deref_mut()
+            && let Some(previous_extra) = previous_inference.extra.as_deref()
+        {
+            extra.symbolic = SymbolicType::cycle_normalized_map(
+                db,
+                env,
+                std::mem::take(&mut extra.symbolic),
+                &previous_extra.symbolic,
+                cycle,
+            );
+        }
 
         if cycle.iteration() > crate::TAINTED_CYCLES
             && let Some(previous_extra) = previous_inference.extra.as_deref()
@@ -1156,9 +1172,11 @@ impl<'db> DefinitionTypes<'db> {
         ty: TypeAndQualifiers<'db>,
     ) -> TypeAndQualifiers<'db> {
         if let Some(previous_ty) = previous.declaration_type(owner, definition) {
-            ty.map_type(|inner| inner.cycle_normalized(db, env, previous_ty.inner_type(), cycle))
+            ty.map_type(db, |inner| {
+                inner.cycle_normalized(db, env, previous_ty.inner_type(), cycle)
+            })
         } else {
-            ty.map_type(|inner| inner.recursive_type_normalized(db, env, cycle))
+            ty.map_type(db, |inner| inner.recursive_type_normalized(db, env, cycle))
         }
     }
 
@@ -1314,6 +1332,7 @@ struct DeferredAndUndecorated<'db> {
 
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, Default, salsa::SalsaValue)]
 struct OtherDefinitionInferenceExtra<'db> {
+    symbolic: FrozenMap<constraints::InferenceSlot<'db>, constraints::SymbolicType<'db>>,
     /// String annotations found in this region
     string_annotations: FrozenSet<ExpressionNodeKey>,
 
@@ -1415,6 +1434,7 @@ impl<'db> DefinitionInference<'db> {
     fn cycle_initial(
         db: &'db dyn Db,
         definition: Definition<'db>,
+        region: InferenceRegion<'db>,
         cycle_recovery: Type<'db>,
     ) -> Self {
         let env = ProgramEnvironment::from_definition(definition);
@@ -1486,6 +1506,17 @@ impl<'db> DefinitionInference<'db> {
             scope: definition.scope(db),
             extra: Some(Box::new(DefinitionInferenceExtra::Other(Box::new(
                 OtherDefinitionInferenceExtra {
+                    symbolic: [(
+                        constraints::InferenceSlot::Binding(definition),
+                        constraints::SymbolicType::initial(
+                            db,
+                            definition.program(db),
+                            constraints::InferenceOwner::Region(region),
+                            constraints::InferenceSlot::Binding(definition),
+                        ),
+                    )]
+                    .into_iter()
+                    .collect(),
                     cycle_recovery: Some(cycle_recovery),
                     ..OtherDefinitionInferenceExtra::default()
                 },
@@ -1522,6 +1553,17 @@ impl<'db> DefinitionInference<'db> {
                 } else {
                     ty.recursive_type_normalized(db, &env, cycle)
                 };
+            }
+            if let Some(DefinitionInferenceExtra::Other(previous_extra)) =
+                previous_inference.extra.as_deref()
+            {
+                extra.symbolic = SymbolicType::cycle_normalized_map(
+                    db,
+                    &env,
+                    std::mem::take(&mut extra.symbolic),
+                    &previous_extra.symbolic,
+                    cycle,
+                );
             }
         }
 
@@ -1614,6 +1656,18 @@ impl<'db> DefinitionInference<'db> {
                 "definition should belong to this TypeInference region and \
                 TypeInferenceBuilder should have inferred a type for it",
             )
+    }
+
+    /// Return a binding together with the equations retained by its inference query.
+    pub(crate) fn binding_place(&self, definition: Definition<'db>) -> Place<'db> {
+        let symbolic = match self.extra.as_deref() {
+            Some(DefinitionInferenceExtra::Other(extra)) => extra
+                .symbolic
+                .get(&constraints::InferenceSlot::Binding(definition))
+                .copied(),
+            _ => None,
+        };
+        Place::bound(self.binding_type(definition)).with_symbolic(symbolic)
     }
 
     fn bindings(
@@ -1725,6 +1779,7 @@ pub(crate) struct ExpressionInference<'db> {
 /// Extra data that only exists for few inferred expression regions.
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, Default, salsa::SalsaValue)]
 struct ExpressionInferenceExtra<'db> {
+    symbolic: FrozenMap<constraints::InferenceSlot<'db>, constraints::SymbolicType<'db>>,
     /// String annotations found in this region
     string_annotations: FrozenSet<ExpressionNodeKey>,
 
@@ -1780,11 +1835,39 @@ struct ExpressionInferenceExtra<'db> {
 }
 
 impl<'db> ExpressionInference<'db> {
-    fn cycle_initial(scope: ScopeId<'db>, cycle_recovery: Type<'db>) -> Self {
-        let _ = scope;
+    pub(crate) fn symbolic_type(
+        &self,
+        expression: impl Into<ExpressionNodeKey>,
+    ) -> Option<constraints::SymbolicType<'db>> {
+        self.extra
+            .as_ref()?
+            .symbolic
+            .get(&constraints::InferenceSlot::Expression(expression.into()))
+            .copied()
+    }
+
+    fn cycle_initial(
+        db: &'db dyn Db,
+        expression: Expression<'db>,
+        tcx: TypeContext<'db>,
+        cycle_recovery: Type<'db>,
+    ) -> Self {
+        let scope = expression.scope(db);
+        let symbolic = constraints::SymbolicType::initial(
+            db,
+            scope.program(db),
+            constraints::InferenceOwner::Region(InferenceRegion::Expression(expression, tcx)),
+            constraints::InferenceSlot::Expression(expression.node_ref(db).into()),
+        );
         Self {
             extra: Some(Box::new(ExpressionInferenceExtra {
                 cycle_recovery: Some(cycle_recovery),
+                symbolic: [(
+                    constraints::InferenceSlot::Expression(expression.node_ref(db).into()),
+                    symbolic,
+                )]
+                .into_iter()
+                .collect(),
                 ..ExpressionInferenceExtra::default()
             })),
             expressions: FrozenMap::default(),
@@ -1812,6 +1895,15 @@ impl<'db> ExpressionInference<'db> {
                 } else {
                     *binding_ty = binding_ty.recursive_type_normalized(db, env, cycle);
                 }
+            }
+            if let Some(previous_extra) = previous.extra.as_deref() {
+                extra.symbolic = SymbolicType::cycle_normalized_map(
+                    db,
+                    env,
+                    std::mem::take(&mut extra.symbolic),
+                    &previous_extra.symbolic,
+                    cycle,
+                );
             }
         }
 
@@ -1972,6 +2064,7 @@ pub(crate) struct StatementInferenceInner<'db> {
 
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, Default, salsa::SalsaValue)]
 struct StatementInferenceInnerExtra<'db> {
+    symbolic: FrozenMap<constraints::InferenceSlot<'db>, constraints::SymbolicType<'db>>,
     /// String annotations found in this region
     string_annotations: FrozenSet<ExpressionNodeKey>,
 
@@ -2049,13 +2142,25 @@ impl<'db> StatementInferenceInner<'db> {
                 .iter()
                 .find(|(previous_declaration, _)| previous_declaration == declaration)
             {
-                *declaration_ty = declaration_ty.map_type(|decl_ty| {
+                *declaration_ty = declaration_ty.map_type(db, |decl_ty| {
                     decl_ty.cycle_normalized(db, env, previous_declaration.inner_type(), cycle)
                 });
             } else {
-                *declaration_ty = declaration_ty
-                    .map_type(|decl_ty| decl_ty.recursive_type_normalized(db, env, cycle));
+                *declaration_ty = declaration_ty.map_type(db, |decl_ty| {
+                    decl_ty.recursive_type_normalized(db, env, cycle)
+                });
             }
+        }
+        if let Some(extra) = self.extra.as_deref_mut()
+            && let Some(previous_extra) = previous_inference.extra.as_deref()
+        {
+            extra.symbolic = SymbolicType::cycle_normalized_map(
+                db,
+                env,
+                std::mem::take(&mut extra.symbolic),
+                &previous_extra.symbolic,
+                cycle,
+            );
         }
 
         if cycle.iteration() > crate::TAINTED_CYCLES

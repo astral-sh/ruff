@@ -260,4 +260,32 @@ class Wrapper:
 reveal_type(Wrapper.value)  # revealed: int
 ```
 
+## Attributes assigned in loops
+
+An unannotated class attribute has the same public type when it is reassigned in a loop. The class
+body can still use its literal value, but external code must allow other values of its public type,
+including values assigned by subclasses.
+
+```py
+from typing import Literal
+
+class Counter:
+    value = 0
+    for _ in range(2):
+        value = value
+
+    reveal_type(value)  # revealed: Literal[0]
+
+class DerivedCounter(Counter):
+    value = 1
+
+def require_zero(value: Literal[0]) -> None: ...
+def check(cls: type[Counter], instance: Counter) -> None:
+    reveal_type(cls.value)  # revealed: int
+    reveal_type(instance.value)  # revealed: int
+    require_zero(cls.value)  # error: [invalid-argument-type]
+
+check(DerivedCounter, DerivedCounter())
+```
+
 [gradual guarantee]: https://typing.python.org/en/latest/spec/concepts.html#the-gradual-guarantee

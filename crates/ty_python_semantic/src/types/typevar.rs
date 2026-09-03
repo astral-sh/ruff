@@ -1,3 +1,4 @@
+use super::infer::constraints::InferenceVariable;
 use crate::ProgramEnvironment;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
@@ -1013,6 +1014,24 @@ pub struct BoundTypeVarInstance<'db> {
 impl get_size2::GetSize for BoundTypeVarInstance<'_> {}
 
 impl<'db> BoundTypeVarInstance<'db> {
+    /// Create an inference variable whose identity is determined by its query output.
+    pub(crate) fn inferred(db: &'db dyn Db, variable: InferenceVariable<'db>) -> Self {
+        let identity = TypeVarIdentity::new(
+            db,
+            Name::new_static("inferred"),
+            None,
+            TypeVarKind::Pep695TypeVar,
+        );
+        let typevar =
+            TypeVarInstance::new(db, identity, None, Some(TypeVarVariance::Covariant), None);
+        Self::new(
+            db,
+            typevar,
+            BindingContext::Inference(variable),
+            None,
+            TypeVarNonce::NONE,
+        )
+    }
     pub(crate) fn new(
         db: &'db dyn Db,
         typevar: TypeVarInstance<'db>,
@@ -1275,7 +1294,9 @@ impl<'db> BoundTypeVarInstance<'db> {
                         variance => variance,
                     }
                 }),
-                BindingContext::Synthetic(_) => TypeVarVariance::Invariant,
+                BindingContext::Synthetic(_) | BindingContext::Inference(_) => {
+                    TypeVarVariance::Invariant
+                }
             },
         }
     }
@@ -1689,6 +1710,7 @@ pub enum BindingContext<'db> {
     /// in the source, but is still bound and eligible for specialization inference. Its program
     /// identifies the environment that cannot otherwise be recovered from a source definition.
     Synthetic(Program<'db>),
+    Inference(InferenceVariable<'db>),
 }
 
 impl<'db> From<Definition<'db>> for BindingContext<'db> {
@@ -1701,7 +1723,7 @@ impl<'db> BindingContext<'db> {
     pub(crate) fn definition(self) -> Option<Definition<'db>> {
         match self {
             BindingContext::Definition(definition) => Some(definition),
-            BindingContext::Synthetic(_) => None,
+            BindingContext::Synthetic(_) | BindingContext::Inference(_) => None,
         }
     }
 
@@ -1709,6 +1731,7 @@ impl<'db> BindingContext<'db> {
         match self {
             Self::Definition(definition) => definition.program(db),
             Self::Synthetic(program) => program,
+            Self::Inference(variable) => variable.program(db),
         }
     }
 
@@ -2065,6 +2088,7 @@ impl<'db> TypeVarConstraints<'db> {
                 Place::Undefined
             } else {
                 Place::Defined(DefinedPlace {
+                    symbolic: None,
                     ty: builder.build(),
                     origin,
                     definedness: if possibly_unbound {
