@@ -6087,6 +6087,16 @@ impl<'db> Type<'db> {
             }
         }
 
+        if let Type::LiteralValue(literal) = self
+            && let Some(length) = match literal.kind() {
+                LiteralValueTypeKind::String(string) => Some(string.python_len(db)),
+                LiteralValueTypeKind::Bytes(bytes) => Some(bytes.python_len(db)),
+                _ => None,
+            }
+        {
+            return i64::try_from(length).ok().map(Type::int_literal);
+        }
+
         let return_ty = match self.try_call_dunder(
             db,
             env,
