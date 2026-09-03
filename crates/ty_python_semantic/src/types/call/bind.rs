@@ -4538,6 +4538,9 @@ impl<'db> CallableBinding<'db> {
         &self,
         db: &'db dyn Db,
     ) -> impl Iterator<Item = OverloadLiteral<'db>> + Clone {
+        if let Type::Callable(callable) = self.signature_type {
+            return Either::Left(callable.deprecated(db).into_iter());
+        }
         let function = match self.signature_type {
             Type::FunctionLiteral(function) => Some(function),
             Type::BoundMethod(bound) => Some(bound.function(db)),
@@ -4549,7 +4552,7 @@ impl<'db> CallableBinding<'db> {
         if let Some(implementation) =
             implementation.filter(|function| function.deprecated(db).is_some())
         {
-            return Either::Left(std::iter::once(implementation));
+            return Either::Left(Some(implementation).into_iter());
         }
 
         Either::Right(self.selected_overloads().filter_map(move |(_, binding)| {

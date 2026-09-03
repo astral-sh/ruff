@@ -297,7 +297,11 @@ impl get_size2::GetSize for OverloadLiteral<'_> {}
 
 #[salsa::tracked]
 impl<'db> OverloadLiteral<'db> {
-    fn with_deprecated(self, db: &'db dyn Db, deprecated: DeprecatedInstance<'db>) -> Self {
+    pub(super) fn with_deprecated(
+        self,
+        db: &'db dyn Db,
+        deprecated: DeprecatedInstance<'db>,
+    ) -> Self {
         Self::new(
             db,
             self.name(db),
@@ -1228,12 +1232,11 @@ impl<'db> FunctionType<'db> {
             self.implementation_callables(db)
                 .iter()
                 .map(|callable| {
-                    CallableType::new(
+                    callable.with_signatures(
                         db,
                         callable
                             .signatures(db)
                             .with_inherited_generic_context(db, inherited_generic_context),
-                        callable.kind(db),
                     )
                 })
                 .collect()
