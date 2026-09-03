@@ -489,8 +489,8 @@ jobs:
           run: |
             apt-get update
             apt-get install -y --no-install-recommends python3 python3-pip libatomic1
-            pip3 install --upgrade --require-hashes -r /pip-requirements.txt
-            pip3 install "${PACKAGE_NAME}" --no-index --find-links /dist --force-reinstall
+            python3 -m pip install --upgrade --require-hashes -r /pip-requirements.txt
+            python3 -m pip install "${PACKAGE_NAME}" --no-index --find-links /dist --force-reinstall
             ruff --help
       - name: "Upload wheels"
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
