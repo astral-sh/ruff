@@ -3,6 +3,10 @@
 //! A cycle marker (`Divergent`) names the query output it stands for. Later inference steps can
 //! then recover that output instead of treating the marker as an opaque dynamic type.
 
+use std::cmp::Ordering;
+
+use salsa::plumbing::AsId;
+use ty_python_core::ExpressionNodeKey;
 use ty_python_core::unpack::Unpack;
 
 use crate::Db;
@@ -30,6 +34,8 @@ impl get_size2::GetSize for CycleOwner<'_> {}
 pub(crate) enum CycleSlot {
     /// The query's own result.
     Root,
+    /// The value of an expression, including an unpacking target.
+    Expression(ExpressionNodeKey),
 }
 
 /// The Salsa key of the query that seeded a cycle marker.
@@ -57,6 +63,10 @@ pub(crate) struct CycleVariable<'db> {
     pub(crate) owner: CycleOwner<'db>,
     #[returns(copy)]
     pub(crate) slot: CycleSlot,
+    /// For a variable standing for the result of an operation, the variable the operation was
+    /// applied to.
+    #[returns(copy)]
+    pub(crate) input: Option<CycleVariable<'db>>,
 }
 
 // The Salsa heap is tracked separately.
@@ -64,10 +74,31 @@ impl get_size2::GetSize for CycleVariable<'_> {}
 
 impl<'db> CycleVariable<'db> {
     pub(crate) fn root(db: &'db dyn Db, head: salsa::Id, owner: CycleOwner<'db>) -> Self {
-        Self::new(db, CycleHead(head), owner, CycleSlot::Root)
+        Self::new(db, CycleHead(head), owner, CycleSlot::Root, None)
     }
 
-    pub(crate) fn is_root(self, db: &'db dyn Db) -> bool {
-        matches!(self.slot(db), CycleSlot::Root)
+    /// The result of an operation on the value of `input`, recorded by the query `owner` for
+    /// the output `slot`.
+    pub(crate) fn derived(
+        db: &'db dyn Db,
+        owner: CycleOwner<'db>,
+        slot: CycleSlot,
+        input: Self,
+    ) -> Self {
+        Self::new(db, input.head(db), owner, slot, Some(input))
+    }
+}
+
+// Deferred operations are stored in ordered maps keyed by their variable. Any total order works
+// for a lookup table; ids are stable within a revision.
+impl PartialOrd for CycleVariable<'_> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for CycleVariable<'_> {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.as_id().cmp(&other.as_id())
     }
 }

@@ -132,15 +132,15 @@ use crate::types::unpacker::{
 };
 use crate::types::{
     BindingContext, BoundTypeVarInstance, CallDunderError, CallableBinding, CallableType,
-    CallableTypes, ClassType, DynamicType, GeneratorTypeMode, InferenceFlags, InternedType,
-    IntersectionBuilder, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
-    KnownUnion, LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy, ParamSpecAttrKind,
-    Parameter, Parameters, ProgramEnvironment, PropertyDeprecations, SentinelInstance, Signature,
-    SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeAndQualifiers, TypeContext,
-    TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, TypingModule,
-    UnionAccumulator, UnionBuilder, UnionType, binding_type,
-    extract_fixed_length_iterable_element_types, infer_complete_scope_types, infer_scope_types,
-    is_discarded_dict_key_assignment, todo_type,
+    CallableTypes, ClassType, CycleOwner, CycleSlot, DeferredOperations, DynamicType,
+    GeneratorTypeMode, InferenceFlags, InternedType, IntersectionBuilder, IntersectionType,
+    KnownBoundMethodType, KnownClass, KnownInstanceType, KnownUnion, LiteralValueType,
+    LiteralValueTypeKind, MemberLookupPolicy, Operation, ParamSpecAttrKind, Parameter, Parameters,
+    ProgramEnvironment, PropertyDeprecations, SentinelInstance, Signature, SpecialFormType,
+    SubclassOfType, Type, TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers,
+    TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, TypingModule, UnionAccumulator,
+    UnionBuilder, UnionType, binding_type, extract_fixed_length_iterable_element_types,
+    infer_complete_scope_types, infer_scope_types, is_discarded_dict_key_assignment, todo_type,
 };
 use crate::{AnalysisSettings, Db, DisplaySettings, FxIndexSet, FxOrderSet, SemanticModel};
 use ty_python_core::definition::{
@@ -287,6 +287,9 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// The types of every expression in this region.
     expressions: FxHashMap<ExpressionNodeKey, Type<'db>>,
     symbolic: FxHashMap<InferenceSlot<'db>, SymbolicType<'db>>,
+
+    /// Operations deferred because an operand's type is still being inferred.
+    equations: DeferredOperations<'db>,
 
     /// Truthiness overrides for evaluating comparison chains directly as conditions.
     /// See [`ExpressionInferenceExtra::comparison_truthiness`] for why these are stored
@@ -521,6 +524,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             deferred_state: DeferredExpressionState::None,
             expressions: FxHashMap::default(),
             symbolic: FxHashMap::default(),
+            equations: DeferredOperations::new(CycleOwner::Region(region)),
             comparison_truthiness: FxHashMap::default(),
             expression_cache: None,
             reachability_cache: OnceCell::new(),
@@ -642,6 +646,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | DefinitionInferenceExtra::DiscardsDictKeyAssignments => {}
                 DefinitionInferenceExtra::Other(extra) => {
                     self.symbolic.extend(extra.symbolic.iter().copied());
+                    self.equations.extend(extra.equations.iter().cloned());
                     self.called_functions
                         .extend(extra.called_functions.iter().copied());
                     self.extend_cycle_recovery(extra.cycle_recovery);
@@ -692,6 +697,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         if let Some(extra) = &inference.extra {
             self.symbolic.extend(extra.symbolic.iter().copied());
+            self.equations.extend(extra.equations.iter().cloned());
             self.called_functions
                 .extend(extra.called_functions.iter().copied());
             self.return_types_and_ranges
@@ -749,6 +755,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         if let Some(extra) = &inference.extra {
             self.symbolic.extend(extra.symbolic.iter().copied());
+            self.equations.extend(extra.equations.iter().cloned());
             self.comparison_truthiness
                 .extend(extra.comparison_truthiness.iter().copied());
             self.context.extend(&extra.diagnostics);
@@ -829,6 +836,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         if let Some(extra) = &inference.extra {
             self.symbolic.extend(extra.symbolic.iter().copied());
+            self.equations.extend(extra.equations.iter().cloned());
             self.context.extend(&extra.diagnostics);
             self.extend_cycle_recovery(extra.cycle_recovery);
             self.string_annotations
@@ -2429,7 +2437,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     self.symbolic
                         .insert(InferenceSlot::Binding(definition), symbolic);
                 }
-                self.infer_context_expression(context_expr, context_expr_ty, with_item.is_async())
+                let entered_ty = self.infer_context_expression(
+                    context_expr,
+                    context_expr_ty,
+                    with_item.is_async(),
+                );
+                self.equations.defer_passthrough(
+                    self.db(),
+                    self.program_environment(),
+                    context_expr_ty,
+                    entered_ty,
+                    CycleSlot::Expression(target.into()),
+                    |value| Operation::Enter {
+                        value,
+                        mode: EvaluationMode::from_is_async(with_item.is_async()),
+                    },
+                )
             }
         };
 
@@ -5393,6 +5416,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         };
 
+        let loop_var_value_type = if let TargetKind::Single = for_stmt.target_kind() {
+            self.equations.defer_passthrough(
+                db,
+                self.program_environment(),
+                self.expression_type(iterable),
+                loop_var_value_type,
+                CycleSlot::Expression(target.into()),
+                |value| Operation::Iterate {
+                    value,
+                    mode: EvaluationMode::from_is_async(for_stmt.is_async()),
+                },
+            )
+        } else {
+            loop_var_value_type
+        };
         if let TargetKind::Single = for_stmt.target_kind()
             && let Some(symbolic) = self
                 .symbolic
@@ -8836,7 +8874,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             TargetKind::Single => {
                 let (iterable_type, element_type) = infer_iterable_type();
 
-                if let Some(element_type) = element_type {
+                let element_type = if let Some(element_type) = element_type {
                     element_type
                 } else {
                     let env = self.program_environment();
@@ -8851,7 +8889,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             err.report_diagnostic(&self.context, iterable_type, iterable.into());
                             err.fallback_element_type(db, env)
                         })
-                }
+                };
+                self.equations.defer_passthrough(
+                    db,
+                    self.program_environment(),
+                    iterable_type,
+                    element_type,
+                    CycleSlot::Expression(target.into()),
+                    |value| Operation::Iterate {
+                        value,
+                        mode: EvaluationMode::from_is_async(comprehension.is_async()),
+                    },
+                )
             }
         };
 
@@ -10449,10 +10498,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .insert(InferenceSlot::Expression(expression), symbolic);
         }
 
-        expr_type.try_await(db, env).unwrap_or_else(|err| {
+        let awaited_ty = expr_type.try_await(db, env).unwrap_or_else(|err| {
             err.report_diagnostic(&self.context, expr_type, value.as_ref().into());
             Type::unknown()
-        })
+        });
+        self.equations.defer_passthrough(
+            db,
+            env,
+            expr_type,
+            awaited_ty,
+            CycleSlot::Expression(ExprRef::Await(await_expression).into()),
+            |value| Operation::Await { value },
+        )
     }
 
     // Perform narrowing with applicable constraints between the current scope and the enclosing scope.
@@ -11685,6 +11742,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         }
         let resolved_type = resolved_type.inner_type();
+        let resolved_type = if assigned_type.is_none() {
+            self.equations.defer_passthrough(
+                db,
+                env,
+                value_type,
+                resolved_type,
+                CycleSlot::Expression(ast::ExprRef::Attribute(attribute).into()),
+                |value| Operation::Member {
+                    value,
+                    name: attr.id.clone(),
+                    policy: MemberLookupPolicy::default(),
+                },
+            )
+        } else {
+            resolved_type
+        };
 
         self.check_deprecated(attr, resolved_type);
 
@@ -12153,6 +12226,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             context,
             expressions,
             symbolic,
+            equations,
             comparison_truthiness,
             qualifiers: _,
             type_expression_flags,
@@ -12197,6 +12271,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         FullExpressionCacheEntry {
             expressions,
             symbolic,
+            equations,
             comparison_truthiness,
             type_expression_flags,
             collection_use_constraints,
@@ -12219,6 +12294,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             context,
             expressions,
             symbolic,
+            equations,
             comparison_truthiness: _,
             qualifiers,
             type_expression_flags,
@@ -12252,6 +12328,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let diagnostics = context.finish();
 
         let extra = (!symbolic.is_empty()
+            || !equations.is_empty()
             || !diagnostics.is_empty()
             || !string_annotations.is_empty()
             || cycle_recovery.is_some()
@@ -12267,6 +12344,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return_types_and_ranges.shrink_to_fit();
             Box::new(StatementInferenceInnerExtra {
                 symbolic: FrozenMap::from(symbolic),
+                equations: equations.finish(),
                 string_annotations: FrozenSet::from(string_annotations),
                 expected_types: FrozenMap::from(expected_types),
                 called_functions: called_functions
@@ -12337,6 +12415,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             context,
             expressions,
             symbolic: _,
+            equations: _,
             comparison_truthiness: _,
             bindings,
             called_functions,
@@ -12392,6 +12471,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             context,
             expressions,
             symbolic,
+            equations,
             comparison_truthiness: _,
             qualifiers,
             type_expression_flags,
@@ -12423,6 +12503,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let diagnostics = context.finish();
 
         let non_undecorated_extra_field_count = usize::from(!symbolic.is_empty())
+            + usize::from(!equations.is_empty())
             + usize::from(!string_annotations.is_empty())
             + usize::from(!expected_types.is_empty())
             + usize::from(!collection_use_constraints.is_empty())
@@ -12478,6 +12559,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 collection_use_constraints.shrink_to_fit();
                 let extra = OtherDefinitionInferenceExtra {
                     symbolic: FrozenMap::from(symbolic),
+                    equations: equations.finish(),
                     string_annotations: FrozenSet::from(string_annotations),
                     expected_types: FrozenMap::from(expected_types),
                     collection_use_constraints,
@@ -12540,6 +12622,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             mut collection_use_constraints,
             expressions,
             mut symbolic,
+            equations,
             comparison_truthiness: _,
             scope,
             cycle_recovery,
@@ -12573,6 +12656,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         symbolic.retain(|slot, _| matches!(slot, InferenceSlot::Expression(_)));
 
         let extra = (!symbolic.is_empty()
+            || !equations.is_empty()
             || !string_annotations.is_empty()
             || !expected_types.is_empty()
             || !diagnostics.is_empty()
@@ -12584,6 +12668,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             collection_use_constraints.shrink_to_fit();
             Box::new(ScopeInferenceExtra {
                 symbolic: FrozenMap::from(symbolic),
+                equations: equations.finish(),
                 string_annotations: FrozenSet::from(string_annotations),
                 qualifiers: FrozenMap::from(qualifiers),
                 expected_types: FrozenMap::from(expected_types),
@@ -12628,6 +12713,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             collection_use_constraints: _,
             expressions: _,
             symbolic: _,
+            equations: _,
             comparison_truthiness: _,
             string_annotations: _,
             expected_types: _,
@@ -12690,6 +12776,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             context,
             expressions,
             symbolic,
+            equations,
             comparison_truthiness,
             type_expression_flags,
             collection_use_constraints,
@@ -12733,6 +12820,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         self.extend_expression_types(expressions);
         self.symbolic.extend(symbolic);
+        self.equations.extend(equations);
         self.comparison_truthiness.extend(comparison_truthiness);
         self.context.extend(&diagnostics);
         self.extend_cycle_recovery(cycle_recovery);
@@ -12861,6 +12949,7 @@ enum ExpressionCacheEntry<'db> {
 struct FullExpressionCacheEntry<'db> {
     expressions: FxHashMap<ExpressionNodeKey, Type<'db>>,
     symbolic: FxHashMap<InferenceSlot<'db>, SymbolicType<'db>>,
+    equations: DeferredOperations<'db>,
     comparison_truthiness: FxHashMap<ExpressionNodeKey, Truthiness>,
     type_expression_flags: FxHashMap<ExpressionNodeKey, TypeExpressionFlags>,
     collection_use_constraints: CollectionUseConstraints<'db>,
@@ -12885,6 +12974,7 @@ impl<'db> FullExpressionCacheEntry<'db> {
 
     fn is_single_expression(&self, expression: ExpressionNodeKey, ty: Type<'db>) -> bool {
         self.symbolic.is_empty()
+            && self.equations.is_empty()
             && self.expressions.len() == 1
             && self.expressions.get(&expression) == Some(&ty)
             && self.comparison_truthiness.is_empty()
@@ -12903,6 +12993,7 @@ impl<'db> FullExpressionCacheEntry<'db> {
         region: InferenceRegion<'db>,
     ) -> ExpressionInference<'db> {
         let extra = (!self.symbolic.is_empty()
+            || !self.equations.is_empty()
             || !self.string_annotations.is_empty()
             || !self.comparison_truthiness.is_empty()
             || !self.type_expression_flags.is_empty()
@@ -12926,6 +13017,7 @@ impl<'db> FullExpressionCacheEntry<'db> {
             self.diagnostics.shrink_to_fit();
             Box::new(ExpressionInferenceExtra {
                 symbolic: FrozenMap::from(self.symbolic),
+                equations: self.equations.finish(),
                 string_annotations: FrozenSet::from(self.string_annotations),
                 comparison_truthiness: FrozenMap::from(self.comparison_truthiness),
                 expected_types: FrozenMap::from(self.expected_types),

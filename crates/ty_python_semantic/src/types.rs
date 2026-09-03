@@ -138,8 +138,10 @@ mod class_base;
 mod constraints;
 mod context;
 mod context_manager;
+mod cycle_equations;
+pub(crate) use cycle_equations::{CycleEquations, DeferredOperations, Operation};
 mod cycle_variable;
-pub(crate) use cycle_variable::{CycleOwner, CycleVariable};
+pub(crate) use cycle_variable::{CycleOwner, CycleSlot, CycleVariable};
 mod cyclic;
 mod dedicated;
 mod diagnostic;
@@ -2078,12 +2080,17 @@ impl<'db> Type<'db> {
         Self::Divergent(DivergentType::new(CycleVariable::root(db, id, owner)))
     }
 
-    /// Returns `true` if this type is the unmaterialized cycle marker of the cycle head `id`.
+    /// The marker of a cycle variable.
+    pub(crate) const fn divergent_variable(variable: CycleVariable<'db>) -> Self {
+        Self::Divergent(DivergentType::new(variable))
+    }
+
+    /// Returns `true` if this type is an unmaterialized cycle marker of the cycle head `id`.
     pub(crate) fn is_cycle_head_marker(self, db: &'db dyn Db, id: salsa::Id) -> bool {
         matches!(
             self,
             Type::Divergent(divergent)
-                if divergent.is_root_of(db, id) && divergent.materialization_kind().is_none()
+                if divergent.is_marker_of_head(db, id) && divergent.materialization_kind().is_none()
         )
     }
 
@@ -2101,7 +2108,7 @@ impl<'db> Type<'db> {
         let found = Cell::new(None);
         any_over_type(db, env, self, false, |ty| {
             if let Type::Divergent(divergent) = ty
-                && divergent.is_root_of(db, id)
+                && divergent.is_marker_of_head(db, id)
             {
                 found.set(Some(divergent.unmaterialized()));
                 true
@@ -10597,18 +10604,21 @@ impl<'db> DivergentType<'db> {
         }
     }
 
-    /// Returns `true` if both markers stand for the result of the same cycle head, regardless
-    /// of materialization state. Queries keyed by the same value share a cycle head.
-    fn same_marker(self, db: &'db dyn Db, other: Self) -> bool {
-        self.variable == other.variable
-            || (self.variable.is_root(db)
-                && other.variable.is_root(db)
-                && self.variable.head(db) == other.variable.head(db))
+    pub(crate) const fn variable(self) -> CycleVariable<'db> {
+        self.variable
     }
 
-    /// Returns `true` if this marker stands for the result of the cycle head `id`.
-    fn is_root_of(self, db: &'db dyn Db, id: salsa::Id) -> bool {
-        self.variable.is_root(db) && self.variable.head(db).id() == id
+    /// Returns `true` if both markers belong to the same cycle head, regardless of
+    /// materialization state. Queries keyed by the same value share a cycle head, and cycle
+    /// recovery treats a marker derived from an operation on the head's marker like the head's
+    /// marker itself.
+    fn same_marker(self, db: &'db dyn Db, other: Self) -> bool {
+        self.variable.head(db) == other.variable.head(db)
+    }
+
+    /// Returns `true` if this marker belongs to the cycle head `id`.
+    fn is_marker_of_head(self, db: &'db dyn Db, id: salsa::Id) -> bool {
+        self.variable.head(db).id() == id
     }
 
     const fn unmaterialized(self) -> Self {

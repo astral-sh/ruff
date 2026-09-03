@@ -22,8 +22,9 @@ use crate::types::tuple::{
     VariableLengthTuple,
 };
 use crate::types::{
-    InferencePromotion, KnownClass, Type, TypeCheckDiagnostics, TypeContext, UnionBuilder,
-    UnionType, infer_expression_types,
+    CycleEquations, CycleOwner, CycleSlot, DeferredOperations, InferencePromotion, KnownClass,
+    Operation, Type, TypeCheckDiagnostics, TypeContext, UnionBuilder, UnionType,
+    infer_expression_types,
 };
 use ty_python_core::ExpressionNodeKey;
 use ty_python_core::unpack::{Unpack, UnpackKind, UnpackValue};
@@ -37,6 +38,8 @@ pub(crate) struct Unpacker<'db, 'ast> {
     unpack: Unpack<'db>,
     targets: FxHashMap<ExpressionNodeKey, Type<'db>>,
     symbolic: FxHashMap<ExpressionNodeKey, SymbolicType<'db>>,
+    /// Operations deferred because the unpacked value's type is still being inferred.
+    equations: DeferredOperations<'db>,
 }
 
 /// Records an `Unknown` type for every expression in a malformed unpack target subtree.
@@ -69,6 +72,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
             ),
             targets: FxHashMap::default(),
             symbolic: FxHashMap::default(),
+            equations: DeferredOperations::new(CycleOwner::Unpack(unpack)),
             unpack,
         }
     }
@@ -135,7 +139,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                         |value| InferenceOperation::Iterate { value, mode },
                     )
                 });
-                value_type
+                let element_type = value_type
                     .try_iterate_with_mode(db, env, mode)
                     .map(|tuple| tuple.homogeneous_element_type(db, env))
                     .unwrap_or_else(|err| {
@@ -145,7 +149,15 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                             value.as_any_node_ref(self.db(), self.module()),
                         );
                         err.fallback_element_type(db, env)
-                    })
+                    });
+                self.equations.defer_passthrough(
+                    db,
+                    env,
+                    value_type,
+                    element_type,
+                    CycleSlot::Expression(value_expr.into()),
+                    |value| Operation::Iterate { value, mode },
+                )
             }
             UnpackKind::ContextManager { mode } => {
                 let env = self.context.program_environment();
@@ -158,7 +170,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                         |value| InferenceOperation::Enter { value, mode },
                     )
                 });
-                value_type
+                let entered_type = value_type
                     .try_enter_with_mode(db, env, mode)
                     .unwrap_or_else(|err| {
                         err.report_diagnostic(
@@ -167,7 +179,15 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                             value.as_any_node_ref(self.db(), self.module()),
                         );
                         err.fallback_enter_type(db, env)
-                    })
+                    });
+                self.equations.defer_passthrough(
+                    db,
+                    env,
+                    value_type,
+                    entered_type,
+                    CycleSlot::Expression(value_expr.into()),
+                    |value| Operation::Enter { value, mode },
+                )
             }
         };
 
@@ -393,11 +413,23 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                     },
                 )
             });
+            let ty = self.equations.defer_passthrough(
+                db,
+                env,
+                value.ty,
+                ty.build(),
+                CycleSlot::Expression(target.into()),
+                |value| Operation::Unpack {
+                    value,
+                    length: target_len,
+                    index,
+                },
+            );
             self.unpack_inner(
                 target,
                 expression.map(AnyNodeRef::from).unwrap_or(value_expr),
                 UnpackElement {
-                    ty: ty.build(),
+                    ty,
                     expression,
                     promote_literals,
                 },
@@ -443,6 +475,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
             diagnostics: self.context.finish(),
             targets: FrozenMap::from(self.targets),
             symbolic: FrozenMap::from(self.symbolic),
+            equations: self.equations.finish(),
             cycle_recovery: None,
         }
     }
@@ -453,6 +486,8 @@ pub(crate) struct UnpackResult<'db> {
     unpack: Unpack<'db>,
     targets: FrozenMap<ExpressionNodeKey, Type<'db>>,
     symbolic: FrozenMap<ExpressionNodeKey, SymbolicType<'db>>,
+    /// Operations deferred because the unpacked value's type is still being inferred.
+    equations: CycleEquations<'db>,
     diagnostics: TypeCheckDiagnostics,
 
     /// The fallback type for missing expressions.
@@ -512,6 +547,7 @@ impl<'db> UnpackResult<'db> {
             unpack,
             targets: FrozenMap::default(),
             symbolic: FrozenMap::default(),
+            equations: CycleEquations::default(),
             diagnostics: TypeCheckDiagnostics::default(),
             cycle_recovery: Some(cycle_recovery),
         }

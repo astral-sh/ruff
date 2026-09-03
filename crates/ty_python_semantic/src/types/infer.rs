@@ -46,7 +46,7 @@
 use self::constraints::{InferenceOwner, InferenceSlot, SymbolicType};
 use crate::ProgramEnvironment;
 use crate::place::Place;
-use crate::types::CycleOwner;
+use crate::types::{CycleEquations, CycleOwner};
 use itertools::Either;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
@@ -923,6 +923,9 @@ pub(crate) struct ScopeInference<'db> {
 struct ScopeInferenceExtra<'db> {
     symbolic: FrozenMap<constraints::InferenceSlot<'db>, constraints::SymbolicType<'db>>,
 
+    /// Operations deferred because an operand's type is still being inferred.
+    equations: CycleEquations<'db>,
+
     /// String annotations found in this region
     string_annotations: FrozenSet<ExpressionNodeKey>,
 
@@ -1344,6 +1347,9 @@ struct DeferredAndUndecorated<'db> {
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, Default, salsa::SalsaValue)]
 struct OtherDefinitionInferenceExtra<'db> {
     symbolic: FrozenMap<constraints::InferenceSlot<'db>, constraints::SymbolicType<'db>>,
+
+    /// Operations deferred because an operand's type is still being inferred.
+    equations: CycleEquations<'db>,
     /// String annotations found in this region
     string_annotations: FrozenSet<ExpressionNodeKey>,
 
@@ -1791,6 +1797,9 @@ pub(crate) struct ExpressionInference<'db> {
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, Default, salsa::SalsaValue)]
 struct ExpressionInferenceExtra<'db> {
     symbolic: FrozenMap<constraints::InferenceSlot<'db>, constraints::SymbolicType<'db>>,
+
+    /// Operations deferred because an operand's type is still being inferred.
+    equations: CycleEquations<'db>,
     /// String annotations found in this region
     string_annotations: FrozenSet<ExpressionNodeKey>,
 
@@ -2109,6 +2118,9 @@ pub(crate) struct StatementInferenceInner<'db> {
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, Default, salsa::SalsaValue)]
 struct StatementInferenceInnerExtra<'db> {
     symbolic: FrozenMap<constraints::InferenceSlot<'db>, constraints::SymbolicType<'db>>,
+
+    /// Operations deferred because an operand's type is still being inferred.
+    equations: CycleEquations<'db>,
     /// String annotations found in this region
     string_annotations: FrozenSet<ExpressionNodeKey>,
 

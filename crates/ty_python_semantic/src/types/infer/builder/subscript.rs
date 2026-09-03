@@ -31,10 +31,10 @@ use crate::types::typed_dict::{
 };
 use crate::types::typevar::{BindingContext, TypeVarSet};
 use crate::types::{
-    BoundTypeVarInstance, CallArguments, CallDunderError, CycleDetector, DisplaySettings,
-    DynamicType, InternedType, KnownClass, KnownInstanceType, LintDiagnosticGuard,
-    MemberLookupPolicy, Parameter, Parameters, SpecialFormType, StaticClassLiteral, Type,
-    TypeAliasType, TypeAndQualifiers, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
+    BoundTypeVarInstance, CallArguments, CallDunderError, CycleDetector, CycleSlot,
+    DisplaySettings, DynamicType, InternedType, KnownClass, KnownInstanceType, LintDiagnosticGuard,
+    MemberLookupPolicy, Operation, Parameter, Parameters, SpecialFormType, StaticClassLiteral,
+    Type, TypeAliasType, TypeAndQualifiers, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
     UnionType, UnionTypeInstance, any_over_type, todo_type,
 };
 use crate::{Db, FxOrderSet, ProgramEnvironment};
@@ -491,6 +491,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     subscript,
                     recovery_ty,
                     &constraint_keys,
+                )
+            })
+            .map(|ty| {
+                self.equations.defer_passthrough(
+                    db,
+                    env,
+                    value_ty,
+                    ty,
+                    CycleSlot::Expression(ast::ExprRef::Subscript(subscript).into()),
+                    |value| Operation::Subscript {
+                        value,
+                        key: slice_ty,
+                    },
                 )
             });
         if let Some(source) = self
