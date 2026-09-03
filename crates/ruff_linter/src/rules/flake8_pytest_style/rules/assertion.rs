@@ -234,8 +234,11 @@ impl Violation for PytestUnittestAssertion {
 /// the exception name.
 struct ExceptionHandlerVisitor<'a, 'b> {
     exception_name: &'a str,
-    current_assert: Option<&'a Stmt>,
-    diagnostic_reported: bool,
+    /// The `assert` statement that is currently being visited, if it has not been reported yet.
+    ///
+    /// This is set to `None` as soon as a diagnostic is reported, so that an `assert` that refers
+    /// to the exception more than once is only reported once.
+    pending_assert: Option<&'a Stmt>,
     checker: &'a Checker<'b>,
 }
 
@@ -243,8 +246,7 @@ impl<'a, 'b> ExceptionHandlerVisitor<'a, 'b> {
     const fn new(checker: &'a Checker<'b>, exception_name: &'a str) -> Self {
         Self {
             exception_name,
-            current_assert: None,
-            diagnostic_reported: false,
+            pending_assert: None,
             checker,
         }
     }
@@ -254,10 +256,9 @@ impl<'a> Visitor<'a> for ExceptionHandlerVisitor<'a, '_> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
             Stmt::Assert(_) => {
-                self.current_assert = Some(stmt);
-                self.diagnostic_reported = false;
+                self.pending_assert = Some(stmt);
                 visitor::walk_stmt(self, stmt);
-                self.current_assert = None;
+                self.pending_assert = None;
             }
             _ => visitor::walk_stmt(self, stmt),
         }
@@ -266,17 +267,16 @@ impl<'a> Visitor<'a> for ExceptionHandlerVisitor<'a, '_> {
     fn visit_expr(&mut self, expr: &'a Expr) {
         match expr {
             Expr::Name(ast::ExprName { id, .. }) => {
-                if let Some(current_assert) = self.current_assert
-                    && !self.diagnostic_reported
+                if let Some(pending_assert) = self.pending_assert
                     && id.as_str() == self.exception_name
                 {
                     self.checker.report_diagnostic(
                         PytestAssertInExcept {
                             name: id.to_string(),
                         },
-                        current_assert.range(),
+                        pending_assert.range(),
                     );
-                    self.diagnostic_reported = true;
+                    self.pending_assert = None;
                 }
             }
             _ => visitor::walk_expr(self, expr),
