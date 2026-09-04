@@ -26,7 +26,7 @@ assert (a + b) == 1.0
 assert -x == 1.0
 assert -x == -1.0
 assert x**2 == 4.0
-assert x / 2 == 1.5
+assert x / 2.0 == 1
 assert (y := x + 1.0) == 2.0
 
 [i for i in range(10) if i == 1.0]
@@ -85,3 +85,13 @@ def _cmath():
     assert cmath.inf == 1e300 * 1e300  # ok
 
     assert cmath.infj == complex(0, 1e300 * 1e300)  # ok
+
+
+def decimal_division():
+    from decimal import Decimal
+
+    a = Decimal("2")
+    b = Decimal("1")
+
+    assert a / 2 == b  # ok
+    assert 2 / a == b  # ok
