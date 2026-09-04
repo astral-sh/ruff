@@ -455,7 +455,7 @@ class Message(Generic[_HeaderT_co, _HeaderParamT_contra]):
 
         If the message object contains binary data that is not encoded
         according to RFC standards, the non-compliant data will be replaced by
-        unicode "unknown character" code points.
+        Unicode "unknown character" code points.
         """
 
     def as_bytes(self, unixfrom: bool = False, policy: Policy[Any] | None = None) -> bytes:

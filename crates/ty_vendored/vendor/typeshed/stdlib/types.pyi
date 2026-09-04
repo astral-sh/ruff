@@ -817,8 +817,6 @@ if sys.version_info >= (3, 15):
         the imported value.
         """
 
-        @property
-        def __name__(self) -> str: ...
         def resolve(self) -> Any:
             """resolves the lazy import and returns the actual object"""
 

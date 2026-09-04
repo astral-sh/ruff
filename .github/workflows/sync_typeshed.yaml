@@ -281,6 +281,9 @@ jobs:
           # Work around https://github.com/mitsuhiko/insta/pull/924 until its fix is released.
           CI: "0"
           MDTEST_UPDATE_SNAPSHOTS: "1"
+          # `UV_LOCKED: 1` will cause spurious changes to snapshots
+          # until https://github.com/astral-sh/ty/issues/4460 is fixed.
+          UV_LOCKED: 0
         run: uv run --only-dev cargo insta test --accept --all-features --test-runner nextest --disable-nextest-doctest
       - name: Commit and push snapshot changes
         if: ${{ success() }}
