@@ -73,6 +73,8 @@ use crate::types::{
 };
 use crate::{Db, FxIndexMap, FxIndexSet};
 
+mod collection;
+
 /// Resolves pytest fixtures requested by `parameter`.
 ///
 /// This function can be used to resolve either a fixture requested by a test
@@ -292,7 +294,7 @@ pub fn fixture_exposures_for_definition<'db>(
     let index = semantic_index(db, definition.program_file(db));
     let definition_scope = definition.file_scope(db);
     if !is_available_fixture_search_scope(db, index, definition_scope)
-        || !is_available_definition_in_scope(db, index, definition_scope, definition)
+        || !is_available_definition(db, definition)
     {
         return Vec::new();
     }
@@ -852,24 +854,17 @@ fn is_available_fixture_search_scope<'db>(
 
             let class_ref = index.scope(scope).node().expect_class();
             let definition = index.expect_single_definition(class_ref);
-            is_available_definition_in_scope(db, index, parent, definition)
+            is_available_definition(db, definition)
         }),
         _ => false,
     }
 }
 
-/// Returns whether `definition` remains bound in `scope` and exists at runtime.
-fn is_available_definition_in_scope<'db>(
-    db: &'db dyn Db,
-    index: &ty_python_core::SemanticIndex<'db>,
-    scope: FileScopeId,
-    definition: Definition<'db>,
-) -> bool {
+/// Returns whether `definition` remains bound in its defining scope and may exist at runtime.
+fn is_available_definition<'db>(db: &'db dyn Db, definition: Definition<'db>) -> bool {
     let resolution = DefinitionResolution::from_bindings(
         db,
-        index
-            .use_def_map(scope)
-            .end_of_scope_bindings(definition.place(db)),
+        use_def_map(db, definition.scope(db)).end_of_scope_bindings(definition.place(db)),
     );
     resolution.definitions().contains(&definition) && may_exist_at_runtime(db, definition)
 }
