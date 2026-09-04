@@ -20,7 +20,7 @@ use crate::types::typed_dict::{
 use crate::types::{Parameters, Type, TypeContext, UnionType, expand_type};
 
 /// Maximum total number of expanded argument type combinations across all arguments
-/// in [`CallArgumentExpansions::iter`].
+/// in [`CallArgumentExpansions::iter`] or [`CallArguments::materialize_gradual_tuples`].
 ///
 /// See: [pyright's `maxTotalOverloadArgTypeExpansionCount`][pyright]
 ///
