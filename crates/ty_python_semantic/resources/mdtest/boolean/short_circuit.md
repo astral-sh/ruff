@@ -347,6 +347,26 @@ def aliased_operand(flag: bool, marker: int):
         reveal_type(marker)  # revealed: Never
 ```
 
+If the call is evaluated first, neither `and` nor `or` can reach a later operand. A conditional
+expression whose test never returns cannot select either branch. This also makes unrelated bindings
+unreachable within those operands and branches.
+
+```py
+def terminal_and(marker: int):
+    if stop() and reveal_type(marker):  # revealed: Never
+        pass
+
+def terminal_or(marker: int):
+    stop() or reveal_type(marker)  # revealed: Never
+
+def terminal_conditional(marker: int):
+    (
+        reveal_type(marker)  # revealed: Never
+        if stop()
+        else reveal_type(marker)  # revealed: Never
+    )
+```
+
 A union of aliases of `Never` still cannot produce a result.
 
 ```py

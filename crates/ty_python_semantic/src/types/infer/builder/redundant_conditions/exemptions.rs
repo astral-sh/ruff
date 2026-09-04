@@ -614,7 +614,18 @@ fn definition_contains_special_cased_condition<'db>(
     let use_def = use_def_map(db, definition.scope(db));
     if use_def
         .reachability_constraints()
-        .predicate_ids(reachability)
+        .predicate_ids(reachability, |predicate| {
+            let predicate = use_def.predicates()[predicate];
+            // Termination does not give later values an environment-dependent origin.
+            // Assume calls and boolean tests complete before collecting their guards;
+            // merely ignoring completion predicates would still visit their failure
+            // paths, where an earlier environment guard can remain in the formula.
+            matches!(
+                predicate.node,
+                PredicateNode::IsNonTerminalCall(_) | PredicateNode::ExpressionCanComplete { .. }
+            )
+            .then_some(predicate.is_positive)
+        })
         .any(|predicate| {
             predicate_contains_special_cased_condition(db, definition.scope(db), predicate)
         })
@@ -673,6 +684,7 @@ fn predicate_contains_special_cased_condition<'db>(
         // particular, a statement such as `print(sys.platform)` should not make every later
         // definition environment-dependent merely because it is reached after that call returns.
         PredicateNode::IsNonTerminalCall(_)
+        | PredicateNode::ExpressionCanComplete { .. }
         | PredicateNode::ContextManagerSuppresses { .. }
         | PredicateNode::FinallyNormalPathImpossible { .. }
         | PredicateNode::OrPatternAlternative(_)

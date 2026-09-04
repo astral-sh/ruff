@@ -221,7 +221,7 @@ use ty_python_core::{
     FileScopeId, NarrowingEvaluator, PredicateNarrowingTargets, ScopedDefinitionId, SemanticIndex,
     Truthiness, UseDefMap,
     definition::DefinitionState,
-    expression::Expression,
+    expression::{Expression, ExpressionContext},
     narrowing_constraints::{NarrowingConstraints, ScopedNarrowingConstraint},
     place::ScopedPlaceId,
     place_table,
@@ -540,7 +540,7 @@ fn accumulate_constraint<'db>(
     }
 }
 
-const NON_TERMINAL_CALL_CHUNK_SIZE: usize = 16;
+const COMPLETION_PREDICATE_CHUNK_SIZE: usize = 16;
 const REACHABILITY_EVALUATION_CHUNK_SIZE: usize = 256;
 const CONTROL_FLOW_REACHABILITY_CHECKPOINT_INTERVAL: usize = 16;
 const NARROWING_EVALUATION_CHECKPOINT_INTERVAL: usize = 8;
@@ -549,7 +549,8 @@ fn predicate_scope<'db>(db: &'db dyn Db, predicate: &Predicate<'db>) -> ScopeId<
         PredicateNode::Expression(expression)
         | PredicateNode::Condition(expression)
         | PredicateNode::ChainedComparisonCondition(expression)
-        | PredicateNode::ContextManagerSuppresses { expression, .. } => expression.scope(db),
+        | PredicateNode::ContextManagerSuppresses { expression, .. }
+        | PredicateNode::ExpressionCanComplete { expression, .. } => expression.scope(db),
         PredicateNode::IsNonTerminalCall(CallableAndCallExpr { callable, .. }) => {
             callable.scope(db)
         }
@@ -562,52 +563,58 @@ fn predicate_scope<'db>(db: &'db dyn Db, predicate: &Predicate<'db>) -> ScopeId<
     }
 }
 
-/// Infers complete preceding blocks of call predicates in source order.
+/// Infers complete preceding blocks of completion predicates in source order.
 ///
 /// Predicate IDs are assigned in source order, but the decision diagrams intentionally order
-/// predicates in reverse to reduce their size. Inferring a later call can depend on the
-/// reachability of all preceding calls, which otherwise creates a deeply recursive Salsa query
+/// predicates in reverse to reduce their size. Inferring a later expression can depend on the
+/// completion of all preceding expressions, which otherwise creates a deeply recursive Salsa query
 /// chain. Inferring the expressions in source order turns that chain into cache lookups while
 /// preserving normal reachability and narrowing during every inference.
 ///
 /// Because the prefix is based on predicate indices rather than graph reachability, branch-heavy
-/// code can warm calls from earlier source branches that this evaluation would not otherwise visit.
-/// A demand-driven graph walk could avoid that work, but would require a more complex work list. We
+/// code can warm expressions from earlier source branches that this evaluation would not otherwise
+/// visit. A demand-driven graph walk could avoid that work, but would require a more complex work list. We
 /// accept the broader eager pass because it keeps the ordering simple, and checking a scope will
 /// typically exercise most of its predicates eventually.
 ///
 /// Reentrant analysis is handled by Salsa cycle recovery on the cached-range queries. The final
-/// incomplete block is left for the reachability walk: it can add at most 15 nested call queries,
-/// and analyzing it eagerly would bypass the range query's cycle recovery and could introduce a
+/// incomplete block is left for the reachability walk: it can add at most 15 nested completion
+/// queries, and analyzing it eagerly would bypass the range query's cycle recovery and could introduce a
 /// divergent inference cycle. For large scopes, keeping the complete-block pass unconditional
 /// ensures that tracked callers record the same dependencies on every thread. Small scopes do not
-/// need prefix warming to bound the Salsa stack, so their calls are evaluated entirely on demand.
-fn analyze_non_terminal_call_prefix<'db>(
+/// need prefix warming to bound the Salsa stack, so their predicates are evaluated entirely on demand.
+fn analyze_completion_prefix<'db>(
     db: &'db dyn Db,
     predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
     root_predicate: ScopedPredicateId,
 ) -> bool {
     let scope = predicate_scope(db, &predicates[root_predicate]);
-    let has_many_calls = predicates
+    let has_many_completions = predicates
         .iter()
-        .filter(|predicate| matches!(predicate.node, PredicateNode::IsNonTerminalCall(_)))
-        .nth(NON_TERMINAL_CALL_CHUNK_SIZE)
+        .filter(|predicate| {
+            matches!(
+                predicate.node,
+                PredicateNode::IsNonTerminalCall(_) | PredicateNode::ExpressionCanComplete { .. }
+            )
+        })
+        .nth(COMPLETION_PREDICATE_CHUNK_SIZE)
         .is_some();
 
-    if !has_many_calls {
+    if !has_many_completions {
         return false;
     }
 
-    let call_predicates = non_terminal_call_predicates(db, scope);
-    let call_count = call_predicates.partition_point(|predicate| *predicate <= root_predicate);
+    let completion_predicates = completion_predicates(db, scope);
+    let completion_count =
+        completion_predicates.partition_point(|predicate| *predicate <= root_predicate);
     let mut start = 0;
     // Leave the incomplete final block demand-driven. Its reverse dependency chain is bounded by
-    // the block size, and every eagerly analyzed call remains behind a recoverable range query.
-    let mut remaining = call_count / NON_TERMINAL_CALL_CHUNK_SIZE;
+    // the block size, and every eagerly analyzed predicate remains behind a recoverable range query.
+    let mut remaining = completion_count / COMPLETION_PREDICATE_CHUNK_SIZE;
     while remaining > 0 {
         let level = remaining.ilog2();
         let length = 1 << level;
-        analyze_non_terminal_call_range(db, scope, level, start >> level);
+        analyze_completion_range(db, scope, level, start >> level);
         start += length;
         remaining -= length;
     }
@@ -615,74 +622,75 @@ fn analyze_non_terminal_call_prefix<'db>(
     true
 }
 
-/// Returns the statement-call predicates for `scope` in source order.
+/// Returns completion predicates for statement calls and boolean evaluation boundaries in source order.
 ///
-/// This tracked index is used only once a scope exceeds [`NON_TERMINAL_CALL_CHUNK_SIZE`], avoiding
-/// a persistent allocation for the common case of scopes with few calls.
+/// This tracked index is used only once a scope exceeds [`COMPLETION_PREDICATE_CHUNK_SIZE`], avoiding
+/// a persistent allocation for the common case of scopes with few completion predicates.
 #[salsa::tracked(returns(deref), heap_size = get_size2::GetSize::get_heap_size)]
-fn non_terminal_call_predicates<'db>(
-    db: &'db dyn Db,
-    scope: ScopeId<'db>,
-) -> Box<[ScopedPredicateId]> {
+fn completion_predicates<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Box<[ScopedPredicateId]> {
     use_def_map(db, scope)
         .predicates()
         .iter_enumerated()
         .filter_map(|(id, predicate)| {
-            matches!(predicate.node, PredicateNode::IsNonTerminalCall(_)).then_some(id)
+            matches!(
+                predicate.node,
+                PredicateNode::IsNonTerminalCall(_) | PredicateNode::ExpressionCanComplete { .. }
+            )
+            .then_some(id)
         })
         .collect()
 }
 
-fn analyze_non_terminal_calls<'db>(
+fn analyze_completion_predicates<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
-    call_predicates: &[ScopedPredicateId],
+    completion_predicates: &[ScopedPredicateId],
 ) {
-    for id in call_predicates {
+    for id in completion_predicates {
         analyze_single(db, env, &predicates[*id]);
     }
 }
 
-/// Analyzes a power-of-two range of call-predicate blocks in source order.
+/// Analyzes a power-of-two range of completion-predicate blocks in source order.
 ///
 /// Prefixes can be decomposed into these canonical ranges and reused by later expression-inference
 /// queries. Splitting ranges in half keeps the Salsa query stack logarithmic even when the first
-/// requested prefix contains thousands of calls. Each leaf handles multiple calls iteratively to
-/// avoid retaining a Salsa argument and query result for every individual predicate.
+/// requested prefix contains thousands of expressions. Each leaf handles multiple predicates
+/// iteratively to avoid retaining a Salsa argument and query result for every individual predicate.
 ///
-/// Analyzing a call can re-enter reachability through expression inference and request this same
-/// range. Recovery is a no-op because the range only warms call queries; any call still needed for
-/// reachability is evaluated directly by the decision-diagram walk.
+/// Analyzing an expression can re-enter reachability through inference and request this same
+/// range. Recovery is a no-op because the range only warms completion queries; any predicate still
+/// needed for reachability is evaluated directly by the decision-diagram walk.
 #[salsa::tracked(
     returns(copy),
     cycle_initial = |_, _, _, _, _| (),
     heap_size = get_size2::GetSize::get_heap_size
 )]
-fn analyze_non_terminal_call_range<'db>(
-    db: &'db dyn Db,
-    scope: ScopeId<'db>,
-    level: u32,
-    index: usize,
-) {
+fn analyze_completion_range<'db>(db: &'db dyn Db, scope: ScopeId<'db>, level: u32, index: usize) {
     if level == 0 {
         let env = ProgramEnvironment::from_scope(scope);
         let use_def = use_def_map(db, scope);
-        let call_predicates = non_terminal_call_predicates(db, scope);
-        let start = index * NON_TERMINAL_CALL_CHUNK_SIZE;
-        let end = start + NON_TERMINAL_CALL_CHUNK_SIZE;
-        analyze_non_terminal_calls(db, &env, use_def.predicates(), &call_predicates[start..end]);
+        let completion_predicates = completion_predicates(db, scope);
+        let start = index * COMPLETION_PREDICATE_CHUNK_SIZE;
+        let end = start + COMPLETION_PREDICATE_CHUNK_SIZE;
+        analyze_completion_predicates(
+            db,
+            &env,
+            use_def.predicates(),
+            &completion_predicates[start..end],
+        );
         return;
     }
 
     let child_index = index * 2;
-    analyze_non_terminal_call_range(db, scope, level - 1, child_index);
-    analyze_non_terminal_call_range(db, scope, level - 1, child_index + 1);
+    analyze_completion_range(db, scope, level - 1, child_index);
+    analyze_completion_range(db, scope, level - 1, child_index + 1);
 }
 
-/// Evaluates a reachability constraint after warming its statement-call prefix.
+/// Evaluates a reachability constraint after warming its completion-predicate prefix.
 ///
-/// Large scopes reuse canonical call ranges and sparse decision-diagram checkpoints; small scopes
+/// Large scopes reuse canonical completion ranges and sparse decision-diagram checkpoints; small scopes
 /// retain the direct evaluation path without creating either cached index.
 fn evaluate_reachability_constraint<'db>(
     db: &'db dyn Db,
@@ -697,15 +705,15 @@ fn evaluate_reachability_constraint<'db>(
     let constraints = use_def.reachability_constraints();
     let predicates = use_def.predicates();
     let root_predicate = constraints.get_interior_node(id).atom();
-    let has_many_calls = analyze_non_terminal_call_prefix(db, predicates, root_predicate);
-    let call_predicates = has_many_calls.then(|| non_terminal_call_predicates(db, scope));
+    let has_many_completions = analyze_completion_prefix(db, predicates, root_predicate);
+    let completion_predicates = has_many_completions.then(|| completion_predicates(db, scope));
 
     evaluate_reachability_path(
         db,
         scope,
         constraints,
         predicates,
-        call_predicates,
+        completion_predicates,
         id,
         true,
     )
@@ -746,16 +754,17 @@ fn terminal_reachability(id: ScopedReachabilityConstraintId) -> Option<Truthines
 
 /// Selects sparse, stable checkpoints without adding a second scope-wide predicate index.
 ///
-/// Statement calls retain their existing checkpoint spacing. Other control-flow predicates become
+/// Completion predicates share fixed checkpoint spacing. Other control-flow predicates become
 /// checkpoints only after a sufficiently long path has demonstrated that reuse is worthwhile.
 fn is_reachability_checkpoint(
-    call_predicates: Option<&[ScopedPredicateId]>,
+    completion_predicates: Option<&[ScopedPredicateId]>,
     predicate: ScopedPredicateId,
     visited: usize,
 ) -> bool {
-    if let Some(call_index) = call_predicates.and_then(|calls| calls.binary_search(&predicate).ok())
+    if let Some(completion_index) =
+        completion_predicates.and_then(|predicates| predicates.binary_search(&predicate).ok())
     {
-        return (call_index + 1).is_multiple_of(REACHABILITY_EVALUATION_CHUNK_SIZE);
+        return (completion_index + 1).is_multiple_of(REACHABILITY_EVALUATION_CHUNK_SIZE);
     }
 
     // Folding the adjacent bucket prevents regularly interleaved predicate kinds from always
@@ -779,7 +788,7 @@ fn evaluate_reachability_path<'db>(
     scope: ScopeId<'db>,
     constraints: &ReachabilityConstraints,
     predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
-    call_predicates: Option<&[ScopedPredicateId]>,
+    completion_predicates: Option<&[ScopedPredicateId]>,
     mut id: ScopedReachabilityConstraintId,
     mut use_checkpoint: bool,
 ) -> Truthiness {
@@ -792,7 +801,8 @@ fn evaluate_reachability_path<'db>(
         }
 
         let node = constraints.get_interior_node(id);
-        if use_checkpoint && is_reachability_checkpoint(call_predicates, node.atom(), visited) {
+        if use_checkpoint && is_reachability_checkpoint(completion_predicates, node.atom(), visited)
+        {
             return evaluate_reachability_checkpoint(db, scope, id);
         }
 
@@ -808,7 +818,7 @@ fn evaluate_reachability_path<'db>(
 
 /// Evaluates a canonical suffix of a reachability decision diagram.
 ///
-/// Statement calls retain their existing sparse checkpoints; other predicates become checkpoints
+/// Completion predicates share sparse checkpoints; other predicates become checkpoints
 /// only after a long path demonstrates that reuse is worthwhile. This lets later statements reuse
 /// constraints accumulated by earlier statements without retaining an additional scope-wide index
 /// or a Salsa query key and memo for every constraint.
@@ -824,18 +834,23 @@ fn evaluate_reachability_checkpoint<'db>(
 ) -> Truthiness {
     let use_def = use_def_map(db, scope);
     let predicates = use_def.predicates();
-    let has_many_calls = predicates
+    let has_many_completions = predicates
         .iter()
-        .filter(|predicate| matches!(predicate.node, PredicateNode::IsNonTerminalCall(_)))
-        .nth(NON_TERMINAL_CALL_CHUNK_SIZE)
+        .filter(|predicate| {
+            matches!(
+                predicate.node,
+                PredicateNode::IsNonTerminalCall(_) | PredicateNode::ExpressionCanComplete { .. }
+            )
+        })
+        .nth(COMPLETION_PREDICATE_CHUNK_SIZE)
         .is_some();
-    let call_predicates = has_many_calls.then(|| non_terminal_call_predicates(db, scope));
+    let completion_predicates = has_many_completions.then(|| completion_predicates(db, scope));
     evaluate_reachability_path(
         db,
         scope,
         use_def.reachability_constraints(),
         predicates,
-        call_predicates,
+        completion_predicates,
         id,
         false,
     )
@@ -864,7 +879,7 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
         }
 
         let root_predicate = self.get_interior_node(id).atom();
-        analyze_non_terminal_call_prefix(db, predicates, root_predicate);
+        analyze_completion_prefix(db, predicates, root_predicate);
         evaluate_reachability_path(
             db,
             predicate_scope(db, &predicates[root_predicate]),
@@ -1370,7 +1385,8 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                             .contains(node.atom, self.place)
                             || matches!(
                                 predicate.node,
-                                PredicateNode::ContextManagerSuppresses { .. }
+                                PredicateNode::ExpressionCanComplete { .. }
+                                    | PredicateNode::ContextManagerSuppresses { .. }
                                     | PredicateNode::FinallyNormalPathImpossible { .. }
                             ))
                     {
@@ -1405,6 +1421,7 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                     let is_control_flow_gate = matches!(
                         predicate.node,
                         PredicateNode::IsNonTerminalCall(_)
+                            | PredicateNode::ExpressionCanComplete { .. }
                             | PredicateNode::ContextManagerSuppresses { .. }
                             | PredicateNode::FinallyNormalPathImpossible { .. }
                     );
@@ -1881,21 +1898,21 @@ pub(crate) fn analyze_condition_expression(
 
 #[salsa::tracked(
     returns(copy),
-    cycle_initial = |_, _, _| Truthiness::Ambiguous,
-    cycle_fn = |_, cycle: &salsa::Cycle, previous: &Truthiness, result: Truthiness, _| {
+    cycle_initial = |_, _, _| Some(Truthiness::Ambiguous),
+    cycle_fn = |_, cycle: &salsa::Cycle, previous: &Option<Truthiness>, result: Option<Truthiness>, _| {
         // A condition can control whether one of its own inputs is reachable. Expression inference
         // can lose its previous result when it ceases to be a cycle head, so its type widening alone
         // does not ensure that the condition's truthiness converges. Delay widening here to avoid
         // retaining imprecise results from the first few iterations.
         if cycle.iteration() > crate::TAINTED_CYCLES && *previous != result {
-            Truthiness::Ambiguous
+            Some(Truthiness::Ambiguous)
         } else {
             result
         }
     },
     heap_size = get_size2::GetSize::get_heap_size
 )]
-fn analyze_condition<'db>(db: &'db dyn Db, expression: Expression<'db>) -> Truthiness {
+fn analyze_condition<'db>(db: &'db dyn Db, expression: Expression<'db>) -> Option<Truthiness> {
     let env = ProgramEnvironment::from_scope(expression.scope(db));
     let module = parsed_module(db, expression.python_file(db)).load(db);
     let inference = infer_expression_types(db, expression, TypeContext::default());
@@ -1904,7 +1921,34 @@ fn analyze_condition<'db>(db: &'db dyn Db, expression: Expression<'db>) -> Truth
             .comparison_truthiness(node)
             .or_else(|| inference.expression_type(node).bool_if_inhabited(db, &env))
     })
-    .unwrap_or(Truthiness::Ambiguous)
+}
+
+/// Cycle recovery assumes evaluation can complete when it depends on its own constraint.
+#[salsa::tracked(
+    returns(copy),
+    cycle_initial = |_, _, _, _| true,
+    cycle_fn = |_, cycle: &salsa::Cycle, previous: &bool, result: bool, _, _| {
+        if cycle.iteration() > crate::TAINTED_CYCLES {
+            *previous || result
+        } else {
+            result
+        }
+    },
+    heap_size = get_size2::GetSize::get_heap_size
+)]
+fn expression_can_complete<'db>(
+    db: &'db dyn Db,
+    expression: Expression<'db>,
+    context: ExpressionContext,
+) -> bool {
+    match context {
+        ExpressionContext::Condition => analyze_condition(db, expression).is_some(),
+        ExpressionContext::Value => {
+            let env = ProgramEnvironment::from_scope(expression.scope(db));
+            !infer_same_file_expression_type(db, expression, TypeContext::default())
+                .is_equivalent_to(db, &env, Type::Never)
+        }
+    }
 }
 
 fn analyze_single(db: &dyn Db, env: &ProgramEnvironment<'_>, predicate: &Predicate) -> Truthiness {
@@ -1916,9 +1960,14 @@ fn analyze_single(db: &dyn Db, env: &ProgramEnvironment<'_>, predicate: &Predica
                 .bool(db, env)
                 .negate_if(!predicate.is_positive)
         }
-        PredicateNode::Condition(test_expr) => {
-            analyze_condition(db, test_expr).negate_if(!predicate.is_positive)
-        }
+        PredicateNode::Condition(test_expr) => analyze_condition(db, test_expr)
+            .unwrap_or(Truthiness::Ambiguous)
+            .negate_if(!predicate.is_positive),
+        PredicateNode::ExpressionCanComplete {
+            expression,
+            context,
+        } => Truthiness::from(expression_can_complete(db, expression, context))
+            .negate_if(!predicate.is_positive),
         PredicateNode::ChainedComparisonCondition(test_expr) => {
             let inference = infer_expression_types(db, test_expr, TypeContext::default());
             let expression = test_expr.node_ref(db);
@@ -2214,10 +2263,18 @@ mod tests {
     use ty_python_core::predicate::Predicates;
     use ty_python_core::semantic_index;
 
+    /// A cached completion range returns without panicking when each class's `target` attribute
+    /// depends on the other class's `setup` method. This forces a Salsa cycle across files while
+    /// the range query itself is active, exercising that query's cycle recovery.
     #[test]
-    fn non_terminal_call_range_recovers_cross_file_cycle() -> anyhow::Result<()> {
+    fn completion_range_recovers_cross_file_cycle() -> anyhow::Result<()> {
         let mut db = setup_db();
-        let calls = "        other.target.ping()\n".repeat(NON_TERMINAL_CALL_CHUNK_SIZE + 1);
+        let calls = concat!(
+            "        other.target.ping()\n",
+            "        other.target.ping() and None\n",
+            "        None if other.target.ping() else None\n",
+        )
+        .repeat(COMPLETION_PREDICATE_CHUNK_SIZE + 1);
         let a = format!(
             r#"from b import B
 
@@ -2259,50 +2316,67 @@ class TargetB:
 
         // Enter the range directly so it becomes the cycle head when inferring `other.target`
         // reaches the other module and then re-enters this scope.
-        analyze_non_terminal_call_range(&db, setup_scope, 0, 0);
+        analyze_completion_range(&db, setup_scope, 0, 0);
         Ok(())
     }
 
+    /// Changing an imported callable's return type from `None` to `NoReturn` invalidates cached
+    /// completion results. Rechecking the unchanged caller in the same database must change its
+    /// end-of-scope reachability from reachable to unreachable.
+    /// Separate fixtures exercise statement calls, boolean operands, and conditional-expression
+    /// tests so a terminal statement cannot hide a stale expression-completion result.
     #[test]
-    fn non_terminal_call_range_invalidates_when_callable_changes() -> anyhow::Result<()> {
-        let mut db = setup_db();
-        let source = format!(
-            "from dependency import callback\n\ndef f() -> None:\n{}",
-            "    callback()\n".repeat(NON_TERMINAL_CALL_CHUNK_SIZE + 1)
-        );
-        db.write_files([
-            ("/src/dependency.py", "def callback() -> None: ..."),
-            ("/src/test.py", source.as_str()),
-        ])?;
+    fn completion_range_invalidates_when_callable_changes() -> anyhow::Result<()> {
+        for expression in [
+            "callback()",
+            "callback() and None",
+            "None if callback() else None",
+        ] {
+            let mut db = setup_db();
+            let source = format!(
+                "from dependency import callback\n\ndef f() -> None:\n{}",
+                format!("    {expression}\n").repeat(COMPLETION_PREDICATE_CHUNK_SIZE + 1)
+            );
+            db.write_files([
+                ("/src/dependency.py", "def callback() -> None: ..."),
+                ("/src/test.py", source.as_str()),
+            ])?;
 
-        let file = system_path_to_file(&db, "/src/test.py").unwrap();
-        let function_scope = {
-            let program_file = ProgramFile::new(&db, file, db.program_environment().program(&db));
-            let index = semantic_index(&db, program_file);
-            index.child_scopes(FileScopeId::global()).next().unwrap().0
-        };
-        {
+            let file = system_path_to_file(&db, "/src/test.py").unwrap();
+            let function_scope = {
+                let program_file =
+                    ProgramFile::new(&db, file, db.program_environment().program(&db));
+                let index = semantic_index(&db, program_file);
+                index.child_scopes(FileScopeId::global()).next().unwrap().0
+            };
+            {
+                let program_file =
+                    ProgramFile::new(&db, file, db.program_environment().program(&db));
+                let scope = function_scope.to_scope_id(&db, program_file);
+                let use_def = use_def_map(&db, scope);
+                assert!(
+                    evaluate_reachability_constraint(
+                        &db,
+                        scope,
+                        use_def.end_of_scope_reachability(),
+                    )
+                    .may_be_true()
+                );
+            }
+
+            db.write_file(
+                "/src/dependency.py",
+                "from typing import NoReturn\ndef callback() -> NoReturn: ...",
+            )?;
+
             let program_file = ProgramFile::new(&db, file, db.program_environment().program(&db));
             let scope = function_scope.to_scope_id(&db, program_file);
             let use_def = use_def_map(&db, scope);
             assert!(
                 evaluate_reachability_constraint(&db, scope, use_def.end_of_scope_reachability(),)
-                    .may_be_true()
+                    .is_always_false()
             );
         }
-
-        db.write_file(
-            "/src/dependency.py",
-            "from typing import NoReturn\ndef callback() -> NoReturn: ...",
-        )?;
-
-        let program_file = ProgramFile::new(&db, file, db.program_environment().program(&db));
-        let scope = function_scope.to_scope_id(&db, program_file);
-        let use_def = use_def_map(&db, scope);
-        assert!(
-            evaluate_reachability_constraint(&db, scope, use_def.end_of_scope_reachability(),)
-                .is_always_false()
-        );
         Ok(())
     }
 

@@ -473,8 +473,9 @@ mod tests {
         Ok(())
     }
 
+    /// An always-taken `if` branch makes both the next `elif` test and its body unreachable.
     #[test]
-    fn reports_statement_in_unreachable_elif_branch() -> anyhow::Result<()> {
+    fn reports_unreachable_elif_test_and_body() -> anyhow::Result<()> {
         let source = r#"
             if True:
                 pass
@@ -484,10 +485,12 @@ mod tests {
 
         assert_snapshot!(UnreachableTest::new().render(source)?, @r#"
         info[unreachable-code]: Code is always unreachable
-         --> src/main.py:5:5
+         --> src/main.py:4:6
           |
-        5 |     print("dead")
-          |     ^^^^^^^^^^^^^
+        4 |   elif False:
+          |  ______^
+        5 | |     print("dead")
+          | |_________________^
         "#);
         Ok(())
     }
