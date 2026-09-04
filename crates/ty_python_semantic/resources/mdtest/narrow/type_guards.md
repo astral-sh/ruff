@@ -474,6 +474,24 @@ def _(x: Foo | Bar, is_bar: Callable[[object], TypeIs[Bar]]):
         reveal_type(x)  # revealed: Foo & ~Bar
 ```
 
+A `TypeIs` function can also be used to narrow to a specific callable type:
+
+```py
+def is_callable_that_returns_int(arg: object) -> TypeIs[Callable[[object], int]]:
+    return callable(arg)
+
+def is_callable_that_takes_str(arg: object) -> TypeIs[Callable[[str], object]]:
+    return callable(arg)
+
+def _(arg: Callable[[object], str] | Callable[[object], int]):
+    if is_callable_that_returns_int(arg):
+        reveal_type(arg)  # revealed: (object, /) -> int
+
+def _(arg: Callable[[str], object] | Callable[[int], object]):
+    if is_callable_that_takes_str(arg):
+        reveal_type(arg)  # revealed: (str, /) -> object
+```
+
 ## `TypeIs` narrowing with generic classes and gradual types
 
 ### Non-strict mode
