@@ -1138,6 +1138,130 @@ def forward_beyond_limit(values: tuple[()] | tuple[int]) -> None:
     requires_ten(*values, *values, *values, *values, *values, *values, *values, *values, *values, 1)
 ```
 
+### Forwarded tuple aliases and unpacked variadic parameters
+
+Each alternative of a tuple union remains valid when part of the union is defined through an alias.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+type Values = tuple[int, str] | tuple[int, int, str]
+
+def with_suffix(*args: *tuple[*tuple[int, ...], str]) -> None: ...
+def forward(values: Values | tuple[int, int, int, str]) -> None:
+    with_suffix(*values)
+```
+
+Aliases can contain other aliases without changing which tuple alternatives are accepted.
+
+```py
+type MoreValues = Values | tuple[int, int, int, str]
+
+def forward_nested(values: MoreValues | tuple[int, int, int, int, str]) -> None:
+    with_suffix(*values)
+```
+
+An incompatible alternative inside an alias still makes the forwarded call invalid.
+
+```py
+type WrongSuffix = tuple[int, str] | tuple[int, int, int]
+
+def forward_invalid(values: WrongSuffix | tuple[int, int, int, str]) -> None:
+    with_suffix(*values)  # error: [invalid-argument-type]
+```
+
+### Gradual arguments and unpacked parameter endpoints
+
+An `Any` tail can be empty, leaving a fixed `str` in the required suffix position.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from typing import Any
+
+def with_suffix(*args: *tuple[*tuple[int, ...], str]) -> None: ...
+def forward_tail(values: tuple[Any, ...]) -> None:
+    with_suffix("last", *values)
+```
+
+An `Any` prefix can also be empty, leaving the fixed `str` in the required first position.
+
+```py
+def with_prefix(*args: *tuple[str, *tuple[int, ...]]) -> None: ...
+def forward_prefix(values: tuple[Any, ...]) -> None:
+    with_prefix(*values, "first")
+```
+
+Between two gradual arguments, a fixed `str` can supply the prefix and the tail can supply `bytes`.
+
+```py
+def with_endpoints(*args: *tuple[str, *tuple[int, ...], bytes]) -> None: ...
+def forward_both(before: tuple[Any, ...], after: tuple[Any, ...]) -> None:
+    with_endpoints(*before, "first", *after)
+```
+
+### Gradual arguments and fixed unpacked parameters
+
+Gradual arguments can supply the two endpoints around a fixed middle argument.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from typing import Any
+
+def fixed(*args: *tuple[str, int, bytes]) -> None: ...
+def forward(before: tuple[Any, ...], after: tuple[Any, ...]) -> None:
+    fixed(*before, 1, *after)
+```
+
+Several fixed arguments retain their order while the gradual arguments fill the remaining positions.
+
+```py
+def forward_ordered(before: tuple[Any, ...], after: tuple[Any, ...]) -> None:
+    fixed(*before, "first", 1, *after)
+    # error: [invalid-argument-type]
+    fixed(*before, 1, "first", *after)  # error: [invalid-argument-type]
+```
+
+A fixed argument still needs a compatible parameter; the surrounding `Any` values cannot absorb it.
+
+```py
+def forward_invalid(before: tuple[Any, ...], after: tuple[Any, ...]) -> None:
+    fixed(*before, None, *after)  # error: [invalid-argument-type]
+```
+
+Two fixed arguments cannot both occupy the same compatible parameter position.
+
+```py
+def repeated(*args: *tuple[str, int, str]) -> None: ...
+def forward_repeated(before: tuple[Any, ...], after: tuple[Any, ...]) -> None:
+    # error: [invalid-argument-type]
+    repeated(*before, 1, 1, *after)  # error: [invalid-argument-type]
+```
+
+Fixed arguments still contribute to generic inference when gradual arguments supply the endpoints.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def generic(*args: *tuple[str, list[T], bytes]) -> T:
+    return args[1][0]
+
+def forward_generic(before: tuple[Any, ...], after: tuple[Any, ...], value: list[int]) -> None:
+    reveal_type(generic(*before, value, *after))  # revealed: int
+```
+
 ### Mixed argument and parameter containing variadic
 
 ```toml

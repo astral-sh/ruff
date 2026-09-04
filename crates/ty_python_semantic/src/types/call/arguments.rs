@@ -8,12 +8,12 @@ use rustc_hash::FxHashMap;
 
 use crate::ProgramEnvironment;
 use crate::types::enums::enum_metadata;
-use crate::types::tuple::Tuple;
+use crate::types::tuple::{Tuple, TupleLength, TupleSpec, TupleType};
 use crate::types::typed_dict::extract_unpacked_typed_dict_keys_from_value_type;
 use crate::types::{KnownClass, Type, TypeContext, expand_type};
 
 /// Maximum total number of expanded argument type combinations across all arguments
-/// in [`CallArguments::expand`].
+/// in [`CallArguments::expand`] or [`CallArguments::materialize_gradual_tuples`].
 ///
 /// See: [pyright's `maxTotalOverloadArgTypeExpansionCount`][pyright]
 ///
@@ -440,6 +440,60 @@ impl<'a, 'db> CallArguments<'a, 'db> {
             }
             State::Expanding(ExpandingState::Expanded(expanded)) => Expansion::Expanded(expanded),
         })
+    }
+
+    /// Try fixed lengths for gradual starred tuples, preserving their fixed endpoints.
+    ///
+    /// Unlike union expansion, these are alternative materializations: a call needs only one
+    /// to succeed. Concrete variable-length tuples are left unchanged, since every length of
+    /// those tuples must remain valid.
+    pub(super) fn materialize_gradual_tuples(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        maximum_length: usize,
+    ) -> impl Iterator<Item = Self> {
+        let gradual = self
+            .items
+            .iter()
+            .enumerate()
+            .filter_map(|(index, item)| {
+                if !matches!(item.argument, Argument::Variadic) {
+                    return None;
+                }
+                let ty = item.types.get_default()?.resolve_type_alias(db);
+                // Do not materialize a merged union: its concrete alternatives need checking
+                // separately. Use iteration to respect tuple subclasses' `__iter__` overrides.
+                if !ty.is_dynamic() && ty.tuple_instance_spec(db, env).is_none() {
+                    return None;
+                }
+                let tuple = ty.try_iterate(db, env).ok()?;
+                let TupleSpec::Variable(variable) = tuple.as_ref() else {
+                    return None;
+                };
+                variable.variable().gradual_element_type(db, env)?;
+                Some((index, tuple))
+            })
+            .collect::<Vec<_>>();
+        let has_gradual = !gradual.is_empty();
+        let arguments = self.clone();
+        let env = env.clone();
+
+        (0..gradual.len())
+            .map(move |_| 0..=maximum_length)
+            .multi_cartesian_product()
+            .take(if has_gradual { MAX_TOTAL_EXPANSION } else { 0 })
+            .filter_map(move |lengths| {
+                let mut materialized = arguments.clone();
+                for ((index, tuple), length) in gradual.iter().zip(lengths) {
+                    let fixed = tuple
+                        .resize(db, &env, TupleLength::Fixed(tuple.len().minimum() + length))
+                        .ok()?;
+                    materialized.items[*index].types =
+                        CallArgumentTypes::new(Some(Type::tuple(TupleType::new(db, &env, &fixed))));
+                }
+                Some(materialized)
+            })
     }
 
     pub(super) fn display<'env>(

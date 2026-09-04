@@ -3829,6 +3829,9 @@ impl<'db> CallableBinding<'db> {
                 }
             };
 
+        let all_overloads_survived_arity =
+            self.matching_overloads().count() == self.overloads.len();
+
         // Step 2: Evaluate each remaining overload as a regular (non-overloaded) call to determine
         // whether it is compatible with the supplied argument list.
         for (_, overload) in self.matching_overloads_mut() {
@@ -3901,6 +3904,15 @@ impl<'db> CallableBinding<'db> {
                 }
             }
         }
+
+        // A sole whole-type match remains the winner if it accepts every forwarded shape.
+        // Expanding to validate that match must not prefer narrower overloads instead.
+        // If provisional arity checking discarded an overload, however, expansion can revive
+        // that overload and must select the winner afresh.
+        let whole_type_match = match self.matching_overload_index() {
+            MatchingOverloadIndex::Single(index) if all_overloads_survived_arity => Some(index),
+            _ => None,
+        };
 
         // Step 3: Perform "argument type expansion". Reference:
         // https://typing.python.org/en/latest/spec/overload.html#argument-type-expansion
@@ -4009,6 +4021,7 @@ impl<'db> CallableBinding<'db> {
             // The return types of each of the expanded argument lists that evaluated successfully.
             let mut return_types = Vec::new();
             let mut selected_overloads = SmallVec::<[usize; 2]>::new();
+            let mut whole_type_match_is_valid = whole_type_match.is_some();
 
             for expanded_arguments in &expanded_argument_lists {
                 // The spec mentions that each expanded argument list should be re-evaluated from
@@ -4046,6 +4059,10 @@ impl<'db> CallableBinding<'db> {
                     matching_overload_index = ?self.matching_overload_index(),
                     "after step 2",
                 );
+
+                whole_type_match_is_valid &= self
+                    .matching_overloads()
+                    .any(|(index, _)| Some(index) == whole_type_match);
 
                 let mut is_ambiguous = false;
                 let return_type = match self.matching_overload_index() {
@@ -4136,6 +4153,10 @@ impl<'db> CallableBinding<'db> {
                         .any(|arguments| Self::has_expandable_variadic_shape(db, env, arguments))
                 {
                     continue;
+                }
+                if whole_type_match_is_valid {
+                    snapshotter.restore(self, post_evaluation_snapshot);
+                    return;
                 }
                 // Restore the bindings state to the one that merges the bindings state evaluating
                 // each of the expanded argument list.
@@ -8344,6 +8365,66 @@ impl<'db> Binding<'db> {
     }
 
     fn check_types(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        constraints: &ConstraintSetBuilder<'db>,
+        arguments: &CallArguments<'_, 'db>,
+        call_expression_tcx: TypeContext<'db>,
+    ) {
+        self.check_types_without_materialization(
+            db,
+            env,
+            constraints,
+            arguments,
+            call_expression_tcx,
+        );
+        if self.errors.is_empty() {
+            return;
+        }
+
+        let parameters = self.signature.parameters();
+        let Some((_, parameter)) = parameters.variadic() else {
+            return;
+        };
+        if !parameter.has_starred_annotation() {
+            return;
+        }
+        let Some(tuple) = parameter.annotated_type().exact_tuple_instance_spec(db) else {
+            return;
+        };
+        if matches!(tuple.as_ref(), TupleSpec::Variable(variable) if variable.variable().typevartuple().is_some())
+        {
+            return;
+        }
+
+        // Gradual tuples may choose a length that aligns the fixed arguments with the parameter
+        // tuple. Check complete argument lists so those choices preserve argument order and share
+        // the usual generic inference. No gradual segment needs more elements than the target's
+        // fixed positions; any additional elements could only occupy its homogeneous portion.
+        let maximum_length = parameters.positional().count() + tuple.len().minimum();
+        for materialized in arguments.materialize_gradual_tuples(db, env, maximum_length) {
+            let mut candidate = self.clone();
+            candidate.reset(db);
+            candidate.match_parameters(db, env, &materialized);
+            if !candidate.errors.is_empty() {
+                continue;
+            }
+            candidate.check_types_without_materialization(
+                db,
+                env,
+                constraints,
+                &materialized,
+                call_expression_tcx,
+            );
+            if candidate.errors.is_empty() {
+                *self = candidate;
+                return;
+            }
+        }
+    }
+
+    fn check_types_without_materialization(
         &mut self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,

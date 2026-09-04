@@ -1388,6 +1388,27 @@ def forward_mixed(values: tuple[int | str]) -> None:
     reveal_type(mixed(*values))  # revealed: object
 ```
 
+A whole-type overload match also wins when the forwarded alternatives have different lengths.
+
+```py
+@overload
+def variadic(value: int, /, *args: object) -> int: ...
+@overload
+def variadic(value: str, /, *args: object) -> str: ...
+@overload
+def variadic(*args: *tuple[int | str, *tuple[object, ...]]) -> object: ...
+def variadic(*args: object) -> object: ...
+def forward_variable(values: tuple[int] | tuple[str, str]) -> None:
+    reveal_type(variadic(*values))  # revealed: object
+```
+
+The narrower overloads still win when each call's first argument has a single concrete type.
+
+```py
+reveal_type(variadic(1))  # revealed: int
+reveal_type(variadic("first", "second"))  # revealed: str
+```
+
 ### Retry from parameter matching with type context
 
 When retrying, arguments are inferred with the correct type context:
