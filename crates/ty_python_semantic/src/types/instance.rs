@@ -1397,24 +1397,6 @@ impl<'db> ProtocolInstanceType<'db> {
         }
     }
 
-    /// Materializes generic arguments without changing the protocol's declared member types.
-    /// An explicitly materialized protocol retains its materialized interface.
-    pub(super) fn top_materialization_of_type_arguments(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-    ) -> Self {
-        match self.inner {
-            Protocol::FromClass(class) => Self::from_class(class.apply_type_mapping_impl(
-                db,
-                &TypeMapping::Materialize(MaterializationKind::Top),
-                TypeContext::default(),
-                &ApplyTypeMappingVisitor::new(env),
-            )),
-            Protocol::Synthesized(_) | Protocol::Materialized(_) => self,
-        }
-    }
-
     /// Returns the class origin of a protocol with a pending materialization.
     pub(super) fn materialized_origin(self, db: &'db dyn Db) -> Option<ProtocolClass<'db>> {
         match self.inner {

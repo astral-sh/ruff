@@ -476,8 +476,6 @@ def _(x: Foo | Bar, is_bar: Callable[[object], TypeIs[Bar]]):
 
 ## `TypeIs` narrowing with gradual generics
 
-### Default mode
-
 ```toml
 [environment]
 python-version = "3.12"
@@ -489,8 +487,8 @@ missing-type-argument = "ignore"
 strict-generic-narrowing = false
 ```
 
-A `TypeIs` function that returns a gradual specialization of a generic class narrows to that generic
-type without replacing its gradual type argument:
+A `TypeIs` function that returns a gradual specialization of a generic class narrows to the top
+materialization of that type, even when `strict-generic-narrowing` is disabled:
 
 ```py
 from typing import Any
@@ -505,7 +503,7 @@ def is_instance_of_covariant(arg: object) -> TypeIs[Covariant[Any]]:
 
 def _(x: object):
     if is_instance_of_covariant(x):
-        reveal_type(x)  # revealed: Covariant[Any]
+        reveal_type(x)  # revealed: Covariant[object]
 ```
 
 The negative branch excludes the top materialization of the target, eliminating every specialization
@@ -549,10 +547,26 @@ def _(x: Unrelated | Invariant[int]):
         reveal_type(x)  # revealed: Invariant[int]
     else:
         reveal_type(x)  # revealed: Unrelated
+```
 
-def explicit_top(value: object):
-    if is_instance_of_invariant(value):
-        reveal_type(value)  # revealed: Top[Invariant[Any]]
+Implicit materialization also covers invariant generic targets. Intersecting with the materialized
+target preserves a known specialization of the subject:
+
+```py
+def is_any_list(value: object) -> TypeIs[list[Any]]:
+    return isinstance(value, list)
+
+def from_object(value: object):
+    if is_any_list(value):
+        reveal_type(value)  # revealed: Top[list[Any]]
+    else:
+        reveal_type(value)  # revealed: ~Top[list[Any]]
+
+def from_union(value: list[int] | str):
+    if is_any_list(value):
+        reveal_type(value)  # revealed: list[int]
+    else:
+        reveal_type(value)  # revealed: str
 ```
 
 An unspecialized `list` target eliminates all lists in the negative branch. Replacing the list in
@@ -571,236 +585,12 @@ def f(value: list | int) -> int:
     return value
 ```
 
-Known type arguments are preserved, including when they come from a superclass of the target. When
-the subject has no specialization to transfer, the declared `Any` is retained:
-
-```py
-from collections.abc import Sequence
-
-def is_any_list(value: object) -> TypeIs[list[Any]]:
-    return isinstance(value, list)
-
-def from_object(value: object):
-    if is_any_list(value):
-        reveal_type(value)  # revealed: list[Any]
-    else:
-        reveal_type(value)  # revealed: ~Top[list[Any]]
-
-def from_union(value: list[int] | str):
-    if is_any_list(value):
-        reveal_type(value)  # revealed: list[int]
-    else:
-        reveal_type(value)  # revealed: str
-
-def from_base(value: Sequence[int]):
-    if is_any_list(value):
-        reveal_type(value)  # revealed: list[int]
-```
-
-The same filtering applies to saved guard results and compound conditions:
-
-```py
-def indirect(value: list[int] | str):
-    result = is_any_list(value)
-    if result:
-        reveal_type(value)  # revealed: list[int]
-    else:
-        reveal_type(value)  # revealed: str
-
-def compound(value: Sequence[int] | str):
-    if is_any_list(value) and value:
-        reveal_type(value)  # revealed: list[int] & ~AlwaysFalsy
-```
-
-Union targets preserve each compatible specialization independently:
-
-```py
-def is_list_or_set(value: object) -> TypeIs[list[Any] | set[Any]]:
-    return isinstance(value, (list, set))
-
-def from_union_target(value: list[int] | set[str] | bytes):
-    if is_list_or_set(value):
-        reveal_type(value)  # revealed: list[int] | set[str]
-    else:
-        reveal_type(value)  # revealed: bytes
-```
-
-Specialization transfer does not discard explicit type arguments in the target. Here `str` keys are
-required, even though the value type is gradual:
-
-```py
-def is_str_dict(value: object) -> TypeIs[dict[str, Any]]:
-    return isinstance(value, dict) and all(isinstance(key, str) for key in value)
-
-def compatible(value: dict[str, int]):
-    if is_str_dict(value):
-        reveal_type(value)  # revealed: dict[str, int]
-    else:
-        reveal_type(value)  # revealed: Never
-
-def incompatible(value: dict[int, int]):
-    if is_str_dict(value):
-        reveal_type(value)  # revealed: Never
-    else:
-        reveal_type(value)  # revealed: dict[int, int]
-```
-
-Fully static targets still refine the subject using their explicit specialization:
-
-```py
-def is_str_list(value: object) -> TypeIs[list[str]]:
-    return isinstance(value, list) and all(isinstance(item, str) for item in value)
-
-def static_target(value: list[int] | list[str]):
-    if is_str_list(value):
-        reveal_type(value)  # revealed: list[str]
-    else:
-        reveal_type(value)  # revealed: list[int]
-
-def static_target_from_base(value: Sequence[object]):
-    if is_str_list(value):
-        reveal_type(value)  # revealed: list[str]
-```
-
-An unspecialized dictionary target preserves a `TypedDict`'s required keys. An explicitly
-specialized target adds its constraints instead of being discarded:
-
-```py
-from typing import TypedDict
-
-class Record(TypedDict):
-    value: int
-
-def is_dict(value: object) -> TypeIs[dict[Any, Any]]:
-    return isinstance(value, dict)
-
-def typed_dict(value: Record):
-    if is_dict(value):
-        reveal_type(value)  # revealed: Record
-
-    if is_str_dict(value):
-        reveal_type(value)  # revealed: Record & dict[str, Any]
-```
-
-Class-object targets preserve compatible specializations without discarding explicit type arguments:
-
-```py
-def is_list_class(value: object) -> TypeIs[type[list[Any]]]:
-    return isinstance(value, type) and issubclass(value, list)
-
-def class_target(value: type[list[int]] | type[int]):
-    if is_list_class(value):
-        reveal_type(value)  # revealed: type[list[int]]
-    else:
-        reveal_type(value)  # revealed: type[int]
-
-def is_str_list_class(value: object) -> TypeIs[type[list[str]]]:
-    return True
-
-def static_class_target(value: type[list[int]] | type[list[str]]):
-    if is_str_list_class(value):
-        reveal_type(value)  # revealed: type[list[str]]
-```
-
-A callable target's explicit return type also constrains the result. An already compatible callable
-retains its parameter types:
-
-```py
-from collections.abc import Callable
-
-def is_str_callable(value: object) -> TypeIs[Callable[..., str]]:
-    return True
-
-def callable_return(value: Callable[..., object]):
-    if is_str_callable(value):
-        reveal_type(value())  # revealed: str
-
-    if value and is_str_callable(value):
-        reveal_type(value())  # revealed: str
-
-def callable_signature(value: Callable[[int], str]):
-    if is_str_callable(value):
-        reveal_type(value)  # revealed: (int, /) -> str
-
-    if value and is_str_callable(value):
-        reveal_type(value)  # revealed: ((int, /) -> str) & ~AlwaysFalsy
-```
-
-### Strict mode
-
-```toml
-[environment]
-python-version = "3.12"
-
-[rules]
-missing-type-argument = "ignore"
-
-[analysis]
-strict-generic-narrowing = true
-```
-
-Strict narrowing materializes generic type arguments. This retains known specializations but
-represents all possible specializations when narrowing from `object`:
-
-```py
-from typing import Any
-from typing_extensions import TypeIs
-
-class Covariant[T]:
-    def get(self) -> T:
-        raise NotImplementedError
-
-def is_covariant(value: object) -> TypeIs[Covariant[Any]]:
-    return isinstance(value, Covariant)
-
-def from_object(value: object):
-    if is_covariant(value):
-        reveal_type(value)  # revealed: Covariant[object]
-
-def is_list(value: object) -> TypeIs[list[Any]]:
-    return isinstance(value, list)
-
-def invariant_from_object(value: object):
-    if is_list(value):
-        reveal_type(value)  # revealed: Top[list[Any]]
-    else:
-        reveal_type(value)  # revealed: ~Top[list[Any]]
-
-def from_union(value: list[int] | str):
-    if is_list(value):
-        reveal_type(value)  # revealed: list[int]
-    else:
-        reveal_type(value)  # revealed: str
-```
-
-The negative branch also excludes all lists for an unspecialized target, so the issue's regression
-example succeeds in strict mode as well:
-
-```py
-def is_unspecialized_list(value: object) -> TypeIs[list]:
-    return isinstance(value, list)
-
-def f(value: list | int) -> int:
-    if is_unspecialized_list(value):
-        reveal_type(value)  # revealed: list[Unknown]
-        value = 0
-    reveal_type(value)  # revealed: int
-    return value
-```
-
 ## `TypeIs` narrowing with gradual protocol members
 
-Strict positive narrowing preserves gradual protocol members. The guard establishes that the subject
-has a `value` attribute, but retains the protocol's explicit `Any` for both reads and writes. The
-negative branch still excludes the full top materialization:
-
-```toml
-[environment]
-python-version = "3.12"
-
-[analysis]
-strict-generic-narrowing = true
-```
+The top materialization also includes gradual protocol members. The guard establishes that the
+subject has a `value` attribute, but its concrete type is unknown. Reading it produces `object`, and
+writing to it is rejected because no value is assignable to every possible attribute type. The
+negative branch excludes the same full top materialization:
 
 ```py
 from typing import Any, Protocol
@@ -814,42 +604,12 @@ def is_reader(value: object) -> TypeIs[Reader]:
 
 def from_object(value: object):
     if is_reader(value):
-        reveal_type(value)  # revealed: Reader
-        reveal_type(value.value)  # revealed: Any
+        reveal_type(value)  # revealed: Top[Reader]
+        reveal_type(value.value)  # revealed: object
+        # error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to attribute `value` of type `Never`"
         value.value = 1
     else:
         reveal_type(value)  # revealed: ~Top[Reader]
-```
-
-A generic protocol's type arguments are still materialized, independently of gradual members that do
-not depend on those arguments:
-
-```py
-class GenericReader[T](Protocol):
-    value: Any
-    def read(self) -> T: ...
-
-def is_generic_reader(value: object) -> TypeIs[GenericReader[Any]]:
-    return True
-
-def from_generic(value: object):
-    if is_generic_reader(value):
-        reveal_type(value)  # revealed: GenericReader[object]
-        reveal_type(value.value)  # revealed: Any
-        reveal_type(value.read())  # revealed: object
-```
-
-The same rule applies when an alias combines protocol instances and protocol class objects:
-
-```py
-type ReaderTarget = Reader | type[GenericReader[Any]]
-
-def is_reader_or_class(value: object) -> TypeIs[ReaderTarget]:
-    return True
-
-def from_union(value: object):
-    if is_reader_or_class(value):
-        reveal_type(value)  # revealed: Reader | type[GenericReader[object]]
 ```
 
 ## `TypeIs` narrowing of `NewType` instances
