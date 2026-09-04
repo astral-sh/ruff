@@ -40,13 +40,14 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 ///
 /// - `re.sub`
 /// - `re.match`
+/// - `re.prefixmatch`
 /// - `re.search`
 /// - `re.fullmatch`
 /// - `re.split`
 ///
 /// For `re.sub`, the `repl` (replacement) argument must also be a string literal,
-/// not a function. For `re.match`, `re.search`, and `re.fullmatch`, the return
-/// value must also be used only for its truth value.
+/// not a function. For `re.match`, `re.prefixmatch`, `re.search`, and `re.fullmatch`,
+/// the return value must also be used only for its truth value.
 ///
 /// ## Fix safety
 ///
@@ -252,7 +253,7 @@ impl<'a> ReFunc<'a> {
                     range,
                 })
             }
-            ("match", 2) if in_truthy_context => Some(ReFunc {
+            ("match" | "prefixmatch", 2) if in_truthy_context => Some(ReFunc {
                 kind: ReFuncKind::Match,
                 pattern: call.arguments.find_argument_value("pattern", 0)?,
                 string: call.arguments.find_argument_value("string", 1)?,
