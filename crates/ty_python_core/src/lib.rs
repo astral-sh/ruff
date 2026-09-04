@@ -38,6 +38,37 @@ pub use use_def::{
 };
 use use_def::{EnclosingSnapshotKey, ScopedEnclosingSnapshotId};
 
+/// File-local snapshot lookup key with the place kind and nested-scope laziness packed together.
+/// Both scope and place IDs retain their full 32-bit range.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, get_size2::GetSize)]
+struct RetainedEnclosingSnapshotKey {
+    enclosing_scope: FileScopeId,
+    nested_scope: FileScopeId,
+    place_id: u32,
+    place_kind_and_laziness: u8,
+}
+
+static_assertions::const_assert_eq!(size_of::<RetainedEnclosingSnapshotKey>(), 16);
+static_assertions::const_assert_eq!(
+    size_of::<(RetainedEnclosingSnapshotKey, ScopedEnclosingSnapshotId)>(),
+    20
+);
+
+impl From<EnclosingSnapshotKey> for RetainedEnclosingSnapshotKey {
+    fn from(key: EnclosingSnapshotKey) -> Self {
+        let (place_id, place_kind) = match key.enclosing_place {
+            ScopedPlaceId::Symbol(symbol) => (symbol.as_u32(), 0),
+            ScopedPlaceId::Member(member) => (member.as_u32(), 1),
+        };
+        Self {
+            enclosing_scope: key.enclosing_scope,
+            nested_scope: key.nested_scope,
+            place_id,
+            place_kind_and_laziness: place_kind | (u8::from(key.nested_laziness.is_lazy()) << 1),
+        }
+    }
+}
+
 pub mod ast_ids;
 pub mod ast_node_ref;
 mod builder;
@@ -334,7 +365,7 @@ pub struct SemanticIndex<'db> {
     has_future_annotations: bool,
 
     /// Map of all of the enclosing snapshots that appear in this file.
-    enclosing_snapshots: FrozenMap<EnclosingSnapshotKey, ScopedEnclosingSnapshotId>,
+    enclosing_snapshots: FrozenMap<RetainedEnclosingSnapshotKey, ScopedEnclosingSnapshotId>,
 
     /// List of all semantic syntax errors in this file.
     semantic_syntax_errors: Vec<SemanticSyntaxError>,
@@ -732,7 +763,7 @@ impl<'db> SemanticIndex<'db> {
                         nested_scope,
                         nested_laziness: ScopeLaziness::Lazy,
                     };
-                    if let Some(id) = self.enclosing_snapshots.get(&key) {
+                    if let Some(id) = self.enclosing_snapshots.get(&key.into()) {
                         return self.use_def_maps[enclosing_scope]
                             .enclosing_snapshot(*id, key.nested_laziness);
                     }
@@ -749,7 +780,7 @@ impl<'db> SemanticIndex<'db> {
             nested_scope,
             nested_laziness: ScopeLaziness::Eager,
         };
-        let Some(id) = self.enclosing_snapshots.get(&key) else {
+        let Some(id) = self.enclosing_snapshots.get(&key.into()) else {
             return EnclosingSnapshotResult::NotFound;
         };
         self.use_def_maps[enclosing_scope].enclosing_snapshot(*id, key.nested_laziness)
@@ -1110,6 +1141,33 @@ mod tests {
         },
         program::Program,
     };
+
+    #[test]
+    fn retained_snapshot_keys_distinguish_places_and_laziness() {
+        let key = EnclosingSnapshotKey {
+            enclosing_scope: FileScopeId::global(),
+            enclosing_place: ScopedPlaceId::Symbol(ScopedSymbolId::from_u32(1 << 31)),
+            nested_scope: FileScopeId::from_u32(1 << 31),
+            nested_laziness: ScopeLaziness::Eager,
+        };
+        let retained = RetainedEnclosingSnapshotKey::from(key);
+        assert_ne!(
+            retained,
+            RetainedEnclosingSnapshotKey::from(EnclosingSnapshotKey {
+                nested_laziness: ScopeLaziness::Lazy,
+                ..key
+            })
+        );
+        assert_ne!(
+            retained,
+            RetainedEnclosingSnapshotKey::from(EnclosingSnapshotKey {
+                enclosing_place: ScopedPlaceId::Member(crate::member::ScopedMemberId::from_u32(
+                    1 << 31,
+                )),
+                ..key
+            })
+        );
+    }
 
     impl UseDefMap<'_> {
         fn first_public_binding(&self, symbol: ScopedSymbolId) -> Option<Definition<'_>> {

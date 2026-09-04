@@ -3325,7 +3325,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             uses_by_collection,
             imported_modules: FrozenSet::from(self.imported_modules),
             has_future_annotations: self.has_future_annotations,
-            enclosing_snapshots: FrozenMap::from(self.enclosing_snapshots),
+            enclosing_snapshots: self
+                .enclosing_snapshots
+                .into_iter()
+                .map(|(key, id)| (key.into(), id))
+                .collect(),
             semantic_syntax_errors,
             generator_functions: FrozenSet::from(self.generator_functions),
             async_comprehensions: FrozenSet::from(self.async_comprehensions),
