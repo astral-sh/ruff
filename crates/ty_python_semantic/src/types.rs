@@ -34,6 +34,7 @@ pub use self::dedicated::pytest::{
     FixtureBinding, FixtureExposure, FixtureNameSource, PytestTest, fixture_bindings_for_parameter,
     fixture_exposures_for_definition, pytest_global_plugin_files, pytest_tests_in_file,
 };
+pub(crate) use self::definition_resolution::user_visible_definitions;
 pub(crate) use self::diagnostic::TypeCheckDiagnostics;
 pub(crate) use self::diagnostic::register_lints;
 pub use self::diagnostic::{UNDEFINED_REVEAL, UNRESOLVED_REFERENCE};
