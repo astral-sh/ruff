@@ -817,6 +817,14 @@ fn filter_generic_narrowing_constraint<'db>(
         (subject, Type::Union(union)) => union.map(db, env, |element| {
             filter_generic_narrowing_constraint(db, env, subject, *element)
         }),
+        // Dynamic types are assignable to every protocol. Including them here would create `Any`
+        // instead of `Any & Awaitable[Any]` when narrowing from `Any` via `isawaitable`. The latter
+        // is more useful in LSP use cases, so exclude dynamic types here.
+        (subject, target @ Type::ProtocolInstance(_))
+            if !subject.is_dynamic() && subject.is_assignable_to(db, env, target) =>
+        {
+            subject
+        }
         (subject, target @ Type::Callable(_))
             if subject.is_subtype_of(db, env, target.top_materialization(db, env)) =>
         {

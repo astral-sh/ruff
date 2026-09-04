@@ -569,7 +569,7 @@ def _(obj: Overlapping | Getter[int]):
         reveal_type(obj)  # revealed: Overlapping & ~Getter[object]
 ```
 
-Similarly, for gradual protocols, `TypeIs` narrowing retains the gradualness of procotol members in
+Similarly, for gradual protocols, `TypeIs` narrowing retains the gradualness of protocol members in
 non-strict mode, when narrowing from object:
 
 ```py
@@ -607,19 +607,15 @@ class SpecificReader:
 
 def _(obj: SpecificReader | Unrelated):
     if is_reader(obj):
-        # TODO: this should be SpecificReader
-        reveal_type(obj)  # revealed: SpecificReader & Reader
-        # TODO: this should be str
-        reveal_type(obj.read())  # revealed: str & Any
+        reveal_type(obj)  # revealed: SpecificReader
+        reveal_type(obj.read())  # revealed: str
     else:
         reveal_type(obj)  # revealed: Unrelated
 
     # For comparison, `isinstance` narrowing behaves in the same way:
     if isinstance(obj, Reader):
-        # TODO: this should be SpecificReader
-        reveal_type(obj)  # revealed: SpecificReader & Reader
-        # TODO: this should be str
-        reveal_type(obj.read())  # revealed: str & Any
+        reveal_type(obj)  # revealed: SpecificReader
+        reveal_type(obj.read())  # revealed: str
     else:
         reveal_type(obj)  # revealed: Unrelated
 ```
