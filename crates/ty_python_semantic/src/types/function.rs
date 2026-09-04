@@ -1994,16 +1994,13 @@ fn is_instance_truthiness<'db>(
                 if is_instance_truthiness(db, env, positive, class).is_always_true() {
                     return Truthiness::AlwaysTrue;
                 } else if let Type::TypeVar(tvar) = positive {
-                    match tvar.typevar(db).bound_or_constraints(db, env) {
-                        Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                    match tvar.require_bound_or_constraints(db, env) {
+                        TypeVarBoundOrConstraints::UpperBound(bound) => {
                             effective.add_positive_in_place(bound);
                         }
-                        Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                        TypeVarBoundOrConstraints::Constraints(constraints) => {
                             effective.add_positive_in_place(constraints.as_type(db, env));
                         }
-                        // A typevar without bounds/constraints has `object` as its implicit upper bound,
-                        // and adding `object` to an intersection is a no-op
-                        None => {}
                     }
                     found_tvars_or_newtypes = true;
                 } else if let Type::NewTypeInstance(newtype) = positive {
@@ -2058,20 +2055,17 @@ fn is_instance_truthiness<'db>(
 
         Type::TypeAlias(alias) => is_instance_truthiness(db, env, alias.value_type(db), class),
 
-        Type::TypeVar(bound_typevar) => {
-            match bound_typevar.typevar(db).bound_or_constraints(db, env) {
-                None => is_instance_truthiness(db, env, Type::object(), class),
-                Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                    is_instance_truthiness(db, env, bound, class)
-                }
-                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => always_true_if(
-                    constraints
-                        .elements(db)
-                        .iter()
-                        .all(|c| is_instance_truthiness(db, env, *c, class).is_always_true()),
-                ),
+        Type::TypeVar(bound_typevar) => match bound_typevar.require_bound_or_constraints(db, env) {
+            TypeVarBoundOrConstraints::UpperBound(bound) => {
+                is_instance_truthiness(db, env, bound, class)
             }
-        }
+            TypeVarBoundOrConstraints::Constraints(constraints) => always_true_if(
+                constraints
+                    .elements(db)
+                    .iter()
+                    .all(|c| is_instance_truthiness(db, env, *c, class).is_always_true()),
+            ),
+        },
 
         Type::BoundMethod(..)
         | Type::KnownBoundMethod(..)
@@ -2149,16 +2143,15 @@ fn is_instance_tuple_covers<'db>(
             .positive(db)
             .iter()
             .any(|element| is_instance_tuple_covers(db, env, tuple, *element, recursion_guard)),
-        Type::TypeVar(typevar) => match typevar.typevar(db).bound_or_constraints(db, env) {
-            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+        Type::TypeVar(typevar) => match typevar.require_bound_or_constraints(db, env) {
+            TypeVarBoundOrConstraints::UpperBound(bound) => {
                 is_instance_tuple_covers(db, env, tuple, bound, recursion_guard)
             }
-            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+            TypeVarBoundOrConstraints::Constraints(constraints) => {
                 constraints.elements(db).iter().all(|constraint| {
                     is_instance_tuple_covers(db, env, tuple, *constraint, recursion_guard)
                 })
             }
-            None => is_instance_tuple_covers(db, env, tuple, Type::object(), recursion_guard),
         },
         ty => tuple.fixed_elements().any(|element| {
             let Type::ClassLiteral(class) = element else {

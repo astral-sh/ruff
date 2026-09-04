@@ -4262,12 +4262,11 @@ impl<'db> Type<'db> {
             }
 
             Type::TypeVar(bound_typevar) => {
-                match bound_typevar.typevar(db).bound_or_constraints(db, env) {
-                    None => Type::object().instance_member(db, env, name),
-                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                match bound_typevar.require_bound_or_constraints(db, env) {
+                    TypeVarBoundOrConstraints::UpperBound(bound) => {
                         bound.instance_member(db, env, name)
                     }
-                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
+                    TypeVarBoundOrConstraints::Constraints(constraints) => constraints
                         .map_with_boundness_and_qualifiers(db, env, |constraint| {
                             constraint.instance_member(db, env, name)
                         }),
@@ -6234,20 +6233,17 @@ impl<'db> Type<'db> {
             }
 
             Type::TypeVar(bound_typevar) => {
-                match bound_typevar.typevar(db).bound_or_constraints(db, env) {
-                    None => CallableBinding::not_callable(self).into(),
-                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                match bound_typevar.require_bound_or_constraints(db, env) {
+                    TypeVarBoundOrConstraints::UpperBound(bound) => {
                         bound.bindings_impl(db, env, recursion_guard)
                     }
-                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                        Bindings::from_union(
-                            self,
-                            constraints
-                                .elements(db)
-                                .iter()
-                                .map(|ty| ty.bindings_impl(db, env, recursion_guard)),
-                        )
-                    }
+                    TypeVarBoundOrConstraints::Constraints(constraints) => Bindings::from_union(
+                        self,
+                        constraints
+                            .elements(db)
+                            .iter()
+                            .map(|ty| ty.bindings_impl(db, env, recursion_guard)),
+                    ),
                 }
             }
 
@@ -6498,7 +6494,7 @@ impl<'db> Type<'db> {
                 ),
                 SubclassOfInner::TypeVar(tvar) => {
                     let constructor_instance_type = Type::TypeVar(tvar);
-                    let bindings = match tvar.typevar(db).require_bound_or_constraints(db, env) {
+                    let bindings = match tvar.require_bound_or_constraints(db, env) {
                         TypeVarBoundOrConstraints::UpperBound(bound) => {
                             let constructor = bound.constructor_for_typevar_bound(db, env);
                             if let Type::ClassLiteral(class) = constructor
@@ -7656,18 +7652,12 @@ impl<'db> Type<'db> {
     /// into generic types or other nested structures.
     fn flatten_typevars(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
         match self {
-            Type::TypeVar(tvar) => {
-                match tvar.typevar(db).bound_or_constraints(db, env) {
-                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                        bound.flatten_typevars(db, env)
-                    }
-                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                        constraints.as_type(db, env).flatten_typevars(db, env)
-                    }
-                    // Unbounded typevar is effectively `object`.
-                    None => Type::object(),
+            Type::TypeVar(tvar) => match tvar.require_bound_or_constraints(db, env) {
+                TypeVarBoundOrConstraints::UpperBound(bound) => bound.flatten_typevars(db, env),
+                TypeVarBoundOrConstraints::Constraints(constraints) => {
+                    constraints.as_type(db, env).flatten_typevars(db, env)
                 }
-            }
+            },
             Type::Union(union) => {
                 // Flatten each element and rebuild through the union builder.
                 UnionType::from_elements(
