@@ -153,6 +153,30 @@ class ColorStr(Enum):
 reveal_type(enum_members(ColorStr))
 ```
 
+### Enum members cannot be reassigned
+
+Assigning to an existing enum member raises an error at runtime, so it should also be rejected
+statically. This includes aliases of enum members. A non-member attribute remains assignable.
+
+```py
+from enum import Enum
+
+class Answer(Enum):
+    NO = 0
+    YES = 1
+    DEFINITELY_NO = NO
+    description: str
+
+# TODO: Reassigning `NO` and its alias should emit `invalid-assignment` diagnostics.
+Answer.NO = 0
+Answer.NO = Answer.NO
+Answer.NO = 5
+Answer.DEFINITELY_NO = 5
+
+# This assignment is valid because `description` is not an enum member.
+Answer.description = "An answer"
+```
+
 ### When deriving from `IntEnum`
 
 ```py
