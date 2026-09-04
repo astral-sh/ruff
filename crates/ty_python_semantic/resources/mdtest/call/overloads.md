@@ -1314,6 +1314,13 @@ def forward(
     select(*invalid)  # error: [no-matching-overload]
 ```
 
+Tuple alternatives with boolean elements also contribute their overload's return type.
+
+```py
+def forward_booleans(values: tuple[bool] | tuple[bool, int, str]) -> None:
+    reveal_type(select(*values))  # revealed: Literal[1, 2]
+```
+
 A fixed argument can occupy different positions when a preceding forwarded tuple has alternatives of
 different lengths. Each concrete alternative must be checked before rejecting that argument.
 
@@ -1342,6 +1349,43 @@ def forward_beyond_limit(
 ) -> None:
     # error: [no-matching-overload]
     bounded(*prefix, *prefix, *prefix, *prefix, *prefix, *prefix, *prefix, *prefix, *suffix)
+```
+
+### Unpacked arguments preserve whole-type overload matches
+
+The third overload accepts `int | str`, so it wins before argument type expansion.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from typing import overload
+
+@overload
+def select(*args: *tuple[int]) -> int: ...
+@overload
+def select(*args: *tuple[str]) -> str: ...
+@overload
+def select(*args: *tuple[int | str]) -> object: ...
+def select(*args: object) -> object: ...
+def forward(values: tuple[int | str]) -> None:
+    reveal_type(select(*values))  # revealed: object
+```
+
+The broader overload also wins when the narrower overloads use ordinary positional parameters.
+
+```py
+@overload
+def mixed(value: int, /) -> int: ...
+@overload
+def mixed(value: str, /) -> str: ...
+@overload
+def mixed(*args: *tuple[int | str]) -> object: ...
+def mixed(*args: object) -> object: ...
+def forward_mixed(values: tuple[int | str]) -> None:
+    reveal_type(mixed(*values))  # revealed: object
 ```
 
 ### Retry from parameter matching with type context

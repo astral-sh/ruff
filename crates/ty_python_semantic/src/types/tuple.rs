@@ -911,7 +911,7 @@ impl<'db> VariableSegment<'db> {
     }
 
     /// Return the homogeneous element type if this segment has gradual arity, including aliases.
-    fn gradual_element_type(
+    pub(super) fn gradual_element_type(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,

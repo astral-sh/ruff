@@ -1048,27 +1048,84 @@ def forward(
     fixed(*too_short)  # error: [missing-argument]
 ```
 
+Boolean and integer-literal elements satisfy the integer prefix in every tuple alternative.
+
+```py
+from typing import Literal
+
+def forward_element_unions(
+    booleans: tuple[bool, str] | tuple[bool, bool, str],
+    literals: tuple[Literal[1, 2], str] | tuple[Literal[1, 2], int, str],
+) -> None:
+    with_suffix(*booleans)
+    with_suffix(*literals)
+```
+
 When several independently forwarded tuple unions are combined, every combination must satisfy the
 complete unpacked parameter.
 
 ```py
 def combine(
     prefix: tuple[()] | tuple[int],
+    boolean_prefix: tuple[bool] | tuple[bool, bool],
     valid_suffix: tuple[str] | tuple[int, str],
     wrong_suffix: tuple[str] | tuple[int, int],
 ) -> None:
     with_suffix(*prefix, *valid_suffix)
+    with_suffix(*boolean_prefix, *valid_suffix)
     with_suffix(*prefix, *wrong_suffix)  # error: [invalid-argument-type]
 ```
 
-A fixed argument preceding an unknown-length tuple can become the required final element if that
-tuple is empty. It must therefore satisfy every position it might occupy.
+A fixed argument before `tuple[str, ...]` must satisfy the suffix when the tuple is empty.
 
 ```py
 def requires_string_suffix(*args: *tuple[*tuple[object, ...], str]) -> None: ...
 def forward_unknown_length(values: tuple[str, ...]) -> None:
     requires_string_suffix("first", *values)
     requires_string_suffix(1, *values)  # error: [invalid-argument-type]
+```
+
+An `Any` tail can supply the required `str`, leaving fixed arguments in the `object` portion.
+
+```py
+from typing import Any
+
+def forward_gradual_tail(values: tuple[Any, ...], unknown: Any) -> None:
+    requires_string_suffix(1, *values)
+    requires_string_suffix(1, *unknown)
+
+def forward_gradual_tuple(values: tuple[int, *tuple[Any, ...]]) -> None:
+    requires_string_suffix(*values)
+```
+
+An `Any` prefix cannot absorb the fixed trailing `int`, which still fails the `str` suffix.
+
+```py
+def forward_gradual_wrong_suffix(values: tuple[*tuple[Any, ...], int]) -> None:
+    requires_string_suffix(*values)  # error: [invalid-argument-type]
+```
+
+An `object` tail is not gradual. Its elements, and the leading `int` when it is empty, fail `str`.
+
+```py
+def forward_object_tail(values: tuple[int, *tuple[object, ...]]) -> None:
+    # error: [invalid-argument-type]
+    requires_string_suffix(*values)  # error: [invalid-argument-type]
+```
+
+A concrete `object` prefix also leaves the fixed trailing `int` incompatible with `str`.
+
+```py
+def forward_object_wrong_suffix(values: tuple[*tuple[object, ...], int]) -> None:
+    requires_string_suffix(*values)  # error: [invalid-argument-type]
+```
+
+A gradual prefix can supply a required first `str` before a fixed `int`.
+
+```py
+def requires_string_prefix(*args: *tuple[str, *tuple[object, ...]]) -> None: ...
+def forward_gradual_prefix(values: tuple[Any, ...]) -> None:
+    requires_string_prefix(*values, 1)
 ```
 
 The shortest alternatives still determine the minimum argument count even when too many forwarded
