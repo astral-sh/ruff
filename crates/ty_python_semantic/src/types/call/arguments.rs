@@ -8,13 +8,12 @@ use rustc_hash::FxHashMap;
 
 use crate::ProgramEnvironment;
 use crate::types::enums::enum_metadata;
-use crate::types::signatures::Parameters;
-use crate::types::tuple::{Tuple, TupleLength, TupleSpec, TupleType};
+use crate::types::tuple::Tuple;
 use crate::types::typed_dict::extract_unpacked_typed_dict_keys_from_value_type;
 use crate::types::{KnownClass, Type, TypeContext, expand_type};
 
 /// Maximum total number of expanded argument type combinations across all arguments
-/// in [`CallArguments::expand`] or [`CallArguments::materialize_gradual_tuples`].
+/// in [`CallArguments::expand`].
 ///
 /// See: [pyright's `maxTotalOverloadArgTypeExpansionCount`][pyright]
 ///
@@ -441,118 +440,6 @@ impl<'a, 'db> CallArguments<'a, 'db> {
             }
             State::Expanding(ExpandingState::Expanded(expanded)) => Expansion::Expanded(expanded),
         })
-    }
-
-    /// Try fixed lengths for gradual starred tuples, preserving their fixed endpoints.
-    ///
-    /// Unlike union expansion, these are alternative materializations: a call needs only one
-    /// to succeed. Concrete variable-length tuples are left unchanged, since every length of
-    /// those tuples must remain valid. The iterator ends with an error if the retry budget
-    /// prevents it from examining every placement.
-    pub(super) fn materialize_gradual_tuples(
-        &self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        parameters: &Parameters<'db>,
-    ) -> Option<impl Iterator<Item = Result<Self, ()>> + use<'a, 'db>> {
-        let (_, parameter) = parameters.variadic()?;
-        if !parameter.has_starred_annotation() {
-            return None;
-        }
-        let parameter_tuple = parameter.annotated_type().exact_tuple_instance_spec(db)?;
-        if matches!(parameter_tuple.as_ref(), TupleSpec::Variable(variable) if variable.variable().typevartuple().is_some())
-        {
-            return None;
-        }
-        let gradual = self
-            .items
-            .iter()
-            .enumerate()
-            .filter_map(|(index, item)| {
-                if !matches!(item.argument, Argument::Variadic) {
-                    return None;
-                }
-                let ty = item.types.get_default()?.resolve_type_alias(db);
-                // Do not materialize a merged union: its concrete alternatives need checking
-                // separately. Use the same iteration behavior as argument matching.
-                if !ty.is_dynamic() && ty.tuple_instance_spec(db, env).is_none() {
-                    return None;
-                }
-                let tuple = ty.try_iterate(db, env).ok()?;
-                let TupleSpec::Variable(variable) = tuple.as_ref() else {
-                    return None;
-                };
-                variable.variable().gradual_element_type(db, env)?;
-                Some((index, tuple))
-            })
-            .collect::<Vec<_>>();
-        if gradual.is_empty() {
-            return None;
-        }
-
-        let mut fixed_arguments = 0;
-        let mut has_variable_arguments = false;
-        for (index, item) in self.items.iter().enumerate() {
-            match item.argument {
-                Argument::Positional | Argument::Synthetic => fixed_arguments += 1,
-                Argument::Variadic => {
-                    let tuple = item.types.get_default()?.try_iterate(db, env).ok()?;
-                    fixed_arguments += tuple.len().minimum();
-                    has_variable_arguments |= tuple.len().is_variable()
-                        && !gradual
-                            .iter()
-                            .any(|(gradual_index, _)| *gradual_index == index);
-                }
-                Argument::Keyword(_) | Argument::Keywords => {}
-            }
-        }
-
-        let fixed_parameters = parameters.positional().count() + parameter_tuple.len().minimum();
-        // A nonempty unpacked tuple requires all preceding positional parameters to be filled.
-        // Concrete variable arguments can supply the missing elements without materialization.
-        let minimum_length = if has_variable_arguments || parameter_tuple.len().minimum() == 0 {
-            0
-        } else {
-            fixed_parameters.saturating_sub(fixed_arguments)
-        };
-        // No gradual segment needs to supply elements for a homogeneous parameter portion.
-        // For fixed parameters, exclude lengths that cannot fit before spending the retry budget.
-        let maximum_length = if parameter_tuple.len().is_variable() {
-            fixed_parameters
-        } else {
-            fixed_parameters.saturating_sub(fixed_arguments)
-        };
-        let gradual_count = gradual.len();
-        let arguments = self.clone();
-        let env = env.clone();
-
-        // Distribute only the required total lengths among the gradual segments, rather than
-        // independently expanding every segment to the full parameter count.
-        Some(
-            (minimum_length..=maximum_length)
-                .flat_map(move |length| (0..gradual_count).combinations_with_replacement(length))
-                .take(MAX_TOTAL_EXPANSION + 1)
-                .enumerate()
-                .filter_map(move |(index, positions)| {
-                    if index == MAX_TOTAL_EXPANSION {
-                        return Some(Err(()));
-                    }
-                    let mut lengths = vec![0; gradual_count];
-                    for position in positions {
-                        lengths[position] += 1;
-                    }
-                    let mut materialized = arguments.clone();
-                    for ((index, tuple), length) in gradual.iter().zip(lengths) {
-                        let fixed = tuple
-                            .resize(db, &env, TupleLength::Fixed(tuple.len().minimum() + length))
-                            .ok()?;
-                        materialized.items[*index].types = CallArgumentTypes::new(Some(
-                            Type::tuple(TupleType::new(db, &env, &fixed)),
-                        ));
-                    }
-                    Some(Ok(materialized))
-                }),
-        )
     }
 
     pub(super) fn display<'env>(

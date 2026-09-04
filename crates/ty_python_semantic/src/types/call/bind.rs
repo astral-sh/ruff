@@ -70,11 +70,10 @@ use crate::types::visitor::{
 use crate::types::{
     BindingContext, BoundMethodType, BoundTypeVarInstance, CallableType, CallableTypes,
     ClassLiteral, DATACLASS_FLAGS, DataclassFlags, DataclassParams, DynamicType, GenericAlias,
-    InternedConstraintSet, IntersectionBuilder, IntersectionType, KnownBoundMethodType, KnownClass,
-    KnownInstanceType, LiteralValueTypeKind, NominalInstanceType, PropertyInstanceType,
-    SpecialFormType, TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance,
-    UnionAccumulator, UnionBuilder, UnionType, WrapperDescriptorKind, enums, is_property_method,
-    list_members,
+    InternedConstraintSet, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
+    LiteralValueTypeKind, NominalInstanceType, PropertyInstanceType, SpecialFormType, TypeContext,
+    TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance, UnionAccumulator, UnionBuilder,
+    UnionType, WrapperDescriptorKind, enums, is_property_method, list_members,
 };
 use crate::{DisplaySettings, FxOrderSet};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
@@ -5549,109 +5548,6 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         }
     }
 
-    /// Returns the intersection of tuple positions a forwarded argument might occupy.
-    ///
-    /// A fixed argument can shift into a required suffix when a following forwarded tuple is
-    /// empty, so checking only its position in the merged argument list is insufficient:
-    ///
-    /// ```python
-    /// def callback(*args: *tuple[*tuple[object, ...], str]) -> None: ...
-    /// def forward(values: tuple[str, ...]) -> None:
-    ///     callback(1, *values)
-    /// ```
-    fn unpacked_expected_type(
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        tuple: &TupleSpec<'db>,
-        fixed_positions: (usize, usize),
-        variable_positions: (bool, bool),
-        gradual_positions: (bool, bool),
-        fallback: Type<'db>,
-    ) -> Type<'db> {
-        let (fixed_before, fixed_after) = fixed_positions;
-        let (variable_before, variable_after) = variable_positions;
-        let (gradual_before, gradual_after) = gradual_positions;
-        let mut candidates: SmallVec<[Type<'db>; 4]> = SmallVec::new();
-        let mut add_candidate = |candidate| {
-            if !candidates.contains(&candidate) {
-                candidates.push(candidate);
-            }
-        };
-
-        match tuple {
-            TupleSpec::Fixed(expected) => {
-                let elements = expected.all_elements();
-                if !variable_before {
-                    if let Some(candidate) = elements.get(fixed_before) {
-                        add_candidate(*candidate);
-                    }
-                } else if !variable_after {
-                    if let Some(candidate) = elements
-                        .len()
-                        .checked_sub(fixed_after + 1)
-                        .and_then(|index| elements.get(index))
-                    {
-                        add_candidate(*candidate);
-                    }
-                } else {
-                    let end = elements.len().saturating_sub(fixed_after);
-                    for candidate in elements.get(fixed_before..end).unwrap_or_default() {
-                        add_candidate(*candidate);
-                    }
-                }
-            }
-            TupleSpec::Variable(expected) => {
-                let expected_prefix = expected.prefix_elements();
-                let expected_suffix = expected.suffix_elements();
-                let expected_variable = expected.variable().element_type(db);
-                let minimum_arity = expected_prefix.len() + expected_suffix.len();
-                if !variable_before && let Some(candidate) = expected_prefix.get(fixed_before) {
-                    add_candidate(*candidate);
-                } else if !variable_after && fixed_after < expected_suffix.len() {
-                    add_candidate(expected_suffix[expected_suffix.len() - fixed_after - 1]);
-                } else {
-                    add_candidate(expected_variable);
-                    // A gradual segment can supply the required endpoint, so fixed arguments
-                    // across it need not match that endpoint: `callback(1, *any_values)` can
-                    // match `*tuple[*tuple[object, ...], str]` by materializing a `str` tail.
-                    if variable_before && !gradual_before {
-                        for (index, candidate) in
-                            expected_prefix.iter().enumerate().skip(fixed_before)
-                        {
-                            if variable_after || index + fixed_after + 1 >= minimum_arity {
-                                add_candidate(*candidate);
-                            }
-                        }
-                    }
-                    if variable_after && !gradual_after {
-                        for (index, candidate) in expected_suffix
-                            .iter()
-                            .enumerate()
-                            .take(expected_suffix.len().saturating_sub(fixed_after))
-                        {
-                            let distance = expected_suffix.len() - index - 1;
-                            if variable_before || fixed_before + distance + 1 >= minimum_arity {
-                                add_candidate(*candidate);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        match candidates.as_slice() {
-            [] => fallback,
-            [candidate] => *candidate,
-            _ => {
-                let mut intersection = IntersectionBuilder::new(db, env);
-                for candidate in candidates {
-                    intersection.add_positive_in_place(candidate);
-                }
-                intersection.build()
-            }
-        }
-    }
-
     /// Checks the positional requirements encoded inside an unpacked variadic annotation.
     ///
     /// Unlike ordinary `*args`, an unpacked tuple can require arguments and prescribe a different
@@ -5681,8 +5577,8 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         let Some(tuple) = parameter.annotated_type().exact_tuple_instance_spec(db) else {
             return;
         };
-        // TypeVarTuple inference checks the complete argument tuple and preserves its pack shape.
-        // Keep its existing per-element matching instead of independently expanding each position.
+
+        // Open type variable packs do not have a finite-union minimum to enforce.
         let has_typevartuple = matches!(
             tuple.as_ref(),
             TupleSpec::Variable(variable) if variable.variable().typevartuple().is_some()
@@ -5690,11 +5586,8 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
 
         let maximum = tuple.len().maximum();
         let mut argument_count = 0;
-        let mut fixed_count = 0;
         let mut first_variable = None;
         let mut last_variable = None;
-        let mut first_gradual = None;
-        let mut last_gradual = None;
         let mut first_excess_argument_index = None;
 
         for (argument_index, argument) in self.argument_matches.iter().enumerate() {
@@ -5720,16 +5613,6 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                         first_variable = Some(argument_count);
                     }
                     last_variable = Some(argument_count);
-                    if matched.argument_type.is_some_and(|ty| {
-                        VariableSegment::Homogeneous(ty)
-                            .gradual_element_type(db, env)
-                            .is_some()
-                    }) {
-                        first_gradual.get_or_insert(argument_count);
-                        last_gradual = Some(argument_count);
-                    }
-                } else {
-                    fixed_count += 1;
                 }
 
                 argument_count += 1;
@@ -5813,34 +5696,14 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         };
         let variable_type = expected.variable_element_type(db);
         let mut expected_types = expected.iter_element_types(db);
-        let mut fixed_before = 0;
-        let variable_length_arguments = &self.variable_length_positional_arguments;
-        let matched_parameters =
-            self.argument_matches
-                .iter_mut()
-                .enumerate()
-                .flat_map(|(argument_index, argument)| {
-                    let match_count = argument.parameters.len();
-                    let variable_segment = variable_length_arguments
-                        .iter()
-                        .find(|(index, _, _)| *index == argument_index);
-                    argument
-                        .parameters
-                        .iter_mut()
-                        .enumerate()
-                        .filter(move |(_, matched)| matched.index == parameter_index)
-                        .map(move |(position, matched)| {
-                            let is_variable =
-                                variable_segment.is_some_and(|(_, prefix, suffix)| {
-                                    position >= *prefix
-                                        && position < match_count.saturating_sub(*suffix)
-                                });
-                            (is_variable, matched)
-                        })
-                });
-        for (position, (is_variable, matched)) in matched_parameters.enumerate() {
-            let fixed_after = fixed_count - fixed_before - usize::from(!is_variable);
-            let expected_type = if first_variable
+        for (position, matched) in self
+            .argument_matches
+            .iter_mut()
+            .flat_map(|argument| argument.parameters.iter_mut())
+            .filter(|matched| matched.index == parameter_index)
+            .enumerate()
+        {
+            matched.expected_type = if first_variable
                 .zip(last_variable)
                 .is_some_and(|(first, last)| position > first && position <= last)
             {
@@ -5848,28 +5711,6 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
             } else {
                 expected_types.next()
             };
-            matched.expected_type = expected_type.map(|expected_type| {
-                if argument_length.is_variable() && !has_typevartuple {
-                    Self::unpacked_expected_type(
-                        db,
-                        env,
-                        &tuple,
-                        (fixed_before, fixed_after),
-                        (
-                            is_variable || first_variable.is_some_and(|first| first < position),
-                            is_variable || last_variable.is_some_and(|last| last > position),
-                        ),
-                        (
-                            first_gradual.is_some_and(|first| first <= position),
-                            last_gradual.is_some_and(|last| last >= position),
-                        ),
-                        expected_type,
-                    )
-                } else {
-                    expected_type
-                }
-            });
-            fixed_before += usize::from(!is_variable);
         }
     }
 
@@ -8369,86 +8210,6 @@ impl<'db> Binding<'db> {
     }
 
     fn check_types(
-        &mut self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        constraints: &ConstraintSetBuilder<'db>,
-        arguments: &CallArguments<'_, 'db>,
-        call_expression_tcx: TypeContext<'db>,
-    ) {
-        self.check_types_without_materialization(
-            db,
-            env,
-            constraints,
-            arguments,
-            call_expression_tcx,
-        );
-        if self.errors.is_empty() {
-            return;
-        }
-
-        let Some(materializations) =
-            arguments.materialize_gradual_tuples(db, env, self.signature.parameters())
-        else {
-            return;
-        };
-
-        // Gradual tuples may choose a length that aligns the fixed arguments with the parameter
-        // tuple. Check complete argument lists so those choices preserve argument order and share
-        // the usual generic inference.
-        let mut matched = false;
-        let mut complete = true;
-        let mut inferences = Vec::new();
-        let mut return_types = UnionBuilder::new(db, env);
-        for materialized in materializations {
-            let Ok(materialized) = materialized else {
-                complete = false;
-                break;
-            };
-            let mut candidate = self.clone();
-            candidate.reset(db);
-            candidate.match_parameters(db, env, &materialized);
-            if !candidate.errors.is_empty() {
-                continue;
-            }
-            candidate.check_types_without_materialization(
-                db,
-                env,
-                constraints,
-                &materialized,
-                call_expression_tcx,
-            );
-            if candidate.errors.is_empty() {
-                matched = true;
-                self.inferable_typevars = candidate.inferable_typevars;
-                return_types.add_in_place(candidate.return_ty);
-                if let Some(inference) = candidate.inference {
-                    inferences.push(inference);
-                } else {
-                    // A nongeneric signature has the same return type for every placement.
-                    break;
-                }
-            }
-        }
-        if matched {
-            // Keep the original argument matches and parameter types: they describe every
-            // possible placement, whereas each retry describes only one fixed-length choice.
-            self.errors.clear();
-            self.return_ty = return_types.build();
-            let mut inferences = inferences.into_iter();
-            if let Some(first) = inferences.next() {
-                let inference = first.combine(db, env, inferences, complete);
-                if !complete {
-                    self.return_ty = self
-                        .initial_return_type(db)
-                        .apply_specialization(db, inference.merged_specialization(db));
-                }
-                self.inference = Some(inference);
-            }
-        }
-    }
-
-    fn check_types_without_materialization(
         &mut self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,

@@ -2463,77 +2463,6 @@ pub(crate) struct TypeVarInference<'db> {
 impl get_size2::GetSize for TypeVarInference<'_> {}
 
 impl<'db> TypeVarInference<'db> {
-    /// Combine inference from alternative bindings in the same generic context. An incomplete
-    /// search cannot use the examined bindings as an exhaustive account of the inferred types.
-    pub(crate) fn combine(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        others: impl Iterator<Item = Self>,
-        complete: bool,
-    ) -> Self {
-        let generic_context = self.generic_context(db);
-        if !complete {
-            return Self::new(
-                db,
-                generic_context,
-                vec![Some(Type::unknown()); generic_context.len(db)].into_boxed_slice(),
-                TypeVarInferenceSolutions::Unavailable(TypeVarInferenceFallback::BudgetExceeded),
-            );
-        }
-
-        let mut merged = self.merged_types(db).to_vec();
-        let mut paths = Vec::new();
-        let mut complete_solutions = true;
-        let mut fallback = None;
-        let budget = SolutionBudget::default();
-        for inference in std::iter::once(self).chain(others).unique() {
-            debug_assert_eq!(generic_context, inference.generic_context(db));
-            for (merged, inferred) in merged.iter_mut().zip(inference.merged_types(db)) {
-                if let Some(inferred) = inferred {
-                    *merged = Some(merged.map_or(*inferred, |previous| {
-                        UnionType::from_two_elements(db, env, previous, *inferred)
-                    }));
-                }
-            }
-            let single;
-            let alternatives = match inference.solutions(db) {
-                TypeVarInferenceSolutions::Single => {
-                    single = inference.merged_types(db).into();
-                    std::slice::from_ref(&single)
-                }
-                TypeVarInferenceSolutions::Alternatives(paths) => paths.as_ref(),
-                TypeVarInferenceSolutions::Incomplete(paths) => {
-                    complete_solutions = false;
-                    paths.as_ref()
-                }
-                TypeVarInferenceSolutions::Unavailable(reason) => {
-                    fallback = Some(*reason);
-                    continue;
-                }
-            };
-            let count = paths.len() + alternatives.len();
-            if count > budget.paths
-                || count.saturating_mul(generic_context.len(db)) > budget.type_terms
-            {
-                fallback = Some(TypeVarInferenceFallback::BudgetExceeded);
-            }
-            if fallback.is_none() {
-                paths.extend(alternatives.iter().cloned());
-            }
-        }
-        let solutions = if let Some(reason) = fallback {
-            TypeVarInferenceSolutions::Unavailable(reason)
-        } else if complete_solutions && paths.len() == 1 {
-            TypeVarInferenceSolutions::Single
-        } else if complete_solutions {
-            TypeVarInferenceSolutions::Alternatives(paths.into_boxed_slice())
-        } else {
-            TypeVarInferenceSolutions::Incomplete(paths.into_boxed_slice())
-        };
-        Self::new(db, generic_context, merged.into_boxed_slice(), solutions)
-    }
-
     /// Merge the alternatives into one closed specialization, discarding their correlations and
     /// completeness. Compatibility and diagnostic results use their recovery mapping.
     pub(crate) fn merged_specialization(self, db: &'db dyn Db) -> Specialization<'db> {
@@ -4738,61 +4667,6 @@ mod tests {
                     ConstraintSet::constrain_typevar(db, &env, constraints, typevar, ty, ty)
                 })
         })
-    }
-
-    #[test]
-    fn combined_inference_retains_alternatives_and_completeness() {
-        let db = setup_db();
-        let db = &db;
-        let env = db.program_environment();
-        let context =
-            GenericContext::from_typevar_instances(db, &env, create_typevars(db, ["T", "U"]));
-        let int = KnownClass::Int.to_instance(db, &env);
-        let str = KnownClass::Str.to_instance(db, &env);
-        let left: Box<[_]> = Box::from([Some(int), Some(str)]);
-        let right: Box<[_]> = Box::from([Some(str), Some(int)]);
-        let first =
-            TypeVarInference::new(db, context, left.clone(), TypeVarInferenceSolutions::Single);
-        let second = TypeVarInference::new(
-            db,
-            context,
-            right.clone(),
-            TypeVarInferenceSolutions::Single,
-        );
-        let combined = first.combine(db, &env, [second].into_iter(), true);
-        assert_eq!(
-            combined.solutions(db),
-            &TypeVarInferenceSolutions::Alternatives(Box::from([left, right.clone()]))
-        );
-        assert_eq!(
-            combined.merged_types(db),
-            &[
-                Some(UnionType::from_two_elements(db, &env, int, str)),
-                Some(UnionType::from_two_elements(db, &env, str, int)),
-            ]
-        );
-
-        let incomplete = TypeVarInference::new(
-            db,
-            context,
-            right.clone(),
-            TypeVarInferenceSolutions::Incomplete(Box::from([right])),
-        );
-        let combined = first.combine(db, &env, [incomplete].into_iter(), true);
-        assert!(matches!(
-            combined.solutions(db),
-            TypeVarInferenceSolutions::Incomplete(paths) if paths.len() == 2
-        ));
-
-        let truncated = first.combine(db, &env, [second].into_iter(), false);
-        assert_eq!(
-            truncated.solutions(db),
-            &TypeVarInferenceSolutions::Unavailable(TypeVarInferenceFallback::BudgetExceeded)
-        );
-        assert_eq!(
-            truncated.merged_types(db),
-            &[Some(Type::unknown()), Some(Type::unknown())]
-        );
     }
 
     #[test]
