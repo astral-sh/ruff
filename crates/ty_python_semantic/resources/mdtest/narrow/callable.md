@@ -27,7 +27,8 @@ def _(f: Callable[[int, str], bytes] | None):
         reveal_type(f)  # revealed: None
 ```
 
-When narrowing from `object`, the result is a gradual callable that can be called with any arguments.
+When narrowing from `object`, the result is a gradual callable that can be called with any
+arguments.
 
 ```py
 def f(f: object):
@@ -74,11 +75,10 @@ def _(f: Callable[[int, str], bytes] | None):
         reveal_type(f)  # revealed: None
 ```
 
-However, when narrowing from `object`, the result is the top-materialized callable type `Top[(...) -> object]`.
-This type represents the set of all possible callable types
-(including, e.g., functions that take no arguments and functions that require arguments). While such
-objects *are* callable (they pass `callable()`), no specific set of arguments can be guaranteed to
-be valid.
+However, when narrowing from `object`, the result is the top-materialized callable type
+`Top[(...) -> object]`. This type represents the set of all possible callable types (including,
+e.g., functions that take no arguments and functions that require arguments). While such objects
+*are* callable (they pass `callable()`), no specific set of arguments can be guaranteed to be valid.
 
 ```py
 def f(f: object):

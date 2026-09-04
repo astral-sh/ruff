@@ -491,8 +491,8 @@ strict-generic-narrowing = false
 missing-type-argument = "ignore"
 ```
 
-In non-strict narrowing mode, a `TypeIs` function that returns a gradual specialization of a generic class
-narrows from `object` to that gradual specialization:
+In non-strict narrowing mode, a `TypeIs` function that returns a gradual specialization of a generic
+class narrows from `object` to that gradual specialization:
 
 ```py
 from typing import Any
@@ -518,8 +518,9 @@ def _(obj: object):
         reveal_type(obj.get())  # revealed: Unknown
 ```
 
-When narrowing from a union of a specific `Getter` specialization and another type, the positive branch
-retains the specific `Getter` specialization and the negative branch excludes `Getter` entirely:
+When narrowing from a union of a specific `Getter` specialization and another type, the positive
+branch retains the specific `Getter` specialization and the negative branch excludes `Getter`
+entirely:
 
 ```py
 from typing import final
@@ -535,8 +536,8 @@ def _(obj: Unrelated | Getter[int]):
         reveal_type(obj)  # revealed: Unrelated
 ```
 
-If the other type is not final, the positive branch retains the possibility of multiple inheritance between
-`Overlapping` and `Getter`:
+If the other type is not final, the positive branch retains the possibility of multiple inheritance
+between `Overlapping` and `Getter`:
 
 ```py
 class Overlapping: ...
@@ -549,8 +550,8 @@ def _(obj: Overlapping | Getter[int]):
         reveal_type(obj)  # revealed: Overlapping & ~Getter[object]
 ```
 
-Similarly, for gradual protocols, `TypeIs` narrowing retains the gradualness of procotol members in non-strict mode, when
-narrowing from object:
+Similarly, for gradual protocols, `TypeIs` narrowing retains the gradualness of procotol members in
+non-strict mode, when narrowing from object:
 
 ```py
 from typing import Protocol, runtime_checkable
@@ -570,8 +571,8 @@ def _(obj: object):
         reveal_type(obj)  # revealed: ~Top[Reader]
 ```
 
-When narrowing from a union of a specific `Reader` implementation and another type, the positive branch
-retains the specific `Reader` implementation, and the negative branch excludes it entirely:
+When narrowing from a union of a specific `Reader` implementation and another type, the positive
+branch retains the specific `Reader` implementation, and the negative branch excludes it entirely:
 
 ```py
 class SpecificReader:
@@ -628,8 +629,9 @@ def _(obj: object):
         reveal_type(obj.get())  # revealed: object
 ```
 
-Like in non-strict mode, when narrowing from a union of a specific `Getter` specialization and another type, the positive branch
-retains the specific `Getter` specialization and the negative branch excludes `Getter` entirely:
+Like in non-strict mode, when narrowing from a union of a specific `Getter` specialization and
+another type, the positive branch retains the specific `Getter` specialization and the negative
+branch excludes `Getter` entirely:
 
 ```py
 from typing import final
@@ -645,8 +647,8 @@ def _(obj: Unrelated | Getter[int]):
         reveal_type(obj)  # revealed: Unrelated
 ```
 
-Like in non-strict mode, if the other type is not final, the positive branch retains the possibility of multiple inheritance between
-`Overlapping` and `Getter`:
+Like in non-strict mode, if the other type is not final, the positive branch retains the possibility
+of multiple inheritance between `Overlapping` and `Getter`:
 
 ```py
 class Overlapping: ...
@@ -659,7 +661,8 @@ def _(obj: Overlapping | Getter[int]):
         reveal_type(obj)  # revealed: Overlapping & ~Getter[object]
 ```
 
-Similarly, for gradual protocols, `TypeIs` narrowing in strict mode also narrows to the top-materialization of the protocol:
+Similarly, for gradual protocols, `TypeIs` narrowing in strict mode also narrows to the
+top-materialization of the protocol:
 
 ```py
 from typing import Protocol, runtime_checkable
@@ -679,8 +682,8 @@ def _(obj: object):
         reveal_type(obj)  # revealed: ~Top[Reader]
 ```
 
-When narrowing from a union of a specific `Reader` implementation and another type, the positive branch
-retains the specific `Reader` implementation, and the negative branch excludes it entirely:
+When narrowing from a union of a specific `Reader` implementation and another type, the positive
+branch retains the specific `Reader` implementation, and the negative branch excludes it entirely:
 
 ```py
 class SpecificReader:
