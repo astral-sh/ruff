@@ -807,8 +807,7 @@ impl<'db> Conjunctions<'db> {
 ///
 /// For example, filtering `Sequence[int]` with `list[Unknown]` first infers `list[int]` from
 /// the target class's specialized `Sequence` base. Unrelated union arms and intersection elements
-/// are still intersected with the original target. A `TypeIs` target can also specify some or all
-/// type arguments, so transferred specializations must remain subtypes of its top materialization.
+/// are still intersected with the original unknown-specialized target.
 fn filter_generic_narrowing_constraint<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
