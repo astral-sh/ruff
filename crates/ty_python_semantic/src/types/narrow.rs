@@ -497,11 +497,11 @@ impl ClassInfoConstraintFunction {
                 }
             };
 
-            if is_positive {
+            if use_generic_filtering {
                 constraint
             } else {
-                // A negative result excludes every specialization of the class. Materialize the
-                // whole type so that this also covers gradual protocol members.
+                // Strict positive narrowing and negative narrowing both cover every
+                // materialization. Materialize the whole type, including gradual protocol members.
                 constraint.top_materialization(db, env)
             }
         };
@@ -538,7 +538,12 @@ impl ClassInfoConstraintFunction {
                     //   protocol-conforming objects even if its nominal instances do not conform.
                     SubclassOfInner::Protocol(protocol) => match self {
                         ClassInfoConstraintFunction::IsInstance => {
-                            Some(Type::ProtocolInstance(protocol))
+                            let constraint = Type::ProtocolInstance(protocol);
+                            Some(if use_generic_filtering {
+                                constraint
+                            } else {
+                                constraint.top_materialization(db, env)
+                            })
                         }
                         ClassInfoConstraintFunction::IsSubclass => Some(classinfo),
                     },

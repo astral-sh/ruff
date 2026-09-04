@@ -733,10 +733,8 @@ def _(obj: object):
 
     # For comparison, `isinstance` narrowing behaves in the same way:
     if isinstance(obj, Reader):
-        # TODO: this should be Top[Reader]
-        reveal_type(obj)  # revealed: Reader
-        # TODO: this should be object
-        reveal_type(obj.read())  # revealed: Any
+        reveal_type(obj)  # revealed: Top[Reader]
+        reveal_type(obj.read())  # revealed: object
     else:
         reveal_type(obj)  # revealed: ~Top[Reader]
 ```
@@ -757,7 +755,7 @@ def _(obj: SpecificReader | Unrelated):
         reveal_type(obj)  # revealed: Unrelated
 
     # For comparison, `isinstance` narrowing behaves in the same way:
-    if isinstance(obj, SpecificReader):
+    if isinstance(obj, Reader):
         reveal_type(obj)  # revealed: SpecificReader
         reveal_type(obj.read())  # revealed: str
     else:
