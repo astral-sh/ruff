@@ -903,8 +903,13 @@ impl<'db> CallableType<'db> {
 
         self.with_signatures(
             db,
-            self.signatures(db)
-                .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+            self.signatures(db).apply_type_mapping_impl(
+                db,
+                type_mapping,
+                tcx,
+                visitor,
+                self.is_paramspec_value(db),
+            ),
         )
     }
 
@@ -1062,10 +1067,9 @@ mod tests {
                 Parameter::positional_only(None).with_annotated_type(Type::object())
             ]),
         );
-        // XXX
         let bottom = paramspec_value.bottom_materialization(&db, &env);
-        assert_ne!(paramspec_value, bottom);
+        assert_eq!(paramspec_value, bottom);
         let top = paramspec_value.top_materialization(&db, &env);
-        assert_ne!(paramspec_value, top);
+        assert_eq!(paramspec_value, top);
     }
 }
