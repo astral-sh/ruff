@@ -122,6 +122,28 @@ fn extend_collection_use_constraints<'db>(
     }
 }
 
+/// Normalizes recursive collection constraints so that each cycle iteration cannot add another
+/// layer of nesting. These constraints feed back into the collection's initializer, so they need
+/// the same normalization as expression and binding types before the next iteration uses them.
+fn normalize_collection_use_constraints<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    constraints: &mut CollectionUseConstraints<'db>,
+    cycle: &salsa::Cycle,
+) {
+    #[expect(
+        clippy::iter_over_hash_type,
+        reason = "constraints for distinct collection definitions are normalized independently"
+    )]
+    for types in constraints.values_mut() {
+        *types = std::mem::take(types)
+            .into_iter()
+            .map(|ty| ty.recursive_type_normalized(db, env, cycle))
+            .collect();
+        types.shrink_to_fit();
+    }
+}
+
 /// Infer all types for a [`Definition`] (including sub-expressions).
 /// Use when resolving a place use or public type of a place.
 #[salsa::tracked(
@@ -962,6 +984,15 @@ impl<'db> ScopeInference<'db> {
             );
         }
 
+        if let Some(extra) = self.extra.as_deref_mut() {
+            normalize_collection_use_constraints(
+                db,
+                env,
+                &mut extra.collection_use_constraints,
+                cycle,
+            );
+        }
+
         self
     }
 
@@ -1545,6 +1576,15 @@ impl<'db> DefinitionInference<'db> {
             self.extra = Some(Box::new(DefinitionInferenceExtra::Other(Box::new(extra))));
         }
 
+        if let Some(DefinitionInferenceExtra::Other(extra)) = self.extra.as_deref_mut() {
+            normalize_collection_use_constraints(
+                db,
+                &env,
+                &mut extra.collection_use_constraints,
+                cycle,
+            );
+        }
+
         self
     }
 
@@ -1835,6 +1875,15 @@ impl<'db> ExpressionInference<'db> {
             );
         }
 
+        if let Some(extra) = self.extra.as_deref_mut() {
+            normalize_collection_use_constraints(
+                db,
+                env,
+                &mut extra.collection_use_constraints,
+                cycle,
+            );
+        }
+
         self
     }
 
@@ -2066,6 +2115,15 @@ impl<'db> StatementInferenceInner<'db> {
             extend_collection_use_constraints(
                 &mut extra.collection_use_constraints,
                 &previous_extra.collection_use_constraints,
+            );
+        }
+
+        if let Some(extra) = self.extra.as_deref_mut() {
+            normalize_collection_use_constraints(
+                db,
+                env,
+                &mut extra.collection_use_constraints,
+                cycle,
             );
         }
 

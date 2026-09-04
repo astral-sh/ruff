@@ -2901,6 +2901,39 @@ x24[1] = "b"
 reveal_type(x24)  # revealed: dict[int | str, str | int]
 ```
 
+## Recursive collection-use constraints
+
+Empty collections can be constrained by their later uses. When a conditional expression provides
+peer context at different nesting depths, those constraints can refer back to the collection being
+inferred.
+
+### Return statements
+
+Inference still converges when several empty dictionaries share a return statement:
+
+```py
+def nested_return(flag: bool):
+    x = {}
+    y = {}
+    return {"a": x, "b": {"c": y} if flag else {"d": {"e": y}}}
+```
+
+### Assignments
+
+The same nesting also works in an assignment. With no concrete keys or values added to either empty
+dictionary, their element types remain unknown:
+
+```py
+def nested_assignment(flag: bool):
+    x = {}
+    y = {}
+    result = {"a": x, "b": {"c": y} if flag else {"d": {"e": y}}}
+    reveal_type(x)  # revealed: dict[Unknown, Unknown]
+    reveal_type(y)  # revealed: dict[Unknown, Unknown]
+    # revealed: dict[str, dict[Unknown, Unknown] | dict[str, dict[str, dict[Unknown, Unknown]]]]
+    reveal_type(result)
+```
+
 ## Multi-inference diagnostics
 
 Diagnostics unrelated to the type-context are only reported once:
