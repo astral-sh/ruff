@@ -4380,7 +4380,7 @@ impl<'db> Type<'db> {
                     );
                 }
                 Type::BoundMethod(method) => {
-                    collect(db, Type::FunctionLiteral(method.function(db)), functions);
+                    collect(db, method.func(db), functions);
                 }
                 Type::Union(union) => {
                     for element in union.elements(db) {
@@ -8785,7 +8785,7 @@ impl<'db> Type<'db> {
 
             let signatures = match self {
                 Type::FunctionLiteral(function) => function_signatures(function),
-                Type::BoundMethod(method) => function_signatures(method.function(db)),
+                Type::BoundMethod(method) => method.function(db).and_then(function_signatures),
                 Type::Callable(callable) => Some(callable.signatures(db)),
                 _ => None,
             };
@@ -10153,7 +10153,13 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
                 } else {
                     // A callable object's type does not include the additional receiver bound
                     // by classmethod, which is also exposed through `__self__`.
-                    variance.join(method_type.self_instance(db).variance_of(db, env, typevar))
+                    VarianceTerm::join(
+                        db,
+                        [
+                            variance,
+                            method_type.self_instance(db).variance_of(db, env, typevar),
+                        ],
+                    )
                 }
             }
 
