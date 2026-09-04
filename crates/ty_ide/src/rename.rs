@@ -91,7 +91,7 @@ pub fn rename(
 
 /// Helper function to check if a file is included in the project.
 fn is_file_in_project(db: &dyn Db, file: File) -> bool {
-    file.path(db).is_system_virtual_path() || db.project().files(db).contains(&file)
+    file.path(db).is_system_virtual_path() || db.project().files(db).contains(file)
 }
 
 #[cfg(test)]

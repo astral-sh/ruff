@@ -134,7 +134,9 @@ def _(path: Path, superclass: super):
     reveal_type(bool(superclass))  # revealed: bool
 ```
 
-### `Callable` types always have ambiguous truthiness
+### Callable objects
+
+Callable objects can define `__bool__`, so `Callable` parameters have ambiguous truthiness.
 
 ```py
 from typing import Any, Callable
@@ -144,13 +146,20 @@ def f(x: Callable[..., Any], y: Callable[[int], str]):
     reveal_type(bool(y))  # revealed: bool
 ```
 
-But certain callable objects are known to be always truthy:
+But instances of `types.FunctionType` (whether they're defined using a `def` statement or a `lambda`
+expression) are always truthy, and this is also true for bound methods:
 
 ```py
 from types import FunctionType
 
 class A:
     def method(self): ...
+
+reveal_type(bool(f))  # revealed: Literal[True]
+reveal_type(bool(lambda: False))  # revealed: Literal[True]
+
+lambda_function = lambda: False
+reveal_type(bool(lambda_function))  # revealed: Literal[True]
 
 reveal_type(bool(A().method))  # revealed: Literal[True]
 reveal_type(bool(f.__get__))  # revealed: Literal[True]

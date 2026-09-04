@@ -10,6 +10,7 @@ on:
       - "crates/ty*/**"
       - "crates/ruff_db/**"
       - "crates/ruff_python_ast/**"
+      - "crates/ruff_python_edits/**"
       - "crates/ruff_python_parser/**"
       - "playground/**"
       - ".github/workflows/publish-ty-playground.yml"
@@ -19,6 +20,7 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
+  UV_LOCKED: 1
   CARGO_INCREMENTAL: 0
   CARGO_NET_RETRY: 10
   CARGO_PROFILE_DEV_LTO: "false"
@@ -27,11 +29,8 @@ env:
   RUSTUP_MAX_RETRIES: 10
 
 jobs:
-  publish:
+  build:
     runs-on: ubuntu-latest
-    environment: release-playground
-    env:
-      CF_API_TOKEN_EXISTS: ${{ secrets.CF_API_TOKEN != '' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -59,11 +58,62 @@ jobs:
           test -f ty/dist/assets/pyodide-lock.json
           test -f ty/dist/assets/python_stdlib.zip
         working-directory: playground
+      - name: "Upload ty playground"
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ty-playground-dist
+          path: playground/ty/dist
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: release-playground
+    env:
+      CF_API_TOKEN_EXISTS: ${{ secrets.CF_API_TOKEN != '' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24.19.0
+          package-manager-cache: false
+      - name: "Download ty playground"
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ty-playground-dist
+          path: playground/ty/dist
+          digest-mismatch: error
+      - name: "Verify static playground assets"
+        run: |
+          # The build runs without deployment credentials, but its output may
+          # still be compromised. Check for missing required assets, and reject
+          # links and special files before the publisher consumes the artifact.
+          # Wrangler can deploy `_worker.js` in the output or `functions/` in its
+          # working directory as server-side Pages code, so reject both.
+          # These checks do not establish that the generated HTML or JavaScript is safe.
+          test -f playground/ty/dist/index.html
+          test -f playground/ty/dist/assets/pyodide.asm.mjs
+          test -f playground/ty/dist/assets/pyodide.asm.wasm
+          test -f playground/ty/dist/assets/pyodide-lock.json
+          test -f playground/ty/dist/assets/python_stdlib.zip
+          test ! -e playground/ty/dist/_worker.js
+          test ! -e functions
+          if [[ -n "$(find playground/ty/dist ! -type f ! -type d -print -quit)" ]]; then
+            echo "Playground artifacts must contain only regular files and directories"
+            exit 1
+          fi
+      - name: "Install deployment dependencies"
+        if: ${{ env.CF_API_TOKEN_EXISTS == 'true' }}
+        run: npm ci --ignore-scripts
+        working-directory: playground/deploy
       - name: "Deploy to Cloudflare Pages"
         if: ${{ env.CF_API_TOKEN_EXISTS == 'true' }}
-        uses: cloudflare/wrangler-action@ebbaa1584979971c8614a24965b4405ff95890e0 # v4.0.0
-        with:
-          apiToken: ${{ secrets.CF_API_TOKEN }}
-          accountId: ${{ secrets.CF_ACCOUNT_ID }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
           # `github.head_ref` is only set during pull requests and for manual runs or tags we use `main` to deploy to production
-          command: pages deploy playground/ty/dist --project-name=ty-playground --branch ${{ github.head_ref || 'main' }} --commit-hash ${GITHUB_SHA}
+          DEPLOY_BRANCH: ${{ github.head_ref || 'main' }}
+        run: ./playground/deploy/node_modules/.bin/wrangler pages deploy playground/ty/dist --project-name=ty-playground --branch "$DEPLOY_BRANCH" --commit-hash "$GITHUB_SHA"

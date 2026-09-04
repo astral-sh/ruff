@@ -48,6 +48,7 @@ on:
         type: string
 
 env:
+  UV_LOCKED: 1
   # Release actions must not consume shared GitHub Actions caches.
   ACTIONS_CACHE_MODE: none
   CARGO_DIST_VERSION: "0.31.0"

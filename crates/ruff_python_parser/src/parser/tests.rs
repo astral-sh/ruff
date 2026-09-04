@@ -1,3 +1,5 @@
+use std::assert_matches;
+
 use ruff_python_ast::{Expr, InterpolatedStringElement, IpyEscapeKind, Number, Stmt};
 
 use crate::{Mode, ParseOptions, parse, parse_expression, parse_module};
@@ -365,8 +367,8 @@ fn deep_nesting_preserves_surrounding_statements() {
     );
     let parsed = parse_module(&src).unwrap();
 
-    assert!(matches!(parsed.suite().first(), Some(Stmt::Assign(_))));
-    assert!(matches!(parsed.suite().last(), Some(Stmt::Assign(_))));
+    assert_matches!(parsed.suite().first(), Some(Stmt::Assign(_)));
+    assert_matches!(parsed.suite().last(), Some(Stmt::Assign(_)));
 }
 
 #[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]

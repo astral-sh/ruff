@@ -5,6 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::pycodestyle::helpers::is_ambiguous_name;
 
 /// ## What it does
@@ -26,7 +27,7 @@ use crate::rules::pycodestyle::helpers::is_ambiguous_name;
 /// class Integer(object): ...
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.35")]
+#[violation_metadata(stable_since = "v0.0.35", category = Category::Pedantic)]
 pub(crate) struct AmbiguousClassName(pub String);
 
 impl Violation for AmbiguousClassName {

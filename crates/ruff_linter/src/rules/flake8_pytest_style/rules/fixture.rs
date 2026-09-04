@@ -13,9 +13,12 @@ use ruff_text_size::{TextLen, TextRange};
 use rustc_hash::FxHashSet;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits;
+use crate::importer::ImportRequest;
+use crate::preview::is_pt020_fix_enabled;
 use crate::registry::Rule;
-use crate::{AlwaysFixableViolation, Violation};
+use crate::{AlwaysFixableViolation, FixAvailability, Violation};
 use crate::{Edit, Fix};
 
 use crate::rules::flake8_pytest_style::helpers::{
@@ -79,7 +82,7 @@ use crate::rules::flake8_pytest_style::helpers::{
 /// ## References
 /// - [`pytest` documentation: API Reference: Fixtures](https://docs.pytest.org/en/latest/reference/reference.html#fixtures-api)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.208")]
+#[violation_metadata(stable_since = "v0.0.208", category = Category::Pedantic)]
 pub(crate) struct PytestFixtureIncorrectParenthesesStyle {
     expected: Parentheses,
     actual: Parentheses,
@@ -131,7 +134,7 @@ impl AlwaysFixableViolation for PytestFixtureIncorrectParenthesesStyle {
 /// ## References
 /// - [`pytest` documentation: `@pytest.fixture` functions](https://docs.pytest.org/en/latest/reference/reference.html#pytest-fixture)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.208")]
+#[violation_metadata(stable_since = "v0.0.208", category = Category::Pedantic)]
 pub(crate) struct PytestFixturePositionalArgs {
     function: String,
 }
@@ -173,7 +176,7 @@ impl Violation for PytestFixturePositionalArgs {
 /// ## References
 /// - [`pytest` documentation: `@pytest.fixture` functions](https://docs.pytest.org/en/latest/reference/reference.html#pytest-fixture)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.208")]
+#[violation_metadata(stable_since = "v0.0.208", category = Category::Pedantic)]
 pub(crate) struct PytestExtraneousScopeFunction;
 
 impl AlwaysFixableViolation for PytestExtraneousScopeFunction {
@@ -237,7 +240,7 @@ impl AlwaysFixableViolation for PytestExtraneousScopeFunction {
 /// - [`pytest` documentation: `@pytest.fixture` functions](https://docs.pytest.org/en/latest/reference/reference.html#pytest-fixture)
 #[derive(ViolationMetadata)]
 #[deprecated(note = "PT004 has been removed")]
-#[violation_metadata(removed_since = "0.8.0")]
+#[violation_metadata(removed_since = "0.8.0", category = Category::Pedantic)]
 pub(crate) struct PytestMissingFixtureNameUnderscore;
 
 #[expect(deprecated)]
@@ -303,7 +306,7 @@ impl Violation for PytestMissingFixtureNameUnderscore {
 /// - [`pytest` documentation: `@pytest.fixture` functions](https://docs.pytest.org/en/latest/reference/reference.html#pytest-fixture)
 #[derive(ViolationMetadata)]
 #[deprecated(note = "PT005 has been removed")]
-#[violation_metadata(removed_since = "0.8.0")]
+#[violation_metadata(removed_since = "0.8.0", category = Category::Pedantic)]
 pub(crate) struct PytestIncorrectFixtureNameUnderscore;
 
 #[expect(deprecated)]
@@ -363,7 +366,7 @@ impl Violation for PytestIncorrectFixtureNameUnderscore {
 /// ## References
 /// - [`pytest` documentation: `pytest.mark.usefixtures`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-mark-usefixtures)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.208")]
+#[violation_metadata(stable_since = "v0.0.208", category = Category::Pedantic)]
 pub(crate) struct PytestFixtureParamWithoutValue {
     name: String,
 }
@@ -383,7 +386,13 @@ impl Violation for PytestFixtureParamWithoutValue {
 /// Checks for `pytest.yield_fixture` usage.
 ///
 /// ## Why is this bad?
-/// `pytest.yield_fixture` is deprecated. `pytest.fixture` should be used instead.
+/// `pytest.fixture` has supported `yield` since pytest 3.0, which left
+/// `pytest.yield_fixture` as a plain alias for it. The alias has been
+/// deprecated since pytest 6.2, now raises a `PytestRemovedIn10Warning`, and
+/// will be removed in pytest 10.
+///
+/// The two are the same function, so switching to `pytest.fixture` is a
+/// rename with no other consequence.
 ///
 /// ## Example
 /// ```python
@@ -409,16 +418,28 @@ impl Violation for PytestFixtureParamWithoutValue {
 ///     obj.cleanup()
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is marked as safe, unless the decorator contains comments
+/// that the fix would remove. `pytest.yield_fixture` and `pytest.fixture` are
+/// the same function; the only behavioral difference is the deprecation
+/// warning that `pytest.yield_fixture` emits.
+///
 /// ## References
-/// - [`pytest` documentation: `yield_fixture` functions](https://docs.pytest.org/en/latest/yieldfixture.html)
+/// - [`pytest` documentation: the `yield_fixture` function/decorator](https://docs.pytest.org/en/stable/deprecations.html#the-yield-fixture-function-decorator)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.208")]
+#[violation_metadata(stable_since = "v0.0.208", category = Category::Suspicious)]
 pub(crate) struct PytestDeprecatedYieldFixture;
 
 impl Violation for PytestDeprecatedYieldFixture {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         "`@pytest.yield_fixture` is deprecated, use `@pytest.fixture`".to_string()
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        Some("Replace with `pytest.fixture`".to_string())
     }
 }
 
@@ -472,7 +493,7 @@ impl Violation for PytestDeprecatedYieldFixture {
 /// - [`pytest` documentation: Adding finalizers directly](https://docs.pytest.org/en/latest/how-to/fixtures.html#adding-finalizers-directly)
 /// - [`pytest` documentation: Factories as fixtures](https://docs.pytest.org/en/latest/how-to/fixtures.html#factories-as-fixtures)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.208")]
+#[violation_metadata(stable_since = "v0.0.208", category = Category::Pedantic)]
 pub(crate) struct PytestFixtureFinalizerCallback;
 
 impl Violation for PytestFixtureFinalizerCallback {
@@ -526,7 +547,7 @@ impl Violation for PytestFixtureFinalizerCallback {
 /// ## References
 /// - [`pytest` documentation: Teardown/Cleanup](https://docs.pytest.org/en/latest/how-to/fixtures.html#teardown-cleanup-aka-fixture-finalization)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.208")]
+#[violation_metadata(stable_since = "v0.0.208", category = Category::Pedantic)]
 pub(crate) struct PytestUselessYieldFixture {
     name: String,
 }
@@ -584,7 +605,7 @@ impl AlwaysFixableViolation for PytestUselessYieldFixture {
 /// ## References
 /// - [`pytest` documentation: `pytest.mark.usefixtures`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-mark-usefixtures)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.208")]
+#[violation_metadata(stable_since = "v0.0.208", category = Category::Correctness)]
 pub(crate) struct PytestErroneousUseFixturesOnFixture;
 
 impl AlwaysFixableViolation for PytestErroneousUseFixturesOnFixture {
@@ -628,7 +649,7 @@ impl AlwaysFixableViolation for PytestErroneousUseFixturesOnFixture {
 /// ## References
 /// - [PyPI: `pytest-asyncio`](https://pypi.org/project/pytest-asyncio/)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.208")]
+#[violation_metadata(stable_since = "v0.0.208", category = Category::Correctness)]
 pub(crate) struct PytestUnnecessaryAsyncioMarkOnFixture;
 
 impl AlwaysFixableViolation for PytestUnnecessaryAsyncioMarkOnFixture {
@@ -914,6 +935,33 @@ fn check_fixture_decorator_name(checker: &Checker, decorator: &Decorator) {
         let mut diagnostic =
             checker.report_diagnostic(PytestDeprecatedYieldFixture, decorator.range());
         diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
+
+        if !is_pt020_fix_enabled(checker.settings()) {
+            return;
+        }
+
+        let reference = map_callable(&decorator.expression);
+
+        // Mark the fix as unsafe when comments are in range, as replacing the
+        // reference would remove them.
+        let applicability = if checker.comment_ranges().intersects(reference.range()) {
+            Applicability::Unsafe
+        } else {
+            Applicability::Safe
+        };
+
+        diagnostic.try_set_fix(|| {
+            let (import_edit, binding) = checker.importer().get_or_import_symbol(
+                &ImportRequest::import("pytest", "fixture"),
+                reference.start(),
+                checker.semantic(),
+            )?;
+            Ok(Fix::applicable_edits(
+                import_edit,
+                [Edit::range_replacement(binding, reference.range())],
+                applicability,
+            ))
+        });
     }
 }
 

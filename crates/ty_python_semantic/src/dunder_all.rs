@@ -3,7 +3,7 @@ use ruff_python_ast::name::Name;
 use ruff_python_ast::statement_visitor::{StatementVisitor, walk_stmt};
 use ruff_python_ast::{self as ast};
 use rustc_hash::FxHashSet;
-use ty_module_resolver::{ImportingFile, ModuleName, resolve_module};
+use ty_module_resolver::{ImportingFile, resolve_module_for_import_from};
 
 use crate::types::{Type, TypeContext, infer_expression_types};
 use crate::{Db, ProgramEnvironment};
@@ -165,9 +165,7 @@ impl<'db> DunderAllNamesCollector<'db> {
 
         let importing_file =
             ImportingFile::File(self.file.file(db), self.env.resolver_environment(db));
-        let module_name =
-            ModuleName::from_import_statement(db, importing_file, import_from).ok()?;
-        let module = resolve_module(db, importing_file, &module_name)?;
+        let module = resolve_module_for_import_from(db, importing_file, import_from)?;
         dunder_all_names(
             db,
             ProgramFile::new(db, module.file(db)?, self.env.program(db)),

@@ -5,6 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for calls of the form `map(int, __version__.split("."))`.
@@ -35,7 +36,7 @@ use crate::checkers::ast::Checker;
 ///
 /// [version-specifier]: https://packaging.python.org/en/latest/specifications/version-specifiers/#version-specifiers
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.10.0")]
+#[violation_metadata(stable_since = "0.10.0", category = Category::Suspicious)]
 pub(crate) struct MapIntVersionParsing;
 
 impl Violation for MapIntVersionParsing {

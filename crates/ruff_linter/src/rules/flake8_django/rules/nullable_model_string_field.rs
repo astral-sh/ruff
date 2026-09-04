@@ -7,6 +7,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 use crate::rules::flake8_django::helpers;
 
@@ -41,7 +42,7 @@ use crate::rules::flake8_django::helpers;
 ///     field = models.CharField(max_length=255, default="")
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.246")]
+#[violation_metadata(stable_since = "v0.0.246", category = Category::Pedantic)]
 pub(crate) struct DjangoNullableModelStringField {
     field_name: String,
 }

@@ -3,6 +3,7 @@ use ruff_python_ast::{PythonVersion, Stmt, StmtImport, StmtImportFrom};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::flake8_tidy_imports::rules::BannedModuleImportPolicies;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
@@ -36,7 +37,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// - `lint.flake8-tidy-imports.require-lazy`
 /// - `lint.flake8-tidy-imports.ban-lazy`
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.15.6")]
+#[violation_metadata(preview_since = "0.15.6", category = Category::Restriction)]
 pub(crate) struct LazyImportMismatch {
     policy: LazyImportPolicy,
     name: Option<String>,

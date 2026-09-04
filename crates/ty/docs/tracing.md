@@ -124,7 +124,7 @@ TY_LOG_PROFILE=1 ty -- --current-directory=../test -vvv
 You can convert the textual representation into a visual one using `inferno`.
 
 ```shell
-cargo install inferno
+cargo install --locked inferno
 ```
 
 ```shell

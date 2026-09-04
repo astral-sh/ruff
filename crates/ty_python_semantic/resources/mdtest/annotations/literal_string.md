@@ -63,6 +63,87 @@ error[invalid-type-form]: `LiteralString` expects no type parameter
   |    Did you mean `Literal`?
 ```
 
+### Parameterized string annotations
+
+Since `LiteralString` cannot be parameterized, its arguments are checked without looking up
+assignment expressions that are absent from the semantic index. Missing names retain their
+diagnostics.
+
+`runtime.py`:
+
+```py
+from typing_extensions import LiteralString
+
+# error: [invalid-type-form]
+# error: [unresolved-reference] "Name `missing` used when not defined"
+a: "LiteralString[(name := missing)]"
+
+# error: [invalid-type-form]
+# error: [unresolved-reference] "Name `missing` used when not defined"
+# error: [not-subscriptable]
+b: "LiteralString[int[(name := missing)]]"
+c: "LiteralString[(name := 0).real]"  # error: [invalid-type-form]
+
+# error: [invalid-type-form]
+# error: [unresolved-reference] "Name `missing` used when not defined"
+d: "LiteralString[lambda default=missing: None]"
+
+# error: [invalid-type-form]
+# error: [unresolved-reference] "Name `missing_direct` used when not defined"
+direct: "LiteralString[missing_direct]"
+
+# error: [invalid-type-form]
+# error: [unresolved-reference] "Name `missing_nested` used when not defined"
+# error: [not-subscriptable]
+nested: "LiteralString[int[missing_nested]]"
+
+# error: [invalid-type-form]
+# error: [unresolved-reference] "Name `missing_call` used when not defined"
+# error: [unresolved-reference] "Name `missing_argument` used when not defined"
+call: "LiteralString[missing_call(missing_argument)]"
+
+# error: [invalid-type-form]
+# error: [unresolved-reference] "Name `missing_binary` used when not defined"
+binary: "LiteralString[missing_binary + 1]"
+
+# error: [invalid-type-form]
+# error: [unresolved-reference] "Name `missing_list` used when not defined"
+collection: "LiteralString[[missing_list]]"
+```
+
+The same error recovery applies in stub files.
+
+`stub.pyi`:
+
+```pyi
+from typing_extensions import LiteralString
+
+# error: [invalid-type-form]
+# error: [unresolved-reference] "Name `missing` used when not defined"
+value: "LiteralString[(name := missing)]"
+
+# error: [invalid-type-form]
+# error: [unresolved-reference] "Name `missing_direct` used when not defined"
+direct: "LiteralString[missing_direct]"
+```
+
+### Parameterized evaluated annotations
+
+Evaluated annotations still report errors in their arguments.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing_extensions import LiteralString
+
+# error: [invalid-type-form]
+# error: [unresolved-reference] "Name `missing` used when not defined"
+value: LiteralString[(name := missing)]
+```
+
 ### As a base class
 
 Subclassing `LiteralString` leads to a runtime error.
@@ -71,6 +152,66 @@ Subclassing `LiteralString` leads to a runtime error.
 from typing_extensions import LiteralString
 
 class C(LiteralString): ...  # error: [invalid-base]
+```
+
+### Literal suggestions in string annotations
+
+A literal alias is valid as a `Literal` argument, so a parameterized `LiteralString` with a literal
+alias suggests `Literal`.
+
+```py
+from typing_extensions import Literal, LiteralString
+
+Alias = Literal["value"]
+
+# snapshot: invalid-type-form
+alias: "LiteralString[Alias]"
+```
+
+```snapshot
+error[invalid-type-form]: `LiteralString` expects no type parameter
+ --> src/mdtest_snippet.py:6:9
+  |
+6 | alias: "LiteralString[Alias]"
+  |         -------------^^^^^^^
+  |         |
+  |         Did you mean `Literal`?
+```
+
+Aliases containing multiple literal values are also valid `Literal` arguments.
+
+```py
+MultipleValues = Literal["a", "b"]
+
+# snapshot: invalid-type-form
+multiple_values: "LiteralString[MultipleValues]"
+```
+
+```snapshot
+error[invalid-type-form]: `LiteralString` expects no type parameter
+  --> src/mdtest_snippet.py:10:19
+   |
+10 | multiple_values: "LiteralString[MultipleValues]"
+   |                   -------------^^^^^^^^^^^^^^^^
+   |                   |
+   |                   Did you mean `Literal`?
+```
+
+Ordinary variables are not valid `Literal` arguments, even if their values are strings.
+
+```py
+value = "value"
+
+# snapshot: invalid-type-form
+variable: "LiteralString[value]"
+```
+
+```snapshot
+error[invalid-type-form]: `LiteralString` expects no type parameter
+  --> src/mdtest_snippet.py:14:12
+   |
+14 | variable: "LiteralString[value]"
+   |            ^^^^^^^^^^^^^^^^^^^^
 ```
 
 ## Inference

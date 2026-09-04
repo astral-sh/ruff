@@ -13,6 +13,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::Locator;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::importer::{ImportRequest, Importer};
 use crate::{Edit, Fix, FixAvailability, Violation};
 
@@ -69,7 +70,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// [descriptors]: https://docs.python.org/3/howto/descriptor.html
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.1.9")]
+#[violation_metadata(preview_since = "v0.1.9", category = Category::Pedantic)]
 pub(crate) struct ReimplementedOperator {
     operator: Operator,
     target: FunctionLikeKind,

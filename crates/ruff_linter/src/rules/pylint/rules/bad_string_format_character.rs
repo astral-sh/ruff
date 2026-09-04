@@ -8,6 +8,7 @@ use ruff_text_size::TextRange;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for unsupported format types in format strings.
@@ -23,7 +24,7 @@ use crate::checkers::ast::Checker;
 /// print("{:z}".format("1"))
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.283")]
+#[violation_metadata(stable_since = "v0.0.283", category = Category::Correctness)]
 pub(crate) struct BadStringFormatCharacter {
     pub(crate) format_char: char,
 }

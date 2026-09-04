@@ -4,11 +4,11 @@ Checks for redundant combinations of the `ClassVar` and `Final` type qualifiers.
 
 ## Why is this bad?
 
-An attribute that is marked `Final` in a class body is implicitly a class variable.
-Marking it as `ClassVar` is therefore redundant.
+An attribute that is marked `Final` in a class body is implicitly a class variable. Marking it as
+`ClassVar` is therefore redundant.
 
-Note that this diagnostic is not emitted for dataclass fields or protocol members,
-where `ClassVar[Final[int]]` has a distinct meaning from `Final[int]`.
+Note that this diagnostic is not emitted for dataclass fields or protocol members, where
+`ClassVar[Final[int]]` has a distinct meaning from `Final[int]`.
 
 ## Examples
 

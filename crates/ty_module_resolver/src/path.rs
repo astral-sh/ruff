@@ -1,5 +1,6 @@
 //! Internal abstractions for differentiating between different kinds of search paths.
 
+use std::assert_matches;
 use std::fmt;
 use std::sync::Arc;
 
@@ -71,8 +72,9 @@ impl ModulePath {
                     "Extension must be `pyi`; got `{component_extension}`"
                 );
             } else {
-                assert!(
-                    matches!(component_extension, "pyi" | "py"),
+                assert_matches!(
+                    component_extension,
+                    "pyi" | "py",
                     "Extension must be `py` or `pyi`; got `{component_extension}`"
                 );
             }
@@ -618,6 +620,11 @@ impl SearchPath {
     /// Is the module in a site-packages directory?
     pub fn is_site_packages(&self) -> bool {
         matches!(&*self.0, SearchPathInner::SitePackages(_))
+    }
+
+    /// Is this search path provided by an editable installation?
+    pub fn is_editable(&self) -> bool {
+        matches!(&*self.0, SearchPathInner::Editable(_))
     }
 
     /// Is it plausible that this search path contains third-party code?

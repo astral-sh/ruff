@@ -866,6 +866,9 @@ impl<'db> BoundSuperType<'db> {
             Type::PropertyInstance(property) => {
                 return delegate_to(property.instance_fallback(db, env));
             }
+            Type::SlotDescriptor(_) => {
+                return delegate_to(KnownClass::MemberDescriptorType.to_instance(db, env));
+            }
             Type::BoundSuper(_) => {
                 return delegate_to(KnownClass::Super.to_instance(db, env));
             }
@@ -953,6 +956,11 @@ impl<'db> BoundSuperType<'db> {
             db,
             member,
             descriptor_error.map(MemberLookupErrorKind::DescriptorGet),
+            instance
+                .and_then(|_| attribute.place.ignore_possibly_undefined())
+                .and_then(|ty| ty.property_deprecations(db))
+                // `super` delegates reads to the owner's descriptors, but not writes or deletions.
+                .map(|properties| properties.getters_only(db)),
         ))
     }
 

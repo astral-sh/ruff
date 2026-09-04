@@ -1,3 +1,5 @@
+use std::debug_assert_matches;
+
 use crate::reachability_constraints::ScopedReachabilityConstraintId;
 use crate::use_def::{ExceptionCheckpointKey, FlowSnapshot, UseDefMapBuilder};
 
@@ -89,14 +91,14 @@ impl ExceptionContextStackManager {
     pub(super) fn finish_context_manager_context(&mut self) -> Vec<FlowSnapshot> {
         let snapshots = self.take_exception_snapshots();
         let context = self.current_exception_context_stack().pop_context();
-        debug_assert!(matches!(context.kind, ExceptionContextKind::With));
+        debug_assert_matches!(context.kind, ExceptionContextKind::With);
         snapshots
     }
 
     /// Removes the current `try` context after its handlers have been deactivated.
     pub(super) fn pop_try_context(&mut self) -> ExceptionContext {
         let context = self.current_exception_context_stack().pop_context();
-        debug_assert!(matches!(context.kind, ExceptionContextKind::Try { .. }));
+        debug_assert_matches!(context.kind, ExceptionContextKind::Try { .. });
         debug_assert!(!context.exception_handlers.is_active());
         context
     }

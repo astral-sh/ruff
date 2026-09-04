@@ -88,7 +88,7 @@ mod tests {
         Ok(())
     }
 }
-"""  # noqa: UP031  # Using an f-string here is ugly as all the curly parens need to be escaped
+"""  # ruff: ignore[printf-string-formatting]  # Using an f-string here is ugly as all the curly parens need to be escaped
             % dir_name(plugin),
         )
 

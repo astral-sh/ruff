@@ -11,6 +11,7 @@ use self::named_tuple::synthesize_namedtuple_class_member;
 pub(super) use self::named_tuple::{
     DynamicNamedTupleAnchor, DynamicNamedTupleLiteral, NamedTupleField, NamedTupleSpec,
 };
+pub use self::slots::SlotDescriptorType;
 pub(crate) use self::static_literal::{
     ExpandedClassBaseEntry, FrozenDataclassDispatch, StaticClassLiteral,
     expanded_class_base_entries,
@@ -19,13 +20,13 @@ pub(super) use self::typed_dict::{
     DynamicTypedDictAnchor, DynamicTypedDictLiteral, synthesized_typed_dict_class_member,
 };
 use super::dedicated::pydantic;
+use super::display;
 use super::{
     BoundTypeVarIdentity, BoundTypeVarInstance, MemberLookupPolicy, MroIterator, SpecialFormType,
     SubclassOfType, Type, TypeQualifiers, class_base::ClassBase, function::FunctionType,
 };
-use super::{TypeVarVariance, display};
 use crate::place::{DefinedPlace, Provenance, TypeOrigin};
-use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
+use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
 };
@@ -43,10 +44,11 @@ use crate::types::signatures::{
 };
 use crate::types::tuple::TupleSpec;
 use crate::types::typevar::TypeVarSet;
+use crate::types::variance::VarianceOrigin;
 use crate::types::{
-    ApplyTypeMappingVisitor, CallableType, CallableTypes, DataclassParams,
-    FindLegacyTypeVarsVisitor, IntersectionType, TypeContext, TypeMapping, TypingModule,
-    UnionBuilder, VarianceInferable,
+    ApplyTypeMappingVisitor, CallableType, CallableTypes, DataclassParams, ErrorContext,
+    ErrorContextTree, FindLegacyTypeVarsVisitor, IntersectionType, TypeContext, TypeMapping,
+    TypingModule, UnionBuilder, VarianceInferable, VarianceTerm,
 };
 use crate::{
     Db, FxIndexMap, FxOrderSet,
@@ -71,6 +73,7 @@ mod enum_literal;
 mod implicit_attributes;
 mod known;
 mod named_tuple;
+mod slots;
 mod static_literal;
 mod typed_dict;
 
@@ -511,23 +514,26 @@ impl<'db> VarianceInferable<'db> for GenericAlias<'db> {
         db: &'db dyn Db,
         _: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
-    ) -> TypeVarVariance {
-        self.variance_of_owner(db, typevar)
+    ) -> VarianceTerm<'db> {
+        VarianceTerm::variable(db, VarianceOrigin::GenericAlias(self), typevar)
     }
 }
 
 #[salsa::tracked]
 impl<'db> GenericAlias<'db> {
+    /// Compose each type argument's variance with its formal parameter's variance. Inferred
+    /// parameters refer to the unspecialized class equation, keeping references such as
+    /// `P[list[T]]` finite without expanding specialized class bodies.
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, _, _, _| TypeVarVariance::Bivariant,
+        cycle_initial=|_, _, _, _| VarianceTerm::BIVARIANT,
         heap_size=ruff_memory_usage::heap_size
     )]
-    fn variance_of_owner(
+    pub(in crate::types) fn variance_equation(
         self,
         db: &'db dyn Db,
         typevar: BoundTypeVarIdentity<'db>,
-    ) -> TypeVarVariance {
+    ) -> VarianceTerm<'db> {
         let origin = self.origin(db);
         let env = ProgramEnvironment::from_file(origin.program_file(db));
 
@@ -535,33 +541,32 @@ impl<'db> GenericAlias<'db> {
 
         // Note that we only care about the variance of the specialized generic alias with respect
         // to the given type variable, not the unspecialized class literal origin.
-        specialization
+        let variances = specialization
             .generic_context(db)
             .variables(db)
             .zip(specialization.types(db))
             .map(|(generic_typevar, ty)| {
-                if let Some(explicit_variance) = generic_typevar.typevar(db).explicit_variance(db) {
-                    ty.with_polarity(explicit_variance)
-                        .variance_of(db, &env, typevar)
-                } else {
-                    // `with_polarity` composes the passed variance with the
-                    // inferred one. The inference is done lazily, as we can
-                    // sometimes determine the result just from the passed
-                    // variance. This operation is commutative, so we could
-                    // infer either first.  We choose to make the `StaticClassLiteral`
-                    // variance lazy, as it is known to be expensive, requiring
-                    // that we traverse all members.
-                    //
-                    // If salsa let us look at the cache, we could check first
-                    // to see if the class literal query was already run.
-
-                    let typevar_variance_in_substituted_type = ty.variance_of(db, &env, typevar);
-                    origin
-                        .with_polarity(typevar_variance_in_substituted_type)
-                        .variance_of(db, &env, generic_typevar.identity(db))
-                }
-            })
-            .collect()
+                // Composition is commutative. Keep the argument on the left so evaluation can
+                // skip the class's potentially expensive equation when the argument is bivariant.
+                ty.variance_of(db, &env, typevar).compose_thunk(db, || {
+                    match generic_typevar.typevar(db).explicit_variance(db) {
+                        Some(explicit_variance)
+                            if generic_typevar.is_paramspec(db)
+                                || generic_typevar.is_typevartuple(db)
+                                || origin.into_protocol_class(db).is_none() =>
+                        {
+                            explicit_variance.into()
+                        }
+                        Some(explicit_variance) => VarianceTerm::variable(
+                            db,
+                            VarianceOrigin::ProtocolParameter(origin, explicit_variance),
+                            generic_typevar.identity(db),
+                        ),
+                        None => origin.variance_of(db, &env, generic_typevar.identity(db)),
+                    }
+                })
+            });
+        VarianceTerm::join(db, variances)
     }
 }
 
@@ -688,6 +693,16 @@ impl<'db> ClassLiteral<'db> {
         }
     }
 
+    pub(super) fn inferred_metaclass(self, db: &'db dyn Db) -> ClassMetaclass<'db> {
+        match self {
+            Self::Static(class) => class.inferred_metaclass(db),
+            Self::Dynamic(class) => class.inferred_metaclass(db),
+            Self::DynamicNamedTuple(_) | Self::DynamicTypedDict(_) | Self::DynamicEnum(_) => {
+                ClassMetaclass::Selected(self.metaclass(db))
+            }
+        }
+    }
+
     /// Look up a class-level member by iterating through the MRO.
     pub(crate) fn class_member(
         self,
@@ -701,7 +716,7 @@ impl<'db> ClassLiteral<'db> {
             Self::Dynamic(class) => class.class_member(db, env, name, policy),
             Self::DynamicNamedTuple(namedtuple) => namedtuple.class_member(db, env, name, policy),
             Self::DynamicTypedDict(typeddict) => typeddict.class_member(db, env, name, policy),
-            Self::DynamicEnum(enum_lit) => enum_lit.class_member(db, env, name),
+            Self::DynamicEnum(enum_lit) => enum_lit.class_member(db, env, name, policy),
         }
     }
 
@@ -1533,12 +1548,17 @@ impl<'db> ClassType<'db> {
 
     /// Return the metaclass of this class, or `type[Unknown]` if the metaclass cannot be inferred.
     pub(super) fn metaclass(self, db: &'db dyn Db) -> Type<'db> {
-        match self {
-            Self::NonGeneric(class) => class.metaclass(db),
-            Self::Generic(generic) => generic
-                .origin(db)
-                .metaclass(db)
-                .apply_optional_specialization(db, Some(generic.specialization(db))),
+        let env = ProgramEnvironment::from_file(self.class_literal(db).program_file(db));
+        self.inferred_metaclass(db).to_type(db, &env)
+    }
+
+    pub(super) fn inferred_metaclass(self, db: &'db dyn Db) -> ClassMetaclass<'db> {
+        let (class, specialization) = self.class_literal_and_specialization(db);
+        match class.inferred_metaclass(db) {
+            ClassMetaclass::Selected(metaclass) => ClassMetaclass::Selected(
+                metaclass.apply_optional_specialization(db, specialization),
+            ),
+            ClassMetaclass::ProtocolFallback => ClassMetaclass::ProtocolFallback,
         }
     }
 
@@ -1653,6 +1673,7 @@ impl<'db> ClassType<'db> {
             db,
             env,
             other,
+            None,
             |this, other| this.could_exist_in_mro_of(db, env, other, constraints),
             |this, other| {
                 this.is_disjoint_from(db, env, other, constraints, TypeVarSet::None)
@@ -1678,6 +1699,7 @@ impl<'db> ClassType<'db> {
             db,
             env,
             other,
+            checker.report_context(),
             |this, other| {
                 this.could_exist_in_mro_of_with_disjointness_checker(db, env, other, checker)
             },
@@ -1694,11 +1716,13 @@ impl<'db> ClassType<'db> {
         )
     }
 
+    #[expect(clippy::too_many_arguments)]
     fn could_coexist_in_mro_with_impl(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         other: Self,
+        context: Option<&ErrorContextTree<'db>>,
         could_exist_in_mro_of: impl Fn(Self, Self) -> bool,
         specializations_are_disjoint: impl Fn(Specialization<'db>, Specialization<'db>) -> bool,
         types_are_disjoint: impl Fn(Type<'db>, Type<'db>) -> bool,
@@ -1708,11 +1732,25 @@ impl<'db> ClassType<'db> {
         }
 
         if self.is_final(db) {
-            return could_exist_in_mro_of(other, self);
+            let compatible = could_exist_in_mro_of(other, self);
+            if !compatible && let Some(context) = context {
+                context.push(ErrorContext::FinalClassDisjoint {
+                    final_type: Type::instance(db, env, self),
+                    other: Type::instance(db, env, other),
+                });
+            }
+            return compatible;
         }
 
         if other.is_final(db) {
-            return could_exist_in_mro_of(self, other);
+            let compatible = could_exist_in_mro_of(self, other);
+            if !compatible && let Some(context) = context {
+                context.push(ErrorContext::FinalClassDisjoint {
+                    final_type: Type::instance(db, env, other),
+                    other: Type::instance(db, env, self),
+                });
+            }
+            return compatible;
         }
 
         // A class cannot implement two incompatible specializations of an invariant base.
@@ -1731,6 +1769,12 @@ impl<'db> ClassType<'db> {
                     })
             })
         {
+            if let Some(context) = context {
+                context.push(ErrorContext::IncompatibleClassLayouts {
+                    left: Type::instance(db, env, self),
+                    right: Type::instance(db, env, other),
+                });
+            }
             return false;
         }
 
@@ -1740,11 +1784,11 @@ impl<'db> ClassType<'db> {
         // that `type` is its own metaclass (and we know that `type` can coexist in an MRO
         // with any other arbitrary class, anyway).
         let type_class = KnownClass::Type.to_class_literal(db, env);
-        let self_metaclass = self.metaclass(db);
+        let self_metaclass = self.inferred_metaclass(db).for_inheritance(db, env);
         if self_metaclass == type_class {
             return true;
         }
-        let other_metaclass = other.metaclass(db);
+        let other_metaclass = other.inferred_metaclass(db).for_inheritance(db, env);
         if other_metaclass == type_class {
             return true;
         }
@@ -1852,7 +1896,7 @@ impl<'db> ClassType<'db> {
                 .map(|specialization| specialization.tuple_runtime_element_specialization(db));
             class_literal
                 .own_class_member(db, env, inherited_generic_context, specialization, name)
-                .map_type(|ty| ty.apply_optional_specialization(db, specialization))
+                .map_type(|ty| ty.apply_optional_owner_specialization_to_member(db, specialization))
         };
 
         match name {
@@ -2050,7 +2094,6 @@ impl<'db> ClassType<'db> {
                             db,
                             getitem_signature,
                             CallableTypeKind::FunctionLike,
-                            CallableFunctionProvenance::None,
                         ));
                         Member::definitely_declared(getitem_type)
                     })
@@ -2168,7 +2211,9 @@ impl<'db> ClassType<'db> {
 
                 class_literal
                     .instance_member(db, env, specialization, name)
-                    .map_type(|ty| ty.apply_optional_specialization(db, specialization))
+                    .map_type(|ty| {
+                        ty.apply_optional_owner_specialization_to_member(db, specialization)
+                    })
             }
         }
     }
@@ -2223,7 +2268,9 @@ impl<'db> ClassType<'db> {
                 generic
                     .origin(db)
                     .own_instance_member(db, env, name)
-                    .map_type(|ty| ty.apply_optional_specialization(db, Some(specialization)))
+                    .map_type(|ty| {
+                        ty.apply_optional_owner_specialization_to_member(db, Some(specialization))
+                    })
             }
         }
     }
@@ -2362,12 +2409,8 @@ impl<'db> ClassType<'db> {
                 .iter()
                 .any(|signature| !signature.return_ty.is_assignable_to(db, env, instance_type));
 
-            let dunder_new_bound_method = CallableType::new(
-                db,
-                bound_signature,
-                CallableTypeKind::Regular,
-                CallableFunctionProvenance::None,
-            );
+            let dunder_new_bound_method =
+                CallableType::new(db, bound_signature, CallableTypeKind::Regular);
 
             if returns_non_subclass {
                 return CallableTypes::one(dunder_new_bound_method);
@@ -2441,7 +2484,6 @@ impl<'db> ClassType<'db> {
                     db,
                     synthesized_dunder_init_signature,
                     CallableTypeKind::Regular,
-                    CallableFunctionProvenance::None,
                 ))
             } else {
                 None
@@ -2554,7 +2596,7 @@ impl<'db> VarianceInferable<'db> for ClassType<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
-    ) -> TypeVarVariance {
+    ) -> VarianceTerm<'db> {
         match self {
             Self::NonGeneric(ClassLiteral::Static(class)) => class.variance_of(db, env, typevar),
             Self::NonGeneric(
@@ -2562,7 +2604,7 @@ impl<'db> VarianceInferable<'db> for ClassType<'db> {
                 | ClassLiteral::DynamicNamedTuple(_)
                 | ClassLiteral::DynamicTypedDict(_)
                 | ClassLiteral::DynamicEnum(_),
-            ) => TypeVarVariance::Bivariant,
+            ) => VarianceTerm::BIVARIANT,
             Self::Generic(generic) => generic.variance_of(db, env, typevar),
         }
     }
@@ -2779,13 +2821,13 @@ impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
-    ) -> TypeVarVariance {
+    ) -> VarianceTerm<'db> {
         match self {
             Self::Static(class) => class.variance_of(db, env, typevar),
             Self::Dynamic(_)
             | Self::DynamicNamedTuple(_)
             | Self::DynamicTypedDict(_)
-            | Self::DynamicEnum(_) => TypeVarVariance::Bivariant,
+            | Self::DynamicEnum(_) => VarianceTerm::BIVARIANT,
         }
     }
 }
@@ -3336,6 +3378,59 @@ pub(super) enum DisjointBaseKind {
     DefinesSlots,
 }
 
+/// A selected metaclass, or the `ABCMeta` fallback inferred from a typeshed stdlib protocol base.
+///
+/// Typeshed lists `Protocol` as a base for some classes, such as collection ABCs, that do not
+/// inherit from it at runtime. Inferring a metaclass constraint from those bases would therefore
+/// produce false conflicts. The fallback exposes ABC methods such as `register`, but does not
+/// participate in metaclass selection.
+///
+/// Outside those stubs, a `Protocol` base selects its actual `_ProtocolMeta` metaclass, even in a
+/// stub file. It participates in metaclass selection and constrains subclasses in the usual way.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+pub(super) enum ClassMetaclass<'db> {
+    Selected(Type<'db>),
+    /// A lookup-only fallback originating in typeshed. Inheritance preserves this provenance.
+    ProtocolFallback,
+}
+
+impl<'db> ClassMetaclass<'db> {
+    fn with_protocol_fallback(
+        db: &'db dyn Db,
+        selected: Type<'db>,
+        has_protocol_fallback: bool,
+    ) -> Self {
+        if has_protocol_fallback
+            && selected
+                .to_class_type(db)
+                .is_some_and(|class| class.is_known(db, KnownClass::Type))
+        {
+            Self::ProtocolFallback
+        } else {
+            Self::Selected(selected)
+        }
+    }
+
+    fn to_type(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
+        match self {
+            Self::Selected(metaclass) => metaclass,
+            Self::ProtocolFallback => KnownClass::ABCMeta.to_class_literal(db, env),
+        }
+    }
+
+    /// Return the metaclass guaranteed by class declarations, without the typeshed fallback.
+    pub(super) fn for_inheritance(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Type<'db> {
+        match self {
+            Self::Selected(metaclass) => metaclass,
+            Self::ProtocolFallback => KnownClass::Type.to_class_literal(db, env),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub(super) struct MetaclassError<'db> {
     kind: MetaclassErrorKind<'db>,
@@ -3355,16 +3450,11 @@ pub(super) enum MetaclassErrorKind<'db> {
     /// The metaclass of a derived class must be a (non-strict) subclass of the metaclasses of all
     /// its bases.
     Conflict {
-        /// `candidate1` will either be the explicit `metaclass=` keyword in the class definition,
-        /// or the inferred metaclass of a base class
-        candidate1: MetaclassCandidate<'db>,
-
-        /// `candidate2` will always be the inferred metaclass of a base class
-        candidate2: MetaclassCandidate<'db>,
-
-        /// Flag to indicate whether `candidate1` is the explicit `metaclass=` keyword or the
-        /// inferred metaclass of a base class. This helps us give better error messages in diagnostics.
-        candidate1_is_base_class: bool,
+        /// The explicit `metaclass=` keyword or a previously visited base's metaclass.
+        candidate: MetaclassCandidate<'db>,
+        /// The incompatible metaclass of `base`.
+        base_metaclass: ClassType<'db>,
+        base: ClassBase<'db>,
     },
     /// The metaclass is a parameterized generic class, which is not supported.
     GenericMetaclass,
@@ -3374,62 +3464,4 @@ pub(super) enum MetaclassErrorKind<'db> {
     PartlyNotCallable(Type<'db>),
     /// A cycle was encountered attempting to determine the metaclass
     Cycle,
-}
-
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-enum SlotsKind {
-    /// `__slots__` is not found in the class.
-    NotSpecified,
-    /// `__slots__` is defined but empty: `__slots__ = ()`.
-    Empty,
-    /// `__slots__` is defined and is not empty: `__slots__ = ("a", "b")`.
-    NotEmpty,
-    /// `__slots__` is defined but its value is dynamic:
-    /// * `__slots__ = tuple(a for a in b)`
-    /// * `__slots__ = ["a", "b"]`
-    Dynamic,
-}
-
-impl SlotsKind {
-    fn from(db: &dyn Db, base: StaticClassLiteral) -> Self {
-        let env = ProgramEnvironment::from_scope(base.body_scope(db));
-        let Place::Defined(DefinedPlace {
-            ty: slots_ty,
-            definedness: bound,
-            ..
-        }) = base
-            .own_class_member(
-                db,
-                &env,
-                base.inherited_generic_context(db),
-                None,
-                "__slots__",
-            )
-            .inner
-            .place
-        else {
-            return Self::NotSpecified;
-        };
-
-        if matches!(bound, Definedness::PossiblyUndefined) {
-            return Self::Dynamic;
-        }
-
-        match slots_ty {
-            // __slots__ = ("a", "b")
-            Type::NominalInstance(nominal) => match nominal
-                .tuple_spec(db, &env)
-                .and_then(|spec| spec.len().into_fixed_length())
-            {
-                Some(0) => Self::Empty,
-                Some(_) => Self::NotEmpty,
-                None => Self::Dynamic,
-            },
-
-            // __slots__ = "abc"  # Same as `("abc",)`
-            Type::LiteralValue(literal) if literal.is_string() => Self::NotEmpty,
-
-            _ => Self::Dynamic,
-        }
-    }
 }

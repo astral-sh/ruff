@@ -4,6 +4,7 @@ use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::importer::ImportRequest;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
@@ -31,7 +32,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// np.all([True, False])
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.276")]
+#[violation_metadata(stable_since = "v0.0.276", category = Category::Suspicious)]
 pub(crate) struct NumpyDeprecatedFunction {
     existing: String,
     replacement: String,

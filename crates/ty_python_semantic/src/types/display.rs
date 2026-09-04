@@ -146,7 +146,7 @@ pub struct DisplaySettings<'db> {
 
 impl<'db> DisplaySettings<'db> {
     #[must_use]
-    pub fn multiline(&self) -> Self {
+    fn multiline(&self) -> Self {
         Self {
             multiline: true,
             ..self.clone()
@@ -162,7 +162,7 @@ impl<'db> DisplaySettings<'db> {
     }
 
     #[must_use]
-    pub(crate) fn preserve_long_unions(self) -> Self {
+    fn preserve_long_unions(self) -> Self {
         Self {
             preserve_full_unions: true,
             ..self
@@ -182,7 +182,7 @@ impl<'db> DisplaySettings<'db> {
     }
 
     #[must_use]
-    pub(crate) fn disallow_signature_name(&self) -> Self {
+    fn disallow_signature_name(&self) -> Self {
         Self {
             signature_name_display: SignatureNameDisplay::Disallow,
             ..self.clone()
@@ -198,7 +198,7 @@ impl<'db> DisplaySettings<'db> {
     }
 
     #[must_use]
-    pub(crate) fn hide_return_type(&self) -> Self {
+    fn hide_return_type(&self) -> Self {
         Self {
             hide_return_type: true,
             ..self.clone()
@@ -652,7 +652,7 @@ impl<'db> Type<'db> {
         }
     }
 
-    pub fn display_with<'env>(
+    pub(crate) fn display_with<'env>(
         self,
         db: &'db dyn Db,
         env: &'env ProgramEnvironment<'db>,
@@ -1139,6 +1139,9 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
             Type::PropertyInstance(property) => f
                 .with_type(self.ty)
                 .write_str(property_display_name(db, property)),
+            Type::SlotDescriptor(_) => f
+                .with_type(self.ty)
+                .write_str(KnownClass::MemberDescriptorType.name(self.env.python_version(db))),
             Type::ModuleLiteral(module) => {
                 f.set_invalid_type_annotation();
                 f.write_char('<')?;
@@ -1232,6 +1235,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
             Type::BoundMethod(bound_method) => {
                 let function = bound_method.function(db);
                 let self_ty = bound_method.self_instance(db);
+                let receiver_ty = bound_method.signature_receiver(db);
                 let bound_signatures = bound_method.bound_signatures(db);
 
                 match bound_signatures.overloads.as_slice() {
@@ -1252,6 +1256,16 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                             settings: self.settings.singleline(),
                         }
                         .fmt_detailed(f)?;
+                        if self_ty != receiver_ty {
+                            f.write_str(" when ")?;
+                            DisplayMaybeParenthesizedType {
+                                ty: receiver_ty,
+                                db,
+                                env: self.env,
+                                settings: self.settings.singleline(),
+                            }
+                            .fmt_detailed(f)?;
+                        }
                         f.write_char('.')?;
                         f.with_type(self.ty).write_str(function.name(db))?;
                         type_parameters.fmt_detailed(f)?;
@@ -2362,7 +2376,7 @@ impl<'db> Signature<'db> {
         )
     }
 
-    pub(crate) fn display_with<'a>(
+    fn display_with<'a>(
         &'a self,
         db: &'db dyn Db,
         env: &'a ProgramEnvironment<'db>,
@@ -2753,7 +2767,7 @@ impl<'db> FmtDetailed<'db> for DisplayParameter<'_, 'db> {
                     .fmt_detailed(f)?;
             }
             // Default value can only be specified if `name` is given.
-            if let Some(default_type) = self.param.default_type() {
+            if let Some(default_type) = self.param.default_type(db) {
                 if self.param.should_annotation_be_displayed() {
                     f.write_str(" = ")?;
                 } else {

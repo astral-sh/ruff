@@ -16,6 +16,7 @@ use ruff_db::testing::{setup_logging, setup_logging_with_filter};
 use ruff_diagnostics::Applicability;
 use ruff_python_ast::PythonVersion;
 use ruff_source_file::OneIndexed;
+use std::assert_matches;
 use std::fmt::Write;
 use ty_module_resolver::{
     Module, SearchPath, SearchPathSettings, list_modules, resolve_module_confident,
@@ -169,11 +170,9 @@ fn run_test(
                 return None;
             }
 
-            assert!(
-                matches!(
-                    embedded.lang,
-                    "py" | "pyi" | "python" | "ipynb" | "text" | "cfg" | "pth"
-                ),
+            assert_matches!(
+                embedded.lang,
+                "py" | "pyi" | "python" | "ipynb" | "text" | "cfg" | "pth",
                 "Supported file types are: py (or python), pyi, ipynb, text, cfg and ignore"
             );
 
@@ -307,6 +306,12 @@ fn run_test(
 
     db.update_program(settings);
     db.update_analysis_options(configuration.analysis.as_ref());
+    db.update_dependency_metadata(
+        configuration
+            .dependency_metadata
+            .as_ref()
+            .map(|fixture| &fixture.metadata),
+    );
     db.update_mdtest_rule_selection(configuration.rules.as_ref(), options.default_error_rule);
     db.set_verbosity(test.configuration().verbose());
 

@@ -24,9 +24,9 @@
 # exclude-newer = "P7D"
 #
 # [tool.uv.sources]
-# # Keep this revision and the script's lockfile in sync with ecosystem-analyzer's
-# # mypy-primer pin so memory reports and ecosystem jobs use the same project definitions.
-# mypy-primer = { git = "https://github.com/hauntsaninja/mypy_primer", rev = "db37f8a384c45c02fc52544fd819f979d66e174a" }
+# # Keep the script's lockfile in sync with the mypy-primer pin in the project's uv.lock file
+# # so memory reports and ecosystem jobs use the same project definitions.
+# mypy-primer = { git = "https://github.com/hauntsaninja/mypy_primer" }
 # ///
 
 """Clone a mypy-primer project and set up a virtualenv with its dependencies installed.
@@ -161,7 +161,7 @@ def main() -> None:
         install_cmd = project.install_cmd.format(install=install_base)
         print(f"Running install command: {install_cmd}")
         # Primer install commands are trusted project metadata and may use shell syntax.
-        subprocess.run(install_cmd, cwd=target_dir, shell=True, check=True)  # noqa: S602
+        subprocess.run(install_cmd, cwd=target_dir, shell=True, check=True)  # ruff: ignore[subprocess-popen-with-shell-equals-true]
 
     # Install listed dependencies (matching primer's setup())
     if project.deps:

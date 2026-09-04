@@ -8,6 +8,7 @@ use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::importer::ImportRequest;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
@@ -50,7 +51,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// [PEP 709]: https://peps.python.org/pep-0709/
 /// [#7771]: https://github.com/astral-sh/ruff/issues/7771
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.0.291")]
+#[violation_metadata(preview_since = "v0.0.291", category = Category::Pedantic)]
 pub(crate) struct ReimplementedStarmap;
 
 impl Violation for ReimplementedStarmap {

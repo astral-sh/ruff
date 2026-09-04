@@ -39,8 +39,8 @@ pub enum ValueSource {
     /// (e.g., the Python environment)
     Editor,
 
-    /// The value was provided by `uv workspace metadata`.
-    UvWorkspace,
+    /// The value was provided by uv metadata for a project or standalone script.
+    UvMetadata,
 }
 
 impl ValueSource {
@@ -51,7 +51,7 @@ impl ValueSource {
             ValueSource::ScriptMetadata(file) => Some(*file),
             ValueSource::Cli => None,
             ValueSource::Editor => None,
-            ValueSource::UvWorkspace => None,
+            ValueSource::UvMetadata => None,
         }
     }
 }

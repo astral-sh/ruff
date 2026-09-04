@@ -1,8 +1,10 @@
 ## What it does
 
-Checks for methods that override a method or attribute in a superclass but are not decorated with `@override`.
+Checks for methods that override a method or attribute in a superclass but are not decorated with
+`@override`.
 
-This rule is disabled by default. Enable it to opt in to strict `@override` enforcement for a project.
+This rule is disabled by default. Enable it to opt in to strict `@override` enforcement for a
+project.
 
 ## Exemptions
 

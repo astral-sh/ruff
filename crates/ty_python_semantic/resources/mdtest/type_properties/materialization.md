@@ -279,6 +279,37 @@ def takes_objects(*args: object, **kwargs: object) -> object:
 static_assert(not is_subtype_of(TopCallable, RegularCallableTypeOf[takes_objects]))
 ```
 
+## `ParamSpec` specializations
+
+For a class invariant in a `ParamSpec`, every fixed specialization lies between the bottom and top
+materializations of its `...` specialization. This holds for both subtyping and assignability. The
+reverse relations do not hold for an arbitrary fixed specialization.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Callable
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import is_assignable_to, is_subtype_of
+
+class Box[**P]:
+    callback: Callable[P, None]
+
+def _[**P]():
+    static_assert(is_subtype_of(Box[P], Top[Box[...]]))
+    static_assert(is_subtype_of(Bottom[Box[...]], Box[P]))
+    static_assert(not is_subtype_of(Top[Box[...]], Box[P]))
+    static_assert(not is_subtype_of(Box[P], Bottom[Box[...]]))
+
+    static_assert(is_assignable_to(Box[P], Top[Box[...]]))
+    static_assert(is_assignable_to(Bottom[Box[...]], Box[P]))
+    static_assert(not is_assignable_to(Top[Box[...]], Box[P]))
+    static_assert(not is_assignable_to(Box[P], Bottom[Box[...]]))
+```
+
 ## Tuple
 
 All positions in a tuple are covariant.
@@ -340,6 +371,197 @@ def _(
 
     reveal_type(top_aiu)  # revealed: Top[list[tuple[Any, int, Unknown]]]
     reveal_type(bottom_aiu)  # revealed: Bottom[list[tuple[Any, int, Unknown]]]
+```
+
+## Gradual tuple length in invariant positions
+
+An unrestricted variable-length tuple with dynamic elements can materialize to an empty tuple. The
+top materialization of an enclosing invariant generic includes that specialization, and its bottom
+materialization is a subtype of it.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from typing import Any, TypeVarTuple
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import is_disjoint_from, is_subtype_of
+
+Ts = TypeVarTuple("Ts")
+
+static_assert(is_subtype_of(list[tuple[()]], Top[list[tuple[Any, ...]]]))
+static_assert(not is_disjoint_from(list[tuple[()]], Top[list[tuple[Any, ...]]]))
+static_assert(not is_disjoint_from(Top[list[tuple[Any, ...]]], list[tuple[()]]))
+static_assert(is_subtype_of(Bottom[list[tuple[Any, ...]]], list[tuple[()]]))
+static_assert(not is_subtype_of(list[tuple[()]], Bottom[list[tuple[Any, ...]]]))
+```
+
+The same gradual-length choice also includes nonempty, fixed-length tuple specializations.
+
+```py
+static_assert(is_subtype_of(list[tuple[int]], Top[list[tuple[Any, ...]]]))
+static_assert(not is_disjoint_from(list[tuple[int]], Top[list[tuple[Any, ...]]]))
+static_assert(not is_disjoint_from(Top[list[tuple[Any, ...]]], list[tuple[int]]))
+static_assert(is_subtype_of(Bottom[list[tuple[Any, ...]]], list[tuple[int]]))
+static_assert(not is_subtype_of(list[tuple[int]], Bottom[list[tuple[Any, ...]]]))
+```
+
+An exact tuple remains a valid materialization when its element is spelled through a type alias.
+
+```py
+from typing_extensions import TypeAliasType
+
+ItemAlias = TypeAliasType("ItemAlias", int)
+
+static_assert(is_subtype_of(list[tuple[ItemAlias]], Top[list[tuple[Any, ...]]]))
+```
+
+Aliases around the entire tuple still need to be resolved before comparing the materialization
+families.
+
+```py
+FixedTupleAlias = TypeAliasType("FixedTupleAlias", tuple[int])
+
+# TODO: Resolve aliases around the entire tuple in invariant subtyping.
+static_assert(is_subtype_of(list[FixedTupleAlias], Top[list[tuple[Any, ...]]]))  # error: [static-assert-error]
+```
+
+A gradual fixed-length tuple has a narrower materialization range than an unrestricted gradual
+tuple. Their top bounds preserve that containment, while their bottom bounds reverse it.
+
+```py
+static_assert(is_subtype_of(Top[list[tuple[Any]]], Top[list[tuple[Any, ...]]]))
+static_assert(not is_subtype_of(Top[list[tuple[Any, ...]]], Top[list[tuple[Any]]]))
+static_assert(is_subtype_of(Bottom[list[tuple[Any, ...]]], Bottom[list[tuple[Any]]]))
+static_assert(not is_subtype_of(Bottom[list[tuple[Any]]], Bottom[list[tuple[Any, ...]]]))
+static_assert(not is_subtype_of(Top[list[tuple[Any, ...]]], Bottom[list[tuple[Any, ...]]]))
+```
+
+An unpacked type variable tuple is another valid exact-tuple specialization, even though its length
+is not known.
+
+```py
+def symbolic(value: list[tuple[*Ts]]) -> None:
+    static_assert(is_subtype_of(list[tuple[*Ts]], Top[list[tuple[Any, ...]]]))
+    static_assert(not is_disjoint_from(list[tuple[*Ts]], Top[list[tuple[Any, ...]]]))
+    static_assert(not is_disjoint_from(Top[list[tuple[Any, ...]]], list[tuple[*Ts]]))
+    static_assert(is_subtype_of(Bottom[list[tuple[Any, ...]]], list[tuple[*Ts]]))
+    static_assert(not is_subtype_of(list[tuple[*Ts]], Bottom[list[tuple[Any, ...]]]))
+```
+
+A tuple subclass is not itself a materialization of the exact built-in `tuple[Any, ...]` type. The
+surrounding invariant generic must therefore keep the subclass distinct.
+
+```py
+class IntTuple(tuple[int]): ...
+
+static_assert(is_subtype_of(IntTuple, tuple[object, ...]))
+static_assert(not is_subtype_of(list[IntTuple], Top[list[tuple[Any, ...]]]))
+static_assert(is_disjoint_from(list[IntTuple], Top[list[tuple[Any, ...]]]))
+static_assert(is_disjoint_from(Top[list[tuple[Any, ...]]], list[IntTuple]))
+static_assert(not is_subtype_of(Bottom[list[tuple[Any, ...]]], list[IntTuple]))
+```
+
+A static homogeneous tuple does not make a gradual choice of length, even though every `int` is an
+`object`.
+
+```py
+static_assert(not is_subtype_of(list[tuple[int]], Top[list[tuple[object, ...]]]))
+static_assert(is_disjoint_from(list[tuple[int]], Top[list[tuple[object, ...]]]))
+```
+
+Fixed elements in a mixed tuple must also retain their invariant identity. In particular, a `bool`
+prefix cannot replace the required `int` prefix simply because `bool` is a subtype of `int`.
+
+```py
+static_assert(not is_subtype_of(list[tuple[bool, str]], Top[list[tuple[int, *tuple[Any, ...]]]]))
+static_assert(is_disjoint_from(list[tuple[bool, str]], Top[list[tuple[int, *tuple[Any, ...]]]]))
+```
+
+A required suffix retains its invariant identity even when there is no required prefix. A `bool`
+cannot replace the required `int` suffix.
+
+```py
+static_assert(not is_subtype_of(list[tuple[bool]], Top[list[tuple[*tuple[Any, ...], int]]]))
+static_assert(is_disjoint_from(list[tuple[bool]], Top[list[tuple[*tuple[Any, ...], int]]]))
+```
+
+A tuple with a required suffix cannot materialize to an empty tuple.
+
+```py
+static_assert(not is_subtype_of(list[tuple[()]], Top[list[tuple[*tuple[Any, ...], int]]]))
+static_assert(is_disjoint_from(list[tuple[()]], Top[list[tuple[*tuple[Any, ...], int]]]))
+```
+
+TODO: Handle valid mixed gradual-length tuples without losing their required prefix and suffix
+elements. For example, `list[tuple[int, str]]` should be a subtype of
+`Top[list[tuple[int, *tuple[Any, ...]]]]`.
+
+## Gradual tuple length with aliased elements
+
+When `Dynamic` aliases `Any`, `tuple[Dynamic, ...]` has the same gradual-length choices as
+`tuple[Any, ...]`. These choices are preserved when the tuple is an invariant type argument.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any, TypeAliasType
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import is_disjoint_from, is_subtype_of
+
+type Dynamic = Any
+
+static_assert(is_subtype_of(list[tuple[int]], Top[list[tuple[Dynamic, ...]]]))
+static_assert(is_subtype_of(Bottom[list[tuple[Dynamic, ...]]], list[tuple[int]]))
+static_assert(not is_disjoint_from(list[tuple[int]], Top[list[tuple[Dynamic, ...]]]))
+static_assert(not is_disjoint_from(Top[list[tuple[Dynamic, ...]]], list[tuple[int]]))
+```
+
+Alias chains, nested generic aliases, and aliases created with `TypeAliasType` preserve the same
+gradual-length choice.
+
+```py
+type IndirectDynamic = Dynamic
+type Identity[T] = T
+
+CalledDynamic = TypeAliasType("CalledDynamic", Any)
+
+static_assert(is_subtype_of(list[tuple[int]], Top[list[tuple[IndirectDynamic, ...]]]))
+static_assert(is_subtype_of(list[tuple[int]], Top[list[tuple[Identity[Identity[Any]], ...]]]))
+static_assert(is_subtype_of(list[tuple[int]], Top[list[tuple[CalledDynamic, ...]]]))
+static_assert(is_subtype_of(Bottom[list[tuple[CalledDynamic, ...]]], list[tuple[int]]))
+```
+
+An alias of a fully static element type does not make the tuple's length gradual, even with an
+unused dynamic type argument. Likewise, `Any` within a container or union does not make the alias
+itself dynamic.
+
+```py
+type Constant[T] = object
+type Container = list[Any]
+type Recursive = list[Recursive] | Any
+
+static_assert(not is_subtype_of(list[tuple[int]], Top[list[tuple[Constant[Any], ...]]]))
+static_assert(is_disjoint_from(list[tuple[int]], Top[list[tuple[Constant[Any], ...]]]))
+static_assert(not is_subtype_of(list[tuple[int]], Top[list[tuple[Container, ...]]]))
+static_assert(not is_subtype_of(list[tuple[int]], Top[list[tuple[Recursive, ...]]]))
+```
+
+An alias cycle does not establish that the element is dynamic. Comparing these tuple specializations
+terminates without treating either alias as `Any`.
+
+```py
+Loop = TypeAliasType("Loop", "Loop")  # error: [cyclic-type-alias-definition]
+First = TypeAliasType("First", "Second")  # error: [cyclic-type-alias-definition]
+Second = TypeAliasType("Second", First)  # error: [cyclic-type-alias-definition]
+
+static_assert(is_disjoint_from(list[tuple[int]], list[tuple[Loop, ...]]))
+static_assert(is_disjoint_from(list[tuple[int]], list[tuple[First, ...]]))
 ```
 
 ## Union
@@ -1200,6 +1422,11 @@ def generic_recursive_materialization(value: Top[Covariant[GenericRecursive[int]
 
 ## Subtyping
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 Any `list[T]` is a subtype of `Top[list[Any]]`, but with more restrictive gradual types, not all
 other specializations are subtypes.
 
@@ -1270,6 +1497,24 @@ static_assert(is_subtype_of(Bottom[list[int | Any]], Bottom[list[int | str | Any
 static_assert(is_subtype_of(Bottom[list[bool | Any]], Bottom[list[int | Any]]))
 static_assert(not is_subtype_of(Bottom[list[int | Any]], Bottom[list[bool | Any]]))
 static_assert(not is_subtype_of(Bottom[list[int | Any]], Bottom[list[Any]]))
+```
+
+An unresolved type variable does not necessarily satisfy a materialization's bounds. Conversely,
+`Top[list[Unknown]]` includes specializations that do not match an arbitrary fixed `T`.
+
+```pyi
+from ty_extensions._internal import Unknown
+
+def unresolved[T]():
+    static_assert(not is_subtype_of(list[T], Top[list[int & Any]]))
+    static_assert(not is_subtype_of(Top[list[Unknown]], list[T]))
+```
+
+A declared upper bound on `T` can make this relation true:
+
+```pyi
+def bounded[T: int]():
+    static_assert(is_subtype_of(list[T], Top[list[int & Any]]))
 ```
 
 ## Assignability
@@ -2299,6 +2544,93 @@ def recursive_materialized_overload_resolution(
     reveal_type(select_specific_recursive_value(valid))  # revealed: Literal["str"]
 ```
 
+### Generic inference through materialized recursive protocol specializations
+
+A recursive requirement can provide the only evidence for one of a materialized protocol's type
+parameters. The finite `first` property determines `First`, but inference still needs
+`recursive_second` to determine `Second`. Both materialization polarities preserve that information.
+
+```py
+from __future__ import annotations
+
+from collections.abc import Callable
+from typing import Any, Protocol
+from ty_extensions import Bottom, Top
+
+class Pair[First, Second](Protocol):
+    marker: Any
+
+    @property
+    def first(self) -> First: ...
+    def recursive_second(self, child: Pair[Any, Any]) -> Second: ...
+
+def infer_second[Second](value: Top[Pair[int, Second]]) -> Second:
+    raise NotImplementedError
+
+def infer_bottom_second[Second](value: Bottom[Pair[int, Second]]) -> Second:
+    raise NotImplementedError
+
+def check(top: Top[Pair[int, str]], bottom: Bottom[Pair[int, str]]) -> None:
+    reveal_type(infer_second(top))  # revealed: str
+    reveal_type(infer_bottom_second(bottom))  # revealed: str
+```
+
+A type alias around the parameter does not remove the recursive member's contribution.
+
+```py
+type Identity[T] = T
+
+def infer_aliased_second[Second](value: Top[Pair[int, Identity[Second]]]) -> Second:
+    raise NotImplementedError
+
+def aliased(top: Top[Pair[int, str]]) -> None:
+    reveal_type(infer_aliased_second(top))  # revealed: str
+```
+
+Comparing callable parameters reverses the protocol comparison: `Pair[int, Second]` becomes the
+source type. The recursive method supplies the upper bound `object`, so `Second` is inferred as
+`object` even though the target specialization has no type variables.
+
+```py
+def infer_source_second[Second](callback: Callable[[Top[Pair[int, Second]]], None]) -> Second:
+    raise NotImplementedError
+
+def accept_pair(value: Top[Pair[int, object]]) -> None: ...
+
+reveal_type(infer_source_second(accept_pair))  # revealed: object
+```
+
+The source's `first` property can itself contain `Pair` while the target's `first` property is
+finite. That source member remains available to establish the valid covariant widening.
+
+```py
+def widen(source: Top[Pair[Pair[int, str], str]]) -> None:
+    widened: Top[Pair[object, str]] = source
+```
+
+### Opposite materializations of recursive protocols
+
+Materialization can change a fixed `Any` inside a recursive method independently of the protocol's
+type parameter. A top-materialized method returning `object` cannot satisfy the bottom-materialized
+requirement to return `Never`, even when the finite `value` property is compatible.
+
+```py
+from __future__ import annotations
+
+from typing import Any, Protocol
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import is_assignable_to
+
+class RecursiveValue[T](Protocol):
+    @property
+    def value(self) -> T: ...
+    def consume(self, child: RecursiveValue[Any]) -> Any: ...
+
+static_assert(not is_assignable_to(Top[RecursiveValue[str]], Bottom[RecursiveValue[object]]))
+static_assert(is_assignable_to(Bottom[RecursiveValue[str]], Top[RecursiveValue[object]]))
+static_assert(is_assignable_to(Top[RecursiveValue[str]], RecursiveValue[object]))
+```
+
 ### Generator delegation
 
 `yield from` uses the same materialized yield and return types as direct generator methods. Applying
@@ -2369,7 +2701,7 @@ A legacy type variable in the protocol's type arguments still makes the enclosin
 from typing import Any, Protocol, TypeVar
 from ty_extensions import Top
 
-T = TypeVar("T")
+T = TypeVar("T", covariant=True)
 
 class LegacyProtocol(Protocol[T]):
     value: Any
@@ -2520,6 +2852,54 @@ def recursive_nested_materialization(
     reveal_type(nested_top.marker)  # revealed: object
     reveal_type(nested_bottom)  # revealed: Bottom[RecursiveProtocol]
     reveal_type(nested_bottom.marker)  # revealed: Never
+```
+
+### Recursive protocols with stable specializations
+
+These specializations have identical property types: both `value` properties return `str | int`, and
+both children have type `Recursive[str | int]`. Materializing either side leaves these fully static
+requirements unchanged, including when the materialization directions are opposite.
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import is_assignable_to
+
+class Recursive[T](Protocol):
+    @property
+    def value(self) -> T | int: ...
+    @property
+    def child(self) -> Recursive[T | int]: ...
+
+static_assert(is_assignable_to(Top[Recursive[str | int]], Recursive[str]))
+static_assert(is_assignable_to(Bottom[Recursive[str | int]], Recursive[str]))
+static_assert(is_assignable_to(Recursive[str | int], Top[Recursive[str]]))
+static_assert(is_assignable_to(Recursive[str | int], Bottom[Recursive[str]]))
+static_assert(is_assignable_to(Top[Recursive[str | int]], Bottom[Recursive[str]]))
+```
+
+### Recursive protocols with growing specializations
+
+Matching outer properties do not establish compatibility when a recursive child changes the
+requirements. Here, the children expose `list[str | int] | int` and `list[str] | int`, which are
+incompatible because `list` is invariant.
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+from ty_extensions import Top, static_assert
+from ty_extensions._internal import is_assignable_to
+
+class Growing[T](Protocol):
+    @property
+    def value(self) -> T | int: ...
+    @property
+    def child(self) -> Growing[list[T]]: ...
+
+static_assert(not is_assignable_to(Top[Growing[str | int]], Growing[str]))
 ```
 
 ### Display

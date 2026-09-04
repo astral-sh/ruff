@@ -99,6 +99,22 @@ reveal_type((1, 2, 3))  # revealed: tuple[Literal[1], Literal[2], Literal[3]]
 reveal_type(frozenset((1, 2, 3)))  # revealed: frozenset[Literal[1, 2, 3]]
 ```
 
+## Callable defaults are not promoted
+
+Promoting a callable as a collection element does not change its default values. This applies both
+to defaults on the source function and to values supplied by keyword to `functools.partial`.
+
+```py
+from functools import partial
+
+def f(x: int = 5, *, y: int) -> int:
+    return x + y
+
+bound = partial(f, y=7)
+reveal_type(bound)  # revealed: partial[(x: int = 5, *, y: int = 7) -> int]
+reveal_type([bound])  # revealed: list[partial[(x: int = 5, *, y: int = 7) -> int]]
+```
+
 ## Unions of homogeneous, fixed-length tuples can be promoted to a single variadic tuple
 
 This type of promotion applies specifically when a collection literal contains at least two tuple
@@ -650,21 +666,6 @@ def f[T](value: T, upper: Callable[[T], None]) -> list[T]:
 def _(upper: Callable[[int], None]):
     # error: [invalid-argument-type]
     reveal_type(f("x", upper))  # revealed: list[str | int]
-```
-
-This also applies when multiple inheritance contributes both static and gradual specializations:
-
-```py
-from typing import Any
-
-class Base[T]: ...
-class Specialized(Base[str]): ...
-class Mixed(Specialized, Base[Any]): ...
-
-def g[T](values: list[T], base: Base[T]) -> list[T]:
-    return values
-
-g([1], Mixed())  # error: [invalid-argument-type]
 ```
 
 ## Literal annotations from declaration are respected

@@ -1,22 +1,25 @@
 use crate::ProgramEnvironment;
 use char_str::CharStr;
 use ruff_db::parsed::parsed_module;
-use ruff_python_ast::{ArgOrKeyword, Arguments, Expr, ExprCall, ExprDict, Keyword, name::Name};
+use ruff_python_ast::{
+    ArgOrKeyword, Arguments, Expr, ExprCall, ExprDict, ExprRef, Keyword, name::Name,
+};
 use rustc_hash::FxHashSet;
 use ty_module_resolver::{KnownModule, file_to_module};
 use ty_python_core::{
     definition::{Definition, DefinitionKind},
-    place_table, use_def_map,
+    place_table, semantic_index, use_def_map,
 };
 
+use crate::Db;
 use crate::diagnostic::format_enumeration;
 use crate::place::{DefinedPlace, Definedness, Place, Provenance, known_module_symbol};
 use crate::reachability::DeclarationsIteratorExtension;
 use crate::types::call::Bindings;
 use crate::types::class::CodeGeneratorKind;
 use crate::types::context::InferContext;
+use crate::types::definition_resolution::{ImportAliasResolution, definitions_for_name};
 use crate::types::diagnostic::PYDANTIC_DISCARDED_EXTRA_ARGUMENT;
-use crate::types::ide_support::{ImportAliasResolution, definitions_for_name};
 use crate::types::infer::function_known_decorators;
 use crate::types::known_instance::FieldInstance;
 use crate::types::member::class_member;
@@ -26,7 +29,6 @@ use crate::types::{
     KnownInstanceType, KnownUnion, Parameter, Specialization, StaticClassLiteral, Type, UnionType,
     definition_expression_type,
 };
-use crate::{Db, SemanticModel};
 
 /// Pydantic treats underscore-prefixed annotations as private instance attributes.
 pub(in crate::types) fn is_private_attribute(name: &str) -> bool {
@@ -171,11 +173,15 @@ impl<'db> FieldMetadata<'db> {
         // using `StrictInt = Annotated[int, Strict()]`. Since we don't retain the `Annotated`
         // metadata, we need to follow the alias back to its definition and parse the metadata
         // from there.
-        let model = SemanticModel::new(db, definition.program_file(db));
+        let file = definition.program_file(db);
+        let index = semantic_index(db, file);
+        let Some(scope) = index.try_expression_scope_id(&ExprRef::Name(name)) else {
+            return;
+        };
         let Some(alias_definition) = definitions_for_name(
-            &model,
+            db,
+            scope.to_scope_id(db, file),
             name.id.as_str(),
-            name.into(),
             ImportAliasResolution::ResolveAliases,
         )
         .into_iter()

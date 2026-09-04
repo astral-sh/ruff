@@ -850,8 +850,9 @@ def _(doubly_specialized: Tuple[int]):
     reveal_type(doubly_specialized)  # revealed: Unknown
 
 T = TypeVar("T")
+T_co = TypeVar("T_co", covariant=True)
 
-class LegacyProto(Protocol[T]):
+class LegacyProto(Protocol[T_co]):
     pass
 
 LegacyProtoInt = LegacyProto[int]

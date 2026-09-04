@@ -1186,6 +1186,127 @@ class Both(Left, Right): ...
 static_assert(not is_disjoint_from(Left, Right))
 ```
 
+### Nested type variables in invariant arguments
+
+An invariant argument can contain a type variable and still be incompatible with another argument.
+For example, `list[T]` cannot equal `int`, regardless of the specialization of `T`.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Never
+from ty_extensions import static_assert
+from ty_extensions._internal import is_disjoint_from
+
+def incompatible[T]():
+    static_assert(is_disjoint_from(list[list[T]], list[int]))
+    static_assert(is_disjoint_from(list[int], list[list[T]]))
+    static_assert(is_disjoint_from(list[tuple[T, int]], list[tuple[T, str]]))
+    static_assert(is_disjoint_from(list[tuple[T, str]], list[tuple[T, int]]))
+```
+
+When the surrounding structure matches, the arguments can instead be equal for some specialization.
+Aliases preserve that possibility, including aliases nested inside the argument.
+
+```py
+type Id[T] = T
+
+def compatible[T]():
+    static_assert(not is_disjoint_from(list[list[T]], list[list[int]]))
+    static_assert(not is_disjoint_from(list[list[Id[T]]], list[list[int]]))
+    static_assert(not is_disjoint_from(list[list[T]], list[list[Never]]))
+```
+
+An upper bound can rule out equality even when the surrounding structure matches. A type variable
+bounded by `str` cannot specialize to `int`, but it can specialize to `str` or `Never`.
+
+```py
+def bounded[T: str]():
+    static_assert(is_disjoint_from(list[list[T]], list[list[int]]))
+    static_assert(is_disjoint_from(list[list[int]], list[list[T]]))
+    static_assert(not is_disjoint_from(list[list[T]], list[list[str]]))
+    static_assert(not is_disjoint_from(list[list[T]], list[list[Never]]))
+```
+
+A constrained type variable can only specialize to one of its constraints. Neither `int` nor `Never`
+is a valid specialization, while matching either `str` or `bytes` preserves a possible overlap.
+
+```py
+def constrained[T: (str, bytes)]():
+    static_assert(is_disjoint_from(list[list[T]], list[list[int]]))
+    static_assert(is_disjoint_from(list[list[int]], list[list[T]]))
+    static_assert(is_disjoint_from(list[list[T]], list[list[Never]]))
+    static_assert(not is_disjoint_from(list[list[T]], list[list[str]]))
+    static_assert(not is_disjoint_from(list[list[T]], list[list[bytes]]))
+```
+
+### Gradual bounds in invariant arguments
+
+A gradual upper bound admits fully static specializations. Invariant types overlap when their
+arguments can be equal for one of those specializations, including inside another invariant type.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any
+from ty_extensions import static_assert
+from ty_extensions._internal import is_disjoint_from
+
+def any_bound[T: Any]():
+    static_assert(not is_disjoint_from(list[T], list[str]))
+    static_assert(not is_disjoint_from(list[str], list[T]))
+    static_assert(not is_disjoint_from(list[list[T]], list[list[str]]))
+    static_assert(not is_disjoint_from(list[list[str]], list[list[T]]))
+    static_assert(is_disjoint_from(list[T], int))
+    static_assert(is_disjoint_from(int, list[T]))
+
+def bounded[T: list[Any]]():
+    static_assert(not is_disjoint_from(list[T], list[list[str]]))
+    static_assert(not is_disjoint_from(list[list[str]], list[T]))
+    static_assert(is_disjoint_from(list[T], list[str]))
+    static_assert(is_disjoint_from(list[str], list[T]))
+```
+
+### Overlapping invariant materialization ranges
+
+Invariant types are not disjoint when their arguments have a common materialization. For every `T`
+bounded by `int`, the left argument can materialize to `int | str`, which is also a materialization
+of the right argument.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```pyi
+from typing import Any
+from ty_extensions import static_assert
+from ty_extensions._internal import is_disjoint_from
+
+type Left[T] = list[(T | Any) & (int | str | bytes)]
+type Right = list[(str | Any) & (int | str | float)]
+
+def overlap[T: int]():
+    static_assert(not is_disjoint_from(Left[T], Right))
+    static_assert(not is_disjoint_from(Right, Left[T]))
+
+static_assert(not is_disjoint_from(Left[int], Right))
+static_assert(not is_disjoint_from(Right, Left[int]))
+```
+
+If the left argument must include `bytes`, the ranges have no common materialization.
+
+```pyi
+static_assert(is_disjoint_from(Left[bytes], Right))
+static_assert(is_disjoint_from(Right, Left[bytes]))
+```
+
 ### NewTypes and overlapping types
 
 A `NewType` overlaps with any nominal or structural type that overlaps its concrete base. This

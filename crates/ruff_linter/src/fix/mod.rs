@@ -62,10 +62,13 @@ fn apply_fixes<'a>(
     let mut fixed = FixTable::default();
     let mut source_map = SourceMap::default();
 
-    for (code, name, fix) in diagnostics
-        .filter_map(|msg| msg.secondary_code().map(|code| (code, msg.name(), msg)))
-        .filter_map(|(code, name, diagnostic)| diagnostic.fix().map(|fix| (code, name, fix)))
-        .sorted_by(|(_, name1, fix1), (_, name2, fix2)| cmp_fix(name1, name2, fix1, fix2))
+    for (id, code, fix) in diagnostics
+        .filter_map(|diagnostic| {
+            diagnostic
+                .fix()
+                .map(|fix| (diagnostic.id(), diagnostic.secondary_code(), fix))
+        })
+        .sorted_by(|(id1, _, fix1), (id2, _, fix2)| cmp_fix(id1.as_str(), id2.as_str(), fix1, fix2))
     {
         let mut edits = fix
             .edits()
@@ -110,7 +113,7 @@ fn apply_fixes<'a>(
         }
 
         applied.extend(applied_edits.drain(..));
-        *fixed.entry(code).or_default(name) += 1;
+        *fixed.entry(id).or_default(code) += 1;
     }
 
     // Add the remaining content.

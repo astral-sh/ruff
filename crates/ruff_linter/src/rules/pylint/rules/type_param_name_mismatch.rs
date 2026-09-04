@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::pylint::helpers::type_param_name;
 
 /// ## What it does
@@ -39,7 +40,7 @@ use crate::rules::pylint::helpers::type_param_name;
 ///
 /// [PEP 484]:https://peps.python.org/pep-0484/#generics
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.277")]
+#[violation_metadata(stable_since = "v0.0.277", category = Category::Suspicious)]
 pub(crate) struct TypeParamNameMismatch {
     kind: VarKind,
     var_name: String,

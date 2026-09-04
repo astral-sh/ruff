@@ -134,6 +134,46 @@ if TYPE_CHECKING:
         def f(x: "int" | "None"): ...
 ```
 
+### Protocol metaclasses
+
+A source protocol's default `_ProtocolMeta` does not supply a string-accepting `__or__` method.
+Partially stringified unions with protocol classes and their subclasses fail at runtime before
+Python 3.14.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Protocol
+
+class P(Protocol): ...
+class Child(P): ...
+
+def f(
+    # error: [unsupported-operator]
+    x: P | "P",
+    # error: [unsupported-operator]
+    y: "Child" | Child,
+): ...
+```
+
+A custom metaclass can accept strings in `__or__`. Deriving it from `type(Protocol)` also makes it
+compatible with the protocol's runtime metaclass.
+
+```py
+from typing import Any
+
+class Meta(type(Protocol)):
+    def __or__(cls, other: str) -> Any:
+        return other
+
+class Custom(P, metaclass=Meta): ...
+
+def g(x: Custom | "Custom"): ...
+```
+
 ### Python less than 3.14 in a stub file
 
 This error is never emitted on stub files, because they are never executed at runtime:

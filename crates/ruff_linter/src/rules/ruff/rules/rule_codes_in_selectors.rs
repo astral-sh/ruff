@@ -7,6 +7,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::TomlSourceType;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
+use crate::codes::Category;
 use crate::{
     AlwaysFixableViolation, checkers::ast::LintContext, codes::Rule,
     preview::is_human_readable_names_enabled, rule_redirects::get_redirect_target,
@@ -35,7 +36,7 @@ use crate::{
 /// select = ["unused-import"]
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.15.22")]
+#[violation_metadata(preview_since = "0.15.22", category = Category::Pedantic)]
 pub(crate) struct RuleCodesInSelectors {
     selector: &'static str,
     name: &'static str,

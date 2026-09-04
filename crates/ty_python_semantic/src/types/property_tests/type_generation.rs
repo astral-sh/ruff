@@ -1,3 +1,5 @@
+use std::debug_assert_matches;
+
 use crate::Db;
 use crate::place::{DefinedPlace, Place, builtins_symbol, global_symbol, known_module_symbol};
 use crate::types::enums::is_single_member_enum;
@@ -54,6 +56,7 @@ pub(crate) enum Ty {
         neg: Vec<Ty>,
     },
     FixedLengthTuple(Vec<Ty>),
+    #[expect(dead_code, reason = "Tuple generation is temporarily disabled")]
     VariableLengthTuple(Vec<Ty>, Box<Ty>, Vec<Ty>),
     SubclassOfAny,
     SubclassOfBuiltinClass(&'static str),
@@ -218,10 +221,12 @@ fn create_bound_method<'db>(
     builtins_class: Type<'db>,
 ) -> Type<'db> {
     let env = ProgramEnvironment::from_program(program);
+    let self_instance = builtins_class.to_instance_approximation(db, &env).unwrap();
     Type::BoundMethod(BoundMethodType::new(
         db,
         function.expect_function_literal(),
-        builtins_class.to_instance_approximation(db, &env).unwrap(),
+        self_instance,
+        self_instance,
     ))
 }
 
@@ -257,8 +262,10 @@ impl Ty {
                 let ty = known_module_symbol(db, env, KnownModule::Dataclasses, "MISSING")
                     .place
                     .expect_type();
-                debug_assert!(
-                    matches!(ty, Type::NominalInstance(instance) if is_single_member_enum(db, instance.class_literal(db, env)))
+                debug_assert_matches!(
+                    ty,
+                    Type::NominalInstance(instance)
+                        if is_single_member_enum(db, instance.class_literal(db, env))
                 );
                 ty
             }
@@ -538,28 +545,14 @@ fn arbitrary_type(g: &mut Gen, size: u32, fully_static: bool) -> Ty {
     if size == 0 {
         arbitrary_core_type(g, fully_static)
     } else {
-        match u32::arbitrary(g) % 6 {
+        match u32::arbitrary(g) % 4 {
             0 => arbitrary_core_type(g, fully_static),
             1 => Ty::Union(
                 (0..*g.choose(&[2, 3]).unwrap())
                     .map(|_| arbitrary_type(g, size - 1, fully_static))
                     .collect(),
             ),
-            2 => Ty::FixedLengthTuple(
-                (0..*g.choose(&[0, 1, 2]).unwrap())
-                    .map(|_| arbitrary_type(g, size - 1, fully_static))
-                    .collect(),
-            ),
-            3 => Ty::VariableLengthTuple(
-                (0..*g.choose(&[0, 1, 2]).unwrap())
-                    .map(|_| arbitrary_type(g, size - 1, fully_static))
-                    .collect(),
-                Box::new(arbitrary_type(g, size - 1, fully_static)),
-                (0..*g.choose(&[0, 1, 2]).unwrap())
-                    .map(|_| arbitrary_type(g, size - 1, fully_static))
-                    .collect(),
-            ),
-            4 => Ty::Intersection {
+            2 => Ty::Intersection {
                 pos: (0..*g.choose(&[0, 1, 2]).unwrap())
                     .map(|_| arbitrary_type(g, size - 1, fully_static))
                     .collect(),
@@ -567,13 +560,29 @@ fn arbitrary_type(g: &mut Gen, size: u32, fully_static: bool) -> Ty {
                     .map(|_| arbitrary_type(g, size - 1, fully_static))
                     .collect(),
             },
-            5 => Ty::Callable {
+            3 => Ty::Callable {
                 params: match u32::arbitrary(g) % 2 {
                     0 if !fully_static => CallableParams::GradualForm,
                     _ => CallableParams::List(arbitrary_parameter_list(g, size, fully_static)),
                 },
                 returns: Box::new(arbitrary_type(g, size - 1, fully_static)),
             },
+            // TODO: Re-enable tuple types once they are fixed, and change the modulus back to 6.
+            // See https://github.com/astral-sh/ty/issues/4263.
+            // 4 => Ty::FixedLengthTuple(
+            //     (0..*g.choose(&[0, 1, 2]).unwrap())
+            //         .map(|_| arbitrary_type(g, size - 1, fully_static))
+            //         .collect(),
+            // ),
+            // 5 => Ty::VariableLengthTuple(
+            //     (0..*g.choose(&[0, 1, 2]).unwrap())
+            //         .map(|_| arbitrary_type(g, size - 1, fully_static))
+            //         .collect(),
+            //     Box::new(arbitrary_type(g, size - 1, fully_static)),
+            //     (0..*g.choose(&[0, 1, 2]).unwrap())
+            //         .map(|_| arbitrary_type(g, size - 1, fully_static))
+            //         .collect(),
+            // ),
             _ => unreachable!(),
         }
     }

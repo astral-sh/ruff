@@ -3,6 +3,7 @@ use ruff_python_ast::{Expr, Stmt, StmtFor};
 use ruff_python_semantic::analyze::typing;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::refurb::helpers::IterLocation;
 use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 
@@ -44,7 +45,7 @@ use crate::rules::refurb::helpers::parenthesize_loop_iter_if_necessary;
 /// ## References
 /// - [Python documentation: `set`](https://docs.python.org/3/library/stdtypes.html#set)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.3.5")]
+#[violation_metadata(preview_since = "v0.3.5", category = Category::Complexity)]
 pub(crate) struct ForLoopSetMutations {
     method_name: &'static str,
     batch_method_name: &'static str,

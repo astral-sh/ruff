@@ -10,6 +10,7 @@ use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::fits;
 use crate::line_width::LineWidthBuilder;
 use crate::{Edit, Fix, FixAvailability, Violation};
@@ -52,7 +53,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// - [Python documentation: `any`](https://docs.python.org/3/library/functions.html#any)
 /// - [Python documentation: `all`](https://docs.python.org/3/library/functions.html#all)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.211")]
+#[violation_metadata(stable_since = "v0.0.211", category = Category::Complexity)]
 pub(crate) struct ReimplementedBuiltin {
     replacement: String,
 }

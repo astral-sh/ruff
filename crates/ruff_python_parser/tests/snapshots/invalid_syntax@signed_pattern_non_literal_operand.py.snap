@@ -1,0 +1,368 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/signed_pattern_non_literal_operand.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..164,
+        body: [
+            Match(
+                StmtMatch {
+                    node_index: NodeIndex(None),
+                    range: 44..163,
+                    subject: Name(
+                        ExprName {
+                            node_index: NodeIndex(None),
+                            range: 50..55,
+                            id: Name("value"),
+                            ctx: Load,
+                        },
+                    ),
+                    cases: [
+                        MatchCase {
+                            range: 61..76,
+                            node_index: NodeIndex(None),
+                            pattern: MatchValue(
+                                PatternMatchValue {
+                                    node_index: NodeIndex(None),
+                                    range: 66..71,
+                                    value: UnaryOp(
+                                        ExprUnaryOp {
+                                            node_index: NodeIndex(None),
+                                            range: 66..71,
+                                            op: USub,
+                                            operand: BinOp(
+                                                ExprBinOp {
+                                                    node_index: NodeIndex(None),
+                                                    range: 67..71,
+                                                    left: NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            node_index: NodeIndex(None),
+                                                            range: 67..68,
+                                                            value: Int(
+                                                                1,
+                                                            ),
+                                                        },
+                                                    ),
+                                                    op: Pow,
+                                                    right: NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            node_index: NodeIndex(None),
+                                                            range: 70..71,
+                                                            value: Int(
+                                                                2,
+                                                            ),
+                                                        },
+                                                    ),
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Expr(
+                                    StmtExpr {
+                                        node_index: NodeIndex(None),
+                                        range: 73..76,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 73..76,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                        MatchCase {
+                            range: 81..99,
+                            node_index: NodeIndex(None),
+                            pattern: MatchValue(
+                                PatternMatchValue {
+                                    node_index: NodeIndex(None),
+                                    range: 86..94,
+                                    value: UnaryOp(
+                                        ExprUnaryOp {
+                                            node_index: NodeIndex(None),
+                                            range: 86..94,
+                                            op: USub,
+                                            operand: Attribute(
+                                                ExprAttribute {
+                                                    node_index: NodeIndex(None),
+                                                    range: 87..94,
+                                                    value: NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            node_index: NodeIndex(None),
+                                                            range: 87..88,
+                                                            value: Int(
+                                                                1,
+                                                            ),
+                                                        },
+                                                    ),
+                                                    attr: Identifier {
+                                                        id: Name("real"),
+                                                        range: 90..94,
+                                                        node_index: NodeIndex(None),
+                                                    },
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Expr(
+                                    StmtExpr {
+                                        node_index: NodeIndex(None),
+                                        range: 96..99,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 96..99,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                        MatchCase {
+                            range: 104..119,
+                            node_index: NodeIndex(None),
+                            pattern: MatchValue(
+                                PatternMatchValue {
+                                    node_index: NodeIndex(None),
+                                    range: 109..114,
+                                    value: UnaryOp(
+                                        ExprUnaryOp {
+                                            node_index: NodeIndex(None),
+                                            range: 109..114,
+                                            op: USub,
+                                            operand: Subscript(
+                                                ExprSubscript {
+                                                    node_index: NodeIndex(None),
+                                                    range: 110..114,
+                                                    value: NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            node_index: NodeIndex(None),
+                                                            range: 110..111,
+                                                            value: Int(
+                                                                1,
+                                                            ),
+                                                        },
+                                                    ),
+                                                    slice: NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            node_index: NodeIndex(None),
+                                                            range: 112..113,
+                                                            value: Int(
+                                                                0,
+                                                            ),
+                                                        },
+                                                    ),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Expr(
+                                    StmtExpr {
+                                        node_index: NodeIndex(None),
+                                        range: 116..119,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 116..119,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                        MatchCase {
+                            range: 124..138,
+                            node_index: NodeIndex(None),
+                            pattern: MatchValue(
+                                PatternMatchValue {
+                                    node_index: NodeIndex(None),
+                                    range: 129..133,
+                                    value: UnaryOp(
+                                        ExprUnaryOp {
+                                            node_index: NodeIndex(None),
+                                            range: 129..133,
+                                            op: USub,
+                                            operand: Call(
+                                                ExprCall {
+                                                    node_index: NodeIndex(None),
+                                                    range: 130..133,
+                                                    func: NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            node_index: NodeIndex(None),
+                                                            range: 130..131,
+                                                            value: Int(
+                                                                1,
+                                                            ),
+                                                        },
+                                                    ),
+                                                    arguments: Arguments {
+                                                        range: 131..133,
+                                                        node_index: NodeIndex(None),
+                                                        args: [],
+                                                        keywords: [],
+                                                    },
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Expr(
+                                    StmtExpr {
+                                        node_index: NodeIndex(None),
+                                        range: 135..138,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 135..138,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                        MatchCase {
+                            range: 143..163,
+                            node_index: NodeIndex(None),
+                            pattern: MatchMapping(
+                                PatternMatchMapping {
+                                    node_index: NodeIndex(None),
+                                    range: 148..158,
+                                    keys: [
+                                        UnaryOp(
+                                            ExprUnaryOp {
+                                                node_index: NodeIndex(None),
+                                                range: 149..154,
+                                                op: UAdd,
+                                                operand: BinOp(
+                                                    ExprBinOp {
+                                                        node_index: NodeIndex(None),
+                                                        range: 150..154,
+                                                        left: NumberLiteral(
+                                                            ExprNumberLiteral {
+                                                                node_index: NodeIndex(None),
+                                                                range: 150..151,
+                                                                value: Int(
+                                                                    1,
+                                                                ),
+                                                            },
+                                                        ),
+                                                        op: Pow,
+                                                        right: NumberLiteral(
+                                                            ExprNumberLiteral {
+                                                                node_index: NodeIndex(None),
+                                                                range: 153..154,
+                                                                value: Int(
+                                                                    2,
+                                                                ),
+                                                            },
+                                                        ),
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                    ],
+                                    patterns: [
+                                        MatchAs(
+                                            PatternMatchAs {
+                                                node_index: NodeIndex(None),
+                                                range: 156..157,
+                                                pattern: None,
+                                                name: None,
+                                            },
+                                        ),
+                                    ],
+                                    rest: None,
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Expr(
+                                    StmtExpr {
+                                        node_index: NodeIndex(None),
+                                        range: 160..163,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 160..163,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | # parse_options: {"target-version": "3.15"}
+2 | match value:
+3 |     case -1**2: ...
+  |           ^^^^ Syntax Error: Expected a numeric literal after unary operator
+4 |     case -1 .real: ...
+5 |     case -1[0]: ...
+  |
+
+
+  |
+2 | match value:
+3 |     case -1**2: ...
+4 |     case -1 .real: ...
+  |           ^^^^^^^ Syntax Error: Expected a numeric literal after unary operator
+5 |     case -1[0]: ...
+6 |     case -1(): ...
+  |
+
+
+  |
+3 |     case -1**2: ...
+4 |     case -1 .real: ...
+5 |     case -1[0]: ...
+  |           ^^^^ Syntax Error: Expected a numeric literal after unary operator
+6 |     case -1(): ...
+7 |     case {+1**2: _}: ...
+  |
+
+
+  |
+4 |     case -1 .real: ...
+5 |     case -1[0]: ...
+6 |     case -1(): ...
+  |           ^^^ Syntax Error: Expected a numeric literal after unary operator
+7 |     case {+1**2: _}: ...
+  |
+
+
+  |
+5 |     case -1[0]: ...
+6 |     case -1(): ...
+7 |     case {+1**2: _}: ...
+  |            ^^^^ Syntax Error: Expected a numeric literal after unary operator

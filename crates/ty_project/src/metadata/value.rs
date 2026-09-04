@@ -65,7 +65,7 @@ impl RelativePathBuf {
     pub fn absolute(&self, configuration_root: &SystemPath, system: &dyn System) -> SystemPathBuf {
         let relative_to = match self.0.source() {
             ValueSource::File(_) | ValueSource::ScriptMetadata(_) => configuration_root,
-            ValueSource::Cli | ValueSource::Editor | ValueSource::UvWorkspace => {
+            ValueSource::Cli | ValueSource::Editor | ValueSource::UvMetadata => {
                 system.current_directory()
             }
         };
@@ -137,7 +137,7 @@ impl RelativeGlobPattern {
     ) -> Result<AbsolutePortableGlobPattern, PortableGlobError> {
         let relative_to = match self.0.source() {
             ValueSource::File(_) | ValueSource::ScriptMetadata(_) => project_root,
-            ValueSource::Cli | ValueSource::Editor | ValueSource::UvWorkspace => {
+            ValueSource::Cli | ValueSource::Editor | ValueSource::UvMetadata => {
                 system.current_directory()
             }
         };
