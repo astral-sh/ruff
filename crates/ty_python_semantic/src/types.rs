@@ -2150,20 +2150,6 @@ impl<'db> Type<'db> {
         )
     }
 
-    pub(crate) fn is_bottom_paramspec_value(self, db: &'db dyn Db) -> bool {
-        let Type::Callable(callable) = self else {
-            return false;
-        };
-        callable.is_bottom_paramspec_value(db)
-    }
-
-    pub(crate) fn is_top_paramspec_value(self, db: &'db dyn Db) -> bool {
-        let Type::Callable(callable) = self else {
-            return false;
-        };
-        callable.is_top_paramspec_value(db)
-    }
-
     /// Returns `true` if this type contains a `Self` type variable.
     fn contains_self(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
         if let Type::NominalInstance(instance) = self

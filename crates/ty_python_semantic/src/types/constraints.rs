@@ -1376,18 +1376,6 @@ impl<'db> ConstraintSetStorage<'db> {
                 support.insert(self.intern_typevar(db, constraint.typevar));
                 self.intern_mentioned_typevars_in_type(db, env, constraint.bound, &mut support);
             }
-            Constraint::ParamSpecLower(constraint) => {
-                support.insert(self.intern_typevar(db, constraint.typevar));
-                self.intern_mentioned_typevars_in_type(db, env, constraint.bound, &mut support);
-            }
-            Constraint::ParamSpecUpper(constraint) => {
-                support.insert(self.intern_typevar(db, constraint.typevar));
-                self.intern_mentioned_typevars_in_type(db, env, constraint.bound, &mut support);
-            }
-            Constraint::ParamSpecEquivalence(constraint) => {
-                support.insert(self.intern_typevar(db, constraint.typevar));
-                self.intern_mentioned_typevars_in_type(db, env, constraint.bound, &mut support);
-            }
             Constraint::TypeVarRange(constraint) => {
                 support.insert(self.intern_typevar(db, constraint.left));
                 support.insert(self.intern_typevar(db, constraint.right));
@@ -3561,57 +3549,6 @@ impl<'db> PathBounds<'db> {
                             ));
                         }
 
-                        Constraint::ParamSpecLower(lower) => {
-                            if !lower.typevar.is_inferable(db, inferable) {
-                                return ControlFlow::Continue(None);
-                            }
-                            if lower.bound.has_typevar(db, env)
-                                || lower.bound.has_provisional_marker(db, env)
-                            {
-                                return ControlFlow::Continue(None);
-                            }
-                            constraints.push((
-                                constraint,
-                                source_orders
-                                    .get_index_of(&interior.constraint)
-                                    .expect("every TDD constraint should have a source order"),
-                            ));
-                        }
-
-                        Constraint::ParamSpecUpper(upper) => {
-                            if !upper.typevar.is_inferable(db, inferable) {
-                                return ControlFlow::Continue(None);
-                            }
-                            if upper.bound.has_typevar(db, env)
-                                || upper.bound.has_provisional_marker(db, env)
-                            {
-                                return ControlFlow::Continue(None);
-                            }
-                            constraints.push((
-                                constraint,
-                                source_orders
-                                    .get_index_of(&interior.constraint)
-                                    .expect("every TDD constraint should have a source order"),
-                            ));
-                        }
-
-                        Constraint::ParamSpecEquivalence(equivalence) => {
-                            if !equivalence.typevar.is_inferable(db, inferable) {
-                                return ControlFlow::Continue(None);
-                            }
-                            if equivalence.bound.has_typevar(db, env)
-                                || equivalence.bound.has_provisional_marker(db, env)
-                            {
-                                return ControlFlow::Continue(None);
-                            }
-                            constraints.push((
-                                constraint,
-                                source_orders
-                                    .get_index_of(&interior.constraint)
-                                    .expect("every TDD constraint should have a source order"),
-                            ));
-                        }
-
                         Constraint::TypeVarRange(_) | Constraint::TypeVarEquivalence(_) => {
                             return ControlFlow::Continue(None);
                         }
@@ -3636,19 +3573,6 @@ impl<'db> PathBounds<'db> {
                     bounds.add_upper(db, env, upper.provenance, upper.bound);
                 }
                 Constraint::ConcreteEquivalence(equivalence) => {
-                    let bounds = mappings.entry(equivalence.typevar).or_default();
-                    bounds.add_lower(db, env, equivalence.provenance, equivalence.bound);
-                    bounds.add_upper(db, env, equivalence.provenance, equivalence.bound);
-                }
-                Constraint::ParamSpecLower(lower) => {
-                    let bounds = mappings.entry(lower.typevar).or_default();
-                    bounds.add_lower(db, env, lower.provenance, lower.bound);
-                }
-                Constraint::ParamSpecUpper(upper) => {
-                    let bounds = mappings.entry(upper.typevar).or_default();
-                    bounds.add_upper(db, env, upper.provenance, upper.bound);
-                }
-                Constraint::ParamSpecEquivalence(equivalence) => {
                     let bounds = mappings.entry(equivalence.typevar).or_default();
                     bounds.add_lower(db, env, equivalence.provenance, equivalence.bound);
                     bounds.add_upper(db, env, equivalence.provenance, equivalence.bound);
@@ -5058,7 +4982,7 @@ mod tests {
         );
         let actual_bound = KnownClass::List.to_specialized_instance(db, &env, &[Type::TypeVar(u)]);
         let mut storage = ConstraintSetStorage::default();
-        let data = ConcreteUpperBound::new(db, ConstraintProvenance::Evidence, t, actual_bound);
+        let data = ConcreteUpperBound::new(ConstraintProvenance::Evidence, t, actual_bound);
         let support = storage.intern_constraint_typevars(db, &env, data.into());
         let mentioned = support
             .iter()

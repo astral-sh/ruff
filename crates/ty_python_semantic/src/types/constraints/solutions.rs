@@ -128,19 +128,6 @@ impl<'db> SolutionWalker<'db> {
                         bounds.add_lower(db, env, equivalence.provenance, equivalence.bound);
                         bounds.add_upper(db, env, equivalence.provenance, equivalence.bound);
                     }
-                    Constraint::ParamSpecLower(lower) => {
-                        let bounds = mappings.entry(lower.typevar).or_default();
-                        bounds.add_lower(db, env, lower.provenance, lower.bound);
-                    }
-                    Constraint::ParamSpecUpper(upper) => {
-                        let bounds = mappings.entry(upper.typevar).or_default();
-                        bounds.add_upper(db, env, upper.provenance, upper.bound);
-                    }
-                    Constraint::ParamSpecEquivalence(equivalence) => {
-                        let bounds = mappings.entry(equivalence.typevar).or_default();
-                        bounds.add_lower(db, env, equivalence.provenance, equivalence.bound);
-                        bounds.add_upper(db, env, equivalence.provenance, equivalence.bound);
-                    }
                     Constraint::TypeVarRange(bound) => {
                         let bounds = mappings.entry(bound.left).or_default();
                         bounds.add_upper(db, env, bound.provenance, Type::TypeVar(bound.right));
