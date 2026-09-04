@@ -644,7 +644,8 @@ fn definition_contains_special_cased_condition<'db>(
 ///
 /// Successive statements often share most of their reachability graph. Cache each node's
 /// summary so checking another definition does not traverse the shared portion again.
-/// All three branches contribute, regardless of the configured environment's truthiness.
+/// All three branches contribute for environment guards, regardless of the configured
+/// environment's truthiness. Calls and boolean tests are assumed to complete.
 #[salsa::tracked(
     returns(copy),
     cycle_initial = |_, _, _, _| false,
@@ -664,9 +665,26 @@ fn reachability_contains_special_cased_condition<'db>(
         return false;
     }
 
-    let node = use_def_map(db, scope)
+    let use_def = use_def_map(db, scope);
+    let node = use_def
         .reachability_constraints()
         .get_interior_node(reachability);
+    let predicate = use_def.predicates()[node.atom()];
+    if matches!(
+        predicate.node,
+        PredicateNode::IsNonTerminalCall(_) | PredicateNode::ExpressionCanComplete { .. }
+    ) {
+        // Termination does not give later values an environment-dependent origin.
+        // Assume calls and boolean tests complete before collecting their guards;
+        // merely ignoring completion predicates would still visit their failure
+        // paths, where an earlier environment guard can remain in the formula.
+        let child = if predicate.is_positive {
+            node.if_true()
+        } else {
+            node.if_false()
+        };
+        return reachability_contains_special_cased_condition(db, scope, child);
+    }
     predicate_contains_special_cased_condition(db, scope, node.atom())
         || [node.if_true(), node.if_ambiguous(), node.if_false()]
             .into_iter()
@@ -700,6 +718,7 @@ fn predicate_contains_special_cased_condition<'db>(
         // particular, a statement such as `print(sys.platform)` should not make every later
         // definition environment-dependent merely because it is reached after that call returns.
         PredicateNode::IsNonTerminalCall(_)
+        | PredicateNode::ExpressionCanComplete { .. }
         | PredicateNode::ContextManagerSuppresses { .. }
         | PredicateNode::FinallyNormalPathImpossible { .. }
         | PredicateNode::OrPatternAlternative(_)

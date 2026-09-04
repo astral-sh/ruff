@@ -934,6 +934,16 @@ def saved_condition(value: Comparable):
     return not (value < 1 < 0)  # no diagnostic
 ```
 
+When the chain is evaluated as a value inside a larger expression, its result can also be tested
+again before evaluating the next operand. That operand is reachable and is checked for redundancy.
+
+```py
+def value_operand(value: Comparable):
+    # error: [redundant-condition] "always truthy"
+    if bool((value < 1 < 0) and not "yes"):
+        pass
+```
+
 ## Conditional expressions used as conditions
 
 Using `a if flag else b` as a condition tests the truthiness of `a` when `flag` is true, or `b`
@@ -2704,6 +2714,166 @@ warning[redundant-condition]: An empty tuple is always falsy
   |
 6 |         case _ if empty and enabled:  # snapshot: redundant-condition
   |                   ^^^^^ Inferred type is `tuple[()]`
+```
+
+Unreachable operands do not take precedence over the complete condition. Once an earlier operand
+determines the outcome, replacing a later operand with a string literal does not hide the strict
+diagnostic.
+
+```py
+from typing import Literal
+
+def unreachable_operands(falsy: Literal[False], truthy: Literal[True], flag: bool):
+    if falsy and flag:  # error: [redundant-condition-strict] "Condition `falsy and flag` is always false"
+        pass
+    if falsy and "yes":  # error: [redundant-condition-strict] "Condition `falsy and "yes"` is always false"
+        pass
+    if truthy or flag:  # error: [redundant-condition-strict] "Condition `truthy or flag` is always true"
+        pass
+    if truthy or "":  # error: [redundant-condition-strict] "Condition `truthy or ""` is always true"
+        pass
+```
+
+The same applies to an unreachable branch of a conditional expression used as a condition.
+
+```py
+def unreachable_branches(falsy: Literal[False]):
+    if falsy if True else "yes":  # error: [redundant-condition-strict] "Condition `falsy if True else "yes"` is always false"
+        pass
+    if "yes" if False else falsy:  # error: [redundant-condition-strict] "Condition `"yes" if False else falsy` is always false"
+        pass
+```
+
+## Conditions containing expressions that never return
+
+An expression that never returns prevents later operands from being evaluated. Those operands cannot
+produce redundant-condition diagnostics, even when their inferred types have fixed truthiness. A
+conditional expression cannot select either branch if its test never returns.
+
+```py
+from typing import Never
+
+def die() -> Never:
+    raise RuntimeError
+
+def terminal_and():
+    if die() and "yes":  # no diagnostic
+        pass
+
+def terminal_or():
+    if die() or "":  # no diagnostic
+        pass
+
+def terminal_conditional():
+    if "yes" if die() else "no":  # no diagnostic
+        pass
+```
+
+A condition can still complete by short-circuiting before the call. The strict rule reports its
+fixed outcome, without reporting operands that cannot be evaluated.
+
+```py
+def short_circuit_and(flag: bool):
+    # error: [redundant-condition-strict] "Condition `flag and die() and "yes"` is always false"
+    if flag and die() and "yes":
+        pass
+
+def short_circuit_or(flag: bool):
+    # error: [redundant-condition-strict] "Condition `flag or die() or ""` is always true"
+    if flag or die() or "":
+        pass
+```
+
+Tests evaluated before the call are still checked, even when the complete condition cannot produce a
+result.
+
+```py
+def evaluated_operand():
+    if "yes" and die():  # error: [redundant-condition] "always truthy"
+        pass
+```
+
+The same evaluation order applies to independent tests inside call arguments. Neither `not`
+expression below is evaluated.
+
+```py
+def consume(value: object) -> bool:
+    return bool(value)
+
+def nested_boolean():
+    if consume(die() and not "yes"):  # no diagnostic
+        pass
+
+def nested_conditional():
+    if consume("yes" if die() else not "no"):  # no diagnostic
+        pass
+```
+
+A statement condition that never returns reaches neither outcome. Tests in the body, the `else`
+branch, and subsequent statements are unreachable.
+
+```py
+def statement_condition():
+    if die():
+        if "yes":  # no diagnostic
+            pass
+    else:
+        if "yes":  # no diagnostic
+            pass
+    if "yes":  # no diagnostic
+        pass
+
+def elif_condition(flag: bool):
+    if flag:
+        return
+    elif die():
+        if "yes":  # no diagnostic
+            pass
+    else:
+        if "yes":  # no diagnostic
+            pass
+
+def while_condition():
+    while die():
+        if "yes":  # no diagnostic
+            pass
+    else:
+        if "yes":  # no diagnostic
+            pass
+    if "yes":  # no diagnostic
+        pass
+```
+
+An assertion's message is not evaluated when its test never returns. A terminal match guard cannot
+select its case or proceed to a later case after the pattern matches.
+
+```py
+def assertion_condition():
+    assert die(), not "yes"  # no diagnostic
+    if "yes":  # no diagnostic
+        pass
+
+def match_condition(value: object):
+    match value:
+        case _ if die():
+            if "yes":  # no diagnostic
+                pass
+        case _:
+            if "yes":  # no diagnostic
+                pass
+```
+
+A terminal comprehension filter prevents later filters and the element expression from being
+evaluated. Negation also requires its operand to return, including when `not` produces a value.
+
+```py
+def comprehension_condition():
+    [not "yes" for _ in [1] if die() if not "yes"]  # no diagnostic
+
+def negated_condition():
+    not die()
+    if "yes":  # no diagnostic
+        pass
 ```
 
 ## Boolean tests inside value expressions

@@ -16,7 +16,7 @@ use ruff_python_ast::{self as ast, Singleton, name::Name};
 use crate::ProgramFile;
 use crate::ast_ids::ExpressionNodeKey;
 use crate::db::Db;
-use crate::expression::Expression;
+use crate::expression::{Expression, ExpressionContext};
 use crate::global_scope;
 use crate::reachability_constraints::ScopedReachabilityConstraintId;
 use crate::scope::{FileScopeId, ScopeId};
@@ -162,6 +162,12 @@ pub enum PredicateNode<'db> {
     /// A chained comparison evaluated directly as a condition. Its inferred truthiness is
     /// available without walking the expression again.
     ChainedComparisonCondition(Expression<'db>),
+    /// Whether a boolean test can produce a result. A terminal test permits neither the
+    /// truthy nor the falsy outcome, so this constraint is independent of its truthiness.
+    ExpressionCanComplete {
+        expression: Expression<'db>,
+        context: ExpressionContext,
+    },
     /// Whether a context manager's exit return type allows an exception to be suppressed.
     ///
     /// Resolved during type inference because the context manager's type is unavailable during

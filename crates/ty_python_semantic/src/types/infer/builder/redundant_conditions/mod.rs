@@ -59,7 +59,7 @@ use ty_python_core::{Truthiness, expression::ExpressionContext, predicate::State
 
 use crate::{
     lint::LintMetadata,
-    reachability::{analyze_condition_expression, is_non_terminal_call},
+    reachability::{analyze_condition_expression, is_non_terminal_call, is_range_reachable},
     types::{
         KnownClass, KnownInstanceType, Type,
         diagnostic::{REDUNDANT_CONDITION, REDUNDANT_CONDITION_STRICT},
@@ -816,6 +816,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
 
         let rule = condition.kind.rule();
+
+        // An unreachable candidate cannot suppress a diagnostic on the enclosing condition,
+        // even when its own rule is disabled or exempted.
+        if !is_range_reachable(
+            self.db(),
+            self.index,
+            self.scope().file_scope_id(self.db()),
+            test.expression.range(),
+        ) {
+            return ConditionCheckResult::CheckEnclosingCondition;
+        }
 
         if self.context.is_lint_enabled(rule) && !condition_context.exempts(self, &condition) {
             conditions.push(condition);

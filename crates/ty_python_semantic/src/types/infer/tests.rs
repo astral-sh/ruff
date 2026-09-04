@@ -814,8 +814,12 @@ const MANY_WIDGETS: usize = 400;
 const MANY_NON_TERMINAL_CALLS: usize = 1_100;
 const FEW_NON_TERMINAL_CALLS: usize = 80;
 
+/// An attribute assigned after many calls and boolean tests retains its `Widget` type when
+/// accessed from another module. Checking the consumer first forces inference of the preceding
+/// completion predicates before their results are cached. This lookup must finish without
+/// overflowing the stack size used by production workers.
 #[test]
-fn implicit_attribute_after_many_non_terminal_calls() -> anyhow::Result<()> {
+fn implicit_attribute_after_many_completion_predicates() -> anyhow::Result<()> {
     let handle = std::thread::Builder::new()
         .name("implicit-attribute-stack-test".into())
         // Match the stack size used by ty's production worker threads.
@@ -894,8 +898,8 @@ class Inner:
                     concat!(
                         "        self.widget_{index} = Widget()\n",
                         "        self.widget_{index}.configure()\n",
-                        "        self.widget_{index}.configure()\n",
-                        "        self.widget_{index}.configure()\n",
+                        "        self.widget_{index}.configure() and None\n",
+                        "        None if self.widget_{index}.configure() else None\n",
                     ),
                     index = index,
                 )?;

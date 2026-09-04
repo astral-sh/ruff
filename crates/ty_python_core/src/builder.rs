@@ -1345,25 +1345,41 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         &mut self,
         expr: &ast::Expr,
     ) -> Option<ConditionFlowSnapshots> {
-        match expr {
-            ast::Expr::BoolOp(_) => self
-                .condition_flow_snapshots_by_node
-                .remove(&ExpressionNodeKey::from(expr)),
-            ast::Expr::UnaryOp(unary_op) if unary_op.op == ast::UnaryOp::Not => {
-                let snapshots = self.take_condition_flow_snapshots(&unary_op.operand)?;
-                Some(ConditionFlowSnapshots {
-                    truthy: snapshots.falsy,
-                    falsy: snapshots.truthy,
-                })
-            }
-            _ => None,
-        }
+        self.condition_flow_snapshots_by_node
+            .remove(&ExpressionNodeKey::from(expr))
     }
 
     fn flow_snapshot_for_condition(&mut self, condition: &ast::Expr) -> ConditionFlowSnapshot {
-        self.record_exception_checkpoint_if(!Self::condition_evaluation_is_known_safe(condition));
+        self.flow_snapshot_for_boolean_test(condition, ExpressionContext::Condition)
+    }
 
-        if let Some(snapshots) = self.take_condition_flow_snapshots(condition) {
+    /// Both outcomes require the test to finish evaluating. Apply that requirement to any
+    /// outcome-specific bindings as well as the merged state after the expression.
+    fn flow_snapshot_for_boolean_test(
+        &mut self,
+        condition: &ast::Expr,
+        context: ExpressionContext,
+    ) -> ConditionFlowSnapshot {
+        self.record_exception_checkpoint_if(!Self::condition_evaluation_is_known_safe(condition));
+        let completion = self.expression_completion_constraint(condition, context);
+        let snapshots = self
+            .take_condition_flow_snapshots(condition)
+            .map(|snapshots| {
+                let merged = self.flow_snapshot();
+                self.flow_restore(snapshots.truthy);
+                self.current_use_def_map_mut()
+                    .record_reachability_constraint(completion);
+                let truthy = self.flow_snapshot();
+                self.flow_restore(snapshots.falsy);
+                self.current_use_def_map_mut()
+                    .record_reachability_constraint(completion);
+                let falsy = self.flow_snapshot();
+                self.flow_restore(merged);
+                ConditionFlowSnapshots { truthy, falsy }
+            });
+        self.current_use_def_map_mut()
+            .record_reachability_constraint(completion);
+        if let Some(snapshots) = snapshots {
             ConditionFlowSnapshot::Branches(snapshots)
         } else {
             ConditionFlowSnapshot::Fallback
@@ -2215,7 +2231,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         self.register_narrowing_alias_predicates(predicate_node);
 
-        let expression = self.add_standalone_expression(predicate_node);
+        let expression = self
+            .expressions_by_node
+            .get(&predicate_node.into())
+            .copied()
+            .unwrap_or_else(|| self.add_standalone_expression(predicate_node));
 
         match resolve_to_literal(predicate_node) {
             Some(literal) => PredicateOrLiteral::Literal(literal),
@@ -2314,6 +2334,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             self.current_use_def_map_mut()
                 .record_boolean_test_root(test.node_index().load());
         }
+        // Record reachability at the test itself, including tests in expression-only scopes such
+        // as comprehensions, where no enclosing statement records the current flow.
+        let in_type_checking_block = self.in_type_checking_block;
+        self.current_use_def_map_mut()
+            .record_range_reachability(test.range(), in_type_checking_block);
         self.visit_expr_with_context(test, context);
         self.active_boolean_test_scope = previous;
     }
@@ -2386,6 +2411,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             .pattern(pattern, module)
                     }
                     PredicateNode::SubjectElementPattern(_)
+                    | PredicateNode::ExpressionCanComplete { .. }
                     | PredicateNode::IsNonTerminalCall(_)
                     | PredicateNode::ContextManagerSuppresses { .. }
                     | PredicateNode::FinallyNormalPathImpossible { .. }
@@ -3605,13 +3631,22 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             ast::Expr::UnaryOp(unary) => {
                 if unary.op == ast::UnaryOp::Not {
                     self.visit_boolean_test(&unary.operand, context);
+                    if let Some(snapshots) = self
+                        .flow_snapshot_for_boolean_test(&unary.operand, context)
+                        .into_branches()
+                    {
+                        self.condition_flow_snapshots_by_node.insert(
+                            ExpressionNodeKey::from(expr),
+                            ConditionFlowSnapshots {
+                                truthy: snapshots.falsy,
+                                falsy: snapshots.truthy,
+                            },
+                        );
+                    }
                 } else {
                     self.visit_expr_with_context(&unary.operand, ExpressionContext::Value);
+                    self.record_exception_checkpoint();
                 }
-                self.record_exception_checkpoint_if(
-                    unary.op != ast::UnaryOp::Not
-                        || !Self::condition_evaluation_is_known_safe(&unary.operand),
-                );
             }
             ast::Expr::Compare(ast::ExprCompare {
                 left,
@@ -3683,6 +3718,35 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.flow_merge(post_body);
     }
 
+    /// Completion must gate both outcomes of a boolean test. Negating its truthiness alone
+    /// would otherwise make one path reachable even when the test never returns.
+    fn expression_completion_constraint(
+        &mut self,
+        node: &ast::Expr,
+        context: ExpressionContext,
+    ) -> ScopedReachabilityConstraintId {
+        // Like terminal calls in expression statements, completion is only relevant to
+        // executable files. In stubs, inferring a version guard can itself depend on the
+        // guarded definitions in `builtins` or `typing`, introducing inference cycles.
+        if self.source_type.is_stub() || node.is_literal_expr() {
+            return ScopedReachabilityConstraintId::ALWAYS_TRUE;
+        }
+        let expression = self
+            .expressions_by_node
+            .get(&node.into())
+            .copied()
+            .unwrap_or_else(|| self.add_standalone_expression(node));
+        let predicate = self.add_predicate(PredicateOrLiteral::Predicate(Predicate {
+            node: PredicateNode::ExpressionCanComplete {
+                expression,
+                context,
+            },
+            is_positive: true,
+        }));
+        self.current_reachability_constraints_mut()
+            .add_atom(predicate)
+    }
+
     /// Keeps short-circuit flow snapshots out of the common recursive expression-visitor frame.
     fn visit_bool_expression(&mut self, node: &'ast ast::ExprBoolOp, context: ExpressionContext) {
         let ast::ExprBoolOp { values, op, .. } = node;
@@ -3704,10 +3768,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             // Only non-final values can short-circuit this boolean operation. The final
             // value can still have its own outcome-specific flow if it is nested.
             if index < values.len() - 1 {
-                self.record_exception_checkpoint_if(!Self::condition_evaluation_is_known_safe(
-                    value,
-                ));
-                let condition_flow_snapshots = self.take_condition_flow_snapshots(value);
+                let condition_flow_snapshots = self
+                    .flow_snapshot_for_boolean_test(value, context)
+                    .into_branches();
                 let predicate = self.build_predicate(value, context);
                 let possibly_narrowed = self.compute_possibly_narrowed_places(&predicate);
                 let predicate_id = match op {
