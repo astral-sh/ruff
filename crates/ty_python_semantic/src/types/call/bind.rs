@@ -8777,6 +8777,8 @@ impl<'db> Binding<'db> {
             argument_matches: self.argument_matches.clone(),
             parameter_tys: self.parameter_tys.clone(),
             errors: self.errors.clone(),
+            variadic_argument_matched_to_variadic_parameter: self
+                .variadic_argument_matched_to_variadic_parameter,
         }
     }
 
@@ -8788,6 +8790,7 @@ impl<'db> Binding<'db> {
             argument_matches,
             parameter_tys,
             errors,
+            variadic_argument_matched_to_variadic_parameter,
         } = snapshot;
 
         self.return_ty = return_ty;
@@ -8796,6 +8799,8 @@ impl<'db> Binding<'db> {
         self.argument_matches = argument_matches;
         self.parameter_tys = parameter_tys;
         self.errors = errors;
+        self.variadic_argument_matched_to_variadic_parameter =
+            variadic_argument_matched_to_variadic_parameter;
     }
 
     /// Returns a vector where each index corresponds to an argument position,
@@ -8821,6 +8826,7 @@ impl<'db> Binding<'db> {
         self.argument_matches = Box::from([]);
         self.parameter_tys = Box::from([]);
         self.errors.clear();
+        self.variadic_argument_matched_to_variadic_parameter = false;
     }
 }
 
@@ -8832,6 +8838,7 @@ struct BindingSnapshot<'db> {
     argument_matches: Box<[MatchedArgument<'db>]>,
     parameter_tys: Box<[Option<Type<'db>>]>,
     errors: Vec<BindingError<'db>>,
+    variadic_argument_matched_to_variadic_parameter: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -8874,6 +8881,8 @@ impl<'db> CallableBindingSnapshot<'db> {
                     .argument_matches
                     .clone_from(&binding.argument_matches);
                 snapshot.parameter_tys.clone_from(&binding.parameter_tys);
+                snapshot.variadic_argument_matched_to_variadic_parameter =
+                    binding.variadic_argument_matched_to_variadic_parameter;
             }
 
             // If the errors in the snapshot was empty, then this binding is the matching overload

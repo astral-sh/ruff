@@ -1425,6 +1425,18 @@ def forward_multiple(values: tuple[int] | tuple[str, str]) -> None:
     reveal_type(multiple(*values))  # revealed: object
 ```
 
+When both overloads accept the whole tuple union, the variadic overload is preferred.
+
+```py
+@overload
+def prefer_variadic(first: object, second: object = ..., /) -> int: ...
+@overload
+def prefer_variadic(*args: *tuple[object, *tuple[object, ...]]) -> object: ...
+def prefer_variadic(*args: object) -> object: ...
+def forward_prefer_variadic(values: tuple[int] | tuple[int, int]) -> None:
+    reveal_type(prefer_variadic(*values))  # revealed: object
+```
+
 ### Retry from parameter matching with type context
 
 When retrying, arguments are inferred with the correct type context:
