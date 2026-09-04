@@ -4231,14 +4231,9 @@ impl<'db> CallableBinding<'db> {
                 && let Some((first, rest)) = cases.split_first()
             {
                 if should_retry_after_variadic_expansion
-                    && expanded_argument_lists.iter().any(|arguments| {
-                        arguments.iter().any(|(argument, argument_types)| {
-                            matches!(argument, Argument::Variadic)
-                                && argument_types
-                                    .get_default()
-                                    .is_some_and(|ty| is_expandable_type(db, env, ty))
-                        })
-                    })
+                    && expanded_argument_lists
+                        .iter()
+                        .any(|arguments| Self::has_expandable_variadic_shape(db, env, arguments))
                 {
                     continue;
                 }
@@ -4300,23 +4295,60 @@ impl<'db> CallableBinding<'db> {
     /// incompatible alternative hidden by a merged unpacked parameter:
     ///
     /// ```python
-    /// def callback(*args: *tuple[int, str]) -> None: ...
-    /// def forward(values: tuple[int, str] | tuple[str, str]) -> None:
+    /// def callback(*args: *tuple[*tuple[int, ...], str]) -> None: ...
+    /// def forward(values: tuple[int, str] | tuple[int, int, int]) -> None:
     ///     callback(*values)
     /// ```
     fn should_retry_after_variadic_expansion(
         &self,
         expansions: &CallArgumentExpansions<'_, '_, 'db>,
     ) -> bool {
-        (self.overloads.len() > 1 && self.matching_overloads().count() < self.overloads.len()
-            || self.overloads.iter().any(|overload| {
-                overload
-                    .signature
-                    .parameters()
-                    .variadic()
-                    .is_some_and(|(_, parameter)| parameter.has_starred_annotation())
-            }))
-            && expansions.has_expandable_variadic()
+        (self.overloads.len() > 1 && self.matching_overloads().count() < self.overloads.len())
+            && call_arguments.iter().any(|(argument, argument_types)| {
+                matches!(argument, Argument::Variadic)
+                    && argument_types
+                        .get_default()
+                        .is_some_and(|argument_type| is_expandable_type(db, env, argument_type))
+            })
+            || self.has_concrete_unpacked_variadic(db)
+                && Self::has_expandable_variadic_shape(db, env, call_arguments)
+    }
+
+    /// A variable merged shape can lose the association between tuple lengths and element types.
+    /// Fixed shapes retain their positions, so a successful match needs no further expansion of
+    /// their elements, even when those elements are themselves expandable unions or booleans.
+    fn has_expandable_variadic_shape(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        call_arguments: &CallArguments<'_, 'db>,
+    ) -> bool {
+        call_arguments.iter().any(|(argument, argument_types)| {
+            matches!(argument, Argument::Variadic)
+                && argument_types.get_default().is_some_and(|ty| {
+                    is_expandable_type(db, env, ty) && ty.iterate(db, env).len().is_variable()
+                })
+        })
+    }
+
+    fn has_concrete_unpacked_variadic(&self, db: &'db dyn Db) -> bool {
+        self.overloads.iter().any(|overload| {
+            overload
+                .signature
+                .parameters()
+                .variadic()
+                .is_some_and(|(_, parameter)| {
+                    parameter.has_starred_annotation()
+                        && parameter
+                            .annotated_type()
+                            .exact_tuple_instance_spec(db)
+                            .is_some_and(|tuple| match tuple.as_ref() {
+                                TupleSpec::Fixed(_) => true,
+                                TupleSpec::Variable(variable) => {
+                                    variable.variable().typevartuple().is_none()
+                                }
+                            })
+                })
+        })
     }
 
     /// Filter overloads based on variadic argument to variadic parameter match.
@@ -5590,10 +5622,12 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         tuple: &TupleSpec<'db>,
         fixed_positions: (usize, usize),
         variable_positions: (bool, bool),
+        gradual_positions: (bool, bool),
         fallback: Type<'db>,
     ) -> Type<'db> {
         let (fixed_before, fixed_after) = fixed_positions;
         let (variable_before, variable_after) = variable_positions;
+        let (gradual_before, gradual_after) = gradual_positions;
         let mut candidates: SmallVec<[Type<'db>; 4]> = SmallVec::new();
         let mut add_candidate = |candidate| {
             if !candidates.contains(&candidate) {
@@ -5634,7 +5668,10 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                     add_candidate(expected_suffix[expected_suffix.len() - fixed_after - 1]);
                 } else {
                     add_candidate(expected_variable);
-                    if variable_before {
+                    // A gradual segment can supply the required endpoint, so fixed arguments
+                    // across it need not match that endpoint: `callback(1, *any_values)` can
+                    // match `*tuple[*tuple[object, ...], str]` by materializing a `str` tail.
+                    if variable_before && !gradual_before {
                         for (index, candidate) in
                             expected_prefix.iter().enumerate().skip(fixed_before)
                         {
@@ -5643,7 +5680,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                             }
                         }
                     }
-                    if variable_after {
+                    if variable_after && !gradual_after {
                         for (index, candidate) in expected_suffix
                             .iter()
                             .enumerate()
@@ -5706,6 +5743,8 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         let mut argument_count = 0;
         let mut first_variable = None;
         let mut last_variable = None;
+        let mut first_gradual = None;
+        let mut last_gradual = None;
         let mut first_excess_argument_index = None;
 
         for (argument_index, argument) in self.argument_matches.iter().enumerate() {
@@ -5731,6 +5770,16 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                         first_variable = Some(argument_count);
                     }
                     last_variable = Some(argument_count);
+                    if matched.argument_type.is_some_and(|ty| {
+                        VariableSegment::Homogeneous(ty)
+                            .gradual_element_type(db, env)
+                            .is_some()
+                    }) {
+                        first_gradual.get_or_insert(argument_count);
+                        last_gradual = Some(argument_count);
+                    }
+                } else {
+                    fixed_count += 1;
                 }
 
                 argument_count += 1;
@@ -5858,6 +5907,10 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                         (
                             is_variable || first_variable.is_some_and(|first| first < position),
                             is_variable || last_variable.is_some_and(|last| last > position),
+                        ),
+                        (
+                            first_gradual.is_some_and(|first| first <= position),
+                            last_gradual.is_some_and(|last| last >= position),
                         ),
                         expected_type,
                     )
