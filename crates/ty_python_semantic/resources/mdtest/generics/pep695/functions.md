@@ -972,7 +972,7 @@ def _(value: Intersection[Source[A], Source[B]]) -> None:
 ```
 
 An argument of type `Any` still contributes gradual evidence when its parameter annotation is an
-alias. The return type uses the merged assignments instead of intersecting the static alternatives:
+alias. We preserve that contribution, but do not yet intersect the first argument's alternatives:
 
 ```py
 from typing import Any
@@ -981,7 +981,8 @@ def aliased_other[T](value: Source[T], other: SourceAlias[T]) -> T:
     return value.get()
 
 def _(value: Intersection[Source[A], Source[B]], other: Any) -> None:
-    reveal_type(aliased_other(value, other))  # revealed: A | B
+    # TODO: revealed: (A & B) | Any
+    reveal_type(aliased_other(value, other))  # revealed: A | Any | B
 ```
 
 An alias in the return annotation can also contain a type variable that no argument determines. Such
@@ -1175,35 +1176,30 @@ def _(
     reveal_type(choose(x, sink))  # revealed: C
 ```
 
-Generic inference keeps the known types contributed by gradual intersections, but does not yet
-preserve their gradual components or intersect the independently inferred return types. Direct
-member access shows the more precise types:
+Generic inference preserves both the gradual component and the known types contributed by an
+intersection. Inferring the source's element type gives the same result as direct member access:
 
 ```py
 def _(x) -> None:
     assert isinstance(x, ASource)
     reveal_type(x.get())  # revealed: Unknown & A
-    # TODO: revealed: Unknown & A
-    reveal_type(element(x))  # revealed: A
+    reveal_type(element(x))  # revealed: Unknown & A
     assert isinstance(x, BSource)
     reveal_type(x.get())  # revealed: Unknown & A & B
-    # TODO: revealed: Unknown & A & B
-    reveal_type(element(x))  # revealed: A | B
+    reveal_type(element(x))  # revealed: Unknown & A & B
 
 def _(x: Any) -> None:
     assert isinstance(x, ASource)
     reveal_type(x.get())  # revealed: Any & A
-    # TODO: revealed: Any & A
-    reveal_type(element(x))  # revealed: A
+    reveal_type(element(x))  # revealed: Any & A
     assert isinstance(x, BSource)
     reveal_type(x.get())  # revealed: Any & A & B
-    # TODO: revealed: Any & A & B
-    reveal_type(element(x))  # revealed: A | B
+    reveal_type(element(x))  # revealed: Any & A & B
 ```
 
-A narrowed gradual argument still contributes its known element type when another argument also
-constrains `T`. Ignoring the source's element type would infer an integer-only result and hide an
-invalid attribute access:
+A narrowed gradual argument still contributes its element type when another argument also constrains
+`T`. The result retains the source's gradual component and its known `str` bound alongside the
+integer literal:
 
 ```py
 def element_with_value[T](value: T, source: Source[T]) -> T:
@@ -1214,12 +1210,20 @@ def _(unknown, any_: Any) -> None:
     assert isinstance(any_, StrSource)
     unknown_result = element_with_value(1, unknown)
     any_result = element_with_value(1, any_)
-    reveal_type(unknown_result)  # revealed: Literal[1] | str
-    reveal_type(any_result)  # revealed: Literal[1] | str
-    # error: [unresolved-attribute]
+    reveal_type(unknown_result)  # revealed: Literal[1] | (Unknown & str)
+    reveal_type(any_result)  # revealed: Literal[1] | (Any & str)
     unknown_result.bit_length()
-    # error: [unresolved-attribute]
     any_result.bit_length()
+```
+
+The gradual component permits attribute access, but a fully static source still reports the missing
+`str` attribute:
+
+```py
+def _(source: StrSource) -> None:
+    result = element_with_value(1, source)
+    reveal_type(result)  # revealed: Literal[1] | str
+    result.bit_length()  # error: [unresolved-attribute]
 ```
 
 Unrelated gradual arguments do not affect `T` and should not prevent static paths from refining the
@@ -1237,9 +1241,8 @@ def _(x: Intersection[Source[A], Source[B]], other) -> None:
     reveal_type(element_with_dynamic_formal(x, A()))  # revealed: A & B
 ```
 
-A gradual argument's known element type also contributes when another argument is an intersection.
-The result includes `D`, but still unions the first argument's `A` and `B` contributions instead of
-intersecting them:
+A gradual argument also contributes when another argument is an intersection. The result combines
+the first argument's `A & B` element type with the second argument's gradual `D` element type:
 
 ```py
 class DSource(Source[D]): ...
@@ -1249,10 +1252,8 @@ def _(x: Intersection[Source[A], Source[B]], unknown, any_: Any) -> None:
     assert isinstance(any_, DSource)
     reveal_type(unknown.get())  # revealed: Unknown & D
     reveal_type(any_.get())  # revealed: Any & D
-    # TODO: revealed: (A & B) | (Unknown & D)
-    reveal_type(correlated(x, unknown))  # revealed: A | D | B
-    # TODO: revealed: (A & B) | (Any & D)
-    reveal_type(correlated(x, any_))  # revealed: A | D | B
+    reveal_type(correlated(x, unknown))  # revealed: (A & B) | (Unknown & D)
+    reveal_type(correlated(x, any_))  # revealed: (A & B) | (Any & D)
 ```
 
 A gradual intersection member can satisfy a declared bound or constraint even when its static
@@ -1270,8 +1271,8 @@ def _(unknown, any_: Any) -> None:
     assert isinstance(any_, StrSource)
     reveal_type(bounded_element(unknown))  # revealed: Unknown
     reveal_type(constrained_element(unknown))  # revealed: Unknown
-    reveal_type(bounded_element(any_))  # revealed: Unknown
-    reveal_type(constrained_element(any_))  # revealed: Unknown
+    reveal_type(bounded_element(any_))  # revealed: Any
+    reveal_type(constrained_element(any_))  # revealed: Any
 ```
 
 When both members specialize `Source`, their intersection simplifies to `Source[str & Any]`, and

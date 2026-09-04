@@ -508,8 +508,14 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
         func: impl FnOnce() -> Type<'db>,
     ) -> Type<'db> {
         let type_transformer = match type_mapping {
-            TypeMapping::Materialize(MaterializationKind::Top) => &self.top_materialization,
-            TypeMapping::Materialize(MaterializationKind::Bottom) => &self.bottom_materialization,
+            TypeMapping::Materialize(MaterializationKind::Top)
+            | TypeMapping::MaterializeTopLevel(MaterializationKind::Top) => {
+                &self.top_materialization
+            }
+            TypeMapping::Materialize(MaterializationKind::Bottom)
+            | TypeMapping::MaterializeTopLevel(MaterializationKind::Bottom) => {
+                &self.bottom_materialization
+            }
             TypeMapping::ApplySpecializationWithMaterialization {
                 materialization_kind: MaterializationKind::Top,
                 ..
@@ -2499,6 +2505,43 @@ impl<'db> Type<'db> {
         (*self).cached_materialization(db, env.program(db), MaterializationKind::Bottom)
     }
 
+    /// Returns whether this type contains a dynamic type outside any type constructors.
+    /// Type aliases are transparent to this check.
+    fn has_top_level_dynamic(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
+        match self.expand_top_level_aliases(db, env) {
+            Type::Dynamic(dynamic) => !dynamic.is_provisional_marker(),
+            Type::Union(union) => union
+                .elements(db)
+                .iter()
+                .any(|ty| ty.has_top_level_dynamic(db, env)),
+            Type::Intersection(intersection) => intersection
+                .iter_positive(db)
+                .chain(intersection.iter_negative(db))
+                .any(|ty| ty.has_top_level_dynamic(db, env)),
+            _ => false,
+        }
+    }
+
+    /// Materializes dynamic types within outer unions, intersections, and type aliases, without
+    /// descending into type constructors or type variable bounds.
+    fn materialize_top_level(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        materialization_kind: MaterializationKind,
+    ) -> Type<'db> {
+        let expanded = self.expand_top_level_aliases(db, env);
+        if !expanded.has_top_level_dynamic(db, env) {
+            return self;
+        }
+        expanded.apply_type_mapping_impl(
+            db,
+            &TypeMapping::MaterializeTopLevel(materialization_kind),
+            TypeContext::default(),
+            &ApplyTypeMappingVisitor::new(env),
+        )
+    }
+
     #[salsa::tracked(
         returns(copy),
         cycle_initial=|_, id, _, _, materialization_kind| {
@@ -2619,6 +2662,15 @@ impl<'db> Type<'db> {
             ty = alias.value_type(db);
         }
         ty
+    }
+
+    /// Expands aliases at the outer level and within outer unions, retaining aliases nested
+    /// inside type constructors. The union builder guards recursive alias expansion.
+    fn expand_top_level_aliases(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Self {
+        match self.resolve_type_alias(db) {
+            Type::Union(union) if union.has_aliases(db) => union.expand_aliases(db, env),
+            ty => ty,
+        }
     }
 
     /// Selects the constructor used for a type variable's upper bound.
@@ -8541,6 +8593,21 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Replaces every type variable with `replacement`.
+    fn specialize_all(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        replacement: Type<'db>,
+    ) -> Type<'db> {
+        self.apply_type_mapping(
+            db,
+            env,
+            &TypeMapping::ApplySpecialization(ApplySpecialization::All(replacement)),
+            TypeContext::default(),
+        )
+    }
+
     /// Applies a specialization to this type, replacing any typevars with the types that they are
     /// specialized to.
     ///
@@ -8668,6 +8735,15 @@ impl<'db> Type<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Type<'db> {
+        if matches!(type_mapping, TypeMapping::MaterializeTopLevel(_))
+            && !matches!(
+                self,
+                Type::Union(_) | Type::Intersection(_) | Type::Dynamic(_)
+            )
+        {
+            return self;
+        }
+
         // If we are binding `typing.Self`, and this type is what we are binding `Self` to, return
         // early. This is not just an optimization, it also prevents us from infinitely expanding
         // the type, if it's something that can contain a `Self` reference.
@@ -9080,6 +9156,7 @@ impl<'db> Type<'db> {
                 | TypeMapping::BindSelf { .. }
                 | TypeMapping::ReplaceSelf { .. }
                 | TypeMapping::Materialize(_)
+                | TypeMapping::MaterializeTopLevel(_)
                 | TypeMapping::ReplaceParameterDefaults
                 | TypeMapping::EagerExpansion
                 | TypeMapping::RescopeReturnCallables(_)
@@ -9093,7 +9170,7 @@ impl<'db> Type<'db> {
                 }
             },
 
-            Type::Dynamic(_) => match type_mapping {
+            Type::Dynamic(dynamic) => match type_mapping {
                 TypeMapping::ApplySpecialization(_)
                 | TypeMapping::ApplySpecializationWithMaterialization { .. }
                 | TypeMapping::BindLegacyTypevars(_)
@@ -9108,6 +9185,15 @@ impl<'db> Type<'db> {
                     MaterializationKind::Top => Type::object(),
                     MaterializationKind::Bottom => Type::Never,
                 },
+                TypeMapping::MaterializeTopLevel(materialization_kind)
+                    if !dynamic.is_provisional_marker() =>
+                {
+                    match materialization_kind {
+                        MaterializationKind::Top => Type::object(),
+                        MaterializationKind::Bottom => Type::Never,
+                    }
+                }
+                TypeMapping::MaterializeTopLevel(_) => self,
             },
             // `Divergent` is an internal cycle marker rather than a gradual type like `Any` or
             // `Unknown`. Preserve the marker across materialization, while recording whether this
@@ -10318,6 +10404,8 @@ pub enum TypeMapping<'a, 'db> {
     ReplaceSelf { new_upper_bound: Type<'db> },
     /// Create the top or bottom materialization of a type.
     Materialize(MaterializationKind),
+    /// Materializes dynamic types within outer unions and intersections only.
+    MaterializeTopLevel(MaterializationKind),
     /// Replace default types in parameters of callables with `Unknown`. This is used to avoid infinite
     /// recursion when the type of the default value of a parameter depends on the callable itself.
     ReplaceParameterDefaults,
@@ -10383,6 +10471,7 @@ impl<'db> TypeMapping<'_, 'db> {
             TypeMapping::Promote(..)
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::Materialize(_)
+            | TypeMapping::MaterializeTopLevel(_)
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion
             | TypeMapping::RescopeReturnCallables(_) => context,
@@ -10416,6 +10505,9 @@ impl<'db> TypeMapping<'_, 'db> {
         match self {
             TypeMapping::Materialize(materialization_kind) => {
                 TypeMapping::Materialize(materialization_kind.flip())
+            }
+            TypeMapping::MaterializeTopLevel(materialization_kind) => {
+                TypeMapping::MaterializeTopLevel(materialization_kind.flip())
             }
             TypeMapping::ApplySpecializationWithMaterialization {
                 specialization,

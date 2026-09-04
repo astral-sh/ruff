@@ -5105,7 +5105,7 @@ element type to generic inference.
 from typing import Any
 
 def collect(cls: type[Any], enabled: bool) -> None:
-    reveal_type(list(cls if enabled else (1,)))  # revealed: list[int]
+    reveal_type(list(cls if enabled else (1,)))  # revealed: list[Any | int]
 ```
 
 ## Subtyping of protocols with `@classmethod` or `@staticmethod` members
@@ -6870,9 +6870,10 @@ static_assert(is_constraint_set_assignable_to(Consumer[Consumer[int]], Consumer[
 ### Recursive members in the source specialization
 
 A protocol member can contain the same protocol in the source specialization but remain finite in
-the target specialization. Its structural requirements must still contribute all valid solutions,
-even when nominal inheritance alone would infer a narrower type. The same members also establish
-assignability when no type variables need to be inferred.
+the target specialization. Its structural requirements still contribute to inference alongside the
+nominal specialization. Both views validate the call, so intersecting their return types preserves
+the nominal element type. The same members also establish assignability when no type variables need
+to be inferred.
 
 ```toml
 [environment]
@@ -6897,8 +6898,8 @@ static_assert(is_assignable_to(Consumer[Consumer[int]], Consumer[int]))
 def extract[T](consumer: Consumer[T]) -> T:
     raise NotImplementedError
 
-def check(value: Consumer[Consumer[int]]) -> None:
-    reveal_type(extract(value))  # revealed: Consumer[int] | int
+def _(value: Consumer[Consumer[int]]) -> None:
+    reveal_type(extract(value))  # revealed: Consumer[int]
 ```
 
 An explicit receiver annotation introduces constraints when comparing a bound method with a
@@ -7882,10 +7883,9 @@ class A2(Protocol[T2]):
 class B1(A1[T3], Protocol[T3]): ...
 class B2(A2[T4], Protocol[T4]): ...
 
-# TODO should just be `B2[Any]`
-reveal_type(T3.__bound__)  # revealed: B2[Any] | Unknown
+reveal_type(T3.__bound__)  # revealed: B2[Any]
 
-# TODO error: [invalid-type-arguments]
+# error: [invalid-type-arguments]
 def f(x: B1[int]):
     pass
 

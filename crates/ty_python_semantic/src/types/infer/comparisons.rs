@@ -819,12 +819,17 @@ fn infer_binary_type_comparison_inner<'db>(
             Type::KnownInstance(KnownInstanceType::ConstraintSet(left)),
             Type::KnownInstance(KnownInstanceType::ConstraintSet(right)),
         ) => {
-            let constraints = ConstraintSetBuilder::new();
-            let left = constraints.load(db, env, left.constraints(db));
-            let right = constraints.load(db, env, right.constraints(db));
-            let equivalent = left
-                .iff(db, &constraints, right)
-                .is_always_satisfied(db, env);
+            // Loading freshens gradual variables. Check identical sets before giving their
+            // materializations independent identities.
+            let equivalent = if left.constraints(db) == right.constraints(db) {
+                true
+            } else {
+                let constraints = ConstraintSetBuilder::new();
+                let left = constraints.load(db, env, left.constraints(db));
+                let right = constraints.load(db, env, right.constraints(db));
+                left.iff(db, &constraints, right)
+                    .is_always_satisfied(db, env)
+            };
             match op {
                 NonIdentityOperator::Rich(RichCompareOperator::Eq) => {
                     Some(Ok(Type::bool_literal(equivalent)))

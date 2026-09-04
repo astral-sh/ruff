@@ -167,9 +167,9 @@ reveal_type(cn)  # revealed: (int, /) -> int
 
 ## Recursive callable constraints in constructors
 
-When inferring the generic constructor for `map`, an overloaded callable together with a gradual
-iterable can produce expanding recursive constraints. We should fall back rather than repeatedly
-substituting those constraints.
+An overloaded callable and gradual iterable can produce recursive constraints when inferring the
+generic constructor for `map`. Inference recovers with a gradual return type instead of indefinitely
+expanding those constraints.
 
 ```py
 import operator
@@ -178,6 +178,7 @@ from typing import Any
 ints: list[int] = []
 dynamic: Any = []
 
+# TODO: This should reveal `map[Any]`.
 reveal_type(map(operator.add, ints, dynamic))  # revealed: map[Unknown]
 ```
 

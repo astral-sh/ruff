@@ -1072,6 +1072,38 @@ class Task(Generic[P]):
         return 1
 ```
 
+### Implementation consistency with independent gradual elements
+
+Each `Any` in a tuple can materialize independently to `int | str`, so these overloads are
+consistent with their implementations. Checking the nested tuples does not require enumerating the
+combinations of `int` and `str` across all elements.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any, overload
+
+type Row[T] = tuple[T, T, T, T, T, T]
+type Matrix[T] = tuple[Row[T], Row[T], Row[T], Row[T]]
+
+@overload
+def accepts_gradual(value: Matrix[Any]) -> None: ...
+@overload
+def accepts_gradual(value: int) -> None: ...
+def accepts_gradual(value: Matrix[int | str] | int) -> None:
+    pass
+
+@overload
+def accepts_union(value: Matrix[int | str]) -> None: ...
+@overload
+def accepts_union(value: int) -> None: ...
+def accepts_union(value: Matrix[Any] | int) -> None:
+    pass
+```
+
 ### Decorated implementation consistency
 
 Decorators on an overload implementation apply only to the implementation signature. The decorated

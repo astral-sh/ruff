@@ -6,8 +6,8 @@ use std::fmt::{Debug, Display};
 use smallvec::SmallVec;
 
 use crate::types::constraints::{
-    ALWAYS_FALSE, ALWAYS_TRUE, Constraint, ConstraintBound, ConstraintId, ConstraintSetBuilder,
-    ConstraintSetStorage, IntersectionResult, Node,
+    ALWAYS_FALSE, ALWAYS_TRUE, Constraint, ConstraintBound, ConstraintData, ConstraintId,
+    ConstraintSetBuilder, ConstraintSetStorage, IntersectionResult, Node,
 };
 use crate::types::typevar::TypeVarSet;
 use crate::types::variance::VarianceInferable;
@@ -158,8 +158,12 @@ impl SequentMap {
         // single constraint; we always break that apart into the two smaller constraints that we
         // started with.
 
-        let left = storage.constraint_data(left);
-        let right = storage.constraint_data(right);
+        let (Some(left), Some(right)) = (
+            storage.constraint_data(left).as_typevar(),
+            storage.constraint_data(right).as_typevar(),
+        ) else {
+            return true;
+        };
         if !left.typevar.is_same_typevar_as(db, right.typevar) {
             return false;
         }
@@ -202,7 +206,9 @@ impl SequentMap {
         post: ConstraintId,
     ) {
         // If the post constraint is unsatisfiable, then the antecedents contradict each other.
-        let post_data = storage.constraint_data(post);
+        let Some(post_data) = storage.constraint_data(post).as_typevar() else {
+            return;
+        };
         let post_lower = post_data.lower_bound(db).ty();
         let post_upper = post_data.upper_bound(db).ty();
         let (when, source_order) = storage.load(
@@ -245,7 +251,9 @@ impl SequentMap {
         // For a ParamSpec, the bottom and top parameter lists likewise allow every specialization.
         // Record this fact without discarding the supplied bounds as inference evidence.
         // Some internal producers still use the ordinary identities for ParamSpecs.
-        let constraint_data = storage.constraint_data(constraint);
+        let Some(constraint_data) = storage.constraint_data(constraint).as_typevar() else {
+            return;
+        };
         let lower = constraint_data.lower_bound(db).ty();
         let upper = constraint_data.upper_bound(db).ty();
         if (constraint_data
@@ -372,19 +380,21 @@ impl SequentMap {
                 Node::AlwaysTrue | Node::AlwaysFalse => break,
                 Node::Interior(interior) => {
                     let interior = storage.interior_node_data(interior.node());
-                    let derived = storage.constraint_data(interior.constraint);
-                    let derived = ConstraintId::new_with_bounds(
-                        db,
-                        env,
-                        storage,
-                        derived.typevar,
-                        derived
-                            .stored_lower_bound()
-                            .map(|bound| bound.with_source_provenance(constraint_data)),
-                        derived
-                            .stored_upper_bound()
-                            .map(|bound| bound.with_source_provenance(constraint_data)),
-                    );
+                    let derived = match storage.constraint_data(interior.constraint) {
+                        ConstraintData::TypeVar(derived) => ConstraintId::new_with_bounds(
+                            db,
+                            env,
+                            storage,
+                            derived.typevar,
+                            derived
+                                .stored_lower_bound()
+                                .map(|bound| bound.with_source_provenance(constraint_data)),
+                            derived
+                                .stored_upper_bound()
+                                .map(|bound| bound.with_source_provenance(constraint_data)),
+                        ),
+                        ConstraintData::Gradual(_) => interior.constraint,
+                    };
                     if interior.if_true != ALWAYS_FALSE {
                         self.add_single_implication(constraint, derived);
                         node = interior.if_true;
@@ -426,12 +436,14 @@ impl SequentMap {
         //
         // If all of the lower and upper bounds are concrete (i.e., not typevars), then there
         // several _other_ sequents that we can add, as handled by `add_concrete_sequents`.
-        let left_constraint_data = storage.constraint_data(left_constraint);
-        let left_typevar = left_constraint_data.typevar;
-        let right_constraint_data = storage.constraint_data(right_constraint);
-        let right_typevar = right_constraint_data.typevar;
+        let (Some(left), Some(right)) = (
+            storage.constraint_data(left_constraint).as_typevar(),
+            storage.constraint_data(right_constraint).as_typevar(),
+        ) else {
+            return;
+        };
 
-        if !left_typevar.is_same_typevar_as(db, right_typevar) {
+        if !left.typevar.is_same_typevar_as(db, right.typevar) {
             self.add_mutual_sequents_for_different_typevars(
                 db,
                 env,
@@ -440,9 +452,9 @@ impl SequentMap {
                 right_constraint,
             );
             self.add_nested_typevar_sequents(db, env, storage, left_constraint, right_constraint);
-        } else if left_constraint_data
+        } else if left
             .iter_stored_bounds()
-            .chain(right_constraint_data.iter_stored_bounds())
+            .chain(right.iter_stored_bounds())
             .any(|bound| bound.ty().is_type_var())
         {
             self.add_mutual_sequents_for_same_typevars(
@@ -470,24 +482,24 @@ impl SequentMap {
         // we only have to check this pair of constraints in one direction — though we do
         // have to figure out which of the two typevars is constrained, and which one is
         // the upper/lower bound.
-        let left_constraint_data = storage.constraint_data(left_constraint);
-        let left_typevar = left_constraint_data.typevar;
-        let right_constraint_data = storage.constraint_data(right_constraint);
-        let right_typevar = right_constraint_data.typevar;
-        let (bound_constraint, constrained_constraint) =
-            if left_typevar.can_be_bound_for(db, storage, right_typevar) {
-                (left_constraint, right_constraint)
+        let (Some(left), Some(right)) = (
+            storage.constraint_data(left_constraint).as_typevar(),
+            storage.constraint_data(right_constraint).as_typevar(),
+        ) else {
+            return;
+        };
+        let (bound_constraint_data, constrained_constraint_data) =
+            if left.typevar.can_be_bound_for(db, storage, right.typevar) {
+                (left, right)
             } else {
-                (right_constraint, left_constraint)
+                (right, left)
             };
 
         // We then look for cases where the "constrained" typevar's upper and/or lower bound
         // matches the "bound" typevar. If so, we're going to add an implication sequent that
         // replaces the upper/lower bound that matched with the bound constraint's corresponding
         // bound.
-        let bound_constraint_data = storage.constraint_data(bound_constraint);
         let bound_typevar = bound_constraint_data.typevar;
-        let constrained_constraint_data = storage.constraint_data(constrained_constraint);
         let constrained_typevar = constrained_constraint_data.typevar;
         let constrained_lower_bound = constrained_constraint_data.stored_lower_bound();
         let constrained_upper_bound = constrained_constraint_data.stored_upper_bound();
@@ -709,20 +721,33 @@ impl SequentMap {
                 .iter_stored_bounds()
                 .any(|bound| any_over_type(db, env, bound.ty(), true, Type::is_type_var))
         };
-        if !has_typevar_bound(storage.constraint_data(left_constraint))
-            && !has_typevar_bound(storage.constraint_data(right_constraint))
-        {
+        // Substituting an unused type variable in a protocol can produce an equivalent bound
+        // with a different identity. Deriving that bound would only repeat the structural check.
+        let is_distinct_bound = |original: Type<'db>, derived: Type<'db>| {
+            original != derived && !original.is_equivalent_to(db, env, derived)
+        };
+        let (Some(left_constraint_data), Some(right_constraint_data)) = (
+            storage.constraint_data(left_constraint).as_typevar(),
+            storage.constraint_data(right_constraint).as_typevar(),
+        ) else {
+            return;
+        };
+        if !has_typevar_bound(left_constraint_data) && !has_typevar_bound(right_constraint_data) {
             return;
         }
 
         let mut try_tightening =
             |bound_constraint: ConstraintId, constrained_constraint: ConstraintId| {
-                let bound_data = storage.constraint_data(bound_constraint);
+                let (Some(bound_data), Some(constrained_data)) = (
+                    storage.constraint_data(bound_constraint).as_typevar(),
+                    storage.constraint_data(constrained_constraint).as_typevar(),
+                ) else {
+                    return;
+                };
                 let bound_typevar = bound_data.typevar;
                 let bound_identity = bound_typevar.identity(db);
                 let bound_lower_bound = bound_data.stored_lower_bound();
                 let bound_upper_bound = bound_data.stored_upper_bound();
-                let constrained_data = storage.constraint_data(constrained_constraint);
                 let constrained_typevar = constrained_data.typevar;
                 let constrained_identity = constrained_typevar.identity(db);
                 let constrained_lower_bound = constrained_data.lower_bound(db);
@@ -819,7 +844,7 @@ impl SequentMap {
                         bound_typevar,
                         replacement.ty(),
                     );
-                    if new_upper != constrained_upper {
+                    if is_distinct_bound(constrained_upper, new_upper) {
                         let post = ConstraintId::new_with_bounds(
                             db,
                             env,
@@ -901,7 +926,7 @@ impl SequentMap {
                         bound_typevar,
                         replacement.ty(),
                     );
-                    if new_lower != constrained_lower {
+                    if is_distinct_bound(constrained_lower, new_lower) {
                         let post = ConstraintId::new_with_bounds(
                             db,
                             env,
@@ -952,12 +977,16 @@ impl SequentMap {
         // bound constraint's typevar.
         let mut try_weakening =
             |bound_constraint: ConstraintId, constrained_constraint: ConstraintId| {
-                let bound_data = storage.constraint_data(bound_constraint);
+                let (Some(bound_data), Some(constrained_data)) = (
+                    storage.constraint_data(bound_constraint).as_typevar(),
+                    storage.constraint_data(constrained_constraint).as_typevar(),
+                ) else {
+                    return;
+                };
                 let bound_typevar = bound_data.typevar;
                 let bound_lower_bound = bound_data.lower_bound(db);
                 let bound_upper_bound = bound_data.upper_bound(db);
                 let bound_lower = bound_lower_bound.ty();
-                let constrained_data = storage.constraint_data(constrained_constraint);
                 let constrained_typevar = constrained_data.typevar;
                 let constrained_lower_bound = constrained_data.lower_bound(db);
                 let constrained_upper_bound = constrained_data.upper_bound(db);
@@ -1008,7 +1037,7 @@ impl SequentMap {
                             nested_typevar,
                             replacement,
                         );
-                        if new_upper != constrained_upper {
+                        if is_distinct_bound(constrained_upper, new_upper) {
                             let post = ConstraintId::new_with_bounds(
                                 db,
                                 env,
@@ -1056,7 +1085,7 @@ impl SequentMap {
                             nested_typevar,
                             replacement,
                         );
-                        if new_lower != constrained_lower {
+                        if is_distinct_bound(constrained_lower, new_lower) {
                             let post = ConstraintId::new_with_bounds(
                                 db,
                                 env,
@@ -1107,10 +1136,14 @@ impl SequentMap {
     ) {
         let mut try_one_direction =
             |left_constraint: ConstraintId, right_constraint: ConstraintId| {
-                let left_constraint_data = storage.constraint_data(left_constraint);
+                let (Some(left_constraint_data), Some(right_constraint_data)) = (
+                    storage.constraint_data(left_constraint).as_typevar(),
+                    storage.constraint_data(right_constraint).as_typevar(),
+                ) else {
+                    return;
+                };
                 let left_lower = left_constraint_data.stored_lower_bound();
                 let left_upper = left_constraint_data.stored_upper_bound();
-                let right_constraint_data = storage.constraint_data(right_constraint);
                 let right_lower = right_constraint_data.stored_lower_bound();
                 let right_upper = right_constraint_data.stored_upper_bound();
                 let mut new_constraints =
@@ -1289,8 +1322,11 @@ impl SequentMap {
 
         match left_constraint.intersect(db, env, storage, right_constraint) {
             IntersectionResult::Simplified(intersection_constraint_data) => {
-                let intersection_constraint =
-                    storage.intern_constraint(db, env, intersection_constraint_data);
+                let intersection_constraint = storage.intern_constraint(
+                    db,
+                    env,
+                    ConstraintData::TypeVar(intersection_constraint_data),
+                );
                 tracing::trace!(
                     target: "ty_python_semantic::types::constraints::SequentMap",
                     left = %left_constraint.display(db, env, storage),

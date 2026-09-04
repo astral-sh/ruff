@@ -1752,10 +1752,8 @@ T2 = TypeVar("T2")
 def sink(func: Callable[[], Union[Awaitable[T2], T2]], future: Future[T2]) -> None:
     raise NotImplementedError
 
-# TODO: This should not error once we conjoin constraints from all call arguments.
 def f9(func: Callable[[], Union[Awaitable[T2], T2]]) -> Future[T2]:
     future: Future[T2] = Future()
-    # error: [invalid-argument-type]
     sink(func, future)
     return future
 ```
@@ -2190,6 +2188,9 @@ x = consume_and_produce(
 reveal_type(x)  # revealed: Literal["s", 1]
 ```
 
+The concrete argument determines the inner callable's parameter type, even when that callable is
+itself a parameter of a lambda inside a collection:
+
 ```py
 def nested_callable[T](
     value: T,
@@ -2237,6 +2238,9 @@ def _(dtype: FloatDtype):
     x = overloaded_call([1.0], dtype)
     reveal_type(x)  # revealed: float
 ```
+
+An intersection of callable protocols selects the matching signature's return type, but does not yet
+infer lambda parameters from that signature:
 
 ```py
 from typing import Protocol, runtime_checkable
@@ -2422,14 +2426,12 @@ def merge[K, V](*maps: dict[K, V]) -> tuple[K, V]:
     raise NotImplementedError
 
 def _(dynamic: Unknown):
-    # TODO: The key and value types should also include `Unknown`.
-    reveal_type(merge({"a": 1}, {2: "b"}, dynamic))  # revealed: tuple[str | int, int | str]
-    reveal_type(merge(dynamic, {"a": 1}, {2: "b"}))  # revealed: tuple[str | int, int | str]
+    reveal_type(merge({"a": 1}, {2: "b"}, dynamic))  # revealed: tuple[str | int | Unknown, int | str | Unknown]
+    reveal_type(merge(dynamic, {"a": 1}, {2: "b"}))  # revealed: tuple[Unknown | str | int, Unknown | int | str]
 
 def _(dynamic: Any):
-    # TODO: The key and value types should also include `Any`.
-    reveal_type(merge({"a": 1}, {2: "b"}, dynamic))  # revealed: tuple[str | int, int | str]
-    reveal_type(merge(dynamic, {"a": 1}, {2: "b"}))  # revealed: tuple[str | int, int | str]
+    reveal_type(merge({"a": 1}, {2: "b"}, dynamic))  # revealed: tuple[str | int | Any, int | str | Any]
+    reveal_type(merge(dynamic, {"a": 1}, {2: "b"}))  # revealed: tuple[Any | str | int, Any | int | str]
 ```
 
 ## Lambda parameter cycles
@@ -2899,6 +2901,19 @@ reveal_type(x23)  # revealed: list[float | str | None]
 x24 = {"a": 1}
 x24[1] = "b"
 reveal_type(x24)  # revealed: dict[int | str, str | int]
+```
+
+A lambda with an uninferred parameter can still contribute its callable type to an unannotated
+dictionary's key type:
+
+```py
+def _():
+    values = {}
+    values["first"] = 1
+    key = lambda value: value
+    reveal_type(values)  # revealed: dict[str | ((value) -> Unknown), int]
+    values[key] = 2
+    reveal_type(values[key])  # revealed: int
 ```
 
 ## Multi-inference diagnostics

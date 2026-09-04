@@ -772,8 +772,15 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     self.type_satisfies_protocol_member(db, ty, member)
                 });
         for (_, member) in recursive_members {
+            // The two checks choose materializations independently. Quantify those choices
+            // before checking whether every structural solution satisfies the nominal relation.
             if structurally_satisfied
-                .implies(db, self.constraints, || nominally_satisfied)
+                .for_some_gradual(db, env, self.constraints)
+                .implies(
+                    db,
+                    self.constraints,
+                    nominally_satisfied.for_some_gradual(db, env, self.constraints),
+                )
                 .is_always_satisfied(db, env)
             {
                 break;
@@ -806,8 +813,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     /// For materialized protocols, we need more than a successful check of the remaining members.
     /// Their constraints must mention every type variable in both sets of type arguments and imply
     /// the nominal relation: every solution they allow must also satisfy the comparison of the
-    /// type arguments, according to the protocol's variance. Together with the materialization
-    /// checks below, this establishes that the recursive members cannot add further restrictions.
+    /// type arguments, according to the protocol's variance. We quantify gradual decisions in both
+    /// comparisons, since they describe independent materializations. Together with the
+    /// materialization checks below, this establishes that the recursive members cannot add further
+    /// restrictions.
     ///
     /// We still return the structural constraints, not the nominal result. In particular, the
     /// unmaterialized path retains structural solutions from members such as `value() -> T | int`
@@ -953,7 +962,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     })
                 })
                 || !structurally_satisfied
-                    .implies(db, self.constraints, || nominally_satisfied)
+                    .for_some_gradual(db, env, self.constraints)
+                    .implies(
+                        db,
+                        self.constraints,
+                        nominally_satisfied.for_some_gradual(db, env, self.constraints),
+                    )
                     .is_always_satisfied(db, env))
         {
             return None;
@@ -1281,7 +1295,14 @@ impl<'db> VarianceInferable<'db> for NominalInstanceType<'db> {
         env: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
     ) -> VarianceTerm<'db> {
-        self.class(db, env).variance_of(db, env, typevar)
+        match self.0 {
+            NominalInstanceInner::ExactTuple(tuple) => tuple.variance_of(db, env, typevar),
+            NominalInstanceInner::Object
+            | NominalInstanceInner::NonTuple(_)
+            | NominalInstanceInner::SysVersionInfo => {
+                self.class(db, env).variance_of(db, env, typevar)
+            }
+        }
     }
 }
 
