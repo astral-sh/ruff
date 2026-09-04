@@ -855,6 +855,50 @@ class Items:
         self.items[0].value = "wrong"  # error: [invalid-assignment] "Cannot assign to read-only property `value`"
 ```
 
+## Reading an attribute missing from a union member
+
+A tuple update reports an attribute missing from one of its possible elements. The error does not
+prevent inferring the tuple's element types from its initial value and the available attribute.
+
+```py
+class Item:
+    value: int = 1
+
+class Missing: ...
+
+class Items:
+    def __init__(self, item: Item | Missing):
+        self.items = (item, 1)
+
+    def update(self):
+        # error: [unresolved-attribute] "Attribute `value` is not defined on `Missing` in union `Item | Missing`"
+        self.items = (self.items[0], self.items[0].value)
+        reveal_type(self.items)  # revealed: tuple[Item | Missing, int]
+```
+
+## Reading an attribute from a partly dynamic tuple element
+
+Reading an attribute from a union containing `Any` preserves that dynamic alternative. Updating a
+tuple with the attribute has the same behavior as reading it directly.
+
+```py
+from typing import Any
+
+class Item:
+    value: int = 1
+
+def read(item: Item | Any):
+    reveal_type(item.value)  # revealed: int | Any
+
+class Items:
+    def __init__(self, item: Item | Any):
+        self.items = (item, 1)
+
+    def update(self):
+        self.items = (self.items[0], self.items[0].value)
+        reveal_type(self.items)  # revealed: tuple[Item | Any, int | Any]
+```
+
 ## Generic tuple attributes
 
 The same generic class can be used with different type arguments. Copying a tuple does not mix these

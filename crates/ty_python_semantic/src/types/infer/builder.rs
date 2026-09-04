@@ -134,11 +134,11 @@ use crate::types::{
     BindingContext, BoundTypeVarInstance, CallDunderError, CallableBinding, CallableType,
     CallableTypes, ClassType, DynamicType, GeneratorTypeMode, InferenceFlags, InternedType,
     IntersectionBuilder, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
-    KnownUnion, LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy, ParamSpecAttrKind,
-    Parameter, Parameters, ProgramEnvironment, PropertyDeprecations, SentinelInstance, Signature,
-    SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeAndQualifiers, TypeContext,
-    TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, TypingModule,
-    UnionAccumulator, UnionBuilder, UnionType, binding_type,
+    KnownUnion, LiteralValueType, LiteralValueTypeKind, MemberLookupKey, MemberLookupPolicy,
+    ParamSpecAttrKind, Parameter, Parameters, ProgramEnvironment, PropertyDeprecations,
+    SentinelInstance, Signature, SpecialFormType, SubclassOfType, Type, TypeAliasType,
+    TypeAndQualifiers, TypeContext, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind,
+    TypeVarVariance, TypingModule, UnionAccumulator, UnionBuilder, UnionType, binding_type,
     extract_fixed_length_iterable_element_types, infer_complete_scope_types, infer_scope_types,
     is_discarded_dict_key_assignment, todo_type,
 };
@@ -11675,13 +11675,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .map(|source| {
                     let mut constraints = InferenceConstraints::default();
                     let source = constraints.import(db, source);
-                    let result = constraints.read_member(
+                    let result = constraints.apply(
                         db,
                         env,
                         InferenceOwner::Region(self.region),
-                        ast::ExprRef::Attribute(attribute).into(),
-                        source,
-                        &attr.id,
+                        InferenceSlot::Expression(ast::ExprRef::Attribute(attribute).into()),
+                        InferenceOperation::Member(MemberLookupKey::new(
+                            db,
+                            env.program(db),
+                            source,
+                            attr.id.clone(),
+                            MemberLookupPolicy::default(),
+                        )),
                     );
                     self.narrow_symbolic_expr(
                         attribute,

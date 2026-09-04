@@ -110,6 +110,8 @@ static_assert(has_member(C(), "static_method"))
 static_assert(not has_member(C(), "non_existent"))
 ```
 
+### Recursive instance attributes
+
 Recursive attribute inference can fall back to `Divergent`, but should still preserve members that
 were available before the cycle was introduced:
 

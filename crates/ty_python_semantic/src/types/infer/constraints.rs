@@ -1,7 +1,7 @@
 //! Constraints retained while a cyclic inference query is still being evaluated.
 //!
-//! Query results carry ordinary type approximations alongside immutable equations. Attribute reads
-//! use anonymous protocols; other operations reuse ordinary inference once their inputs are known.
+//! Query results carry ordinary type approximations alongside immutable equations. Operations
+//! reuse ordinary inference once their inputs are known.
 //! Producers use existing types with variables for unresolved outputs. Ordinary query bodies
 //! substitute producers and solve the resulting constraints.
 
@@ -27,13 +27,13 @@ use crate::types::call::{CallDunderError, CapturedCallArguments};
 use crate::types::class::AugmentedAttribute;
 use crate::types::class::implicit_attributes::ImplicitAttributeName;
 use crate::types::constraints::{
-    ConstraintSet, ConstraintSetBuilder, PathBoundSolution, PathBounds,
-    projection::{ProjectionError, SolutionBudget, SolutionProjection},
+    ConstraintSetBuilder,
+    projection::{ProjectionError, SolutionBudget},
 };
 use crate::types::narrow::NarrowingEvaluatorExtension;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::tuple::{TupleBuilder, TupleLength, TupleType};
-use crate::types::typevar::{BindingContext, BoundTypeVarInstance, TypeVarSet};
+use crate::types::typevar::{BindingContext, BoundTypeVarInstance};
 use crate::types::{
     ApplySpecialization, GenericContext, KnownClass, MemberLookupKey, MemberLookupPolicy,
     Specialization, Type, TypeContext, TypeMapping, UnionBuilder, UnionType, any_over_type,
@@ -254,11 +254,6 @@ pub(crate) enum Equation<'db> {
     Pending,
     /// The lower bound supplied by the producer of this output.
     Value(Type<'db>),
-    /// A read operation constraining its input and result, without assuming it is valid.
-    Requirement {
-        source: Type<'db>,
-        target: Type<'db>,
-    },
     Operation(InferenceOperation<'db>),
 }
 
@@ -277,19 +272,6 @@ impl<'db> Equation<'db> {
             (Self::Value(current), Self::Value(previous)) => {
                 Self::Value(current.cycle_normalized(db, env, previous, cycle))
             }
-            (
-                Self::Requirement {
-                    source: current_source,
-                    target: current_target,
-                },
-                Self::Requirement {
-                    source: previous_source,
-                    target: previous_target,
-                },
-            ) => Self::Requirement {
-                source: current_source.cycle_normalized(db, env, previous_source, cycle),
-                target: current_target.cycle_normalized(db, env, previous_target, cycle),
-            },
             (Self::Operation(current), Self::Operation(previous)) => {
                 Self::Operation(current.cycle_normalized(db, env, previous, cycle))
             }
@@ -301,10 +283,6 @@ impl<'db> Equation<'db> {
         match self {
             Self::Pending => {}
             Self::Value(ty) => visit(ty),
-            Self::Requirement { source, target } => {
-                visit(source);
-                visit(target);
-            }
             Self::Operation(operation) => {
                 operation.map(db, |ty| {
                     visit(ty);
@@ -318,6 +296,7 @@ impl<'db> Equation<'db> {
 /// An operation evaluated from its inferred inputs in the ordinary query body.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) enum InferenceOperation<'db> {
+    Member(MemberLookupKey<'db>),
     Subscript {
         value: Type<'db>,
         key: Type<'db>,
@@ -527,6 +506,13 @@ impl<'db> InferenceOperation<'db> {
 
     fn map(self, db: &'db dyn Db, mut f: impl FnMut(Type<'db>) -> Type<'db>) -> Self {
         match self {
+            Self::Member(key) => Self::Member(MemberLookupKey::new(
+                db,
+                key.program(db),
+                f(key.ty(db)),
+                key.name(db).clone(),
+                key.policy(db),
+            )),
             Self::Unary { operand, operator } => Self::Unary {
                 operand: f(operand),
                 operator,
@@ -616,6 +602,11 @@ impl<'db> InferenceOperation<'db> {
         variable: InferenceVariable<'db>,
     ) -> Option<Type<'db>> {
         match self {
+            Self::Member(key) => key
+                .ty(db)
+                .member_lookup_with_policy(db, env, key.name(db), key.policy(db))
+                .place
+                .ignore_possibly_undefined(),
             Self::Unary { operand, operator } => operand
                 .try_unary_operation(db, env, operator, &mut |_| {})
                 .ok(),
@@ -988,27 +979,9 @@ impl<'db> InferenceEquations<'db> {
                 .collect();
             let mut seen = FxHashSet::default();
             loop {
-                let (mut changed, operations_complete) = producers
+                let (changed, operations_complete) = producers
                     .evaluate_operations(&operations, &mut budget)
                     .ok()?;
-                let previous_requirements: Vec<_> = equations
-                    .iter()
-                    .filter(|(_, equation)| matches!(equation, Equation::Requirement { .. }))
-                    .map(|(variable, _)| {
-                        let variable = variable.typevar(db);
-                        (variable, producers.bindings.swap_remove(&variable))
-                    })
-                    .collect();
-                producers.resolved.clear();
-                let resolved = producers.solve_requirements(&equations)?;
-                for ((variable, previous), ty) in previous_requirements.into_iter().zip(resolved) {
-                    if previous.is_none_or(|previous| !previous.is_equivalent_to(db, env, ty)) {
-                        changed = true;
-                        producers.bindings.insert(variable, ty);
-                    } else if let Some(previous) = previous {
-                        producers.bindings.insert(variable, previous);
-                    }
-                }
                 producers.resolved.clear();
                 if !changed && operations_complete {
                     break;
@@ -1118,10 +1091,6 @@ impl<'db> SymbolicType<'db> {
                 let equation = match equation {
                     Equation::Pending => Equation::Pending,
                     Equation::Value(ty) => Equation::Value(apply(*ty)),
-                    Equation::Requirement { source, target } => Equation::Requirement {
-                        source: apply(*source),
-                        target: apply(*target),
-                    },
                     Equation::Operation(operation) => Equation::Operation(operation.map(db, apply)),
                 };
                 (variable.specialized(db, specialization), equation)
@@ -1414,29 +1383,6 @@ impl<'db> InferenceConstraints<'db> {
         variable.ty(db)
     }
 
-    /// Constrain an attribute read using a read-only protocol member.
-    pub(crate) fn read_member(
-        &mut self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        owner: InferenceOwner<'db>,
-        expression: ExpressionNodeKey,
-        source: Type<'db>,
-        name: &str,
-    ) -> Type<'db> {
-        let variable = InferenceVariable::new(
-            db,
-            env.program(db),
-            owner,
-            InferenceSlot::Expression(expression),
-        );
-        let result = variable.ty(db);
-        let target = Type::protocol_with_readonly_members(db, env, [(name, result)]);
-        self.equations
-            .insert(variable, Equation::Requirement { source, target });
-        result
-    }
-
     /// Retain an operation until its inputs have been supplied by their producers.
     pub(crate) fn apply(
         &mut self,
@@ -1690,81 +1636,6 @@ impl<'db> InferenceSolutions<'_, 'db> {
                     && any_over_type(self.db, self.env, element, false, |ty| ty == target)
             }),
             _ => ty != target && any_over_type(self.db, self.env, ty, false, |ty| ty == target),
-        }
-    }
-
-    fn solve_requirements(
-        &mut self,
-        equations: &[(InferenceVariable<'db>, Equation<'db>)],
-    ) -> Option<Vec<Type<'db>>> {
-        let db = self.db;
-        let env = self.env;
-        // Only requirement outputs are rebound; other producers retain their defining equations.
-        let outputs: Vec<_> = equations
-            .iter()
-            .filter(|(_, equation)| matches!(equation, Equation::Requirement { .. }))
-            .map(|(variable, _)| self.resolve_type(variable.ty(db)))
-            .collect();
-        let builder = ConstraintSetBuilder::new();
-        let inferable = TypeVarSet::from_typevars(
-            db,
-            equations.iter().map(|(variable, _)| variable.typevar(db)),
-        );
-        let mut constraints = ConstraintSet::from_bool(&builder, true);
-        for (_, equation) in equations {
-            let Equation::Requirement { source, target } = equation else {
-                continue;
-            };
-            let source = self.resolve_type(*source);
-            let target = self.resolve_type(*target);
-            let owned = source.when_constraint_set_assignable_to_owned(db, env, target);
-            let next = builder.load(db, env, &owned);
-            constraints = constraints.intersect(db, &builder, next);
-        }
-
-        let result = constraints
-            .try_fold_solutions(
-                db,
-                env,
-                inferable,
-                SolutionBudget::default(),
-                |_variance, bound| {
-                    if bound.evidence_lower().is_none() {
-                        PathBoundSolution::Unsolved
-                    } else {
-                        PathBounds::default_solve(db, env, &builder, bound)
-                    }
-                },
-                vec![Type::Never; outputs.len()],
-                |previous, bindings, budget| {
-                    let mut solutions = InferenceSolutions {
-                        db,
-                        env,
-                        bindings: bindings
-                            .iter()
-                            .map(|binding| (binding.bound_typevar, binding.solution))
-                            .collect(),
-                        active: Vec::new(),
-                        resolved: FxIndexMap::default(),
-                        evaluated: FxHashMap::default(),
-                        growing: FxHashSet::default(),
-                    };
-                    previous
-                        .into_iter()
-                        .zip(&outputs)
-                        .map(|(previous, output)| {
-                            let ty = solutions.resolve_type(*output);
-                            budget.charge_type(db, ty)?;
-                            Ok(UnionType::from_two_elements(db, env, previous, ty))
-                        })
-                        .collect()
-                },
-            )
-            .ok()?;
-        match result {
-            SolutionProjection::Constrained(types) => Some(types),
-            SolutionProjection::Unconstrained => Some(outputs),
-            SolutionProjection::Unsatisfiable => None,
         }
     }
 
