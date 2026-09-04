@@ -764,52 +764,76 @@ class Unrelated2: ...
 
 def first[T: Base](x: Sequence[T]) -> T:
     return x[0]
+```
 
-# Both positive elements satisfy the bound.
+Both positive elements satisfy the bound, so both specializations contribute to the return type:
+
+```py
 def _(x: Intersection[Sequence[Sub1], Sequence[Sub2]]) -> None:
     reveal_type(first(x))  # revealed: Sub1 & Sub2
+```
 
-# Invalid specialization paths do not contribute to the inferred return type.
+Elements that do not satisfy the bound are ignored. Every valid specialization still contributes to
+the return type:
+
+```py
 def _(x: Intersection[Sequence[Sub1], Sequence[Unrelated1]]) -> None:
     reveal_type(first(x))  # revealed: Sub1
 
-# Every valid path contributes to the inferred return type.
 def _(x: Intersection[Sequence[Sub1], Sequence[Sub2], Sequence[Unrelated1]]) -> None:
     reveal_type(first(x))  # revealed: Sub1 & Sub2
+```
 
-# An intersection with two positive elements, neither of which produces a valid specialization.
+If neither positive element produces a valid specialization, the call reports a bound violation:
+
+```py
 def _(x: Intersection[Sequence[Unrelated1], Sequence[Unrelated2]]) -> None:
     # error: [invalid-argument-type] "Argument to function `first` is incorrect: Argument type `Unrelated1 & Unrelated2` does not satisfy upper bound `Base` of type variable `T`"
     reveal_type(first(x))  # revealed: Unknown
+```
 
-# Constrained typevars can be inferred from matching intersection elements; non-matching elements
-# do not contribute. If no element matches a declared constraint, report the constraint violation.
+A constrained type variable must be solved to one of its declared constraints. Here, the call is
+solved separately with `Constrained = Sub1` and `Constrained = Sub2`, and the return types are
+intersected. `Constrained` itself is not solved to `Sub1 & Sub2`, which would not be a valid
+declared constraint:
 
+```py
 def first_constrained[Constrained: (Sub1, Sub2)](
     x: Sequence[Constrained],
 ) -> Constrained:
     return x[0]
 
 def _(x: Intersection[Sequence[Sub1], Sequence[Sub2]]) -> None:
-    # `Constrained` is not solved to `Sub1 & Sub2`, which would not be a valid declared constraint.
-    # The call is solved separately with `Sub1` and `Sub2`, then the return types are intersected.
     reveal_type(first_constrained(x))  # revealed: Sub1 & Sub2
+```
 
+For `Sequence[SubclassOfSub2]`, `Constrained` must be solved to its declared `Sub2` constraint, not
+to `SubclassOfSub2`. Intersecting this return type with `Sub1` therefore still gives `Sub1 & Sub2`:
+
+```py
 def _(x: Intersection[Sequence[Sub1], Sequence[SubclassOfSub2]]) -> None:
-    # A constrained typevar must solve the second path to its declared `Sub2` constraint, not to
-    # `SubclassOfSub2`; the two separately inferred return types are then intersected.
     reveal_type(first_constrained(x))  # revealed: Sub1 & Sub2
+```
 
+An element that does not match a declared constraint does not contribute to the return type:
+
+```py
 def _(x: Intersection[Sequence[Sub1], Sequence[Unrelated1]]) -> None:
     reveal_type(first_constrained(x))  # revealed: Sub1
+```
 
+If no element matches a declared constraint, the call reports a constraint violation:
+
+```py
 def _(x: Intersection[Sequence[Unrelated1], Sequence[Unrelated2]]) -> None:
     # error: [invalid-argument-type] "Argument to function `first_constrained` is incorrect: Argument type `Unrelated1 & Unrelated2` does not satisfy constraints (`Sub1`, `Sub2`) of type variable `Constrained`"
     reveal_type(first_constrained(x))  # revealed: Unknown
+```
 
-# Incompatible invariant specializations are disjoint, so two valid positive elements must agree
-# on the constrained type. A single matching element can still select either constraint.
+Incompatible invariant specializations are disjoint, so two valid positive elements must agree on
+the constrained type:
 
+```py
 class Box[T]:
     value: T
 
@@ -822,16 +846,28 @@ def unbox[Constrained: (Sub1, Sub2)](x: Box[Constrained]) -> Constrained:
 
 def _(x: Intersection[Sub1Box, OtherSub1Box]) -> None:
     reveal_type(unbox(x))  # revealed: Sub1
+```
 
+A single matching element can still select either constraint:
+
+```py
 def _(x: Intersection[Box[Sub2], Marker]) -> None:
     reveal_type(unbox(x))  # revealed: Sub2
+```
 
+An unrelated intersection element does not make an invalid specialization of `Box` satisfy the
+constraints:
+
+```py
 def _(x: Intersection[Box[Unrelated1], Marker]) -> None:
     # error: [invalid-argument-type] "Argument to function `unbox` is incorrect: Argument type `Unrelated1` does not satisfy constraints (`Sub1`, `Sub2`) of type variable `Constrained`"
     reveal_type(unbox(x))  # revealed: Unknown
+```
 
-# Each argument independently selects a valid constraint, but invariance requires both arguments
-# to select the same one.
+Each argument independently selects a valid constraint, but invariance requires both arguments to
+select the same one:
+
+```py
 def unbox_pair[Constrained: (Sub1, Sub2)](x: Box[Constrained], y: Box[Constrained]) -> Constrained:
     raise NotImplementedError
 
@@ -840,10 +876,12 @@ def _(x: Intersection[Box[Sub1], Marker], y: Intersection[Box[Sub2], Marker]) ->
     # error: [invalid-argument-type] "Argument to function `unbox_pair` is incorrect: Expected `Box[Sub1 | Sub2]`, found `Box[Sub1] & Marker`"
     # error: [invalid-argument-type] "Argument to function `unbox_pair` is incorrect: Expected `Box[Sub1 | Sub2]`, found `Box[Sub2] & Marker`"
     reveal_type(unbox_pair(x, y))  # revealed: Sub1 | Sub2
+```
 
-# Contravariant inference contributes upper-bound evidence instead. Matching elements contribute to
-# the result; if every element rules out the constraints, report the constraint violation.
+For a contravariant sink, the selected constraint must be a subtype of the sink's element type. Each
+valid specialization contributes its return type:
 
+```py
 class ConstrainedSink[T]:
     def put(self, value: T) -> None: ...
 
@@ -854,22 +892,37 @@ def sink_constrained[Constrained: (Sub1, Sub2)](
 
 def _(x: Intersection[ConstrainedSink[Sub1], ConstrainedSink[Sub2]]) -> None:
     reveal_type(sink_constrained(x))  # revealed: Sub1 & Sub2
+```
 
-# Contravariance allows a sink of a superclass to select the `Sub2` constraint.
+Contravariance allows a sink of a superclass to select the `Sub2` constraint:
+
+```py
 def _(x: Intersection[ConstrainedSink[Sub1], ConstrainedSink[SuperclassOfSub2]]) -> None:
     reveal_type(sink_constrained(x))  # revealed: Sub1 & Sub2
 
 def _(x: Intersection[ConstrainedSink[SuperclassOfSub2], Marker]) -> None:
     reveal_type(sink_constrained(x))  # revealed: Sub2
+```
 
-# A sink of a strict subclass cannot accept every `Sub2`, so it cannot select that constraint.
+A sink of a strict subclass cannot accept every `Sub2`, so it cannot select that constraint:
+
+```py
 def _(x: Intersection[ConstrainedSink[SubclassOfSub2], Marker]) -> None:
     # error: [invalid-argument-type] "Argument to function `sink_constrained` is incorrect: Argument type `SubclassOfSub2` does not satisfy constraints (`Sub1`, `Sub2`) of type variable `Constrained`"
     reveal_type(sink_constrained(x))  # revealed: Unknown
+```
 
+A valid specialization still contributes its return type when another element does not match a
+declared constraint:
+
+```py
 def _(x: Intersection[ConstrainedSink[Sub1], ConstrainedSink[Unrelated1]]) -> None:
     reveal_type(sink_constrained(x))  # revealed: Sub1
+```
 
+If every element rules out the declared constraints, the call reports a constraint violation:
+
+```py
 def _(x: Intersection[ConstrainedSink[Unrelated1], ConstrainedSink[Unrelated2]]) -> None:
     # error: [invalid-argument-type] "Argument to function `sink_constrained` is incorrect: Argument type `Unrelated1 | Unrelated2` does not satisfy constraints (`Sub1`, `Sub2`) of type variable `Constrained`"
     reveal_type(sink_constrained(x))  # revealed: Unknown
@@ -1346,8 +1399,15 @@ def _(source: Intersection[Source[A], Source[B]], value: str) -> None:
 
 ## Type guards inferred from intersection arguments
 
-Type guards still return booleans when their argument provides multiple specializations. Until their
-narrowing behavior supports those alternatives, preserve the merged specialization:
+Type-guard functions return booleans. The types inside `TypeGuard` and `TypeIs` describe how their
+arguments can be narrowed, not the values they return. When an intersection argument permits two
+valid specializations of a guard, the call can still return a boolean. Intersecting the specialized
+guard annotations as ordinary return types could instead produce `Never`, incorrectly suggesting
+that the call cannot return.
+
+Until narrowing can preserve the separate specializations, we merge the inferred types for `T`
+before applying the guard annotation. The result is a guard for `A | B`, rather than an intersection
+of guards for `A` and `B`:
 
 ```py
 from typing import TypeGuard
