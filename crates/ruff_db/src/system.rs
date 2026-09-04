@@ -24,6 +24,8 @@ pub use self::path::{
 use crate::file_revision::FileRevision;
 
 mod command;
+#[cfg(feature = "os")]
+pub mod directory_metadata;
 mod memory_fs;
 #[cfg(feature = "os")]
 mod os;

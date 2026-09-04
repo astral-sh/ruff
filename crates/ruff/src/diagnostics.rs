@@ -26,7 +26,7 @@ use ruff_text_size::TextRange;
 use ruff_workspace::Settings;
 use rustc_hash::FxHashMap;
 
-use crate::cache::{Cache, FileCache, FileCacheKey};
+use crate::cache::{Cache, FileCache};
 
 /// A collection of [`Diagnostic`]s and additional information needed to render them.
 ///
@@ -195,7 +195,9 @@ pub(crate) fn lint_path(
                 .relative_path(path)
                 .expect("wrong package cache for file");
 
-            let cache_key = FileCacheKey::from_path(path).context("Failed to create cache key")?;
+            let cache_key = cache
+                .file_cache_key(path)
+                .context("Failed to create cache key")?;
             let cached_diagnostics = cache
                 .get(relative_path, &cache_key)
                 .is_some_and(FileCache::linted);

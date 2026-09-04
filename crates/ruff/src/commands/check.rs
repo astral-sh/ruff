@@ -74,7 +74,14 @@ pub(crate) fn check(
 
     // Load the caches.
     let caches = if cache.is_enabled() {
-        Some(PackageCacheMap::init(&package_roots, &resolver))
+        let mut caches = PackageCacheMap::init(&package_roots, &resolver);
+        if noqa.is_enabled() {
+            caches.prefetch_file_keys(
+                paths.iter().flatten().map(ResolvedFile::path),
+                &package_roots,
+            );
+        }
+        Some(caches)
     } else {
         None
     };

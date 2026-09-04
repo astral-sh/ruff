@@ -17,6 +17,8 @@ use rustc_hash::FxHashMap;
 use tempfile::NamedTempFile;
 
 use ruff_cache::{CacheKey, CacheKeyHasher};
+#[cfg(target_os = "macos")]
+use ruff_db::system::directory_metadata;
 use ruff_linter::package::PackageRoot;
 use ruff_linter::{VERSION, warn_user};
 use ruff_macros::CacheKey;
@@ -28,7 +30,7 @@ pub(crate) type RelativePath = Path;
 /// [`PathBuf`] that is relative to the package root in [`PackageCache`].
 pub(crate) type RelativePathBuf = PathBuf;
 
-#[derive(CacheKey)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, CacheKey)]
 pub(crate) struct FileCacheKey {
     /// Timestamp when the file was last modified before the (cached) check.
     file_last_modified: FileTime,
@@ -76,6 +78,9 @@ pub(crate) struct Cache {
     /// `package.files` but are outdated. This gets merged with `package.files`
     /// when the cache is written back to disk in [`Cache::store`].
     changes: Mutex<Vec<Change>>,
+    /// Metadata fetched before this invocation starts checking or formatting files.
+    #[cfg(target_os = "macos")]
+    initial_file_keys: Mutex<FxHashMap<PathBuf, FileCacheKey>>,
     /// The "current" timestamp used as cache for the updates of
     /// [`FileCache::last_seen`]
     #[expect(clippy::struct_field_names)]
@@ -147,10 +152,23 @@ impl Cache {
             path,
             package,
             changes: Mutex::new(Vec::new()),
+            #[cfg(target_os = "macos")]
+            initial_file_keys: Mutex::default(),
             // SAFETY: this will be truncated to the year ~2554 (so don't use
             // this code after that!).
             last_seen_cache: SystemTime::UNIX_EPOCH.elapsed().unwrap().as_millis() as u64,
         }
+    }
+
+    /// Takes a prefetched key once, so a later check of the same path reads fresh metadata.
+    pub(crate) fn file_cache_key(&self, path: &Path) -> io::Result<FileCacheKey> {
+        #[cfg(target_os = "macos")]
+        if let Ok(mut keys) = self.initial_file_keys.lock()
+            && let Some(key) = keys.remove(path)
+        {
+            return Ok(key);
+        }
+        FileCacheKey::from_path(path)
     }
 
     /// Applies the pending changes and persists the cache to disk, if it has been changed.
@@ -420,6 +438,61 @@ where
 pub(crate) struct PackageCacheMap<'a>(FxHashMap<&'a Path, Cache>);
 
 impl<'a> PackageCacheMap<'a> {
+    /// Prefetch cache keys for directories containing several selected files.
+    ///
+    /// The ordinary walker still applies ignore and configuration rules. Bulk reads only replace
+    /// metadata lookups for the selected regular files; symlinks and unavailable entries fall back
+    /// to `FileCacheKey::from_path`. A single explicitly selected file never scans its siblings.
+    pub(crate) fn prefetch_file_keys<'p>(
+        &mut self,
+        paths: impl Iterator<Item = &'p Path>,
+        package_roots: &FxHashMap<&Path, Option<PackageRoot<'_>>>,
+    ) {
+        #[cfg(target_os = "macos")]
+        {
+            let mut directories: FxHashMap<&Path, Vec<&Path>> = FxHashMap::default();
+            for path in paths {
+                if let Some(parent) = path.parent() {
+                    directories.entry(parent).or_default().push(path);
+                }
+            }
+            let keys: Vec<_> = directories
+                .into_par_iter()
+                .filter(|(_, paths)| paths.len() > 1)
+                .flat_map_iter(|(directory, paths)| {
+                    let entries = directory_metadata::read(directory).unwrap_or_default();
+                    paths.into_iter().filter_map(move |path| {
+                        let metadata = entries.get(path.file_name()?)?;
+                        Some((
+                            path,
+                            FileCacheKey {
+                                file_last_modified: metadata.last_modified,
+                                file_permissions_mode: metadata.mode,
+                            },
+                        ))
+                    })
+                })
+                .collect();
+            for (path, key) in keys {
+                if let Some(parent) = path.parent() {
+                    let root = package_roots
+                        .get(parent)
+                        .copied()
+                        .flatten()
+                        .map(PackageRoot::path)
+                        .unwrap_or(parent);
+                    if let Some(cache) = self.0.get_mut(root)
+                        && let Ok(keys) = cache.initial_file_keys.get_mut()
+                    {
+                        keys.insert(path.to_path_buf(), key);
+                    }
+                }
+            }
+        }
+        #[cfg(not(target_os = "macos"))]
+        let _ = (paths, package_roots);
+    }
+
     pub(crate) fn init(
         package_roots: &FxHashMap<&'a Path, Option<PackageRoot<'a>>>,
         resolver: &Resolver,
@@ -525,6 +598,30 @@ mod tests {
     use crate::cache::{Cache, RelativePathBuf};
     use crate::commands::format::{FormatCommandError, FormatMode, FormatResult, format_path};
     use crate::diagnostics::{Diagnostics, lint_path};
+
+    #[test]
+    #[cfg(target_os = "macos")]
+    fn prefetched_keys_are_consumed_once() -> io::Result<()> {
+        let root = tempfile::tempdir()?;
+        let path = root.path().join("source.py");
+        fs::write(&path, "")?;
+        let original = FileCacheKey::from_path(&path)?;
+        let mut cache = Cache::empty(root.path().join("cache"), root.path().to_path_buf());
+        cache
+            .initial_file_keys
+            .get_mut()
+            .unwrap()
+            .insert(path.clone(), original);
+
+        assert_eq!(cache.file_cache_key(&path)?, original);
+        set_file_mtime(&path, FileTime::from_unix_time(1_000, 0))?;
+        assert_eq!(
+            cache.file_cache_key(&path)?,
+            FileCacheKey::from_path(&path)?
+        );
+        assert_ne!(cache.file_cache_key(&path)?, original);
+        Ok(())
+    }
 
     #[test_case("../ruff_linter/resources/test/fixtures", "ruff_tests/cache_same_results_ruff_linter"; "ruff_linter_fixtures")]
     #[test_case("../ruff_notebook/resources/test/fixtures", "ruff_tests/cache_same_results_ruff_notebook"; "ruff_notebook_fixtures")]

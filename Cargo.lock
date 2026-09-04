@@ -3225,6 +3225,7 @@ dependencies = [
  "get-size2",
  "ignore",
  "insta",
+ "libc",
  "matchit",
  "path-slash",
  "pathdiff",

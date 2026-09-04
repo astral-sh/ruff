@@ -110,7 +110,12 @@ pub(crate) fn format(
         #[cfg(debug_assertions)]
         crate::warn_user!("Detected debug build without --no-cache.");
 
-        Some(PackageCacheMap::init(&package_roots, &resolver))
+        let mut caches = PackageCacheMap::init(&package_roots, &resolver);
+        caches.prefetch_file_keys(
+            paths.iter().flatten().map(ResolvedFile::path),
+            &package_roots,
+        );
+        Some(caches)
     };
 
     let start = Instant::now();
@@ -264,7 +269,7 @@ pub(crate) fn format_path(
             .relative_path(path)
             .expect("wrong package cache for file");
 
-        if let Ok(cache_key) = FileCacheKey::from_path(path) {
+        if let Ok(cache_key) = cache.file_cache_key(path) {
             if cache.is_formatted(relative_path, &cache_key) {
                 return Ok(FormatResult::Unchanged);
             }
