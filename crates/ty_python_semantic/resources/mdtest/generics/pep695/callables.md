@@ -780,6 +780,36 @@ def singleton[S](flag: bool = False) -> Callable[[Callable[[int], S]], Callable[
     return wrapper
 ```
 
+## Dependent return types from generic callbacks
+
+A generic identity callback returns the type it receives. Each overload of the consumer selects a
+different argument type for that callback, which also determines its result type. The enclosing
+call's return type should satisfy both specializations, giving `A & B`. We currently retain `A | B`
+because subtype revalidation does not recognize the generic callback as a subtype of either
+specialized callable type:
+
+```py
+from typing import Callable, overload
+
+class A: ...
+class B: ...
+
+def infer_result[T, R](callback: Callable[[T], R], consumer: Callable[[T], None]) -> R:
+    raise NotImplementedError
+
+def identity[T](value: T) -> T:
+    return value
+
+@overload
+def consume(value: A) -> None: ...
+@overload
+def consume(value: B) -> None: ...
+def consume(value: A | B) -> None: ...
+
+# TODO: revealed: A & B
+reveal_type(infer_result(identity, consume))  # revealed: A | B
+```
+
 ## Intersected returns exceeding the output budget
 
 Each overload below independently accepts the call, giving return types `A | B` and `C | D | E`.
@@ -821,9 +851,14 @@ reveal_type(accepts_callable_aliased(consumer))  # revealed: A | B | C | D | E
 
 ## Inferred type-guard return alternatives
 
-A callback can supply type-guard alternatives even when the generic function's return annotation is
-only a type variable. Calling either guard returns a boolean; intersecting their inferred guard
-wrappers must not make the call's result `Never`.
+Type-guard functions return booleans. The types inside `TypeGuard` and `TypeIs` describe how their
+arguments can be narrowed, not the values they return. A callback can have two type-guard signatures
+and still return normally. Intersecting those return annotations as ordinary types can instead
+produce `Never`, incorrectly suggesting that the call cannot return.
+
+A generic function that calls the callback and returns its result has the same behavior, even if its
+own return annotation is only a type variable. Its inferred return type therefore retains the union
+of the guard annotations rather than becoming `Never`.
 
 ```py
 from collections.abc import Callable
@@ -846,9 +881,19 @@ def _(callback: Intersection[Callable[[object], TypeIs[A]], Callable[[object], T
 
 ## Inferred mutable return alternatives
 
-A callback can return an empty list under either specialization. Inferring its return type through a
-type variable must not make the enclosing call return `Never` merely because the two list types have
-different invariant element types.
+Multiple return types can be intersected when they describe properties that hold simultaneously for
+the same returned value. A fresh list (or other invariant container) introduces a different
+situation: the same expression, `[]`, can be correctly typed as either `list[A]` or `list[B]`,
+depending on the expected type. These successful typings make different (and mutually exclusive)
+choices for the newly constructed list's static element type. They do not give one returned list
+both specializations at once.
+
+The two signatures therefore provide alternative valid typings for each call, not two simultaneous
+properties of a single result. Their return-type intersection is `Never`, since these incompatible
+invariant list specializations are disjoint, but that does not mean the callback cannot return. We
+conservatively keep `list[A] | list[B]` instead for now. TODO this may be overly conservative; in
+the absence of type context it would be less restrictive to just pick one type or the other (since
+either is a valid inference), though it's hard to find a compelling rationale for which to pick.
 
 ```py
 from collections.abc import Callable
@@ -862,6 +907,19 @@ def invoke[R](callback: Callable[[object], R], value: object) -> R:
 
 def _(callback: Intersection[Callable[[object], list[A]], Callable[[object], list[B]]]) -> None:
     reveal_type(invoke(callback, object()))  # revealed: list[A] | list[B]
+```
+
+An assignment to a variable annotated as `list[A]` or `list[B]` should select the corresponding
+callback signature. Each signature independently accepts the call and returns the required type:
+
+```py
+def _(callback: Intersection[Callable[[object], list[A]], Callable[[object], list[B]]]) -> None:
+    # TODO: This assignment should succeed with `R = list[A]`.
+    # error: [invalid-assignment] "Object of type `list[A] | list[B]` is not assignable to `list[A]`"
+    a: list[A] = invoke(callback, object())
+    # TODO: This assignment should succeed with `R = list[B]`.
+    # error: [invalid-assignment] "Object of type `list[A] | list[B]` is not assignable to `list[B]`"
+    b: list[B] = invoke(callback, object())
 ```
 
 ## Multiple occurrences of a higher-order generic callable
