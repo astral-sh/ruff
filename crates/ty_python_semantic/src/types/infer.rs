@@ -46,7 +46,7 @@
 use self::constraints::{InferenceOwner, InferenceSlot, SymbolicType};
 use crate::ProgramEnvironment;
 use crate::place::Place;
-use crate::types::{CycleEquations, CycleOwner};
+use crate::types::{CycleEquations, CycleOwner, cycle_normalized_equations};
 use itertools::Either;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
@@ -980,6 +980,17 @@ impl<'db> ScopeInference<'db> {
                 cycle,
             );
         }
+        if let Some(previous_extra) = previous_inference.extra.as_deref()
+            && !previous_extra.equations.is_empty()
+        {
+            let extra = self.extra.get_or_insert_default();
+            extra.equations = cycle_normalized_equations(
+                db,
+                env,
+                std::mem::take(&mut extra.equations),
+                &previous_extra.equations,
+            );
+        }
 
         if cycle.iteration() > crate::TAINTED_CYCLES
             && let Some(previous_extra) = previous_inference.extra.as_deref()
@@ -1584,6 +1595,25 @@ impl<'db> DefinitionInference<'db> {
             }
         }
 
+        if let Some(DefinitionInferenceExtra::Other(previous_extra)) =
+            previous_inference.extra.as_deref()
+            && !previous_extra.equations.is_empty()
+        {
+            let mut extra = self
+                .extra
+                .take()
+                .map_or_else(OtherDefinitionInferenceExtra::default, |extra| {
+                    extra.into_other()
+                });
+            extra.equations = cycle_normalized_equations(
+                db,
+                &env,
+                std::mem::take(&mut extra.equations),
+                &previous_extra.equations,
+            );
+            self.extra = Some(Box::new(DefinitionInferenceExtra::Other(Box::new(extra))));
+        }
+
         if cycle.iteration() > crate::TAINTED_CYCLES
             && let Some(previous_constraints) = previous_inference
                 .extra
@@ -1926,6 +1956,17 @@ impl<'db> ExpressionInference<'db> {
                 );
             }
         }
+        if let Some(previous_extra) = previous.extra.as_deref()
+            && !previous_extra.equations.is_empty()
+        {
+            let extra = self.extra.get_or_insert_default();
+            extra.equations = cycle_normalized_equations(
+                db,
+                env,
+                std::mem::take(&mut extra.equations),
+                &previous_extra.equations,
+            );
+        }
 
         if cycle.iteration() > crate::TAINTED_CYCLES {
             self.widen_comparison_truthiness(db, env, previous);
@@ -2216,6 +2257,17 @@ impl<'db> StatementInferenceInner<'db> {
                 std::mem::take(&mut extra.symbolic),
                 &previous_extra.symbolic,
                 cycle,
+            );
+        }
+        if let Some(previous_extra) = previous_inference.extra.as_deref()
+            && !previous_extra.equations.is_empty()
+        {
+            let extra = self.extra.get_or_insert_default();
+            extra.equations = cycle_normalized_equations(
+                db,
+                env,
+                std::mem::take(&mut extra.equations),
+                &previous_extra.equations,
             );
         }
 

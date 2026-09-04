@@ -24,7 +24,7 @@ use crate::types::tuple::{
 use crate::types::{
     CycleEquations, CycleOwner, CycleSlot, DeferredOperations, InferencePromotion, KnownClass,
     Operation, Type, TypeCheckDiagnostics, TypeContext, UnionBuilder, UnionType,
-    infer_expression_types,
+    cycle_normalized_equations, infer_expression_types,
 };
 use ty_python_core::ExpressionNodeKey;
 use ty_python_core::unpack::{Unpack, UnpackKind, UnpackValue};
@@ -570,6 +570,12 @@ impl<'db> UnpackResult<'db> {
             std::mem::take(&mut self.symbolic),
             &previous_cycle_result.symbolic,
             cycle,
+        );
+        self.equations = cycle_normalized_equations(
+            db,
+            env,
+            std::mem::take(&mut self.equations),
+            &previous_cycle_result.equations,
         );
 
         self

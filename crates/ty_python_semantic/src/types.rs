@@ -139,7 +139,9 @@ mod constraints;
 mod context;
 mod context_manager;
 mod cycle_equations;
-pub(crate) use cycle_equations::{CycleEquations, DeferredOperations, Operation};
+pub(crate) use cycle_equations::{
+    CycleEquations, DeferredOperations, Operation, cycle_normalized_equations,
+};
 mod cycle_variable;
 pub(crate) use cycle_variable::{CycleOwner, CycleSlot, CycleVariable};
 mod cyclic;

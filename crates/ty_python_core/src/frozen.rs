@@ -11,6 +11,14 @@ use rustc_hash::FxHashMap;
 pub struct FrozenMap<K, V>(Box<[(K, V)]>);
 
 impl<K, V> FrozenMap<K, V> {
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
     pub fn iter(&self) -> std::slice::Iter<'_, (K, V)> {
         self.0.iter()
     }

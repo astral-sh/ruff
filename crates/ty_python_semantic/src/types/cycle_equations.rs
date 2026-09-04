@@ -11,7 +11,7 @@ use ty_python_core::frozen::FrozenMap;
 
 use crate::types::cycle_variable::{CycleOwner, CycleSlot, CycleVariable};
 use crate::types::tuple::TupleLength;
-use crate::types::{MemberLookupPolicy, Type};
+use crate::types::{MemberLookupPolicy, Type, UnionType};
 use crate::{Db, ProgramEnvironment};
 
 /// An operation whose result is a cycle variable of the query that recorded it.
@@ -47,8 +47,122 @@ pub(crate) enum Operation<'db> {
     },
 }
 
+impl<'db> Operation<'db> {
+    /// Combines the inputs recorded for the same variable by two cycle iterations.
+    fn cycle_normalized(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        previous: &Self,
+    ) -> Self {
+        let join = |current: Type<'db>, previous: Type<'db>| {
+            if current == previous {
+                current
+            } else {
+                UnionType::from_elements_cycle_recovery(db, env, [previous, current])
+            }
+        };
+        match (self, previous) {
+            (
+                Self::Subscript { value, key },
+                Self::Subscript {
+                    value: previous_value,
+                    key: previous_key,
+                },
+            ) => Self::Subscript {
+                value: join(value, *previous_value),
+                key: join(key, *previous_key),
+            },
+            (
+                Self::Member {
+                    value,
+                    name,
+                    policy,
+                },
+                Self::Member {
+                    value: previous_value,
+                    ..
+                },
+            ) => Self::Member {
+                value: join(value, *previous_value),
+                name,
+                policy,
+            },
+            (
+                Self::Iterate { value, mode },
+                Self::Iterate {
+                    value: previous_value,
+                    ..
+                },
+            ) => Self::Iterate {
+                value: join(value, *previous_value),
+                mode,
+            },
+            (
+                Self::Unpack {
+                    value,
+                    length,
+                    index,
+                },
+                Self::Unpack {
+                    value: previous_value,
+                    ..
+                },
+            ) => Self::Unpack {
+                value: join(value, *previous_value),
+                length,
+                index,
+            },
+            (
+                Self::Enter { value, mode },
+                Self::Enter {
+                    value: previous_value,
+                    ..
+                },
+            ) => Self::Enter {
+                value: join(value, *previous_value),
+                mode,
+            },
+            (
+                Self::Await { value },
+                Self::Await {
+                    value: previous_value,
+                },
+            ) => Self::Await {
+                value: join(value, *previous_value),
+            },
+            (current, _) => current,
+        }
+    }
+}
+
 /// The operations one query deferred, keyed by the variable standing for each result.
 pub(crate) type CycleEquations<'db> = FrozenMap<CycleVariable<'db>, Operation<'db>>;
+
+/// Retains the operations recorded by both cycle iterations.
+///
+/// An iteration can leave out an operation that an earlier iteration recorded, and the inputs of
+/// an operation can change between iterations. Keeping every operation and joining changed inputs
+/// makes the table grow monotonically, so the fixed-point iteration converges.
+pub(crate) fn cycle_normalized_equations<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    current: CycleEquations<'db>,
+    previous: &CycleEquations<'db>,
+) -> CycleEquations<'db> {
+    if previous.is_empty() {
+        return current;
+    }
+    let mut merged: FxHashMap<_, _> = previous.iter().cloned().collect();
+    for (variable, operation) in current {
+        let operation = match merged.get(&variable) {
+            Some(previous_operation) => operation.cycle_normalized(db, env, previous_operation),
+            None => operation,
+        };
+        merged.insert(variable, operation);
+    }
+    FrozenMap::from(merged)
+}
 
 /// Collects the operations a query defers while it infers types.
 #[derive(Debug)]
