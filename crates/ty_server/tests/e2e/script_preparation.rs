@@ -42,7 +42,7 @@ fn closed_scripts_are_prepared_at_startup() -> Result<()> {
     file://<temp_dir>/src/main.py
     	0:0..0:16[ERROR]: Name `ordinary_missing` used when not defined
     file://<temp_dir>/src/script.py
-    	1:0..4:5[ERROR]: `uv workspace metadata` failed with status exit status: 2: error: Unable to find lockfile at `script.py.lock`, but `UV_LOCKED=1` was provided. To create a lockfile, run `uv lock` or `uv sync` without the flag.
+    	5:0..5:7[ERROR]: Name `missing` used when not defined
     ");
     Ok(())
 }
@@ -80,7 +80,7 @@ fn created_closed_script_is_prepared_after_a_file_event() -> Result<()> {
     let report = server.workspace_diagnostic_request(None, None);
     assert_snapshot!(condensed_workspace_diagnostic_snapshot(report), @"
     file://<temp_dir>/src/script.py
-    	1:0..4:5[ERROR]: `uv workspace metadata` failed with status exit status: 2: error: Unable to find lockfile at `script.py.lock`, but `UV_LOCKED=1` was provided. To create a lockfile, run `uv lock` or `uv sync` without the flag.
+    	5:0..5:7[ERROR]: Name `missing` used when not defined
     ");
     Ok(())
 }

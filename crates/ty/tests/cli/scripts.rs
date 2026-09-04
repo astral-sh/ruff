@@ -1493,13 +1493,22 @@ mod uv_metadata {
         .with_filter(r"Literal\[(?:1[2-9]|[2-9][0-9])\]", "Literal[<uv-minor>]");
 
         assert_cmd_snapshot!(command_with_script_uv(&case).arg("script.py"), @"
-        success: false
-        exit_code: 1
+        success: true
+        exit_code: 0
         ----- stdout -----
-        error[uv-metadata]: `uv workspace metadata` failed with status exit status: 2: error: Unable to find lockfile at `script.py.lock`, but `UV_LOCKED=1` was provided. To create a lockfile, run `uv lock` or `uv sync` without the flag.
-        --> script.py:2:1
+        info[revealed-type]: Revealed type
+          --> script.py:17:13
+           |
+        17 | reveal_type(User(1).value)
+           |             ^^^^^^^^^^^^^ `int`
 
-        Found 1 diagnostic
+        info[revealed-type]: Revealed type
+          --> script.py:18:13
+           |
+        18 | reveal_type(sys.version_info[:2])
+           |             ^^^^^^^^^^^^^^^^^^^^ `tuple[Literal[3], Literal[<uv-minor>]]`
+
+        Found 2 diagnostics
 
         ----- stderr -----
         ");
@@ -1509,13 +1518,22 @@ mod uv_metadata {
                 .arg("script.py")
                 .args(["--python-version", "3.11"]),
             @"
-        success: false
-        exit_code: 1
+        success: true
+        exit_code: 0
         ----- stdout -----
-        error[uv-metadata]: `uv workspace metadata` failed with status exit status: 2: error: Unable to find lockfile at `script.py.lock`, but `UV_LOCKED=1` was provided. To create a lockfile, run `uv lock` or `uv sync` without the flag.
-        --> script.py:2:1
+        info[revealed-type]: Revealed type
+          --> script.py:17:13
+           |
+        17 | reveal_type(User(1).value)
+           |             ^^^^^^^^^^^^^ `int`
 
-        Found 1 diagnostic
+        info[revealed-type]: Revealed type
+          --> script.py:18:13
+           |
+        18 | reveal_type(sys.version_info[:2])
+           |             ^^^^^^^^^^^^^^^^^^^^ `tuple[Literal[3], Literal[11]]`
+
+        Found 2 diagnostics
 
         ----- stderr -----
         "
@@ -1563,13 +1581,10 @@ mod uv_metadata {
             .env("UV_PYTHON_DOWNLOADS", "never");
 
         assert_cmd_snapshot!(command, @"
-        success: false
-        exit_code: 1
+        success: true
+        exit_code: 0
         ----- stdout -----
-        error[uv-metadata]: `uv workspace metadata` failed with status exit status: 2: error: Unable to find lockfile at `script.py.lock`, but `UV_LOCKED=1` was provided. To create a lockfile, run `uv lock` or `uv sync` without the flag.
-        --> script.py:2:1
-
-        Found 1 diagnostic
+        All checks passed!
 
         ----- stderr -----
         ");
@@ -1579,10 +1594,23 @@ mod uv_metadata {
         success: false
         exit_code: 1
         ----- stdout -----
-        error[uv-metadata]: `uv workspace metadata` failed with status exit status: 2: error: Unable to find lockfile at `script.py.lock`, but `UV_LOCKED=1` was provided. To create a lockfile, run `uv lock` or `uv sync` without the flag.
-        --> script.py:2:1
+        error[missing-direct-dependency]: Import of `indirect_module` requires a direct dependency on `indirect-dependency`
+          --> script.py:11:6
+           |
+        11 | from indirect_module import value
+           |      ^^^^^^^^^^^^^^^
+        help: Declare `indirect-dependency` in the script's inline `dependencies` metadata
+        info: See https://docs.astral.sh/uv/guides/scripts/#declaring-script-dependencies
 
-        Found 1 diagnostic
+        error[missing-direct-dependency]: Import of `indirect_module` requires a direct dependency on `indirect-dependency`
+          --> script.py:12:8
+           |
+        12 | import indirect_module
+           |        ^^^^^^^^^^^^^^^
+        help: Declare `indirect-dependency` in the script's inline `dependencies` metadata
+        info: See https://docs.astral.sh/uv/guides/scripts/#declaring-script-dependencies
+
+        Found 2 diagnostics
 
         ----- stderr -----
         ");
@@ -1671,13 +1699,10 @@ mod uv_metadata {
                 .env(EnvVars::TY_UV, "scripts")
                 .env(EnvVars::TY_MAX_PARALLELISM, "1"),
             @"
-        success: false
-        exit_code: 1
+        success: true
+        exit_code: 0
         ----- stdout -----
-        error[uv-metadata]: `uv workspace metadata` failed with status exit status: 2: error: Unable to find lockfile at `b.py.lock`, but `UV_LOCKED=1` was provided. To create a lockfile, run `uv lock` or `uv sync` without the flag.
-        --> b.py:2:1
-
-        Found 1 diagnostic
+        All checks passed!
 
         ----- stderr -----
         "
@@ -1712,13 +1737,10 @@ mod uv_metadata {
                 .env(EnvVars::TY_UV, "scripts")
                 .env(EnvVars::TY_MAX_PARALLELISM, "1"),
             @"
-        success: false
-        exit_code: 1
+        success: true
+        exit_code: 0
         ----- stdout -----
-        error[uv-metadata]: `uv workspace metadata` failed with status exit status: 2: error: Unable to find lockfile at `b.py.lock`, but `UV_LOCKED=1` was provided. To create a lockfile, run `uv lock` or `uv sync` without the flag.
-        --> b.py:2:1
-
-        Found 1 diagnostic
+        All checks passed!
 
         ----- stderr -----
         "
@@ -1745,16 +1767,10 @@ mod uv_metadata {
                 .args(["first.py", "second.py"])
                 .env(EnvVars::TY_MAX_PARALLELISM, "1"),
             @"
-        success: false
-        exit_code: 1
+        success: true
+        exit_code: 0
         ----- stdout -----
-        error[uv-metadata]: `uv workspace metadata` failed with status exit status: 2: error: Unable to find lockfile at `first.py.lock`, but `UV_LOCKED=1` was provided. To create a lockfile, run `uv lock` or `uv sync` without the flag.
-        --> first.py:2:1
-
-        error[uv-metadata]: `uv workspace metadata` failed with status exit status: 2: error: Unable to find lockfile at `second.py.lock`, but `UV_LOCKED=1` was provided. To create a lockfile, run `uv lock` or `uv sync` without the flag.
-        --> second.py:2:1
-
-        Found 2 diagnostics
+        All checks passed!
 
         ----- stderr -----
         "
@@ -1808,13 +1824,22 @@ mod uv_metadata {
                 .arg("scripts/script.py")
                 .args(["--python", ".venv"]),
             @"
-        success: false
-        exit_code: 1
+        success: true
+        exit_code: 0
         ----- stdout -----
-        error[uv-metadata]: `uv workspace metadata` failed with status exit status: 2: error: Unable to find lockfile at `script.py.lock`, but `UV_LOCKED=1` was provided. To create a lockfile, run `uv lock` or `uv sync` without the flag.
-        --> scripts/script.py:2:1
+        info[revealed-type]: Revealed type
+          --> scripts/script.py:15:13
+           |
+        15 | reveal_type(User(1).value)
+           |             ^^^^^^^^^^^^^ `int`
 
-        Found 1 diagnostic
+        info[revealed-type]: Revealed type
+          --> scripts/script.py:16:13
+           |
+        16 | reveal_type(sys.version_info[:2])
+           |             ^^^^^^^^^^^^^^^^^^^^ `tuple[Literal[3], Literal[12]]`
+
+        Found 2 diagnostics
 
         ----- stderr -----
         "
@@ -1851,13 +1876,10 @@ mod uv_metadata {
                 .arg("--fix")
                 .args(["--warn", "unused-ignore-comment"]),
             @"
-        success: false
-        exit_code: 1
+        success: true
+        exit_code: 0
         ----- stdout -----
-        error[uv-metadata]: `uv workspace metadata` failed with status exit status: 2: error: Unable to find lockfile at `script.py.lock`, but `UV_LOCKED=1` was provided. To create a lockfile, run `uv lock` or `uv sync` without the flag.
-        --> script.py:2:1
-
-        Found 1 diagnostic (0 fixed, 1 remaining).
+        Found 1 diagnostic (1 fixed, 0 remaining).
 
         ----- stderr -----
         "
@@ -1889,9 +1911,7 @@ mod uv_metadata {
         success: false
         exit_code: 1
         ----- stdout -----
-        error[uv-metadata]: `uv workspace metadata` failed with status exit status: 2: error: Unable to find lockfile at `script.py.lock`, but `UV_LOCKED=1` was provided. To create a lockfile, run `uv lock` or `uv sync` without the flag.
-        --> script.py:1:1
-
+        error[uv-metadata]: `uv workspace metadata` failed: missing-script-dependency==99.0.0 could not be resolved
         Found 1 diagnostic
 
         ----- stderr -----
