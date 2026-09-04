@@ -65,6 +65,7 @@ use crate::unpack::{Unpack, UnpackKind, UnpackPosition, UnpackValue};
 use crate::use_def::{
     EnclosingSnapshotKey, FlowSnapshot, FutureDefinitions, LiveBinding, LiveBindingStatus,
     PreviousDefinitions, ScopedDefinitionId, ScopedEnclosingSnapshotId, UseDefMapBuilder,
+    UseDefMapInterner,
 };
 use crate::{Db, Statement, StatementNodeKey};
 use crate::{
@@ -3297,6 +3298,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 .collect(),
         );
 
+        let mut use_def_map_interner = UseDefMapInterner::default();
+
         SemanticIndex {
             place_tables: self
                 .place_tables
@@ -3315,7 +3318,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             use_def_maps: self
                 .use_def_maps
                 .into_iter()
-                .map(|builder| Arc::new(builder.finish()))
+                .map(|builder| use_def_map_interner.intern(builder.finish()))
                 .collect(),
             enclosing_lambda_statements: FrozenMap::from(self.enclosing_lambda_statements),
             collections_by_use: FrozenMap::from(self.collections_by_use),

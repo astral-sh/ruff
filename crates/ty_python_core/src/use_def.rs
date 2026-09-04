@@ -242,11 +242,11 @@ use std::collections::hash_map::Entry;
 use std::hash::{Hash as _, Hasher as _};
 use std::ops::Index;
 use std::rc::Rc;
-use std::sync::LazyLock;
+use std::sync::{Arc, LazyLock};
 
 use ruff_index::{FrozenIndexVec, Idx, IndexVec, newtype_index};
 use ruff_text_size::TextRange;
-use rustc_hash::{FxBuildHasher, FxHashMap, FxHasher};
+use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet, FxHasher};
 use smallvec::SmallVec;
 use thin_vec::ThinVec;
 
@@ -457,7 +457,7 @@ impl PlaceStateInterner {
 /// The builder needs a `SmallVec` and an optional unbound constraint while constructing each
 /// binding state. Neither is needed after the semantic index is built, so the retained map stores
 /// cumulative end offsets into one contiguous array instead.
-#[derive(Debug, PartialEq, Eq, get_size2::GetSize)]
+#[derive(Debug, PartialEq, Eq, Hash, get_size2::GetSize)]
 struct RetainedBindings {
     ends: FrozenIndexVec<InternedBindingsId, u32>,
     live_bindings: Box<[LiveBinding]>,
@@ -526,7 +526,7 @@ impl Index<InternedBindingsId> for RetainedBindings {
 }
 
 /// Compact, retained representation of the interned declaration vectors for a scope.
-#[derive(Debug, PartialEq, Eq, get_size2::GetSize)]
+#[derive(Debug, PartialEq, Eq, Hash, get_size2::GetSize)]
 struct RetainedDeclarations {
     /// The exclusive end of each state in `live_declarations`; its start is the previous end.
     ends: FrozenIndexVec<InternedDeclarationsId, u32>,
@@ -758,9 +758,9 @@ pub struct UseDefMap<'db> {
     constraint_tables: Option<Box<ConstraintTables<'db>>>,
 
     /// Interned [`Bindings`] values.
-    interned_bindings: RetainedBindings,
+    interned_bindings: Arc<RetainedBindings>,
     /// Interned [`Declarations`] values.
-    interned_declarations: RetainedDeclarations,
+    interned_declarations: Arc<RetainedDeclarations>,
 
     /// Tracks the reachability constraint for statements and certain sub-expressions
     /// (e.g. ternary branches, boolean operator operands), keyed by their text range.
@@ -813,6 +813,37 @@ pub struct UseDefMap<'db> {
     ///
     /// This is used by `can_implicitly_return_none` in the `ty_python_semantic` crate.
     end_of_scope_reachability: ScopedReachabilityConstraintId,
+}
+
+/// Shares equivalent scope-local binding and declaration tables within a file.
+///
+/// Their IDs are interpreted through each scope's own definitions and constraints, so
+/// identical tables can share storage without sharing the scope-specific data they reference.
+#[derive(Default)]
+pub(super) struct UseDefMapInterner {
+    bindings: FxHashSet<Arc<RetainedBindings>>,
+    declarations: FxHashSet<Arc<RetainedDeclarations>>,
+}
+
+impl UseDefMapInterner {
+    pub(super) fn intern<'db>(&mut self, mut map: UseDefMap<'db>) -> Arc<UseDefMap<'db>> {
+        map.interned_bindings = Self::intern_table(&mut self.bindings, map.interned_bindings);
+        map.interned_declarations =
+            Self::intern_table(&mut self.declarations, map.interned_declarations);
+        Arc::new(map)
+    }
+
+    fn intern_table<T: Eq + std::hash::Hash>(
+        values: &mut FxHashSet<Arc<T>>,
+        value: Arc<T>,
+    ) -> Arc<T> {
+        if let Some(existing) = values.get(value.as_ref()) {
+            Arc::clone(existing)
+        } else {
+            values.insert(Arc::clone(&value));
+            value
+        }
+    }
 }
 
 /// Information about a given range of source code.
@@ -2955,8 +2986,8 @@ impl<'db> UseDefMapBuilder<'db> {
         UseDefMap {
             all_definitions,
             constraint_tables,
-            interned_bindings,
-            interned_declarations,
+            interned_bindings: Arc::new(interned_bindings),
+            interned_declarations: Arc::new(interned_declarations),
             range_reachability: self.range_reachability.into_boxed_slice(),
             symbol_states,
             definitions_by_definition,
