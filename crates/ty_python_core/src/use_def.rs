@@ -275,12 +275,14 @@ use crate::{
 
 mod exception_checkpoint;
 mod place_state;
+mod range_reachability;
 
 pub(super) use exception_checkpoint::ExceptionCheckpointKey;
 use exception_checkpoint::{ExceptionCheckpointSnapshot, ExceptionCheckpointState};
 pub use place_state::LiveBinding;
 pub use place_state::ScopedDefinitionId;
 pub(super) use place_state::{FutureDefinitions, PreviousDefinitions};
+use range_reachability::RangeReachability;
 
 /// Summarizes whether the live control-flow paths leave a symbol bound.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -783,7 +785,7 @@ pub struct UseDefMap<'db> {
     /// Tracks the reachability constraint for statements and certain sub-expressions
     /// (e.g. ternary branches, boolean operator operands), keyed by their text range.
     /// Used to suppress diagnostics in unreachable code.
-    range_reachability: Box<[(TextRange, RangeInfo)]>,
+    range_reachability: RangeReachability,
 
     /// If the definition is a binding (only) -- `x = 1` for example -- then we need
     /// [`Declarations`] to know whether this binding is permitted by the live declarations.
@@ -865,20 +867,72 @@ impl UseDefMapInterner {
 }
 
 /// Information about a given range of source code.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, get_size2::GetSize)]
-struct RangeInfo {
-    reachability: ScopedReachabilityConstraintId,
-    in_type_checking_block: bool,
+#[derive(Copy, Clone, PartialEq, Eq, get_size2::GetSize)]
+struct RangeInfo(u32);
+
+impl RangeInfo {
+    // Keep the TYPE_CHECKING flag in the high bit so a range and its metadata occupy 12 bytes.
+    // Reserve the three largest 31-bit values for terminals, whose original IDs use all 32 bits.
+    const IN_TYPE_CHECKING_BLOCK: u32 = 1 << 31;
+    const CONSTRAINT_MASK: u32 = !Self::IN_TYPE_CHECKING_BLOCK;
+    const ALWAYS_TRUE: u32 = Self::CONSTRAINT_MASK;
+    const AMBIGUOUS: u32 = Self::CONSTRAINT_MASK - 1;
+    const ALWAYS_FALSE: u32 = Self::CONSTRAINT_MASK - 2;
+
+    fn new(reachability: ScopedReachabilityConstraintId, in_type_checking_block: bool) -> Self {
+        let reachability = match reachability {
+            ScopedReachabilityConstraintId::ALWAYS_TRUE => Self::ALWAYS_TRUE,
+            ScopedReachabilityConstraintId::AMBIGUOUS => Self::AMBIGUOUS,
+            ScopedReachabilityConstraintId::ALWAYS_FALSE => Self::ALWAYS_FALSE,
+            id => {
+                let id = id.as_u32();
+                assert!(
+                    id < Self::ALWAYS_FALSE,
+                    "reachability constraint IDs must fit in 31 bits without aliasing terminals"
+                );
+                id
+            }
+        };
+        Self(
+            reachability
+                | if in_type_checking_block {
+                    Self::IN_TYPE_CHECKING_BLOCK
+                } else {
+                    0
+                },
+        )
+    }
+
+    fn reachability(self) -> ScopedReachabilityConstraintId {
+        match self.0 & Self::CONSTRAINT_MASK {
+            Self::ALWAYS_TRUE => ScopedReachabilityConstraintId::ALWAYS_TRUE,
+            Self::AMBIGUOUS => ScopedReachabilityConstraintId::AMBIGUOUS,
+            Self::ALWAYS_FALSE => ScopedReachabilityConstraintId::ALWAYS_FALSE,
+            id => ScopedReachabilityConstraintId::new(id as usize),
+        }
+    }
+
+    fn in_type_checking_block(self) -> bool {
+        self.0 & Self::IN_TYPE_CHECKING_BLOCK != 0
+    }
+}
+
+impl std::fmt::Debug for RangeInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RangeInfo")
+            .field("reachability", &self.reachability())
+            .field("in_type_checking_block", &self.in_type_checking_block())
+            .finish()
+    }
 }
 
 impl Default for RangeInfo {
     fn default() -> Self {
-        Self {
-            reachability: ScopedReachabilityConstraintId::ALWAYS_TRUE,
-            in_type_checking_block: false,
-        }
+        Self::new(ScopedReachabilityConstraintId::ALWAYS_TRUE, false)
     }
 }
+
+static_assertions::assert_eq_size!((TextRange, RangeInfo), [u32; 3]);
 
 #[derive(Debug, PartialEq, Eq, get_size2::GetSize)]
 struct MultiBindingsByUse(ThinVec<(ScopedUseId, Box<[Bindings]>)>);
@@ -936,7 +990,19 @@ impl<'db> UseDefMap<'db> {
     ) -> impl Iterator<Item = (TextRange, ScopedReachabilityConstraintId)> + '_ {
         self.range_reachability
             .iter()
-            .map(|&(range, RangeInfo { reachability, .. })| (range, reachability))
+            .map(|&(range, info)| (range, info.reachability()))
+    }
+
+    /// Whether any part of `range` is reachable under the supplied constraint evaluator.
+    /// The ranges are disjoint, so only segments overlapping the query need to be examined.
+    pub fn is_range_reachable(
+        &self,
+        range: TextRange,
+        mut is_reachable: impl FnMut(ScopedReachabilityConstraintId) -> bool,
+    ) -> bool {
+        !self
+            .range_reachability
+            .all_in_range(range, |info| !is_reachable(info.reachability()))
     }
 
     pub fn end_of_scope_reachability(&self) -> ScopedReachabilityConstraintId {
@@ -1058,11 +1124,7 @@ impl<'db> UseDefMap<'db> {
 
     pub(crate) fn is_range_in_type_checking_block(&self, range: TextRange) -> bool {
         self.range_reachability
-            .iter()
-            .take_while(|(entry_range, _)| entry_range.start() <= range.start())
-            .any(|&(entry_range, block)| {
-                block.in_type_checking_block && entry_range.contains_range(range)
-            })
+            .all_in_range(range, RangeInfo::in_type_checking_block)
     }
 
     /// Return `true` if `node` is one of the tests recorded in
@@ -2702,10 +2764,7 @@ impl<'db> UseDefMapBuilder<'db> {
         range: TextRange,
         is_type_checking_block: bool,
     ) {
-        let this_range_info = RangeInfo {
-            reachability: self.reachability,
-            in_type_checking_block: is_type_checking_block,
-        };
+        let this_range_info = RangeInfo::new(self.reachability, is_type_checking_block);
 
         // If the last entry has the same reachability constraint and the same
         // "in-TYPE_CHECKING" status, extend it to cover this range too, collapsing
@@ -3044,10 +3103,10 @@ impl<'db> UseDefMapBuilder<'db> {
         // Keep default entries while building so they remain barriers between non-contiguous
         // ranges with the same metadata. Once construction is complete, absence represents the
         // default of reachable code outside a `TYPE_CHECKING` block.
-        self.range_reachability
-            .retain(|(_, info)| *info != RangeInfo::default());
-        for &(_, RangeInfo { reachability, .. }) in &self.range_reachability {
-            self.reachability_constraints.mark_used(reachability);
+        let range_reachability =
+            RangeReachability::new(self.range_reachability, &mut self.reachability_constraints);
+        for &(_, info) in range_reachability.iter() {
+            self.reachability_constraints.mark_used(info.reachability());
         }
         for enclosing_snapshot in &enclosing_snapshots {
             // Bindings are already marked above.
@@ -3104,7 +3163,7 @@ impl<'db> UseDefMapBuilder<'db> {
             constraint_tables,
             interned_bindings: Arc::new(interned_bindings),
             interned_declarations: Arc::new(interned_declarations),
-            range_reachability: self.range_reachability.into_boxed_slice(),
+            range_reachability,
             symbol_states,
             definitions_by_definition,
             extra,

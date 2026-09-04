@@ -2009,11 +2009,7 @@ pub(crate) fn is_range_reachable<'db>(
 ) -> bool {
     index.ancestor_scopes(scope_id).all(|(scope_id, _)| {
         let use_def = index.use_def_map(scope_id);
-        !use_def
-            .range_reachability()
-            .any(|(entry_range, constraint)| {
-                entry_range.contains_range(range) && !is_reachable(db, use_def, constraint)
-            })
+        use_def.is_range_reachable(range, |constraint| is_reachable(db, use_def, constraint))
     })
 }
 
