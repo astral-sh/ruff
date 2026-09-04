@@ -26,6 +26,21 @@ impl<'db> ProjectionTerm<'db> {
         }
     }
 
+    /// Converts inference-time projection metadata before a term enters recovery.
+    pub(super) fn materialize_projection_derivations(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Self {
+        match self {
+            Self::Exact(ty) => Self::Exact(ty.materialize_projection_derivations(db, env)),
+            Self::Homogeneous(ty) => {
+                Self::Homogeneous(ty.materialize_projection_derivations(db, env))
+            }
+            Self::List(element) => Self::List(element.materialize_projection_derivations(db, env)),
+        }
+    }
+
     pub(super) fn from_union_terms(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,

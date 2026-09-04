@@ -4,6 +4,7 @@
 //! the operations applied to it. It does not infer or solve projection results.
 
 use ruff_python_ast::name::Name;
+use salsa::plumbing::{AsId, FromId};
 
 use crate::Db;
 use crate::types::call::{Argument, CallArgumentTypes, CallArguments};
@@ -11,6 +12,37 @@ use crate::types::instance::SliceLiteral;
 use crate::types::{
     DivergentType, KnownClass, MemberLookupPolicy, ProgramEnvironment, Type, TypeContext,
 };
+
+/// A projection path recorded during normal inference.
+///
+/// Normal inference carries this as metadata on Divergent. Recovery materializes it as a
+/// ProjectionType before invoking the projection solver.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+struct ProjectionDerivation<'db> {
+    #[returns(copy)]
+    root: DivergentType,
+    #[returns(ref)]
+    path: ProjectionPath<'db>,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for ProjectionDerivation<'_> {}
+
+pub(super) fn new_projection_derivation<'db>(
+    db: &'db dyn Db,
+    root: DivergentType,
+    path: ProjectionPath<'db>,
+) -> salsa::Id {
+    ProjectionDerivation::new(db, root, path).as_id()
+}
+
+pub(super) fn projection_derivation_from_id(
+    db: &dyn Db,
+    id: salsa::Id,
+) -> (DivergentType, ProjectionPath<'_>) {
+    let derivation = ProjectionDerivation::from_id(id);
+    (derivation.root(db), derivation.path(db).clone())
+}
 
 /// A projected view of a cycle root produced while recovering recursive inference.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::SalsaValue)]
@@ -30,10 +62,6 @@ impl<'db> ProjectionType<'db> {
 
     pub(super) fn path(self, db: &'db dyn Db) -> ProjectionPath<'db> {
         self.0.path(db).clone()
-    }
-
-    pub(super) fn append(self, db: &'db dyn Db, op: ProjectionOp<'db>) -> Self {
-        Self::new(db, self.root(db), self.path(db).append(op))
     }
 }
 
@@ -69,14 +97,6 @@ impl<'db> ProjectionPath<'db> {
 
     pub(super) fn ops(&self) -> &[ProjectionOp<'db>] {
         &self.ops
-    }
-
-    fn append(&self, op: ProjectionOp<'db>) -> Self {
-        let mut ops = self.ops.to_vec();
-        ops.push(op);
-        Self {
-            ops: ops.into_boxed_slice(),
-        }
     }
 
     pub(super) fn append_path(&self, path: &Self) -> Self {

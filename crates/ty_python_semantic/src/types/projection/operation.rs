@@ -11,7 +11,7 @@ use crate::types::{
 
 use super::artifact::{
     ProjectionCallArguments, ProjectionMember, ProjectionOp, ProjectionPath, ProjectionSubscript,
-    ProjectionType, StarUnpackPosition, UnpackProjection,
+    StarUnpackPosition, UnpackProjection, new_projection_derivation,
 };
 use super::container::ProjectionContainer;
 use super::equation::CycleRootSet;
@@ -250,12 +250,17 @@ impl<'db> Type<'db> {
         op: ProjectionOp<'db>,
     ) -> Option<ProjectionResult<'db>> {
         match self {
-            Type::Divergent(root) => Some(ProjectionResult::new(Self::Projection(
-                ProjectionType::new(db, root, ProjectionPath::from_op(op)),
-            ))),
-            Type::Projection(projection) => Some(ProjectionResult::new(Self::Projection(
-                projection.append(db, op),
-            ))),
+            Type::Divergent(root) => {
+                let (root, path) = super::projection_derivation(db, root).map_or_else(
+                    || (root, ProjectionPath::from_op(op)),
+                    |(root, path)| (root, path.append_path(&ProjectionPath::from_op(op))),
+                );
+                Some(ProjectionResult::new(Self::Divergent(
+                    root.with_projection_derivation(new_projection_derivation(db, root, path)),
+                )))
+            }
+            // Projection only exists while cycle recovery is active.
+            Type::Projection(_) => None,
             _ => None,
         }
     }
@@ -372,7 +377,7 @@ impl<'db> Type<'db> {
             let container =
                 ProjectionContainer::try_from(db, env, *root, element, evidence.as_ref())?;
             let term = container
-                .project_path(db, env, *root, evidence.as_ref(), &path)
+                .project_inference_path(db, env, *root, evidence.as_ref(), &path)
                 .or_else(|| {
                     if matches!(op, ProjectionOp::Subscript(_)) {
                         // The subscript path suppresses projection creation, so it can expose a
@@ -428,7 +433,7 @@ impl<'db> Type<'db> {
                 // re-enter projection construction with the same recursive element.
                 roots.iter().find_map(|root| {
                     let container = ProjectionContainer::try_from(db, env, *root, element, None)?;
-                    container.project_multi_root_path(db, env, *root, None, &path)
+                    container.project_inference_path(db, env, *root, None, &path)
                 })?
             } else {
                 project(element)?

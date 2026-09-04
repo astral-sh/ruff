@@ -13,7 +13,7 @@ use crate::{Db, FxIndexMap};
 use super::ProjectionType;
 use super::artifact::{
     ProjectionCallArguments, ProjectionOp, ProjectionPath, ProjectionSubscript, StarUnpackPosition,
-    UnpackProjection,
+    UnpackProjection, new_projection_derivation,
 };
 use super::evidence::{ProjectionContainerFact, ProjectionEvidenceSet};
 use super::term::ProjectionTerm;
@@ -29,11 +29,51 @@ pub(super) enum ProjectionContainer<'db> {
 enum ProjectionReplayMode {
     SingleRoot,
     MultiRoot,
+    Inference,
 }
 
 impl ProjectionReplayMode {
     const fn projects_cycle_artifacts(self) -> bool {
-        matches!(self, Self::MultiRoot)
+        matches!(self, Self::MultiRoot | Self::Inference)
+    }
+
+    fn materialize_evidence_term<'db>(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        term: ProjectionTerm<'db>,
+    ) -> ProjectionTerm<'db> {
+        match self {
+            Self::SingleRoot | Self::MultiRoot => term.materialize_projection_derivations(db, env),
+            Self::Inference => term,
+        }
+    }
+
+    fn projected_cycle_artifact<'db>(
+        self,
+        db: &'db dyn Db,
+        root: DivergentType,
+        path: &ProjectionPath<'db>,
+    ) -> Option<Type<'db>> {
+        match self {
+            Self::SingleRoot => None,
+            Self::MultiRoot => {
+                let (root, path) = super::projection_derivation(db, root).map_or_else(
+                    || (root, path.clone()),
+                    |(root, prefix)| (root, prefix.append_path(path)),
+                );
+                Some(Type::Projection(ProjectionType::new(db, root, path)))
+            }
+            Self::Inference => {
+                let (root, path) = super::projection_derivation(db, root).map_or_else(
+                    || (root, path.clone()),
+                    |(root, prefix)| (root, prefix.append_path(path)),
+                );
+                Some(Type::Divergent(root.with_projection_derivation(
+                    new_projection_derivation(db, root, path),
+                )))
+            }
+        }
     }
 }
 
@@ -112,6 +152,25 @@ impl<'db> ProjectionContainer<'db> {
         )
     }
 
+    /// Inference-time API: structurally replays one path without creating a Projection.
+    pub(super) fn project_inference_path(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        root: DivergentType,
+        evidence: Option<&ProjectionEvidenceSet<'db>>,
+        path: &ProjectionPath<'db>,
+    ) -> Option<ProjectionTerm<'db>> {
+        self.project_path_impl(
+            db,
+            env,
+            root,
+            evidence,
+            path,
+            ProjectionReplayMode::Inference,
+        )
+    }
+
     fn project_path_impl(
         &self,
         db: &'db dyn Db,
@@ -127,7 +186,7 @@ impl<'db> ProjectionContainer<'db> {
                 if let Some(term) = evidence
                     .and_then(|evidence| evidence.project_arm_path(db, env, root, fact.arm, path))
                 {
-                    return Some(term);
+                    return Some(mode.materialize_evidence_term(db, env, term));
                 }
 
                 return None;
@@ -187,21 +246,19 @@ impl<'db> ProjectionContainer<'db> {
         if mode.projects_cycle_artifacts()
             && let Type::Divergent(divergent) = ty
         {
-            return Some(ProjectionTerm::Exact(Type::Projection(
-                ProjectionType::new(db, divergent, path.clone()),
-            )));
+            return Some(ProjectionTerm::Exact(
+                mode.projected_cycle_artifact(db, divergent, path)?,
+            ));
         }
 
         if mode.projects_cycle_artifacts()
             && let Type::Projection(projection) = ty
         {
-            return Some(ProjectionTerm::Exact(Type::Projection(
-                ProjectionType::new(
-                    db,
-                    projection.root(db),
-                    projection.path(db).append_path(path),
-                ),
-            )));
+            return Some(ProjectionTerm::Exact(mode.projected_cycle_artifact(
+                db,
+                projection.root(db),
+                &projection.path(db).append_path(path),
+            )?));
         }
 
         if let Type::Union(union) = ty {
@@ -218,7 +275,7 @@ impl<'db> ProjectionContainer<'db> {
         if let Some(term) =
             evidence.and_then(|evidence| evidence.project_arm_path(db, env, root, ty, path))
         {
-            return Some(term);
+            return Some(mode.materialize_evidence_term(db, env, term));
         }
 
         let ops = path.ops();
@@ -227,6 +284,7 @@ impl<'db> ProjectionContainer<'db> {
         let single_op_path = ProjectionPath::from_op(op);
         let projected = evidence
             .and_then(|evidence| evidence.project_arm_path(db, env, root, ty, &single_op_path))
+            .map(|term| mode.materialize_evidence_term(db, env, term))
             .or_else(|| Self::project_op(db, env, ty, op))?;
 
         if tail.is_empty() {

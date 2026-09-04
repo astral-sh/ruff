@@ -3348,6 +3348,7 @@ impl<'db> Type<'db> {
         cycle.head_ids().fold(self, |ty, id| {
             let divergent = DivergentType::new(id);
             let div = Type::Divergent(divergent);
+            let ty = ty.materialize_projection_derivations(db, env);
             let ty = ty
                 .try_projection_cycle_normalized(db, env, divergent, projection_evidence)
                 .unwrap_or(ty);
@@ -3367,13 +3368,20 @@ impl<'db> Type<'db> {
         projection_solutions: Option<&projection::ProjectionSolutions<'db>>,
         projection_evidence: Option<&projection::ProjectionEvidenceSet<'db>>,
     ) -> Self {
+        let materialized = self.materialize_projection_derivations(db, env);
         if let Some(projection_solutions) = projection_solutions
-            && let Some(ty) = self.replace_solved_projection_vars(db, env, projection_solutions)
+            && let Some(ty) =
+                materialized.replace_solved_projection_vars(db, env, projection_solutions)
         {
-            return ty.recursive_type_normalized_without_projection_solver(db, env, cycle);
+            ty.recursive_type_normalized_without_projection_solver(db, env, cycle)
+        } else {
+            materialized.recursive_type_normalized_with_projection_evidence(
+                db,
+                env,
+                cycle,
+                projection_evidence,
+            )
         }
-
-        self.recursive_type_normalized_with_projection_evidence(db, env, cycle, projection_evidence)
     }
 
     fn recursive_type_normalized_without_projection_solver(
@@ -10574,6 +10582,8 @@ impl<'db> TypeMapping<'_, 'db> {
 pub struct DivergentType {
     /// The query ID that caused the cycle.
     id: salsa::Id,
+    /// A projection path observed during normal inference.
+    projection_derivation: Option<salsa::Id>,
     /// If this divergent marker has been materialized, preserve whether it should behave like the
     /// top (`object`) or bottom (`Never`) bound while still remaining recognizable as divergent.
     materialization: Option<MaterializationKind>,
@@ -10586,6 +10596,7 @@ impl DivergentType {
     const fn new(id: salsa::Id) -> Self {
         Self {
             id,
+            projection_derivation: None,
             materialization: None,
         }
     }
@@ -10597,8 +10608,21 @@ impl DivergentType {
     const fn materialized(self, kind: MaterializationKind) -> Self {
         Self {
             id: self.id,
+            projection_derivation: self.projection_derivation,
             materialization: Some(kind),
         }
+    }
+
+    const fn with_projection_derivation(self, derivation: salsa::Id) -> Self {
+        Self {
+            id: self.id,
+            projection_derivation: Some(derivation),
+            materialization: self.materialization,
+        }
+    }
+
+    const fn projection_derivation_id(self) -> Option<salsa::Id> {
+        self.projection_derivation
     }
 
     const fn materialization_kind(self) -> Option<MaterializationKind> {

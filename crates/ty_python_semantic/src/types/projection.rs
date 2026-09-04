@@ -32,7 +32,86 @@ pub(crate) use evidence::ProjectionEvidenceSet;
 pub(crate) use operation::ProjectionResult;
 pub(crate) use recovery::ProjectionRecoveryBuilder;
 
+fn projection_derivation(
+    db: &dyn Db,
+    root: DivergentType,
+) -> Option<(DivergentType, ProjectionPath<'_>)> {
+    root.projection_derivation_id()
+        .map(|id| artifact::projection_derivation_from_id(db, id))
+}
+
 impl<'db> Type<'db> {
+    /// Converts normal-inference projection metadata into recovery-only projection artifacts.
+    pub(super) fn materialize_projection_derivations(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Self {
+        if let Type::Divergent(root) = self
+            && let Some((root, path)) = projection_derivation(db, root)
+        {
+            return Type::Projection(ProjectionType::new(db, root, path));
+        }
+
+        match self {
+            Type::Union(union) => UnionType::from_elements_cycle_recovery(
+                db,
+                env,
+                union
+                    .elements(db)
+                    .iter()
+                    .map(|element| element.materialize_projection_derivations(db, env)),
+            ),
+            Type::Intersection(intersection) => intersection
+                .try_map_cycle_recovery(db, |element| {
+                    Some(element.materialize_projection_derivations(db, env))
+                })
+                .unwrap_or(self),
+            _ => {
+                if let Some(spec) = self.exact_tuple_instance_spec(db) {
+                    return match spec.as_ref() {
+                        TupleSpec::Fixed(tuple) => Type::heterogeneous_tuple(
+                            db,
+                            env,
+                            tuple
+                                .iter_all_elements()
+                                .map(|element| element.materialize_projection_derivations(db, env)),
+                        ),
+                        TupleSpec::Variable(tuple) => Type::tuple(TupleType::mixed(
+                            db,
+                            env,
+                            tuple
+                                .iter_prefix_elements()
+                                .map(|element| element.materialize_projection_derivations(db, env)),
+                            tuple
+                                .variable()
+                                .element_type(db)
+                                .materialize_projection_derivations(db, env),
+                            tuple
+                                .iter_suffix_elements()
+                                .map(|element| element.materialize_projection_derivations(db, env)),
+                        )),
+                    };
+                }
+
+                let Some((class, specialization)) = self.direct_class_specialization(db, env)
+                else {
+                    return self;
+                };
+                let arguments = specialization
+                    .types(db)
+                    .iter()
+                    .map(|argument| argument.materialize_projection_derivations(db, env))
+                    .collect::<Vec<_>>();
+                Type::from(class.apply_specialization(db, |generic_context| {
+                    generic_context.specialize(db, arguments)
+                }))
+                .to_instance_approximation(db, env)
+                .unwrap_or(self)
+            }
+        }
+    }
+
     fn top_level_cycle_artifact_root(self, db: &'db dyn Db) -> Option<DivergentType> {
         match self {
             Type::Divergent(root) => Some(root),
@@ -158,7 +237,6 @@ impl<'db> Type<'db> {
         for container in &containers {
             container.collect_projection_terms(db, env, root, evidence, &mut terms_by_op)?;
         }
-
         let solutions = ProjectionEquationSystem::from_terms_by_op(db, env, root, &terms_by_op)?
             .solve(db, env)?;
         let solved_ops = paths
@@ -345,10 +423,13 @@ impl<'db> Type<'db> {
     ) -> Vec<(DivergentType, ProjectionPath<'db>)> {
         let demands = RefCell::<Vec<(DivergentType, ProjectionPath<'db>)>>::new(Vec::new());
         any_over_type(db, env, self, false, |nested| {
-            if let Type::Projection(projection) = nested {
+            let demand = match nested {
+                Type::Projection(projection) => Some((projection.root(db), projection.path(db))),
+                Type::Divergent(root) => projection_derivation(db, root),
+                _ => None,
+            };
+            if let Some((root, path)) = demand {
                 let mut demands = demands.borrow_mut();
-                let root = projection.root(db);
-                let path = projection.path(db);
                 if !demands.iter().any(|(candidate_root, candidate_path)| {
                     candidate_root.same_marker(root) && candidate_path == &path
                 }) {
@@ -390,7 +471,9 @@ impl<'db> Type<'db> {
         include_divergent: bool,
     ) {
         match self {
-            Type::Divergent(root) if include_divergent => {
+            Type::Divergent(root)
+                if include_divergent || root.projection_derivation_id().is_some() =>
+            {
                 Self::push_cycle_artifact_root(roots, root);
             }
             Type::Projection(projection) => {
@@ -676,6 +759,8 @@ impl<'db> Type<'db> {
                 root: projection.root(db),
                 path: projection.path(db),
             }),
+            Type::Divergent(root) => projection_derivation(db, root)
+                .is_some_and(|(root, path)| vars.contains(&ProjectionVar { root, path })),
             _ => false,
         })
     }
