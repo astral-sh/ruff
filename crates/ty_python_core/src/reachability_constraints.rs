@@ -105,7 +105,7 @@ impl ScopedReachabilityConstraintId {
         self.0 >= SMALLEST_TERMINAL.0
     }
 
-    fn as_u32(self) -> u32 {
+    pub(crate) fn as_u32(self) -> u32 {
         self.0
     }
 }
