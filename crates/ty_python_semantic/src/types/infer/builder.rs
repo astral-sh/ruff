@@ -1596,12 +1596,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 place_and_quals = place_and_quals.or_fall_back_to(
                     db,
                     env,
-                    InferenceVariable::new(
-                        db,
-                        env.program(db),
-                        InferenceOwner::Region(self.region),
-                        InferenceSlot::Binding(binding),
-                    ),
+                    || {
+                        InferenceVariable::new(
+                            db,
+                            env.program(db),
+                            InferenceOwner::Region(self.region),
+                            InferenceSlot::Binding(binding),
+                        )
+                    },
                     || module_type_implicit_global_declaration(db, env, symbol.name()),
                 );
             }
@@ -1792,12 +1794,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         .or_fall_back_to(
             db,
             env,
-            InferenceVariable::new(
-                db,
-                env.program(db),
-                InferenceOwner::Region(self.region),
-                InferenceSlot::Binding(declaration),
-            ),
+            || {
+                InferenceVariable::new(
+                    db,
+                    env.program(db),
+                    InferenceOwner::Region(self.region),
+                    InferenceSlot::Binding(declaration),
+                )
+            },
             || {
                 // Fallback to bindings declared on `types.ModuleType` if it's a global symbol
                 let scope = self.scope().file_scope_id(self.db());
@@ -10833,12 +10837,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let (resolved, _) = self.infer_place_load(expr, ast::ExprRef::Name(name_node));
         let env = self.program_environment();
 
-        let lookup = InferenceVariable::new(
-            db,
-            env.program(db),
-            InferenceOwner::Region(self.region),
-            InferenceSlot::Expression(ast::ExprRef::Name(name_node).into()),
-        );
+        let lookup = || {
+            InferenceVariable::new(
+                db,
+                env.program(db),
+                InferenceOwner::Region(self.region),
+                InferenceSlot::Expression(ast::ExprRef::Name(name_node).into()),
+            )
+        };
         let ty =
             resolved.unwrap_with_diagnostic(db, env, lookup, |lookup_error| match lookup_error {
                 LookupError::Undefined(qualifiers) => {
@@ -10885,12 +10891,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut place = PlaceAndQualifiers::from(Place::Undefined);
         let mut failure = None;
         let mut checked_deprecated = false;
-        let lookup = InferenceVariable::new(
-            self.db(),
-            env.program(self.db()),
-            InferenceOwner::Region(self.region),
-            InferenceSlot::Expression(expr_ref.into()),
-        );
+        let lookup = || {
+            InferenceVariable::new(
+                self.db(),
+                env.program(self.db()),
+                InferenceOwner::Region(self.region),
+                InferenceSlot::Expression(expr_ref.into()),
+            )
+        };
         let mut source_index = 0;
 
         while let Some(step) = resolution.next() {
@@ -10911,7 +10919,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     place = place.or_fall_back_to(
                         self.db(),
                         env,
-                        lookup.lookup_part(self.db(), source_index),
+                        || lookup().lookup_part(self.db(), source_index),
                         || self.infer_place_load_source(expr_ref, source, narrowing_constraints),
                     );
                     source_index += 1;
@@ -10940,7 +10948,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             place.or_fall_back_to(
                 self.db(),
                 env,
-                lookup.lookup_part(self.db(), source_index),
+                || lookup().lookup_part(self.db(), source_index),
                 || self.infer_unimported_reveal_type_fallback(expr_ref),
             )
         } else {
@@ -11398,12 +11406,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let attr_name = &attr.id;
-        let lookup = InferenceVariable::new(
-            db,
-            env.program(db),
-            InferenceOwner::Region(self.region),
-            InferenceSlot::Expression(ast::ExprRef::Attribute(attribute).into()),
-        );
+        let lookup = || {
+            InferenceVariable::new(
+                db,
+                env.program(db),
+                InferenceOwner::Region(self.region),
+                InferenceSlot::Expression(ast::ExprRef::Attribute(attribute).into()),
+            )
+        };
         let lookup_result = fallback_place.into_lookup_result(db, env, lookup);
         let resolved_type = lookup_result.unwrap_or_else(|lookup_err| {
             match lookup_err {

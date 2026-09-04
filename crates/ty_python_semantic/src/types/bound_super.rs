@@ -990,9 +990,10 @@ impl<'db> BoundSuperType<'db> {
 
         let mut mro_after_pivot = self.skip_until_after_pivot(db, env, owner.iter_mro(db, env));
         let class_literal = class.class_literal(db);
-        let lookup =
+        let lookup = || {
             MemberLookupKey::new(db, env.program(db), Type::BoundSuper(self), name, policy)
-                .inference_variable(db);
+                .inference_variable(db)
+        };
         let result = class_literal.class_member_from_mro(
             db,
             env,

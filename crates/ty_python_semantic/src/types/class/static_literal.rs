@@ -1358,17 +1358,21 @@ impl<'db> StaticClassLiteral<'db> {
         name: &str,
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
-        let lookup = MemberLookupKey::new(
-            db,
-            env.program(db),
-            specialization.map_or_else(
-                || Type::from(self),
-                |specialization| Type::GenericAlias(GenericAlias::new(db, self, specialization)),
-            ),
-            name,
-            policy,
-        )
-        .inference_variable(db);
+        let lookup = || {
+            MemberLookupKey::new(
+                db,
+                env.program(db),
+                specialization.map_or_else(
+                    || Type::from(self),
+                    |specialization| {
+                        Type::GenericAlias(GenericAlias::new(db, self, specialization))
+                    },
+                ),
+                name,
+                policy,
+            )
+            .inference_variable(db)
+        };
         // An unspecialized MRO retains mappings such as `Parent[T@Child]`, so ordinary members
         // accessed through `Child` must use its default arguments. Constructor methods are different:
         // we add their class's type variables to the callable's generic context, so those variables
@@ -1423,7 +1427,7 @@ impl<'db> StaticClassLiteral<'db> {
         env: &ProgramEnvironment<'db>,
         name: &str,
         policy: MemberLookupPolicy,
-        lookup: InferenceVariable<'db>,
+        lookup: impl Fn() -> InferenceVariable<'db>,
         mro_iter: impl Iterator<Item = ClassBase<'db>>,
     ) -> PlaceAndQualifiers<'db> {
         fn into_function_like_callable<'d>(

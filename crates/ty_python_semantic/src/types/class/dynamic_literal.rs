@@ -432,14 +432,16 @@ impl<'db> DynamicClassLiteral<'db> {
             policy,
             None,  // No inherited generic context.
             false, // Dynamic classes are never `object`.
-            MemberLookupKey::new(
-                db,
-                env.program(db),
-                Type::from(ClassLiteral::Dynamic(self)),
-                name,
-                policy,
-            )
-            .inference_variable(db),
+            || {
+                MemberLookupKey::new(
+                    db,
+                    env.program(db),
+                    Type::from(ClassLiteral::Dynamic(self)),
+                    name,
+                    policy,
+                )
+                .inference_variable(db)
+            },
         );
 
         match result {

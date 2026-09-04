@@ -101,14 +101,14 @@ impl PublicTypePolicy {
         env: &ProgramEnvironment<'db>,
         ty: Type<'db>,
         symbolic: Option<SymbolicType<'db>>,
-        lookup: InferenceVariable<'db>,
+        lookup: impl Fn() -> InferenceVariable<'db>,
     ) -> (Type<'db>, Option<SymbolicType<'db>>) {
         match self {
             Self::Raw => (ty, symbolic),
             Self::Promote => (
                 InferencePromotion::Attribute.apply(db, env, ty),
                 symbolic.map(|symbolic| {
-                    symbolic.promote(db, env, lookup, InferencePromotion::Attribute)
+                    symbolic.promote(db, env, lookup(), InferencePromotion::Attribute)
                 }),
             ),
         }
@@ -464,7 +464,7 @@ impl<'db> LookupError<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        lookup: InferenceVariable<'db>,
+        lookup: impl Fn() -> InferenceVariable<'db>,
         fallback: PlaceAndQualifiers<'db>,
     ) -> LookupResult<'db> {
         let fallback = fallback.into_lookup_result(db, env, lookup);
@@ -551,14 +551,16 @@ pub(crate) fn global_symbol<'db>(
     name: &str,
 ) -> PlaceAndQualifiers<'db> {
     let env = ProgramEnvironment::from_file(file);
-    let lookup = SymbolLookupKey::new(
-        db,
-        global_scope(db, file),
-        name,
-        RequiresExplicitReExport::No,
-        ConsideredDefinitions::AllReachable,
-    )
-    .inference_variable(db);
+    let lookup = || {
+        SymbolLookupKey::new(
+            db,
+            global_scope(db, file),
+            name,
+            RequiresExplicitReExport::No,
+            ConsideredDefinitions::AllReachable,
+        )
+        .inference_variable(db)
+    };
     explicit_global_symbol(db, file, name).or_fall_back_to(db, &env, lookup, || {
         module_type_implicit_global_symbol(db, file, name)
     })
@@ -596,35 +598,37 @@ pub(crate) fn imported_symbol<'db>(
     // ignore `__getattr__`. Typeshed has a fake `__getattr__` on `types.ModuleType` to help out with
     // dynamic imports; we shouldn't use it for `ModuleLiteral` types where we know exactly which
     // module we're dealing with.
-    let lookup = file.map_or_else(
-        || {
-            MemberLookupKey::new(
-                db,
-                env.program(db),
-                KnownClass::ModuleType.to_instance(db, env),
-                name,
-                MemberLookupPolicy::NO_GETATTR_LOOKUP,
-            )
-            .inference_variable(db)
-        },
-        |file| {
-            let requires_explicit_reexport = requires_explicit_reexport.unwrap_or_else(|| {
-                if file.file(db).is_stub(db) {
-                    RequiresExplicitReExport::Yes
-                } else {
-                    RequiresExplicitReExport::No
-                }
-            });
-            SymbolLookupKey::new(
-                db,
-                global_scope(db, file),
-                name,
-                requires_explicit_reexport,
-                ConsideredDefinitions::EndOfScope,
-            )
-            .inference_variable(db)
-        },
-    );
+    let lookup = || {
+        file.map_or_else(
+            || {
+                MemberLookupKey::new(
+                    db,
+                    env.program(db),
+                    KnownClass::ModuleType.to_instance(db, env),
+                    name,
+                    MemberLookupPolicy::NO_GETATTR_LOOKUP,
+                )
+                .inference_variable(db)
+            },
+            |file| {
+                let requires_explicit_reexport = requires_explicit_reexport.unwrap_or_else(|| {
+                    if file.file(db).is_stub(db) {
+                        RequiresExplicitReExport::Yes
+                    } else {
+                        RequiresExplicitReExport::No
+                    }
+                });
+                SymbolLookupKey::new(
+                    db,
+                    global_scope(db, file),
+                    name,
+                    requires_explicit_reexport,
+                    ConsideredDefinitions::EndOfScope,
+                )
+                .inference_variable(db)
+            },
+        )
+    };
     file.map(|file| {
         let requires_explicit_reexport = requires_explicit_reexport.unwrap_or_else(|| {
             if file.file(db).is_stub(db) {
@@ -744,14 +748,16 @@ fn builtins_symbol_impl<'db>(
     let resolver = |module: Module<'db>| {
         let file = ProgramFile::new(db, module.file(db)?, program);
         let scope = global_scope(db, file);
-        let lookup = SymbolLookupKey::new(
-            db,
-            scope,
-            symbol,
-            RequiresExplicitReExport::Yes,
-            ConsideredDefinitions::EndOfScope,
-        )
-        .inference_variable(db);
+        let lookup = || {
+            SymbolLookupKey::new(
+                db,
+                scope,
+                symbol,
+                RequiresExplicitReExport::Yes,
+                ConsideredDefinitions::EndOfScope,
+            )
+            .inference_variable(db)
+        };
         let found_symbol = symbol_impl(
             db,
             scope,
@@ -1056,12 +1062,13 @@ impl<'db> PlaceAndQualifiers<'db> {
     /// and the `Err` variant represents a place that is either definitely or possibly undefined.
     ///
     /// For places whose public type differs from their raw stored type, this applies the
-    /// public-type policy lazily during lookup.
+    /// public-type policy lazily during lookup. The lookup identity is only needed when
+    /// promoting a symbolic type.
     pub(crate) fn into_lookup_result(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        lookup: InferenceVariable<'db>,
+        lookup: impl Fn() -> InferenceVariable<'db>,
     ) -> LookupResult<'db> {
         match self {
             PlaceAndQualifiers {
@@ -1102,7 +1109,7 @@ impl<'db> PlaceAndQualifiers<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        lookup: InferenceVariable<'db>,
+        lookup: impl Fn() -> InferenceVariable<'db>,
         diagnostic_fn: impl FnOnce(LookupError<'db>) -> TypeAndQualifiers<'db>,
     ) -> TypeAndQualifiers<'db> {
         self.into_lookup_result(db, env, lookup)
@@ -1124,12 +1131,12 @@ impl<'db> PlaceAndQualifiers<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        lookup: InferenceVariable<'db>,
+        lookup: impl Fn() -> InferenceVariable<'db>,
         fallback_fn: impl FnOnce() -> PlaceAndQualifiers<'db>,
     ) -> Self {
-        self.into_lookup_result(db, env, lookup.lookup_part(db, 0))
+        self.into_lookup_result(db, env, || lookup().lookup_part(db, 0))
             .or_else(|lookup_error| {
-                lookup_error.or_fall_back_to(db, env, lookup.lookup_part(db, 1), fallback_fn())
+                lookup_error.or_fall_back_to(db, env, || lookup().lookup_part(db, 1), fallback_fn())
             })
             .into()
     }
@@ -2726,14 +2733,16 @@ mod tests {
         let env = db.program_environment();
         let ty1 = Type::int_literal(1);
         let ty2 = Type::int_literal(2);
-        let lookup = MemberLookupKey::new(
-            db,
-            env.program(db),
-            ty1,
-            "member",
-            MemberLookupPolicy::default(),
-        )
-        .inference_variable(db);
+        let lookup = || {
+            MemberLookupKey::new(
+                db,
+                env.program(db),
+                ty1,
+                "member",
+                MemberLookupPolicy::default(),
+            )
+            .inference_variable(db)
+        };
 
         let unbound = || PlaceAndQualifiers::default();
 

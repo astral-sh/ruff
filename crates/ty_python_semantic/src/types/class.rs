@@ -733,7 +733,7 @@ impl<'db> ClassLiteral<'db> {
         env: &ProgramEnvironment<'db>,
         name: &str,
         policy: MemberLookupPolicy,
-        lookup: InferenceVariable<'db>,
+        lookup: impl Fn() -> InferenceVariable<'db>,
         mro_iter: impl Iterator<Item = ClassBase<'db>>,
     ) -> PlaceAndQualifiers<'db> {
         match self {
@@ -2974,7 +2974,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
         policy: MemberLookupPolicy,
         inherited_generic_context: Option<GenericContext<'db>>,
         is_self_object: bool,
-        lookup: InferenceVariable<'db>,
+        lookup: impl Fn() -> InferenceVariable<'db>,
     ) -> ClassMemberResult<'db> {
         let db = self.db;
 
@@ -3064,7 +3064,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                         lookup_error.or_fall_back_to(
                             db,
                             &self.env,
-                            lookup.lookup_part(db, index),
+                            || lookup().lookup_part(db, index),
                             member,
                         )
                     });

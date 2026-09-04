@@ -1098,7 +1098,7 @@ fn distribute_member_lookup_over_bound_or_constraints<'db>(
 fn member_lookup_or_fall_back_to<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
-    lookup: InferenceVariable<'db>,
+    lookup: impl Fn() -> InferenceVariable<'db>,
     result: MemberLookupResult<'db>,
     fallback_fn: impl FnOnce() -> MemberLookupResult<'db>,
 ) -> MemberLookupResult<'db> {
@@ -4047,7 +4047,7 @@ impl<'db> Type<'db> {
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
         let lookup =
-            MemberLookupKey::new(db, env.program(db), self, name, policy).inference_variable(db);
+            || MemberLookupKey::new(db, env.program(db), self, name, policy).inference_variable(db);
         let class_attr = self
             .find_name_in_mro_with_policy(db, env, name, policy)
             .expect(
@@ -4147,7 +4147,7 @@ impl<'db> Type<'db> {
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
         let lookup =
-            MemberLookupKey::new(db, env.program(db), self, name, policy).inference_variable(db);
+            || MemberLookupKey::new(db, env.program(db), self, name, policy).inference_variable(db);
         let class_attr = self
             .find_name_in_mro_with_policy(db, env, name, policy)
             .expect("The meta-type of an instance-like type should always have an MRO");
@@ -4172,7 +4172,7 @@ impl<'db> Type<'db> {
             env,
             name,
             policy,
-            lookup.lookup_part(db, 0),
+            || lookup().lookup_part(db, 0),
             class.iter_mro(db).take(1),
         );
         // A non-ClassVar declaration-only member describes instance storage but does not add a
@@ -4201,7 +4201,7 @@ impl<'db> Type<'db> {
             env,
             name,
             policy,
-            lookup.lookup_part(db, 1),
+            || lookup().lookup_part(db, 1),
             class.iter_mro(db).skip(1),
         );
 
@@ -4211,10 +4211,13 @@ impl<'db> Type<'db> {
             metaclass_member
         };
         let class_member = own_class_member
-            .or_fall_back_to(db, env, lookup.lookup_part(db, 2), || metaclass_member)
-            .or_fall_back_to(db, env, lookup.lookup_part(db, 3), || {
-                inherited_class_member
-            });
+            .or_fall_back_to(db, env, || lookup().lookup_part(db, 2), || metaclass_member)
+            .or_fall_back_to(
+                db,
+                env,
+                || lookup().lookup_part(db, 3),
+                || inherited_class_member,
+            );
         let class_member = if metaclass_member_is_implicit {
             // Preserve the existing convention that an inferred instance member is assumed to be
             // available even when no lower-precedence fallback exists.
@@ -4267,9 +4270,12 @@ impl<'db> Type<'db> {
             ..declaration
         })
         .with_qualifiers(qualifiers)
-        .or_fall_back_to(db, env, lookup.lookup_part(db, 4), || {
-            dynamic_instance_fallback
-        })
+        .or_fall_back_to(
+            db,
+            env,
+            || lookup().lookup_part(db, 4),
+            || dynamic_instance_fallback,
+        )
     }
 
     /// This function roughly corresponds to looking up an attribute in the `__dict__` of an object.
@@ -5799,7 +5805,7 @@ impl<'db> Type<'db> {
                         member_lookup_or_fall_back_to(
                             db,
                             env,
-                            key.inference_variable(db),
+                            || key.inference_variable(db),
                             result,
                             || {
                                 // If an attribute is not available on the bound method object,
@@ -7669,7 +7675,7 @@ impl<'db> Type<'db> {
         policy: MemberLookupPolicy,
     ) -> MemberLookupResult<'db> {
         let lookup =
-            MemberLookupKey::new(db, env.program(db), self, name, policy).inference_variable(db);
+            || MemberLookupKey::new(db, env.program(db), self, name, policy).inference_variable(db);
         let custom_getattr_result = || {
             if policy.no_getattr_lookup() {
                 return MemberLookupResult::from(Place::Undefined);
@@ -7721,7 +7727,7 @@ impl<'db> Type<'db> {
             return member_lookup_or_fall_back_to(
                 db,
                 env,
-                lookup.lookup_part(db, 0),
+                || lookup().lookup_part(db, 0),
                 result,
                 custom_getattr_result,
             );
@@ -7751,7 +7757,7 @@ impl<'db> Type<'db> {
                 return member_lookup_or_fall_back_to(
                     db,
                     env,
-                    lookup.lookup_part(db, 0),
+                    || lookup().lookup_part(db, 0),
                     result,
                     custom_getattr_result,
                 );
@@ -7762,11 +7768,12 @@ impl<'db> Type<'db> {
             let member = result.unwrap_or_else(|error| error.fallback_member(db));
             return member_lookup_result(
                 db,
-                member
-                    .member(db)
-                    .or_fall_back_to(db, env, lookup.lookup_part(db, 1), || {
-                        error.fallback_member(db).member(db)
-                    }),
+                member.member(db).or_fall_back_to(
+                    db,
+                    env,
+                    || lookup().lookup_part(db, 1),
+                    || error.fallback_member(db).member(db),
+                ),
                 Some(error.kind(db)),
                 member.deprecated_properties(db),
             );
@@ -7782,14 +7789,17 @@ impl<'db> Type<'db> {
             result
         };
 
-        let result =
-            member_lookup_or_fall_back_to(db, env, lookup.lookup_part(db, 2), result, || {
-                custom_getattribute
-            });
+        let result = member_lookup_or_fall_back_to(
+            db,
+            env,
+            || lookup().lookup_part(db, 2),
+            result,
+            || custom_getattribute,
+        );
         member_lookup_or_fall_back_to(
             db,
             env,
-            lookup.lookup_part(db, 3),
+            || lookup().lookup_part(db, 3),
             result,
             custom_getattr_result,
         )
