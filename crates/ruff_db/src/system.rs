@@ -10,6 +10,7 @@ pub use os::OsSystem;
 use filetime::FileTime;
 use ruff_notebook::{Notebook, NotebookError};
 use ruff_python_ast::PySourceType;
+use rustc_hash::FxHashMap;
 use std::error::Error;
 use std::fmt;
 use std::fmt::Debug;
@@ -55,6 +56,15 @@ pub trait System: Debug + Sync + Send {
     ///
     /// This function will traverse symbolic links to query information about the destination file.
     fn path_metadata(&self, path: &SystemPath) -> Result<Metadata>;
+
+    /// Optionally reads regular-file metadata for a directory in one batch.
+    ///
+    /// Entries are keyed by filename. Missing entries, including symlinks, must use
+    /// `path_metadata`. Implementations with file overlays must omit overridden entries or return
+    /// their overlay metadata. Callers may retain the result only for the current discovery pass.
+    fn directory_file_metadata(&self, _path: &SystemPath) -> Option<FxHashMap<String, Metadata>> {
+        None
+    }
 
     /// Returns the canonical, absolute form of a path with all intermediate components normalized
     /// and symbolic links resolved.

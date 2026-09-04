@@ -93,6 +93,10 @@ impl TestSystem {
 }
 
 impl System for TestSystem {
+    fn directory_file_metadata(&self, path: &SystemPath) -> Option<FxHashMap<String, Metadata>> {
+        self.system().directory_file_metadata(path)
+    }
+
     fn path_metadata(&self, path: &SystemPath) -> Result<Metadata> {
         self.system().path_metadata(path)
     }

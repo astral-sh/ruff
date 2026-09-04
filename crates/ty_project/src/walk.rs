@@ -3,7 +3,7 @@ use crate::glob::IncludeExcludeFilter;
 use crate::script::script_tag;
 use crate::{Db, GlobFilterCheckMode, IncludeResult, Project};
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
-use ruff_db::files::system_path_to_file;
+use ruff_db::files::{FileMetadataBatch, system_path_to_file};
 use ruff_db::system::walk_directory::{ErrorKind, WalkDirectoryBuilder, WalkState};
 use ruff_db::system::{SystemPath, SystemPathBuf, deduplicate_nested_paths};
 use std::collections::BTreeSet;
@@ -178,6 +178,7 @@ impl ProjectFilesWalker {
         let exclude_scripts = project.settings(db).src().exclude_scripts;
         let files = std::sync::Mutex::new(Vec::new());
         let diagnostics = std::sync::Mutex::new(Vec::new());
+        let metadata = FileMetadataBatch::default();
 
         walker.run(|| {
             let db = Db::dyn_clone(db);
@@ -185,6 +186,7 @@ impl ProjectFilesWalker {
             let incremental_paths = &self.incremental_paths;
             let files = &files;
             let diagnostics = &diagnostics;
+            let metadata = &metadata;
             let force_exclude = filter.force_exclude();
 
             // The memory walker runs on the caller's thread, where a different database may
@@ -270,7 +272,12 @@ impl ProjectFilesWalker {
 
                                 // If this returns `Err`, then the file was deleted between now and when the walk callback was called.
                                 // We can ignore this.
-                                if let Ok(file) = system_path_to_file(&*db, entry.path()) {
+                                let file = if entry.depth() == 0 {
+                                    system_path_to_file(&*db, entry.path())
+                                } else {
+                                    metadata.file(&*db, entry.path())
+                                };
+                                if let Ok(file) = file {
                                     let is_script = script_tag(&*db, file).is_some();
                                     if entry.depth() > 0 && exclude_scripts && is_script {
                                         tracing::debug!(

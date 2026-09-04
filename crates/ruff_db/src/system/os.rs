@@ -14,6 +14,7 @@ use crate::system::{
 };
 use filetime::FileTime;
 use ruff_notebook::{Notebook, NotebookError};
+use rustc_hash::FxHashMap;
 use std::num::NonZeroUsize;
 use std::process::Output;
 use std::sync::Arc;
@@ -69,6 +70,20 @@ impl OsSystem {
 }
 
 impl System for OsSystem {
+    fn directory_file_metadata(&self, path: &SystemPath) -> Option<FxHashMap<String, Metadata>> {
+        super::directory_metadata::read(path.as_std_path()).map(|entries| {
+            entries
+                .into_iter()
+                .filter_map(|(name, entry)| {
+                    Some((
+                        name.into_string().ok()?,
+                        Metadata::new(entry.last_modified.into(), Some(entry.mode), FileType::File),
+                    ))
+                })
+                .collect()
+        })
+    }
+
     fn path_metadata(&self, path: &SystemPath) -> Result<Metadata> {
         let metadata = path.as_std_path().metadata()?;
         let last_modified = FileTime::from_last_modification_time(&metadata);

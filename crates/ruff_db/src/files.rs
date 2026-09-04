@@ -10,6 +10,8 @@ pub use path::FilePath;
 use ruff_notebook::{Notebook, NotebookError};
 use ruff_python_ast::PySourceType;
 use ruff_text_size::{Ranged, TextRange};
+#[cfg(target_os = "macos")]
+use rustc_hash::FxHashMap;
 use salsa::plumbing::AsId;
 use salsa::{Durability, Setter};
 
@@ -19,7 +21,8 @@ use crate::files::file_root::FileRoots;
 use crate::files::private::FileStatus;
 use crate::source::SourceText;
 use crate::system::{
-    SystemPath, SystemPathBuf, SystemVirtualPath, SystemVirtualPathBuf, deduplicate_nested_paths,
+    Metadata, SystemPath, SystemPathBuf, SystemVirtualPath, SystemVirtualPathBuf,
+    deduplicate_nested_paths,
 };
 use crate::vendored::{VendoredPath, VendoredPathBuf};
 use crate::{Db, FxDashMap, vendored};
@@ -33,7 +36,15 @@ mod path;
 /// Returns `Err` if the path doesn't exist, isn't accessible, or if the path points to a directory.
 #[inline]
 pub fn system_path_to_file(db: &dyn Db, path: impl AsRef<SystemPath>) -> Result<File, FileError> {
-    let file = db.files().system(db, path.as_ref());
+    system_path_to_file_with_metadata(db, path.as_ref(), None)
+}
+
+fn system_path_to_file_with_metadata(
+    db: &dyn Db,
+    path: &SystemPath,
+    metadata: Option<Metadata>,
+) -> Result<File, FileError> {
+    let file = db.files().system_with_metadata(db, path, metadata);
 
     // It's important that `vfs.file_system` creates a `VfsFile` even for files that don't exist or don't
     // exist anymore so that Salsa can track that the caller of this function depends on the existence of
@@ -43,6 +54,44 @@ pub fn system_path_to_file(db: &dyn Db, path: impl AsRef<SystemPath>) -> Result<
         FileStatus::Exists => Ok(file),
         FileStatus::IsADirectory => Err(FileError::IsADirectory),
         FileStatus::NotFound => Err(FileError::NotFound),
+    }
+}
+
+/// Metadata batches shared by the workers in one file-discovery pass.
+///
+/// This is deliberately separate from Salsa's directory listings: editing a file changes its
+/// metadata without changing directory membership. Drop these batches at the end of the walk.
+#[derive(Default)]
+pub struct FileMetadataBatch {
+    #[cfg(target_os = "macos")]
+    directories: FxDashMap<SystemPathBuf, Option<FxHashMap<String, Metadata>>>,
+}
+
+impl FileMetadataBatch {
+    /// Interns a discovered file using its directory's metadata when available.
+    ///
+    /// Existing files retain their current inputs, including revisions supplied by the editor or
+    /// file watcher. Symlinks and failed bulk reads use the ordinary per-path lookup.
+    pub fn file(&self, db: &dyn Db, path: &SystemPath) -> Result<File, FileError> {
+        #[cfg(target_os = "macos")]
+        {
+            if db.files().try_system(db, path).is_some() {
+                return system_path_to_file(db, path);
+            }
+            let metadata = path
+                .parent()
+                .zip(path.file_name())
+                .and_then(|(parent, name)| {
+                    self.directories
+                        .entry(parent.to_path_buf())
+                        .or_insert_with(|| db.system().directory_file_metadata(parent))
+                        .as_mut()
+                        .and_then(|entries| entries.remove(name))
+                });
+            system_path_to_file_with_metadata(db, path, metadata)
+        }
+        #[cfg(not(target_os = "macos"))]
+        system_path_to_file(db, path)
     }
 }
 
@@ -106,6 +155,15 @@ impl Files {
     /// The operation always succeeds even if the path doesn't exist on disk, isn't accessible or if the path points to a directory.
     /// In these cases, a file with the appropriate [`FileStatus`] is returned.
     fn system(&self, db: &dyn Db, path: &SystemPath) -> File {
+        self.system_with_metadata(db, path, None)
+    }
+
+    fn system_with_metadata(
+        &self,
+        db: &dyn Db,
+        path: &SystemPath,
+        metadata: Option<Metadata>,
+    ) -> File {
         // All cache keys are normalized, absolute paths. However, an absolute path does not need
         // to be fully normalized for this lookup: Camino's equality and hashing ignore redundant
         // separators and `.` components, so `/foo/bar.py`, `/foo//bar.py`, and `/foo/./bar.py`
@@ -131,7 +189,7 @@ impl Files {
             .system_by_path
             .entry(absolute.clone())
             .or_insert_with(|| {
-                let metadata = db.system().path_metadata(path);
+                let metadata = metadata.map_or_else(|| db.system().path_metadata(path), Ok);
 
                 tracing::trace!("Adding file '{absolute}'");
 
@@ -727,12 +785,56 @@ mod tests {
 
     use crate::Db as _;
     use crate::file_revision::FileRevision;
-    use crate::files::{File, FileError, system_path_to_file, vendored_path_to_file};
+    use crate::files::{
+        File, FileError, FileMetadataBatch, system_path_to_file, system_path_to_file_with_metadata,
+        vendored_path_to_file,
+    };
     use crate::source::source_text;
-    use crate::system::{DbWithWritableSystem as _, SystemPath};
+    use crate::system::{DbWithWritableSystem as _, FileType, Metadata, SystemPath};
     use crate::tests::TestDb;
     use crate::vendored::VendoredFileSystemBuilder;
     use zip::CompressionMethod;
+
+    #[test]
+    fn prefetched_metadata_preserves_existing_inputs() -> crate::system::Result<()> {
+        let mut db = TestDb::new();
+        db.write_file("test.py", "before")?;
+        let path = SystemPath::new("test.py");
+        let prefetched = Metadata::new(FileRevision::new(123), Some(0o640), FileType::File);
+        let file = system_path_to_file_with_metadata(&db, path, Some(prefetched.clone())).unwrap();
+        assert_eq!(file.revision(&db), prefetched.revision());
+        assert_eq!(file.permissions(&db), prefetched.permissions());
+
+        db.write_file(path, "after")?;
+        file.sync(&mut db);
+        let updated = file.revision(&db);
+        assert_ne!(updated, prefetched.revision());
+        assert_eq!(
+            system_path_to_file_with_metadata(&db, path, Some(prefetched)),
+            Ok(file)
+        );
+        assert_eq!(file.revision(&db), updated);
+        assert_eq!(file.read_to_string(&db)?, "after");
+        Ok(())
+    }
+
+    #[test]
+    fn metadata_batch_falls_back_for_unavailable_entries() -> crate::system::Result<()> {
+        let mut db = TestDb::new();
+        db.write_file("test.py", "content")?;
+        let batch = FileMetadataBatch::default();
+        let path = SystemPath::new("test.py");
+        let file = batch.file(&db, path).unwrap();
+        assert_eq!(
+            file.revision(&db),
+            db.system().path_metadata(path)?.revision()
+        );
+        assert_eq!(
+            batch.file(&db, SystemPath::new("missing.py")),
+            Err(FileError::NotFound)
+        );
+        Ok(())
+    }
 
     #[test]
     fn system_existing_file() -> crate::system::Result<()> {

@@ -19,6 +19,7 @@ use ruff_db::system::{
 };
 use ruff_notebook::{Notebook, NotebookError};
 use ruff_python_ast::PySourceType;
+use rustc_hash::FxHashMap;
 use serde::{Deserialize, Deserializer};
 use ty_ide::cached_vendored_path;
 
@@ -165,6 +166,16 @@ impl LSPSystem {
 }
 
 impl System for LSPSystem {
+    fn directory_file_metadata(&self, path: &SystemPath) -> Option<FxHashMap<String, Metadata>> {
+        self.native_system
+            .directory_file_metadata(path)
+            .map(|mut entries| {
+                // Open documents use editor revisions, even when the file also exists on disk.
+                entries.retain(|name, _| self.system_path_to_document(&path.join(name)).is_none());
+                entries
+            })
+    }
+
     fn path_metadata(&self, path: &SystemPath) -> Result<Metadata> {
         let document = self.system_path_to_document(path);
 
