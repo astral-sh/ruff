@@ -2,6 +2,7 @@
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::{fs, io};
 
 use anyhow::{Context, Result};
 use log::debug;
@@ -101,6 +102,52 @@ pub fn settings_toml<P: AsRef<Path>>(path: P) -> Result<Option<PathBuf>> {
         return Ok(Some(pyproject_toml));
     }
 
+    Ok(None)
+}
+
+/// Finds configuration while walking a directory by listing its candidate names together.
+///
+/// Ancestor searches and explicit paths still use `settings_toml`: those directories may be large
+/// or searchable without being readable. A failed listing also falls back to individual probes.
+pub(crate) fn settings_toml_in_directory(path: &Path) -> Result<Option<PathBuf>> {
+    const NAMES: [&str; 3] = [".ruff.toml", "ruff.toml", "pyproject.toml"];
+
+    fn candidates(path: &Path) -> io::Result<[bool; 3]> {
+        let mut found = [false; 3];
+        for entry in fs::read_dir(path)? {
+            let entry = entry?;
+            let name = entry.file_name();
+            if let Some(index) = NAMES.iter().position(|candidate| name == *candidate) {
+                let file_type = entry.file_type()?;
+                found[index] |=
+                    file_type.is_file() || (file_type.is_symlink() && entry.path().is_file());
+                if index == 0 && found[index] {
+                    break;
+                }
+            } else if let Some(name) = name.to_str()
+                && let Some(index) = NAMES
+                    .iter()
+                    .position(|candidate| name.eq_ignore_ascii_case(candidate))
+            {
+                // Preserve path-lookup behavior on case-insensitive filesystems without treating
+                // differently cased names as configuration on case-sensitive filesystems.
+                found[index] |= path.join(NAMES[index]).is_file();
+            }
+        }
+        Ok(found)
+    }
+
+    let Ok(found) = candidates(path) else {
+        return settings_toml(path);
+    };
+    for (name, found) in NAMES.into_iter().zip(found) {
+        if found {
+            let candidate = path.join(name);
+            if name != "pyproject.toml" || ruff_enabled(&candidate)? {
+                return Ok(Some(candidate));
+            }
+        }
+    }
     Ok(None)
 }
 
@@ -268,6 +315,8 @@ fn get_minimum_supported_version(requires_version: &VersionSpecifiers) -> Option
 #[cfg(test)]
 mod tests {
     use std::fs;
+    #[cfg(unix)]
+    use std::os::unix::fs::symlink;
     use std::str::FromStr;
     use std::sync::Arc;
 
@@ -282,7 +331,73 @@ mod tests {
     use ruff_ranged_value::{ValueSource, ValueSourceGuard};
 
     use crate::options::{Flake8BuiltinsOptions, LintCommonOptions, LintOptions, Options};
-    use crate::pyproject::{Pyproject, Tools, find_settings_toml, parse_pyproject_toml};
+    use crate::pyproject::{
+        Pyproject, Tools, find_settings_toml, parse_pyproject_toml, settings_toml,
+        settings_toml_in_directory,
+    };
+
+    #[test]
+    fn directory_discovery_preserves_precedence() -> Result<()> {
+        let directory = TempDir::new()?;
+        let root = directory.path();
+        assert_eq!(settings_toml_in_directory(root)?, None);
+
+        fs::write(root.join("pyproject.toml"), "[project]\nname = 'example'\n")?;
+        assert_eq!(settings_toml_in_directory(root)?, None);
+        fs::write(root.join("pyproject.toml"), "[tool.ruff]\n")?;
+        assert_eq!(
+            settings_toml_in_directory(root)?,
+            Some(root.join("pyproject.toml"))
+        );
+
+        fs::write(root.join("ruff.toml"), "")?;
+        // A higher-priority configuration hides even a malformed pyproject.toml.
+        fs::write(root.join("pyproject.toml"), "invalid toml")?;
+        assert_eq!(
+            settings_toml_in_directory(root)?,
+            Some(root.join("ruff.toml"))
+        );
+        fs::create_dir(root.join(".ruff.toml"))?;
+        assert_eq!(settings_toml_in_directory(root)?, settings_toml(root)?);
+        fs::remove_dir(root.join(".ruff.toml"))?;
+        fs::write(root.join(".ruff.toml"), "")?;
+        assert_eq!(
+            settings_toml_in_directory(root)?,
+            Some(root.join(".ruff.toml"))
+        );
+        Ok(())
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn directory_discovery_follows_configuration_symlinks() -> Result<()> {
+        let directory = TempDir::new()?;
+        let root = directory.path();
+        fs::write(root.join("configuration"), "")?;
+        symlink("configuration", root.join("ruff.toml"))?;
+        symlink("missing", root.join(".ruff.toml"))?;
+        assert_eq!(
+            settings_toml_in_directory(root)?,
+            Some(root.join("ruff.toml"))
+        );
+        fs::write(root.join("missing"), "")?;
+        assert_eq!(
+            settings_toml_in_directory(root)?,
+            Some(root.join(".ruff.toml"))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn directory_discovery_preserves_filesystem_case_matching() -> Result<()> {
+        let directory = TempDir::new()?;
+        let root = directory.path();
+        fs::write(root.join("RUFF.TOML"), "")?;
+        assert_eq!(settings_toml_in_directory(root)?, settings_toml(root)?);
+        fs::write(root.join(".RUFF.TOML"), "")?;
+        assert_eq!(settings_toml_in_directory(root)?, settings_toml(root)?);
+        Ok(())
+    }
 
     #[test]
     fn deserialize() -> Result<()> {

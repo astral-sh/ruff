@@ -23,7 +23,7 @@ use ruff_linter::package::PackageRoot;
 use ruff_linter::packaging::is_package;
 
 use crate::configuration::Configuration;
-use crate::pyproject::settings_toml;
+use crate::pyproject::{settings_toml, settings_toml_in_directory};
 use crate::settings::Settings;
 use crate::{FileResolverSettings, pyproject};
 
@@ -638,7 +638,7 @@ impl ParallelVisitor for PythonFilesVisitor<'_, '_> {
                     .file_type()
                     .is_some_and(|file_type| file_type.is_dir())
                 {
-                    match settings_toml(entry.path()) {
+                    match settings_toml_in_directory(entry.path()) {
                         Ok(Some(pyproject)) => match resolve_scoped_settings(
                             &pyproject,
                             self.transformer,
