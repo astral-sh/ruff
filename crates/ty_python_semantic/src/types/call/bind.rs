@@ -34,6 +34,7 @@ use crate::types::ProgramEnvironment;
 use crate::types::call::arguments::{CallArgumentTypes, Expansion, is_expandable_type};
 use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::projection::{ProjectionTypeBudget, SolutionBudget};
+use crate::types::constraints::resolution::SolutionType;
 use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, PathBound, PathBoundSolution, PathBounds, SolutionPaths,
     Solutions,
@@ -6009,7 +6010,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
     /// Intersects the returns of complete, static specializations that each validate all arguments.
     ///
     /// Returns `None` when correlated inference is unavailable or cannot safely replace the
-    /// merged projection. A single solution already has the same return under either projection.
+    /// merged projection. `Single` already has the same return under either projection.
     fn intersected_return_type(&self, inference: TypeVarInference<'db>) -> Option<Type<'db>> {
         let db = self.db;
         let env = self.env;
@@ -6020,6 +6021,10 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         }
         let TypeVarInferenceSolutions::Alternatives(alternatives) = inference.solutions(db) else {
             return None;
+        };
+        let resolved_type = |binding| match binding {
+            SolutionType::Resolved(ty) => Some(ty),
+            SolutionType::Unresolved(_) => None,
         };
         let generic_context = inference.generic_context(db);
         let mentions_inferable = |ty| {
@@ -6040,11 +6045,34 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 .then_some((index, variable))
             })
             .collect();
-        // Intersecting `list[A]` and `list[B]` would produce `Never`, even when the generic
-        // function constructs an empty list. Keep the merged specialization for varying
-        // invariant returns, including containers inside an inferred type. TODO: Distinguish
-        // mutable invariant specializations from mixed variance, such as `Callable[[T], T]`,
-        // whose intersection can be meaningful.
+        // Missing return bindings or unresolved dependencies do not make an alternative invalid.
+        // Keep the merged fallback for the whole call rather than silently dropping that sibling.
+        // Unresolved bindings can contain cycles, so none may reach recursive specialization.
+        if alternatives.iter().any(|types| {
+            return_variables
+                .iter()
+                .any(|&(index, _)| types[index].is_none())
+                || types
+                    .iter()
+                    .flatten()
+                    .any(|binding| matches!(binding, SolutionType::Unresolved(_)))
+        }) {
+            return None;
+        }
+        // A fresh invariant container can receive its specialization from context: the same
+        // expression `[]` is valid as either `list[A]` or `list[B]`. These typings make different,
+        // mutually exclusive choices for the allocated list's static element type, rather than
+        // establish simultaneous properties of one returned value. Their intersection is `Never`,
+        // which would incorrectly imply that the function cannot return.
+        //
+        // Keep the merged specialization for varying invariant returns, including containers
+        // hidden inside an inferred type, such as `R = list[A]` versus `R = list[B]`. This is
+        // conservative: choosing either valid specialization could be less restrictive, but
+        // without a return context there is no clear preference between them.
+        //
+        // TODO: Refine this check when independent specializations can safely coexist, such as
+        // for a polymorphic identity callable. Mixed variance alone does not establish that:
+        // a `Callable[[T], T]` can capture mutable state tied to one specialization of `T`.
         let has_invariant_specialization = |ty| {
             any_over_type_expanding_aliases(db, env, ty, |nested| {
                 let specialization = match nested {
@@ -6070,20 +6098,33 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     == TypeVarVariance::Invariant
                     || alternatives
                         .iter()
-                        .filter_map(|types| types[*index])
+                        .filter_map(|types| types[*index].and_then(resolved_type))
                         .any(has_invariant_specialization))
         }) {
             return None;
         }
+        // Intersecting returns requires the same call to satisfy every retained specialization,
+        // without choosing a different materialization of a gradual type for each one. For
+        // example, `Any` is assignable to both `int` and `str`, but this does not prove that a
+        // value typed as `Any` has type `int & str`.
+        //
+        // Solved types alone cannot establish this: comparing `Any` against a generic parameter
+        // can succeed without constraining its type variables, while another argument supplies
+        // complete, static solutions for them. The constraint set does not currently record
+        // that those solutions still depend on gradual assignability. Rejecting individual
+        // solutions during subtype revalidation can also discard a valid gradual alternative
+        // while keeping a static sibling.
+        //
+        // TODO: Track gradual evidence per alternative. Until then, use the merged fallback
+        // for the whole call when an inference-relevant relation involves gradual types.
+        // A gradual argument unrelated to inference does not change the solutions, so it need
+        // not prevent intersecting their returns.
         let relations: Vec<_> = self
             .argument_relations()
             .map(|relation| {
                 let contributes_to_inference = [relation.declared_type, relation.argument_type]
                     .into_iter()
                     .any(mentions_inferable);
-                // TODO: Track gradual evidence per alternative. Assignability can discard
-                // constraints through a gradual member, even when another argument solves all
-                // variables. Unrelated gradual arguments do not affect this inference.
                 if contributes_to_inference
                     && (relation.argument_type.bottom_materialization(db, env)
                         != relation.argument_type.top_materialization(db, env)
@@ -6098,23 +6139,18 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         let mut returns = Vec::with_capacity(alternatives.len());
         let mut budget = ProjectionTypeBudget::new(SolutionBudget::default().type_terms);
         for types in alternatives {
-            // An incomplete sibling can describe a valid return alternative. Do not silently
-            // drop it just because other specializations have fully inferred return types.
-            // TODO: Have solution extraction distinguish unresolved dependencies from closed
-            // mappings. `Some` can still contain another inferable variable; applying defaults
-            // could hide that missing evidence, or a cycle such as A = R, R = A.
-            if return_variables
+            if types
                 .iter()
-                .any(|&(index, _)| types[index].is_none_or(mentions_inferable))
-                || types
-                    .iter()
-                    .flatten()
-                    .any(|ty| ty.bottom_materialization(db, env) != ty.top_materialization(db, env))
+                .filter_map(|binding| binding.and_then(resolved_type))
+                .any(|ty| ty.bottom_materialization(db, env) != ty.top_materialization(db, env))
             {
                 return None;
             }
 
-            let specialization = generic_context.specialize_recursive(db, types.iter().copied());
+            let specialization = generic_context.specialize_recursive(
+                db,
+                types.iter().map(|binding| binding.and_then(resolved_type)),
+            );
             // TODO: Remove revalidation once constraint generation and solution selection
             // guarantee the original argument relations. Inference currently drops `None`
             // from `list[int] | None` against `list[T]`, and can infer `T = str` from
