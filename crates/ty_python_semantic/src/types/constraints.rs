@@ -2010,7 +2010,7 @@ impl<'db> ConstraintBound<'db> {
         Self::Validity(Type::object())
     }
 
-    pub(super) fn ty(self) -> Type<'db> {
+    fn ty(self) -> Type<'db> {
         match self {
             Self::Validity(ty) | Self::Evidence(ty) => ty,
         }
@@ -2165,7 +2165,7 @@ impl<'db> UpperBound<'db> {
         self.evidence.is_empty() && self.validity.is_empty()
     }
 
-    pub(super) fn iter_evidence(&self) -> impl Iterator<Item = ConstraintBound<'db>> + Clone + '_ {
+    fn iter_evidence(&self) -> impl Iterator<Item = ConstraintBound<'db>> + Clone + '_ {
         self.evidence.iter().copied().map(ConstraintBound::Evidence)
     }
 
@@ -3926,9 +3926,21 @@ impl<'db> PathBound<'db> {
         }
     }
 
+    /// Allows tests to construct conflicting bounds that relation construction would reject.
+    #[cfg(test)]
+    pub(crate) fn with_upper_evidence(mut self, upper: Type<'db>) -> Self {
+        self.upper = UpperBound::from_clause(upper);
+        self
+    }
+
     /// Returns lower-bound inference evidence without supplying a default for a missing bound.
     pub(crate) fn evidence_lower(&self) -> Option<Type<'db>> {
         self.evidence_lower
+    }
+
+    /// Returns upper-bound inference evidence without including validity requirements.
+    pub(crate) fn iter_upper_evidence(&self) -> impl Iterator<Item = Type<'db>> + Clone + '_ {
+        self.upper.iter_evidence().map(ConstraintBound::ty)
     }
 
     /// Returns one effective upper bound without expanding factored intersections.
