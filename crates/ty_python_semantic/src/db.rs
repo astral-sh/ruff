@@ -149,7 +149,7 @@ pub(crate) mod tests {
     }
 
     impl TestDb {
-        fn new() -> Self {
+        fn new(recording_mode: PlaceLoadRecordingMode) -> Self {
             let events = Events::default();
             let vendored = ty_vendored::file_system().clone();
             let program_settings = ProgramSettings::empty(&vendored);
@@ -171,7 +171,7 @@ pub(crate) mod tests {
                 open_files: rustc_hash::FxHashSet::default(),
                 program_settings,
             };
-            initialize_place_load_recording(&db, PlaceLoadRecordingMode::default());
+            initialize_place_load_recording(&db, recording_mode);
             db
         }
 
@@ -188,6 +188,24 @@ pub(crate) mod tests {
         /// This is untracked state: open a file before running any queries.
         pub(crate) fn open_file(&mut self, file: File) {
             self.open_files.insert(file);
+        }
+
+        pub(crate) fn enable_place_load_recording(&mut self, file: File) {
+            super::enable_place_load_recording(self, [file]);
+        }
+
+        pub(crate) fn set_place_load_recording(&mut self, file: File, enabled: bool) {
+            let recording = PlaceLoadRecording::get(self);
+            let mut files = recording.files(self).clone();
+            let changed = if enabled {
+                files.insert(file)
+            } else {
+                files.remove(&file)
+            };
+            if changed {
+                files.shrink_to_fit();
+                recording.set_files(self).to(files);
+            }
         }
 
         /// Takes the salsa events.
@@ -309,6 +327,7 @@ pub(crate) mod tests {
         files: Vec<(&'a str, &'a str)>,
         /// Whether module resolution should include packages from the synthetic virtual environment.
         third_party_packages: bool,
+        recording_mode: PlaceLoadRecordingMode,
     }
 
     impl<'a> TestDbBuilder<'a> {
@@ -319,11 +338,20 @@ pub(crate) mod tests {
                 src_roots: vec![SystemPathBuf::from("/src")],
                 files: vec![],
                 third_party_packages: false,
+                recording_mode: PlaceLoadRecordingMode::default(),
             }
         }
 
         pub(crate) fn with_python_version(mut self, version: PythonVersion) -> Self {
             self.python_version = version;
+            self
+        }
+
+        pub(crate) fn with_place_load_recording_mode(
+            mut self,
+            mode: PlaceLoadRecordingMode,
+        ) -> Self {
+            self.recording_mode = mode;
             self
         }
 
@@ -356,7 +384,7 @@ pub(crate) mod tests {
         }
 
         pub(crate) fn build(self) -> anyhow::Result<TestDb> {
-            let mut db = TestDb::new();
+            let mut db = TestDb::new(self.recording_mode);
 
             for src_root in &self.src_roots {
                 db.memory_file_system().create_directory_all(src_root)?;

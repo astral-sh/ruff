@@ -585,10 +585,6 @@ impl<'db, 'ast> PlaceLoadResolution<'db, 'ast> {
         }
     }
 
-    #[allow(
-        dead_code,
-        reason = "place-load recording in inference consumes this state"
-    )]
     pub(crate) fn crosses_scope_declaration(&self) -> bool {
         self.crosses_scope_declaration
     }

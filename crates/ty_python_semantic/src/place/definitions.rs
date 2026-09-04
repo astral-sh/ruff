@@ -1,8 +1,3 @@
-#![allow(
-    dead_code,
-    reason = "definition-resolution metadata and its builder are retained for inference and IDE consumers"
-)]
-
 use smallvec::SmallVec;
 use ty_python_core::definition::{Definition, DefinitionKind, DefinitionState};
 use ty_python_core::scope::ScopeId;
@@ -34,6 +29,10 @@ pub(crate) struct DefinitionResolution<'db> {
     crosses_scope_declaration: bool,
 }
 
+#[allow(
+    dead_code,
+    reason = "definition-resolution metadata is retained for IDE consumers"
+)]
 impl<'db> DefinitionResolution<'db> {
     /// Returns the definitions found by name resolution.
     pub(crate) fn definitions(&self) -> &[Definition<'db>] {

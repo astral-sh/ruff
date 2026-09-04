@@ -753,6 +753,14 @@ pub(crate) mod testing {
 
     impl TestDb {
         pub fn new(project: ProjectMetadata) -> Self {
+            Self::with_place_load_recording_mode(project, PlaceLoadRecordingMode::default())
+        }
+
+        /// Creates a test database with the given recording policy.
+        fn with_place_load_recording_mode(
+            project: ProjectMetadata,
+            recording_mode: PlaceLoadRecordingMode,
+        ) -> Self {
             let events = Events::default();
             let uv_environments = UvEnvironments::new(project.use_uv());
             let mut db = Self {
@@ -771,10 +779,7 @@ pub(crate) mod testing {
                 project: None,
             };
 
-            ty_python_semantic::initialize_place_load_recording(
-                &db,
-                PlaceLoadRecordingMode::default(),
-            );
+            ty_python_semantic::initialize_place_load_recording(&db, recording_mode);
 
             let (settings, settings_diagnostics) = project
                 .to_merged_options()
@@ -958,6 +963,27 @@ mod tests {
     use crate::db::testing::TestDb;
     use crate::watch::ChangeEvent;
     use crate::{Db, ProjectDatabase, ProjectMetadata, UseUv};
+
+    #[test]
+    fn place_load_recording_defaults_to_disabled() {
+        let system = TestSystem::default();
+        system
+            .memory_file_system()
+            .write_file_all(
+                "/project/test.py",
+                r#"
+value = 1
+result = value
+"#,
+            )
+            .expect("write recording fixture");
+        let metadata = ProjectMetadata::new("recording", SystemPathBuf::from("/project"));
+        let mut db = ProjectDatabase::fallible(metadata, system).expect("valid test project");
+        let file = system_path_to_file(&db, "/project/test.py").expect("fixture exists");
+        ty_python_semantic::enable_place_load_recording(&mut db, [file]);
+        assert!(!ty_python_semantic::should_record_place_loads(&db, file));
+        assert!(db.check_file(file).is_empty());
+    }
 
     #[test]
     fn checks_use_available_script_environment_without_running_uv() -> anyhow::Result<()> {
