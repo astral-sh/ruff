@@ -132,15 +132,16 @@ use crate::types::unpacker::{
 };
 use crate::types::{
     BindingContext, BoundTypeVarInstance, CallDunderError, CallableBinding, CallableType,
-    CallableTypes, ClassType, CycleOwner, CycleSlot, DeferredOperations, DynamicType,
-    GeneratorTypeMode, InferenceFlags, InternedType, IntersectionBuilder, IntersectionType,
-    KnownBoundMethodType, KnownClass, KnownInstanceType, KnownUnion, LiteralValueType,
-    LiteralValueTypeKind, MemberLookupPolicy, Operation, ParamSpecAttrKind, Parameter, Parameters,
-    ProgramEnvironment, PropertyDeprecations, SentinelInstance, Signature, SpecialFormType,
-    SubclassOfType, Type, TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers,
-    TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, TypingModule, UnionAccumulator,
-    UnionBuilder, UnionType, binding_type, extract_fixed_length_iterable_element_types,
-    infer_complete_scope_types, infer_scope_types, is_discarded_dict_key_assignment, todo_type,
+    CallableTypes, ClassType, CycleOwner, CycleResolver, CycleSlot, DeferredOperations,
+    DynamicType, GeneratorTypeMode, InferenceFlags, InternedType, IntersectionBuilder,
+    IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, KnownUnion,
+    LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy, Operation, ParamSpecAttrKind,
+    Parameter, Parameters, ProgramEnvironment, PropertyDeprecations, SentinelInstance, Signature,
+    SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeAndQualifiers, TypeContext,
+    TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, TypingModule,
+    UnionAccumulator, UnionBuilder, UnionType, binding_type,
+    extract_fixed_length_iterable_element_types, infer_complete_scope_types, infer_scope_types,
+    is_discarded_dict_key_assignment, opaque_passthrough, resolve_cycle_variables, todo_type,
 };
 use crate::{AnalysisSettings, Db, DisplaySettings, FxIndexSet, FxOrderSet, SemanticModel};
 use ty_python_core::definition::{
@@ -5293,9 +5294,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.symbolic.insert(slot, constraints.finish(db, result));
         }
 
+        let operands = std::iter::once(target_type).chain(
+            self.expressions
+                .get(&ExpressionNodeKey::from(value))
+                .copied(),
+        );
+        let opaque = |ty| opaque_passthrough(self.db(), self.program_environment(), operands, ty);
         match (target_result, operation_result) {
-            (Ok(_), Ok(result_ty)) => Ok(result_ty),
-            (_, Ok(recovery_ty) | Err(recovery_ty)) => Err(recovery_ty),
+            (Ok(_), Ok(result_ty)) => Ok(opaque(result_ty)),
+            (_, Ok(recovery_ty) | Err(recovery_ty)) => Err(opaque(recovery_ty)),
         }
     }
 
@@ -9451,7 +9458,30 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) -> Type<'db> {
         let callable_type = self.infer_callee(&call_expression.func);
 
-        self.infer_call_expression_impl(call_expression, callable_type, tcx)
+        let result = self.infer_call_expression_impl(call_expression, callable_type, tcx);
+        // Calling a value whose type is still being inferred returns the same marker, which would
+        // then name the callee rather than the call's result. The same holds for an argument
+        // whose marker a return type repeats.
+        let db = self.db();
+        let arguments = &call_expression.arguments;
+        let argument_types: Vec<_> = arguments
+            .args
+            .iter()
+            .map(ExpressionNodeKey::from)
+            .chain(
+                arguments
+                    .keywords
+                    .iter()
+                    .map(|keyword| ExpressionNodeKey::from(&keyword.value)),
+            )
+            .filter_map(|argument| self.expressions.get(&argument).copied())
+            .collect();
+        opaque_passthrough(
+            db,
+            self.program_environment(),
+            std::iter::once(callable_type).chain(argument_types),
+            result,
+        )
     }
 
     /// Infer a callable expression without introducing new type variable bindings.
@@ -11923,9 +11953,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             },
         );
         self.report_deprecated_functions(unary, deprecated_functions);
-        match result {
+        let result = match result {
             Ok(ty) | Err(ty) => ty,
-        }
+        };
+        opaque_passthrough(
+            self.db(),
+            self.program_environment(),
+            [operand_type],
+            result,
+        )
     }
 
     fn infer_boolean_expression(
@@ -12126,6 +12162,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 });
 
+                let ty =
+                    opaque_passthrough(db, builder.program_environment(), [left_ty, right_ty], ty);
                 last_comparison_ty = ty;
                 (ty, range)
             },
@@ -12174,6 +12212,41 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.into_expression_inference()
     }
 
+    /// Substitutes the values of the cycle variables that the current cycle iteration determines
+    /// for their markers in the region's outputs.
+    ///
+    /// `root` is the value the region's own root marker stands for: the main output of a
+    /// definition or expression region. Statement and scope regions have no single main output.
+    fn resolve_cycle_markers(&mut self, root: Option<Type<'db>>) {
+        let db = self.db();
+        let env = self.program_environment();
+        let outputs = self
+            .bindings
+            .iter()
+            .map(|(_, ty)| *ty)
+            .chain(self.declarations.iter().map(|(_, ty)| ty.inner_type()))
+            .chain(self.expressions.values().copied());
+        let resolver = CycleResolver::new(
+            db,
+            env,
+            CycleOwner::Region(self.region),
+            self.equations.equations(),
+            root,
+        );
+        let Some(solution) = resolver.solve(outputs) else {
+            return;
+        };
+        for (_, ty) in &mut self.bindings.0 {
+            *ty = resolve_cycle_variables(db, env, &solution, *ty);
+        }
+        for (_, declared) in &mut self.declarations.0 {
+            *declared = declared.map_type(db, |ty| resolve_cycle_variables(db, env, &solution, ty));
+        }
+        self.expressions
+            .values_mut()
+            .for_each(|ty| *ty = resolve_cycle_variables(db, env, &solution, *ty));
+    }
+
     fn resolve_symbolic_bindings(&mut self) {
         let db = self.db();
         let env = self.program_environment();
@@ -12198,6 +12271,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn into_expression_inference(mut self) -> ExpressionInference<'db> {
         self.resolve_symbolic_bindings();
         let db = self.db();
+        let root = match self.region {
+            InferenceRegion::Expression(expression, _) => self
+                .expressions
+                .get(&ExpressionNodeKey::from(expression.node_ref(db)))
+                .copied(),
+            _ => None,
+        };
+        self.resolve_cycle_markers(root);
         let env = self.program_environment();
         if let InferenceRegion::Expression(expression, _) = self.region {
             let key = ExpressionNodeKey::from(expression.node_ref(db));
@@ -12289,6 +12370,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     pub(super) fn finish_statement(mut self) -> StatementInferenceInner<'db> {
         self.infer_region();
         self.resolve_symbolic_bindings();
+        self.resolve_cycle_markers(None);
 
         let Self {
             context,
@@ -12467,6 +12549,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         definition: Definition<'db>,
     ) -> DefinitionInference<'db> {
         self.resolve_symbolic_bindings();
+        let root = self
+            .bindings
+            .iter()
+            .find_map(|(bound, ty)| (*bound == definition).then_some(*ty))
+            .or_else(|| {
+                self.declarations
+                    .iter()
+                    .find_map(|(declared, ty)| (*declared == definition).then_some(ty.inner_type()))
+            });
+        self.resolve_cycle_markers(root);
         let Self {
             context,
             expressions,
@@ -12613,6 +12705,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     pub(super) fn finish_scope(mut self) -> ScopeInference<'db> {
         self.infer_region();
+        self.resolve_cycle_markers(None);
 
         let Self {
             context,

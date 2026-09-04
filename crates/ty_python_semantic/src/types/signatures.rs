@@ -181,14 +181,10 @@ impl<'db> CallableSignature<'db> {
         Self::single(Signature::bottom())
     }
 
-    pub(crate) fn cycle_initial(
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        id: salsa::Id,
-    ) -> Self {
+    pub(crate) fn cycle_initial(db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Self {
         Self::single(Signature::new(
             Parameters::bottom(),
-            Type::divergent(db, id).bottom_materialization(db, env),
+            Type::divergent().bottom_materialization(db, env),
         ))
     }
 
@@ -5844,7 +5840,7 @@ impl<'db> ParameterDefault<'db> {
 
 #[salsa::tracked(
     returns(copy),
-    cycle_initial=|db, id, _| Type::divergent(db, id),
+    cycle_initial=|db, id, _| Type::divergent_head(db, id),
     cycle_fn=|db, cycle, previous: &Type<'db>, ty: Type<'db>, parameter: Definition<'db>| {
         ty.cycle_normalized(db, &ProgramEnvironment::from_definition(parameter), *previous, cycle)
     },

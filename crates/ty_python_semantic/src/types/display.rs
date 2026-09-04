@@ -33,10 +33,10 @@ use crate::types::typevar::BoundTypeVarIdentity;
 use crate::types::visitor::TypeVisitor;
 use crate::types::{
     CallableType, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
-    KnownUnion, LiteralValueType, LiteralValueTypeKind, MaterializationKind, PropertyInstanceClass,
-    PropertyInstanceType, Protocol, SpecialFormType, StringLiteralType, SubclassOfInner,
-    SubclassOfType, Type, TypeAliasType, TypeGuardLike, TypedDictType, TypingModule, UnionType,
-    WrapperDescriptorKind, visitor,
+    KnownUnion, LiteralValueType, LiteralValueTypeKind, MarkerErasure, MaterializationKind,
+    PropertyInstanceClass, PropertyInstanceType, Protocol, SpecialFormType, StringLiteralType,
+    SubclassOfInner, SubclassOfType, Type, TypeAliasType, TypeGuardLike, TypedDictType,
+    TypingModule, UnionType, WrapperDescriptorKind, visitor,
 };
 use ty_python_core::ProgramFile;
 use ty_python_core::definition::Definition;
@@ -3004,7 +3004,17 @@ impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
         }
         let db = self.db;
 
-        let elements = self.ty.elements(db);
+        // Markers of different cycle heads display the same, so elements that differ only in
+        // their markers would print as duplicates.
+        let mut elements: Vec<Type<'db>> = Vec::new();
+        for element in self.ty.elements(db).iter().copied() {
+            if !elements.iter().any(|shown| {
+                shown.equals_modulo_cycle_markers(db, self.env, element, MarkerErasure::All)
+            }) {
+                elements.push(element);
+            }
+        }
+        let elements = &elements;
         let numeric_tower = matches!(
             self.settings.numeric_tower_display,
             NumericTowerDisplay::Canonical

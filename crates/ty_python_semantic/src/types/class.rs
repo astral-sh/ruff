@@ -625,6 +625,51 @@ impl<'db> ClassLiteral<'db> {
         }
     }
 
+    /// Calls `f` on every type a dynamically created class is built from: its members, bases,
+    /// fields, or enum values. A class defined by a `class` statement is built from none.
+    ///
+    /// Cycle recovery normalizes these types, so cycle markers inside them must be found by
+    /// the searches that decide what recovery cuts.
+    pub(crate) fn walk_dynamic_types(self, db: &'db dyn Db, f: &mut dyn FnMut(Type<'db>)) {
+        match self {
+            Self::Static(_) => {}
+            Self::Dynamic(class) => {
+                if let DynamicClassAnchor::ScopeOffset { explicit_bases, .. } = class.anchor(db) {
+                    explicit_bases.iter().copied().for_each(&mut *f);
+                }
+                class.members(db).iter().for_each(|(_, ty)| f(*ty));
+            }
+            Self::DynamicNamedTuple(class) => {
+                let spec = match class.anchor(db) {
+                    DynamicNamedTupleAnchor::CollectionsDefinition { spec, .. }
+                    | DynamicNamedTupleAnchor::ScopeOffset { spec, .. } => *spec,
+                    DynamicNamedTupleAnchor::TypingDefinition(_) => return,
+                };
+                for field in spec.fields(db) {
+                    f(field.ty);
+                    if let Some(default) = field.default {
+                        f(default);
+                    }
+                }
+            }
+            Self::DynamicTypedDict(class) => {
+                if let DynamicTypedDictAnchor::ScopeOffset { schema, .. } = class.anchor(db) {
+                    schema.values().for_each(|field| f(field.declared_ty));
+                }
+            }
+            Self::DynamicEnum(class) => {
+                let spec = match class.anchor(db) {
+                    DynamicEnumAnchor::Definition { spec, .. }
+                    | DynamicEnumAnchor::ScopeOffset { spec, .. } => *spec,
+                };
+                spec.members(db).iter().for_each(|(_, ty)| f(*ty));
+                if let Some(mixin) = class.mixin_type(db) {
+                    f(mixin);
+                }
+            }
+        }
+    }
+
     /// Returns the name of the class.
     pub(crate) fn name(self, db: &'db dyn Db) -> &'db ast::name::Name {
         match self {

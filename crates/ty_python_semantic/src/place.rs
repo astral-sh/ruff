@@ -1219,7 +1219,7 @@ impl<'db> From<Place<'db>> for PlaceAndQualifiers<'db> {
 
 #[salsa::tracked(
     returns(copy),
-    cycle_initial=|db, id, _, _, _, _| Place::bound(Type::divergent(db, id)).into(),
+    cycle_initial=|db, id, _, _, _, _| Place::bound(Type::divergent_head(db, id)).into(),
     cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, place: PlaceAndQualifiers<'db>, scope: ScopeId<'db>, _, _, _| {
         let env = ProgramEnvironment::from_scope(scope);
         place.cycle_normalized(db, &env, *previous, cycle)

@@ -48,8 +48,9 @@ use crate::types::set_theoretic::expand_intersection_typevars_and_newtypes;
 use crate::types::visitor::any_over_type;
 use crate::types::{
     BytesLiteralType, ClassLiteral, EnumLiteralType, IntersectionType, KnownClass,
-    KnownInstanceType, LiteralValueType, LiteralValueTypeKind, NegativeIntersectionElements,
-    StringLiteralType, SubclassOfType, Type, TypePair, TypeVarBoundOrConstraints, UnionType,
+    KnownInstanceType, LiteralValueType, LiteralValueTypeKind, MarkerErasure,
+    NegativeIntersectionElements, StringLiteralType, SubclassOfType, Type, TypePair,
+    TypeVarBoundOrConstraints, UnionType,
 };
 use crate::{Db, FxOrderMap, FxOrderSet, ProgramEnvironment};
 use rustc_hash::FxHashSet;
@@ -1017,6 +1018,13 @@ impl<'db> UnionBuilder<'db> {
             };
 
             if ty == element_type {
+                return;
+            }
+
+            // An element that differs only in which cycle heads its markers belong to is the
+            // same provisional value seen from another query or iteration.
+            if ty.equals_modulo_cycle_markers(db, &self.env, element_type, MarkerErasure::KeepHeads)
+            {
                 return;
             }
 

@@ -445,6 +445,8 @@ impl<'db> KnownInstanceType<'db> {
                 | TypeMapping::Materialize(_)
                 | TypeMapping::ReplaceParameterDefaults
                 | TypeMapping::EagerExpansion
+                | TypeMapping::ResolveCycleVariables(_)
+                | TypeMapping::EraseCycleMarkers(_)
                 | TypeMapping::RescopeReturnCallables(_) => Type::KnownInstance(self),
             },
             KnownInstanceType::UnionType(instance) => {

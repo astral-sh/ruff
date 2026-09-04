@@ -22,9 +22,9 @@ use crate::types::tuple::{
     VariableLengthTuple,
 };
 use crate::types::{
-    CycleEquations, CycleOwner, CycleSlot, DeferredOperations, InferencePromotion, KnownClass,
-    Operation, Type, TypeCheckDiagnostics, TypeContext, UnionBuilder, UnionType,
-    cycle_normalized_equations, infer_expression_types,
+    CycleEquations, CycleOwner, CycleResolver, CycleSlot, DeferredOperations, InferencePromotion,
+    KnownClass, Operation, Type, TypeCheckDiagnostics, TypeContext, UnionBuilder, UnionType,
+    cycle_normalized_equations, infer_expression_types, resolve_cycle_variables,
 };
 use ty_python_core::ExpressionNodeKey;
 use ty_python_core::unpack::{Unpack, UnpackKind, UnpackValue};
@@ -470,6 +470,24 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                 self.symbolic.insert(target, symbolic);
             }
         }
+        // The unpacking's root marker stands for whichever target it reached, so no target can
+        // treat it as its own value; cycle recovery removes it instead.
+        let resolved: Vec<_> = self
+            .targets
+            .iter()
+            .filter_map(|(target, ty)| {
+                let resolver = CycleResolver::new(
+                    db,
+                    env,
+                    CycleOwner::Unpack(self.unpack),
+                    self.equations.equations(),
+                    None,
+                );
+                let solution = resolver.solve([*ty])?;
+                Some((*target, resolve_cycle_variables(db, env, &solution, *ty)))
+            })
+            .collect();
+        self.targets.extend(resolved);
         UnpackResult {
             unpack: self.unpack,
             diagnostics: self.context.finish(),
@@ -540,6 +558,11 @@ impl<'db> UnpackResult<'db> {
     /// Returns the diagnostics in this unpacking assignment.
     pub(crate) fn diagnostics(&self) -> &TypeCheckDiagnostics {
         &self.diagnostics
+    }
+
+    /// The operations deferred while unpacking.
+    pub(crate) fn equations(&self) -> &CycleEquations<'db> {
+        &self.equations
     }
 
     pub(crate) fn cycle_initial(unpack: Unpack<'db>, cycle_recovery: Type<'db>) -> Self {

@@ -188,7 +188,7 @@ fn oscillating_generic_alias_cycle_recover<'db>(
 
 #[salsa::tracked(
     returns(copy),
-    cycle_initial=|db, id, _| Type::divergent(db, id),
+    cycle_initial=|db, id, _| Type::divergent_head(db, id),
     cycle_fn=oscillating_generic_alias_cycle_recover,
 )]
 fn oscillating_generic_alias<'db>(db: &'db dyn Db, program: Program<'db>) -> Type<'db> {
@@ -278,7 +278,7 @@ fn divergent_type() {
     let db = setup_db();
     let db = &db;
     let env = db.program_environment();
-    let div = Type::divergent(db, salsa::plumbing::Id::from_bits(1));
+    let div = Type::divergent();
     assert!(div.is_dynamic());
     assert!(div.has_dynamic(db, &env));
     let visitor = ApplyTypeMappingVisitor::new(&env);
@@ -556,7 +556,7 @@ fn unrestricted_tuple_materialization_absorbs_divergent_approximations() {
     let db = setup_db();
     let db = &db;
     let env = db.program_environment();
-    let div = Type::divergent(db, salsa::plumbing::Id::from_bits(1));
+    let div = Type::divergent();
     let list_of = |tuple| KnownClass::List.to_specialized_instance(db, &env, &[tuple]);
     let approximation = |element| list_of(Type::heterogeneous_tuple(db, &env, [element]));
     let top = list_of(Type::homogeneous_tuple(db, &env, Type::any())).top_materialization(db, &env);

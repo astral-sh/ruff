@@ -1561,11 +1561,11 @@ impl<'db> FunctionType<'db> {
     /// would depend on the function's AST and rerun for every change in that file.
     #[salsa::tracked(
         returns(ref),
-        cycle_initial=|db, id, function: FunctionType<'db>| {
+        cycle_initial=|db, _, function: FunctionType<'db>| {
             let env = ProgramEnvironment::from_scope(
                 function.literal(db).last_definition.body_scope(db),
             );
-            CallableSignature::cycle_initial(db, &env, id)
+            CallableSignature::cycle_initial(db, &env)
         },
         cycle_fn=|db, cycle, previous, value: CallableSignature<'db>, function: FunctionType<'db>| {
             let env = ProgramEnvironment::from_scope(

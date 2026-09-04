@@ -239,9 +239,9 @@ impl Ty {
         match self {
             Ty::Never => Type::Never,
             Ty::Unknown => Type::unknown(),
-            Ty::Divergent => divergent(db, env, 1, None),
-            Ty::TopDivergent => divergent(db, env, 2, Some(MaterializationKind::Top)),
-            Ty::BottomDivergent => divergent(db, env, 3, Some(MaterializationKind::Bottom)),
+            Ty::Divergent => divergent(db, env, None),
+            Ty::TopDivergent => divergent(db, env, Some(MaterializationKind::Top)),
+            Ty::BottomDivergent => divergent(db, env, Some(MaterializationKind::Bottom)),
             Ty::None => Type::none(db, env),
             Ty::Any => Type::any(),
             Ty::IntLiteral(n) => Type::int_literal(n),
@@ -363,10 +363,9 @@ impl Ty {
 fn divergent<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
-    id_bits: u64,
     materialization: Option<MaterializationKind>,
 ) -> Type<'db> {
-    let divergent = Type::divergent(db, salsa::plumbing::Id::from_bits(id_bits));
+    let divergent = Type::divergent();
 
     match materialization {
         Some(materialization_kind) => {

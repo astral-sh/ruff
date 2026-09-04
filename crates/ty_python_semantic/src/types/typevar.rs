@@ -690,7 +690,7 @@ impl<'db> TypeVarInstance<'db> {
 
     /// Returns the "unchecked" default type of a type variable instance.
     /// `lazy_default` checks if the default type is not self-referential.
-    #[salsa::tracked(returns(copy), cycle_initial=|db, id, _| Some(Type::divergent(db, id)), cycle_fn=lazy_default_cycle_recover, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| Some(Type::divergent()), cycle_fn=lazy_default_cycle_recover, heap_size=ruff_memory_usage::heap_size)]
     fn lazy_default_unchecked(self, db: &'db dyn Db) -> Option<Type<'db>> {
         fn convert_type_to_paramspec_value<'db>(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
             let parameters = match ty {
@@ -1419,6 +1419,8 @@ impl<'db> BoundTypeVarInstance<'db> {
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::EagerExpansion
+            | TypeMapping::ResolveCycleVariables(_)
+            | TypeMapping::EraseCycleMarkers(_)
             | TypeMapping::RescopeReturnCallables(_) => Type::TypeVar(self),
             TypeMapping::Materialize(materialization_kind) => {
                 if visitor.materialize_typevar_bounds_and_defaults {
@@ -1911,7 +1913,7 @@ impl<'db> TypeVarSet<'db> {
 
 #[salsa::tracked(
     returns(copy),
-    cycle_initial=|db, id, _| Some(Type::divergent(db, id)),
+    cycle_initial=|_, _, _| Some(Type::divergent()),
     cycle_fn=bound_typevar_default_type_cycle_recover,
     heap_size=ruff_memory_usage::heap_size
 )]

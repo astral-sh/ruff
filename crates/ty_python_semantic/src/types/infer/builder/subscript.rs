@@ -1,3 +1,4 @@
+use crate::types::opaque_passthrough;
 use itertools::{Either, EitherOrBoth, Itertools};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span};
 use ruff_db::parsed::parsed_module;
@@ -494,6 +495,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 )
             })
             .map(|ty| {
+                // A key whose type is still being inferred can pass through as the result too.
+                let ty = opaque_passthrough(db, env, [slice_ty], ty);
                 self.equations.defer_passthrough(
                     db,
                     env,

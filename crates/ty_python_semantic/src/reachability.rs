@@ -241,7 +241,7 @@ use ty_python_core::{
 /// same intersections.
 #[salsa::tracked(
     returns(copy),
-    cycle_initial = |db, id, _, _| Type::divergent(db, id),
+    cycle_initial = |db, _, predicate: PatternPredicate<'db>, ty: Type<'db>| Type::divergent_for_key(db, &ProgramEnvironment::from_scope(predicate.subject(db).scope(db)), [ty]),
     cycle_fn = |db: &'db dyn Db, cycle, previous: &Type<'db>, result: Type<'db>, predicate: PatternPredicate<'db>, _| {
         let env = ProgramEnvironment::from_scope(predicate.subject(db).scope(db));
         result.cycle_normalized(db, &env, *previous, cycle)
@@ -272,7 +272,7 @@ pub(crate) fn type_narrowed_by_previous_patterns<'db>(
 /// This result is also the preceding-pattern prefix for the next unguarded case.
 #[salsa::tracked(
     returns(copy),
-    cycle_initial = |db, id, _, _| Type::divergent(db, id),
+    cycle_initial = |db, _, predicate: PatternPredicate<'db>, ty: Type<'db>| Type::divergent_for_key(db, &ProgramEnvironment::from_scope(predicate.subject(db).scope(db)), [ty]),
     cycle_fn = |db: &'db dyn Db, cycle, previous: &Type<'db>, result: Type<'db>, predicate: PatternPredicate<'db>, _| {
         let env = ProgramEnvironment::from_scope(predicate.subject(db).scope(db));
         result.cycle_normalized(db, &env, *previous, cycle)
@@ -1012,7 +1012,7 @@ impl<'db> ProjectedNarrowingCheckpoint<'db> {
 /// when simplifying a join requires their predicates.
 #[salsa::tracked(
     returns(copy),
-    cycle_initial = |db, id, _, _, _, _| ProjectedNarrowingCheckpoint::Narrowed(Type::divergent(db, id)),
+    cycle_initial = |db, _, scope: ScopeId<'db>, _, _, base_ty: Type<'db>| ProjectedNarrowingCheckpoint::Narrowed(Type::divergent_for_key(db, &ProgramEnvironment::from_scope(scope), [base_ty])),
     cycle_fn = |db: &'db dyn Db, cycle, previous: &ProjectedNarrowingCheckpoint<'db>, result: ProjectedNarrowingCheckpoint<'db>, scope: ScopeId<'db>, _, _, base_ty| {
         match result {
             ProjectedNarrowingCheckpoint::Narrowed(ty) => ProjectedNarrowingCheckpoint::Narrowed(

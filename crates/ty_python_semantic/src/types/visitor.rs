@@ -47,6 +47,14 @@ pub(crate) trait TypeVisitor<'db> {
     /// Notify the visitor that lazily-inferred type attributes were not visited.
     fn notify_skipped_lazy_type_attributes(&self) {}
 
+    /// Should the visitor visit the types a dynamically created class is built from?
+    ///
+    /// Most walks treat a class literal as atomic; searches for cycle markers must look inside,
+    /// because cycle recovery normalizes those types.
+    fn should_visit_dynamic_class_members(&self) -> bool {
+        false
+    }
+
     fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>);
 
     fn visit_union_type(&self, db: &'db dyn Db, union: UnionType<'db>) {
@@ -330,6 +338,13 @@ pub(crate) fn walk_type_with_recursion_guard<'db>(
     visitor: &impl TypeVisitor<'db>,
     recursion_guard: &TypeCollector<'db>,
 ) {
+    if visitor.should_visit_dynamic_class_members()
+        && let Type::ClassLiteral(class) = ty
+        && !recursion_guard.type_was_already_seen(ty)
+    {
+        class.walk_dynamic_types(db, &mut |member| visitor.visit_type(db, member));
+        return;
+    }
     match TypeKind::from(ty) {
         TypeKind::Atomic => {}
         TypeKind::NonAtomic(non_atomic_type) => {
@@ -753,6 +768,9 @@ enum TypeSearchMode {
     IncludeLazyAttributes,
     /// Visit alias arguments without evaluating alias bodies or other lazy attributes.
     IncludeAliasArguments,
+    /// Search for cycle markers: skip lazy attributes, but look inside dynamically created
+    /// classes.
+    CycleMarkers,
 }
 
 impl TypeSearchMode {
@@ -795,6 +813,10 @@ where
 
         fn should_visit_lazy_type_attributes(&self) -> bool {
             self.mode.should_visit_lazy_type_attributes()
+        }
+
+        fn should_visit_dynamic_class_members(&self) -> bool {
+            matches!(self.mode, TypeSearchMode::CycleMarkers)
         }
 
         fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
@@ -854,6 +876,17 @@ pub(super) fn any_over_type<'db>(
         TypeSearchMode::SkipLazyAttributes
     };
     any_over_type_impl(db, env, ty, mode, query)
+}
+
+/// Like [`any_over_type`] without lazy type attributes, but also searching the types that a
+/// dynamically created class is built from; see [`TypeVisitor::should_visit_dynamic_class_members`].
+pub(super) fn any_over_type_for_cycle_markers<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+    query: impl Fn(Type<'db>) -> bool,
+) -> bool {
+    any_over_type_impl(db, env, ty, TypeSearchMode::CycleMarkers, query)
 }
 
 /// Searches through the arguments of [`Type::TypeAlias`] without evaluating alias bodies or other
@@ -991,7 +1024,7 @@ mod tests {
     fn materialization_noop_rejects_divergent_markers() {
         let db = setup_db();
         let env = db.program_environment();
-        let divergent = Type::divergent(&db, salsa::plumbing::Id::from_bits(1));
+        let divergent = Type::divergent();
 
         for ty in [
             divergent,

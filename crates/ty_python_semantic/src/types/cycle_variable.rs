@@ -17,8 +17,8 @@ use crate::types::{MemberLookupKey, Type};
 /// The query whose result a cycle variable belongs to.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, salsa::SalsaValue)]
 pub(crate) enum CycleOwner<'db> {
-    /// A query identified only by its Salsa key. Its cycle marker is approximated by the
-    /// ordinary fixed-point iteration and is never resolved from the query's own result.
+    /// A query identified only by its Salsa key. Its marker is approximated by the ordinary
+    /// fixed-point iteration and is never resolved from the query's own result.
     Query(salsa::Id),
     Region(InferenceRegion<'db>),
     Member(MemberLookupKey<'db>, Option<Type<'db>>),
@@ -55,6 +55,10 @@ impl CycleHead {
 }
 
 /// A value whose type is still being inferred because its query is part of a cycle.
+///
+/// A root variable stands for the whole result of the query that seeded a cycle. A derived
+/// variable stands for the result of an operation the owning query deferred for one of its
+/// outputs, applied to the value of another variable; it belongs to that variable's cycle head.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub(crate) struct CycleVariable<'db> {
     #[returns(copy)]
@@ -86,6 +90,10 @@ impl<'db> CycleVariable<'db> {
         input: Self,
     ) -> Self {
         Self::new(db, input.head(db), owner, slot, Some(input))
+    }
+
+    pub(crate) fn is_root(self, db: &'db dyn Db) -> bool {
+        self.slot(db) == CycleSlot::Root
     }
 }
 

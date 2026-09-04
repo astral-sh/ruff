@@ -1,12 +1,14 @@
 //! Implicit instance and class attributes inferred from method assignments.
 
+use rustc_hash::FxHashMap;
+
 use super::{MethodDecorator, static_literal::StaticClassLiteral};
 use crate::{
     Db, ProgramEnvironment, TypeQualifiers, attribute_assignments, attribute_declarations,
-    place::{Place, Provenance},
+    place::{DefinedPlace, Place, Provenance, TypeOrigin},
     reachability::binding_reachability,
     types::{
-        CycleOwner, KnownClass, Truthiness, Type, TypeContext, UnionBuilder,
+        CycleOwner, CycleResolver, KnownClass, Truthiness, Type, TypeContext, UnionBuilder,
         definition_expression_type,
         function::{is_implicit_classmethod, is_implicit_staticmethod},
         infer::{
@@ -19,6 +21,7 @@ use crate::{
         },
         infer_expression_type, inferred_declaration,
         member::Member,
+        resolve_cycle_variables,
     },
 };
 use ruff_db::parsed::parsed_module;
@@ -101,13 +104,39 @@ impl<'db> StaticClassLiteral<'db> {
         db: &'db dyn Db,
         attribute: ImplicitAttributeName<'db>,
     ) -> ImplicitAttribute<'db> {
+        let env = ProgramEnvironment::from_scope(attribute.class_body_scope(db));
         let mut result = Self::implicit_attribute_impl(db, attribute);
-        result.member.inner.place = SymbolicType::bind_place(
-            db,
-            &ProgramEnvironment::from_scope(attribute.class_body_scope(db)),
-            attribute.owner(),
-            result.member.inner.place,
-        );
+        result.member.inner.place =
+            SymbolicType::bind_place(db, &env, attribute.owner(), result.member.inner.place);
+        if let Some(value) = result.member.inner.place.ignore_possibly_undefined() {
+            let local = FxHashMap::default();
+            let resolver = CycleResolver::new(
+                db,
+                &env,
+                CycleOwner::Attribute(attribute),
+                &local,
+                Some(value),
+            );
+            if let Some(solution) = resolver.solve([value]) {
+                // Resolved values are unpromoted binding types; an inferred attribute type
+                // promotes them like the bindings inferred directly.
+                let promote = matches!(
+                    result.member.inner.place,
+                    Place::Defined(DefinedPlace {
+                        origin: TypeOrigin::Inferred,
+                        ..
+                    })
+                );
+                result.member = result.member.map_type(db, |ty| {
+                    let ty = resolve_cycle_variables(db, &env, &solution, ty);
+                    if promote {
+                        ty.promote(db, &env).promote_singletons(db, &env)
+                    } else {
+                        ty
+                    }
+                });
+            }
+        }
         result
     }
 
@@ -393,6 +422,18 @@ impl<'db> ImplicitAttributeName<'db> {
     fn owner(self) -> InferenceOwner<'db> {
         InferenceOwner::Attribute(self)
     }
+}
+
+/// The current value of an implicit attribute, as its root cycle marker stands for it.
+pub(crate) fn implicit_attribute_value<'db>(
+    db: &'db dyn Db,
+    attribute: ImplicitAttributeName<'db>,
+) -> Option<Type<'db>> {
+    StaticClassLiteral::implicit_attribute_inner(db, attribute)
+        .member
+        .inner
+        .place
+        .ignore_possibly_undefined()
 }
 
 /// Infer the value written by an attribute definition, including unpacked and iteration targets.

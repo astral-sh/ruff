@@ -404,7 +404,10 @@ pub(crate) fn infer_scope_types<'db>(
     returns(ref),
     cycle_initial=|db, id, input: InferScope<'db>| {
         let (scope, tcx) = input.into_inner(db);
-        ScopeInference::cycle_initial(Type::divergent_root(db, id, CycleOwner::Region(InferenceRegion::Scope(scope, tcx))))
+        let env = ProgramEnvironment::from_scope(scope);
+        let transient = tcx.annotation.is_some_and(|annotation| annotation.mentions_cycle_marker(db, &env));
+        let root = if transient { Type::divergent_for_key(db, &env, tcx.annotation) } else { Type::divergent_root(db, id, CycleOwner::Region(InferenceRegion::Scope(scope, tcx))) };
+        ScopeInference::cycle_initial(root)
     },
     cycle_fn=|db, cycle, previous: &ScopeInference<'db>, inference: ScopeInference<'db>, input: InferScope<'db>| {
         let (scope, _) = input.into_inner(db);
@@ -504,12 +507,36 @@ fn expression_cycle_initial<'db>(
     input: InferExpression<'db>,
 ) -> ExpressionInference<'db> {
     let (expression, tcx) = input.into_inner(db);
-    let cycle_recovery = Type::divergent_root(
-        db,
-        id,
-        CycleOwner::Region(InferenceRegion::Expression(expression, tcx)),
-    );
+    let cycle_recovery = expression_cycle_root(db, id, expression, tcx);
     ExpressionInference::cycle_initial(db, expression, tcx, cycle_recovery)
+}
+
+/// The provisional type of an expression that is part of a cycle.
+///
+/// An expression inferred under a type context that mentions a cycle marker is transient: the
+/// marker stands for a value that is still changing, so a later iteration infers the expression
+/// under a different context. Giving such a query a root marker of its own would embed the
+/// identity of a transient query into the types the next iteration is keyed by, so it gets the
+/// marker that stands for no value.
+fn expression_cycle_root<'db>(
+    db: &'db dyn Db,
+    id: salsa::Id,
+    expression: Expression<'db>,
+    tcx: TypeContext<'db>,
+) -> Type<'db> {
+    let env = ProgramEnvironment::from_scope(expression.scope(db));
+    if tcx
+        .annotation
+        .is_some_and(|annotation| annotation.mentions_cycle_marker(db, &env))
+    {
+        Type::divergent_for_key(db, &env, tcx.annotation)
+    } else {
+        Type::divergent_root(
+            db,
+            id,
+            CycleOwner::Region(InferenceRegion::Expression(expression, tcx)),
+        )
+    }
 }
 
 /// Infers the type of an `expression` that is guaranteed to be in the same file as the calling query.
@@ -545,7 +572,7 @@ pub(crate) fn infer_expression_type<'db>(
     returns(copy),
     cycle_initial=|db, id, input: InferExpression<'db>| {
         let (expression, tcx) = input.into_inner(db);
-        Type::divergent_root(db, id, CycleOwner::Region(InferenceRegion::Expression(expression, tcx)))
+        expression_cycle_root(db, id, expression, tcx)
     },
     cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, input: InferExpression<'db>| {
         let (expression, _) = input.into_inner(db);
@@ -595,7 +622,7 @@ pub(super) fn infer_statement_types<'db>(
     },
     heap_size=ruff_memory_usage::heap_size
 )]
-fn infer_statement_types_impl<'db>(
+pub(super) fn infer_statement_types_impl<'db>(
     db: &'db dyn Db,
     statement: StatementInner<'db>,
 ) -> StatementInferenceInner<'db> {
@@ -1466,7 +1493,12 @@ impl<'db> DefinitionInference<'db> {
         cycle_recovery: Type<'db>,
     ) -> Self {
         let env = ProgramEnvironment::from_definition(definition);
-        let mut types = DefinitionTypes::Empty;
+        // The root marker stands for the definition's own value; every other placeholder in the
+        // provisional result is opaque. It is recorded as a binding only: a declaration would be
+        // merged into regions that must not have any, such as an expression region that infers
+        // this definition.
+        let placeholder = cycle_recovery.opaque_cycle_marker(db);
+        let mut types = DefinitionTypes::Binding(cycle_recovery);
 
         // Eagerly store more precise types for collection literals to avoid an extra
         // cycle iteration, i.e., by inferring `list[Divergent]` instead of `Divergent`.
@@ -1485,7 +1517,7 @@ impl<'db> DefinitionInference<'db> {
                 if let Some(collection_class) = known_collection.try_to_class_literal(db, &env) {
                     let divergent_collection = collection_class
                         .apply_specialization(db, |generic_context| {
-                            generic_context.repeat_specialization(db, cycle_recovery)
+                            generic_context.repeat_specialization(db, placeholder)
                         });
 
                     types =
@@ -1522,7 +1554,7 @@ impl<'db> DefinitionInference<'db> {
                 .infer_annotated_assignment_cycle_initial(
                     definition,
                     assignment,
-                    cycle_recovery,
+                    placeholder,
                 );
             }
         }
@@ -1545,7 +1577,7 @@ impl<'db> DefinitionInference<'db> {
                     )]
                     .into_iter()
                     .collect(),
-                    cycle_recovery: Some(cycle_recovery),
+                    cycle_recovery: Some(placeholder),
                     ..OtherDefinitionInferenceExtra::default()
                 },
             )))),
@@ -1703,6 +1735,27 @@ impl<'db> DefinitionInference<'db> {
                 "definition should belong to this TypeInference region and \
                 TypeInferenceBuilder should have inferred a type for it",
             )
+    }
+
+    /// The main output of this region's query: the binding of `definition`, or its declaration
+    /// for a definition that only declares.
+    pub(crate) fn root_value(&self, definition: Definition<'db>) -> Option<Type<'db>> {
+        self.types
+            .binding_type(definition, definition)
+            .or_else(|| {
+                self.types
+                    .declaration_type(definition, definition)
+                    .map(|declared| declared.inner_type())
+            })
+            .or_else(|| self.fallback_type())
+    }
+
+    /// The operations deferred while inferring this region.
+    pub(crate) fn equations(&self) -> Option<&CycleEquations<'db>> {
+        match self.extra.as_deref() {
+            Some(DefinitionInferenceExtra::Other(extra)) => Some(&extra.equations),
+            _ => None,
+        }
     }
 
     /// Return a binding together with the equations retained by its inference query.
@@ -1885,6 +1938,11 @@ struct ExpressionInferenceExtra<'db> {
 }
 
 impl<'db> ExpressionInference<'db> {
+    /// The operations deferred while inferring this region.
+    pub(crate) fn equations(&self) -> Option<&CycleEquations<'db>> {
+        self.extra.as_deref().map(|extra| &extra.equations)
+    }
+
     pub(crate) fn symbolic_type(
         &self,
         expression: impl Into<ExpressionNodeKey>,
@@ -1909,18 +1967,18 @@ impl<'db> ExpressionInference<'db> {
             constraints::InferenceOwner::Region(InferenceRegion::Expression(expression, tcx)),
             constraints::InferenceSlot::Expression(expression.node_ref(db).into()),
         );
+        // The root marker stands for the expression itself; sub-expressions get an opaque
+        // placeholder.
+        let key = ExpressionNodeKey::from(expression.node_ref(db));
         Self {
             extra: Some(Box::new(ExpressionInferenceExtra {
-                cycle_recovery: Some(cycle_recovery),
-                symbolic: [(
-                    constraints::InferenceSlot::Expression(expression.node_ref(db).into()),
-                    symbolic,
-                )]
-                .into_iter()
-                .collect(),
+                cycle_recovery: Some(cycle_recovery.opaque_cycle_marker(db)),
+                symbolic: [(constraints::InferenceSlot::Expression(key), symbolic)]
+                    .into_iter()
+                    .collect(),
                 ..ExpressionInferenceExtra::default()
             })),
-            expressions: FrozenMap::default(),
+            expressions: FrozenMap::from_iter([(key, cycle_recovery)]),
             #[cfg(debug_assertions)]
             scope,
         }
@@ -2027,7 +2085,10 @@ impl<'db> ExpressionInference<'db> {
         }
     }
 
-    fn try_expression_type(&self, expression: impl Into<ExpressionNodeKey>) -> Option<Type<'db>> {
+    pub(crate) fn try_expression_type(
+        &self,
+        expression: impl Into<ExpressionNodeKey>,
+    ) -> Option<Type<'db>> {
         self.expressions
             .get(&expression.into())
             .copied()
@@ -2195,6 +2256,11 @@ struct StatementInferenceInnerExtra<'db> {
 }
 
 impl<'db> StatementInferenceInner<'db> {
+    /// The operations deferred while inferring this region.
+    pub(crate) fn equations(&self) -> Option<&CycleEquations<'db>> {
+        self.extra.as_deref().map(|extra| &extra.equations)
+    }
+
     fn cycle_initial(scope: ScopeId<'db>, cycle_recovery: Type<'db>) -> Self {
         let _ = scope;
 
@@ -2290,7 +2356,10 @@ impl<'db> StatementInferenceInner<'db> {
             .unwrap_or_else(Type::unknown)
     }
 
-    fn try_expression_type(&self, expression: impl Into<ExpressionNodeKey>) -> Option<Type<'db>> {
+    pub(crate) fn try_expression_type(
+        &self,
+        expression: impl Into<ExpressionNodeKey>,
+    ) -> Option<Type<'db>> {
         self.expressions
             .get(&expression.into())
             .copied()

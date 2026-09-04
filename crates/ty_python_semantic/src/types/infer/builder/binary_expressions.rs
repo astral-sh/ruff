@@ -22,7 +22,7 @@ use crate::types::typevar::TypeVarConstraints;
 use crate::types::{
     DynamicType, InternedConstraintSet, KnownClass, KnownInstanceType, LiteralValueTypeKind,
     MemberLookupPolicy, Type, TypeContext, TypeVarBoundOrConstraints, TypedDictType, UnionBuilder,
-    UnionTypeInstance,
+    UnionTypeInstance, opaque_passthrough,
 };
 
 enum BinaryExpressionOperandTypes<'db> {
@@ -76,10 +76,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let return_type =
             self.infer_binary_expression_type(binary.into(), left_ty, right_ty, *op, &mut state);
         self.report_deprecated_functions(binary, state.deprecated_functions);
-        return_type.unwrap_or_else(|| {
+        let return_type = return_type.unwrap_or_else(|| {
             report_unsupported_binary_operation(&self.context, binary, left_ty, right_ty, *op);
             Type::unknown()
-        })
+        });
+        opaque_passthrough(
+            self.db(),
+            self.program_environment(),
+            [left_ty, right_ty],
+            return_type,
+        )
     }
 
     /// Retain both operands so a later solution uses the same binary operation.

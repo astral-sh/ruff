@@ -5,7 +5,7 @@
 //! that variable's marker as the operation's result.
 
 use ruff_python_ast::name::Name;
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use ty_python_core::EvaluationMode;
 use ty_python_core::frozen::FrozenMap;
 
@@ -48,6 +48,60 @@ pub(crate) enum Operation<'db> {
 }
 
 impl<'db> Operation<'db> {
+    /// The types the operation consumes.
+    pub(crate) fn inputs(&self) -> impl Iterator<Item = Type<'db>> + '_ {
+        match self {
+            Self::Subscript { value, key } => [Some(*value), Some(*key)],
+            Self::Member { value, .. }
+            | Self::Iterate { value, .. }
+            | Self::Unpack { value, .. }
+            | Self::Enter { value, .. }
+            | Self::Await { value } => [Some(*value), None],
+        }
+        .into_iter()
+        .flatten()
+    }
+
+    /// Replaces every type the operation consumes, or returns `None` if `f` rejects one.
+    pub(crate) fn map_inputs(
+        &self,
+        mut f: impl FnMut(Type<'db>) -> Option<Type<'db>>,
+    ) -> Option<Self> {
+        Some(match self {
+            Self::Subscript { value, key } => Self::Subscript {
+                value: f(*value)?,
+                key: f(*key)?,
+            },
+            Self::Member {
+                value,
+                name,
+                policy,
+            } => Self::Member {
+                value: f(*value)?,
+                name: name.clone(),
+                policy: *policy,
+            },
+            Self::Iterate { value, mode } => Self::Iterate {
+                value: f(*value)?,
+                mode: *mode,
+            },
+            Self::Unpack {
+                value,
+                length,
+                index,
+            } => Self::Unpack {
+                value: f(*value)?,
+                length: *length,
+                index: *index,
+            },
+            Self::Enter { value, mode } => Self::Enter {
+                value: f(*value)?,
+                mode: *mode,
+            },
+            Self::Await { value } => Self::Await { value: f(*value)? },
+        })
+    }
+
     /// Combines the inputs recorded for the same variable by two cycle iterations.
     fn cycle_normalized(
         self,
@@ -136,6 +190,54 @@ impl<'db> Operation<'db> {
     }
 }
 
+/// Replaces every unmaterialized marker at the top level of `result` that is also a top-level
+/// element of one of `operands` by the opaque marker of its cycle head.
+///
+/// An operation that passes a marker through unchanged without recording an equation leaves the
+/// marker naming the operand rather than the result. The opaque marker names neither, so the
+/// solver leaves it alone and cycle recovery treats it like the head's own marker.
+pub(crate) fn opaque_passthrough<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    operands: impl IntoIterator<Item = Type<'db>>,
+    result: Type<'db>,
+) -> Type<'db> {
+    let mut passed = FxHashSet::default();
+    for operand in operands {
+        let single = [operand];
+        let elements: &[Type<'db>] = match operand {
+            Type::Union(union) => union.elements(db),
+            _ => &single,
+        };
+        for element in elements {
+            if let Type::Divergent(marker) = element
+                && marker.materialization_kind().is_none()
+                && let Some(variable) = marker.variable()
+            {
+                passed.insert(variable);
+            }
+        }
+    }
+    if passed.is_empty() {
+        return result;
+    }
+    let replace = |ty: Type<'db>| match ty {
+        Type::Divergent(marker)
+            if marker.materialization_kind().is_none()
+                && marker
+                    .variable()
+                    .is_some_and(|variable| passed.contains(&variable)) =>
+        {
+            Type::Divergent(marker.opaque(db))
+        }
+        _ => ty,
+    };
+    match result {
+        Type::Union(union) => union.map(db, env, |element| replace(*element)),
+        _ => replace(result),
+    }
+}
+
 /// The operations one query deferred, keyed by the variable standing for each result.
 pub(crate) type CycleEquations<'db> = FrozenMap<CycleVariable<'db>, Operation<'db>>;
 
@@ -183,6 +285,11 @@ impl<'db> DeferredOperations<'db> {
         self.equations.is_empty()
     }
 
+    /// The operations recorded so far.
+    pub(crate) fn equations(&self) -> &FxHashMap<CycleVariable<'db>, Operation<'db>> {
+        &self.equations
+    }
+
     pub(crate) fn extend(
         &mut self,
         equations: impl IntoIterator<Item = (CycleVariable<'db>, Operation<'db>)>,
@@ -198,7 +305,8 @@ impl<'db> DeferredOperations<'db> {
     /// `result` with the marker of a new variable, defined by the operation applied to that
     /// marker alone.
     ///
-    /// Materialized markers already behave like `object` or `Never` and are left as they are.
+    /// Materialized markers already behave like `object` or `Never`, and markers that belong to
+    /// no cycle head cannot be resolved; both are left as they are.
     pub(crate) fn defer_passthrough(
         &mut self,
         db: &'db dyn Db,
@@ -217,7 +325,10 @@ impl<'db> DeferredOperations<'db> {
             Type::Divergent(marker)
                 if marker.materialization_kind().is_none() && operand_elements.contains(&ty) =>
             {
-                let variable = CycleVariable::derived(db, self.owner, slot, marker.variable());
+                let Some(input) = marker.variable() else {
+                    return ty;
+                };
+                let variable = CycleVariable::derived(db, self.owner, slot, input);
                 self.equations.insert(variable, operation(ty));
                 Type::divergent_variable(variable)
             }
