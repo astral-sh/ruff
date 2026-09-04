@@ -953,8 +953,7 @@ mod tests {
                 Parameter::positional_only(None).with_annotated_type(Type::object())
             ]),
         );
-        // XXX: should pass
-        assert!(!dynamic_content(&db, &env, paramspec_value).is_absent());
+        assert!(dynamic_content(&db, &env, paramspec_value).is_absent());
     }
 
     #[test]
