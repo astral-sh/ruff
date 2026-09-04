@@ -5647,6 +5647,9 @@ struct ArgumentTypeChecker<'a, 'db> {
     /// TODO: Once specialization inference fully owns generic argument validation, this field can
     /// be removed.
     constraint_set_errors: Vec<bool>,
+
+    /// Callback argument whose forwarded arguments already produced a more precise diagnostic.
+    typevartuple_forwarded_callback_error: Option<usize>,
 }
 
 /// The formal and actual types associated with one matched argument-parameter pair.
@@ -5764,6 +5767,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             inferable_typevars: TypeVarSet::None,
             inference: None,
             constraint_set_errors: vec![false; arguments.len()],
+            typevartuple_forwarded_callback_error: None,
         }
     }
 
@@ -6702,6 +6706,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         //
         // An unresolved `*Ts` still has no per-element expected type.
         if !self.constraint_set_errors[argument_index]
+            && self.typevartuple_forwarded_callback_error != Some(argument_index)
             && !constructor_receiver
             && (!has_starred_annotation || matched_parameter.expected_type.is_some())
             && !is_valid_isinstance_target()
@@ -6878,6 +6883,30 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             }
         });
 
+        if let Some((variadic_parameter_index, variadic_parameter)) =
+            self.signature.parameters().variadic()
+            && let Type::TypeVar(typevartuple) = variadic_parameter.annotated_type()
+            && variadic_parameter.has_starred_annotation()
+            && typevartuple.is_typevartuple(db)
+        {
+            let typevartuple_argument_indices: Vec<_> = self
+                .enumerate_argument_types()
+                .filter_map(|(argument_index, adjusted_argument_index, _, _)| {
+                    self.argument_matches[argument_index]
+                        .parameters
+                        .iter()
+                        .any(|parameter| parameter.index == variadic_parameter_index)
+                        .then_some((argument_index, adjusted_argument_index))
+                })
+                .collect();
+
+            self.evaluate_typevartuple_sub_call(
+                constraints,
+                &typevartuple_argument_indices,
+                typevartuple,
+            );
+        }
+
         let is_paramspec_component_parameter = |parameter_index: usize| {
             paramspec_component_start.is_some_and(|start| parameter_index >= start)
         };
@@ -6934,6 +6963,223 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 }
             }
         }
+    }
+
+    /// Invoke a callback with the arguments matched to its `TypeVarTuple`.
+    ///
+    /// As with the `ParamSpec` sub-call below, overload selection is used only to validate the
+    /// forwarded arguments. It does not update the outer call's inferred specialization.
+    fn evaluate_typevartuple_sub_call(
+        &mut self,
+        constraints: &ConstraintSetBuilder<'db>,
+        typevartuple_arguments: &[(usize, Option<usize>)],
+        typevartuple: BoundTypeVarInstance<'db>,
+    ) -> bool {
+        let db = self.db;
+        if self
+            .specialization()
+            .and_then(|specialization| specialization.get(db, typevartuple))
+            .is_none()
+        {
+            return false;
+        }
+
+        if typevartuple_arguments.iter().any(|(argument_index, _)| {
+            self.arguments
+                .argument_types(*argument_index)
+                .and_then(CallArgumentTypes::get_default)
+                .is_some_and(|argument_type| {
+                    any_over_type(db, self.env, argument_type, false, |ty| {
+                        matches!(ty, Type::TypeVar(_))
+                    })
+                })
+        }) {
+            return false;
+        }
+
+        let Some((callback_argument_index, callable)) = self.enumerate_argument_types().find_map(
+            |(argument_index, _, argument, argument_types)| {
+                if matches!(argument, Argument::Synthetic) {
+                    return None;
+                }
+
+                self.argument_matches[argument_index]
+                    .iter()
+                    .find_map(|matched_parameter| {
+                        let declared_type =
+                            self.signature.parameters()[matched_parameter.index].annotated_type();
+                        let declared_callable = declared_type
+                            .try_upcast_to_callable(db, self.env)
+                            .and_then(CallableTypes::exactly_one)?;
+                        let declares_typevartuple =
+                            declared_callable.signatures(db).iter().any(|signature| {
+                                signature.parameters().iter().any(|parameter| {
+                                    parameter.is_variadic()
+                                        && matches!(
+                                            parameter.annotated_type(),
+                                            Type::TypeVar(declared_typevartuple)
+                                                if declared_typevartuple
+                                                    .is_same_typevar_as(db, typevartuple)
+                                        )
+                                })
+                            });
+                        if !declares_typevartuple {
+                            return None;
+                        }
+
+                        let argument_type = argument_types.get_for_declared_type(declared_type);
+                        argument_type
+                            .try_upcast_to_callable(db, self.env)
+                            .and_then(CallableTypes::exactly_one)
+                            .map(|callable| (argument_index, callable))
+                    })
+            },
+        ) else {
+            return false;
+        };
+        let signatures = &callable.signatures(db).overloads;
+        if signatures.is_empty() {
+            return false;
+        }
+
+        let (sub_arguments, error_argument_indices) = if typevartuple_arguments.is_empty() {
+            (CallArguments::none(), None)
+        } else {
+            let (typevartuple_argument_indices, error_argument_indices): (Vec<_>, Vec<_>) =
+                typevartuple_arguments.iter().copied().unzip();
+            let mut sub_arguments = self.arguments.select(&typevartuple_argument_indices);
+            let Some((variadic_parameter_index, _)) = self.signature.parameters().variadic() else {
+                return false;
+            };
+
+            for (sub_argument_index, (argument_index, _)) in
+                typevartuple_arguments.iter().enumerate()
+            {
+                if !self.arguments.is_variadic(*argument_index) {
+                    continue;
+                }
+
+                let Some(argument_type) = self
+                    .arguments
+                    .argument_types(*argument_index)
+                    .and_then(CallArgumentTypes::get_default)
+                else {
+                    return false;
+                };
+                let mut argument_tuple = argument_type.iterate(db, self.env);
+                let consumed_prefix = self.argument_matches[*argument_index]
+                    .parameters
+                    .iter()
+                    .take_while(|matched| matched.index != variadic_parameter_index)
+                    .count();
+                if consumed_prefix != 0 {
+                    let Ok(consumed_prefix) = i32::try_from(consumed_prefix) else {
+                        return false;
+                    };
+                    let Ok(sliced) = argument_tuple.py_slice_type(
+                        db,
+                        self.env,
+                        Some(consumed_prefix),
+                        None,
+                        None,
+                    ) else {
+                        return false;
+                    };
+                    let Some(sliced) = sliced.exact_tuple_instance_spec(db) else {
+                        return false;
+                    };
+                    argument_tuple = sliced;
+                }
+
+                sub_arguments.clear_types(sub_argument_index);
+                sub_arguments.insert_type(
+                    sub_argument_index,
+                    TypeContext::default(),
+                    Type::tuple(TupleType::new(db, self.env, &argument_tuple)),
+                );
+            }
+
+            (sub_arguments, Some(error_argument_indices))
+        };
+        let error_argument_indices = error_argument_indices.as_deref();
+
+        let callable_binding =
+            CallableBinding::from_overloads(self.signature_type, signatures.iter().cloned());
+        let bindings = match Bindings::from(callable_binding)
+            .match_parameters(db, self.env, &sub_arguments)
+            .check_types(
+                db,
+                self.env,
+                constraints,
+                &sub_arguments,
+                self.call_expression_tcx,
+                &[],
+            ) {
+            Ok(bindings) => bindings,
+            Err(CallError(_, bindings)) => *bindings,
+        };
+        let Some(callable_binding) = bindings.single_element() else {
+            return false;
+        };
+
+        let errors_before_sub_call = self.errors.len();
+        let mut extend_errors = |binding: &Binding<'db>| {
+            let argument_matches = self.argument_matches;
+            self.errors
+                .extend(binding.errors.iter().cloned().map(|mut error| {
+                    if let BindingError::InvalidArgumentType {
+                        parameter,
+                        argument_index,
+                        parameter_source,
+                        ..
+                    } = &mut error
+                        && parameter_source.is_none()
+                        && let Some(parameter_index) = argument_index
+                            .and_then(|index| typevartuple_arguments.get(index))
+                            .and_then(|(index, _)| argument_matches[*index].parameters.first())
+                            .map(|parameter| parameter.index)
+                    {
+                        parameter.signature_parameter_index = parameter_index;
+                    }
+
+                    error.maybe_remap_argument_indices(error_argument_indices)
+                }));
+        };
+
+        let mut matching_overloads = callable_binding.matching_overloads();
+        match (matching_overloads.next(), matching_overloads.next()) {
+            (None, _) => {
+                if let [binding] = callable_binding.overloads() {
+                    extend_errors(binding);
+                } else {
+                    let index = callable_binding
+                        .best_failing_overload_index(
+                            FailingOverloadSelection::AffectsOverloadResolution,
+                        )
+                        .unwrap_or(0);
+                    // TODO: Update the TypeVarTuple specialization to reflect the matching overload.
+                    extend_errors(&callable_binding.overloads()[index]);
+                }
+            }
+            (Some((_, binding)), None) => {
+                // TODO: Update the TypeVarTuple specialization to reflect the matching overload.
+                extend_errors(binding);
+            }
+            (Some(_), Some(_)) => {
+                if !matches!(
+                    callable_binding.overload_call_return_type,
+                    Some(OverloadCallReturnType::ArgumentTypeExpansion(_))
+                ) {
+                    extend_errors(&callable_binding.overloads()[0]);
+                }
+            }
+        }
+
+        if self.errors.len() > errors_before_sub_call {
+            self.typevartuple_forwarded_callback_error = Some(callback_argument_index);
+        }
+
+        true
     }
 
     /// Invoke a sub-call for the given `ParamSpec` type variable, using the forwarded arguments.
