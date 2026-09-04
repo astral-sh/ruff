@@ -4463,10 +4463,7 @@ impl<'db> PathBounds<'db> {
         let bound_typevar = path_bound.bound_typevar;
         let lower = path_bound.effective_lower(db, env);
 
-        match bound_typevar
-            .typevar(db)
-            .require_bound_or_constraints(db, env)
-        {
+        match bound_typevar.require_bound_or_constraints(db, env) {
             TypeVarBoundOrConstraints::UpperBound(bound) => {
                 let declared_upper = bound.top_materialization(db, env);
 

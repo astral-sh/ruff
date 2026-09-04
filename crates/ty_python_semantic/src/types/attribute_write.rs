@@ -1021,14 +1021,11 @@ fn descriptor_setter_signature_domain<'db>(
         return DescriptorSetterSignatureDomain::Deferred;
     }
 
-    match typevar.typevar(db).bound_or_constraints(db, env) {
-        None => DescriptorSetterSignatureDomain::Known(Type::object()),
-        Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+    match typevar.require_bound_or_constraints(db, env) {
+        TypeVarBoundOrConstraints::UpperBound(bound) => {
             DescriptorSetterSignatureDomain::Known(bound.bind_self_typevars(db, env, descriptor_ty))
         }
-        Some(TypeVarBoundOrConstraints::Constraints(_)) => {
-            DescriptorSetterSignatureDomain::Deferred
-        }
+        TypeVarBoundOrConstraints::Constraints(_) => DescriptorSetterSignatureDomain::Deferred,
     }
 }
 
