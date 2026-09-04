@@ -77,9 +77,6 @@ pub(crate) enum Constraint<'db> {
     ConcreteLower(ConcreteLowerBound<'db>),
     ConcreteUpper(ConcreteUpperBound<'db>),
     ConcreteEquivalence(ConcreteEquivalenceBound<'db>),
-    ParamSpecLower(ParamSpecLowerBound<'db>),
-    ParamSpecUpper(ParamSpecUpperBound<'db>),
-    ParamSpecEquivalence(ParamSpecEquivalenceBound<'db>),
     TypeVarRange(TypeVarRangeBound<'db>),
     TypeVarEquivalence(TypeVarEquivalenceBound<'db>),
 }
@@ -164,8 +161,7 @@ impl<'db> Constraint<'db> {
 
                 // Comparing a paramspec with a callable type
                 Type::Callable(_) if typevar.domain(db) == TypeVarDomain::ParameterSignature => {
-                    let constraint =
-                        ParamSpecLowerBound::new(db, provenance, typevar, bound).into();
+                    let constraint = ConcreteLowerBound::new(provenance, typevar, bound).into();
                     Some(Ok(constraint))
                 }
 
@@ -176,7 +172,7 @@ impl<'db> Constraint<'db> {
 
                 // Comparing a typevar with a type
                 _ => {
-                    let constraint = ConcreteLowerBound::new(db, provenance, typevar, bound).into();
+                    let constraint = ConcreteLowerBound::new(provenance, typevar, bound).into();
                     Some(Ok(constraint))
                 }
             }
@@ -242,8 +238,7 @@ impl<'db> Constraint<'db> {
 
                 // Comparing a paramspec with a callable type
                 Type::Callable(_) if typevar.domain(db) == TypeVarDomain::ParameterSignature => {
-                    let constraint =
-                        ParamSpecUpperBound::new(db, provenance, typevar, bound).into();
+                    let constraint = ConcreteUpperBound::new(provenance, typevar, bound).into();
                     Some(Ok(constraint))
                 }
 
@@ -254,7 +249,7 @@ impl<'db> Constraint<'db> {
 
                 // Comparing a typevar with a type
                 _ => {
-                    let constraint = ConcreteUpperBound::new(db, provenance, typevar, bound).into();
+                    let constraint = ConcreteUpperBound::new(provenance, typevar, bound).into();
                     Some(Ok(constraint))
                 }
             }
@@ -335,8 +330,7 @@ impl<'db> Constraint<'db> {
             Type::Callable(_) if typevar.domain(db) == TypeVarDomain::ParameterSignature => {
                 // We already normalized the callable into a paramspec_value above
                 let constraint =
-                    ParamSpecEquivalenceBound::new(db, provenance, typevar, normalized_bound)
-                        .into();
+                    ConcreteEquivalenceBound::new(provenance, typevar, normalized_bound).into();
                 Some(Ok(constraint))
             }
 
@@ -348,7 +342,7 @@ impl<'db> Constraint<'db> {
             // Comparing a typevar with a type
             _ => {
                 let constraint =
-                    ConcreteEquivalenceBound::new(db, provenance, typevar, normalized_bound).into();
+                    ConcreteEquivalenceBound::new(provenance, typevar, normalized_bound).into();
                 Some(Ok(constraint))
             }
         };
@@ -382,10 +376,7 @@ impl<'db> Constraint<'db> {
             Constraint::TypeVarEquivalence(this) => this.left.is_same_typevar_as(db, this.right),
             Constraint::ConcreteLower(_)
             | Constraint::ConcreteUpper(_)
-            | Constraint::ConcreteEquivalence(_)
-            | Constraint::ParamSpecLower(_)
-            | Constraint::ParamSpecUpper(_)
-            | Constraint::ParamSpecEquivalence(_) => false,
+            | Constraint::ConcreteEquivalence(_) => false,
         }
     }
 
@@ -394,8 +385,6 @@ impl<'db> Constraint<'db> {
             self,
             Constraint::ConcreteLower(_)
                 | Constraint::ConcreteEquivalence(_)
-                | Constraint::ParamSpecLower(_)
-                | Constraint::ParamSpecEquivalence(_)
                 | Constraint::TypeVarRange(_)
                 | Constraint::TypeVarEquivalence(_)
         )
@@ -406,8 +395,6 @@ impl<'db> Constraint<'db> {
             self,
             Constraint::ConcreteUpper(_)
                 | Constraint::ConcreteEquivalence(_)
-                | Constraint::ParamSpecUpper(_)
-                | Constraint::ParamSpecEquivalence(_)
                 | Constraint::TypeVarRange(_)
                 | Constraint::TypeVarEquivalence(_)
         )
@@ -433,15 +420,6 @@ impl<'db> Constraint<'db> {
             Constraint::ConcreteEquivalence(this) => {
                 bound_is_concrete(this.bound).then_some(this.typevar)
             }
-            Constraint::ParamSpecLower(this) => {
-                bound_is_concrete(this.bound).then_some(this.typevar)
-            }
-            Constraint::ParamSpecUpper(this) => {
-                bound_is_concrete(this.bound).then_some(this.typevar)
-            }
-            Constraint::ParamSpecEquivalence(this) => {
-                bound_is_concrete(this.bound).then_some(this.typevar)
-            }
             Constraint::TypeVarRange(_) | Constraint::TypeVarEquivalence(_) => None,
         }
     }
@@ -457,15 +435,6 @@ impl<'db> Constraint<'db> {
             Constraint::ConcreteEquivalence(this) => {
                 max_constructor_and_typevar_depth(db, env, this.bound)
             }
-            Constraint::ParamSpecLower(this) => {
-                max_constructor_and_typevar_depth(db, env, this.bound)
-            }
-            Constraint::ParamSpecUpper(this) => {
-                max_constructor_and_typevar_depth(db, env, this.bound)
-            }
-            Constraint::ParamSpecEquivalence(this) => {
-                max_constructor_and_typevar_depth(db, env, this.bound)
-            }
             Constraint::TypeVarRange(_) | Constraint::TypeVarEquivalence(_) => (0, 0),
         }
     }
@@ -479,9 +448,6 @@ impl<'db> Constraint<'db> {
             Constraint::ConcreteLower(this) => this.typevar.is_inferable(db, inferable),
             Constraint::ConcreteUpper(this) => this.typevar.is_inferable(db, inferable),
             Constraint::ConcreteEquivalence(this) => this.typevar.is_inferable(db, inferable),
-            Constraint::ParamSpecLower(this) => this.typevar.is_inferable(db, inferable),
-            Constraint::ParamSpecUpper(this) => this.typevar.is_inferable(db, inferable),
-            Constraint::ParamSpecEquivalence(this) => this.typevar.is_inferable(db, inferable),
             Constraint::TypeVarRange(this) => {
                 this.left.is_inferable(db, inferable) || this.right.is_inferable(db, inferable)
             }
@@ -509,15 +475,6 @@ impl<'db> Constraint<'db> {
             Constraint::ConcreteEquivalence(this) => {
                 this.apply_type_mapping_impl(db, builder, type_mapping, tcx, visitor)
             }
-            Constraint::ParamSpecLower(this) => {
-                this.apply_type_mapping_impl(db, builder, type_mapping, tcx, visitor)
-            }
-            Constraint::ParamSpecUpper(this) => {
-                this.apply_type_mapping_impl(db, builder, type_mapping, tcx, visitor)
-            }
-            Constraint::ParamSpecEquivalence(this) => {
-                this.apply_type_mapping_impl(db, builder, type_mapping, tcx, visitor)
-            }
             Constraint::TypeVarRange(this) => {
                 this.apply_type_mapping_impl(db, builder, type_mapping, tcx, visitor)
             }
@@ -532,9 +489,6 @@ impl<'db> Constraint<'db> {
             Constraint::ConcreteLower(this) => [Type::TypeVar(this.typevar), this.bound],
             Constraint::ConcreteUpper(this) => [Type::TypeVar(this.typevar), this.bound],
             Constraint::ConcreteEquivalence(this) => [Type::TypeVar(this.typevar), this.bound],
-            Constraint::ParamSpecLower(this) => [Type::TypeVar(this.typevar), this.bound],
-            Constraint::ParamSpecUpper(this) => [Type::TypeVar(this.typevar), this.bound],
-            Constraint::ParamSpecEquivalence(this) => [Type::TypeVar(this.typevar), this.bound],
             Constraint::TypeVarRange(this) => [Type::TypeVar(this.left), Type::TypeVar(this.right)],
             Constraint::TypeVarEquivalence(this) => {
                 [Type::TypeVar(this.left), Type::TypeVar(this.right)]
@@ -553,9 +507,6 @@ impl<'db> Constraint<'db> {
             Constraint::ConcreteLower(this) => this.display(db, env, holds).fmt(f),
             Constraint::ConcreteUpper(this) => this.display(db, env, holds).fmt(f),
             Constraint::ConcreteEquivalence(this) => this.display(db, env, holds).fmt(f),
-            Constraint::ParamSpecLower(this) => this.display(db, env, holds).fmt(f),
-            Constraint::ParamSpecUpper(this) => this.display(db, env, holds).fmt(f),
-            Constraint::ParamSpecEquivalence(this) => this.display(db, env, holds).fmt(f),
             Constraint::TypeVarRange(this) => this.display(db, holds).fmt(f),
             Constraint::TypeVarEquivalence(this) => this.display(db, holds).fmt(f),
         })
@@ -570,18 +521,12 @@ pub(super) trait ProvidesConcreteBound<'db>: Copy + Into<Constraint<'db>> {
 }
 
 pub(super) trait ProvidesConcreteLowerBound<'db>: ProvidesConcreteBound<'db> {
-    type LowerBound: ProvidesConcreteBound<'db>;
-
-    fn into_lower_bound(self) -> Self::LowerBound;
+    fn into_lower_bound(self) -> ConcreteLowerBound<'db>;
 }
 
 pub(super) trait ProvidesConcreteUpperBound<'db>: ProvidesConcreteBound<'db> {
-    type UpperBound: ProvidesConcreteBound<'db>;
-
-    fn into_upper_bound(self) -> Self::UpperBound;
+    fn into_upper_bound(self) -> ConcreteUpperBound<'db>;
 }
-
-pub(super) trait ProvidesConcreteEquivalenceBound<'db>: ProvidesConcreteBound<'db> {}
 
 pub(super) trait ProvidesTypeVarBound<'db>: Copy + Into<Constraint<'db>> {
     fn provenance(self) -> ConstraintProvenance;
@@ -612,16 +557,10 @@ pub(super) struct ConcreteLowerBound<'db> {
 
 impl<'db> ConcreteLowerBound<'db> {
     pub(super) fn new(
-        db: &'db dyn Db,
         provenance: ConstraintProvenance,
         typevar: BoundTypeVarInstance<'db>,
         bound: Type<'db>,
     ) -> Self {
-        // TODO: Handle TypeVarTuple separately
-        assert!(matches!(
-            typevar.domain(db),
-            TypeVarDomain::Type | TypeVarDomain::TypeTuple
-        ));
         Self {
             provenance,
             typevar,
@@ -710,8 +649,6 @@ impl<'db> ProvidesConcreteBound<'db> for ConcreteLowerBound<'db> {
 }
 
 impl<'db> ProvidesConcreteLowerBound<'db> for ConcreteLowerBound<'db> {
-    type LowerBound = ConcreteLowerBound<'db>;
-
     fn into_lower_bound(self) -> ConcreteLowerBound<'db> {
         self
     }
@@ -734,16 +671,10 @@ pub(super) struct ConcreteUpperBound<'db> {
 
 impl<'db> ConcreteUpperBound<'db> {
     pub(super) fn new(
-        db: &'db dyn Db,
         provenance: ConstraintProvenance,
         typevar: BoundTypeVarInstance<'db>,
         bound: Type<'db>,
     ) -> Self {
-        // TODO: Handle TypeVarTuple separately
-        assert!(matches!(
-            typevar.domain(db),
-            TypeVarDomain::Type | TypeVarDomain::TypeTuple
-        ));
         Self {
             provenance,
             typevar,
@@ -832,8 +763,6 @@ impl<'db> ProvidesConcreteBound<'db> for ConcreteUpperBound<'db> {
 }
 
 impl<'db> ProvidesConcreteUpperBound<'db> for ConcreteUpperBound<'db> {
-    type UpperBound = ConcreteUpperBound<'db>;
-
     fn into_upper_bound(self) -> ConcreteUpperBound<'db> {
         self
     }
@@ -853,16 +782,10 @@ pub(super) struct ConcreteEquivalenceBound<'db> {
 
 impl<'db> ConcreteEquivalenceBound<'db> {
     pub(super) fn new(
-        db: &'db dyn Db,
         provenance: ConstraintProvenance,
         typevar: BoundTypeVarInstance<'db>,
         bound: Type<'db>,
     ) -> Self {
-        // TODO: Handle TypeVarTuple separately
-        assert!(matches!(
-            typevar.domain(db),
-            TypeVarDomain::Type | TypeVarDomain::TypeTuple
-        ));
         Self {
             provenance,
             typevar,
@@ -952,8 +875,6 @@ impl<'db> ProvidesConcreteBound<'db> for ConcreteEquivalenceBound<'db> {
 }
 
 impl<'db> ProvidesConcreteLowerBound<'db> for ConcreteEquivalenceBound<'db> {
-    type LowerBound = ConcreteLowerBound<'db>;
-
     fn into_lower_bound(self) -> ConcreteLowerBound<'db> {
         ConcreteLowerBound {
             provenance: self.provenance,
@@ -965,8 +886,6 @@ impl<'db> ProvidesConcreteLowerBound<'db> for ConcreteEquivalenceBound<'db> {
 }
 
 impl<'db> ProvidesConcreteUpperBound<'db> for ConcreteEquivalenceBound<'db> {
-    type UpperBound = ConcreteUpperBound<'db>;
-
     fn into_upper_bound(self) -> ConcreteUpperBound<'db> {
         ConcreteUpperBound {
             provenance: self.provenance,
@@ -976,380 +895,6 @@ impl<'db> ProvidesConcreteUpperBound<'db> for ConcreteEquivalenceBound<'db> {
         }
     }
 }
-
-impl<'db> ProvidesConcreteEquivalenceBound<'db> for ConcreteEquivalenceBound<'db> {}
-
-/// Restricts a single paramspec so that a concrete lower bound signature is assignable to it. (A
-/// concrete type is not a bare typevar. [`TypeVarRangeBound`] is used to model an assignability
-/// relationship between two paramspecs.)
-///
-/// The bound will never be a union type, since union lower bounds can be broken apart into
-/// separate constraints for each union element.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
-pub(super) struct ParamSpecLowerBound<'db> {
-    pub(super) provenance: ConstraintProvenance,
-    pub(super) typevar: BoundTypeVarInstance<'db>,
-    pub(super) bound: Type<'db>,
-    // Always construct via the `new` method
-    _phantom: PhantomData<()>,
-}
-
-impl<'db> ParamSpecLowerBound<'db> {
-    pub(super) fn new(
-        db: &'db dyn Db,
-        provenance: ConstraintProvenance,
-        typevar: BoundTypeVarInstance<'db>,
-        bound: Type<'db>,
-    ) -> Self {
-        assert_eq!(typevar.domain(db), TypeVarDomain::ParameterSignature);
-        Self {
-            provenance,
-            typevar,
-            bound,
-            _phantom: PhantomData,
-        }
-    }
-
-    fn apply_type_mapping_impl(
-        self,
-        db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
-        type_mapping: &TypeMapping<'_, 'db>,
-        tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
-    ) -> (NodeId, Option<SourceOrderId>) {
-        let env = visitor.env;
-        let subject =
-            Type::TypeVar(self.typevar).apply_type_mapping_impl(db, type_mapping, tcx, visitor);
-        let bound = self
-            .bound
-            .apply_type_mapping_impl(db, type_mapping, tcx, visitor);
-        let mut storage = builder.storage.borrow_mut();
-        match subject {
-            Type::TypeVar(typevar) => {
-                let applied = Constraint::new_lower_bound(db, self.provenance, typevar, bound);
-                Constraint::new_nodes(db, env, &mut storage, applied)
-            }
-            _ => storage.load(
-                db,
-                env,
-                &bound.when_constraint_set_assignable_to_owned(db, env, subject),
-            ),
-        }
-    }
-
-    fn display<'a>(
-        self,
-        db: &'db dyn Db,
-        env: &'a ProgramEnvironment<'db>,
-        holds: Option<bool>,
-    ) -> impl Display + 'a {
-        let range_prefix = match holds {
-            Some(true) => "",
-            Some(false) => "¬",
-            None => "?",
-        };
-        std::fmt::from_fn(move |f| {
-            write!(
-                f,
-                "{range_prefix}({} ≤ {})",
-                self.bound.display(db, env),
-                self.typevar.identity(db).display(db),
-            )
-        })
-    }
-}
-
-impl<'db> From<ParamSpecLowerBound<'db>> for Constraint<'db> {
-    fn from(bound: ParamSpecLowerBound<'db>) -> Constraint<'db> {
-        Constraint::ParamSpecLower(bound)
-    }
-}
-
-impl<'db> ProvidesConcreteBound<'db> for ParamSpecLowerBound<'db> {
-    fn provenance(self) -> ConstraintProvenance {
-        self.provenance
-    }
-
-    fn typevar(self) -> BoundTypeVarInstance<'db> {
-        self.typevar
-    }
-
-    fn bound(self) -> Type<'db> {
-        self.bound
-    }
-
-    fn map(self, provenance: ConstraintProvenance, bound: Type<'db>) -> Self {
-        Self {
-            provenance,
-            typevar: self.typevar,
-            bound,
-            _phantom: PhantomData,
-        }
-    }
-}
-
-impl<'db> ProvidesConcreteLowerBound<'db> for ParamSpecLowerBound<'db> {
-    type LowerBound = ParamSpecLowerBound<'db>;
-
-    fn into_lower_bound(self) -> ParamSpecLowerBound<'db> {
-        self
-    }
-}
-
-/// Restricts a single paramspec so that it is assignable to a concrete upper bound signature. (A
-/// concrete type is not a bare typevar. [`TypeVarRangeBound`] is used to model an assignability
-/// relationship between two paramspecs.)
-///
-/// The bound will never be an intersection type, since intersection upper bounds can be broken
-/// apart into separate constraints for each intersection element.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
-pub(super) struct ParamSpecUpperBound<'db> {
-    pub(super) provenance: ConstraintProvenance,
-    pub(super) typevar: BoundTypeVarInstance<'db>,
-    pub(super) bound: Type<'db>,
-    // Always construct via the `new` method
-    _phantom: PhantomData<()>,
-}
-
-impl<'db> ParamSpecUpperBound<'db> {
-    pub(super) fn new(
-        db: &'db dyn Db,
-        provenance: ConstraintProvenance,
-        typevar: BoundTypeVarInstance<'db>,
-        bound: Type<'db>,
-    ) -> Self {
-        assert_eq!(typevar.domain(db), TypeVarDomain::ParameterSignature);
-        Self {
-            provenance,
-            typevar,
-            bound,
-            _phantom: PhantomData,
-        }
-    }
-
-    fn apply_type_mapping_impl(
-        self,
-        db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
-        type_mapping: &TypeMapping<'_, 'db>,
-        tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
-    ) -> (NodeId, Option<SourceOrderId>) {
-        let env = visitor.env;
-        let subject =
-            Type::TypeVar(self.typevar).apply_type_mapping_impl(db, type_mapping, tcx, visitor);
-        let bound = self
-            .bound
-            .apply_type_mapping_impl(db, type_mapping, tcx, visitor);
-        let mut storage = builder.storage.borrow_mut();
-        match subject {
-            Type::TypeVar(typevar) => {
-                let applied = Constraint::new_upper_bound(db, env, self.provenance, typevar, bound);
-                Constraint::new_nodes(db, env, &mut storage, applied)
-            }
-            _ => storage.load(
-                db,
-                env,
-                &subject.when_constraint_set_assignable_to_owned(db, env, bound),
-            ),
-        }
-    }
-
-    fn display<'a>(
-        self,
-        db: &'db dyn Db,
-        env: &'a ProgramEnvironment<'db>,
-        holds: Option<bool>,
-    ) -> impl Display + 'a {
-        let range_prefix = match holds {
-            Some(true) => "",
-            Some(false) => "¬",
-            None => "?",
-        };
-        std::fmt::from_fn(move |f| {
-            write!(
-                f,
-                "{range_prefix}({} ≤ {})",
-                self.typevar.identity(db).display(db),
-                self.bound.display(db, env),
-            )
-        })
-    }
-}
-
-impl<'db> From<ParamSpecUpperBound<'db>> for Constraint<'db> {
-    fn from(bound: ParamSpecUpperBound<'db>) -> Constraint<'db> {
-        Constraint::ParamSpecUpper(bound)
-    }
-}
-
-impl<'db> ProvidesConcreteBound<'db> for ParamSpecUpperBound<'db> {
-    fn provenance(self) -> ConstraintProvenance {
-        self.provenance
-    }
-
-    fn typevar(self) -> BoundTypeVarInstance<'db> {
-        self.typevar
-    }
-
-    fn bound(self) -> Type<'db> {
-        self.bound
-    }
-
-    fn map(self, provenance: ConstraintProvenance, bound: Type<'db>) -> Self {
-        Self {
-            provenance,
-            typevar: self.typevar,
-            bound,
-            _phantom: PhantomData,
-        }
-    }
-}
-
-impl<'db> ProvidesConcreteUpperBound<'db> for ParamSpecUpperBound<'db> {
-    type UpperBound = ParamSpecUpperBound<'db>;
-
-    fn into_upper_bound(self) -> ParamSpecUpperBound<'db> {
-        self
-    }
-}
-
-/// Restricts a single paramspec so that it is equivalent to some concrete signature. (A concrete
-/// type is not a bare typevar. [`TypeVarEquivalenceBound`] is used to model an equivalence
-/// relationship between two paramspecs.)
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
-pub(super) struct ParamSpecEquivalenceBound<'db> {
-    pub(super) provenance: ConstraintProvenance,
-    pub(super) typevar: BoundTypeVarInstance<'db>,
-    pub(super) bound: Type<'db>,
-    // Always construct via the `new` method
-    _phantom: PhantomData<()>,
-}
-
-impl<'db> ParamSpecEquivalenceBound<'db> {
-    pub(super) fn new(
-        db: &'db dyn Db,
-        provenance: ConstraintProvenance,
-        typevar: BoundTypeVarInstance<'db>,
-        bound: Type<'db>,
-    ) -> Self {
-        assert_eq!(typevar.domain(db), TypeVarDomain::ParameterSignature);
-        Self {
-            provenance,
-            typevar,
-            bound,
-            _phantom: PhantomData,
-        }
-    }
-
-    fn apply_type_mapping_impl(
-        self,
-        db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
-        type_mapping: &TypeMapping<'_, 'db>,
-        tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
-    ) -> (NodeId, Option<SourceOrderId>) {
-        let env = visitor.env;
-        let subject =
-            Type::TypeVar(self.typevar).apply_type_mapping_impl(db, type_mapping, tcx, visitor);
-        let bound = self
-            .bound
-            .apply_type_mapping_impl(db, type_mapping, tcx, visitor);
-        let mut storage = builder.storage.borrow_mut();
-        match subject {
-            Type::TypeVar(typevar) => {
-                let applied =
-                    Constraint::new_equivalence_bound(db, env, self.provenance, typevar, bound);
-                Constraint::new_nodes(db, env, &mut storage, applied)
-            }
-            _ => storage.load(
-                db,
-                env,
-                &subject.when_constraint_set_equivalent_to_owned(db, env, bound),
-            ),
-        }
-    }
-
-    fn display<'a>(
-        self,
-        db: &'db dyn Db,
-        env: &'a ProgramEnvironment<'db>,
-        holds: Option<bool>,
-    ) -> impl Display + 'a {
-        let equality_sign = match holds {
-            Some(true) => "=",
-            Some(false) => "≠",
-            None => "=?",
-        };
-        std::fmt::from_fn(move |f| {
-            write!(
-                f,
-                "({} {equality_sign} {})",
-                self.typevar.identity(db).display(db),
-                self.bound.display(db, env),
-            )
-        })
-    }
-}
-
-impl<'db> From<ParamSpecEquivalenceBound<'db>> for Constraint<'db> {
-    fn from(bound: ParamSpecEquivalenceBound<'db>) -> Constraint<'db> {
-        Constraint::ParamSpecEquivalence(bound)
-    }
-}
-
-impl<'db> ProvidesConcreteBound<'db> for ParamSpecEquivalenceBound<'db> {
-    fn provenance(self) -> ConstraintProvenance {
-        self.provenance
-    }
-
-    fn typevar(self) -> BoundTypeVarInstance<'db> {
-        self.typevar
-    }
-
-    fn bound(self) -> Type<'db> {
-        self.bound
-    }
-
-    fn map(self, provenance: ConstraintProvenance, bound: Type<'db>) -> Self {
-        Self {
-            provenance,
-            typevar: self.typevar,
-            bound,
-            _phantom: PhantomData,
-        }
-    }
-}
-
-impl<'db> ProvidesConcreteLowerBound<'db> for ParamSpecEquivalenceBound<'db> {
-    type LowerBound = ParamSpecLowerBound<'db>;
-
-    fn into_lower_bound(self) -> ParamSpecLowerBound<'db> {
-        ParamSpecLowerBound {
-            provenance: self.provenance,
-            typevar: self.typevar,
-            bound: self.bound,
-            _phantom: PhantomData,
-        }
-    }
-}
-
-impl<'db> ProvidesConcreteUpperBound<'db> for ParamSpecEquivalenceBound<'db> {
-    type UpperBound = ParamSpecUpperBound<'db>;
-
-    fn into_upper_bound(self) -> ParamSpecUpperBound<'db> {
-        ParamSpecUpperBound {
-            provenance: self.provenance,
-            typevar: self.typevar,
-            bound: self.bound,
-            _phantom: PhantomData,
-        }
-    }
-}
-
-impl<'db> ProvidesConcreteEquivalenceBound<'db> for ParamSpecEquivalenceBound<'db> {}
 
 /// Restricts two typevars so that `left` must be assignable to `right`. Both typevars must have
 /// the same domain.
