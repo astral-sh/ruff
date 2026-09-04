@@ -37,6 +37,37 @@ pub trait Db: PythonCoreDb {
     fn dyn_clone(&self) -> Box<dyn Db>;
 }
 
+/// Sets whether inference records place loads throughout the database.
+///
+/// Call once when constructing a database, before running inference or creating snapshots.
+/// The setting cannot change during the database's lifetime.
+pub fn initialize_place_load_recording(db: &dyn Db, mode: PlaceLoadRecordingMode) {
+    let _ = PlaceLoadRecording::builder(mode)
+        .mode_durability(salsa::Durability::NEVER_CHANGE)
+        .new(db);
+}
+
+/// Whether a database can retain place-load metadata alongside inferred types.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, get_size2::GetSize)]
+pub enum PlaceLoadRecordingMode {
+    /// Do not record place loads.
+    #[default]
+    Disabled,
+    /// Record place loads whenever inference runs.
+    Enabled,
+}
+
+#[salsa::input(singleton, heap_size=ruff_memory_usage::heap_size)]
+struct PlaceLoadRecording {
+    #[returns(copy)]
+    mode: PlaceLoadRecordingMode,
+}
+
+/// Returns whether inference retains place-load metadata in this database.
+pub(crate) fn should_record_place_loads(db: &dyn Db) -> bool {
+    PlaceLoadRecording::get(db).mode(db) == PlaceLoadRecordingMode::Enabled
+}
+
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
@@ -76,11 +107,11 @@ pub(crate) mod tests {
     }
 
     impl TestDb {
-        fn new() -> Self {
+        fn new(recording_mode: PlaceLoadRecordingMode) -> Self {
             let events = Events::default();
             let vendored = ty_vendored::file_system().clone();
             let program_settings = ProgramSettings::empty(&vendored);
-            Self {
+            let db = Self {
                 storage: salsa::Storage::new(Some(Box::new({
                     let events = events.clone();
                     move |event| {
@@ -97,7 +128,9 @@ pub(crate) mod tests {
                 analysis_settings: AnalysisSettings::default().into(),
                 open_files: rustc_hash::FxHashSet::default(),
                 program_settings,
-            }
+            };
+            initialize_place_load_recording(&db, recording_mode);
+            db
         }
 
         pub(crate) fn python_version(&self) -> PythonVersion {
@@ -235,6 +268,7 @@ pub(crate) mod tests {
         /// Whether module resolution should include packages from the synthetic virtual environment.
         third_party_packages: bool,
         rule_selection: Option<RuleSelection>,
+        recording_mode: PlaceLoadRecordingMode,
     }
 
     impl<'a> TestDbBuilder<'a> {
@@ -246,11 +280,20 @@ pub(crate) mod tests {
                 files: vec![],
                 third_party_packages: false,
                 rule_selection: None,
+                recording_mode: PlaceLoadRecordingMode::default(),
             }
         }
 
         pub(crate) fn with_python_version(mut self, version: PythonVersion) -> Self {
             self.python_version = version;
+            self
+        }
+
+        pub(crate) fn with_place_load_recording_mode(
+            mut self,
+            mode: PlaceLoadRecordingMode,
+        ) -> Self {
+            self.recording_mode = mode;
             self
         }
 
@@ -288,7 +331,7 @@ pub(crate) mod tests {
         }
 
         pub(crate) fn build(self) -> anyhow::Result<TestDb> {
-            let mut db = TestDb::new();
+            let mut db = TestDb::new(self.recording_mode);
 
             if let Some(selection) = self.rule_selection {
                 db.rule_selection = Arc::new(selection);
