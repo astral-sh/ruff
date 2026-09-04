@@ -664,6 +664,9 @@ struct UseDefMapExtra {
 
     /// Completed loop headers in this scope.
     loop_headers: FrozenIndexVec<LoopHeaderId, LoopHeader>,
+
+    /// Outermost boolean tests in this scope, sorted in source order without overlaps.
+    boolean_test_contexts: Box<[TextRange]>,
 }
 
 static EMPTY_CONSTRAINT_TABLES: LazyLock<ConstraintTables<'static>> =
@@ -991,6 +994,22 @@ impl<'db> UseDefMap<'db> {
                 block.in_type_checking_block && entry_range.contains_range(range)
             })
     }
+
+    /// Returns the outermost boolean test containing `range`, including an exact match.
+    pub(crate) fn enclosing_boolean_test(&self, range: TextRange) -> Option<TextRange> {
+        self.extra.as_ref().and_then(|extra| {
+            let index = extra
+                .boolean_test_contexts
+                .partition_point(|context| context.end() <= range.start());
+
+            extra
+                .boolean_test_contexts
+                .get(index)
+                .copied()
+                .filter(|context| context.contains_range(range))
+        })
+    }
+
     pub fn end_of_scope_bindings(
         &self,
         place: ScopedPlaceId,
@@ -1817,6 +1836,9 @@ pub(super) struct UseDefMapBuilder<'db> {
     /// keyed by their text range.
     range_reachability: Vec<(TextRange, RangeInfo)>,
 
+    /// Non-overlapping assertion and compound conditional tests, in source order.
+    boolean_test_contexts: Vec<TextRange>,
+
     /// Identifies the current control-flow path for exception checkpoints.
     ///
     /// Unlike `reachability`, this excludes per-call gates so repeated calls with unchanged
@@ -1871,6 +1893,7 @@ impl<'db> UseDefMapBuilder<'db> {
             multi_bindings_by_use: FxHashMap::default(),
             reachability: ScopedReachabilityConstraintId::ALWAYS_TRUE,
             range_reachability: Vec::new(),
+            boolean_test_contexts: Vec::new(),
             checkpoint_flow: ScopedReachabilityConstraintId::ALWAYS_TRUE,
             checkpoint_state: ExceptionCheckpointState::default(),
             definitions_by_definition: FxHashMap::default(),
@@ -2594,6 +2617,12 @@ impl<'db> UseDefMapBuilder<'db> {
         self.range_reachability.push((range, this_range_info));
     }
 
+    /// Records a directly tested condition or the operand of `not`.
+    /// Nested tests are discarded when the map is finished: their outer test owns the analysis.
+    pub(super) fn record_boolean_test_context(&mut self, range: TextRange) {
+        self.boolean_test_contexts.push(range);
+    }
+
     pub(super) fn snapshot_enclosing_state(
         &mut self,
         enclosing_place: ScopedPlaceId,
@@ -2922,10 +2951,17 @@ impl<'db> UseDefMapBuilder<'db> {
             Self::zip_place_states(end_of_scope_members, reachable_definitions_by_member);
         let multi_bindings_by_use = MultiBindingsByUse::from_map(self.multi_bindings_by_use);
         let loop_headers = self.loop_headers;
+        let mut boolean_test_contexts = self.boolean_test_contexts;
+        // Conditional expressions visit their test before their body, which appears earlier in
+        // the source. Sort outer tests before nested tests, then retain only the outer tests.
+        boolean_test_contexts
+            .sort_unstable_by_key(|range| (range.start(), std::cmp::Reverse(range.end())));
+        boolean_test_contexts.dedup_by(|inner, outer| outer.contains_range(*inner));
         let extra = (!bindings_by_use.is_empty()
             || !member_states.is_empty()
             || !enclosing_snapshots.is_empty()
-            || !loop_headers.is_empty())
+            || !loop_headers.is_empty()
+            || !boolean_test_contexts.is_empty())
         .then(|| {
             Box::new(UseDefMapExtra {
                 bindings_by_use: bindings_by_use.into(),
@@ -2933,6 +2969,7 @@ impl<'db> UseDefMapBuilder<'db> {
                 member_states,
                 enclosing_snapshots: enclosing_snapshots.into(),
                 loop_headers: loop_headers.into(),
+                boolean_test_contexts: boolean_test_contexts.into_boxed_slice(),
             })
         });
         let predicates = self.predicates.build();

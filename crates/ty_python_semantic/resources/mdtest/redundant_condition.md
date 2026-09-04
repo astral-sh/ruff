@@ -3,9 +3,10 @@
 A common error in Python is to accidentally test truthiness of the wrong object: for example
 `if func:` (which is always true) where `if func():` was intended, or `if coroutine():` where
 `if await coroutine():` was intended. By default, ty alerts the user to these errors with the error
-code `redundant-condition`, but only if the inferred type of the object is not assignable to `int`.
-This heuristic catches the `if func` and `if coroutine()` cases, while avoiding false positives on
-cases such as `if DEBUG:` where `DEBUG = 0` or `DEBUG = False` is a constant.
+code `redundant-condition`, but only if the inferred type of the object is not assignable to `int`
+and has fixed truthiness. This heuristic catches the `if func` and `if coroutine()` cases, while
+avoiding false positives on cases such as `if DEBUG:` where `DEBUG = 0` or `DEBUG = False` is a
+constant.
 
 The remaining cases -- where the inferred type is assignable to `int`, or only short-circuit
 evaluation makes the condition's truthiness fixed -- are covered by a separate, stricter rule
@@ -15,6 +16,9 @@ evaluation makes the condition's truthiness fixed -- are covered by a separate, 
 [environment]
 python-version = "3.14"
 python-platform = "linux"
+
+[rules]
+redundant-condition-strict = "error"
 ```
 
 ## Basic cases
@@ -24,8 +28,23 @@ We catch testing a function without calling it:
 ```py
 def func(): ...
 
-if func:  # TODO: should error
+if func:  # snapshot: redundant-condition
     pass
+```
+
+```snapshot
+warning[redundant-condition]: Function `func` is always truthy
+ --> src/mdtest_snippet.py:3:4
+  |
+3 | if func:  # snapshot: redundant-condition
+  |    ^^^^ Did you mean to call this function?
+  |
+2 |
+  - if func:  # snapshot: redundant-condition
+3 + if func():  # snapshot: redundant-condition
+4 |     pass
+  |
+note: This is an unsafe fix and may change runtime behavior
 ```
 
 And testing a method without calling it:
@@ -36,8 +55,23 @@ class Foo:
         return True
 
     def baz(self):
-        if self.bar:  # TODO: should error
+        if self.bar:  # snapshot: redundant-condition
             pass
+```
+
+```snapshot
+warning[redundant-condition]: Method `Foo.bar` is always truthy
+  --> src/mdtest_snippet.py:10:12
+   |
+10 |         if self.bar:  # snapshot: redundant-condition
+   |            ^^^^^^^^ Did you mean to call this method?
+   |
+9  |     def baz(self):
+   -         if self.bar:  # snapshot: redundant-condition
+10 +         if self.bar():  # snapshot: redundant-condition
+11 |             pass
+   |
+note: This is an unsafe fix and may change runtime behavior
 ```
 
 And testing a generator expression without executing it:
@@ -45,9 +79,25 @@ And testing a generator expression without executing it:
 ```py
 def work(items: list[int]):
     filtered = (item for item in items if item < 42)
-    if filtered:  # # TODO: should error
+    if filtered:  # snapshot: redundant-condition
         pass
-    assert filtered  # # TODO: should error
+    assert filtered  # error: [redundant-condition] "Object of type `GeneratorType[int, None, None]` is always truthy"
+```
+
+```snapshot
+warning[redundant-condition]: A generator is always truthy
+  --> src/mdtest_snippet.py:14:8
+   |
+14 |     if filtered:  # snapshot: redundant-condition
+   |        ^^^^^^^^ Inferred type is `GeneratorType[int, None, None]`
+help: Did you mean to use `any()`?
+   |
+13 |     filtered = (item for item in items if item < 42)
+   -     if filtered:  # snapshot: redundant-condition
+14 +     if any(filtered):  # snapshot: redundant-condition
+15 |         pass
+   |
+note: This is a display-only fix and is likely to be incorrect
 ```
 
 And testing an awaitable without awaiting it:
@@ -55,8 +105,16 @@ And testing an awaitable without awaiting it:
 ```py
 async def coroutine(): ...
 async def main():
-    if coroutine():  # TODO: should error
+    if coroutine():  # snapshot: redundant-condition
         pass
+```
+
+```snapshot
+warning[redundant-condition]: Condition is always truthy
+  --> src/mdtest_snippet.py:19:8
+   |
+19 |     if coroutine():  # snapshot: redundant-condition
+   |        ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
 ```
 
 And testing a tuple that is known to always be empty or non-empty:
@@ -70,19 +128,48 @@ class Foo:
         self.no_elements: tuple[()] = ()
 
     def other_method(self):
-        if self.two_element_tuple:  # TODO: should error
+        if self.two_element_tuple:  # snapshot: redundant-condition
             pass
-        if self.at_least_one_element:  # TODO: should error
+        if self.at_least_one_element:  # snapshot: redundant-condition
             pass
-        if self.at_least_two_elements:  # TODO: should error
+        if self.at_least_two_elements:  # snapshot: redundant-condition
             pass
-        if self.no_elements:  # TODO: should error
+        if self.no_elements:  # snapshot: redundant-condition
             pass
 
-        # TODO: should error
+        # error: [redundant-condition] "Object of type `tuple[int, *tuple[int, ...]]` is always truthy"
         assert self.at_least_one_element
-        # TODO: should error
+        # error: [redundant-condition] "Object of type `tuple[int, int, *tuple[int, ...]]` is always truthy"
         assert self.at_least_two_elements
+```
+
+```snapshot
+warning[redundant-condition]: A 2-element tuple is always truthy
+  --> src/mdtest_snippet.py:29:12
+   |
+29 |         if self.two_element_tuple:  # snapshot: redundant-condition
+   |            ^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `tuple[int, int]`
+
+
+warning[redundant-condition]: A tuple with >=1 element is always truthy
+  --> src/mdtest_snippet.py:31:12
+   |
+31 |         if self.at_least_one_element:  # snapshot: redundant-condition
+   |            ^^^^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `tuple[int, *tuple[int, ...]]`
+
+
+warning[redundant-condition]: A tuple with >=2 elements is always truthy
+  --> src/mdtest_snippet.py:33:12
+   |
+33 |         if self.at_least_two_elements:  # snapshot: redundant-condition
+   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `tuple[int, int, *tuple[int, ...]]`
+
+
+warning[redundant-condition]: An empty tuple is always falsy
+  --> src/mdtest_snippet.py:35:12
+   |
+35 |         if self.no_elements:  # snapshot: redundant-condition
+   |            ^^^^^^^^^^^^^^^^ Inferred type is `tuple[()]`
 ```
 
 And testing `None`:
@@ -90,8 +177,16 @@ And testing `None`:
 ```py
 X = None
 
-if X:  # TODO: should error
+if X:  # snapshot: redundant-condition
     pass
+```
+
+```snapshot
+warning[redundant-condition]: `None` is always falsy
+  --> src/mdtest_snippet.py:44:4
+   |
+44 | if X:  # snapshot: redundant-condition
+   |    ^
 ```
 
 And testing a string that is known to always be truthy or always be falsy:
@@ -100,11 +195,26 @@ And testing a string that is known to always be truthy or always be falsy:
 x = "foo"
 y = ""
 
-if x:  # TODO: should error
+if x:  # snapshot: redundant-condition
     pass
 
-if y:  # TODO: should error
+if y:  # snapshot: redundant-condition
     pass
+```
+
+```snapshot
+warning[redundant-condition]: A nonempty string is always truthy
+  --> src/mdtest_snippet.py:49:4
+   |
+49 | if x:  # snapshot: redundant-condition
+   |    ^ Inferred type is `Literal["foo"]`
+
+
+warning[redundant-condition]: An empty string is always falsy
+  --> src/mdtest_snippet.py:52:4
+   |
+52 | if y:  # snapshot: redundant-condition
+   |    ^ Inferred type is `Literal[""]`
 ```
 
 or even a union of strings that is known to always be truthy:
@@ -113,8 +223,16 @@ or even a union of strings that is known to always be truthy:
 from typing import Literal
 
 def f(x: Literal["a", "b"]):
-    if x:  # TODO: should error
+    if x:  # snapshot: redundant-condition
         pass
+```
+
+```snapshot
+warning[redundant-condition]: A nonempty string is always truthy
+  --> src/mdtest_snippet.py:57:8
+   |
+57 |     if x:  # snapshot: redundant-condition
+   |        ^ Inferred type is `Literal["a", "b"]`
 ```
 
 and testing a `TypedDict` that is known to always be truthy:
@@ -141,10 +259,10 @@ def test(
     sometimes_empty: SometimesEmpty,
     also_sometimes_empty: AlsoSometimesEmpty,
 ):
-    if never_empty:  # TODO: should error
+    if never_empty:  # snapshot: redundant-condition
         pass
 
-    if also_never_empty:  # TODO: should error
+    if also_never_empty:  # snapshot: redundant-condition
         pass
 
     if sometimes_empty:  # no diagnostic
@@ -153,10 +271,39 @@ def test(
     if also_sometimes_empty:  # no diagnostic
         pass
 
-    assert never_empty  # TODO: should error
-    assert also_never_empty  # TODO: should error
+    assert never_empty  # error: [redundant-condition] "TypedDict `NeverEmpty` with 2 required fields is always truthy"
+    assert also_never_empty  # error: [redundant-condition] "TypedDict `AlsoNeverEmpty` with 1 required field is always truthy"
     assert sometimes_empty  # no diagnostic
     assert also_sometimes_empty  # no diagnostic
+```
+
+```snapshot
+warning[redundant-condition]: A TypedDict with 2 required fields is always truthy
+  --> src/mdtest_snippet.py:80:8
+   |
+80 |     if never_empty:  # snapshot: redundant-condition
+   |        ^^^^^^^^^^^ Inferred type is `NeverEmpty`
+   |
+  ::: src/mdtest_snippet.py:61:7
+   |
+61 | class NeverEmpty(TypedDict):
+   |       ---------- `NeverEmpty` defined here
+62 |     x: int
+   |     ------ First required field defined here
+
+
+warning[redundant-condition]: A TypedDict with 1 required field is always truthy
+  --> src/mdtest_snippet.py:83:8
+   |
+83 |     if also_never_empty:  # snapshot: redundant-condition
+   |        ^^^^^^^^^^^^^^^^ Inferred type is `AlsoNeverEmpty`
+   |
+  ::: src/mdtest_snippet.py:65:7
+   |
+65 | class AlsoNeverEmpty(TypedDict, total=False):
+   |       -------------- `AlsoNeverEmpty` defined here
+66 |     x: Required[int]
+   |     ---------------- Required field declared here
 ```
 
 and testing an object that is known to be always truthy due to it being `@final` and not defining
@@ -166,26 +313,22 @@ and testing an object that is known to be always truthy due to it being `@final`
 from re import Pattern
 
 def f(x: Pattern[str]):
-    if x:  # TODO: should error
+    if x:  # snapshot: redundant-condition
         pass
 ```
 
-## Required keys established by narrowing
-
-A `TypedDict` with no declared required keys can be empty. After a key-presence check establishes
-that a key is present, the dictionary is always truthy, so a subsequent truthiness check is
-redundant.
-
-```py
-from typing import TypedDict
-
-class Record(TypedDict):
-    pass
-
-def check(value: Record):
-    if "x" in value:
-        if value:  # TODO: should error
-            pass
+```snapshot
+warning[redundant-condition]: Condition is always truthy
+  --> src/mdtest_snippet.py:99:8
+   |
+99 |     if x:  # snapshot: redundant-condition
+   |        ^ Inferred type is `Pattern[str]`
+info: `Pattern` instances are always truthy because `Pattern` cannot be subclassed and does not define `__bool__` or `__len__`
+   --> stdlib/re.pyi:285:1
+    |
+285 | / @final
+286 | | class Pattern(Generic[AnyStr]):
+    | |______________________________^ `Pattern` defined here
 ```
 
 ## Enum instances
@@ -201,8 +344,84 @@ class Choice(Enum):
     SECOND = 2
 
 def f(choice: Choice):
-    if choice:  # TODO: should error
+    if choice:  # snapshot: redundant-condition
         pass
+```
+
+```snapshot
+warning[redundant-condition]: Condition is always truthy
+ --> src/mdtest_snippet.py:8:8
+  |
+8 |     if choice:  # snapshot: redundant-condition
+  |        ^^^^^^ Inferred type is `Choice`
+info: `Choice` instances are always truthy because `Choice` cannot be subclassed and does not define `__bool__` or `__len__`
+ --> src/mdtest_snippet.py:3:7
+  |
+3 | class Choice(Enum):
+  |       ^^^^^^^^^^^^ `Choice` defined here
+```
+
+## Inherited required `TypedDict` fields
+
+A required field makes a `TypedDict` nonempty even when the field is inherited from a class in
+another module. The diagnostic points to the inherited field's declaration in that module.
+
+`base.py`:
+
+```py
+from typing import TypedDict
+
+class Base(TypedDict):
+    value: int
+```
+
+`child.py`:
+
+```py
+from base import Base
+
+class Child(Base):
+    pass
+
+def check(value: Child):
+    if value:  # snapshot: redundant-condition
+        pass
+    assert value  # error: [redundant-condition] "TypedDict `Child` with 1 required field is always truthy"
+```
+
+```snapshot
+warning[redundant-condition]: A TypedDict with 1 required field is always truthy
+ --> src/child.py:7:8
+  |
+7 |     if value:  # snapshot: redundant-condition
+  |        ^^^^^ Inferred type is `Child`
+  |
+ ::: src/child.py:3:7
+  |
+3 | class Child(Base):
+  |       ----- `Child` defined here
+  |
+ ::: src/base.py:4:5
+  |
+4 |     value: int
+  |     ---------- Required field declared here
+```
+
+## Required keys established by narrowing
+
+A key-presence check can narrow an open `TypedDict` to an unnamed schema with required keys. The
+diagnostic describes the number of required fields without inventing a class name.
+
+```py
+from typing import TypedDict
+
+class Record(TypedDict):
+    pass
+
+def check(value: Record):
+    if "x" in value:
+        if value:  # error: [redundant-condition] "A TypedDict with 1 required field is always truthy"
+            pass
 ```
 
 ## Other boolean contexts
@@ -221,53 +440,53 @@ def coinflip() -> bool:
 
 def func(): ...
 
-if not func:  # TODO: should error
+if not func:  # error: [redundant-condition]
     pass
 
-if not not func:  # TODO: should error
+if not not func:  # error: [redundant-condition]
     pass
 
-a = True if func else False  # TODO: should error
+a = True if func else False  # error: [redundant-condition]
 
-if coinflip() if func else False:  # TODO: should error
+if coinflip() if func else False:  # error: [redundant-condition]
     pass
 
 b = func and coinflip()  # no diagnostic
 
-if func and coinflip():  # TODO: should error
+if func and coinflip():  # error: [redundant-condition]
     pass
 
 c = func or coinflip()  # no diagnostic
 
-if func or coinflip():  # TODO: should error
+if func or coinflip():  # error: [redundant-condition]
     pass
 
-[x for x in range(3) if func]  # TODO: should error
+[x for x in range(3) if func]  # error: [redundant-condition]
 
 def function(flag: bool):
     if flag:
         pass
-    elif func:  # TODO: should error
+    elif func:  # error: [redundant-condition]
         pass
 
 def _():
-    assert func  # TODO: should error
+    assert func  # error: [redundant-condition]
 
 def _():
-    while func and coinflip():  # TODO: should error
+    while func and coinflip():  # error: [redundant-condition]
         pass
 
 def _():
-    while not (func and coinflip()):  # TODO: should error
+    while not (func and coinflip()):  # error: [redundant-condition]
         pass
 
 def f(x: str | int):
     match x:
-        case str() if func:  # TODO: should error
+        case str() if func:  # error: [redundant-condition]
             pass
 
 def _():
-    while func:  # TODO: should error
+    while func:  # error: [redundant-condition]
         pass
 ```
 
@@ -279,28 +498,70 @@ condition overall is inferred as having ambiguous truthiness. We still report th
 ```py
 def func(): ...
 def compound_statement_conditions(flag: bool, other: bool):
-    if flag and func:  # TODO: should error
+    if flag and func:  # snapshot: redundant-condition
         pass
 
     if other:
         pass
-    elif flag and func:  # TODO: should error
+    elif flag and func:  # error: [redundant-condition]
         pass
 
-    while flag and func:  # TODO: should error
+    while flag and func:  # error: [redundant-condition]
         break
 
     match flag:
-        case bool() if flag and func:  # TODO: should error
+        case bool() if flag and func:  # error: [redundant-condition]
             pass
 
 def compound_expression_conditions(flag: bool):
-    selected = True if flag and func else False  # TODO: should error
-    filtered = [value for value in range(1) if flag and func]  # TODO: should error
+    selected = True if flag and func else False  # snapshot: redundant-condition
+    filtered = [value for value in range(1) if flag and func]  # error: [redundant-condition]
     result = flag and func
 
 def compound_assertion_condition(flag: bool):
-    assert flag and func  # TODO: should error
+    assert flag and func  # snapshot: redundant-condition
+```
+
+```snapshot
+warning[redundant-condition]: Function `func` is always truthy
+ --> src/mdtest_snippet.py:3:17
+  |
+3 |     if flag and func:  # snapshot: redundant-condition
+  |                 ^^^^ Did you mean to call this function?
+  |
+2 | def compound_statement_conditions(flag: bool, other: bool):
+  -     if flag and func:  # snapshot: redundant-condition
+3 +     if flag and func():  # snapshot: redundant-condition
+4 |         pass
+  |
+note: This is an unsafe fix and may change runtime behavior
+
+
+warning[redundant-condition]: Function `func` is always truthy
+  --> src/mdtest_snippet.py:19:33
+   |
+19 |     selected = True if flag and func else False  # snapshot: redundant-condition
+   |                                 ^^^^ Did you mean to call this function?
+   |
+18 | def compound_expression_conditions(flag: bool):
+   -     selected = True if flag and func else False  # snapshot: redundant-condition
+19 +     selected = True if flag and func() else False  # snapshot: redundant-condition
+20 |     filtered = [value for value in range(1) if flag and func]  # error: [redundant-condition]
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+
+warning[redundant-condition]: Function `func` is always truthy
+  --> src/mdtest_snippet.py:24:21
+   |
+24 |     assert flag and func  # snapshot: redundant-condition
+   |                     ^^^^ Did you mean to call this function?
+   |
+23 | def compound_assertion_condition(flag: bool):
+   -     assert flag and func  # snapshot: redundant-condition
+24 +     assert flag and func()  # snapshot: redundant-condition
+   |
+note: This is an unsafe fix and may change runtime behavior
 ```
 
 ## Chained comparison conditions
@@ -318,7 +579,7 @@ def direct_condition(value: Comparable):
     reveal_type(bool(value < 1 < 0))  # revealed: bool
 
     # Short-circuiting makes the direct condition always false, despite the standalone types above.
-    if value < 1 < 0:  # TODO: should flag `value < 1 < 0`
+    if value < 1 < 0:  # error: [redundant-condition-strict]
         pass
 
 def negated_condition(value: Comparable):
@@ -326,7 +587,7 @@ def negated_condition(value: Comparable):
     reveal_type(bool(not (value < 1 < 0)))  # revealed: bool
 
     # Short-circuiting makes the direct condition always true, despite the standalone types above.
-    if not (value < 1 < 0):  # TODO: should flag `not (value < 1 < 0)`
+    if not (value < 1 < 0):  # error: [redundant-condition-strict]
         pass
 ```
 
@@ -367,13 +628,13 @@ def ready() -> bool:
     return False
 
 def uncalled_functions(flag: bool):
-    if ready if flag else False:  # TODO: should flag `ready`
+    if ready if flag else False:  # error: [redundant-condition]
         pass
-    if False if flag else ready:  # TODO: should flag `ready`
+    if False if flag else ready:  # error: [redundant-condition]
         pass
-    if ready if flag else True:  # TODO: should flag `ready`
+    if ready if flag else True:  # error: [redundant-condition]
         pass
-    assert ready if flag else False  # TODO: should flag `ready`
+    assert ready if flag else False  # error: [redundant-condition]
 ```
 
 The `not` operator also tests truthiness, so we report the uncalled function in
@@ -382,7 +643,7 @@ The `not` operator also tests truthiness, so we report the uncalled function in
 
 ```py
 def negated_expression(flag: bool) -> bool:
-    return not (ready if flag else False)  # TODO: should flag `ready`
+    return not (ready if flag else False)  # error: [redundant-condition]
 ```
 
 Passing a function as an argument does not test its truthiness. Here, `callable()` checks whether
@@ -402,7 +663,7 @@ reported as a whole:
 def boolean_branches(value: int, flag: bool):
     assert isinstance(value, int) if flag else True  # no diagnostic
 
-    # TODO: should flag `isinstance(value, int) if flag else True`
+    # error: [redundant-condition-strict]
     if isinstance(value, int) if flag else True:
         pass
 ```
@@ -413,7 +674,7 @@ if `value` has mutable truthiness, `value or True` short-circuits directly to th
 
 ```py
 def conditional_expression(value: object, flag: bool):
-    # TODO: should flag `True if flag else (value or True)`
+    # error: [redundant-condition-strict]
     while True if flag else (value or True):
         break
 ```
@@ -433,8 +694,101 @@ class FalsyTuple(tuple[int, int]):
         return False
 
 def check_falsy_tuple(value: FalsyTuple):
-    if value:  # TODO: should error
+    if value:  # error: [redundant-condition] "Object of type `FalsyTuple` is always falsy"
         pass
+```
+
+Calling a function with an always-truthy return value does not resolve the redundant condition --
+but they still probably meant to call the function, so we still offer autofixes in these cases:
+
+```py
+def always_truthy() -> Literal[True]:
+    return True
+
+def inspect_truthy_function():
+    if always_truthy:  # snapshot: redundant-condition
+        pass
+
+async def always_truthy_coro() -> Literal[True]:
+    return True
+
+async def foo():
+    if always_truthy_coro:  # snapshot: redundant-condition
+        pass
+```
+
+```snapshot
+warning[redundant-condition]: Function `always_truthy` is always truthy
+  --> src/mdtest_snippet.py:17:8
+   |
+17 |     if always_truthy:  # snapshot: redundant-condition
+   |        ^^^^^^^^^^^^^ Did you mean to call this function?
+   |
+16 | def inspect_truthy_function():
+   -     if always_truthy:  # snapshot: redundant-condition
+17 +     if always_truthy():  # snapshot: redundant-condition
+18 |         pass
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+
+warning[redundant-condition]: Function `always_truthy_coro` is always truthy
+  --> src/mdtest_snippet.py:24:8
+   |
+24 |     if always_truthy_coro:  # snapshot: redundant-condition
+   |        ^^^^^^^^^^^^^^^^^^ Did you mean to call this function?
+   |
+23 | async def foo():
+   -     if always_truthy_coro:  # snapshot: redundant-condition
+24 +     if always_truthy_coro():  # snapshot: redundant-condition
+25 |         pass
+   |
+note: This is an unsafe fix and may change runtime behavior
+```
+
+If a function has parameters, we still offer a "fix", but we do not attempt to make the fix valid --
+it's just to show the user visually what kind of edit we're suggesting that they make. The fix is
+"display-only" to indicate that it's almost certainly incorrect:
+
+```py
+def wut(x): ...
+
+if wut:  # snapshot: redundant-condition
+    pass
+
+async def wuttt(x): ...
+async def bar():
+    if wuttt:  # snapshot: redundant-condition
+        pass
+```
+
+```snapshot
+warning[redundant-condition]: Function `wut` is always truthy
+  --> src/mdtest_snippet.py:28:4
+   |
+28 | if wut:  # snapshot: redundant-condition
+   |    ^^^ Did you mean to call this function?
+   |
+27 |
+   - if wut:  # snapshot: redundant-condition
+28 + if wut(...):  # snapshot: redundant-condition
+29 |     pass
+   |
+note: This is a display-only fix and is likely to be incorrect
+
+
+warning[redundant-condition]: Function `wuttt` is always truthy
+  --> src/mdtest_snippet.py:33:8
+   |
+33 |     if wuttt:  # snapshot: redundant-condition
+   |        ^^^^^ Did you mean to call this function?
+   |
+32 | async def bar():
+   -     if wuttt:  # snapshot: redundant-condition
+33 +     if wuttt(...):  # snapshot: redundant-condition
+34 |         pass
+   |
+note: This is a display-only fix and is likely to be incorrect
 ```
 
 ## Strict version
@@ -445,23 +799,153 @@ Our stricter `redundant-condition-strict` rule extends this logic to boolean and
 from typing import Literal
 
 def f(x: Literal[1, 2]):
-    if x > 5:  # TODO: should error
+    if x > 5:  # error: [redundant-condition-strict]
         pass
 
-    if x:  # TODO: should error
+    if x:  # snapshot: redundant-condition-strict
         pass
 
 def g(flag: bool, some_bytes: bytes):
     if flag:
         pass
-    elif some_bytes[0] == b"\x1e":  # TODO: should error
+    elif some_bytes[0] == b"\x1e":  # snapshot: redundant-condition-strict
         pass
+```
 
+```snapshot
+error[redundant-condition-strict]: Condition is always truthy
+ --> src/mdtest_snippet.py:7:8
+  |
+7 |     if x:  # snapshot: redundant-condition-strict
+  |        ^ Inferred type is `Literal[1, 2]`
+
+
+error[redundant-condition-strict]: Condition is always false
+  --> src/mdtest_snippet.py:13:10
+   |
+13 |     elif some_bytes[0] == b"/x1e":  # snapshot: redundant-condition-strict
+   |          -------------^^^^-------
+   |          |                |
+   |          |                Has type `Literal[b"/x1e"]`
+   |          Has type `int`
+```
+
+We offer bespoke diagnostics for common mistakes such as accidentally comparing a string with a
+bytestring:
+
+```py
 def falsy(flag: bool):
     if flag:
         pass
-    elif "foo" == b"foo":  # TODO: should error
+    elif "foo" == b"foo":  # snapshot: redundant-condition-strict
         pass
+```
+
+```snapshot
+error[redundant-condition-strict]: Condition is always false
+  --> src/mdtest_snippet.py:18:10
+   |
+18 |     elif "foo" == b"foo":  # snapshot: redundant-condition-strict
+   |          -----^^^^------
+   |          |        |
+   |          |        Instance of `bytes`
+   |          Instance of `str`
+```
+
+Or comparing a number with a string:
+
+```py
+x = 1
+if x == "1":  # snapshot: redundant-condition-strict
+    pass
+```
+
+```snapshot
+error[redundant-condition-strict]: Condition is always false
+  --> src/mdtest_snippet.py:21:4
+   |
+21 | if x == "1":  # snapshot: redundant-condition-strict
+   |    -^^^^---
+   |    |    |
+   |    |    Instance of `str`
+   |    Instance of `int`
+```
+
+Or testing the length of a tuple that always has a fixed length:
+
+```py
+def test(x: tuple[int]):  # the user probably meant to use `tuple[int, ...]` here
+    # error: [redundant-condition-strict] "`x` always has length 1"
+    if len(x) == 1:
+        pass
+
+    if len(x) == 2:  # snapshot: redundant-condition-strict
+        pass
+```
+
+```snapshot
+error[redundant-condition-strict]: `x` always has length 1
+  --> src/mdtest_snippet.py:28:8
+   |
+28 |     if len(x) == 2:  # snapshot: redundant-condition-strict
+   |        ^^^^-^^^^^^
+   |            |
+   |            Has type `tuple[int]`
+```
+
+We avoid annotating the inferred types of comparison conditions for very obvious AST literals such
+as the `None` keyword or number-literal expressions, including signed numbers:
+
+```py
+def f(x: None):
+    if x is None:  # snapshot: redundant-condition-strict
+        pass
+
+    if x == 3:  # snapshot: redundant-condition-strict
+        pass
+
+    if x == -3:  # snapshot: redundant-condition-strict
+        pass
+
+    if x == +3:  # snapshot: redundant-condition-strict
+        pass
+```
+
+```snapshot
+error[redundant-condition-strict]: Condition is always true
+  --> src/mdtest_snippet.py:31:8
+   |
+31 |     if x is None:  # snapshot: redundant-condition-strict
+   |        -^^^^^^^^
+   |        |
+   |        Has type `None`
+
+
+error[redundant-condition-strict]: Condition is always false
+  --> src/mdtest_snippet.py:34:8
+   |
+34 |     if x == 3:  # snapshot: redundant-condition-strict
+   |        -^^^^^
+   |        |
+   |        Has type `None`
+
+
+error[redundant-condition-strict]: Condition is always false
+  --> src/mdtest_snippet.py:37:8
+   |
+37 |     if x == -3:  # snapshot: redundant-condition-strict
+   |        -^^^^^^
+   |        |
+   |        Has type `None`
+
+
+error[redundant-condition-strict]: Condition is always false
+  --> src/mdtest_snippet.py:40:8
+   |
+40 |     if x == +3:  # snapshot: redundant-condition-strict
+   |        -^^^^^^
+   |        |
+   |        Has type `None`
 ```
 
 `redundant-condition-strict` is also emitted on negated conditions where the negated condition is
@@ -469,28 +953,28 @@ inferred as an instance of `bool`:
 
 ```py
 def negated_conditions():
-    if not 1 > 2:  # TODO: should error
+    if not 1 > 2:  # error: [redundant-condition-strict] "Condition `not 1 > 2` is always true"
         pass
 
-    if not 1 < 2:  # TODO: should error
+    if not 1 < 2:  # error: [redundant-condition-strict] "Condition `not 1 < 2` is always false"
         pass
 
-    if not 0 == 1:  # TODO: should error
+    if not 0 == 1:  # error: [redundant-condition-strict] "Condition `not 0 == 1` is always true"
         pass
 
-    if not 1 == 1:  # TODO: should error
+    if not 1 == 1:  # error: [redundant-condition-strict] "Condition `not 1 == 1` is always false"
         pass
 
-    if not not 1 == 1:  # TODO: should error
+    if not not 1 == 1:  # error: [redundant-condition-strict] "Condition `not not 1 == 1` is always true"
         pass
 
 def negated_conditional_contexts(flag: bool):
     if flag:
         pass
-    elif not 1 == 0:  # TODO: should error
+    elif not 1 == 0:  # error: [redundant-condition-strict] "Condition `not 1 == 0` is always true"
         pass
 
-    while not 1 == 0:  # TODO: should error
+    while not 1 == 0:  # error: [redundant-condition-strict] "Condition `not 1 == 0` is always true"
         break
 ```
 
@@ -499,26 +983,26 @@ rule reports redundant boolean and integer operands in assignments and return ex
 
 ```py
 def negated_boolean_assignment(value: str):
-    result = not isinstance(value, str)  # TODO: should error
+    result = not isinstance(value, str)  # error: [redundant-condition-strict] "Condition `isinstance(value, str)` is always true"
 
 def negated_integer_return(value: Literal[1, 2]) -> bool:
-    return not value  # TODO: should error
+    return not value  # error: [redundant-condition-strict] "Object of type `Literal[1, 2]` is always truthy"
 ```
 
-When the strict rule can report that a complete compound condition is always true or always false,
-it reports that condition instead of its operands. Only a single diagnostic is emitted on each of
+When the strict rule is needed because of a test's type or short-circuit behavior, we report the
+complete compound condition instead of its operands. Only a single diagnostic is emitted on each of
 these:
 
 ```py
 def compound_truthy(x: str):
-    if isinstance(x, str) and isinstance(x, str):  # TODO: should error
+    if isinstance(x, str) and isinstance(x, str):  # error: [redundant-condition-strict]
         pass
 
-    while isinstance(x, str) and isinstance(x, str):  # TODO: should error
+    while isinstance(x, str) and isinstance(x, str):  # error: [redundant-condition-strict]
         break
 
     match x:
-        case str() if isinstance(x, str) and isinstance(x, str):  # TODO: should error
+        case str() if isinstance(x, str) and isinstance(x, str):  # error: [redundant-condition-strict]
             pass
 ```
 
@@ -530,13 +1014,13 @@ annotation, while `value is None` is always false. The result depends on `enable
 
 ```py
 def check(value: int, enabled: bool):
-    if enabled and value is not None:  # TODO: should flag `value is not None`
+    if enabled and value is not None:  # error: [redundant-condition-strict] "Condition `value is not None` is always true"
         print(value)
-    if value is not None and enabled:  # TODO: should flag `value is not None`
+    if value is not None and enabled:  # error: [redundant-condition-strict] "Condition `value is not None` is always true"
         print(value)
-    if enabled or value is None:  # TODO: should flag `value is None`
+    if enabled or value is None:  # error: [redundant-condition-strict] "Condition `value is None` is always false"
         print(value)
-    if value is None or enabled:  # TODO: should flag `value is None`
+    if value is None or enabled:  # error: [redundant-condition-strict] "Condition `value is None` is always false"
         print(value)
 ```
 
@@ -545,18 +1029,18 @@ filters:
 
 ```py
 def condition_contexts(value: int, enabled: bool):
-    while enabled and value is not None:  # TODO: should flag `value is not None`
+    while enabled and value is not None:  # error: [redundant-condition-strict] "Condition `value is not None` is always true"
         break
-
+    
     match value:
-        # TODO: should flag `value is not None`
+        # error: [redundant-condition-strict] "Condition `value is not None` is always true"
         case _ if enabled and value is not None:
             pass
 
-    # TODO: should flag `value is not None`
+    # error: [redundant-condition-strict] "Condition `value is not None` is always true"
     selected = value if enabled and value is not None else 0
 
-    # TODO: should flag `item is not None`
+    # error: [redundant-condition-strict] "Condition `item is not None` is always true"
     filtered = [item for item in range(3) if enabled and item is not None]
 ```
 
@@ -565,12 +1049,12 @@ hide a redundant operand when the complete condition still has unknown truthines
 
 ```py
 def nested(value: int, enabled: bool):
-    # TODO: should flag `value is not None and isinstance(value, int)`
+    # error: [redundant-condition-strict] "Condition `value is not None and isinstance(value, int)` is always true"
     if enabled and (value is not None and isinstance(value, int)):
         print(value)
-    if not (enabled or value is None):  # TODO: should flag `value is None`
+    if not (enabled or value is None):  # error: [redundant-condition-strict] "Condition `value is None` is always false"
         print(value)
-    # TODO: should flag `(enabled and value is not None) or True`
+    # error: [redundant-condition-strict] "Condition `(enabled and value is not None) or True` is always true"
     if (enabled and value is not None) or True:
         print(value)
 ```
@@ -581,9 +1065,9 @@ expression does not replace a diagnostic on an earlier operand:
 ```py
 def separate_operands(value: int, text: str, enabled: bool):
     if (
-        value is not None  # TODO: should flag `value is not None`
+        value is not None  # error: [redundant-condition-strict] "Condition `value is not None` is always true"
         and enabled
-        and isinstance(text, str)  # TODO: should flag `isinstance(text, str)`
+        and isinstance(text, str)  # error: [redundant-condition-strict] "Condition `isinstance(text, str)` is always true"
     ):
         print(value)
 ```
@@ -593,9 +1077,9 @@ not guarantee that truthiness:
 
 ```py
 def short_circuit_operands(value: object, enabled: bool):
-    if enabled and (value or True):  # TODO: should flag `value or True`
+    if enabled and (value or True):  # error: [redundant-condition-strict] "Condition `value or True` is always true"
         pass
-    if enabled or (value and False):  # TODO: should flag `value and False`
+    if enabled or (value and False):  # error: [redundant-condition-strict] "Condition `value and False` is always false"
         pass
 ```
 
@@ -605,7 +1089,7 @@ when it evaluates to `enabled`:
 
 ```py
 def conditional_branch(value: int, select: bool, enabled: bool):
-    # TODO: should flag `value is not None`
+    # error: [redundant-condition-strict] "Condition `value is not None` is always true"
     if value is not None if select else enabled:
         print(value)
 ```
@@ -619,10 +1103,10 @@ diagnostic for the same subexpression.
 ```py
 def func(): ...
 def mixed_operands(value: object):
-    if func and False:  # TODO: should flag `func`
+    if func and False:  # error: [redundant-condition] "Function `func` is always truthy"
         pass
-
-    if not (value or func):  # TODO: should flag `func`
+    
+    if not (value or func):  # error: [redundant-condition] "Function `func` is always truthy"
         pass
 ```
 
@@ -635,7 +1119,7 @@ def short_circuit(value: object):
     reveal_type(bool(value and False))  # revealed: bool
 
     # Short-circuiting means this body is never reached, despite the standalone types above.
-    if value and False:  # TODO: should flag `value and False`
+    if value and False:  # error: [redundant-condition-strict] "Condition `value and False` is always false"
         pass
 ```
 
@@ -650,7 +1134,7 @@ def accepts(value: object) -> bool:
     return bool(value)
 
 def nested_tests():
-    if accepts(not func):  # TODO: should error
+    if accepts(not func):  # error: [redundant-condition]
         pass
 ```
 
@@ -660,13 +1144,13 @@ reported once in either case.
 
 ```py
 def nested_scopes():
-    if accepts(lambda: not func):  # TODO: should error
+    if accepts(lambda: not func):  # error: [redundant-condition]
         pass
-    if accepts(lambda value=not func: value):  # TODO: should error
+    if accepts(lambda value=not func: value):  # error: [redundant-condition]
         pass
-    if accepts([item for item in (not func,)]):  # TODO: should error
+    if accepts([item for item in (not func,)]):  # error: [redundant-condition]
         pass
-    if accepts([item for item in range(2) if not func]):  # TODO: should error
+    if accepts([item for item in range(2) if not func]):  # error: [redundant-condition]
         pass
 ```
 
@@ -675,11 +1159,11 @@ condition once, rather than both the condition and its negated operand.
 
 ```py
 def compound_expression_tests():
-    selected = 1 if not not (1 == 1) else 0  # TODO: should flag `not not (1 == 1)`
+    selected = 1 if not not (1 == 1) else 0  # error: [redundant-condition-strict] "Condition `not not (1 == 1)` is always true"
     filtered = [
         item
         for item in range(2)
-        # TODO: should flag `not not (1 == 1)`
+        # error: [redundant-condition-strict] "Condition `not not (1 == 1)` is always true"
         if not not (1 == 1)
     ]
 ```
@@ -689,8 +1173,36 @@ expressions are redundant, regardless of which one runs:
 
 ```py
 def selected_values(flag: bool):
-    # TODO: should flag both uses of `func`
+    # snapshot: redundant-condition
+    # snapshot: redundant-condition
     selected = not func if flag else not func
+```
+
+```snapshot
+warning[redundant-condition]: Function `func` is always truthy
+  --> src/mdtest_snippet.py:28:20
+   |
+28 |     selected = not func if flag else not func
+   |                    ^^^^ Did you mean to call this function?
+   |
+27 |     # snapshot: redundant-condition
+   -     selected = not func if flag else not func
+28 +     selected = not func() if flag else not func
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+
+warning[redundant-condition]: Function `func` is always truthy
+  --> src/mdtest_snippet.py:28:42
+   |
+28 |     selected = not func if flag else not func
+   |                                          ^^^^ Did you mean to call this function?
+   |
+27 |     # snapshot: redundant-condition
+   -     selected = not func if flag else not func
+28 +     selected = not func if flag else not func()
+   |
+note: This is an unsafe fix and may change runtime behavior
 ```
 
 ## Redundant boolean tests in call arguments
@@ -702,9 +1214,37 @@ def accepts(value: bool) -> bool:
     return value
 
 def nested_boolean_test(value: int, enabled: bool):
-    # TODO: should flag `value is None`
+    # error: [redundant-condition-strict] "Condition `value is None` is always false"
     if enabled and accepts(not (value is None)):
         pass
+```
+
+## Multiline conditions in concise diagnostics
+
+Concise diagnostics usually quote source code in their diagnostics:
+
+```py
+if 1 + 1 == 2:  # error: [redundant-condition-strict] "Condition `1 + 1 == 2` is always true"
+    pass
+```
+
+But the source code is omitted if the full condition is split over multiple lines:
+
+```py
+def multiline_conditions(value: int):
+    if (
+        value is not None  # error: [redundant-condition-strict] "Condition is always true"
+        # Both operands are always true.
+        and value is not None
+    ):
+        pass
+
+    # fmt: off
+    if (value  # error: [redundant-condition-strict] "Condition is always false"
+        is
+        None):
+        pass
+    # fmt: on
 ```
 
 ## `if` and `while` conditions that use AST literal bools or ints
@@ -749,12 +1289,18 @@ if 2:  # no diagnostic
     pass
 ```
 
+`assert None` also comes up unexpectedly often in certain ecosystem projects to assert an
+unreachable region, so we special-case a literal `None` too:
+
+```py
+assert None  # no diagnostic
+```
+
 ## Defensive assertions
 
-The rules are only applied to tests in `assert` statements (and any subexpressions within those
-tests) if the inferred type of the `assert` test is not inferred as being a subtype of `bool` or
-`int`. This is to prevent false positives on defensive assertions such as the following, which are
-common in well written Python code:
+In assertion tests, we only report always-truthy values covered by the ordinary rule. The strict
+rule never reports a diagnostic, even within subexpressions of the test. This avoids false positives
+on defensive assertions such as the following, which are common in well written Python code:
 
 ```py
 def f(x: str, y: str | int, z: str | int | bytes):
@@ -773,7 +1319,7 @@ neither rule checks its `and` or `or` operands:
 ```py
 def func(): ...
 def assertion_boundaries(x: str, flag: bool):
-    assert func and isinstance(x, str)  # TODO: should error
+    assert func and isinstance(x, str)  # error: [redundant-condition]
     
     # no diagnostic: `and` is used as a value expression here, not as a condition.
     assert flag, isinstance(x, str) and flag
@@ -813,8 +1359,17 @@ The strict rule can still fire in assertion tests if the assertion test uses a w
 with `redundant-condition-strict`):
 
 ```py
-# TODO: should error
+# error: [redundant-condition-strict]
 assert (value := "foo")
+```
+
+Always falsy variables that are not AST literals are still reported as redundant assertions by
+`redundant-condition`:
+
+```py
+def failing_assertion(value: None):
+    # error: [redundant-condition] "`None` is always falsy"
+    assert value
 ```
 
 ## `sys.version_info` checks, `sys.platform` checks, `os.name` checks, `if TYPE_CHECKING` checks
@@ -953,7 +1508,7 @@ if CHECKING:  # no diagnostic
 
 ORDINARY_CONSTANT = 1 == 1
 
-if ORDINARY_CONSTANT:  # TODO: should error
+if ORDINARY_CONSTANT:  # error: [redundant-condition-strict]
     pass
 
 BAR = foo
@@ -1027,11 +1582,11 @@ def rebound_receiver():
     config = PlatformConfig()
     if config.enabled:  # no diagnostic
         pass
-    if config.fixed:  # TODO: should error
+    if config.fixed:  # error: [redundant-condition-strict] "Condition `config.fixed` is always true"
         pass
 
     config = FixedConfig()
-    if config.enabled:  # TODO: should error
+    if config.enabled:  # error: [redundant-condition-strict] "Condition `config.enabled` is always true"
         pass
 
 def narrowed_receiver(config: PlatformConfig | FixedConfig):
@@ -1039,7 +1594,7 @@ def narrowed_receiver(config: PlatformConfig | FixedConfig):
         pass
 
     if isinstance(config, FixedConfig):
-        if config.enabled:  # TODO: should error
+        if config.enabled:  # error: [redundant-condition-strict] "Condition `config.enabled` is always true"
             pass
     else:
         if config.enabled:  # no diagnostic
@@ -1077,9 +1632,9 @@ def local_aliases():
     if major >= 3:  # no diagnostic
         pass
 
-if ordinary := 1 == 1:  # TODO: should error
+if ordinary := 1 == 1:  # error: [redundant-condition-strict] "Condition `ordinary := 1 == 1` is always true"
     pass
-if ordinary:  # TODO: should error
+if ordinary:  # error: [redundant-condition-strict] "Condition `ordinary` is always true"
     pass
 ```
 
@@ -1097,7 +1652,7 @@ if platform == "win32":  # no diagnostic
 
 fixed = ""
 fixed += "linux"
-if fixed == "win32":  # TODO: should error
+if fixed == "win32":  # error: [redundant-condition-strict] "Condition `fixed == "win32"` is always false"
     pass
 ```
 
@@ -1112,7 +1667,7 @@ def plain_cycle(flag: bool):
     while flag:
         first = second
         second = first
-    if first:  # TODO: should error
+    if first:  # error: [redundant-condition] "Object of type `Literal["ready"]` is always truthy"
         pass
 
 class AttributeCycle:
@@ -1121,7 +1676,7 @@ class AttributeCycle:
         while flag:
             self.first = self.second
             self.second = self.first
-        if self.first:  # TODO: should error
+        if self.first:  # error: [redundant-condition] "Object of type `Literal["ready"]` is always truthy"
             pass
 ```
 
@@ -1205,12 +1760,12 @@ def ordinary_guard(flag: bool):
         value = "ready"
     else:
         value = "ready"
-    if value:  # TODO: should error
+    if value:  # error: [redundant-condition] "Object of type `Literal["ready"]` is always truthy"
         pass
 
 def recursive_guard():
     value = "ready"
-    if value:  # TODO: should error
+    if value:  # error: [redundant-condition] "Object of type `Literal["ready"]` is always truthy"
         value = "still ready"
 ```
 
@@ -1223,7 +1778,7 @@ if sys.platform == "win32":
 
 print(sys.platform)
 fixed = "ready"
-if fixed:  # TODO: should error
+if fixed:  # error: [redundant-condition] "Object of type `Literal["ready"]` is always truthy"
     pass
 ```
 
@@ -1260,10 +1815,10 @@ Loop and comprehension targets without an environment-dependent source still pro
 
 ```py
 for fixed in (True,):
-    if fixed:  # TODO: should error
+    if fixed:  # error: [redundant-condition-strict] "Condition `fixed` is always true"
         pass
 
-[fixed for fixed in (True,) if fixed]  # TODO: should error
+[fixed for fixed in (True,) if fixed]  # error: [redundant-condition-strict] "Condition `fixed` is always true"
 ```
 
 ## Environment-dependent pattern captures
@@ -1296,7 +1851,7 @@ A capture of an ordinary constant is not exempt.
 ```py
 match True:
     case fixed:
-        if fixed:  # TODO: should error
+        if fixed:  # error: [redundant-condition-strict] "Condition `fixed` is always true"
             pass
 ```
 
@@ -1313,19 +1868,41 @@ with nullcontext(sys.version_info) as version:
         pass
 
 with nullcontext((1,)) as fixed:
-    if fixed:  # TODO: should error
+    if fixed:  # error: [redundant-condition] "Object of type `tuple[int]` is always truthy"
         pass
 ```
 
-## Environment references in called lambdas and consumed generators
+## Environment references in called `lambda` functions and consumed generators
 
-Calls can execute lambda bodies or consume generator expressions. Environment references inside
-those bodies exempt the enclosing condition from both rules, including when the call's result is a
-non-boolean object whose truthiness is known.
+If the top-level expression is a `lambda` or a generator, we know that the inferred type of the
+expression will always be the same regardless of whether a subexpression is defined in terms of
+`sys.version_info`, `sys.platform`, `os.name`, or similar. Therefore we continue to emit diagnostics
+on these:
 
 ```py
 import sys
 
+if lambda: sys.version_info >= (3, 12):  # snapshot: redundant-condition
+    pass
+
+if (sys.platform == "linux" for _ in range(1)):  # error: [redundant-condition]
+    pass
+```
+
+```snapshot
+warning[redundant-condition]: Function object is always truthy
+ --> src/mdtest_snippet.py:3:4
+  |
+3 | if lambda: sys.version_info >= (3, 12):  # snapshot: redundant-condition
+  |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Did you mean to call this function?
+```
+
+However, if a `lambda`, generator or similar is found as a subexpression, we recurse into that
+subexpression to search for references to `sys.version_info`, `os.name`, `sys.platform` and
+`typing.TYPE_CHECKING`. This is because calls can execute `lambda` bodies or consume generator
+expressions:
+
+```py
 if (lambda: sys.version_info >= (3, 12))():  # no diagnostic
     pass
 if next(sys.platform == "linux" for _ in range(1)):  # no diagnostic
@@ -1368,13 +1945,18 @@ def f1(x: int | str):
         pass
     else:
         raise AssertionError
+        """Here's some documentation for why we raised `AssertionError` there"""
         
 def f2(x: int | str):
     if isinstance(x, int):
         pass
-    # always False, but no diagnostic emitted: the block only contains `raise` statements
+    # always False, but no diagnostic emitted: the only nontrivial statmements in the block
+    # are `raise` statements
     elif not isinstance(x, str):
         raise AssertionError
+        pass
+        ...
+        pass
 
 def f3(x: int | str):
     if isinstance(x, int):
@@ -1498,17 +2080,17 @@ conditional body, an `else` block, or immediately after the statement:
 
 ```py
 def successful_assertion_in_body(value: int):
-    if value is None:  # TODO: should error
+    if value is None:  # error: [redundant-condition-strict] "Condition `value is None` is always false"
         assert True
 
 def successful_assertion_in_else(value: int):
-    if value is not None:  # TODO: should error
+    if value is not None:  # error: [redundant-condition-strict] "Condition `value is not None` is always true"
         pass
     else:
         assert True
 
 def successful_assertion_after_if(value: int):
-    if value is not None:  # TODO: should error
+    if value is not None:  # error: [redundant-condition-strict] "Condition `value is not None` is always true"
         pass
     assert True
 ```
@@ -1518,14 +2100,14 @@ body end in defensive exits. A body that falls through does not establish exhaus
 
 ```py
 def nested_fallthrough(value: int, flag: bool):
-    if value is None:  # TODO: should error
+    if value is None:  # error: [redundant-condition-strict] "Condition `value is None` is always false"
         if flag:
             print(value)
         else:
             raise AssertionError
 
 def nested_without_else(value: int, flag: bool):
-    if value is None:  # TODO: should error
+    if value is None:  # error: [redundant-condition-strict] "Condition `value is None` is always false"
         if flag:
             raise AssertionError
 ```
@@ -1547,7 +2129,7 @@ def predicate() -> bool:
 def uncalled_function(flag: bool):
     if flag:
         pass
-    elif predicate:  # TODO: should error
+    elif predicate:  # error: [redundant-condition] "Function `predicate` is always truthy: Did you mean to call this function?"
         pass
     else:
         raise AssertionError
@@ -1598,11 +2180,11 @@ rather than reach it:
 
 ```py
 def nondefensive_operand(value: int, enabled: bool):
-    if enabled and value is not None:  # TODO: should flag `value is not None`
+    if enabled and value is not None:  # error: [redundant-condition-strict] "Condition `value is not None` is always true"
         raise TypeError
 
 def negated_nondefensive_operand(value: int, enabled: bool):
-    if not (enabled or value is None):  # TODO: should flag `value is None`
+    if not (enabled or value is None):  # error: [redundant-condition-strict] "Condition `value is None` is always false"
         raise TypeError
 ```
 
@@ -1614,7 +2196,7 @@ def accepts(value: bool) -> bool:
     return value
 
 def independent_test(value: int):
-    if accepts(not (value is None)):  # TODO: should flag `value is None`
+    if accepts(not (value is None)):  # error: [redundant-condition-strict] "Condition `value is None` is always false"
         raise TypeError
 ```
 
@@ -1630,7 +2212,7 @@ when the `if` body ends in an ordinary call:
 
 ```py
 def fallthrough(value: int, limit: int):
-    if value is not None:  # TODO: should flag `value is not None`
+    if value is not None:  # error: [redundant-condition-strict] "Condition `value is not None` is always true"
         print(value)
     assert limit > 0
 ```
@@ -1641,7 +2223,7 @@ The same applies to a final `elif` whose body falls through:
 def fallthrough_elif(value: int | str):
     if isinstance(value, int):
         return
-    elif isinstance(value, str):  # TODO: should flag `isinstance(value, str)`
+    elif isinstance(value, str):  # error: [redundant-condition-strict] "Condition `isinstance(value, str)` is always true"
         print(value)
     raise TypeError
 ```
@@ -1678,7 +2260,7 @@ succeeds does not count as an exit:
 
 ```py
 def successful_assertion(value: int):
-    if value is not None:  # TODO: should flag `value is not None`
+    if value is not None:  # error: [redundant-condition-strict] "Condition `value is not None` is always true"
         assert True
     raise TypeError
 ```
@@ -1688,7 +2270,7 @@ establish an implicit `else` after the outer `if`:
 
 ```py
 def nested_fallthrough(value: int, flag: bool):
-    if value is not None:  # TODO: should flag `value is not None`
+    if value is not None:  # error: [redundant-condition-strict] "Condition `value is not None` is always true"
         if flag:
             return value
         else:
@@ -1696,7 +2278,7 @@ def nested_fallthrough(value: int, flag: bool):
     raise TypeError
 
 def nested_without_else(value: int, flag: bool):
-    if value is not None:  # TODO: should flag `value is not None`
+    if value is not None:  # error: [redundant-condition-strict] "Condition `value is not None` is always true"
         if flag:
             return value
     raise TypeError
@@ -1707,9 +2289,42 @@ exhaustiveness:
 
 ```py
 def ordinary_return(value: int):
-    if value is not None:  # TODO: should flag `value is not None`
+    if value is not None:  # error: [redundant-condition-strict] "Condition `value is not None` is always true"
         return value
     return 0
+```
+
+## Awaited defensive exits
+
+Awaiting an async function that returns `Never` is a defensive exit, just like calling a synchronous
+function that returns `Never`. Merely creating its coroutine does not exit the suite.
+
+```py
+from typing import Never
+
+def stop() -> Never:
+    raise TypeError
+
+async def async_stop() -> Never:
+    raise TypeError
+
+def synchronous(value: int):
+    if value is None:  # no diagnostic
+        stop()
+
+async def asynchronous(value: int):
+    if value is None:  # no diagnostic
+        await async_stop()
+
+async def implicit_else(value: int):
+    if value is not None:  # no diagnostic
+        await async_stop()
+    raise TypeError
+
+async def not_awaited(value: int):
+    if value is not None:  # error: [redundant-condition-strict]
+        async_stop()  # error: [unused-awaitable]
+    raise TypeError
 ```
 
 ## Dunder methods that return `NotImplemented`
@@ -1752,36 +2367,36 @@ foo = ("foo",)
 # so this would normally trigger `redundant-condition`,
 # but the presence of the walrus expression means we use
 # the disabled-by-default error code.
-if coinflip1() and (foo := ("bar",)) and coinflip2():  # TODO: should error
+if coinflip1() and (foo := ("bar",)) and coinflip2():  # error: [redundant-condition-strict]
     ...
 ```
 
-Walruses in lambda defaults or eager comprehensions can run while the condition is evaluated. These
-conditions also use the strict rule.
+Walruses in `lambda` defaults or eager comprehensions can run while the condition is evaluated.
+These conditions also use the strict rule.
 
 ```py
 def eager_walruses(items: list[int]):
-    if ((lambda value=(saved := 1): value),):  # TODO: should error
+    if ((lambda value=(saved := 1): value),):  # error: [redundant-condition-strict]
         pass
-    if ([saved := item for item in items],):  # TODO: should error
+    if ([saved := item for item in items],):  # error: [redundant-condition-strict]
         pass
-    if ({saved := item for item in items},):  # TODO: should error
+    if ({saved := item for item in items},):  # error: [redundant-condition-strict]
         pass
-    if ({item: (saved := item) for item in items},):  # TODO: should error
+    if ({item: (saved := item) for item in items},):  # error: [redundant-condition-strict]
         pass
 ```
 
-## Walrus expressions in called lambdas and consumed generators
+## Walrus expressions in called `lambda` functions and consumed generators
 
-Calling a lambda or consuming a generator can evaluate a walrus in its body. The nonempty tuples
+Calling a `lambda` or consuming a generator can evaluate a walrus in its body. The nonempty tuples
 returned here are always truthy, but the assignments run when evaluating the conditions. These
 conditions therefore use only the strict rule.
 
 ```py
-if (lambda: (value := (1,)))():  # TODO: should error
+if (lambda: (value := (1,)))():  # error: [redundant-condition-strict]
     pass
-if next((value := (1,)) for _ in range(1)):  # TODO: should error
+if next((value := (1,)) for _ in range(1)):  # error: [redundant-condition-strict]
     pass
-if next((1,) for item in range(3) if (value := item > 0)):  # TODO: should error
+if next((1,) for item in range(3) if (value := item > 0)):  # error: [redundant-condition-strict]
     pass
 ```

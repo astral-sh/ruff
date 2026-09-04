@@ -3962,8 +3962,10 @@ class C:
 
 def _(x: Literal["foo", b"bar"] | int):
     match x:
+        # error: [redundant-condition] "always truthy"
         case "foo" if reveal_type(x):  # revealed: Literal["foo"]
             pass
+        # error: [redundant-condition] "always truthy"
         case b"bar" if reveal_type(x):  # revealed: Literal[b"bar"]
             pass
         case 42 if reveal_type(x):  # revealed: Literal[42]
@@ -4062,8 +4064,10 @@ from typing import Literal
 
 def _(x: Literal["foo", b"bar"] | int):
     match x:
+        # error: [redundant-condition] "always truthy"
         case "foo" | 42 if reveal_type(x):  # revealed: Literal["foo", 42]
             pass
+        # error: [redundant-condition] "always truthy"
         case b"bar" if reveal_type(x):  # revealed: Literal[b"bar"]
             pass
         case _ if reveal_type(x):  # revealed: int & ~Literal[42]
@@ -4102,6 +4106,7 @@ match x:
         pass
     case False if x and reveal_type(x):  #  revealed: Never
         pass
+    # error: [redundant-condition] "always truthy"
     case "foo" if (x := "bar") and reveal_type(x):  #  revealed: Literal["bar"]
         pass
 
