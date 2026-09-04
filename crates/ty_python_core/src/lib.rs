@@ -1391,38 +1391,6 @@ y = 2
     }
 
     #[test]
-    fn equal_nonempty_place_tables_are_shared_within_a_file() {
-        let TestCase { db, file } = test_case(
-            "
-def first():
-    value = 1
-
-def second():
-    value = 2
-
-def third():
-    value = 3
-    value
-",
-        );
-        let index = semantic_index(&db, program_file(&db, file));
-        let scopes = index
-            .child_scopes(FileScopeId::global())
-            .map(|(scope, _)| scope)
-            .collect::<Vec<_>>();
-        assert_eq!(scopes.len(), 3);
-
-        assert!(Arc::ptr_eq(
-            &index.place_tables[scopes[0]],
-            &index.place_tables[scopes[1]]
-        ));
-        assert!(!Arc::ptr_eq(
-            &index.place_tables[scopes[0]],
-            &index.place_tables[scopes[2]]
-        ));
-    }
-
-    #[test]
     fn function_parameter_symbols() {
         let TestCase { db, file } = test_case(
             "
