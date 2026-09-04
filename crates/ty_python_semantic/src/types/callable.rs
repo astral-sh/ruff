@@ -15,7 +15,7 @@ use crate::{
         known_instance::FunctoolsPartialInstance,
         relation::{TypeRelation, TypeRelationChecker},
         signatures::{CallableSignature, PartialSignatureApplication},
-        visitor, walk_signature,
+        visitor, walk_signature, walk_signature_without_return_type,
     },
 };
 use ty_python_core::definition::Definition;
@@ -664,8 +664,16 @@ pub(super) fn walk_callable_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     ty: CallableType<'db>,
     visitor: &V,
 ) {
-    for signature in &ty.signatures(db).overloads {
-        walk_signature(db, signature, visitor);
+    if ty.is_paramspec_value(db) {
+        // We normalize the callables that represent the value assigned to a ParamSpec by removing
+        // their return values. A missing return value is usually treated as `Unknown`
+        for signature in &ty.signatures(db).overloads {
+            walk_signature_without_return_type(db, signature, visitor);
+        }
+    } else {
+        for signature in &ty.signatures(db).overloads {
+            walk_signature(db, signature, visitor);
+        }
     }
 }
 
@@ -720,6 +728,10 @@ impl<'db> CallableType<'db> {
             CallableSignature::single(Signature::new(parameters, Type::unknown())),
             CallableTypeKind::ParamSpecValue,
         )
+    }
+
+    fn is_paramspec_value(self, db: &'db dyn Db) -> bool {
+        self.kind(db) == CallableTypeKind::ParamSpecValue
     }
 
     /// Create a callable type which accepts any parameters and returns an `Unknown` type.

@@ -678,6 +678,18 @@ pub(super) fn walk_signature<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     signature: &Signature<'db>,
     visitor: &V,
 ) {
+    walk_signature_without_return_type(db, signature, visitor);
+    visitor.visit_type(db, signature.return_ty);
+}
+
+pub(super) fn walk_signature_without_return_type<
+    'db,
+    V: super::visitor::TypeVisitor<'db> + ?Sized,
+>(
+    db: &'db dyn Db,
+    signature: &Signature<'db>,
+    visitor: &V,
+) {
     if let Some(generic_context) = &signature.generic_context {
         walk_generic_context(db, *generic_context, visitor);
     }
@@ -689,7 +701,6 @@ pub(super) fn walk_signature<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     for parameter in &signature.parameters {
         visitor.visit_type(db, parameter.annotated_type());
     }
-    visitor.visit_type(db, signature.return_ty);
 }
 
 /// Describes how a `functools.partial(...)` call binds one overload's parameters.
