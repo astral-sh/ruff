@@ -4008,18 +4008,27 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 );
             }
             (Type::Union(union_formal), _) => {
-                // If the formal is a union and the actual is a bare inferable TypeVar in an
-                // invariant position, record the whole union as the mapping. Invariant matching is
-                // equality-like; probing individual union elements below can leave spurious
-                // partial mappings from non-matching elements. For example, while comparing
-                // `ClassSelector[T]` with `ClassSelector[CT | None]`, descending into `None`
-                // would map `T` to `None` before `CT` is solved from another argument.
                 if let Type::TypeVar(actual_typevar) = actual
                     && actual_typevar.is_inferable(db, self.inferable)
-                    && matches!(polarity, TypeVarVariance::Invariant)
                 {
-                    self.add_type_mapping(actual_typevar, formal, polarity);
-                    return Ok(());
+                    let has_variadic = self
+                        .inferable
+                        .iter(db)
+                        .any(|typevar| typevar.is_paramspec(db) || typevar.is_typevartuple(db));
+                    if has_variadic {
+                        // TODO:
+                        // Variadic contexts still solve from legacy mappings. Projecting the relation
+                        // here can choose a narrow TypeVar constraint before later arguments supply
+                        // evidence for another, such as `str | None` instead of `Any`. Preserve the
+                        // legacy union heuristics, including the whole-union mapping for invariance.
+                        if matches!(polarity, TypeVarVariance::Invariant) {
+                            self.add_type_mapping(actual_typevar, formal, polarity);
+                            return Ok(());
+                        }
+                    }
+
+                    let when = self.constraint_for_relation(formal, actual, relation_polarity);
+                    return self.infer_from_constraint_set(when);
                 }
 
                 // Second, if the formal is a union, and the actual type is assignable to precisely
