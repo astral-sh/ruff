@@ -200,8 +200,16 @@ pub(super) fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Size
             }
         }
         KnownInstanceType::UnionType(instance) => {
-            if let Ok(union_type) = instance.union_type(db) {
+            if let Some(Ok(union_type)) = instance.eager_union_type(db) {
                 visitor.visit_type(db, *union_type);
+            } else if instance.deferred_union(db).is_some() {
+                if visitor.should_visit_lazy_type_attributes() {
+                    if let Ok(union_type) = instance.union_type(db) {
+                        visitor.visit_type(db, union_type);
+                    }
+                } else {
+                    visitor.notify_skipped_lazy_type_attributes();
+                }
             }
         }
         KnownInstanceType::Literal(ty)
@@ -369,7 +377,7 @@ impl<'db> KnownInstanceType<'db> {
     ) -> Option<Type<'db>> {
         match self {
             Self::TypeAliasType(alias) => Some(Type::TypeAlias(alias)),
-            Self::UnionType(instance) => instance.union_type(db).as_ref().ok().copied(),
+            Self::UnionType(instance) => instance.union_type(db).ok(),
             Self::Literal(ty) | Self::Annotated(ty) | Self::LiteralStringAlias(ty) => {
                 Some(ty.inner(db))
             }
@@ -625,34 +633,110 @@ impl<'db> FieldInstance<'db> {
     }
 }
 
+/// A deferred `typing.Union[...]` or `typing.Optional[...]` expression within an assignment.
+///
+/// The node index is relative to the assignment's RHS so edits preceding the assignment do not
+/// change the value type exposed to other modules.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+pub struct DeferredUnionType<'db> {
+    #[returns(copy)]
+    pub(super) definition: Definition<'db>,
+
+    #[returns(copy)]
+    pub(super) relative_node_index: u32,
+
+    #[returns(copy)]
+    pub(super) typevar_binding_context: Option<Definition<'db>>,
+
+    #[returns(copy)]
+    pub(super) is_optional: bool,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for DeferredUnionType<'_> {}
+
 /// Contains information about a `types.UnionType` instance built from a PEP 604
 /// union or a legacy `typing.Union[…]` annotation in a value expression context,
 /// e.g. `IntOrStr = int | str` or `IntOrStr = Union[int, str]`.
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
 pub struct UnionTypeInstance<'db> {
-    /// You probably don't want to access this field outside `UnionTypeInstance`
-    /// internals.
-    ///
-    /// This field is the types of the elements of this union, as they were inferred
-    /// in a value expression context. For `int | str`, this would contain
-    /// `<class 'int'>` and `<class 'str'>`. For `Union[int, str]`, this field is
-    /// `None`, as we infer the elements as type expressions.
-    ///
-    /// Use `value_expression_types` to get the corresponding value expression types.
     #[returns(ref)]
-    _value_expr_types: Option<[Type<'db>; 2]>,
+    kind: UnionTypeInstanceKind<'db>,
+}
 
-    /// The type of the full union, which can be used when this `UnionType` instance
-    /// is used in a type expression context. For `int | str`, this would contain
-    /// `Ok(int | str)`. If any of the element types could not be converted, this
-    /// contains the first encountered error.
-    #[returns(ref)]
-    pub(super) union_type: Result<Type<'db>, InvalidTypeExpressionError<'db>>,
+#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+pub enum UnionTypeInstanceKind<'db> {
+    Eager {
+        /// The operand value types of a PEP 604 union. Legacy `typing.Union[...]`
+        /// expressions infer their elements as type expressions and have no value operands.
+        /// Use `value_expression_types` to obtain value types for either form.
+        value_expr_types: Option<[Type<'db>; 2]>,
+        /// The represented type, or the first error converting a value operand to a type.
+        union_type: Result<Type<'db>, InvalidTypeExpressionError<'db>>,
+    },
+    /// A `typing.Union[...]` or `typing.Optional[...]` with separately inferred elements.
+    Deferred(DeferredUnionType<'db>),
 }
 
 impl get_size2::GetSize for UnionTypeInstance<'_> {}
 
 impl<'db> UnionTypeInstance<'db> {
+    pub(super) fn new(
+        db: &'db dyn Db,
+        value_expr_types: Option<[Type<'db>; 2]>,
+        union_type: Result<Type<'db>, InvalidTypeExpressionError<'db>>,
+    ) -> Self {
+        Self::new_internal(
+            db,
+            UnionTypeInstanceKind::Eager {
+                value_expr_types,
+                union_type,
+            },
+        )
+    }
+
+    pub(super) fn deferred(db: &'db dyn Db, deferred: DeferredUnionType<'db>) -> Self {
+        Self::new_internal(db, UnionTypeInstanceKind::Deferred(deferred))
+    }
+
+    pub(super) fn deferred_union(self, db: &'db dyn Db) -> Option<DeferredUnionType<'db>> {
+        match self.kind(db) {
+            UnionTypeInstanceKind::Deferred(deferred) => Some(*deferred),
+            UnionTypeInstanceKind::Eager { .. } => None,
+        }
+    }
+
+    pub(super) fn eager_union_type(
+        self,
+        db: &'db dyn Db,
+    ) -> Option<&'db Result<Type<'db>, InvalidTypeExpressionError<'db>>> {
+        match self.kind(db) {
+            UnionTypeInstanceKind::Eager { union_type, .. } => Some(union_type),
+            UnionTypeInstanceKind::Deferred(_) => None,
+        }
+    }
+
+    pub(super) fn union_type(
+        self,
+        db: &'db dyn Db,
+    ) -> Result<Type<'db>, InvalidTypeExpressionError<'db>> {
+        match self.kind(db) {
+            UnionTypeInstanceKind::Eager { union_type, .. } => union_type.clone(),
+            UnionTypeInstanceKind::Deferred(deferred) => {
+                Ok(super::infer::infer_union_type(db, *deferred))
+            }
+        }
+    }
+
+    fn value_operand_types(self, db: &'db dyn Db) -> Option<[Type<'db>; 2]> {
+        match self.kind(db) {
+            UnionTypeInstanceKind::Eager {
+                value_expr_types, ..
+            } => *value_expr_types,
+            UnionTypeInstanceKind::Deferred(_) => None,
+        }
+    }
+
     pub(crate) fn from_value_expression_types(
         db: &'db dyn Db,
         value_expr_types: [Type<'db>; 2],
@@ -681,7 +765,7 @@ impl<'db> UnionTypeInstance<'db> {
         // an ever-deeper value-expression tree like `((A | B) | B) | B`.
         for ty in &value_expr_types {
             if let Type::KnownInstance(KnownInstanceType::UnionType(union)) = ty
-                && let Ok(&existing_union) = union.union_type(db).as_ref()
+                && let Ok(existing_union) = union.union_type(db)
                 && existing_union == union_type
             {
                 return *ty;
@@ -703,11 +787,10 @@ impl<'db> UnionTypeInstance<'db> {
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
         if let Ok(union_type) = self.union_type(db) {
-            UnionTypeInstance::new(
-                db,
-                self._value_expr_types(db),
-                Ok(union_type.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
-            )
+            // Specializing a deferred union produces an eager value, even for an unchanged
+            // body. This lets cycle normalization see the current approximation of its members.
+            let mapped = union_type.apply_type_mapping_impl(db, type_mapping, tcx, visitor);
+            UnionTypeInstance::new(db, self.value_operand_types(db), Ok(mapped))
         } else {
             self
         }
@@ -736,10 +819,10 @@ impl<'db> UnionTypeInstance<'db> {
                 .unwrap_or_else(Type::unknown)
         };
 
-        if let Some(value_expr_types) = self._value_expr_types(db) {
-            Ok(Either::Left(value_expr_types.iter().copied()))
+        if let Some(value_expr_types) = self.value_operand_types(db) {
+            Ok(Either::Left(value_expr_types.into_iter()))
         } else {
-            match self.union_type(db).clone()? {
+            match self.union_type(db)? {
                 Type::Union(union) => Ok(Either::Right(Either::Left(
                     union.elements(db).iter().copied().map(to_class_literal),
                 ))),
@@ -757,9 +840,18 @@ impl<'db> UnionTypeInstance<'db> {
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
+        let UnionTypeInstanceKind::Eager {
+            value_expr_types,
+            union_type,
+        } = self.kind(db)
+        else {
+            // The value of a deferred union is independent of its recursively inferred elements.
+            return Some(self);
+        };
+
         // The `Divergent` elimination rules are different within union types.
         // See `UnionType::recursive_type_normalized_impl` for details.
-        let value_expr_types = match self._value_expr_types(db).as_ref() {
+        let value_expr_types = match value_expr_types {
             Some([first, second]) if nested => Some([
                 first.recursive_type_normalized_impl(db, env, div, nested)?,
                 second.recursive_type_normalized_impl(db, env, div, nested)?,
@@ -774,7 +866,7 @@ impl<'db> UnionTypeInstance<'db> {
             ]),
             None => None,
         };
-        let union_type = match self.union_type(db).clone() {
+        let union_type = match union_type.clone() {
             Ok(ty) if nested => Ok(ty.recursive_type_normalized_impl(db, env, div, nested)?),
             Ok(ty) => Ok(ty
                 .recursive_type_normalized_impl(db, env, div, nested)

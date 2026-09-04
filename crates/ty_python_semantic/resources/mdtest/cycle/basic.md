@@ -336,7 +336,7 @@ from types import UnionType
 
 D = Union["D", "D"]
 R = Union[D, int]
-reveal_type(R)  # revealed: <types.UnionType special-form 'Divergent | int'>
+reveal_type(R)  # revealed: <types.UnionType special-form>
 
 def accumulate_unions(iterations: list[int]) -> UnionType:
     result = R
@@ -391,6 +391,8 @@ b = Union["a", "b", int]
 Adding another concrete member to the recursive union also converges. The union keeps both concrete
 members when its recursive part is normalized.
 
+TODO: Eliminate redundant tuple members retained from intermediate recursive expansions.
+
 ```py
 from typing import Union
 
@@ -398,7 +400,70 @@ a = tuple["b"]
 b = Union["a", "b", int, str]
 
 def f(x: b):
-    reveal_type(x)  # revealed: tuple[Divergent] | int | str
+    reveal_type(x)  # revealed: tuple[Divergent] | tuple[int | str] | int | str
+```
+
+## Chained assignments of recursive union aliases
+
+A chained assignment gives both names the same recursive union. Each alias accepts tuples and
+integers, but rejects unrelated types.
+
+```py
+from typing import Union
+
+A = tuple["B"]
+B = C = Union["A", "B", int]
+
+def consume(first: B, second: C):
+    # TODO: eliminate the redundant `tuple[int]` member.
+    reveal_type(first)  # revealed: tuple[Divergent] | tuple[int] | int
+    reveal_type(second)  # revealed: tuple[Divergent] | tuple[int] | int
+
+consume(1, (1,))
+consume(1.5, 1)  # error: [invalid-argument-type]
+consume(1, 1.5)  # error: [invalid-argument-type]
+```
+
+## Unpacking assignments of recursive union aliases
+
+A recursive union can be unpacked from a tuple without changing its members or the other unpacked
+value's type.
+
+```py
+from typing import Union
+
+A = tuple["B"]
+B, C = (Union["A", "B", int], str)
+
+reveal_type(C)  # revealed: <class 'str'>
+
+def consume(value: B):
+    # TODO: eliminate the redundant `tuple[int]` member.
+    reveal_type(value)  # revealed: tuple[Divergent] | tuple[int] | int
+
+consume(1)
+consume((1,))
+consume(1.5)  # error: [invalid-argument-type]
+```
+
+## Mutually recursive tuple and optional aliases
+
+A recursive optional alias includes `None` alongside its tuple member. The self-reference does not
+admit unrelated types.
+
+```py
+from typing import Optional
+
+A = tuple["B"]
+B = Optional["A | B"]
+
+def consume(value: B):
+    # TODO: coalesce the repeated tuple alternatives.
+    reveal_type(value)  # revealed: tuple[Divergent] | tuple[Divergent] | None
+
+consume(None)
+consume((None,))
+consume(1.5)  # error: [invalid-argument-type]
 ```
 
 ## Mutually recursive union and tuple aliases in reverse order
@@ -412,7 +477,7 @@ b = Union["a", "b", int, str]
 a = tuple["b"]
 
 def f(x: b):
-    reveal_type(x)  # revealed: tuple[Divergent] | int | str
+    reveal_type(x)  # revealed: tuple[Divergent] | tuple[int | str] | int | str
 ```
 
 ## Conditional recursive union values
@@ -451,7 +516,7 @@ a = tuple[str, "b"]
 b = Union["a", "b", int]
 
 def f(x: b):
-    reveal_type(x)  # revealed: tuple[str, Divergent] | int
+    reveal_type(x)  # revealed: tuple[str, Divergent] | tuple[str, int] | int
 ```
 
 ## Recursive tuple aliases containing another recursive alias
@@ -467,7 +532,7 @@ a = tuple[Other, "b"]
 b = Union["a", "b", int]
 
 def consume(x: b):
-    reveal_type(x)  # revealed: tuple[tuple[Divergent], Divergent] | int
+    reveal_type(x)  # revealed: tuple[tuple[Divergent], Divergent] | tuple[tuple[Divergent], int] | int
 
 consume((1, 1))  # error: [invalid-argument-type]
 ```
@@ -483,7 +548,7 @@ a = Tuple["b", ...]
 b = Union["a", "b", int]
 
 def f(x: b):
-    reveal_type(x)  # revealed: tuple[Divergent, ...] | int
+    reveal_type(x)  # revealed: tuple[Divergent, ...] | tuple[int, ...] | int
 ```
 
 ## Recursive aliases using imported tuple constructors
@@ -498,7 +563,7 @@ a = TupleConstructor["b"]
 b = Union["a", "b", int]
 
 def f(x: b):
-    reveal_type(x)  # revealed: tuple[Divergent] | int
+    reveal_type(x)  # revealed: tuple[Divergent] | tuple[int] | int
 ```
 
 ## Recursive generic tuple aliases
@@ -536,6 +601,44 @@ def f(x: One, y: Many):
 
 f("", 0)  # error: [invalid-argument-type]
 f(0, b"")  # error: [invalid-argument-type]
+```
+
+## Self-referential optional aliases
+
+Without a concrete member, a self-referential optional alias reduces to `None`:
+
+```py
+from typing import Optional
+
+Alias = Optional["Alias"]
+reveal_type(Alias)  # revealed: None
+
+def consume(value: Alias):
+    reveal_type(value)  # revealed: None
+
+consume(None)
+consume(1)  # error: [invalid-argument-type]
+```
+
+## Mutually recursive optional aliases
+
+Mutual references between optional aliases also reduce to `None` when neither adds a concrete
+member:
+
+```py
+from typing import Optional
+
+A = Optional["B"]
+B = Optional["A"]
+reveal_type(A)  # revealed: None
+reveal_type(B)  # revealed: None
+
+def consume(first: A, second: B):
+    reveal_type(first)  # revealed: None
+    reveal_type(second)  # revealed: None
+
+consume(None, None)
+consume(1, None)  # error: [invalid-argument-type]
 ```
 
 ## Self-referential legacy type variables

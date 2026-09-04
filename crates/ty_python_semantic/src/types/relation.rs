@@ -1617,6 +1617,26 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             }
 
             (
+                Type::KnownInstance(KnownInstanceType::UnionType(source_union)),
+                Type::KnownInstance(KnownInstanceType::UnionType(target_union)),
+            ) if (source_union.deferred_union(db).is_some()
+                || target_union.deferred_union(db).is_some())
+                && !matches!(self.relation, TypeRelation::Redundancy { pure: false }) =>
+            {
+                // A deferred union's definition identifies where to infer its elements, not a
+                // distinct runtime union value. Compare represented types when a relation needs
+                // that value, but do not force elements merely to simplify a union of values.
+                self.with_recursion_guard(db, source, target, || {
+                    match (source_union.union_type(db), target_union.union_type(db)) {
+                        (Ok(source_type), Ok(target_type)) => self
+                            .as_equivalence_checker()
+                            .check_type_pair(db, source_type, target_type),
+                        _ => self.never(),
+                    }
+                })
+            }
+
+            (
                 Type::KnownInstance(KnownInstanceType::FunctoolsPartial(source_partial)),
                 Type::KnownInstance(KnownInstanceType::FunctoolsPartial(target_partial)),
             )
@@ -3375,6 +3395,17 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderDelete(left)),
                 Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderDelete(right)),
             ) => nontrivial_check(self, || self.check_property_instance_pair(db, left, right)),
+
+            (
+                Type::KnownInstance(KnownInstanceType::UnionType(left_union)),
+                Type::KnownInstance(KnownInstanceType::UnionType(right_union)),
+            ) if left_union.deferred_union(db).is_some()
+                || right_union.deferred_union(db).is_some() =>
+            {
+                // Different source definitions can produce equivalent runtime union values.
+                // Keep disjointness conservative without forcing their deferred elements.
+                self.never()
+            }
 
             (
                 Type::KnownInstance(KnownInstanceType::Sentinel(left_sentinel)),

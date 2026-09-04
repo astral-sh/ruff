@@ -29,9 +29,9 @@ use super::{
     CollectionUseConstraints, DeferredAndUndecorated, DefinitionInference,
     DefinitionInferenceExtra, DefinitionTypes, ExpressionInference, ExpressionInferenceExtra,
     FrozenMap, FrozenSet, FrozenValueMap, FunctionDecoratorInference, InferenceRegion,
-    OtherDefinitionInferenceExtra, ScopeInference, ScopeInferenceExtra, infer_deferred_types,
-    infer_definition_types, infer_expression_types, infer_same_file_expression_type,
-    infer_unpack_types,
+    OtherDefinitionInferenceExtra, ScopeInference, ScopeInferenceExtra, UnionInference,
+    infer_deferred_types, infer_definition_types, infer_expression_types,
+    infer_same_file_expression_type, infer_union_types, infer_unpack_types,
 };
 use crate::diagnostic::format_enumeration;
 use crate::place::{
@@ -104,6 +104,7 @@ use crate::types::infer::{
     TypeExpressionFlags, infer_statement_types, nearest_enclosing_class,
     nearest_enclosing_function, original_class_type,
 };
+use crate::types::known_instance::DeferredUnionType;
 use crate::types::match_pattern::{ClassPatternPositionalResult, class_pattern_positional_result};
 use crate::types::narrow::NarrowingEvaluatorExtension;
 use crate::types::narrow::pattern_success_types;
@@ -1173,6 +1174,27 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             } else {
                 self.extend_definition(*definition, infer_deferred_types(self.db(), *definition));
             }
+        }
+
+        // Check local deferred unions even when no annotation uses them. Sort only these
+        // expressions so diagnostic and query evaluation order do not depend on hash order.
+        let unions: Vec<_> = self
+            .expressions
+            .iter()
+            .filter_map(|(node, ty)| {
+                let Type::KnownInstance(KnownInstanceType::UnionType(union)) = ty else {
+                    return None;
+                };
+                let union = union.deferred_union(self.db())?;
+                (union.definition(self.db()).scope(self.db()) == self.scope)
+                    .then_some((*node, union))
+            })
+            .sorted_by_key(|(node, _)| *node)
+            .map(|(_, union)| union)
+            .unique()
+            .collect();
+        for union in unions {
+            self.extend_expression(&infer_union_types(self.db(), union).inference);
         }
 
         assert!(
@@ -4440,75 +4462,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.dataclass_field_specifiers.clear();
 
         declared
-    }
-
-    pub(super) fn infer_tuple_alias_cycle_initial(
-        mut self,
-        definition: Definition<'db>,
-        subscript: &ast::ExprSubscript,
-        cycle_recovery: Type<'db>,
-    ) -> Option<Type<'db>> {
-        fn contains_bare_divergent(db: &dyn Db, ty: Type<'_>) -> bool {
-            match ty {
-                Type::Divergent(_) => true,
-                Type::Union(union) => union
-                    .elements(db)
-                    .iter()
-                    .any(|ty| contains_bare_divergent(db, *ty)),
-                Type::Intersection(intersection) => intersection
-                    .positive(db)
-                    .iter()
-                    .chain(intersection.negative(db))
-                    .any(|ty| contains_bare_divergent(db, *ty)),
-                _ => false,
-            }
-        }
-
-        // The full definition inference collects diagnostics and expression metadata.
-        self.context.defuse();
-        self.context.suppress_diagnostics();
-        self.typevar_binding_context = Some(definition);
-        let origin = self.infer_expression(&subscript.value, TypeContext::default());
-        let is_tuple = match origin {
-            Type::ClassLiteral(class) => class.is_tuple(self.db()),
-            Type::SpecialForm(SpecialFormType::Tuple) => true,
-            _ => false,
-        };
-        if !is_tuple {
-            return None;
-        }
-        let inferred_tuple = self.infer_tuple_type_expression(subscript);
-        // Preserve nominal element types, even if they contain their own recursive aliases.
-        // Only bare markers (possibly in a union or intersection) are replaced with this
-        // definition's marker, so another query's approximation cannot prevent reduction of
-        // this definition's tuple nesting.
-        let normalize_element = |ty| {
-            if contains_bare_divergent(self.db(), ty) {
-                cycle_recovery
-            } else {
-                ty
-            }
-        };
-        let tuple = match inferred_tuple.tuple(self.db()) {
-            Tuple::Fixed(elements) => TupleType::heterogeneous(
-                self.db(),
-                self.program_environment(),
-                elements.iter_all_elements().map(normalize_element),
-            ),
-            Tuple::Variable(elements) => TupleType::mixed_with_segment(
-                self.db(),
-                self.program_environment(),
-                elements.iter_prefix_elements().map(normalize_element),
-                match elements.variable() {
-                    VariableSegment::Homogeneous(ty) => {
-                        VariableSegment::Homogeneous(normalize_element(ty))
-                    }
-                    segment @ VariableSegment::TypeVarTuple(_) => segment,
-                },
-                elements.iter_suffix_elements().map(normalize_element),
-            ),
-        };
-        Some(tuple.to_class_type(self.db()).into())
     }
 
     /// Initialize a declaration cycle without discarding its annotation diagnostics or metadata.
@@ -11728,6 +11681,62 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     pub(super) fn finish_expression(mut self) -> ExpressionInference<'db> {
         self.infer_region();
         self.into_expression_inference()
+    }
+
+    pub(super) fn finish_union_inference(
+        mut self,
+        union: DeferredUnionType<'db>,
+    ) -> UnionInference<'db> {
+        let db = self.db();
+        self.typevar_binding_context = union.typevar_binding_context(db);
+        let subscript = if let DefinitionKind::Assignment(assignment) =
+            union.definition(db).kind(db)
+            && let Some(node_index) = assignment
+                .value(self.module())
+                .node_index()
+                .load()
+                .as_u32()
+                .and_then(|base| base.checked_add(union.relative_node_index(db)))
+        {
+            <&ast::ExprSubscript>::try_from(
+                self.module().get_by_index(ast::NodeIndex::from(node_index)),
+            )
+            .ok()
+        } else {
+            None
+        };
+        let union_type = match subscript {
+            Some(subscript) if union.is_optional(db) => {
+                let ty = self.infer_type_expression(&subscript.slice);
+                UnionType::from_two_elements(
+                    db,
+                    self.program_environment(),
+                    ty,
+                    Type::none(db, self.program_environment()),
+                )
+            }
+            Some(subscript) if let ast::Expr::Tuple(elements) = subscript.slice.as_ref() => {
+                let union_type = UnionType::from_elements(
+                    db,
+                    self.program_environment(),
+                    elements
+                        .iter()
+                        .map(|element| self.infer_type_expression(element)),
+                );
+                self.store_expression_type(subscript.slice.as_ref(), union_type);
+                if elements.is_empty()
+                    && let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript)
+                {
+                    builder.into_diagnostic("`typing.Union` requires at least one type argument");
+                }
+                union_type
+            }
+            _ => Type::unknown(),
+        };
+        UnionInference {
+            union_type,
+            inference: self.into_expression_inference(),
+        }
     }
 
     /// Consume the results already collected by this builder without inferring its region.

@@ -57,6 +57,7 @@ pub(super) use ty_python_core::frozen::{FrozenMap, FrozenSet, FrozenValueMap};
 use crate::types::diagnostic::TypeCheckDiagnostics;
 use crate::types::function::{FunctionDecorators, FunctionType};
 use crate::types::generics::Specialization;
+use crate::types::known_instance::DeferredUnionType;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     ClassLiteral, KnownClass, StaticClassLiteral, Type, TypeAndQualifiers, TypeQualifiers,
@@ -315,6 +316,45 @@ pub(crate) fn infer_deferred_types<'db>(
         &module,
     )
     .finish_definition(definition)
+}
+
+pub(super) fn infer_union_type<'db>(db: &'db dyn Db, union: DeferredUnionType<'db>) -> Type<'db> {
+    infer_union_types(db, union).union_type
+}
+
+// Keep AST lookup inside this query so inspecting a union's value alone does not depend on its
+// defining module's AST.
+#[salsa::tracked(
+    returns(ref),
+    cycle_initial=|db, id, union: DeferredUnionType<'db>| UnionInference {
+        union_type: Type::divergent(id),
+        inference: ExpressionInference::cycle_initial(union.definition(db).scope(db), Type::divergent(id)),
+    },
+    cycle_fn=|db, cycle, previous: &UnionInference<'db>, result: UnionInference<'db>, union: DeferredUnionType<'db>| {
+        let env = ProgramEnvironment::from_definition(union.definition(db));
+        UnionInference {
+            union_type: result.union_type.recursive_type_normalized(db, &env, cycle),
+            inference: result.inference.cycle_normalized(db, &env, &previous.inference, cycle),
+        }
+    },
+    heap_size=ruff_memory_usage::heap_size
+)]
+fn infer_union_types<'db>(db: &'db dyn Db, union: DeferredUnionType<'db>) -> UnionInference<'db> {
+    let definition = union.definition(db);
+    let program_file = definition.program_file(db);
+    let python_file = program_file.python_file(db);
+    let module = parsed_module(db, python_file).load(db);
+    let env = ProgramEnvironment::from_definition(definition);
+    TypeInferenceBuilder::new(
+        db,
+        &env,
+        InferenceRegion::Deferred(definition),
+        python_file.file(db),
+        program_file,
+        semantic_index(db, program_file),
+        &module,
+    )
+    .finish_union_inference(union)
 }
 
 /// Infer a function's parameter defaults without retaining its annotation types.
@@ -1411,39 +1451,6 @@ impl<'db> DefinitionInferenceExtra<'db> {
     }
 }
 
-/// Resolving a tuple alias's constructor or elements can recurse while initializing its definition.
-/// Use a separate query so that this recursion falls back to the definition's marker.
-#[salsa::tracked(returns(copy), cycle_initial=|_, _, _, cycle_recovery| Some(cycle_recovery))]
-fn infer_tuple_alias_cycle_initial<'db>(
-    db: &'db dyn Db,
-    definition: Definition<'db>,
-    cycle_recovery: Type<'db>,
-) -> Option<Type<'db>> {
-    let DefinitionKind::Assignment(assignment) = definition.kind(db) else {
-        return None;
-    };
-    if assignment.unpack().is_some() {
-        return None;
-    }
-    let program_file = definition.program_file(db);
-    let python_file = program_file.python_file(db);
-    let module = parsed_module(db, python_file).load(db);
-    let ast::Expr::Subscript(subscript) = assignment.value(&module) else {
-        return None;
-    };
-    let env = ProgramEnvironment::from_definition(definition);
-    TypeInferenceBuilder::new(
-        db,
-        &env,
-        InferenceRegion::Definition(definition),
-        python_file.file(db),
-        program_file,
-        semantic_index(db, program_file),
-        &module,
-    )
-    .infer_tuple_alias_cycle_initial(definition, subscript, cycle_recovery)
-}
-
 impl<'db> DefinitionInference<'db> {
     fn cycle_initial(
         db: &'db dyn Db,
@@ -1476,14 +1483,6 @@ impl<'db> DefinitionInference<'db> {
                     types =
                         DefinitionTypes::Binding(Type::instance(db, &env, divergent_collection));
                 }
-            } else if assignment.value(&module).is_subscript_expr()
-                && let Some(ty) = infer_tuple_alias_cycle_initial(db, definition, cycle_recovery)
-            {
-                // For `A = tuple["B"]; B = Union["A", "B", int]`, a bare marker for A would
-                // disappear along with B's direct self-reference. Starting with the tuple's shape
-                // lets recursive reduction recognize the nesting instead of adding a tuple layer
-                // on each iteration.
-                types = DefinitionTypes::Binding(ty);
             }
         } else if let DefinitionKind::AnnotatedAssignment(assignment) = definition.kind(db) {
             let program_file = definition.program_file(db);
@@ -1748,6 +1747,17 @@ impl<'db> DefinitionInference<'db> {
 
         ty.as_function_literal()
     }
+}
+
+/// The represented type and expression metadata for a deferred `Union` or `Optional`.
+#[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+struct UnionInference<'db> {
+    /// Unlike ordinary expression inference, this type does not accumulate previous cycle
+    /// iterations: intermediate recursive expansions are not additional union alternatives.
+    union_type: Type<'db>,
+
+    /// Retain the ordinary expression-inference history and diagnostics for scope checking.
+    inference: ExpressionInference<'db>,
 }
 
 /// The inferred types for an expression region.

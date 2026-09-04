@@ -895,6 +895,44 @@ fn dependency_public_symbol_type_change() -> anyhow::Result<()> {
 }
 
 #[test]
+fn dependency_union_alias_body_change() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    let alias_source = "from typing import Union\nAlias = Union[int, str] if True else bytes";
+    db.write_files([
+        ("/src/aliases.py", alias_source),
+        (
+            "/src/main.py",
+            "from aliases import Alias\nfrom typing_extensions import reveal_type\n\
+             def consume(value: Alias): reveal_type(value)",
+        ),
+    ])?;
+    assert_revealed_type(&db, "/src/main.py", "int | str");
+
+    db.write_file("/src/aliases.py", alias_source.replace("int", "bytes"))?;
+    assert_revealed_type(&db, "/src/main.py", "bytes | str");
+
+    // Inserting expressions before the alias must not redirect its deferred body lookup.
+    let shifted_source = "from typing import Union\n\
+                          Padding = Union[float, bool]\n\
+                          Alias = Union[bytes, str] if True else bytes";
+    db.write_file("/src/aliases.py", shifted_source)?;
+    assert_revealed_type(&db, "/src/main.py", "bytes | str");
+
+    // Changing the condition moves the union's node index within the same assignment RHS.
+    let shifted_source = shifted_source.replace("if True", "if not False");
+    db.write_file("/src/aliases.py", &shifted_source)?;
+    assert_revealed_type(&db, "/src/main.py", "bytes | str");
+
+    db.write_file(
+        "/src/aliases.py",
+        shifted_source.replace("bytes", "complex"),
+    )?;
+    assert_revealed_type(&db, "/src/main.py", "complex | str");
+
+    Ok(())
+}
+
+#[test]
 fn function_inference_regions_are_disjoint() -> anyhow::Result<()> {
     let mut db = setup_db();
     db.write_dedented(
