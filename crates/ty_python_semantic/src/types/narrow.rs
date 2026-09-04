@@ -802,7 +802,8 @@ impl<'db> Conjunctions<'db> {
 ///
 /// For example, filtering `Sequence[int]` with `list[Unknown]` first infers `list[int]` from
 /// the target class's specialized `Sequence` base. Unrelated union arms and intersection elements
-/// are still intersected with the original unknown-specialized target.
+/// are still intersected with the original target. A `TypeIs` target can also specify some or all
+/// type arguments, so transferred specializations must remain subtypes of its top materialization.
 fn filter_generic_narrowing_constraint<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
@@ -826,6 +827,15 @@ fn filter_generic_narrowing_constraint<'db>(
                 && target.nominal_class(db, env).is_some_and(|class| {
                     !class.is_protocol(db)
                         && typed_dict_matches_class_pattern(db, env, class.class_literal(db))
+                        && target.is_equivalent_to(
+                            db,
+                            env,
+                            Type::instance(
+                                db,
+                                env,
+                                class.class_literal(db).unknown_specialization(db),
+                            ),
+                        )
                 }) =>
         {
             // A TypedDict is a dictionary at runtime, but intersecting it with the target would
@@ -844,6 +854,9 @@ fn filter_generic_narrowing_constraint<'db>(
                 }
                 _ => specialize_narrowing_target(db, env, subject, target),
             }
+            .filter(|specialized| {
+                specialized.is_subtype_of(db, env, target.top_materialization(db, env))
+            })
             .unwrap_or(target);
             IntersectionType::from_two_elements(db, env, subject, specialized_target)
         }
@@ -4493,14 +4506,24 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         let place_and_constraint = match return_ty {
             Type::TypeIs(type_is) => {
                 let (_, place) = type_is.place_info(db)?;
+                let target = type_is.return_type(db);
+                let use_generic_filtering = is_positive
+                    && !db
+                        .analysis_settings(self.scope().file(db))
+                        .strict_generic_narrowing;
                 Some((
                     place,
-                    NarrowingConstraint::intersection(
-                        type_is
-                            .return_type(db)
-                            .top_materialization(db, &self.env)
-                            .negate_if(db, &self.env, !is_positive),
-                    ),
+                    if use_generic_filtering {
+                        NarrowingConstraint::generic_filtering(target)
+                    } else {
+                        NarrowingConstraint::intersection(
+                            target.top_materialization(db, &self.env).negate_if(
+                                db,
+                                &self.env,
+                                !is_positive,
+                            ),
+                        )
+                    },
                 ))
             }
             // TypeGuard only narrows in the positive case

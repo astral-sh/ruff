@@ -150,7 +150,7 @@ def get_any() -> Any:
 async def test():
     x = get_any()
     if inspect.isawaitable(x):
-        reveal_type(x)  # revealed: Any & Top[Awaitable[object]]
+        reveal_type(x)  # revealed: Any & Awaitable[Any]
         y = await x
         reveal_type(y)  # revealed: Any
 ```
@@ -278,19 +278,30 @@ async def coroutine(value: Coroutine[Any, Any, int] | None):
         reveal_type(value)  # revealed: None
 ```
 
-When narrowing from `object`, the target's gradual type arguments and protocol members are fully
-materialized:
+An `int` subclass can also be awaitable. In gradual mode, that alternative retains the predicate's
+`Any` result, so the awaited value remains assignable to `int`:
+
+```py
+async def overlapping(value: int | Awaitable[int]):
+    if inspect.isawaitable(value):
+        reveal_type(value)  # revealed: (int & Awaitable[Any]) | Awaitable[int]
+        reveal_type(await value)  # revealed: Any | int
+        result: int = await value
+        return result
+```
+
+When narrowing from `object`, the declared gradual specialization is retained:
 
 ```py
 def from_object(value: object):
     if inspect.isawaitable(value):
-        reveal_type(value)  # revealed: Top[Awaitable[object]]
+        reveal_type(value)  # revealed: Awaitable[Any]
     if inspect.iscoroutine(value):
-        reveal_type(value)  # revealed: CoroutineType[object, Never, object]
+        reveal_type(value)  # revealed: CoroutineType[Any, Any, Any]
     if asyncio.isfuture(value):
-        reveal_type(value)  # revealed: Top[Future[Any]]
+        reveal_type(value)  # revealed: Future[Any]
     if asyncio.iscoroutine(value):
-        reveal_type(value)  # revealed: Coroutine[object, Never, object]
+        reveal_type(value)  # revealed: Coroutine[Any, Any, Any]
 ```
 
 ## Awaiting intersection types (Python 3.12 or lower)

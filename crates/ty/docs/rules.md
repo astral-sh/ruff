@@ -329,13 +329,19 @@ types with return type `T`).
 **Why is this bad?**
 
 
-When an object is narrowed to `Top[Callable[..., object]]` (e.g., via `callable(x)`), we know the
-object is callable, but we don't know its precise signature. This type represents the set of all
-possible callable types (including, e.g., functions that take no arguments and functions that
-require arguments), so no specific set of arguments can be guaranteed to be valid.
+When `analysis.strict-generic-narrowing` is enabled, `callable(x)` and `isinstance(x, Callable)`
+narrow an object to `Top[Callable[..., object]]`. We know the object is callable, but we don't know
+its precise signature. This type represents the set of all possible callable types (including, e.g.,
+functions that take no arguments and functions that require arguments), so no specific set of
+arguments can be guaranteed to be valid.
 
 **Examples**
 
+
+```toml
+[analysis]
+strict-generic-narrowing = true
+```
 
 ```python
 def f(x: object):
