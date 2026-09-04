@@ -4254,24 +4254,17 @@ impl<'db> CallableBinding<'db> {
     }
 
     fn has_concrete_unpacked_variadic(&self, db: &'db dyn Db) -> bool {
-        self.overloads.iter().any(|overload| {
-            overload
-                .signature
-                .parameters()
-                .variadic()
-                .is_some_and(|(_, parameter)| {
-                    parameter.has_starred_annotation()
-                        && parameter
-                            .annotated_type()
-                            .exact_tuple_instance_spec(db)
-                            .is_some_and(|tuple| match tuple.as_ref() {
-                                TupleSpec::Fixed(_) => true,
-                                TupleSpec::Variable(variable) => {
-                                    variable.variable().typevartuple().is_none()
-                                }
-                            })
-                })
-        })
+        self.overloads
+            .iter()
+            .filter_map(|overload| overload.signature.parameters().variadic())
+            .filter(|(_, parameter)| parameter.has_starred_annotation())
+            .filter_map(|(_, parameter)| parameter.annotated_type().exact_tuple_instance_spec(db))
+            .any(|tuple| {
+                !matches!(
+                    tuple.as_ref(),
+                    TupleSpec::Variable(variable) if variable.variable().typevartuple().is_some()
+                )
+            })
     }
 
     /// Filter overloads based on variadic argument to variadic parameter match.
@@ -5627,53 +5620,54 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
 
         // Fixed tuple alternatives retain a definite minimum even when merging their union makes
         // the forwarded argument appear variable or expansion stops before reaching every branch.
-        let minimum_finite_argument_count = (argument_length.is_variable() && !has_typevartuple)
-            .then(|| {
-                self.argument_matches.iter().enumerate().try_fold(
-                    0usize,
-                    |minimum, (argument_index, matches)| {
-                        let matched_count = matches
-                            .parameters
-                            .iter()
-                            .filter(|matched| matched.index == parameter_index)
-                            .count();
-                        if matched_count == 0 {
-                            return Some(minimum);
-                        }
-                        if !self
-                            .variable_length_positional_arguments
-                            .iter()
-                            .any(|(index, _, _)| *index == argument_index)
-                        {
-                            return Some(minimum + matched_count);
-                        }
+        let minimum_argument_count = if !argument_length.is_variable() {
+            Some(argument_count)
+        } else if has_typevartuple {
+            None
+        } else {
+            self.argument_matches.iter().enumerate().try_fold(
+                0usize,
+                |minimum, (argument_index, matches)| {
+                    let matched_count = matches
+                        .parameters
+                        .iter()
+                        .filter(|matched| matched.index == parameter_index)
+                        .count();
+                    if matched_count == 0 {
+                        return Some(minimum);
+                    }
+                    if !self
+                        .variable_length_positional_arguments
+                        .iter()
+                        .any(|(index, _, _)| *index == argument_index)
+                    {
+                        return Some(minimum + matched_count);
+                    }
 
-                        let argument_type = self
-                            .arguments
-                            .argument_types(argument_index)?
-                            .get_default()?;
-                        let Type::Union(union) = argument_type.resolve_type_alias(db) else {
-                            return None;
-                        };
-                        let union_minimum = union.elements(db).iter().try_fold(
-                            usize::MAX,
-                            |minimum, element| {
-                                let spec = element
-                                    .exact_tuple_instance_spec(db)
-                                    .filter(|spec| !spec.len().is_variable())?;
-                                Some(minimum.min(spec.len().minimum()))
-                            },
-                        )?;
-                        let matched_prefix = matches.parameters.len() - matched_count;
-                        Some(minimum + union_minimum.saturating_sub(matched_prefix))
-                    },
-                )
-            });
-        if (!argument_length.is_variable() && argument_count < tuple.len().minimum())
-            || minimum_finite_argument_count
-                .flatten()
-                .is_some_and(|minimum| minimum < tuple.len().minimum())
-        {
+                    let argument_type = self
+                        .arguments
+                        .argument_types(argument_index)?
+                        .get_default()?;
+                    let Type::Union(union) = argument_type.resolve_type_alias(db) else {
+                        return None;
+                    };
+                    let union_minimum =
+                        union
+                            .elements(db)
+                            .iter()
+                            .try_fold(usize::MAX, |minimum, element| {
+                                let length = element
+                                    .exact_tuple_instance_spec(db)?
+                                    .len()
+                                    .into_fixed_length()?;
+                                Some(minimum.min(length))
+                            })?;
+                    let matched_prefix = matches.parameters.len() - matched_count;
+                    Some(minimum + union_minimum.saturating_sub(matched_prefix))
+                },
+            )
+        };
+        if minimum_argument_count.is_some_and(|minimum| minimum < tuple.len().minimum()) {
             missing.push(ParameterContext::new(parameter, parameter_index, false));
             // TODO: Check matched tuple elements even when required elements are missing.
             return;
