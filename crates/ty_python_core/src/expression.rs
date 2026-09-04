@@ -78,7 +78,7 @@ use salsa;
 /// Condition context does not propagate through calls or assignment expressions: in
 /// `if f(x and False)`, the call's result controls the branch, but its argument is evaluated in
 /// value context.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub enum ExpressionContext {
     /// Produce the expression's result object for the enclosing code to use.
     Value,

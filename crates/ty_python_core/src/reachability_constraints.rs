@@ -151,14 +151,16 @@ pub struct ReachabilityConstraints {
 }
 
 impl ReachabilityConstraints {
-    /// Iterate over the predicates in every branch of a constraint, without evaluating them.
+    /// Iterate over the predicates in the branches left open by the supplied assumptions.
     ///
     /// Each predicate is yielded once, even if several decision-diagram nodes refer to it.
-    /// Shared nodes are also visited only once.
+    /// Shared nodes are also visited only once. An assumed predicate selects one branch and
+    /// is not yielded; unresolved predicates leave all three branches open.
     pub fn predicate_ids(
         &self,
         root: ScopedReachabilityConstraintId,
-    ) -> impl Iterator<Item = ScopedPredicateId> + '_ {
+        mut assume: impl FnMut(ScopedPredicateId) -> Option<bool>,
+    ) -> impl Iterator<Item = ScopedPredicateId> {
         let mut pending = Vec::new();
         if !root.is_terminal() {
             pending.push(root);
@@ -173,6 +175,14 @@ impl ReachabilityConstraints {
                 }
 
                 let node = self.get_interior_node(id);
+                if let Some(value) = assume(node.atom()) {
+                    pending.push(if value {
+                        node.if_true()
+                    } else {
+                        node.if_false()
+                    });
+                    continue;
+                }
                 pending.extend([node.if_false(), node.if_ambiguous(), node.if_true()]);
                 if predicates.insert(node.atom()) {
                     return Some(node.atom());

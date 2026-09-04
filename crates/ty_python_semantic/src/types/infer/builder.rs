@@ -11176,7 +11176,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             operand,
         } = unary;
 
-        let operand_type = self.infer_expression(operand, TypeContext::default());
+        let operand_type = self.infer_maybe_standalone_expression(operand, TypeContext::default());
 
         self.infer_unary_expression_type(*op, operand_type, unary)
     }
