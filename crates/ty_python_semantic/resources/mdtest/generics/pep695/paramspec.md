@@ -1947,8 +1947,10 @@ reveal_type(identity(1))  # revealed: Any
 This also applies to type variables from an enclosing scope:
 
 ```py
-def _[T](callback: Callable[[T], T]) -> None:
-    reveal_type(decorate(callback))  # revealed: Wrapper[(T@_, /)]
+def _[T](callback: Callable[[T], T], value: T) -> None:
+    f = decorate(callback)
+    reveal_type(f)  # revealed: Wrapper[(T@_, /)]
+    reveal_type(f(value))  # revealed: Any
 ```
 
 The same applies when the return type is an alias for `Any`:
