@@ -42,6 +42,7 @@ If localhost is not given then `localhost' is used, and if localport is not
 given then 8025 is used.  If remotehost is not given then `localhost' is used,
 and if remoteport is not given, then 25 is used.
 """
+
 import asynchat
 import asyncore
 import socket
@@ -121,9 +122,7 @@ class SMTPServer(asyncore.dispatcher):
         decode_data: bool = False,
     ) -> None: ...
     def handle_accepted(self, conn: socket.socket, addr: Any) -> None: ...
-    def process_message(
-        self, peer: _Address, mailfrom: str, rcpttos: list[str], data: bytes | str, **kwargs: Any
-    ) -> str | None:
+    def process_message(self, peer: _Address, mailfrom: str, rcpttos: list[str], data: bytes | str, **kwargs: Any) -> str | None:
         """Override this abstract method to handle messages from the client.
 
         peer is a tuple containing (ipaddr, port) of the client that made the

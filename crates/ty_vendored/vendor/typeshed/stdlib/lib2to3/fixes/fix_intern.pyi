@@ -2,6 +2,7 @@
 
 intern(s) -> sys.intern(s)
 """
+
 from typing import ClassVar, Literal
 
 from .. import fixer_base

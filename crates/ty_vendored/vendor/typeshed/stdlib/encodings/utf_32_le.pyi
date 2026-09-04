@@ -1,6 +1,7 @@
 """
 Python 'utf-32-le' Codec
 """
+
 import codecs
 from _typeshed import ReadableBuffer
 

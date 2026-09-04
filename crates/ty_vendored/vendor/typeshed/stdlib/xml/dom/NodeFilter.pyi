@@ -3,8 +3,9 @@ from xml.dom.minidom import Node
 
 class NodeFilter:
     """
-This is the DOM2 NodeFilter interface. It contains only constants.
-"""
+    This is the DOM2 NodeFilter interface. It contains only constants.
+    """
+
     FILTER_ACCEPT: Final = 1
     FILTER_REJECT: Final = 2
     FILTER_SKIP: Final = 3

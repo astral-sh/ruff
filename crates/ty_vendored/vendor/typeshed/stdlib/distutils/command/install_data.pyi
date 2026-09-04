@@ -3,6 +3,7 @@
 Implements the Distutils 'install_data' command, for installing
 platform-independent data files.
 """
+
 from _typeshed import Incomplete
 from typing import ClassVar
 
