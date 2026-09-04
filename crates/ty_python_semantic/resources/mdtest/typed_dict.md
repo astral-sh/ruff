@@ -3303,8 +3303,8 @@ def _(value: AnyExtraItems | OtherAnyExtraItems) -> None:
 ```
 
 Rejected common-constraint probes must not affect fallback protocol inference. Both mappings below
-contain an `int`, so inference should select the `int` constraint. It currently selects the broader
-`object` constraint instead:
+contain an `int`, so inference selects the `int` constraint rather than the broader `object`
+constraint:
 
 ```py
 from typing import Literal, Protocol, TypeVar, TypedDict
@@ -3325,8 +3325,7 @@ def get_value(value: GetValue[ConstrainedValue]) -> ConstrainedValue:
 
 def takes_str(value: str) -> None: ...
 def _(value: ValueA | ValueB) -> None:
-    # TODO: revealed int
-    reveal_type(get_value(value))  # revealed: object
+    reveal_type(get_value(value))  # revealed: int
     takes_str(get_value(value))  # error: [invalid-argument-type]
 ```
 

@@ -2660,7 +2660,7 @@ struct ConstraintFailure<'db> {
 impl<'db> ConstraintFailure<'db> {
     fn from_bounds(path_bound: &PathBound<'db>, error: SpecializationError<'db>) -> Option<Self> {
         let variance = match (
-            path_bound.evidence_lower.is_some(),
+            path_bound.evidence_lower().is_some(),
             path_bound.has_upper_evidence(),
         ) {
             (true, true) => ConstraintFailureVariance::Invariant,
@@ -3604,7 +3604,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             .bound_or_constraints(db, self.env)?
         {
             TypeVarBoundOrConstraints::UpperBound(bound) => {
-                let argument = path_bound.evidence_lower?;
+                let argument = path_bound.evidence_lower()?;
                 argument
                     .when_constraint_set_assignable_to(
                         db,
@@ -3620,7 +3620,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             }
             TypeVarBoundOrConstraints::Constraints(constraints) => {
                 let declared_constraints = constraints.elements(db);
-                let lower = path_bound.evidence_lower.filter(|argument| {
+                let lower = path_bound.evidence_lower().filter(|argument| {
                     declared_constraints.iter().all(|constraint| {
                         argument
                             .when_constraint_set_assignable_to(
@@ -3635,7 +3635,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 let argument = if let Some(lower) = lower {
                     lower
                 } else {
-                    let upper_evidence = path_bound.upper.iter_evidence().map(ConstraintBound::ty);
+                    let upper_evidence = path_bound.iter_upper_evidence();
                     if !path_bound.has_upper_evidence()
                         || declared_constraints.iter().any(|constraint| {
                             !upper_evidence
@@ -5676,8 +5676,7 @@ mod tests {
         let constraints = ConstraintSetBuilder::new();
         let builder = SpecializationBuilder::new(db, &env, &constraints, context);
         // Relation construction can reject this conflict before bounds reach the classifier.
-        let mut bounds = PathBound::exact(typevar, int);
-        bounds.upper = PathBound::exact(typevar, str).upper;
+        let bounds = PathBound::exact(typevar, int).with_upper_evidence(str);
 
         assert!(matches!(
             PathBounds::preliminary_solve(db, &env, &constraints, &bounds),

@@ -6094,7 +6094,10 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         };
         if return_variables.iter().any(|(index, variable)| {
             !alternatives.iter().map(|types| types[*index]).all_equal()
-                && (self.return_ty.variance_of(db, env, variable.identity(db))
+                && (self
+                    .return_ty
+                    .variance_of(db, env, variable.identity(db))
+                    .evaluate(db)
                     == TypeVarVariance::Invariant
                     || alternatives
                         .iter()
