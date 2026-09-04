@@ -2423,8 +2423,8 @@ help: Add an `else` branch that calls `assert_never`
 note: This is an unsafe fix and may change runtime behavior
 ```
 
-No fix is offered for an assignment expression: the new branch could observe a variable whose value
-the condition has changed:
+An unparenthesized assignment expression is valid in an `elif` condition but must be parenthesized
+when moved into an assertion:
 
 ```py
 def assignment_expression(value: str | int):
@@ -2440,6 +2440,15 @@ error[redundant-condition-strict]: Condition is always true
    |
 27 |     elif matched := isinstance(value, int):  # snapshot: redundant-condition-strict
    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+help: Replace this `elif` with an `else` branch that asserts the condition to be `True`
+   |
+26 |         print(value)
+   -     elif matched := isinstance(value, int):  # snapshot: redundant-condition-strict
+27 +     else:  # snapshot: redundant-condition-strict
+28 +         assert (matched := isinstance(value, int))
+29 |         print(matched)
+   |
+note: This is an unsafe fix and may change runtime behavior
 ```
 
 If the branch body begins on the same line as its header, the new `else` still goes on a separate
@@ -2522,6 +2531,7 @@ error[redundant-condition-strict]: Condition is always true
    |
 47 |     elif isinstance(value, int):  # snapshot: redundant-condition-strict
    |          ^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+help: Replace this `elif` with an `else` branch that asserts the condition to be `True`
 ```
 
 A redundant check on a variable whose type is `int` before the chain is still reported, but it does
@@ -2543,6 +2553,15 @@ error[redundant-condition-strict]: Condition is always true
    |          -----^^^^^^^^^^^^
    |          |
    |          Has type `int`
+help: Replace this `elif` with an `else` branch that asserts the condition to be `True`
+   |
+50 |         print(items)
+   -     elif value is not None:  # snapshot: redundant-condition-strict
+51 +     else:  # snapshot: redundant-condition-strict
+52 +         assert value is not None
+53 |         print(value)
+   |
+note: This is an unsafe fix and may change runtime behavior
 ```
 
 ## Exhaustiveness checks after explicit line continuations
@@ -2682,6 +2701,15 @@ error[redundant-condition-strict]: Condition is always true
   |          -----^^^^^^^^^^^^
   |          |
   |          Has type `int`
+help: Replace this `elif` with an `else` branch that asserts the condition to be `True`
+  |
+5 |         print("flag")
+  -     elif value is not None:  # snapshot: redundant-condition-strict
+6 +     else:  # snapshot: redundant-condition-strict
+7 +         assert value is not None
+8 |         print(value)
+  |
+note: This is an unsafe fix and may change runtime behavior
 ```
 
 ## Exhaustiveness checks for captured variables
@@ -2741,6 +2769,15 @@ error[redundant-condition-strict]: Condition is always true
   |              -----^^^^^^^^^^^^
   |              |
   |              Has type `int`
+help: Replace this `elif` with an `else` branch that asserts the condition to be `True`
+  |
+6 |             print("flag")
+  -         elif value is not None:  # snapshot: redundant-condition-strict
+7 +         else:  # snapshot: redundant-condition-strict
+8 +             assert value is not None
+9 |             print(value)
+  |
+note: This is an unsafe fix and may change runtime behavior
 ```
 
 ## Exhaustiveness checks for comparisons
@@ -2882,8 +2919,8 @@ note: This is an unsafe fix and may change runtime behavior
 
 ## Exhaustiveness checks with shadowed imports
 
-When both the function and module names are shadowed, no fix is offered. An import elsewhere in the
-module does not make a shadowed alias usable:
+When both the function and module names are shadowed, the fix converts the original condition into a
+defensive assertion. An import elsewhere in the module does not make a shadowed alias usable:
 
 ```py
 import typing as t
@@ -2902,6 +2939,15 @@ error[redundant-condition-strict]: Condition is always true
   |
 7 |     elif isinstance(value, int):  # snapshot: redundant-condition-strict
   |          ^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+help: Replace this `elif` with an `else` branch that asserts the condition to be `True`
+  |
+6 |         print(value)
+  -     elif isinstance(value, int):  # snapshot: redundant-condition-strict
+7 +     else:  # snapshot: redundant-condition-strict
+8 +         assert isinstance(value, int)
+9 |         print(value)
+  |
+note: This is an unsafe fix and may change runtime behavior
 ```
 
 ## Exhaustiveness checks with a deleted import
@@ -2943,8 +2989,8 @@ note: This is an unsafe fix and may change runtime behavior
 
 ## Exhaustiveness checks without a reusable variable
 
-Calling a function again could change its result or have side effects, so no fix is offered when the
-tested value is not a plain variable:
+Calling a function again could change its result or have side effects, so the fix retains the
+original condition as an assertion when the tested value is not a plain variable:
 
 ```py
 def get_value() -> int:
@@ -2963,12 +3009,22 @@ error[redundant-condition-strict]: Condition is always true
   |
 7 |     elif isinstance(get_value(), int):  # snapshot: redundant-condition-strict
   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+help: Replace this `elif` with an `else` branch that asserts the condition to be `True`
+  |
+6 |         print("flag")
+  -     elif isinstance(get_value(), int):  # snapshot: redundant-condition-strict
+7 +     else:  # snapshot: redundant-condition-strict
+8 +         assert isinstance(get_value(), int)
+9 |         print("integer")
+  |
+note: This is an unsafe fix and may change runtime behavior
 ```
 
 ## Exhaustiveness checks on Python 3.10 without dependency metadata
 
 Python 3.10 does not provide `typing.assert_never`. Bundled stubs for `typing_extensions` do not
-establish that the runtime package is available, so no fix is offered without dependency metadata:
+establish that the runtime package is available, so the fix converts the original condition into an
+assertion:
 
 ```toml
 [environment]
@@ -2992,6 +3048,15 @@ error[redundant-condition-strict]: Condition is always true
   |
 4 |     elif isinstance(value, int):  # snapshot: redundant-condition-strict
   |          ^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+help: Replace this `elif` with an `else` branch that asserts the condition to be `True`
+  |
+3 |         print(value)
+  -     elif isinstance(value, int):  # snapshot: redundant-condition-strict
+4 +     else:  # snapshot: redundant-condition-strict
+5 +         assert isinstance(value, int)
+6 |         print(value)
+  |
+note: This is an unsafe fix and may change runtime behavior
 ```
 
 ## Exhaustiveness checks with a direct backport dependency
@@ -3062,8 +3127,8 @@ note: This is an unsafe fix and may change runtime behavior
 
 ### Older runtime module
 
-An installed backport without `assert_never` cannot provide the new assertion. No fix is offered
-even though the bundled stub includes the function:
+An installed backport without `assert_never` cannot provide the new assertion. The fix retains the
+original condition even though the bundled stub includes the function:
 
 `/.venv/<path-to-site-packages>/typing_extensions.py`:
 
@@ -3086,12 +3151,21 @@ error[redundant-condition-strict]: Condition is always true
   |
 4 |     elif isinstance(value, int):  # snapshot: redundant-condition-strict
   |          ^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+help: Replace this `elif` with an `else` branch that asserts the condition to be `True`
+  |
+3 |         print(value)
+  -     elif isinstance(value, int):  # snapshot: redundant-condition-strict
+4 +     else:  # snapshot: redundant-condition-strict
+5 +         assert isinstance(value, int)
+6 |         print(value)
+  |
+note: This is an unsafe fix and may change runtime behavior
 ```
 
 ### Missing runtime module
 
 A dependency declaration does not establish that the backport is installed. If only ty's bundled
-stub is available, no fix is offered:
+stub is available, the fix retains the original condition:
 
 `/.venv/<path-to-site-packages>/unrelated.py`:
 
@@ -3114,6 +3188,15 @@ error[redundant-condition-strict]: Condition is always true
   |
 4 |     elif isinstance(value, int):  # snapshot: redundant-condition-strict
   |          ^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+help: Replace this `elif` with an `else` branch that asserts the condition to be `True`
+  |
+3 |         print(value)
+  -     elif isinstance(value, int):  # snapshot: redundant-condition-strict
+4 +     else:  # snapshot: redundant-condition-strict
+5 +         assert isinstance(value, int)
+6 |         print(value)
+  |
+note: This is an unsafe fix and may change runtime behavior
 ```
 
 ## Exhaustiveness checks with an indirect backport dependency
@@ -3165,7 +3248,263 @@ error[redundant-condition-strict]: Condition is always true
   |
 4 |     elif isinstance(value, int):  # snapshot: redundant-condition-strict
   |          ^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+help: Replace this `elif` with an `else` branch that asserts the condition to be `True`
+  |
+3 |         print(value)
+  -     elif isinstance(value, int):  # snapshot: redundant-condition-strict
+4 +     else:  # snapshot: redundant-condition-strict
+5 +         assert isinstance(value, int)
+6 |         print(value)
+  |
+note: This is an unsafe fix and may change runtime behavior
 ```
+
+## Defensive assertions preserve condition formatting
+
+Without an available `assert_never` import, the fix moves the condition into an assertion.
+Parentheses keep a multiline condition valid, and comments within the condition move with it. Header
+and body comments stay with the branch, which retains its original indentation.
+
+```toml
+[environment]
+python-version = "3.10"
+
+[rules]
+redundant-condition-strict = "error"
+```
+
+```py
+# fmt: off
+def commented_condition(value: str | int):
+  if isinstance(value, str):
+    print(value)
+  elif (
+    # Explain the defensive runtime check.
+    isinstance(value, int)  # snapshot: redundant-condition-strict
+  ):  # Preserve this header comment.
+    # Preserve this body comment.
+    print(value)
+# fmt: on
+```
+
+```snapshot
+error[redundant-condition-strict]: Condition is always true
+ --> src/mdtest_snippet.py:7:5
+  |
+7 |     isinstance(value, int)  # snapshot: redundant-condition-strict
+  |     ^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+help: Replace this `elif` with an `else` branch that asserts the condition to be `True`
+   |
+4  |     print(value)
+   -   elif (
+5  +   else:  # Preserve this header comment.
+6  +     # Preserve this body comment.
+7  +     assert (
+8  |     # Explain the defensive runtime check.
+9  |     isinstance(value, int)  # snapshot: redundant-condition-strict
+   -   ):  # Preserve this header comment.
+   -     # Preserve this body comment.
+10 +   )
+11 |     print(value)
+   |
+note: This is an unsafe fix and may change runtime behavior
+```
+
+## Defensive assertions with inline bodies
+
+The fallback does not rewrite a branch whose body begins on the header line: inserting an indented
+assertion would require moving the existing body. This also applies when the header spans several
+lines.
+
+```toml
+[environment]
+python-version = "3.10"
+
+[rules]
+redundant-condition-strict = "error"
+```
+
+```py
+# fmt: off
+def inline_branch(value: str | int):
+    if isinstance(value, str):
+        print(value)
+    elif isinstance(value, int): print(value)  # snapshot: redundant-condition-strict
+# fmt: on
+```
+
+```snapshot
+error[redundant-condition-strict]: Condition is always true
+ --> src/mdtest_snippet.py:5:10
+  |
+5 |     elif isinstance(value, int): print(value)  # snapshot: redundant-condition-strict
+  |          ^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+help: Replace this `elif` with an `else` branch that asserts the condition to be `True`
+```
+
+```py
+# fmt: off
+def multiline_inline_branch(value: str | int):
+    if isinstance(value, str):
+        print(value)
+    elif (
+        isinstance(value, int)  # snapshot: redundant-condition-strict
+    ): print(value)
+# fmt: on
+```
+
+```snapshot
+error[redundant-condition-strict]: Condition is always true
+  --> src/mdtest_snippet.py:12:9
+   |
+12 |         isinstance(value, int)  # snapshot: redundant-condition-strict
+   |         ^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+help: Replace this `elif` with an `else` branch that asserts the condition to be `True`
+```
+
+## Defensive assertions with continued conditions
+
+A continuation within the condition moves with the condition into the assertion.
+
+```toml
+[environment]
+python-version = "3.10"
+
+[rules]
+redundant-condition-strict = "error"
+```
+
+<!-- fmt:off -->
+
+```py
+def continued_condition(value: str | int):
+    if isinstance(value, str):
+        print(value)
+    # snapshot: redundant-condition-strict
+    elif isinstance(value, \
+                    int):
+        print(value)
+```
+
+```snapshot
+error[redundant-condition-strict]: Condition is always true
+ --> src/mdtest_snippet.py:5:10
+  |
+5 |       elif isinstance(value, \
+  |  __________^
+6 | |                     int):
+  | |________________________^ Inferred type is `Literal[True]`
+help: Replace this `elif` with an `else` branch that asserts the condition to be `True`
+  |
+4 |     # snapshot: redundant-condition-strict
+  -     elif isinstance(value, \
+  -                     int):
+5 +     else:
+6 +         assert isinstance(value, \
+7 +                     int)
+8 |         print(value)
+  |
+note: This is an unsafe fix and may change runtime behavior
+```
+
+<!-- fmt:on -->
+
+## Defensive assertions with continued inline bodies
+
+An inline body can start on a different physical line when the header ends with a backslash. No fix
+is offered: inserting a newline after the assertion would leave the original statement with an
+unexpected indent.
+
+```toml
+[environment]
+python-version = "3.10"
+
+[rules]
+redundant-condition-strict = "error"
+```
+
+<!-- fmt:off -->
+
+```py
+def continued_inline_body(value: str | int):
+    if isinstance(value, str):
+        print(value)
+    # snapshot: redundant-condition-strict
+    elif isinstance(value, int): \
+        print(value)
+```
+
+```snapshot
+error[redundant-condition-strict]: Condition is always true
+ --> src/mdtest_snippet.py:5:10
+  |
+5 |     elif isinstance(value, int): \
+  |          ^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+help: Replace this `elif` with an `else` branch that asserts the condition to be `True`
+```
+
+<!-- fmt:on -->
+
+Continuation lines can also have the same indentation as the branch header. No fix is offered here
+either: the newline would move the original statement outside the branch, making it run after either
+branch.
+
+<!-- fmt:off -->
+
+```py
+def continued_inline_body_at_header_indentation(value: str | int):
+    if isinstance(value, str):
+        print(value)
+    # snapshot: redundant-condition-strict
+    elif isinstance(value, int): \
+    print(value)
+```
+
+```snapshot
+error[redundant-condition-strict]: Condition is always true
+  --> src/mdtest_snippet.py:11:10
+   |
+11 |     elif isinstance(value, int): \
+   |          ^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+help: Replace this `elif` with an `else` branch that asserts the condition to be `True`
+```
+
+<!-- fmt:on -->
+
+## Defensive assertions with continued indented bodies
+
+The first statement of an indented body can itself start on a continuation line. Its physical
+indentation does not determine the body's indentation, so this case also receives no fix.
+
+```toml
+[environment]
+python-version = "3.10"
+
+[rules]
+redundant-condition-strict = "error"
+```
+
+<!-- fmt:off -->
+
+```py
+def continued_indented_body(value: str | int):
+    if isinstance(value, str):
+        print(value)
+    elif isinstance(value, int):  # snapshot: redundant-condition-strict
+        \
+    print(value)
+```
+
+```snapshot
+error[redundant-condition-strict]: Condition is always true
+ --> src/mdtest_snippet.py:4:10
+  |
+4 |     elif isinstance(value, int):  # snapshot: redundant-condition-strict
+  |          ^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+help: Replace this `elif` with an `else` branch that asserts the condition to be `True`
+```
+
+<!-- fmt:on -->
 
 ## `if` and `while` conditions that use AST literal bools or ints
 
