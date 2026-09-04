@@ -274,12 +274,14 @@ use crate::{
 
 mod exception_checkpoint;
 mod place_state;
+mod range_reachability;
 
 pub(super) use exception_checkpoint::ExceptionCheckpointKey;
 use exception_checkpoint::{ExceptionCheckpointSnapshot, ExceptionCheckpointState};
 pub use place_state::LiveBinding;
 pub use place_state::ScopedDefinitionId;
 pub(super) use place_state::{FutureDefinitions, PreviousDefinitions};
+use range_reachability::RangeReachability;
 
 /// Summarizes whether the live control-flow paths leave a symbol bound.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -775,7 +777,7 @@ pub struct UseDefMap<'db> {
     /// Tracks the reachability constraint for statements and certain sub-expressions
     /// (e.g. ternary branches, boolean operator operands), keyed by their text range.
     /// Used to suppress diagnostics in unreachable code.
-    range_reachability: Box<[(TextRange, RangeInfo)]>,
+    range_reachability: RangeReachability,
 
     /// If the definition is a binding (only) -- `x = 1` for example -- then we need
     /// [`Declarations`] to know whether this binding is permitted by the live declarations.
@@ -900,6 +902,18 @@ impl<'db> UseDefMap<'db> {
             .map(|&(range, RangeInfo { reachability, .. })| (range, reachability))
     }
 
+    /// Whether any part of `range` is reachable under the supplied constraint evaluator.
+    /// The ranges are disjoint, so only segments overlapping the query need to be examined.
+    pub fn is_range_reachable(
+        &self,
+        range: TextRange,
+        mut is_reachable: impl FnMut(ScopedReachabilityConstraintId) -> bool,
+    ) -> bool {
+        !self
+            .range_reachability
+            .all_in_range(range, |info| !is_reachable(info.reachability))
+    }
+
     pub fn end_of_scope_reachability(&self) -> ScopedReachabilityConstraintId {
         self.end_of_scope_reachability
     }
@@ -1019,11 +1033,7 @@ impl<'db> UseDefMap<'db> {
 
     pub(crate) fn is_range_in_type_checking_block(&self, range: TextRange) -> bool {
         self.range_reachability
-            .iter()
-            .take_while(|(entry_range, _)| entry_range.start() <= range.start())
-            .any(|&(entry_range, block)| {
-                block.in_type_checking_block && entry_range.contains_range(range)
-            })
+            .all_in_range(range, |info| info.in_type_checking_block)
     }
 
     /// Returns the outermost boolean test containing `range`, including an exact match.
@@ -3003,9 +3013,9 @@ impl<'db> UseDefMapBuilder<'db> {
         // Keep default entries while building so they remain barriers between non-contiguous
         // ranges with the same metadata. Once construction is complete, absence represents the
         // default of reachable code outside a `TYPE_CHECKING` block.
-        self.range_reachability
-            .retain(|(_, info)| *info != RangeInfo::default());
-        for &(_, RangeInfo { reachability, .. }) in &self.range_reachability {
+        let range_reachability =
+            RangeReachability::new(self.range_reachability, &mut self.reachability_constraints);
+        for &(_, RangeInfo { reachability, .. }) in range_reachability.iter() {
             self.reachability_constraints.mark_used(reachability);
         }
         for enclosing_snapshot in &enclosing_snapshots {
@@ -3065,7 +3075,7 @@ impl<'db> UseDefMapBuilder<'db> {
             constraint_tables,
             interned_bindings,
             interned_declarations,
-            range_reachability: self.range_reachability.into_boxed_slice(),
+            range_reachability,
             symbol_states,
             definitions_by_definition,
             extra,

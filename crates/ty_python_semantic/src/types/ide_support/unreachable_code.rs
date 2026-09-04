@@ -75,7 +75,7 @@ fn merge_overlapping_ranges(mut ranges: Vec<UnreachableRange>) -> Box<[Unreachab
     ranges
         .into_iter()
         .coalesce(|mut previous, range| {
-            if range.range.start() < previous.range.end() {
+            if range.range.start() <= previous.range.end() {
                 previous.range = TextRange::new(
                     previous.range.start(),
                     previous.range.end().max(range.range.end()),
