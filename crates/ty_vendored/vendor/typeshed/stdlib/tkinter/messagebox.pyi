@@ -1,3 +1,4 @@
+"""Interface to the standard Tk message boxes."""
 from tkinter import Misc
 from tkinter.commondialog import Dialog
 from typing import ClassVar, Final, Literal
@@ -22,6 +23,7 @@ YES: Final = "yes"
 NO: Final = "no"
 
 class Message(Dialog):
+    """A message box"""
     command: ClassVar[str]
 
 def showinfo(
@@ -32,7 +34,8 @@ def showinfo(
     icon: Literal["error", "info", "question", "warning"] = ...,
     default: Literal["ok"] = "ok",
     parent: Misc = ...,
-) -> str: ...
+) -> str:
+    """Show an info message"""
 def showwarning(
     title: str | None = None,
     message: str | None = None,
@@ -41,7 +44,8 @@ def showwarning(
     icon: Literal["error", "info", "question", "warning"] = ...,
     default: Literal["ok"] = "ok",
     parent: Misc = ...,
-) -> str: ...
+) -> str:
+    """Show a warning message"""
 def showerror(
     title: str | None = None,
     message: str | None = None,
@@ -50,7 +54,8 @@ def showerror(
     icon: Literal["error", "info", "question", "warning"] = ...,
     default: Literal["ok"] = "ok",
     parent: Misc = ...,
-) -> str: ...
+) -> str:
+    """Show an error message"""
 def askquestion(
     title: str | None = None,
     message: str | None = None,
@@ -59,7 +64,8 @@ def askquestion(
     icon: Literal["error", "info", "question", "warning"] = ...,
     default: Literal["yes", "no"] = ...,
     parent: Misc = ...,
-) -> str: ...
+) -> str:
+    """Ask a question; return the symbolic name of the selected button"""
 def askokcancel(
     title: str | None = None,
     message: str | None = None,
@@ -68,7 +74,8 @@ def askokcancel(
     icon: Literal["error", "info", "question", "warning"] = ...,
     default: Literal["ok", "cancel"] = ...,
     parent: Misc = ...,
-) -> bool: ...
+) -> bool:
+    """Ask if operation should proceed; return True if the answer is ok"""
 def askyesno(
     title: str | None = None,
     message: str | None = None,
@@ -77,7 +84,8 @@ def askyesno(
     icon: Literal["error", "info", "question", "warning"] = ...,
     default: Literal["yes", "no"] = ...,
     parent: Misc = ...,
-) -> bool: ...
+) -> bool:
+    """Ask a question; return True if the answer is yes"""
 def askyesnocancel(
     title: str | None = None,
     message: str | None = None,
@@ -86,7 +94,8 @@ def askyesnocancel(
     icon: Literal["error", "info", "question", "warning"] = ...,
     default: Literal["cancel", "yes", "no"] = ...,
     parent: Misc = ...,
-) -> bool | None: ...
+) -> bool | None:
+    """Ask a question; return True if the answer is yes, None if cancelled"""
 def askretrycancel(
     title: str | None = None,
     message: str | None = None,
@@ -95,4 +104,5 @@ def askretrycancel(
     icon: Literal["error", "info", "question", "warning"] = ...,
     default: Literal["retry", "cancel"] = ...,
     parent: Misc = ...,
-) -> bool: ...
+) -> bool:
+    """Ask if operation should be retried; return True if the answer is retry"""
