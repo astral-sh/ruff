@@ -549,8 +549,8 @@ pub fn project_files_in_path<'a>(
     let walker = builder.build_parallel();
 
     // Run the `WalkParallel` to collect all files.
-    let state = WalkPythonFilesState::new(resolver);
-    let mut visitor = PythonFilesVisitorBuilder::new(transformer, &state, &configuration_cache);
+    let state = WalkPythonFilesState::new(resolver, configuration_cache);
+    let mut visitor = PythonFilesVisitorBuilder::new(transformer, &state);
     walker.visit(&mut visitor);
 
     state.finish()
@@ -562,14 +562,16 @@ struct WalkPythonFilesState<'config> {
     is_hierarchical: bool,
     merged: std::sync::Mutex<(ResolvedFiles, Result<()>)>,
     resolver: RwLock<Resolver<'config>>,
+    configuration_cache: ConfigurationCache,
 }
 
 impl<'config> WalkPythonFilesState<'config> {
-    fn new(resolver: Resolver<'config>) -> Self {
+    fn new(resolver: Resolver<'config>, configuration_cache: ConfigurationCache) -> Self {
         Self {
             is_hierarchical: resolver.is_hierarchical(),
             merged: std::sync::Mutex::new((Vec::new(), Ok(()))),
             resolver: RwLock::new(resolver),
+            configuration_cache,
         }
     }
 
@@ -616,20 +618,14 @@ fn deduplicate_files(mut files: ResolvedFiles) -> ResolvedFiles {
 struct PythonFilesVisitorBuilder<'s, 'config> {
     state: &'s WalkPythonFilesState<'config>,
     transformer: &'s (dyn ConfigurationTransformer + Sync),
-    configuration_cache: &'s ConfigurationCache,
 }
 
 impl<'s, 'config> PythonFilesVisitorBuilder<'s, 'config> {
     fn new(
         transformer: &'s (dyn ConfigurationTransformer + Sync),
         state: &'s WalkPythonFilesState<'config>,
-        configuration_cache: &'s ConfigurationCache,
     ) -> Self {
-        Self {
-            state,
-            transformer,
-            configuration_cache,
-        }
+        Self { state, transformer }
     }
 }
 
@@ -638,7 +634,6 @@ struct PythonFilesVisitor<'s, 'config> {
     local_error: Result<()>,
     global: &'s WalkPythonFilesState<'config>,
     transformer: &'s (dyn ConfigurationTransformer + Sync),
-    configuration_cache: &'s ConfigurationCache,
 }
 
 impl<'config, 's> ignore::ParallelVisitorBuilder<'s> for PythonFilesVisitorBuilder<'s, 'config>
@@ -651,7 +646,6 @@ where
             local_error: Ok(()),
             global: self.state,
             transformer: self.transformer,
-            configuration_cache: self.configuration_cache,
         })
     }
 }
@@ -702,7 +696,7 @@ impl ParallelVisitor for PythonFilesVisitor<'_, '_> {
                             &pyproject,
                             self.transformer,
                             ConfigurationOrigin::Ancestor,
-                            Some(self.configuration_cache),
+                            Some(&self.global.configuration_cache),
                         ) {
                             Ok((root, settings)) => {
                                 self.global
