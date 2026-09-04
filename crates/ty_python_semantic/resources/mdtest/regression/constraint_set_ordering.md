@@ -362,8 +362,7 @@ def get_value(value: GetValue[ConstrainedValue]) -> ConstrainedValue:
     raise NotImplementedError
 
 def typed_dict_union(value: ValueA | ValueB) -> None:
-    # TODO: revealed int
-    # revealed: object
+    # revealed: int
     reveal_type(get_value(value))
 ```
 
