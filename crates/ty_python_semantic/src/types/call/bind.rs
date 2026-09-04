@@ -8396,7 +8396,15 @@ impl<'db> Binding<'db> {
         // Gradual tuples may choose a length that aligns the fixed arguments with the parameter
         // tuple. Check complete argument lists so those choices preserve argument order and share
         // the usual generic inference.
+        let mut matched = false;
+        let mut complete = true;
+        let mut inferences = Vec::new();
+        let mut return_types = UnionBuilder::new(db, env);
         for materialized in materializations {
+            let Ok(materialized) = materialized else {
+                complete = false;
+                break;
+            };
             let mut candidate = self.clone();
             candidate.reset(db);
             candidate.match_parameters(db, env, &materialized);
@@ -8411,8 +8419,31 @@ impl<'db> Binding<'db> {
                 call_expression_tcx,
             );
             if candidate.errors.is_empty() {
-                *self = candidate;
-                return;
+                matched = true;
+                self.inferable_typevars = candidate.inferable_typevars;
+                return_types.add_in_place(candidate.return_ty);
+                if let Some(inference) = candidate.inference {
+                    inferences.push(inference);
+                } else {
+                    // A nongeneric signature has the same return type for every placement.
+                    break;
+                }
+            }
+        }
+        if matched {
+            // Keep the original argument matches and parameter types: they describe every
+            // possible placement, whereas each retry describes only one fixed-length choice.
+            self.errors.clear();
+            self.return_ty = return_types.build();
+            let mut inferences = inferences.into_iter();
+            if let Some(first) = inferences.next() {
+                let inference = first.combine(db, env, inferences, complete);
+                if !complete {
+                    self.return_ty = self
+                        .initial_return_type(db)
+                        .apply_specialization(db, inference.merged_specialization(db));
+                }
+                self.inference = Some(inference);
             }
         }
     }

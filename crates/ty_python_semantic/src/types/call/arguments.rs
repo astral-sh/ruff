@@ -447,13 +447,14 @@ impl<'a, 'db> CallArguments<'a, 'db> {
     ///
     /// Unlike union expansion, these are alternative materializations: a call needs only one
     /// to succeed. Concrete variable-length tuples are left unchanged, since every length of
-    /// those tuples must remain valid.
+    /// those tuples must remain valid. The iterator ends with an error if the retry budget
+    /// prevents it from examining every placement.
     pub(super) fn materialize_gradual_tuples(
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         parameters: &Parameters<'db>,
-    ) -> Option<impl Iterator<Item = Self> + use<'a, 'db>> {
+    ) -> Option<impl Iterator<Item = Result<Self, ()>> + use<'a, 'db>> {
         let (_, parameter) = parameters.variadic()?;
         if !parameter.has_starred_annotation() {
             return None;
@@ -473,7 +474,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                 }
                 let ty = item.types.get_default()?.resolve_type_alias(db);
                 // Do not materialize a merged union: its concrete alternatives need checking
-                // separately. Use iteration to respect tuple subclasses' `__iter__` overrides.
+                // separately. Use the same iteration behavior as argument matching.
                 if !ty.is_dynamic() && ty.tuple_instance_spec(db, env).is_none() {
                     return None;
                 }
@@ -530,8 +531,12 @@ impl<'a, 'db> CallArguments<'a, 'db> {
         Some(
             (minimum_length..=maximum_length)
                 .flat_map(move |length| (0..gradual_count).combinations_with_replacement(length))
-                .take(MAX_TOTAL_EXPANSION)
-                .filter_map(move |positions| {
+                .take(MAX_TOTAL_EXPANSION + 1)
+                .enumerate()
+                .filter_map(move |(index, positions)| {
+                    if index == MAX_TOTAL_EXPANSION {
+                        return Some(Err(()));
+                    }
                     let mut lengths = vec![0; gradual_count];
                     for position in positions {
                         lengths[position] += 1;
@@ -545,7 +550,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                             Type::tuple(TupleType::new(db, &env, &fixed)),
                         ));
                     }
-                    Some(materialized)
+                    Some(Ok(materialized))
                 }),
         )
     }

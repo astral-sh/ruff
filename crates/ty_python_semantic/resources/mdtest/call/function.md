@@ -1277,6 +1277,61 @@ def forward_many(
     fixed(*before, None, *a, *b, *c, *after)  # error: [invalid-argument-type]
 ```
 
+### Generic inference across gradual placements
+
+A fixed argument can occupy different positions when gradual tuples supply the remaining arguments.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any
+
+def middle[T](*args: *tuple[object, T, str]) -> T:
+    return args[1]
+
+def forward(before: tuple[Any, ...], after: tuple[Any, ...], value: int) -> None:
+    reveal_type(middle(*before, value, *after))  # revealed: int | Any
+    reveal_type(middle(*before, 1, *after))  # revealed: Literal[1] | Any
+```
+
+The generic position can come from a gradual tuple on either side of the fixed argument.
+
+```py
+def mirrored[T](*args: *tuple[str, T, object]) -> T:
+    return args[1]
+
+def forward_mirrored(before: tuple[Any, ...], after: tuple[Any, ...], value: int) -> None:
+    reveal_type(mirrored(*before, value, *after))  # revealed: Any | int
+```
+
+Each valid placement also contributes when the return type contains a generic class.
+
+```py
+class Box[T]:
+    value: T
+
+def boxed[T](*args: *tuple[object, T, str]) -> Box[T]:
+    raise NotImplementedError
+
+def forward_boxed(before: tuple[Any, ...], after: tuple[Any, ...], value: int) -> None:
+    box = boxed(*before, value, *after)
+    reveal_type(box)  # revealed: Box[int] | Box[Any]
+    reveal_type(box.value)  # revealed: int | Any
+```
+
+When not every placement can be checked, inference cannot rely only on the placements examined.
+
+```py
+def many[T](*args: *tuple[object, object, object, T, str]) -> T:
+    return args[3]
+
+def forward_many(before: tuple[Any, ...], after: tuple[Any, ...], value: int) -> None:
+    reveal_type(many(*before, *before, *before, *before, *before, *before, *before, value, *after))  # revealed: Unknown
+```
+
 ### Mixed argument and parameter containing variadic
 
 ```toml
