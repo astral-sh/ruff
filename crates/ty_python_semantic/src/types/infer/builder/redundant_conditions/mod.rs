@@ -448,10 +448,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 self.report_redundant_condition(&condition)
                                 && condition.expression.range() == test.range()
                             {
+                                // An operand's truthiness can differ from the complete condition's,
+                                // so only annotate branch reachability for the complete test.
                                 self.annotate_redundant_if_or_elif(
                                     &condition,
                                     &mut diagnostic,
                                     if_stmt,
+                                    branch_index,
+                                    &suite[i + 1..],
                                 );
                             }
                         }
