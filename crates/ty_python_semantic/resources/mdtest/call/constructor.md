@@ -534,9 +534,8 @@ class Mapper(Generic[R]):
 
 values: Any
 
-# TODO: Preserve correlated overload solutions so dynamic values do not infer an extra
-# `frozenset` layer or an element type of `Never`.
-reveal_type(Mapper(callback, values))  # revealed: Mapper[frozenset[frozenset[Never]]]
+# TODO: Infer `Mapper[Any]` without retaining the recursive callback's intermediate bounds.
+reveal_type(Mapper(callback, values))  # revealed: Mapper[frozenset[frozenset[Never] | Any] | Any]
 
 def wrap(function: Callable[P, R]) -> Callable[P, R]: ...
 
@@ -544,8 +543,8 @@ class Wrapped(Generic[R]):
     @wrap
     def __new__(cls, callback: Callable[[T], R], values: list[T]) -> Self: ...
 
-# TODO: Preserve the callback's correlated overload solutions through the decorator.
-reveal_type(Wrapped(callback, values))  # revealed: Wrapped[frozenset[frozenset[Never]]]
+# TODO: Infer `Wrapped[Any]` as above.
+reveal_type(Wrapped(callback, values))  # revealed: Wrapped[frozenset[frozenset[Never] | Any] | Any]
 ```
 
 A decorator can preserve `cls` explicitly with `Concatenate`, re-expressing the receiver with its

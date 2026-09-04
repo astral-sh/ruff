@@ -112,7 +112,9 @@ impl<'db> SolutionWalker<'db> {
         for path in self.sorted_paths {
             mappings.clear();
             for (constraint, _) in path {
-                let constraint = storage.constraint_data(constraint);
+                let Some(constraint) = storage.constraint_data(constraint).as_typevar() else {
+                    continue;
+                };
                 let typevar = constraint.typevar;
                 if let Some(lower) = constraint.stored_lower_bound() {
                     let bounds = mappings.entry(typevar).or_default();

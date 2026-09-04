@@ -116,9 +116,8 @@ impl<'db> CallArgumentTypes<'db> {
 }
 
 impl<'a, 'db> CallArguments<'a, 'db> {
-    /// Create `CallArguments` from AST arguments. We will use the provided callback to obtain the
-    /// type of each splatted argument, so that we can determine its length. All other arguments
-    /// will remain uninitialized.
+    /// Creates `CallArguments` from AST arguments. Infers splatted arguments to determine their
+    /// lengths, leaving all other arguments uninferred.
     pub(crate) fn from_arguments(
         arguments: &'a ast::Arguments,
         mut infer_argument_type: impl FnMut(&ast::ArgOrKeyword, &ast::Expr) -> Type<'db>,

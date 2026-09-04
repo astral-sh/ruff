@@ -1077,3 +1077,131 @@ class DeferredChild1(DeferredBase):
 class DeferredChild2(DeferredBase):
     def method(self) -> None: ...
 ```
+
+## Gradual receiver annotations accept generic subclasses
+
+An explicit `Any` receiver accepts instances of any subclass without constraining its type
+variables.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any, NoReturn, TypeVar
+
+T = TypeVar("T")
+
+class NeverReturningMixin:
+    def reverse(self: Any) -> NoReturn:
+        raise TypeError
+
+class NoneReturningMixin:
+    def reverse(self: Any) -> None:
+        raise TypeError
+
+class NeverReturningList(NeverReturningMixin, list[T]): ...
+class NoneReturningList(NoneReturningMixin, list[T]): ...
+```
+
+A union containing `Any` also accepts every possible receiver.
+
+```py
+class GradualUnionMixin:
+    def reverse(self: Any | str) -> None:
+        raise TypeError
+
+class GradualUnionList(GradualUnionMixin, list[T]): ...
+```
+
+A type alias of `Any` does not restrict the receiver either.
+
+```py
+type DynamicAlias = Any
+
+class GradualAliasMixin:
+    def reverse(self: DynamicAlias) -> None:
+        raise TypeError
+
+class GradualAliasList(GradualAliasMixin, list[T]): ...
+```
+
+An unrestricted receiver does not suppress an incompatible return type.
+
+```py
+class InvalidMixin:
+    def reverse(self: Any) -> str:
+        return "invalid"
+
+# error: [invalid-method-override]
+class InvalidList(InvalidMixin, list[T]): ...
+
+class InvalidGradualUnionMixin:
+    def reverse(self: Any | str) -> str:
+        return "invalid"
+
+# error: [invalid-method-override]
+class InvalidGradualUnionList(InvalidGradualUnionMixin, list[T]): ...
+
+class InvalidGradualAliasMixin:
+    def reverse(self: DynamicAlias) -> str:
+        return "invalid"
+
+# error: [invalid-method-override]
+class InvalidGradualAliasList(InvalidGradualAliasMixin, list[T]): ...
+```
+
+## Gradual aliases inside receiver unions
+
+A union containing an alias of `Any` accepts every possible receiver, just like a union containing
+`Any` directly. An inherited method with this receiver annotation is compatible with a generic base
+class's method.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any
+
+type Dynamic = Any
+
+class Base[T]:
+    def method(self) -> None: ...
+
+class Mixin:
+    def method(self: Dynamic | str) -> None: ...
+
+class Child[T](Mixin, Base[T]): ...
+```
+
+Aliases can expose the gradual union through other aliases, including recursive aliases. Recursion
+beneath a type constructor does not restrict the outer `Any` alternative.
+
+```py
+type GradualUnion = Dynamic | str
+type NestedUnion = GradualUnion | bytes
+type RecursiveUnion = Dynamic | tuple[RecursiveUnion]
+
+class NestedMixin:
+    def method(self: NestedUnion) -> None: ...
+
+class RecursiveMixin:
+    def method(self: RecursiveUnion) -> None: ...
+
+class NestedChild[T](NestedMixin, Base[T]): ...
+class RecursiveChild[T](RecursiveMixin, Base[T]): ...
+```
+
+An unrestricted receiver does not hide an incompatible return type.
+
+```py
+class InvalidMixin:
+    def method(self: Dynamic | str) -> str:
+        return "invalid"
+
+# error: [invalid-method-override]
+class InvalidChild[T](InvalidMixin, Base[T]): ...
+```

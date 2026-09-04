@@ -268,7 +268,7 @@ impl<'db> Type<'db> {
             Type::KnownInstance(KnownInstanceType::ConstraintSet(tracked_set)) => {
                 let constraints = ConstraintSetBuilder::new();
                 let tracked_set = constraints.load(db, env, tracked_set.constraints(db));
-                Truthiness::from(tracked_set.is_always_satisfied(db, env))
+                Truthiness::from(tracked_set.is_gradually_satisfied(db, env))
             }
 
             Type::KnownInstance(KnownInstanceType::Range { is_non_empty }) => {

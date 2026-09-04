@@ -458,12 +458,13 @@ def singleton(flag: bool = False) -> Callable[[Callable[[int], S]], Callable[[in
 
 ## Return type inference from partially annotated overloads
 
-The catch-all overload returns `object`, which is preserved when inferring a return type from the
-whole callback even though the literal-specific overloads have unannotated return types.
+The catch-all overload guarantees an `object` return. The literal-specific overloads also contribute
+their unannotated return types, so intersecting these guarantees preserves `Unknown`.
 
 ```py
 from typing import Callable, Literal, TypeVar, overload
 from typing_extensions import assert_type
+from ty_extensions._internal import Unknown
 
 R = TypeVar("R")
 T = TypeVar("T")
@@ -490,7 +491,7 @@ def callback(value: object) -> object: ...
 def callback(value):
     raise NotImplementedError
 
-assert_type(infer_return(callback), object)
+assert_type(infer_return(callback), Unknown)
 ```
 
 ## Generic inference after projection budget exhaustion

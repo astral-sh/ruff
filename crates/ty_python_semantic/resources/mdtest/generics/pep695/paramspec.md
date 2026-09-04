@@ -1951,6 +1951,47 @@ reveal_type(c.generic_method(100))  # revealed: Literal[100]
 reveal_type(c.generic_method([1, 2, 3]))  # revealed: list[int]
 ```
 
+### Generic decorators with gradual return types
+
+A decorator that captures `Callable[P, Any]` preserves the generic function's parameter types in
+`P`.
+
+```py
+from collections.abc import Callable
+from typing import Any
+
+class Wrapper[**P]:
+    def __call__(self, *args: P.args, **kwargs: P.kwargs) -> Any:
+        raise NotImplementedError
+
+class Decorator:
+    def __call__[**P](self, fn: Callable[P, Any]) -> Wrapper[P]:
+        raise NotImplementedError
+
+@Decorator()
+def identity[T](value: T) -> T:
+    return value
+
+reveal_type(identity)  # revealed: Wrapper[(value: T@identity)]
+reveal_type(identity(1))  # revealed: Any
+```
+
+The same applies when the return type is an alias for `Any`.
+
+```py
+type Anything = Any
+
+def decorate_alias[**P](fn: Callable[P, Anything]) -> Wrapper[P]:
+    raise NotImplementedError
+
+@decorate_alias
+def identity_alias[T](value: T) -> T:
+    return value
+
+reveal_type(identity_alias)  # revealed: Wrapper[(value: T@identity_alias)]
+reveal_type(identity_alias(1))  # revealed: Any
+```
+
 ## Callable protocols with `ParamSpec` and class constructors
 
 When a class is passed to a function expecting a callable protocol with `ParamSpec`, the `ParamSpec`

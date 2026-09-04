@@ -74,9 +74,10 @@ use crate::types::{
     BindingContext, BoundMethodType, BoundTypeVarInstance, CallableType, CallableTypes,
     ClassLiteral, DATACLASS_FLAGS, DataclassFlags, DataclassParams, DynamicType, GenericAlias,
     InternedConstraintSet, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
-    LiteralValueTypeKind, NominalInstanceType, PropertyInstanceType, SpecialFormType, TypeContext,
-    TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance, UnionAccumulator, UnionBuilder,
-    UnionType, WrapperDescriptorKind, enums, is_property_method, list_members,
+    LiteralValueTypeKind, MaterializationKind, NominalInstanceType, PropertyInstanceType,
+    SpecialFormType, TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance,
+    UnionAccumulator, UnionBuilder, UnionType, WrapperDescriptorKind, enums, is_property_method,
+    list_members,
 };
 use crate::{DisplaySettings, FxOrderSet};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
@@ -3099,8 +3100,13 @@ impl<'db> Bindings<'db> {
                         let constraints = ConstraintSetBuilder::new();
                         let result = constraints.into_owned(|constraints| {
                             let lhs = constraints.load(db, env, tracked.constraints(db));
-                            let rhs = constraints.load(db, env, other.constraints(db));
-                            lhs.implies(db, constraints, || rhs)
+                            let rhs = if tracked == *other {
+                                lhs
+                            } else {
+                                constraints.load(db, env, other.constraints(db))
+                            };
+                            lhs.implies(db, constraints, rhs)
+                                .for_all_gradual(db, env, constraints)
                         });
                         let tracked = InternedConstraintSet::new(db, result);
                         overload.set_return_type(Type::KnownInstance(
@@ -3965,7 +3971,7 @@ impl<'db> CallableBinding<'db> {
                             constraints,
                             overload.inferable_typevars,
                         )
-                        .is_always_satisfied(db, env)
+                        .is_gradually_satisfied(db, env)
                 })
             });
             if !is_argument_assignable_to_any_overload {
@@ -5730,7 +5736,7 @@ fn validate_keyword_unpack_key_type<'db>(
             constraints,
             inferable_typevars,
         )
-        .is_always_satisfied(db, env)
+        .is_gradually_satisfied(db, env)
     {
         KeywordUnpackKeyTypeCheck::Valid
     } else {
@@ -5810,6 +5816,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
     }
 
     /// Yields the effective formal and actual types for each matched argument-parameter pair.
+    ///
+    /// Uninferred arguments are skipped, but arguments inferred as `Unknown` are still included.
     ///
     /// Gradual variadic parameters do not contribute constraints. For unpacked tuple parameters,
     /// the matched parameter can provide a more specific formal type for the corresponding element.
@@ -6007,7 +6015,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             .map(|inference| inference.merged_specialization(db))
     }
 
-    /// Intersects the returns of complete, static specializations that each validate all arguments.
+    /// Intersects the returns of complete specializations that each validate all arguments without
+    /// narrowing their materializations.
     ///
     /// Returns `None` when correlated inference is unavailable or cannot safely replace the
     /// merged projection. `Single` already has the same return under either projection.
@@ -6106,33 +6115,16 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         }) {
             return None;
         }
-        // Intersecting returns requires the same call to satisfy every retained specialization,
-        // without choosing a different materialization of a gradual type for each one. For
-        // example, `Any` is assignable to both `int` and `str`, but this does not prove that a
-        // value typed as `Any` has type `int & str`.
-        //
-        // Solved types alone cannot establish this: comparing `Any` against a generic parameter
-        // can succeed without constraining its type variables, while another argument supplies
-        // complete, static solutions for them. The constraint set does not currently record
-        // that those solutions still depend on gradual assignability. Rejecting individual
-        // solutions during subtype revalidation can also discard a valid gradual alternative
-        // while keeping a static sibling.
-        //
-        // TODO: Track gradual evidence per alternative. Until then, use the merged fallback
-        // for the whole call when an inference-relevant relation involves gradual types.
-        // A gradual argument unrelated to inference does not change the solutions, so it need
-        // not prevent intersecting their returns.
+        // Inferred gradual bindings can cover every materialization of an argument without
+        // narrowing it. Explicit gradual requirements can instead make different alternatives
+        // depend on incompatible materializations, so keep their merged fallback.
         let relations: Vec<_> = self
             .argument_relations()
             .map(|relation| {
                 let contributes_to_inference = [relation.declared_type, relation.argument_type]
                     .into_iter()
                     .any(mentions_inferable);
-                if contributes_to_inference
-                    && (relation.argument_type.bottom_materialization(db, env)
-                        != relation.argument_type.top_materialization(db, env)
-                        || relation.declared_type.has_dynamic(db, env))
-                {
+                if contributes_to_inference && relation.declared_type.has_dynamic(db, env) {
                     return None;
                 }
                 Some((relation, contributes_to_inference))
@@ -6142,18 +6134,15 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         let mut returns = Vec::with_capacity(alternatives.len());
         let mut budget = ProjectionTypeBudget::new(SolutionBudget::default().type_terms);
         for types in alternatives {
-            if types
-                .iter()
-                .filter_map(|binding| binding.and_then(resolved_type))
-                .any(|ty| ty.bottom_materialization(db, env) != ty.top_materialization(db, env))
-            {
-                return None;
-            }
-
             let specialization = generic_context.specialize_recursive(
                 db,
                 types.iter().map(|binding| binding.and_then(resolved_type)),
             );
+            // Revalidation covers every materialization of each argument. Materialize only
+            // inferred bindings in the parameter types, respecting their variance; the return
+            // type below keeps those bindings' gradual restrictions.
+            let parameter_specialization =
+                specialization.with_materialization_kind(db, Some(MaterializationKind::Top));
             // TODO: Remove revalidation once constraint generation and solution selection
             // guarantee the original argument relations. Inference currently drops `None`
             // from `list[int] | None` against `list[T]`, and can infer `T = str` from
@@ -6168,7 +6157,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                         .apply_specialization(db, specialization);
                     let formal = relation
                         .declared_type
-                        .apply_specialization(db, specialization);
+                        .apply_specialization(db, parameter_specialization);
                     if *contributes_to_inference {
                         actual.is_subtype_of(db, env, formal)
                     } else {

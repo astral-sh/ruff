@@ -890,7 +890,8 @@ of the first type represent sets of values that are a subset of every possible s
 represented by a materialization of the second type.
 
 ```pyi
-from ty_extensions import static_assert
+from collections.abc import Iterable
+from ty_extensions import Intersection, static_assert
 from ty_extensions._internal import Unknown, is_subtype_of
 from typing_extensions import Any
 
@@ -903,6 +904,15 @@ static_assert(not is_subtype_of(object, Any))
 static_assert(is_subtype_of(int, Any | int))
 static_assert(is_subtype_of(Any & int, int))
 static_assert(not is_subtype_of(tuple[int, int], tuple[int, Any]))
+
+type LowerBoundedIterable = Iterable[str] | Any
+type UpperBoundedIterable = Intersection[Any, Iterable[int]]
+type BoundedIterable = Iterable[bool] | Intersection[Any, Iterable[int]]
+
+static_assert(is_subtype_of(Iterable[bool], BoundedIterable))
+static_assert(is_subtype_of(BoundedIterable, Iterable[int]))
+static_assert(is_subtype_of(UpperBoundedIterable, Iterable[int]))
+static_assert(not is_subtype_of(LowerBoundedIterable, Iterable[object]))
 
 class Covariant[T]:
     def get(self) -> T:

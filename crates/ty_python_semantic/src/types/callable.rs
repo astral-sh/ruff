@@ -1018,6 +1018,28 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         if target.is_function_like(db) && !source.is_function_like(db) {
             return self.never();
         }
+        if source.kind(db) == CallableTypeKind::ParamSpecValue
+            && target.kind(db) == CallableTypeKind::ParamSpecValue
+        {
+            // `ParamSpec` values describe parameter lists, not callable return types. Their
+            // placeholder returns must not impose materialization conditions or affect subtyping.
+            let parameters_only = |callable: CallableType<'db>| {
+                CallableSignature::from_overloads(
+                    callable
+                        .signatures(db)
+                        .iter()
+                        .cloned()
+                        .map(|signature| signature.with_return_type(Type::object())),
+                )
+            };
+
+            return self.check_callable_signature_pair(
+                db,
+                &parameters_only(source),
+                &parameters_only(target),
+            );
+        }
+
         self.check_callable_signature_pair(db, source.signatures(db), target.signatures(db))
     }
 

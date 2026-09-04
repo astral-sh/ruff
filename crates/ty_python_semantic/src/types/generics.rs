@@ -19,7 +19,7 @@ use crate::types::constraints::{
 };
 use crate::types::infer::original_class_type;
 use crate::types::relation::{
-    DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation,
+    DisjointnessChecker, GradualEvaluation, HasRelationToVisitor, IsDisjointVisitor, TypeRelation,
     TypeRelationChecker, TypeVarEvaluation,
 };
 use crate::types::signatures::{Parameters, ReturnCallableTypeVarScope, SignatureRelationVisitor};
@@ -2266,8 +2266,9 @@ pub enum ApplySpecialization<'a, 'db> {
         skip: Option<usize>,
     },
     ReturnCallables(&'a FxIndexMap<BoundTypeVarInstance<'db>, BoundTypeVarInstance<'db>>),
-    /// Maps a single typevar to a concrete type. Used by the constraint set's sequent map to
-    /// substitute a typevar nested inside another constraint's bound.
+    /// Maps every type variable to the provided type.
+    All(Type<'db>),
+    /// Maps a single type variable to the provided type.
     Single(BoundTypeVarInstance<'db>, Type<'db>),
     /// Overrides the given type variables in an existing specialization mapping.
     WithBindings {
@@ -2332,6 +2333,7 @@ impl<'db> ApplySpecialization<'_, 'db> {
             ApplySpecialization::ReturnCallables(replacements) => {
                 replacements.get(&bound_typevar).copied().map(Type::TypeVar)
             }
+            ApplySpecialization::All(replacement) => Some(*replacement),
             ApplySpecialization::Single(typevar, ty) => {
                 if bound_typevar.is_same_typevar_as(db, *typevar) {
                     Some(*ty)
@@ -2379,7 +2381,9 @@ impl<'db> ApplySpecialization<'_, 'db> {
                         .collect::<Vec<_>>(),
                 ),
             ),
-            ApplySpecialization::ReturnCallables(_) | ApplySpecialization::Single(_, _) => None,
+            ApplySpecialization::ReturnCallables(_)
+            | ApplySpecialization::All(_)
+            | ApplySpecialization::Single(_, _) => None,
             ApplySpecialization::WithBindings {
                 specialization,
                 bindings,
@@ -4031,6 +4035,31 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             return Ok(());
         }
 
+        if matches!(formal, Type::Dynamic(_)) {
+            return Ok(());
+        }
+
+        if formal.has_top_level_dynamic(db, self.env) || actual.has_top_level_dynamic(db, self.env)
+        {
+            if let Type::TypeAlias(alias) = formal {
+                return self.infer_map_impl(alias.value_type(db), actual, polarity, seen);
+            }
+
+            // Preserve constraints from every materialization before pruning union alternatives.
+            let when = actual.has_relation_to_with_variance(
+                db,
+                self.env,
+                formal,
+                self.constraints,
+                self.inferable,
+                TypeRelation::Assignability,
+                TypeVarEvaluation::Lazy,
+                GradualEvaluation::Lazy,
+                polarity,
+            );
+            return self.infer_from_constraint_set(when);
+        }
+
         // Remove the union elements from `actual` that are not related to `formal`, and vice
         // versa.
         //
@@ -4298,7 +4327,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                                 self.constraints,
                                 self.inferable,
                             )
-                            .is_always_satisfied(db, self.env)
+                            .is_gradually_satisfied(db, self.env)
                         {
                             return Err(SpecializationError::MismatchedBound {
                                 bound_typevar,
@@ -4343,7 +4372,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                                         self.constraints,
                                         self.inferable,
                                     )
-                                    .is_always_satisfied(db, self.env)
+                                    .is_gradually_satisfied(db, self.env)
                             } else {
                                 ty.when_assignable_to(
                                     db,
@@ -4352,7 +4381,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                                     self.constraints,
                                     self.inferable,
                                 )
-                                .is_always_satisfied(db, self.env)
+                                .is_gradually_satisfied(db, self.env)
                             };
 
                             if is_satisfied {
@@ -4395,69 +4424,11 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 // the new solver, which does not support those variables yet.
                 return self.infer_map_impl(formal, positive, polarity, seen);
             }
-            (_, Type::Intersection(actual_intersection)) => {
-                // Use correlated constraints to keep alternative specializations separate. This
-                // follows the TypeVar arm so a bare variable still receives the entire intersection.
+            (_, Type::Intersection(_)) => {
+                // Each positive can establish the relation independently. Keep those
+                // specializations separate until the call's return type is instantiated.
                 let when = self.constraint_for_relation(formal, actual, relation_polarity);
-                let analysis = self.analyze_constraint_set(when);
-                let is_gradual = |ty: Type<'db>| {
-                    ty.bottom_materialization(db, self.env) != ty.top_materialization(db, self.env)
-                };
-                let use_legacy_inference = polarity.is_covariant()
-                    && match &analysis {
-                        // An unconditional relation may already have discarded gradual evidence.
-                        ConstraintSetAnalysis::Unconstrained => true,
-                        ConstraintSetAnalysis::Constrained(SolutionPaths::Complete(paths)) => paths
-                            .iter()
-                            .flatten()
-                            .any(|binding| is_gradual(binding.solution)),
-                        ConstraintSetAnalysis::Unsatisfiable(failures) => failures
-                            .iter()
-                            .any(|failure| is_gradual(failure.error.argument_type())),
-                        // Do not bypass exhausted budgets by retrying recursive inference.
-                        ConstraintSetAnalysis::Constrained(SolutionPaths::BudgetExceeded(_))
-                        | ConstraintSetAnalysis::BudgetExceeded => false,
-                    };
-                if use_legacy_inference {
-                    // TODO: Remove this compatibility path once gradual materialization evidence
-                    // is preserved (https://github.com/astral-sh/ruff/pull/26873). For example,
-                    // `Any & Source[str] <= Source[T]` becomes unconditionally true, losing the
-                    // `str` contribution. Inferring each positive separately retains that evidence.
-                    // Inspecting inferred types also catches gradual specializations inherited
-                    // through an MRO, which may not appear directly in the argument type.
-                    let mut first_error = None;
-                    let mut found_matching_element = false;
-                    // One matching positive makes errors from other positives irrelevant;
-                    // successful recursive inference alone does not establish assignability.
-                    for positive in actual_intersection.iter_positive(db) {
-                        if let Err(error) = self.infer_map_impl(formal, positive, polarity, seen) {
-                            // TODO: Failed inference can modify both `self.types` and `self.pending`.
-                            // Isolate alternatives before mutating shared state.
-                            first_error.get_or_insert(error);
-                        } else if !positive
-                            .when_assignable_to(
-                                db,
-                                self.env,
-                                formal,
-                                self.constraints,
-                                self.inferable,
-                            )
-                            .is_never_satisfied(db, self.env)
-                        {
-                            found_matching_element = true;
-                        }
-                    }
-                    if !found_matching_element && let Some(error) = first_error {
-                        return Err(error);
-                    }
-                } else {
-                    self.record_constraint_set(when);
-                    if let Some(error) = analysis.specialization_error(db, self.env) {
-                        return Err(error);
-                    }
-                    self.project_for_legacy_fallback(&analysis);
-                }
-                return Ok(());
+                return self.infer_from_constraint_set(when);
             }
 
             (

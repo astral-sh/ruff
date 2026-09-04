@@ -79,6 +79,30 @@ str("Müsli", "utf-8")
 str(b"M\xc3\xbcsli", b"utf-8")
 ```
 
+## Gradual collections after narrowing
+
+Collection constructors preserve the gradual component of an element type after narrowing.
+
+```py
+from typing import Any
+
+def _(value: list[str] | Any) -> None:
+    if isinstance(value, list):
+        reveal_type(value)  # revealed: list[str] | (Any & list[Unknown])
+        reveal_type(list(value))  # revealed: list[str | Any]
+
+def _(value: dict[str, Any] | dict[str, list[Any]] | Any) -> None:
+    if not isinstance(value, dict):
+        return
+
+    key, item = next(iter(value.items()))
+    reveal_type(key)  # revealed: str | Any
+    reveal_type(item)  # revealed: Any | list[Any]
+
+    for element in item:
+        reveal_type(element)  # revealed: Any
+```
+
 ## Calls to `isinstance`
 
 We infer `Literal[True]` for a limited set of cases where we can be sure that the answer is correct,
@@ -398,27 +422,48 @@ def partial_mutually_recursive_alias(x: RecursivePartialA) -> bool:  # error: [i
         return True
 ```
 
-## Generic builtins should not overfit upper-bound-only callback constraints
+## Generic builtins preserve gradual callback constraints
 
-These examples are minimized from ecosystem regressions seen while preserving explicit `Never` and
-`object` bounds through the constraint solver. The current solver picks callback parameter upper
-bounds as concrete solutions when the iterable argument is otherwise unknown. That overfits the
-result to `Sized` or `object`; ideally the element type would remain `Unknown`, while the callable
-return type would still be used where possible.
+A callback's parameter type restricts a gradual iterable's element type without replacing its
+gradual component. For `sorted(xs, key=len)`, we infer `Sized & Unknown` rather than `Sized` for
+each element.
 
 ```py
+from typing import Any
 from ty_extensions._internal import Unknown
 
 def _(xs: Unknown):
-    # TODO: should be `list[Unknown]`
-    reveal_type(sorted(xs, key=len))  # revealed: list[Sized]
+    reveal_type(sorted(xs, key=len))  # revealed: list[Sized & Unknown]
 
     # TODO: should be `map[str]`
-    reveal_type(map("{}".format, xs))  # revealed: map[object]
+    reveal_type(map("{}".format, xs))  # revealed: map[str | Unknown]
 
-    # TODO: should not emit an error and should reveal `str`
-    # error: [no-matching-overload]
-    reveal_type("".join(map("{}".format, xs)))  # revealed: Unknown
+    # TODO: should be `LiteralString`
+    reveal_type("".join(map("{}".format, xs)))  # revealed: str
+```
+
+Overloaded callbacks also preserve `Any` from a known iterable type:
+
+```py
+def _(values: list[tuple[Any, ...]]):
+    reveal_type(map(min, values))  # revealed: map[Any]
+```
+
+## Gradual variadic arguments
+
+A gradual argument still contributes to the result when a starred argument contributes a static
+type:
+
+```py
+from typing import Any, Sequence
+
+def _(x: Any, y: Any, values: Sequence[float]):
+    largest = max(abs(x), abs(y), *(value for value in values))
+    reveal_type(largest)  # revealed: Any | float
+
+def _(x, y, values: Sequence[float]):
+    largest = max(abs(x), abs(y), *(value for value in values))
+    reveal_type(largest)  # revealed: Unknown | float
 ```
 
 ## Mapping methods accept arbitrary object types
@@ -522,12 +567,12 @@ import re
 
 def _(s: Unknown | str):
     escaped = map(re.escape, s)
-    reveal_type(escaped)  # revealed: map[str]
+    reveal_type(escaped)  # revealed: map[Unknown | str]
     "".join(escaped)
 
 def _(xs: Unknown | list[str]):
     escaped = map(re.escape, xs)
-    reveal_type(escaped)  # revealed: map[str]
+    reveal_type(escaped)  # revealed: map[Unknown | str]
     tokens: list[Unknown | str] = []
     tokens.extend(escaped)
 ```

@@ -511,6 +511,11 @@ impl PathAssignments {
             return;
         }
 
+        // Gradual decisions produce no sequents, but projection still needs their source order.
+        if storage.constraint_data(constraint).as_gradual().is_some() {
+            return;
+        }
+
         let single_map = SequentMap::for_constraint(db, env, storage, constraint);
         self.sequents.extend_from_slice(&single_map.sequents);
 

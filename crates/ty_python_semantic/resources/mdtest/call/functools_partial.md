@@ -1805,6 +1805,39 @@ partial_like: PartialLike[int] = partial(f)
 partial_like_bad: PartialLike[str] = partial(f)  # error: [invalid-assignment]
 ```
 
+### Overloaded protocols with specialized receivers
+
+Comparing an overloaded `partial` against a protocol with specialized receivers does not recurse
+indefinitely when its bound argument can be either `classmethod` or `staticmethod`.
+
+```py
+from __future__ import annotations
+
+from functools import partial
+from typing import Any, ParamSpec, Protocol, TypeVar, overload
+
+T = TypeVar("T")
+V = TypeVar("V", covariant=True)
+P = ParamSpec("P")
+C = TypeVar("C", bound=type)
+
+class Wrapper(Protocol[V]):
+    @overload
+    def __call__(self: Wrapper[classmethod[C, P, T]], method: classmethod[C, P, T], /) -> classmethod[C, P, T]: ...
+    @overload
+    def __call__(self: Wrapper[staticmethod[P, T]], method: staticmethod[P, T], /) -> staticmethod[P, T]: ...
+    def __call__(self, method, /): ...
+
+@overload
+def wrap(kind: type[staticmethod[P, T]], method: staticmethod[P, T], /) -> staticmethod[P, T]: ...
+@overload
+def wrap(kind: type[classmethod[C, P, T]], method: classmethod[C, P, T], /) -> classmethod[C, P, T]: ...
+def wrap(*args, **kwargs): ...
+def _(class_method: bool) -> Wrapper[Any]:
+    # error: [invalid-argument-type]
+    return partial(wrap, classmethod if class_method else staticmethod)
+```
+
 ### Accessing `__call__` directly
 
 `__call__` on a `partial` result should reflect the refined callable signature, not the broad
