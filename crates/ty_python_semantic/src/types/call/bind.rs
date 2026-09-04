@@ -4554,15 +4554,15 @@ impl<'db> CallableBinding<'db> {
         &self,
         db: &'db dyn Db,
     ) -> impl Iterator<Item = OverloadLiteral<'db>> + Clone {
-        if let Type::Callable(callable) = self.signature_type {
+        let signature_type = match self.signature_type {
+            Type::BoundMethod(bound) => bound.func(db),
+            ty => ty,
+        };
+        if let Type::Callable(callable) = signature_type {
             return Either::Left(callable.deprecated(db).into_iter());
         }
-        let function = match self.signature_type {
-            Type::FunctionLiteral(function) => Some(function),
-            Type::BoundMethod(bound) => Some(bound.function(db)),
-            _ => None,
-        };
-        let (overloads, implementation) = function
+        let (overloads, implementation) = signature_type
+            .as_function_literal()
             .map(|function| function.overloads_and_implementation(db))
             .unwrap_or_default();
         if let Some(implementation) =

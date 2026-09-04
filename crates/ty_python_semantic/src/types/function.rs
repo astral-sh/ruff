@@ -1664,15 +1664,22 @@ impl<'db> FunctionType<'db> {
     }
 
     /// Bind this function's signatures to a receiver while preserving overload selection and `Self`.
+    #[salsa::tracked(
+        returns(copy),
+        cycle_initial=|db, _, _, _, _| CallableType::bottom(db),
+        heap_size=ruff_memory_usage::heap_size
+    )]
     pub(crate) fn into_bound_callable(
         self,
         db: &'db dyn Db,
         receiver_type: Type<'db>,
         typing_self_type: Type<'db>,
     ) -> CallableType<'db> {
+        let env = ProgramEnvironment::from_scope(self.literal(db).last_definition.body_scope(db));
+
         CallableType::new(
             db,
-            self.bound_signatures(db, receiver_type, typing_self_type),
+            self.bound_signatures_with_receiver(db, &env, receiver_type, typing_self_type),
             CallableTypeKind::FunctionLike,
         )
     }
@@ -1692,16 +1699,15 @@ impl<'db> FunctionType<'db> {
         )
     }
 
-    #[salsa::tracked(returns(ref), cycle_initial=|_, _, _, _, _| CallableSignature::bottom(), heap_size=ruff_memory_usage::heap_size)]
+    /// Shares the signatures retained in the function's interned bound callable.
     pub(crate) fn bound_signatures(
         self,
         db: &'db dyn Db,
         receiver_type: Type<'db>,
         typing_self_type: Type<'db>,
-    ) -> CallableSignature<'db> {
-        let env = ProgramEnvironment::from_scope(self.literal(db).last_definition.body_scope(db));
-
-        self.bound_signatures_with_receiver(db, &env, receiver_type, typing_self_type)
+    ) -> &'db CallableSignature<'db> {
+        self.into_bound_callable(db, receiver_type, typing_self_type)
+            .signatures(db)
     }
 
     fn bound_signatures_with_receiver(

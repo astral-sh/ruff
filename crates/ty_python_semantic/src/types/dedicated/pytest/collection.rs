@@ -186,7 +186,7 @@ pub(crate) fn pytest_test_for_binding<'db>(
     } else {
         let function = match binding_value_type(db, binding) {
             Type::FunctionLiteral(function) => function,
-            Type::BoundMethod(method) => method.function(db),
+            Type::BoundMethod(method) => method.function(db)?,
             _ => return None,
         };
         test_function_definition(db, function)

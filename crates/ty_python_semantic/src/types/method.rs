@@ -166,10 +166,16 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 self.check_type_pair(db, source.self_instance(db), target.self_instance(db))
             })
             .and(db, self.constraints, || {
-                self.check_callable_signature_pair(
+                let (Some(source), Some(target)) = (
+                    source.callables(db, self.env),
+                    target.callables(db, self.env),
+                ) else {
+                    return self.never();
+                };
+                self.check_type_pair(
                     db,
-                    source.bound_signatures(db),
-                    target.bound_signatures(db),
+                    source.into_type(db, self.env),
+                    target.into_type(db, self.env),
                 )
             })
     }

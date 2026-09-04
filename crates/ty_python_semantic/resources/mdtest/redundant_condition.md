@@ -422,6 +422,23 @@ info: `Pattern` instances are always truthy because `Pattern` cannot be subclass
     | |______________________________^ `Pattern` defined here
 ```
 
+## Classmethods wrapping callable objects
+
+A bound classmethod is always truthy even when it wraps a callable instance instead of a Python
+function. Testing the method does not call the wrapped object.
+
+```py
+class CallableObject:
+    def __call__(self, cls: type[object]) -> bool:
+        return False
+
+class C:
+    method = classmethod(CallableObject())
+
+if C.method:  # error: [redundant-condition] "Object of type `MethodType[CallableObject]` is always truthy"
+    pass
+```
+
 ## Enum instances
 
 An enum with members is implicitly final, so its instances are always truthy if the enum defines
