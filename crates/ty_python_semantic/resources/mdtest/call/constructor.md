@@ -1699,6 +1699,58 @@ class RequiredClassSelector(Generic[T]):
 reveal_type(RequiredClassSelector(class_=MyClass))  # revealed: RequiredClassSelector[MyClass | None]
 ```
 
+## Inferring type arguments from a union `self` annotation
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from typing import Never
+
+class Covariant[T]:
+    def __init__(self: Covariant[int | str]) -> None: ...
+
+    # Make it covariant in `T`:
+    def get(self) -> T:
+        raise NotImplementedError
+
+reveal_type(Covariant())  # revealed: Covariant[int | str]
+reveal_type(Covariant[int]())  # revealed: Covariant[int]
+reveal_type(Covariant[str]())  # revealed: Covariant[str]
+reveal_type(Covariant[Never]())  # revealed: Covariant[Never]
+
+Covariant[object]()  # error: [invalid-argument-type]
+
+class Contravariant[T]:
+    def __init__(self: Contravariant[int | str]) -> None: ...
+
+    # Make it contravariant in `T`:
+    def push(self, value: T) -> None: ...
+
+reveal_type(Contravariant())  # revealed: Contravariant[int | str]
+reveal_type(Contravariant[object]())  # revealed: Contravariant[object]
+
+Contravariant[int]()  # error: [invalid-argument-type]
+Contravariant[str]()  # error: [invalid-argument-type]
+
+class Invariant[T]:
+    def __init__(self: Invariant[int | str]) -> None: ...
+
+    # Make it invariant in `T`:
+    def get(self) -> T:
+        raise NotImplementedError
+    def push(self, value: T) -> None: ...
+
+reveal_type(Invariant())  # revealed: Invariant[int | str]
+reveal_type(Invariant[int | str]())  # revealed: Invariant[int | str]
+
+Invariant[int]()  # error: [invalid-argument-type]
+Invariant[Never]()  # error: [invalid-argument-type]
+Invariant[object]()  # error: [invalid-argument-type]
+```
+
 ## `__init__` can remap constructor generic arguments via `self` annotation
 
 ```py
