@@ -17,7 +17,7 @@ use crate::reachability::{
 };
 use crate::types::cycle_variable::CycleQuery;
 use crate::types::{
-    DynamicType, InferencePromotion, InferenceVariable, KnownClass, MemberLookupKey,
+    CycleVariable, DynamicType, InferencePromotion, KnownClass, MemberLookupKey,
     MemberLookupPolicy, SymbolicType, Type, TypeAndQualifiers, TypeQualifiers, UnionBuilder,
     UnionType, infer_definition_types, inferred_declaration, is_discarded_dict_key_assignment,
     may_exist_at_runtime,
@@ -101,7 +101,7 @@ impl PublicTypePolicy {
         env: &ProgramEnvironment<'db>,
         ty: Type<'db>,
         symbolic: Option<SymbolicType<'db>>,
-        lookup: impl Fn() -> InferenceVariable<'db>,
+        lookup: impl Fn() -> CycleVariable<'db>,
     ) -> (Type<'db>, Option<SymbolicType<'db>>) {
         match self {
             Self::Raw => (ty, symbolic),
@@ -464,7 +464,7 @@ impl<'db> LookupError<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        lookup: impl Fn() -> InferenceVariable<'db>,
+        lookup: impl Fn() -> CycleVariable<'db>,
         fallback: PlaceAndQualifiers<'db>,
     ) -> LookupResult<'db> {
         let fallback = fallback.into_lookup_result(db, env, lookup);
@@ -1068,7 +1068,7 @@ impl<'db> PlaceAndQualifiers<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        lookup: impl Fn() -> InferenceVariable<'db>,
+        lookup: impl Fn() -> CycleVariable<'db>,
     ) -> LookupResult<'db> {
         match self {
             PlaceAndQualifiers {
@@ -1109,7 +1109,7 @@ impl<'db> PlaceAndQualifiers<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        lookup: impl Fn() -> InferenceVariable<'db>,
+        lookup: impl Fn() -> CycleVariable<'db>,
         diagnostic_fn: impl FnOnce(LookupError<'db>) -> TypeAndQualifiers<'db>,
     ) -> TypeAndQualifiers<'db> {
         self.into_lookup_result(db, env, lookup)
@@ -1131,12 +1131,17 @@ impl<'db> PlaceAndQualifiers<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        lookup: impl Fn() -> InferenceVariable<'db>,
+        lookup: impl Fn() -> CycleVariable<'db>,
         fallback_fn: impl FnOnce() -> PlaceAndQualifiers<'db>,
     ) -> Self {
-        self.into_lookup_result(db, env, || lookup().lookup_part(db, 0))
+        self.into_lookup_result(db, env, || lookup().lookup_part(db, env, 0))
             .or_else(|lookup_error| {
-                lookup_error.or_fall_back_to(db, env, || lookup().lookup_part(db, 1), fallback_fn())
+                lookup_error.or_fall_back_to(
+                    db,
+                    env,
+                    || lookup().lookup_part(db, env, 1),
+                    fallback_fn(),
+                )
             })
             .into()
     }

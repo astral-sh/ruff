@@ -1,4 +1,5 @@
 use crate::ProgramEnvironment;
+use crate::types::cycle_variable::CycleVariable;
 use std::borrow::Cow;
 use std::debug_assert_matches;
 
@@ -13,8 +14,8 @@ use ruff_text_size::Ranged;
 use crate::Db;
 use crate::types::cycle_variable::CycleOutput;
 use crate::types::infer::constraints::{
-    InferenceConstraints, InferenceOperation, InferenceOwner, InferenceSlot, InferenceVariable,
-    SymbolicType, TupleLiteral, TupleLiteralPart,
+    InferenceConstraints, InferenceOperation, InferenceOwner, InferenceSlot, SymbolicType,
+    TupleLiteral, TupleLiteralPart,
 };
 use crate::types::infer::{ExpressionInference, FrozenMap};
 use crate::types::tuple::promotion::TupleSizePromotionConstraints;
@@ -776,11 +777,12 @@ impl<'db> SymbolicType<'db> {
             let (ty, symbolic) = inferred(source);
             let mut value = symbolic.map_or(ty, |symbolic| constraints.import(db, symbolic));
             if promote {
-                let input = InferenceVariable::new(
+                let input = CycleVariable::inferred(
                     db,
                     env.program(db),
                     owner,
                     InferenceSlot::Expression(source.into()),
+                    None,
                 );
                 value = constraints.promote(db, env, input, value, InferencePromotion::Regular);
             }

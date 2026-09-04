@@ -26,7 +26,8 @@ use ty_module_resolver::{
 
 pub(crate) use self::callable::UpcastPolicy;
 use self::class::ClassInstanceFlags;
-use self::cycle_variable::{CycleOrigin, CycleOutput, CycleQuery, CycleVariable};
+pub(crate) use self::cycle_variable::CycleVariable;
+use self::cycle_variable::{CycleOrigin, CycleOutput, CycleQuery};
 pub use self::cyclic::CycleDetector;
 pub(crate) use self::cyclic::TypeTransformer;
 use self::cyclic::{ActiveRecursionDetector, TypeIdentity};
@@ -151,7 +152,7 @@ mod generics;
 pub mod ide_support;
 mod infer;
 use infer::constraints::{InferenceOwner, InferenceSlot};
-pub(crate) use infer::constraints::{InferencePromotion, InferenceVariable, SymbolicType};
+pub(crate) use infer::constraints::{InferencePromotion, SymbolicType};
 mod instance;
 mod iteration;
 mod known_instance;
@@ -1098,7 +1099,7 @@ fn distribute_member_lookup_over_bound_or_constraints<'db>(
 fn member_lookup_or_fall_back_to<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
-    lookup: impl Fn() -> InferenceVariable<'db>,
+    lookup: impl Fn() -> CycleVariable<'db>,
     result: MemberLookupResult<'db>,
     fallback_fn: impl FnOnce() -> MemberLookupResult<'db>,
 ) -> MemberLookupResult<'db> {
@@ -2070,26 +2071,29 @@ impl<'db> Type<'db> {
 
     /// The initial value supplied by a particular query during cycle recovery.
     pub(crate) fn divergent(db: &'db dyn Db, id: salsa::Id, query: CycleQuery<'db>) -> Self {
-        Self::Divergent(DivergentType::new(CycleVariable::new(
+        Self::Divergent(DivergentType::new(CycleVariable::query(
             db,
             id,
-            CycleOrigin::Query {
-                query,
-                output: CycleOutput::Type,
-            },
+            query,
+            CycleOutput::Type,
         )))
     }
 
     /// Selects an output of a query's initial cycle value when that output is read.
     fn with_cycle_output(self, db: &'db dyn Db, output: CycleOutput<'db>) -> Self {
         if let Self::Divergent(divergent) = self
-            && let CycleOrigin::Query { query, .. } = divergent.variable.origin(db)
+            && let CycleOrigin::Query {
+                head_id_bits,
+                query,
+                ..
+            } = divergent.variable.origin(db)
         {
             return Self::Divergent(DivergentType {
-                variable: CycleVariable::new(
+                variable: CycleVariable::query(
                     db,
-                    divergent.variable.head_id(db),
-                    CycleOrigin::Query { query, output },
+                    salsa::Id::from_bits(head_id_bits),
+                    query,
+                    output,
                 ),
                 ..divergent
             });
@@ -2100,14 +2104,12 @@ impl<'db> Type<'db> {
     /// Preserve cycle dependence when no particular output of the source query is known.
     fn cycle_fallback(self, db: &'db dyn Db) -> Self {
         match self {
-            Self::Divergent(divergent) => Self::Divergent(DivergentType {
-                variable: CycleVariable::new(
-                    db,
-                    divergent.variable.head_id(db),
-                    CycleOrigin::RecursiveType,
-                ),
-                ..divergent
-            }),
+            Self::Divergent(divergent) if let Some(head_id) = divergent.variable.head_id(db) => {
+                Self::Divergent(DivergentType {
+                    variable: CycleVariable::recursive(db, head_id),
+                    ..divergent
+                })
+            }
             Self::Union(union) => {
                 let elements: Box<[_]> = union
                     .elements(db)
@@ -2126,6 +2128,15 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Returns an equation reference without treating cycle-recovery approximations as variables.
+    fn inference_variable(self, db: &'db dyn Db) -> Option<CycleVariable<'db>> {
+        let Self::Divergent(divergent) = self else {
+            return None;
+        };
+        matches!(divergent.variable.origin(db), CycleOrigin::Inference { .. })
+            .then_some(divergent.variable)
+    }
+
     const fn is_divergent(&self) -> bool {
         matches!(self, Type::Divergent(_))
     }
@@ -2140,9 +2151,10 @@ impl<'db> Type<'db> {
     /// Tests a root against Salsa's cycle head, independently of its output and materialization.
     fn same_divergent_marker(self, db: &'db dyn Db, other: Type<'db>) -> bool {
         match (self, other) {
-            (Type::Divergent(left), Type::Divergent(right)) => {
-                left.variable.head_id(db) == right.variable.head_id(db)
-            }
+            (Type::Divergent(left), Type::Divergent(right)) => left
+                .variable
+                .head_id(db)
+                .is_some_and(|head| Some(head) == right.variable.head_id(db)),
             _ => false,
         }
     }
@@ -2151,7 +2163,7 @@ impl<'db> Type<'db> {
     pub(crate) fn is_cycle_initial(self, db: &'db dyn Db, head_id: salsa::Id) -> bool {
         self.as_divergent().is_some_and(|divergent| {
             divergent.materialization.is_none()
-                && divergent.variable.head_id(db) == head_id
+                && divergent.variable.head_id(db) == Some(head_id)
                 && matches!(divergent.variable.origin(db), CycleOrigin::Query { .. })
         })
     }
@@ -2573,8 +2585,8 @@ impl<'db> Type<'db> {
     #[salsa::tracked(
         returns(copy),
         cycle_initial=|db, id, ty, program, materialization_kind| {
-            Type::Divergent(DivergentType::new(CycleVariable::new(
-                db, id, CycleOrigin::Query { query: CycleQuery::Materialization(ty, program, materialization_kind), output: CycleOutput::Type },
+            Type::Divergent(DivergentType::new(CycleVariable::query(
+                db, id, CycleQuery::Materialization(ty, program, materialization_kind), CycleOutput::Type,
             )).materialized(materialization_kind))
         },
         cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _, program, _| {
@@ -4172,7 +4184,7 @@ impl<'db> Type<'db> {
             env,
             name,
             policy,
-            || lookup().lookup_part(db, 0),
+            || lookup().lookup_part(db, env, 0),
             class.iter_mro(db).take(1),
         );
         // A non-ClassVar declaration-only member describes instance storage but does not add a
@@ -4201,7 +4213,7 @@ impl<'db> Type<'db> {
             env,
             name,
             policy,
-            || lookup().lookup_part(db, 1),
+            || lookup().lookup_part(db, env, 1),
             class.iter_mro(db).skip(1),
         );
 
@@ -4211,11 +4223,16 @@ impl<'db> Type<'db> {
             metaclass_member
         };
         let class_member = own_class_member
-            .or_fall_back_to(db, env, || lookup().lookup_part(db, 2), || metaclass_member)
             .or_fall_back_to(
                 db,
                 env,
-                || lookup().lookup_part(db, 3),
+                || lookup().lookup_part(db, env, 2),
+                || metaclass_member,
+            )
+            .or_fall_back_to(
+                db,
+                env,
+                || lookup().lookup_part(db, env, 3),
                 || inherited_class_member,
             );
         let class_member = if metaclass_member_is_implicit {
@@ -4273,7 +4290,7 @@ impl<'db> Type<'db> {
         .or_fall_back_to(
             db,
             env,
-            || lookup().lookup_part(db, 4),
+            || lookup().lookup_part(db, env, 4),
             || dynamic_instance_fallback,
         )
     }
@@ -7727,7 +7744,7 @@ impl<'db> Type<'db> {
             return member_lookup_or_fall_back_to(
                 db,
                 env,
-                || lookup().lookup_part(db, 0),
+                || lookup().lookup_part(db, env, 0),
                 result,
                 custom_getattr_result,
             );
@@ -7757,7 +7774,7 @@ impl<'db> Type<'db> {
                 return member_lookup_or_fall_back_to(
                     db,
                     env,
-                    || lookup().lookup_part(db, 0),
+                    || lookup().lookup_part(db, env, 0),
                     result,
                     custom_getattr_result,
                 );
@@ -7771,7 +7788,7 @@ impl<'db> Type<'db> {
                 member.member(db).or_fall_back_to(
                     db,
                     env,
-                    || lookup().lookup_part(db, 1),
+                    || lookup().lookup_part(db, env, 1),
                     || error.fallback_member(db).member(db),
                 ),
                 Some(error.kind(db)),
@@ -7792,14 +7809,14 @@ impl<'db> Type<'db> {
         let result = member_lookup_or_fall_back_to(
             db,
             env,
-            || lookup().lookup_part(db, 2),
+            || lookup().lookup_part(db, env, 2),
             result,
             || custom_getattribute,
         );
         member_lookup_or_fall_back_to(
             db,
             env,
-            || lookup().lookup_part(db, 3),
+            || lookup().lookup_part(db, env, 3),
             result,
             custom_getattr_result,
         )
@@ -9297,6 +9314,10 @@ impl<'db> Type<'db> {
             // `Unknown`. Preserve the marker across materialization, while recording whether this
             // occurrence should behave like the top (`object`) or bottom (`Never`) bound.
             Type::Divergent(divergent) => match type_mapping {
+                TypeMapping::ReplaceInferenceVariables(replacements) => replacements
+                    .get(&divergent.variable)
+                    .copied()
+                    .unwrap_or(self),
                 TypeMapping::Materialize(materialization_kind) => {
                     Type::Divergent(divergent.materialized(*materialization_kind))
                 }
@@ -10486,7 +10507,7 @@ pub enum TypeMapping<'a, 'db> {
         materialization_kind: MaterializationKind,
     },
     /// Substitutes cyclic inference variables without specializing Python type parameters.
-    ReplaceInferenceVariables(&'a FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>),
+    ReplaceInferenceVariables(&'a FxHashMap<CycleVariable<'db>, Type<'db>>),
     /// Replaces any literal types with their corresponding promoted type form (e.g. `Literal["string"]`
     /// to `str`, or `def _() -> int` to `Callable[[], int]`).
     Promote(PromotionMode, PromotionKind),
@@ -10566,21 +10587,7 @@ impl<'db> TypeMapping<'_, 'db> {
                     GenericContext::from_typevar_instances(db, env, kept)
                 }
             }
-            TypeMapping::ReplaceInferenceVariables(replacements) => {
-                let kept = context.variables(db).filter(|bound_typevar| {
-                    let BindingContext::Inference(_) = bound_typevar.binding_context(db) else {
-                        return true;
-                    };
-                    match replacements.get(&bound_typevar.identity(db)) {
-                        None => true,
-                        Some(Type::TypeVar(mapped_typevar)) => {
-                            mapped_typevar.identity(db) == bound_typevar.identity(db)
-                        }
-                        Some(_) => false,
-                    }
-                });
-                GenericContext::from_typevar_instances(db, env, kept)
-            }
+            TypeMapping::ReplaceInferenceVariables(_) => context,
             TypeMapping::Promote(..)
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::Materialize(_)
@@ -10666,7 +10673,7 @@ impl<'db> DivergentType<'db> {
 
     /// A terminal approximation for structural recursion without an unresolved query output.
     fn recursive(db: &'db dyn Db, head_id: salsa::Id) -> Self {
-        Self::new(CycleVariable::new(db, head_id, CycleOrigin::RecursiveType))
+        Self::new(CycleVariable::recursive(db, head_id))
     }
 
     const fn materialized(self, kind: MaterializationKind) -> Self {

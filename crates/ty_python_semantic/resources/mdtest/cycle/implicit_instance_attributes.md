@@ -960,6 +960,38 @@ class Values:
         reveal_type(self.values)  # revealed: tuple[int]
 ```
 
+## Default type arguments in a cyclic call
+
+A self-referential assignment does not establish an independent argument type for this call. The
+type parameter's default contributes `str` to the result alongside the explicitly returned `int`.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+def choose[T = str](values: tuple[T, ...]) -> T | int:
+    return values[0] if values else 1
+
+class WithoutInitialValue:
+    def update(self):
+        self.values = (choose(self.values),)
+        reveal_type(self.values)  # revealed: tuple[str | int]
+```
+
+An independent initial value supplies the argument type, so the default is not needed.
+
+```py
+class WithInitialValue:
+    def __init__(self):
+        self.values = (1,)
+
+    def update(self):
+        self.values = (choose(self.values),)
+        reveal_type(self.values)  # revealed: tuple[int]
+```
+
 ## Calling a function returning a type alias
 
 An attribute can be initialized outside the class and copied through a generic function. A type

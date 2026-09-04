@@ -1,3 +1,5 @@
+use salsa::plumbing::AsId;
+
 use ty_python_core::ExpressionNodeKey;
 use ty_python_core::definition::Definition;
 use ty_python_core::narrowing_constraints::ScopedNarrowingConstraint;
@@ -10,6 +12,7 @@ use ty_python_core::unpack::Unpack;
 use crate::place::{ConsideredDefinitions, RequiresExplicitReExport};
 use crate::types::class::implicit_attributes::ImplicitAttributeName;
 use crate::types::generics::Specialization;
+use crate::types::infer::constraints::{InferenceOwner, InferenceSlot};
 use crate::types::infer::{InferExpression, InferScope};
 use crate::types::tuple::TupleType;
 use crate::types::type_alias::{ManualPEP695TypeAliasType, PEP695TypeAliasType};
@@ -85,31 +88,99 @@ pub(crate) enum CycleOutput<'db> {
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) enum CycleOrigin<'db> {
     Query {
+        head_id_bits: u64,
         query: CycleQuery<'db>,
         output: CycleOutput<'db>,
     },
-    RecursiveType,
+    RecursiveType {
+        head_id_bits: u64,
+    },
+    /// An equation reference retained by the inference solver, with no Salsa head.
+    Inference {
+        program: Program<'db>,
+        owner: InferenceOwner<'db>,
+        slot: InferenceSlot<'db>,
+        specialization: Option<Specialization<'db>>,
+    },
 }
 
-/// An unresolved query output or a terminal approximation of a recursive type.
-#[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
-pub(crate) struct CycleVariable<'db> {
-    /// Salsa's head identity is shared by queries using the same interned input.
+/// Identity of a query output, recursive approximation, or unresolved inference equation.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, get_size2::GetSize, salsa::SalsaValue)]
+#[repr(transparent)]
+pub struct CycleVariable<'db>(CycleVariableInner<'db>);
+
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+struct CycleVariableInner<'db> {
     #[returns(copy)]
-    head_id_bits: u64,
-    #[returns(copy)]
-    pub(crate) origin: CycleOrigin<'db>,
+    origin: CycleOrigin<'db>,
 }
 
-impl get_size2::GetSize for CycleVariable<'_> {}
+impl get_size2::GetSize for CycleVariableInner<'_> {}
+
+impl AsId for CycleVariable<'_> {
+    fn as_id(&self) -> salsa::Id {
+        self.0.as_id()
+    }
+}
 
 impl<'db> CycleVariable<'db> {
-    /// Preserve the Salsa head separately from the typed origin of this marker.
-    pub(crate) fn new(db: &'db dyn Db, head_id: salsa::Id, origin: CycleOrigin<'db>) -> Self {
-        Self::new_internal(db, head_id.as_bits(), origin)
+    /// Identifies an output supplied by Salsa's cycle recovery.
+    pub(crate) fn query(
+        db: &'db dyn Db,
+        head_id: salsa::Id,
+        query: CycleQuery<'db>,
+        output: CycleOutput<'db>,
+    ) -> Self {
+        Self(CycleVariableInner::new(
+            db,
+            CycleOrigin::Query {
+                head_id_bits: head_id.as_bits(),
+                query,
+                output,
+            },
+        ))
     }
 
-    pub(crate) fn head_id(self, db: &'db dyn Db) -> salsa::Id {
-        salsa::Id::from_bits(self.head_id_bits(db))
+    /// Marks a recursive type component after its query reference has been cut.
+    pub(crate) fn recursive(db: &'db dyn Db, head_id: salsa::Id) -> Self {
+        Self(CycleVariableInner::new(
+            db,
+            CycleOrigin::RecursiveType {
+                head_id_bits: head_id.as_bits(),
+            },
+        ))
+    }
+
+    /// Creates a solver reference without constructing a Python type parameter.
+    pub(crate) fn inferred(
+        db: &'db dyn Db,
+        program: Program<'db>,
+        owner: InferenceOwner<'db>,
+        slot: InferenceSlot<'db>,
+        specialization: Option<Specialization<'db>>,
+    ) -> Self {
+        Self(CycleVariableInner::new(
+            db,
+            CycleOrigin::Inference {
+                program,
+                owner,
+                slot,
+                specialization,
+            },
+        ))
+    }
+
+    pub(crate) fn origin(self, db: &'db dyn Db) -> CycleOrigin<'db> {
+        self.0.origin(db)
+    }
+
+    pub(crate) fn head_id(self, db: &'db dyn Db) -> Option<salsa::Id> {
+        match self.origin(db) {
+            CycleOrigin::Query { head_id_bits, .. }
+            | CycleOrigin::RecursiveType { head_id_bits } => {
+                Some(salsa::Id::from_bits(head_id_bits))
+            }
+            CycleOrigin::Inference { .. } => None,
+        }
     }
 }

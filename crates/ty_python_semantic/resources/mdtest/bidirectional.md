@@ -2999,6 +2999,21 @@ def update_entries():
     assert_type(items, dict[str, tuple[str, int]])
 ```
 
+## Dictionary updates followed by a comprehension
+
+A dictionary filled with integer keys and values keeps those types when its existing values are
+replaced. Its values can be collected into an integer list.
+
+```py
+def refresh_indices(indices: list[int]):
+    updates = {}
+    updates.update({0: 0})
+    for e in updates:
+        updates[e] = 0
+    indices = [updates[i] for i in indices]
+    reveal_type(updates)  # revealed: dict[int, int]
+```
+
 ## Mutually dependent collection updates
 
 Two lists exchange the first elements of their tuples. Each list can contain either initial type in

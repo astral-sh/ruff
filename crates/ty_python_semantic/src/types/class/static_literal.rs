@@ -40,13 +40,13 @@ use crate::{
             typed_dict::{TypedDictFields, synthesize_typed_dict_method, typed_dict_class_member},
         },
         context::InferContext,
+        cycle_variable::CycleVariable,
         dedicated::pydantic,
         definition_expression_type, determine_upper_bound,
         diagnostic::INVALID_DATACLASS_OVERRIDE,
         enums::{enum_metadata, is_enum_class_by_inheritance, try_unwrap_nonmember_value},
         function::{DataclassTransformerParams, KnownFunction},
         generics::Specialization,
-        infer::constraints::InferenceVariable,
         inferred_declaration,
         known_instance::DeprecatedInstance,
         member::{Member, class_member},
@@ -1427,7 +1427,7 @@ impl<'db> StaticClassLiteral<'db> {
         env: &ProgramEnvironment<'db>,
         name: &str,
         policy: MemberLookupPolicy,
-        lookup: impl Fn() -> InferenceVariable<'db>,
+        lookup: impl Fn() -> CycleVariable<'db>,
         mro_iter: impl Iterator<Item = ClassBase<'db>>,
     ) -> PlaceAndQualifiers<'db> {
         fn into_function_like_callable<'d>(

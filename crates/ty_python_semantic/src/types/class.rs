@@ -1,4 +1,5 @@
 use crate::ProgramEnvironment;
+use crate::types::cycle_variable::CycleVariable;
 use std::fmt::Write;
 
 pub(crate) use self::dynamic_literal::{
@@ -35,7 +36,7 @@ use crate::types::function::{AbstractMethodKind, DataclassTransformerParams};
 use crate::types::generics::{GenericContext, Specialization, walk_specialization};
 use crate::types::infer::constraints::{
     InferenceConstraints, InferenceOperation, InferenceOwner, InferencePromotion, InferenceSlot,
-    InferenceVariable, SymbolicType,
+    SymbolicType,
 };
 use crate::types::infer::infer_definition_types;
 use crate::types::known_instance::DeprecatedInstance;
@@ -733,7 +734,7 @@ impl<'db> ClassLiteral<'db> {
         env: &ProgramEnvironment<'db>,
         name: &str,
         policy: MemberLookupPolicy,
-        lookup: impl Fn() -> InferenceVariable<'db>,
+        lookup: impl Fn() -> CycleVariable<'db>,
         mro_iter: impl Iterator<Item = ClassBase<'db>>,
     ) -> PlaceAndQualifiers<'db> {
         match self {
@@ -2974,7 +2975,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
         policy: MemberLookupPolicy,
         inherited_generic_context: Option<GenericContext<'db>>,
         is_self_object: bool,
-        lookup: impl Fn() -> InferenceVariable<'db>,
+        lookup: impl Fn() -> CycleVariable<'db>,
     ) -> ClassMemberResult<'db> {
         let db = self.db;
 
@@ -3064,7 +3065,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                         lookup_error.or_fall_back_to(
                             db,
                             &self.env,
-                            || lookup().lookup_part(db, index),
+                            || lookup().lookup_part(db, &self.env, index),
                             member,
                         )
                     });

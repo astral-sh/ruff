@@ -1,3 +1,4 @@
+use crate::types::cycle_variable::CycleVariable;
 use std::cell::{OnceCell, RefCell};
 use std::collections::hash_map;
 use std::rc::Rc;
@@ -28,7 +29,7 @@ use ty_python_core::statement::StatementInner;
 
 use super::constraints::{
     InferenceCallOutput, InferenceConstraints, InferenceOperation, InferenceOwner,
-    InferencePromotion, InferenceSlot, InferenceVariable, SymbolicType,
+    InferencePromotion, InferenceSlot, SymbolicType,
 };
 use super::{
     CollectionUseConstraints, DeferredAndUndecorated, DefinitionInference,
@@ -1597,11 +1598,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     db,
                     env,
                     || {
-                        InferenceVariable::new(
+                        CycleVariable::inferred(
                             db,
                             env.program(db),
                             InferenceOwner::Region(self.region),
                             InferenceSlot::Binding(binding),
+                            None,
                         )
                     },
                     || module_type_implicit_global_declaration(db, env, symbol.name()),
@@ -1795,11 +1797,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             db,
             env,
             || {
-                InferenceVariable::new(
+                CycleVariable::inferred(
                     db,
                     env.program(db),
                     InferenceOwner::Region(self.region),
                     InferenceSlot::Binding(declaration),
+                    None,
                 )
             },
             || {
@@ -10838,11 +10841,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let env = self.program_environment();
 
         let lookup = || {
-            InferenceVariable::new(
+            CycleVariable::inferred(
                 db,
                 env.program(db),
                 InferenceOwner::Region(self.region),
                 InferenceSlot::Expression(ast::ExprRef::Name(name_node).into()),
+                None,
             )
         };
         let ty =
@@ -10892,11 +10896,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut failure = None;
         let mut checked_deprecated = false;
         let lookup = || {
-            InferenceVariable::new(
+            CycleVariable::inferred(
                 self.db(),
                 env.program(self.db()),
                 InferenceOwner::Region(self.region),
                 InferenceSlot::Expression(expr_ref.into()),
+                None,
             )
         };
         let mut source_index = 0;
@@ -10919,7 +10924,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     place = place.or_fall_back_to(
                         self.db(),
                         env,
-                        || lookup().lookup_part(self.db(), source_index),
+                        || lookup().lookup_part(self.db(), env, source_index),
                         || self.infer_place_load_source(expr_ref, source, narrowing_constraints),
                     );
                     source_index += 1;
@@ -10948,7 +10953,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             place.or_fall_back_to(
                 self.db(),
                 env,
-                || lookup().lookup_part(self.db(), source_index),
+                || lookup().lookup_part(self.db(), env, source_index),
                 || self.infer_unimported_reveal_type_fallback(expr_ref),
             )
         } else {
@@ -11254,11 +11259,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
         let db = self.db();
         let env = self.program_environment();
-        let input = InferenceVariable::new(
+        let input = CycleVariable::inferred(
             db,
             env.program(db),
             InferenceOwner::Region(self.region),
             InferenceSlot::Expression(target.into()),
+            None,
         );
         let constraints = RefCell::new(InferenceConstraints::default());
         let value = constraints.borrow_mut().import(db, symbolic);
@@ -11279,11 +11285,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             },
             &mut |evaluator, ty, place, definition| {
                 let input = definition.map_or(input, |definition| {
-                    InferenceVariable::new(
+                    CycleVariable::inferred(
                         db,
                         env.program(db),
                         InferenceOwner::Region(self.region),
                         InferenceSlot::NarrowedBinding(target.into(), definition),
+                        None,
                     )
                 });
                 constraints
@@ -11407,11 +11414,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let attr_name = &attr.id;
         let lookup = || {
-            InferenceVariable::new(
+            CycleVariable::inferred(
                 db,
                 env.program(db),
                 InferenceOwner::Region(self.region),
                 InferenceSlot::Expression(ast::ExprRef::Attribute(attribute).into()),
+                None,
             )
         };
         let lookup_result = fallback_place.into_lookup_result(db, env, lookup);

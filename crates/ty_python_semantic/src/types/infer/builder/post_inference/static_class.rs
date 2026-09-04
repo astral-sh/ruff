@@ -845,7 +845,7 @@ pub(crate) fn check_static_class_definitions<'db>(
                             MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
                         )
                         .inference_variable(db)
-                        .lookup_part(db, 1)
+                        .lookup_part(db, env, 1)
                     },
                     // skip(1) to skip the current class and only consider base classes.
                     class.iter_mro(db, None).skip(1),

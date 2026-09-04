@@ -23,6 +23,7 @@ use super::InferenceRegion;
 use super::builder::binary_expressions::BinaryOperationContext;
 use crate::place::{Place, PlaceAndQualifiers, SymbolLookupKey};
 use crate::reachability::predicate_scope;
+use crate::types::DivergentType;
 use crate::types::call::{CallDunderError, CapturedCallArguments};
 use crate::types::class::AugmentedAttribute;
 use crate::types::class::implicit_attributes::ImplicitAttributeName;
@@ -30,15 +31,16 @@ use crate::types::constraints::{
     ConstraintSetBuilder,
     projection::{ProjectionError, SolutionBudget},
 };
+use crate::types::cycle_variable::{CycleOrigin, CycleVariable};
 use crate::types::narrow::NarrowingEvaluatorExtension;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::tuple::{TupleBuilder, TupleLength, TupleType};
-use crate::types::typevar::{BindingContext, BoundTypeVarInstance};
+use crate::types::typevar::BoundTypeVarInstance;
 use crate::types::{
     KnownClass, MemberLookupKey, MemberLookupPolicy, Specialization, Type, TypeContext,
     TypeMapping, UnionBuilder, UnionType, any_over_type, any_over_type_including_alias_arguments,
 };
-use crate::{Db, FxIndexMap, FxOrderMap, ProgramEnvironment};
+use crate::{Db, FxIndexMap, FxOrderSet, ProgramEnvironment};
 
 #[salsa::tracked]
 impl<'db> Type<'db> {
@@ -48,20 +50,16 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         program: Program<'db>,
-    ) -> Box<[BoundTypeVarInstance<'db>]> {
+    ) -> Box<[CycleVariable<'db>]> {
         let env = ProgramEnvironment::from_program(program);
-        let variables = RefCell::new(FxOrderMap::default());
+        let variables = RefCell::new(FxOrderSet::default());
         any_over_type_including_alias_arguments(db, &env, self, |ty| {
-            if let Type::TypeVar(variable) = ty
-                && matches!(variable.binding_context(db), BindingContext::Inference(_))
-            {
-                variables
-                    .borrow_mut()
-                    .insert(variable.identity(db), variable);
+            if let Some(variable) = ty.inference_variable(db) {
+                variables.borrow_mut().insert(variable);
             }
             false
         });
-        variables.into_inner().into_values().collect()
+        variables.into_inner().into_iter().collect()
     }
 }
 
@@ -74,9 +72,9 @@ pub(crate) enum InferenceOwner<'db> {
     Attribute(ImplicitAttributeName<'db>),
     AugmentedAttribute(AugmentedAttribute<'db>),
     Unpack(Unpack<'db>),
-    Narrowing(InferenceVariable<'db>, InferenceNarrowing<'db>),
-    Promotion(InferenceVariable<'db>),
-    Lookup(InferenceVariable<'db>),
+    Narrowing(CycleVariable<'db>, InferenceNarrowing<'db>),
+    Promotion(CycleVariable<'db>),
+    Lookup(CycleVariable<'db>),
 }
 
 #[derive(
@@ -99,51 +97,34 @@ pub(crate) enum InferenceSlot<'db> {
     NarrowedBinding(ExpressionNodeKey, Definition<'db>),
 }
 
-/// A variable belongs to one query output, independently of its current approximation.
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-pub(crate) struct InferenceVariableInner<'db> {
-    #[returns(copy)]
-    pub(crate) program: Program<'db>,
-    #[returns(copy)]
-    owner: InferenceOwner<'db>,
-    #[returns(copy)]
-    slot: InferenceSlot<'db>,
-    #[returns(copy)]
-    specialization: Option<Specialization<'db>>,
-}
-
-impl get_size2::GetSize for InferenceVariableInner<'_> {}
-
-/// Identity of an output whose type is still being inferred across a query cycle.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, get_size2::GetSize, salsa::SalsaValue)]
-pub struct InferenceVariable<'db>(InferenceVariableInner<'db>);
-
-impl<'db> InferenceVariable<'db> {
-    pub(crate) fn new(
-        db: &'db dyn Db,
-        program: Program<'db>,
-        owner: InferenceOwner<'db>,
-        slot: InferenceSlot<'db>,
-    ) -> Self {
-        Self(InferenceVariableInner::new(db, program, owner, slot, None))
-    }
-
-    pub(crate) fn program(self, db: &'db dyn Db) -> Program<'db> {
-        self.0.program(db)
-    }
-
+impl<'db> CycleVariable<'db> {
     /// Identify a lookup candidate within a fixed query or expression context.
-    pub(crate) fn lookup_part(self, db: &'db dyn Db, index: usize) -> Self {
-        Self::new(
+    pub(crate) fn lookup_part(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        index: usize,
+    ) -> Self {
+        let program = env.program(db);
+        Self::inferred(
             db,
-            self.program(db),
+            program,
             InferenceOwner::Lookup(self),
             InferenceSlot::Lookup(index),
+            None,
         )
     }
 
     fn specialized(self, db: &'db dyn Db, specialization: Specialization<'db>) -> Self {
-        let owner = self.0.owner(db);
+        let CycleOrigin::Inference {
+            program,
+            owner,
+            slot,
+            specialization: previous,
+        } = self.origin(db)
+        else {
+            return self;
+        };
         // Derived lookup identities follow their inputs so specializing a retained graph and
         // evaluating the specialized lookup produce the same variables.
         let specialized_owner = match owner {
@@ -156,7 +137,7 @@ impl<'db> InferenceVariable<'db> {
             _ => None,
         };
         if let Some(owner) = specialized_owner {
-            return Self::new(db, self.program(db), owner, self.0.slot(db));
+            return Self::inferred(db, program, owner, slot, None);
         }
         if let InferenceOwner::Member(key, receiver) = owner {
             let key = MemberLookupKey::new(
@@ -167,19 +148,19 @@ impl<'db> InferenceVariable<'db> {
                 key.name(db).clone(),
                 key.policy(db),
             );
-            return Self::new(
+            return Self::inferred(
                 db,
-                self.program(db),
+                program,
                 InferenceOwner::Member(
                     key,
                     receiver.map(|ty| {
                         ty.apply_optional_owner_specialization_to_member(db, Some(specialization))
                     }),
                 ),
-                self.0.slot(db),
+                slot,
+                None,
             );
         }
-        let previous = self.0.specialization(db);
         let context = previous.map_or(specialization.generic_context(db), |previous| {
             previous
                 .generic_context(db)
@@ -202,44 +183,43 @@ impl<'db> InferenceVariable<'db> {
             return self;
         }
         let specialization = Specialization::new(db, context, types.into_boxed_slice(), None, None);
-        Self(InferenceVariableInner::new(
-            db,
-            self.program(db),
-            owner,
-            self.0.slot(db),
-            Some(specialization),
-        ))
+        Self::inferred(db, program, owner, slot, Some(specialization))
     }
 
-    fn typevar(self, db: &'db dyn Db) -> BoundTypeVarInstance<'db> {
-        BoundTypeVarInstance::inferred(db, self)
+    fn ty(self) -> Type<'db> {
+        Type::Divergent(DivergentType::new(self))
     }
 
-    fn ty(self, db: &'db dyn Db) -> Type<'db> {
-        Type::TypeVar(self.typevar(db))
+    fn inference_specialization(self, db: &'db dyn Db) -> Option<Specialization<'db>> {
+        match self.origin(db) {
+            CycleOrigin::Inference { specialization, .. } => specialization,
+            _ => None,
+        }
     }
 }
 
 impl<'db> MemberLookupKey<'db> {
     /// Identify the ordinary member lookup independently of its current inferred value.
-    pub(crate) fn inference_variable(self, db: &'db dyn Db) -> InferenceVariable<'db> {
-        InferenceVariable::new(
+    pub(crate) fn inference_variable(self, db: &'db dyn Db) -> CycleVariable<'db> {
+        CycleVariable::inferred(
             db,
             self.program(db),
             InferenceOwner::Member(self, None),
             InferenceSlot::Root,
+            None,
         )
     }
 }
 
 impl<'db> SymbolLookupKey<'db> {
     /// Identify a public symbol lookup independently of its current inferred value.
-    pub(crate) fn inference_variable(self, db: &'db dyn Db) -> InferenceVariable<'db> {
-        InferenceVariable::new(
+    pub(crate) fn inference_variable(self, db: &'db dyn Db) -> CycleVariable<'db> {
+        CycleVariable::inferred(
             db,
             self.scope(db).program(db),
             InferenceOwner::Symbol(self),
             InferenceSlot::Root,
+            None,
         )
     }
 }
@@ -595,7 +575,7 @@ impl<'db> InferenceOperation<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        variable: InferenceVariable<'db>,
+        variable: CycleVariable<'db>,
     ) -> Option<Type<'db>> {
         match self {
             Self::Member(key) => key
@@ -673,27 +653,14 @@ impl<'db> InferenceOperation<'db> {
             Self::MappingKey(value) => Some(value.unpack_keys_and_items(db, env)?.0),
             Self::Enter { value, mode } => value.try_enter_with_mode(db, env, mode).ok(),
             Self::Await(value) => value.try_await(db, env).ok(),
-            Self::Promote { value, promotion } => {
-                // Wait for a value to promote; forwarding an unresolved reference creates mutable
-                // aliases that can repeatedly unfold recursive types.
-                if let Type::TypeVar(reference) = value
-                    && matches!(reference.binding_context(db), BindingContext::Inference(_))
-                {
-                    return None;
-                }
-                Some(promotion.apply(db, env, value))
-            }
+            Self::Promote { value, promotion } => Some(promotion.apply(db, env, value)),
             Self::Narrow { value, narrowing } => {
-                // Generic filtering requires the subject's arguments, not an unresolved variable.
-                if !value.inference_variables(db, env.program(db)).is_empty() {
-                    return None;
-                }
                 let narrowed = use_def_map(db, narrowing.scope)
                     .narrowing_evaluator(narrowing.constraint)
                     .narrow(db, env, value, narrowing.place);
                 Some(narrowed.apply_optional_owner_specialization_to_member(
                     db,
-                    variable.0.specialization(db),
+                    variable.inference_specialization(db),
                 ))
             }
             Self::Call {
@@ -757,7 +724,7 @@ impl InferenceGraph {
     fn from_equations<'db>(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        equations: &[(InferenceVariable<'db>, Equation<'db>)],
+        equations: &[(CycleVariable<'db>, Equation<'db>)],
     ) -> Self {
         let indices: FxIndexMap<_, _> = equations
             .iter()
@@ -769,8 +736,7 @@ impl InferenceGraph {
             let mut dependencies = Vec::new();
             equation.visit_types(db, |ty| {
                 for variable in ty.inference_variables(db, env.program(db)) {
-                    if let BindingContext::Inference(variable) = variable.binding_context(db)
-                        && let Some(dependency) = indices.get(&variable)
+                    if let Some(dependency) = indices.get(variable)
                         && !dependencies.contains(dependency)
                     {
                         dependencies.push(*dependency);
@@ -913,7 +879,7 @@ pub(crate) struct InferenceNarrowing<'db> {
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub(crate) struct InferenceEquations<'db> {
     #[returns(ref)]
-    equations: Box<[(InferenceVariable<'db>, Equation<'db>)]>,
+    equations: Box<[(CycleVariable<'db>, Equation<'db>)]>,
 }
 
 impl get_size2::GetSize for InferenceEquations<'_> {}
@@ -930,7 +896,7 @@ impl<'db> InferenceEquations<'db> {
         self,
         db: &'db dyn Db,
         program: Program<'db>,
-    ) -> Option<Box<[(BoundTypeVarInstance<'db>, Type<'db>)]>> {
+    ) -> Option<Box<[(CycleVariable<'db>, Type<'db>)]>> {
         let env = &ProgramEnvironment::from_program(program);
         let equations = self.equations(db);
         if equations
@@ -955,22 +921,15 @@ impl<'db> InferenceEquations<'db> {
             let equations: Vec<_> = component.iter().map(|index| equations[*index]).collect();
             for (variable, equation) in &equations {
                 if let Equation::Value(ty) = equation {
-                    producers.bindings.insert(variable.typevar(db), *ty);
+                    producers.bindings.insert(*variable, *ty);
                 }
             }
             producers.resolved.clear();
 
-            let operations: Vec<_> = equations
-                .iter()
-                .filter_map(|(variable, equation)| match equation {
-                    Equation::Operation(operation) => Some((*variable, *operation)),
-                    _ => None,
-                })
-                .collect();
             let mut seen = FxHashSet::default();
             loop {
                 let (changed, operations_complete) = producers
-                    .evaluate_operations(&operations, &mut budget)
+                    .evaluate_operations(&equations, &mut budget)
                     .ok()?;
                 producers.resolved.clear();
                 if !changed && operations_complete {
@@ -981,10 +940,7 @@ impl<'db> InferenceEquations<'db> {
                 let state: Vec<_> = equations
                     .iter()
                     .filter_map(|(variable, _)| {
-                        producers
-                            .bindings
-                            .get(&variable.typevar(db))
-                            .map(|ty| (variable.typevar(db), *ty))
+                        producers.bindings.get(variable).map(|ty| (*variable, *ty))
                     })
                     .collect();
                 if !seen.insert(state) {
@@ -1012,7 +968,7 @@ impl get_size2::GetSize for SymbolicType<'_> {}
 
 impl<'db> SymbolicType<'db> {
     /// The equations retained alongside this output.
-    fn equations(self, db: &'db dyn Db) -> &'db [(InferenceVariable<'db>, Equation<'db>)] {
+    fn equations(self, db: &'db dyn Db) -> &'db [(CycleVariable<'db>, Equation<'db>)] {
         self.graph(db).equations(db)
     }
 
@@ -1043,10 +999,10 @@ impl<'db> SymbolicType<'db> {
         owner: InferenceOwner<'db>,
         slot: InferenceSlot<'db>,
     ) -> Self {
-        let variable = InferenceVariable::new(db, program, owner, slot);
+        let variable = CycleVariable::inferred(db, program, owner, slot, None);
         Self::new(
             db,
-            variable.ty(db),
+            variable.ty(),
             InferenceEquations::new(db, vec![(variable, Equation::Pending)].into_boxed_slice()),
         )
     }
@@ -1056,12 +1012,7 @@ impl<'db> SymbolicType<'db> {
         let rename: FxHashMap<_, _> = self
             .equations(db)
             .iter()
-            .map(|(variable, _)| {
-                (
-                    variable.typevar(db).identity(db),
-                    variable.specialized(db, specialization).ty(db),
-                )
-            })
+            .map(|(variable, _)| (*variable, variable.specialized(db, specialization).ty()))
             .collect();
         let apply = |ty: Type<'db>| {
             ty.apply_optional_owner_specialization_to_member(db, Some(specialization))
@@ -1086,7 +1037,7 @@ impl<'db> SymbolicType<'db> {
             .collect();
         // Different cycle entry points can produce the same specialized graph in different
         // insertion orders. Sort the rewritten identities so the interned slices compare equal.
-        equations.sort_unstable_by_key(|(variable, _)| variable.0.as_id());
+        equations.sort_unstable_by_key(|(variable, _)| variable.as_id());
         Self::new(
             db,
             apply(self.ty(db)),
@@ -1152,11 +1103,12 @@ impl<'db> SymbolicType<'db> {
         env: &ProgramEnvironment<'db>,
         binding: Definition<'db>,
     ) -> Self {
-        let input = InferenceVariable::new(
+        let input = CycleVariable::inferred(
             db,
             env.program(db),
             InferenceOwner::Region(InferenceRegion::Definition(binding)),
             InferenceSlot::Binding(binding),
+            None,
         );
         self.promote(db, env, input, InferencePromotion::Regular)
     }
@@ -1166,7 +1118,7 @@ impl<'db> SymbolicType<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        input: InferenceVariable<'db>,
+        input: CycleVariable<'db>,
         promotion: InferencePromotion,
     ) -> Self {
         let mut constraints = InferenceConstraints::default();
@@ -1183,11 +1135,12 @@ impl<'db> SymbolicType<'db> {
         binding: Definition<'db>,
         evaluator: &NarrowingEvaluator<'_, 'db>,
     ) -> Self {
-        let input = InferenceVariable::new(
+        let input = CycleVariable::inferred(
             db,
             env.program(db),
             InferenceOwner::Region(InferenceRegion::Definition(binding)),
             InferenceSlot::Binding(binding),
+            None,
         );
         let mut constraints = InferenceConstraints::default();
         let value = constraints.import(db, self);
@@ -1280,7 +1233,7 @@ impl<'db> SymbolicType<'db> {
 /// Mutable state belongs to one query invocation. Cached values contain immutable equations.
 #[derive(Default)]
 pub(crate) struct InferenceConstraints<'db> {
-    equations: FxIndexMap<InferenceVariable<'db>, Equation<'db>>,
+    equations: FxIndexMap<CycleVariable<'db>, Equation<'db>>,
 }
 
 impl<'db> InferenceConstraints<'db> {
@@ -1299,7 +1252,7 @@ impl<'db> InferenceConstraints<'db> {
         &mut self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        input: InferenceVariable<'db>,
+        input: CycleVariable<'db>,
         value: Type<'db>,
         promotion: InferencePromotion,
     ) -> Type<'db> {
@@ -1317,7 +1270,7 @@ impl<'db> InferenceConstraints<'db> {
         &mut self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        input: InferenceVariable<'db>,
+        input: CycleVariable<'db>,
         value: Type<'db>,
         evaluator: &NarrowingEvaluator<'_, 'db>,
         place: ScopedPlaceId,
@@ -1355,7 +1308,7 @@ impl<'db> InferenceConstraints<'db> {
         slot: InferenceSlot<'db>,
         ty: Type<'db>,
     ) -> Type<'db> {
-        let variable = InferenceVariable::new(db, program, owner, slot);
+        let variable = CycleVariable::inferred(db, program, owner, slot, None);
         // Keep output identities independent of where evaluation entered the query cycle, but do
         // not replace a producer equation imported from an earlier query result.
         if self
@@ -1363,12 +1316,12 @@ impl<'db> InferenceConstraints<'db> {
             .get(&variable)
             .is_some_and(|equation| !matches!(equation, Equation::Pending))
         {
-            return variable.ty(db);
+            return variable.ty();
         }
-        if ty != variable.ty(db) {
+        if ty != variable.ty() {
             self.equations.insert(variable, Equation::Value(ty));
         }
-        variable.ty(db)
+        variable.ty()
     }
 
     /// Retain an operation until its inputs have been supplied by their producers.
@@ -1380,8 +1333,8 @@ impl<'db> InferenceConstraints<'db> {
         slot: InferenceSlot<'db>,
         operation: InferenceOperation<'db>,
     ) -> Type<'db> {
-        let variable = InferenceVariable::new(db, env.program(db), owner, slot);
-        let result = variable.ty(db);
+        let variable = CycleVariable::inferred(db, env.program(db), owner, slot, None);
+        let result = variable.ty();
         self.equations
             .insert(variable, Equation::Operation(operation));
         result
@@ -1422,7 +1375,7 @@ impl<'db> InferenceConstraints<'db> {
         // The same dependency graph can be collected from different cycle entry points. Salsa
         // compares this slice structurally while finding a fixed point, so insertion order would
         // make equal graphs look different and prevent cycle recovery from converging.
-        equations.sort_unstable_by_key(|(variable, _)| variable.0.as_id());
+        equations.sort_unstable_by_key(|(variable, _)| variable.as_id());
         SymbolicType::new(
             db,
             ty,
@@ -1435,11 +1388,11 @@ impl<'db> InferenceConstraints<'db> {
 struct InferenceSolutions<'a, 'db> {
     db: &'db dyn Db,
     env: &'a ProgramEnvironment<'db>,
-    bindings: FxIndexMap<BoundTypeVarInstance<'db>, Type<'db>>,
-    active: Vec<BoundTypeVarInstance<'db>>,
-    resolved: FxIndexMap<BoundTypeVarInstance<'db>, Type<'db>>,
-    evaluated: FxHashMap<(InferenceVariable<'db>, InferenceOperation<'db>), Option<Type<'db>>>,
-    growing: FxHashSet<BoundTypeVarInstance<'db>>,
+    bindings: FxIndexMap<CycleVariable<'db>, Type<'db>>,
+    active: Vec<CycleVariable<'db>>,
+    resolved: FxIndexMap<CycleVariable<'db>, Type<'db>>,
+    evaluated: FxHashMap<(CycleVariable<'db>, InferenceOperation<'db>), Option<Type<'db>>>,
+    growing: FxHashSet<CycleVariable<'db>>,
 }
 
 enum OperationBinding {
@@ -1454,45 +1407,67 @@ impl<'db> InferenceSolutions<'_, 'db> {
             .is_empty()
     }
 
-    /// Use only complete union alternatives to start an operation whose inputs form a cycle.
-    fn productive_type(&self, ty: Type<'db>) -> Option<Type<'db>> {
-        if self.is_ground(ty) {
+    /// Preserve constructed values while starting unresolved equation outputs at their lower bound.
+    fn productive_type(
+        &self,
+        ty: Type<'db>,
+        equations: &[(CycleVariable<'db>, Equation<'db>)],
+    ) -> Option<Type<'db>> {
+        let variables = ty.inference_variables(self.db, self.env.program(self.db));
+        if variables.is_empty() {
             return Some(ty);
         }
-        let Type::Union(union) = ty else {
-            return None;
-        };
-        let mut elements = union
-            .elements(self.db)
+        let replacements: Option<FxHashMap<_, _>> = variables
             .iter()
-            .copied()
-            .filter(|ty| self.is_ground(*ty))
-            .peekable();
-        elements.peek()?;
-        Some(UnionType::from_elements(self.db, self.env, elements))
+            .map(|variable| {
+                equations
+                    .binary_search_by_key(&variable.as_id(), |(key, _)| key.as_id())
+                    .ok()
+                    .map(|_| (*variable, Type::Never))
+            })
+            .collect();
+        let ty = ty.apply_type_mapping(
+            self.db,
+            self.env,
+            &TypeMapping::ReplaceInferenceVariables(&replacements?),
+            TypeContext::default(),
+        );
+        // A bare unresolved reference has no value yet. A known container can still contribute
+        // information: `dict[Never, Never].get(key, 0)` returns the known default.
+        (!ty.is_equivalent_to(self.db, self.env, Type::Never)).then_some(ty)
     }
 
     fn evaluate_operations(
         &mut self,
-        operations: &[(InferenceVariable<'db>, InferenceOperation<'db>)],
+        equations: &[(CycleVariable<'db>, Equation<'db>)],
         budget: &mut SolutionBudget,
     ) -> Result<(bool, bool), ProjectionError> {
         let mut changed = false;
         let mut complete = true;
         let mut deferred = Vec::new();
-        for (variable, operation) in operations {
-            self.active.push(variable.typevar(self.db));
+        for (variable, equation) in equations {
+            let Equation::Operation(operation) = equation else {
+                continue;
+            };
+            self.active.push(*variable);
             let operation = operation.map(self.db, |ty| self.operation_input(ty));
             self.active.pop();
             let mut operation_complete = true;
+            let mut inputs_resolved = true;
             let productive = operation.map(self.db, |ty| {
-                self.productive_type(ty).unwrap_or_else(|| {
+                inputs_resolved &= self.is_ground(ty);
+                self.productive_type(ty, equations).unwrap_or_else(|| {
                     complete = false;
                     operation_complete = false;
                     ty
                 })
             });
             if operation_complete {
+                if !inputs_resolved {
+                    complete = false;
+                    deferred.push((*variable, productive));
+                    continue;
+                }
                 let Some(ty) = self.evaluate_operation(*variable, productive, budget)? else {
                     complete = false;
                     continue;
@@ -1505,12 +1480,10 @@ impl<'db> InferenceSolutions<'_, 'db> {
                     OperationBinding::Stable => {}
                     OperationBinding::RejectedGrowth => complete = false,
                 }
-            } else {
-                deferred.push((*variable, operation));
             }
         }
-        // Exhaust known inputs before evaluating unresolved ones. An overload selected from an
-        // unresolved argument can otherwise seed a wider, self-sustaining solution to the cycle.
+        // Use known inputs before starting unresolved outputs at their lower bounds. Otherwise
+        // a provisional overload choice can obscure a value that another equation already knows.
         if !changed {
             for (variable, operation) in deferred {
                 let Some(ty) = self.evaluate_operation(variable, operation, budget)? else {
@@ -1530,7 +1503,7 @@ impl<'db> InferenceSolutions<'_, 'db> {
 
     fn evaluate_operation(
         &mut self,
-        variable: InferenceVariable<'db>,
+        variable: CycleVariable<'db>,
         operation: InferenceOperation<'db>,
         budget: &mut SolutionBudget,
     ) -> Result<Option<Type<'db>>, ProjectionError> {
@@ -1548,11 +1521,10 @@ impl<'db> InferenceSolutions<'_, 'db> {
 
     fn bind_operation(
         &mut self,
-        variable: InferenceVariable<'db>,
+        variable: CycleVariable<'db>,
         mut ty: Type<'db>,
         remaining: &mut usize,
     ) -> Option<OperationBinding> {
-        let variable = variable.typevar(self.db);
         let is_literal = |ty| match ty {
             Type::LiteralValue(_) => true,
             Type::Union(union) => union
@@ -1634,7 +1606,7 @@ impl<'db> InferenceSolutions<'_, 'db> {
         }
         let replacements: FxHashMap<_, _> = variables
             .iter()
-            .map(|variable| (variable.identity(self.db), self.resolve_variable(*variable)))
+            .map(|variable| (*variable, self.resolve_variable(*variable)))
             .collect();
         ty.apply_type_mapping(
             self.db,
@@ -1647,12 +1619,24 @@ impl<'db> InferenceSolutions<'_, 'db> {
     /// Preserve references inside incomplete constructed types instead of repeatedly unfolding
     /// them, as in X = tuple[X, int]. Ground inputs can use their complete specialization.
     fn operation_input(&mut self, ty: Type<'db>) -> Type<'db> {
-        let resolved = self.resolve_type(ty);
-        if self.is_ground(resolved) {
-            resolved
-        } else {
-            self.resolve_outer_type(ty)
+        let ty = self.resolve_outer_type(ty);
+        let replacements: FxHashMap<_, _> = ty
+            .inference_variables(self.db, self.env.program(self.db))
+            .iter()
+            .filter_map(|variable| {
+                let resolved = self.resolve_variable(*variable);
+                self.is_ground(resolved).then_some((*variable, resolved))
+            })
+            .collect();
+        if replacements.is_empty() {
+            return ty;
         }
+        ty.apply_type_mapping(
+            self.db,
+            self.env,
+            &TypeMapping::ReplaceInferenceVariables(&replacements),
+            TypeContext::default(),
+        )
     }
 
     fn resolve_outer_type(&self, ty: Type<'db>) -> Type<'db> {
@@ -1663,17 +1647,14 @@ impl<'db> InferenceSolutions<'_, 'db> {
         let mut alternatives = Vec::new();
         while let Some(ty) = pending.pop() {
             match ty {
-                Type::TypeVar(variable)
-                    if matches!(
-                        variable.binding_context(self.db),
-                        BindingContext::Inference(_)
-                    ) =>
+                Type::Divergent(reference)
+                    if let Some(variable) = ty.inference_variable(self.db) =>
                 {
-                    if seen.insert(variable) {
-                        if let Some(ty) = self.binding(variable) {
-                            pending.push(ty);
+                    if seen.insert(reference) {
+                        if let Some(replacement) = self.binding(variable) {
+                            pending.push(replacement);
                         } else {
-                            alternatives.push(Type::TypeVar(variable));
+                            alternatives.push(ty);
                         }
                     }
                 }
@@ -1691,14 +1672,14 @@ impl<'db> InferenceSolutions<'_, 'db> {
         }
     }
 
-    fn resolve_variable(&mut self, variable: BoundTypeVarInstance<'db>) -> Type<'db> {
+    fn resolve_variable(&mut self, variable: CycleVariable<'db>) -> Type<'db> {
         if self.active.contains(&variable) {
-            return self.binding(variable).unwrap_or(Type::TypeVar(variable));
+            return self.binding(variable).unwrap_or(variable.ty());
         }
         if let Some(ty) = self.resolved.get(&variable) {
             return *ty;
         }
-        let ty = self.resolve_outer_type(Type::TypeVar(variable));
+        let ty = self.resolve_outer_type(variable.ty());
         self.active.push(variable);
         let ty = self.resolve_type(ty);
         self.active.pop();
@@ -1710,7 +1691,7 @@ impl<'db> InferenceSolutions<'_, 'db> {
 
     /// A partial result cannot expand itself while its producer is being evaluated.
     /// Ground results can feed back into the next iteration without unfolding recursion.
-    fn binding(&self, variable: BoundTypeVarInstance<'db>) -> Option<Type<'db>> {
+    fn binding(&self, variable: CycleVariable<'db>) -> Option<Type<'db>> {
         self.bindings
             .get(&variable)
             .copied()
