@@ -1951,6 +1951,89 @@ reveal_type(c.generic_method(100))  # revealed: Literal[100]
 reveal_type(c.generic_method([1, 2, 3]))  # revealed: list[int]
 ```
 
+### Callables inferred against gradual return types
+
+A decorator accepting `Callable[P, Any]` preserves any type variables scoped to the callable,
+instead of eagerly specializing them to `Any`:
+
+```py
+from collections.abc import Callable
+from typing import Any, overload
+
+class Wrapper[**P]:
+    def __call__(self, *args: P.args, **kwargs: P.kwargs) -> Any:
+        raise NotImplementedError
+
+def decorate[**P](callback: Callable[P, Any]) -> Wrapper[P]:
+    raise NotImplementedError
+
+@decorate
+def identity[T](value: T) -> T:
+    return value
+
+reveal_type(identity)  # revealed: Wrapper[(value: T@identity)]
+reveal_type(identity(1))  # revealed: Any
+```
+
+This also applies to type variables from an enclosing scope:
+
+```py
+def _[T](callback: Callable[[T], T], value: T) -> None:
+    f = decorate(callback)
+    reveal_type(f)  # revealed: Wrapper[(T@_, /)]
+    reveal_type(f(value))  # revealed: Any
+```
+
+The same applies when the return type is an alias for `Any`:
+
+```py
+type Anything = Any
+
+def decorate_alias[**P](callback: Callable[P, Anything]) -> Wrapper[P]:
+    raise NotImplementedError
+
+def _[T](callback: Callable[[T], T]) -> None:
+    reveal_type(decorate_alias(callback))  # revealed: Wrapper[(T@_, /)]
+```
+
+Type variables shared by multiple overloads are preserved as well:
+
+```py
+def _[T](value: T) -> None:
+    @overload
+    def callback(value: T) -> T: ...
+    @overload
+    def callback(value: T, count: int) -> T: ...
+    def callback(value: T, count: int = 1) -> T:
+        return value
+
+    # revealed: Wrapper[Overload[(value: T@_) -> Unknown, (value: T@_, count: int) -> Unknown]]
+    reveal_type(decorate(callback))
+```
+
+A local return type variable is inferred from the argument, even when it appears in a nested
+callable with a `ParamSpec`:
+
+```py
+def make[**P, R](consume: Callable[[Callable[P, R]], None]) -> Callable[P, R]:
+    raise NotImplementedError
+
+def _[**P](consume: Callable[[Callable[P, Any]], None]) -> None:
+    reveal_type(make(consume))  # revealed: (**P@_) -> Any
+```
+
+The inferred return type also takes precedence over a type parameter default:
+
+```py
+def make_with_default[**P, R = bytes](consume: Callable[[Callable[P, R]], None]) -> Callable[P, R]:
+    raise NotImplementedError
+
+def _[**P](consume: Callable[[Callable[P, Any]], None], *args: P.args, **kwargs: P.kwargs) -> str:
+    callback = make_with_default(consume)
+    reveal_type(callback)  # revealed: (**P@_) -> Any
+    return callback(*args, **kwargs)
+```
+
 ## Callable protocols with `ParamSpec` and class constructors
 
 When a class is passed to a function expecting a callable protocol with `ParamSpec`, the `ParamSpec`
