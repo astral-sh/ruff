@@ -1,7 +1,7 @@
 import sys
 from collections.abc import Awaitable, Callable, Coroutine
 from typing import Any, ParamSpec, TypeGuard, TypeVar, overload
-from typing_extensions import Never, TypeIs, deprecated
+from typing_extensions import TypeIs, deprecated
 
 # Keep asyncio.__all__ updated with any changes to __all__ here
 if sys.version_info >= (3, 11):
@@ -15,21 +15,14 @@ _P = ParamSpec("_P")
 
 if sys.version_info < (3, 11):
     @deprecated("Deprecated since Python 3.8; removed in Python 3.11. Use `async def` instead.")
-    def coroutine(func: _FunctionT) -> _FunctionT:
-        """Decorator to mark coroutines.
+    def coroutine(func: _FunctionT) -> _FunctionT: ...
 
-        If the coroutine is not yielded from before it is destroyed,
-        an error message is logged.
-        """
-
-def iscoroutine(obj: object) -> TypeIs[Coroutine[object, Never, object]]:
-    """Return True if obj is a coroutine object."""
+def iscoroutine(obj: object) -> TypeIs[Coroutine[Any, Any, Any]]: ...
 
 if sys.version_info >= (3, 11):
     @overload
     @deprecated("Deprecated; will be removed in Python 3.16. Use `inspect.iscoroutinefunction()` instead.")
-    def iscoroutinefunction(func: Callable[..., Coroutine[Any, Any, Any]]) -> bool:
-        """Return True if func is a decorated coroutine function."""
+    def iscoroutinefunction(func: Callable[..., Coroutine[Any, Any, Any]]) -> bool: ...
     @overload
     @deprecated("Deprecated; will be removed in Python 3.16. Use `inspect.iscoroutinefunction()` instead.")
     def iscoroutinefunction(func: Callable[_P, Awaitable[_T]]) -> TypeGuard[Callable[_P, Coroutine[Any, Any, _T]]]: ...
@@ -43,8 +36,7 @@ else:
     # Sometimes needed in Python < 3.11 due to the fact that it supports @coroutine
     # which was removed in 3.11 which the inspect version doesn't support.
     @overload
-    def iscoroutinefunction(func: Callable[..., Coroutine[Any, Any, Any]]) -> bool:
-        """Return True if func is a decorated coroutine function."""
+    def iscoroutinefunction(func: Callable[..., Coroutine[Any, Any, Any]]) -> bool: ...
     @overload
     def iscoroutinefunction(func: Callable[_P, Awaitable[_T]]) -> TypeGuard[Callable[_P, Coroutine[Any, Any, _T]]]: ...
     @overload

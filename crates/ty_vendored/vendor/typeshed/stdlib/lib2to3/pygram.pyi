@@ -1,14 +1,7 @@
-"""Export the Python grammar and symbols."""
-
 from .pgen2.grammar import Grammar
 
 class Symbols:
-    def __init__(self, grammar: Grammar) -> None:
-        """Initializer.
-
-        Creates an attribute for each grammar symbol (nonterminal),
-        whose value is the symbol's type (an int >= 256).
-        """
+    def __init__(self, grammar: Grammar) -> None: ...
 
 class python_symbols(Symbols):
     and_expr: int
