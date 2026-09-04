@@ -192,7 +192,7 @@ pub(crate) fn pytest_test_for_binding<'db>(
         test_function_definition(db, function)
     };
 
-    if super::fixture_declaration(db, function).is_some() {
+    if super::fixtures::fixture_declaration(db, function).is_some() {
         return None;
     }
 

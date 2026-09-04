@@ -958,14 +958,6 @@ kind = "inherent_method"
 level = "expect"
 reason = "semantic ingredients expose consistent file, scope, and program accessors"
 
-[[override]]
-lint = "hawk::dead_public"
-crate = "ty_python_semantic"
-item = "types::dedicated::pytest::FixtureBinding::<'db>::request"
-kind = "inherent_method"
-level = "expect"
-reason = "the public pytest fixture lookup API exposes both request and fixture definitions"
-
 # Keep public APIs whose narrower visibility would break a uniform interface or
 # activate compiler lints that Rust intentionally suppresses for public APIs.
 
