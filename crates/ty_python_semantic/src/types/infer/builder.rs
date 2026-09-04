@@ -2751,7 +2751,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         err.fallback_truthiness()
                     });
 
-                self.check_condition_redundancy(guard, guard_ty, truthiness);
+                self.check_match_condition_redundancy(guard, guard_ty, truthiness, body);
             }
 
             self.infer_body(body);

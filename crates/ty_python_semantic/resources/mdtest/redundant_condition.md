@@ -694,15 +694,72 @@ def _():
 def _():
     while not (func and coinflip()):  # error: [redundant-condition]
         pass
+```
 
-def f(x: str | int):
+An always-falsy `match` guard makes its case body unreachable. We annotate the first nontrivial
+statement's first line. An always-truthy guard leaves its case body reachable:
+
+```py
+def f(x: str | int, empty: tuple[()]):
     match x:
-        case str() if func:  # error: [redundant-condition]
+        case str() if empty:  # snapshot: redundant-condition
             pass
+            print(
+                "unreachable",
+            )
+        case int() if func:  # snapshot: redundant-condition
+            print("reachable")
+```
 
-def _():
-    while func:  # error: [redundant-condition]
+```snapshot
+warning[redundant-condition]: An empty tuple is always falsy
+  --> src/mdtest_snippet.py:47:23
+   |
+47 |         case str() if empty:  # snapshot: redundant-condition
+   |                       ^^^^^ Inferred type is `tuple[()]`
+48 |             pass
+49 |             print(
+   |             ------ This statement is unreachable
+
+
+warning[redundant-condition]: Function `func` is always truthy
+  --> src/mdtest_snippet.py:52:23
+   |
+52 |         case int() if func:  # snapshot: redundant-condition
+   |                       ^^^^ Did you mean to call this function?
+   |
+51 |             )
+   -         case int() if func:  # snapshot: redundant-condition
+52 +         case int() if func():  # snapshot: redundant-condition
+53 |             print("reachable")
+   |
+note: This is an unsafe fix and may change runtime behavior
+```
+
+An always-falsy loop condition makes the loop body unreachable. We annotate the first nontrivial
+statement's first line; the `else` body and statements after the loop remain reachable:
+
+```py
+def _(empty: tuple[()]):
+    while empty:  # snapshot: redundant-condition
         pass
+        print(
+            "unreachable",
+        )
+    else:
+        print("reachable")
+    print("still reachable")
+```
+
+```snapshot
+warning[redundant-condition]: An empty tuple is always falsy
+  --> src/mdtest_snippet.py:55:11
+   |
+55 |     while empty:  # snapshot: redundant-condition
+   |           ^^^^^ Inferred type is `tuple[()]`
+56 |         pass
+57 |         print(
+   |         ------ This statement is unreachable
 ```
 
 ## Always truthy values appearing later in compound conditions
@@ -2015,7 +2072,8 @@ error[redundant-condition-strict]: Condition is always false
 ```
 
 `redundant-condition-strict` is also emitted on negated conditions where the negated condition is
-inferred as an instance of `bool`:
+inferred as an instance of `bool`. If an always-true loop has no reachable `break`, we also annotate
+the following statement as unreachable:
 
 ```py
 def negated_conditions():
@@ -2040,8 +2098,20 @@ def negated_conditional_contexts(flag: bool):
     elif not 1 == 0:  # error: [redundant-condition-strict] "Condition `not 1 == 0` is always true"
         pass
 
-    while not 1 == 0:  # error: [redundant-condition-strict] "Condition `not 1 == 0` is always true"
-        break
+    while not 1 == 0:  # snapshot: redundant-condition-strict
+        print("loop body")
+    print("unreachable")
+```
+
+```snapshot
+error[redundant-condition-strict]: Condition is always true
+  --> src/mdtest_snippet.py:64:11
+   |
+64 |     while not 1 == 0:  # snapshot: redundant-condition-strict
+   |           ^^^^^^^^^^ Inferred type is `Literal[True]`
+65 |         print("loop body")
+66 |     print("unreachable")
+   |     -------------------- This following statement is unreachable
 ```
 
 In cases where an always-true `if` or `elif` test makes a following branch unreachable, and that
@@ -2073,24 +2143,24 @@ def g(x: int | str):
 
 ```snapshot
 error[redundant-condition-strict]: Condition is always true
-  --> src/mdtest_snippet.py:67:8
+  --> src/mdtest_snippet.py:68:8
    |
-67 |       if isinstance(x, int):  # snapshot: redundant-condition-strict
+68 |       if isinstance(x, int):  # snapshot: redundant-condition-strict
    |          ^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
-68 |           return
-69 | /     else:
-70 | |         return
+69 |           return
+70 | /     else:
+71 | |         return
    | |______________- This following branch is unreachable
 
 
 error[redundant-condition-strict]: Condition is always true
-  --> src/mdtest_snippet.py:76:10
+  --> src/mdtest_snippet.py:77:10
    |
-76 |       elif isinstance(x, str):  # snapshot: redundant-condition-strict
+77 |       elif isinstance(x, str):  # snapshot: redundant-condition-strict
    |            ^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
-77 |           print("b")
-78 | /     elif isinstance(x, bytes):
-79 | |         for byte in x:
+78 |           print("b")
+79 | /     elif isinstance(x, bytes):
+80 | |         for byte in x:
    | |______________________- This following branch is unreachable
 ```
 
@@ -2105,11 +2175,11 @@ def f(x: int):
 
 ```snapshot
 error[redundant-condition-strict]: Condition is always false
-  --> src/mdtest_snippet.py:84:8
+  --> src/mdtest_snippet.py:85:8
    |
-84 |     if not isinstance(x, int):  # snapshot: redundant-condition-strict
+85 |     if not isinstance(x, int):  # snapshot: redundant-condition-strict
    |        ^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[False]`
-85 |         print("not an int")
+86 |         print("not an int")
    |         ------------------- This statement is unreachable
 ```
 
@@ -2125,13 +2195,13 @@ def f(x: int):
 
 ```snapshot
 error[redundant-condition-strict]: Condition is always true
-  --> src/mdtest_snippet.py:87:8
+  --> src/mdtest_snippet.py:88:8
    |
-87 |     if isinstance(x, int):  # snapshot: redundant-condition-strict
+88 |     if isinstance(x, int):  # snapshot: redundant-condition-strict
    |        ^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
-88 |         return
-89 |
-90 |     print("hi")
+89 |         return
+90 |
+91 |     print("hi")
    |     ----------- This following statement is unreachable
 ```
 
@@ -2148,19 +2218,37 @@ def negated_integer_return(value: Literal[1, 2]) -> bool:
 
 When the strict rule is needed because of a test's type or short-circuit behavior, we report the
 complete compound condition instead of its operands. Only a single diagnostic is emitted on each of
-these:
+these. A reachable `break` keeps the statement after the loop reachable, so the loop diagnostic has
+no unreachable-code annotation. The always-false `match` guard makes its case body unreachable:
 
 ```py
-def compound_truthy(x: str):
+def compound_conditions(x: str):
     if isinstance(x, str) and isinstance(x, str):  # error: [redundant-condition-strict]
         pass
 
-    while isinstance(x, str) and isinstance(x, str):  # error: [redundant-condition-strict]
+    while isinstance(x, str) and isinstance(x, str):  # snapshot: redundant-condition-strict
         break
 
     match x:
-        case str() if isinstance(x, str) and isinstance(x, str):  # error: [redundant-condition-strict]
-            pass
+        case str() if not isinstance(x, str) or not isinstance(x, str):  # snapshot: redundant-condition-strict
+            print("unreachable")
+```
+
+```snapshot
+error[redundant-condition-strict]: Condition is always true
+   --> src/mdtest_snippet.py:101:11
+    |
+101 |     while isinstance(x, str) and isinstance(x, str):  # snapshot: redundant-condition-strict
+    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+
+
+error[redundant-condition-strict]: Condition is always false
+   --> src/mdtest_snippet.py:105:23
+    |
+105 |         case str() if not isinstance(x, str) or not isinstance(x, str):  # snapshot: redundant-condition-strict
+    |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[False]`
+106 |             print("unreachable")
+    |             -------------------- This statement is unreachable
 ```
 
 ## Reachability after exhaustive `if`/`elif` chains
@@ -2358,16 +2446,27 @@ always false:
 
 ```py
 def check(empty: tuple[()], enabled: bool):
-    if empty and enabled:  # snapshot: redundant-condition
+    while empty and enabled:  # snapshot: redundant-condition
         print("unreachable")
+
+    match enabled:
+        case _ if empty and enabled:  # snapshot: redundant-condition
+            print("unreachable")
 ```
 
 ```snapshot
 warning[redundant-condition]: An empty tuple is always falsy
- --> src/mdtest_snippet.py:2:8
+ --> src/mdtest_snippet.py:2:11
   |
-2 |     if empty and enabled:  # snapshot: redundant-condition
-  |        ^^^^^ Inferred type is `tuple[()]`
+2 |     while empty and enabled:  # snapshot: redundant-condition
+  |           ^^^^^ Inferred type is `tuple[()]`
+
+
+warning[redundant-condition]: An empty tuple is always falsy
+ --> src/mdtest_snippet.py:6:19
+  |
+6 |         case _ if empty and enabled:  # snapshot: redundant-condition
+  |                   ^^^^^ Inferred type is `tuple[()]`
 ```
 
 ## Boolean tests inside value expressions
@@ -3804,12 +3903,28 @@ assert (value := "foo")
 ```
 
 Always falsy variables that are not AST literals are still reported as redundant assertions by
-`redundant-condition`:
+`redundant-condition`. Since these assertions always fail, we also annotate the first nontrivial
+following statement as unreachable. For a multiline statement, the annotation ends on its first
+line:
 
 ```py
 def failing_assertion(value: None):
-    # error: [redundant-condition] "`None` is always falsy"
-    assert value
+    assert value  # snapshot: redundant-condition
+    pass
+    print(
+        "unreachable",
+    )
+```
+
+```snapshot
+warning[redundant-condition]: `None` is always falsy
+  --> src/mdtest_snippet.py:35:12
+   |
+35 |     assert value  # snapshot: redundant-condition
+   |            ^^^^^
+36 |     pass
+37 |     print(
+   |     ------ This following statement is unreachable
 ```
 
 ## `sys.version_info` checks, `sys.platform` checks, `os.name` checks, `if TYPE_CHECKING` checks
