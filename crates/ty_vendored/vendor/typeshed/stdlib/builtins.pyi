@@ -78,6 +78,7 @@ from typing import (  # noqa: Y022,UP035
 
 # we can't import `Literal` from typing or mypy crashes: see #11247
 from typing_extensions import Literal, LiteralString, Self, TypeIs, TypeVarTuple, deprecated, disjoint_base  # noqa: Y023, UP035
+from ty_extensions import Top
 
 if sys.version_info >= (3, 14):
     from _typeshed import AnnotateFunc
@@ -3156,12 +3157,12 @@ class dict(MutableMapping[_KT, _VT]):
 
     # Positional-only in dict, but not in MutableMapping
     @overload  # type: ignore[override]
-    def get(self, key: _KT, default: None = None, /) -> _VT | None:
+    def get(self, key: object, default: None = None, /) -> _VT | None:
         """Return the value for key if key is in the dictionary, else default."""
     @overload
-    def get(self, key: _KT, default: _VT, /) -> _VT: ...
+    def get(self, key: object, default: _VT, /) -> _VT: ...
     @overload
-    def get(self, key: _KT, default: _T, /) -> _VT | _T: ...
+    def get(self, key: object, default: _T, /) -> _VT | _T: ...
 
     @overload
     def pop(self, key: _KT, /) -> _VT:
@@ -3171,9 +3172,9 @@ class dict(MutableMapping[_KT, _VT]):
         raise a KeyError.
         """
     @overload
-    def pop(self, key: _KT, default: _VT, /) -> _VT: ...
+    def pop(self, key: object, default: _VT, /) -> _VT: ...
     @overload
-    def pop(self, key: _KT, default: _T, /) -> _VT | _T: ...
+    def pop(self, key: object, default: _T, /) -> _VT | _T: ...
 
     def __len__(self) -> int:
         """Return len(self)."""
@@ -3669,7 +3670,7 @@ def breakpoint(*args: Any, **kws: Any) -> None:
     By default, this drops you into the pdb debugger.
     """
 
-def callable(obj: object, /) -> TypeIs[Callable[..., object]]:
+def callable(obj: object, /) -> TypeIs[Top[Callable[..., object]]]:
     """Return whether the object is callable (i.e., some kind of function).
 
     Note that classes are callable, as are instances of classes with a

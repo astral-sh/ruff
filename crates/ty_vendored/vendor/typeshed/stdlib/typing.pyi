@@ -1857,12 +1857,12 @@ class Mapping(Collection[_KT], Generic[_KT, _VT_co]):
 
     # Mixin methods
     @overload
-    def get(self, key: _KT, /) -> _VT_co | None:
+    def get(self, key: object, /) -> _VT_co | None:
         """D.get(k[,d]) -> D[k] if k in D, else d.  d defaults to None."""
     @overload
-    def get(self, key: _KT, default: _VT_co, /) -> _VT_co: ...  # type: ignore[misc] # pyright: ignore[reportGeneralTypeIssues] # Covariant type as parameter  # pyrefly: ignore [invalid-variance]
+    def get(self, key: object, default: _VT_co, /) -> _VT_co: ...  # type: ignore[misc] # pyright: ignore[reportGeneralTypeIssues] # Covariant type as parameter  # pyrefly: ignore [invalid-variance]
     @overload
-    def get(self, key: _KT, default: _T, /) -> _VT_co | _T: ...
+    def get(self, key: object, default: _T, /) -> _VT_co | _T: ...
 
     def items(self) -> ItemsView[_KT, _VT_co]:
         """D.items() -> a set-like object providing a view on D's items"""
@@ -2281,7 +2281,6 @@ if sys.version_info >= (3, 11):
         kw_only_default: bool = False,
         frozen_default: bool = False,  # on 3.11, runtime accepts it as part of kwargs
         field_specifiers: tuple[type[Any] | Callable[..., Any], ...] = (),
-        **kwargs: Any,
     ) -> IdentityFunction:
         """Decorator to mark an object as providing dataclass-like behavior.
 
