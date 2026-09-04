@@ -516,6 +516,11 @@ def _(obj: object):
     if is_getter_unspecialized(obj):
         reveal_type(obj)  # revealed: Getter[Unknown]
         reveal_type(obj.get())  # revealed: Unknown
+
+    # For comparison, `isinstance` narrowing behaves in the same way:
+    if isinstance(obj, Getter):
+        reveal_type(obj)  # revealed: Getter[Unknown]
+        reveal_type(obj.get())  # revealed: Unknown
 ```
 
 When narrowing from a union of a specific `Getter` specialization and another type, the positive
@@ -534,6 +539,13 @@ def _(obj: Unrelated | Getter[int]):
         reveal_type(obj.get())  # revealed: int
     else:
         reveal_type(obj)  # revealed: Unrelated
+
+    # For comparison, `isinstance` narrowing behaves in the same way:
+    if isinstance(obj, Getter):
+        reveal_type(obj)  # revealed: Getter[int]
+        reveal_type(obj.get())  # revealed: int
+    else:
+        reveal_type(obj)  # revealed: Unrelated
 ```
 
 If the other type is not final, the positive branch retains the possibility of multiple inheritance
@@ -546,6 +558,13 @@ def _(obj: Overlapping | Getter[int]):
     if is_getter(obj):
         reveal_type(obj)  # revealed: (Overlapping & Getter[Any]) | Getter[int]
         reveal_type(obj.get())  # revealed: Any | int
+    else:
+        reveal_type(obj)  # revealed: Overlapping & ~Getter[object]
+
+    # For comparison, `isinstance` narrowing behaves in the same way (except for Any -> Unknown)
+    if isinstance(obj, Getter):
+        reveal_type(obj)  # revealed: (Overlapping & Getter[Unknown]) | Getter[int]
+        reveal_type(obj.get())  # revealed: Unknown | int
     else:
         reveal_type(obj)  # revealed: Overlapping & ~Getter[object]
 ```
@@ -569,6 +588,13 @@ def _(obj: object):
         reveal_type(obj.read())  # revealed: Any
     else:
         reveal_type(obj)  # revealed: ~Top[Reader]
+
+    # For comparison, `isinstance` narrowing behaves in the same way:
+    if isinstance(obj, Reader):
+        reveal_type(obj)  # revealed: Reader
+        reveal_type(obj.read())  # revealed: Any
+    else:
+        reveal_type(obj)  # revealed: ~Top[Reader]
 ```
 
 When narrowing from a union of a specific `Reader` implementation and another type, the positive
@@ -581,6 +607,15 @@ class SpecificReader:
 
 def _(obj: SpecificReader | Unrelated):
     if is_reader(obj):
+        # TODO: this should be SpecificReader
+        reveal_type(obj)  # revealed: SpecificReader & Reader
+        # TODO: this should be str
+        reveal_type(obj.read())  # revealed: str & Any
+    else:
+        reveal_type(obj)  # revealed: Unrelated
+
+    # For comparison, `isinstance` narrowing behaves in the same way:
+    if isinstance(obj, Reader):
         # TODO: this should be SpecificReader
         reveal_type(obj)  # revealed: SpecificReader & Reader
         # TODO: this should be str
@@ -627,6 +662,11 @@ def _(obj: object):
     if is_getter_unspecialized(obj):
         reveal_type(obj)  # revealed: Getter[object]
         reveal_type(obj.get())  # revealed: object
+
+    # For comparison, `isinstance` narrowing behaves in the same way:
+    if isinstance(obj, Getter):
+        reveal_type(obj)  # revealed: Getter[object]
+        reveal_type(obj.get())  # revealed: object
 ```
 
 Like in non-strict mode, when narrowing from a union of a specific `Getter` specialization and
@@ -645,6 +685,13 @@ def _(obj: Unrelated | Getter[int]):
         reveal_type(obj.get())  # revealed: int
     else:
         reveal_type(obj)  # revealed: Unrelated
+
+    # For comparison, `isinstance` narrowing behaves in the same way:
+    if isinstance(obj, Getter):
+        reveal_type(obj)  # revealed: Getter[int]
+        reveal_type(obj.get())  # revealed: int
+    else:
+        reveal_type(obj)  # revealed: Unrelated
 ```
 
 Like in non-strict mode, if the other type is not final, the positive branch retains the possibility
@@ -655,6 +702,13 @@ class Overlapping: ...
 
 def _(obj: Overlapping | Getter[int]):
     if is_getter(obj):
+        reveal_type(obj)  # revealed: (Overlapping & Getter[object]) | Getter[int]
+        reveal_type(obj.get())  # revealed: object
+    else:
+        reveal_type(obj)  # revealed: Overlapping & ~Getter[object]
+
+    # For comparison, `isinstance` narrowing behaves in the same way:
+    if isinstance(obj, Getter):
         reveal_type(obj)  # revealed: (Overlapping & Getter[object]) | Getter[int]
         reveal_type(obj.get())  # revealed: object
     else:
@@ -680,6 +734,15 @@ def _(obj: object):
         reveal_type(obj.read())  # revealed: object
     else:
         reveal_type(obj)  # revealed: ~Top[Reader]
+
+    # For comparison, `isinstance` narrowing behaves in the same way:
+    if isinstance(obj, Reader):
+        # TODO: this should be Top[Reader]
+        reveal_type(obj)  # revealed: Reader
+        # TODO: this should be object
+        reveal_type(obj.read())  # revealed: Any
+    else:
+        reveal_type(obj)  # revealed: ~Top[Reader]
 ```
 
 When narrowing from a union of a specific `Reader` implementation and another type, the positive
@@ -692,6 +755,13 @@ class SpecificReader:
 
 def _(obj: SpecificReader | Unrelated):
     if is_reader(obj):
+        reveal_type(obj)  # revealed: SpecificReader
+        reveal_type(obj.read())  # revealed: str
+    else:
+        reveal_type(obj)  # revealed: Unrelated
+
+    # For comparison, `isinstance` narrowing behaves in the same way:
+    if isinstance(obj, SpecificReader):
         reveal_type(obj)  # revealed: SpecificReader
         reveal_type(obj.read())  # revealed: str
     else:
