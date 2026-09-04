@@ -32,8 +32,8 @@ assert (y := x + 1.0) == 2.0
 [i for i in range(10) if i == 1.0]
 {i for i in range(10) if i != 2.0}
 
-assert x / 2 == 1
-assert (x / 2) == (y / 3)
+assert x / 2 == 1  # ok
+assert (x / 2) == (y / 3)  # ok
 
 # ok
 assert Path(__file__).parent / ".txt" == 1
@@ -43,7 +43,7 @@ def foo(a, b):
 
 assert complex(0.3, 0.2) == complex(0.1 + 0.2, 0.1 + 0.1)
 
-assert (y := x / 2) == 1
+assert (y := x / 2) == 1  # ok
 
 assert (0.3 if x > 0 else 1) == 0.1 + 0.2
 
@@ -87,7 +87,7 @@ def _cmath():
     assert cmath.infj == complex(0, 1e300 * 1e300)  # ok
 
 
-def decimal_division():
+def _decimal_division():
     from decimal import Decimal
 
     a = Decimal("2")
