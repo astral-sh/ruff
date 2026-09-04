@@ -230,7 +230,7 @@ pub(crate) enum Equation<'db> {
     Pending,
     /// The lower bound supplied by the producer of this output.
     Value(Type<'db>),
-    Operation(InferenceOperation<'db>),
+    Operation(RecordedOperation<'db>),
 }
 
 impl<'db> Equation<'db> {
@@ -259,13 +259,50 @@ impl<'db> Equation<'db> {
         match self {
             Self::Pending => {}
             Self::Value(ty) => visit(ty),
-            Self::Operation(operation) => {
-                operation.map(db, |ty| {
+            Self::Operation(recorded) => {
+                if let Some(initial) = recorded.initial(db) {
+                    visit(initial);
+                }
+                recorded.operation(db).map(db, |ty| {
                     visit(ty);
                     ty
                 });
             }
         }
+    }
+}
+
+/// An immutable operation and any initial evidence supplied by its producer.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+pub(crate) struct RecordedOperation<'db> {
+    #[returns(copy)]
+    operation: InferenceOperation<'db>,
+    #[returns(copy)]
+    initial: Option<Type<'db>>,
+}
+
+impl get_size2::GetSize for RecordedOperation<'_> {}
+
+impl<'db> RecordedOperation<'db> {
+    fn cycle_normalized(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        previous: Self,
+        cycle: &salsa::Cycle,
+    ) -> Self {
+        let initial = match (self.initial(db), previous.initial(db)) {
+            (Some(current), Some(previous)) => {
+                Some(current.cycle_normalized(db, env, previous, cycle))
+            }
+            (current, previous) => current.or(previous),
+        };
+        Self::new(
+            db,
+            self.operation(db)
+                .cycle_normalized(db, env, previous.operation(db), cycle),
+            initial,
+        )
     }
 }
 
@@ -928,10 +965,23 @@ impl<'db> InferenceEquations<'db> {
 
             let mut seen = FxHashSet::default();
             loop {
-                let (changed, operations_complete) = producers
+                let (mut changed, operations_complete) = producers
                     .evaluate_operations(&equations, &mut budget)
                     .ok()?;
                 producers.resolved.clear();
+                // Use inferred contributions before starting from the initializer's contents.
+                // A provisional empty collection can otherwise obscure a known element type.
+                if !changed {
+                    for (variable, equation) in &equations {
+                        if let Equation::Operation(operation) = equation
+                            && let Some(initial) = operation.initial(db)
+                            && !producers.bindings.contains_key(variable)
+                        {
+                            producers.bindings.insert(*variable, initial);
+                            changed = true;
+                        }
+                    }
+                }
                 if !changed && operations_complete {
                     break;
                 }
@@ -1030,7 +1080,11 @@ impl<'db> SymbolicType<'db> {
                 let equation = match equation {
                     Equation::Pending => Equation::Pending,
                     Equation::Value(ty) => Equation::Value(apply(*ty)),
-                    Equation::Operation(operation) => Equation::Operation(operation.map(db, apply)),
+                    Equation::Operation(recorded) => Equation::Operation(RecordedOperation::new(
+                        db,
+                        recorded.operation(db).map(db, apply),
+                        recorded.initial(db).map(apply),
+                    )),
                 };
                 (variable.specialized(db, specialization), equation)
             })
@@ -1335,9 +1389,20 @@ impl<'db> InferenceConstraints<'db> {
     ) -> Type<'db> {
         let variable = CycleVariable::inferred(db, env.program(db), owner, slot, None);
         let result = variable.ty();
-        self.equations
-            .insert(variable, Equation::Operation(operation));
+        self.equations.insert(
+            variable,
+            Equation::Operation(RecordedOperation::new(db, operation, None)),
+        );
         result
+    }
+
+    /// Supply an initial observation without discarding the operation's dependencies.
+    pub(crate) fn initialize(&mut self, db: &'db dyn Db, output: Type<'db>, ty: Type<'db>) {
+        if let Some(variable) = output.inference_variable(db)
+            && let Some(Equation::Operation(recorded)) = self.equations.get_mut(&variable)
+        {
+            *recorded = RecordedOperation::new(db, recorded.operation(db), Some(ty));
+        }
     }
 
     /// Represent a mapping spread by a dictionary with the same key and value types.
@@ -1407,8 +1472,8 @@ impl<'db> InferenceSolutions<'_, 'db> {
             .is_empty()
     }
 
-    /// Preserve constructed values while starting unresolved equation outputs at their lower bound.
-    fn productive_type(
+    /// Use known union alternatives while waiting for the rest of a closed component.
+    fn known_input(
         &self,
         ty: Type<'db>,
         equations: &[(CycleVariable<'db>, Equation<'db>)],
@@ -1417,24 +1482,24 @@ impl<'db> InferenceSolutions<'_, 'db> {
         if variables.is_empty() {
             return Some(ty);
         }
-        let replacements: Option<FxHashMap<_, _>> = variables
+        if variables.iter().any(|variable| {
+            equations
+                .binary_search_by_key(&variable.as_id(), |(key, _)| key.as_id())
+                .is_err()
+        }) {
+            return None;
+        }
+        let Type::Union(union) = ty else {
+            return None;
+        };
+        let mut known = union
+            .elements(self.db)
             .iter()
-            .map(|variable| {
-                equations
-                    .binary_search_by_key(&variable.as_id(), |(key, _)| key.as_id())
-                    .ok()
-                    .map(|_| (*variable, Type::Never))
-            })
-            .collect();
-        let ty = ty.apply_type_mapping(
-            self.db,
-            self.env,
-            &TypeMapping::ReplaceInferenceVariables(&replacements?),
-            TypeContext::default(),
-        );
-        // A bare unresolved reference has no value yet. A known container can still contribute
-        // information: `dict[Never, Never].get(key, 0)` returns the known default.
-        (!ty.is_equivalent_to(self.db, self.env, Type::Never)).then_some(ty)
+            .copied()
+            .filter(|ty| self.is_ground(*ty))
+            .peekable();
+        known.peek()?;
+        Some(UnionType::from_elements(self.db, self.env, known))
     }
 
     fn evaluate_operations(
@@ -1444,58 +1509,38 @@ impl<'db> InferenceSolutions<'_, 'db> {
     ) -> Result<(bool, bool), ProjectionError> {
         let mut changed = false;
         let mut complete = true;
-        let mut deferred = Vec::new();
         for (variable, equation) in equations {
-            let Equation::Operation(operation) = equation else {
+            let Equation::Operation(recorded) = equation else {
                 continue;
             };
             self.active.push(*variable);
-            let operation = operation.map(self.db, |ty| self.operation_input(ty));
+            let operation = recorded
+                .operation(self.db)
+                .map(self.db, |ty| self.operation_input(ty));
             self.active.pop();
-            let mut operation_complete = true;
             let mut inputs_resolved = true;
-            let productive = operation.map(self.db, |ty| {
-                inputs_resolved &= self.is_ground(ty);
-                self.productive_type(ty, equations).unwrap_or_else(|| {
-                    complete = false;
-                    operation_complete = false;
+            let operation = operation.map(self.db, |ty| {
+                self.known_input(ty, equations).unwrap_or_else(|| {
+                    inputs_resolved = false;
                     ty
                 })
             });
-            if operation_complete {
-                if !inputs_resolved {
-                    complete = false;
-                    deferred.push((*variable, productive));
-                    continue;
-                }
-                let Some(ty) = self.evaluate_operation(*variable, productive, budget)? else {
-                    complete = false;
-                    continue;
-                };
-                match self
-                    .bind_operation(*variable, ty, &mut budget.type_terms)
-                    .ok_or(ProjectionError::TypeBudgetExceeded)?
-                {
-                    OperationBinding::Changed => changed = true,
-                    OperationBinding::Stable => {}
-                    OperationBinding::RejectedGrowth => complete = false,
-                }
+            // Missing type information is not evidence that an input has type `Never`.
+            if !inputs_resolved {
+                complete = false;
+                continue;
             }
-        }
-        // Use known inputs before starting unresolved outputs at their lower bounds. Otherwise
-        // a provisional overload choice can obscure a value that another equation already knows.
-        if !changed {
-            for (variable, operation) in deferred {
-                let Some(ty) = self.evaluate_operation(variable, operation, budget)? else {
-                    continue;
-                };
-                match self
-                    .bind_operation(variable, ty, &mut budget.type_terms)
-                    .ok_or(ProjectionError::TypeBudgetExceeded)?
-                {
-                    OperationBinding::Changed => changed = true,
-                    OperationBinding::Stable | OperationBinding::RejectedGrowth => {}
-                }
+            let Some(ty) = self.evaluate_operation(*variable, operation, budget)? else {
+                complete = false;
+                continue;
+            };
+            match self
+                .bind_operation(*variable, ty, &mut budget.type_terms)
+                .ok_or(ProjectionError::TypeBudgetExceeded)?
+            {
+                OperationBinding::Changed => changed = true,
+                OperationBinding::Stable => {}
+                OperationBinding::RejectedGrowth => complete = false,
             }
         }
         Ok((changed, complete))

@@ -7889,7 +7889,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         &mut |_, (_, elt, _)| element_types[&elt.into()],
                         tcx,
                         &mut |parameter, value, promotion| {
-                            constraints.apply(
+                            let output = constraints.apply(
                                 db,
                                 env,
                                 InferenceOwner::Region(self.region),
@@ -7898,7 +7898,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     parameter.as_id().as_bits(),
                                 ),
                                 InferenceOperation::Promote { value, promotion },
-                            )
+                            );
+                            // An empty initializer contributes no elements before its uses.
+                            // This is evidence about this collection, not an unresolved type.
+                            if elts.is_empty() {
+                                constraints.initialize(db, output, Type::Never);
+                            }
+                            output
                         },
                     )
             } else {
