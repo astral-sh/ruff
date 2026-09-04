@@ -546,10 +546,8 @@ impl<'db> Constraint<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         map: &mut SequentMap<Constraint<'db>>,
-        lower_constraint: Self,
-        lower_bound: Type<'db>,
-        upper_constraint: Self,
-        upper_bound: Type<'db>,
+        lower: impl ProvidesConcreteLowerBound<'db>,
+        upper: impl ProvidesConcreteUpperBound<'db>,
     ) {
         // Given constraints `α ≤ T` and `T ≤ β`, `α ≤ β` must also hold. If those bounds contain
         // other typevars, we can infer additional constraints. (α and U won't be bare typevars,
@@ -580,12 +578,19 @@ impl<'db> Constraint<'db> {
         // implication. (That is, this check directly encodes `(α ≤ T) ∧ (T ≤ β) → (α ≤ β)` as an
         // implication.)
 
+        let lower_constraint = lower.into();
+        let lower = lower.into_lower_bound();
+        let upper_constraint = upper.into();
+        let upper = upper.into_upper_bound();
+
         // Skip trivial cases where the assignability check won't produce useful results.
-        if lower_bound.is_never() || upper_bound.is_object() {
+        if lower.bound().is_never() || upper.bound().is_object() {
             return;
         }
 
-        let when = lower_bound.when_constraint_set_assignable_to_owned(db, env, upper_bound);
+        let when = lower
+            .bound()
+            .when_constraint_set_assignable_to_owned(db, env, upper.bound());
         Self::add_constraint_set_implication(
             map,
             lower_constraint,
@@ -598,15 +603,20 @@ impl<'db> Constraint<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         map: &mut SequentMap<Constraint<'db>>,
-        lower_constraint: Self,
-        lower_bound: Type<'db>,
-        upper_constraint: Self,
-        upper_bound: Type<'db>,
+        lower: impl ProvidesConcreteLowerBound<'db>,
+        upper: impl ProvidesConcreteUpperBound<'db>,
     ) {
         // Given constraints `T = α` and `T = β`, `α = β` must also hold. If those bounds contain
         // other typevars, we can infer additional constraints.
 
-        let when = lower_bound.when_constraint_set_equivalent_to_owned(db, env, upper_bound);
+        let lower_constraint = lower.into();
+        let lower = lower.into_lower_bound();
+        let upper_constraint = upper.into();
+        let upper = upper.into_upper_bound();
+
+        let when = lower
+            .bound()
+            .when_constraint_set_equivalent_to_owned(db, env, upper.bound());
         Self::add_constraint_set_implication(
             map,
             lower_constraint,
@@ -1376,15 +1386,7 @@ impl<'db> ConcreteLowerBound<'db> {
         if self.bound.is_static_sequent_eligible(db, env)
             && other.bound.is_static_sequent_eligible(db, env)
         {
-            Constraint::add_sequents_for_range(
-                db,
-                env,
-                map,
-                self.into(),
-                lower,
-                other.into(),
-                upper,
-            );
+            Constraint::add_sequents_for_range(db, env, map, self, other);
         }
     }
 
@@ -1429,15 +1431,7 @@ impl<'db> ConcreteLowerBound<'db> {
 
         // Given constraints `α ≤ T` and `T = β`, `α ≤ β` must also hold. If those bounds contain
         // other typevars, we can infer additional constraints.
-        Constraint::add_sequents_for_range(
-            db,
-            env,
-            map,
-            self.into(),
-            self.bound,
-            other.into(),
-            other.bound,
-        );
+        Constraint::add_sequents_for_range(db, env, map, self, other);
     }
 
     fn add_sequents_with_paramspec_lower(
@@ -1656,15 +1650,7 @@ impl<'db> ConcreteUpperBound<'db> {
 
         // Given constraints `T ≤ α` and `T = β`, `α ≤ β` must also hold. If those bounds contain
         // other typevars, we can infer additional constraints.
-        Constraint::add_sequents_for_range(
-            db,
-            env,
-            map,
-            other.into(),
-            other.bound,
-            self.into(),
-            self.bound,
-        );
+        Constraint::add_sequents_for_range(db, env, map, other, self);
     }
 
     fn add_sequents_with_paramspec_lower(
@@ -1804,15 +1790,7 @@ impl<'db> ConcreteEquivalenceBound<'db> {
 
         // Given constraints `T = α` and `T = β`, `α = β` must also hold. If those bounds contain
         // other typevars, we can infer additional constraints.
-        Constraint::add_sequents_for_equivalence(
-            db,
-            env,
-            map,
-            self.into(),
-            self.bound,
-            other.into(),
-            other.bound,
-        );
+        Constraint::add_sequents_for_equivalence(db, env, map, self, other);
     }
 
     fn add_sequents_with_paramspec_lower(
@@ -2074,15 +2052,7 @@ impl<'db> ParamSpecLowerBound<'db> {
         if self.bound.is_static_sequent_eligible(db, env)
             && other.bound.is_static_sequent_eligible(db, env)
         {
-            Constraint::add_sequents_for_range(
-                db,
-                env,
-                map,
-                self.into(),
-                self.bound,
-                other.into(),
-                other.bound,
-            );
+            Constraint::add_sequents_for_range(db, env, map, self, other);
         }
     }
 
@@ -2127,15 +2097,7 @@ impl<'db> ParamSpecLowerBound<'db> {
 
         // Given constraints `ξ ≤ P` and `P = η`, `ξ ≤ η` must also hold. If those bounds contain
         // other typevars, we can infer additional constraints.
-        Constraint::add_sequents_for_range(
-            db,
-            env,
-            map,
-            self.into(),
-            self.bound,
-            other.into(),
-            other.bound,
-        );
+        Constraint::add_sequents_for_range(db, env, map, self, other);
     }
 
     fn add_sequents_with_typevar_range(
@@ -2318,15 +2280,7 @@ impl<'db> ParamSpecUpperBound<'db> {
 
         // Given constraints `P ≤ ξ` and `P = η`, `ξ ≤ η` must also hold. If those bounds contain
         // other typevars, we can infer additional constraints.
-        Constraint::add_sequents_for_range(
-            db,
-            env,
-            map,
-            other.into(),
-            other.bound,
-            self.into(),
-            self.bound,
-        );
+        Constraint::add_sequents_for_range(db, env, map, other, self);
     }
 
     fn add_sequents_with_typevar_range(
@@ -2430,15 +2384,7 @@ impl<'db> ParamSpecEquivalenceBound<'db> {
 
         // Given constraints `P = ξ` and `P = η`, `ξ = η` must also hold. If those bounds contain
         // other typevars, we can infer additional constraints.
-        Constraint::add_sequents_for_equivalence(
-            db,
-            env,
-            map,
-            self.into(),
-            self.bound,
-            other.into(),
-            other.bound,
-        );
+        Constraint::add_sequents_for_equivalence(db, env, map, self, other);
     }
 
     fn add_sequents_with_typevar_range(
