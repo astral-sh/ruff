@@ -9,8 +9,9 @@ use crate::{Db, PossiblyNarrowedPlaces};
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_index::IndexVec;
 use ruff_python_ast as ast;
+use rustc_hash::FxHasher;
 use smallvec::SmallVec;
-use std::hash::Hash;
+use std::hash::{Hash, Hasher};
 use std::iter::FusedIterator;
 
 /// Return the expressions whose existing bindings a match pattern can narrow.
@@ -190,6 +191,31 @@ pub struct PlaceTable {
 }
 
 impl PlaceTable {
+    /// Hash the ordered places and their flags, omitting the reverse-lookup indexes.
+    /// Equal tables must produce the same hash even if their indexes have different layouts.
+    pub(super) fn fingerprint(&self) -> u64 {
+        let mut hasher = FxHasher::default();
+        self.symbols.iter().len().hash(&mut hasher);
+        for symbol in self.symbols.iter() {
+            symbol.name().hash(&mut hasher);
+            symbol.is_used().hash(&mut hasher);
+            symbol.is_bound().hash(&mut hasher);
+            symbol.is_declared().hash(&mut hasher);
+            symbol.is_global().hash(&mut hasher);
+            symbol.is_nonlocal().hash(&mut hasher);
+            symbol.is_reassigned().hash(&mut hasher);
+            symbol.is_parameter().hash(&mut hasher);
+        }
+        self.members.iter().len().hash(&mut hasher);
+        for member in self.members.iter() {
+            member.expression().as_ref().hash(&mut hasher);
+            member.is_bound().hash(&mut hasher);
+            member.is_declared().hash(&mut hasher);
+            member.is_instance_attribute().hash(&mut hasher);
+        }
+        hasher.finish()
+    }
+
     /// Iterate over the "root" expressions of the place (e.g. `x.y.z`, `x.y`, `x` for `x.y.z[0]`).
     ///
     /// Note, this iterator may skip some parents if they are not defined in the current scope.
