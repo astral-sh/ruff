@@ -63,7 +63,7 @@ use crate::types::{
 };
 use crate::{Db, FxIndexSet};
 
-use builder::TypeInferenceBuilder;
+use builder::{DeferredExpressionState, TypeInferenceBuilder};
 pub(super) use comparisons::UnsupportedComparisonError;
 use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::expression::Expression;
@@ -76,6 +76,13 @@ mod builder;
 mod comparisons;
 #[cfg(test)]
 mod tests;
+
+/// The place-load metadata produced alongside an expression's type when recording is enabled.
+#[derive(Debug, Clone, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+struct PlaceLoadMetadata {
+    range: TextRange,
+    deferred_state: DeferredExpressionState,
+}
 
 bitflags::bitflags! {
     /// Metadata for expressions inferred as type expressions.
@@ -255,6 +262,7 @@ pub(crate) fn function_known_decorator_flags<'db>(
 /// function-definition inference.
 #[derive(Debug, Eq, PartialEq, Default, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct FunctionDecoratorInference<'db> {
+    place_load_metadata: Option<Box<FrozenMap<ExpressionNodeKey, PlaceLoadMetadata>>>,
     expression_types: FrozenMap<ExpressionNodeKey, Type<'db>>,
     bindings: Box<[(Definition<'db>, Type<'db>)]>,
     called_functions: Box<[FunctionType<'db>]>,
@@ -929,6 +937,8 @@ pub(crate) struct ScopeInference<'db> {
 
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, Default, salsa::SalsaValue)]
 struct ScopeInferenceExtra<'db> {
+    /// Place-load metadata retained only for files that opted into recording.
+    place_load_metadata: Option<Box<FrozenMap<ExpressionNodeKey, PlaceLoadMetadata>>>,
     /// String annotations found in this region
     string_annotations: FrozenSet<ExpressionNodeKey>,
 
@@ -1313,6 +1323,9 @@ impl<'db> DefinitionTypes<'db> {
 /// `Other` stores uncommon combinations that require multiple fields.
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 enum DefinitionInferenceExtra<'db> {
+    /// Place-load metadata is the only extra data for some definitions.
+    PlaceLoadMetadata(FrozenMap<ExpressionNodeKey, PlaceLoadMetadata>),
+
     /// Type qualifiers are the only extra data for most annotated definitions.
     Qualifiers(FrozenMap<ExpressionNodeKey, TypeQualifiers>),
 
@@ -1348,6 +1361,9 @@ struct OtherDefinitionInferenceExtra<'db> {
     /// Condition truthiness retained for checks of enclosing conditions containing walrus expressions.
     /// See [`ExpressionInferenceExtra::comparison_truthiness`] for the distinction from value types.
     comparison_truthiness: FrozenMap<ExpressionNodeKey, Truthiness>,
+
+    /// Place-load metadata retained only for files that opted into recording.
+    place_load_metadata: Option<Box<FrozenMap<ExpressionNodeKey, PlaceLoadMetadata>>>,
 
     /// String annotations found in this region
     string_annotations: FrozenSet<ExpressionNodeKey>,
@@ -1391,6 +1407,10 @@ struct OtherDefinitionInferenceExtra<'db> {
 impl<'db> DefinitionInferenceExtra<'db> {
     fn into_other(self) -> OtherDefinitionInferenceExtra<'db> {
         match self {
+            Self::PlaceLoadMetadata(place_load_metadata) => OtherDefinitionInferenceExtra {
+                place_load_metadata: Some(Box::new(place_load_metadata)),
+                ..OtherDefinitionInferenceExtra::default()
+            },
             Self::Qualifiers(qualifiers) => OtherDefinitionInferenceExtra {
                 qualifiers,
                 ..OtherDefinitionInferenceExtra::default()
@@ -1846,6 +1866,8 @@ pub(crate) struct ExpressionInference<'db> {
 /// Extra data that only exists for few inferred expression regions.
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, Default, salsa::SalsaValue)]
 struct ExpressionInferenceExtra<'db> {
+    /// Place-load metadata retained only for files that opted into recording.
+    place_load_metadata: Option<Box<FrozenMap<ExpressionNodeKey, PlaceLoadMetadata>>>,
     /// String annotations found in this region
     string_annotations: FrozenSet<ExpressionNodeKey>,
 
@@ -2092,6 +2114,8 @@ struct StatementInferenceInnerExtra<'db> {
     /// See [`ExpressionInferenceExtra::comparison_truthiness`] for the distinction from value types.
     comparison_truthiness: FrozenMap<ExpressionNodeKey, Truthiness>,
 
+    /// Place-load metadata retained only for files that opted into recording.
+    place_load_metadata: Option<Box<FrozenMap<ExpressionNodeKey, PlaceLoadMetadata>>>,
     /// String annotations found in this region
     string_annotations: FrozenSet<ExpressionNodeKey>,
 
