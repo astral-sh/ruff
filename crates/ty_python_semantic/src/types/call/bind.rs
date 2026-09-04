@@ -79,10 +79,10 @@ use crate::types::visitor::{
 use crate::types::{
     BindingContext, BoundTypeVarInstance, CallableType, CallableTypes, ClassLiteral, CycleDetector,
     DATACLASS_FLAGS, DataclassFlags, DataclassParams, DynamicType, GenericAlias,
-    InternedConstraintSet, IntersectionBuilder, IntersectionType, KnownBoundMethodType, KnownClass,
-    KnownInstanceType, LiteralValueTypeKind, NominalInstanceType, PropertyInstanceType,
-    TypeContext, TypeIdentity, TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance,
-    UnionAccumulator, UnionBuilder, UnionType, WrapperDescriptorKind, enums, is_property_method, list_members,
+    InternedConstraintSet, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
+    LiteralValueTypeKind, NominalInstanceType, PropertyInstanceType, TypeContext, TypeIdentity,
+    TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance, UnionAccumulator, UnionBuilder,
+    UnionType, WrapperDescriptorKind, enums, is_property_method, list_members,
 };
 use crate::{DisplaySettings, FxOrderSet};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
@@ -3914,14 +3914,15 @@ impl<'db> CallableBinding<'db> {
 
         // Step 1: Check the result of the arity check which is done by `match_parameters`
 
-        // Arity-based overload pruning is provisional when forwarded tuple alternatives differ in
-        // length. Unpacked parameters also require each alternative's fixed elements to be checked
-        // separately, including when there is only one signature.
+        // For overloaded calls with expandable `*args`, any arity-based overload pruning is only
+        // provisional. If we have an arity-2 overload and an arity-3 overload, and the call has
+        // `*arg` where `arg` is a union of a 2-tuple and a 3-tuple, we shouldn't eliminate any
+        // overload for arity reasons before trying argument expansion.
         let argument_expansions = call_arguments.expansions(db, env);
         let (should_retry_after_variadic_expansion, overloads_for_expansion) = if self
-            .should_retry_after_variadic_expansion(&argument_expansions)
+            .should_retry_after_variadic_expansion(db, env, call_arguments.as_ref(), &argument_expansions)
         {
-            // Retry every candidate against each forwarded tuple alternative.
+            // We will retry all overloads after argument expansion.
             (true, (0..self.overloads.len()).collect())
         } else {
             match self.matching_overload_index() {
@@ -3998,15 +3999,7 @@ impl<'db> CallableBinding<'db> {
         // assigned to any of the overloads.
         for (argument_index, call_argument) in call_arguments.iter().enumerate() {
             let argument = call_argument.kind();
-            if should_retry_after_variadic_expansion
-                && self.overloads.iter().any(|overload| {
-                    overload
-                        .signature
-                        .parameters()
-                        .variadic()
-                        .is_some_and(|(_, parameter)| parameter.has_starred_annotation())
-                })
-            {
+            if should_retry_after_variadic_expansion && self.has_concrete_unpacked_variadic(db) {
                 // A fixed argument can move between tuple elements as forwarded lengths vary.
                 break;
             }
@@ -4085,9 +4078,8 @@ impl<'db> CallableBinding<'db> {
                         failed_variadic_expansion_snapshot.unwrap_or(post_evaluation_snapshot),
                     );
                     if self.overloads.len() > 1 {
-                        self.overload_call_result = Some(
-                            OverloadCallResult::ArgumentTypeExpansionLimitReached(index),
-                        );
+                        self.overload_call_result =
+                            Some(OverloadCallResult::ArgumentTypeExpansionLimitReached(index));
                     }
                     return;
                 }
@@ -4135,7 +4127,6 @@ impl<'db> CallableBinding<'db> {
                     !self.overloads[*index].has_errors_affecting_overload_resolution()
                 });
 
-                let mut is_ambiguous = false;
                 let return_type = match self.matching_overload_index() {
                     MatchingOverloadIndex::None => None,
                     MatchingOverloadIndex::Single(index) => {
@@ -4308,7 +4299,7 @@ impl<'db> CallableBinding<'db> {
         env: &ProgramEnvironment<'db>,
         call_arguments: &CallArguments<'_, 'db>,
     ) -> SmallVec<[usize; 1]> {
-        if self.should_retry_after_variadic_expansion(&call_arguments.expansions(db, env)) {
+        if self.should_retry_after_variadic_expansion(db, env, call_arguments, &call_arguments.expansions(db, env)) {
             (0..self.overloads.len()).collect()
         } else {
             self.matching_overloads().map(|(index, _)| index).collect()
@@ -4327,15 +4318,14 @@ impl<'db> CallableBinding<'db> {
     /// ```
     fn should_retry_after_variadic_expansion(
         &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        call_arguments: &CallArguments<'_, 'db>,
         expansions: &CallArgumentExpansions<'_, '_, 'db>,
     ) -> bool {
-        (self.overloads.len() > 1 && self.matching_overloads().count() < self.overloads.len())
-            && call_arguments.iter().any(|(argument, argument_types)| {
-                matches!(argument, Argument::Variadic)
-                    && argument_types
-                        .get_default()
-                        .is_some_and(|argument_type| is_expandable_type(db, env, argument_type))
-            })
+(self.overloads.len() > 1
+            && self.matching_overloads().count() < self.overloads.len()
+            && expansions.has_expandable_variadic())
             || self.has_concrete_unpacked_variadic(db)
                 && Self::has_expandable_variadic_shape(db, env, call_arguments)
     }
@@ -4348,33 +4338,26 @@ impl<'db> CallableBinding<'db> {
         env: &ProgramEnvironment<'db>,
         call_arguments: &CallArguments<'_, 'db>,
     ) -> bool {
-        call_arguments.iter().any(|(argument, argument_types)| {
-            matches!(argument, Argument::Variadic)
-                && argument_types.get_default().is_some_and(|ty| {
-                    is_expandable_type(db, env, ty) && ty.iterate(db, env).len().is_variable()
-                })
+        let expansions = call_arguments.expansions(db, env);
+        call_arguments.iter().enumerate().any(|(index, argument)| {
+            matches!(argument, CallArgument::Variadic(variadic)
+                if expansions.argument_alternatives(index).is_some() &&
+                    variadic.sequence(db, env).is_some_and(|sequence| sequence.len().is_variable()))
         })
     }
 
     fn has_concrete_unpacked_variadic(&self, db: &'db dyn Db) -> bool {
-        self.overloads.iter().any(|overload| {
-            overload
-                .signature
-                .parameters()
-                .variadic()
-                .is_some_and(|(_, parameter)| {
-                    parameter.has_starred_annotation()
-                        && parameter
-                            .annotated_type()
-                            .exact_tuple_instance_spec(db)
-                            .is_some_and(|tuple| match tuple.as_ref() {
-                                TupleSpec::Fixed(_) => true,
-                                TupleSpec::Variable(variable) => {
-                                    variable.variable().typevartuple().is_none()
-                                }
-                            })
-                })
-        })
+        self.overloads
+            .iter()
+            .filter_map(|overload| overload.signature.parameters().variadic())
+            .filter(|(_, parameter)| parameter.has_starred_annotation())
+            .filter_map(|(_, parameter)| parameter.annotated_type().exact_tuple_instance_spec(db))
+            .any(|tuple| {
+                !matches!(
+                    tuple.as_ref(),
+                    TupleSpec::Variable(variable) if variable.variable().typevartuple().is_some()
+                )
+            })
     }
 
     /// Filter overloads based on variadic argument to variadic parameter match.
@@ -5711,7 +5694,11 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
 
         // Fixed tuple alternatives retain a definite minimum even when merging their union makes
         // the forwarded argument appear variable or expansion stops before reaching every branch.
-        let minimum_finite_argument_count = argument_length.is_variable().then(|| {
+        let minimum_argument_count = if !argument_length.is_variable() {
+            Some(argument_count)
+        } else if has_typevartuple {
+            None
+        } else {
             self.argument_matches.iter().enumerate().try_fold(
                 0usize,
                 |minimum, (argument_index, matches)| {
@@ -5743,21 +5730,18 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                             .elements(db)
                             .iter()
                             .try_fold(usize::MAX, |minimum, element| {
-                                let spec = element
-                                    .exact_tuple_instance_spec(db)
-                                    .filter(|spec| !spec.len().is_variable())?;
-                                Some(minimum.min(spec.len().minimum()))
+                                let length = element
+                                    .exact_tuple_instance_spec(db)?
+                                    .len()
+                                    .into_fixed_length()?;
+                                Some(minimum.min(length))
                             })?;
                     let matched_prefix = matches.parameters.len() - matched_count;
                     Some(minimum + union_minimum.saturating_sub(matched_prefix))
                 },
             )
-        });
-        if (!argument_length.is_variable() && argument_count < tuple.len().minimum())
-            || minimum_finite_argument_count
-                .flatten()
-                .is_some_and(|minimum| minimum < tuple.len().minimum())
-        {
+        };
+        if minimum_argument_count.is_some_and(|minimum| minimum < tuple.len().minimum()) {
             missing.push(ParameterContext::new(parameter, parameter_index, false));
             // TODO: Check matched tuple elements even when required elements are missing.
             return;
@@ -5780,33 +5764,14 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         };
         let variable_type = expected.variable_element_type(db);
         let mut expected_types = expected.iter_element_types(db);
-        let fixed_count = matched_arguments()
-            .filter(|(argument_index, position, match_count)| {
-                !is_variable_match(*argument_index, *position, *match_count)
-            })
-            .count();
-        let mut fixed_before = 0;
-        let matched_parameters =
-            self.argument_matches
-                .iter_mut()
-                .enumerate()
-                .flat_map(|(argument_index, argument)| {
-                    let match_count = argument.parameters.len();
-                    argument
-                        .parameters
-                        .iter_mut()
-                        .enumerate()
-                        .filter(move |(_, matched)| matched.index == parameter_index)
-                        .map(move |(position, matched)| {
-                            (argument_index, position, match_count, matched)
-                        })
-                });
-        for (position, (argument_index, match_position, match_count, matched)) in
-            matched_parameters.enumerate()
+        for (position, matched) in self
+            .argument_matches
+            .iter_mut()
+            .flat_map(|argument| argument.parameters.iter_mut())
+            .filter(|matched| matched.index == parameter_index)
+            .enumerate()
         {
-            let is_variable = is_variable_match(argument_index, match_position, match_count);
-            let fixed_after = fixed_count - fixed_before - usize::from(!is_variable);
-            let expected_type = if first_variable
+            matched.expected_type = if first_variable
                 .zip(last_variable)
                 .is_some_and(|(first, last)| position > first && position <= last)
             {
@@ -5814,28 +5779,6 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
             } else {
                 expected_types.next()
             };
-            matched.expected_type = expected_type.map(|expected_type| {
-                if argument_length.is_variable() {
-                    Self::unpacked_expected_type(
-                        db,
-                        env,
-                        &tuple,
-                        (fixed_before, fixed_after),
-                        (
-                            is_variable || first_variable.is_some_and(|first| first < position),
-                            is_variable || last_variable.is_some_and(|last| last > position),
-                        ),
-                        (
-                            first_gradual.is_some_and(|first| first <= position),
-                            last_gradual.is_some_and(|last| last >= position),
-                        ),
-                        expected_type,
-                    )
-                } else {
-                    expected_type
-                }
-            });
-            fixed_before += usize::from(!is_variable);
         }
     }
 
@@ -8932,86 +8875,6 @@ impl<'db> Binding<'db> {
         // bounds/constraints. We should reconcile the invariants expected by the constraint solver
         // with those actually enforced by our typevar representation.
         let constraints = &ConstraintSetBuilder::new();
-        self.check_types_without_materialization(
-            db,
-            env,
-            constraints,
-            arguments,
-            call_expression_tcx,
-        );
-        if self.errors.is_empty() {
-            return;
-        }
-
-        let Some(materializations) =
-            arguments.materialize_gradual_tuples(db, env, self.signature.parameters())
-        else {
-            return;
-        };
-
-        // Gradual tuples may choose a length that aligns the fixed arguments with the parameter
-        // tuple. Check complete argument lists so those choices preserve argument order and share
-        // the usual generic inference.
-        let mut matched = false;
-        let mut complete = true;
-        let mut inferences = Vec::new();
-        let mut return_types = UnionBuilder::new(db, env);
-        for materialized in materializations {
-            let Ok(materialized) = materialized else {
-                complete = false;
-                break;
-            };
-            let mut candidate = self.clone();
-            candidate.reset(db);
-            candidate.match_parameters(db, env, &materialized);
-            if !candidate.errors.is_empty() {
-                continue;
-            }
-            candidate.check_types_without_materialization(
-                db,
-                env,
-                constraints,
-                &materialized,
-                call_expression_tcx,
-            );
-            if candidate.errors.is_empty() {
-                matched = true;
-                self.inferable_typevars = candidate.inferable_typevars;
-                return_types.add_in_place(candidate.return_ty);
-                if let Some(inference) = candidate.inference {
-                    inferences.push(inference);
-                } else {
-                    // A nongeneric signature has the same return type for every placement.
-                    break;
-                }
-            }
-        }
-        if matched {
-            // Keep the original argument matches and parameter types: they describe every
-            // possible placement, whereas each retry describes only one fixed-length choice.
-            self.errors.clear();
-            self.return_ty = return_types.build();
-            let mut inferences = inferences.into_iter();
-            if let Some(first) = inferences.next() {
-                let inference = first.combine(db, env, inferences, complete);
-                if !complete {
-                    self.return_ty = self
-                        .initial_return_type(db)
-                        .apply_specialization(db, inference.merged_specialization(db));
-                }
-                self.inference = Some(inference);
-            }
-        }
-    }
-
-    fn check_types_without_materialization(
-        &mut self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        constraints: &ConstraintSetBuilder<'db>,
-        arguments: &CallArguments<'_, 'db>,
-        call_expression_tcx: TypeContext<'db>,
-    ) {
         let parameters = self.signature.parameters();
 
         if parameters.is_top() {
