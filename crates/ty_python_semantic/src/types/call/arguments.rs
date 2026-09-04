@@ -8,6 +8,7 @@ use rustc_hash::FxHashMap;
 
 use crate::ProgramEnvironment;
 use crate::types::enums::enum_metadata;
+use crate::types::signatures::Parameters;
 use crate::types::tuple::{Tuple, TupleLength, TupleSpec, TupleType};
 use crate::types::typed_dict::extract_unpacked_typed_dict_keys_from_value_type;
 use crate::types::{KnownClass, Type, TypeContext, expand_type};
@@ -451,8 +452,17 @@ impl<'a, 'db> CallArguments<'a, 'db> {
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        maximum_length: usize,
-    ) -> impl Iterator<Item = Self> {
+        parameters: &Parameters<'db>,
+    ) -> Option<impl Iterator<Item = Self> + use<'a, 'db>> {
+        let (_, parameter) = parameters.variadic()?;
+        if !parameter.has_starred_annotation() {
+            return None;
+        }
+        let parameter_tuple = parameter.annotated_type().exact_tuple_instance_spec(db)?;
+        if matches!(parameter_tuple.as_ref(), TupleSpec::Variable(variable) if variable.variable().typevartuple().is_some())
+        {
+            return None;
+        }
         let gradual = self
             .items
             .iter()
@@ -475,25 +485,69 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                 Some((index, tuple))
             })
             .collect::<Vec<_>>();
-        let has_gradual = !gradual.is_empty();
+        if gradual.is_empty() {
+            return None;
+        }
+
+        let mut fixed_arguments = 0;
+        let mut has_variable_arguments = false;
+        for (index, item) in self.items.iter().enumerate() {
+            match item.argument {
+                Argument::Positional | Argument::Synthetic => fixed_arguments += 1,
+                Argument::Variadic => {
+                    let tuple = item.types.get_default()?.try_iterate(db, env).ok()?;
+                    fixed_arguments += tuple.len().minimum();
+                    has_variable_arguments |= tuple.len().is_variable()
+                        && !gradual
+                            .iter()
+                            .any(|(gradual_index, _)| *gradual_index == index);
+                }
+                Argument::Keyword(_) | Argument::Keywords => {}
+            }
+        }
+
+        let fixed_parameters = parameters.positional().count() + parameter_tuple.len().minimum();
+        // A nonempty unpacked tuple requires all preceding positional parameters to be filled.
+        // Concrete variable arguments can supply the missing elements without materialization.
+        let minimum_length = if has_variable_arguments || parameter_tuple.len().minimum() == 0 {
+            0
+        } else {
+            fixed_parameters.saturating_sub(fixed_arguments)
+        };
+        // No gradual segment needs to supply elements for a homogeneous parameter portion.
+        // For fixed parameters, exclude lengths that cannot fit before spending the retry budget.
+        let maximum_length = if parameter_tuple.len().is_variable() {
+            fixed_parameters
+        } else {
+            fixed_parameters.saturating_sub(fixed_arguments)
+        };
+        let gradual_count = gradual.len();
         let arguments = self.clone();
         let env = env.clone();
 
-        (0..gradual.len())
-            .map(move |_| 0..=maximum_length)
-            .multi_cartesian_product()
-            .take(if has_gradual { MAX_TOTAL_EXPANSION } else { 0 })
-            .filter_map(move |lengths| {
-                let mut materialized = arguments.clone();
-                for ((index, tuple), length) in gradual.iter().zip(lengths) {
-                    let fixed = tuple
-                        .resize(db, &env, TupleLength::Fixed(tuple.len().minimum() + length))
-                        .ok()?;
-                    materialized.items[*index].types =
-                        CallArgumentTypes::new(Some(Type::tuple(TupleType::new(db, &env, &fixed))));
-                }
-                Some(materialized)
-            })
+        // Distribute only the required total lengths among the gradual segments, rather than
+        // independently expanding every segment to the full parameter count.
+        Some(
+            (minimum_length..=maximum_length)
+                .flat_map(move |length| (0..gradual_count).combinations_with_replacement(length))
+                .take(MAX_TOTAL_EXPANSION)
+                .filter_map(move |positions| {
+                    let mut lengths = vec![0; gradual_count];
+                    for position in positions {
+                        lengths[position] += 1;
+                    }
+                    let mut materialized = arguments.clone();
+                    for ((index, tuple), length) in gradual.iter().zip(lengths) {
+                        let fixed = tuple
+                            .resize(db, &env, TupleLength::Fixed(tuple.len().minimum() + length))
+                            .ok()?;
+                        materialized.items[*index].types = CallArgumentTypes::new(Some(
+                            Type::tuple(TupleType::new(db, &env, &fixed)),
+                        ));
+                    }
+                    Some(materialized)
+                }),
+        )
     }
 
     pub(super) fn display<'env>(

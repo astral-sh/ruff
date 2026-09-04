@@ -1262,6 +1262,21 @@ def forward_generic(before: tuple[Any, ...], after: tuple[Any, ...], value: list
     reveal_type(generic(*before, value, *after))  # revealed: int
 ```
 
+Several gradual arguments can be empty while the first and last supply the required endpoints.
+
+```py
+def forward_many(
+    before: tuple[Any, ...],
+    a: tuple[Any, ...],
+    b: tuple[Any, ...],
+    c: tuple[Any, ...],
+    after: tuple[Any, ...],
+) -> None:
+    fixed(*before, 1, *a, *b, *c, *after)
+    fixed(*before, *a, *b, *c, 1, *after)
+    fixed(*before, None, *a, *b, *c, *after)  # error: [invalid-argument-type]
+```
+
 ### Mixed argument and parameter containing variadic
 
 ```toml

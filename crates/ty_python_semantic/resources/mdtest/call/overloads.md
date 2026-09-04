@@ -1409,6 +1409,22 @@ reveal_type(variadic(1))  # revealed: int
 reveal_type(variadic("first", "second"))  # revealed: str
 ```
 
+Multiple whole-type matches are resolved before expansion can reopen narrower overloads.
+
+```py
+@overload
+def multiple(value: int, /, *args: object) -> int: ...
+@overload
+def multiple(value: str, /, *args: object) -> str: ...
+@overload
+def multiple(*args: *tuple[int | str, *tuple[object, ...]]) -> object: ...
+@overload
+def multiple(*args: *tuple[object, *tuple[object, ...]]) -> object: ...
+def multiple(*args: object) -> object: ...
+def forward_multiple(values: tuple[int] | tuple[str, str]) -> None:
+    reveal_type(multiple(*values))  # revealed: object
+```
+
 ### Retry from parameter matching with type context
 
 When retrying, arguments are inferred with the correct type context:

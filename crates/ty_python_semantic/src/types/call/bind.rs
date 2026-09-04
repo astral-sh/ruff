@@ -3851,67 +3851,20 @@ impl<'db> CallableBinding<'db> {
         );
 
         // A merged forwarded tuple cannot establish that every concrete alternative is valid.
-        if !should_retry_after_variadic_expansion {
-            match self.matching_overload_index() {
-                MatchingOverloadIndex::None => {
-                    // If all overloads result in errors, proceed to step 3.
-                }
-                MatchingOverloadIndex::Single(_) => {
-                    // If only one overload evaluates without error, it is the winning match.
-                    return;
-                }
-                MatchingOverloadIndex::Multiple(indexes) => {
-                    // If two or more candidate overloads remain, proceed to step 4.
-                    self.filter_overloads_containing_variadic(&indexes);
-
-                    tracing::trace!(
-                        target: "ty_python_semantic::types::call::bind",
-                        matching_overload_index = ?self.matching_overload_index(),
-                        "after step 4",
-                    );
-
-                    match self.matching_overload_index() {
-                        MatchingOverloadIndex::None => {
-                            // This shouldn't be possible because step 4 can only filter out overloads
-                            // when there _is_ a matching variadic argument.
-                            tracing::debug!("All overloads have been filtered out in step 4");
-                            return;
-                        }
-                        MatchingOverloadIndex::Single(_) => {
-                            // If only one candidate overload remains, it is the winning match.
-                            return;
-                        }
-                        MatchingOverloadIndex::Multiple(indexes) => {
-                            // If two or more candidate overloads remain, proceed to step 5.
-                            self.filter_overloads_using_any_or_unknown(
-                                db,
-                                env,
-                                constraints,
-                                call_arguments.as_ref(),
-                                &indexes,
-                            );
-
-                            tracing::trace!(
-                                target: "ty_python_semantic::types::call::bind",
-                                matching_overload_index = ?self.matching_overload_index(),
-                                "after step 5",
-                            );
-                        }
-                    }
-
-                    // This shouldn't lead to argument type expansion.
-                    return;
-                }
-            }
+        if !should_retry_after_variadic_expansion
+            && self.finish_overload_selection(db, env, constraints, call_arguments.as_ref())
+        {
+            return;
         }
 
-        // A sole whole-type match remains the winner if it accepts every forwarded shape.
-        // Expanding to validate that match must not prefer narrower overloads instead.
+        // Whole-type matches remain candidates if they accept every forwarded shape.
+        // Expanding to validate those matches must not prefer narrower overloads instead.
         // If provisional arity checking discarded an overload, however, expansion can revive
         // that overload and must select the winner afresh.
-        let whole_type_match = match self.matching_overload_index() {
-            MatchingOverloadIndex::Single(index) if all_overloads_survived_arity => Some(index),
-            _ => None,
+        let whole_type_matches = if all_overloads_survived_arity {
+            self.matching_overloads().map(|(index, _)| index).collect()
+        } else {
+            Vec::new()
         };
 
         // Step 3: Perform "argument type expansion". Reference:
@@ -4021,7 +3974,7 @@ impl<'db> CallableBinding<'db> {
             // The return types of each of the expanded argument lists that evaluated successfully.
             let mut return_types = Vec::new();
             let mut selected_overloads = SmallVec::<[usize; 2]>::new();
-            let mut whole_type_match_is_valid = whole_type_match.is_some();
+            let mut valid_whole_type_matches = whole_type_matches.clone();
 
             for expanded_arguments in &expanded_argument_lists {
                 // The spec mentions that each expanded argument list should be re-evaluated from
@@ -4060,9 +4013,9 @@ impl<'db> CallableBinding<'db> {
                     "after step 2",
                 );
 
-                whole_type_match_is_valid &= self
-                    .matching_overloads()
-                    .any(|(index, _)| Some(index) == whole_type_match);
+                valid_whole_type_matches.retain(|index| {
+                    !self.overloads[*index].has_errors_affecting_overload_resolution()
+                });
 
                 let mut is_ambiguous = false;
                 let return_type = match self.matching_overload_index() {
@@ -4154,8 +4107,14 @@ impl<'db> CallableBinding<'db> {
                 {
                     continue;
                 }
-                if whole_type_match_is_valid {
+                if !valid_whole_type_matches.is_empty() {
                     snapshotter.restore(self, post_evaluation_snapshot);
+                    for (index, overload) in self.matching_overloads_mut() {
+                        if !valid_whole_type_matches.contains(&index) {
+                            overload.mark_as_unmatched_overload();
+                        }
+                    }
+                    self.finish_overload_selection(db, env, constraints, call_arguments.as_ref());
                     return;
                 }
                 // Restore the bindings state to the one that merges the bindings state evaluating
@@ -4187,6 +4146,51 @@ impl<'db> CallableBinding<'db> {
             self,
             failed_variadic_expansion_snapshot.unwrap_or(post_evaluation_snapshot),
         );
+    }
+
+    /// Finish overload selection after type checking, returning whether expansion is unnecessary.
+    fn finish_overload_selection(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        constraints: &ConstraintSetBuilder<'db>,
+        arguments: &CallArguments<'_, 'db>,
+    ) -> bool {
+        let indexes = match self.matching_overload_index() {
+            MatchingOverloadIndex::None => return false,
+            MatchingOverloadIndex::Single(_) => return true,
+            MatchingOverloadIndex::Multiple(indexes) => indexes,
+        };
+        // If two or more candidate overloads remain, proceed to step 4.
+        self.filter_overloads_containing_variadic(&indexes);
+        tracing::trace!(
+            target: "ty_python_semantic::types::call::bind",
+            matching_overload_index = ?self.matching_overload_index(),
+            "after step 4",
+        );
+
+        match self.matching_overload_index() {
+            MatchingOverloadIndex::None => {
+                // Step 4 can only filter overloads when there is a matching variadic argument.
+                tracing::debug!("All overloads have been filtered out in step 4");
+            }
+            MatchingOverloadIndex::Single(_) => {}
+            MatchingOverloadIndex::Multiple(indexes) => {
+                self.filter_overloads_using_any_or_unknown(
+                    db,
+                    env,
+                    constraints,
+                    arguments,
+                    &indexes,
+                );
+                tracing::trace!(
+                    target: "ty_python_semantic::types::call::bind",
+                    matching_overload_index = ?self.matching_overload_index(),
+                    "after step 5",
+                );
+            }
+        }
+        true
     }
 
     /// Returns the set of overload candidates that may contribute to the call evaluation.
@@ -8383,27 +8387,16 @@ impl<'db> Binding<'db> {
             return;
         }
 
-        let parameters = self.signature.parameters();
-        let Some((_, parameter)) = parameters.variadic() else {
+        let Some(materializations) =
+            arguments.materialize_gradual_tuples(db, env, self.signature.parameters())
+        else {
             return;
         };
-        if !parameter.has_starred_annotation() {
-            return;
-        }
-        let Some(tuple) = parameter.annotated_type().exact_tuple_instance_spec(db) else {
-            return;
-        };
-        if matches!(tuple.as_ref(), TupleSpec::Variable(variable) if variable.variable().typevartuple().is_some())
-        {
-            return;
-        }
 
         // Gradual tuples may choose a length that aligns the fixed arguments with the parameter
         // tuple. Check complete argument lists so those choices preserve argument order and share
-        // the usual generic inference. No gradual segment needs more elements than the target's
-        // fixed positions; any additional elements could only occupy its homogeneous portion.
-        let maximum_length = parameters.positional().count() + tuple.len().minimum();
-        for materialized in arguments.materialize_gradual_tuples(db, env, maximum_length) {
+        // the usual generic inference.
+        for materialized in materializations {
             let mut candidate = self.clone();
             candidate.reset(db);
             candidate.match_parameters(db, env, &materialized);
