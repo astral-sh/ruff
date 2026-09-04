@@ -5632,109 +5632,6 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         }
     }
 
-    /// Returns the intersection of tuple positions a forwarded argument might occupy.
-    ///
-    /// A fixed argument can shift into a required suffix when a following forwarded tuple is
-    /// empty, so checking only its position in the merged argument list is insufficient:
-    ///
-    /// ```python
-    /// def callback(*args: *tuple[*tuple[object, ...], str]) -> None: ...
-    /// def forward(values: tuple[str, ...]) -> None:
-    ///     callback(1, *values)
-    /// ```
-    fn unpacked_expected_type(
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        tuple: &TupleSpec<'db>,
-        fixed_positions: (usize, usize),
-        variable_positions: (bool, bool),
-        gradual_positions: (bool, bool),
-        fallback: Type<'db>,
-    ) -> Type<'db> {
-        let (fixed_before, fixed_after) = fixed_positions;
-        let (variable_before, variable_after) = variable_positions;
-        let (gradual_before, gradual_after) = gradual_positions;
-        let mut candidates: SmallVec<[Type<'db>; 4]> = SmallVec::new();
-        let mut add_candidate = |candidate| {
-            if !candidates.contains(&candidate) {
-                candidates.push(candidate);
-            }
-        };
-
-        match tuple {
-            TupleSpec::Fixed(expected) => {
-                let elements = expected.all_elements();
-                if !variable_before {
-                    if let Some(candidate) = elements.get(fixed_before) {
-                        add_candidate(*candidate);
-                    }
-                } else if !variable_after {
-                    if let Some(candidate) = elements
-                        .len()
-                        .checked_sub(fixed_after + 1)
-                        .and_then(|index| elements.get(index))
-                    {
-                        add_candidate(*candidate);
-                    }
-                } else {
-                    let end = elements.len().saturating_sub(fixed_after);
-                    for candidate in elements.get(fixed_before..end).unwrap_or_default() {
-                        add_candidate(*candidate);
-                    }
-                }
-            }
-            TupleSpec::Variable(expected) => {
-                let expected_prefix = expected.prefix_elements();
-                let expected_suffix = expected.suffix_elements();
-                let expected_variable = expected.variable().element_type(db);
-                let minimum_arity = expected_prefix.len() + expected_suffix.len();
-                if !variable_before && let Some(candidate) = expected_prefix.get(fixed_before) {
-                    add_candidate(*candidate);
-                } else if !variable_after && fixed_after < expected_suffix.len() {
-                    add_candidate(expected_suffix[expected_suffix.len() - fixed_after - 1]);
-                } else {
-                    add_candidate(expected_variable);
-                    // A gradual segment can supply the required endpoint, so fixed arguments
-                    // across it need not match that endpoint: `callback(1, *any_values)` can
-                    // match `*tuple[*tuple[object, ...], str]` by materializing a `str` tail.
-                    if variable_before && !gradual_before {
-                        for (index, candidate) in
-                            expected_prefix.iter().enumerate().skip(fixed_before)
-                        {
-                            if variable_after || index + fixed_after + 1 >= minimum_arity {
-                                add_candidate(*candidate);
-                            }
-                        }
-                    }
-                    if variable_after && !gradual_after {
-                        for (index, candidate) in expected_suffix
-                            .iter()
-                            .enumerate()
-                            .take(expected_suffix.len().saturating_sub(fixed_after))
-                        {
-                            let distance = expected_suffix.len() - index - 1;
-                            if variable_before || fixed_before + distance + 1 >= minimum_arity {
-                                add_candidate(*candidate);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        match candidates.as_slice() {
-            [] => fallback,
-            [candidate] => *candidate,
-            _ => {
-                let mut intersection = IntersectionBuilder::new(db, env);
-                for candidate in candidates {
-                    intersection.add_positive_in_place(candidate);
-                }
-                intersection.build()
-            }
-        }
-    }
-
     /// Checks the positional requirements encoded inside an unpacked variadic annotation.
     ///
     /// Unlike ordinary `*args`, an unpacked tuple can require arguments and prescribe a different
@@ -5765,12 +5662,16 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
             return;
         };
 
+        // Open type variable packs do not have a finite-union minimum to enforce.
+        let has_typevartuple = matches!(
+            tuple.as_ref(),
+            TupleSpec::Variable(variable) if variable.variable().typevartuple().is_some()
+        );
+
         let maximum = tuple.len().maximum();
         let mut argument_count = 0;
         let mut first_variable = None;
         let mut last_variable = None;
-        let mut first_gradual = None;
-        let mut last_gradual = None;
         let mut first_excess_argument_index = None;
 
         for (argument_index, argument) in self.argument_matches.iter().enumerate() {
@@ -5796,16 +5697,6 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                         first_variable = Some(argument_count);
                     }
                     last_variable = Some(argument_count);
-                    if matched.argument_type.is_some_and(|ty| {
-                        VariableSegment::Homogeneous(ty)
-                            .gradual_element_type(db, env)
-                            .is_some()
-                    }) {
-                        first_gradual.get_or_insert(argument_count);
-                        last_gradual = Some(argument_count);
-                    }
-                } else {
-                    fixed_count += 1;
                 }
 
                 argument_count += 1;
