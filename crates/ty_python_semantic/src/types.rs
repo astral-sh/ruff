@@ -9209,6 +9209,20 @@ impl<'db> Type<'db> {
                                 )
                         }))
                     }
+                    TypeMapping::ReplaceInferenceVariables(_) => {
+                        Type::TypeAlias(alias.apply_specialization(db, |generic_context| {
+                            alias
+                                .specialization(db)
+                                .unwrap_or_else(|| generic_context.default_specialization(db, None))
+                                .apply_type_mapping_impl(
+                                    db,
+                                    type_mapping,
+                                    &[],
+                                    &ApplyTypeMappingVisitor::new(visitor.env)
+                                        .with_recursion_context(visitor.recursion_context),
+                                )
+                        }))
+                    }
                     _ => {
                         // IMPORTANT: All processing must happen inside a single visitor.visit() call so that if we encounter
                         // this same TypeAlias again (e.g., in `type RecursiveT = int | tuple[RecursiveT, ...]`), the visitor
@@ -9243,6 +9257,7 @@ impl<'db> Type<'db> {
             Type::LiteralValue(_) => match type_mapping {
                 TypeMapping::ApplySpecialization(_)
                 | TypeMapping::ApplySpecializationWithMaterialization { .. }
+                | TypeMapping::ReplaceInferenceVariables(_)
                 | TypeMapping::BindLegacyTypevars(_)
                 | TypeMapping::FreshenBoundTypeVars { .. }
                 | TypeMapping::BindSelf { .. }
@@ -9264,6 +9279,7 @@ impl<'db> Type<'db> {
             Type::Dynamic(_) => match type_mapping {
                 TypeMapping::ApplySpecialization(_)
                 | TypeMapping::ApplySpecializationWithMaterialization { .. }
+                | TypeMapping::ReplaceInferenceVariables(_)
                 | TypeMapping::BindLegacyTypevars(_)
                 | TypeMapping::FreshenBoundTypeVars { .. }
                 | TypeMapping::BindSelf(..)
@@ -10469,6 +10485,8 @@ pub enum TypeMapping<'a, 'db> {
         specialization: ApplySpecialization<'a, 'db>,
         materialization_kind: MaterializationKind,
     },
+    /// Substitutes cyclic inference variables without specializing Python type parameters.
+    ReplaceInferenceVariables(&'a FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>),
     /// Replaces any literal types with their corresponding promoted type form (e.g. `Literal["string"]`
     /// to `str`, or `def _() -> int` to `Callable[[], int]`).
     Promote(PromotionMode, PromotionKind),
@@ -10548,6 +10566,21 @@ impl<'db> TypeMapping<'_, 'db> {
                     GenericContext::from_typevar_instances(db, env, kept)
                 }
             }
+            TypeMapping::ReplaceInferenceVariables(replacements) => {
+                let kept = context.variables(db).filter(|bound_typevar| {
+                    let BindingContext::Inference(_) = bound_typevar.binding_context(db) else {
+                        return true;
+                    };
+                    match replacements.get(&bound_typevar.identity(db)) {
+                        None => true,
+                        Some(Type::TypeVar(mapped_typevar)) => {
+                            mapped_typevar.identity(db) == bound_typevar.identity(db)
+                        }
+                        Some(_) => false,
+                    }
+                });
+                GenericContext::from_typevar_instances(db, env, kept)
+            }
             TypeMapping::Promote(..)
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::Materialize(_)
@@ -10594,6 +10627,7 @@ impl<'db> TypeMapping<'_, 'db> {
             },
             TypeMapping::Promote(mode, kind) => TypeMapping::Promote(mode.flip(), *kind),
             TypeMapping::ApplySpecialization(_)
+            | TypeMapping::ReplaceInferenceVariables(_)
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::FreshenBoundTypeVars { .. }
             | TypeMapping::BindSelf(..)

@@ -1346,6 +1346,15 @@ impl<'db> BoundTypeVarInstance<'db> {
         };
 
         match type_mapping {
+            TypeMapping::ReplaceInferenceVariables(replacements) => {
+                match self.binding_context(db) {
+                    BindingContext::Inference(_) => replacements
+                        .get(&self.identity(db))
+                        .copied()
+                        .unwrap_or(Type::TypeVar(self)),
+                    _ => Type::TypeVar(self),
+                }
+            }
             TypeMapping::ApplySpecialization(specialization) => {
                 mapped_specialization_type(specialization)
                     .unwrap_or_else(|| possibly_apply_to_self(specialization))

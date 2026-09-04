@@ -35,37 +35,33 @@ use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::tuple::{TupleBuilder, TupleLength, TupleType};
 use crate::types::typevar::{BindingContext, BoundTypeVarInstance};
 use crate::types::{
-    ApplySpecialization, GenericContext, KnownClass, MemberLookupKey, MemberLookupPolicy,
-    Specialization, Type, TypeContext, TypeMapping, UnionBuilder, UnionType, any_over_type,
-    any_over_type_including_alias_arguments,
+    KnownClass, MemberLookupKey, MemberLookupPolicy, Specialization, Type, TypeContext,
+    TypeMapping, UnionBuilder, UnionType, any_over_type, any_over_type_including_alias_arguments,
 };
-use crate::{Db, FxIndexMap, ProgramEnvironment};
+use crate::{Db, FxIndexMap, FxOrderMap, ProgramEnvironment};
 
 #[salsa::tracked]
 impl<'db> Type<'db> {
     /// Collect inference variables, including alias arguments, without evaluating lazy attributes.
-    #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
-    fn inference_variable_context(
+    #[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
+    fn inference_variables(
         self,
         db: &'db dyn Db,
         program: Program<'db>,
-    ) -> Option<GenericContext<'db>> {
+    ) -> Box<[BoundTypeVarInstance<'db>]> {
         let env = ProgramEnvironment::from_program(program);
-        let variables = RefCell::new(Vec::new());
+        let variables = RefCell::new(FxOrderMap::default());
         any_over_type_including_alias_arguments(db, &env, self, |ty| {
             if let Type::TypeVar(variable) = ty
                 && matches!(variable.binding_context(db), BindingContext::Inference(_))
             {
-                variables.borrow_mut().push(variable);
+                variables
+                    .borrow_mut()
+                    .insert(variable.identity(db), variable);
             }
             false
         });
-        let variables = variables.into_inner();
-        if variables.is_empty() {
-            None
-        } else {
-            Some(GenericContext::from_typevar_instances(db, &env, variables))
-        }
+        variables.into_inner().into_values().collect()
     }
 }
 
@@ -689,10 +685,7 @@ impl<'db> InferenceOperation<'db> {
             }
             Self::Narrow { value, narrowing } => {
                 // Generic filtering requires the subject's arguments, not an unresolved variable.
-                if value
-                    .inference_variable_context(db, env.program(db))
-                    .is_some()
-                {
+                if !value.inference_variables(db, env.program(db)).is_empty() {
                     return None;
                 }
                 let narrowed = use_def_map(db, narrowing.scope)
@@ -775,10 +768,7 @@ impl InferenceGraph {
         for (index, (_, equation)) in equations.iter().enumerate() {
             let mut dependencies = Vec::new();
             equation.visit_types(db, |ty| {
-                let Some(context) = ty.inference_variable_context(db, env.program(db)) else {
-                    return;
-                };
-                for variable in context.variables(db) {
+                for variable in ty.inference_variables(db, env.program(db)) {
                     if let BindingContext::Inference(variable) = variable.binding_context(db)
                         && let Some(dependency) = indices.get(&variable)
                         && !dependencies.contains(dependency)
@@ -1063,26 +1053,24 @@ impl<'db> SymbolicType<'db> {
 
     fn specialized(self, db: &'db dyn Db, specialization: Specialization<'db>) -> Self {
         let env = ProgramEnvironment::from_program(specialization.generic_context(db).program(db));
-        let context = GenericContext::from_typevar_instances(
-            db,
-            &env,
-            self.equations(db)
-                .iter()
-                .map(|(variable, _)| variable.typevar(db)),
-        );
-        let types: Vec<_> = context
-            .variables(db)
-            .map(|variable| match variable.binding_context(db) {
-                BindingContext::Inference(variable) => {
-                    variable.specialized(db, specialization).ty(db)
-                }
-                _ => Type::TypeVar(variable),
+        let rename: FxHashMap<_, _> = self
+            .equations(db)
+            .iter()
+            .map(|(variable, _)| {
+                (
+                    variable.typevar(db).identity(db),
+                    variable.specialized(db, specialization).ty(db),
+                )
             })
             .collect();
-        let rename = Specialization::new(db, context, types.into_boxed_slice(), None, None);
         let apply = |ty: Type<'db>| {
             ty.apply_optional_owner_specialization_to_member(db, Some(specialization))
-                .apply_specialization(db, rename)
+                .apply_type_mapping(
+                    db,
+                    &env,
+                    &TypeMapping::ReplaceInferenceVariables(&rename),
+                    TypeContext::default(),
+                )
         };
         let mut equations: Vec<_> = self
             .equations(db)
@@ -1462,8 +1450,8 @@ enum OperationBinding {
 
 impl<'db> InferenceSolutions<'_, 'db> {
     fn is_ground(&self, ty: Type<'db>) -> bool {
-        ty.inference_variable_context(self.db, self.env.program(self.db))
-            .is_none()
+        ty.inference_variables(self.db, self.env.program(self.db))
+            .is_empty()
     }
 
     /// Use only complete union alternatives to start an operation whose inputs form a cycle.
@@ -1640,20 +1628,18 @@ impl<'db> InferenceSolutions<'_, 'db> {
     }
 
     fn resolve_type(&mut self, ty: Type<'db>) -> Type<'db> {
-        let Some(context) = ty.inference_variable_context(self.db, self.env.program(self.db))
-        else {
+        let variables = ty.inference_variables(self.db, self.env.program(self.db));
+        if variables.is_empty() {
             return ty;
-        };
-        let types: Vec<_> = context
-            .variables(self.db)
-            .map(|variable| self.resolve_variable(variable))
+        }
+        let replacements: FxHashMap<_, _> = variables
+            .iter()
+            .map(|variable| (variable.identity(self.db), self.resolve_variable(*variable)))
             .collect();
-        let specialization =
-            Specialization::new(self.db, context, types.into_boxed_slice(), None, None);
         ty.apply_type_mapping(
             self.db,
             self.env,
-            &TypeMapping::ApplySpecialization(ApplySpecialization::specialization(specialization)),
+            &TypeMapping::ReplaceInferenceVariables(&replacements),
             TypeContext::default(),
         )
     }
