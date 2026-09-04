@@ -603,6 +603,23 @@ f("", 0)  # error: [invalid-argument-type]
 f(0, b"")  # error: [invalid-argument-type]
 ```
 
+## Recursive sequence unions
+
+A recursive alias can combine sequences of itself with strings, even though strings are also
+sequences. Inferring the alias converges and still rejects non-sequence values.
+
+```py
+from typing import Sequence, Union
+
+Values = Union[Sequence["Values"], str]
+
+def consume(value: Values): ...
+
+consume("value")
+consume(["value"])
+consume(0)  # error: [invalid-argument-type]
+```
+
 ## Self-referential optional aliases
 
 Without a concrete member, a self-referential optional alias reduces to `None`:

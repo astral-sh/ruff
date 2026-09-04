@@ -333,7 +333,7 @@ pub(super) fn infer_union_type<'db>(db: &'db dyn Db, union: DeferredUnionType<'d
     cycle_fn=|db, cycle, previous: &UnionInference<'db>, result: UnionInference<'db>, union: DeferredUnionType<'db>| {
         let env = ProgramEnvironment::from_definition(union.definition(db));
         UnionInference {
-            union_type: result.union_type.recursive_type_normalized(db, &env, cycle),
+            union_type: result.union_type.cycle_normalized(db, &env, previous.union_type, cycle),
             inference: result.inference.cycle_normalized(db, &env, &previous.inference, cycle),
         }
     },
@@ -1752,8 +1752,7 @@ impl<'db> DefinitionInference<'db> {
 /// The represented type and expression metadata for a deferred `Union` or `Optional`.
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 struct UnionInference<'db> {
-    /// Unlike ordinary expression inference, this type does not accumulate previous cycle
-    /// iterations: intermediate recursive expansions are not additional union alternatives.
+    /// The represented type, separate from the union's stable value-expression type.
     union_type: Type<'db>,
 
     /// Retain the ordinary expression-inference history and diagnostics for scope checking.
