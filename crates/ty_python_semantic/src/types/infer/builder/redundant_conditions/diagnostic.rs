@@ -8,31 +8,44 @@ use ruff_db::{
     source::source_text,
 };
 use ruff_diagnostics::{Applicability, Edit, Fix};
-use ruff_python_ast::{self as ast, PythonVersion};
-use ruff_source_file::LineRanges;
-use ruff_text_size::Ranged;
+use ruff_python_ast::{
+    self as ast, PythonVersion,
+    helpers::any_over_expr,
+    token::{TokenKind, Tokens},
+};
+use ruff_python_trivia::indentation_at_offset;
+use ruff_source_file::{LineRanges, UniversalNewlineIterator, find_newline};
+use ruff_text_size::{Ranged, TextSize};
 use ty_module_resolver::{SearchPath, file_to_module};
 use ty_python_core::{
     Truthiness,
+    ast_ids::HasScopedUseId,
     definition::DefinitionKind,
+    place::PlaceExpr,
+    predicate::{Predicate, PredicateNode},
     scope::{NodeWithScopeKind, ScopeKind},
 };
 
 use crate::{
     SemanticModel,
+    importer::ImportRequest,
+    place::{Place, PlaceAndQualifiers},
+    place_load::{PlaceLoadMode, PlaceLoadResolutionStep, resolve_place_load},
     types::{
         KnownClass, LintDiagnosticGuard, LintDiagnosticGuardBuilder, MemberLookupPolicy, Type,
         TypeContext,
         call::bind::CallableDescription,
+        diagnostic::typing_module_for_fix,
         function::KnownFunction,
         infer::{InferenceFlags, TypeInferenceBuilder},
         infer_definition_types, infer_scope_types,
+        narrow::{NarrowingConstraint, infer_narrowing_constraints},
         signatures::CallableSignature,
         tuple::{Tuple, TupleLength},
     },
 };
 
-use super::{RedundantCondition, exemptions::condition_definition_info};
+use super::{ConditionKind, RedundantCondition, exemptions::condition_definition_info};
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
     pub(super) fn report_redundant_condition<'ctx>(
@@ -487,6 +500,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 diagnostic
             }
         };
+
         Some(diagnostic)
     }
 
@@ -729,4 +743,181 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         false
     }
+
+    pub(super) fn annotate_redundant_if_or_elif(
+        &self,
+        condition: &RedundantCondition<'_, 'db>,
+        diagnostic: &mut Diagnostic,
+        if_stmt: &ast::StmtIf,
+    ) {
+        let RedundantCondition {
+            expression: test,
+            value_type: _,
+            is_truthy,
+            kind,
+        } = condition;
+
+        if *is_truthy
+            && *kind == ConditionKind::Boolean
+            && let Some(clause) = if_stmt.elif_else_clauses.last()
+            && clause.test.as_ref() == Some(test)
+            && !diagnostic.has_applicable_fix(Applicability::DisplayOnly)
+            && let Some(fix) = self.add_assert_never_else(clause, test)
+        {
+            diagnostic.help("Add an `else` branch that calls `assert_never`");
+            diagnostic.set_fix(fix);
+        }
+    }
+
+    /// Add an explicit exhaustiveness check after a redundant final `elif`.
+    ///
+    /// Only read a plain variable whose type is a union before the chain, and which narrows
+    /// to `Never` when the condition is false. Repeating attribute access or a function call
+    /// could have side effects. Returns `None`
+    /// when no such variable or unshadowed runtime import is available.
+    /// The fix is unsafe because the new branch raises if the static assumptions fail at runtime.
+    fn add_assert_never_else(&self, clause: &ast::ElifElseClause, test: &ast::Expr) -> Option<Fix> {
+        let db = self.db();
+        let first_statement = clause.body.first()?;
+        let source = source_text(db, self.file());
+        let indentation = indentation_at_offset(clause.start(), &source)?;
+        let argument = self.assert_never_argument(test)?;
+
+        let module = typing_module_for_fix(&self.context, "assert_never", PythonVersion::PY311)?;
+        let importer = self.context.importer();
+
+        let action = importer.import_for_diagnostic(
+            ImportRequest::import_from(module.as_str(), "assert_never"),
+            self.scope().file_scope_id(db),
+            clause.start(),
+        )?;
+
+        let body_indentation = indentation_at_offset(first_statement.start(), &source)
+            .map(Cow::Borrowed)
+            .unwrap_or_else(|| Cow::Owned(format!("{indentation}{}", importer.indentation())));
+
+        let line_ending = find_newline(&source)
+            .map(|(_, ending)| ending)
+            .unwrap_or_default()
+            .as_str();
+
+        let mut end = logical_line_end(&source, self.module().tokens(), clause.end());
+
+        // Keep trailing body comments with the `elif`, including those after a nested statement.
+        for line in UniversalNewlineIterator::with_offset(&source[usize::from(end)..], end) {
+            if line.trim().is_empty() {
+                continue;
+            }
+            if line.starts_with(body_indentation.as_ref()) && line.trim_start().starts_with('#') {
+                end = line.full_end();
+            } else {
+                break;
+            }
+        }
+
+        let leading_newline = if source.line_start(end) == end {
+            ""
+        } else {
+            line_ending
+        };
+
+        Some(Fix::unsafe_edits(
+            Edit::insertion(
+                format!(
+                    "{leading_newline}{indentation}else:{line_ending}{body_indentation}{}({}){line_ending}",
+                    action.symbol_text(),
+                    argument.id,
+                ),
+                end,
+            ),
+            action.import().cloned(),
+        ))
+    }
+
+    /// Find a variable tested directly, by a comparison, or by a narrowing function.
+    /// More complex conditions cannot provide an argument without repeating their evaluation.
+    fn assert_never_argument<'a>(&self, test: &'a ast::Expr) -> Option<&'a ast::ExprName> {
+        if any_over_expr(test, ast::Expr::is_named_expr) {
+            return None;
+        }
+
+        let mut operand = test;
+
+        while let ast::Expr::UnaryOp(unary) = operand
+            && unary.op == ast::UnaryOp::Not
+        {
+            operand = &unary.operand;
+        }
+
+        let candidates = match operand {
+            ast::Expr::Name(_) => [Some(operand), None],
+            ast::Expr::Compare(compare) if compare.ops.len() == 1 => {
+                [Some(compare.left.as_ref()), compare.comparators.first()]
+            }
+            ast::Expr::Call(call) => [call.arguments.args.first(), None],
+            _ => return None,
+        };
+
+        let db = self.db();
+        let env = self.program_environment();
+        let places = self.index.place_table(self.scope().file_scope_id(db));
+
+        let predicate = Predicate {
+            node: PredicateNode::Expression(self.index.expression(test)),
+            is_positive: false,
+        };
+
+        candidates.into_iter().flatten().find_map(|candidate| {
+            let name = candidate.as_name_expr()?;
+            let ty = self.expression_type(candidate);
+            if ty.is_never() || !self.type_before_if_chain(name)?.is_union() {
+                return None;
+            }
+            let place = places.symbol_id(&name.id)?;
+            let (constraint, _) = infer_narrowing_constraints(db, predicate, place.into());
+            NarrowingConstraint::intersection(ty)
+                .merge_constraint_and(constraint?)
+                .evaluate_constraint_type(db, env)
+                .is_never()
+                .then_some(name)
+        })
+    }
+
+    /// Resolve a name using the bindings and constraints that precede its `if` chain.
+    /// This preserves earlier narrowing, including constraints on captured variables.
+    fn type_before_if_chain(&self, name: &ast::ExprName) -> Option<Type<'db>> {
+        let db = self.db();
+        let env = self.program_environment();
+        let use_def = self.index.use_def_map(self.scope().file_scope_id(db));
+        let snapshot =
+            use_def.if_chain_start_for_use(name.scoped_use_id(db, self.program_file()))?;
+        let mut resolution = resolve_place_load(
+            db,
+            self.index,
+            self.scope(),
+            PlaceExpr::from_expr_name(name),
+            PlaceLoadMode::AtNameSnapshot(snapshot),
+        );
+        let mut place = PlaceAndQualifiers::from(Place::Undefined);
+        while let Some(PlaceLoadResolutionStep::Source(source)) = resolution.next() {
+            let constraints = resolution.narrowing_constraints_for(&source);
+            place = place.or_fall_back_to(db, env, || {
+                self.infer_place_load_source(resolution.place_expr(), source, constraints)
+            });
+            if place.place.is_definitely_bound() {
+                break;
+            }
+        }
+        place.place.ignore_possibly_undefined()
+    }
+}
+
+/// Returns the end of the logical line at `offset`, including its newline.
+/// A trailing backslash can extend the line beyond its last AST node's physical line.
+fn logical_line_end(source: &str, tokens: &Tokens, offset: TextSize) -> TextSize {
+    tokens
+        .after(offset)
+        .iter()
+        .find(|token| token.kind() == TokenKind::Newline)
+        .map_or_else(|| source.full_line_end(offset), Ranged::end)
 }

@@ -4356,6 +4356,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 }
             }
             ast::Stmt::If(node) => {
+                let final_elif_test = node
+                    .elif_else_clauses
+                    .last()
+                    .and_then(|clause| clause.test.as_ref());
+                let mut chain_start = final_elif_test.map(|_| self.flow_snapshot());
                 self.visit_condition(&node.test);
                 let condition_flow_snapshot = self.flow_snapshot_for_condition(&node.test);
                 let mut falsy = if let Some(snapshots) = condition_flow_snapshot.into_branches() {
@@ -4410,7 +4415,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     self.record_negated_reachability_constraint(last_reachability_constraint);
 
                     let next_falsy = if let Some(elif_test) = clause_test {
+                        if final_elif_test.is_some_and(|test| test.range() == elif_test.range()) {
+                            self.current_use_def_map_mut()
+                                .set_if_chain_start(chain_start.take());
+                        }
                         self.visit_condition(elif_test);
+                        self.current_use_def_map_mut().set_if_chain_start(None);
                         // A test expression is evaluated whether the branch is taken or not
                         let condition_flow_snapshot = self.flow_snapshot_for_condition(elif_test);
                         let next_falsy =

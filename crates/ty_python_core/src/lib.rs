@@ -33,8 +33,8 @@ use scope::{NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopeKind, Scope
 use symbol::ScopedSymbolId;
 pub use use_def::{
     ApplicableConstraints, BindingWithConstraints, BindingWithConstraintsIterator,
-    DeclarationWithConstraint, DeclarationsIterator, LiveBinding, LoopHeaderId, NarrowingEvaluator,
-    PredicateNarrowingTargets, ScopedDefinitionId, UseDefMap,
+    BindingsSnapshotId, DeclarationWithConstraint, DeclarationsIterator, LiveBinding, LoopHeaderId,
+    NarrowingEvaluator, PredicateNarrowingTargets, ScopedDefinitionId, UseDefMap,
 };
 use use_def::{EnclosingSnapshotKey, ScopedEnclosingSnapshotId};
 

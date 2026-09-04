@@ -302,6 +302,10 @@ pub struct LoopHeaderId;
 #[derive(get_size2::GetSize, salsa::SalsaValue)]
 struct InternedBindingsId;
 
+/// A retained set of bindings and constraints at a point in one scope's control flow.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct BindingsSnapshotId(InternedBindingsId);
+
 /// Uniquely identifies an interned [`Declarations`] entry in [`UseDefMap::interned_declarations`].
 #[newtype_index]
 #[derive(get_size2::GetSize, salsa::SalsaValue)]
@@ -650,6 +654,9 @@ struct UseDefMapExtra {
     /// [`Bindings`] reaching a [`ScopedUseId`].
     bindings_by_use: FrozenIndexVec<ScopedUseId, InternedBindingsId>,
 
+    /// Bindings before an `if` chain, for uses in its final `elif` condition.
+    if_chain_start_by_use: FrozenMap<ScopedUseId, InternedBindingsId>,
+
     /// [`Bindings`] for each member reaching a [`ScopedUseId`].
     ///
     /// This is only used for kwargs expressions, whose corresponding `bindings_by_use` entry
@@ -923,6 +930,27 @@ impl<'db> UseDefMap<'db> {
         )
     }
 
+    /// Return the state before the enclosing `if` chain for a use in its final `elif` condition.
+    /// No snapshot is recorded when the chain ends with an `else` branch.
+    pub fn if_chain_start_for_use(&self, use_id: ScopedUseId) -> Option<BindingsSnapshotId> {
+        self.extra
+            .as_deref()?
+            .if_chain_start_by_use
+            .get(&use_id)
+            .copied()
+            .map(BindingsSnapshotId)
+    }
+
+    pub fn bindings_at_snapshot(
+        &self,
+        snapshot: BindingsSnapshotId,
+    ) -> BindingWithConstraintsIterator<'_, 'db> {
+        self.bindings_iterator(
+            &self.interned_bindings[snapshot.0],
+            BoundnessAnalysis::BasedOnUnboundVisibility,
+        )
+    }
+
     pub fn multi_bindings_at_use(
         &self,
         use_id: ScopedUseId,
@@ -968,6 +996,9 @@ impl<'db> UseDefMap<'db> {
             }
             ConstraintKey::UseId(use_id) => {
                 ApplicableConstraints::ConstrainedBindings(self.bindings_at_use(use_id))
+            }
+            ConstraintKey::Snapshot(snapshot) => {
+                ApplicableConstraints::ConstrainedBindings(self.bindings_at_snapshot(snapshot))
             }
         }
     }
@@ -1848,6 +1879,11 @@ pub(super) struct UseDefMapBuilder<'db> {
     /// Restorable identity of the bindings visible to exception handlers.
     checkpoint_state: ExceptionCheckpointState,
 
+    /// Active only while visiting the final `elif` condition of an `if` chain without an `else`.
+    if_chain_start: Option<FlowSnapshot>,
+
+    if_chain_start_by_use: Vec<(ScopedUseId, Bindings)>,
+
     /// Live bindings for each so-far-recorded definition and, for binding-only definitions, the
     /// live declarations.
     definitions_by_definition:
@@ -1896,6 +1932,8 @@ impl<'db> UseDefMapBuilder<'db> {
             boolean_test_contexts: Vec::new(),
             checkpoint_flow: ScopedReachabilityConstraintId::ALWAYS_TRUE,
             checkpoint_state: ExceptionCheckpointState::default(),
+            if_chain_start: None,
+            if_chain_start_by_use: Vec::new(),
             definitions_by_definition: FxHashMap::default(),
             symbol_states: IndexVec::new(),
             member_states: IndexVec::new(),
@@ -2494,6 +2532,27 @@ impl<'db> UseDefMapBuilder<'db> {
     }
 
     pub(super) fn record_use(&mut self, place: ScopedPlaceId, use_id: ScopedUseId) {
+        if let Some(snapshot) = &mut self.if_chain_start {
+            let state = match place {
+                ScopedPlaceId::Symbol(symbol) => snapshot.symbol_states.get_mut(symbol),
+                ScopedPlaceId::Member(member) => snapshot.member_states.get_mut(member),
+            };
+            let bindings = state.map_or_else(
+                || Bindings::unbound(snapshot.reachability),
+                |state| {
+                    self.pending_reachability
+                        .materialize_ref_at_use(
+                            state,
+                            snapshot.pending_reachability,
+                            &mut self.reachability_constraints,
+                        )
+                        .bindings()
+                        .clone()
+                },
+            );
+            self.if_chain_start_by_use.push((use_id, bindings));
+        }
+
         let pending = self.pending_reachability.current;
         let place_state =
             pending_place_state_mut(place, &mut self.symbol_states, &mut self.member_states);
@@ -2505,6 +2564,10 @@ impl<'db> UseDefMapBuilder<'db> {
         let bindings = place_state.bindings().clone();
 
         self.record_use_bindings(bindings, use_id);
+    }
+
+    pub(super) fn set_if_chain_start(&mut self, snapshot: Option<FlowSnapshot>) {
+        self.if_chain_start = snapshot;
     }
 
     pub(super) fn record_multi_use(
@@ -2863,6 +2926,7 @@ impl<'db> UseDefMapBuilder<'db> {
             .count();
         let interned_bindings_capacity = self.definitions_by_definition.len()
             + self.bindings_by_use.len()
+            + self.if_chain_start_by_use.len()
             + self.enclosing_snapshots.len()
             + place_state_count;
         let interned_declarations_capacity =
@@ -2881,6 +2945,12 @@ impl<'db> UseDefMapBuilder<'db> {
         );
         let bindings_by_use =
             Self::intern_bindings_by_use(self.bindings_by_use, &mut place_state_interner);
+        let if_chain_start_by_use = FrozenMap::from_entries(
+            self.if_chain_start_by_use
+                .into_iter()
+                .map(|(use_id, bindings)| (use_id, place_state_interner.intern_bindings(&bindings)))
+                .collect(),
+        );
         let symbol_states = self
             .symbol_states
             .into_iter()
@@ -2965,6 +3035,7 @@ impl<'db> UseDefMapBuilder<'db> {
         .then(|| {
             Box::new(UseDefMapExtra {
                 bindings_by_use: bindings_by_use.into(),
+                if_chain_start_by_use,
                 multi_bindings_by_use,
                 member_states,
                 enclosing_snapshots: enclosing_snapshots.into(),
