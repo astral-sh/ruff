@@ -118,6 +118,34 @@ unused-ignore-comment = \"warn\"
 }
 
 #[test]
+fn code_action_undefined_reveal() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let foo_content = "reveal_type(1)\n";
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(workspace_root, None)?
+        .with_file(
+            SystemPath::new("src/ty.toml"),
+            "[environment]\npython-version = '3.11'\n",
+        )?
+        .with_file(foo, foo_content)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(foo, foo_content, 1);
+
+    let diagnostics = server.document_diagnostic_request(foo, None);
+    let params = code_actions_at(&server, diagnostics, foo, full_range(foo_content));
+    let request_id = server.send_request::<CodeActionRequest>(params);
+    let code_actions = server.await_response::<CodeActionRequest>(&request_id);
+
+    insta::assert_json_snapshot!(code_actions);
+
+    Ok(())
+}
+
+#[test]
 fn no_code_action_for_non_overlapping_range_on_same_line() -> Result<()> {
     let workspace_root = SystemPath::new("src");
     let foo = SystemPath::new("src/foo.py");
