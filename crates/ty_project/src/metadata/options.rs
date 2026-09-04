@@ -1540,8 +1540,8 @@ pub struct TerminalOptions {
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct AnalysisOptions {
-    /// Whether ty should use strict narrowing for gradual generic types in `isinstance()`
-    /// and `issubclass()` checks, `match` class patterns, and `TypeIs` checks.
+    /// Whether ty should use strict narrowing for unspecialized generic classes in
+    /// `isinstance()` and `issubclass()` checks, `match` class patterns, and `TypeIs` checks.
     ///
     /// When enabled, ty narrows to the top materialization of the class. For example,
     /// `isinstance(value, list)` narrows a value of type `object` to `Top[list[Unknown]]`,

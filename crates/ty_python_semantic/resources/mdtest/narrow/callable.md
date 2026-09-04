@@ -2,30 +2,103 @@
 
 ## Basic narrowing
 
-The `callable()` builtin returns `TypeIs[Callable[..., object]]`. Narrowing preserves known callable
-signatures because they are subtypes of the target's top materialization. The negative branch
-excludes all callable types.
+### Non-strict mode
 
-```py
-from typing import Any, Callable
-
-def f(x: Callable[..., Any] | None):
-    if callable(x):
-        reveal_type(x)  # revealed: (...) -> Any
-    else:
-        reveal_type(x)  # revealed: None
+```toml
+[analysis]
+strict-generic-narrowing = false
 ```
 
-## Narrowing with other callable types
+Narrowing with `callable(x)` or `isinstance(x, Callable)` narrow a union to just the callable types,
+while preserving their signatures:
 
 ```py
 from typing import Any, Callable
 
-def g(x: Callable[[int], str] | None):
-    if callable(x):
-        reveal_type(x)  # revealed: (int, /) -> str
+def _(f: Callable[[int, str], bytes] | None):
+    if callable(f):
+        reveal_type(f)  # revealed: (int, str, /) -> bytes
     else:
-        reveal_type(x)  # revealed: None
+        reveal_type(f)  # revealed: None
+
+    if isinstance(f, Callable):
+        reveal_type(f)  # revealed: (int, str, /) -> bytes
+    else:
+        reveal_type(f)  # revealed: None
+```
+
+When narrowing from `object`, the result is a gradual callable that can be called with any arguments.
+
+```py
+def f(f: object):
+    if callable(f):
+        # Note: typeshed annotates `callable` with a return type of `TypeIs[Callable[..., object]]`, which
+        # is a hybrid between the fully gradual callable `Callable[..., Unknown]` and the top materialization
+        # `Top[Callable[..., Unknown]]` which returns `object` and cannot be called. For consistency with
+        # `isinstance` narrowing below, `(...) -> Unknown` would be better here, but we currently follow
+        # the typeshed annotation.
+        reveal_type(f)  # revealed: (...) -> object
+        f(1, keyword="value")
+    else:
+        reveal_type(f)  # revealed: ~Top[(...) -> object]
+
+    if isinstance(f, Callable):
+        reveal_type(f)  # revealed: (...) -> Unknown
+        f(1, keyword="value")
+    else:
+        reveal_type(f)  # revealed: ~Top[(...) -> object]
+```
+
+### Strict mode
+
+```toml
+[analysis]
+strict-generic-narrowing = true
+```
+
+Narrowing with `callable(x)` or `isinstance(x, Callable)` narrow a union to just the callable types,
+while preserving their signatures. Exactly the same as in non-strict mode.
+
+```py
+from typing import Any, Callable
+
+def _(f: Callable[[int, str], bytes] | None):
+    if callable(f):
+        reveal_type(f)  # revealed: (int, str, /) -> bytes
+    else:
+        reveal_type(f)  # revealed: None
+
+    if isinstance(f, Callable):
+        reveal_type(f)  # revealed: (int, str, /) -> bytes
+    else:
+        reveal_type(f)  # revealed: None
+```
+
+However, when narrowing from `object`, the result is the top-materialized callable type `Top[(...) -> object]`.
+This type represents the set of all possible callable types
+(including, e.g., functions that take no arguments and functions that require arguments). While such
+objects *are* callable (they pass `callable()`), no specific set of arguments can be guaranteed to
+be valid.
+
+```py
+def f(f: object):
+    if callable(f):
+        reveal_type(f)  # revealed: Top[(...) -> object]
+        f(1, keyword="value")  # error: [call-top-callable]
+    else:
+        reveal_type(f)  # revealed: ~Top[(...) -> object]
+
+    if isinstance(f, Callable):
+        reveal_type(f)  # revealed: Top[(...) -> object]
+        f(1, keyword="value")  # error: [call-top-callable]
+    else:
+        reveal_type(f)  # revealed: ~Top[(...) -> object]
+```
+
+## Narrowing from gradual callable types
+
+```py
+from typing import Any, Callable
 
 def h(x: Callable[..., int] | None):
     if callable(x):
@@ -34,114 +107,24 @@ def h(x: Callable[..., int] | None):
         reveal_type(x)  # revealed: None
 ```
 
-## Narrowing from object
-
-By default, narrowing from `object` uses the declared gradual callable. Its parameters are unknown,
-and its return type is `object`:
-
-```py
-def f(x: object):
-    if callable(x):
-        reveal_type(x)  # revealed: (...) -> object
-        reveal_type(x(1, keyword="value"))  # revealed: object
-    else:
-        reveal_type(x)  # revealed: ~Top[(...) -> object]
-```
-
-## Calling narrowed callables
-
-### Strict generic narrowing mode
+## Intersections with the top-callable
 
 ```toml
 [analysis]
 strict-generic-narrowing = true
 ```
 
-In strict generic narrowing mode, both `callable()` and `isinstance(.., Callable)` intersect the
-type with `Top[Callable[..., object]]`. This type represents the set of all possible callable types
-(including, e.g., functions that take no arguments and functions that require arguments). While such
-objects *are* callable (they pass `callable()`), no specific set of arguments can be guaranteed to
-be valid.
-
-```py
-import typing as t
-
-def call_with_args(y: object, a: int, b: str) -> object:
-    if isinstance(y, t.Callable):
-        # error: [call-top-callable]
-        return y(a, b)
-    return None
-
-def call_with_typeis(y: object):
-    if callable(y):
-        reveal_type(y)  # revealed: Top[(...) -> object]
-        # error: [call-top-callable]
-        reveal_type(y())  # revealed: object
-```
-
 If a top-callable is part of an intersection, it should still contribute its return type even when
 the other intersection elements are not callable:
 
 ```py
+from typing import Callable
+
 def resolve(value: str):
     if callable(value):
         reveal_type(value)  # revealed: str & Top[(...) -> object]
         # error: [call-top-callable]
         reveal_type(value())  # revealed: object
-```
-
-### Gradual generic narrowing mode
-
-```toml
-[analysis]
-strict-generic-narrowing = false
-```
-
-In gradual generic narrowing mode, an `isinstance(.., Callable)` check narrows to a gradual
-callable. Its parameters accept arbitrary arguments, and its return type is `Unknown`:
-
-```py
-from typing import Callable
-
-def call_with_args(y: object):
-    if isinstance(y, Callable):
-        reveal_type(y)  # revealed: (...) -> Unknown
-
-        reveal_type(y())  # revealed: Unknown
-        reveal_type(y(1, "foo"))  # revealed: Unknown
-        reveal_type(y(1, "foo", keyword_arg="bar"))  # revealed: Unknown
-```
-
-An already-specialized callable retains its known parameter and return types:
-
-```py
-def preserve_callable_signature(fn: Callable[[int], str]) -> None:
-    if isinstance(fn, Callable):
-        reveal_type(fn)  # revealed: (int, /) -> str
-```
-
-### Truthiness before a callable check
-
-Checking that a callback is truthy or callable preserves its known parameter and return types.
-
-```py
-from collections.abc import Callable
-
-def f(callback: Callable[[int], object]) -> None:
-    if callback:
-        reveal_type(callback)  # revealed: ((int, /) -> object) & ~AlwaysFalsy
-
-    if callable(callback):
-        reveal_type(callback)  # revealed: (int, /) -> object
-
-    if isinstance(callback, Callable):
-        reveal_type(callback)  # revealed: (int, /) -> object
-
-    if callback and callable(callback):
-        reveal_type(callback)  # revealed: ((int, /) -> object) & ~AlwaysFalsy
-
-    if callback and isinstance(callback, Callable):
-        reveal_type(callback)  # revealed: ((int, /) -> object) & ~AlwaysFalsy
 ```
 
 ## Narrowing with named expressions (walrus operator)
