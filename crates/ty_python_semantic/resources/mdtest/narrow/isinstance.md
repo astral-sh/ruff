@@ -1103,7 +1103,7 @@ class IntReader:
 
 def f(reader: IntReader | None):
     if isinstance(reader, Reader):
-        reveal_type(reader.read())  # revealed: int & Any
+        reveal_type(reader.read())  # revealed: int
     else:
         reveal_type(reader)  # revealed: None
 ```
