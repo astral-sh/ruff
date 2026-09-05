@@ -1,10 +1,11 @@
 use std::cell::{OnceCell, RefCell};
+use std::hash::BuildHasher;
 use std::sync::Arc;
 
 use except_handlers::{ExceptionContextStackManager, ExceptionHandlers};
 use itertools::Itertools;
 use ruff_python_ast::helpers::{Truthiness, any_over_expr, is_dotted_name};
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
 
 use ruff_db::parsed::ParsedModuleRef;
 
@@ -42,7 +43,7 @@ use crate::expression::{Expression, ExpressionKind};
 use crate::frozen::{FrozenMap, FrozenSet};
 use crate::member::MemberExprBuilder;
 use crate::place::{
-    PlaceExpr, PlaceTableBuilder, PossiblyNarrowedPlacesBuilder, ScopedPlaceId,
+    PlaceExpr, PlaceTable, PlaceTableBuilder, PossiblyNarrowedPlacesBuilder, ScopedPlaceId,
     match_subject_place_expressions,
 };
 use crate::predicate::{
@@ -3299,13 +3300,38 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         );
 
         let mut use_def_map_interner = UseDefMapInterner::default();
+        let mut interned_place_tables: FxHashMap<u64, SmallVec<[Arc<PlaceTable>; 1]>> =
+            FxHashMap::default();
+        let place_tables = self
+            .place_tables
+            .into_iter()
+            .map(|builder| {
+                let table = builder.finish();
+                // Empty tables are cheap and do not need a lookup in the interner.
+                if table.symbols().next().is_none() && table.members().next().is_none() {
+                    return Arc::new(table);
+                }
+
+                let hash = FxBuildHasher.hash_one(&table);
+                if let Some(existing) = interned_place_tables.get(&hash).and_then(|candidates| {
+                    candidates
+                        .iter()
+                        .find(|candidate| candidate.as_ref() == &table)
+                }) {
+                    return Arc::clone(existing);
+                }
+
+                let table = Arc::new(table);
+                interned_place_tables
+                    .entry(hash)
+                    .or_default()
+                    .push(Arc::clone(&table));
+                table
+            })
+            .collect();
 
         SemanticIndex {
-            place_tables: self
-                .place_tables
-                .into_iter()
-                .map(|builder| Arc::new(builder.finish()))
-                .collect(),
+            place_tables,
             scopes: self.scopes.into(),
             definitions_by_node: DefinitionsByNode::from_map(self.definitions_by_node),
             expressions_by_node: self.expressions_by_node,
