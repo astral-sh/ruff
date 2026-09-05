@@ -1357,6 +1357,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Flake8Logging, "015") => rules::flake8_logging::rules::RootLoggerCall,
 
         // Rules that belong only to categories, without linter groups or codes.
+        () => rules::ruff::rules::AssertUnfilteredComprehension,
         () => rules::ruff::rules::PytestFixtureAutouse,
 
         _ => return None,

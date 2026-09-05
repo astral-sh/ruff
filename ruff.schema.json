@@ -4604,6 +4604,7 @@
         "assert-on-string-literal",
         "assert-raises-exception",
         "assert-tuple",
+        "assert-unfiltered-comprehension",
         "assert-with-print-message",
         "assignment-default-in-stub",
         "assignment-in-assert",
