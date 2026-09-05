@@ -4536,48 +4536,6 @@ impl<'db> Type<'db> {
                 };
             }
 
-            match ty {
-                Type::Callable(callable) if callable.is_staticmethod_like(db) => {
-                    // For "staticmethod-like" callables, model the behavior of `staticmethod.__get__`.
-                    // The underlying function is returned as-is, without binding self.
-                    return Ok(Some(DescriptorGetResult {
-                        return_type: ty,
-                        kind: AttributeKind::NormalOrNonDataDescriptor,
-                    }));
-                }
-                Type::Callable(callable)
-                    if let is_function_like = callable.is_function_like(db)
-                        && (is_function_like || callable.is_classmethod_like(db)) =>
-                {
-                    // For "function-like" or "classmethod-like" callables, model the behavior of
-                    // `FunctionType.__get__` or `classmethod.__get__`.
-                    //
-                    // It is a shortcut to model this in `try_call_dunder_get`. If we
-                    // want to be really precise, we should instead return a new method-wrapper
-                    // type variant for the synthesized `__get__` method of these synthesized
-                    // functions. The method-wrapper would then be returned from
-                    // `find_name_in_mro` when called on function-like `Callable`s. This would
-                    // allow us to correctly model the behavior of *explicit*
-                    // `SomeDataclass.__init__.__get__` calls.
-                    let return_type = if instance.is_none() && is_function_like {
-                        ty
-                    } else {
-                        let self_type = instance.unwrap_or_else(|| {
-                            // For classmethod-like callables, bind to the owner class.
-                            owner.to_instance_approximation(db, env).unwrap_or(owner)
-                        });
-
-                        Type::Callable(callable.bind_self(db, env, Some(self_type)))
-                    };
-
-                    return Ok(Some(DescriptorGetResult {
-                        return_type,
-                        kind: AttributeKind::NormalOrNonDataDescriptor,
-                    }));
-                }
-                _ => {}
-            }
-
             let Place::Defined(DefinedPlace {
                 ty: concrete_descr_get,
                 ..
@@ -4648,6 +4606,51 @@ impl<'db> Type<'db> {
                 .display(db, env),
             owner.display(db, env)
         );
+
+        // Bind known callable descriptors outside the tracked lookup. Checking a protocol
+        // receiver can recursively access this method; the lookup's `None` cycle value would
+        // leave it unbound and falsely reject the protocol match.
+        match self {
+            Type::Callable(callable) if callable.is_staticmethod_like(db) => {
+                // For "staticmethod-like" callables, model the behavior of `staticmethod.__get__`.
+                // The underlying function is returned as-is, without binding self.
+                return Ok(Some(DescriptorGetResult {
+                    return_type: self,
+                    kind: AttributeKind::NormalOrNonDataDescriptor,
+                }));
+            }
+            Type::Callable(callable)
+                if let is_function_like = callable.is_function_like(db)
+                    && (is_function_like || callable.is_classmethod_like(db)) =>
+            {
+                // For "function-like" or "classmethod-like" callables, model the behavior of
+                // `FunctionType.__get__` or `classmethod.__get__`.
+                //
+                // It is a shortcut to model this in `try_call_dunder_get`. If we
+                // want to be really precise, we should instead return a new method-wrapper
+                // type variant for the synthesized `__get__` method of these synthesized
+                // functions. The method-wrapper would then be returned from
+                // `find_name_in_mro` when called on function-like `Callable`s. This would
+                // allow us to correctly model the behavior of *explicit*
+                // `SomeDataclass.__init__.__get__` calls.
+                let return_type = if instance.is_none() && is_function_like {
+                    self
+                } else {
+                    let self_type = instance.unwrap_or_else(|| {
+                        // For classmethod-like callables, bind to the owner class.
+                        owner.to_instance_approximation(db, env).unwrap_or(owner)
+                    });
+
+                    Type::Callable(callable.bind_self(db, env, Some(self_type)))
+                };
+
+                return Ok(Some(DescriptorGetResult {
+                    return_type,
+                    kind: AttributeKind::NormalOrNonDataDescriptor,
+                }));
+            }
+            _ => {}
+        }
 
         // Function descriptors have fixed binding behavior, so avoid retaining a tracked query
         // for every function and access context.
