@@ -4283,7 +4283,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     for element in union.elements(db) {
                         self.infer_map_impl(
                             formal_protocol,
-                            element.bindings(db, self.env).return_type(db, self.env),
+                            element.instance_type_for_meta_protocol(db, self.env),
                             polarity,
                             seen,
                         )?;
@@ -4292,7 +4292,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 }
                 return self.infer_map_impl(
                     formal_protocol,
-                    actual.bindings(db, self.env).return_type(db, self.env),
+                    actual.instance_type_for_meta_protocol(db, self.env),
                     polarity,
                     seen,
                 );
