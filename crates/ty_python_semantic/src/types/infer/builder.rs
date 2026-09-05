@@ -11067,7 +11067,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let ast::ExprAttribute {
             value,
             attr,
-            range: _,
             node_index: _,
             ctx,
         } = attribute;

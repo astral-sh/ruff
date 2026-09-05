@@ -6,9 +6,9 @@ use crate::rules::airflow::helpers::{
 };
 use crate::{FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{Expr, ExprAttribute, ExprName};
+use ruff_python_ast::Expr;
 use ruff_python_semantic::Modules;
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 
 /// ## What it does
 /// Checks for uses of deprecated or moved Airflow functions and values in Airflow 3.1.
@@ -85,8 +85,8 @@ pub(crate) fn airflow_3_1_moved_expr(checker: &Checker, expr: &Expr) {
     }
 
     match expr {
-        Expr::Attribute(ExprAttribute { range, .. }) | Expr::Name(ExprName { range, .. }) => {
-            check_name(checker, expr, *range);
+        Expr::Attribute(_) | Expr::Name(_) => {
+            check_name(checker, expr, expr.range());
         }
         _ => {}
     }

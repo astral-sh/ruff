@@ -1,6 +1,7 @@
 use std::assert_matches;
 
 use ruff_python_ast::{Expr, InterpolatedStringElement, IpyEscapeKind, Number, Stmt};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::{Mode, ParseOptions, parse, parse_expression, parse_module};
 
@@ -74,6 +75,53 @@ fn nfkc_normalizes_names() {
     };
 
     assert_eq!(name.id.as_str(), "C");
+}
+
+#[test]
+fn attribute_expression_ranges() {
+    let source = "(value).attr";
+    let parsed = parse_expression(source).unwrap();
+    let Expr::Attribute(attribute) = parsed.expr() else {
+        panic!("expected attribute expression, got {:?}", parsed.expr());
+    };
+
+    assert_eq!(
+        attribute.range(),
+        TextRange::new(TextSize::new(0), TextSize::new(12))
+    );
+    assert_eq!(
+        attribute.attr.range(),
+        TextRange::new(TextSize::new(8), TextSize::new(12))
+    );
+
+    let mut expr = parsed.into_syntax().body;
+    ruff_python_ast::relocate::relocate_expr(
+        &mut expr,
+        TextRange::new(TextSize::new(20), TextSize::new(30)),
+    );
+    let Expr::Attribute(attribute) = expr.as_ref() else {
+        panic!("expected relocated attribute expression, got {expr:?}");
+    };
+    assert_eq!(
+        attribute.range(),
+        TextRange::new(TextSize::new(20), TextSize::new(30))
+    );
+    assert_eq!(
+        attribute.attr.range(),
+        TextRange::new(TextSize::new(8), TextSize::new(12))
+    );
+
+    ruff_python_ast::relocate::relocate_expr(
+        &mut expr,
+        TextRange::new(TextSize::new(0), TextSize::new(1)),
+    );
+    let Expr::Attribute(attribute) = expr.as_ref() else {
+        panic!("expected relocated attribute expression, got {expr:?}");
+    };
+    assert_eq!(
+        attribute.range(),
+        TextRange::new(TextSize::new(0), TextSize::new(1))
+    );
 }
 
 #[test]

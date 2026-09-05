@@ -731,7 +731,6 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
 
             // `[a, b].test.test[300].dot`
             Expr::Attribute(ast::ExprAttribute {
-                range: _,
                 node_index: _,
                 value,
                 attr: _,

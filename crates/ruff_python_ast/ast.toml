@@ -387,7 +387,7 @@ doc = "See also [DictComp](https://docs.python.org/3/library/ast.html#ast.DictCo
 fields = [
   { name = "key", type = "Expr?" },
   { name = "value", type = "Expr" },
-  { name = "generators", type = "Comprehension*" },
+  { name = "generators", type = "Box<[Comprehension]>" },
 ]
 
 [Expr.nodes.ExprGenerator]
@@ -414,7 +414,7 @@ fields = [{ name = "value", type = "Expr" }]
 doc = "See also [Compare](https://docs.python.org/3/library/ast.html#ast.Compare)"
 fields = [
   { name = "left", type = "Expr" },
-  { name = "ops", type = "Box<[CmpOp]>" },
+  { name = "ops", type = "ThinVec<CmpOp>" },
   { name = "comparators", type = "Box<[Expr]>" },
 ]
 # The fields must be visited simultaneously
@@ -490,6 +490,8 @@ derives = ["Default"]
 
 [Expr.nodes.ExprAttribute]
 doc = "See also [Attribute](https://docs.python.org/3/library/ast.html#ast.Attribute)"
+custom_debug = true
+custom_range = true
 fields = [
   { name = "value", type = "Expr" },
   { name = "attr", type = "Identifier" },

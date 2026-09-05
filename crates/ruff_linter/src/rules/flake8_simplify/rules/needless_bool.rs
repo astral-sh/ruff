@@ -254,7 +254,7 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
                     };
 
                     Some(Expr::Compare(ast::ExprCompare {
-                        ops: Box::new([op.negate()]),
+                        ops: [op.negate()].into(),
                         left: left.clone(),
                         comparators: Box::new([right.clone()]),
                         range: TextRange::default(),
@@ -284,7 +284,7 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
             let call_node = ast::ExprCall {
                 func: Box::new(func_node.into()),
                 arguments: Arguments {
-                    args: Box::from([if_test.clone()]),
+                    args: [if_test.clone()].into(),
                     keywords: std::iter::empty().collect(),
                     range: TextRange::default(),
                     node_index: ruff_python_ast::AtomicNodeIndex::NONE,

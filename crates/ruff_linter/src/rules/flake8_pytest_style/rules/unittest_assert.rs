@@ -173,7 +173,7 @@ fn assert(expr: &Expr, msg: Option<&Expr>) -> Stmt {
 fn compare(left: &Expr, cmp_op: CmpOp, right: &Expr) -> Expr {
     Expr::Compare(ast::ExprCompare {
         left: Box::new(left.clone()),
-        ops: Box::from([cmp_op]),
+        ops: [cmp_op].into(),
         comparators: Box::from([right.clone()]),
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
@@ -392,7 +392,7 @@ impl UnittestAssert {
                 let node1 = ast::ExprCall {
                     func: Box::new(node.into()),
                     arguments: Arguments {
-                        args: Box::from([(**obj).clone(), (**cls).clone()]),
+                        args: [(**obj).clone(), (**cls).clone()].into(),
                         keywords: std::iter::empty().collect(),
                         range: TextRange::default(),
                         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
@@ -435,13 +435,12 @@ impl UnittestAssert {
                     value: Box::new(node.into()),
                     attr: Identifier::new("search".to_string(), TextRange::default()),
                     ctx: ExprContext::Load,
-                    range: TextRange::default(),
                     node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 };
                 let node2 = ast::ExprCall {
                     func: Box::new(node1.into()),
                     arguments: Arguments {
-                        args: Box::from([(**regex).clone(), (**text).clone()]),
+                        args: [(**regex).clone(), (**text).clone()].into(),
                         keywords: std::iter::empty().collect(),
                         range: TextRange::default(),
                         node_index: ruff_python_ast::AtomicNodeIndex::NONE,

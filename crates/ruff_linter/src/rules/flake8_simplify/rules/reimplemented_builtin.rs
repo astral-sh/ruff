@@ -172,7 +172,7 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &Checker, stmt: &Stmt) {
                         };
                         let node = ast::ExprCompare {
                             left: left.clone(),
-                            ops: Box::from([op]),
+                            ops: [op].into(),
                             comparators: Box::from([comparator.clone()]),
                             range: TextRange::default(),
                             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
@@ -431,7 +431,7 @@ fn return_stmt(id: Name, test: &Expr, target: &Expr, iter: &Expr, generator: Gen
     let node2 = ast::ExprCall {
         func: Box::new(node1.into()),
         arguments: Arguments {
-            args: Box::from([node.into()]),
+            args: [node.into()].into(),
             keywords: std::iter::empty().collect(),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,

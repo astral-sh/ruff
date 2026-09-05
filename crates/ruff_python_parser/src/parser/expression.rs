@@ -508,22 +508,14 @@ impl<'src> Parser<'src> {
 
         if self.at(TokenKind::Name) {
             let name = self.bump_name();
-            return ast::Identifier {
-                id: name,
-                range,
-                node_index: AtomicNodeIndex::NONE,
-            };
+            return ast::Identifier::new(name, range);
         }
 
         if self.current_token_kind().is_soft_keyword() {
             let text = self.src_text(range);
             let id = self.intern_name(text);
             self.bump_soft_keyword_as_name();
-            return ast::Identifier {
-                id,
-                range,
-                node_index: AtomicNodeIndex::NONE,
-            };
+            return ast::Identifier::new(id, range);
         }
 
         // test_err incomplete_attribute_before_for_in_delimiter
@@ -554,11 +546,7 @@ impl<'src> Parser<'src> {
             let text = self.src_text(range);
             let id = self.intern_name(text);
             self.bump_any();
-            ast::Identifier {
-                id,
-                range,
-                node_index: AtomicNodeIndex::NONE,
-            }
+            ast::Identifier::new(id, range)
         } else {
             self.parse_missing_identifier()
         }
@@ -570,11 +558,7 @@ impl<'src> Parser<'src> {
             self.current_token_range(),
         );
 
-        ast::Identifier {
-            id: Name::empty(),
-            range: self.missing_node_range(),
-            node_index: AtomicNodeIndex::NONE,
-        }
+        ast::Identifier::new(Name::empty(), self.missing_node_range())
     }
 
     /// Parses an atom.
@@ -734,7 +718,7 @@ impl<'src> Parser<'src> {
             return ast::Arguments {
                 range: self.node_range(start),
                 node_index: AtomicNodeIndex::NONE,
-                args: Box::default(),
+                args: ThinVec::new(),
                 keywords: ThinVec::default(),
             };
         }
@@ -818,11 +802,7 @@ impl<'src> Parser<'src> {
                                 );
                             }
 
-                            ast::Identifier {
-                                id: ident_expr.id,
-                                range: ident_expr.range,
-                                node_index: AtomicNodeIndex::NONE,
-                            }
+                            ast::Identifier::new(ident_expr.id, ident_expr.range)
                         } else {
                             // TODO(dhruvmanila): Parser shouldn't drop the `parsed_expr` if it's
                             // not a name expression. We could add the expression into `args` but
@@ -831,11 +811,7 @@ impl<'src> Parser<'src> {
                                 ParseErrorType::OtherError("Expected a parameter name".to_string()),
                                 &parsed_expr,
                             );
-                            ast::Identifier {
-                                id: Name::empty(),
-                                range: parsed_expr.range(),
-                                node_index: AtomicNodeIndex::NONE,
-                            }
+                            ast::Identifier::new(Name::empty(), parsed_expr.range())
                         };
 
                         let value = parser.parse_conditional_expression_or_higher();
@@ -871,7 +847,7 @@ impl<'src> Parser<'src> {
         let arguments = ast::Arguments {
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
-            args: self.expr_scratch.take(args_snapshot),
+            args: self.expr_scratch.take_thin_vec(args_snapshot),
             keywords,
         };
 
@@ -1142,13 +1118,14 @@ impl<'src> Parser<'src> {
     ) -> ast::ExprAttribute {
         self.bump(TokenKind::Dot);
 
-        let attr = self.parse_identifier_with_context(context);
+        let mut attr = self.parse_identifier_with_context(context);
+        debug_assert_eq!(attr.end(), self.node_range(start).end());
+        attr.expression_start = start;
 
         ast::ExprAttribute {
             value: Box::new(value),
             attr,
             ctx: ExprContext::Load,
-            range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
         }
     }
@@ -1273,7 +1250,7 @@ impl<'src> Parser<'src> {
 
         ast::ExprCompare {
             left: Box::new(lhs),
-            ops: operators.into_boxed_slice(),
+            ops: ThinVec::from(operators),
             comparators: self.expr_scratch.take(comparators_snapshot),
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
@@ -2666,7 +2643,7 @@ impl<'src> Parser<'src> {
         ast::ExprDictComp {
             key: key.map(Box::new),
             value: Box::new(value),
-            generators,
+            generators: generators.into_boxed_slice(),
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
         }

@@ -5782,9 +5782,15 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
         for scope_info in self.scope_stack.iter().rev() {
             let scope = &self.scopes[scope_info.file_scope_id];
             let generators = match scope.node() {
-                NodeWithScopeKind::ListComprehension(node) => &node.node(self.module).generators,
-                NodeWithScopeKind::SetComprehension(node) => &node.node(self.module).generators,
-                NodeWithScopeKind::DictComprehension(node) => &node.node(self.module).generators,
+                NodeWithScopeKind::ListComprehension(node) => {
+                    node.node(self.module).generators.as_ref()
+                }
+                NodeWithScopeKind::SetComprehension(node) => {
+                    node.node(self.module).generators.as_ref()
+                }
+                NodeWithScopeKind::DictComprehension(node) => {
+                    node.node(self.module).generators.as_ref()
+                }
                 _ => continue,
             };
             if generators

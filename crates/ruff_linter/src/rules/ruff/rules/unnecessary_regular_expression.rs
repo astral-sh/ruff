@@ -332,7 +332,7 @@ impl<'a> ReFunc<'a> {
     fn compare_expr(left: &Expr, op: CmpOp, right: &Expr) -> Expr {
         Expr::Compare(ExprCompare {
             left: Box::new(left.clone()),
-            ops: Box::new([op]),
+            ops: [op].into(),
             comparators: Box::new([right.clone()]),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
@@ -346,13 +346,12 @@ impl<'a> ReFunc<'a> {
             value: Box::new(self.string.clone()),
             attr: Identifier::new(method, TextRange::default()),
             ctx: ExprContext::Load,
-            range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         });
         Expr::Call(ExprCall {
             func: Box::new(method),
             arguments: Arguments {
-                args: args.into_boxed_slice(),
+                args: args.into(),
                 keywords: std::iter::empty().collect(),
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,

@@ -92,10 +92,14 @@ impl<'a> Visitor<'a> for NameFinder<'a> {
                 self.names.insert(id, expr);
             }
             Expr::ListComp(ast::ExprListComp { generators, .. })
-            | Expr::DictComp(ast::ExprDictComp { generators, .. })
             | Expr::SetComp(ast::ExprSetComp { generators, .. })
             | Expr::Generator(ast::ExprGenerator { generators, .. }) => {
                 for comp in generators {
+                    self.visit_expr(&comp.iter);
+                }
+            }
+            Expr::DictComp(ast::ExprDictComp { generators, .. }) => {
+                for comp in generators.as_ref() {
                     self.visit_expr(&comp.iter);
                 }
             }

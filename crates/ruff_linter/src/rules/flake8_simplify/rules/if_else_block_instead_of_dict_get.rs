@@ -199,13 +199,12 @@ pub(crate) fn if_else_block_instead_of_dict_get(checker: &Checker, stmt_if: &ast
         value: expected_subscript.clone(),
         attr: Identifier::new("get".to_string(), TextRange::default()),
         ctx: ExprContext::Load,
-        range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     let node3 = ast::ExprCall {
         func: Box::new(node2.into()),
         arguments: Arguments {
-            args: Box::from([node1, node]),
+            args: [node1, node].into(),
             keywords: std::iter::empty().collect(),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
@@ -308,13 +307,12 @@ pub(crate) fn if_exp_instead_of_dict_get(
         value: expected_subscript.clone(),
         attr: Identifier::new("get".to_string(), TextRange::default()),
         ctx: ExprContext::Load,
-        range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     let fixed_node = ast::ExprCall {
         func: Box::new(dict_get_node.into()),
         arguments: Arguments {
-            args: Box::from([dict_key_node, default_value_node]),
+            args: [dict_key_node, default_value_node].into(),
             keywords: std::iter::empty().collect(),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,

@@ -204,8 +204,8 @@ pub(crate) fn repeated_equality_comparison(checker: &Checker, bool_op: &ast::Exp
                         .chain(std::iter::once(Expr::Compare(ast::ExprCompare {
                             left: Box::new(expr.clone()),
                             ops: match bool_op.op {
-                                BoolOp::Or => Box::from([CmpOp::In]),
-                                BoolOp::And => Box::from([CmpOp::NotIn]),
+                                BoolOp::Or => [CmpOp::In].into(),
+                                BoolOp::And => [CmpOp::NotIn].into(),
                             },
                             comparators: Box::from([comparator]),
                             range: bool_op.range(),

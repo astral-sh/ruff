@@ -25,14 +25,13 @@ pub(super) fn generate_method_call(name: Name, method: &str, generator: Generato
         value: Box::new(var.into()),
         attr: ast::Identifier::new(method.to_string(), TextRange::default()),
         ctx: ast::ExprContext::Load,
-        range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     // Make it into a call `name.method()`
     let call = ast::ExprCall {
         func: Box::new(attr.into()),
         arguments: ast::Arguments {
-            args: Box::from([]),
+            args: [].into(),
             keywords: std::iter::empty().collect(),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
