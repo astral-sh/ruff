@@ -697,19 +697,19 @@ Module(
                         ExprCompare {
                             node_index: NodeIndex(None),
                             range: 358..367,
-                            left: Name(
-                                ExprName {
-                                    node_index: NodeIndex(None),
-                                    range: 358..359,
-                                    id: Name("a"),
-                                    ctx: Load,
-                                },
-                            ),
                             ops: [
                                 Lt,
                                 Lt,
                             ],
-                            comparators: [
+                            operands: [
+                                Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 358..359,
+                                        id: Name("a"),
+                                        ctx: Load,
+                                    },
+                                ),
                                 Name(
                                     ExprName {
                                         node_index: NodeIndex(None),

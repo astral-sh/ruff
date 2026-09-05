@@ -46,7 +46,7 @@ pub(crate) fn in_empty_collection(checker: &Checker, compare: &ast::ExprCompare)
         return;
     }
 
-    let [right] = &*compare.comparators else {
+    let [_, right] = &*compare.operands else {
         return;
     };
 

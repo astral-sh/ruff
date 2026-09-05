@@ -132,22 +132,17 @@ fn compare(lhs: &ComparableExpr, rhs: &ComparableExpr) -> bool {
 
 /// Match `if` condition to be `expr in name`, returns a tuple of (`expr`, `name`) on success.
 fn match_check(if_stmt: &ast::StmtIf) -> Option<(&Expr, &ast::ExprName)> {
-    let ast::ExprCompare {
-        ops,
-        left,
-        comparators,
-        ..
-    } = if_stmt.test.as_compare_expr()?;
+    let ast::ExprCompare { ops, operands, .. } = if_stmt.test.as_compare_expr()?;
 
     if **ops != [CmpOp::In] {
         return None;
     }
 
-    let [Expr::Name(right @ ast::ExprName { .. })] = &**comparators else {
+    let [left, Expr::Name(right @ ast::ExprName { .. })] = &**operands else {
         return None;
     };
 
-    Some((left.as_ref(), right))
+    Some((left, right))
 }
 
 /// Match `if` body to be `name.remove(expr)`, returns a tuple of (`expr`, `name`) on success.

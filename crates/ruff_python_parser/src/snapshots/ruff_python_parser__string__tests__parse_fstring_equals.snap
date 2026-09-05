@@ -26,19 +26,19 @@ expression: suite
                                                     ExprCompare {
                                                         node_index: NodeIndex(None),
                                                         range: 3..11,
-                                                        left: NumberLiteral(
-                                                            ExprNumberLiteral {
-                                                                node_index: NodeIndex(None),
-                                                                range: 3..5,
-                                                                value: Int(
-                                                                    42,
-                                                                ),
-                                                            },
-                                                        ),
                                                         ops: [
                                                             Eq,
                                                         ],
-                                                        comparators: [
+                                                        operands: [
+                                                            NumberLiteral(
+                                                                ExprNumberLiteral {
+                                                                    node_index: NodeIndex(None),
+                                                                    range: 3..5,
+                                                                    value: Int(
+                                                                        42,
+                                                                    ),
+                                                                },
+                                                            ),
                                                             NumberLiteral(
                                                                 ExprNumberLiteral {
                                                                     node_index: NodeIndex(None),

@@ -1240,7 +1240,8 @@ impl<'src> Parser<'src> {
     ) -> ast::ExprCompare {
         self.bump_cmp_op(op);
 
-        let comparators_snapshot = self.expr_scratch.snapshot();
+        let operands_snapshot = self.expr_scratch.snapshot();
+        self.expr_scratch.push(lhs);
         let mut operators = vec![op];
 
         let mut progress = ParserProgress::default();
@@ -1272,9 +1273,8 @@ impl<'src> Parser<'src> {
         }
 
         ast::ExprCompare {
-            left: Box::new(lhs),
-            ops: ThinVec::from(operators),
-            comparators: self.expr_scratch.take(comparators_snapshot),
+            ops: operators.into_boxed_slice(),
+            operands: self.expr_scratch.take(operands_snapshot),
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
         }

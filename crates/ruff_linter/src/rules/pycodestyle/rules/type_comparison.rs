@@ -63,8 +63,9 @@ impl Violation for TypeComparison {
 
 /// E721
 pub(crate) fn type_comparison(checker: &Checker, compare: &ast::ExprCompare) {
-    for (left, right) in std::iter::once(&*compare.left)
-        .chain(&compare.comparators)
+    for (left, right) in compare
+        .operands
+        .iter()
         .tuple_windows()
         .zip(&compare.ops)
         .filter(|(_, op)| matches!(op, CmpOp::Eq | CmpOp::NotEq))
