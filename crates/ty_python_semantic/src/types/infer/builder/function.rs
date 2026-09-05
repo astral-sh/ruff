@@ -89,7 +89,11 @@ impl MethodReceiverKind {
             return None;
         }
 
-        let decorators = function_known_decorator_flags(db, definition);
+        let decorators = if function.decorator_list.is_empty() {
+            FunctionDecorators::empty()
+        } else {
+            function_known_decorator_flags(db, definition)
+        };
         if decorators.contains(FunctionDecorators::STATICMETHOD) && function.name.id != "__new__" {
             return None;
         }
