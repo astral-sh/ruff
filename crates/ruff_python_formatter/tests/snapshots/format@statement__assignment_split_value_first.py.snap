@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
-input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/statement/assignment_split_value_first.py
 ---
 ## Input
 ```python
@@ -265,7 +264,9 @@ bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
     first_item,
     second_item,
 ) = some_looooooooong_module.some_loooooog_function_name(
-    first_argument, second_argument, third_argument
+    first_argument,
+    second_argument,
+    third_argument,
 )
 
 
@@ -356,10 +357,17 @@ aaaaaa = a["aaa"] = bbbbb[aa, bbb, cccc] = dddddddddd = eeeeee = (
 
 # Don't parenthesize the function call if the left is unsplittable.
 this_is_a_ridiculously_long_name_and_nobody_in_their_right_mind_would_use_one_like_it = a.b.function(
-    arg1, arg2, arg3
+    arg1,
+    arg2,
+    arg3,
 )
 this_is_a_ridiculously_long_name_and_nobody_in_their_right_mind_would_use_one_like_it = function(
-    [1, 2, 3], arg1, [1, 2, 3], arg2, [1, 2, 3], arg3
+    [1, 2, 3],
+    arg1,
+    [1, 2, 3],
+    arg2,
+    [1, 2, 3],
+    arg3,
 )
 this_is_a_ridiculously_long_name_and_nobody_in_their_right_mind_would_use_one_like_it = function(
     [1, 2, 3],
@@ -378,7 +386,12 @@ this_is_a_ridiculously_long_name_and_nobodyddddddddddddddddddddddddddddddd = (
 )
 this_is_a_ridiculously_long_name_and_nobodyddddddddddddddddddddddddddddddd = function()
 this_is_a_ridiculously_long_name_and_nobodyddddddddddddddddddddddddddddddd = function(
-    [1, 2, 3], arg1, [1, 2, 3], arg2, [1, 2, 3], arg3
+    [1, 2, 3],
+    arg1,
+    [1, 2, 3],
+    arg2,
+    [1, 2, 3],
+    arg3,
 )
 this_is_a_ridiculously_long_name_and_nobodyddddddddddddddddddddddddddddddd = function(
     [1, 2, 3],

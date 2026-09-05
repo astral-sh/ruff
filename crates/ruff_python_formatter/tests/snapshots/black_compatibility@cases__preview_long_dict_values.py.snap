@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
-input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/preview_long_dict_values.py
 ---
 ## Input
 
@@ -228,7 +227,7 @@ class Random:
  }
  
  {
-@@ -139,17 +133,17 @@
+@@ -139,17 +133,18 @@
  
  class Random:
      def func():
@@ -245,7 +244,8 @@ class Random:
 -                            Timestamp(seconds=1530584000, nanos=0).ToJsonString()
 -                        ),
 +                        "actionTimestamp": Timestamp(
-+                            seconds=1530584000, nanos=0
++                            seconds=1530584000,
++                            nanos=0,
 +                        ).ToJsonString(),
                      }
                  },
@@ -400,7 +400,8 @@ class Random:
                         "latitude": 1,
                         "longitude": 2,
                         "actionTimestamp": Timestamp(
-                            seconds=1530584000, nanos=0
+                            seconds=1530584000,
+                            nanos=0,
                         ).ToJsonString(),
                     }
                 },
