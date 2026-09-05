@@ -1401,8 +1401,8 @@ def _(x1: int, x2: int, kwargs: dict[str, int]):
 
 ### `TypedDict`
 
-The keys in a `TypedDict` are static so there's no variable part to it, so step 4 shouldn't filter
-out any overloads.
+The keys in a closed `TypedDict` are static so there's no variable part to it, so step 4 shouldn't
+filter out any overloads.
 
 `overloaded.pyi`:
 
@@ -1418,16 +1418,34 @@ def f(**kwargs: int) -> tuple[int, ...]: ...
 ```
 
 ```py
-from typing import TypedDict
+from typing_extensions import TypedDict
 from overloaded import f
 
-class Foo(TypedDict):
+class Foo(TypedDict, closed=True):
     x: int
     y: int
 
 def _(foo: Foo, kwargs: dict[str, int]):
     reveal_type(f(**foo))  # revealed: tuple[int, int]
     reveal_type(f(**kwargs))  # revealed: tuple[int, ...]
+```
+
+An open `TypedDict` requires an overload that accepts arbitrary keyword arguments. Here, that
+overload only accepts `int` values, so it cannot accept hidden items of type `object`.
+
+`open.py`:
+
+```py
+from typing_extensions import TypedDict
+from overloaded import f
+
+class OpenFoo(TypedDict):
+    x: int
+    y: int
+
+def _(foo: OpenFoo):
+    # error: [invalid-argument-type]
+    reveal_type(f(**foo))  # revealed: Unknown
 ```
 
 ## Filtering based on `Any` / `Unknown`

@@ -52,7 +52,7 @@ keys into invalid named parameters:
 from typing import Optional, TypedDict
 
 Config = TypedDict("Config", {"in": int, "x-y": str, "ok": int})
-# revealed: Overload[(self: Config, map: Config, /, *, ok: int = ..., **kwargs) -> None, (self: Config, /, *, ok: int, **kwargs) -> None]
+# revealed: Overload[(self: Config, map: Config, /, *, ok: int = ..., **kwargs: object) -> None, (self: Config, /, *, ok: int, **kwargs: object) -> None]
 reveal_type(Config.__init__)
 ```
 
@@ -4005,7 +4005,7 @@ from typing import TypedDict
 class Box[T](TypedDict):
     value: T
 
-# revealed: Overload[(self: Box[int], map: Box[int], /, *, value: int = ...) -> None, (self: Box[int], /, *, value: int) -> None]
+# revealed: Overload[(self: Box[int], map: Box[int], /, *, value: int = ..., **kwargs: object) -> None, (self: Box[int], /, *, value: int, **kwargs: object) -> None]
 reveal_type(Box[int].__init__)
 ```
 
@@ -4053,6 +4053,18 @@ Box()  # error: [missing-typed-dict-key]
 Box(value=1, extra=2)  # error: [invalid-key]
 ```
 
+Known extra keys in an unpacked `TypedDict` are also rejected, even though the constructor accepts
+implicit hidden items.
+
+```py
+class SourceWithExtra(TypedDict):
+    value: int
+    extra: int
+
+def _(source: SourceWithExtra) -> None:
+    Box(**source)  # error: [invalid-key]
+```
+
 An invalid field value points to the field declaration and retains the usual `TypedDict`
 annotations.
 
@@ -4067,18 +4079,18 @@ LabeledBox(value=1, label=2)
 
 ```snapshot
 error[invalid-argument-type]: Invalid argument to key "label" with declared type `str` on TypedDict `LabeledBox`
-  --> src/mdtest_snippet.py:13:27
+  --> src/mdtest_snippet.py:19:27
    |
-13 | LabeledBox(value=1, label=2)
+19 | LabeledBox(value=1, label=2)
    | ----------          ------^
    | |                   |     |
    | |                   |     value of type `Literal[2]`
    | |                   key has declared type `str`
    | TypedDict `LabeledBox`
 info: Item declaration
-  --> src/mdtest_snippet.py:10:5
+  --> src/mdtest_snippet.py:16:5
    |
-10 |     label: str
+16 |     label: str
    |     ---------- Item declared here
 ```
 
@@ -8292,13 +8304,11 @@ def _(
     accepts_ints(**open_source)  # error: [invalid-argument-type]
     accepts_name(**ints)  # error: [unknown-argument]
 
-    # For backwards compatibility, implicit extra items on an ordinary open TypedDict are ignored
-    # when checking whether unpacking may supply unexpected arguments. Explicit extra items are not.
-    accepts_name(**open_source)
+    # Implicit extra items can also supply unexpected keyword arguments.
+    accepts_name(**open_source)  # error: [unknown-argument]
 
-    # TODO: This should arguably be rejected because `open_source` may contain a hidden `label`
-    # whose value is not assignable to `int`, but no other type checker rejects it.
-    accepts_optional_int_label(**open_source)
+    # A defaulted parameter does not make arbitrary additional keywords safe.
+    accepts_optional_int_label(**open_source)  # error: [unknown-argument]
     accepts_optional_label(**extra_only)  # error: [invalid-argument-type]
 
     OpenTarget(name="ok", **extra_only)  # error: [invalid-key]

@@ -5402,9 +5402,9 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
 
     /// Match the possible arbitrary keyword arguments represented by a `TypedDict`'s openness.
     ///
-    /// Explicit extra items can constrain named parameters without satisfying required parameters,
-    /// and require a keyword-variadic parameter to accept all remaining names. An open `TypedDict`
-    /// only constrains an existing keyword-variadic parameter.
+    /// Both implicit and explicit extra items require a keyword-variadic parameter to accept all
+    /// remaining names. Explicit extra items can also constrain named parameters without satisfying
+    /// required parameters.
     fn match_typed_dict_openness(
         &mut self,
         argument_index: usize,
@@ -5448,7 +5448,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                 false,
                 true,
             );
-        } else if has_explicit_extra_items {
+        } else {
             self.errors
                 .push(BindingError::UnknownKeywordVariadicArgument {
                     argument_index: self.get_argument_index(argument_index),
