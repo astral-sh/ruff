@@ -436,3 +436,57 @@ help: Use the `type` keyword
 123 |     # comment1
     |
 note: This is an unsafe fix and may change runtime behavior
+
+UP040 [*] Type alias `LongAlias` uses `TypeAliasType` assignment instead of the `type` keyword
+   --> UP040.py:137:1
+    |
+136 |   # Preserve parentheses around a multiline union in a TypeAliasType call.
+137 | / LongAlias = TypeAliasType(
+138 | |     "LongAlias",
+139 | |     int
+140 | |     | str
+141 | |     | float
+142 | | )
+    | |_^
+143 |
+144 |   # An already parenthesized value keeps its own parentheses.
+    |
+help: Use the `type` keyword
+    |
+136 | # Preserve parentheses around a multiline union in a TypeAliasType call.
+    - LongAlias = TypeAliasType(
+    -     "LongAlias",
+    -     int
+137 + type LongAlias = (int
+138 |     | str
+    -     | float
+    - )
+139 +     | float)
+140 |
+    |
+
+UP040 [*] Type alias `ParenAlias` uses `TypeAliasType` assignment instead of the `type` keyword
+   --> UP040.py:145:1
+    |
+144 |   # An already parenthesized value keeps its own parentheses.
+145 | / ParenAlias = TypeAliasType(
+146 | |     "ParenAlias",
+147 | |     (
+148 | |         int
+149 | |         | str
+150 | |     ),
+151 | | )
+    | |_^
+help: Use the `type` keyword
+    |
+144 | # An already parenthesized value keeps its own parentheses.
+    - ParenAlias = TypeAliasType(
+    -     "ParenAlias",
+    -     (
+145 + type ParenAlias = (
+146 |         int
+147 |         | str
+    -     ),
+    - )
+148 +     )
+    |
