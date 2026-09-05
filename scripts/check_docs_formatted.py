@@ -70,6 +70,7 @@ KNOWN_FORMATTING_VIOLATIONS = [
     "blank-lines-after-function-or-class",
     "blank-lines-before-nested-definition",
     "blank-lines-top-level",
+    "call-non-callable",
     "docstring-tab-indentation",
     "explicit-string-concatenation",
     "f-string-missing-placeholders",

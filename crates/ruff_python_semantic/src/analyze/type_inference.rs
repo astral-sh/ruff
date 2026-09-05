@@ -1,5 +1,7 @@
 //! Analysis rules to perform basic type inference on individual expressions.
 
+use std::fmt;
+
 use rustc_hash::FxHashSet;
 
 use ruff_python_ast as ast;
@@ -15,6 +17,27 @@ pub enum ResolvedPythonType {
     Unknown,
     /// The expression resolved to a `TypeError`, like `1 + "hello"`.
     TypeError,
+}
+
+impl fmt::Display for ResolvedPythonType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Atom(python_type) => write!(f, "{python_type}"),
+            Self::Union(python_types) => {
+                let mut python_types: Vec<_> = python_types.iter().collect();
+                python_types.sort_unstable();
+                for (index, python_type) in python_types.iter().enumerate() {
+                    if index > 0 {
+                        f.write_str(" | ")?;
+                    }
+                    write!(f, "{python_type}")?;
+                }
+                Ok(())
+            }
+            Self::Unknown => f.write_str("Unknown"),
+            Self::TypeError => f.write_str("TypeError"),
+        }
+    }
 }
 
 impl ResolvedPythonType {
@@ -427,6 +450,23 @@ impl PythonType {
     }
 }
 
+impl fmt::Display for PythonType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            PythonType::String => f.write_str("str"),
+            PythonType::Bytes => f.write_str("bytes"),
+            PythonType::Number(number_like) => number_like.fmt(f),
+            PythonType::None => f.write_str("NoneType"),
+            PythonType::Ellipsis => f.write_str("ellipsis"),
+            PythonType::Dict => f.write_str("dict"),
+            PythonType::List => f.write_str("list"),
+            PythonType::Set => f.write_str("set"),
+            PythonType::Tuple => f.write_str("tuple"),
+            PythonType::Generator => f.write_str("generator"),
+        }
+    }
+}
+
 /// A numeric type, or a type that can be trivially coerced to a numeric type.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum NumberLike {
@@ -448,6 +488,17 @@ impl NumberLike {
             (NumberLike::Complex, _) | (_, NumberLike::Complex) => NumberLike::Complex,
             (NumberLike::Float, _) | (_, NumberLike::Float) => NumberLike::Float,
             _ => NumberLike::Integer,
+        }
+    }
+}
+
+impl fmt::Display for NumberLike {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            NumberLike::Integer => f.write_str("int"),
+            NumberLike::Float => f.write_str("float"),
+            NumberLike::Complex => f.write_str("complex"),
+            NumberLike::Bool => f.write_str("bool"),
         }
     }
 }
