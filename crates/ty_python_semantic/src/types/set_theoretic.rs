@@ -1267,19 +1267,14 @@ fn expand_intersection_typevars_and_newtypes<'db>(
     let mut builder = IntersectionBuilder::new(db, env);
     for &element in positive {
         match element {
-            Type::TypeVar(tvar) => {
-                match tvar.typevar(db).bound_or_constraints(db, env) {
-                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                        builder.add_positive_in_place(bound);
-                    }
-                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                        builder.add_positive_in_place(constraints.as_type(db, env));
-                    }
-                    // Type variables without bounds or constraints implicitly have `object`
-                    // as their upper bound, and adding `object` to an intersection is always a no-op
-                    None => {}
+            Type::TypeVar(tvar) => match tvar.require_bound_or_constraints(db, env) {
+                TypeVarBoundOrConstraints::UpperBound(bound) => {
+                    builder.add_positive_in_place(bound);
                 }
-            }
+                TypeVarBoundOrConstraints::Constraints(constraints) => {
+                    builder.add_positive_in_place(constraints.as_type(db, env));
+                }
+            },
             Type::NewTypeInstance(newtype) => {
                 builder.add_positive_in_place(newtype.concrete_base_type(db));
             }

@@ -2858,6 +2858,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             }
         };
 
+        // The top signature is supertype of (and assignable from) all other signatures. It is a
+        // subtype of no signature except itself, and assignable only to the gradual signature.
+        if target_parameters.is_top() {
+            return result;
+        }
+
         if self.typevar_evaluation == TypeVarEvaluation::Lazy {
             let source_paramspec = source_parameters.as_paramspec_with_prefix();
             let target_paramspec = target_parameters.as_paramspec_with_prefix();
@@ -3453,11 +3459,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             return result;
         }
 
-        // The top signature is supertype of (and assignable from) all other signatures. It is a
-        // subtype of no signature except itself, and assignable only to the gradual signature.
-        if target_parameters.is_top() {
-            return result;
-        } else if source_parameters.is_top() && !target_parameters.is_gradual() {
+        if source_parameters.is_top() && !target_parameters.is_gradual() {
             if let Some(context) = self.report_context() {
                 context.push(ErrorContext::TopCallableAssignedToNonTop {
                     return_type: source.return_ty,
