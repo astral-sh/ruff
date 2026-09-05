@@ -1,0 +1,30 @@
+---
+source: crates/ruff_linter/src/rules/isort/mod.rs
+---
+I001 [*] Import block is un-sorted or un-formatted
+  --> lines_before_imports_comment_before.py:3:1
+   |
+ 1 |   #!/usr/bin/env python
+ 2 |
+ 3 | / from __future__ import annotations
+ 4 | |
+ 5 | | from typing import Any
+ 6 | |
+ 7 | | from requests import Session
+ 8 | |
+ 9 | | from my_first_party import my_first_party_object
+10 | |
+11 | | from . import my_local_folder_object
+   | |____________________________________^
+   |
+help: Organize imports
+4  |
+5  | from typing import Any
+6  |
+   - from requests import Session
+   -
+7  | from my_first_party import my_first_party_object
+8  + from requests import Session
+9  |
+10 | from . import my_local_folder_object
+11 |
