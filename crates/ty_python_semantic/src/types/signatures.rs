@@ -350,12 +350,9 @@ impl<'db> CallableSignature<'db> {
                             type_mapping.update_signature_generic_context(db, env, context)
                         }),
                         definition: self_signature.definition,
-                        source_overload_index: self_signature.source_overload_index,
-                        receiver_constraints: self_signature.map_receiver_constraints(
-                            db,
-                            type_mapping,
-                            tcx,
-                            visitor,
+                        extras: SignatureExtras::new(
+                            self_signature.source_overload_index_raw(),
+                            self_signature.map_receiver_constraints(db, type_mapping, tcx, visitor),
                         ),
                         parameters,
                         return_ty: self_signature.return_ty.apply_type_mapping_impl(
@@ -382,8 +379,7 @@ impl<'db> CallableSignature<'db> {
                             // Keep the enclosing method's definition for binding `Self` and
                             // other receiver type variables after specializing its parameters.
                             definition: self_signature.definition,
-                            source_overload_index: signature.source_overload_index,
-                            receiver_constraints: {
+                            extras: SignatureExtras::new(signature.source_overload_index_raw(), {
                                 let mapped = self_signature.map_receiver_constraints(
                                     db,
                                     type_mapping,
@@ -393,10 +389,10 @@ impl<'db> CallableSignature<'db> {
                                 merge_receiver_constraints(
                                     db,
                                     env,
-                                    signature.receiver_constraints.as_ref(),
+                                    signature.receiver_constraints(),
                                     mapped.as_ref(),
                                 )
-                            },
+                            }),
                             parameters: signature.parameters().with_prefix(
                                 prefix_parameters.iter().map(|param| {
                                     param.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
@@ -604,14 +600,8 @@ pub struct Signature<'db> {
     /// This is useful for locating and extracting docstring information for the signature.
     pub(crate) definition: Option<Definition<'db>>,
 
-    /// Position of this overload in the original function definition.
-    ///
-    /// Filtering, receiver binding, and partial application can leave a signature at a different
-    /// position in the active overload list. Preserve its source position for call diagnostics.
-    source_overload_index: Option<NonZeroU32>,
-
-    /// The constraint introduced by binding an explicitly annotated receiver, if any.
-    receiver_constraints: Option<OwnedConstraintSet<'db>>,
+    /// Information that is only present for overloads or signatures with a bound receiver.
+    extras: Option<Box<SignatureExtras<'db>>>,
 
     /// Parameters, in source order.
     ///
@@ -625,6 +615,33 @@ pub struct Signature<'db> {
 
     /// Return type. If no annotation was provided, this is `Unknown`.
     pub(crate) return_ty: Type<'db>,
+}
+
+/// Additional signature data needed for overload diagnostics or receiver binding.
+#[derive(Clone, Debug, get_size2::GetSize, PartialEq, Eq, Hash, salsa::SalsaValue)]
+struct SignatureExtras<'db> {
+    /// Position of this overload in the original function definition.
+    ///
+    /// Filtering, receiver binding, and partial application can leave a signature at a different
+    /// position in the active overload list. Preserve its source position for call diagnostics.
+    source_overload_index: Option<NonZeroU32>,
+
+    /// The constraint introduced by binding an explicitly annotated receiver, if any.
+    receiver_constraints: Option<OwnedConstraintSet<'db>>,
+}
+
+impl<'db> SignatureExtras<'db> {
+    fn new(
+        source_overload_index: Option<NonZeroU32>,
+        receiver_constraints: Option<OwnedConstraintSet<'db>>,
+    ) -> Option<Box<Self>> {
+        (source_overload_index.is_some() || receiver_constraints.is_some()).then(|| {
+            Box::new(Self {
+                source_overload_index,
+                receiver_constraints,
+            })
+        })
+    }
 }
 
 /// Whether one callable signature's parameters are compatible with another's.
@@ -761,8 +778,7 @@ impl<'db> Signature<'db> {
         Self {
             generic_context: None,
             definition: None,
-            source_overload_index: None,
-            receiver_constraints: None,
+            extras: None,
             parameters,
             return_ty,
         }
@@ -776,8 +792,7 @@ impl<'db> Signature<'db> {
         Self {
             generic_context,
             definition: None,
-            source_overload_index: None,
-            receiver_constraints: None,
+            extras: None,
             parameters,
             return_ty,
         }
@@ -788,8 +803,7 @@ impl<'db> Signature<'db> {
         Signature {
             generic_context: None,
             definition: None,
-            source_overload_index: None,
-            receiver_constraints: None,
+            extras: None,
             parameters: Parameters::gradual_form(),
             return_ty: signature_type,
         }
@@ -842,8 +856,7 @@ impl<'db> Signature<'db> {
         Self {
             generic_context,
             definition: Some(definition),
-            source_overload_index: None,
-            receiver_constraints: None,
+            extras: None,
             parameters,
             return_ty,
         }
@@ -949,8 +962,7 @@ impl<'db> Signature<'db> {
         Self {
             generic_context: self.generic_context,
             definition: self.definition,
-            source_overload_index: self.source_overload_index,
-            receiver_constraints: self.receiver_constraints.clone(),
+            extras: self.extras.clone(),
             parameters,
             return_ty,
         }
@@ -981,8 +993,7 @@ impl<'db> Signature<'db> {
         Some(Self {
             generic_context: self.generic_context,
             definition: self.definition,
-            source_overload_index: self.source_overload_index,
-            receiver_constraints: self.receiver_constraints.clone(),
+            extras: self.extras.clone(),
             parameters,
             return_ty,
         })
@@ -1001,8 +1012,10 @@ impl<'db> Signature<'db> {
                 .generic_context
                 .map(|context| type_mapping.update_signature_generic_context(db, env, context)),
             definition: self.definition,
-            source_overload_index: self.source_overload_index,
-            receiver_constraints: self.map_receiver_constraints(db, type_mapping, tcx, visitor),
+            extras: SignatureExtras::new(
+                self.source_overload_index_raw(),
+                self.map_receiver_constraints(db, type_mapping, tcx, visitor),
+            ),
             parameters: self
                 .parameters
                 .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
@@ -1224,7 +1237,7 @@ impl<'db> Signature<'db> {
         let receiver_constraints = merge_receiver_constraints(
             db,
             env,
-            self.receiver_constraints.as_ref(),
+            self.receiver_constraints(),
             receiver_constraint.as_deref(),
         );
         if let Some(self_type) = typing_self_type
@@ -1246,8 +1259,7 @@ impl<'db> Signature<'db> {
                 .generic_context
                 .map(|generic_context| generic_context.remove_self(db, binding_context)),
             definition: self.definition,
-            source_overload_index: self.source_overload_index,
-            receiver_constraints,
+            extras: SignatureExtras::new(self.source_overload_index_raw(), receiver_constraints),
             parameters,
             return_ty,
         }
@@ -1304,7 +1316,7 @@ impl<'db> Signature<'db> {
     ) -> Option<CallableSignature<'db>> {
         let bound_signature =
             self.bind_self_with_receiver(db, env, Some(receiver_type), Some(typing_self_type));
-        let Some(receiver_constraints) = bound_signature.receiver_constraints.as_ref() else {
+        let Some(receiver_constraints) = bound_signature.receiver_constraints() else {
             return Some(CallableSignature::single(self.clone()));
         };
 
@@ -1375,7 +1387,7 @@ impl<'db> Signature<'db> {
         // The captured `ParamSpec` can carry overload indices from another callable. Keep
         // this method's overload index so call diagnostics refer to the correct declaration.
         for signature in &mut specialized.overloads {
-            signature.source_overload_index = self.source_overload_index;
+            signature.set_source_overload_index(self.source_overload_index_raw());
         }
 
         Some(specialized)
@@ -1577,7 +1589,10 @@ impl<'db> Signature<'db> {
             });
         if !self.needs_self_mapping(db, env, false) {
             return Self {
-                receiver_constraints,
+                extras: SignatureExtras::new(
+                    self.source_overload_index_raw(),
+                    receiver_constraints,
+                ),
                 ..self.clone()
             };
         }
@@ -1597,8 +1612,7 @@ impl<'db> Signature<'db> {
         Self {
             generic_context: self.generic_context,
             definition: self.definition,
-            source_overload_index: self.source_overload_index,
-            receiver_constraints,
+            extras: SignatureExtras::new(self.source_overload_index_raw(), receiver_constraints),
             parameters,
             return_ty,
         }
@@ -1609,7 +1623,7 @@ impl<'db> Signature<'db> {
         db: &'db dyn Db,
         checker: &TypeRelationChecker<'_, 'c, 'db>,
     ) -> ConstraintSet<'db, 'c> {
-        let Some(constraints) = self.receiver_constraints.as_ref() else {
+        let Some(constraints) = self.receiver_constraints() else {
             return checker.always();
         };
         checker.constraints.load(db, checker.env, constraints)
@@ -1622,13 +1636,8 @@ impl<'db> Signature<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Option<OwnedConstraintSet<'db>> {
-        let constraints = Self::map_constraints(
-            db,
-            self.receiver_constraints.as_ref()?,
-            type_mapping,
-            tcx,
-            visitor,
-        );
+        let constraints =
+            Self::map_constraints(db, self.receiver_constraints()?, type_mapping, tcx, visitor);
         (!constraints
             .query(|_builder, constraints| constraints.is_always_satisfied(db, visitor.env)))
         .then_some(constraints)
@@ -1656,8 +1665,8 @@ impl<'db> Signature<'db> {
     }
 
     pub(super) fn receiver_constraint_types(&self) -> impl Iterator<Item = Type<'db>> + '_ {
-        self.receiver_constraints
-            .iter()
+        self.receiver_constraints()
+            .into_iter()
             .flat_map(OwnedConstraintSet::types)
     }
 
@@ -1989,16 +1998,40 @@ impl<'db> Signature<'db> {
 
     /// Records this signature's position in its defining function's overload list.
     pub(crate) fn with_source_overload_index(mut self, index: Option<usize>) -> Self {
-        self.source_overload_index = index
+        let index = index
             .and_then(|index| u32::try_from(index).ok())
             .and_then(|index| index.checked_add(1))
             .and_then(NonZeroU32::new);
+        self.set_source_overload_index(index);
         self
+    }
+
+    fn set_source_overload_index(&mut self, index: Option<NonZeroU32>) {
+        if let Some(extras) = self.extras.as_deref_mut() {
+            extras.source_overload_index = index;
+            if index.is_none() && extras.receiver_constraints.is_none() {
+                self.extras = None;
+            }
+        } else {
+            self.extras = SignatureExtras::new(index, None);
+        }
+    }
+
+    fn source_overload_index_raw(&self) -> Option<NonZeroU32> {
+        self.extras
+            .as_ref()
+            .and_then(|extras| extras.source_overload_index)
+    }
+
+    fn receiver_constraints(&self) -> Option<&OwnedConstraintSet<'db>> {
+        self.extras
+            .as_ref()
+            .and_then(|extras| extras.receiver_constraints.as_ref())
     }
 
     /// Returns this signature's position in its defining function's overload list.
     pub(crate) fn source_overload_index(&self) -> Option<usize> {
-        self.source_overload_index
+        self.source_overload_index_raw()
             .map(|index| index.get() as usize - 1)
     }
 
@@ -2074,10 +2107,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // Aggregation summarizes visible parameters and return types, but receiver bindings are
         // additional per-signature obligations. Leave those signatures to the ordinary relation,
         // which checks each receiver binding before comparing the visible signature.
-        if target_signature.receiver_constraints.is_some()
+        if target_signature.receiver_constraints().is_some()
             || source_signatures
                 .iter()
-                .any(|signature| signature.receiver_constraints.is_some())
+                .any(|signature| signature.receiver_constraints().is_some())
         {
             return None;
         }
@@ -2413,7 +2446,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // Every nonterminal receiver constraint constrains at least one typevar. Terminal `always`
         // sets are discarded when receiver constraints are merged, so presence alone is enough to
         // require lazy typevar evaluation here.
-        if source.receiver_constraints.is_some() || target.receiver_constraints.is_some() {
+        if source.receiver_constraints().is_some() || target.receiver_constraints().is_some() {
             checker.typevar_evaluation = TypeVarEvaluation::Lazy;
         }
         let when = checker.with_signature_recursion_guard(source, target, || {
@@ -6122,6 +6155,25 @@ mod tests {
                 "source-backed parameter should have a definition"
             );
         }
+    }
+
+    #[test]
+    #[cfg(target_pointer_width = "64")]
+    fn signature_size() {
+        assert_eq!(std::mem::size_of::<Signature<'_>>(), 64);
+    }
+
+    #[test]
+    fn overload_index_preserves_receiver_constraints() {
+        let mut signature = Signature::new(Parameters::empty(), Type::unknown());
+        signature.extras = SignatureExtras::new(None, Some(OwnedConstraintSet::always()));
+        signature = signature
+            .with_source_overload_index(Some(2))
+            .with_source_overload_index(None);
+
+        assert_eq!(signature.source_overload_index(), None);
+        assert!(signature.receiver_constraints().is_some());
+        assert!(signature.extras.is_some());
     }
 
     #[test]
