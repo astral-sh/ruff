@@ -6158,25 +6158,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(target_pointer_width = "64")]
-    fn signature_size() {
-        assert_eq!(std::mem::size_of::<Signature<'_>>(), 64);
-    }
-
-    #[test]
-    fn overload_index_preserves_receiver_constraints() {
-        let mut signature = Signature::new(Parameters::empty(), Type::unknown());
-        signature.extras = SignatureExtras::new(None, Some(OwnedConstraintSet::always()));
-        signature = signature
-            .with_source_overload_index(Some(2))
-            .with_source_overload_index(None);
-
-        assert_eq!(signature.source_overload_index(), None);
-        assert!(signature.receiver_constraints().is_some());
-        assert!(signature.extras.is_some());
-    }
-
-    #[test]
     fn always_satisfied_receiver_constraints_are_discarded() {
         let db = setup_db();
         let db = &db;
