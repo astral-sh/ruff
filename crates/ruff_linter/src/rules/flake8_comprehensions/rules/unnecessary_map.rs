@@ -42,9 +42,35 @@ use crate::{FixAvailability, Violation};
 /// (x + 1 for x in iterable)
 /// ```
 ///
+/// ## Known problems
+/// A `map` object and a generator expression are not interchangeable when the
+/// mapped expression raises. Once an exception propagates out of a generator,
+/// the generator is closed, so every later `next()` call raises
+/// `StopIteration`. A `map` object is not closed, so iteration can resume after
+/// the error:
+///
+/// ```python
+/// values = ["0", "x", "2"]
+///
+/// m = map(lambda v: int(v), values)
+/// next(m)  # 0
+/// next(m)  # raises ValueError
+/// next(m)  # 2
+///
+/// g = (int(v) for v in values)
+/// next(g)  # 0
+/// next(g)  # raises ValueError
+/// next(g)  # raises StopIteration
+/// ```
+///
+/// Ruff cannot tell whether a caller relies on this difference, so the
+/// diagnostic is still reported in such cases.
+///
 /// ## Fix safety
 /// This rule's fix is marked as unsafe, as it may occasionally drop comments
 /// when rewriting the call. In most cases, though, comments will be preserved.
+/// The fix is also unsafe because it can change how errors propagate out of the
+/// resulting iterator, as described under "Known problems" above.
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.74", category = Category::Complexity)]
 pub(crate) struct UnnecessaryMap {
