@@ -1045,9 +1045,6 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     checker.semantic.current_statement_parent(),
                 );
             }
-            if checker.is_rule_enabled(Rule::OutdatedVersionBlock) {
-                pyupgrade::rules::outdated_version_block(checker, if_);
-            }
             if checker.is_rule_enabled(Rule::CollapsibleElseIf) {
                 pylint::rules::collapsible_else_if(checker, stmt);
             }

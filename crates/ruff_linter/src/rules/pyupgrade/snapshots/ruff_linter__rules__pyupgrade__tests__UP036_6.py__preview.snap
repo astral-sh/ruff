@@ -1,0 +1,356 @@
+---
+source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+---
+UP036 Version check is outdated for minimum Python version
+  --> UP036_6.py:8:8
+   |
+ 6 | ###
+ 7 |
+ 8 | PY37 = sys.version_info < (3, 8)
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^
+ 9 |
+10 | old_pypy = hasattr(sys, "pypy_version_info") and sys.version_info < (3, 8)
+   |
+
+UP036 Version check is outdated for minimum Python version
+  --> UP036_6.py:10:50
+   |
+ 8 | PY37 = sys.version_info < (3, 8)
+ 9 |
+10 | old_pypy = hasattr(sys, "pypy_version_info") and sys.version_info < (3, 8)
+   |                                                  ^^^^^^^^^^^^^^^^^^^^^^^^^
+11 |
+12 | print("py3" if sys.version_info >= (3, 8) else "py2")
+   |
+
+UP036 Version check is outdated for minimum Python version
+  --> UP036_6.py:12:16
+   |
+10 | old_pypy = hasattr(sys, "pypy_version_info") and sys.version_info < (3, 8)
+11 |
+12 | print("py3" if sys.version_info >= (3, 8) else "py2")
+   |                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+13 |
+14 | print(sys.version_info >= (3, 8))
+   |
+
+UP036 Version check is outdated for minimum Python version
+  --> UP036_6.py:14:7
+   |
+12 | print("py3" if sys.version_info >= (3, 8) else "py2")
+13 |
+14 | print(sys.version_info >= (3, 8))
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^
+15 |
+16 | assert sys.version_info >= (3, 8)
+   |
+
+UP036 Version check is outdated for minimum Python version
+  --> UP036_6.py:16:8
+   |
+14 | print(sys.version_info >= (3, 8))
+15 |
+16 | assert sys.version_info >= (3, 8)
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+17 |
+18 | while sys.version_info < (3, 8):
+   |
+
+UP036 Version check is outdated for minimum Python version
+  --> UP036_6.py:18:7
+   |
+16 | assert sys.version_info >= (3, 8)
+17 |
+18 | while sys.version_info < (3, 8):
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^
+19 |     print("py2")
+   |
+
+UP036 Version check is outdated for minimum Python version
+  --> UP036_6.py:21:14
+   |
+19 |     print("py2")
+20 |
+21 | legacy = not sys.version_info >= (3, 8)
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^
+22 |
+23 | supported = [feature for feature in features if sys.version_info >= (3, 8)]
+   |
+
+UP036 Version check is outdated for minimum Python version
+  --> UP036_6.py:23:49
+   |
+21 | legacy = not sys.version_info >= (3, 8)
+22 |
+23 | supported = [feature for feature in features if sys.version_info >= (3, 8)]
+   |                                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+
+UP036 Version check is outdated for minimum Python version
+  --> UP036_6.py:26:14
+   |
+26 | def f(legacy=sys.version_info < (3, 8)):
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^
+27 |     return sys.version_info < (3, 8)
+   |
+
+UP036 Version check is outdated for minimum Python version
+  --> UP036_6.py:27:12
+   |
+26 | def f(legacy=sys.version_info < (3, 8)):
+27 |     return sys.version_info < (3, 8)
+   |            ^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+
+UP036 Version check is outdated for minimum Python version
+  --> UP036_6.py:31:14
+   |
+30 | class C:
+31 |     LEGACY = sys.version_info < (3, 8)
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+
+UP036 Version check is outdated for minimum Python version
+  --> UP036_6.py:39:13
+   |
+37 | ###
+38 |
+39 | if True and sys.version_info < (3, 5):
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^
+40 |     print("35")
+   |
+
+UP036 Version check is outdated for minimum Python version
+  --> UP036_6.py:42:4
+   |
+40 |     print("35")
+41 |
+42 | if sys.version_info < (3, 5) or sys.version_info > (3, 10):
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^
+43 |     print("both operands are outdated")
+   |
+
+UP036 Version check is outdated for minimum Python version
+  --> UP036_6.py:42:33
+   |
+40 |     print("35")
+41 |
+42 | if sys.version_info < (3, 5) or sys.version_info > (3, 10):
+   |                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^
+43 |     print("both operands are outdated")
+   |
+
+UP036 Version check is outdated for minimum Python version
+  --> UP036_6.py:45:8
+   |
+43 |     print("both operands are outdated")
+44 |
+45 | if not sys.version_info < (3, 8):
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^
+46 |     print("py3")
+   |
+
+UP036 Version check is outdated for minimum Python version
+  --> UP036_6.py:50:14
+   |
+48 | if foo:
+49 |     print(1)
+50 | elif bar and sys.version_info < (3, 8):
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^
+51 |     print(2)
+   |
+
+UP036 [*] Version block is outdated for minimum Python version
+  --> UP036_6.py:54:4
+   |
+53 | # Every link of the chain is a version check, so the whole branch can go.
+54 | if (3, 8) <= sys.version_info < (3, 10):
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+55 |     print("3.8 or 3.9")
+   |
+help: Remove outdated version block
+   |
+53 | # Every link of the chain is a version check, so the whole branch can go.
+   - if (3, 8) <= sys.version_info < (3, 10):
+   -     print("3.8 or 3.9")
+54 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+UP036 Version check is outdated for minimum Python version
+  --> UP036_6.py:58:15
+   |
+57 | # Outside of a branch test there is nothing to remove, so each link is reported on its own.
+58 | is_38_or_39 = (3, 8) <= sys.version_info < (3, 10)
+   |               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+59 |
+60 | # Only the first link is outdated; the branch is still reachable, so it stays.
+   |
+
+UP036 Version check is outdated for minimum Python version
+  --> UP036_6.py:58:25
+   |
+57 | # Outside of a branch test there is nothing to remove, so each link is reported on its own.
+58 | is_38_or_39 = (3, 8) <= sys.version_info < (3, 10)
+   |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+59 |
+60 | # Only the first link is outdated; the branch is still reachable, so it stays.
+   |
+
+UP036 Version check is outdated for minimum Python version
+  --> UP036_6.py:61:4
+   |
+60 | # Only the first link is outdated; the branch is still reachable, so it stays.
+61 | if (3, 8) <= sys.version_info < (3, 15):
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^
+62 |     print("at most 3.14")
+   |
+
+UP036 Version check is outdated for minimum Python version
+  --> UP036_6.py:66:10
+   |
+64 | # `foo` is not a version check, so the branch is left alone even though the second link
+65 | # is always false.
+66 | if foo < sys.version_info < (3, 10):
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^
+67 |     print("unreachable")
+   |
+
+UP036 Version check is outdated for minimum Python version
+  --> UP036_6.py:70:4
+   |
+69 | # The second link cannot be resolved, so the branch is left alone.
+70 | if (3, 8) <= sys.version_info <= (3, 13, foo):
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^
+71 |     print("maybe")
+   |
+
+UP036 [*] Version block is outdated for minimum Python version
+  --> UP036_6.py:78:4
+   |
+76 | ###
+77 |
+78 | if (3, 0) > sys.version_info:
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^
+79 |     print("py2")
+   |
+help: Remove outdated version block
+   |
+77 |
+   - if (3, 0) > sys.version_info:
+   -     print("py2")
+78 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+UP036 Version check is outdated for minimum Python version
+  --> UP036_6.py:81:10
+   |
+79 |     print("py2")
+80 |
+81 | is_py3 = (3, 0) < sys.version_info
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^^
+82 |
+83 | if 3 == sys.version_info[0]:
+   |
+
+UP036 [*] Version block is outdated for minimum Python version
+  --> UP036_6.py:83:4
+   |
+81 | is_py3 = (3, 0) < sys.version_info
+82 |
+83 | if 3 == sys.version_info[0]:
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^
+84 |     print("py3")
+   |
+help: Remove outdated version block
+   |
+82 |
+   - if 3 == sys.version_info[0]:
+   -     print("py3")
+83 + print("py3")
+84 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+UP036 Version check is outdated for minimum Python version
+  --> UP036_6.py:86:7
+   |
+84 |     print("py3")
+85 |
+86 | while (3, 8) > sys.version_info:
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^
+87 |     print("py2")
+   |
+
+UP036 Version specifier is invalid
+  --> UP036_6.py:94:34
+   |
+92 | ###
+93 |
+94 | unsupported = sys.version_info < (3, 10000000)
+   |                                  ^^^^^^^^^^^^^
+95 |
+96 | if foo or sys.version_info == 10000000:
+   |
+
+UP036 Version specifier is invalid
+  --> UP036_6.py:96:31
+   |
+94 | unsupported = sys.version_info < (3, 10000000)
+95 |
+96 | if foo or sys.version_info == 10000000:
+   |                               ^^^^^^^^
+97 |     print("py3")
+   |
+
+UP036 Version specifier is invalid
+   --> UP036_6.py:99:12
+    |
+ 97 |     print("py3")
+ 98 |
+ 99 | nonsense = 10000000 == sys.version_info[0]
+    |            ^^^^^^^^
+100 |
+101 | # Identity is symmetric, so both operand orders are reported.
+    |
+
+UP036 Version specifier is invalid
+   --> UP036_6.py:102:34
+    |
+101 | # Identity is symmetric, so both operand orders are reported.
+102 | mistake = sys.version_info[0] is 10000000
+    |                                  ^^^^^^^^
+103 |
+104 | also_mistake = 10000000 is sys.version_info[0]
+    |
+
+UP036 Version specifier is invalid
+   --> UP036_6.py:104:16
+    |
+102 | mistake = sys.version_info[0] is 10000000
+103 |
+104 | also_mistake = 10000000 is sys.version_info[0]
+    |                ^^^^^^^^
+    |
+
+UP036 Version check is outdated for minimum Python version
+   --> UP036_6.py:111:16
+    |
+109 | ###
+110 |
+111 | major_is_py3 = sys.version_info.major >= 3
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+112 |
+113 | if foo and sys.version_info.major < 3:
+    |
+
+UP036 Version check is outdated for minimum Python version
+   --> UP036_6.py:113:12
+    |
+111 | major_is_py3 = sys.version_info.major >= 3
+112 |
+113 | if foo and sys.version_info.major < 3:
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+114 |     print("py2")
+    |

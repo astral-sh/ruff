@@ -1,4 +1,5 @@
 use std::cmp::Ordering;
+use std::ptr;
 
 use anyhow::Result;
 
@@ -6,27 +7,29 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::stmt_if::{BranchKind, IfElifBranch, if_elif_branches};
 use ruff_python_ast::whitespace::indentation;
-use ruff_python_ast::{self as ast, CmpOp, ElifElseClause, Expr, Int, StmtIf};
+use ruff_python_ast::{self as ast, CmpOp, ElifElseClause, Expr, Int, PythonVersion, Stmt, StmtIf};
+use ruff_python_semantic::SemanticModel;
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextLen, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::fix::edits::{adjust_indentation, delete_stmt};
+use crate::preview::is_outdated_version_check_enabled;
 use crate::{Edit, Fix, FixAvailability, Violation};
-use ruff_python_ast::PythonVersion;
-use ruff_python_semantic::SemanticModel;
 
 /// ## What it does
-/// Checks for conditional blocks gated on `sys.version_info` comparisons
-/// that are outdated for the minimum supported Python version.
+/// Checks for `sys.version_info` comparisons that are outdated for the minimum
+/// supported Python version.
 ///
 /// ## Why is this bad?
 /// In Python, code can be conditionally executed based on the active
 /// Python version by comparing against the `sys.version_info` tuple.
 ///
-/// If a code block is only executed for Python versions older than the
-/// minimum supported version, it should be removed.
+/// If a comparison always evaluates to the same value for every supported Python
+/// version, the code it guards is either dead or unconditional, and should be
+/// simplified. For example, if a code block is only executed for Python versions
+/// older than the minimum supported version, it should be removed.
 ///
 /// ## Example
 /// ```python
@@ -43,8 +46,30 @@ use ruff_python_semantic::SemanticModel;
 /// print("py3")
 /// ```
 ///
+/// By default, this rule only applies to comparisons that make up the entire test
+/// of an `if` or `elif` branch. In [preview], it flags every outdated
+/// `sys.version_info` comparison, wherever it appears:
+///
+/// ```python
+/// import sys
+///
+/// PY2 = sys.version_info < (3, 0)
+///
+/// if force_legacy or sys.version_info < (3, 0):
+///     print("py2")
+/// ```
+///
 /// ## Options
 /// - `target-version`
+///
+/// ## Fix availability
+/// A fix is only offered when the entire test of an `if` or `elif` branch is made up of
+/// `sys.version_info` comparisons, since only then is it clear which code is
+/// unreachable. This includes chained comparisons such as
+/// `if (3, 8) <= sys.version_info < (3, 10)`, as long as every link is a version check.
+/// Elsewhere, such as in an assignment or alongside an unrelated condition, replacing
+/// the comparison with `True` or `False` would be sound, but it would defeat the
+/// purpose of flagging obsolete code that can be migrated.
 ///
 /// ## Fix safety
 /// This rule's fix is marked as unsafe because it will remove all code,
@@ -52,10 +77,15 @@ use ruff_python_semantic::SemanticModel;
 ///
 /// ## References
 /// - [Python documentation: `sys.version_info`](https://docs.python.org/3/library/sys.html#sys.version_info)
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.240", category = Category::Suspicious)]
 pub(crate) struct OutdatedVersionBlock {
     reason: Reason,
+    /// Whether the comparison makes up the entire test of an `if` or `elif` branch,
+    /// in which case the branch as a whole (not just the comparison) is outdated.
+    is_block: bool,
 }
 
 impl Violation for OutdatedVersionBlock {
@@ -65,7 +95,11 @@ impl Violation for OutdatedVersionBlock {
     fn message(&self) -> String {
         match self.reason {
             Reason::AlwaysFalse | Reason::AlwaysTrue => {
-                "Version block is outdated for minimum Python version".to_string()
+                if self.is_block {
+                    "Version block is outdated for minimum Python version".to_string()
+                } else {
+                    "Version check is outdated for minimum Python version".to_string()
+                }
             }
             Reason::Invalid => "Version specifier is invalid".to_string(),
         }
@@ -73,140 +107,248 @@ impl Violation for OutdatedVersionBlock {
 
     fn fix_title(&self) -> Option<String> {
         match self.reason {
-            Reason::AlwaysFalse | Reason::AlwaysTrue => {
+            Reason::AlwaysFalse | Reason::AlwaysTrue if self.is_block => {
                 Some("Remove outdated version block".to_string())
             }
-            Reason::Invalid => None,
+            _ => None,
         }
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 enum Reason {
     AlwaysTrue,
     AlwaysFalse,
     Invalid,
 }
 
+/// One adjacent pair of a (possibly chained) comparison, normalized to the
+/// `sys.version_info <op> <version>` form.
+struct Link {
+    /// Why the check is outdated, or `None` if this pair is not a decidable version check.
+    reason: Option<Reason>,
+    /// Where to report: the version operand for an invalid specifier, the whole pair otherwise.
+    range: TextRange,
+    /// Whether `sys.version_info` was written on the left-hand side.
+    version_info_on_left: bool,
+}
+
+/// Whether an entire branch test is known to evaluate the same way on every supported version.
+#[derive(Debug, Copy, Clone)]
+enum BranchVerdict {
+    AlwaysTrue,
+    AlwaysFalse,
+}
+
+impl From<BranchVerdict> for Reason {
+    fn from(verdict: BranchVerdict) -> Self {
+        match verdict {
+            BranchVerdict::AlwaysTrue => Reason::AlwaysTrue,
+            BranchVerdict::AlwaysFalse => Reason::AlwaysFalse,
+        }
+    }
+}
+
 /// UP036
-pub(crate) fn outdated_version_block(checker: &Checker, stmt_if: &StmtIf) {
-    for branch in if_elif_branches(stmt_if) {
-        let Expr::Compare(ast::ExprCompare {
-            left,
-            ops,
-            comparators,
-            range: _,
-            node_index: _,
-        }) = &branch.test
-        else {
-            continue;
-        };
+pub(crate) fn outdated_version_block(checker: &Checker, expr: &Expr, compare: &ast::ExprCompare) {
+    let branch = gated_branch(checker.semantic(), expr);
+    let is_chained = compare.ops.len() > 1;
 
-        let ([op], [comparison]) = (&**ops, &**comparators) else {
-            continue;
-        };
+    // `a < b < c` is equivalent to `a < b and b < c`, so judge each adjacent pair on its own.
+    let links: Vec<Link> = compare
+        .ops
+        .iter()
+        .zip(&compare.comparators)
+        .enumerate()
+        .map(|(index, (op, right))| {
+            let left = if index == 0 {
+                &*compare.left
+            } else {
+                &compare.comparators[index - 1]
+            };
+            // For a lone comparison, prefer the range of the comparison itself, so that any
+            // parentheses around the left operand are covered.
+            let link_range = if is_chained {
+                TextRange::new(left.start(), right.end())
+            } else {
+                compare.range()
+            };
 
-        if !is_valid_version_info(checker.semantic(), left) {
-            continue;
-        }
-
-        match comparison {
-            Expr::Tuple(ast::ExprTuple { elts, .. }) => match op {
-                CmpOp::Lt | CmpOp::LtE | CmpOp::Gt | CmpOp::GtE => {
-                    let Some(version) = extract_version(elts) else {
-                        return;
+            // Normalize to `sys.version_info <op> <version>`, mirroring the operator when the
+            // check is written the other way around (e.g., `(3, 0) > sys.version_info`).
+            let (op, comparison, version_info_on_left) =
+                if is_valid_version_info(checker.semantic(), left) {
+                    (*op, right, true)
+                } else if is_valid_version_info(checker.semantic(), right)
+                    && let Some(mirrored) = mirror(*op)
+                {
+                    (mirrored, left, false)
+                } else {
+                    return Link {
+                        reason: None,
+                        range: link_range,
+                        version_info_on_left: false,
                     };
-                    let target = checker.target_version();
-                    match version_always_less_than(
-                        &version,
-                        target,
-                        // `x <= y` and `x > y` are cases where `x == y` will not stop the comparison
-                        // from always evaluating to true or false respectively
-                        op.is_lt_e() || op.is_gt(),
-                    ) {
-                        Ok(false) => {}
-                        Ok(true) => {
-                            let mut diagnostic = checker.report_diagnostic(
-                                OutdatedVersionBlock {
-                                    reason: if op.is_lt() || op.is_lt_e() {
-                                        Reason::AlwaysFalse
-                                    } else {
-                                        Reason::AlwaysTrue
-                                    },
-                                },
-                                branch.test.range(),
-                            );
-                            if let Some(fix) = if op.is_lt() || op.is_lt_e() {
-                                fix_always_false_branch(checker, stmt_if, &branch)
-                            } else {
-                                fix_always_true_branch(checker, stmt_if, &branch)
-                            } {
-                                diagnostic.set_fix(fix);
-                            }
-                        }
-                        Err(_) => {
-                            checker.report_diagnostic(
-                                OutdatedVersionBlock {
-                                    reason: Reason::Invalid,
-                                },
-                                comparison.range(),
-                            );
-                        }
-                    }
-                }
-                _ => {}
-            },
-            Expr::NumberLiteral(ast::ExprNumberLiteral {
-                value: ast::Number::Int(int),
-                ..
-            }) => {
-                let reason = match (int.as_u8(), op) {
-                    (Some(2), CmpOp::Eq) => Reason::AlwaysFalse,
-                    (Some(3), CmpOp::Eq) => Reason::AlwaysTrue,
-                    (Some(2), CmpOp::NotEq) => Reason::AlwaysTrue,
-                    (Some(3), CmpOp::NotEq) => Reason::AlwaysFalse,
-                    (Some(2), CmpOp::Lt) => Reason::AlwaysFalse,
-                    (Some(3), CmpOp::Lt) => Reason::AlwaysFalse,
-                    (Some(2), CmpOp::LtE) => Reason::AlwaysFalse,
-                    (Some(3), CmpOp::LtE) => Reason::AlwaysTrue,
-                    (Some(2), CmpOp::Gt) => Reason::AlwaysTrue,
-                    (Some(3), CmpOp::Gt) => Reason::AlwaysFalse,
-                    (Some(2), CmpOp::GtE) => Reason::AlwaysTrue,
-                    (Some(3), CmpOp::GtE) => Reason::AlwaysTrue,
-                    (None, _) => Reason::Invalid,
-                    _ => return,
                 };
-                match reason {
-                    Reason::AlwaysTrue => {
-                        let mut diagnostic = checker.report_diagnostic(
-                            OutdatedVersionBlock { reason },
-                            branch.test.range(),
-                        );
-                        if let Some(fix) = fix_always_true_branch(checker, stmt_if, &branch) {
-                            diagnostic.set_fix(fix);
-                        }
-                    }
-                    Reason::AlwaysFalse => {
-                        let mut diagnostic = checker.report_diagnostic(
-                            OutdatedVersionBlock { reason },
-                            branch.test.range(),
-                        );
-                        if let Some(fix) = fix_always_false_branch(checker, stmt_if, &branch) {
-                            diagnostic.set_fix(fix);
-                        }
-                    }
-                    Reason::Invalid => {
-                        checker.report_diagnostic(
-                            OutdatedVersionBlock {
-                                reason: Reason::Invalid,
-                            },
-                            comparison.range(),
-                        );
-                    }
-                }
+
+            let reason = version_check_reason(op, comparison, checker.target_version());
+            Link {
+                reason,
+                range: if reason == Some(Reason::Invalid) {
+                    comparison.range()
+                } else {
+                    link_range
+                },
+                version_info_on_left,
             }
-            _ => (),
+        })
+        .collect();
+
+    // Outside of preview, the rule is limited to a single canonical
+    // `sys.version_info <op> <version>` comparison gating an entire branch.
+    let stable_shape = branch.is_some()
+        && !is_chained
+        && links.first().is_some_and(|link| link.version_info_on_left);
+    if !stable_shape && !is_outdated_version_check_enabled(checker.settings()) {
+        return;
+    }
+
+    // When the comparison is the entire test of a branch and every link is a decidable version
+    // check, the branch as a whole is either dead or unconditional, so it can be removed. Report
+    // it once, against the whole test, rather than once per outdated link.
+    if let Some((stmt_if, branch)) = &branch
+        && let Some(verdict) = branch_verdict(&links)
+    {
+        let mut diagnostic = checker.report_diagnostic(
+            OutdatedVersionBlock {
+                reason: verdict.into(),
+                is_block: true,
+            },
+            compare.range(),
+        );
+        let fix = match verdict {
+            BranchVerdict::AlwaysFalse => fix_always_false_branch(checker, stmt_if, branch),
+            BranchVerdict::AlwaysTrue => fix_always_true_branch(checker, stmt_if, branch),
+        };
+        if let Some(fix) = fix {
+            diagnostic.set_fix(fix);
         }
+        return;
+    }
+
+    // Otherwise the branch (if any) survives, so only the individual outdated links are at fault.
+    for link in &links {
+        let Some(reason) = link.reason else {
+            continue;
+        };
+        checker.report_diagnostic(
+            OutdatedVersionBlock {
+                reason,
+                is_block: !is_chained && branch.is_some(),
+            },
+            link.range,
+        );
+    }
+}
+
+/// Determine whether every link of a comparison gating a branch resolves the same way.
+///
+/// Returns `None` unless *all* links are decidable version checks. A branch guarded by anything
+/// else may still be reachable, and removing it would drop a condition that matters at runtime.
+fn branch_verdict(links: &[Link]) -> Option<BranchVerdict> {
+    if links.is_empty() {
+        return None;
+    }
+    // The links of a chain are joined by `and`, so one always-false link is enough to make the
+    // whole test always false, while an always-true test needs every link to be always true.
+    let mut verdict = BranchVerdict::AlwaysTrue;
+    for link in links {
+        match link.reason? {
+            Reason::Invalid => return None,
+            Reason::AlwaysFalse => verdict = BranchVerdict::AlwaysFalse,
+            Reason::AlwaysTrue => {}
+        }
+    }
+    Some(verdict)
+}
+
+/// If `expr` is the entire test of an `if` or `elif` branch, return that branch along with the
+/// `if` statement that owns it.
+fn gated_branch<'a>(
+    semantic: &SemanticModel<'a>,
+    expr: &Expr,
+) -> Option<(&'a StmtIf, IfElifBranch<'a>)> {
+    let Stmt::If(stmt_if) = semantic.current_statement() else {
+        return None;
+    };
+    let branch = if_elif_branches(stmt_if).find(|branch| ptr::eq(branch.test, expr))?;
+    Some((stmt_if, branch))
+}
+
+/// Return the operator that yields the same result once the operands are swapped, if any.
+///
+/// For example, `(3, 0) > sys.version_info` is equivalent to `sys.version_info < (3, 0)`.
+fn mirror(op: CmpOp) -> Option<CmpOp> {
+    match op {
+        // Equality and identity are symmetric.
+        CmpOp::Eq => Some(CmpOp::Eq),
+        CmpOp::NotEq => Some(CmpOp::NotEq),
+        CmpOp::Is => Some(CmpOp::Is),
+        CmpOp::IsNot => Some(CmpOp::IsNot),
+        CmpOp::Lt => Some(CmpOp::Gt),
+        CmpOp::LtE => Some(CmpOp::GtE),
+        CmpOp::Gt => Some(CmpOp::Lt),
+        CmpOp::GtE => Some(CmpOp::LtE),
+        // Containment is not: `a in b` says nothing about `b in a`.
+        CmpOp::In | CmpOp::NotIn => None,
+    }
+}
+
+/// Determine whether `sys.version_info <op> <comparison>` always evaluates to the same value for
+/// every Python version supported by `target`, or is not a well-formed version check at all.
+fn version_check_reason(op: CmpOp, comparison: &Expr, target: PythonVersion) -> Option<Reason> {
+    match comparison {
+        Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+            if !matches!(op, CmpOp::Lt | CmpOp::LtE | CmpOp::Gt | CmpOp::GtE) {
+                return None;
+            }
+            let version = extract_version(elts)?;
+            match version_always_less_than(
+                &version,
+                target,
+                // `x <= y` and `x > y` are cases where `x == y` will not stop the comparison
+                // from always evaluating to true or false respectively
+                op.is_lt_e() || op.is_gt(),
+            ) {
+                Ok(false) => None,
+                Ok(true) => Some(if op.is_lt() || op.is_lt_e() {
+                    Reason::AlwaysFalse
+                } else {
+                    Reason::AlwaysTrue
+                }),
+                Err(_) => Some(Reason::Invalid),
+            }
+        }
+        Expr::NumberLiteral(ast::ExprNumberLiteral {
+            value: ast::Number::Int(int),
+            ..
+        }) => match (int.as_u8(), op) {
+            (Some(2), CmpOp::Eq) => Some(Reason::AlwaysFalse),
+            (Some(3), CmpOp::Eq) => Some(Reason::AlwaysTrue),
+            (Some(2), CmpOp::NotEq) => Some(Reason::AlwaysTrue),
+            (Some(3), CmpOp::NotEq) => Some(Reason::AlwaysFalse),
+            (Some(2), CmpOp::Lt) => Some(Reason::AlwaysFalse),
+            (Some(3), CmpOp::Lt) => Some(Reason::AlwaysFalse),
+            (Some(2), CmpOp::LtE) => Some(Reason::AlwaysFalse),
+            (Some(3), CmpOp::LtE) => Some(Reason::AlwaysTrue),
+            (Some(2), CmpOp::Gt) => Some(Reason::AlwaysTrue),
+            (Some(3), CmpOp::Gt) => Some(Reason::AlwaysFalse),
+            (Some(2), CmpOp::GtE) => Some(Reason::AlwaysTrue),
+            (Some(3), CmpOp::GtE) => Some(Reason::AlwaysTrue),
+            (None, _) => Some(Reason::Invalid),
+            _ => None,
+        },
+        _ => None,
     }
 }
 
