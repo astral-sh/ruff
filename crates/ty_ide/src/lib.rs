@@ -28,6 +28,8 @@ mod semantic_tokens;
 mod signature_help;
 mod stub_mapping;
 mod symbols;
+#[cfg(test)]
+mod test_discovery;
 mod type_hierarchy;
 mod workspace_symbols;
 
