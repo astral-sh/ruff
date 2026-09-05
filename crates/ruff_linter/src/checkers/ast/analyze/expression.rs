@@ -1102,7 +1102,6 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 flake8_simplify::rules::zip_dict_keys_and_values(checker, call);
             }
             if checker.any_rule_enabled(&[
-                Rule::OsPathJoin,
                 Rule::OsPathSplitext,
                 Rule::PyPath,
                 Rule::Glob,
@@ -1159,6 +1158,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 }
                 if checker.is_rule_enabled(Rule::OsPathIslink) {
                     flake8_use_pathlib::rules::os_path_islink(checker, call, segments);
+                }
+                if checker.is_rule_enabled(Rule::OsPathJoin) {
+                    flake8_use_pathlib::rules::os_path_join(checker, call, segments);
                 }
                 if checker.is_rule_enabled(Rule::OsReadlink) {
                     flake8_use_pathlib::rules::os_readlink(checker, call, segments);
