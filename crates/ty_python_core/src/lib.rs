@@ -9,7 +9,7 @@ use std::sync::Arc;
 use ruff_db::parsed::parsed_module;
 
 use ruff_index::{FrozenIndexVec, IndexSlice};
-use ruff_python_ast::NodeIndex;
+use ruff_python_ast::{HasNodeIndex, NodeIndex};
 use ruff_python_parser::semantic_errors::SemanticSyntaxError;
 use ruff_text_size::TextRange;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -553,6 +553,36 @@ impl<'db> SemanticIndex<'db> {
         })
     }
 
+    /// Return `true` if `expression` is an outermost "boolean test".
+    ///
+    /// A boolean test is an expression that Python tests for truthiness, such as an `if`
+    /// condition or the operand of a `not` expression. ty's `redundant-condition` and
+    /// `redundant-condition-strict` rules can warn when such a test is always true or
+    /// always false. The rules try hard to avoid emitting duplicate diagnostics on the
+    /// same boolean test, however: in this case, a naive implementation would emit two
+    /// diagnostics on the `if` test, since there is both an `if` condition that is always
+    /// falsy and a `not` operand that is always truthy:
+    ///
+    /// ```py
+    /// def func(): ...
+    ///
+    /// if not func:  # one diagnostic, or two?
+    ///     pass
+    /// ```
+    ///
+    /// This method returns `true` when passed the expression `not func` in the above
+    /// example, but `false` for `func`, which is part of a nested boolean test.
+    ///
+    /// See `SemanticIndexBuilder::visit_boolean_test` for details on how we compute
+    /// and store the required data for answering this query during semantic indexing.
+    pub fn is_boolean_test_root(&self, expression: &ast::Expr) -> bool {
+        self.try_expression_scope_id(expression)
+            .is_some_and(|scope| {
+                self.use_def_map(scope)
+                    .is_boolean_test_root(expression.node_index().load())
+            })
+    }
+
     /// Returns an iterator over the descendent scopes of `scope`.
     fn descendent_scopes(&self, scope: FileScopeId) -> DescendantsIter<'_> {
         DescendantsIter::new(&self.scopes, scope)
@@ -952,6 +982,10 @@ impl Truthiness {
 
     pub const fn may_be_true(self) -> bool {
         !self.is_always_false()
+    }
+
+    pub const fn may_be_false(self) -> bool {
+        !self.is_always_true()
     }
 
     pub const fn is_always_true(self) -> bool {
