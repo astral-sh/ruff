@@ -345,6 +345,71 @@ def func3(t: tuple[*Ts]):
     t6: tuple[*tuple[str, ...], *Ts]  # error: [invalid-type-form]
 ```
 
+## Multiple starred expressions when specializing a `TypeVarTuple`
+
+The same restriction applies when a generic class or type alias has a `TypeVarTuple` type parameter,
+and it is specialized with more than one unpacked variadic tuple: each one could contribute any
+number of elements, so there is no way to know where one ends and the next begins.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+class Box[*Ts]: ...
+
+def f[*Ts1, *Ts2](
+    # error: [invalid-type-form] "Multiple unpacked variadic tuples are not allowed when specializing a `TypeVarTuple`"
+    x: Box[*tuple[int, ...], *tuple[str, ...]],
+):
+    reveal_type(x)  # revealed: Box[*tuple[int | str, ...]]
+```
+
+A fixed-length unpacked tuple does not create this ambiguity, since its element count is known
+statically. It may be combined with another unpack, even a variadic one, without error:
+
+```py
+def g(
+    x: Box[*tuple[int, str], *tuple[bool, ...]],
+    y: Box[*tuple[bool, ...], *tuple[int, str]],
+    z: Box[*tuple[int], *tuple[str]],
+):
+    reveal_type(x)  # revealed: Box[*tuple[int, str, *tuple[bool, ...]]]
+    reveal_type(y)  # revealed: Box[*tuple[*tuple[bool, ...], int, str]]
+    reveal_type(z)  # revealed: Box[int, str]
+```
+
+A fixed-length unpacked tuple that itself has a variadic element is still fixed-length, and does not
+get miscounted as a second variadic unpack:
+
+```py
+def i(
+    x: Box[*tuple[tuple[int, ...], str], *tuple[bool, ...]],
+    y: Box[*tuple[tuple[int, ...], str]],
+):
+    reveal_type(x)  # revealed: Box[*tuple[tuple[int, ...], str, *tuple[bool, ...]]]
+    reveal_type(y)  # revealed: Box[tuple[int, ...], str]
+```
+
+The same check applies to a generic type alias, and to a `TypeVarTuple` positioned between two fixed
+type parameters:
+
+```py
+type Pair[*Ts] = tuple[*Ts]
+
+class Wrapped[T1, *Ts, T2]: ...
+
+def h(
+    # error: [invalid-type-form]
+    a: Pair[*tuple[int, ...], *tuple[str, ...]],
+    # error: [invalid-type-form]
+    b: Wrapped[int, *tuple[bool, ...], *tuple[bytes, ...], str],
+):
+    reveal_type(a)  # revealed: tuple[int | str, ...]
+    reveal_type(b)  # revealed: Wrapped[int, *tuple[bool | bytes, ...], str]
+```
+
 ## Ellipses in the wrong place in a `tuple` specialization
 
 ```toml
