@@ -389,13 +389,8 @@ where
             }) => value
                 .as_ref()
                 .is_some_and(|value| any_over_expr(value, func)),
-            Expr::Compare(ast::ExprCompare {
-                left, comparators, ..
-            }) => {
-                any_over_expr(left, &mut *func)
-                    || comparators
-                        .iter()
-                        .any(|expr| any_over_expr(expr, &mut *func))
+            Expr::Compare(ast::ExprCompare { operands, .. }) => {
+                operands.iter().any(|expr| any_over_expr(expr, &mut *func))
             }
             Expr::Call(ast::ExprCall {
                 func: call_func,

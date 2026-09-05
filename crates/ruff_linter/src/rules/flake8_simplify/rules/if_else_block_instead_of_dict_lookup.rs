@@ -60,24 +60,20 @@ pub(crate) fn if_else_block_instead_of_dict_lookup(checker: &Checker, stmt_if: &
     } = stmt_if;
 
     let Expr::Compare(ast::ExprCompare {
-        left,
         ops,
-        comparators,
+        operands,
         range: _,
         node_index: _,
     }) = test.as_ref()
     else {
         return;
     };
-    let Expr::Name(ast::ExprName { id: target, .. }) = left.as_ref() else {
+    let [Expr::Name(ast::ExprName { id: target, .. }), expr] = &**operands else {
         return;
     };
     if **ops != [CmpOp::Eq] {
         return;
     }
-    let [expr] = &**comparators else {
-        return;
-    };
     let Some(literal_expr) = expr.as_literal_expr() else {
         return;
     };
@@ -147,21 +143,17 @@ pub(crate) fn if_else_block_instead_of_dict_lookup(checker: &Checker, stmt_if: &
             }
             // `elif`
             Some(Expr::Compare(ast::ExprCompare {
-                left,
                 ops,
-                comparators,
+                operands,
                 range: _,
                 node_index: _,
             })) => {
-                let Expr::Name(ast::ExprName { id, .. }) = left.as_ref() else {
+                let [Expr::Name(ast::ExprName { id, .. }), expr] = &**operands else {
                     return;
                 };
                 if id != target || **ops != [CmpOp::Eq] {
                     return;
                 }
-                let [expr] = &**comparators else {
-                    return;
-                };
                 let Some(literal_expr) = expr.as_literal_expr() else {
                     return;
                 };

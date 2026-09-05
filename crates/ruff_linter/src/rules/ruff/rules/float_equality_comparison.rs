@@ -126,8 +126,9 @@ pub(crate) fn float_equality_comparison(checker: &Checker, compare: &ast::ExprCo
     let locator = checker.locator();
     let semantic = checker.semantic();
 
-    for (left, right, operator) in std::iter::once(&*compare.left)
-        .chain(&compare.comparators)
+    for (left, right, operator) in compare
+        .operands
+        .iter()
         .tuple_windows()
         .zip(&compare.ops)
         .filter(|(_, op)| matches!(op, CmpOp::Eq | CmpOp::NotEq))

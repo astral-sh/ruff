@@ -131,16 +131,15 @@ pub(crate) fn if_else_block_instead_of_dict_get(checker: &Checker, stmt_if: &ast
     };
 
     let Expr::Compare(ast::ExprCompare {
-        left: test_key,
         ops,
-        comparators: test_dict,
+        operands,
         range: _,
         node_index: _,
     }) = &**test
     else {
         return;
     };
-    let [test_dict] = &**test_dict else {
+    let [test_key, test_dict] = &**operands else {
         return;
     };
 
@@ -194,7 +193,7 @@ pub(crate) fn if_else_block_instead_of_dict_get(checker: &Checker, stmt_if: &ast
     }
 
     let node = default_value.clone();
-    let node1 = *test_key.clone();
+    let node1 = test_key.clone();
     let node2 = ast::ExprAttribute {
         value: expected_subscript.clone(),
         attr: Identifier::new("get".to_string(), TextRange::default()),
@@ -259,16 +258,15 @@ pub(crate) fn if_exp_instead_of_dict_get(
     orelse: &Expr,
 ) {
     let Expr::Compare(ast::ExprCompare {
-        left: test_key,
         ops,
-        comparators: test_dict,
+        operands,
         range: _,
         node_index: _,
     }) = test
     else {
         return;
     };
-    let [test_dict] = &**test_dict else {
+    let [test_key, test_dict] = &**operands else {
         return;
     };
 
@@ -303,7 +301,7 @@ pub(crate) fn if_exp_instead_of_dict_get(
     }
 
     let default_value_node = default_value.clone();
-    let dict_key_node = *test_key.clone();
+    let dict_key_node = test_key.clone();
     let dict_get_node = ast::ExprAttribute {
         value: expected_subscript.clone(),
         attr: Identifier::new("get".to_string(), TextRange::default()),

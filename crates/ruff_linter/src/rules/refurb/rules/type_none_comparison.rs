@@ -54,7 +54,7 @@ impl AlwaysFixableViolation for TypeNoneComparison {
 
 /// FURB169
 pub(crate) fn type_none_comparison(checker: &Checker, compare: &ast::ExprCompare) {
-    let ([op], [right]) = (&*compare.ops, &*compare.comparators) else {
+    let ([op], [left, right]) = (&*compare.ops, &*compare.operands) else {
         return;
     };
 
@@ -64,7 +64,7 @@ pub(crate) fn type_none_comparison(checker: &Checker, compare: &ast::ExprCompare
         _ => return,
     };
 
-    let Some(left_arg) = type_call_arg(&compare.left, checker.semantic()) else {
+    let Some(left_arg) = type_call_arg(left, checker.semantic()) else {
         return;
     };
     let Some(right_arg) = type_call_arg(right, checker.semantic()) else {

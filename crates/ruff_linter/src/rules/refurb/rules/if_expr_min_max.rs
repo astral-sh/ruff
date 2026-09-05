@@ -87,13 +87,7 @@ impl Violation for IfExprMinMax {
 
 /// FURB136
 pub(crate) fn if_expr_min_max(checker: &Checker, if_exp: &ast::ExprIf) {
-    let Expr::Compare(ast::ExprCompare {
-        left,
-        ops,
-        comparators,
-        ..
-    }) = if_exp.test.as_ref()
-    else {
+    let Expr::Compare(ast::ExprCompare { ops, operands, .. }) = if_exp.test.as_ref() else {
         return;
     };
 
@@ -112,7 +106,7 @@ pub(crate) fn if_expr_min_max(checker: &Checker, if_exp: &ast::ExprIf) {
         _ => return,
     };
 
-    let [right] = &**comparators else {
+    let [left, right] = &**operands else {
         return;
     };
 
@@ -129,9 +123,9 @@ pub(crate) fn if_expr_min_max(checker: &Checker, if_exp: &ast::ExprIf) {
     }
 
     let (arg1, arg2) = if flip_args {
-        (right, left.as_ref())
+        (right, left)
     } else {
-        (left.as_ref(), right)
+        (left, right)
     };
 
     let replacement = format!(

@@ -332,9 +332,8 @@ impl<'a> ReFunc<'a> {
     /// Return a new compare expr of the form `left op right`
     fn compare_expr(left: &Expr, op: CmpOp, right: &Expr) -> Expr {
         Expr::Compare(ExprCompare {
-            left: Box::new(left.clone()),
             ops: [op].into(),
-            comparators: Box::new([right.clone()]),
+            operands: Box::new([left.clone(), right.clone()]),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         })
@@ -443,7 +442,7 @@ fn get_comparison_to_none(semantic: &SemanticModel) -> Option<(ComparisonToNone,
 
     let Expr::Compare(ExprCompare {
         ops,
-        comparators,
+        operands,
         range,
         ..
     }) = parent_expr
@@ -451,7 +450,7 @@ fn get_comparison_to_none(semantic: &SemanticModel) -> Option<(ComparisonToNone,
         return None;
     };
 
-    let Some(Expr::NoneLiteral(_)) = comparators.first() else {
+    let Some(Expr::NoneLiteral(_)) = operands.get(1) else {
         return None;
     };
 

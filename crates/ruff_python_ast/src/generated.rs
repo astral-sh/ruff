@@ -9767,15 +9767,20 @@ pub struct ExprYieldFrom {
     pub value: Box<Expr>,
 }
 
-/// See also [Compare](https://docs.python.org/3/library/ast.html#ast.Compare)
+/// A comparison or chain of comparisons.
+///
+/// `operands` contains all operands in source order, including the leftmost operand.
+/// For example, `a < b <= c` has operands `[a, b, c]` and operators `[Lt, LtE]`.
+/// There is at least one operator, and `operands.len() == ops.len() + 1`.
+///
+/// See also [Compare](https://docs.python.org/3/library/ast.html#ast.Compare).
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprCompare {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
-    pub left: Box<Expr>,
-    pub ops: thin_vec::ThinVec<crate::CmpOp>,
-    pub comparators: Box<[Expr]>,
+    pub ops: Box<[crate::CmpOp]>,
+    pub operands: Box<[Expr]>,
 }
 
 /// A call expression whose end offset is derived from its arguments.

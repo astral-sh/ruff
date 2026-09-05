@@ -500,18 +500,19 @@ pub fn walk_expr<V: Transformer + ?Sized>(visitor: &V, expr: &mut Expr) {
             node_index: _,
         }) => visitor.visit_expr(value),
         Expr::Compare(ast::ExprCompare {
-            left,
             ops,
-            comparators,
+            operands,
             range: _,
             node_index: _,
         }) => {
-            visitor.visit_expr(left);
-            for cmp_op in &mut **ops {
-                visitor.visit_cmp_op(cmp_op);
-            }
-            for expr in &mut **comparators {
-                visitor.visit_expr(expr);
+            if let Some((left, comparators)) = operands.split_first_mut() {
+                visitor.visit_expr(left);
+                for cmp_op in &mut **ops {
+                    visitor.visit_cmp_op(cmp_op);
+                }
+                for expr in comparators {
+                    visitor.visit_expr(expr);
+                }
             }
         }
         Expr::Call(ast::ExprCall {

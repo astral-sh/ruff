@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/valid/expressions/f_string.py
 ---
 ## AST
 
@@ -342,19 +343,19 @@ Module(
                                                             ExprCompare {
                                                                 node_index: NodeIndex(None),
                                                                 range: 79..83,
-                                                                left: NumberLiteral(
-                                                                    ExprNumberLiteral {
-                                                                        node_index: NodeIndex(None),
-                                                                        range: 79..80,
-                                                                        value: Int(
-                                                                            3,
-                                                                        ),
-                                                                    },
-                                                                ),
                                                                 ops: [
                                                                     NotEq,
                                                                 ],
-                                                                comparators: [
+                                                                operands: [
+                                                                    NumberLiteral(
+                                                                        ExprNumberLiteral {
+                                                                            node_index: NodeIndex(None),
+                                                                            range: 79..80,
+                                                                            value: Int(
+                                                                                3,
+                                                                            ),
+                                                                        },
+                                                                    ),
                                                                     NumberLiteral(
                                                                         ExprNumberLiteral {
                                                                             node_index: NodeIndex(None),

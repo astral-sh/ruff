@@ -647,12 +647,8 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
     fn expr_compare(&self, expr_compare: &ast::ExprCompare) -> PossiblyNarrowedPlaces {
         let mut places = PossiblyNarrowedPlaces::default();
 
-        // The left side can be narrowed
-        self.add_narrowing_target(&expr_compare.left, &mut places);
-
-        // Each comparator can also be narrowed
-        for comparator in &expr_compare.comparators {
-            self.add_narrowing_target(comparator, &mut places);
+        for operand in &expr_compare.operands {
+            self.add_narrowing_target(operand, &mut places);
         }
 
         let can_narrow_tagged_union_base = matches!(
@@ -661,7 +657,7 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
         );
 
         // Tagged-union checks can also narrow the base of a subscript or attribute on either side.
-        for expr in std::iter::once(&*expr_compare.left).chain(&expr_compare.comparators) {
+        for expr in &expr_compare.operands {
             if can_narrow_tagged_union_base
                 && let ast::Expr::Subscript(subscript) = expr.expression_value()
                 && let Some(place_expr) = PlaceExpr::try_from_expr(&subscript.value)
