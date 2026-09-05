@@ -17,6 +17,137 @@ def f(x: MyInt):
 f(1)
 ```
 
+## Forward-referenced class aliases in stubs
+
+A class alias in a stub may refer to a class defined later in the same file, and another alias can
+reuse the same forward reference.
+
+`aliases.pyi`:
+
+```pyi
+Alias = Target
+ChainedAlias = Alias
+
+class Target: ...
+
+def accepts(value: Alias) -> Alias: ...
+```
+
+The imported aliases resolve correctly as values and in type expressions.
+
+`main.py`:
+
+```py
+from aliases import Alias, ChainedAlias, Target, accepts
+
+reveal_type(Alias)  # revealed: <class 'Target'>
+reveal_type(ChainedAlias)  # revealed: <class 'Target'>
+reveal_type(accepts(Target()))  # revealed: Target
+
+def use_alias(value: Alias) -> None:
+    reveal_type(value)  # revealed: Target
+```
+
+## Forward-referenced union aliases in stubs
+
+A union alias in a stub may refer to classes defined after the assignment.
+
+```pyi
+UnionAlias = Target | Other
+
+class Target: ...
+class Other: ...
+
+reveal_type(UnionAlias)  # revealed: <types.UnionType special-form 'Target | Other'>
+
+def use_alias(value: UnionAlias) -> None:
+    reveal_type(value)  # revealed: Target | Other
+```
+
+## Forward-referenced values in stubs
+
+A stub assignment may refer to an ordinary value defined later in the same file.
+
+```pyi
+AliasValue = VALUE
+
+VALUE = 7
+
+reveal_type(AliasValue)  # revealed: Literal[7]
+```
+
+## Stub assignments preserve existing bindings
+
+An already-defined name is resolved at the assignment even if it is rebound later.
+
+```pyi
+VALUE = 1
+Alias = VALUE
+VALUE = 2
+
+reveal_type(Alias)  # revealed: Literal[1]
+reveal_type(VALUE)  # revealed: Literal[2]
+```
+
+## Self-referential stub reassignments
+
+Reassigning a stub variable to itself should resolve its previous binding without creating a cycle.
+
+```pyi
+SelfValue = 3
+SelfValue = SelfValue
+
+reveal_type(SelfValue)  # revealed: Literal[3]
+```
+
+## Forward-referenced aliases as generic bounds
+
+A forward-referenced stub alias used as a generic bound must reject incompatible arguments during
+overload selection.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+`aliases.pyi`:
+
+```pyi
+from typing import overload
+
+Alias = Target
+
+class Target: ...
+
+@overload
+def choose[T: Alias](value: T) -> T: ...
+@overload
+def choose(value: int) -> str: ...
+```
+
+The first overload accepts instances of its bound, while an incompatible integer selects the second
+overload.
+
+`main.py`:
+
+```py
+from aliases import Target, choose
+
+reveal_type(choose(Target()))  # revealed: Target
+reveal_type(choose(1))  # revealed: str
+```
+
+## Forward references in runtime modules
+
+Assignments in runtime Python modules are evaluated eagerly, so a class defined later is not yet
+available.
+
+```py
+Alias = Target  # error: [unresolved-reference]
+
+class Target: ...
+```
+
 ## None
 
 ```py

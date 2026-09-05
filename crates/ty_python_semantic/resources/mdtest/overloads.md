@@ -140,6 +140,44 @@ reveal_type(foo3.takes_self_or_int(foo3))  # revealed: Foo3
 reveal_type(foo3.takes_self_or_int(1))  # revealed: int
 ```
 
+## Aliases of conditionally overloaded methods in stubs
+
+An alias assigned to an overloaded stub method retains every applicable overload across separate
+platform-specific branches.
+
+```toml
+[environment]
+python-platform = "linux"
+```
+
+```pyi
+import sys
+from typing import overload
+
+class Window:
+    if sys.platform == "darwin":
+        @overload
+        def method(self) -> str: ...
+
+    else:
+        @overload
+        def method(self) -> int: ...
+
+    if sys.platform == "darwin":
+        @overload
+        def method(self, value: bytes) -> bytes: ...
+
+    else:
+        @overload
+        def method(self, value: float) -> float: ...
+
+    alias = method
+
+window: Window
+reveal_type(window.alias)  # revealed: Overload[() -> int, (value: float) -> float]
+reveal_type(window.alias(1.0))  # revealed: float
+```
+
 ## Explicit receiver annotations
 
 Binding a method filters overloads that explicitly annotate `self` with a type that cannot accept

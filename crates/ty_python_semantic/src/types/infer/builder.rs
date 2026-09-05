@@ -3574,6 +3574,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                     self.store_expression_type(value, ty);
                     ty
+                } else if self.in_stub()
+                    && value.as_name_expr().is_none_or(|name| {
+                        // Already-bound overloaded functions need their at-use binding set.
+                        !name.is_invalid()
+                            && self
+                                .index
+                                .use_def_map(self.scope().file_scope_id(self.db()))
+                                .bindings_at_use(name.scoped_use_id(self.db(), self.program_file()))
+                                .all(|binding| binding.binding.definition().is_none())
+                    })
+                {
+                    self.infer_expression_with_state(value, tcx, DeferredExpressionState::Deferred)
                 } else {
                     self.infer_expression(value, tcx)
                 };

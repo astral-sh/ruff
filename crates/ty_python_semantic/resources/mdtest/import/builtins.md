@@ -254,10 +254,9 @@ reveal_type(custom_builtin)  # revealed: Custom
 reveal_type(str)  # revealed: Unknown
 ```
 
-## Unknown builtin (later defined)
+## Forward reference in a builtins stub
 
-`foo` has a type of `Unknown` in this example, as it relies on `bar` which has not been defined at
-that point:
+A simple assignment in a builtins stub may refer to a value defined later in the same file.
 
 ```toml
 [environment]
@@ -278,7 +277,7 @@ def reveal_type(obj, /): ...
 ```
 
 ```py
-reveal_type(foo)  # revealed: Unknown
+reveal_type(foo)  # revealed: Literal[1]
 ```
 
 ## Builtins imported from custom project-level stubs
