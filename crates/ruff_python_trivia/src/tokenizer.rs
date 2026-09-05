@@ -999,10 +999,16 @@ impl<'a> BackwardsTokenizer<'a> {
 
                 let forward_lexer = SimpleTokenizer::new(self.source, range);
                 if let Some(token) = forward_lexer.last() {
+                    // Clamp the token to the operator run we lexed. A trailing `Bogus` token
+                    // (produced when the run contains an unparsable character) spans to the end
+                    // of the entire source rather than to the end of `range`, so slicing on its
+                    // unclamped range would walk the cursor past the start of the run.
+                    let token_end = token.range.end().min(range.end());
+                    let token_in_run = TextRange::new(token.range.start(), token_end);
                     // If the token spans multiple characters, bump the cursor. Note,
                     // though, that we already bumped the cursor to past the last character
-                    // in the token at the very start of `next_token_back`.y
-                    for _ in self.source[token.range].chars().rev().skip(1) {
+                    // in the token at the very start of `next_token_back`.
+                    for _ in self.source[token_in_run].chars().rev().skip(1) {
                         self.cursor.bump_back().unwrap();
                     }
                     token.kind()
@@ -1030,5 +1036,30 @@ impl Iterator for BackwardsTokenizer<'_> {
         } else {
             Some(token)
         }
+    }
+}
+
+#[cfg(test)]
+mod backwards_tokenizer_tests {
+    use ruff_text_size::{TextRange, TextSize};
+
+    use super::{BackwardsTokenizer, SimpleTokenKind, SimpleTokenizer};
+
+    #[test]
+    fn backwards_matches_reversed_forwards_on_unparsable_operator_run() {
+        // `range` covers `!<`; the source deliberately continues past the range.
+        let source = "!<bbbb";
+        let range = TextRange::new(TextSize::new(0), TextSize::new(2));
+
+        let backwards: Vec<SimpleTokenKind> = BackwardsTokenizer::new(source, range, &[])
+            .map(|token| token.kind())
+            .collect();
+
+        let mut forwards: Vec<SimpleTokenKind> = SimpleTokenizer::new(source, range)
+            .map(|token| token.kind())
+            .collect();
+        forwards.reverse();
+
+        assert_eq!(backwards, forwards);
     }
 }
