@@ -1807,15 +1807,17 @@ impl<'db> TypeVarSet<'db> {
         for typevar in typevars {
             set.entry(typevar.identity(db)).or_insert(typevar);
         }
-        set.shrink_to_fit();
-        Self::Some(TypeVarSetInner::new_internal(db, set))
+        Self::Some(TypeVarSetInner::new_internal(
+            db,
+            set.into_values().collect::<Box<[_]>>(),
+        ))
     }
 }
 
 #[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
 pub(crate) struct TypeVarSetInner<'db> {
-    #[returns(ref)]
-    typevars: FxOrderMap<BoundTypeVarIdentity<'db>, BoundTypeVarInstance<'db>>,
+    #[returns(deref)]
+    typevars: Box<[BoundTypeVarInstance<'db>]>,
 }
 
 // The Salsa heap is tracked separately.
@@ -1825,7 +1827,10 @@ impl<'db> BoundTypeVarIdentity<'db> {
     pub(crate) fn is_inferable(self, db: &'db dyn Db, inferable: TypeVarSet<'db>) -> bool {
         match inferable {
             TypeVarSet::None => false,
-            TypeVarSet::Some(inner) => inner.typevars(db).contains_key(&self),
+            TypeVarSet::Some(inner) => inner
+                .typevars(db)
+                .iter()
+                .any(|typevar| typevar.identity(db) == self),
         }
     }
 }
@@ -1848,8 +1853,8 @@ impl<'db> TypeVarSet<'db> {
                 db,
                 self_inner
                     .typevars(db)
-                    .values()
-                    .chain(other_inner.typevars(db).values())
+                    .iter()
+                    .chain(other_inner.typevars(db).iter())
                     .copied(),
             )
         }
@@ -1870,7 +1875,7 @@ impl<'db> TypeVarSet<'db> {
     ) -> impl Iterator<Item = BoundTypeVarInstance<'db>> + 'db {
         match self {
             TypeVarSet::None => Either::Left(std::iter::empty()),
-            TypeVarSet::Some(inner) => Either::Right(inner.typevars(db).values().copied()),
+            TypeVarSet::Some(inner) => Either::Right(inner.typevars(db).iter().copied()),
         }
     }
 
