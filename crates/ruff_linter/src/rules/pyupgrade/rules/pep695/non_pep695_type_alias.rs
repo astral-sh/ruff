@@ -14,8 +14,8 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 use ruff_python_ast::PythonVersion;
 
 use super::{
-    DisplayTypeVars, TypeParamKind, TypeVar, TypeVarReferenceVisitor, expr_name_to_type_var,
-    non_default_follows_default,
+    DisplayTypeVars, TypeVar, TypeVarReferenceVisitor, expr_name_to_type_var,
+    non_default_follows_default, type_var_has_unpacked_kwargs,
 };
 
 /// ## What it does
@@ -169,17 +169,20 @@ pub(crate) fn non_pep695_type_alias_type(checker: &Checker, stmt: &StmtAssign) {
         return;
     }
 
+    // Bail out if any type parameter has unpacked keyword arguments that
+    // cannot be represented in PEP 695 syntax.
+    if type_params.iter().any(|expr| {
+        expr.as_name_expr()
+            .is_some_and(|name| type_var_has_unpacked_kwargs(checker.semantic(), name))
+    }) {
+        return;
+    }
+
     let Some(vars) = type_params
         .iter()
         .map(|expr| {
-            expr.as_name_expr().map(|name| {
-                expr_name_to_type_var(checker.semantic(), name).unwrap_or(TypeVar {
-                    name: &name.id,
-                    restriction: None,
-                    kind: TypeParamKind::TypeVar,
-                    default: None,
-                })
-            })
+            expr.as_name_expr()
+                .and_then(|name| expr_name_to_type_var(checker.semantic(), name))
         })
         .collect::<Option<Vec<_>>>()
     else {
@@ -224,15 +227,17 @@ pub(crate) fn non_pep695_type_alias(checker: &Checker, stmt: &StmtAnnAssign) {
         return;
     };
 
-    let vars = {
-        let mut visitor = TypeVarReferenceVisitor {
-            vars: vec![],
-            semantic: checker.semantic(),
-            any_skipped: false,
-        };
-        visitor.visit_expr(value);
-        visitor.vars
+    let mut visitor = TypeVarReferenceVisitor {
+        vars: vec![],
+        semantic: checker.semantic(),
+        any_skipped: false,
+        has_unpacked_kwargs: false,
     };
+    visitor.visit_expr(value);
+    if visitor.has_unpacked_kwargs {
+        return;
+    }
+    let vars = visitor.vars;
 
     // Type variables must be unique; filter while preserving order.
     let vars = vars
