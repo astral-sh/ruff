@@ -113,13 +113,13 @@ impl<'db> Type<'db> {
                 Some(CallableTypes::one(function_literal.into_callable_type(db)))
             }
             Type::BoundMethod(bound_method)
-                if context.is_recursive_reference(db, bound_method.function(db)) =>
+                if bound_method
+                    .function(db)
+                    .is_some_and(|function| context.is_recursive_reference(db, function)) =>
             {
                 Some(CallableTypes::one(CallableType::bottom(db)))
             }
-            Type::BoundMethod(bound_method) => {
-                Some(CallableTypes::one(bound_method.into_callable_type(db)))
-            }
+            Type::BoundMethod(bound_method) => bound_method.callables(db, env),
 
             Type::NominalInstance(_) | Type::ProtocolInstance(_) => {
                 let call_symbol = self
@@ -287,6 +287,10 @@ impl<'db> Type<'db> {
                 KnownInstanceType::FunctoolsPartial(partial)
                 | KnownInstanceType::FunctoolsPartialCall(partial),
             ) => Some(CallableTypes::one(partial.partial(db))),
+
+            Type::KnownInstance(KnownInstanceType::MethodWrapper(wrapper)) => {
+                wrapper.callables(db, env)
+            }
 
             Type::Intersection(intersection) => intersection
                 .finite_alternative_union(db, env)

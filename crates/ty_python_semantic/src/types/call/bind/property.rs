@@ -20,7 +20,7 @@ impl<'db> Bindings<'db> {
                 continue;
             }
             let function = match constructor.callable().callable_type {
-                Type::BoundMethod(method) => method.function(db),
+                Type::BoundMethod(method) if let Some(function) = method.function(db) => function,
                 Type::FunctionLiteral(function) => function,
                 _ => continue,
             };

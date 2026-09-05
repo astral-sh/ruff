@@ -54,7 +54,9 @@ use crate::types::generics::{
     GenericContext, Specialization, SpecializationBuilder, SpecializationError, TypeVarInference,
 };
 use crate::types::infer::original_class_type;
-use crate::types::known_instance::{FieldInstance, InternedConstraintSetSolution};
+use crate::types::known_instance::{
+    FieldInstance, InternedConstraintSetSolution, MethodWrapper, MethodWrapperKind,
+};
 use crate::types::signatures::{
     CallableSignature, Parameter, ParameterDisplayName, ParameterKind, Parameters, ParametersKind,
     PartialApplication, PartialSignatureApplication,
@@ -1980,9 +1982,10 @@ impl<'db> Bindings<'db> {
                     Type::BoundMethod(bound_method)
                         if let Type::PropertyInstance(property) =
                             bound_method.self_instance(db)
-                            && is_property_method(db, env, bound_method.function(db)) =>
+                            && let Some(function) = bound_method.function(db)
+                            && is_property_method(db, env, function) =>
                     {
-                        match bound_method.function(db).name(db).as_str() {
+                        match function.name(db).as_str() {
                             "setter" => {
                                 if let [Some(_), Some(setter)] = overload.parameter_types() {
                                     overload.set_return_type(Type::PropertyInstance(
@@ -2351,9 +2354,11 @@ impl<'db> Bindings<'db> {
                                         signature_generic_context(function.signature(db))
                                     }
 
-                                    Type::BoundMethod(bound_method) => signature_generic_context(
-                                        bound_method.function(db).signature(db),
-                                    ),
+                                    Type::BoundMethod(bound_method) => {
+                                        bound_method.function(db).and_then(|function| {
+                                            signature_generic_context(function.signature(db))
+                                        })
+                                    }
 
                                     Type::Callable(callable) => {
                                         signature_generic_context(callable.signatures(db))
@@ -3251,6 +3256,17 @@ impl<'db> Bindings<'db> {
                         Some(KnownClass::Type) if overload_index == 0 => {
                             if let [Some(arg)] = overload.parameter_types() {
                                 overload.set_return_type(arg.dunder_class(db, env));
+                            }
+                        }
+
+                        Some(class @ (KnownClass::Classmethod | KnownClass::Staticmethod)) => {
+                            if let [Some(wrapped)] = overload.parameter_types() {
+                                let kind = match class {
+                                    KnownClass::Classmethod => MethodWrapperKind::Classmethod,
+                                    _ => MethodWrapperKind::Staticmethod,
+                                };
+                                overload
+                                    .set_return_type(MethodWrapper::wrap(db, env, *wrapped, kind));
                             }
                         }
 
@@ -4538,15 +4554,15 @@ impl<'db> CallableBinding<'db> {
         &self,
         db: &'db dyn Db,
     ) -> impl Iterator<Item = OverloadLiteral<'db>> + Clone {
-        if let Type::Callable(callable) = self.signature_type {
+        let signature_type = match self.signature_type {
+            Type::BoundMethod(bound) => bound.func(db),
+            ty => ty,
+        };
+        if let Type::Callable(callable) = signature_type {
             return Either::Left(callable.deprecated(db).into_iter());
         }
-        let function = match self.signature_type {
-            Type::FunctionLiteral(function) => Some(function),
-            Type::BoundMethod(bound) => Some(bound.function(db)),
-            _ => None,
-        };
-        let (overloads, implementation) = function
+        let (overloads, implementation) = signature_type
+            .as_function_literal()
             .map(|function| function.overloads_and_implementation(db))
             .unwrap_or_default();
         if let Some(implementation) =
@@ -4679,10 +4695,9 @@ impl<'db> CallableBinding<'db> {
                 // [1]: https://github.com/astral-sh/ty/issues/274#issuecomment-2881856028
                 let function_type_and_kind = match self.signature_type {
                     Type::FunctionLiteral(function) => Some((FunctionKind::Function, function)),
-                    Type::BoundMethod(bound_method) => Some((
-                        FunctionKind::BoundMethod,
-                        bound_method.function(context.db()),
-                    )),
+                    Type::BoundMethod(bound_method) => bound_method
+                        .function(context.db())
+                        .map(|function| (FunctionKind::BoundMethod, function)),
                     Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(
                         function,
                     )) => Some((FunctionKind::MethodWrapper, function)),
@@ -5953,7 +5968,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                         let callable = argument_bindings.single_item()?.callable();
                         let (function, is_bound_method) = match callable.signature_type {
                             Type::FunctionLiteral(function) => (function, false),
-                            Type::BoundMethod(method) => (method.function(db), true),
+                            Type::BoundMethod(method) => (method.function(db)?, true),
                             _ => return None,
                         };
                         let source_binding = callable
@@ -8582,7 +8597,7 @@ impl<'db> CallableDescription<'db> {
     fn defining_class(db: &'db dyn Db, callable_type: Type<'db>) -> Option<ClassLiteral<'db>> {
         let function = match callable_type {
             Type::FunctionLiteral(function) => function,
-            Type::BoundMethod(method) => method.function(db),
+            Type::BoundMethod(method) => method.function(db)?,
             Type::ClassLiteral(class) => return Some(class),
             _ => return None,
         };
@@ -8660,7 +8675,7 @@ impl<'db> CallableDescription<'db> {
                 })
             }
             Type::BoundMethod(bound_method) => Some({
-                let function = bound_method.function(db);
+                let function = bound_method.function(db)?;
                 let kind = if function.name(db) == "__init__" {
                     None
                 } else {

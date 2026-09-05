@@ -1316,6 +1316,26 @@ node.label = 2
 reveal_type(Node[int](1).label)  # revealed: int
 ```
 
+Callable instance attributes follow the same restriction. Neither a `Callable` annotation nor a
+`__call__` method makes an attribute a descriptor.
+
+```py
+from collections.abc import Callable
+
+class CallableObject(Generic[T]):
+    def __call__(self) -> T:
+        raise NotImplementedError
+
+class Callables(Generic[T]):
+    function: Callable[[], T]
+    instance: CallableObject[T]
+
+# error: [invalid-attribute-access]
+Callables[int].function
+# error: [invalid-attribute-access]
+Callables[int].instance
+```
+
 ## Class attributes independent of type variables
 
 Generic classes can expose class variables, ordinary attributes whose types do not depend on their
@@ -1468,6 +1488,107 @@ class DescriptorOrInt(Generic[T]):
 
 reveal_type(DescriptorOrInt[str].value)  # revealed: int
 DescriptorOrInt[int].value = 1
+```
+
+## Decorated methods on generic classes
+
+A decorator can wrap a method in a callable object whose type depends on the enclosing class's type
+parameter. This wrapper preserves the function's return type but has no `__get__` method of its own.
+
+```py
+from collections.abc import Callable
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+R = TypeVar("R")
+
+class Wrapper(Generic[R]):
+    def __init__(self, function: Callable[..., R]) -> None:
+        self.function = function
+
+    def __call__(self, argument: object) -> R:
+        return self.function(argument)
+```
+
+An outer `classmethod` supplies descriptor behavior, making the method accessible through the
+generic class. The method's return type uses any type argument supplied to the class.
+
+```py
+class Box(Generic[T]):
+    @classmethod
+    @Wrapper
+    def make(cls) -> "Box[T]":
+        return cls()
+
+Box.make()
+reveal_type(Box[int].make())  # revealed: Box[int]
+```
+
+A `staticmethod` also permits access through the generic class, without supplying a class or
+instance argument to the wrapper.
+
+```py
+class C(Generic[T]):
+    @staticmethod
+    @Wrapper
+    def identity(value: T) -> T:
+        return value
+
+C.identity(1)
+reveal_type(C[int].identity(1))  # revealed: int
+```
+
+## Decorators returning `Callable` on generic classes
+
+We retain classmethod binding when an outer decorator returns a `Callable`. The method remains
+accessible through the generic class and uses any supplied type argument in its return type.
+
+```py
+from collections.abc import Callable
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+R = TypeVar("R")
+
+def preserve_return(function: Callable[..., R]) -> Callable[..., R]:
+    return function
+
+class Box(Generic[T]):
+    @preserve_return
+    @classmethod
+    def make(cls) -> "Box[T]":
+        return cls()
+
+Box.make()
+reveal_type(Box[int].make())  # revealed: Box[int]
+```
+
+## Cached classmethods
+
+`functools.lru_cache` returns a callable wrapper. An outer `classmethod` makes it accessible through
+the generic class, and the cached method retains its return type.
+
+```py
+from functools import lru_cache
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Box(Generic[T]):
+    @classmethod
+    @lru_cache
+    def make(cls) -> "Box[T]":
+        return cls()
+
+Box.make()
+reveal_type(Box[int].make())  # revealed: Box[int]
+```
+
+The cache's `cache_clear` and `cache_info` methods remain accessible through the bound classmethod.
+
+```py
+Box.make.cache_clear()
+Box[int].make.cache_info()
 ```
 
 ## Metaclass descriptors shadow generic instance attributes
