@@ -21,6 +21,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use ruff_linter::fs;
 use ruff_linter::package::PackageRoot;
 use ruff_linter::packaging::is_package;
+use ruff_linter::warn_user_once_by_message;
 
 use crate::configuration::Configuration;
 use crate::pyproject::settings_toml;
@@ -189,6 +190,12 @@ impl<'a> Resolver<'a> {
                     self.pyproject_config.path.as_deref(),
                 )),
         }
+    }
+
+    fn settings_with_paths(&self) -> impl Iterator<Item = (&Settings, &Path)> {
+        self.settings
+            .iter()
+            .map(|(settings, path)| (settings, path.as_path()))
     }
 
     /// Return a mapping from Python package to its package root.
@@ -580,8 +587,96 @@ impl<'config> WalkPythonFilesState<'config> {
         error?;
 
         let deduplicated_files = deduplicate_files(files);
+        warn_about_unmatched_patterns(&deduplicated_files, &self.resolver);
 
         Ok((deduplicated_files, self.resolver.into_inner().unwrap()))
+    }
+}
+
+fn warn_unmatched<'a>(
+    label: &str,
+    config_path: &str,
+    pattern_count: usize,
+    pattern_str: impl Fn(usize) -> &'a str,
+    matches: impl Fn(usize, &Path) -> bool,
+    paths: &[&Path],
+) {
+    let mut unmatched: Vec<&str> = (0..pattern_count)
+        .filter(|&index| !paths.iter().any(|path| matches(index, path)))
+        .map(pattern_str)
+        .collect();
+
+    unmatched.sort_unstable();
+
+    if !unmatched.is_empty() {
+        warn_user_once_by_message!(
+            "The following `{label}` patterns in `{config_path}` did not match any files: {}",
+            unmatched.join(", ")
+        );
+    }
+}
+
+fn warn_about_unmatched_patterns(
+    files: &[Result<ResolvedFile, ignore::Error>],
+    resolver: &RwLock<Resolver<'_>>,
+) {
+    let resolver = resolver.read().unwrap();
+    let paths: Vec<&Path> = files
+        .iter()
+        .filter_map(|file| file.as_ref().ok())
+        .map(ResolvedFile::path)
+        .collect();
+
+    for (settings, config_path) in std::iter::once((
+        &resolver.pyproject_config.settings,
+        resolver.pyproject_config.path.as_deref(),
+    ))
+    .chain(
+        resolver
+            .settings_with_paths()
+            .map(|(settings, path)| (settings, Some(path))),
+    ) {
+        let config_path = config_path.map_or_else(
+            || "<default>".to_string(),
+            |path| path.display().to_string(),
+        );
+
+        for (name, patterns) in [
+            ("include", &settings.file_resolver.include),
+            ("extend-include", &settings.file_resolver.extend_include),
+        ] {
+            let non_builtin: Vec<usize> = patterns
+                .patterns()
+                .iter()
+                .enumerate()
+                .filter(|(_, pattern)| !pattern.is_builtin())
+                .map(|(index, _)| index)
+                .collect();
+
+            warn_unmatched(
+                name,
+                &config_path,
+                patterns.patterns().len(),
+                |index| patterns.patterns()[index].as_str(),
+                |index, path| non_builtin.contains(&index) && patterns.matches_pattern(index, path),
+                &paths,
+            );
+        }
+
+        let per_file_patterns: Vec<&str> = settings.linter.per_file_ignores.patterns().collect();
+        warn_unmatched(
+            "lint.per-file-ignores",
+            &config_path,
+            per_file_patterns.len(),
+            |index| per_file_patterns[index],
+            |index, path| {
+                settings
+                    .linter
+                    .per_file_ignores
+                    .matches_pattern(index, path)
+            },
+            &paths,
+        );
     }
 }
 
@@ -1091,9 +1186,9 @@ mod tests {
         Ok(())
     }
 
-    fn make_exclusion(file_pattern: FilePattern) -> GlobSet {
+    fn make_exclusion(file_pattern: &FilePattern) -> GlobSet {
         let mut builder = globset::GlobSetBuilder::new();
-        file_pattern.add_to(&mut builder).unwrap();
+        file_pattern.add_to(&mut builder, 0).unwrap();
         builder.build().unwrap()
     }
 
@@ -1109,7 +1204,7 @@ mod tests {
         assert!(match_exclusion(
             file_path,
             file_basename,
-            &make_exclusion(exclude),
+            &make_exclusion(&exclude),
         ));
 
         let path = Path::new("foo/bar").absolutize_from(project_root);
@@ -1120,7 +1215,7 @@ mod tests {
         assert!(match_exclusion(
             file_path,
             file_basename,
-            &make_exclusion(exclude),
+            &make_exclusion(&exclude),
         ));
 
         let path = Path::new("foo/bar/baz.py").absolutize_from(project_root);
@@ -1133,7 +1228,7 @@ mod tests {
         assert!(match_exclusion(
             file_path,
             file_basename,
-            &make_exclusion(exclude),
+            &make_exclusion(&exclude),
         ));
 
         let path = Path::new("foo/bar").absolutize_from(project_root);
@@ -1146,7 +1241,7 @@ mod tests {
         assert!(match_exclusion(
             file_path,
             file_basename,
-            &make_exclusion(exclude),
+            &make_exclusion(&exclude),
         ));
 
         let path = Path::new("foo/bar/baz.py").absolutize_from(project_root);
@@ -1159,7 +1254,7 @@ mod tests {
         assert!(match_exclusion(
             file_path,
             file_basename,
-            &make_exclusion(exclude),
+            &make_exclusion(&exclude),
         ));
 
         let path = Path::new("foo/bar/baz.py").absolutize_from(project_root);
@@ -1172,7 +1267,7 @@ mod tests {
         assert!(match_exclusion(
             file_path,
             file_basename,
-            &make_exclusion(exclude),
+            &make_exclusion(&exclude),
         ));
 
         let path = Path::new("foo/bar/baz.py").absolutize_from(project_root);
@@ -1183,7 +1278,7 @@ mod tests {
         assert!(!match_exclusion(
             file_path,
             file_basename,
-            &make_exclusion(exclude),
+            &make_exclusion(&exclude),
         ));
     }
 
