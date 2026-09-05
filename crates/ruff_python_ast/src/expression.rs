@@ -278,6 +278,15 @@ impl<'a> From<&'a ast::FString> for StringLikePart<'a> {
     }
 }
 
+impl<'a> From<ast::FStringPartRef<'a>> for StringLikePart<'a> {
+    fn from(value: ast::FStringPartRef<'a>) -> Self {
+        match value {
+            ast::FStringPartRef::Literal(literal) => Self::String(literal),
+            ast::FStringPartRef::FString(fstring) => Self::FString(fstring),
+        }
+    }
+}
+
 impl<'a> From<&'a ast::TString> for StringLikePart<'a> {
     fn from(value: &'a ast::TString) -> Self {
         StringLikePart::TString(value)
@@ -330,15 +339,7 @@ impl<'a> Iterator for StringLikePartIter<'a> {
         let part = match self {
             StringLikePartIter::String(inner) => StringLikePart::String(inner.next()?),
             StringLikePartIter::Bytes(inner) => StringLikePart::Bytes(inner.next()?),
-            StringLikePartIter::FString(inner) => {
-                let part = inner.next()?;
-                match part {
-                    ast::FStringPartRef::Literal(string_literal) => {
-                        StringLikePart::String(string_literal)
-                    }
-                    ast::FStringPartRef::FString(f_string) => StringLikePart::FString(f_string),
-                }
-            }
+            StringLikePartIter::FString(inner) => inner.next()?.into(),
             StringLikePartIter::TString(inner) => StringLikePart::TString(inner.next()?),
         };
 
@@ -360,15 +361,7 @@ impl DoubleEndedIterator for StringLikePartIter<'_> {
         let part = match self {
             StringLikePartIter::String(inner) => StringLikePart::String(inner.next_back()?),
             StringLikePartIter::Bytes(inner) => StringLikePart::Bytes(inner.next_back()?),
-            StringLikePartIter::FString(inner) => {
-                let part = inner.next_back()?;
-                match part {
-                    ast::FStringPartRef::Literal(string_literal) => {
-                        StringLikePart::String(string_literal)
-                    }
-                    ast::FStringPartRef::FString(f_string) => StringLikePart::FString(f_string),
-                }
-            }
+            StringLikePartIter::FString(inner) => inner.next_back()?.into(),
             StringLikePartIter::TString(inner) => StringLikePart::TString(inner.next_back()?),
         };
 
