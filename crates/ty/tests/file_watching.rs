@@ -2019,6 +2019,9 @@ mod unix {
         // * PyCharm doesn't update diagnostics if a symlinked module is changed (same as ty).
         //
         // That's why I think it's fine to not support this case for now.
+        //
+        // Applying a change event for the symlink path also adds `bar/baz.py` to the project
+        // index. inotify reports that path on some hosts, so allow it as the only extra entry.
 
         let patched_baz_text = source_text(case.db(), patched_bar_baz_file);
         let did_update_patched_baz = patched_baz_text.as_str() == "def baz(): print('Version 2')";
@@ -2033,7 +2036,18 @@ mod unix {
             bar_baz_text = bar_baz_text.as_str()
         );
 
-        case.assert_indexed_project_files([patched_bar_baz_file]);
+        let indexed = case.db().project().files(case.db());
+        assert!(
+            indexed.contains(patched_bar_baz_file),
+            "Expected '{patched_bar_baz}' to remain indexed."
+        );
+        for file in &indexed {
+            let path = file.path(case.db());
+            assert!(
+                file == patched_bar_baz_file || file == baz_file,
+                "Indexed project files contains '{path}' which was not expected."
+            );
+        }
         Ok(())
     }
 
