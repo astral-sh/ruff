@@ -355,7 +355,59 @@ pub struct GenericContext<'db> {
     pub(crate) program: Program<'db>,
 
     #[returns(ref)]
-    variables_inner: FxOrderMap<BoundTypeVarIdentity<'db>, BoundTypeVarInstance<'db>>,
+    variables_inner: GenericVariables<'db>,
+}
+
+type VariableEntry<'db> = (BoundTypeVarIdentity<'db>, BoundTypeVarInstance<'db>);
+
+/// Keep small contexts in declaration order without retaining a hash table.
+#[derive(Debug, Clone, Eq, PartialEq, Hash, get_size2::GetSize, salsa::SalsaValue)]
+pub enum GenericVariables<'db> {
+    Small(Box<[VariableEntry<'db>]>),
+    Indexed(Box<FxOrderMap<BoundTypeVarIdentity<'db>, BoundTypeVarInstance<'db>>>),
+}
+
+impl<'db> GenericVariables<'db> {
+    fn new(mut entries: impl Iterator<Item = VariableEntry<'db>>) -> Self {
+        let mut small = SmallVec::<[VariableEntry<'db>; 4]>::new();
+        while let Some((identity, variable)) = entries.next() {
+            // Match OrderMap: retain the first position and the last value for each identity.
+            if let Some((_, existing)) = small.iter_mut().find(|(key, _)| *key == identity) {
+                *existing = variable;
+            } else if small.len() < small.inline_size() {
+                small.push((identity, variable));
+            } else {
+                let mut indexed = small.into_iter().collect::<FxOrderMap<_, _>>();
+                indexed.insert(identity, variable);
+                indexed.extend(entries);
+                indexed.shrink_to_fit();
+                return Self::Indexed(Box::new(indexed));
+            }
+        }
+        assert!(!small.is_empty(), "a generic context must be nonempty");
+        Self::Small(small.into_boxed_slice())
+    }
+
+    fn iter(
+        &self,
+    ) -> impl ExactSizeIterator<Item = (&BoundTypeVarIdentity<'db>, &BoundTypeVarInstance<'db>)> + Clone
+    {
+        match self {
+            Self::Small(entries) => itertools::Either::Left(entries.iter().map(|(k, v)| (k, v))),
+            Self::Indexed(entries) => itertools::Either::Right(entries.iter()),
+        }
+    }
+
+    fn keys(&self) -> impl Iterator<Item = &BoundTypeVarIdentity<'db>> {
+        self.iter().map(|(identity, _)| identity)
+    }
+
+    fn get_index_of(&self, identity: &BoundTypeVarIdentity<'db>) -> Option<usize> {
+        match self {
+            Self::Small(entries) => entries.iter().position(|(key, _)| key == identity),
+            Self::Indexed(entries) => entries.get_index_of(identity),
+        }
+    }
 }
 
 pub(super) fn walk_generic_context<'db, V: TypeVisitor<'db> + ?Sized>(
@@ -477,13 +529,10 @@ impl<'db> GenericContext<'db> {
         program: Program<'db>,
         type_params: impl IntoIterator<Item = BoundTypeVarInstance<'db>>,
     ) -> Self {
-        let mut variables = type_params
+        let entries = type_params
             .into_iter()
-            .map(|variable| (variable.identity(db), variable))
-            .collect::<FxOrderMap<_, _>>();
-        assert!(!variables.is_empty(), "a generic context must be nonempty");
-        variables.shrink_to_fit();
-        Self::new_internal(db, program, variables)
+            .map(|variable| (variable.identity(db), variable));
+        Self::new_internal(db, program, GenericVariables::new(entries))
     }
 
     /// Merge this generic context with another, returning a new generic context that
@@ -494,10 +543,7 @@ impl<'db> GenericContext<'db> {
         Self::from_typevar_instances_in_program(
             db,
             program,
-            self.variables_inner(db)
-                .values()
-                .chain(other.variables_inner(db).values())
-                .copied(),
+            self.variables(db).chain(other.variables(db)),
         )
     }
 
@@ -551,7 +597,9 @@ impl<'db> GenericContext<'db> {
         self,
         db: &'db dyn Db,
     ) -> impl ExactSizeIterator<Item = BoundTypeVarInstance<'db>> + Clone {
-        self.variables_inner(db).values().copied()
+        self.variables_inner(db)
+            .iter()
+            .map(|(_, variable)| *variable)
     }
 
     pub(super) fn variable_index(
@@ -567,8 +615,7 @@ impl<'db> GenericContext<'db> {
         db: &'db dyn Db,
         bound_typevar: BoundTypeVarIdentity<'db>,
     ) -> bool {
-        self.variables_inner(db)
-            .contains_key(&bound_typevar.binder())
+        self.variable_index(db, bound_typevar.binder()).is_some()
     }
     /// Returns `true` if this generic context contains exactly one `ParamSpec` and no other type
     /// variables.
@@ -890,7 +937,7 @@ impl<'db> GenericContext<'db> {
     }
 
     pub(crate) fn len(self, db: &'db dyn Db) -> usize {
-        self.variables_inner(db).len()
+        self.variables(db).len()
     }
 
     pub(crate) fn default_specialization(
@@ -953,8 +1000,9 @@ impl<'db> GenericContext<'db> {
 
     pub(crate) fn is_subset_of(self, db: &'db dyn Db, other: GenericContext<'db>) -> bool {
         let other_variables = other.variables_inner(db);
-        self.variables(db)
-            .all(|bound_typevar| other_variables.contains_key(&bound_typevar.identity(db)))
+        self.variables_inner(db)
+            .keys()
+            .all(|identity| other_variables.get_index_of(identity).is_some())
     }
 
     pub(crate) fn binds_named_typevar(
@@ -3337,7 +3385,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         // TODO: This is a solution-level projection. A more principled version would live in the
         // constraint-set solution extraction layer, taking an explicit domain of typevars to solve
         // for and existentially quantifying away the other typevars in that domain.
-        for (identity, variable) in generic_context.variables_inner(db) {
+        for (identity, variable) in generic_context.variables_inner(db).iter() {
             if let Some(ty) = inference.merged_types.get_mut(identity) {
                 *ty = self.remove_inferable_typevar_artifacts_from_solution(*variable, *ty);
             }
@@ -3602,7 +3650,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         let db = self.db;
         // Check every binding against the original map so recovery is independent of iteration order.
         let mut replacements = Vec::new();
-        for (&identity, variable) in self.generic_context.variables_inner(db) {
+        for (&identity, variable) in self.generic_context.variables_inner(db).iter() {
             let Some(&ty) = types.get(&identity) else {
                 continue;
             };
