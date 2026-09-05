@@ -1704,28 +1704,31 @@ fn resolve_component(
         return Err(());
     }
 
-    let subdirectory = module_directory.child_directory(context, module_name);
-    let init = resolve_file_module_with_filter(&subdirectory, context, "__init__", file_filter);
-    candidate.path = subdirectory.into_path();
+    let subdirectory = module_directory
+        .may_contain_directory(context, module_name)
+        .then(|| module_directory.child_directory(context, module_name));
 
-    if let Some(init) = init {
+    if let Some(subdirectory) = &subdirectory
+        && let Some(init) =
+            resolve_file_module_with_filter(subdirectory, context, "__init__", file_filter)
+    {
         // Check for a regular package first (highest priority).
-        candidate.module = if is_legacy_namespace_package(&candidate.path, context, init) {
+        candidate.module = if is_legacy_namespace_package(subdirectory.path(), context, init) {
             ResolvedModule::LegacyNamespacePackage(init)
         } else {
             ResolvedModule::RegularPackage(init)
         };
-        candidate.py_typed = candidate
-            .path
+        candidate.py_typed = subdirectory
+            .path()
             .py_typed(context)
             .inherit_parent(candidate.py_typed);
-        Ok(())
     } else if let Some(file_module) =
         resolve_file_module_with_filter(&module_directory, context, module_name, file_filter)
     {
         // Check for a file module next
         candidate.module = ResolvedModule::Module(file_module);
-        Ok(())
+        candidate.path.push(module_name);
+        return Ok(());
     } else {
         // Last resort, check if a folder with the given name exists. If so,
         // then this is a namespace package. We need to skip this check for
@@ -1746,19 +1749,25 @@ fn resolve_component(
         // `VERSIONS` file into consideration.
         // A namespace package is not backed by a file, so it cannot satisfy a stub-only lookup.
         if file_filter != ComponentFileFilter::StubOnly
-            && !candidate.path.search_path().is_standard_library()
-            && candidate.path.is_directory(context)
+            && let Some(subdirectory) = &subdirectory
+            && !subdirectory.path().search_path().is_standard_library()
+            && subdirectory.path().is_directory(context)
         {
             candidate.module = ResolvedModule::NamespacePackage;
-            candidate.py_typed = candidate
-                .path
+            candidate.py_typed = subdirectory
+                .path()
                 .py_typed(context)
                 .inherit_parent(candidate.py_typed);
-            Ok(())
         } else {
-            Err(())
+            return Err(());
         }
     }
+
+    if let Some(subdirectory) = subdirectory {
+        candidate.path = subdirectory.into_path();
+    }
+
+    Ok(())
 }
 
 type ResolvedNames = Vec<ModuleResolutionCandidate>;

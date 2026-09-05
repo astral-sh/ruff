@@ -234,6 +234,15 @@ impl ModulePath {
         }
     }
 
+    /// Returns the path within the vendored filesystem, if this is a vendored module.
+    fn to_vendored_path(&self) -> Option<VendoredPathBuf> {
+        Some(
+            self.search_path
+                .as_vendored_path()?
+                .join(&self.relative_path),
+        )
+    }
+
     #[must_use]
     pub(crate) fn to_module_name(&self) -> Option<ModuleName> {
         fn strip_stubs(component: &str) -> &str {
@@ -377,6 +386,18 @@ impl<'db> ModuleDirectory<'db> {
             || self
                 .listing
                 .is_some_and(|listing| listing.contains_name_with_prefix(name))
+    }
+
+    /// Returns whether a child could be a directory, leaving symlink targets unchecked.
+    pub(crate) fn may_contain_directory(&self, context: &ResolverContext, name: &str) -> bool {
+        if let Some(path) = self.path.to_vendored_path() {
+            context.vendored().is_directory(path.join(name))
+        } else {
+            matches!(
+                self.listing.and_then(|listing| listing.file_type(name)),
+                Some(FileType::Directory | FileType::Symlink)
+            )
+        }
     }
 
     /// Resolves one exact filename in this directory, validating file status,
