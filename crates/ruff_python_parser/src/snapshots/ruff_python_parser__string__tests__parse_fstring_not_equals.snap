@@ -13,58 +13,56 @@ expression: suite
                     range: 0..11,
                     value: FStringValue {
                         inner: Single(
-                            FString(
-                                FString {
-                                    range: 0..11,
-                                    node_index: NodeIndex(None),
-                                    elements: [
-                                        Interpolation(
-                                            InterpolatedElement {
-                                                range: 2..10,
-                                                node_index: NodeIndex(None),
-                                                expression: Compare(
-                                                    ExprCompare {
-                                                        node_index: NodeIndex(None),
-                                                        range: 3..9,
-                                                        ops: [
-                                                            NotEq,
-                                                        ],
-                                                        operands: [
-                                                            NumberLiteral(
-                                                                ExprNumberLiteral {
-                                                                    node_index: NodeIndex(None),
-                                                                    range: 3..4,
-                                                                    value: Int(
-                                                                        1,
-                                                                    ),
-                                                                },
-                                                            ),
-                                                            NumberLiteral(
-                                                                ExprNumberLiteral {
-                                                                    node_index: NodeIndex(None),
-                                                                    range: 8..9,
-                                                                    value: Int(
-                                                                        2,
-                                                                    ),
-                                                                },
-                                                            ),
-                                                        ],
-                                                    },
-                                                ),
-                                                debug_text: None,
-                                                conversion: None,
-                                                format_spec: None,
-                                            },
-                                        ),
-                                    ],
-                                    flags: FStringFlags {
-                                        quote_style: Double,
-                                        prefix: Regular,
-                                        triple_quoted: false,
-                                        unclosed: false,
-                                    },
+                            FString {
+                                range: 0..11,
+                                node_index: NodeIndex(None),
+                                elements: [
+                                    Interpolation(
+                                        InterpolatedElement {
+                                            range: 2..10,
+                                            node_index: NodeIndex(None),
+                                            expression: Compare(
+                                                ExprCompare {
+                                                    node_index: NodeIndex(None),
+                                                    range: 3..9,
+                                                    ops: [
+                                                        NotEq,
+                                                    ],
+                                                    operands: [
+                                                        NumberLiteral(
+                                                            ExprNumberLiteral {
+                                                                node_index: NodeIndex(None),
+                                                                range: 3..4,
+                                                                value: Int(
+                                                                    1,
+                                                                ),
+                                                            },
+                                                        ),
+                                                        NumberLiteral(
+                                                            ExprNumberLiteral {
+                                                                node_index: NodeIndex(None),
+                                                                range: 8..9,
+                                                                value: Int(
+                                                                    2,
+                                                                ),
+                                                            },
+                                                        ),
+                                                    ],
+                                                },
+                                            ),
+                                            debug_text: None,
+                                            conversion: None,
+                                            format_spec: None,
+                                        },
+                                    ),
+                                ],
+                                flags: FStringFlags {
+                                    quote_style: Double,
+                                    prefix: Regular,
+                                    triple_quoted: false,
+                                    unclosed: false,
                                 },
-                            ),
+                            },
                         ),
                     },
                 },

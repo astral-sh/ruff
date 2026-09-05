@@ -527,10 +527,10 @@ pub fn walk_expr<V: Transformer + ?Sized>(visitor: &V, expr: &mut Expr) {
         Expr::FString(ast::ExprFString { value, .. }) => {
             for f_string_part in value.iter_mut() {
                 match f_string_part {
-                    ast::FStringPart::Literal(string_literal) => {
+                    ast::FStringPartMut::Literal(string_literal) => {
                         visitor.visit_string_literal(string_literal);
                     }
-                    ast::FStringPart::FString(f_string) => {
+                    ast::FStringPartMut::FString(f_string) => {
                         visitor.visit_f_string(f_string);
                     }
                 }

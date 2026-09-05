@@ -706,10 +706,10 @@ impl<'a> From<&'a ast::FStringValue> for ComparableFString<'a> {
 
         for part in value {
             match part {
-                ast::FStringPart::Literal(string_literal) => {
+                ast::FStringPartRef::Literal(string_literal) => {
                     collector.push_literal(&string_literal.value);
                 }
-                ast::FStringPart::FString(fstring) => {
+                ast::FStringPartRef::FString(fstring) => {
                     for element in &fstring.elements {
                         match element {
                             ast::InterpolatedStringElement::Literal(literal) => {

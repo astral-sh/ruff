@@ -6977,10 +6977,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // Make sure we iter through every parts to infer all sub-expressions. The `collector`
             // struct ensures we don't allocate unnecessary strings.
             match part {
-                ast::FStringPart::Literal(literal) => {
+                ast::FStringPartRef::Literal(literal) => {
                     collector.push_str(&literal.value);
                 }
-                ast::FStringPart::FString(fstring) => {
+                ast::FStringPartRef::FString(fstring) => {
                     for element in &fstring.elements {
                         match element {
                             ast::InterpolatedStringElement::Interpolation(expression) => {

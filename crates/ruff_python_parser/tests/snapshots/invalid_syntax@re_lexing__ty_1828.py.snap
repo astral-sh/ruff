@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/re_lexing/ty_1828.py
 ---
 ## AST
 
@@ -54,43 +55,41 @@ Module(
                                                     range: 78..85,
                                                     value: FStringValue {
                                                         inner: Single(
-                                                            FString(
-                                                                FString {
-                                                                    range: 78..85,
-                                                                    node_index: NodeIndex(None),
-                                                                    elements: [
-                                                                        Interpolation(
-                                                                            InterpolatedElement {
-                                                                                range: 82..85,
-                                                                                node_index: NodeIndex(None),
-                                                                                expression: Name(
-                                                                                    ExprName {
-                                                                                        node_index: NodeIndex(None),
-                                                                                        range: 83..84,
-                                                                                        id: Name("d"),
-                                                                                        ctx: Load,
-                                                                                    },
-                                                                                ),
-                                                                                debug_text: Some(
-                                                                                    DebugText {
-                                                                                        leading: "",
-                                                                                        expression: "d",
-                                                                                        trailing: "=",
-                                                                                    },
-                                                                                ),
-                                                                                conversion: None,
-                                                                                format_spec: None,
-                                                                            },
-                                                                        ),
-                                                                    ],
-                                                                    flags: FStringFlags {
-                                                                        quote_style: Double,
-                                                                        prefix: Regular,
-                                                                        triple_quoted: true,
-                                                                        unclosed: true,
-                                                                    },
+                                                            FString {
+                                                                range: 78..85,
+                                                                node_index: NodeIndex(None),
+                                                                elements: [
+                                                                    Interpolation(
+                                                                        InterpolatedElement {
+                                                                            range: 82..85,
+                                                                            node_index: NodeIndex(None),
+                                                                            expression: Name(
+                                                                                ExprName {
+                                                                                    node_index: NodeIndex(None),
+                                                                                    range: 83..84,
+                                                                                    id: Name("d"),
+                                                                                    ctx: Load,
+                                                                                },
+                                                                            ),
+                                                                            debug_text: Some(
+                                                                                DebugText {
+                                                                                    leading: "",
+                                                                                    expression: "d",
+                                                                                    trailing: "=",
+                                                                                },
+                                                                            ),
+                                                                            conversion: None,
+                                                                            format_spec: None,
+                                                                        },
+                                                                    ),
+                                                                ],
+                                                                flags: FStringFlags {
+                                                                    quote_style: Double,
+                                                                    prefix: Regular,
+                                                                    triple_quoted: true,
+                                                                    unclosed: true,
                                                                 },
-                                                            ),
+                                                            },
                                                         ),
                                                     },
                                                 },

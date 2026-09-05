@@ -4313,37 +4313,35 @@ Module(
                                             range: 2932..2938,
                                             value: FStringValue {
                                                 inner: Single(
-                                                    FString(
-                                                        FString {
-                                                            range: 2932..2938,
-                                                            node_index: NodeIndex(None),
-                                                            elements: [
-                                                                Interpolation(
-                                                                    InterpolatedElement {
-                                                                        range: 2934..2937,
-                                                                        node_index: NodeIndex(None),
-                                                                        expression: Name(
-                                                                            ExprName {
-                                                                                node_index: NodeIndex(None),
-                                                                                range: 2935..2936,
-                                                                                id: Name("y"),
-                                                                                ctx: Load,
-                                                                            },
-                                                                        ),
-                                                                        debug_text: None,
-                                                                        conversion: None,
-                                                                        format_spec: None,
-                                                                    },
-                                                                ),
-                                                            ],
-                                                            flags: FStringFlags {
-                                                                quote_style: Double,
-                                                                prefix: Regular,
-                                                                triple_quoted: false,
-                                                                unclosed: false,
-                                                            },
+                                                    FString {
+                                                        range: 2932..2938,
+                                                        node_index: NodeIndex(None),
+                                                        elements: [
+                                                            Interpolation(
+                                                                InterpolatedElement {
+                                                                    range: 2934..2937,
+                                                                    node_index: NodeIndex(None),
+                                                                    expression: Name(
+                                                                        ExprName {
+                                                                            node_index: NodeIndex(None),
+                                                                            range: 2935..2936,
+                                                                            id: Name("y"),
+                                                                            ctx: Load,
+                                                                        },
+                                                                    ),
+                                                                    debug_text: None,
+                                                                    conversion: None,
+                                                                    format_spec: None,
+                                                                },
+                                                            ),
+                                                        ],
+                                                        flags: FStringFlags {
+                                                            quote_style: Double,
+                                                            prefix: Regular,
+                                                            triple_quoted: false,
+                                                            unclosed: false,
                                                         },
-                                                    ),
+                                                    },
                                                 ),
                                             },
                                         },
