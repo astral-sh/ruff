@@ -40,7 +40,7 @@ use crate::place::{
     explicit_global_symbol, implicit_builtins_symbol, loop_header_reachability,
     module_type_implicit_global_declaration, module_type_implicit_global_symbol, place_by_id,
     place_from_bindings_with_reachability_cache, place_from_declarations_with_reachability_cache,
-    typing_extensions_symbol,
+    place_from_deferred_bindings_with_reachability_cache, typing_extensions_symbol,
 };
 use crate::place_load::{
     ImplicitPlaceLoad, PlaceExprPrefixLoad, PlaceExprPrefixLoads, PlaceLoadFailure, PlaceLoadMode,
@@ -550,7 +550,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.cycle_recovery
     }
 
-    fn recursive_type_expression_definition(&self) -> Option<Definition<'db>> {
+    /// Returns the definition whose expressions are currently being inferred.
+    ///
+    /// A type-variable binding context can identify a more specific active definition than the
+    /// surrounding inference region, so prefer it when one is available.
+    fn current_definition(&self) -> Option<Definition<'db>> {
         self.typevar_binding_context.or(match self.region {
             InferenceRegion::Definition(definition)
             | InferenceRegion::FunctionDefaults(definition)
@@ -10332,11 +10336,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         place_expr: PlaceExpr,
         expr_ref: ast::ExprRef,
     ) -> (PlaceAndQualifiers<'db>, Vec<(FileScopeId, ConstraintKey)>) {
+        let db = self.db();
         let env = self.program_environment();
         let mode = if self.is_deferred() && self.in_string_annotation() {
             PlaceLoadMode::StringAnnotation
         } else if self.is_deferred() {
-            PlaceLoadMode::Deferred
+            let scope = self.scope();
+            let use_def = self.index.use_def_map(scope.file_scope_id(db));
+            PlaceLoadMode::Deferred {
+                expression: expr_ref,
+                definition_order: self
+                    .current_definition()
+                    .filter(|definition| definition.scope(db) == scope)
+                    .and_then(|definition| use_def.definition_order(db, definition)),
+            }
         } else {
             PlaceLoadMode::AtExpression(expr_ref)
         };
@@ -10431,6 +10444,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 place.into()
             }
+            PlaceLoadSourceKind::DeferredBindings {
+                scope,
+                id,
+                use_id,
+                definition_order,
+            } => {
+                let use_def = self.index.use_def_map(scope.file_scope_id(db));
+                place_from_deferred_bindings_with_reachability_cache(
+                    db,
+                    env,
+                    use_def.reachable_bindings(id),
+                    use_def.bindings_at_use(use_id),
+                    definition_order,
+                    self.reachability_cache(),
+                )
+                .place
+                .into()
+            }
             PlaceLoadSourceKind::DefinitionsFromOwningScope { scope, id } => place_by_id(
                 db,
                 scope,
@@ -10515,6 +10546,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         db,
                         env,
                         use_def.bindings_at_use(use_id),
+                        self.reachability_cache(),
+                    )
+                    .place
+                }
+                PlaceExprPrefixLoad::Deferred {
+                    id,
+                    use_id,
+                    definition_order,
+                } => {
+                    place_from_deferred_bindings_with_reachability_cache(
+                        db,
+                        env,
+                        use_def.reachable_bindings(id),
+                        use_def.bindings_at_use(use_id),
+                        definition_order,
                         self.reachability_cache(),
                     )
                     .place

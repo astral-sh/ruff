@@ -30,8 +30,8 @@ use ty_python_core::reachability_constraints::{
 use ty_python_core::scope::ScopeId;
 use ty_python_core::{
     BindingWithConstraints, BindingWithConstraintsIterator, BoundnessAnalysis,
-    DeclarationWithConstraint, DeclarationsIterator, ProgramFile, Truthiness, global_scope,
-    place_table, use_def_map,
+    DeclarationWithConstraint, DeclarationsIterator, ProgramFile, ScopedDefinitionId, Truthiness,
+    global_scope, place_table, use_def_map,
 };
 
 pub(crate) use implicit_globals::{
@@ -811,6 +811,25 @@ pub(super) fn place_from_bindings_with_reachability_cache<'db>(
         db,
         env,
         bindings_with_constraints,
+        RequiresExplicitReExport::No,
+        Some(reachability_cache),
+    )
+}
+
+/// Resolve a deferred use from its current bindings and all subsequent reachable bindings.
+pub(super) fn place_from_deferred_bindings_with_reachability_cache<'map, 'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    reachable_bindings: BindingWithConstraintsIterator<'map, 'db>,
+    current_bindings: BindingWithConstraintsIterator<'map, 'db>,
+    definition_order: ScopedDefinitionId,
+    reachability_cache: &ReachabilityEvaluationCache<'db>,
+) -> PlaceWithDefinition<'db> {
+    place_from_binding_iterator_impl(
+        db,
+        env,
+        reachable_bindings,
+        Some((current_bindings, definition_order)),
         RequiresExplicitReExport::No,
         Some(reachability_cache),
     )
@@ -1672,9 +1691,53 @@ fn place_from_bindings_impl<'db>(
     requires_explicit_reexport: RequiresExplicitReExport,
     reachability_cache: Option<&ReachabilityEvaluationCache<'db>>,
 ) -> PlaceWithDefinition<'db> {
+    place_from_binding_iterator_impl(
+        db,
+        env,
+        bindings_with_constraints,
+        None,
+        requires_explicit_reexport,
+        reachability_cache,
+    )
+}
+
+fn place_from_binding_iterator_impl<'map, 'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    bindings_with_constraints: BindingWithConstraintsIterator<'map, 'db>,
+    current_bindings: Option<(
+        BindingWithConstraintsIterator<'map, 'db>,
+        ScopedDefinitionId,
+    )>,
+    requires_explicit_reexport: RequiresExplicitReExport,
+    reachability_cache: Option<&ReachabilityEvaluationCache<'db>>,
+) -> PlaceWithDefinition<'db> {
     let predicates = bindings_with_constraints.predicates();
     let reachability_constraints = bindings_with_constraints.reachability_constraints();
     let boundness_analysis = bindings_with_constraints.boundness_analysis();
+
+    let bindings_with_constraints =
+        if let Some((current_bindings, containing_definition)) = current_bindings {
+            // Start with the control-flow-sensitive bindings reaching this use. Then add bindings
+            // reachable anywhere in the scope from the containing definition onward. This excludes
+            // earlier shadowed bindings, but can still include a later binding from a mutually
+            // exclusive branch that cannot be reached from this use.
+            let containing_definition_was_visible = current_bindings
+                .clone()
+                .any(|binding| binding.binding_order == containing_definition);
+            let subsequent_bindings = bindings_with_constraints.skip_while(move |binding| {
+                binding.binding_order < containing_definition
+                    || (containing_definition_was_visible
+                        && binding.binding_order == containing_definition)
+            });
+
+            // A deletion at the reference cannot prevent a later definition from binding the place.
+            let current_bindings = current_bindings
+                .filter(|binding| !matches!(binding.binding, DefinitionState::Deleted));
+            Either::Left(current_bindings.chain(subsequent_bindings))
+        } else {
+            Either::Right(bindings_with_constraints)
+        };
     let mut bindings_with_constraints = bindings_with_constraints.peekable();
 
     let is_non_exported = |binding: Definition<'db>| {

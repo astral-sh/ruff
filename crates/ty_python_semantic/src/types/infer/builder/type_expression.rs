@@ -2464,7 +2464,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     .try_upcast_to_callable_with_recursive_fallback(
                         db,
                         env,
-                        self.recursive_type_expression_definition(),
+                        self.current_definition(),
                     )
                     .map(|callables| {
                         if special_form == SpecialFormType::RegularCallableTypeOf {

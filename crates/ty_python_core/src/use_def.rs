@@ -269,7 +269,8 @@ use crate::use_def::place_state::{
     LiveDeclarationsIterator, PlaceState,
 };
 use crate::{
-    BoundnessAnalysis, EnclosingSnapshotResult, LoopHeader, PossiblyNarrowedPlaces, SemanticIndex,
+    BoundnessAnalysis, Db, EnclosingSnapshotResult, LoopHeader, PossiblyNarrowedPlaces,
+    SemanticIndex,
 };
 
 mod exception_checkpoint;
@@ -1002,6 +1003,36 @@ impl<'db> UseDefMap<'db> {
 
     pub fn definition(&self, id: ScopedDefinitionId) -> DefinitionState<'db> {
         self.all_definitions.get(id).state()
+    }
+
+    /// Returns the scope-local insertion-order ID of a binding or declaration.
+    ///
+    /// [`ScopedDefinitionId`] indexes the append-only sequence of definition states for one scope.
+    /// Bindings, declarations, deletions, and synthesized definitions share this increasing
+    /// sequence, so comparing two IDs says which state the semantic index recorded first. This is
+    /// semantic-index visitation order, not necessarily source order or execution order: evaluation
+    /// order can differ from source order, mutually exclusive branches are visited consecutively,
+    /// and synthesized definitions are inserted where needed. IDs are meaningful only within the
+    /// same scope and do not, by themselves, describe which definitions can reach a use.
+    ///
+    /// The supplied definition must belong to this map's scope. Returns `None` if it is absent
+    /// from its place's reachable bindings and declarations.
+    pub fn definition_order(
+        &self,
+        db: &'db dyn Db,
+        definition: Definition<'db>,
+    ) -> Option<ScopedDefinitionId> {
+        let place = definition.place(db);
+
+        self.reachable_bindings(place)
+            .map(|binding| (binding.binding, binding.binding_order))
+            .chain(
+                self.reachable_declarations(place)
+                    .map(|declaration| (declaration.declaration, declaration.declaration_order)),
+            )
+            .find_map(|(candidate, order)| {
+                (candidate.definition() == Some(definition)).then_some(order)
+            })
     }
 
     pub fn narrowing_evaluator(
