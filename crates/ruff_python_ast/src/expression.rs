@@ -319,7 +319,7 @@ impl Ranged for StringLikePart<'_> {
 pub enum StringLikePartIter<'a> {
     String(std::slice::Iter<'a, ast::StringLiteral>),
     Bytes(std::slice::Iter<'a, ast::BytesLiteral>),
-    FString(std::slice::Iter<'a, ast::FStringPart>),
+    FString(ast::FStringParts<'a>),
     TString(std::slice::Iter<'a, ast::TString>),
 }
 
@@ -333,10 +333,10 @@ impl<'a> Iterator for StringLikePartIter<'a> {
             StringLikePartIter::FString(inner) => {
                 let part = inner.next()?;
                 match part {
-                    ast::FStringPart::Literal(string_literal) => {
+                    ast::FStringPartRef::Literal(string_literal) => {
                         StringLikePart::String(string_literal)
                     }
-                    ast::FStringPart::FString(f_string) => StringLikePart::FString(f_string),
+                    ast::FStringPartRef::FString(f_string) => StringLikePart::FString(f_string),
                 }
             }
             StringLikePartIter::TString(inner) => StringLikePart::TString(inner.next()?),
@@ -363,10 +363,10 @@ impl DoubleEndedIterator for StringLikePartIter<'_> {
             StringLikePartIter::FString(inner) => {
                 let part = inner.next_back()?;
                 match part {
-                    ast::FStringPart::Literal(string_literal) => {
+                    ast::FStringPartRef::Literal(string_literal) => {
                         StringLikePart::String(string_literal)
                     }
-                    ast::FStringPart::FString(f_string) => StringLikePart::FString(f_string),
+                    ast::FStringPartRef::FString(f_string) => StringLikePart::FString(f_string),
                 }
             }
             StringLikePartIter::TString(inner) => StringLikePart::TString(inner.next_back()?),

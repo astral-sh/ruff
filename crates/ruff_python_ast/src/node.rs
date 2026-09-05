@@ -148,10 +148,10 @@ impl ast::ExprFString {
 
         for f_string_part in value {
             match f_string_part {
-                ast::FStringPart::Literal(string_literal) => {
+                ast::FStringPartRef::Literal(string_literal) => {
                     visitor.visit_string_literal(string_literal);
                 }
-                ast::FStringPart::FString(f_string) => {
+                ast::FStringPartRef::FString(f_string) => {
                     visitor.visit_f_string(f_string);
                 }
             }

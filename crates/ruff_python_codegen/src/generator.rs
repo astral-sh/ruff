@@ -1464,10 +1464,10 @@ impl<'a> Generator<'a> {
         for f_string_part in value {
             self.p_delim(&mut first, " ");
             match f_string_part {
-                ast::FStringPart::Literal(string_literal) => {
+                ast::FStringPartRef::Literal(string_literal) => {
                     self.unparse_string_literal(string_literal);
                 }
-                ast::FStringPart::FString(f_string) => {
+                ast::FStringPartRef::FString(f_string) => {
                     self.unparse_interpolated_string(&f_string.elements, f_string.flags.into());
                 }
             }

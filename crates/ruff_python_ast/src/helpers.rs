@@ -1599,8 +1599,8 @@ fn is_non_empty_f_string(expr: &ast::ExprFString) -> bool {
     }
 
     expr.value.iter().any(|part| match part {
-        ast::FStringPart::Literal(string_literal) => !string_literal.is_empty(),
-        ast::FStringPart::FString(f_string) => {
+        ast::FStringPartRef::Literal(string_literal) => !string_literal.is_empty(),
+        ast::FStringPartRef::FString(f_string) => {
             // The part is a concatenation of elements, so it's guaranteed non-empty if any element is
             f_string.elements.iter().any(|element| match element {
                 InterpolatedStringElement::Literal(string_literal) => !string_literal.is_empty(),
@@ -1648,8 +1648,8 @@ pub fn is_empty_f_string(expr: &ast::ExprFString) -> bool {
     }
 
     expr.value.iter().all(|part| match part {
-        ast::FStringPart::Literal(string_literal) => string_literal.is_empty(),
-        ast::FStringPart::FString(f_string) => {
+        ast::FStringPartRef::Literal(string_literal) => string_literal.is_empty(),
+        ast::FStringPartRef::FString(f_string) => {
             is_empty_interpolated_elements(f_string.elements.iter())
         }
     })
