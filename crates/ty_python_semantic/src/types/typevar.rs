@@ -2034,12 +2034,15 @@ impl<'db> TypeVarConstraints<'db> {
         let mut all_unbound = true;
         let mut possibly_unbound = false;
         let mut origin = TypeOrigin::Declared;
+        let mut needs_projection_evidence_from_types = false;
         for ty in self.elements(db) {
             let PlaceAndQualifiers {
                 place: ty_member,
                 qualifiers: new_qualifiers,
+                needs_projection_evidence_from_types: new_needs_projection_evidence,
             } = transform_fn(ty);
             qualifiers |= new_qualifiers;
+            needs_projection_evidence_from_types |= new_needs_projection_evidence;
             match ty_member {
                 Place::Undefined => {
                     possibly_unbound = true;
@@ -2077,6 +2080,7 @@ impl<'db> TypeVarConstraints<'db> {
                 })
             },
             qualifiers,
+            needs_projection_evidence_from_types,
         }
     }
 

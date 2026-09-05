@@ -698,6 +698,7 @@ impl ClassInfoConstraintFunction {
 
             Type::AlwaysFalsy
             | Type::AlwaysTruthy
+            | Type::Projection(_)
             | Type::EnumComplement(_)
             | Type::LiteralValue(_)
             | Type::BoundMethod(_)
@@ -5149,6 +5150,7 @@ fn is_or_contains_typeddict<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
 
         Type::Dynamic(_)
         | Type::Divergent(_)
+        | Type::Projection(_)
         | Type::Never
         | Type::EnumComplement(_)
         | Type::FunctionLiteral(_)
@@ -5341,6 +5343,7 @@ fn all_matching_typeddict_fields_have_literal_types<'db>(
         // always guarded by that check.
         Type::Dynamic(_)
         | Type::Divergent(_)
+        | Type::Projection(_)
         | Type::Never
         | Type::EnumComplement(_)
         | Type::FunctionLiteral(_)

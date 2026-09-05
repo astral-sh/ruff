@@ -1240,6 +1240,27 @@ def check_protocol(value: Callback):
         value.callback = lambda argument: reveal_type(argument)  # revealed: str
 ```
 
+## Properties in loops
+
+A deprecated getter is reported even when its receiver is repeatedly unpacked from and stored in a
+tuple inside a loop.
+
+```py
+from typing_extensions import deprecated
+
+class Node:
+    @property
+    @deprecated("Use a different link")
+    def next(self) -> "Node":
+        return self
+
+def visit(node: Node):
+    pair = (node,)
+    while True:
+        (node,) = pair
+        pair = (node.next,)  # error: [deprecated] "Use a different link"
+```
+
 ## Overloads
 
 ### Deprecated overloads

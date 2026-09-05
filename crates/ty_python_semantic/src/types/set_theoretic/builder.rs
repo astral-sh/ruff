@@ -40,6 +40,7 @@
 //! (unless exactly the same literal type), we can avoid many unnecessary redundancy checks.
 
 use std::hint::cold_path;
+use std::ops::ControlFlow;
 
 use super::RecursivelyDefined;
 use super::generic_gradual_intersections::{GenericIntersection, generic_gradual_intersection};
@@ -1389,6 +1390,134 @@ impl<'db> IntersectionBuilder<'db> {
     }
 }
 
+impl<'db> IntersectionType<'db> {
+    /// Maps intersection factors during recovery without invoking type relations or expanding
+    /// aliases. Substitutions can expose unions, so rebuilding still preserves DNF.
+    pub(crate) fn try_map_cycle_recovery(
+        self,
+        db: &'db dyn Db,
+        mut transform: impl FnMut(Type<'db>) -> Option<Type<'db>>,
+    ) -> Option<Type<'db>> {
+        let mut expansion = IntersectionExpansion::default();
+        for positive in self.positive(db) {
+            expansion.add_positive(db, transform(*positive)?);
+        }
+        for negative in self.negative(db) {
+            expansion.add_negative(db, transform(*negative)?);
+        }
+        Some(expansion.build(db))
+    }
+}
+
+/// Structural distribution of intersections, with no inference-dependent simplifications.
+#[derive(Clone)]
+struct IntersectionExpansion<'db> {
+    branches: Vec<InnerIntersectionBuilder<'db>>,
+}
+
+impl Default for IntersectionExpansion<'_> {
+    fn default() -> Self {
+        Self {
+            branches: vec![InnerIntersectionBuilder::default()],
+        }
+    }
+}
+
+impl<'db> IntersectionExpansion<'db> {
+    fn add_positive(&mut self, db: &'db dyn Db, ty: Type<'db>) {
+        match ty {
+            Type::Union(union) => {
+                let mut branches = Vec::new();
+                for element in union.elements(db) {
+                    let mut branch = self.clone();
+                    branch.add_positive(db, *element);
+                    branches.extend(branch.branches.into_iter().filter(|b| !b.contains_never()));
+                }
+                self.branches = branches;
+            }
+            Type::Intersection(intersection) => {
+                for positive in intersection.positive(db) {
+                    self.add_positive(db, *positive);
+                }
+                for negative in intersection.negative(db) {
+                    self.add_negative(db, *negative);
+                }
+            }
+            _ => {
+                for branch in &mut self.branches {
+                    if branch.add_positive_absorbing(ty).is_break() || ty.is_object() {
+                        continue;
+                    }
+                    branch.positive.insert(ty);
+                }
+            }
+        }
+    }
+
+    fn add_negative(&mut self, db: &'db dyn Db, ty: Type<'db>) {
+        match ty {
+            Type::Union(union) => {
+                for element in union.elements(db) {
+                    self.add_negative(db, *element);
+                }
+            }
+            Type::Intersection(intersection) => {
+                let mut branches = Vec::new();
+                for positive in intersection.positive(db) {
+                    let mut branch = self.clone();
+                    branch.add_negative(db, *positive);
+                    branches.extend(branch.branches.into_iter().filter(|b| !b.contains_never()));
+                }
+                for negative in intersection.negative(db) {
+                    let mut branch = self.clone();
+                    branch.add_positive(db, *negative);
+                    branches.extend(branch.branches.into_iter().filter(|b| !b.contains_never()));
+                }
+                self.branches = branches;
+            }
+            Type::Dynamic(_) => self.add_positive(db, ty),
+            Type::Never => {}
+            _ => {
+                for branch in &mut self.branches {
+                    if branch.add_negative_absorbing(ty).is_break() {
+                        continue;
+                    }
+                    if ty.is_object() {
+                        *branch = InnerIntersectionBuilder::default();
+                        branch.positive.insert(Type::Never);
+                    } else {
+                        branch.negative.insert(ty);
+                    }
+                }
+            }
+        }
+    }
+
+    fn build(self, db: &'db dyn Db) -> Type<'db> {
+        let mut types = FxOrderSet::default();
+        let mut recursively_defined = RecursivelyDefined::No;
+        for branch in self.branches {
+            let ty = branch.build_structural(db);
+            if ty.is_never() {
+                continue;
+            }
+            if let Type::LiteralValue(literal) = ty {
+                recursively_defined = recursively_defined.or(literal.recursively_defined());
+            }
+            types.insert(ty);
+        }
+        match types.len() {
+            0 => Type::Never,
+            1 => types[0],
+            _ => Type::Union(UnionType::new(
+                db,
+                types.into_iter().collect::<Box<[_]>>(),
+                recursively_defined,
+            )),
+        }
+    }
+}
+
 /// The signs of a pair of intersection elements. For `Mixed`, the first is positive.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, salsa::SalsaValue)]
 enum IntersectionPolarity {
@@ -1483,6 +1612,41 @@ impl<'db> InnerIntersectionBuilder<'db> {
         self.positive.contains(&Type::Never)
     }
 
+    /// Handle `Never` and recursive markers before inspecting the other intersection factors.
+    fn add_positive_absorbing(&mut self, ty: Type<'db>) -> ControlFlow<()> {
+        if self.contains_never() {
+            return ControlFlow::Break(());
+        }
+        // `Divergent` dominates intersections like `Never`, but its negation remains gradual.
+        // Preserve the marker for cycle recovery instead of treating it as an empty type.
+        if ty.is_never() || ty.is_divergent() {
+            *self = Self::default();
+            self.positive.insert(ty);
+            return ControlFlow::Break(());
+        }
+        if self.positive.iter().any(Type::is_divergent) {
+            return ControlFlow::Break(());
+        }
+        ControlFlow::Continue(())
+    }
+
+    /// Preserve an existing recursive marker before considering a new exclusion.
+    fn add_negative_absorbing(&mut self, ty: Type<'db>) -> ControlFlow<()> {
+        if self.contains_never() {
+            return ControlFlow::Break(());
+        }
+        if self.positive.iter().any(Type::is_divergent) {
+            debug_assert_eq!(self.positive.len(), 1, "`Divergent` should be alone");
+            return ControlFlow::Break(());
+        }
+        if let Some(negated) = ty.negated_divergent() {
+            *self = Self::default();
+            self.positive.insert(negated);
+            return ControlFlow::Break(());
+        }
+        ControlFlow::Continue(())
+    }
+
     /// Return `true` when an intersection excludes every member of an enum class.
     ///
     /// This recognizes enum complements that have become empty, such as
@@ -1551,29 +1715,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
         env: &ProgramEnvironment<'db>,
         mut new_positive: Type<'db>,
     ) {
-        // `Never & T` -> `Never`
-        if self.positive.contains(&Type::Never) {
-            return;
-        }
-
-        // `T & Never` -> `Never`
-        if new_positive.is_never() {
-            *self = Self::default();
-            self.positive.insert(Type::Never);
-            return;
-        }
-
-        // `T & Divergent` -> `Divergent`. Conceptually, `Divergent` behaves like `Never` here and
-        // dominates intersections. However, `Divergent` is actually a dynamic/gradual type, so
-        // `~Divergent` acts like `Divergent` rather than dropping out like `~Never` does.
-        // `Divergent` also gets a lot of special handling in cycle recovery.
-        if new_positive.is_divergent() {
-            *self = Self::default();
-            self.positive.insert(new_positive);
-            return;
-        }
-        // `Divergent & T` -> `Divergent`
-        if self.positive.iter().any(Type::is_divergent) {
+        if self.add_positive_absorbing(new_positive).is_break() {
             return;
         }
 
@@ -1793,20 +1935,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
         env: &ProgramEnvironment<'db>,
         new_negative: Type<'db>,
     ) {
-        // `Never & ~T` -> `Never`.
-        if self.positive.contains(&Type::Never) {
-            return;
-        }
-
-        // `Divergent & ~T` -> `Divergent`.
-        if self.positive.iter().any(Type::is_divergent) {
-            debug_assert_eq!(self.positive.len(), 1, "`Divergent` should be alone");
-            return;
-        }
-
-        if let Some(negated_divergent) = new_negative.negated_divergent() {
-            *self = Self::default();
-            self.positive.insert(negated_divergent);
+        if self.add_negative_absorbing(new_negative).is_break() {
             return;
         }
 
@@ -2054,6 +2183,10 @@ impl<'db> InnerIntersectionBuilder<'db> {
             return Type::EnumComplement(complement);
         }
 
+        self.build_structural(db)
+    }
+
+    fn build_structural(mut self, db: &'db dyn Db) -> Type<'db> {
         match (self.positive.len(), self.negative.len()) {
             (0, 0) => Type::object(),
             (1, 0) => self.positive[0],

@@ -65,6 +65,7 @@ pub(crate) fn all_end_of_scope_members<'db>(
                 let PlaceWithDefinition {
                     place,
                     first_definition,
+                    ..
                 } = place_from_bindings(db, &bindings_ctx, bindings);
 
                 let first_reachable_definition = first_definition?;
@@ -323,6 +324,7 @@ impl<'db> AllMembers<'db> {
 
             Type::Dynamic(_)
             | Type::Divergent(_)
+            | Type::Projection(_)
             | Type::Never
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy

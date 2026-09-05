@@ -1,0 +1,770 @@
+use ruff_python_ast as ast;
+use ruff_python_ast::name::Name;
+use ty_python_core::EvaluationMode;
+
+use crate::place::{DefinedPlace, Definedness, Place};
+use crate::subscript::{PyIndex, PySlice};
+use crate::types::tuple::{Tuple, TupleLength, TupleType};
+use crate::types::{
+    DivergentType, KnownClass, MemberLookupPolicy, ProgramEnvironment, TupleSpec, Type, UnionType,
+};
+use crate::{Db, FxIndexMap};
+
+use super::ProjectionType;
+use super::artifact::{
+    ProjectionCallArguments, ProjectionOp, ProjectionPath, ProjectionSubscript, StarUnpackPosition,
+    UnpackProjection, new_projection_derivation,
+};
+use super::evidence::{ProjectionContainerFact, ProjectionEvidenceSet};
+use super::term::ProjectionTerm;
+
+/// A container shape that can explain projections of a cycle root.
+#[derive(Debug, Clone)]
+pub(super) enum ProjectionContainer<'db> {
+    Tuple { spec: TupleSpec<'db> },
+    Generic(ProjectionContainerFact<'db>),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ProjectionReplayMode {
+    SingleRoot,
+    MultiRoot,
+    Inference,
+}
+
+impl ProjectionReplayMode {
+    const fn projects_cycle_artifacts(self) -> bool {
+        matches!(self, Self::MultiRoot | Self::Inference)
+    }
+
+    fn materialize_evidence_term<'db>(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        term: ProjectionTerm<'db>,
+    ) -> ProjectionTerm<'db> {
+        match self {
+            Self::SingleRoot | Self::MultiRoot => term.materialize_projection_derivations(db, env),
+            Self::Inference => term,
+        }
+    }
+
+    fn projected_cycle_artifact<'db>(
+        self,
+        db: &'db dyn Db,
+        root: DivergentType,
+        path: &ProjectionPath<'db>,
+    ) -> Option<Type<'db>> {
+        match self {
+            Self::SingleRoot => None,
+            Self::MultiRoot => {
+                let (root, path) = super::projection_derivation(db, root).map_or_else(
+                    || (root, path.clone()),
+                    |(root, prefix)| (root, prefix.append_path(path)),
+                );
+                Some(Type::Projection(ProjectionType::new(db, root, path)))
+            }
+            Self::Inference => {
+                let (root, path) = super::projection_derivation(db, root).map_or_else(
+                    || (root, path.clone()),
+                    |(root, prefix)| (root, prefix.append_path(path)),
+                );
+                Some(Type::Divergent(root.with_projection_derivation(
+                    new_projection_derivation(db, root, path),
+                )))
+            }
+        }
+    }
+}
+
+impl<'db> ProjectionContainer<'db> {
+    /// Cycle-recovery-time API: builds a container from direct structure or stored evidence.
+    pub(super) fn try_from(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        root: DivergentType,
+        ty: Type<'db>,
+        evidence: Option<&ProjectionEvidenceSet<'db>>,
+    ) -> Option<Self> {
+        if let Some(spec) = ty.exact_tuple_instance_spec(db) {
+            return Some(Self::Tuple {
+                spec: spec.as_ref().clone(),
+            });
+        }
+
+        if let Some(fact) = ProjectionContainerFact::try_from_recovery_type(db, env, ty) {
+            return Some(Self::Generic(fact));
+        }
+
+        let fact = evidence?.container_fact_for_arm(db, env, root, ty)?;
+        Some(Self::Generic(fact.clone()))
+    }
+
+    /// Cycle-recovery-time API: replays all demanded paths against this container.
+    pub(super) fn collect_projection_terms(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        root: DivergentType,
+        evidence: Option<&ProjectionEvidenceSet<'db>>,
+        terms_by_op: &mut FxIndexMap<ProjectionPath<'db>, Vec<ProjectionTerm<'db>>>,
+    ) -> Option<()> {
+        for (path, terms) in terms_by_op {
+            terms.push(self.project_path(db, env, root, evidence, path)?);
+        }
+        Some(())
+    }
+
+    /// Cycle-recovery-time API: replays one projection path against this container.
+    pub(super) fn project_path(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        root: DivergentType,
+        evidence: Option<&ProjectionEvidenceSet<'db>>,
+        path: &ProjectionPath<'db>,
+    ) -> Option<ProjectionTerm<'db>> {
+        self.project_path_impl(
+            db,
+            env,
+            root,
+            evidence,
+            path,
+            ProjectionReplayMode::SingleRoot,
+        )
+    }
+
+    pub(super) fn project_multi_root_path(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        root: DivergentType,
+        evidence: Option<&ProjectionEvidenceSet<'db>>,
+        path: &ProjectionPath<'db>,
+    ) -> Option<ProjectionTerm<'db>> {
+        self.project_path_impl(
+            db,
+            env,
+            root,
+            evidence,
+            path,
+            ProjectionReplayMode::MultiRoot,
+        )
+    }
+
+    /// Inference-time API: structurally replays one path without creating a Projection.
+    pub(super) fn project_inference_path(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        root: DivergentType,
+        evidence: Option<&ProjectionEvidenceSet<'db>>,
+        path: &ProjectionPath<'db>,
+    ) -> Option<ProjectionTerm<'db>> {
+        self.project_path_impl(
+            db,
+            env,
+            root,
+            evidence,
+            path,
+            ProjectionReplayMode::Inference,
+        )
+    }
+
+    fn project_path_impl(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        root: DivergentType,
+        evidence: Option<&ProjectionEvidenceSet<'db>>,
+        path: &ProjectionPath<'db>,
+        mode: ProjectionReplayMode,
+    ) -> Option<ProjectionTerm<'db>> {
+        let ty = match self {
+            Self::Tuple { spec } => Type::tuple(TupleType::new(db, env, spec)),
+            Self::Generic(fact) => {
+                if let Some(term) = evidence
+                    .and_then(|evidence| evidence.project_arm_path(db, env, root, fact.arm, path))
+                {
+                    return Some(mode.materialize_evidence_term(db, env, term));
+                }
+
+                return None;
+            }
+        };
+        Self::project_type_path_impl(db, env, ty, root, evidence, path, mode)
+    }
+
+    /// Cycle-recovery-time API: structurally replays a projection path against a type.
+    pub(super) fn project_type_path(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+        root: DivergentType,
+        evidence: Option<&ProjectionEvidenceSet<'db>>,
+        path: &ProjectionPath<'db>,
+    ) -> Option<ProjectionTerm<'db>> {
+        Self::project_type_path_impl(
+            db,
+            env,
+            ty,
+            root,
+            evidence,
+            path,
+            ProjectionReplayMode::SingleRoot,
+        )
+    }
+
+    pub(super) fn project_multi_root_type_path(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+        root: DivergentType,
+        evidence: Option<&ProjectionEvidenceSet<'db>>,
+        path: &ProjectionPath<'db>,
+    ) -> Option<ProjectionTerm<'db>> {
+        Self::project_type_path_impl(
+            db,
+            env,
+            ty,
+            root,
+            evidence,
+            path,
+            ProjectionReplayMode::MultiRoot,
+        )
+    }
+
+    fn project_type_path_impl(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+        root: DivergentType,
+        evidence: Option<&ProjectionEvidenceSet<'db>>,
+        path: &ProjectionPath<'db>,
+        mode: ProjectionReplayMode,
+    ) -> Option<ProjectionTerm<'db>> {
+        if mode.projects_cycle_artifacts()
+            && let Type::Divergent(divergent) = ty
+        {
+            return Some(ProjectionTerm::Exact(
+                mode.projected_cycle_artifact(db, divergent, path)?,
+            ));
+        }
+
+        if mode.projects_cycle_artifacts()
+            && let Type::Projection(projection) = ty
+        {
+            return Some(ProjectionTerm::Exact(mode.projected_cycle_artifact(
+                db,
+                projection.root(db),
+                &projection.path(db).append_path(path),
+            )?));
+        }
+
+        if let Type::Union(union) = ty {
+            let terms = union
+                .elements(db)
+                .iter()
+                .map(|element| {
+                    Self::project_type_path_impl(db, env, *element, root, evidence, path, mode)
+                })
+                .collect::<Option<Vec<_>>>()?;
+            return ProjectionTerm::from_union_terms(db, env, &terms);
+        }
+
+        if let Some(term) =
+            evidence.and_then(|evidence| evidence.project_arm_path(db, env, root, ty, path))
+        {
+            return Some(mode.materialize_evidence_term(db, env, term));
+        }
+
+        let ops = path.ops();
+        let (&op, tail) = ops.split_first()?;
+
+        let single_op_path = ProjectionPath::from_op(op);
+        let projected = evidence
+            .and_then(|evidence| evidence.project_arm_path(db, env, root, ty, &single_op_path))
+            .map(|term| mode.materialize_evidence_term(db, env, term))
+            .or_else(|| Self::project_op(db, env, ty, op))?;
+
+        if tail.is_empty() {
+            return Some(projected);
+        }
+
+        Self::project_term_path_impl(
+            db,
+            env,
+            projected,
+            root,
+            evidence,
+            &ProjectionPath::from_ops(tail.iter().copied()),
+            mode,
+        )
+    }
+
+    fn project_term_path_impl(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        term: ProjectionTerm<'db>,
+        root: DivergentType,
+        evidence: Option<&ProjectionEvidenceSet<'db>>,
+        path: &ProjectionPath<'db>,
+        mode: ProjectionReplayMode,
+    ) -> Option<ProjectionTerm<'db>> {
+        let ProjectionTerm::List(element) = term else {
+            return Self::project_type_path_impl(
+                db,
+                env,
+                term.ty(db, env),
+                root,
+                evidence,
+                path,
+                mode,
+            );
+        };
+
+        // Preserve the list wrapper from starred unpacking while applying the tail path.
+        // Converting to `list[T]` would require generic-container evidence for this synthetic list.
+        let ops = path.ops();
+        let (&op, tail) = ops.split_first()?;
+        let projected = Self::project_list_op(db, env, element, op)?;
+        if tail.is_empty() {
+            return Some(projected);
+        }
+
+        Self::project_term_path_impl(
+            db,
+            env,
+            projected,
+            root,
+            evidence,
+            &ProjectionPath::from_ops(tail.iter().copied()),
+            mode,
+        )
+    }
+
+    pub(super) fn project_list_op(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        element: Type<'db>,
+        op: ProjectionOp<'db>,
+    ) -> Option<ProjectionTerm<'db>> {
+        match op {
+            ProjectionOp::Iter { is_async: false } => Some(ProjectionTerm::Homogeneous(element)),
+            ProjectionOp::Iter { is_async: true } => None,
+            ProjectionOp::Unpack(UnpackProjection::Exact { .. }) => {
+                Some(ProjectionTerm::Homogeneous(element))
+            }
+            ProjectionOp::Unpack(UnpackProjection::Star { position, .. }) => {
+                Some(Self::star_unpack_homogeneous(element, position))
+            }
+            ProjectionOp::Subscript(
+                ProjectionSubscript::Unknown
+                | ProjectionSubscript::Int
+                | ProjectionSubscript::LiteralInt(_),
+            ) => Some(ProjectionTerm::Homogeneous(element)),
+            ProjectionOp::Subscript(ProjectionSubscript::StaticSlice(_)) => {
+                Some(ProjectionTerm::Exact(
+                    KnownClass::List.to_specialized_instance(db, env, &[element]),
+                ))
+            }
+            ProjectionOp::Subscript(ProjectionSubscript::KeyType(_)) => None,
+            ProjectionOp::Member(_)
+            | ProjectionOp::Call(_)
+            | ProjectionOp::ContextEnter { .. }
+            | ProjectionOp::AwaitResult => None,
+        }
+    }
+
+    /// Cycle-recovery-time API: structurally replays one projection operation.
+    fn project_op(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+        op: ProjectionOp<'db>,
+    ) -> Option<ProjectionTerm<'db>> {
+        match op {
+            ProjectionOp::Iter { is_async } => Self::project_iter_item(db, env, ty, is_async),
+            ProjectionOp::Unpack(unpack) => Self::project_unpack(db, env, ty, unpack),
+            ProjectionOp::Subscript(subscript) => Self::project_subscript(db, env, ty, subscript),
+            ProjectionOp::Member(_)
+            | ProjectionOp::Call(_)
+            | ProjectionOp::ContextEnter { .. }
+            | ProjectionOp::AwaitResult => None,
+        }
+    }
+
+    fn project_star_unpack_tuple(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        tuple: &TupleSpec<'db>,
+        prefix: usize,
+        suffix: usize,
+        position: StarUnpackPosition,
+    ) -> Option<ProjectionTerm<'db>> {
+        let resized = tuple
+            .resize(db, env, TupleLength::Variable(prefix, suffix))
+            .ok()?;
+        let Tuple::Variable(tuple) = resized else {
+            return None;
+        };
+
+        Some(match position {
+            StarUnpackPosition::Prefix(index) => {
+                ProjectionTerm::Exact(tuple.iter_prefix_elements().nth(index)?)
+            }
+            StarUnpackPosition::Rest => ProjectionTerm::List(tuple.variable().element_type(db)),
+            StarUnpackPosition::Suffix(index) => {
+                ProjectionTerm::Exact(tuple.iter_suffix_elements().nth(index)?)
+            }
+        })
+    }
+
+    fn project_iter_item(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+        is_async: bool,
+    ) -> Option<ProjectionTerm<'db>> {
+        if let Some(spec) = ty.exact_tuple_instance_spec(db) {
+            if is_async {
+                return None;
+            }
+
+            return Some(ProjectionTerm::Homogeneous(
+                spec.as_ref().homogeneous_element_type(db, env),
+            ));
+        }
+
+        None
+    }
+
+    fn project_unpack(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+        unpack: UnpackProjection,
+    ) -> Option<ProjectionTerm<'db>> {
+        match unpack {
+            UnpackProjection::Exact { len, index } => {
+                Self::project_unpack_exact(db, env, ty, len, index)
+            }
+            UnpackProjection::Star {
+                prefix,
+                suffix,
+                position,
+            } => Self::project_star_unpack(db, env, ty, prefix, suffix, position),
+        }
+    }
+
+    fn project_unpack_exact(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+        len: usize,
+        index: usize,
+    ) -> Option<ProjectionTerm<'db>> {
+        if let Some(spec) = ty.exact_tuple_instance_spec(db) {
+            let tuple = spec
+                .as_ref()
+                .resize(db, env, TupleLength::Fixed(len))
+                .ok()?;
+            let Tuple::Fixed(tuple) = tuple else {
+                return None;
+            };
+            return Some(ProjectionTerm::Exact(tuple.iter_all_elements().nth(index)?));
+        }
+
+        None
+    }
+
+    fn project_star_unpack(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+        prefix: usize,
+        suffix: usize,
+        position: StarUnpackPosition,
+    ) -> Option<ProjectionTerm<'db>> {
+        if let Some(spec) = ty.exact_tuple_instance_spec(db) {
+            return Self::project_star_unpack_tuple(
+                db,
+                env,
+                spec.as_ref(),
+                prefix,
+                suffix,
+                position,
+            );
+        }
+
+        None
+    }
+
+    const fn star_unpack_homogeneous(
+        element: Type<'db>,
+        position: StarUnpackPosition,
+    ) -> ProjectionTerm<'db> {
+        match position {
+            StarUnpackPosition::Prefix(_) | StarUnpackPosition::Suffix(_) => {
+                ProjectionTerm::Homogeneous(element)
+            }
+            StarUnpackPosition::Rest => ProjectionTerm::List(element),
+        }
+    }
+
+    fn project_subscript(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+        subscript: ProjectionSubscript<'db>,
+    ) -> Option<ProjectionTerm<'db>> {
+        if let Some(spec) = ty.exact_tuple_instance_spec(db) {
+            let tuple = spec.as_ref();
+
+            return match subscript {
+                ProjectionSubscript::LiteralInt(index) => {
+                    let index = i32::try_from(index).ok()?;
+                    Some(ProjectionTerm::Exact(tuple.py_index(db, env, index).ok()?))
+                }
+                ProjectionSubscript::Int | ProjectionSubscript::Unknown => Some(
+                    ProjectionTerm::Homogeneous(tuple.homogeneous_element_type(db, env)),
+                ),
+                ProjectionSubscript::KeyType(_) => None,
+                ProjectionSubscript::StaticSlice(slice) => match tuple {
+                    TupleSpec::Fixed(tuple) => {
+                        let elements = tuple
+                            .py_slice(db, slice.start, slice.stop, slice.step)
+                            .ok()?;
+                        Some(ProjectionTerm::Exact(Type::heterogeneous_tuple(
+                            db, env, elements,
+                        )))
+                    }
+                    TupleSpec::Variable(tuple) => {
+                        let element = UnionType::from_elements_leave_aliases(
+                            db,
+                            env,
+                            tuple
+                                .iter_prefix_elements()
+                                .chain(std::iter::once(tuple.variable().element_type(db)))
+                                .chain(tuple.iter_suffix_elements()),
+                        );
+                        Some(ProjectionTerm::Exact(Type::homogeneous_tuple(
+                            db, env, element,
+                        )))
+                    }
+                },
+            };
+        }
+
+        None
+    }
+
+    pub(super) fn into_type(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        root: DivergentType,
+        solved_ops: &FxIndexMap<ProjectionPath<'db>, Type<'db>>,
+        evidence: Option<&ProjectionEvidenceSet<'db>>,
+    ) -> Option<Type<'db>> {
+        match self {
+            Self::Tuple { spec } => match spec {
+                Tuple::Fixed(tuple) => {
+                    let elements = tuple
+                        .iter_all_elements()
+                        .map(|element| {
+                            element.replace_solved_projection_artifacts(
+                                db, env, root, solved_ops, evidence,
+                            )
+                        })
+                        .collect::<Option<Vec<_>>>()?;
+
+                    Some(Type::heterogeneous_tuple(db, env, elements))
+                }
+                Tuple::Variable(tuple) => {
+                    let prefix = tuple
+                        .iter_prefix_elements()
+                        .map(|element| {
+                            element.replace_solved_projection_artifacts(
+                                db, env, root, solved_ops, evidence,
+                            )
+                        })
+                        .collect::<Option<Vec<_>>>()?;
+                    let variable = tuple
+                        .variable()
+                        .element_type(db)
+                        .replace_solved_projection_artifacts(db, env, root, solved_ops, evidence)?;
+                    let suffix = tuple
+                        .iter_suffix_elements()
+                        .map(|element| {
+                            element.replace_solved_projection_artifacts(
+                                db, env, root, solved_ops, evidence,
+                            )
+                        })
+                        .collect::<Option<Vec<_>>>()?;
+
+                    Some(Type::tuple(TupleType::mixed(
+                        db, env, prefix, variable, suffix,
+                    )))
+                }
+            },
+            Self::Generic(fact) => {
+                let arguments = fact
+                    .arguments
+                    .iter()
+                    .map(|argument| {
+                        (*argument).replace_solved_projection_artifacts(
+                            db, env, root, solved_ops, evidence,
+                        )
+                    })
+                    .collect::<Option<Vec<_>>>()?;
+
+                Type::from(fact.class.apply_specialization(db, |generic_context| {
+                    generic_context.specialize(db, arguments)
+                }))
+                .to_instance_approximation(db, env)
+            }
+        }
+    }
+
+    pub(super) fn infer_call_type_for_type(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+        arguments: ProjectionCallArguments<'db>,
+    ) -> Option<Type<'db>> {
+        let arguments = arguments.to_call_arguments(db);
+        Some(ty.try_call(db, env, &arguments).ok()?.return_type(db, env))
+    }
+
+    pub(super) fn infer_member_type_for_type(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+        name: &Name,
+        policy: MemberLookupPolicy,
+    ) -> Option<Type<'db>> {
+        let Place::Defined(DefinedPlace {
+            ty,
+            definedness: Definedness::AlwaysDefined,
+            ..
+        }) = ty
+            .member_lookup_with_policy(db, env, name.as_str(), policy)
+            .place
+        else {
+            return None;
+        };
+
+        Some(ty)
+    }
+
+    pub(super) fn infer_projection_op(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+        op: ProjectionOp<'db>,
+    ) -> Option<ProjectionTerm<'db>> {
+        match op {
+            ProjectionOp::Iter { is_async } => {
+                let mode = EvaluationMode::from_is_async(is_async);
+                Some(ProjectionTerm::Homogeneous(
+                    ty.try_iterate_with_mode(db, env, mode)
+                        .ok()?
+                        .homogeneous_element_type(db, env),
+                ))
+            }
+            ProjectionOp::Unpack(unpack) => Self::infer_unpack(db, env, ty, unpack),
+            ProjectionOp::Subscript(subscript) => Some(ProjectionTerm::Exact(
+                ty.subscript_without_projection(
+                    db,
+                    env,
+                    subscript.to_type(db, env),
+                    ast::ExprContext::Load,
+                )
+                .ok()?,
+            )),
+            ProjectionOp::Member(member) => Some(ProjectionTerm::Exact(
+                Self::infer_member_type_for_type(db, env, ty, member.name(db), member.policy())?,
+            )),
+            ProjectionOp::Call(arguments) => Some(ProjectionTerm::Exact(
+                Self::infer_call_type_for_type(db, env, ty, arguments)?,
+            )),
+            ProjectionOp::ContextEnter { is_async } => {
+                let mode = EvaluationMode::from_is_async(is_async);
+                Some(ProjectionTerm::Exact(
+                    ty.try_enter_with_mode(db, env, mode).ok()?,
+                ))
+            }
+            ProjectionOp::AwaitResult => Some(ProjectionTerm::Exact(ty.try_await(db, env).ok()?)),
+        }
+    }
+
+    fn infer_unpack(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+        unpack: UnpackProjection,
+    ) -> Option<ProjectionTerm<'db>> {
+        match unpack {
+            UnpackProjection::Exact { len, index } => {
+                Self::infer_unpack_exact(db, env, ty, len, index)
+            }
+            UnpackProjection::Star {
+                prefix,
+                suffix,
+                position,
+            } => Self::infer_star_unpack(db, env, ty, prefix, suffix, position),
+        }
+    }
+
+    fn infer_unpack_exact(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+        len: usize,
+        index: usize,
+    ) -> Option<ProjectionTerm<'db>> {
+        if let Some(spec) = ty.exact_tuple_instance_spec(db) {
+            let tuple = spec
+                .as_ref()
+                .resize(db, env, TupleLength::Fixed(len))
+                .ok()?;
+            let Tuple::Fixed(tuple) = tuple else {
+                return None;
+            };
+            return Some(ProjectionTerm::Exact(tuple.iter_all_elements().nth(index)?));
+        }
+
+        Some(ProjectionTerm::Homogeneous(
+            ty.try_iterate(db, env)
+                .ok()?
+                .homogeneous_element_type(db, env),
+        ))
+    }
+
+    fn infer_star_unpack(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+        prefix: usize,
+        suffix: usize,
+        position: StarUnpackPosition,
+    ) -> Option<ProjectionTerm<'db>> {
+        if let Some(spec) = ty.exact_tuple_instance_spec(db) {
+            return Self::project_star_unpack_tuple(
+                db,
+                env,
+                spec.as_ref(),
+                prefix,
+                suffix,
+                position,
+            );
+        }
+
+        let element = ty
+            .try_iterate(db, env)
+            .ok()?
+            .homogeneous_element_type(db, env);
+        Some(Self::star_unpack_homogeneous(element, position))
+    }
+}

@@ -584,6 +584,7 @@ impl<'db> BoundSuperType<'db> {
             Type::SpecialForm(SpecialFormType::TypedDict(module)) => ClassBase::TypedDict(module),
             Type::Dynamic(dynamic) => ClassBase::Dynamic(dynamic),
             Type::Divergent(divergent) => ClassBase::Divergent(divergent),
+            Type::Projection(projection) => ClassBase::Divergent(projection.root(db)),
             _ => {
                 return Err(BoundSuperError::InvalidPivotClassType {
                     pivot_class: pivot_class_type,
@@ -643,6 +644,7 @@ impl<'db> BoundSuperType<'db> {
             Type::Never => SuperOwnerKind::Dynamic(DynamicType::Unknown),
             Type::Dynamic(dynamic) => SuperOwnerKind::Dynamic(dynamic),
             Type::Divergent(divergent) => SuperOwnerKind::Divergent(divergent),
+            Type::Projection(projection) => SuperOwnerKind::Divergent(projection.root(db)),
             Type::ClassLiteral(class) => SuperOwnerKind::Resolved(Self::resolve_class_super_owner(
                 db,
                 pivot_class,

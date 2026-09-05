@@ -1,0 +1,80 @@
+---
+source: crates/mdtest/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: assignment_diagnostics.md - Subscript assignment diagnostics - Recursive element types
+mdtest path: crates/ty_python_semantic/resources/mdtest/subscript/assignment_diagnostics.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | def recursive_list():
+ 2 |     values = [0]
+ 3 |     while True:
+ 4 |         values = [values]
+ 5 |         values["bad"] = "bad"  # error: [invalid-assignment]
+ 6 | 
+ 7 | class Container[T]:
+ 8 |     def __init__(self, value: T):
+ 9 |         pass
+10 | 
+11 |     def __setitem__(self, key: int, value: str) -> None:
+12 |         pass
+13 | 
+14 | def recursive_generic():
+15 |     value = Container(0)
+16 |     while True:
+17 |         value = Container(value)
+18 |         value["bad"] = "valid"  # error: [invalid-assignment]
+19 |         value[0] = 1  # error: [invalid-assignment]
+20 |         value[0] = "valid"
+21 | def recursive_tuple():
+22 |     value = (0,)
+23 |     while True:
+24 |         value = (value,)
+25 |         value[0] = 0  # error: [invalid-assignment]
+```
+
+# Diagnostics
+
+```
+error[invalid-assignment]: Invalid subscript assignment with key of type `Literal["bad"]` and value of type `Literal["bad"]` on object of type `list[Divergent]`
+ --> src/mdtest_snippet.py:5:9
+  |
+5 |         values["bad"] = "bad"  # error: [invalid-assignment]
+  |         ^^^^^^^^^^^^^^^^^^^^^
+
+```
+
+```
+error[invalid-assignment]: Invalid subscript assignment with key of type `Literal["bad"]` and value of type `Literal["valid"]` on object of type `Container[Divergent]`
+  --> src/mdtest_snippet.py:18:9
+   |
+18 |         value["bad"] = "valid"  # error: [invalid-assignment]
+   |         ^^^^^^^^^^^^^^^^^^^^^^
+
+```
+
+```
+error[invalid-assignment]: Invalid subscript assignment with key of type `Literal[0]` and value of type `Literal[1]` on object of type `Container[Divergent]`
+  --> src/mdtest_snippet.py:19:9
+   |
+19 |         value[0] = 1  # error: [invalid-assignment]
+   |         ^^^^^^^^^^^^
+
+```
+
+```
+error[invalid-assignment]: Cannot assign to a subscript on an object of type `tuple[Divergent]`
+  --> src/mdtest_snippet.py:25:9
+   |
+25 |         value[0] = 0  # error: [invalid-assignment]
+   |         ^^^^^^^^
+info: `tuple[Divergent]` does not have a `__setitem__` method.
+
+```

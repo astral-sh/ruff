@@ -2930,6 +2930,7 @@ impl<'db> StaticClassLiteral<'db> {
                             ..
                         }),
                     qualifiers,
+                    needs_projection_evidence_from_types: declared_needs_projection_evidence,
                 } => {
                     // For the purpose of finding instance attributes, ignore `ClassVar`
                     // declarations:
@@ -2980,7 +2981,11 @@ impl<'db> StaticClassLiteral<'db> {
                                 // attribute assignments in methods of the class,
                                 // we trust the declared type.
                                 Member {
-                                    inner: declared.with_qualifiers(qualifiers),
+                                    inner: declared
+                                        .with_qualifiers(qualifiers)
+                                        .with_projection_evidence_requirement(
+                                            declared_needs_projection_evidence,
+                                        ),
                                 }
                             } else {
                                 Member {
@@ -2996,7 +3001,11 @@ impl<'db> StaticClassLiteral<'db> {
                                         public_type_policy: PublicTypePolicy::Raw,
                                         provenance: implicit_provenance.or(declared_provenance),
                                     })
-                                    .with_qualifiers(qualifiers),
+                                    .with_qualifiers(qualifiers)
+                                    .with_projection_evidence_requirement(
+                                        declared_needs_projection_evidence
+                                            || implicit.inner.needs_projection_evidence_from_types,
+                                    ),
                                 }
                             }
                         } else if self.is_own_dataclass_instance_field(db, name)
@@ -3015,7 +3024,11 @@ impl<'db> StaticClassLiteral<'db> {
                             // protocol in `member_lookup_with_policy` can resolve
                             // the attribute type through `__get__`.
                             Member {
-                                inner: declared.with_qualifiers(qualifiers),
+                                inner: declared
+                                    .with_qualifiers(qualifiers)
+                                    .with_projection_evidence_requirement(
+                                        declared_needs_projection_evidence,
+                                    ),
                             }
                         } else {
                             // The symbol is declared and bound in the class body,
@@ -3035,17 +3048,19 @@ impl<'db> StaticClassLiteral<'db> {
 
                         if declaredness == Definedness::AlwaysDefined {
                             Member {
-                                inner: declared.with_qualifiers(qualifiers),
+                                inner: declared
+                                    .with_qualifiers(qualifiers)
+                                    .with_projection_evidence_requirement(
+                                        declared_needs_projection_evidence,
+                                    ),
                             }
                         } else {
+                            let implicit = self.implicit_attribute(db, name, MethodDecorator::None);
                             if let Place::Defined(DefinedPlace {
                                 ty: implicit_ty,
                                 provenance: implicit_provenance,
                                 ..
-                            }) = self
-                                .implicit_attribute(db, name, MethodDecorator::None)
-                                .inner
-                                .place
+                            }) = implicit.inner.place
                             {
                                 Member {
                                     inner: Place::Defined(DefinedPlace {
@@ -3060,11 +3075,19 @@ impl<'db> StaticClassLiteral<'db> {
                                         public_type_policy: PublicTypePolicy::Raw,
                                         provenance: implicit_provenance.or(declared_provenance),
                                     })
-                                    .with_qualifiers(qualifiers),
+                                    .with_qualifiers(qualifiers)
+                                    .with_projection_evidence_requirement(
+                                        declared_needs_projection_evidence
+                                            || implicit.inner.needs_projection_evidence_from_types,
+                                    ),
                                 }
                             } else {
                                 Member {
-                                    inner: declared.with_qualifiers(qualifiers),
+                                    inner: declared
+                                        .with_qualifiers(qualifiers)
+                                        .with_projection_evidence_requirement(
+                                            declared_needs_projection_evidence,
+                                        ),
                                 }
                             }
                         }
@@ -3073,7 +3096,7 @@ impl<'db> StaticClassLiteral<'db> {
 
                 PlaceAndQualifiers {
                     place: Place::Undefined,
-                    qualifiers: _,
+                    ..
                 } => {
                     // The attribute is not *declared* in the class body. It could still be declared/bound
                     // in a method.

@@ -1,0 +1,394 @@
+//! Projection artifact data structures.
+//!
+//! This module only defines the copyable values that represent a cycle root and
+//! the operations applied to it. It does not infer or solve projection results.
+
+use ruff_python_ast::name::Name;
+use salsa::plumbing::{AsId, FromId};
+
+use crate::Db;
+use crate::types::call::{Argument, CallArgumentTypes, CallArguments};
+use crate::types::instance::SliceLiteral;
+use crate::types::{
+    DivergentType, KnownClass, MemberLookupPolicy, ProgramEnvironment, Type, TypeContext,
+};
+
+/// A projection path recorded during normal inference.
+///
+/// Normal inference carries this as metadata on Divergent. Recovery materializes it as a
+/// ProjectionType before invoking the projection solver.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+struct ProjectionDerivation<'db> {
+    #[returns(copy)]
+    root: DivergentType,
+    #[returns(ref)]
+    path: ProjectionPath<'db>,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for ProjectionDerivation<'_> {}
+
+pub(super) fn new_projection_derivation<'db>(
+    db: &'db dyn Db,
+    root: DivergentType,
+    path: ProjectionPath<'db>,
+) -> salsa::Id {
+    ProjectionDerivation::new(db, root, path).as_id()
+}
+
+pub(super) fn projection_derivation_from_id(
+    db: &dyn Db,
+    id: salsa::Id,
+) -> (DivergentType, ProjectionPath<'_>) {
+    let derivation = ProjectionDerivation::from_id(id);
+    (derivation.root(db), derivation.path(db).clone())
+}
+
+/// A projected view of a cycle root produced while recovering recursive inference.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::SalsaValue)]
+pub struct ProjectionType<'db>(ProjectionTypeInterned<'db>);
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for ProjectionType<'_> {}
+
+impl<'db> ProjectionType<'db> {
+    pub(super) fn new(db: &'db dyn Db, root: DivergentType, path: ProjectionPath<'db>) -> Self {
+        Self(ProjectionTypeInterned::new(db, root, path))
+    }
+
+    pub(crate) fn root(self, db: &'db dyn Db) -> DivergentType {
+        self.0.root(db)
+    }
+
+    pub(super) fn path(self, db: &'db dyn Db) -> ProjectionPath<'db> {
+        self.0.path(db).clone()
+    }
+}
+
+/// Interned storage for [`ProjectionType`].
+// Due to salsa restrictions, it is not possible to directly intern a public struct containing a private type.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+struct ProjectionTypeInterned<'db> {
+    #[returns(copy)]
+    root: DivergentType,
+    #[returns(ref)]
+    path: ProjectionPath<'db>,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for ProjectionTypeInterned<'_> {}
+
+/// An ordered sequence of projection operations applied to a cycle root.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, salsa::SalsaValue, get_size2::GetSize)]
+pub(super) struct ProjectionPath<'db> {
+    ops: Box<[ProjectionOp<'db>]>,
+}
+
+impl<'db> ProjectionPath<'db> {
+    pub(super) fn from_op(op: ProjectionOp<'db>) -> Self {
+        Self::from_ops([op])
+    }
+
+    pub(super) fn from_ops(ops: impl IntoIterator<Item = ProjectionOp<'db>>) -> Self {
+        Self {
+            ops: ops.into_iter().collect::<Vec<_>>().into_boxed_slice(),
+        }
+    }
+
+    pub(super) fn ops(&self) -> &[ProjectionOp<'db>] {
+        &self.ops
+    }
+
+    pub(super) fn append_path(&self, path: &Self) -> Self {
+        Self::from_ops(self.ops.iter().chain(path.ops.iter()).copied())
+    }
+
+    pub(super) fn is_strict_prefix_of(&self, other: &Self) -> bool {
+        self.ops.len() < other.ops.len() && other.ops.starts_with(&self.ops)
+    }
+}
+
+/// An interned member name used by attribute projections.
+#[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
+pub(super) struct ProjectionMemberName<'db> {
+    #[returns(ref)]
+    name: Name,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for ProjectionMemberName<'_> {}
+
+impl<'db> ProjectionMemberName<'db> {
+    fn new(db: &'db dyn Db, name: &Name) -> Self {
+        Self::new_internal(db, name.clone())
+    }
+
+    fn as_name(self, db: &'db dyn Db) -> &'db Name {
+        self.name(db)
+    }
+}
+
+/// An attribute lookup projection.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::SalsaValue, get_size2::GetSize)]
+pub(super) struct ProjectionMember<'db> {
+    name: ProjectionMemberName<'db>,
+    policy: ProjectionMemberLookupPolicy,
+}
+
+impl<'db> ProjectionMember<'db> {
+    pub(super) fn new(db: &'db dyn Db, name: &Name, policy: MemberLookupPolicy) -> Self {
+        Self {
+            name: ProjectionMemberName::new(db, name),
+            policy: ProjectionMemberLookupPolicy::new(policy),
+        }
+    }
+
+    pub(super) fn name(self, db: &'db dyn Db) -> &'db Name {
+        self.name.as_name(db)
+    }
+
+    pub(super) fn policy(self) -> MemberLookupPolicy {
+        self.policy.to_policy()
+    }
+}
+
+/// Compact copyable member lookup policy stored in projection paths.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::SalsaValue, get_size2::GetSize)]
+struct ProjectionMemberLookupPolicy(u8);
+
+impl ProjectionMemberLookupPolicy {
+    const fn new(policy: MemberLookupPolicy) -> Self {
+        Self(policy.bits())
+    }
+
+    fn to_policy(self) -> MemberLookupPolicy {
+        MemberLookupPolicy::from_bits_retain(self.0)
+    }
+}
+
+/// An interned non-index subscript key type.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+pub(super) struct ProjectionSubscriptKeyType<'db> {
+    #[returns(copy)]
+    ty: Type<'db>,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for ProjectionSubscriptKeyType<'_> {}
+
+/// An interned snapshot of the arguments supplied to a projected call.
+///
+/// The snapshot retains every argument type inferred under a parameter type context. Replaying a
+/// call from inference-time evidence must use the same call binding inputs as the original call.
+#[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
+pub(super) struct ProjectionCallArguments<'db> {
+    #[returns(ref)]
+    arguments: Box<[ProjectionCallArgument<'db>]>,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for ProjectionCallArguments<'_> {}
+
+impl<'db> ProjectionCallArguments<'db> {
+    pub(super) fn new(db: &'db dyn Db, arguments: &CallArguments<'_, 'db>) -> Self {
+        Self::new_internal(
+            db,
+            arguments
+                .iter()
+                .map(|(argument, types)| ProjectionCallArgument {
+                    kind: ProjectionCallArgumentKind::from_argument(argument),
+                    types: ProjectionCallArgumentTypes::from_call_argument_types(types),
+                })
+                .collect::<Box<[_]>>(),
+        )
+    }
+
+    pub(super) fn to_call_arguments(self, db: &'db dyn Db) -> CallArguments<'db, 'db> {
+        let arguments = self.arguments(db);
+        let mut call_arguments = arguments
+            .iter()
+            .map(|argument| (argument.kind.as_argument(), argument.types.fallback))
+            .collect::<CallArguments<'db, 'db>>();
+
+        for (index, argument) in arguments.iter().enumerate() {
+            for (context, ty) in &argument.types.contextual {
+                call_arguments.insert_type(index, TypeContext::new(Some(*context)), *ty);
+            }
+        }
+
+        call_arguments
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, salsa::SalsaValue, get_size2::GetSize)]
+pub(super) struct ProjectionCallArgument<'db> {
+    kind: ProjectionCallArgumentKind,
+    types: ProjectionCallArgumentTypes<'db>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, salsa::SalsaValue, get_size2::GetSize)]
+enum ProjectionCallArgumentKind {
+    Synthetic,
+    Positional,
+    Variadic,
+    Keyword(Name),
+    Keywords,
+}
+
+impl ProjectionCallArgumentKind {
+    fn from_argument(argument: Argument<'_>) -> Self {
+        match argument {
+            Argument::Synthetic => Self::Synthetic,
+            Argument::Positional => Self::Positional,
+            Argument::Variadic => Self::Variadic,
+            Argument::Keyword(name) => Self::Keyword(Name::new(name)),
+            Argument::Keywords => Self::Keywords,
+        }
+    }
+
+    fn as_argument(&self) -> Argument<'_> {
+        match self {
+            Self::Synthetic => Argument::Synthetic,
+            Self::Positional => Argument::Positional,
+            Self::Variadic => Argument::Variadic,
+            Self::Keyword(name) => Argument::Keyword(name.as_str()),
+            Self::Keywords => Argument::Keywords,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, salsa::SalsaValue, get_size2::GetSize)]
+struct ProjectionCallArgumentTypes<'db> {
+    fallback: Option<Type<'db>>,
+    contextual: Box<[(Type<'db>, Type<'db>)]>,
+}
+
+impl<'db> ProjectionCallArgumentTypes<'db> {
+    fn from_call_argument_types(types: &CallArgumentTypes<'db>) -> Self {
+        Self {
+            fallback: types.fallback_type(),
+            contextual: types.contextual_types().collect(),
+        }
+    }
+}
+
+/// A single operation that can be preserved through cycle recovery.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::SalsaValue, get_size2::GetSize)]
+pub(super) enum ProjectionOp<'db> {
+    Iter { is_async: bool },
+    Unpack(UnpackProjection),
+    Subscript(ProjectionSubscript<'db>),
+    Member(ProjectionMember<'db>),
+    Call(ProjectionCallArguments<'db>),
+    ContextEnter { is_async: bool },
+    AwaitResult,
+}
+
+/// The fixed-length or starred-unpack projection of one unpacked position.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::SalsaValue, get_size2::GetSize)]
+pub(super) enum UnpackProjection {
+    Exact {
+        len: usize,
+        index: usize,
+    },
+    Star {
+        prefix: usize,
+        suffix: usize,
+        position: StarUnpackPosition,
+    },
+}
+
+/// A subscript projection represented precisely enough for cycle recovery.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::SalsaValue, get_size2::GetSize)]
+pub(super) enum ProjectionSubscript<'db> {
+    Unknown,
+    Int,
+    LiteralInt(i64),
+    StaticSlice(StaticSliceProjection),
+    KeyType(ProjectionSubscriptKeyType<'db>),
+}
+
+impl<'db> ProjectionSubscript<'db> {
+    pub(super) fn from_type(db: &'db dyn Db, slice_ty: Type<'db>) -> Option<Self> {
+        if let Some(index) = slice_ty.as_int_like_literal() {
+            return Some(Self::LiteralInt(index));
+        }
+
+        if let Some(slice) = slice_ty
+            .as_nominal_instance()
+            .and_then(|instance| instance.slice_literal(db))
+            && slice.step != Some(0)
+        {
+            return Some(Self::StaticSlice(StaticSliceProjection::from(slice)));
+        }
+
+        if slice_ty.is_instance_of(db, KnownClass::Int)
+            || slice_ty.is_instance_of(db, KnownClass::Bool)
+        {
+            return Some(Self::Int);
+        }
+
+        if slice_ty.is_dynamic() {
+            return Some(Self::Unknown);
+        }
+
+        if slice_ty.is_instance_of(db, KnownClass::Slice) {
+            return None;
+        }
+
+        Some(Self::KeyType(ProjectionSubscriptKeyType::new(db, slice_ty)))
+    }
+
+    pub(super) fn to_type(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
+        match self {
+            Self::Unknown => Type::unknown(),
+            Self::Int => KnownClass::Int.to_instance(db, env),
+            Self::LiteralInt(index) => Type::int_literal(index),
+            Self::StaticSlice(slice) => KnownClass::Slice.to_specialized_instance(
+                db,
+                env,
+                &[
+                    slice.start.map_or_else(
+                        || Type::none(db, env),
+                        |value| Type::int_literal(i64::from(value)),
+                    ),
+                    slice.stop.map_or_else(
+                        || Type::none(db, env),
+                        |value| Type::int_literal(i64::from(value)),
+                    ),
+                    slice.step.map_or_else(
+                        || Type::none(db, env),
+                        |value| Type::int_literal(i64::from(value)),
+                    ),
+                ],
+            ),
+            Self::KeyType(key) => key.ty(db),
+        }
+    }
+}
+
+/// The projected position within a starred unpack pattern.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::SalsaValue, get_size2::GetSize)]
+pub(super) enum StarUnpackPosition {
+    Prefix(usize),
+    Rest,
+    Suffix(usize),
+}
+
+/// A statically known `slice` value used by a subscript projection.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::SalsaValue, get_size2::GetSize)]
+pub(super) struct StaticSliceProjection {
+    pub(super) start: Option<i32>,
+    pub(super) stop: Option<i32>,
+    pub(super) step: Option<i32>,
+}
+
+impl From<SliceLiteral> for StaticSliceProjection {
+    fn from(slice: SliceLiteral) -> Self {
+        Self {
+            start: slice.start,
+            stop: slice.stop,
+            step: slice.step,
+        }
+    }
+}

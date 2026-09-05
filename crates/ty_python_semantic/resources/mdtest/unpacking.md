@@ -1614,3 +1614,20 @@ Unpacking an empty tuple or list shouldn't raise any diagnostics.
 [] = ()
 () = []
 ```
+
+An empty target still requires an iterable value with no elements, including when it is nested
+inside another target or the value is a union.
+
+```py
+() = 42  # error: [not-iterable]
+[] = (1,)  # error: [invalid-assignment] "Too many values to unpack"
+((),) = (1,)  # error: [not-iterable]
+
+def empty_targets(value: tuple[()] | tuple[int]):
+    () = value  # error: [invalid-assignment] "Too many values to unpack"
+
+class NonIterable:
+    pass
+
+[] = NonIterable()  # error: [not-iterable]
+```

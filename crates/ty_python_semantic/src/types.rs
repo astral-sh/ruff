@@ -39,8 +39,8 @@ pub use self::diagnostic::{UNDEFINED_REVEAL, UNRESOLVED_REFERENCE};
 use self::infer::infer_function_default_types;
 pub(crate) use self::infer::{
     InferredDeclaration, TypeContext, infer_complete_scope_types, infer_deferred_types,
-    infer_definition_types, infer_expression_type, infer_expression_types,
-    infer_same_file_expression_type, infer_scope_types, is_discarded_dict_key_assignment,
+    infer_definition_types, infer_expression_types, infer_same_file_expression_type,
+    infer_scope_types, is_discarded_dict_key_assignment,
 };
 pub(crate) use self::iteration::extract_fixed_length_iterable_element_types;
 pub use self::known_instance::KnownInstanceType;
@@ -51,6 +51,7 @@ pub(crate) use self::match_pattern::{
     sequence_pattern_type_builder, singleton_pattern_type, starred_sequence_pattern_type,
     typed_dict_matches_class_pattern,
 };
+pub use self::projection::ProjectionType;
 pub(crate) use self::relation_error::{ErrorContext, ErrorContextTree, ParameterDescription};
 use self::set_theoretic::NegativeIntersectionElements;
 pub(crate) use self::set_theoretic::builder::{
@@ -162,6 +163,7 @@ mod mro;
 pub(crate) mod narrow;
 mod newtype;
 mod overrides;
+mod projection;
 mod protocol_class;
 pub(crate) mod relation;
 mod relation_error;
@@ -187,6 +189,10 @@ pub(crate) mod definition_resolution;
 #[cfg(test)]
 mod property_tests;
 mod subscript;
+
+pub(crate) use projection::{
+    ProjectionEvidenceSet, ProjectionRecoveryBuilder, ProjectionSolutions,
+};
 
 pub fn check_types(db: &dyn Db, file: ProgramFile<'_>) -> Vec<Diagnostic> {
     let source_file = file.file(db);
@@ -1779,6 +1785,8 @@ pub enum Type<'db> {
     Dynamic(DynamicType<'db>),
     /// A cycle marker used during recursive type inference.
     Divergent(DivergentType),
+    /// A cycle marker consumed by a projection operation.
+    Projection(ProjectionType<'db>),
     /// The empty set of values
     Never,
     /// A specific function object
@@ -2078,15 +2086,6 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Returns `true` if both `self` and `other` are `Divergent` types originating from the
-    /// same cycle (i.e., sharing the same query ID), regardless of materialization state.
-    fn same_divergent_marker(self, other: Type<'db>) -> bool {
-        match (self, other) {
-            (Type::Divergent(left), Type::Divergent(right)) => left.same_marker(right),
-            _ => false,
-        }
-    }
-
     /// If `self` is a materialized `Divergent` type, returns the concrete type it should
     /// behave as: `object` for top-materialized, `Never` for bottom-materialized.
     /// Returns `None` if `self` is not `Divergent` or has not been materialized.
@@ -2229,6 +2228,33 @@ impl<'db> Type<'db> {
         previous: Self,
         cycle: &salsa::Cycle,
     ) -> Self {
+        self.cycle_normalized_with_projection_evidence(db, env, previous, cycle, None)
+    }
+
+    fn cycle_normalized_with_projection_evidence(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        previous: Self,
+        cycle: &salsa::Cycle,
+        projection_evidence: Option<&projection::ProjectionEvidenceSet<'db>>,
+    ) -> Self {
+        self.cycle_join_for_recovery(db, env, previous, cycle)
+            .recursive_type_normalized_with_projection_evidence(db, env, cycle, projection_evidence)
+    }
+
+    /// Cycle-recovery-time API: combines the current and previous fixed-point iteration results.
+    ///
+    /// This intentionally does not normalize recursive projection artifacts. Result-level
+    /// recovery first joins every type slot, solves projection equations for all cycle heads, and
+    /// then normalizes the joined slots.
+    pub(crate) fn cycle_join_for_recovery(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        previous: Self,
+        cycle: &salsa::Cycle,
+    ) -> Self {
         // When we encounter a salsa cycle, we want to avoid oscillating between two or more types
         // without converging on a fixed-point result. Most of the time, we union together the
         // types from each cycle iteration to ensure that our result is monotonic, even if we
@@ -2268,7 +2294,6 @@ impl<'db> Type<'db> {
             // this cycle, if any.
             UnionType::from_elements_cycle_recovery(db, env, [previous, self])
         }
-        .recursive_type_normalized_impl_with_cycle(db, env, cycle)
     }
 
     pub fn is_none(&self, db: &'db dyn Db) -> bool {
@@ -2354,11 +2379,12 @@ impl<'db> Type<'db> {
                     materialization: None,
                     ..
                 })
+                | Type::Projection(_)
         )
     }
 
     const fn is_non_divergent_dynamic(&self) -> bool {
-        self.is_dynamic() && !self.is_divergent()
+        self.is_dynamic() && !self.is_cycle_artifact()
     }
 
     /// Returns `true` if this type is an awaitable that should be awaited before being discarded.
@@ -2441,6 +2467,22 @@ impl<'db> Type<'db> {
         };
 
         class
+            .static_class_literal(db)
+            .and_then(|(class_literal, specialization)| Some((class_literal, specialization?)))
+    }
+
+    /// If this type is directly a specialized class instance, returns the class and specialization.
+    ///
+    /// Unlike [`Type::class_specialization`], this does not expand aliases, type-variable bounds, or
+    /// literal fallbacks. Use it when a caller must inspect an already-materialized container shape
+    /// without triggering additional inference.
+    fn direct_class_specialization(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Option<(StaticClassLiteral<'db>, Specialization<'db>)> {
+        self.as_nominal_instance()?
+            .class(db, env)
             .static_class_literal(db)
             .and_then(|(class_literal, specialization)| Some((class_literal, specialization?)))
     }
@@ -2928,6 +2970,7 @@ impl<'db> Type<'db> {
             Type::Divergent(_) => (*self)
                 .negated_divergent()
                 .expect("matched `Type::Divergent` above"),
+            Type::Projection(_) => *self,
 
             Type::NominalInstance(instance) if instance.is_object() => Type::Never,
 
@@ -2999,6 +3042,7 @@ impl<'db> Type<'db> {
             Type::Intersection(_) => false,
             Type::EnumComplement(complement) => complement.is_spellable(db),
             Type::Divergent(_)
+            | Type::Projection(_)
             | Type::SpecialForm(_)
             | Type::BoundSuper(_)
             | Type::BoundMethod(_)
@@ -3033,6 +3077,7 @@ impl<'db> Type<'db> {
             Type::Intersection(_)
             | Type::EnumComplement(_)
             | Type::Divergent(_)
+            | Type::Projection(_)
             | Type::SpecialForm(_)
             | Type::BoundSuper(_)
             | Type::BoundMethod(_)
@@ -3285,24 +3330,72 @@ impl<'db> Type<'db> {
     /// If this continues, the query will not converge, so this method is called in the cycle recovery function.
     /// Then `tuple[tuple[Divergent, Literal[1]], Literal[1]]` is replaced with `tuple[Divergent, Literal[1]]` and the query converges.
     #[must_use]
-    pub(crate) fn recursive_type_normalized(
+    fn recursive_type_normalized(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         cycle: &salsa::Cycle,
     ) -> Self {
-        self.recursive_type_normalized_impl_with_cycle(db, env, cycle)
+        self.recursive_type_normalized_with_projection_evidence(db, env, cycle, None)
     }
 
-    fn recursive_type_normalized_impl_with_cycle(
+    #[must_use]
+    fn recursive_type_normalized_with_projection_evidence(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        cycle: &salsa::Cycle,
+        projection_evidence: Option<&projection::ProjectionEvidenceSet<'db>>,
+    ) -> Self {
+        cycle.head_ids().fold(self, |ty, id| {
+            let divergent = DivergentType::new(id);
+            let div = Type::Divergent(divergent);
+            let ty = ty.materialize_projection_derivations(db, env);
+            let ty = ty
+                .try_projection_cycle_normalized(db, env, divergent, projection_evidence)
+                .unwrap_or(ty);
+            ty.recursive_type_normalized_impl(db, env, div, false)
+                .unwrap_or(div)
+        })
+    }
+
+    /// Cycle-recovery-time API: normalizes a joined result slot using result-wide projection
+    /// solutions when available, falling back to the single-root projection solver otherwise.
+    #[must_use]
+    pub(crate) fn recursive_type_normalized_with_projection_solutions(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        cycle: &salsa::Cycle,
+        projection_solutions: Option<&projection::ProjectionSolutions<'db>>,
+        projection_evidence: Option<&projection::ProjectionEvidenceSet<'db>>,
+    ) -> Self {
+        let materialized = self.materialize_projection_derivations(db, env);
+        if let Some(projection_solutions) = projection_solutions
+            && let Some(ty) =
+                materialized.replace_solved_projection_vars(db, env, projection_solutions)
+        {
+            ty.recursive_type_normalized_without_projection_solver(db, env, cycle)
+        } else {
+            materialized.recursive_type_normalized_with_projection_evidence(
+                db,
+                env,
+                cycle,
+                projection_evidence,
+            )
+        }
+    }
+
+    fn recursive_type_normalized_without_projection_solver(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         cycle: &salsa::Cycle,
     ) -> Self {
         cycle.head_ids().fold(self, |ty, id| {
-            ty.recursive_type_normalized_impl(db, env, Type::divergent(id), false)
-                .unwrap_or(Type::divergent(id))
+            let div = Type::Divergent(DivergentType::new(id));
+            ty.recursive_type_normalized_impl(db, env, div, false)
+                .unwrap_or(div)
         })
     }
 
@@ -3329,7 +3422,7 @@ impl<'db> Type<'db> {
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
-        if nested && self.same_divergent_marker(div) {
+        if nested && self.same_divergent_marker(db, div) {
             return None;
         }
         match self {
@@ -3392,6 +3485,9 @@ impl<'db> Type<'db> {
                 .recursive_type_normalized_impl(db, env, div, true)
                 .map(|ty| TypeFormType::from_type_expression(db, ty)),
             Type::Divergent(_) => Some(self),
+            // Preserve the original cycle root when falling back from an unsolved projection.
+            // The projection path is only useful if `try_projection_cycle_normalized` can solve it.
+            Type::Projection(projection) => Some(Type::Divergent(projection.root(db))),
             Type::Dynamic(dynamic) => Some(Type::Dynamic(dynamic.recursive_type_normalized())),
             Type::TypedDict(_) => {
                 // TODO: Normalize TypedDicts
@@ -3502,7 +3598,7 @@ impl<'db> Type<'db> {
     /// for more complicated types that are actually singletons.
     fn is_singleton(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
         match self {
-            Type::Dynamic(_) | Type::Divergent(_) | Type::Never => false,
+            Type::Dynamic(_) | Type::Divergent(_) | Type::Projection(_) | Type::Never => false,
 
             Type::LiteralValue(literal) => match literal.kind() {
                 LiteralValueTypeKind::Int(..)
@@ -3658,7 +3754,9 @@ impl<'db> Type<'db> {
 
             Type::Dynamic(_) if policy.require_concrete() => Some(Place::Undefined.into()),
 
-            Type::Dynamic(_) | Type::Divergent(_) | Type::Never => Some(Place::bound(self).into()),
+            Type::Dynamic(_) | Type::Divergent(_) | Type::Projection(_) | Type::Never => {
+                Some(Place::bound(self).into())
+            }
 
             Type::ClassLiteral(class) if class.is_typed_dict(db) => {
                 Some(class.typed_dict_member(db, env, None, name, policy))
@@ -4036,7 +4134,10 @@ impl<'db> Type<'db> {
             PlaceAndQualifiers {
                 place: Place::Defined(member),
                 qualifiers,
-            } => Place::Defined(member.with_definedness(definedness)).with_qualifiers(qualifiers),
+                needs_projection_evidence_from_types,
+            } => Place::Defined(member.with_definedness(definedness))
+                .with_qualifiers(qualifiers)
+                .with_projection_evidence_requirement(needs_projection_evidence_from_types),
             member => member,
         }
     }
@@ -4165,6 +4266,7 @@ impl<'db> Type<'db> {
         let PlaceAndQualifiers {
             place: Place::Defined(declaration),
             qualifiers,
+            needs_projection_evidence_from_types,
         } = class_member
         else {
             return dynamic_instance_fallback;
@@ -4185,6 +4287,7 @@ impl<'db> Type<'db> {
             ..declaration
         })
         .with_qualifiers(qualifiers)
+        .with_projection_evidence_requirement(needs_projection_evidence_from_types)
         .or_fall_back_to(db, env, || dynamic_instance_fallback)
     }
 
@@ -4229,7 +4332,9 @@ impl<'db> Type<'db> {
                 enums::instance_member_for_enum_complement(db, env, *complement, name)
             }
 
-            Type::Dynamic(_) | Type::Divergent(_) | Type::Never => Place::bound(self).into(),
+            Type::Dynamic(_) | Type::Divergent(_) | Type::Projection(_) | Type::Never => {
+                Place::bound(self).into()
+            }
 
             Type::NominalInstance(instance) => {
                 instance.class(db, env).instance_member(db, env, name)
@@ -4704,6 +4809,7 @@ impl<'db> Type<'db> {
                     provenance,
                 }),
             qualifiers,
+            needs_projection_evidence_from_types,
         } = attribute
             && let Some(fallback) = ty.materialized_divergent_fallback()
         {
@@ -4717,7 +4823,8 @@ impl<'db> Type<'db> {
                     public_type_policy,
                     provenance,
                 })
-                .with_qualifiers(qualifiers),
+                .with_qualifiers(qualifiers)
+                .with_projection_evidence_requirement(needs_projection_evidence_from_types),
                 instance,
                 owner,
             );
@@ -4733,7 +4840,7 @@ impl<'db> Type<'db> {
                         ty: Type::Dynamic(_) | Type::Divergent(_) | Type::Never,
                         ..
                     }),
-                qualifiers: _,
+                ..
             } => (attribute, AttributeKind::DataDescriptor, None),
 
             PlaceAndQualifiers {
@@ -4746,6 +4853,7 @@ impl<'db> Type<'db> {
                         provenance: attribute_provenance,
                     }),
                 qualifiers,
+                needs_projection_evidence_from_types,
             } => {
                 let mut all_data_descriptors = true;
                 let mut error = None;
@@ -4776,7 +4884,8 @@ impl<'db> Type<'db> {
                             provenance: attribute_provenance,
                         })
                     })
-                    .with_qualifiers(qualifiers);
+                    .with_qualifiers(qualifiers)
+                    .with_projection_evidence_requirement(needs_projection_evidence_from_types);
 
                 let kind = if all_data_descriptors {
                     AttributeKind::DataDescriptor
@@ -4797,6 +4906,7 @@ impl<'db> Type<'db> {
                         provenance: attribute_provenance,
                     }),
                 qualifiers,
+                needs_projection_evidence_from_types,
             } => {
                 let mut error = None;
                 let place = if intersection.positive(db).is_empty() {
@@ -4820,6 +4930,7 @@ impl<'db> Type<'db> {
                             })
                         })
                         .with_qualifiers(qualifiers)
+                        .with_projection_evidence_requirement(needs_projection_evidence_from_types)
                 };
                 (
                     place,
@@ -4840,6 +4951,7 @@ impl<'db> Type<'db> {
                         provenance,
                     }),
                 qualifiers: _,
+                needs_projection_evidence_from_types,
             } => {
                 let mut error = None;
                 let result = attribute_ty
@@ -4857,7 +4969,8 @@ impl<'db> Type<'db> {
                             public_type_policy,
                             provenance,
                         })
-                        .into(),
+                        .with_qualifiers(TypeQualifiers::empty())
+                        .with_projection_evidence_requirement(needs_projection_evidence_from_types),
                         kind,
                         error,
                     )
@@ -5021,6 +5134,7 @@ impl<'db> Type<'db> {
             PlaceAndQualifiers {
                 place: meta_attr,
                 qualifiers: meta_attr_qualifiers,
+                needs_projection_evidence_from_types: meta_needs_projection_evidence,
             },
             meta_attr_kind,
             meta_attr_error,
@@ -5046,6 +5160,7 @@ impl<'db> Type<'db> {
         let PlaceAndQualifiers {
             place: fallback,
             qualifiers: fallback_qualifiers,
+            needs_projection_evidence_from_types: fallback_needs_projection_evidence,
         } = fallback_member;
 
         match (meta_attr, meta_attr_kind, fallback) {
@@ -5053,7 +5168,9 @@ impl<'db> Type<'db> {
             // no matter if it's data descriptor, a non-data descriptor, or a normal attribute.
             (meta_attr @ Place::Defined(_), _, Place::Undefined) => member_lookup_result(
                 db,
-                meta_attr.with_qualifiers(meta_attr_qualifiers),
+                meta_attr
+                    .with_qualifiers(meta_attr_qualifiers)
+                    .with_projection_evidence_requirement(meta_needs_projection_evidence),
                 meta_attr_error,
                 meta_properties,
             ),
@@ -5069,7 +5186,9 @@ impl<'db> Type<'db> {
                 _,
             ) => member_lookup_result(
                 db,
-                meta_attr.with_qualifiers(meta_attr_qualifiers),
+                meta_attr
+                    .with_qualifiers(meta_attr_qualifiers)
+                    .with_projection_evidence_requirement(meta_needs_projection_evidence),
                 meta_attr_error,
                 meta_properties,
             ),
@@ -5102,7 +5221,10 @@ impl<'db> Type<'db> {
                     public_type_policy: fallback_public_type_policy,
                     provenance: fallback_provenance.or(meta_attr_provenance),
                 })
-                .with_qualifiers(meta_attr_qualifiers.union(fallback_qualifiers)),
+                .with_qualifiers(meta_attr_qualifiers.union(fallback_qualifiers))
+                .with_projection_evidence_requirement(
+                    meta_needs_projection_evidence || fallback_needs_projection_evidence,
+                ),
                 meta_attr_error.or(fallback_error),
                 union_deprecated_properties(db, meta_properties, fallback_properties),
             ),
@@ -5124,7 +5246,9 @@ impl<'db> Type<'db> {
                 }),
             ) if policy == InstanceFallbackShadowsNonDataDescriptor::Yes => member_lookup_result(
                 db,
-                fallback.with_qualifiers(fallback_qualifiers),
+                fallback
+                    .with_qualifiers(fallback_qualifiers)
+                    .with_projection_evidence_requirement(fallback_needs_projection_evidence),
                 fallback_error,
                 fallback_properties,
             ),
@@ -5157,7 +5281,10 @@ impl<'db> Type<'db> {
                     public_type_policy: fallback_public_type_policy,
                     provenance: fallback_provenance.or(meta_attr_provenance),
                 })
-                .with_qualifiers(meta_attr_qualifiers.union(fallback_qualifiers)),
+                .with_qualifiers(meta_attr_qualifiers.union(fallback_qualifiers))
+                .with_projection_evidence_requirement(
+                    meta_needs_projection_evidence || fallback_needs_projection_evidence,
+                ),
                 meta_attr_error.or(fallback_error),
                 union_deprecated_properties(db, meta_properties, fallback_properties),
             ),
@@ -5165,7 +5292,9 @@ impl<'db> Type<'db> {
             // If the attribute is not found on the meta-type, we simply return the fallback.
             (Place::Undefined, _, fallback) => member_lookup_result(
                 db,
-                fallback.with_qualifiers(fallback_qualifiers),
+                fallback
+                    .with_qualifiers(fallback_qualifiers)
+                    .with_projection_evidence_requirement(fallback_needs_projection_evidence),
                 fallback_error,
                 fallback_properties,
             ),
@@ -5507,7 +5636,9 @@ impl<'db> Type<'db> {
                         .into()
                 }
 
-                Type::Dynamic(..) | Type::Divergent(_) | Type::Never => Place::bound(this).into(),
+                Type::Dynamic(..) | Type::Divergent(_) | Type::Projection(_) | Type::Never => {
+                    Place::bound(this).into()
+                }
 
                 Type::FunctionLiteral(function) if name == "__get__" => Place::bound(
                     Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(function)),
@@ -6573,7 +6704,7 @@ impl<'db> Type<'db> {
 
             // Dynamic types are callable, and the return type is the same dynamic type. Similarly,
             // `Never` is always callable and returns `Never`.
-            Type::Dynamic(_) | Type::Divergent(_) | Type::Never => {
+            Type::Dynamic(_) | Type::Divergent(_) | Type::Projection(_) | Type::Never => {
                 Binding::single(self, Signature::dynamic(self)).into()
             }
 
@@ -7855,11 +7986,13 @@ impl<'db> Type<'db> {
                     return_ty: return_builder.map(IntersectionBuilder::build),
                 })
             }
-            ty @ (Type::Dynamic(_) | Type::Divergent(_) | Type::Never) => Some(GeneratorTypes {
-                yield_ty: Some(ty),
-                send_ty: Some(ty),
-                return_ty: Some(ty),
-            }),
+            ty @ (Type::Dynamic(_) | Type::Divergent(_) | Type::Projection(_) | Type::Never) => {
+                Some(GeneratorTypes {
+                    yield_ty: Some(ty),
+                    send_ty: Some(ty),
+                    return_ty: Some(ty),
+                })
+            }
             _ => None,
         }
     }
@@ -7945,7 +8078,7 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
     ) -> Option<InstanceProjection<Type<'db>>> {
         match self {
-            Type::Dynamic(_) | Type::Divergent(_) | Type::Never => {
+            Type::Dynamic(_) | Type::Divergent(_) | Type::Projection(_) | Type::Never => {
                 Some(InstanceProjection::Exact(self))
             }
             Type::ClassLiteral(class) => Some(InstanceProjection::OverApproximation(
@@ -8235,7 +8368,7 @@ impl<'db> Type<'db> {
                 }
             }
 
-            Type::Dynamic(_) | Type::Divergent(_) => Ok(*self),
+            Type::Dynamic(_) | Type::Divergent(_) | Type::Projection(_) => Ok(*self),
 
             Type::NominalInstance(instance) => match instance.known_class(db) {
                 Some(KnownClass::NoneType) => Ok(Type::none(db, env)),
@@ -8367,7 +8500,7 @@ impl<'db> Type<'db> {
                 Type::Dynamic(dynamic) => {
                     SubclassOfType::from(db, env, SubclassOfInner::Dynamic(dynamic))
                 }
-                Type::Divergent(_) => ty,
+                Type::Divergent(_) | Type::Projection(_) => ty,
                 Type::Intersection(intersection) => {
                     if let Some(alternatives) = intersection.finite_alternative_union(db, env) {
                         to_meta_type_inner(db, env, alternatives, context, visitor)
@@ -9136,6 +9269,7 @@ impl<'db> Type<'db> {
                 }
                 _ => self,
             },
+            Type::Projection(_) => self,
 
             Type::Never
             | Type::AlwaysTruthy
@@ -9235,7 +9369,7 @@ impl<'db> Type<'db> {
                     typevars.insert(bound_typevar);
                 }
             }
-            Type::Divergent(_) => {}
+            Type::Divergent(_) | Type::Projection(_) => {}
 
             Type::FunctionLiteral(function) => {
                 visitor.visit(db, self, || {
@@ -9747,7 +9881,8 @@ impl<'db> Type<'db> {
             }
 
             // These types have no definition
-            Self::Dynamic(
+            Self::Projection(_)
+            | Self::Dynamic(
                 DynamicType::InvalidConcatenateUnknown | DynamicType::UnspecializedTypeVar,
             )
             | Self::Callable(_)
@@ -10156,6 +10291,7 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
             Type::TypeAlias(alias) => alias.variance_of(db, env, typevar),
             Type::Dynamic(_)
             | Type::Divergent(_)
+            | Type::Projection(_)
             | Type::Never
             | Type::WrapperDescriptor(_)
             | Type::KnownBoundMethod(_)
@@ -10464,6 +10600,8 @@ impl<'db> TypeMapping<'_, 'db> {
 pub struct DivergentType {
     /// The query ID that caused the cycle.
     id: salsa::Id,
+    /// A projection path observed during normal inference.
+    projection_derivation: Option<salsa::Id>,
     /// If this divergent marker has been materialized, preserve whether it should behave like the
     /// top (`object`) or bottom (`Never`) bound while still remaining recognizable as divergent.
     materialization: Option<MaterializationKind>,
@@ -10476,6 +10614,7 @@ impl DivergentType {
     const fn new(id: salsa::Id) -> Self {
         Self {
             id,
+            projection_derivation: None,
             materialization: None,
         }
     }
@@ -10487,8 +10626,21 @@ impl DivergentType {
     const fn materialized(self, kind: MaterializationKind) -> Self {
         Self {
             id: self.id,
+            projection_derivation: self.projection_derivation,
             materialization: Some(kind),
         }
+    }
+
+    const fn with_projection_derivation(self, derivation: salsa::Id) -> Self {
+        Self {
+            id: self.id,
+            projection_derivation: Some(derivation),
+            materialization: self.materialization,
+        }
+    }
+
+    const fn projection_derivation_id(self) -> Option<salsa::Id> {
+        self.projection_derivation
     }
 
     const fn materialization_kind(self) -> Option<MaterializationKind> {
@@ -10647,6 +10799,8 @@ pub(crate) struct TypeAndQualifiers<'db> {
     origin: TypeOrigin,
     qualifiers: TypeQualifiers,
     provenance: Provenance<'db>,
+    /// Whether the type may carry projection demands observed by an inference result.
+    needs_projection_evidence_from_types: bool,
 }
 
 impl<'db> TypeAndQualifiers<'db> {
@@ -10656,6 +10810,7 @@ impl<'db> TypeAndQualifiers<'db> {
             origin,
             qualifiers,
             provenance: Provenance::Unknown,
+            needs_projection_evidence_from_types: false,
         }
     }
 
@@ -10665,6 +10820,7 @@ impl<'db> TypeAndQualifiers<'db> {
             origin: TypeOrigin::Declared,
             qualifiers: TypeQualifiers::empty(),
             provenance: Provenance::Unknown,
+            needs_projection_evidence_from_types: false,
         }
     }
 
@@ -10675,6 +10831,18 @@ impl<'db> TypeAndQualifiers<'db> {
 
     pub(crate) fn provenance(&self) -> Provenance<'db> {
         self.provenance
+    }
+
+    /// Preserve the requirement to collect projection evidence when this type crosses an
+    /// inference-result boundary.
+    pub(crate) fn with_projection_evidence_requirement(mut self, required: bool) -> Self {
+        self.needs_projection_evidence_from_types |= required;
+        self
+    }
+
+    /// Return whether this type may carry projection demands observed by an inference result.
+    pub(crate) fn needs_projection_evidence_from_types(&self) -> bool {
+        self.needs_projection_evidence_from_types
     }
 
     /// Forget about type qualifiers and only return the inner type.
@@ -10703,6 +10871,7 @@ impl<'db> TypeAndQualifiers<'db> {
             origin: self.origin,
             qualifiers: self.qualifiers,
             provenance: self.provenance,
+            needs_projection_evidence_from_types: self.needs_projection_evidence_from_types,
         }
     }
 }
@@ -11290,6 +11459,7 @@ impl<'db> ModuleLiteralType<'db> {
                         ..place
                     }),
                     qualifiers: TypeQualifiers::FROM_MODULE_GETATTR,
+                    needs_projection_evidence_from_types: false,
                 },
                 error,
                 None,
@@ -11361,6 +11531,8 @@ impl<'db> ModuleLiteralType<'db> {
                         ..defined
                     }),
                     qualifiers: place_and_qualifiers.qualifiers,
+                    needs_projection_evidence_from_types: place_and_qualifiers
+                        .needs_projection_evidence_from_types,
                 }
                 .into();
             }

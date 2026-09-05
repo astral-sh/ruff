@@ -672,6 +672,66 @@ while x != "bar":
 reveal_type(definitely_bound)  # revealed: Literal[42]
 ```
 
+### Recursive packing/unpacking
+
+```py
+from collections.abc import Iterator
+from typing import Generic, TypeVar
+
+tuple_count = 0
+t = (1,)
+while tuple_count < 10:
+    (value,) = t
+    value += 1
+    t = (value,)
+    tuple_count += 1
+
+reveal_type(t)  # revealed: tuple[int]
+
+list_count = 0
+l = [1]
+while list_count < 10:
+    [value] = l
+    value += 1
+    l = [value]
+    list_count += 1
+
+reveal_type(l)  # revealed: list[int]
+
+WhileLoopT = TypeVar("WhileLoopT")
+
+class WhileLoopVarBox(Generic[WhileLoopT]):
+    def __init__(self, value: WhileLoopT) -> None:
+        pass
+
+    def __iter__(self) -> Iterator[WhileLoopT]:
+        return iter(())
+
+box_count = 0
+box = WhileLoopVarBox(1)
+while box_count < 10:
+    (value,) = box
+    value += 1
+    box = WhileLoopVarBox(value)
+    box_count += 1
+
+reveal_type(box)  # revealed: WhileLoopVarBox[int]
+```
+
+### Recursive tuple slice unpacking converges
+
+Rebuilding a variadic tuple from its static slice forms a recursive projection orbit. Cycle recovery
+must widen that orbit instead of replaying the same projection indefinitely.
+
+```py
+from collections.abc import Hashable
+
+def rebuild_tuple(value: Hashable, cond: bool) -> None:
+    while cond:
+        if isinstance(value, tuple):
+            value = (*value[:-1], f"{value[-1]}")
+```
+
 ### Bindings in statically unreachable branches are excluded from loopback
 
 ```py

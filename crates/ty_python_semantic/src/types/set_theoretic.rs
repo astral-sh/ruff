@@ -385,12 +385,15 @@ impl<'db> UnionType<'db> {
         let mut possibly_unbound = false;
         let mut origin = TypeOrigin::Declared;
         let mut provenance = Provenance::Unknown;
+        let mut needs_projection_evidence_from_types = false;
         for ty in self.elements(db) {
             let PlaceAndQualifiers {
                 place: ty_member,
                 qualifiers: new_qualifiers,
+                needs_projection_evidence_from_types: new_needs_projection_evidence,
             } = transform_fn(ty);
             qualifiers |= new_qualifiers;
+            needs_projection_evidence_from_types |= new_needs_projection_evidence;
             match ty_member {
                 Place::Undefined => {
                     possibly_unbound = true;
@@ -432,6 +435,7 @@ impl<'db> UnionType<'db> {
                 })
             },
             qualifiers,
+            needs_projection_evidence_from_types,
         }
     }
 
@@ -451,7 +455,7 @@ impl<'db> UnionType<'db> {
             if nested {
                 // list[T | Divergent] => list[Divergent]
                 let ty = ty.recursive_type_normalized_impl(db, env, div, nested)?;
-                if ty.same_divergent_marker(div) {
+                if ty.same_divergent_marker(db, div) {
                     return Some(ty);
                 }
                 builder.add_in_place(ty);
@@ -459,7 +463,7 @@ impl<'db> UnionType<'db> {
             } else {
                 // `Divergent` in a union type does not mean true divergence, so we skip it if not nested.
                 // e.g. T | Divergent == T | (T | (T | (T | ...))) == T
-                if (*ty).same_divergent_marker(div) {
+                if (*ty).same_divergent_marker(db, div) {
                     builder = builder.recursively_defined(RecursivelyDefined::Yes);
                     continue;
                 }
@@ -1133,12 +1137,15 @@ impl<'db> IntersectionType<'db> {
         let mut any_definitely_bound = false;
         let mut origin = TypeOrigin::Declared;
         let mut provenance = Provenance::Unknown;
+        let mut needs_projection_evidence_from_types = false;
         for ty in self.positive_elements_or_object(db) {
             let PlaceAndQualifiers {
                 place: member,
                 qualifiers: new_qualifiers,
+                needs_projection_evidence_from_types: new_needs_projection_evidence,
             } = transform_fn(&ty);
             qualifiers |= new_qualifiers;
+            needs_projection_evidence_from_types |= new_needs_projection_evidence;
             match member {
                 Place::Undefined => {}
                 Place::Defined(DefinedPlace {
@@ -1177,6 +1184,7 @@ impl<'db> IntersectionType<'db> {
                 })
             },
             qualifiers,
+            needs_projection_evidence_from_types,
         }
     }
 

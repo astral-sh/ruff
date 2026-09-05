@@ -481,6 +481,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let slice_ty = self.infer_expression(slice, TypeContext::default());
+        if let Some(projection) = value_ty.try_subscript_projection_result(db, env, slice_ty) {
+            self.extend_projection_result(projection);
+        }
         self.infer_subscript_expression_types(subscript, value_ty, slice_ty, ExprContext::Load)
             .map(|ty| self.narrow_expr_with_applicable_constraints(subscript, ty, &constraint_keys))
             .map_err(|recovery_ty| {
@@ -1693,10 +1696,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             continue;
                         };
 
-                        self.collection_use_constraints
-                            .entry(collection_def)
-                            .or_default()
-                            .insert(constraints);
+                        self.record_collection_use_constraint(collection_def, constraints);
                     }
                 }
             }

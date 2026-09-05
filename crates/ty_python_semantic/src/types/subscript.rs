@@ -564,36 +564,86 @@ impl<'db> Type<'db> {
         slice_ty: Type<'db>,
         expr_context: ast::ExprContext,
     ) -> Result<Type<'db>, SubscriptError<'db>> {
+        self.subscript_impl(db, env, slice_ty, expr_context, true)
+    }
+
+    /// Evaluate a subscript without starting another projection-recovery attempt.
+    ///
+    /// Use this only after the caller has already committed to replaying a projection path.
+    pub(super) fn subscript_without_projection(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        slice_ty: Type<'db>,
+        expr_context: ast::ExprContext,
+    ) -> Result<Type<'db>, SubscriptError<'db>> {
+        self.subscript_impl(db, env, slice_ty, expr_context, false)
+    }
+
+    fn subscript_impl(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        slice_ty: Type<'db>,
+        expr_context: ast::ExprContext,
+        allow_projection: bool,
+    ) -> Result<Type<'db>, SubscriptError<'db>> {
         if let Some(fallback) = self.materialized_divergent_fallback() {
-            return fallback.subscript(db, env, slice_ty, expr_context);
+            return fallback.subscript_impl(db, env, slice_ty, expr_context, allow_projection);
         }
 
         if let Some(fallback) = slice_ty.materialized_divergent_fallback() {
-            return self.subscript(db, env, fallback, expr_context);
+            return self.subscript_impl(db, env, fallback, expr_context, allow_projection);
         }
 
         let value_ty = self;
 
-        let inferred = match (value_ty, slice_ty) {
-            (Type::Dynamic(_) | Type::Divergent(_) | Type::Never, _) => Some(Ok(value_ty)),
-
-            (Type::TypeAlias(alias), _) => Some(alias.value_type(db).subscript(
+        if allow_projection
+            && expr_context == ast::ExprContext::Load
+            && let Some(result) = value_ty.try_subscript_without_projection_for_concrete_key(
                 db,
                 env,
                 slice_ty,
                 expr_context,
+            )
+        {
+            return result;
+        }
+
+        if allow_projection
+            && expr_context == ast::ExprContext::Load
+            && let Some(projection) = value_ty.try_subscript_projection(db, env, slice_ty)
+        {
+            return Ok(projection);
+        }
+
+        let inferred = match (value_ty, slice_ty) {
+            (Type::Dynamic(_) | Type::Divergent(_) | Type::Projection(_) | Type::Never, _) => {
+                Some(Ok(value_ty))
+            }
+
+            (Type::TypeAlias(alias), _) => Some(alias.value_type(db).subscript_impl(
+                db,
+                env,
+                slice_ty,
+                expr_context,
+                allow_projection,
             )),
 
-            (_, Type::TypeAlias(alias)) => {
-                Some(value_ty.subscript(db, env, alias.value_type(db), expr_context))
-            }
+            (_, Type::TypeAlias(alias)) => Some(value_ty.subscript_impl(
+                db,
+                env,
+                alias.value_type(db),
+                expr_context,
+                allow_projection,
+            )),
 
             (Type::Union(union), _) => Some(map_subscript_alternatives(
                 db,
                 env,
                 value_ty,
                 union.elements(db).iter().copied(),
-                |element| element.subscript(db, env, slice_ty, expr_context),
+                |element| element.subscript_impl(db, env, slice_ty, expr_context, allow_projection),
             )),
 
             (_, Type::Union(union)) => Some(map_subscript_alternatives(
@@ -601,37 +651,39 @@ impl<'db> Type<'db> {
                 env,
                 slice_ty,
                 union.elements(db).iter().copied(),
-                |element| value_ty.subscript(db, env, element, expr_context),
+                |element| value_ty.subscript_impl(db, env, element, expr_context, allow_projection),
             )),
 
             (Type::EnumComplement(complement), _) => {
-                Some(complement.remaining_literal_union(db, env).subscript(
+                Some(complement.remaining_literal_union(db, env).subscript_impl(
                     db,
                     env,
                     slice_ty,
                     expr_context,
+                    allow_projection,
                 ))
             }
 
-            (_, Type::EnumComplement(complement)) => Some(value_ty.subscript(
+            (_, Type::EnumComplement(complement)) => Some(value_ty.subscript_impl(
                 db,
                 env,
                 complement.remaining_literal_union(db, env),
                 expr_context,
+                allow_projection,
             )),
 
             (Type::Intersection(intersection), _) => Some(map_intersection_subscript(
                 db,
                 env,
                 intersection,
-                |element| element.subscript(db, env, slice_ty, expr_context),
+                |element| element.subscript_impl(db, env, slice_ty, expr_context, allow_projection),
             )),
 
             (_, Type::Intersection(intersection)) => Some(map_intersection_subscript(
                 db,
                 env,
                 intersection,
-                |element| value_ty.subscript(db, env, element, expr_context),
+                |element| value_ty.subscript_impl(db, env, element, expr_context, allow_projection),
             )),
 
             (Type::TypeVar(typevar), _)
@@ -643,7 +695,9 @@ impl<'db> Type<'db> {
                     env,
                     value_ty,
                     constraints.elements(db).iter().copied(),
-                    |constraint| constraint.subscript(db, env, slice_ty, expr_context),
+                    |constraint| {
+                        constraint.subscript_impl(db, env, slice_ty, expr_context, allow_projection)
+                    },
                 ))
             }
 
@@ -825,14 +879,26 @@ impl<'db> Type<'db> {
                 if (lhs_literal.is_string() || lhs_literal.is_bytes())
                     && let Some(bool) = rhs_literal.as_bool() =>
             {
-                Some(value_ty.subscript(db, env, Type::int_literal(i64::from(bool)), expr_context))
+                Some(value_ty.subscript_impl(
+                    db,
+                    env,
+                    Type::int_literal(i64::from(bool)),
+                    expr_context,
+                    allow_projection,
+                ))
             }
 
             (Type::NominalInstance(nominal), Type::LiteralValue(literal))
                 if let Some(bool) = literal.as_bool()
                     && nominal.tuple_spec(db, env).is_some() =>
             {
-                Some(value_ty.subscript(db, env, Type::int_literal(i64::from(bool)), expr_context))
+                Some(value_ty.subscript_impl(
+                    db,
+                    env,
+                    Type::int_literal(i64::from(bool)),
+                    expr_context,
+                    allow_projection,
+                ))
             }
 
             (Type::KnownInstance(KnownInstanceType::SubscriptedProtocol(_)), _) => {

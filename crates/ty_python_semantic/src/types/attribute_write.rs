@@ -263,7 +263,7 @@ pub(super) fn attribute_write_requirement<'db>(
         }
         Type::BoundSuper(_) => AttributeWriteRequirement::CannotAssign,
 
-        Type::Dynamic(..) | Type::Divergent(_) | Type::Never => {
+        Type::Dynamic(..) | Type::Divergent(_) | Type::Projection(_) | Type::Never => {
             AttributeWriteRequirement::Unconstrained
         }
 
@@ -379,6 +379,7 @@ fn instance_attribute_write_member_requirement<'db>(
         PlaceAndQualifiers {
             place: Place::Defined(DefinedPlace { ty, .. }),
             qualifiers,
+            ..
         } => {
             let member = explicit_attribute_write_requirement(
                 db,
@@ -468,6 +469,7 @@ fn class_attribute_write_requirement<'db>(
         PlaceAndQualifiers {
             place: Place::Defined(place @ DefinedPlace { ty, .. }),
             qualifiers,
+            ..
         } => {
             let descriptor_ty = receiver_fallback
                 .and_then(|_| possible_class_attribute_descriptor(db, env, place))
@@ -580,6 +582,7 @@ fn explicit_attribute_write_requirement<'db>(
         && let PlaceAndQualifiers {
             place: Place::Defined(DefinedPlace { ty, .. }),
             qualifiers: storage_qualifiers,
+            ..
         } = object_ty.instance_member(db, env, attribute)
     {
         return ExplicitAttributeWriteRequirement::AssignableTo {
@@ -627,6 +630,7 @@ fn instance_fallback_write_requirement<'db>(
             ty, definedness, ..
         }),
         qualifiers,
+        ..
     } = fallback
     else {
         return FallbackAttributeWriteRequirement::PossiblyMissing;
@@ -652,6 +656,7 @@ fn class_fallback_write_requirement<'db>(
             ty, definedness, ..
         }),
         qualifiers,
+        ..
     } = fallback
     else {
         return FallbackAttributeWriteRequirement::PossiblyMissing;
@@ -855,6 +860,7 @@ pub(super) fn assignment_attribute_members<'db>(
             | Type::TypeAlias(..)
             | Type::Dynamic(..)
             | Type::Divergent(_)
+            | Type::Projection(_)
             | Type::Never
             | Type::ModuleLiteral(..)
             | Type::BoundSuper(..) => return None,

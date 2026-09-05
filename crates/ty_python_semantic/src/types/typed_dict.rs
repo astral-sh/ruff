@@ -2022,6 +2022,7 @@ pub(crate) fn extract_unpacked_typed_dict_from_value_type<'db>(
         // All other types cannot contain a TypedDict
         Type::Dynamic(_)
         | Type::Divergent(_)
+        | Type::Projection(_)
         | Type::Never
         | Type::EnumComplement(_)
         | Type::FunctionLiteral(_)

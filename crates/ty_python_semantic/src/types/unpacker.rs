@@ -28,11 +28,14 @@ use ty_python_core::unpack::{UnpackKind, UnpackValue};
 
 use super::context::InferContext;
 use super::diagnostic::INVALID_ASSIGNMENT;
+use super::projection::{ProjectionEvidenceSet, ProjectionRecoveryBuilder, ProjectionResult};
 
 /// Unpacks the value expression type to their respective targets.
 pub(crate) struct Unpacker<'db, 'ast> {
     context: InferContext<'db, 'ast>,
     targets: FxHashMap<ExpressionNodeKey, Type<'db>>,
+    projection_evidence: Option<ProjectionEvidenceSet<'db>>,
+    needs_projection_evidence_from_types: bool,
 }
 
 /// Records an `Unknown` type for every expression in a malformed unpack target subtree.
@@ -65,6 +68,8 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                 module,
             ),
             targets: FxHashMap::default(),
+            projection_evidence: None,
+            needs_projection_evidence_from_types: false,
         }
     }
 
@@ -74,6 +79,16 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
 
     fn module(&self) -> &'ast ParsedModuleRef {
         self.context.module()
+    }
+
+    fn extend_projection_evidence(&mut self, other: Option<ProjectionEvidenceSet<'db>>) {
+        self.projection_evidence =
+            ProjectionEvidenceSet::merged(self.db(), self.projection_evidence, other);
+    }
+
+    fn extend_projection_result(&mut self, result: ProjectionResult<'db>) {
+        self.needs_projection_evidence_from_types = true;
+        self.extend_projection_evidence(result.projection_evidence());
     }
 
     /// Unpack the value to the target expression.
@@ -90,9 +105,14 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
             value.expression(),
             TypeContext::default(),
         );
+        self.extend_projection_evidence(value_inference.projection_evidence());
         let value_expr = value.expression().node_ref(self.db()).node(self.module());
 
         let value_type = value_inference.expression_type(value_expr);
+        let allow_projection = matches!(
+            value.kind(),
+            UnpackKind::Assign | UnpackKind::Iterable { .. } | UnpackKind::ContextManager { .. }
+        );
 
         let value_type = match value.kind() {
             UnpackKind::Assign => {
@@ -104,30 +124,44 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
             }
             UnpackKind::Iterable { mode } => {
                 let env = self.context.program_environment();
-                value_type
-                    .try_iterate_with_mode(db, env, mode)
-                    .map(|tuple| tuple.homogeneous_element_type(db, env))
-                    .unwrap_or_else(|err| {
-                        err.report_diagnostic(
-                            &self.context,
-                            value_type,
-                            value.as_any_node_ref(self.db(), self.module()),
-                        );
-                        err.fallback_element_type(db, env)
-                    })
+                if let Some(projected) =
+                    value_type.try_iter_projection_result_with_mode(db, env, mode)
+                {
+                    self.extend_projection_result(projected);
+                    projected.ty()
+                } else {
+                    value_type
+                        .try_iterate_with_mode(db, env, mode)
+                        .map(|tuple| tuple.homogeneous_element_type(db, env))
+                        .unwrap_or_else(|err| {
+                            err.report_diagnostic(
+                                &self.context,
+                                value_type,
+                                value.as_any_node_ref(self.db(), self.module()),
+                            );
+                            err.fallback_element_type(db, env)
+                        })
+                }
             }
             UnpackKind::ContextManager { mode } => {
                 let env = self.context.program_environment();
-                value_type
-                    .try_enter_with_mode(db, env, mode)
-                    .unwrap_or_else(|err| {
-                        err.report_diagnostic(
-                            &self.context,
-                            value_type,
-                            value.as_any_node_ref(self.db(), self.module()),
-                        );
-                        err.fallback_enter_type(db, env)
-                    })
+                if let Some(projected) =
+                    value_type.try_context_enter_projection_result(db, env, mode)
+                {
+                    self.extend_projection_result(projected);
+                    projected.ty()
+                } else {
+                    value_type
+                        .try_enter_with_mode(db, env, mode)
+                        .unwrap_or_else(|err| {
+                            err.report_diagnostic(
+                                &self.context,
+                                value_type,
+                                value.as_any_node_ref(self.db(), self.module()),
+                            );
+                            err.fallback_enter_type(db, env)
+                        })
+                }
             }
         };
 
@@ -140,6 +174,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                 promote_literals: false,
             },
             value_inference,
+            allow_projection,
         );
     }
 
@@ -176,6 +211,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
         value_expr: AnyNodeRef<'_>,
         value: UnpackElement<'db, 'ast>,
         value_inference: &ExpressionInference<'db>,
+        allow_projection: bool,
     ) {
         let db = self.db();
         let env = self.context.program_environment();
@@ -185,7 +221,13 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                 return;
             }
             ast::Expr::Starred(starred) => {
-                self.unpack_inner(&starred.value, value_expr, value, value_inference);
+                self.unpack_inner(
+                    &starred.value,
+                    value_expr,
+                    value,
+                    value_inference,
+                    allow_projection,
+                );
                 return;
             }
             ast::Expr::List(ast::ExprList { elts, .. })
@@ -198,6 +240,20 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                 return;
             }
         };
+        if allow_projection
+            && let Some(projected_tys) = self.try_unpack_projections(value.ty, targets)
+        {
+            for (target, projected_ty) in targets.iter().zip(projected_tys) {
+                self.unpack_inner(
+                    target,
+                    value_expr,
+                    UnpackElement::from_type(projected_ty),
+                    value_inference,
+                    allow_projection,
+                );
+            }
+            return;
+        }
         let target_len = target_length(targets);
         let literal = value.expression.and_then(|expression| {
             literal_sequence(
@@ -342,15 +398,195 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                     promote_literals,
                 },
                 value_inference,
+                allow_projection,
             );
         }
     }
 
+    fn try_unpack_projections(
+        &mut self,
+        value_ty: Type<'db>,
+        targets: &[ast::Expr],
+    ) -> Option<Vec<Type<'db>>> {
+        // With no elements to project, iteration and length still need ordinary validation.
+        if targets.is_empty() {
+            return None;
+        }
+
+        let original_evidence = self.projection_evidence;
+        if let Some(projected) = self.try_unpack_projections_for_element(value_ty, targets) {
+            return Some(projected);
+        }
+        self.projection_evidence = original_evidence;
+
+        let Type::Union(union) = value_ty else {
+            return None;
+        };
+
+        let mut saw_projection = false;
+        let mut target_tys = vec![Vec::new(); targets.len()];
+        for element in union.elements(self.db()).iter().copied() {
+            let before = self.projection_evidence;
+            let element_tys = if let Some(projected) =
+                self.try_unpack_projections_for_element(element, targets)
+            {
+                saw_projection = true;
+                projected
+            } else {
+                self.projection_evidence = before;
+                let Some(types) = self.try_normal_unpack_types(element, targets) else {
+                    self.projection_evidence = original_evidence;
+                    return None;
+                };
+                types
+            };
+
+            for (target_ty, element_ty) in target_tys.iter_mut().zip(element_tys) {
+                target_ty.push(element_ty);
+            }
+        }
+
+        let env = self.context.program_environment();
+        saw_projection.then(|| {
+            target_tys
+                .into_iter()
+                .map(|elements| UnionType::from_elements(self.db(), env, elements))
+                .collect()
+        })
+    }
+
+    fn try_unpack_projections_for_element(
+        &mut self,
+        value_ty: Type<'db>,
+        targets: &[ast::Expr],
+    ) -> Option<Vec<Type<'db>>> {
+        let env = self.context.program_environment();
+        match targets.iter().position(ast::Expr::is_starred_expr) {
+            Some(starred_index) => {
+                if targets
+                    .iter()
+                    .skip(starred_index + 1)
+                    .any(ast::Expr::is_starred_expr)
+                {
+                    return None;
+                }
+
+                let prefix = starred_index;
+                let suffix = targets.len() - (starred_index + 1);
+                let mut projected_tys = Vec::with_capacity(targets.len());
+                let mut projection_evidence = None;
+                for index in 0..targets.len() {
+                    let projected = if index < prefix {
+                        value_ty.try_star_unpack_prefix_projection_result(
+                            self.db(),
+                            env,
+                            prefix,
+                            suffix,
+                            index,
+                        )
+                    } else if index == starred_index {
+                        value_ty.try_star_unpack_rest_projection_result(
+                            self.db(),
+                            env,
+                            prefix,
+                            suffix,
+                        )
+                    } else {
+                        value_ty.try_star_unpack_suffix_projection_result(
+                            self.db(),
+                            env,
+                            prefix,
+                            suffix,
+                            index - starred_index - 1,
+                        )
+                    }?;
+                    projection_evidence = ProjectionEvidenceSet::merged(
+                        self.db(),
+                        projection_evidence,
+                        projected.projection_evidence(),
+                    );
+                    self.needs_projection_evidence_from_types = true;
+                    projected_tys.push(projected.ty());
+                }
+                self.extend_projection_evidence(projection_evidence);
+                Some(projected_tys)
+            }
+            None => {
+                let mut projected_tys = Vec::with_capacity(targets.len());
+                let mut projection_evidence = None;
+                for index in 0..targets.len() {
+                    let projected = value_ty.try_unpack_projection_result(
+                        self.db(),
+                        env,
+                        targets.len(),
+                        index,
+                    )?;
+                    projection_evidence = ProjectionEvidenceSet::merged(
+                        self.db(),
+                        projection_evidence,
+                        projected.projection_evidence(),
+                    );
+                    self.needs_projection_evidence_from_types = true;
+                    projected_tys.push(projected.ty());
+                }
+                self.extend_projection_evidence(projection_evidence);
+                Some(projected_tys)
+            }
+        }
+    }
+
+    fn try_normal_unpack_types(
+        &self,
+        value_ty: Type<'db>,
+        targets: &[ast::Expr],
+    ) -> Option<Vec<Type<'db>>> {
+        let db = self.db();
+        let env = self.context.program_environment();
+        let tuple = value_ty.try_iterate(db, env).ok()?;
+        let sequence = sequence_from_type(db, &tuple);
+        let matched = sequence
+            .unpack(target_length(targets), Clone::clone, |elements| {
+                UnpackElement::from_type(UnionType::from_elements_leave_aliases(
+                    db,
+                    env,
+                    elements.iter().map(|element| element.ty),
+                ))
+            })
+            .ok()?;
+        Some(
+            matched
+                .into_all_elements_with_kind()
+                .map(|element| match element {
+                    TupleElement::Fixed(value)
+                    | TupleElement::Prefix(value)
+                    | TupleElement::Suffix(value) => value.ty,
+                    TupleElement::Variable(values) => collected_list_type(
+                        db,
+                        env,
+                        values.into_iter().map(|value| (value.ty, value.expression)),
+                    ),
+                })
+                .collect(),
+        )
+    }
+
     pub(crate) fn finish(self) -> UnpackResult<'db> {
+        let projection_evidence = ProjectionEvidenceSet::merged(
+            self.db(),
+            self.projection_evidence,
+            ProjectionEvidenceSet::from_types_if_needed(
+                self.db(),
+                self.context.program_environment(),
+                self.needs_projection_evidence_from_types,
+                self.targets.values().copied(),
+            ),
+        );
         UnpackResult {
             diagnostics: self.context.finish(),
             targets: FrozenMap::from(self.targets),
             cycle_recovery: None,
+            projection_evidence,
+            needs_projection_evidence_from_types: self.needs_projection_evidence_from_types,
         }
     }
 }
@@ -364,6 +600,8 @@ pub(crate) struct UnpackResult<'db> {
     ///
     /// This is used only when constructing a cycle-recovery `UnpackResult`.
     cycle_recovery: Option<Type<'db>>,
+    projection_evidence: Option<ProjectionEvidenceSet<'db>>,
+    needs_projection_evidence_from_types: bool,
 }
 
 impl<'db> UnpackResult<'db> {
@@ -394,11 +632,21 @@ impl<'db> UnpackResult<'db> {
         &self.diagnostics
     }
 
+    pub(crate) fn projection_evidence(&self) -> Option<ProjectionEvidenceSet<'db>> {
+        self.projection_evidence
+    }
+
+    pub(crate) const fn needs_projection_evidence_from_types(&self) -> bool {
+        self.needs_projection_evidence_from_types
+    }
+
     pub(crate) fn cycle_initial(cycle_recovery: Type<'db>) -> Self {
         Self {
             targets: FrozenMap::default(),
             diagnostics: TypeCheckDiagnostics::default(),
             cycle_recovery: Some(cycle_recovery),
+            projection_evidence: None,
+            needs_projection_evidence_from_types: false,
         }
     }
 
@@ -409,10 +657,36 @@ impl<'db> UnpackResult<'db> {
         previous_cycle_result: &UnpackResult<'db>,
         cycle: &salsa::Cycle,
     ) -> Self {
+        let projection_evidence = ProjectionEvidenceSet::merged(
+            db,
+            self.projection_evidence,
+            previous_cycle_result.projection_evidence,
+        );
+        let mut projection_recovery = ProjectionRecoveryBuilder::new(cycle);
         for (expr, ty) in &mut self.targets {
             let previous_ty = previous_cycle_result.expression_type(*expr);
-            *ty = ty.cycle_normalized(db, env, previous_ty, cycle);
+            *ty = projection_recovery.push_candidate(
+                db,
+                env,
+                Some(previous_ty),
+                ty.cycle_join_for_recovery(db, env, previous_ty, cycle),
+            );
         }
+        let projection_solutions =
+            projection_recovery.finish(db, env, projection_evidence.as_ref());
+        for (_, ty) in &mut self.targets {
+            *ty = ty.recursive_type_normalized_with_projection_solutions(
+                db,
+                env,
+                cycle,
+                projection_solutions.as_ref(),
+                projection_evidence.as_ref(),
+            );
+        }
+
+        self.projection_evidence = projection_evidence;
+        self.needs_projection_evidence_from_types |=
+            previous_cycle_result.needs_projection_evidence_from_types;
 
         self
     }

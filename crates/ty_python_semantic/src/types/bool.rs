@@ -247,6 +247,7 @@ impl<'db> Type<'db> {
 
             Type::Dynamic(_)
             | Type::Divergent(_)
+            | Type::Projection(_)
             | Type::Never
             | Type::Callable(_)
             | Type::TypeIs(_)
