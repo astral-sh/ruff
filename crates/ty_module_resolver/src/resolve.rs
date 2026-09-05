@@ -36,6 +36,7 @@ use std::borrow::Cow;
 use std::fmt;
 use std::iter::FusedIterator;
 
+use compact_str::format_compact;
 use rustc_hash::{FxBuildHasher, FxHashSet};
 
 use ruff_db::PythonFile;
@@ -51,7 +52,7 @@ use ruff_python_ast::{
 use crate::db::Db;
 use crate::module::{Module, ModuleKind};
 use crate::module_name::{ImportingFile, ModuleName};
-use crate::path::{ModulePath, SearchPath, SystemOrVendoredPathRef};
+use crate::path::{ModuleDirectory, ModulePath, SearchPath, SystemOrVendoredPathRef};
 use crate::strategy::MisconfigurationStrategy;
 use crate::typeshed::{TypeshedVersions, vendored_typeshed_versions};
 use crate::{ResolverEnvironment, ResolverFile, SearchPathSettings, SearchPathSettingsError};
@@ -1507,11 +1508,8 @@ impl<'db, 'name> NameResolver<'db, 'name> {
             }));
             // Defer file probes after stdlib until we know that stdlib does not win.
             pending_stub_paths.extend(stub_paths.after_stdlib.iter().filter(|search_path| {
-                candidate_may_exist(
-                    &self.context,
-                    &ModuleResolutionCandidate::stub(search_path),
-                    stub_name,
-                )
+                ModuleDirectory::new(&self.context, search_path.to_module_path())
+                    .may_contain_name(stub_name)
             }));
         }
 
@@ -1701,87 +1699,66 @@ fn resolve_component(
         return Err(());
     }
 
-    if !candidate_may_exist(context, candidate, module_name) {
+    let module_directory = ModuleDirectory::new(context, candidate.path.clone());
+    if !module_directory.may_contain_name(module_name) {
         return Err(());
     }
 
-    let package_path = &mut candidate.path;
-    package_path.push(module_name);
+    let subdirectory = module_directory.child_directory(context, module_name);
+    let init = resolve_file_module_with_filter(&subdirectory, context, "__init__", file_filter);
+    candidate.path = subdirectory.into_path();
 
-    // Check for a regular package first (highest priority)
-    package_path.push("__init__");
-    if let Some(init) = resolve_file_module_with_filter(package_path, context, file_filter) {
-        // Remove the `__init__` component for any potential next step
-        package_path.pop();
-        candidate.py_typed = package_path
-            .py_typed(context)
-            .inherit_parent(candidate.py_typed);
-        if is_legacy_namespace_package(package_path, context, init) {
-            candidate.module = ResolvedModule::LegacyNamespacePackage(init);
+    if let Some(init) = init {
+        // Check for a regular package first (highest priority).
+        candidate.module = if is_legacy_namespace_package(&candidate.path, context, init) {
+            ResolvedModule::LegacyNamespacePackage(init)
         } else {
-            candidate.module = ResolvedModule::RegularPackage(init);
-        }
-        return Ok(());
-    }
-
-    // Check for a file module next
-    package_path.pop();
-
-    if let Some(file_module) = resolve_file_module_with_filter(package_path, context, file_filter) {
-        candidate.module = ResolvedModule::Module(file_module);
-        return Ok(());
-    }
-
-    // Last resort, check if a folder with the given name exists. If so,
-    // then this is a namespace package. We need to skip this check for
-    // typeshed because the `resolve_file_module` can also return `None` if the
-    // `__init__.py` exists but isn't available for the current Python version.
-    // Let's assume that the `xml` module is only available on Python 3.11+ and
-    // we're resolving for Python 3.10:
-    //
-    // * `resolve_file_module("xml/__init__.pyi")` returns `None` even though
-    //   the file exists but the module isn't available for the current Python
-    //   version.
-    // * The check here would now return `true` because the `xml` directory
-    //   exists, resulting in a false positive for a namespace package.
-    //
-    // Since typeshed doesn't use any namespace packages today (May 2025),
-    // simply skip this check which also helps performance. If typeshed
-    // ever uses namespace packages, ensure that this check also takes the
-    // `VERSIONS` file into consideration.
-    // A namespace package is not backed by a file, so it cannot satisfy a stub-only lookup.
-    if file_filter != ComponentFileFilter::StubOnly
-        && !package_path.search_path().is_standard_library()
-        && package_path.is_directory(context)
-    {
-        candidate.py_typed = package_path
+            ResolvedModule::RegularPackage(init)
+        };
+        candidate.py_typed = candidate
+            .path
             .py_typed(context)
             .inherit_parent(candidate.py_typed);
-        candidate.module = ResolvedModule::NamespacePackage;
-        return Ok(());
+        Ok(())
+    } else if let Some(file_module) =
+        resolve_file_module_with_filter(&module_directory, context, module_name, file_filter)
+    {
+        // Check for a file module next
+        candidate.module = ResolvedModule::Module(file_module);
+        Ok(())
+    } else {
+        // Last resort, check if a folder with the given name exists. If so,
+        // then this is a namespace package. We need to skip this check for
+        // typeshed because the `resolve_file_module` can also return `None` if the
+        // `__init__.py` exists but isn't available for the current Python version.
+        // Let's assume that the `xml` module is only available on Python 3.11+ and
+        // we're resolving for Python 3.10:
+        //
+        // * `resolve_file_module("xml/__init__.pyi")` returns `None` even though
+        //   the file exists but the module isn't available for the current Python
+        //   version.
+        // * The check here would now return `true` because the `xml` directory
+        //   exists, resulting in a false positive for a namespace package.
+        //
+        // Since typeshed doesn't use any namespace packages today (May 2025),
+        // simply skip this check which also helps performance. If typeshed
+        // ever uses namespace packages, ensure that this check also takes the
+        // `VERSIONS` file into consideration.
+        // A namespace package is not backed by a file, so it cannot satisfy a stub-only lookup.
+        if file_filter != ComponentFileFilter::StubOnly
+            && !candidate.path.search_path().is_standard_library()
+            && candidate.path.is_directory(context)
+        {
+            candidate.module = ResolvedModule::NamespacePackage;
+            candidate.py_typed = candidate
+                .path
+                .py_typed(context)
+                .inherit_parent(candidate.py_typed);
+            Ok(())
+        } else {
+            Err(())
+        }
     }
-
-    Err(())
-}
-
-/// Uses the parent directory's entries to reject candidates that cannot exist without performing
-/// individual file-system probes for every supported module layout.
-fn candidate_may_exist(
-    context: &ResolverContext,
-    candidate: &ModuleResolutionCandidate,
-    module_name: &str,
-) -> bool {
-    let Some(parent) = candidate.path.to_system_path() else {
-        return true;
-    };
-
-    let Ok(listing) = directory_listing(context.db, &parent) else {
-        return false;
-    };
-
-    // Other suffixes are harmless false positives; the normal probes still determine whether the
-    // module exists.
-    listing.contains_name_with_prefix(module_name)
 }
 
 type ResolvedNames = Vec<ModuleResolutionCandidate>;
@@ -1794,28 +1771,34 @@ pub(super) fn resolve_file_module(
     module: &ModulePath,
     resolver_state: &ResolverContext,
 ) -> Option<File> {
-    resolve_file_module_with_filter(module, resolver_state, ComponentFileFilter::ByMode)
+    let mut parent = module.clone();
+    parent.pop();
+
+    resolve_file_module_with_filter(
+        &ModuleDirectory::new(resolver_state, parent),
+        resolver_state,
+        module.file_stem()?,
+        ComponentFileFilter::ByMode,
+    )
 }
 
 fn resolve_file_module_with_filter(
-    module: &ModulePath,
+    directory: &ModuleDirectory,
     resolver_state: &ResolverContext,
+    name: &str,
     filter: ComponentFileFilter,
 ) -> Option<File> {
     let stub_file = if resolver_state.mode.is_typing() {
-        module.with_pyi_extension().to_file(resolver_state)
+        directory.resolve_file(resolver_state, &format_compact!("{name}.pyi"))
     } else {
         None
     };
+
     if filter == ComponentFileFilter::StubOnly {
         return stub_file;
     }
 
-    stub_file.or_else(|| {
-        module
-            .with_py_extension()
-            .and_then(|path| path.to_file(resolver_state))
-    })
+    stub_file.or_else(|| directory.resolve_file(resolver_state, &format_compact!("{name}.py")))
 }
 
 /// Determines whether a package is a legacy namespace package.
