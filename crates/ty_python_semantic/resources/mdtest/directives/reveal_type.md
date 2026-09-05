@@ -82,10 +82,11 @@ warning[undefined-reveal]: `reveal_type` used without importing it
 info: This is allowed for debugging convenience but will fail at runtime
 ```
 
-## On Python 3.10
+## On Python 3.10 without dependency metadata
 
-On Python versions before 3.11, the fix imports `reveal_type` from `typing_extensions` because
-`typing.reveal_type` is not available.
+On Python versions before 3.11, `reveal_type` requires `typing_extensions`. Without dependency
+metadata, we cannot establish that the project declares a direct dependency on `typing_extensions`,
+so the diagnostic does not offer an import fix.
 
 ```toml
 [environment]
@@ -104,6 +105,56 @@ warning[undefined-reveal]: `reveal_type` used without importing it
 2 | reveal_type(1)  # error: [revealed-type] "Literal[1]"
   | ^^^^^^^^^^^
 info: This is allowed for debugging convenience but will fail at runtime
+```
+
+## On Python 3.10 with a direct `typing_extensions` dependency
+
+Dependency metadata can establish that `typing_extensions` is a direct dependency. The diagnostic
+offers to import `reveal_type` only if the installed runtime module also exports it. (Typeshed's
+stub for `typing_extensions` is not a trustworthy source of information here: the bundled stub
+falsely states that `typing_extensions.reveal_type` has always existed.)
+
+```toml
+[environment]
+python-version = "3.10"
+python = "/.venv"
+
+[dependency-metadata]
+projects = [{ path = "/src", dependencies = ["extensions"] }]
+
+[dependency-metadata.distributions]
+extensions = { name = "typing-extensions" }
+
+[dependency-metadata.module-owners]
+typing_extensions = ["extensions"]
+```
+
+### Available runtime function
+
+This installation of `typing_extensions` provides `reveal_type`, so the diagnostic offers an import
+fix.
+
+`/.venv/<path-to-site-packages>/typing_extensions.py`:
+
+```py
+def reveal_type(value):
+    return value
+```
+
+`main.py`:
+
+```py
+# snapshot: undefined-reveal
+reveal_type(1)  # error: [revealed-type] "Literal[1]"
+```
+
+```snapshot
+warning[undefined-reveal]: `reveal_type` used without importing it
+ --> src/main.py:2:1
+  |
+2 | reveal_type(1)  # error: [revealed-type] "Literal[1]"
+  | ^^^^^^^^^^^
+info: This is allowed for debugging convenience but will fail at runtime
 help: Import `reveal_type` from `typing_extensions`
   |
 1 | # snapshot: undefined-reveal
@@ -111,6 +162,224 @@ help: Import `reveal_type` from `typing_extensions`
 3 | reveal_type(1)  # error: [revealed-type] "Literal[1]"
   |
 note: This is an unsafe fix and may change runtime behavior
+```
+
+### Older runtime module
+
+An installation of `typing_extensions` without `reveal_type` cannot provide the runtime import, even
+if it is declared as a direct dependency and typeshed's bundled stub includes the function. As such,
+no import fix is offered.
+
+`/.venv/<path-to-site-packages>/typing_extensions.py`:
+
+```py
+```
+
+`main.py`:
+
+```py
+# snapshot: undefined-reveal
+reveal_type(1)  # error: [revealed-type] "Literal[1]"
+```
+
+```snapshot
+warning[undefined-reveal]: `reveal_type` used without importing it
+ --> src/main.py:2:1
+  |
+2 | reveal_type(1)  # error: [revealed-type] "Literal[1]"
+  | ^^^^^^^^^^^
+info: This is allowed for debugging convenience but will fail at runtime
+```
+
+### Missing runtime module
+
+A declared dependency on `typing_extensions` does not establish that the library is installed. When
+only typeshed's stub is available and no runtime source is available in `site-packages`, no import
+fix is offered.
+
+`/.venv/<path-to-site-packages>/unrelated.py`:
+
+```py
+```
+
+`main.py`:
+
+```py
+# snapshot: undefined-reveal
+reveal_type(1)  # error: [revealed-type] "Literal[1]"
+```
+
+```snapshot
+warning[undefined-reveal]: `reveal_type` used without importing it
+ --> src/main.py:2:1
+  |
+2 | reveal_type(1)  # error: [revealed-type] "Literal[1]"
+  | ^^^^^^^^^^^
+info: This is allowed for debugging convenience but will fail at runtime
+```
+
+## On Python 3.10 with an indirect `typing_extensions` dependency
+
+An installation of `typing_exetnsions` does not justify adding an import if the containing project
+does not declare a dependency on the library. A parent project's dependency declaration does not
+apply to a nested project.
+
+```toml
+[environment]
+python-version = "3.10"
+python = "/.venv"
+
+[dependency-metadata]
+projects = [
+    { path = "/src", dependencies = ["extensions"] },
+    { path = "/src/member", dependencies = [] },
+]
+
+[dependency-metadata.distributions]
+extensions = { name = "typing-extensions" }
+
+[dependency-metadata.module-owners]
+typing_extensions = ["extensions"]
+```
+
+`/.venv/<path-to-site-packages>/typing_extensions.py`:
+
+```py
+def reveal_type(value):
+    return value
+```
+
+`member/main.py`:
+
+```py
+# snapshot: undefined-reveal
+reveal_type(1)  # error: [revealed-type] "Literal[1]"
+```
+
+```snapshot
+warning[undefined-reveal]: `reveal_type` used without importing it
+ --> src/member/main.py:2:1
+  |
+2 | reveal_type(1)  # error: [revealed-type] "Literal[1]"
+  | ^^^^^^^^^^^
+info: This is allowed for debugging convenience but will fail at runtime
+```
+
+## On Python 3.10 with `typing_extensions` in a dependency group
+
+Files outside the installed package can use direct dependencies from dependency groups. Package code
+cannot rely on those groups, however, so only the test file receives an import fix.
+
+```toml
+[environment]
+python-version = "3.10"
+python = "/.venv"
+
+[dependency-metadata]
+projects = [{ path = "/src", distribution = "app", group-dependencies = ["extensions"] }]
+
+[dependency-metadata.distributions]
+app = { name = "app", editable-path = "/src" }
+extensions = { name = "typing-extensions" }
+
+[dependency-metadata.module-owners]
+app = ["app"]
+typing_extensions = ["extensions"]
+```
+
+`/.venv/<path-to-site-packages>/typing_extensions.py`:
+
+```py
+def reveal_type(value):
+    return value
+```
+
+`app/__init__.py`:
+
+```py
+# snapshot: undefined-reveal
+reveal_type(1)  # error: [revealed-type] "Literal[1]"
+```
+
+```snapshot
+warning[undefined-reveal]: `reveal_type` used without importing it
+ --> src/app/__init__.py:2:1
+  |
+2 | reveal_type(1)  # error: [revealed-type] "Literal[1]"
+  | ^^^^^^^^^^^
+info: This is allowed for debugging convenience but will fail at runtime
+```
+
+`tests/test_app.py`:
+
+```py
+# snapshot: undefined-reveal
+reveal_type(1)  # error: [revealed-type] "Literal[1]"
+```
+
+```snapshot
+warning[undefined-reveal]: `reveal_type` used without importing it
+ --> src/tests/test_app.py:2:1
+  |
+2 | reveal_type(1)  # error: [revealed-type] "Literal[1]"
+  | ^^^^^^^^^^^
+info: This is allowed for debugging convenience but will fail at runtime
+help: Import `reveal_type` from `typing_extensions`
+  |
+1 | # snapshot: undefined-reveal
+2 + from typing_extensions import reveal_type
+3 | reveal_type(1)  # error: [revealed-type] "Literal[1]"
+  |
+note: This is an unsafe fix and may change runtime behavior
+```
+
+## On Python 3.10 with `typing_extensions` shadowed
+
+A local runtime module can shadow an installed dependency even when type checking uses the bundled
+stub. Declaring `typing_extensions` as a dependency does not establish that the import reaches it,
+so no import fix is offered.
+
+```toml
+[environment]
+python-version = "3.10"
+python = "/.venv"
+
+[dependency-metadata]
+projects = [{ path = "/src", dependencies = ["extensions"] }]
+
+[dependency-metadata.distributions]
+extensions = { name = "typing-extensions" }
+
+[dependency-metadata.module-owners]
+typing_extensions = ["extensions"]
+```
+
+`/.venv/<path-to-site-packages>/typing_extensions.py`:
+
+```py
+def reveal_type(value):
+    return value
+```
+
+`typing_extensions.py`:
+
+```py
+```
+
+`main.py`:
+
+```py
+# snapshot: undefined-reveal
+reveal_type(1)  # error: [revealed-type] "Literal[1]"
+```
+
+```snapshot
+warning[undefined-reveal]: `reveal_type` used without importing it
+ --> src/main.py:2:1
+  |
+2 | reveal_type(1)  # error: [revealed-type] "Literal[1]"
+  | ^^^^^^^^^^^
+info: This is allowed for debugging convenience but will fail at runtime
 ```
 
 ## In type-checking blocks

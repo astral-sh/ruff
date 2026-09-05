@@ -9,10 +9,11 @@ use super::{
     CallArguments, CallDunderError, ClassBase, ClassLiteral, GenericAlias, KnownClass,
     ModuleLiteralType, StaticClassLiteral, add_inferred_python_version_hint_to_diagnostic,
 };
+use crate::dependency::is_direct_dependency;
 use crate::diagnostic::{did_you_mean, format_enumeration};
 use crate::importer::{ImportRequest, MembersInScope};
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
-use crate::place::{DefinedPlace, Place, place_from_bindings};
+use crate::place::{DefinedPlace, Place, imported_symbol, place_from_bindings};
 use crate::suppression::FileSuppressionId;
 use crate::types::call::bind::CallableDescription;
 use crate::types::call::{Bindings, CallDiagnosticOverride, CallError};
@@ -54,7 +55,10 @@ use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::fmt::{self, Formatter};
-use ty_module_resolver::{KnownModule, Module, ModuleName, SearchPath, file_to_module};
+use ty_module_resolver::{
+    ImportingFile, KnownModule, Module, ModuleName, SearchPath, file_to_module,
+    resolve_real_shadowable_module,
+};
 use ty_python_core::definition::{Definition, DefinitionKind, ParameterDefinitionNodeKind};
 use ty_python_core::place::{PlaceTable, ScopedPlaceId};
 use ty_python_core::{ProgramFile, global_scope, place_table, use_def_map};
@@ -3055,6 +3059,50 @@ pub(super) fn report_possibly_missing_attribute(
     };
 }
 
+/// Selects a runtime typing module for a fix, checking declared dependencies and installed exports
+/// when the requested member needs a backport.
+fn typing_module_for_fix(
+    context: &InferContext,
+    member: &str,
+    minimum_version: PythonVersion,
+) -> Option<KnownModule> {
+    let db = context.db();
+    let env = context.program_environment();
+    let module = if env.python_version(db) >= minimum_version {
+        KnownModule::Typing
+    } else {
+        KnownModule::TypingExtensions
+    };
+    let model = SemanticModel::new(db, context.program_file());
+    let resolved = model.resolve_module(Some(module.as_str()), 0)?;
+    if !resolved.is_known(db, module)
+        || (module == KnownModule::TypingExtensions
+            && !is_direct_dependency(db, context.program_file(), resolved))
+    {
+        return None;
+    }
+    if module == KnownModule::TypingExtensions {
+        // Bundled stubs can export a member that the installed backport does not provide.
+        // A dependency declaration alone is therefore insufficient for a runtime import.
+        let runtime_module = resolve_real_shadowable_module(
+            db,
+            ImportingFile::File(
+                context.file(),
+                context.program_file().resolver_environment(db),
+            ),
+            &module.name(),
+        )?;
+        let runtime_file = env.program(db).program_file(db, runtime_module.file(db)?);
+        if !imported_symbol(db, env, Some(runtime_file), member, None)
+            .place
+            .is_definitely_bound()
+        {
+            return None;
+        }
+    }
+    Some(module)
+}
+
 pub(super) fn report_undefined_reveal(context: &InferContext, name: &ast::ExprName) {
     let Some(builder) = context.report_lint(&UNDEFINED_REVEAL, name) else {
         return;
@@ -3062,12 +3110,10 @@ pub(super) fn report_undefined_reveal(context: &InferContext, name: &ast::ExprNa
     let mut diagnostic = builder.into_diagnostic("`reveal_type` used without importing it");
     diagnostic.info("This is allowed for debugging convenience but will fail at runtime");
 
-    let db = context.db();
-    let module = if context.program_environment().python_version(db) >= PythonVersion::PY311 {
-        "typing"
-    } else {
-        "typing_extensions"
+    let Some(module) = typing_module_for_fix(context, "reveal_type", PythonVersion::PY311) else {
+        return;
     };
+    let module = module.as_str();
     // `reveal_type` is unbound. Force a `from` import to avoid introducing a module name
     // that might be shadowed, without querying inferred types while emitting a diagnostic.
     let action = context.importer().import(
