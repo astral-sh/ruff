@@ -345,8 +345,8 @@ pub struct GenericContext<'db> {
     #[returns(copy)]
     pub(crate) program: Program<'db>,
 
-    #[returns(ref)]
-    variables_inner: FxOrderMap<BoundTypeVarIdentity<'db>, BoundTypeVarInstance<'db>>,
+    #[returns(deref)]
+    variables_inner: Box<[BoundTypeVarInstance<'db>]>,
 }
 
 pub(super) fn walk_generic_context<'db, V: TypeVisitor<'db> + ?Sized>(
@@ -445,7 +445,9 @@ impl<'db> GenericContext<'db> {
             type_params
                 .into_iter()
                 .map(|variable| (variable.identity(db), variable))
-                .collect::<FxOrderMap<_, _>>(),
+                .collect::<FxOrderMap<_, _>>()
+                .into_values()
+                .collect::<Box<[_]>>(),
         )
     }
 
@@ -457,10 +459,7 @@ impl<'db> GenericContext<'db> {
         Self::from_typevar_instances_in_program(
             db,
             program,
-            self.variables_inner(db)
-                .values()
-                .chain(other.variables_inner(db).values())
-                .copied(),
+            self.variables(db).chain(other.variables(db)),
         )
     }
 
@@ -511,7 +510,12 @@ impl<'db> GenericContext<'db> {
         self,
         db: &'db dyn Db,
     ) -> impl ExactSizeIterator<Item = BoundTypeVarInstance<'db>> + Clone {
-        self.variables_inner(db).values().copied()
+        self.variables_inner(db).iter().copied()
+    }
+
+    fn variable_index(self, db: &'db dyn Db, identity: BoundTypeVarIdentity<'db>) -> Option<usize> {
+        self.variables(db)
+            .position(|variable| variable.identity(db) == identity)
     }
 
     pub(crate) fn contains(
@@ -524,7 +528,7 @@ impl<'db> GenericContext<'db> {
         } else {
             bound_typevar
         };
-        self.variables_inner(db).contains_key(&bound_typevar)
+        self.variable_index(db, bound_typevar).is_some()
     }
     /// Returns `true` if this generic context contains exactly one `ParamSpec` and no other type
     /// variables.
@@ -935,9 +939,11 @@ impl<'db> GenericContext<'db> {
     }
 
     pub(crate) fn is_subset_of(self, db: &'db dyn Db, other: GenericContext<'db>) -> bool {
-        let other_variables = other.variables_inner(db);
-        self.variables(db)
-            .all(|bound_typevar| other_variables.contains_key(&bound_typevar.identity(db)))
+        self.variables(db).all(|bound_typevar| {
+            other
+                .variable_index(db, bound_typevar.identity(db))
+                .is_some()
+        })
     }
 
     pub(crate) fn binds_named_typevar(
@@ -1280,12 +1286,13 @@ impl<'db> Specialization<'db> {
         db: &'db dyn Db,
         generic_context: GenericContext<'db>,
     ) -> Option<Self> {
-        let self_variables = self.generic_context(db).variables_inner(db);
         let self_types = self.types(db);
         let restricted_variables = generic_context.variables(db);
         let restricted_types: Option<Box<[_]>> = restricted_variables
             .map(|variable| {
-                let index = self_variables.get_index_of(&variable.identity(db))?;
+                let index = self
+                    .generic_context(db)
+                    .variable_index(db, variable.identity(db))?;
                 self_types.get(index).copied()
             })
             .collect();
@@ -1344,8 +1351,7 @@ impl<'db> Specialization<'db> {
     ) -> Option<Type<'db>> {
         let index = self
             .generic_context(db)
-            .variables_inner(db)
-            .get_index_of(&bound_typevar.identity(db))?;
+            .variable_index(db, bound_typevar.identity(db))?;
         self.types(db).get(index).copied()
     }
 
@@ -2318,9 +2324,7 @@ impl<'db> ApplySpecialization<'_, 'db> {
                 types,
                 skip,
             } => {
-                let index = generic_context
-                    .variables_inner(db)
-                    .get_index_of(&bound_typevar.identity(db))?;
+                let index = generic_context.variable_index(db, bound_typevar.identity(db))?;
                 if skip.is_some_and(|skip| skip == index) {
                     return Some(Type::Never);
                 }
@@ -2766,17 +2770,13 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     &mut choose_solution,
                 )
             });
-        let types = self
-            .generic_context
-            .variables_inner(db)
-            .iter()
-            .map(|(identity, variable)| {
-                inference
-                    .merged_types
-                    .get(identity)
-                    .copied()
-                    .or_else(|| choose(*variable, None))
-            });
+        let types = self.generic_context.variables(db).map(|variable| {
+            inference
+                .merged_types
+                .get(&variable.identity(db))
+                .copied()
+                .or_else(|| choose(variable, None))
+        });
         self.generic_context.specialize_recursive(db, types)
     }
 
@@ -2859,9 +2859,8 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     ) -> Box<[Option<Type<'db>>]> {
         let db = self.db;
         self.generic_context
-            .variables_inner(db)
-            .keys()
-            .map(|identity| types.get(identity).copied())
+            .variables(db)
+            .map(|variable| types.get(&variable.identity(db)).copied())
             .collect()
     }
 
@@ -3009,9 +3008,9 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         // TODO: This is a solution-level projection. A more principled version would live in the
         // constraint-set solution extraction layer, taking an explicit domain of typevars to solve
         // for and existentially quantifying away the other typevars in that domain.
-        for (identity, variable) in generic_context.variables_inner(db) {
-            if let Some(ty) = types.get_mut(identity) {
-                *ty = self.remove_inferable_typevar_artifacts_from_solution(*variable, *ty);
+        for variable in generic_context.variables(db) {
+            if let Some(ty) = types.get_mut(&variable.identity(db)) {
+                *ty = self.remove_inferable_typevar_artifacts_from_solution(variable, *ty);
             }
         }
 
@@ -3241,20 +3240,20 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             return self.unknown_type_mappings(generic_context);
         };
         generic_context
-            .variables_inner(db)
-            .iter()
-            .filter_map(|(identity, variable)| {
+            .variables(db)
+            .filter_map(|variable| {
+                let identity = variable.identity(db);
                 let mapped_ty = types
-                    .get_mut(identity)
+                    .get_mut(&identity)
                     .map(|accumulator| accumulator.get_or_build(db, self.env));
                 let chosen = match mapped_ty {
                     Some(mapped_ty) => {
-                        let path_bound = PathBound::exact(*variable, mapped_ty);
-                        choose(*variable, Some(&path_bound)).unwrap_or(mapped_ty)
+                        let path_bound = PathBound::exact(variable, mapped_ty);
+                        choose(variable, Some(&path_bound)).unwrap_or(mapped_ty)
                     }
-                    None => choose(*variable, None)?,
+                    None => choose(variable, None)?,
                 };
-                Some((*identity, chosen))
+                Some((identity, chosen))
             })
             .collect()
     }
@@ -3266,9 +3265,8 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         let db = self.db;
         let unknown = generic_context.unknown_specialization(db, None);
         generic_context
-            .variables_inner(db)
-            .keys()
-            .copied()
+            .variables(db)
+            .map(|variable| variable.identity(db))
             .zip(unknown.types(db).iter().copied())
             .collect()
     }
