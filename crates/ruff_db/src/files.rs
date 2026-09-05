@@ -178,6 +178,22 @@ impl Files {
             .map(|entry| *entry.value())
     }
 
+    /// Returns whether a known system file is at or beneath `path`.
+    ///
+    /// Includes directories and missing files. This only inspects cached paths, without accessing
+    /// the filesystem. If `path` itself is unknown, it scans the known paths until finding a match.
+    pub fn has_known_files_under(&self, db: &dyn Db, path: &SystemPath) -> bool {
+        if self.try_system(db, path).is_some() {
+            return true;
+        }
+
+        let path = SystemPath::absolute(path, db.system().current_directory());
+        self.inner
+            .system_by_path
+            .iter()
+            .any(|entry| entry.key().starts_with(&path))
+    }
+
     /// Looks up a vendored file by its path. Returns `Some` if a vendored file for the given path
     /// exists and `None` otherwise.
     fn vendored(&self, db: &dyn Db, path: &VendoredPath) -> Result<File, FileError> {
@@ -781,6 +797,29 @@ mod tests {
 
         let distinct = system_path_to_file(&db, "/foo/baz/bar.py").unwrap();
         assert_ne!(canonical, distinct);
+    }
+
+    #[test]
+    fn known_files_under_path() -> crate::system::Result<()> {
+        let mut db = TestDb::new();
+        db.write_file("/project/file.py", "value = 1")?;
+        db.write_file("/directory/unread.py", "")?;
+        let has_files_under = |path| db.files().has_known_files_under(&db, SystemPath::new(path));
+        assert!(!has_files_under("/project"));
+
+        assert!(system_path_to_file(&db, "/project/file.py").is_ok());
+
+        assert!(has_files_under("/project"));
+        assert!(has_files_under("project/./file.py"));
+        assert!(!has_files_under("/proj"));
+        assert!(!has_files_under("/project/other"));
+
+        db.files().system(&db, SystemPath::new("/missing/file.py"));
+        assert!(has_files_under("/missing"));
+
+        db.files().system(&db, SystemPath::new("/directory"));
+        assert!(has_files_under("/directory"));
+        Ok(())
     }
 
     #[test]
