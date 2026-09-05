@@ -274,6 +274,26 @@ def f(x): ...
 reveal_type(f)  # revealed: str
 ```
 
+Each error in a decorator stack describes the value received at that step. An inner decorator can
+replace the function before a failing call, and an outer decorator can replace the result again.
+
+```py
+def returns_bytes(value: object) -> bytes:
+    return b""
+
+def requires_bytes(value: bytes) -> bool:
+    return bool(value)
+
+# error: [invalid-argument-type] "Expected `bytes`, found `str`"
+@requires_bytes
+# error: [invalid-argument-type] "Expected `int`, found `bytes`"
+@wrong_signature
+@returns_bytes
+def stacked(): ...
+
+reveal_type(stacked)  # revealed: bool
+```
+
 #### Wrong number of arguments
 
 Decorators need to be callable with a single argument. If they are not, we emit a diagnostic:
@@ -294,6 +314,25 @@ def takes_no_argument() -> str:
 # error: [too-many-positional-arguments] "Too many positional arguments to function `takes_no_argument`: expected 0, got 1"
 @takes_no_argument
 def g(x): ...
+```
+
+#### No matching overload
+
+An overloaded decorator is rejected when none of its signatures accepts the function being
+decorated.
+
+```py
+from typing import overload
+
+@overload
+def scalar(value: int) -> None: ...
+@overload
+def scalar(value: str) -> None: ...
+def scalar(value: int | str) -> None: ...
+
+# error: [no-matching-overload]
+@scalar
+def f() -> None: ...
 ```
 
 ### Class, with wrong signature, used as a decorator

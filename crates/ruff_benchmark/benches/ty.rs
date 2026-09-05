@@ -918,6 +918,78 @@ class Chain[T](Protocol):
     }
 }
 
+/// Regression benchmark for ty#4269: inherited receiver binding with nested type variables.
+///
+/// The nominal relation constrains `T` inside the source's union argument. Ignoring that
+/// evidence repeatedly expands the recursive overloads while binding `chain`.
+fn benchmark_nested_recursive_protocol_receiver(criterion: &mut Criterion) {
+    setup_rayon();
+
+    let code = r#"
+from __future__ import annotations
+
+from typing import Protocol, overload
+
+class Chain[T](Protocol):
+    def value(self) -> T: ...
+    @overload
+    def chain[S, O1](self: Chain[S], o1: O1, /) -> Chain[S | O1]: ...
+    @overload
+    def chain[S, O1, O2](self: Chain[S], o1: O1, o2: O2, /) -> Chain[S | O1 | O2]: ...
+    @overload
+    def chain[S, O1, O2, O3](self: Chain[S], o1: O1, o2: O2, o3: O3, /) -> Chain[S | O1 | O2 | O3]: ...
+    def chain[S, O](self: Chain[S], *others: O) -> Chain[S | O]: ...
+
+class Concrete[T](Chain[T]): ...
+
+def check[T, S](base: Concrete[T | list[T]], *others: S) -> None:
+    base.chain(*others)
+"#;
+
+    criterion.bench_function("ty_micro[nested_recursive_protocol_receiver]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(code),
+            |case| assert_eq!(case.db.check().len(), 0),
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+/// Regression benchmark for ty#4269: materialized recursive protocol comparisons.
+///
+/// Comparing the tuple-specific receiver with the gradual overload can repeatedly expand
+/// `child` into deeper tuple specializations. The finite `value` requirement establishes the
+/// needed constraints without that expansion.
+fn benchmark_materialized_recursive_protocol_overload(criterion: &mut Criterion) {
+    setup_rayon();
+
+    let code = r#"
+from __future__ import annotations
+
+from collections.abc import Callable
+from typing import Any, Protocol, overload
+
+class Chain[T](Protocol):
+    def value(self) -> T: ...
+    def child(self) -> Chain[tuple[T]]: ...
+    @overload
+    def map_star[A, B, R](self: Chain[tuple[A, B]], callback: Callable[[A, B], R]) -> Chain[R]: ...
+    @overload
+    def map_star[R](self: Chain[tuple[Any, ...]], callback: Callable[..., R]) -> Chain[R]: ...
+
+def check(value: Chain[tuple[int, str]]) -> None:
+    value.map_star(lambda first, second: 1)
+"#;
+
+    criterion.bench_function("ty_micro[materialized_recursive_protocol_overload]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(code),
+            |case| assert_eq!(case.db.check().len(), 0),
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 /// Regression benchmark for large calls to a gradual variadic tail.
 ///
 /// Without the gradual-call shortcut, every positional argument type is folded into the same
@@ -980,6 +1052,45 @@ accepts_objects(
     code.push_str(")\n");
 
     criterion.bench_function("ty_micro[vararg_parameter_type_accumulation]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+/// Regression benchmark for contextual inference of `TypedDict.get` with a large literal union.
+///
+/// Passing the result to a typed function should not retry inference against each literal in the
+/// expected type: <https://github.com/astral-sh/ty/issues/4419>.
+fn benchmark_typed_dict_get_large_literal_union(criterion: &mut Criterion) {
+    const NUM_LITERAL_MEMBERS: usize = 1024;
+
+    setup_rayon();
+
+    let mut code = "from typing import Literal, TypedDict\n\nIcon = Literal[\n".to_string();
+    for i in 0..NUM_LITERAL_MEMBERS {
+        writeln!(&mut code, r#"    "icon_{i}","#).ok();
+    }
+    code.push_str(
+        r#"]
+
+class Message(TypedDict, total=False):
+    icon: Icon
+
+def accept_icon(icon: Icon | None) -> None: ...
+
+def check(message: Message, default: Icon | None) -> None:
+    accept_icon(message.get("icon", default))
+"#,
+    );
+
+    criterion.bench_function("ty_micro[typed_dict_get_large_literal_union]", |b| {
         b.iter_batched_ref(
             || setup_micro_case(&code),
             |case| {
@@ -1481,6 +1592,89 @@ fn benchmark_repeated_statement_calls(criterion: &mut Criterion) {
     }
 }
 
+/// Exercises repeated control-flow gates with and without interleaved statement-call predicates.
+///
+/// Each suppressing context manager merges the old binding with a reassigned binding. Repeating
+/// this pattern can accumulate unnecessary narrowing gates and repeatedly evaluate the same
+/// reachability suffixes, while interleaved calls can make simple checkpoint selection miss every
+/// suppression predicate.
+fn benchmark_repeated_suppressing_context_managers(criterion: &mut Criterion) {
+    setup_rayon();
+
+    let cases = [
+        (
+            "ty_micro[repeated_suppressing_context_managers]",
+            "    with suppress(ValueError):\n        value = may_raise(value)\n",
+            320,
+        ),
+        (
+            "ty_micro[repeated_suppressing_context_managers_interleaved_calls]",
+            "    with suppress(ValueError):\n        value = may_raise(value)\n    may_raise(value)\n",
+            160,
+        ),
+    ];
+
+    for (name, statement, repetitions) in cases {
+        let mut code = String::from(
+            "from contextlib import suppress\n\ndef may_raise(value: int) -> int:\n    return value\n\ndef f() -> int:\n    value = 0\n",
+        );
+        code.push_str(&statement.repeat(repetitions));
+        code.push_str("    return value\n");
+
+        criterion.bench_function(name, |b| {
+            b.iter_batched_ref(
+                || setup_micro_case(&code),
+                |case| {
+                    let Case { db } = case;
+                    let result = db.check();
+                    assert_eq!(result.len(), 0);
+                },
+                BatchSize::SmallInput,
+            );
+        });
+    }
+}
+
+/// Exercises overlapping narrowing histories for repeated conditional assignments.
+///
+/// Every `isinstance` check narrows the same place, while each conditional assignment preserves
+/// the earlier binding on another path. Suppressing context managers add additional path gates to
+/// the same narrowing histories.
+fn benchmark_repeated_narrowed_assignments(criterion: &mut Criterion) {
+    setup_rayon();
+
+    let cases = [
+        (
+            "ty_micro[repeated_narrowed_assignments]",
+            "    if isinstance(value, int):\n        value = may_raise(value)\n",
+        ),
+        (
+            "ty_micro[repeated_narrowed_assignments_suppressing_context_managers]",
+            "    with suppress(ValueError):\n        if isinstance(value, int):\n            value = may_raise(value)\n",
+        ),
+    ];
+
+    for (name, statement) in cases {
+        let mut code = String::from(
+            "from contextlib import suppress\n\ndef may_raise(value: int) -> int:\n    return value\n\ndef f(value: int | str) -> int | str:\n",
+        );
+        code.push_str(&statement.repeat(320));
+        code.push_str("    return value\n");
+
+        criterion.bench_function(name, |b| {
+            b.iter_batched_ref(
+                || setup_micro_case(&code),
+                |case| {
+                    let Case { db } = case;
+                    let result = db.check();
+                    assert_eq!(result.len(), 0);
+                },
+                BatchSize::SmallInput,
+            );
+        });
+    }
+}
+
 struct ProjectBenchmark<'a> {
     project: InstalledProject<'a>,
     fs: MemoryFileSystem,
@@ -1692,7 +1886,10 @@ criterion_group!(
     benchmark_many_enum_members_2,
     benchmark_many_protocol_members_mismatch,
     benchmark_inherited_recursive_protocol,
+    benchmark_nested_recursive_protocol_receiver,
+    benchmark_materialized_recursive_protocol_overload,
     benchmark_vararg_parameter_type_accumulation,
+    benchmark_typed_dict_get_large_literal_union,
     benchmark_very_large_tuple,
     benchmark_large_union_narrowing,
     benchmark_large_isinstance_narrowing,
@@ -1703,6 +1900,8 @@ criterion_group!(
     benchmark_literal_or_pattern_reachability,
     benchmark_typeis_narrowing,
     benchmark_repeated_statement_calls,
+    benchmark_repeated_suppressing_context_managers,
+    benchmark_repeated_narrowed_assignments,
 );
 criterion_group!(project, anyio, attrs, hydra, datetype);
 criterion_main!(check_file, micro, project);

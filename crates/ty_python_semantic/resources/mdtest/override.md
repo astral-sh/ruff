@@ -1055,10 +1055,12 @@ class MyMapping(MutableMapping[KT, VT]):
     def __len__(self) -> int:
         raise NotImplementedError
     def update(self, arg: MapOrItems[KT, VT] = (), /, **kw: VT) -> None: ...
+```
 
-# TODO: We should emit an `invalid-method-override` diagnostic on
-# `DeferredChild1.method`. The `DeferredChild1`-specific overload applies to
-# this subclass, so its override cannot remove the `extra` parameter.
+The `DeferredChild1`-specific overload applies on that subclass, so its override cannot remove the
+`extra` parameter:
+
+```py
 class DeferredBase:
     @overload
     def method(self) -> None: ...
@@ -1067,7 +1069,7 @@ class DeferredBase:
     def method(self, extra: str = "") -> None: ...
 
 class DeferredChild1(DeferredBase):
-    def method(self) -> None: ...
+    def method(self) -> None: ...  # error: [invalid-method-override]
 
 # TODO: A strict Liskov check would emit an `invalid-method-override`
 # diagnostic here too. A subclass could inherit from both `DeferredChild1`

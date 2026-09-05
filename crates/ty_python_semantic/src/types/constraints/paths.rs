@@ -11,7 +11,8 @@ use rustc_hash::FxHashSet;
 
 use crate::types::constraints::sequents::{Sequent, SequentMap};
 use crate::types::constraints::{
-    ConstraintAssignment, ConstraintId, ConstraintSetStorage, Node, NodeId, PathVisitor, TypeVarId,
+    ConstraintAssignment, ConstraintId, ConstraintSetStorage, Node, NodeId, PathVisitor,
+    SourceOrderId, TypeVarId,
 };
 use crate::{Db, FxIndexMap, ProgramEnvironment};
 
@@ -130,6 +131,64 @@ impl Ord for AssignmentFuel {
 }
 
 impl PathAssignments {
+    /// Orders projected facts by replaying the rules already discovered during this walk.
+    ///
+    /// Projection emits derived facts in TDD branch order. Retaining that order can prevent
+    /// recursive relations from converging when an equivalent diagram is rebuilt in a different
+    /// arena. Start with the original source order and visit each rule's consequences in order,
+    /// including intermediate facts that are themselves projected away. This only replays cached
+    /// rules; it does not derive more facts or change the walk's assignments and fuel.
+    pub(super) fn projection_source_order(
+        &self,
+        storage: &mut ConstraintSetStorage<'_>,
+        original_source_order: Option<SourceOrderId>,
+        derived_source_order: Option<SourceOrderId>,
+    ) -> Option<SourceOrderId> {
+        let emitted = storage.calculate_source_orders(derived_source_order);
+        if emitted.is_empty() {
+            return None;
+        }
+        let mut ordered = storage.calculate_source_orders(original_source_order);
+        ordered.retain(|constraint| self.discovered.contains_key(constraint));
+        let mut index = 0;
+        // Once all emitted facts have positions, later appends cannot change their relative order.
+        while !emitted.is_subset(&ordered)
+            && let Some(constraint) = ordered.get_index(index).copied()
+        {
+            if self.discovered.get(&constraint) == Some(&true)
+                && let Some(map) = storage.single_sequent_cache.get(&constraint)
+            {
+                ordered.extend(
+                    map.consequents()
+                        .filter(|constraint| self.discovered.contains_key(constraint)),
+                );
+            }
+            for earlier_index in 0..index {
+                let earlier = ordered[earlier_index];
+                // Pair rules are not commutative. Replay the orientation used by this walk,
+                // which can differ from the order in which the replay reaches its inputs.
+                let pair = [(earlier, constraint), (constraint, earlier)]
+                    .into_iter()
+                    .find(|pair| self.elaborated_pairs.contains(pair));
+                if let Some(map) = pair.and_then(|pair| storage.pair_sequent_cache.get(&pair)) {
+                    ordered.extend(
+                        map.consequents()
+                            .filter(|constraint| self.discovered.contains_key(constraint)),
+                    );
+                }
+            }
+            index += 1;
+        }
+        debug_assert!(emitted.is_subset(&ordered));
+        ordered
+            .into_iter()
+            .filter(|constraint| emitted.contains(constraint))
+            .fold(None, |source_order, constraint| {
+                let next = storage.constraint_source_order(constraint);
+                storage.ordered_source_order(source_order, Some(next))
+            })
+    }
+
     pub(super) fn new(
         constraints: impl IntoIterator<Item = ConstraintId>,
         independent_typevars: FxHashSet<TypeVarId>,

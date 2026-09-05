@@ -34,8 +34,7 @@ use ty_python_core::definition::docstring_from_body;
 use ty_python_core::platform::PythonPlatform;
 use ty_python_core::scope::ScopeId;
 use ty_python_core::{
-    BindingWithConstraintsIterator, DeclarationsIterator, FileScopeId, attribute_scopes,
-    semantic_index,
+    BindingWithConstraints, DeclarationsIterator, FileScopeId, attribute_scopes, semantic_index,
 };
 pub use ty_site_packages::{
     PythonEnvironment, PythonVersionFileSource, PythonVersionSource, PythonVersionWithSource,
@@ -49,11 +48,13 @@ pub use types::ide_support::{
     type_hierarchy_supertypes,
 };
 pub use types::{
-    DisplaySettings, FixtureBinding, ProgramEnvironment, TypeQualifiers,
-    fixture_bindings_for_parameter,
+    DisplaySettings, FixtureBinding, FixtureExposure, FixtureNameSource, ProgramEnvironment,
+    TypeQualifiers, fixture_bindings_for_parameter, fixture_exposures_for_definition,
+    pytest_global_plugin_files,
 };
 
 mod db;
+pub mod dependency;
 mod dunder_all;
 mod fixes;
 mod lexical_name_path;
@@ -133,20 +134,35 @@ impl Default for AnalysisSettings {
 /// Returns all attribute assignments (and their method scope IDs) with a symbol name matching
 /// the one given for a specific class body scope.
 ///
+/// Loop headers are excluded: rebinding an attribute's receiver can create a loop header for the
+/// attribute without assigning to the attribute itself.
+///
 /// Only call this when doing type inference on the same file as `class_body_scope`, otherwise it
 /// introduces a direct dependency on that file's AST.
 pub(crate) fn attribute_assignments<'db, 's>(
     db: &'db dyn Db,
     class_body_scope: ScopeId<'db>,
     name: &'s str,
-) -> impl Iterator<Item = (BindingWithConstraintsIterator<'db, 'db>, FileScopeId)> + use<'s, 'db> {
+) -> impl Iterator<
+    Item = (
+        impl Iterator<Item = BindingWithConstraints<'db, 'db>>,
+        FileScopeId,
+    ),
+> + use<'s, 'db> {
     let index = semantic_index(db, class_body_scope.program_file(db));
 
-    attribute_scopes(db, class_body_scope).filter_map(|function_scope_id| {
+    attribute_scopes(db, class_body_scope).filter_map(move |function_scope_id| {
         let place_table = index.place_table(function_scope_id);
         let member = place_table.member_id_by_instance_attribute_name(name)?;
         let use_def = index.use_def_map(function_scope_id);
-        Some((use_def.reachable_member_bindings(member), function_scope_id))
+        let assignments = use_def
+            .reachable_member_bindings(member)
+            .filter(move |binding| {
+                !binding
+                    .binding
+                    .is_defined_and(|definition| definition.kind(db).is_loop_header())
+            });
+        Some((assignments, function_scope_id))
     })
 }
 

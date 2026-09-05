@@ -1156,8 +1156,9 @@ def _(answer: CoupledInequality):
 
 ## Recursive aliases containing enum domains
 
-Comparisons involving recursive enum aliases remain valid. Comparing against a specific enum member
-narrows both branches to their remaining members while preserving any `NewType` tag.
+Comparisons involving invalid recursive enum aliases still use their non-recursive members.
+Comparing against a specific enum member narrows both branches to their remaining members while
+preserving any `NewType` tag.
 
 ```toml
 [environment]
@@ -1172,13 +1173,13 @@ class EnumValue(Enum):
     VALUE = 1
     OTHER = 2
 
-type Recursive = EnumValue | Recursive
+type Recursive = EnumValue | Recursive  # error: [cyclic-type-alias-definition]
 
 def _(left: Recursive, right: EnumValue):
     reveal_type(left == right)  # revealed: bool
 
 BrandedEnumValue = NewType("BrandedEnumValue", EnumValue)
-type RecursiveBrand = BrandedEnumValue | RecursiveBrand
+type RecursiveBrand = BrandedEnumValue | RecursiveBrand  # error: [cyclic-type-alias-definition]
 
 def compare_recursive_brand_to_member(left: RecursiveBrand) -> None:
     if left == EnumValue.VALUE:
@@ -1204,7 +1205,7 @@ class Number(IntEnum):
     TWO = 2
 
 BrandedNumber = NewType("BrandedNumber", Number)
-type Changing[T] = T | Changing[bool]
+type Changing[T] = T | Changing[bool]  # error: [cyclic-type-alias-definition]
 
 def compare_changing_specialization(value: Changing[BrandedNumber]) -> None:
     if value == Number.ONE:
@@ -1219,8 +1220,8 @@ aliases does not remove their shared `bool` alternative.
 ```py
 from ty_extensions import Intersection
 
-type RecursiveWithBool = RecursiveWithBrand | bool
-type RecursiveWithBrand = RecursiveWithBool | BrandedNumber
+type RecursiveWithBool = RecursiveWithBrand | bool  # error: [cyclic-type-alias-definition]
+type RecursiveWithBrand = RecursiveWithBool | BrandedNumber  # error: [cyclic-type-alias-definition]
 
 def compare_mutually_recursive_intersection(
     value: Intersection[RecursiveWithBool, RecursiveWithBrand],

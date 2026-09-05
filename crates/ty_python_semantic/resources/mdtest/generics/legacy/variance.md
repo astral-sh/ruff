@@ -296,6 +296,296 @@ equivalent to) each other.
 
 It is not possible to construct a legacy typevar that is explicitly bivariant.
 
+## Variance in method signatures
+
+Methods must respect the declared variance of the class's type variables. Covariant variables can be
+returned but cannot be consumed, while contravariant variables can be consumed but not returned.
+
+```py
+from typing import Callable, Generic, TypeVar
+
+T_co = TypeVar("T_co", covariant=True)
+T_contra = TypeVar("T_contra", contravariant=True)
+
+class Covariant(Generic[T_co]):
+    def returns(self) -> T_co:
+        raise NotImplementedError
+
+    # snapshot: invalid-generic-class
+    def accepts(self, value: T_co) -> None: ...
+    def accepts_callback(self, callback: Callable[[T_co], None]) -> None: ...
+
+class Contravariant(Generic[T_contra]):
+    def accepts(self, value: T_contra) -> None: ...
+
+    # error: [invalid-generic-class]
+    def returns(self) -> T_contra:
+        raise NotImplementedError
+```
+
+```snapshot
+error[invalid-generic-class]: Variance of type variable `T_co` is incompatible with method `accepts`
+  --> src/mdtest_snippet.py:11:30
+   |
+11 |     def accepts(self, value: T_co) -> None: ...
+   |                              ^^^^
+info: Type variable `T_co` is declared as covariant, but this method requires it to be contravariant
+```
+
+Returning a mutable `list[T_co]` requires invariance, as does using `T_co` in both parameter and
+return positions. In `identity`, the callback parameter and return annotation respect covariance;
+only the `value` parameter violates it.
+
+```py
+class InvariantMethods(Generic[T_co]):
+    # snapshot: invalid-generic-class
+    def values(self) -> list[T_co]:
+        raise NotImplementedError
+
+    # snapshot: invalid-generic-class
+    def identity(self, callback: Callable[[T_co], None], value: T_co) -> T_co:
+        return value
+```
+
+```snapshot
+error[invalid-generic-class]: Variance of type variable `T_co` is incompatible with method `values`
+  --> src/mdtest_snippet.py:22:25
+   |
+22 |     def values(self) -> list[T_co]:
+   |                         ^^^^^^^^^^
+info: Type variable `T_co` is declared as covariant, but this method requires it to be invariant
+
+
+error[invalid-generic-class]: Variance of type variable `T_co` is incompatible with method `identity`
+  --> src/mdtest_snippet.py:26:65
+   |
+26 |     def identity(self, callback: Callable[[T_co], None], value: T_co) -> T_co:
+   |                                                                 ^^^^
+info: Type variable `T_co` is declared as covariant, but this method requires it to be invariant
+```
+
+The same variable can be bound independently to a generic method. Its declared variance does not
+apply to that method binding. A nested function is not part of the class's interface either.
+
+```py
+class GenericMethod(Generic[T_contra]):
+    def identity(self, value: T_co) -> T_co:
+        return value
+
+class NestedFunction(Generic[T_co]):
+    def method(self) -> None:
+        def accepts(value: T_co) -> None: ...
+```
+
+Class methods also respect the declared variance. A static method has no receiver, so its first
+parameter still contributes to its variance.
+
+```py
+class ClassMethods(Generic[T_co]):
+    @classmethod
+    def returns(cls) -> T_co:
+        raise NotImplementedError
+
+    @classmethod
+    # error: [invalid-generic-class]
+    def accepts(cls, value: T_co) -> None: ...
+    @staticmethod
+    # error: [invalid-generic-class]
+    def static_accepts(value: T_co) -> None: ...
+```
+
+## Variance in generic methods
+
+A method's independent type variable can accept arguments outside the class's covariant value type.
+The `V_co` arm in the parameter annotation is redundant: `T` already accepts any argument, and the
+result includes both types. This signature does not require the class to be invariant.
+
+```py
+from typing import Generic, TypeVar
+
+V_co = TypeVar("V_co", covariant=True)
+T = TypeVar("T")
+
+class Covariant(Generic[V_co]):
+    def identity(self, value: V_co | T) -> V_co | T:
+        return value
+```
+
+Reusing `T` in another parameter can constrain which arguments the method accepts, so these generic
+methods do not always respect covariance. TODO: We defer variance checking for independently generic
+methods until we can account for these relationships, and miss this invalid use of `V_co`.
+
+```py
+class Correlated(Generic[V_co]):
+    # TODO: Emit `invalid-generic-class`; this use of `V_co` requires contravariance.
+    def get(self, value: V_co | T, other: T) -> T:
+        raise NotImplementedError
+```
+
+## Overloads with generic fallbacks
+
+An overload that consumes a covariant type variable can be covered by a generic fallback. The second
+overload below accepts the first overload's arguments with the same result when `T` is `T_co`. The
+complete method therefore respects covariance.
+
+```py
+from typing import Generic, TypeVar, overload
+
+T_co = TypeVar("T_co", covariant=True)
+T = TypeVar("T")
+
+class Sequence(Generic[T_co]):
+    @overload
+    def __add__(self, value: tuple[T_co, ...]) -> tuple[T_co, ...]: ...
+    @overload
+    def __add__(self, value: tuple[T, ...]) -> tuple[T_co | T, ...]: ...
+    def __add__(self, value: tuple[object, ...]) -> tuple[object, ...]:
+        return value
+```
+
+## Overloaded mapping defaults
+
+A mapping can similarly accept its covariant value type as a default when another overload accepts
+arbitrary defaults. The generic overload covers the specialized default without losing its result
+type. The key parameter is invariant and does not affect this value-variance relationship.
+
+`mapping.pyi`:
+
+```pyi
+from typing import Generic, TypeVar, overload
+
+K = TypeVar("K")
+V_co = TypeVar("V_co", covariant=True)
+T = TypeVar("T")
+
+class Mapping(Generic[K, V_co]):
+    @overload
+    def get(self, key: K) -> V_co | None: ...
+    @overload
+    def get(self, key: K, default: V_co) -> V_co: ...
+    @overload
+    def get(self, key: K, default: T) -> V_co | T: ...
+```
+
+## Variance in overloaded methods
+
+TODO: We defer variance checking for overloaded methods until we can account for the complete
+overload set. This also means we miss invalid uses of covariant variables that no other overload
+covers.
+
+```py
+from typing import Generic, TypeVar, overload
+
+T_co = TypeVar("T_co", covariant=True)
+
+class Overloaded(Generic[T_co]):
+    @overload
+    # TODO: Emit `invalid-generic-class`; this use of `T_co` requires contravariance.
+    def method(self, value: T_co) -> int: ...
+    @overload
+    def method(self, value: int, other: int) -> int: ...
+    def method(self, value: object, other: int = 0) -> int:
+        return 0
+```
+
+## Variance with explicit receivers
+
+Annotating the receiver with `Self` or the class's own type parameters does not restrict which
+specializations can call the method. These annotations do not affect variance checking, for either
+instance methods or class methods.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from typing import Generic, Self, TypeVar
+
+T_co = TypeVar("T_co", covariant=True)
+
+class Unrestricted(Generic[T_co]):
+    # error: [invalid-generic-class]
+    def accepts_self(self: Self, value: T_co) -> None: ...
+    # error: [invalid-generic-class]
+    def accepts_identity(self: "Unrestricted[T_co]", value: T_co) -> None: ...
+    def returns(self: "Unrestricted[T_co]") -> T_co:
+        raise NotImplementedError
+
+    @classmethod
+    # error: [invalid-generic-class]
+    def class_accepts_self(cls: type[Self], value: T_co) -> None: ...
+    @classmethod
+    # error: [invalid-generic-class]
+    def class_accepts_identity(cls: type["Unrestricted[T_co]"], value: T_co) -> None: ...
+    @classmethod
+    def class_returns(cls: type[Self]) -> T_co:
+        raise NotImplementedError
+```
+
+A specialized receiver does not in general make an incompatible use of a covariant type variable
+valid. These methods still consume the class's type variable.
+
+```py
+class Restricted(Generic[T_co]):
+    # error: [invalid-generic-class]
+    def accepts(self: "Restricted[int]", value: T_co) -> None: ...
+    @classmethod
+    # error: [invalid-generic-class]
+    def class_accepts(cls: type["Restricted[int]"], value: T_co) -> None: ...
+```
+
+The receiver can sometimes make a use of the type variable redundant. Here, `T_co` must be a subtype
+of `int`, so `T_co | int` accepts exactly the same arguments as `int`. This method does not
+constrain the class's variance.
+
+```py
+class Redundant(Generic[T_co]):
+    # TODO: Do not report an error; the receiver makes the `T_co` arm redundant.
+    # error: [invalid-generic-class]
+    def accepts(self: "Redundant[int]", value: T_co | int) -> None: ...
+```
+
+## Variance in decorated methods
+
+A decorator can replace a method with a value that does not consume the class's type variable.
+Variance checking should account for the exposed attribute, rather than the original signature.
+
+```py
+from typing import Generic, TypeVar
+
+T_co = TypeVar("T_co", covariant=True)
+
+def replace(func: object) -> int:
+    return 1
+
+class Decorated(Generic[T_co]):
+    @replace
+    # TODO: Do not report an error; the decorator replaces the method with an `int`.
+    # error: [invalid-generic-class]
+    def method(self, value: T_co) -> None: ...
+
+reveal_type(Decorated[int].method)  # revealed: int
+```
+
+## Variance in deleted methods
+
+A method deleted in the class body is not part of the class's interface and does not constrain its
+variance.
+
+```py
+from typing import Generic, TypeVar
+
+T_co = TypeVar("T_co", covariant=True)
+
+class Deleted(Generic[T_co]):
+    # TODO: Do not report an error; the method is absent from the final class interface.
+    # error: [invalid-generic-class]
+    def method(self, value: T_co) -> None: ...
+
+    del method
+```
+
 ## Generic protocol variance
 
 A protocol's declared variance must match whether its members consume or produce that type variable.
@@ -580,42 +870,337 @@ class Sink(Protocol[T_contra]):
     def write(self, reader: NestedReader[T_contra]) -> None: ...
 ```
 
+## Unused parameters of independent protocols
+
+`Marker`'s unused type parameter is inferred as bivariant, which falls back to covariance. Accepting
+`Marker[T]` therefore makes `Sink` contravariant in `T`, even though `Marker`'s members never use
+that parameter.
+
+```py
+from typing import Protocol, TypeVar
+
+T_co = TypeVar("T_co", covariant=True)
+T_contra = TypeVar("T_contra", contravariant=True)
+
+class Marker(Protocol[T_co]):
+    def ready(self) -> bool: ...
+
+class Sink(Protocol[T_contra]):
+    def accept(self, value: Marker[T_contra]) -> None: ...
+
+# error: [invalid-protocol] "Type variable `T_co` in protocol `CovariantSink` should be contravariant, but is covariant"
+class CovariantSink(Protocol[T_co]):
+    def accept(self, value: Marker[T_co]) -> None: ...
+```
+
 ## Recursive protocol variance
 
-Declared-variance validation still skips recursive protocol interfaces. Each protocol below exposes
-a method that consumes its type parameter, either directly or through another protocol, so a
-covariant declaration is invalid.
+Recursive protocol references use the variance inferred from their interfaces, so an incorrect
+declaration cannot justify itself. A protocol that only produces its type parameter remains
+covariant when it returns another instance of itself; a protocol that only consumes the parameter
+remains contravariant.
+
+```py
+from typing import Protocol, TypeVar
+
+T = TypeVar("T")
+T_co = TypeVar("T_co", covariant=True)
+T_contra = TypeVar("T_contra", contravariant=True)
+
+class Source(Protocol[T_co]):
+    def read(self) -> T_co: ...
+    def next(self) -> "Source[T_co]": ...
+
+class Sink(Protocol[T_contra]):
+    def write(self, value: T_contra) -> None: ...
+    def next(self) -> "Sink[T_contra]": ...
+
+# error: [invalid-protocol] "Type variable `T` in protocol `InvariantSource` should be covariant, but is invariant"
+class InvariantSource(Protocol[T]):
+    def read(self) -> T: ...
+    def next(self) -> "InvariantSource[T]": ...
+
+# error: [invalid-protocol] "Type variable `T_co` in protocol `Recursive` should be contravariant, but is covariant"
+class Recursive(Protocol[T_co]):
+    def write(self, value: T_co) -> None: ...
+    def next(self) -> "Recursive[T_co]": ...
+```
+
+An expanding recursive reference composes variance with its type arguments. `list[T_co]` makes
+`Expanding` invariant even though its only direct use of `T_co` is a method parameter.
+
+```py
+# error: [invalid-protocol] "Type variable `T_co` in protocol `Expanding` should be invariant, but is covariant"
+class Expanding(Protocol[T_co]):
+    def write(self, value: T_co) -> None: ...
+    def next(self) -> "Expanding[list[T_co]]": ...
+```
+
+Passing the recursive protocol as an argument introduces the opposite variance as well. Together
+with the direct return of `T_co`, this makes the protocol invariant.
+
+```py
+# error: [invalid-protocol] "Type variable `T_co` in protocol `RecursiveArgument` should be invariant, but is covariant"
+class RecursiveArgument(Protocol[T_co]):
+    def combine(self, other: "RecursiveArgument[T_co]") -> T_co: ...
+```
+
+The input position in `Left.write` also makes `Right` contravariant through its return type. Both
+covariant declarations are rejected.
+
+```py
+# error: [invalid-protocol] "Type variable `T_co` in protocol `Left` should be contravariant, but is covariant"
+class Left(Protocol[T_co]):
+    def write(self, value: T_co) -> None: ...
+    def right(self) -> "Right[T_co]": ...
+
+# error: [invalid-protocol] "Type variable `T_co` in protocol `Right` should be contravariant, but is covariant"
+class Right(Protocol[T_co]):
+    def left(self) -> Left[T_co]: ...
+```
+
+## Recursive protocols with independent dependencies
+
+Mutually recursive protocols infer their variance together, but still honor the declared variance of
+independent protocols. `Left` consumes the covariant `Marker[T]`, which also makes `Right`
+contravariant through its return type.
+
+```py
+from typing import Protocol, TypeVar
+
+T_co = TypeVar("T_co", covariant=True)
+T_contra = TypeVar("T_contra", contravariant=True)
+
+class Marker(Protocol[T_co]):
+    def ready(self) -> bool: ...
+
+class Left(Protocol[T_contra]):
+    def accept(self, value: Marker[T_contra]) -> None: ...
+    def right(self) -> "Right[T_contra]": ...
+
+class Right(Protocol[T_contra]):
+    def left(self) -> Left[T_contra]: ...
+```
+
+## Recursive protocols without observable type parameters
+
+A parameter used only in recursive references has no observable input or output position. We accept
+a covariant declaration, just as for an unused parameter, even when the recursive reference is a
+method argument. Consumers still use that declared covariance when inferring their own variance.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol, TypeVar
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+T_co = TypeVar("T_co", covariant=True)
+
+class Recursive(Protocol[T_co]):
+    def accept(self, other: "Recursive[T_co]") -> None: ...
+
+class Source[T]:
+    def read(self) -> Recursive[T]:
+        raise NotImplementedError
+
+static_assert(is_subtype_of(Source[int], Source[object]))
+static_assert(not is_subtype_of(Source[object], Source[int]))
+
+class Sink[T]:
+    def write(self, value: Recursive[T]) -> None: ...
+
+static_assert(is_subtype_of(Sink[object], Sink[int]))
+static_assert(not is_subtype_of(Sink[int], Sink[object]))
+```
+
+An independent protocol consumer also uses `Recursive`'s declared covariance. The recursive
+references within `Recursive` do not make it mutually recursive with `ProtocolSink`.
+
+```py
+T_contra = TypeVar("T_contra", contravariant=True)
+
+class ProtocolSink(Protocol[T_contra]):
+    def write(self, value: Recursive[T_contra]) -> None: ...
+```
+
+## Recursive protocol variance through aliases and nominal classes
+
+Variance validation follows mutually recursive references through a type alias and an inferred
+nominal class. The list in the alias makes both protocols invariant, even though `Recursive` only
+directly produces its type parameter.
+
+```toml
+[environment]
+python-version = "3.12"
+```
 
 ```py
 from typing import Protocol, TypeVar
 
 T_co = TypeVar("T_co", covariant=True)
 
-# TODO: Reject the covariant declaration even though `next` refers to this protocol.
+type Next[T] = Recursive[list[T]]
+
+class Wrapper[T]:
+    def value(self) -> Next[T]:
+        raise NotImplementedError
+
+# error: [invalid-protocol] "Type variable `T_co` in protocol `Forward` should be invariant, but is covariant"
+class Forward(Protocol[T_co]):
+    def value(self) -> Wrapper[T_co]: ...
+
+# error: [invalid-protocol] "Type variable `T_co` in protocol `Recursive` should be invariant, but is covariant"
 class Recursive(Protocol[T_co]):
-    def write(self, value: T_co) -> None: ...
-    def next(self) -> "Recursive[T_co]": ...
+    def read(self) -> T_co: ...
+    def next(self) -> Forward[T_co]: ...
 ```
 
-The guard also recognizes recursion when each reference changes the specialization.
+## Recursive protocol references with fixed arguments
+
+The definitions refer to each other, but `Right`'s variance does not depend on `Left`: its reference
+to `Left[int]` does not use its type parameter. `Left` therefore uses `Right`'s declared covariance
+and is contravariant in the parameter it consumes.
 
 ```py
-# TODO: Reject the covariant declaration despite the expanding recursive reference.
-class Expanding(Protocol[T_co]):
-    def write(self, value: T_co) -> None: ...
-    def next(self) -> "Expanding[list[T_co]]": ...
+from typing import Protocol, TypeVar
+
+T_co = TypeVar("T_co", covariant=True)
+T_contra = TypeVar("T_contra", contravariant=True)
+
+class Left(Protocol[T_contra]):
+    def accept(self, value: "Right[T_contra]") -> None: ...
+
+class Right(Protocol[T_co]):
+    def left(self) -> Left[int]: ...
 ```
 
-Mutually recursive interfaces are also skipped, regardless of which protocol is checked first.
+## Recursive dependencies after invariant members
+
+A mutable list makes `Left` invariant. Its other method makes `Left` mutually recursive with
+`Right`, so `Right` is also invariant. Finding an invariant member does not stop dependency
+discovery in the remaining members.
 
 ```py
-# TODO: Reject the covariant declarations in this recursive pair.
+from typing import Protocol, TypeVar
+
+T_co = TypeVar("T_co", covariant=True)
+
+# error: [invalid-protocol] "Type variable `T_co` in protocol `Left` should be invariant, but is covariant"
+class Left(Protocol[T_co]):
+    def items(self) -> list[T_co]: ...
+    def next(self) -> "Right[T_co]": ...
+
+# error: [invalid-protocol] "Type variable `T_co` in protocol `Right` should be invariant, but is covariant"
+class Right(Protocol[T_co]):
+    def left(self) -> Left[T_co]: ...
+```
+
+## Recursive protocol references in unused alias arguments
+
+An alias that ignores a type argument also removes its variance dependencies. `Ignore[Sink[T]]` is
+just `int`, so `Marker` is independent of `Sink`. Consuming the covariant `Marker[T]` makes `Sink`
+contravariant.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol, TypeVar
+
+T_co = TypeVar("T_co", covariant=True)
+T_contra = TypeVar("T_contra", contravariant=True)
+
+type Ignore[T] = int
+
+class Marker(Protocol[T_co]):
+    def marker(self) -> Ignore["Sink[T_co]"]: ...
+
+class Sink(Protocol[T_contra]):
+    def accept(self, value: Marker[T_contra]) -> None: ...
+```
+
+## Recursive protocols with unsupported member types
+
+Declared-variance validation still skips recursive type aliases. This also applies when the alias
+appears in another protocol in a recursive cycle, so both covariant declarations below remain
+undiagnosed even though `Left.write` consumes the type parameter.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol, TypeVar
+
+T_co = TypeVar("T_co", covariant=True)
+type Nested = int | list[Nested]
+
+# TODO: Reject these covariant declarations once recursive type aliases are supported.
 class Left(Protocol[T_co]):
     def write(self, value: T_co) -> None: ...
     def right(self) -> "Right[T_co]": ...
 
 class Right(Protocol[T_co]):
     def left(self) -> Left[T_co]: ...
+    def nested(self) -> Nested: ...
+```
+
+## Declared variance of variadic protocol parameters
+
+Parameter specifications and type variable tuples retain their declared variance when used in a
+protocol specialization. They do not participate in the validation of ordinary protocol type
+variables. These invariant parameters also make the enclosing nominal classes invariant.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import ParamSpec, Protocol, TypeVar, TypeVarTuple, Unpack
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+P = ParamSpec("P")
+Ts = TypeVarTuple("Ts")
+T = TypeVar("T")
+
+class Callback(Protocol[P]):
+    def __call__(self, *args: P.args, **kwargs: P.kwargs) -> None: ...
+
+class CallbackProtocol(Protocol[T]):
+    def callback(self) -> Callback[[T]]: ...
+
+class CallbackWrapper[T]:
+    def callback(self) -> Callback[[T]]:
+        raise NotImplementedError
+
+static_assert(not is_subtype_of(CallbackWrapper[int], CallbackWrapper[object]))
+static_assert(not is_subtype_of(CallbackWrapper[object], CallbackWrapper[int]))
+```
+
+The same applies when a type variable is used as one element of a type variable tuple.
+
+```py
+class TupleProtocol(Protocol[Unpack[Ts]]):
+    def values(self) -> tuple[Unpack[Ts]]: ...
+
+class TupleMemberProtocol(Protocol[T]):
+    def value(self) -> TupleProtocol[T]: ...
+
+class TupleWrapper[T]:
+    def value(self) -> TupleProtocol[T]:
+        raise NotImplementedError
+
+static_assert(not is_subtype_of(TupleWrapper[int], TupleWrapper[object]))
+static_assert(not is_subtype_of(TupleWrapper[object], TupleWrapper[int]))
 ```
 
 ## Inherited protocol variance

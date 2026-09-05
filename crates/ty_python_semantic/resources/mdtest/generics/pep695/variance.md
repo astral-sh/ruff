@@ -441,6 +441,131 @@ static_assert(not is_subtype_of(Wrapper[int], Wrapper[object]))
 static_assert(not is_subtype_of(Wrapper[object], Wrapper[int]))
 ```
 
+## Recursive protocol variance
+
+A recursive protocol that only produces its type parameter is covariant. Returning that protocol
+from a nominal class preserves covariance.
+
+```py
+from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+class Reader[T](Protocol):
+    def read(self) -> T: ...
+    def next(self) -> "Reader[T]": ...
+
+class Source[T]:
+    def reader(self) -> Reader[T]:
+        raise NotImplementedError
+
+static_assert(is_subtype_of(Source[int], Source[object]))
+static_assert(not is_subtype_of(Source[object], Source[int]))
+```
+
+A recursive protocol that consumes its type parameter is contravariant, even when it also returns
+another instance of itself.
+
+```py
+class Writer[T](Protocol):
+    def write(self, value: T) -> None: ...
+    def next(self) -> "Writer[T]": ...
+
+class Sink[T]:
+    def writer(self) -> Writer[T]:
+        raise NotImplementedError
+
+static_assert(is_subtype_of(Sink[object], Sink[int]))
+static_assert(not is_subtype_of(Sink[int], Sink[object]))
+```
+
+Writable attributes make recursive protocols invariant, including underscore-prefixed attributes.
+
+```py
+class Writable[T](Protocol):
+    _value: T
+
+    def next(self) -> "Writable[T]": ...
+
+class Wrapper[T]:
+    def value(self) -> Writable[T]:
+        raise NotImplementedError
+
+static_assert(not is_subtype_of(Wrapper[int], Wrapper[object]))
+static_assert(not is_subtype_of(Wrapper[object], Wrapper[int]))
+```
+
+## Recursive protocol variance with annotated receivers
+
+An explicit receiver annotation does not make a bound method consume its type parameter. `Reader`
+remains covariant when its interface also recurses through the return type of `next`, and returning
+that protocol from `Source` preserves covariance.
+
+```py
+from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+class Reader[T](Protocol):
+    def read(self: "Reader[T]") -> T: ...
+    def next(self) -> "Reader[T]": ...
+
+class Source[T]:
+    def reader(self) -> Reader[T]:
+        raise NotImplementedError
+
+static_assert(is_subtype_of(Source[int], Source[object]))
+static_assert(not is_subtype_of(Source[object], Source[int]))
+```
+
+## Expanding recursive protocol variance
+
+Variance inference terminates when a recursive reference changes the specialization. The mutable
+list in `next` makes `Node` invariant, even though `read` produces `T` directly.
+
+```py
+from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+class Node[T](Protocol):
+    def read(self) -> T: ...
+    def next(self) -> "Node[list[T]]": ...
+
+class Wrapper[T]:
+    def node(self) -> Node[T]:
+        raise NotImplementedError
+
+static_assert(not is_subtype_of(Wrapper[int], Wrapper[object]))
+static_assert(not is_subtype_of(Wrapper[object], Wrapper[int]))
+```
+
+## Mutually recursive protocol variance
+
+A writable attribute constrains every protocol in a recursive cycle. Here, `Left` is invariant
+because it returns a `Right` whose `_value` attribute can be mutated.
+
+```py
+from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+class Left[T](Protocol):
+    def right(self) -> "Right[T]": ...
+
+class Right[T](Protocol):
+    _value: T
+
+    def left(self) -> Left[T]: ...
+
+class Wrapper[T]:
+    def left(self) -> Left[T]:
+        raise NotImplementedError
+
+static_assert(not is_subtype_of(Wrapper[int], Wrapper[object]))
+static_assert(not is_subtype_of(Wrapper[object], Wrapper[int]))
+```
+
 ## Mutual Recursion
 
 This example due to Martin Huschenbett's PyCon 2025 talk,
@@ -636,6 +761,44 @@ class C[T]:
 
 static_assert(is_subtype_of(C[B], C[A]))
 static_assert(not is_subtype_of(C[A], C[B]))
+```
+
+#### Final attributes in stubs
+
+Stub attributes declared as `Final` are read-only, whether their declarations omit an initializer or
+use an ellipsis placeholder. A type parameter used only in such an attribute is covariant, while one
+used in an ordinary writable attribute is invariant.
+
+`box.pyi`:
+
+```pyi
+from typing import Final
+
+class Box[T]:
+    value: Final[T]
+
+class BoxWithPlaceholder[T]:
+    value: Final[T] = ...
+
+class MutableBox[T]:
+    value: T
+```
+
+`main.py`:
+
+```py
+from box import Box, BoxWithPlaceholder, MutableBox
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+static_assert(is_subtype_of(Box[int], Box[object]))
+static_assert(not is_subtype_of(Box[object], Box[int]))
+
+static_assert(is_subtype_of(BoxWithPlaceholder[int], BoxWithPlaceholder[object]))
+static_assert(not is_subtype_of(BoxWithPlaceholder[object], BoxWithPlaceholder[int]))
+
+static_assert(not is_subtype_of(MutableBox[int], MutableBox[object]))
+static_assert(not is_subtype_of(MutableBox[object], MutableBox[int]))
 ```
 
 #### Underscore-prefixed attributes

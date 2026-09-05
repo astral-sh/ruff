@@ -99,7 +99,11 @@ fn usage_is_safe(semantic: &SemanticModel) -> bool {
 
     match (parent, grandparent) {
         (Expr::Attribute(ExprAttribute { attr, .. }), Expr::Call(ExprCall { arguments, .. })) => {
-            attr == "time" || (attr == "replace" && arguments.find_keyword("tzinfo").is_some())
+            attr == "time"
+                || (attr == "replace"
+                    && arguments
+                        .find_keyword("tzinfo")
+                        .is_some_and(|keyword| !keyword.value.is_none_literal_expr()))
         }
         _ => false,
     }

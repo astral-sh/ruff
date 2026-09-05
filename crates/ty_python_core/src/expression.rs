@@ -7,13 +7,25 @@ use ruff_db::files::File;
 use ruff_python_ast as ast;
 use salsa;
 
-/// Whether or not this expression should be inferred as a normal expression or
-/// a type expression. For example, in `self.x: <annotation> = <value>`, the
-/// `<annotation>` is inferred as a type expression, while `<value>` is inferred
-/// as a normal expression.
+/// The context used to infer an independently tracked expression.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub enum ExpressionKind {
+    /// An ordinary value expression, such as `1` in `self.x: int = 1`.
     Normal,
+    /// The callable part of a call, such as `list[T]` in `list[T]()`.
+    ///
+    /// Type variables used to specialize the callable must already be bound. A constructor call
+    /// cannot introduce type variable bindings as a generic alias definition can:
+    ///
+    /// ```python
+    /// from typing import TypeVar
+    ///
+    /// T = TypeVar("T")
+    /// Items = list[T]  # Valid: defines a generic alias.
+    /// list[T]()  # Error: no generic context binds T.
+    /// ```
+    Callee,
+    /// An expression interpreted as a type, such as `int` in `self.x: int = 1`.
     TypeExpression,
 }
 
@@ -59,7 +71,7 @@ pub struct Expression<'db> {
     #[returns(clone)]
     pub assigned_to: Option<AstNodeRef<ast::StmtAssign>>,
 
-    /// Should this expression be inferred as a normal expression or a type expression?
+    /// The inference context for this expression.
     #[returns(copy)]
     pub kind: ExpressionKind,
 }

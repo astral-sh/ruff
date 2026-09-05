@@ -6,6 +6,7 @@ mod rule;
 mod server;
 mod version;
 
+use std::fmt::Display;
 use std::io::{BufWriter, Write};
 use std::process::{ExitCode, Termination};
 use std::sync::Mutex;
@@ -27,8 +28,11 @@ use ruff_diagnostics::Applicability;
 use salsa::Database;
 use ty_project::metadata::settings::TerminalSettings;
 use ty_project::watch::ProjectWatcher;
-use ty_project::{CollectReporter, Db, ScriptEnvironmentAvailability, ScriptSyncProgress, watch};
-use ty_project::{ProjectDatabase, ProjectMetadata};
+use ty_project::{
+    ChangeResult, CollectReporter, Db, Project, ScriptEnvironmentAvailability, UvSyncProgress,
+    watch,
+};
+use ty_project::{ProjectDatabase, ProjectMetadata, ProjectReloadResult};
 use ty_python_semantic::{fix_all_diagnostics, suppress_all_diagnostics};
 use ty_static::EnvVars;
 
@@ -149,17 +153,11 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         }
         None if check_paths.iter().any(|path| system.is_file(path)) => {
             // `uv check --script` passes a file as its check path. Standalone scripts must not
-            // inherit the enclosing workspace; their environments are synchronized lazily.
+            // inherit the enclosing workspace; their environments are synchronized separately.
             ProjectMetadata::discover_without_uv(&project_path, &system)?
         }
         None => ProjectMetadata::discover(&project_path, &system)?,
     };
-
-    if watch && project_metadata.has_uv_workspace() {
-        return Err(anyhow!(
-            "`--watch` is not supported with uv workspace integration"
-        ));
-    }
 
     project_metadata.apply_configuration_files(&system)?;
 
@@ -280,8 +278,8 @@ struct MainLoop {
     /// The file system watcher, if running in watch mode.
     watcher: Option<ProjectWatcher>,
 
-    /// Progress bars shared by project checks and background script synchronization.
-    progress: ProgressDisplay,
+    /// Progress for the current synchronization batch, cleared before checking starts.
+    sync_progress: Option<SyncProgress>,
 
     /// Interface for displaying information to the user.
     printer: Printer,
@@ -298,8 +296,6 @@ impl MainLoop {
 
         let cancellation_token_source = CancellationTokenSource::new();
         let cancellation_token = cancellation_token_source.token();
-        let progress = ProgressDisplay::new();
-        progress.bars.set_draw_target(printer.progress_target());
 
         (
             Self {
@@ -307,7 +303,7 @@ impl MainLoop {
                 sender: sender.clone(),
                 receiver,
                 watcher: None,
-                progress,
+                sync_progress: None,
                 printer,
                 cancellation_token,
             },
@@ -341,15 +337,20 @@ impl MainLoop {
         tracing::debug!("Starting main loop");
 
         let mut revision = 0u64;
-        let script_sync_wakeups = db.script_environments().sync_wakeups();
+        let uv_sync_wakeups = db.uv_environments().sync_wakeups();
         let (check_sender, check_receiver) = crossbeam_channel::bounded(1);
-        request_check(db, &check_sender);
+
+        // Initialize the uv environment for all scripts
+        let scripts: Vec<_> = db.project().script_files(db).iter().collect();
+        self.synchronize_scripts(db, &scripts);
+
+        request_check(&check_sender);
 
         // Apply all queued changes before starting a pending check because every applied change
         // cancels the running check.
         while let Ok(message) = crossbeam_channel::select_biased! {
-            recv(script_sync_wakeups) -> wakeup => {
-                wakeup.map(|()| MainLoopMessage::PollScriptEnvironments)
+            recv(uv_sync_wakeups) -> wakeup => {
+                wakeup.map(|()| MainLoopMessage::PollUvEnvironments)
             }
             recv(self.receiver) -> message => message,
             recv(check_receiver) -> request => request.map(|()| MainLoopMessage::CheckWorkspace),
@@ -357,19 +358,20 @@ impl MainLoop {
             match message {
                 MainLoopMessage::CheckWorkspace => {
                     // Synchronization may have started after this request was queued.
-                    if db.script_environments().has_pending_synchronizations() {
-                        tracing::debug!("Deferring check until script synchronization completes");
+                    if db.uv_environments().has_pending_synchronizations() {
+                        tracing::debug!("Deferring check until uv synchronization completes");
                         continue;
                     }
+                    self.sync_progress = None;
                     let db = db.clone();
                     let sender = self.sender.clone();
-                    let progress = self.progress.clone();
+                    let printer = self.printer;
 
                     // Spawn a new task that checks the project. This needs to be done in a separate thread
                     // to prevent blocking the main loop here.
                     rayon::spawn(move || {
                         match salsa::Cancelled::catch(|| {
-                            let mut reporter = IndicatifReporter::new(progress);
+                            let mut reporter = IndicatifReporter::new(printer.progress_target());
                             db.check_with_reporter(&mut reporter);
                             reporter.into_sorted_diagnostics(&db)
                         }) {
@@ -487,43 +489,45 @@ impl MainLoop {
                     return Ok(exit_status);
                 }
 
-                MainLoopMessage::PollScriptEnvironments => {
-                    let environments = db.script_environments().clone();
-                    if !environments.poll_sync(db).is_empty() {
+                MainLoopMessage::PollUvEnvironments => {
+                    let environments = db.uv_environments().clone();
+                    let changes = environments.poll_sync(db);
+                    if !changes.is_empty() {
                         revision += 1;
                     }
-                    request_check(db, &check_sender);
+                    if let Some(project_change) = changes.project {
+                        if matches!(
+                            project_change,
+                            ProjectReloadResult::Changed {
+                                files_changed: true,
+                            }
+                        ) {
+                            let scripts: Vec<_> = db.project().script_files(db).iter().collect();
+                            self.synchronize_scripts(db, &scripts);
+                        }
+
+                        if let Some(watcher) = self.watcher.as_mut() {
+                            watcher.update(db);
+                        }
+                    }
+                    request_check(&check_sender);
                 }
 
                 MainLoopMessage::ApplyChanges(changes) => {
-                    // Another filesystem event can arrive while a script is still synchronizing.
-                    // Keep its progress visible after clearing the previous check's output.
-                    self.progress.bars.suspend(Printer::clear_screen)?;
-
                     revision += 1;
                     // Automatically cancels any pending queries and waits for them to complete.
-                    db.apply_changes(&changes);
-
-                    let environments = db.script_environments().clone();
-                    for file in environments.files() {
-                        environments.request_sync(
-                            db,
-                            file,
-                            ScriptEnvironmentAvailability::Pending,
-                            &|db, file| self.progress.for_script(db, file),
-                        );
-                    }
+                    let result = db.apply_changes(&changes);
+                    self.synchronize_environments(db, &result)?;
 
                     if let Some(watcher) = self.watcher.as_mut() {
                         watcher.update(db);
                     }
 
-                    request_check(db, &check_sender);
+                    request_check(&check_sender);
                 }
                 MainLoopMessage::Exit => {
                     // Cancel any pending queries and wait for them to complete.
                     db.trigger_cancellation();
-                    self.progress.clear();
                     return Ok(ExitStatus::Interrupted);
                 }
             }
@@ -532,6 +536,60 @@ impl MainLoop {
         }
 
         Ok(ExitStatus::Success)
+    }
+
+    fn synchronize_environments(
+        &mut self,
+        db: &mut ProjectDatabase,
+        changes: &ChangeResult,
+    ) -> Result<()> {
+        // Another filesystem event can arrive while a script is still synchronizing.
+        // Keep its progress visible after clearing the previous check's output.
+        if let Some(progress) = &self.sync_progress {
+            progress.bars.suspend(Printer::clear_screen)?;
+        } else {
+            Printer::clear_screen()?;
+        }
+
+        let project_path = changes.project_sync_path();
+        let scripts = changes.scripts_to_synchronize(db);
+        if project_path.is_none() && scripts.is_empty() {
+            return Ok(());
+        }
+
+        let progress = self
+            .sync_progress
+            .get_or_insert_with(|| SyncProgress::new(self.printer.progress_target()));
+
+        if let Some(project_path) = project_path {
+            db.uv_environments()
+                .request_project_sync(db, project_path, &|db, project| {
+                    progress.for_project(db, project)
+                });
+        }
+        self.synchronize_scripts(db, &scripts);
+        Ok(())
+    }
+
+    fn synchronize_scripts(&mut self, db: &mut ProjectDatabase, scripts: &[File]) {
+        let environments = db.uv_environments().clone();
+
+        if scripts.is_empty() {
+            return;
+        }
+
+        let progress = self
+            .sync_progress
+            .get_or_insert_with(|| SyncProgress::new(self.printer.progress_target()));
+
+        for &file in scripts {
+            environments.request_sync(
+                db,
+                file,
+                ScriptEnvironmentAvailability::Pending,
+                &|db, file| progress.for_script(db, file),
+            );
+        }
     }
 
     fn write_diagnostics(
@@ -649,23 +707,14 @@ fn exit_status_from_diagnostics(
 struct IndicatifReporter {
     collector: CollectReporter,
 
-    progress: ProgressDisplay,
-
-    /// A reporter that is ready, containing a progress bar to report to.
-    ///
-    /// Initialization of the bar is deferred to [`ty_project::ProgressReporter::set_files`] so we
-    /// do not initialize the bar too early as it may take a while to collect the number of files to
-    /// process and we don't want to display an empty "0/0" bar.
+    /// Kept hidden until the files to check have been collected, to avoid displaying "0/0".
     checking_bar: indicatif::ProgressBar,
 }
 
 impl IndicatifReporter {
-    fn new(progress: ProgressDisplay) -> Self {
-        let checking_bar = progress.bars.add(indicatif::ProgressBar::hidden());
-
+    fn new(target: indicatif::ProgressDrawTarget) -> Self {
         Self {
-            progress,
-            checking_bar,
+            checking_bar: indicatif::ProgressBar::with_draw_target(None, target),
             collector: CollectReporter::default(),
         }
     }
@@ -683,16 +732,12 @@ impl ty_project::ProgressReporter for IndicatifReporter {
         self.checking_bar.set_message("Checking");
         self.checking_bar.set_style(
             indicatif::ProgressStyle::with_template(
-                "{msg:8.dim} {bar:60.green/dim} {pos}/{len} files",
+                "{msg:8.dim} {wide_bar:.green/dim} {pos}/{len} files",
             )
             .unwrap()
             .progress_chars("--"),
         );
-        self.checking_bar.tick();
-    }
-
-    fn for_script(&self, db: &dyn Db, file: File) -> Option<Box<dyn ScriptSyncProgress>> {
-        self.progress.for_script(db, file)
+        self.checking_bar.force_draw();
     }
 
     fn report_checked_file(&self, db: &ProjectDatabase, file: File, diagnostics: &[Diagnostic]) {
@@ -707,59 +752,106 @@ impl ty_project::ProgressReporter for IndicatifReporter {
 
 impl Drop for IndicatifReporter {
     fn drop(&mut self) {
-        self.progress.finish_checking(&self.checking_bar);
+        self.checking_bar.finish_and_clear();
     }
 }
 
-/// Coordinates the file-checking bar and per-script synchronization messages.
-#[derive(Clone)]
-struct ProgressDisplay {
+/// Shows the script count and individual uv status lines for one synchronization batch.
+struct SyncProgress {
     bars: indicatif::MultiProgress,
+
+    /// Hidden until the first script synchronization is requested.
+    script_bar: indicatif::ProgressBar,
 }
 
-impl ProgressDisplay {
-    fn new() -> Self {
-        Self {
-            bars: indicatif::MultiProgress::with_draw_target(
-                indicatif::ProgressDrawTarget::hidden(),
-            ),
-        }
+impl SyncProgress {
+    fn new(target: indicatif::ProgressDrawTarget) -> Self {
+        let bars = indicatif::MultiProgress::with_draw_target(target);
+        let script_bar = indicatif::ProgressBar::hidden();
+        script_bar.set_length(0);
+        script_bar.set_message("Syncing");
+        script_bar.set_style(
+            indicatif::ProgressStyle::with_template(
+                "{msg:8.dim} {wide_bar:.green/dim} {pos}/{len} scripts",
+            )
+            .unwrap()
+            .progress_chars("--"),
+        );
+        let script_bar = bars.add(script_bar);
+        Self { bars, script_bar }
     }
 
-    fn for_script(&self, db: &dyn Db, file: File) -> Option<Box<dyn ScriptSyncProgress>> {
+    fn for_project(&self, db: &dyn Db, project: Project) -> Option<Box<dyn UvSyncProgress>> {
+        Some(self.start("Refreshing", format_args!("{} metadata", project.name(db)))?)
+    }
+
+    fn for_script(&self, db: &dyn Db, file: File) -> Option<Box<dyn UvSyncProgress>> {
+        let path = file.path(db).as_system_path()?;
+        let path = path.strip_prefix(db.project().root(db)).unwrap_or(path);
+        let mut progress = self.start("Syncing", path)?;
+        self.script_bar.inc_length(1);
+        self.script_bar.force_draw();
+        progress.completion_bar = Some(self.script_bar.clone());
+        Some(progress)
+    }
+
+    fn start(&self, action: &str, target: impl Display) -> Option<Box<UvSyncProgressBar>> {
         if self.bars.is_hidden() {
             return None;
         }
 
-        let path = file.path(db).as_system_path()?;
-        let path = path.strip_prefix(db.project().root(db)).unwrap_or(path);
-
-        let bar = self.bars.insert(0, indicatif::ProgressBar::hidden());
+        let bar = indicatif::ProgressBar::hidden();
         bar.set_style(indicatif::ProgressStyle::with_template("{wide_msg}").unwrap());
-        bar.set_message(format!("   {} {path}", "Syncing".bold().cyan()));
-
-        Some(Box::new(ScriptSyncProgressBar { bar }))
+        bar.set_message(format!("   {} {target}", action.bold().cyan()));
+        Some(Box::new(UvSyncProgressBar {
+            bars: self.bars.clone(),
+            bar,
+            completion_bar: None,
+        }))
     }
+}
 
-    fn finish_checking(&self, bar: &indicatif::ProgressBar) {
-        self.bars.remove(bar);
-        self.clear();
-    }
-
-    fn clear(&self) {
+impl Drop for SyncProgress {
+    fn drop(&mut self) {
+        self.script_bar.finish_and_clear();
         let _ = self.bars.clear();
     }
 }
 
-struct ScriptSyncProgressBar {
+struct UvSyncProgressBar {
+    bars: indicatif::MultiProgress,
     bar: indicatif::ProgressBar,
+    /// The shared script synchronization bar, advanced when this request completes.
+    ///
+    /// This reporter handles both script synchronization (`Some`) and project metadata
+    /// refreshes (`None`), which do not contribute to the script count.
+    completion_bar: Option<indicatif::ProgressBar>,
 }
 
-impl ScriptSyncProgress for ScriptSyncProgressBar {}
+impl UvSyncProgress for UvSyncProgressBar {
+    fn started(&mut self) {
+        self.bar.reset();
+        self.bars.insert(0, self.bar.clone());
+        // There are no periodic ticks to redraw this status line if drawing is rate-limited.
+        self.bar.force_draw();
+    }
 
-impl Drop for ScriptSyncProgressBar {
-    fn drop(&mut self) {
+    fn finished(&mut self) {
         self.bar.finish_and_clear();
+        self.bars.remove(&self.bar);
+    }
+
+    fn completed(self: Box<Self>) {
+        if let Some(bar) = &self.completion_bar {
+            bar.inc(1);
+            bar.force_draw();
+        }
+    }
+}
+
+impl Drop for UvSyncProgressBar {
+    fn drop(&mut self) {
+        self.finished();
     }
 }
 
@@ -785,16 +877,12 @@ enum MainLoopMessage {
         result: Vec<Diagnostic>,
         revision: u64,
     },
-    PollScriptEnvironments,
+    PollUvEnvironments,
     ApplyChanges(Vec<watch::ChangeEvent>),
     Exit,
 }
 
-fn request_check(db: &dyn Db, sender: &crossbeam_channel::Sender<()>) {
-    if db.script_environments().has_pending_synchronizations() {
-        return;
-    }
-
+fn request_check(sender: &crossbeam_channel::Sender<()>) {
     // A full channel means that a check has already been requested. Keeping one pending request
     // coalesces bursts of file changes while the main loop drains higher-priority work.
     let _ = sender.try_send(());

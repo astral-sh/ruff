@@ -18,8 +18,8 @@ use crate::{
         ApplySpecialization, ApplyTypeMappingVisitor, CycleDetector, DynamicType, GenericContext,
         InstanceProjection, IntersectionType, KnownClass, KnownInstanceType, MaterializationKind,
         Parameter, Parameters, Specialization, Type, TypeAliasType, TypeContext, TypeMapping,
-        TypeVarVariance, UnionBuilder, UnionType, any_over_type, binding_type,
-        definition_expression_type,
+        TypeVarVariance, UnionBuilder, UnionType, any_over_type,
+        any_over_type_including_alias_arguments, binding_type, definition_expression_type,
         tuple::Tuple,
         variance::VarianceInferable,
         visitor::{self, TypeCollector, TypeVisitor, walk_type_with_recursion_guard},
@@ -83,17 +83,11 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         typevar_id: TypeVarIdentity<'db>,
     ) -> bool {
-        any_over_type(db, env, self, false, |ty| match ty {
+        any_over_type_including_alias_arguments(db, env, self, |ty| match ty {
             Type::TypeVar(typevar) => typevar_id == typevar.typevar(db).identity(db),
             Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => {
                 typevar_id == typevar.identity(db)
             }
-            Type::TypeAlias(alias) => alias.specialization(db).is_some_and(|specialization| {
-                specialization
-                    .types(db)
-                    .iter()
-                    .any(|ty| ty.references_typevar_through_aliases(db, env, typevar_id))
-            }),
             _ => false,
         })
     }
@@ -132,6 +126,17 @@ impl<'db> Type<'db> {
     ) -> bool {
         any_over_type(db, env, self, false, |ty| {
             matches!(ty, Type::Dynamic(DynamicType::UnspecializedTypeVar))
+        })
+    }
+
+    pub(crate) fn has_provisional_marker(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> bool {
+        any_over_type(db, env, self, false, |ty| {
+            ty.as_dynamic()
+                .is_some_and(DynamicType::is_provisional_marker)
         })
     }
 }
@@ -713,6 +718,7 @@ impl<'db> TypeVarInstance<'db> {
                     | DynamicType::Unknown
                     | DynamicType::UnknownGeneric(_)
                     | DynamicType::UnspecializedTypeVar
+                    | DynamicType::UnknownLambdaParameter
                     | DynamicType::InvalidConcatenateUnknown
                     | DynamicType::AmbiguousOverload => Parameters::unknown(),
                 },
@@ -1260,7 +1266,10 @@ impl<'db> BoundTypeVarInstance<'db> {
             None => match self.binding_context(db) {
                 BindingContext::Definition(definition) => polarity.compose_thunk(|| {
                     let env = ProgramEnvironment::from_definition(definition);
-                    match binding_type(db, definition).variance_of(db, &env, self.identity(db)) {
+                    match binding_type(db, definition)
+                        .variance_of(db, &env, self.identity(db))
+                        .evaluate(db)
+                    {
                         // When both directions are valid, the typing spec selects covariance.
                         TypeVarVariance::Bivariant => TypeVarVariance::Covariant,
                         variance => variance,
@@ -1301,14 +1310,12 @@ impl<'db> BoundTypeVarInstance<'db> {
 
         let possibly_apply_to_self = |specialization: &ApplySpecialization<'a, 'db>| {
             if self.typevar(db).is_self(db)
-                && let ApplySpecialization::Specialization {
-                    specialization,
-                    specialize_self_domain: true,
-                } = specialization
+                && specialization.specialize_self_domain()
+                && let Some(specialization) = specialization.as_specialization(db)
             {
                 Type::TypeVar(self.apply_specialization_to_bound_or_constraints(
                     db,
-                    *specialization,
+                    specialization,
                     visitor.env,
                 ))
             } else {
@@ -1393,7 +1400,11 @@ impl<'db> BoundTypeVarInstance<'db> {
             | TypeMapping::EagerExpansion
             | TypeMapping::RescopeReturnCallables(_) => Type::TypeVar(self),
             TypeMapping::Materialize(materialization_kind) => {
-                Type::TypeVar(self.materialize_impl(db, *materialization_kind, visitor))
+                if visitor.materialize_typevar_bounds_and_defaults {
+                    Type::TypeVar(self.materialize_impl(db, *materialization_kind, visitor))
+                } else {
+                    Type::TypeVar(self)
+                }
             }
         }
     }

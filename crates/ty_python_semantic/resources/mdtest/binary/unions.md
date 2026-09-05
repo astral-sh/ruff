@@ -57,3 +57,13 @@ def f5(m: int, n: Literal[-1, 0, 1]):
     # error: [division-by-zero] "Cannot divide object of type `int` by zero"
     return m / n
 ```
+
+Binary-operator diagnostics share state across union alternatives, so several combinations that
+divide by zero produce only one warning per expression. Each expression has its own state, so
+repeating the operation still produces a warning:
+
+```py
+def f6(m: Literal[1, 2], n: Literal[0, 1]):
+    m / n  # error: [division-by-zero]
+    m / n  # error: [division-by-zero]
+```

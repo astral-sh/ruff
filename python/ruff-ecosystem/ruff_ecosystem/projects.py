@@ -30,9 +30,12 @@ class Project(Serializable):
     """
 
     repo: Repository
+    # ruff: disable[unnecessary-lambda] False positive on types defined later in the file
+    # See https://github.com/astral-sh/ruff/issues/24704
     check_options: CheckOptions = field(default_factory=lambda: CheckOptions())
     format_options: FormatOptions = field(default_factory=lambda: FormatOptions())
     config_overrides: ConfigOverrides = field(default_factory=lambda: ConfigOverrides())
+    # ruff: enable[unnecessary-lambda]
 
     def with_preview_enabled(self: Self) -> Self:
         return type(self)(

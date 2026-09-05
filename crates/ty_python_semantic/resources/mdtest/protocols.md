@@ -4452,6 +4452,46 @@ static_assert(not is_assignable_to(BadReturnType, ShapeProtocolImplicitSelf))
 static_assert(not is_assignable_to(BadReturnType, ShapeProtocolExplicitSelf))
 ```
 
+## `Self` in generic type aliases during protocol matching
+
+`Self` in a protocol method's return type refers to the structural implementation, even when it is
+wrapped in a generic type alias. The implementation can return plain `Self`:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol, Self
+
+type Identity[T] = T
+
+class Cloneable(Protocol):
+    def clone(self) -> Identity[Self]: ...
+
+class DirectClone:
+    def clone(self) -> Self:
+        return self
+
+direct: Cloneable = DirectClone()
+```
+
+The same binding applies to a property return type:
+
+```py
+class Current(Protocol):
+    @property
+    def current(self) -> Identity[Self]: ...
+
+class CurrentImpl:
+    @property
+    def current(self) -> Self:
+        return self
+
+current: Current = CurrentImpl()
+```
+
 ## `Self`-returning instance methods in `ParamSpec` protocols
 
 Specializing a protocol's `ParamSpec` preserves the meaning of `Self`: the return type names the
@@ -6708,7 +6748,7 @@ y: A | Foo[A]
 
 # The same thing, but using the legacy syntax:
 
-S = TypeVar("S")
+S = TypeVar("S", covariant=True)
 
 class Bar(Protocol[S]):
     def x(self) -> "S | Bar[S]": ...
@@ -6781,6 +6821,31 @@ def infer[T](outer: T, recursive: C[int]) -> None:
     accept(outer, recursive)
 ```
 
+### Recursive protocol requirements after matching finite members
+
+Matching a finite member does not prove that the whole protocol is compatible. The recursive `split`
+requirement also carries `T` in a tuple element, so these specializations are incompatible even
+though their `marker` methods match.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to
+
+class Node[T](Protocol):
+    def marker(self) -> int: ...
+    def split(self) -> tuple[T, Node[T]]: ...
+
+static_assert(not is_assignable_to(Node[str], Node[int]))
+```
+
 ### Nested protocol source members with finite targets
 
 A source specialization can contain its own protocol even when the target has no recursive
@@ -6806,7 +6871,8 @@ static_assert(is_constraint_set_assignable_to(Consumer[Consumer[int]], Consumer[
 
 A protocol member can contain the same protocol in the source specialization but remain finite in
 the target specialization. Its structural requirements must still contribute all valid solutions,
-even when nominal inheritance alone would infer a narrower type.
+even when nominal inheritance alone would infer a narrower type. The same members also establish
+assignability when no type variables need to be inferred.
 
 ```toml
 [environment]
@@ -6816,18 +6882,36 @@ python-version = "3.12"
 ```py
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to
 
 class Consumer[T](Protocol):
     def consume(self, value: T | int) -> None: ...
     @property
     def child(self) -> Consumer[T]: ...
 
+static_assert(is_assignable_to(Consumer[Consumer[int]], Consumer[int]))
+
 def extract[T](consumer: Consumer[T]) -> T:
     raise NotImplementedError
 
 def check(value: Consumer[Consumer[int]]) -> None:
     reveal_type(extract(value))  # revealed: Consumer[int] | int
+```
+
+An explicit receiver annotation introduces constraints when comparing a bound method with a
+callable. The return types still match structurally, so union simplification retains only the
+callable.
+
+```py
+class Receiver:
+    def method[S](self: S, value: S, /) -> Consumer[Consumer[int]]:
+        raise NotImplementedError
+
+def check_union(receiver: Receiver, callback: Callable[[object], Consumer[int]], flag: bool) -> None:
+    reveal_type(receiver.method if flag else callback)  # revealed: (object, /) -> Consumer[int]
 ```
 
 ### Repeated applications of a nonrecursive alias
@@ -6875,7 +6959,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
-type GrowingAlias[T] = T | GrowingAlias[list[T]]
+type GrowingAlias[T] = T | GrowingAlias[list[T]]  # error: [cyclic-type-alias-definition]
 
 class Recursive[T](Protocol):
     def consume(self, value: T) -> None: ...
@@ -6948,6 +7032,103 @@ def check[T](concrete: Concrete[int], symbolic: Concrete[T]) -> None:
     reveal_type(Concrete().accumulate())  # revealed: Chain[Unknown]
 ```
 
+### Nested symbolic sources with constrained protocol receivers
+
+Type variables nested inside a concrete class's specialization still contribute constraints when
+binding an inherited recursive protocol method. Tuple, union, and aliased specializations preserve
+their element types in the result.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+
+class Chain[T](Protocol):
+    def value(self) -> T: ...
+    def accumulate[S](self: Chain[S]) -> Chain[S]: ...
+
+class Concrete[T](Chain[T]): ...
+
+type Wrapped[T] = tuple[T]
+
+def check[T](nested: Concrete[tuple[T]], union: Concrete[T | list[T]], aliased: Concrete[Wrapped[T]]) -> None:
+    reveal_type(nested.accumulate())  # revealed: Chain[tuple[T@check]]
+    reveal_type(union.accumulate())  # revealed: Chain[T@check | list[T@check]]
+    reveal_type(aliased.accumulate())  # revealed: Chain[Wrapped[T@check]]
+```
+
+### Incompatible explicit receivers on recursive protocols
+
+The `value` and `write` methods make `Chain` invariant. Calling `flatten` on `Chain[list[int]]` is
+therefore invalid, even though `list[int]` is assignable to `Iterable[int]`. The incompatible
+`write` requirement rejects the receiver without expanding the recursive specializations in
+`combinations` and `product`. A receiver specialized with `Iterable[int]` remains valid and
+preserves the element type.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from collections.abc import Iterable
+from typing import Literal, Protocol, overload
+
+class Chain[T](Protocol):
+    def value(self) -> T: ...
+    @overload
+    def combinations(self, length: Literal[2]) -> Chain[tuple[T, T]]: ...
+    @overload
+    def combinations(self, length: Literal[3]) -> Chain[tuple[T, T, T]]: ...
+    @overload
+    def combinations(self, length: int) -> Chain[tuple[T, ...]]: ...
+    def product(self) -> Chain[tuple[T]]: ...
+    def flatten[U](self: Chain[Iterable[U]]) -> Chain[U]: ...
+    def write(self, items: Iterable[T]) -> None: ...
+
+def invalid(value: Chain[list[int]]) -> None:
+    value.flatten()  # error: [invalid-argument-type]
+
+def valid(value: Chain[Iterable[int]]) -> None:
+    reveal_type(value.flatten())  # revealed: Chain[int]
+```
+
+### Explicit receivers on overloaded recursive protocol methods
+
+An overloaded method can constrain its receiver to a tuple specialization of the same recursive
+protocol. Comparing the fixed-length overload with the gradual fallback terminates without
+repeatedly expanding the recursive requirement, and the call preserves the callback's return type.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from collections.abc import Callable
+from typing import Any, Protocol, overload
+
+class Chain[T](Protocol):
+    def value(self) -> T: ...
+    def child(self) -> Chain[tuple[T]]: ...
+    @overload
+    def map_star[A, B, R](self: Chain[tuple[A, B]], callback: Callable[[A, B], R]) -> Chain[R]: ...
+    @overload
+    def map_star[R](self: Chain[tuple[Any, ...]], callback: Callable[..., R]) -> Chain[R]: ...
+
+def check(value: Chain[tuple[int, str]]) -> None:
+    reveal_type(value.map_star(lambda first, second: 1))  # revealed: Chain[Literal[1]]
+```
+
 ### Structural inference from recursive protocol requirements
 
 An inherited protocol specialization can erase a class type parameter. A recursive member can still
@@ -6976,6 +7157,17 @@ class Erased[T, U](Recursive[T, Any]):
     def __init__(self, callback: Callable[[U], object]) -> None: ...
 
 pair: Recursive[int, str] = Erased(lambda value: reveal_type(value))  # revealed: str
+```
+
+The same inference is needed when an erased source argument contains a nested type variable. The
+nominal relation constrains `T`, but only the recursive `value` member can infer `U` through the
+tuple.
+
+```py
+def make[T, U](callback: Callable[[U], object]) -> Erased[T, tuple[U]]:
+    raise NotImplementedError
+
+nested: Recursive[int, tuple[str]] = make(lambda value: reveal_type(value))  # revealed: str
 ```
 
 ### Overridden recursive protocol requirements
@@ -7738,6 +7930,10 @@ visible. As of Python 3.13, it is necessary because structurally inferring throu
 `close() -> _ReturnT_co | None` can spuriously infer `None`. The latter workaround can be removed
 once [ty#3596](https://github.com/astral-sh/ty/issues/3596) is fixed.
 
+The custom protocol below is invariant because its mutable list contains a generator with a
+covariant return parameter. Variance validation respects that declaration even when the parameter is
+not structurally visible.
+
 ```toml
 [environment]
 python-version = "3.12"
@@ -7748,7 +7944,7 @@ from ty_extensions import static_assert
 from ty_extensions._internal import is_equivalent_to, is_subtype_of, is_assignable_to
 from typing import Generator, Awaitable, Protocol, TypeVar, Any, Protocol
 
-T_co = TypeVar("T_co", covariant=True)
+T = TypeVar("T")
 
 class A: ...
 class B: ...
@@ -7768,19 +7964,20 @@ static_assert(not is_equivalent_to(Awaitable[A], Awaitable[Any]))
 static_assert(not is_subtype_of(Awaitable[A], Awaitable[B]))
 static_assert(not is_assignable_to(Awaitable[A], Awaitable[B]))
 
-class CustomCovariantProtocol(Protocol[T_co]):
-    def foo(self) -> tuple[list[Generator[None, None, T_co]]]: ...
+class CustomInvariantProtocol(Protocol[T]):
+    def foo(self) -> tuple[list[Generator[None, None, T]]]: ...
 
-static_assert(not is_equivalent_to(CustomCovariantProtocol[A], CustomCovariantProtocol[B]))
-static_assert(not is_equivalent_to(CustomCovariantProtocol[A], CustomCovariantProtocol[Any]))
-static_assert(not is_subtype_of(CustomCovariantProtocol[A], CustomCovariantProtocol[B]))
-static_assert(not is_assignable_to(CustomCovariantProtocol[A], CustomCovariantProtocol[B]))
+static_assert(not is_equivalent_to(CustomInvariantProtocol[A], CustomInvariantProtocol[B]))
+static_assert(not is_equivalent_to(CustomInvariantProtocol[A], CustomInvariantProtocol[Any]))
+static_assert(not is_subtype_of(CustomInvariantProtocol[A], CustomInvariantProtocol[B]))
+static_assert(not is_assignable_to(CustomInvariantProtocol[A], CustomInvariantProtocol[B]))
 ```
 
 ## The `Generator` protocol's `_ReturnT_co` appears in `close` as of Python 3.13
 
 The same test cases as above, but for Python 3.13 instead of 3.12. In this version `_ReturnT_co`
-appears in `Generator`'s `close` method.
+appears in `Generator`'s `close` method. The custom protocol is invariant because this return type
+is exposed inside a mutable list.
 
 ```toml
 [environment]
@@ -7792,7 +7989,7 @@ from ty_extensions import static_assert
 from ty_extensions._internal import is_equivalent_to, is_subtype_of, is_assignable_to
 from typing import Generator, Awaitable, TypeVar, Protocol, Any
 
-T_co = TypeVar("T_co", covariant=True)
+T = TypeVar("T")
 
 class A: ...
 class B: ...
@@ -7810,13 +8007,13 @@ static_assert(not is_equivalent_to(Awaitable[A], Awaitable[Any]))
 static_assert(not is_subtype_of(Awaitable[A], Awaitable[B]))
 static_assert(not is_assignable_to(Awaitable[A], Awaitable[B]))
 
-class CustomCovariantProtocol(Protocol[T_co]):
-    def foo(self) -> tuple[list[Generator[None, None, T_co]]]: ...
+class CustomInvariantProtocol(Protocol[T]):
+    def foo(self) -> tuple[list[Generator[None, None, T]]]: ...
 
-static_assert(not is_equivalent_to(CustomCovariantProtocol[A], CustomCovariantProtocol[B]))
-static_assert(not is_equivalent_to(CustomCovariantProtocol[A], CustomCovariantProtocol[Any]))
-static_assert(not is_subtype_of(CustomCovariantProtocol[A], CustomCovariantProtocol[B]))
-static_assert(not is_assignable_to(CustomCovariantProtocol[A], CustomCovariantProtocol[B]))
+static_assert(not is_equivalent_to(CustomInvariantProtocol[A], CustomInvariantProtocol[B]))
+static_assert(not is_equivalent_to(CustomInvariantProtocol[A], CustomInvariantProtocol[Any]))
+static_assert(not is_subtype_of(CustomInvariantProtocol[A], CustomInvariantProtocol[B]))
+static_assert(not is_assignable_to(CustomInvariantProtocol[A], CustomInvariantProtocol[B]))
 ```
 
 ## Inferring async return contexts on Python 3.13 or newer

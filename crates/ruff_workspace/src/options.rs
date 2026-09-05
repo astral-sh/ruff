@@ -1092,6 +1092,8 @@ pub struct LintCommonOptions {
     /// A list of mappings from file pattern to rule codes or prefixes to
     /// exclude, when considering any matching files. An initial '!' negates
     /// the file pattern.
+    ///
+    /// For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).
     #[option(
         default = "{}",
         value_type = "dict[str, list[RuleSelector]]",
@@ -1102,6 +1104,8 @@ pub struct LintCommonOptions {
             "path/to/file.py" = ["E402"]
             # Ignore `D` rules everywhere except for the `src/` directory.
             "!src/**.py" = ["D"]
+            # Ignore check for packages that are missing an `__init__.py` file.
+            "{benchmark,scripts,.github/action-name/}/*.py" = ["INP001"]
         "#
     )]
     pub per_file_ignores: Option<FxHashMap<String, Vec<UnresolvedRuleSelector>>>,

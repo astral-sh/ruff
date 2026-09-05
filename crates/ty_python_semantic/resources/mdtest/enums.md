@@ -811,6 +811,67 @@ reveal_type(InheritedWeirdEnum.FROM_INT)  # revealed: Literal[InheritedWeirdEnum
 reveal_type(enum_members(InheritedWeirdEnum))  # revealed: Unknown
 ```
 
+### Generic data-type mixin `__new__`
+
+A data-type mixin may be generic. When an enum lists a specialized alias of that mixin as a base,
+members are validated against the specialized `__new__` signature, not against one whose typevars
+are still free. Here `T` is `str`, so a `str` member is accepted and an `int` member is not:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from enum import Enum
+from typing import Self
+
+class GenericMixin[T]:
+    def __new__(cls, value: T) -> Self:
+        return object.__new__(cls)
+
+class Specialized(GenericMixin[str], Enum):
+    A = "a"
+    B = 1  # error: [invalid-assignment]
+```
+
+The specialization is applied through intermediate generic bases, too. `Middle[int]` binds
+`GenericMixin`'s `T` to `int` one step further up the MRO:
+
+```py
+class Middle[T](GenericMixin[T]): ...
+
+class Inherited(Middle[int], Enum):
+    A = 1
+    B = "b"  # error: [invalid-assignment]
+```
+
+A mixin with several type parameters is specialized the same way, and each element of a member's
+tuple payload is checked against the corresponding specialized parameter:
+
+```py
+class Pair[T, U]:
+    def __new__(cls, first: T, second: U) -> Self:
+        return object.__new__(cls)
+
+class Unpacked(Pair[str, int], Enum):
+    A = ("a", 1)
+    B = ("b", "c")  # error: [invalid-assignment]
+```
+
+A mixin whose `__new__` does not mention its type parameters at all is accepted as well. Before the
+specialization was applied, the free typevar made the synthesized `cls` argument fail to match, so
+even a fully permissive signature rejected every member:
+
+```py
+class Ignored[T]:
+    def __new__(cls, *args: object, **kwargs: object) -> Self:
+        return object.__new__(cls)
+
+class Permissive(Ignored[str], Enum):
+    A = "a"
+```
+
 ### Built-in data types
 
 An enum with an `int` or `str` data type stores the value produced by that type's constructor.
@@ -1270,7 +1331,9 @@ reveal_type(enum_members(Answer))
 
 ### In stubs
 
-Stubs can optionally use `...` for the actual value:
+Stubs can optionally use `...` for the actual value. They should use `cast()` to declare the type of
+the enum member's value in cases where the value type cannot be unambiguously expressed as a static
+assignment without a type annotation:
 
 ```pyi
 from enum import Enum

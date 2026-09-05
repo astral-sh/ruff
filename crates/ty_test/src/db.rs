@@ -17,6 +17,7 @@ use tempfile::TempDir;
 use ty_module_resolver::ModuleGlobSetBuilder;
 use ty_python_core::program::ProgramSettings;
 use ty_python_core::{Db as _, ProgramFile, TestProgramDb};
+use ty_python_semantic::dependency::DependencyMetadata;
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::{
     AnalysisSettings, Db as SemanticDb, PythonVersionWithSource, check_file_unwrap,
@@ -75,6 +76,13 @@ impl Db {
         let settings = self.settings();
         if settings.analysis(self) != &analysis {
             settings.set_analysis(self).to(analysis);
+        }
+    }
+
+    pub(crate) fn update_dependency_metadata(&mut self, metadata: Option<&DependencyMetadata>) {
+        let settings = self.settings();
+        if settings.dependency_metadata(self).as_ref() != metadata {
+            settings.set_dependency_metadata(self).to(metadata.cloned());
         }
     }
 
@@ -171,6 +179,16 @@ impl SemanticDb for Db {
         file_settings(self, file).analysis(self)
     }
 
+    fn dependency_metadata(&self, file: File) -> Option<&DependencyMetadata> {
+        match file_settings(self, file) {
+            FileSettings::Global => self.settings().dependency_metadata(self).as_ref(),
+            FileSettings::File {
+                dependency_metadata,
+                ..
+            } => dependency_metadata.as_ref(),
+        }
+    }
+
     fn dyn_clone(&self) -> Box<dyn SemanticDb> {
         Box::new(self.clone())
     }
@@ -206,6 +224,7 @@ fn file_settings(db: &dyn SemanticDb, file: File) -> FileSettings {
     FileSettings::File {
         rules: MdtestRuleSelection(mdtest_rule_selection(options.rules.as_ref(), None)),
         analysis: mdtest_analysis_settings(options.analysis.as_ref()),
+        dependency_metadata: options.dependency_metadata.map(|fixture| fixture.metadata),
     }
 }
 
@@ -215,6 +234,7 @@ enum FileSettings {
     File {
         rules: MdtestRuleSelection,
         analysis: AnalysisSettings,
+        dependency_metadata: Option<DependencyMetadata>,
     },
 }
 
@@ -241,6 +261,9 @@ struct Settings {
     #[default]
     #[returns(ref)]
     analysis: AnalysisSettings,
+    #[default]
+    #[returns(ref)]
+    dependency_metadata: Option<DependencyMetadata>,
     #[default]
     #[returns(deref)]
     rule_selection: MdtestRuleSelection,

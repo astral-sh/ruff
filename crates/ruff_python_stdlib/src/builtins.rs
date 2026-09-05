@@ -530,6 +530,7 @@ pub fn is_exception(name: &str, minor_version: u8) -> bool {
                 | "UserWarning"
         ) | (10.., "EncodingWarning")
             | (11.., "BaseExceptionGroup" | "ExceptionGroup")
-            | (13.., "PythonFinalizationError" | "ImportCycleError")
+            | (13.., "PythonFinalizationError")
+            | (15.., "ImportCycleError")
     )
 }

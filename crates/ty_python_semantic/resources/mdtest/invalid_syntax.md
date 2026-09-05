@@ -106,6 +106,16 @@ out = (obj.attr := obj).attr
 out = (obj[0] := obj).attr
 ```
 
+## Multiple starred assignment targets
+
+Even when a recovered assignment has more than one starred target, unpacking records types for its
+bindings without panicking.
+
+```py
+first, *left, *right = [1, 2, 3]  # error: [invalid-syntax] "Two starred expressions in assignment"
+first, *left, *right = (1, 2, 3)  # error: [invalid-syntax] "Two starred expressions in assignment"
+```
+
 ## Match-pattern alternatives binding different names
 
 A capture present in only one invalid `or` alternative is possibly undefined.

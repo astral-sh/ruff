@@ -109,7 +109,7 @@ flowchart TD
 
 The first question filters out special categories of rules: those that relate to the visual
 presentation of code (`formatting`), those that relate to `security` vulnerabilities, and those that
-impose `restriction`s on language features. "Restriction" here specifically means an arbitrary or
+impose `restriction`s on certain features. "Restriction" here specifically means an arbitrary or
 severe restriction, not the broad way in which any lint rule could be considered to restrict usage.
 Examples of restriction lints are rules like `assert` (`S101`) and `print` (`T201`), which ban basic
 language features across the board.

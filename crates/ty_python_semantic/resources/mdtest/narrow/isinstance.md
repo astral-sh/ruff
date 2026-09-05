@@ -1084,11 +1084,70 @@ def _(value: Concrete[int]) -> None:
         reveal_type(value.read())  # revealed: int
 ```
 
+## Negative narrowing for protocols with gradual members
+
+Negative narrowing excludes every materialization of a protocol, including when its members are
+gradual. `IntReader` is a subtype of the fully materialized `Reader` protocol, so the negative
+branch retains only `None`:
+
+```py
+from typing import Any, Protocol, runtime_checkable
+
+@runtime_checkable
+class Reader(Protocol):
+    def read(self) -> Any: ...
+
+class IntReader:
+    def read(self) -> int:
+        return 1
+
+def f(reader: IntReader | None):
+    if isinstance(reader, Reader):
+        reveal_type(reader.read())  # revealed: int & Any
+    else:
+        reveal_type(reader)  # revealed: None
+```
+
+## Narrowing iterables to containers and iterators in strict mode
+
+```toml
+[analysis]
+strict-generic-narrowing = true
+```
+
+Narrowing an `Iterable[T]` to an `Iterator`, or to a container type, retains its element type. See
+`generics/set_theoretic.md` for more details on the assumptions behind this, and for an explanation
+of the behavior of invariant containers:
+
+```py
+from typing import Iterable, Iterator
+
+def f(values: Iterable[int]):
+    if isinstance(values, Iterator):
+        reveal_type(values)  # revealed: Iterator[int]
+        reveal_type(next(values))  # revealed: int
+    if isinstance(values, tuple):
+        reveal_type(values)  # revealed: tuple[int, ...]
+        reveal_type(values[0])  # revealed: int
+    if isinstance(values, frozenset):
+        reveal_type(values)  # revealed: frozenset[int]
+        reveal_type(next(iter(values)))  # revealed: int
+    if isinstance(values, list):
+        reveal_type(values)  # revealed: Top[list[Unknown & int]]
+        reveal_type(values[0])  # revealed: int
+    if isinstance(values, set):
+        reveal_type(values)  # revealed: Top[set[Unknown & int]]
+        reveal_type(next(iter(values)))  # revealed: int
+```
+
 ## Use cases: `isinstance` narrowing and generics
 
 ### Strict mode
 
 ```toml
+[environment]
+python-version = "3.12"
+
 [analysis]
 strict-generic-narrowing = true
 ```
@@ -1196,6 +1255,25 @@ def _(xs: list[str] | set[str]) -> str:
         return "it's a list!"
     elif isinstance(xs, set):
         return "it's a set!"
+```
+
+#### Invariance with bounded type variables
+
+A value of a type variable bounded by `str` can also be an instance of a `Box` specialization
+through multiple inheritance. Checking `isinstance(value, Box)` cannot establish that this
+specialization is `Box[T]`, so the intersection with `T` survives and the return is rejected.
+
+```py
+class Box[T]:
+    value: T
+
+def narrow_box[T: str](value: Box[T] | T) -> Box[T]:
+    if isinstance(value, Box):
+        reveal_type(value)  # revealed: Box[T@narrow_box] | (T@narrow_box & Top[Box[Unknown]])
+        return value  # error: [invalid-return-type]
+
+    reveal_type(value)  # revealed: T@narrow_box & ~Top[Box[Unknown]]
+    raise TypeError
 ```
 
 ### Gradual mode
@@ -1310,6 +1388,25 @@ def _(xs: list[str] | set[str]) -> str:
         return "it's a list!"
     elif isinstance(xs, set):
         return "it's a set!"
+```
+
+#### Invariance with bounded type variables
+
+A value of a type variable bounded by `str` can also be an instance of a `Box` specialization
+through multiple inheritance. In gradual mode, `isinstance(value, Box)` preserves this overlap using
+`Box[Unknown]`, which is assignable to `Box[T]`, so the return statement is (unsoundly) accepted.
+
+```py
+class Box[T]:
+    value: T
+
+def narrow_box[T: str](value: Box[T] | T) -> Box[T]:
+    if isinstance(value, Box):
+        reveal_type(value)  # revealed: Box[T@narrow_box] | (T@narrow_box & Box[Unknown])
+        return value
+
+    reveal_type(value)  # revealed: T@narrow_box & ~Top[Box[Unknown]]
+    raise TypeError
 ```
 
 ## Narrowing recursively bounded generics (strict mode)
@@ -1453,8 +1550,9 @@ Narrowing must therefore preserve the original type argument instead of substitu
 default.
 
 ```py
-from typing import assert_never
+from typing import assert_never, final
 
+@final
 class Box[T: str = str]:
     value: T
 
@@ -1466,7 +1564,7 @@ def box_with_default[T: str = str](value: Box[T] | T) -> Box[T]:
         return value
 
     if not isinstance(value, Box):
-        reveal_type(value)  # revealed: T@box_with_default & ~Top[Box[Unknown]]
+        reveal_type(value)  # revealed: T@box_with_default
         return Box[T](value)
 
     assert_never(value)

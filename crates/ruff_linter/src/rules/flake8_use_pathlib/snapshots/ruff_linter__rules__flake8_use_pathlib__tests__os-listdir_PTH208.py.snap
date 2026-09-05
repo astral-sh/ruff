@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_use_pathlib/mod.rs
 ---
-PTH208 Use `pathlib.Path.iterdir()` instead.
+PTH208 [*] Use `pathlib.Path.iterdir()` instead.
  --> PTH208.py:3:1
   |
 1 | import os
@@ -10,8 +10,18 @@ PTH208 Use `pathlib.Path.iterdir()` instead.
   | ^^^^^^^^^^
 4 | os.listdir(b'.')
   |
+help: Replace with `Path(...).iterdir()`
+  |
+1 | import os
+2 + import pathlib
+3 |
+  - os.listdir('.')
+4 + pathlib.Path('.').iterdir()
+5 | os.listdir(b'.')
+  |
+note: This is a display-only fix and is likely to be incorrect
 
-PTH208 Use `pathlib.Path.iterdir()` instead.
+PTH208 [*] Use `pathlib.Path.iterdir()` instead.
  --> PTH208.py:4:1
   |
 3 | os.listdir('.')
@@ -20,8 +30,19 @@ PTH208 Use `pathlib.Path.iterdir()` instead.
 5 |
 6 | string_path = '.'
   |
+help: Replace with `Path(...).iterdir()`
+  |
+1 | import os
+2 + import pathlib
+3 |
+4 | os.listdir('.')
+  - os.listdir(b'.')
+5 + pathlib.Path(b'.').iterdir()
+6 |
+  |
+note: This is a display-only fix and is likely to be incorrect
 
-PTH208 Use `pathlib.Path.iterdir()` instead.
+PTH208 [*] Use `pathlib.Path.iterdir()` instead.
  --> PTH208.py:7:1
   |
 6 | string_path = '.'
@@ -30,30 +51,70 @@ PTH208 Use `pathlib.Path.iterdir()` instead.
 8 |
 9 | bytes_path = b'.'
   |
+help: Replace with `Path(...).iterdir()`
+  |
+1 | import os
+2 + import pathlib
+3 |
+--------------------------------------------------------------------------------
+7 | string_path = '.'
+  - os.listdir(string_path)
+8 + pathlib.Path(string_path).iterdir()
+9 |
+  |
+note: This is a display-only fix and is likely to be incorrect
 
-PTH208 Use `pathlib.Path.iterdir()` instead.
+PTH208 [*] Use `pathlib.Path.iterdir()` instead.
   --> PTH208.py:10:1
    |
  9 | bytes_path = b'.'
 10 | os.listdir(bytes_path)
    | ^^^^^^^^^^
+help: Replace with `Path(...).iterdir()`
+   |
+1  | import os
+2  + import pathlib
+3  |
+--------------------------------------------------------------------------------
+10 | bytes_path = b'.'
+   - os.listdir(bytes_path)
+11 + pathlib.Path(bytes_path).iterdir()
+12 |
+   |
+note: This is a display-only fix and is likely to be incorrect
 
-PTH208 Use `pathlib.Path.iterdir()` instead.
+PTH208 [*] Use `pathlib.Path.iterdir()` instead.
   --> PTH208.py:16:1
    |
 15 | path_path = Path('.')
 16 | os.listdir(path_path)
    | ^^^^^^^^^^
+help: Replace with `Path(...).iterdir()`
+   |
+15 | path_path = Path('.')
+   - os.listdir(path_path)
+16 + Path(path_path).iterdir()
+17 |
+   |
+note: This is a display-only fix and is likely to be incorrect
 
-PTH208 Use `pathlib.Path.iterdir()` instead.
+PTH208 [*] Use `pathlib.Path.iterdir()` instead.
   --> PTH208.py:19:4
    |
 19 | if os.listdir("dir"):
    |    ^^^^^^^^^^
 20 |     ...
    |
+help: Replace with `Path(...).iterdir()`
+   |
+18 |
+   - if os.listdir("dir"):
+19 + if Path("dir").iterdir():
+20 |     ...
+   |
+note: This is a display-only fix and is likely to be incorrect
 
-PTH208 Use `pathlib.Path.iterdir()` instead.
+PTH208 [*] Use `pathlib.Path.iterdir()` instead.
   --> PTH208.py:22:14
    |
 20 |     ...
@@ -62,3 +123,11 @@ PTH208 Use `pathlib.Path.iterdir()` instead.
    |              ^^^^^^^^^^
 23 |     ...
    |
+help: Replace with `Path(...).iterdir()`
+   |
+21 |
+   - if "file" in os.listdir("dir"):
+22 + if "file" in Path("dir").iterdir():
+23 |     ...
+   |
+note: This is a display-only fix and is likely to be incorrect

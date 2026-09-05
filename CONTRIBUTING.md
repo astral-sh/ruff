@@ -37,6 +37,13 @@ exploration of new features, we will often close these pull requests immediately
 new feature to ruff creates a long-term maintenance burden and requires strong consensus from the ruff
 team before it is appropriate to begin work on an implementation.
 
+### Avoiding duplicate work
+
+Before starting on an issue, take a look at the discussion and any linked pull requests, including
+those in the sidebar. An issue may still be open while a fix is under review. Even if a previous
+attempt was closed, it may contain useful context or review comments that you could incorporate
+before submitting a new PR.
+
 ## Use of AI
 
 We **require all use of AI in contributions to follow our
@@ -65,31 +72,26 @@ them manually from the repository root by running these slash commands inside Cl
 Ruff is written in Rust. You'll need to install the
 [Rust toolchain](https://www.rust-lang.org/tools/install) for development.
 
-You'll also need [Insta](https://insta.rs/docs/) to update snapshot tests:
+You'll need [uv](https://docs.astral.sh/uv/getting-started/installation/) to
+run Python utility commands. uv also manages our development toolchain.
+
+We use [Insta](https://insta.rs/docs/) to update snapshot tests. It's already part
+of the development toolchain:
 
 ```shell
-cargo install --locked cargo-insta
+uv run --only-dev cargo insta --version
 ```
-
-You'll need [uv](https://docs.astral.sh/uv/getting-started/installation/) (or `pipx` and `pip`) to
-run Python utility commands.
 
 You can optionally install hooks to automatically run the validation checks
 when making a commit:
 
 ```shell
-uv run --only-group dev --locked prek install
+uv run --only-dev --locked prek install
 ```
 
-We recommend [nextest](https://nexte.st/) to run Ruff's test suite (via `cargo nextest run`),
-though it's not strictly necessary:
-
-```shell
-cargo install cargo-nextest --locked
-```
-
-Throughout this guide, any usages of `cargo test` can be replaced with `cargo nextest run`,
-if you choose to install `nextest`.
+We recommend [nextest](https://nexte.st/) to run Ruff's test suite (via `uv run --only-dev cargo nextest run`),
+though it's not strictly necessary. Throughout this guide, any usages of `cargo test` can be replaced
+with `uv run --only-dev cargo nextest run`.
 
 ### Development
 
@@ -105,7 +107,7 @@ and that it passes both the lint and test validation checks:
 ```shell
 cargo clippy --workspace --all-targets --all-features -- -D warnings  # Rust linting
 RUFF_UPDATE_SCHEMA=1 cargo test  # Rust testing and updating ruff.schema.json
-uv run --only-group dev --locked prek run --all-files  # Rust and Python formatting, Markdown and Python linting, etc.
+uv run --only-dev --locked prek run --all-files  # Rust and Python formatting, Markdown and Python linting, etc.
 ```
 
 These checks will run on GitHub Actions when you open your pull request, but running them locally
@@ -117,7 +119,7 @@ Note that many code changes also require updating the snapshot tests, which is d
 after running `cargo test` like so:
 
 ```shell
-cargo insta review
+uv run --only-dev cargo insta review
 ```
 
 If your pull request relates to a specific lint rule, include the category and rule code or name in
@@ -189,15 +191,10 @@ uv run scripts/generate-crate-readmes.py
 cargo publish --workspace --dry-run
 ```
 
-Before merging a publishable crate, ask a crates.io owner to bootstrap it by running:
-
-```shell
-CARGO_REGISTRY_TOKEN=<token> uv run --no-config scripts/setup-crates-io-publish.py
-```
-
-The bootstrap script reserves the crate name, configures the release workflow as its trusted
-publisher, requires trusted publishing for future versions, and adds the crate to `.known-crates`.
-Commit the generated README and `.known-crates` update with the new crate.
+Before merging a publishable crate, register it in
+[astral-sh/crates-policies](https://github.com/astral-sh/crates-policies#readme) and follow the
+instructions there to bootstrap the crate and configure trusted publishing. Commit the generated
+README with the new crate.
 
 ### Example: Adding a new lint rule
 
@@ -602,16 +599,10 @@ which makes it a good target for benchmarking.
 git clone --branch 3.10 https://github.com/python/cpython.git crates/ruff_linter/resources/test/cpython
 ```
 
-Install `hyperfine`:
-
-```shell
-cargo install --locked hyperfine
-```
-
 To benchmark the release build:
 
 ```shell
-cargo build --release --bin ruff && hyperfine --warmup 10 \
+cargo build --release --bin ruff && uv run --only-dev hyperfine --warmup 10 \
   "./target/release/ruff check ./crates/ruff_linter/resources/test/cpython/ --no-cache -e" \
   "./target/release/ruff check ./crates/ruff_linter/resources/test/cpython/ -e"
 
@@ -631,7 +622,7 @@ Summary
 To benchmark against the ecosystem's existing tools:
 
 ```shell
-hyperfine --ignore-failure --warmup 5 \
+uv run --only-dev hyperfine --ignore-failure --warmup 5 \
   "./target/release/ruff check ./crates/ruff_linter/resources/test/cpython/ --no-cache" \
   "pyflakes crates/ruff_linter/resources/test/cpython" \
   "autoflake --recursive --expand-star-imports --remove-all-unused-imports --remove-unused-variables --remove-duplicate-keys resources/test/cpython" \
@@ -677,7 +668,7 @@ Summary
 To benchmark a subset of rules, e.g. `LineTooLong` and `DocLineTooLong`:
 
 ```shell
-cargo build --release && hyperfine --warmup 10 \
+cargo build --release && uv run --only-dev hyperfine --warmup 10 \
   "./target/release/ruff check ./crates/ruff_linter/resources/test/cpython/ --no-cache -e --select W505,E501"
 ```
 
@@ -717,7 +708,7 @@ will execute Pylint with maximum parallelism and only report errors.
 To benchmark Pyupgrade, run the following from `crates/ruff_linter/resources/test/cpython`:
 
 ```shell
-hyperfine --ignore-failure --warmup 5 --prepare "git reset --hard HEAD" \
+uv run --only-dev hyperfine --ignore-failure --warmup 5 --prepare "git reset --hard HEAD" \
   "find . -type f -name \"*.py\" | xargs -P 0 pyupgrade --py311-plus"
 
 Benchmark 1: find . -type f -name "*.py" | xargs -P 0 pyupgrade --py311-plus

@@ -1543,9 +1543,10 @@ fn complex_config_setting_overridden_via_cli() -> Result<()> {
 }
 
 #[test]
-fn deprecated_config_option_overridden_via_cli() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
+fn deprecated_config_option_overridden_via_cli() -> Result<()> {
+    let test = CliTest::new()?;
+
+    assert_cmd_snapshot!(test.check_command()
         .args(["--config", "select=['N801']", "-"])
         .pass_stdin("class lowercase: ..."),
         @"
@@ -1559,6 +1560,8 @@ fn deprecated_config_option_overridden_via_cli() {
     warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in your `--config` CLI arguments:
       - 'select' -> 'lint.select'
     ");
+
+    Ok(())
 }
 
 #[test]
@@ -3553,30 +3556,36 @@ fn required_import_set_conflicts_with_pyi025() {
 
 // https://github.com/astral-sh/ruff/issues/20891
 #[test]
-fn required_import_set_aliased_as_abstract_set_no_conflict() {
+fn required_import_set_aliased_as_abstract_set_no_conflict() -> Result<()> {
+    let test = CliTest::new()?;
+
     assert_cmd_snapshot!(
-        Command::new(get_cargo_bin(BIN_NAME))
-            .args(STDIN_BASE_OPTIONS)
+        test.check_command()
             .arg("--config")
             .arg(r#"lint.isort.required-imports = ["from collections.abc import Set as AbstractSet"]"#)
             .args(["--select", "I002,PYI025"])
             .arg("-")
             .pass_stdin("1")
     );
+
+    Ok(())
 }
 
 // https://github.com/astral-sh/ruff/issues/20891
 #[test]
-fn required_import_set_without_pyi025_no_conflict() {
+fn required_import_set_without_pyi025_no_conflict() -> Result<()> {
+    let test = CliTest::new()?;
+
     assert_cmd_snapshot!(
-        Command::new(get_cargo_bin(BIN_NAME))
-            .args(STDIN_BASE_OPTIONS)
+        test.check_command()
             .arg("--config")
             .arg(r#"lint.isort.required-imports = ["from collections.abc import Set"]"#)
             .args(["--select", "I002"])
             .arg("-")
             .pass_stdin("1")
     );
+
+    Ok(())
 }
 
 // https://github.com/astral-sh/ruff/issues/19842

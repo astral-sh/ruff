@@ -37,6 +37,15 @@ def convert(value: "Annotated[str, dict(**{'name': 'value'})]") -> "Annotated[in
     return 1
 ```
 
+Conditional expressions are also valid metadata and do not affect the annotated type.
+
+```py
+def flag() -> bool:
+    return True
+
+conditional_value: "Annotated[int, 1 if flag() else 2]" = 1
+```
+
 ## Inside `type[...]`
 
 `Annotated` can wrap a class or specialized generic class inside `type[...]` without changing the

@@ -1440,6 +1440,7 @@ mod uv_metadata {
     use ty_static::EnvVars;
 
     use crate::CliTest;
+    use crate::uv_workspace::{uv_sync_command, write_dependency_wheel};
 
     fn command_with_script_uv(case: &CliTest) -> Command {
         let mut command = case.command_inheriting_environment();
@@ -1541,6 +1542,132 @@ mod uv_metadata {
         Ok(())
     }
 
+    fn script_with_indirect_dependency() -> anyhow::Result<CliTest> {
+        let case = CliTest::with_file(
+            "script.py",
+            r#"
+            # /// script
+            # requires-python = ">=3.8"
+            # dependencies = ["direct-dependency"]
+            # [tool.uv]
+            # no-index = true
+            # find-links = ["wheels"]
+            # ///
+
+            import direct_module
+            from indirect_module import value
+            import indirect_module
+            "#,
+        )?;
+        write_dependency_wheel(&case, "indirect-dependency", "indirect_module", &[])?;
+        write_dependency_wheel(
+            &case,
+            "direct-dependency",
+            "direct_module",
+            &["indirect-dependency"],
+        )?;
+        Ok(case)
+    }
+
+    #[test]
+    fn indirect_dependencies_use_script_declarations() -> anyhow::Result<()> {
+        assert_uv_supports_script_metadata()?;
+
+        let case = script_with_indirect_dependency()?;
+        let mut command = command_with_script_uv(&case);
+        command
+            .arg("script.py")
+            .env("UV_OFFLINE", "1")
+            .env("UV_PYTHON_DOWNLOADS", "never");
+
+        assert_cmd_snapshot!(command, @"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        All checks passed!
+
+        ----- stderr -----
+        ");
+
+        command.args(["--error", "missing-direct-dependency"]);
+        assert_cmd_snapshot!(command, @"
+        success: false
+        exit_code: 1
+        ----- stdout -----
+        error[missing-direct-dependency]: Import of `indirect_module` requires a direct dependency on `indirect-dependency`
+          --> script.py:11:6
+           |
+        11 | from indirect_module import value
+           |      ^^^^^^^^^^^^^^^
+        help: Declare `indirect-dependency` in the script's inline `dependencies` metadata
+        info: See https://docs.astral.sh/uv/guides/scripts/#declaring-script-dependencies
+
+        error[missing-direct-dependency]: Import of `indirect_module` requires a direct dependency on `indirect-dependency`
+          --> script.py:12:8
+           |
+        12 | import indirect_module
+           |        ^^^^^^^^^^^^^^^
+        help: Declare `indirect-dependency` in the script's inline `dependencies` metadata
+        info: See https://docs.astral.sh/uv/guides/scripts/#declaring-script-dependencies
+
+        Found 2 diagnostics
+
+        ----- stderr -----
+        ");
+
+        Ok(())
+    }
+
+    #[test]
+    fn workspace_dependencies_do_not_apply_to_scripts() -> anyhow::Result<()> {
+        assert_uv_supports_script_metadata()?;
+
+        let case = script_with_indirect_dependency()?;
+        case.write_files([
+            (
+                "pyproject.toml",
+                r#"
+                [project]
+                name = "project"
+                version = "0.1.0"
+                requires-python = ">=3.8"
+                dependencies = ["indirect-dependency"]
+
+                [tool.uv]
+                no-index = true
+                find-links = ["wheels"]
+                "#,
+            ),
+            (
+                "ordinary.py",
+                r#"
+                import indirect_module
+                from typing_extensions import reveal_type
+
+                reveal_type(indirect_module.value)
+                "#,
+            ),
+        ])?;
+
+        assert_cmd_snapshot!(
+            uv_sync_command(&case, None)?
+                .args(["--error", "missing-direct-dependency"]),
+            @"
+        success: false
+        exit_code: 1
+        ----- stdout -----
+        ordinary.py:5:13: info[revealed-type] Revealed type: `int`
+        script.py:11:6: error[missing-direct-dependency] Import of `indirect_module` requires a direct dependency on `indirect-dependency`
+        script.py:12:8: error[missing-direct-dependency] Import of `indirect_module` requires a direct dependency on `indirect-dependency`
+        Found 3 diagnostics
+
+        ----- stderr -----
+        "
+        );
+
+        Ok(())
+    }
+
     #[test]
     fn imported_script_environment() -> anyhow::Result<()> {
         assert_uv_supports_script_metadata()?;
@@ -1565,27 +1692,17 @@ mod uv_metadata {
             ),
         ])?;
 
-        // FIXME: Checking a.py can create b.py's environment before synchronization, causing
-        // b.py to use its Python 3.11 fallback instead of the Python 3.12 environment from uv.
+        // The script uses uv's Python version even when its importer is checked first.
         assert_cmd_snapshot!(
             command_with_script_uv(&case)
                 .args(["a.py", "b.py"])
                 .env(EnvVars::TY_UV, "scripts")
                 .env(EnvVars::TY_MAX_PARALLELISM, "1"),
             @"
-        success: false
-        exit_code: 1
+        success: true
+        exit_code: 0
         ----- stdout -----
-        error[type-assertion-failure]: Argument does not have asserted type `tuple[Literal[3], Literal[12]]`
-          --> b.py:12:1
-           |
-        12 | assert_type(sys.version_info[:2], tuple[Literal[3], Literal[12]])
-           | ^^^^^^^^^^^^--------------------^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-           |             |
-           |             Inferred type is `tuple[Literal[3], Literal[11]]`
-        info: `tuple[Literal[3], Literal[12]]` and `tuple[Literal[3], Literal[11]]` are not equivalent types
-
-        Found 1 diagnostic
+        All checks passed!
 
         ----- stderr -----
         "

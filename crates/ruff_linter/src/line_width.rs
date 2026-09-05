@@ -9,7 +9,35 @@ use unicode_width::UnicodeWidthChar;
 
 use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_macros::CacheKey;
-use ruff_python_trivia::tab_offset;
+use ruff_python_trivia::{find_trailing_pragma_offset, is_pragma_comment, tab_offset};
+
+use crate::preview::{
+    is_pragma_excluded_from_import_width_enabled, is_trailing_pragma_in_line_length_enabled,
+};
+use crate::settings::types::PreviewMode;
+
+/// Returns the offset within `comment` at which the pragma comment excluded from line-length
+/// measurement begins, or `None` if the comment contains no such pragma.
+///
+/// This is the shared policy for how pragma comments (e.g., `# noqa: F401` or `# type: ignore`)
+/// are excluded when measuring line width, used by `line-too-long` (E501) and
+/// `doc-line-too-long` (W505), and, in preview mode, by isort's (I001) decision of whether an
+/// import fits on one line (see [`LineWidthBuilder::add_comment`]). The formatter applies the
+/// equivalent policy when measuring comment widths.
+///
+/// In stable mode, only comments that are pragmas in their entirety are excluded (the returned
+/// offset is `0`). In preview mode, a trailing pragma within a mixed comment (e.g.,
+/// `# explanation  # noqa: F401`) is also excluded, in which case the offset points at the `#`
+/// that begins the pragma.
+pub(crate) fn pragma_offset_for_line_length(comment: &str, preview: PreviewMode) -> Option<usize> {
+    if is_trailing_pragma_in_line_length_enabled(preview) {
+        find_trailing_pragma_offset(comment)
+    } else if is_pragma_comment(comment) {
+        Some(0)
+    } else {
+        None
+    }
+}
 
 /// The length of a line of text that is considered too long.
 ///
@@ -236,6 +264,41 @@ impl LineWidthBuilder {
         self.width += width;
         self.column += width;
         self
+    }
+
+    /// Adds the width of a trailing comment, including the standard two-space separator that
+    /// precedes it. In preview mode, any pragma comment is excluded per
+    /// [`pragma_offset_for_line_length`].
+    ///
+    /// Pragma comments are excluded so that adding one to a line never affects whether the line
+    /// is considered to fit, consistent with how `line-too-long` (E501) measures lines. For
+    /// example, counting a `# noqa` comment towards an import's width could cause isort to wrap
+    /// an import that otherwise fits on one line, moving the pragma to a position where it no
+    /// longer applies to the import statement:
+    ///
+    /// ```python
+    /// from module import (
+    ///     member,  # noqa: PLC0415
+    /// )
+    /// ```
+    ///
+    /// Unlike E501, which has always stripped whole-pragma comments on stable, the exclusion
+    /// changes how imports are formatted, so it is preview-gated in its entirety: on stable, the
+    /// full comment width is counted.
+    #[must_use]
+    pub(crate) fn add_comment(self, comment: &str, preview: PreviewMode) -> Self {
+        if !is_pragma_excluded_from_import_width_enabled(preview) {
+            return self.add_width(2).add_str(comment);
+        }
+        let counted = match pragma_offset_for_line_length(comment, preview) {
+            Some(offset) => comment[..offset].trim_end(),
+            None => comment,
+        };
+        if counted.is_empty() {
+            self
+        } else {
+            self.add_width(2).add_str(counted)
+        }
     }
 }
 

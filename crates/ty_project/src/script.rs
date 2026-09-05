@@ -12,19 +12,14 @@ use serde::Deserialize;
 use ty_combine::Combine;
 use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings, UseDefaultStrategy};
 use ty_python_semantic::PythonVersionWithSource;
+use ty_python_semantic::dependency::DependencyMetadata;
 
 use crate::metadata::options::{EnvironmentOptions, Options, OptionsContext};
 use crate::metadata::pyproject::Tool;
 use crate::metadata::settings::Settings;
 use crate::metadata::value::RelativePathBuf;
-use crate::uv::UvMetadata;
+use crate::uv::{DependencyMetadataError, UvMetadata, script_environment};
 use crate::{Db, ProjectMetadata};
-
-mod environment;
-
-pub(crate) use environment::ScriptEnvironmentCacheKey;
-use environment::script_environment;
-pub use environment::{ScriptEnvironmentAvailability, ScriptEnvironments};
 
 /// A standalone PEP 723 script and its resolved settings.
 #[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
@@ -60,6 +55,7 @@ pub(crate) struct Script<'db> {
     pub(crate) settings_diagnostics: Box<[Diagnostic]>,
 }
 
+#[salsa::tracked]
 impl<'db> Script<'db> {
     /// Returns the script for `file` without creating a second Salsa memo for ordinary files.
     pub(crate) fn for_file(db: &'db dyn Db, file: File) -> Option<Self> {
@@ -67,6 +63,27 @@ impl<'db> Script<'db> {
         // do not also allocate a tracked `script` memo just to cache another `None`.
         script_tag(db, file)?;
         script(db, file)
+    }
+
+    /// Cache dependency declarations separately from settings, which can remain unchanged after
+    /// uv synchronizes an edit to the script's dependencies.
+    #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+    pub(crate) fn dependency_metadata(
+        self,
+        db: &'db dyn Db,
+    ) -> Result<Option<Box<DependencyMetadata>>, DependencyMetadataError> {
+        if !self.has_valid_settings(db) {
+            return Ok(None);
+        }
+
+        let Some(metadata) = script_environment(db, self.file(db))
+            .and_then(|environment| environment.uv_metadata(db))
+        else {
+            return Ok(None);
+        };
+        metadata
+            .dependency_metadata()
+            .map(|metadata| Some(Box::new(metadata)))
     }
 }
 
@@ -79,7 +96,7 @@ pub(crate) fn script(db: &dyn Db, file: File) -> Option<Script<'_>> {
     let tag = script_tag(db, file)?;
 
     // Never treat third-party files as scripts.
-    if !crate::should_check_file(db, file) {
+    if !crate::is_project_file(db, file) {
         return None;
     }
 
@@ -137,7 +154,7 @@ pub(crate) fn script(db: &dyn Db, file: File) -> Option<Script<'_>> {
 ///
 /// Most files have no script tag. Boxing keeps the cached result compact when it is `None`.
 #[salsa::tracked(returns(as_deref))]
-pub(crate) fn script_tag(db: &dyn SourceDb, file: File) -> Option<Box<ScriptTag>> {
+pub fn script_tag(db: &dyn SourceDb, file: File) -> Option<Box<ScriptTag>> {
     let path = file.path(db);
     if path.is_vendored_path() {
         return None;

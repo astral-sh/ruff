@@ -195,8 +195,9 @@ strict-generic-narrowing = true
 ```
 
 ```py
-from typing import Any
+from typing import Any, final
 
+@final
 class Box[T: str = str]:
     value: T
 
@@ -208,7 +209,7 @@ def box_with_default[T: str = str](value: Box[T] | T) -> Box[T]:
             reveal_type(value)  # revealed: Box[T@box_with_default]
             return value
         case remaining:
-            reveal_type(remaining)  # revealed: T@box_with_default & ~Top[Box[Unknown]]
+            reveal_type(remaining)  # revealed: T@box_with_default
             return Box[T](remaining)
 ```
 
@@ -503,6 +504,57 @@ def match_nested_list_of_tuples_captures(
             reveal_type(item)  # revealed: bytes
 ```
 
+## Mutable starred sequence captures
+
+A starred capture creates a new list, just like a starred assignment target. Inferred literal types
+are promoted in that list so it can be mutated, without widening the fixed captures or the original
+tuple.
+
+```py
+value = (1, "two")
+first, *assigned = value
+reveal_type(assigned)  # revealed: list[str]
+
+match value:
+    case [first, *rest]:
+        reveal_type(first)  # revealed: Literal[1]
+        reveal_type(rest)  # revealed: list[str]
+        rest.append("three")
+        reveal_type(value)  # revealed: tuple[Literal[1], Literal["two"]]
+```
+
+Singleton values follow the same promotion rules as in a list literal.
+
+```py
+match (1, None):
+    case [first, *rest]:
+        reveal_type(rest)  # revealed: list[None | Unknown]
+        rest.append(2)
+```
+
+Explicit literal annotations are preserved in the captured list.
+
+```py
+from typing import Literal
+
+def explicit_literal_capture(value: tuple[int, Literal["two"]]):
+    match value:
+        case [first, *rest]:
+            reveal_type(rest)  # revealed: list[Literal["two"]]
+```
+
+## Empty starred sequence captures
+
+When the fixed patterns consume every element, the starred capture gets an empty list with an
+unknown element type, just like an empty list literal.
+
+```py
+match (1,):
+    case [first, *rest]:
+        reveal_type(rest)  # revealed: list[Unknown]
+        rest.append(2)
+```
+
 ## Captures from unions of tuples
 
 When a union contains several tuple types, matching one element can determine the types of the other
@@ -566,6 +618,20 @@ def test_match_capture_filters_aliased_union_members(value: MatchPair) -> None:
     match value:
         case [1, item]:
             reveal_type(item)  # revealed: int
+```
+
+Promoting the starred capture does not widen the fixed elements used to select a union member.
+Matching `1` excludes the tuple beginning with `2`, so its integer element does not contribute to
+`rest`.
+
+```py
+def inferred_union_capture(flag: bool):
+    value = (1, "two") if flag else (2, 3)
+    match value:
+        case [1, *rest]:
+            reveal_type(rest)  # revealed: list[str]
+            rest.append("three")
+            reveal_type(value)  # revealed: tuple[Literal[1], Literal["two"]]
 ```
 
 ## Pattern aliases
@@ -2553,6 +2619,30 @@ def runtime_protocol_pattern_is_exhaustive(value: RuntimeProtocolImplementer) ->
             return 1
 ```
 
+## Negative narrowing for protocols with gradual members
+
+The fallback case excludes the fully materialized protocol. `IntReader` is a subtype of the fully
+materialized `Reader` protocol, so the fallback case retains only `None`:
+
+```py
+from typing import Any, Protocol, runtime_checkable
+
+@runtime_checkable
+class Reader(Protocol):
+    def read(self) -> Any: ...
+
+class IntReader:
+    def read(self) -> int:
+        return 1
+
+def f(reader: IntReader | None):
+    match reader:
+        case Reader():
+            reveal_type(reader.read())  # revealed: int & Any
+        case _:
+            reveal_type(reader)  # revealed: None
+```
+
 ## Members from the subject type
 
 A keyword pattern reads the attribute from the matched value. The subject type can therefore provide
@@ -3821,8 +3911,8 @@ def test_match_alias_ignores_custom_ne(flag: bool) -> str:
 
 ## Recursive enum aliases in value patterns
 
-An enum value pattern narrows a recursive alias to the matching member while preserving its
-`NewType` tag.
+An enum value pattern uses the non-recursive members of an invalid recursive alias, narrowing to the
+matching member while preserving its `NewType` tag.
 
 ```toml
 [environment]
@@ -3838,7 +3928,7 @@ class Number(IntEnum):
     TWO = 2
 
 BrandedNumber = NewType("BrandedNumber", Number)
-type RecursiveNumber = BrandedNumber | RecursiveNumber
+type RecursiveNumber = BrandedNumber | RecursiveNumber  # error: [cyclic-type-alias-definition]
 
 def match_recursive_branded_enum(value: RecursiveNumber) -> None:
     match value:
@@ -3852,7 +3942,7 @@ A recursive alias that changes its specialization can also contain values outsid
 `True` compares equal to `Number.ONE`, both branches preserve the possible boolean values.
 
 ```py
-type Changing[T] = T | Changing[bool]
+type Changing[T] = T | Changing[bool]  # error: [cyclic-type-alias-definition]
 
 def match_changing_specialization(value: Changing[BrandedNumber]) -> None:
     match value:

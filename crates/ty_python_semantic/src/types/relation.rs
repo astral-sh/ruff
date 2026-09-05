@@ -13,6 +13,7 @@ use crate::types::constraints::{
 use crate::types::cyclic::{HasIdentity, PairVisitor, TypeIdentity};
 use crate::types::enums::is_single_member_enum;
 use crate::types::function::FunctionDecorators;
+use crate::types::relation_error::ErrorRelation;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::signatures::{ParametersKind, SignatureRelationVisitor};
 use crate::types::tuple::TupleType;
@@ -893,6 +894,7 @@ impl<'db> Type<'db> {
             env,
             constraints,
             inferable,
+            context_tree: None,
             given: ConstraintSet::from_bool(constraints, false),
             perform_expensive_checks: true,
             disjointness_visitor: &disjointness_visitor,
@@ -901,6 +903,31 @@ impl<'db> Type<'db> {
             materialization_visitor: &materialization_visitor,
         };
         checker.check_type_pair(db, self, other)
+    }
+
+    /// Re-run a successful disjointness check with diagnostic context collection enabled.
+    pub(crate) fn disjointness_error_context(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        other: Type<'db>,
+    ) -> ErrorContextTree<'db> {
+        let constraints = ConstraintSetBuilder::new();
+        let context = ErrorContextTree::new(ErrorRelation::Disjointness);
+        let checker = DisjointnessChecker {
+            env,
+            constraints: &constraints,
+            inferable: TypeVarSet::None,
+            context_tree: Some(context.clone()),
+            given: ConstraintSet::from_bool(&constraints, false),
+            perform_expensive_checks: true,
+            relation_visitor: &HasRelationToVisitor::default(&constraints),
+            disjointness_visitor: &IsDisjointVisitor::default(&constraints),
+            signature_relation_visitor: &SignatureRelationVisitor::default(),
+            materialization_visitor: &ApplyTypeMappingVisitor::new(env),
+        };
+        checker.check_type_pair(db, self, other);
+        context
     }
 
     /// Checks whether `self` is disjoint from `other`, while being more accepting of false
@@ -922,6 +949,7 @@ impl<'db> Type<'db> {
             env,
             constraints,
             inferable,
+            context_tree: None,
             given: ConstraintSet::from_bool(constraints, false),
             perform_expensive_checks: false,
             disjointness_visitor: &disjointness_visitor,
@@ -1139,6 +1167,260 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             && matches!(self.typevar_evaluation, TypeVarEvaluation::Eager)
     }
 
+    fn should_expand_intersection(
+        &self,
+        db: &'db dyn Db,
+        intersection: IntersectionType<'db>,
+    ) -> bool {
+        intersection
+            .positive(db)
+            .iter()
+            .any(|element| match element {
+                Type::TypeVar(tvar) => !tvar.is_inferable(db, self.inferable),
+                Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db).is_union(),
+                _ => false,
+            })
+    }
+
+    fn check_source_union(
+        &self,
+        db: &'db dyn Db,
+        union: UnionType<'db>,
+        target: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        if let Some(supertype) = union.common_literal_supertype(db, self.env) {
+            // Use the broader supertype only as a positive proof. If it has the requested
+            // relation to the target, then every literal in the union does too. Otherwise,
+            // check each literal individually.
+            let supertype_result =
+                self.without_context_collection(|| self.check_type_pair(db, supertype, target));
+            if supertype_result.is_trivially_always_satisfied() {
+                return supertype_result;
+            }
+        }
+
+        union
+            .elements(db)
+            .iter()
+            .when_all(db, self.constraints, |&element| {
+                let constraint_set = self.check_type_pair(db, element, target);
+                if let Some(context) = self.report_context()
+                    && constraint_set.is_never_satisfied(db, self.env)
+                {
+                    context.push(ErrorContext::NotAllUnionElementsAssignable {
+                        element,
+                        union: Type::Union(union),
+                        target,
+                    });
+                }
+                constraint_set
+            })
+    }
+
+    fn check_target_union(
+        &self,
+        db: &'db dyn Db,
+        source: Type<'db>,
+        union: UnionType<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        let target = Type::Union(union);
+        if let Type::Intersection(intersection) = source
+            && let Some(alternatives) = intersection.finite_alternative_union(db, self.env)
+        {
+            return self.check_type_pair(db, alternatives, target);
+        }
+
+        let is_new_type_of_union = || {
+            // Normally non-unions cannot directly contain unions in our model due to the fact that
+            // we enforce a DNF structure on our set-theoretic types. However, it *is* possible for
+            // there to be a newtype of a union, for an intersection to contain a newtype of a
+            // union, or for a non-inferable typevar (possibly inside an intersection) to widen to a
+            // bound or set of constraints that exposes a union; this requires special handling.
+            match source {
+                Type::Intersection(intersection)
+                    if self.should_expand_intersection(db, intersection) =>
+                {
+                    self.check_type_pair(
+                        db,
+                        intersection.with_expanded_typevars_and_newtypes(db, self.env),
+                        target,
+                    )
+                }
+                Type::NewTypeInstance(newtype) => {
+                    let concrete_base = newtype.concrete_base_type(db);
+                    if concrete_base.is_union() {
+                        self.check_type_pair(db, concrete_base, target)
+                    } else {
+                        self.never()
+                    }
+                }
+                _ => self.never(),
+            }
+        };
+
+        let mut elements_context = vec![];
+        let context_tree = self.context_tree.as_ref().filter(|tree| tree.is_enabled());
+
+        let elements = union.elements(db);
+        let result = elements
+            .iter()
+            .when_any(db, self.constraints, |&element| {
+                let result = self.check_type_pair(db, source, element);
+                if let Some(context_tree) = context_tree {
+                    let context = context_tree.take();
+                    if !context.is_empty() {
+                        elements_context.push(context);
+                    }
+                }
+                result
+            })
+            .or(db, self.constraints, is_new_type_of_union);
+
+        if context_tree.is_some()
+            && !elements_context.is_empty()
+            && result.is_never_satisfied(db, self.env)
+        {
+            let elements_without_context = elements.len() - elements_context.len();
+            if elements_without_context > 0 && elements_without_context < elements.len() {
+                elements_context.push(ErrorContextTree::from_context(
+                    ErrorContext::NotAssignableToNOtherUnionElements {
+                        n: elements_without_context,
+                    },
+                    self.relation,
+                ));
+            }
+            self.set_context(
+                ErrorContext::NotAssignableToAnyUnionElement {
+                    source,
+                    union: target,
+                },
+                elements_context,
+            );
+        }
+
+        result
+    }
+
+    fn check_target_intersection(
+        &self,
+        db: &'db dyn Db,
+        source: Type<'db>,
+        intersection: IntersectionType<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        intersection
+            .positive(db)
+            .iter()
+            .when_all(db, self.constraints, |&positive| {
+                let constraint_set = self.check_type_pair(db, source, positive);
+                if let Some(context) = self.report_context()
+                    && constraint_set.is_never_satisfied(db, self.env)
+                {
+                    context.push(ErrorContext::NotAssignableToIntersectionElement {
+                        source,
+                        element: positive,
+                        intersection: Type::Intersection(intersection),
+                    });
+                }
+                constraint_set
+            })
+            .and(db, self.constraints, || {
+                // For subtyping, we would want to check whether the *top materialization* of
+                // `source` is disjoint from the *top materialization* of `negative`. As an
+                // optimization, however, we can avoid this explicit transformation here, since
+                // our `Type::is_disjoint_from` implementation already only returns true for
+                // `T.is_disjoint_from(U)` if the *top materialization* of `T` is disjoint from the
+                // *top materialization* of `U`.
+                //
+                // Note that the implementation of redundancy here may be too strict from a
+                // theoretical perspective: under redundancy, `T <: ~U` if `Bottom[T]` is disjoint
+                // from `Top[U]` and `Bottom[U]` is disjoint from `Top[T]`. It's possible that this
+                // could be improved. For now, however, we err on the side of strictness for our
+                // redundancy implementation: a fully complete implementation of redundancy may
+                // lead to non-transitivity (highly undesirable); and pragmatically, a full
+                // implementation of redundancy may not generally lead to simpler types in many
+                // situations.
+                let source_ty = match self.relation {
+                    TypeRelation::Subtyping
+                    | TypeRelation::Redundancy { .. }
+                    | TypeRelation::SubtypingAssuming => source,
+                    TypeRelation::Assignability => source.bottom_materialization(db, self.env),
+                };
+                intersection
+                    .negative(db)
+                    .iter()
+                    .when_all(db, self.constraints, |&negative| {
+                        let negative = match self.relation {
+                            TypeRelation::Subtyping
+                            | TypeRelation::Redundancy { .. }
+                            | TypeRelation::SubtypingAssuming => negative,
+                            TypeRelation::Assignability => {
+                                negative.bottom_materialization(db, self.env)
+                            }
+                        };
+                        self.as_disjointness_checker()
+                            .check_type_pair(db, source_ty, negative)
+                    })
+            })
+    }
+
+    fn check_source_intersection(
+        &self,
+        db: &'db dyn Db,
+        intersection: IntersectionType<'db>,
+        target: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        if matches!(target, Type::LiteralValue(_))
+            && let Some(alternatives) = intersection.finite_alternative_union(db, self.env)
+        {
+            return self.check_type_pair(db, alternatives, target);
+        }
+
+        // An intersection type is a subtype of another type if at least one of its positive
+        // elements is a subtype of that type. If there are no positive elements, we treat `object`
+        // as the implicit positive element (e.g., `~str` is semantically `object & ~str`).
+        let mut elements_context = vec![];
+        let context_tree = self.context_tree.as_ref().filter(|tree| tree.is_enabled());
+
+        let result = intersection
+            .positive_elements_or_object(db)
+            .when_any(db, self.constraints, |element| {
+                let result = self.check_type_pair(db, element, target);
+                if let Some(context_tree) = context_tree {
+                    let context = context_tree.take();
+                    if !context.is_empty() {
+                        elements_context.push(context);
+                    }
+                }
+                result
+            })
+            .or(db, self.constraints, || {
+                if self.should_expand_intersection(db, intersection) {
+                    self.check_type_pair(
+                        db,
+                        intersection.with_expanded_typevars_and_newtypes(db, self.env),
+                        target,
+                    )
+                } else {
+                    self.never()
+                }
+            });
+
+        if context_tree.is_some()
+            && !elements_context.is_empty()
+            && result.is_never_satisfied(db, self.env)
+        {
+            self.set_context(
+                ErrorContext::NoIntersectionElementAssignableToTarget {
+                    intersection: Type::Intersection(intersection),
+                    target,
+                },
+                elements_context,
+            );
+        }
+
+        result
+    }
+
     /// Return the collected error context, or an empty tree if collection was disabled.
     pub(super) fn into_error_context(self) -> ErrorContextTree<'db> {
         self.context_tree
@@ -1217,10 +1499,16 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         target: Type<'db>,
         work: impl FnOnce() -> ConstraintSet<'db, 'c>,
     ) -> ConstraintSet<'db, 'c> {
+        let collect_context = self.is_context_collection_enabled();
         self.relation_visitor
             .try_visit(
                 db,
                 (source, target, self.relation, self.typevar_evaluation),
+                // Cached constraints do not retain explanations. When collecting context,
+                // recompute unsatisfiable comparisons while preserving the active recursion
+                // guards. Satisfiable constraints remain reusable, including those that
+                // constrain type variables.
+                |result| !collect_context || !result.is_never_satisfied(db, self.env),
                 work,
             )
             .unwrap_or_else(|item| self.recursive_type_pair_fallback(db, item.0, item.1))
@@ -1412,17 +1700,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 );
             }
         }
-
-        let should_expand_intersection = |intersection: IntersectionType<'db>| {
-            intersection
-                .positive(db)
-                .iter()
-                .any(|element| match element {
-                    Type::TypeVar(tvar) => !tvar.is_inferable(db, self.inferable),
-                    Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db).is_union(),
-                    _ => false,
-                })
-        };
 
         match (source, target) {
             // Everything is a subtype of `object`.
@@ -1755,14 +2032,19 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 self.always()
             }
 
-            // Any concrete specialization of a `ParamSpec` is a subtype of the top
-            // materialization of a `ParamSpec` value.
+            // Compare fixed `ParamSpec`s with the endpoints of the materialization range of `...`:
+            // its bottom is below every `ParamSpec`, and its top is above every `ParamSpec`.
             (Type::TypeVar(bound_typevar), Type::Callable(other))
+            | (Type::Callable(other), Type::TypeVar(bound_typevar))
                 if !bound_typevar.is_inferable(db, self.inferable)
                     && bound_typevar.is_paramspec(db)
-                    && Self::is_top_paramspec_value(db, other) =>
+                    && other.kind(db) == CallableTypeKind::ParamSpecValue
+                    && other.signatures(db).iter().all(|signature| {
+                        signature.parameters().is_top() || signature.parameters().is_bottom()
+                    }) =>
             {
-                self.always()
+                let other_is_top = Self::is_top_paramspec_value(db, other);
+                ConstraintSet::from_bool(self.constraints, source.is_type_var() == other_is_top)
             }
 
             // A fully static typevar is a subtype of its upper bound, and to something similar to
@@ -1841,223 +2123,18 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 self.check_newtype_pair(db, source_newtype, target_newtype)
             }
 
-            (Type::Union(union), _) => {
-                if let Some(supertype) = union.common_literal_supertype(db, env) {
-                    // Use the broader supertype only as a positive proof. If it has the requested
-                    // relation to the target, then every literal in the union does too. Otherwise,
-                    // check each literal individually.
-                    let supertype_result = self
-                        .without_context_collection(|| self.check_type_pair(db, supertype, target));
-                    if supertype_result.is_trivially_always_satisfied() {
-                        return supertype_result;
-                    }
-                }
-
-                union
-                    .elements(db)
-                    .iter()
-                    .when_all(db, self.constraints, |&elem_ty| {
-                        let constraint_set = self.check_type_pair(db, elem_ty, target);
-                        if let Some(context) = self.report_context()
-                            && constraint_set.is_never_satisfied(db, env)
-                        {
-                            context.push(ErrorContext::NotAllUnionElementsAssignable {
-                                element: elem_ty,
-                                union: source,
-                                target,
-                            });
-                        }
-                        constraint_set
-                    })
-            }
-
-            (_, Type::Union(union)) => {
-                if let Type::Intersection(intersection) = source
-                    && let Some(alternatives) = intersection.finite_alternative_union(db, env)
-                {
-                    return self.check_type_pair(db, alternatives, target);
-                }
-
-                let is_new_type_of_union = || {
-                    // Normally non-unions cannot directly contain unions in our model due to the fact that we
-                    // enforce a DNF structure on our set-theoretic types. However, it *is* possible for there
-                    // to be a newtype of a union, for an intersection to contain a newtype of a union, or for
-                    // a non-inferable typevar (possibly inside an intersection) to widen to a bound or set of
-                    // constraints that exposes a union; this requires special handling.
-                    match source {
-                        Type::Intersection(intersection)
-                            if should_expand_intersection(intersection) =>
-                        {
-                            self.check_type_pair(
-                                db,
-                                intersection.with_expanded_typevars_and_newtypes(db, env),
-                                target,
-                            )
-                        }
-                        Type::NewTypeInstance(newtype) => {
-                            let concrete_base = newtype.concrete_base_type(db);
-                            if concrete_base.is_union() {
-                                self.check_type_pair(db, concrete_base, target)
-                            } else {
-                                self.never()
-                            }
-                        }
-                        _ => self.never(),
-                    }
-                };
-
-                let mut elements_context = vec![];
-                let context_tree = self.context_tree.as_ref().filter(|tree| tree.is_enabled());
-
-                let elements = union.elements(db);
-                let result = elements
-                    .iter()
-                    .when_any(db, self.constraints, |&elem_ty| {
-                        let result = self.check_type_pair(db, source, elem_ty);
-                        if let Some(context_tree) = context_tree {
-                            let env = context_tree.take();
-                            if !env.is_empty() {
-                                elements_context.push(env);
-                            }
-                        }
-                        result
-                    })
-                    .or(db, self.constraints, is_new_type_of_union);
-
-                if context_tree.is_some()
-                    && !elements_context.is_empty()
-                    && result.is_never_satisfied(db, env)
-                {
-                    let elements_without_context = elements.len() - elements_context.len();
-                    if elements_without_context > 0 && elements_without_context < elements.len() {
-                        elements_context.push(ErrorContextTree::from_context(
-                            ErrorContext::NotAssignableToNOtherUnionElements {
-                                n: elements_without_context,
-                            },
-                            self.relation,
-                        ));
-                    }
-                    self.set_context(
-                        ErrorContext::NotAssignableToAnyUnionElement {
-                            source,
-                            union: target,
-                        },
-                        elements_context,
-                    );
-                }
-
-                result
-            }
+            (Type::Union(union), _) => self.check_source_union(db, union, target),
+            (_, Type::Union(union)) => self.check_target_union(db, source, union),
 
             // If both sides are intersections we need to handle the right side first
             // (A & B & C) is a subtype of (A & B) because the left is a subtype of both A and B,
             // but none of A, B, or C is a subtype of (A & B).
-            (_, Type::Intersection(intersection)) => intersection
-                .positive(db)
-                .iter()
-                .when_all(db, self.constraints, |&pos_ty| {
-                    let constraint_set = self.check_type_pair(db, source, pos_ty);
-                    if let Some(context) = self.report_context()
-                        && constraint_set.is_never_satisfied(db, env)
-                    {
-                        context.push(ErrorContext::NotAssignableToIntersectionElement {
-                            source,
-                            element: pos_ty,
-                            intersection: target,
-                        });
-                    }
-                    constraint_set
-                })
-                .and(db, self.constraints, || {
-                    // For subtyping, we would want to check whether the *top materialization* of `source`
-                    // is disjoint from the *top materialization* of `neg_ty`. As an optimization, however,
-                    // we can avoid this explicit transformation here, since our `Type::is_disjoint_from`
-                    // implementation already only returns true for `T.is_disjoint_from(U)` if the *top
-                    // materialization* of `T` is disjoint from the *top materialization* of `U`.
-                    //
-                    // Note that the implementation of redundancy here may be too strict from a
-                    // theoretical perspective: under redundancy, `T <: ~U` if `Bottom[T]` is disjoint
-                    // from `Top[U]` and `Bottom[U]` is disjoint from `Top[T]`. It's possible that this
-                    // could be improved. For now, however, we err on the side of strictness for our
-                    // redundancy implementation: a fully complete implementation of redundancy may lead
-                    // to non-transitivity (highly undesirable); and pragmatically, a full implementation
-                    // of redundancy may not generally lead to simpler types in many situations.
-                    let source_ty = match self.relation {
-                        TypeRelation::Subtyping
-                        | TypeRelation::Redundancy { .. }
-                        | TypeRelation::SubtypingAssuming => source,
-                        TypeRelation::Assignability => source.bottom_materialization(db, env),
-                    };
-                    intersection
-                        .negative(db)
-                        .iter()
-                        .when_all(db, self.constraints, |&neg_ty| {
-                            let neg_ty = match self.relation {
-                                TypeRelation::Subtyping
-                                | TypeRelation::Redundancy { .. }
-                                | TypeRelation::SubtypingAssuming => neg_ty,
-                                TypeRelation::Assignability => {
-                                    neg_ty.bottom_materialization(db, env)
-                                }
-                            };
-                            self.as_disjointness_checker()
-                                .check_type_pair(db, source_ty, neg_ty)
-                        })
-                }),
+            (_, Type::Intersection(intersection)) => {
+                self.check_target_intersection(db, source, intersection)
+            }
 
             (Type::Intersection(intersection), _) => {
-                if matches!(target, Type::LiteralValue(_))
-                    && let Some(alternatives) = intersection.finite_alternative_union(db, env)
-                {
-                    return self.check_type_pair(db, alternatives, target);
-                }
-
-                // An intersection type is a subtype of another type if at least one of its
-                // positive elements is a subtype of that type. If there are no positive elements,
-                // we treat `object` as the implicit positive element (e.g., `~str` is semantically
-                // `object & ~str`).
-
-                let mut elements_context = vec![];
-                let context_tree = self.context_tree.as_ref().filter(|tree| tree.is_enabled());
-
-                let result = intersection
-                    .positive_elements_or_object(db)
-                    .when_any(db, self.constraints, |elem_ty| {
-                        let result = self.check_type_pair(db, elem_ty, target);
-                        if let Some(context_tree) = context_tree {
-                            let env = context_tree.take();
-                            if !env.is_empty() {
-                                elements_context.push(env);
-                            }
-                        }
-                        result
-                    })
-                    .or(db, self.constraints, || {
-                        if should_expand_intersection(intersection) {
-                            self.check_type_pair(
-                                db,
-                                intersection.with_expanded_typevars_and_newtypes(db, env),
-                                target,
-                            )
-                        } else {
-                            self.never()
-                        }
-                    });
-
-                if context_tree.is_some()
-                    && !elements_context.is_empty()
-                    && result.is_never_satisfied(db, env)
-                {
-                    self.set_context(
-                        ErrorContext::NoIntersectionElementAssignableToTarget {
-                            intersection: source,
-                            target,
-                        },
-                        elements_context,
-                    );
-                }
-
-                result
+                self.check_source_intersection(db, intersection, target)
             }
 
             // `Never` is the bottom type, the empty set.
@@ -2731,6 +2808,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             env: self.env,
             constraints: self.constraints,
             inferable: self.inferable,
+            context_tree: None,
             given: self.given,
             perform_expensive_checks: self.perform_expensive_checks,
             relation_visitor: self.relation_visitor,
@@ -2842,6 +2920,7 @@ pub(super) struct DisjointnessChecker<'a, 'c, 'db> {
     pub(super) env: &'a ProgramEnvironment<'db>,
     pub(super) constraints: &'c ConstraintSetBuilder<'db>,
     inferable: TypeVarSet<'db>,
+    context_tree: Option<ErrorContextTree<'db>>,
     given: ConstraintSet<'db, 'c>,
     perform_expensive_checks: bool,
 
@@ -2871,6 +2950,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             env,
             constraints,
             inferable,
+            context_tree: None,
             given: ConstraintSet::from_bool(constraints, false),
             perform_expensive_checks: true,
             disjointness_visitor,
@@ -2898,6 +2978,32 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             signature_relation_visitor: self.signature_relation_visitor,
             materialization_visitor: self.materialization_visitor,
         }
+    }
+
+    pub(super) fn report_context(&self) -> Option<&ErrorContextTree<'db>> {
+        self.context_tree
+            .as_ref()
+            .filter(|context| context.is_enabled())
+    }
+
+    /// Retain a failed subtyping or assignability check that proves disjointness.
+    pub(super) fn check_relation_with_context(
+        &self,
+        db: &'db dyn Db,
+        mut checker: TypeRelationChecker<'_, 'c, 'db>,
+        check: impl FnOnce(&TypeRelationChecker<'_, 'c, 'db>) -> ConstraintSet<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c> {
+        checker.context_tree = self
+            .report_context()
+            .map(|_| ErrorContextTree::new(checker.relation));
+        let result = check(&checker);
+        if let Some(context) = self.report_context() {
+            context.take();
+            if result.is_never_satisfied(db, self.env) {
+                context.replace(&checker.into_error_context());
+            }
+        }
+        result
     }
 
     fn as_equivalence_checker(&self) -> EquivalenceChecker<'_, 'c, 'db> {
@@ -2935,26 +3041,54 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             .interface(db)
             .members(db)
             .when_any(db, self.constraints, |member| {
-                other
+                if let Some(context) = self.report_context() {
+                    context.take();
+                }
+                let attribute = other
                     .member(db, env, member.name())
                     .place
-                    .ignore_possibly_undefined()
-                    .when_none_or(db, self.constraints, |attribute_type| {
-                        self.protocol_member_has_disjoint_type_from_ty(db, &member, attribute_type)
-                            .or(db, self.constraints, || {
-                                self.protocol_member_write_is_definitely_missing_from_ty(
-                                    db, &member, other,
-                                )
-                            })
-                            .or(db, self.constraints, || {
-                                ConstraintSet::from_bool(
-                                    self.constraints,
-                                    member.has_incompatible_class_variable_declaration(
-                                        db, env, other,
-                                    ),
-                                )
-                            })
+                    .ignore_possibly_undefined();
+                let Some(attribute_type) = attribute else {
+                    if let Some(context) = self.report_context() {
+                        context.push(ErrorContext::ProtocolMemberNotDefined {
+                            member_name: member.name().into(),
+                            ty: other,
+                        });
+                        if let Type::NominalInstance(nominal) = other
+                            && nominal.class(db, env).is_final(db)
+                        {
+                            context.push(ErrorContext::FinalTypeMissingProtocolMembers {
+                                final_type: other,
+                                protocol: Type::ProtocolInstance(protocol),
+                            });
+                        }
+                    }
+                    return self.always();
+                };
+                let result = self
+                    .protocol_member_has_disjoint_type_from_ty(db, &member, attribute_type)
+                    .or(db, self.constraints, || {
+                        self.protocol_member_write_is_definitely_missing_from_ty(db, &member, other)
                     })
+                    .or(db, self.constraints, || {
+                        let incompatible =
+                            member.has_incompatible_class_variable_declaration(db, env, other);
+                        if incompatible && let Some(context) = self.report_context() {
+                            context.push(ErrorContext::ProtocolMemberClassVarMismatch {
+                                member_name: member.name().into(),
+                                ty: other,
+                            });
+                        }
+                        ConstraintSet::from_bool(self.constraints, incompatible)
+                    });
+                if let Some(context) = self.report_context()
+                    && result.is_always_satisfied(db, env)
+                {
+                    context.push(ErrorContext::ProtocolMemberIncompatible {
+                        member_name: member.name().into(),
+                    });
+                }
+                result
             })
     }
 
@@ -2999,6 +3133,25 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
     }
 
     pub(super) fn check_type_pair(
+        &self,
+        db: &'db dyn Db,
+        left: Type<'db>,
+        right: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        if let Some(context) = self.report_context() {
+            context.take();
+        }
+        let result = self.check_type_pair_impl(db, left, right);
+        if let Some(context) = self.report_context()
+            && !result.is_always_satisfied(db, self.env)
+        {
+            // A failed alternative is not evidence for a later successful disjointness check.
+            context.take();
+        }
+        result
+    }
+
+    fn check_type_pair_impl(
         &self,
         db: &'db dyn Db,
         left: Type<'db>,
@@ -3145,12 +3298,35 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
 
             (Type::Union(union), other) | (other, Type::Union(union)) => {
                 nontrivial_check(self, || {
-                    union
+                    let mut children = Vec::new();
+                    let result = union
                         .elements(db)
                         .iter()
                         .when_all(db, self.constraints, |e| {
-                            self.check_type_pair(db, *e, other)
-                        })
+                            let result = self.check_type_pair(db, *e, other);
+                            if let Some(context) = self.report_context() {
+                                if context.is_empty() {
+                                    context.push(ErrorContext::DisjointTypes {
+                                        left: *e,
+                                        right: other,
+                                    });
+                                }
+                                children.push(context.take());
+                            }
+                            result
+                        });
+                    if let Some(context) = self.report_context()
+                        && result.is_always_satisfied(db, env)
+                    {
+                        context.set(
+                            ErrorContext::DisjointUnion {
+                                union: Type::Union(union),
+                                other,
+                            },
+                            children,
+                        );
+                    }
+                    result
                 })
             }
 
@@ -3405,7 +3581,10 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                         .interface(db)
                         .members(db)
                         .when_any(db, self.constraints, |member| {
-                            match other.member(db, env, member.name()).place {
+                            if let Some(context) = self.report_context() {
+                                context.take();
+                            }
+                            let result = match other.member(db, env, member.name()).place {
                                 Place::Defined(DefinedPlace {
                                     ty: attribute_type, ..
                                 }) => self.protocol_member_has_disjoint_type_from_ty(
@@ -3414,7 +3593,15 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                                     attribute_type,
                                 ),
                                 Place::Undefined => self.never(),
+                            };
+                            if let Some(context) = self.report_context()
+                                && result.is_always_satisfied(db, env)
+                            {
+                                context.push(ErrorContext::ProtocolMemberIncompatible {
+                                    member_name: member.name().into(),
+                                });
                             }
+                            result
                         })
                 })
             }),

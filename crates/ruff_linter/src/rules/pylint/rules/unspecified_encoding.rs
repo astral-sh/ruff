@@ -155,7 +155,7 @@ impl<'a> Callee<'a> {
     fn mode_argument(&self) -> ModeArgument {
         match self {
             Callee::Qualified(qualified_name) => match qualified_name.segments() {
-                ["" | "codecs" | "_io", "open"] => ModeArgument::Supported,
+                ["" | "builtins" | "codecs" | "_io", "open"] => ModeArgument::Supported,
                 [
                     "tempfile",
                     "TemporaryFile" | "NamedTemporaryFile" | "SpooledTemporaryFile",
@@ -224,7 +224,7 @@ fn is_violation(call: &ast::ExprCall, qualified_name: &Callee) -> bool {
     }
     match qualified_name {
         Callee::Qualified(qualified_name) => match qualified_name.segments() {
-            ["" | "codecs" | "_io", "open"] => {
+            ["" | "builtins" | "codecs" | "_io", "open"] => {
                 if let Some(mode_arg) = call.arguments.find_argument_value("mode", 1) {
                     if is_binary_mode(mode_arg).unwrap_or(true) {
                         // binary mode or unknown mode is no violation

@@ -176,6 +176,7 @@ impl InstanceDictionary {
             | KnownClass::TyExtensionsAsyncIterator
             | KnownClass::TyExtensionsIterable
             | KnownClass::TyExtensionsIterator
+            | KnownClass::UnittestTestCase
             | KnownClass::PydanticBaseModel
             | KnownClass::PydanticBaseSettings
             | KnownClass::PydanticConfigDict

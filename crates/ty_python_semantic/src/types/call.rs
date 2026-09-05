@@ -3,6 +3,7 @@ use super::{ClassType, Signature, Type, TypeContext, UnionType};
 use crate::Db;
 use crate::place::Provenance;
 use crate::types::call::bind::BindingError;
+use crate::types::function::OverloadLiteral;
 use crate::types::{MemberLookupPolicy, PropertyInstanceType};
 use crate::{Program, ProgramEnvironment};
 use ruff_python_ast as ast;
@@ -13,6 +14,14 @@ pub(super) use arguments::{Argument, CallArguments};
 pub(super) use bind::{
     Binding, Bindings, CallDiagnosticOverride, CallableBinding, MatchedArgument,
 };
+
+/// The return type and deprecations retained from binary operator resolution.
+#[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+pub(crate) struct BinaryOperationResult<'db> {
+    pub(crate) return_type: Type<'db>,
+    /// Deprecated implementations or overloads selected for the operation.
+    pub(crate) deprecated_functions: Box<[OverloadLiteral<'db>]>,
+}
 
 /// Whether the right operand's reflected method has priority based on the possible runtime
 /// classes of both operands.
@@ -149,30 +158,37 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Memoize the pure return-type part of binary dunder resolution so repeated identical
-    /// expressions don't re-run overload selection at every call site.
-    pub(crate) fn try_call_bin_op_return_type(
+    /// Memoize the return type and deprecations from binary dunder resolution, without retaining
+    /// the full call bindings or repeating overload selection at each expression.
+    /// Returns `None` if resolution fails; callers remain responsible for call-site diagnostics.
+    pub(crate) fn try_call_bin_op_result(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         left_ty: Type<'db>,
         op: ast::Operator,
         right_ty: Type<'db>,
-    ) -> Option<Type<'db>> {
-        #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
-        fn try_call_bin_op_return_type_impl<'db>(
+    ) -> Option<&'db BinaryOperationResult<'db>> {
+        #[salsa::tracked(returns(ref), cycle_initial=|_, _, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+        fn try_call_bin_op_result_impl<'db>(
             db: &'db dyn Db,
             program: Program<'db>,
             left_ty: Type<'db>,
             op: ast::Operator,
             right_ty: Type<'db>,
-        ) -> Option<Type<'db>> {
+        ) -> Option<BinaryOperationResult<'db>> {
             let env = &ProgramEnvironment::from_program(program);
             Type::try_call_bin_op(db, env, left_ty, op, right_ty)
                 .ok()
-                .map(|bindings| bindings.return_type(db, env))
+                .map(|bindings| BinaryOperationResult {
+                    return_type: bindings.return_type(db, env),
+                    deprecated_functions: bindings
+                        .deprecated_functions(db)
+                        .map(|(_, function)| function)
+                        .collect(),
+                })
         }
 
-        try_call_bin_op_return_type_impl(db, env.program(db), left_ty, op, right_ty)
+        try_call_bin_op_result_impl(db, env.program(db), left_ty, op, right_ty).as_ref()
     }
 
     pub(crate) fn try_call_bin_op(

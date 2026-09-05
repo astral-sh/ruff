@@ -616,6 +616,86 @@ def _(x: object):
         reveal_type(x)  # revealed: B & C
 ```
 
+## TypeGuard narrowing across multiple bindings
+
+A conditional assignment can leave two bindings with the same original type. If a type guard
+replaces the type of only one binding, both the replacement and the original type remain possible.
+
+```py
+from typing_extensions import TypeGuard
+
+def make_int() -> int:
+    return 1
+
+def is_str(value: object) -> TypeGuard[str]:
+    return True
+
+def _(flag: bool):
+    value = make_int()
+    if flag:
+        value = make_int()
+        if not is_str(value):
+            return
+
+    reveal_type(value)  # revealed: int | str
+```
+
+Once both branches of a type guard rejoin, the replacement no longer applies. A call on the negative
+branch must not preserve the positive branch's replacement.
+
+```py
+def _(flag: bool):
+    value = make_int()
+    if flag:
+        value = make_int()
+
+    if is_str(value):
+        pass
+    else:
+        make_int()
+
+    reveal_type(value)  # revealed: int
+```
+
+## TypeGuard joins after repeated suppressed assignments
+
+Conditional assignments inside suppressing context managers preserve several possible bindings.
+After a type guard's branches rejoin, its replacement no longer applies to any of those bindings,
+even when a nested `TypeIs` check rules out the replacement type.
+
+```py
+from contextlib import suppress
+from typing_extensions import TypeGuard, TypeIs
+
+def make_int() -> int:
+    return 1
+
+def is_str(value: object) -> TypeGuard[str]:
+    return True
+
+def is_int(value: object) -> TypeIs[int]:
+    return True
+
+def _(flag: bool, value: int | None) -> None:
+    with suppress(Exception):
+        if flag:
+            value = make_int()
+    with suppress(Exception):
+        if flag:
+            value = make_int()
+    with suppress(Exception):
+        if flag:
+            value = make_int()
+    with suppress(Exception):
+        if flag:
+            value = make_int()
+
+    if is_str(value):
+        if is_int(value):
+            reveal_type(value)  # revealed: Never
+    reveal_type(value)  # revealed: int | None
+```
+
 ## Boolean logic with TypeGuard and TypeIs
 
 TypeGuard constraints need to properly distribute through boolean operations.

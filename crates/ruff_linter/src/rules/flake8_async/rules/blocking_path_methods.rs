@@ -7,15 +7,17 @@ use ruff_python_semantic::analyze::typing::{TypeChecker, check_type, traverse_un
 use ruff_text_size::Ranged;
 
 /// ## What it does
-/// Checks that async functions do not call blocking `os.path` or `pathlib.Path`
-/// methods.
+/// Checks that async functions do not call blocking `os.path` functions or
+/// `pathlib.Path` methods.
 ///
 /// ## Why is this bad?
-/// Calling some `os.path` or `pathlib.Path` methods in an async function will block
-/// the entire event loop, preventing it from executing other tasks while waiting
-/// for the operation. This negates the benefits of asynchronous programming.
+/// Calling some `os.path` functions or `pathlib.Path` methods in an async function
+/// will block the entire event loop, preventing it from executing other tasks while
+/// waiting for the operation. This negates the benefits of asynchronous programming.
 ///
-/// Instead, use the methods' async equivalents from `trio.Path` or `anyio.Path`.
+/// Instead, run blocking path operations in a separate thread, or use an API that
+/// provides asynchronous path operations, such as `aiofiles.os.path`, `anyio.Path`,
+/// or `trio.Path`.
 ///
 /// ## Example
 /// ```python
@@ -27,7 +29,20 @@ use ruff_text_size::Ranged;
 ///     file_exists = os.path.exists(path)
 /// ```
 ///
-/// Use instead:
+/// On Python 3.9 and later, use instead:
+/// ```python
+/// import asyncio
+/// import os
+///
+///
+/// async def func():
+///     path = "my_file.txt"
+///     file_exists = await asyncio.to_thread(os.path.exists, path)
+/// ```
+///
+/// On earlier Python versions, use `loop.run_in_executor()`.
+///
+/// Or, use an asynchronous path API:
 /// ```python
 /// import trio
 ///
@@ -37,16 +52,15 @@ use ruff_text_size::Ranged;
 ///     file_exists = await path.exists()
 /// ```
 ///
-/// Non-blocking methods are OK to use:
-/// ```python
-/// import pathlib
+/// Purely computational path operations, such as `os.path.join()` and
+/// `pathlib.Path.with_suffix()`, are not flagged.
 ///
-///
-/// async def func():
-///     path = pathlib.Path("my_file.txt")
-///     file_dirname = path.dirname()
-///     new_path = os.path.join("/tmp/src/", path)
-/// ```
+/// ## References
+/// - [Python documentation: `asyncio.to_thread`](https://docs.python.org/3/library/asyncio-task.html#asyncio.to_thread)
+/// - [Python documentation: `loop.run_in_executor`](https://docs.python.org/3/library/asyncio-eventloop.html#asyncio.loop.run_in_executor)
+/// - [aiofiles documentation: `aiofiles.os`](https://github.com/Tinche/aiofiles#usage)
+/// - [AnyIO documentation: `anyio.Path`](https://anyio.readthedocs.io/en/stable/api.html#anyio.Path)
+/// - [Trio documentation: `trio.Path`](https://trio.readthedocs.io/en/stable/reference-io.html#trio.Path)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "0.15.0", category = Category::Suspicious)]
 pub(crate) struct BlockingPathMethodInAsyncFunction {
@@ -57,7 +71,7 @@ impl Violation for BlockingPathMethodInAsyncFunction {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!(
-            "Async functions should not use {path_library} methods, use trio.Path or anyio.path",
+            "Async functions should not perform blocking {path_library} operations",
             path_library = self.path_library
         )
     }

@@ -1,0 +1,28 @@
+---
+source: crates/ruff_linter/src/rules/isort/mod.rs
+---
+I001 [*] Import block is un-sorted or un-formatted
+ --> fit_line_length_mixed_pragma.py:3:1
+  |
+1 |   # The next import fits on one line once the trailing pragma is excluded from the width
+2 |   # (the `# keep this` prefix still counts); in preview it should not be wrapped.
+3 | / from aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa import x  # keep this  # noqa: TID251
+4 | | # The next import exceeds the line length even without the trailing pragma
+5 | | # (code plus the `# keep this` prefix is 89 columns); it must always be wrapped.
+6 | | from bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb import x  # keep this  # noqa: TID251
+  | |____________________________________________________________________________^
+help: Organize imports
+   |
+2  | # (the `# keep this` prefix still counts); in preview it should not be wrapped.
+   - from aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa import x  # keep this  # noqa: TID251
+3  + from aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa import (
+4  +     x,  # keep this  # noqa: TID251
+5  + )
+6  +
+7  | # The next import exceeds the line length even without the trailing pragma
+8  | # (code plus the `# keep this` prefix is 89 columns); it must always be wrapped.
+   - from bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb import x  # keep this  # noqa: TID251
+9  + from bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb import (
+10 +     x,  # keep this  # noqa: TID251
+11 + )
+   |

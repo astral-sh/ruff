@@ -243,5 +243,48 @@ B031 Using the generator returned from `itertools.groupby()` more than once will
 226 |         collect_shop_items(shopper, section_items)  # B031
     |                                     ^^^^^^^^^^^^^
 227 |
-228 | # Let's redefine the `groupby` function to make sure we pick up the correct one.
+228 | # https://github.com/astral-sh/ruff/issues/26624
+    |
+
+B031 Using the generator returned from `itertools.groupby()` more than once will do nothing on the second usage
+   --> B031.py:240:41
+    |
+238 |     match list(section_items):
+239 |         case []:
+240 |             collect_shop_items(shopper, section_items)  # B031
+    |                                         ^^^^^^^^^^^^^
+241 |         case _:
+242 |             collect_shop_items(shopper, section_items)  # B031
+    |
+
+B031 Using the generator returned from `itertools.groupby()` more than once will do nothing on the second usage
+   --> B031.py:242:41
+    |
+240 |             collect_shop_items(shopper, section_items)  # B031
+241 |         case _:
+242 |             collect_shop_items(shopper, section_items)  # B031
+    |                                         ^^^^^^^^^^^^^
+243 |
+244 | for _section, section_items in itertools.groupby(items, key=lambda p: p[1]):
+    |
+
+B031 Using the generator returned from `itertools.groupby()` more than once will do nothing on the second usage
+   --> B031.py:245:38
+    |
+244 | for _section, section_items in itertools.groupby(items, key=lambda p: p[1]):
+245 |     match (list(section_items), list(section_items)):  # B031
+    |                                      ^^^^^^^^^^^^^
+246 |         case _:
+247 |             pass
+    |
+
+B031 Using the generator returned from `itertools.groupby()` more than once will do nothing on the second usage
+   --> B031.py:255:37
+    |
+253 |         pass
+254 |     else:
+255 |         collect_shop_items(shopper, section_items)  # B031
+    |                                     ^^^^^^^^^^^^^
+256 |
+257 | # Let's redefine the `groupby` function to make sure we pick up the correct one.
     |

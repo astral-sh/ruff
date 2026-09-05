@@ -104,6 +104,11 @@ fn generate_markdown() -> String {
             .join("\n");
 
         let status_text = match lint.status() {
+            ty_python_semantic::lint::LintStatus::Preview { since } => {
+                format!(
+                    r#"Preview (since <a href="https://github.com/astral-sh/ty/releases/tag/{since}">{since}</a>)"#
+                )
+            }
             ty_python_semantic::lint::LintStatus::Stable { since } => {
                 format!(
                     r#"Added in <a href="https://github.com/astral-sh/ty/releases/tag/{since}">{since}</a>"#

@@ -1,3 +1,7 @@
+// The doc-comments for structs in this file are user-facing rule documentation,
+// not intended for rustdoc to render.
+#![expect(clippy::doc_link_with_quotes, clippy::doc_overindented_list_items)]
+
 use super::call::CallErrorKind;
 use super::context::InferContext;
 use super::mro::DuplicateBaseError;
@@ -124,6 +128,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_TYPE_VARIABLE_DEFAULT);
     registry.register_lint(&UNBOUND_TYPE_VARIABLE);
     registry.register_lint(&MISSING_ARGUMENT);
+    registry.register_lint(&MISSING_DIRECT_DEPENDENCY);
     registry.register_lint(&MISSING_TYPE_ARGUMENT);
     registry.register_lint(&NO_MATCHING_OVERLOAD);
     registry.register_lint(&NON_CALLABLE_INIT_SUBCLASS);
@@ -164,6 +169,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&ZERO_STEPSIZE_IN_SLICE);
     registry.register_lint(&STATIC_ASSERT_ERROR);
     registry.register_lint(&INVALID_ATTRIBUTE_ACCESS);
+    registry.register_lint(&DISJOINT_CAST);
     registry.register_lint(&REDUNDANT_CAST);
     registry.register_lint(&REDUNDANT_FINAL_CLASSVAR);
     registry.register_lint(&UNRESOLVED_GLOBAL);
@@ -315,7 +321,6 @@ declare_lint! {
 }
 
 declare_lint! {
-    #[expect(clippy::doc_overindented_list_items)]
     #[doc = include_str!("../../resources/lint_docs/invalid-dataclass.md")]
     pub(crate) static INVALID_DATACLASS = {
         summary: "detects invalid `@dataclass` applications",
@@ -444,7 +449,6 @@ declare_lint! {
 }
 
 declare_lint! {
-    #[expect(clippy::doc_link_with_quotes)]
     #[doc = include_str!("../../resources/lint_docs/unsound-return-statement.md")]
     pub(crate) static UNSOUND_RETURN_STATEMENT = {
         summary: "detects return statements that unsoundly return a type that is not a subtype of the function's annotated return type",
@@ -463,7 +467,6 @@ declare_lint! {
 }
 
 declare_lint! {
-    #[expect(clippy::doc_link_with_quotes)]
     #[doc = include_str!("../../resources/lint_docs/unsound-yield.md")]
     pub(crate) static UNSOUND_YIELD = {
         summary: "detects yield expressions that unsoundly yield a type that is not a subtype of the generator's annotated yield type",
@@ -491,7 +494,6 @@ declare_lint! {
 }
 
 declare_lint! {
-    #[expect(clippy::doc_link_with_quotes)]
     #[doc = include_str!("../../resources/lint_docs/unsound-assignment.md")]
     pub(crate) static UNSOUND_ASSIGNMENT = {
         summary: "detects assignments that unsoundly assign a type that is not a subtype of the declared type",
@@ -1175,6 +1177,19 @@ declare_lint! {
 }
 
 declare_lint! {
+    #[allow(
+        rustdoc::invalid_codeblock_attributes,
+        reason = "`data-mdtest` is an mdtest-specific code-block attribute"
+    )]
+    #[doc = include_str!("../../resources/lint_docs/missing-direct-dependency.md")]
+    pub(crate) static MISSING_DIRECT_DEPENDENCY = {
+        summary: "detects imports of dependencies that are not declared directly",
+        status: LintStatus::preview("0.0.76"),
+        default_level: Level::Ignore,
+    }
+}
+
+declare_lint! {
     #[doc = include_str!("../../resources/lint_docs/unresolved-reference.md")]
     pub static UNRESOLVED_REFERENCE = {
         summary: "detects references to names that are not defined",
@@ -1225,6 +1240,15 @@ declare_lint! {
         summary: "Invalid attribute access",
         status: LintStatus::stable("0.0.1-alpha.1"),
         default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/disjoint-cast.md")]
+    pub(crate) static DISJOINT_CAST = {
+        summary: "detects `cast` calls between disjoint types",
+        status: LintStatus::stable("0.0.78"),
+        default_level: Level::Ignore,
     }
 }
 
@@ -1310,7 +1334,6 @@ declare_lint! {
 }
 
 declare_lint! {
-    #[expect(clippy::doc_overindented_list_items)]
     #[doc = include_str!("../../resources/lint_docs/invalid-method-override.md")]
     pub(crate) static INVALID_METHOD_OVERRIDE = {
         summary: "detects method definitions that violate the Liskov Substitution Principle",

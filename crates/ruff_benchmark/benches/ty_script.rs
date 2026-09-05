@@ -1,9 +1,10 @@
 use std::process::Command;
+use std::time::Duration;
 
 use divan::{Bencher, bench};
 use rayon::ThreadPoolBuilder;
 use ruff_db::system::{OsSystem, SystemPath, TestSystem};
-use ty_project::{ProjectDatabase, ProjectMetadata};
+use ty_project::{Db, ProjectDatabase, ProjectMetadata, ScriptEnvironmentAvailability};
 use ty_static::EnvVars;
 
 fn setup_iteration(root: &SystemPath) -> ProjectDatabase {
@@ -63,7 +64,26 @@ def greet(user: User) -> str:
 
     bencher
         .with_inputs(|| setup_iteration(root))
-        .bench_local_refs(|db| assert!(db.check().is_empty()));
+        .bench_local_refs(|db| {
+            // Include environment initialization in the measurement, as in the CLI.
+            let environments = db.uv_environments().clone();
+            let scripts: Vec<_> = db.project().script_files(db).iter().collect();
+            for script in scripts {
+                environments.request_sync(
+                    db,
+                    script,
+                    ScriptEnvironmentAvailability::Pending,
+                    &|_, _| None,
+                );
+            }
+            let wakeups = environments.sync_wakeups();
+            while environments.has_pending_synchronizations() {
+                wakeups.recv_timeout(Duration::from_secs(30)).unwrap();
+                environments.poll_sync(db);
+            }
+            let diagnostics = db.check();
+            assert!(diagnostics.is_empty(), "{diagnostics:?}");
+        });
 }
 
 fn main() {

@@ -1,4 +1,4 @@
-from _typeshed import StrOrBytesPath
+from _typeshed import StrOrBytesPath, SupportsGet
 from abc import ABCMeta
 from collections.abc import Sequence
 
@@ -33,6 +33,9 @@ class FlamegraphCollector(StackTraceCollector):
         mode: int | None = None,
     ) -> None:
         """Set profiling statistics to include in flamegraph data."""
+
+    def set_replay_stats(self, info: SupportsGet[str, float | None]) -> None:
+        """Restore measured statistics stored in a binary profile."""
 
     def export(self, filename: StrOrBytesPath) -> None: ...
     def process_frames(self, frames: Sequence[_Frame], thread_id: int, weight: int = 1) -> None:
