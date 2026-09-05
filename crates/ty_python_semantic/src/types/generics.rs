@@ -721,6 +721,7 @@ impl<'db> GenericContext<'db> {
                             &TypeMapping::ApplySpecialization(apply),
                             TypeContext::default(),
                             &ApplyTypeMappingVisitor::new(&env),
+                            /* skip_return_type */ false,
                         );
                         let generic_context = GenericContext::from_typevar_instances(
                             db,
