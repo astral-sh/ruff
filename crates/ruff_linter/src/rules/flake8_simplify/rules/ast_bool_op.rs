@@ -546,7 +546,7 @@ pub(crate) fn compare_with_tuple(checker: &Checker, expr: &Expr) {
         };
         let node2 = ast::ExprCompare {
             left: Box::new(node1.into()),
-            ops: Box::from([CmpOp::In]),
+            ops: [CmpOp::In].into(),
             comparators: Box::from([node.into()]),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,

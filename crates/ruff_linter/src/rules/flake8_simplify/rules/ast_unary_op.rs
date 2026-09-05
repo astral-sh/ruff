@@ -187,7 +187,7 @@ pub(crate) fn negation_with_equal_op(checker: &Checker, expr: &Expr, op: UnaryOp
     );
     let node = ast::ExprCompare {
         left: left.clone(),
-        ops: Box::from([CmpOp::NotEq]),
+        ops: [CmpOp::NotEq].into(),
         comparators: comparators.clone(),
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
@@ -243,7 +243,7 @@ pub(crate) fn negation_with_not_equal_op(
     );
     let node = ast::ExprCompare {
         left: left.clone(),
-        ops: Box::from([CmpOp::Eq]),
+        ops: [CmpOp::Eq].into(),
         comparators: comparators.clone(),
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
@@ -293,7 +293,7 @@ pub(crate) fn double_negation(checker: &Checker, expr: &Expr, op: UnaryOp, opera
         let node1 = ast::ExprCall {
             func: Box::new(node.into()),
             arguments: Arguments {
-                args: Box::from([*operand.clone()]),
+                args: [*operand.clone()].into(),
                 keywords: std::iter::empty().collect(),
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,

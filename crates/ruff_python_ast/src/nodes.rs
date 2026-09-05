@@ -469,10 +469,13 @@ impl DebugText {
 impl ExprFString {
     /// Returns the single [`FString`] if the f-string isn't implicitly concatenated, [`None`]
     /// otherwise.
-    pub const fn as_single_part_fstring(&self) -> Option<&FString> {
+    pub fn as_single_part_fstring(&self) -> Option<&FString> {
         match &self.value.inner {
-            FStringValueInner::Single(FStringPart::FString(fstring)) => Some(fstring),
-            _ => None,
+            FStringValueInner::Single(part) => match part.as_ref() {
+                FStringPart::FString(fstring) => Some(fstring),
+                FStringPart::Literal(_) => None,
+            },
+            FStringValueInner::Concatenated(_) => None,
         }
     }
 }
@@ -488,7 +491,7 @@ impl FStringValue {
     /// Creates a new f-string literal with a single [`FString`] part.
     pub fn single(value: FString) -> Self {
         Self {
-            inner: FStringValueInner::Single(FStringPart::FString(value)),
+            inner: FStringValueInner::Single(Box::new(FStringPart::FString(value))),
         }
     }
 
@@ -517,7 +520,7 @@ impl FStringValue {
     /// Returns a slice of all the [`FStringPart`]s contained in this value.
     pub fn as_slice(&self) -> &[FStringPart] {
         match &self.inner {
-            FStringValueInner::Single(part) => std::slice::from_ref(part),
+            FStringValueInner::Single(part) => std::slice::from_ref(part.as_ref()),
             FStringValueInner::Concatenated(parts) => parts,
         }
     }
@@ -525,7 +528,7 @@ impl FStringValue {
     /// Returns a mutable slice of all the [`FStringPart`]s contained in this value.
     fn as_mut_slice(&mut self) -> &mut [FStringPart] {
         match &mut self.inner {
-            FStringValueInner::Single(part) => std::slice::from_mut(part),
+            FStringValueInner::Single(part) => std::slice::from_mut(part.as_mut()),
             FStringValueInner::Concatenated(parts) => parts,
         }
     }
@@ -622,7 +625,7 @@ enum FStringValueInner {
     ///
     /// This is always going to be `FStringPart::FString` variant which is
     /// maintained by the `FStringValue::single` constructor.
-    Single(FStringPart),
+    Single(Box<FStringPart>),
 
     /// An implicitly concatenated f-string i.e., `"foo" f"bar {x}"`.
     Concatenated(Vec<FStringPart>),
@@ -664,7 +667,7 @@ impl Ranged for FStringPart {
 impl ExprTString {
     /// Returns the single [`TString`] if the t-string isn't implicitly concatenated, [`None`]
     /// otherwise.
-    pub const fn as_single_part_tstring(&self) -> Option<&TString> {
+    pub fn as_single_part_tstring(&self) -> Option<&TString> {
         match &self.value.inner {
             TStringValueInner::Single(tstring) => Some(tstring),
             TStringValueInner::Concatenated(_) => None,
@@ -683,7 +686,7 @@ impl TStringValue {
     /// Creates a new t-string literal with a single [`TString`] part.
     pub fn single(value: TString) -> Self {
         Self {
-            inner: TStringValueInner::Single(value),
+            inner: TStringValueInner::Single(Box::new(value)),
         }
     }
 
@@ -712,7 +715,7 @@ impl TStringValue {
     /// Returns a slice of all the [`TString`]s contained in this value.
     pub fn as_slice(&self) -> &[TString] {
         match &self.inner {
-            TStringValueInner::Single(part) => std::slice::from_ref(part),
+            TStringValueInner::Single(part) => std::slice::from_ref(part.as_ref()),
             TStringValueInner::Concatenated(parts) => parts,
         }
     }
@@ -720,7 +723,7 @@ impl TStringValue {
     /// Returns a mutable slice of all the [`TString`]s contained in this value.
     fn as_mut_slice(&mut self) -> &mut [TString] {
         match &mut self.inner {
-            TStringValueInner::Single(part) => std::slice::from_mut(part),
+            TStringValueInner::Single(part) => std::slice::from_mut(part.as_mut()),
             TStringValueInner::Concatenated(parts) => parts,
         }
     }
@@ -790,7 +793,7 @@ impl<'a> IntoIterator for &'a mut TStringValue {
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 enum TStringValueInner {
     /// A single t-string i.e., `t"foo"`.
-    Single(TString),
+    Single(Box<TString>),
 
     /// An implicitly concatenated t-string i.e., `t"foo" t"bar {x}"`.
     Concatenated(Vec<TString>),
@@ -3501,7 +3504,7 @@ impl ParameterWithDefault {
 pub struct Arguments {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
-    pub args: Box<[Expr]>,
+    pub args: ThinVec<Expr>,
     pub keywords: ThinVec<Keyword>,
 }
 
@@ -3836,12 +3839,16 @@ impl IpyEscapeKind {
 /// def 1():
 ///     ...
 /// ```
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct Identifier {
     pub id: Name,
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
+    /// The start of the enclosing attribute expression, when this names an attribute.
+    /// Other identifiers use their own start offset. This fits in the identifier's padding,
+    /// so attribute expressions can retain their start without a separate range field.
+    pub expression_start: TextSize,
 }
 
 impl Identifier {
@@ -3851,6 +3858,7 @@ impl Identifier {
             id: id.into(),
             node_index: AtomicNodeIndex::NONE,
             range,
+            expression_start: range.start(),
         }
     }
 
@@ -3860,6 +3868,43 @@ impl Identifier {
 
     pub fn is_valid(&self) -> bool {
         !self.id.is_empty()
+    }
+}
+
+#[expect(
+    clippy::missing_fields_in_debug,
+    reason = "`expression_start` is represented by the enclosing attribute expression's range"
+)]
+impl fmt::Debug for Identifier {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Identifier")
+            .field("id", &self.id)
+            .field("range", &self.range)
+            .field("node_index", &self.node_index)
+            .finish()
+    }
+}
+
+impl Ranged for crate::ExprAttribute {
+    fn range(&self) -> TextRange {
+        // Parsed attributes end at their identifier. Relocated string annotations instead
+        // expand the receiver to the annotation range without changing identifier ranges.
+        TextRange::new(
+            self.attr.expression_start,
+            self.value.end().max(self.attr.end()),
+        )
+    }
+}
+
+impl fmt::Debug for crate::ExprAttribute {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ExprAttribute")
+            .field("node_index", &self.node_index)
+            .field("range", &self.range())
+            .field("value", &self.value)
+            .field("attr", &self.attr)
+            .field("ctx", &self.ctx)
+            .finish()
     }
 }
 
@@ -3933,7 +3978,7 @@ impl From<bool> for Singleton {
 #[cfg(test)]
 mod tests {
     use crate::generated::*;
-    use crate::{Arguments, Mod, Parameters};
+    use crate::{Arguments, Identifier, Mod, Parameters};
 
     #[test]
     #[cfg(target_pointer_width = "64")]
@@ -3945,20 +3990,21 @@ mod tests {
         assert_eq!(std::mem::size_of::<Mod>(), 32);
         assert_eq!(std::mem::size_of::<Pattern>(), 72);
         assert_eq!(std::mem::size_of::<Parameters>(), 56);
-        assert_eq!(std::mem::size_of::<Arguments>(), 40);
-        assert_eq!(std::mem::size_of::<Expr>(), 64);
-        assert_eq!(std::mem::size_of::<ExprAttribute>(), 56);
+        assert_eq!(std::mem::size_of::<Arguments>(), 32);
+        assert_eq!(std::mem::size_of::<Identifier>(), 32);
+        assert_eq!(std::mem::size_of::<Expr>(), 56);
+        assert_eq!(std::mem::size_of::<ExprAttribute>(), 48);
         assert_eq!(std::mem::size_of::<ExprAwait>(), 24);
         assert_eq!(std::mem::size_of::<ExprBinOp>(), 32);
         assert_eq!(std::mem::size_of::<ExprBoolOp>(), 40);
         assert_eq!(std::mem::size_of::<ExprBooleanLiteral>(), 16);
         assert_eq!(std::mem::size_of::<ExprBytesLiteral>(), 48);
-        assert_eq!(std::mem::size_of::<ExprCall>(), 56);
-        assert_eq!(std::mem::size_of::<ExprCompare>(), 56);
+        assert_eq!(std::mem::size_of::<ExprCall>(), 48);
+        assert_eq!(std::mem::size_of::<ExprCompare>(), 48);
         assert_eq!(std::mem::size_of::<ExprDict>(), 40);
-        assert_eq!(std::mem::size_of::<ExprDictComp>(), 56);
+        assert_eq!(std::mem::size_of::<ExprDictComp>(), 48);
         assert_eq!(std::mem::size_of::<ExprEllipsisLiteral>(), 12);
-        assert_eq!(std::mem::size_of::<ExprFString>(), 56);
+        assert_eq!(std::mem::size_of::<ExprFString>(), 40);
         assert_eq!(std::mem::size_of::<ExprGenerator>(), 48);
         assert_eq!(std::mem::size_of::<ExprIf>(), 40);
         assert_eq!(std::mem::size_of::<ExprIpyEscapeCommand>(), 32);
@@ -3975,6 +4021,7 @@ mod tests {
         assert_eq!(std::mem::size_of::<ExprStarred>(), 24);
         assert_eq!(std::mem::size_of::<ExprStringLiteral>(), 48);
         assert_eq!(std::mem::size_of::<ExprSubscript>(), 32);
+        assert_eq!(std::mem::size_of::<ExprTString>(), 40);
         assert_eq!(std::mem::size_of::<ExprTuple>(), 40);
         assert_eq!(std::mem::size_of::<ExprUnaryOp>(), 24);
         assert_eq!(std::mem::size_of::<ExprYield>(), 24);

@@ -1291,7 +1291,6 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
                 value,
                 attr,
                 ctx: _,
-                range: _,
                 node_index: _,
             }) => Self::Attribute(ExprAttribute {
                 value: value.into(),

@@ -575,6 +575,7 @@ impl ast::Identifier {
             range: _,
             node_index: _,
             id: _,
+            expression_start: _,
         } = self;
     }
 }

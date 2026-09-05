@@ -3870,12 +3870,6 @@ impl ruff_text_size::Ranged for crate::ExprEllipsisLiteral {
     }
 }
 
-impl ruff_text_size::Ranged for crate::ExprAttribute {
-    fn range(&self) -> ruff_text_size::TextRange {
-        self.range
-    }
-}
-
 impl ruff_text_size::Ranged for crate::ExprSubscript {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
@@ -9726,7 +9720,7 @@ pub struct ExprDictComp {
     pub range: ruff_text_size::TextRange,
     pub key: Option<Box<Expr>>,
     pub value: Box<Expr>,
-    pub generators: Vec<crate::Comprehension>,
+    pub generators: Box<[crate::Comprehension]>,
 }
 
 /// See also [GeneratorExp](https://docs.python.org/3/library/ast.html#ast.GeneratorExp)
@@ -9774,7 +9768,7 @@ pub struct ExprCompare {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
     pub left: Box<Expr>,
-    pub ops: Box<[crate::CmpOp]>,
+    pub ops: thin_vec::ThinVec<crate::CmpOp>,
     pub comparators: Box<[Expr]>,
 }
 
@@ -9876,11 +9870,10 @@ pub struct ExprEllipsisLiteral {
 }
 
 /// See also [Attribute](https://docs.python.org/3/library/ast.html#ast.Attribute)
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprAttribute {
     pub node_index: crate::AtomicNodeIndex,
-    pub range: ruff_text_size::TextRange,
     pub value: Box<Expr>,
     pub attr: crate::Identifier,
     pub ctx: crate::ExprContext,
@@ -10899,7 +10892,6 @@ impl ExprAttribute {
             value,
             attr,
             ctx: _,
-            range: _,
             node_index: _,
         } = self;
         visitor.visit_expr(value);

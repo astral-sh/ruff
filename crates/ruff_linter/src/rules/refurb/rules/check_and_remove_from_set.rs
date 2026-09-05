@@ -192,14 +192,13 @@ fn make_suggestion(set: &ast::ExprName, element: &Expr, generator: Generator) ->
         value: Box::new(set.clone().into()),
         attr: ast::Identifier::new("discard".to_string(), TextRange::default()),
         ctx: ast::ExprContext::Load,
-        range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     // Make the actual call `set.discard(element)`
     let call = ast::ExprCall {
         func: Box::new(attr.into()),
         arguments: ast::Arguments {
-            args: Box::from([element.clone()]),
+            args: [element.clone()].into(),
             keywords: std::iter::empty().collect(),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
