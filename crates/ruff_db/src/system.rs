@@ -14,7 +14,7 @@ use std::error::Error;
 use std::fmt;
 use std::fmt::Debug;
 use std::process::Output;
-pub use test::{DbWithTestSystem, DbWithWritableSystem, InMemorySystem, TestSystem};
+pub use test::{DbWithTestSystem, DbWithWritableSystem, InMemorySystem, TestSystem, test_env_vars};
 use walk_directory::WalkDirectoryBuilder;
 
 pub use self::path::{

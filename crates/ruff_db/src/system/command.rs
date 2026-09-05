@@ -1,4 +1,7 @@
+use std::ffi::OsString;
 use std::process::Output;
+
+use rustc_hash::FxHashMap;
 
 use super::{Result, SystemPath, SystemPathBuf};
 
@@ -8,6 +11,8 @@ pub struct Command {
     executable: String,
     arguments: Vec<String>,
     current_directory: Option<SystemPathBuf>,
+    /// When set, replaces the inherited environment. Used by `TestSystem` to isolate subprocesses.
+    pub(super) environment: Option<FxHashMap<OsString, OsString>>,
 }
 
 impl Command {
@@ -17,6 +22,7 @@ impl Command {
             executable: executable.into(),
             arguments: Vec::new(),
             current_directory: None,
+            environment: None,
         }
     }
 

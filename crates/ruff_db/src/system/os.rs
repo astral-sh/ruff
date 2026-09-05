@@ -234,10 +234,14 @@ impl CommandExecutor for OsSystem {
             .get_current_dir()
             .unwrap_or_else(|| self.current_directory());
 
-        std::process::Command::new(command.get_executable())
+        let mut process = std::process::Command::new(command.get_executable());
+        process
             .args(command.get_args())
-            .current_dir(directory.as_std_path())
-            .output()
+            .current_dir(directory.as_std_path());
+        if let Some(environment) = command.environment {
+            process.env_clear().envs(environment);
+        }
+        process.output()
     }
 
     fn dyn_clone(&self) -> Box<dyn CommandExecutor> {
@@ -519,9 +523,58 @@ mod tests {
     use tempfile::TempDir;
 
     use crate::system::DirectoryEntry;
+    #[cfg(unix)]
+    use crate::system::TestSystem;
     use crate::system::walk_directory::tests::DirectoryEntryToString;
 
     use super::*;
+
+    /// Subprocesses launched through a cloned `TestSystem` executor preserve installation paths
+    /// but ignore inherited settings such as `UV_LOCKED`. They respect subsequent explicit
+    /// overrides and removals.
+    #[cfg(unix)]
+    #[test]
+    fn command_environment_is_isolated() -> Result<()> {
+        let system = TestSystem::new(OsSystem::default());
+        let executor = system
+            .command_executor()
+            .ok_or_else(|| std::io::Error::other("expected a command executor"))?
+            .dyn_clone();
+        let run = || {
+            let mut command = Command::new("/bin/sh");
+            command.args(["-c", "printf '%s' \"$UV_LOCKED\""]);
+            executor.execute(command)
+        };
+
+        assert_eq!(run()?.stdout, b"");
+
+        system.set_env_var("UV_LOCKED", "1");
+        assert_eq!(run()?.stdout, b"1");
+
+        system.remove_env_var("UV_LOCKED");
+        assert_eq!(run()?.stdout, b"");
+
+        let mut command = Command::new("/bin/sh");
+        command.args(["-c", "printf '%s' \"$XDG_DATA_HOME\""]);
+        assert_eq!(
+            executor.execute(command)?.stdout,
+            std::env::var_os("XDG_DATA_HOME")
+                .unwrap_or_default()
+                .as_encoded_bytes()
+        );
+
+        // HOME is inherited even without an explicit TestSystem override.
+        let home_is_set = || -> Result<bool> {
+            let mut command = Command::new("/bin/sh");
+            command.args(["-c", "test \"${HOME+set}\" = set"]);
+            Ok(executor.execute(command)?.status.success())
+        };
+        assert!(home_is_set()?);
+        system.remove_env_var("HOME");
+        assert!(!home_is_set()?);
+
+        Ok(())
+    }
 
     #[test]
     fn read_directory() {

@@ -405,9 +405,6 @@ jobs:
         # This step is just to get nice GitHub annotations on the PR diff in the files-changed tab.
         run: cargo test -p ty_python_semantic --test mdtest || true
       - name: "Run tests"
-        env:
-          # Tests create disposable uv projects that must be resolved without a lockfile.
-          UV_LOCKED: 0
         run: uv run --locked --only-dev cargo insta test --all-features --unreferenced reject --test-runner nextest --disable-nextest-doctest
       - name: "Run doctests"
         run: cargo test --doc --all-features
@@ -464,9 +461,6 @@ jobs:
           version: "0.12.9"
           enable-cache: "true"
       - name: "Run tests"
-        env:
-          # Tests create disposable uv projects that must be resolved without a lockfile.
-          UV_LOCKED: 0
         run: uv run --locked --only-dev cargo nextest run --cargo-profile profiling --all-features
       - name: "Run doctests"
         run: cargo test --doc --profile profiling --all-features
@@ -502,9 +496,6 @@ jobs:
           version: "0.12.9"
           enable-cache: "true"
       - name: "Run tests"
-        env:
-          # Tests create disposable uv projects that must be resolved without a lockfile.
-          UV_LOCKED: 0
         run: |
           uv run --locked --only-dev cargo nextest run --all-features --profile ci
           cargo test --all-features --doc
