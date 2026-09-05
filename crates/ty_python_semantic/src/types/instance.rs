@@ -242,6 +242,20 @@ impl<'db> NominalInstanceType<'db> {
         }
     }
 
+    /// Whether `other` is an instance of the same class, or a tuple like this one, without
+    /// resolving the class of either.
+    pub(super) fn same_class_as(&self, db: &'db dyn Db, other: &Self) -> bool {
+        match (self.0, other.0) {
+            (NominalInstanceInner::NonTuple(left), NominalInstanceInner::NonTuple(right)) => {
+                left.class(db).class_literal(db) == right.class(db).class_literal(db)
+            }
+            (NominalInstanceInner::ExactTuple(_), NominalInstanceInner::ExactTuple(_))
+            | (NominalInstanceInner::SysVersionInfo, NominalInstanceInner::SysVersionInfo)
+            | (NominalInstanceInner::Object, NominalInstanceInner::Object) => true,
+            _ => false,
+        }
+    }
+
     /// Returns the class literal for this instance.
     pub(super) fn class_literal(
         &self,

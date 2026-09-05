@@ -305,6 +305,39 @@ impl<'db> UnionType<'db> {
         })
     }
 
+    /// Maps the elements without simplifying the result: an element that maps to an earlier
+    /// one is dropped, and the rest keep their order.
+    ///
+    /// The result is not a union in normal form. It serves comparisons of unions mapped the
+    /// same way, where normalizing would cost more than the comparison.
+    pub(crate) fn map_elements(
+        self,
+        db: &'db dyn Db,
+        mut transform_fn: impl FnMut(&Type<'db>) -> Type<'db>,
+    ) -> Type<'db> {
+        let elements = self.elements(db);
+        let mut new: Vec<Type<'db>> = Vec::with_capacity(elements.len());
+        let mut changed = false;
+        for element in elements {
+            let mapped = transform_fn(element);
+            changed |= &mapped != element;
+            if !new.contains(&mapped) {
+                new.push(mapped);
+            }
+        }
+        if !changed {
+            return Type::Union(self);
+        }
+        match &*new {
+            [single] => *single,
+            _ => Type::Union(UnionType::new(
+                db,
+                new.into_boxed_slice(),
+                self.recursively_defined(db),
+            )),
+        }
+    }
+
     pub(crate) fn filter(self, db: &'db dyn Db, f: impl FnMut(&Type<'db>) -> bool) -> Type<'db> {
         let current = self.elements(db);
         let new: Box<[Type<'db>]> = current.iter().copied().filter(f).collect();

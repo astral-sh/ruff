@@ -998,9 +998,10 @@ impl<'db> UnionBuilder<'db> {
 
         let mut ty_negated: Option<Type> = None;
         let mut to_remove = SmallVec::<[usize; 2]>::new();
-        // Whether `ty` mentions a cycle marker, found once rather than once per element: the
-        // walk over `ty` costs as much as the type is large, and most types mention none.
-        let mut mentions_marker = (ty, ty.mentions_cycle_marker(db, &self.env));
+        // Whether `ty` mentions a cycle marker, found once rather than once per element, and
+        // only once an element has the shape `ty` could equal modulo markers: the walk over
+        // `ty` costs as much as the type is large, and most types mention none.
+        let mut mentions_marker: Option<(Type<'db>, bool)> = None;
 
         for (i, element) in self.elements.iter_mut().enumerate() {
             let element_type = match element.try_reduce(db, &self.env, ty, self.cycle_recovery) {
@@ -1026,18 +1027,25 @@ impl<'db> UnionBuilder<'db> {
 
             // An element that differs only in which cycle heads its markers belong to is the
             // same provisional value seen from another query or iteration.
-            if mentions_marker.0 != ty {
-                mentions_marker = (ty, ty.mentions_cycle_marker(db, &self.env));
-            }
-            if mentions_marker.1
-                && ty.equals_modulo_cycle_markers(
-                    db,
-                    &self.env,
-                    element_type,
-                    MarkerErasure::KeepHeads,
-                )
-            {
-                return;
+            if ty.same_shape_as(db, element_type) {
+                let mentions = match mentions_marker {
+                    Some((known, mentions)) if known == ty => mentions,
+                    _ => {
+                        let mentions = ty.mentions_cycle_marker(db, &self.env);
+                        mentions_marker = Some((ty, mentions));
+                        mentions
+                    }
+                };
+                if mentions
+                    && ty.equals_modulo_cycle_markers(
+                        db,
+                        &self.env,
+                        element_type,
+                        MarkerErasure::KeepHeads,
+                    )
+                {
+                    return;
+                }
             }
 
             // `object` already contains every possible union element.

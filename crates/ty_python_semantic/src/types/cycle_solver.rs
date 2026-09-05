@@ -34,7 +34,9 @@ use crate::types::infer::{
     infer_unpack_types,
 };
 use crate::types::set_theoretic::RecursivelyDefined;
-use crate::types::visitor::{any_over_type_for_cycle_markers, nesting_depth};
+use crate::types::visitor::{
+    any_over_type_for_cycle_markers, nesting_depth, visit_types_for_cycle_markers,
+};
 use crate::types::{
     DivergentType, MemberLookupPolicy, ProgramEnvironment, Type, TypeContext, TypeMapping,
     UnionBuilder, UnionType, member_lookup_value,
@@ -177,10 +179,7 @@ impl<'a, 'db> CycleResolver<'a, 'db> {
     ) -> Option<CycleSolution<'db>> {
         let db = self.db;
         let mut system = System::default();
-        let mut worklist: Vec<_> = outputs
-            .into_iter()
-            .flat_map(|output| unmaterialized_markers(db, self.env, output))
-            .collect();
+        let mut worklist = unmaterialized_markers_of(db, self.env, outputs);
         if worklist.is_empty() {
             return None;
         }
@@ -308,6 +307,28 @@ impl<'db> CycleOwner<'db> {
             | CycleOwner::Query(_) => None,
         }
     }
+}
+
+/// The variables appearing in any of `types` whose markers still stand for values to be
+/// resolved.
+///
+/// The outputs of a query share most of their types, such as the type of a name and of every
+/// expression that reads it; each is walked once.
+fn unmaterialized_markers_of<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    types: impl IntoIterator<Item = Type<'db>>,
+) -> Vec<CycleVariable<'db>> {
+    let found = RefCell::new(Vec::new());
+    visit_types_for_cycle_markers(db, env, types, |ty| {
+        if let Type::Divergent(marker) = ty
+            && marker.materialization_kind().is_none()
+            && let Some(variable) = marker.variable()
+        {
+            found.borrow_mut().push(variable);
+        }
+    });
+    found.into_inner()
 }
 
 /// The variables appearing in `ty` whose markers still stand for values to be resolved.

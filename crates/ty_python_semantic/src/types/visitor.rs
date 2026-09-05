@@ -857,10 +857,29 @@ where
     T: Copy + Default + PartialEq,
     F: Fn(Type<'db>) -> T,
 {
+    any_over_type_with_guard(db, env, ty, mode, &query, &TypeCollector::default())
+}
+
+/// [`any_over_type_impl`] with a recursion guard shared between searches, so that a type seen
+/// in an earlier search of the same guard is not walked again.
+///
+/// A search that ends early on a match may leave types unvisited in the guard's record only
+/// when it returns a match, so the guard must not be shared beyond the first match.
+fn any_over_type_with_guard<'db, T>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+    mode: TypeSearchMode,
+    query: &dyn Fn(Type<'db>) -> T,
+    recursion_guard: &TypeCollector<'db>,
+) -> T
+where
+    T: Copy + Default + PartialEq,
+{
     struct AnyOverTypeVisitor<'db, 'a, U> {
         env: &'a ProgramEnvironment<'db>,
         query: &'a dyn Fn(Type<'db>) -> U,
-        recursion_guard: TypeCollector<'db>,
+        recursion_guard: &'a TypeCollector<'db>,
         found_matching_type: Cell<U>,
         mode: TypeSearchMode,
     }
@@ -901,20 +920,38 @@ where
                     walk_specialization_types(db, specialization, self);
                 }
             } else {
-                walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+                walk_type_with_recursion_guard(db, ty, self, self.recursion_guard);
             }
         }
     }
 
     let visitor = AnyOverTypeVisitor {
         env,
-        query: &query,
-        recursion_guard: TypeCollector::default(),
+        query,
+        recursion_guard,
         found_matching_type: Cell::default(),
         mode,
     };
     visitor.visit_type(db, ty);
     visitor.found_matching_type.get()
+}
+
+/// Calls `visit` on every type in each of `types` for which it is defined, as
+/// [`any_over_type_for_cycle_markers`] does, walking the types nested in several of them once.
+pub(super) fn visit_types_for_cycle_markers<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    types: impl IntoIterator<Item = Type<'db>>,
+    visit: impl Fn(Type<'db>),
+) {
+    let guard = TypeCollector::default();
+    let query = |ty: Type<'db>| {
+        visit(ty);
+        false
+    };
+    for ty in types {
+        any_over_type_with_guard(db, env, ty, TypeSearchMode::CycleMarkers, &query, &guard);
+    }
 }
 
 /// Return `true` if `ty`, or any of the types contained in `ty`, match the closure passed in.

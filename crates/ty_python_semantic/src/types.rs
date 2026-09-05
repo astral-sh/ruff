@@ -2116,7 +2116,7 @@ impl<'db> Type<'db> {
         erasure: MarkerErasure,
     ) -> bool {
         self == other
-            || (self.same_shape_as(db, env, other)
+            || (self.same_shape_as(db, other)
                 && self.mentions_cycle_marker(db, env)
                 && other.mentions_cycle_marker(db, env)
                 && self.apply_type_mapping(
@@ -2137,10 +2137,10 @@ impl<'db> Type<'db> {
     ///
     /// Checked before erasing, which walks both types in full: most pairs compared while a
     /// union is built differ in their variant or class.
-    fn same_shape_as(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>, other: Self) -> bool {
+    pub(crate) fn same_shape_as(self, db: &'db dyn Db, other: Self) -> bool {
         match (self, other) {
             (Type::NominalInstance(left), Type::NominalInstance(right)) => {
-                left.class(db, env).class_literal(db) == right.class(db, env).class_literal(db)
+                left.same_class_as(db, &right)
             }
             _ => std::mem::discriminant(&self) == std::mem::discriminant(&other),
         }
@@ -8447,6 +8447,14 @@ impl<'db> Type<'db> {
                     .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
             )),
 
+            // Erasing markers serves an equality check on the erased types; the union is
+            // taken as it is rather than simplified again, which would compare every pair of
+            // its elements.
+            Type::Union(union) if matches!(type_mapping, TypeMapping::EraseCycleMarkers(_)) => {
+                union.map_elements(db, |element| {
+                    element.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                })
+            }
             Type::Union(union) => union.map_leave_aliases(db, visitor.env, |element| {
                 element.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
             }),
