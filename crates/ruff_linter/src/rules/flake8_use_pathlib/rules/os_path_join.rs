@@ -30,6 +30,23 @@ use crate::{
 ///
 /// Path(ROOT_PATH) / "folder" / "file.py"
 /// ```
+///
+/// ## Known issues
+/// While using pathlib can improve the readability and type safety of your
+/// code, it can be less performant than the lower-level alternatives that work
+/// directly with strings, especially on older versions of Python.
+///
+/// ## Fix Safety
+/// This rule's fix is always marked as unsafe because `pathlib.Path` and `os.stat` differ in their
+/// handling of `bytes` paths and file descriptors.
+///
+/// References
+/// - [Python documentation: `PurePath.joinpath`](https://docs.python.org/3/library/pathlib.html#pathlib.PurePath.joinpath)
+/// - [Python documentation: `os.path.join`](https://docs.python.org/3/library/os.path.html#os.path.join)
+/// - [PEP 428 – The pathlib module – object-oriented filesystem paths](https://peps.python.org/pep-0428/)
+/// - [Correspondence between `os` and `pathlib`](https://docs.python.org/3/library/pathlib.html#corresponding-tools)
+/// - [Why you should be using pathlib](https://treyhunner.com/2018/12/why-you-should-be-using-pathlib/)
+/// - [No really, pathlib is great](https://treyhunner.com/2019/01/no-really-pathlib-is-great/)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.231", category = Category::Pedantic)]
 pub(crate) struct OsPathJoin {
