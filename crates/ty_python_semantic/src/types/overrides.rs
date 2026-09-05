@@ -790,29 +790,16 @@ fn check_class_declaration<'db>(
                         variable_kind(
                             db,
                             env,
+                            class,
+                            &member.name,
                             class.own_class_member(db, env, None, &member.name).inner,
                             subclass_instance_member,
                         )
                     });
 
                     if let Some(subclass_kind) = subclass_kind
-                        && subclass_kind != superclass_variable_kind
+                        && subclass_kind.conflicts_with(superclass_variable_kind)
                     {
-                        // An unannotated class-body assignment can inherit an overridden `ClassVar`
-                        // declaration instead of introducing a conflicting instance variable. This
-                        // also applies to augmented assignments after the initial class-body
-                        // assignment, e.g. `epilog = "..."; epilog += "..."`.
-                        if subclass_kind == VariableKind::Instance
-                            && superclass_variable_kind == VariableKind::Class
-                            && matches!(
-                                first_reachable_definition.kind(db),
-                                DefinitionKind::Assignment(_)
-                                    | DefinitionKind::AugmentedAssignment(_)
-                            )
-                        {
-                            continue;
-                        }
-
                         if let Some((immediate_parent, immediate_parent_kind)) =
                             immediate_parent_variable_kind
                             && immediate_parent != superclass
@@ -1061,13 +1048,34 @@ fn method_override_types<'db>(
     Some((subclass_type, superclass_callable.into_type(db, env)))
 }
 
-/// Whether an attribute declaration is a class variable or an instance variable.
+/// How an attribute declaration makes the attribute available: on the class only, on instances
+/// only, or on both.
+///
+/// ```python
+/// from typing import ClassVar
+///
+/// class C:
+///     class_only: ClassVar[int] = 1  # `C.class_only`, but not assignable via an instance
+///     regular: int = 2               # `C.regular` and `C().regular`
+///
+///     def __init__(self) -> None:
+///         self.instance_only = 3     # `C().instance_only` only
+/// ```
+///
+/// See [`VariableKind::conflicts_with`] for which combinations this rule treats as an invalid
+/// override. Note that only `Class` restricts what callers may do, so it is the only kind whose
+/// presence on one side of an override can make that override invalid.
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, get_size2::GetSize)]
 pub(super) enum VariableKind {
-    /// A variable annotated with `ClassVar`.
+    /// A variable annotated with `ClassVar`, available on the class object but not assignable
+    /// through an instance.
     Class,
-    /// An instance variable, including an unannotated class-body assignment.
-    Instance,
+    /// A variable declared in the class body without `ClassVar`, available both on the class
+    /// object and on instances.
+    Regular,
+    /// A variable that only exists on instances, because it is assigned via `self.x = ...` in a
+    /// method body and never declared in the class body.
+    InstanceOnly,
 }
 
 impl VariableKind {
@@ -1075,7 +1083,30 @@ impl VariableKind {
     const fn description(self) -> &'static str {
         match self {
             VariableKind::Class => "class variable",
-            VariableKind::Instance => "instance variable",
+            VariableKind::Regular => "regular attribute",
+            VariableKind::InstanceOnly => "instance variable",
+        }
+    }
+
+    /// Whether overriding a `superclass_kind` declaration with a `self` declaration changes whether
+    /// the attribute is reachable through the class object.
+    ///
+    /// `ClassVar` is the only kind that withholds instance-level assignment, so a conflict arises
+    /// only when exactly one side is a `ClassVar`. The exception is a `Regular` attribute overriding
+    /// a `ClassVar`: it still provides the class-level access the superclass promised, and merely
+    /// adds instance access on top, so it substitutes cleanly.
+    ///
+    /// `Regular` and `InstanceOnly` never conflict with each other. Neither withholds anything the
+    /// other guarantees for the purposes of this rule.
+    const fn conflicts_with(self, superclass_kind: Self) -> bool {
+        match (superclass_kind, self) {
+            (VariableKind::Class, VariableKind::Class | VariableKind::Regular) => false,
+            (VariableKind::Class, VariableKind::InstanceOnly) => true,
+            (VariableKind::Regular | VariableKind::InstanceOnly, VariableKind::Class) => true,
+            (
+                VariableKind::Regular | VariableKind::InstanceOnly,
+                VariableKind::Regular | VariableKind::InstanceOnly,
+            ) => false,
         }
     }
 }
@@ -1083,6 +1114,8 @@ impl VariableKind {
 /// Returns the variable kind for a superclass member.
 fn superclass_variable_kind<'db>(
     db: &'db dyn Db,
+    superclass: ClassType<'db>,
+    name: &Name,
     superclass_scope: ScopeId<'db>,
     superclass_symbol_id: Option<ScopedSymbolId>,
     class_member: PlaceAndQualifiers<'db>,
@@ -1105,7 +1138,7 @@ fn superclass_variable_kind<'db>(
     }
 
     let env = ProgramEnvironment::from_scope(superclass_scope);
-    variable_kind(db, &env, class_member, instance_member)
+    variable_kind(db, &env, superclass, name, class_member, instance_member)
 }
 
 /// Returns the variable kind for a superclass member, preserving inherited `ClassVar` declarations
@@ -1159,13 +1192,15 @@ pub(super) fn effective_superclass_variable_kind<'db>(
     if has_own_member {
         let superclass_variable_kind = superclass_variable_kind(
             db,
+            superclass,
+            &name,
             superclass_scope,
             superclass_symbol_id,
             superclass.own_class_member(db, env, None, &name).inner,
             superclass.own_instance_member(db, env, &name).inner,
         );
 
-        if superclass_variable_kind == Some(VariableKind::Instance)
+        if superclass_variable_kind == Some(VariableKind::Regular)
             && superclass_symbol_id.is_some_and(|id| {
                 symbol_definition(db, superclass_scope, id).is_some_and(|definition| {
                     matches!(
@@ -1222,10 +1257,36 @@ fn is_function_definition<'db>(
         .any(|definition| definition.kind(db).is_function_def())
 }
 
+/// Whether `name` is a field that a dataclass-like decorator turns into per-instance storage.
+///
+/// These are written as ordinary class-body annotations, but the generated `__init__` assigns them
+/// on the instance, so they do not make the attribute available on the class object the way the
+/// same annotation would in a plain class. `ClassVar` fields are excluded from `own_fields`, so
+/// they never reach this check.
+fn is_code_generator_instance_field<'db>(
+    db: &'db dyn Db,
+    owner: ClassType<'db>,
+    name: &Name,
+) -> bool {
+    let Some((literal, specialization)) = owner.static_class_literal(db) else {
+        return false;
+    };
+    let Some(field_policy) = CodeGeneratorKind::from_class(db, literal.into()) else {
+        return false;
+    };
+
+    field_policy.is_dataclass_like()
+        && literal
+            .own_fields(db, specialization, field_policy)
+            .contains_key(name)
+}
+
 /// Returns the variable kind for an attribute if it should participate in `ClassVar` override checks.
 fn variable_kind<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
+    owner: ClassType<'db>,
+    name: &Name,
     class_member: PlaceAndQualifiers<'db>,
     instance_member: PlaceAndQualifiers<'db>,
 ) -> Option<VariableKind> {
@@ -1281,7 +1342,46 @@ fn variable_kind<'db>(
         return None;
     }
 
-    Some(VariableKind::Instance)
+    // An attribute exists only on instances when the class body never mentions it and it is there
+    // purely because some method assigned to `self`.
+    if instance_member
+        .qualifiers
+        .contains(TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE)
+        && class_member.place.is_undefined()
+    {
+        return Some(VariableKind::InstanceOnly);
+    }
+
+    // A property is stored in the class body, but reading it through the class object yields the
+    // `property` object rather than a value of the declared type, so it does not provide the
+    // class-level access that a regular attribute does:
+    //
+    // ```python
+    // class Base:
+    //     attr: ClassVar[int]
+    //
+    // class Sub(Base):
+    //     @property
+    //     def attr(self) -> int: ...  # `Sub.attr` is a `property`, not an `int`
+    // ```
+    if matches!(
+        class_member.place,
+        Place::Defined(DefinedPlace {
+            ty: Type::PropertyInstance(_),
+            ..
+        })
+    ) {
+        return Some(VariableKind::InstanceOnly);
+    }
+
+    // Dataclass-like fields read as ordinary class-body annotations but describe instance storage.
+    if is_code_generator_instance_field(db, owner, name) {
+        return Some(VariableKind::InstanceOnly);
+    }
+
+    // What remains is declared in the class body and reachable through both the class object and
+    // an instance.
+    Some(VariableKind::Regular)
 }
 
 /// Returns the definition to use as the secondary annotation for an overridden symbol.
