@@ -212,11 +212,13 @@ impl Declarations {
 /// If there are bindings in a (non-class) scope, they are stored in `Bindings`.
 /// Even if it's a class scope (class variables are not visible to nested scopes) or there are no
 /// bindings, the current narrowing constraint is necessary for narrowing, so it's stored in
-/// `Constraint`.
+/// `Constraint`. An unbound member can also carry deletions, which `UnboundBindings` retains
+/// without making this scope the source of the member's value.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub(super) enum EnclosingSnapshot {
     Constraint(ScopedNarrowingConstraint),
     Bindings(Bindings),
+    UnboundBindings(Bindings),
 }
 
 /// Live bindings for a single place at some point in control flow. Each live binding comes

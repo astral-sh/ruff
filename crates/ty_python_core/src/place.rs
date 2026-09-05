@@ -45,6 +45,13 @@ pub enum PlaceExpr {
 }
 
 impl PlaceExpr {
+    /// Construct the member place read by a presence check such as `hasattr(value, "name")`.
+    /// This lets the check constrain `value.name` even without an attribute expression in the AST.
+    /// Returns `None` when the base is not trackable, such as the result of a function call.
+    pub fn attribute(base: ast::ExprRef<'_>, name: &str) -> Option<Self> {
+        Self::try_from_member_expr(MemberExprBuilder::attribute(base, name)?)
+    }
+
     /// Create a new `PlaceExpr` from a name.
     ///
     /// This always returns a `PlaceExpr::Symbol` with empty flags and `name`.
@@ -685,6 +692,14 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
     /// or narrow based on TypeGuard/TypeIs return types.
     fn expr_call(&self, expr_call: &ast::ExprCall) -> PossiblyNarrowedPlaces {
         let mut places = PossiblyNarrowedPlaces::default();
+
+        if let [base, ast::Expr::StringLiteral(name)] = &*expr_call.arguments.args
+            && expr_call.arguments.keywords.is_empty()
+            && let Some(member) = PlaceExpr::attribute(base.into(), name.value.to_str())
+            && let Some(place) = self.places.place_id((&member).into())
+        {
+            places.insert(place);
+        }
 
         // Under the current narrowing semantics, we only ever use the first two positional
         // arguments: argument 0 for most narrowing calls, and argument 1 for unbound
