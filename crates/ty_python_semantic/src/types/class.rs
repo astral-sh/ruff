@@ -2299,15 +2299,20 @@ impl<'db> ClassType<'db> {
         name: &str,
         target_method_decorator: MethodDecorator,
     ) -> ImplicitAttribute<'db> {
-        let augmented_bindings = self
+        let implicit = self
             .static_class_literal(db)
-            .map(|(class, _)| class.implicit_attribute_bindings(db, name, target_method_decorator))
+            .map(|(class, _)| class.implicit_attribute_bindings(db, name, target_method_decorator));
+        let established_in_constructor = implicit
+            .as_ref()
+            .is_some_and(|implicit| implicit.established_in_constructor);
+        let augmented_bindings = implicit
             .filter(|implicit| member.is_undefined() == implicit.member.is_undefined())
             .and_then(|implicit| implicit.augmented_bindings);
 
         ImplicitAttribute {
             member,
             augmented_bindings,
+            established_in_constructor,
         }
     }
 
@@ -3098,6 +3103,8 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                         // If the attribute is not definitely declared on this class, keep looking
                         // higher up in the MRO, and build a union of all inferred types (and
                         // possibly-declared types):
+                        let originating_constructor =
+                            implicit.established_in_constructor && union.is_empty();
                         union = union.add(ty);
                         provenance = provenance.or(member_provenance);
 
@@ -3115,6 +3122,21 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                             provenance = provenance.or(inferred_provenance);
                             union_qualifiers |= TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE;
                             pending_augmented_bindings.clear();
+                        }
+
+                        if originating_constructor {
+                            // The looked-up class assigns this attribute in a constructor.
+                            // Do not union inherited instance types into the subclass.
+                            return InstanceMemberResult::Done(
+                                Place::Defined(DefinedPlace {
+                                    ty: union.build(),
+                                    origin: TypeOrigin::Inferred,
+                                    definedness: Definedness::AlwaysDefined,
+                                    public_type_policy: PublicTypePolicy::Raw,
+                                    provenance,
+                                })
+                                .with_qualifiers(union_qualifiers),
+                            );
                         }
                     }
 

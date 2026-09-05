@@ -1474,6 +1474,23 @@ reveal_type(Derived().undeclared)  # revealed: str
 reveal_type(Derived().pure_undeclared)  # revealed: str
 ```
 
+### Constructor assignment on a subclass
+
+A constructor assignment on a subclass is the type of that instance attribute. Inherited types from
+the base class are not unioned in.
+
+```py
+class Client:
+    def __init__(self) -> None:
+        self.db = 1
+
+class PatchedClient(Client):
+    def __init__(self) -> None:
+        self.db = "mock"
+
+reveal_type(PatchedClient().db)  # revealed: str
+```
+
 ## Allow replacing ordinary methods with compatible functions
 
 An ordinary method can be replaced directly on a class by another function with a compatible
