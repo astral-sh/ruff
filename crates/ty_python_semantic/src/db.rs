@@ -3,6 +3,8 @@ use crate::lint::{LintRegistry, RuleSelection};
 use crate::{AnalysisSettings, PythonVersionWithSource};
 use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::File;
+use rustc_hash::FxHashSet;
+use salsa::Setter;
 use ty_python_core::{Db as PythonCoreDb, ProgramFile};
 
 /// Database giving access to semantic information about a Python program.
@@ -35,6 +37,77 @@ pub trait Db: PythonCoreDb {
     fn is_open_file(&self, file: File) -> bool;
 
     fn dyn_clone(&self) -> Box<dyn Db>;
+}
+
+/// Initializes the database's permanent recording policy, with no files selected.
+///
+/// Call once when constructing a database, before running inference or creating snapshots.
+/// The input must exist even while recording is disabled: Salsa does not track the absence
+/// of a singleton, so creating it on first opt-in would not invalidate earlier inference.
+pub fn initialize_place_load_recording(db: &dyn Db, mode: PlaceLoadRecordingMode) {
+    let _ = PlaceLoadRecording::builder(mode, FxHashSet::default())
+        .mode_durability(salsa::Durability::NEVER_CHANGE)
+        .new(db);
+}
+
+/// Whether a database can retain place-load resolutions alongside inferred types.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, get_size2::GetSize)]
+pub enum PlaceLoadRecordingMode {
+    /// Never record place loads, even if a caller requests them.
+    #[default]
+    Disabled,
+    /// Allow callers to enable recording for individual files.
+    OnDemand,
+}
+
+/// Enables cached place-load records for the selected files without running inference.
+///
+/// Recording persists across requests and source edits. Newly enabled files invalidate their
+/// unrecorded inference; enabling an already-enabled file does not change the database.
+/// Has no effect when the database was constructed with [`PlaceLoadRecordingMode::Disabled`].
+pub fn enable_place_load_recording(db: &mut dyn Db, files: impl IntoIterator<Item = File>) {
+    let recording = PlaceLoadRecording::get(db);
+    if recording.mode(db) == PlaceLoadRecordingMode::Disabled {
+        return;
+    }
+
+    let enabled = recording.files(db);
+
+    let additions: FxHashSet<_> = files
+        .into_iter()
+        .filter(|file| !enabled.contains(file))
+        .collect();
+    if additions.is_empty() {
+        return;
+    }
+
+    let mut enabled = enabled.clone();
+    enabled.extend(additions);
+    enabled.shrink_to_fit();
+
+    recording.set_files(db).to(enabled);
+}
+
+#[salsa::input(singleton, heap_size=ruff_memory_usage::heap_size)]
+struct PlaceLoadRecording {
+    #[returns(copy)]
+    mode: PlaceLoadRecordingMode,
+    #[returns(ref)]
+    files: FxHashSet<File>,
+}
+
+/// Returns whether inference retains place-load resolutions for `file`.
+///
+/// Permanently disabled databases neither cache per-file flags nor depend on the selected files.
+pub fn should_record_place_loads(db: &dyn Db, file: File) -> bool {
+    PlaceLoadRecording::get(db).mode(db) == PlaceLoadRecordingMode::OnDemand
+        && should_record_place_loads_impl(db, file)
+}
+
+/// Isolates recording changes so inference for other files can retain its cached result.
+#[salsa::tracked(heap_size=ruff_memory_usage::heap_size, returns(copy))]
+fn should_record_place_loads_impl(db: &dyn Db, file: File) -> bool {
+    PlaceLoadRecording::get(db).files(db).contains(&file)
 }
 
 #[cfg(test)]
@@ -76,11 +149,11 @@ pub(crate) mod tests {
     }
 
     impl TestDb {
-        fn new() -> Self {
+        fn new(recording_mode: PlaceLoadRecordingMode) -> Self {
             let events = Events::default();
             let vendored = ty_vendored::file_system().clone();
             let program_settings = ProgramSettings::empty(&vendored);
-            Self {
+            let db = Self {
                 storage: salsa::Storage::new(Some(Box::new({
                     let events = events.clone();
                     move |event| {
@@ -97,7 +170,9 @@ pub(crate) mod tests {
                 analysis_settings: AnalysisSettings::default().into(),
                 open_files: rustc_hash::FxHashSet::default(),
                 program_settings,
-            }
+            };
+            initialize_place_load_recording(&db, recording_mode);
+            db
         }
 
         pub(crate) fn python_version(&self) -> PythonVersion {
@@ -113,6 +188,24 @@ pub(crate) mod tests {
         /// This is untracked state: open a file before running any queries.
         pub(crate) fn open_file(&mut self, file: File) {
             self.open_files.insert(file);
+        }
+
+        pub(crate) fn enable_place_load_recording(&mut self, file: File) {
+            super::enable_place_load_recording(self, [file]);
+        }
+
+        pub(crate) fn set_place_load_recording(&mut self, file: File, enabled: bool) {
+            let recording = PlaceLoadRecording::get(self);
+            let mut files = recording.files(self).clone();
+            let changed = if enabled {
+                files.insert(file)
+            } else {
+                files.remove(&file)
+            };
+            if changed {
+                files.shrink_to_fit();
+                recording.set_files(self).to(files);
+            }
         }
 
         /// Takes the salsa events.
@@ -234,6 +327,7 @@ pub(crate) mod tests {
         files: Vec<(&'a str, &'a str)>,
         /// Whether module resolution should include packages from the synthetic virtual environment.
         third_party_packages: bool,
+        recording_mode: PlaceLoadRecordingMode,
     }
 
     impl<'a> TestDbBuilder<'a> {
@@ -244,11 +338,20 @@ pub(crate) mod tests {
                 src_roots: vec![SystemPathBuf::from("/src")],
                 files: vec![],
                 third_party_packages: false,
+                recording_mode: PlaceLoadRecordingMode::default(),
             }
         }
 
         pub(crate) fn with_python_version(mut self, version: PythonVersion) -> Self {
             self.python_version = version;
+            self
+        }
+
+        pub(crate) fn with_place_load_recording_mode(
+            mut self,
+            mode: PlaceLoadRecordingMode,
+        ) -> Self {
+            self.recording_mode = mode;
             self
         }
 
@@ -281,7 +384,7 @@ pub(crate) mod tests {
         }
 
         pub(crate) fn build(self) -> anyhow::Result<TestDb> {
-            let mut db = TestDb::new();
+            let mut db = TestDb::new(self.recording_mode);
 
             for src_root in &self.src_roots {
                 db.memory_file_system().create_directory_all(src_root)?;

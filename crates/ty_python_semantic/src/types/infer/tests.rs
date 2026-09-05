@@ -2,6 +2,7 @@ use std::assert_matches;
 use std::fmt::Write;
 
 use super::builder::TypeInferenceBuilder;
+use crate::db::PlaceLoadRecordingMode;
 use crate::db::tests::{TestDb, TestDbBuilder, setup_db};
 use crate::place::symbol;
 use crate::place::{ConsideredDefinitions, Place, PlaceAndQualifiers};
@@ -10,7 +11,9 @@ use ruff_db::diagnostic::{Diagnostic, DiagnosticId};
 use ruff_db::files::{File, system_path_to_file};
 use ruff_db::system::DbWithWritableSystem as _;
 use ruff_db::testing::{assert_function_query_was_not_run, assert_function_query_was_run};
-use ruff_python_ast::PythonVersion;
+use ruff_python_ast::visitor::{Visitor, walk_expr};
+use ruff_python_ast::{self as ast, PythonVersion};
+use ruff_text_size::Ranged;
 use salsa::plumbing::AsId;
 use ty_python_core::definition::Definition;
 use ty_python_core::program::{Program, ProgramSettings};
@@ -21,6 +24,251 @@ use ty_python_core::{
 use ty_site_packages::{PythonVersionSource, PythonVersionWithSource};
 
 use super::*;
+
+#[test]
+fn recording_is_disabled_by_default() {
+    let mut db = TestDbBuilder::new()
+        .with_file(
+            "/src/test.py",
+            r#"
+value = 1
+result = value
+"#,
+        )
+        .build()
+        .expect("valid recording fixture");
+    let file = system_path_to_file(&db, "/src/test.py").expect("fixture file exists");
+    let original = recording_snapshot(&db, file, "value");
+    assert!(original.metadata.is_empty());
+
+    db.enable_place_load_recording(file);
+    assert_eq!(recording_snapshot(&db.clone(), file, "value"), original);
+
+    db.write_file(
+        "/src/test.py",
+        r#"
+value = "updated"
+result = value
+"#,
+    )
+    .expect("replace source in permanently disabled database");
+    db.enable_place_load_recording(file);
+    let updated = recording_snapshot(&db, file, "value");
+    assert!(updated.metadata.is_empty());
+    assert_ne!(updated.types, original.types);
+}
+
+#[test]
+fn recording_retains_deferredness_and_reaching_definitions() {
+    let source = r#"
+import first as value
+annotation: value.C
+runtime = [value]
+import second as value
+"#;
+    let mut db = recording_db("/src/test.pyi", source);
+    let file = system_path_to_file(&db, "/src/test.pyi").expect("fixture file exists");
+    db.enable_place_load_recording(file);
+    let snapshot = recording_snapshot(&db, file, "value");
+    assert_eq!(snapshot.metadata.len(), 2);
+    assert_eq!(snapshot.metadata[0].1, DeferredExpressionState::Deferred);
+    assert_eq!(
+        snapshot.metadata[0].2,
+        ["first as value", "second as value"]
+    );
+    assert_eq!(snapshot.metadata[1].1, DeferredExpressionState::None);
+    assert_eq!(snapshot.metadata[1].2, ["first as value"]);
+}
+
+#[test]
+fn recording_follows_nested_and_cached_regions() {
+    assert_recording_preserves_types(
+        r#"
+import package as value
+
+def identity[T](item: T) -> T:
+    return item
+
+module_value = [value]
+generic_value = identity(value)
+for item in [value]:
+    pass
+
+@value.decorator
+def function(default=value):
+    statement = value
+    named = (alias := value)
+    closure = lambda: value
+    comprehension = [value for _ in value]
+"#,
+        "value",
+    );
+}
+
+#[test]
+fn recording_preserves_recursive_module_members() {
+    assert_recording_preserves_types(
+        r#"
+import test
+f = lambda: test.f
+"#,
+        "test",
+    );
+}
+
+#[test]
+fn recording_preserves_recursive_unpack_targets() {
+    assert_recording_preserves_types(
+        r#"
+x, = (lambda: x,)
+"#,
+        "x",
+    );
+}
+
+#[test]
+fn recording_preserves_recursive_lambdas_and_collections() {
+    for source in [
+        r#"
+x = lambda: x
+"#,
+        r#"
+x = lambda: y
+y = lambda: x
+"#,
+        r#"
+x = []
+x.append(x)
+"#,
+        r#"
+x = {}
+x["self"] = x
+"#,
+        r#"
+x = [lambda: x]
+"#,
+        r#"
+while True:
+    x = (*x, x)
+"#,
+        r#"
+def f(flag: bool):
+    x = ()
+    while flag:
+        x = (x,)
+    return x
+"#,
+    ] {
+        assert_recording_preserves_types(source, "x");
+    }
+}
+
+#[test]
+fn recording_preserves_recursive_annotations_and_context() {
+    for source in [
+        r#"
+from __future__ import annotations
+def f(x: f):
+    pass
+"#,
+        r#"
+from collections.abc import Callable
+f: Callable[[int], int] = lambda x: f(x)
+"#,
+    ] {
+        assert_recording_preserves_types(source, "f");
+    }
+}
+
+#[test]
+fn recording_tracks_file_selection_and_source_edits() {
+    let source = r#"
+import first as value
+result = value
+"#;
+    let mut db = recording_db("/src/test.py", source);
+    db.write_file("/src/other.py", source)
+        .expect("write second fixture");
+    let file = system_path_to_file(&db, "/src/test.py").expect("fixture file exists");
+    let other = system_path_to_file(&db, "/src/other.py").expect("second fixture file exists");
+    let original = recording_snapshot(&db, file, "value");
+    assert!(original.metadata.is_empty());
+
+    db.enable_place_load_recording(file);
+    assert_eq!(
+        recording_snapshot(&db, file, "value").metadata[0].2,
+        ["first as value"]
+    );
+    assert!(recording_snapshot(&db, other, "value").metadata.is_empty());
+
+    db.write_file(
+        "/src/test.py",
+        r#"
+import second as value
+result = value
+"#,
+    )
+    .expect("replace recorded source");
+    assert_eq!(
+        recording_snapshot(&db, file, "value").metadata[0].2,
+        ["second as value"]
+    );
+
+    db.set_place_load_recording(file, false);
+    assert!(recording_snapshot(&db, file, "value").metadata.is_empty());
+    db.enable_place_load_recording(file);
+    assert_eq!(
+        recording_snapshot(&db, file, "value").metadata[0].2,
+        ["second as value"]
+    );
+}
+
+#[test]
+fn recording_keeps_string_annotation_names_distinct() {
+    let source = r#"
+import first
+import second
+annotation: "tuple[first.C, second.C]"
+"#;
+    let mut db = recording_db("/src/test.py", source);
+    let file = system_path_to_file(&db, "/src/test.py").expect("fixture file exists");
+    db.enable_place_load_recording(file);
+    let file = program_file(&db, file);
+    let inference = infer_complete_scope_types(&db, global_scope(&db, file));
+    let metadata = inference
+        .extra
+        .as_ref()
+        .expect("recorded scope has extra data")
+        .place_load_metadata
+        .as_deref()
+        .expect("recorded scope has place-load metadata");
+    let annotation_metadata: Vec<_> = metadata
+        .iter()
+        .map(|(_, metadata)| metadata)
+        .filter(|metadata| {
+            !metadata.resolution.definitions().is_empty()
+                && metadata
+                    .resolution
+                    .definitions()
+                    .iter()
+                    .all(|definition| definition.program_file(&db) == file)
+        })
+        .collect();
+    assert_eq!(annotation_metadata.len(), 2);
+    assert!(annotation_metadata.iter().all(|metadata| matches!(
+        metadata.deferred_state,
+        DeferredExpressionState::InStringAnnotation(_)
+    )));
+    assert_ne!(annotation_metadata[0].range, annotation_metadata[1].range);
+    assert_eq!(
+        recording_definition_texts(&db, &annotation_metadata[0].resolution),
+        ["first"]
+    );
+    assert_eq!(
+        recording_definition_texts(&db, &annotation_metadata[1].resolution),
+        ["second"]
+    );
+}
 
 fn program_file(db: &TestDb, file: File) -> ProgramFile<'_> {
     ProgramFile::new(db, file, db.program_environment().program(db))
@@ -1542,4 +1790,152 @@ fn call_type_doesnt_rerun_when_only_callee_changed() -> anyhow::Result<()> {
     );
 
     Ok(())
+}
+
+fn recording_db(path: &str, source: &str) -> TestDb {
+    TestDbBuilder::new()
+        .with_place_load_recording_mode(PlaceLoadRecordingMode::OnDemand)
+        .with_python_version(PythonVersion::PY314)
+        .with_file(path, source)
+        .build()
+        .expect("valid recording fixture")
+}
+
+#[track_caller]
+fn assert_recording_preserves_types(source: &str, name: &str) {
+    let baseline = recording_db("/src/test.py", source);
+    let file = system_path_to_file(&baseline, "/src/test.py").expect("fixture file exists");
+    check_types(&baseline, program_file(&baseline, file));
+    let expected = recording_snapshot(&baseline, file, name);
+    assert!(expected.metadata.is_empty());
+
+    let mut cold_metadata = None;
+    for warm_first in [false, true] {
+        let mut db = recording_db("/src/test.py", source);
+        let file = system_path_to_file(&db, "/src/test.py").expect("fixture file exists");
+        if warm_first {
+            check_types(&db, program_file(&db, file));
+            assert_eq!(recording_snapshot(&db, file, name), expected);
+        }
+        db.enable_place_load_recording(file);
+        let actual = recording_snapshot(&db, file, name);
+        assert_eq!(
+            actual.types, expected.types,
+            "warm={warm_first}; source={source}"
+        );
+        assert!(
+            !actual.metadata.is_empty(),
+            "fixture must record place-load metadata"
+        );
+        assert_eq!(actual, recording_snapshot(&db, file, name));
+        if let Some(cold_metadata) = &cold_metadata {
+            assert_eq!(
+                &actual.metadata, cold_metadata,
+                "records differ after warming: {source}"
+            );
+        } else {
+            cold_metadata = Some(actual.metadata);
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct RecordingSnapshot {
+    types: Vec<(ExpressionNodeKey, String)>,
+    metadata: Vec<(TextRange, DeferredExpressionState, Vec<String>)>,
+}
+
+fn recording_snapshot(db: &TestDb, file: File, name: &str) -> RecordingSnapshot {
+    let file = program_file(db, file);
+    let env = ProgramEnvironment::from_file(file);
+    let index = semantic_index(db, file);
+    let model = crate::SemanticModel::new(db, file);
+    let module = parsed_module(db, file.python_file(db)).load(db);
+    let mut collector = RecordingNameCollector {
+        name,
+        names: Vec::new(),
+    };
+    collector.visit_body(&module.syntax().body);
+    assert!(
+        !collector.names.is_empty(),
+        "fixture must contain a requested name"
+    );
+
+    let mut by_scope = crate::FxIndexMap::<ScopeId<'_>, Vec<&ast::ExprName>>::default();
+    for name in collector.names {
+        let mut scope = model
+            .scope(name.into())
+            .expect("name scope")
+            .to_scope_id(db, file);
+        while scope.accepts_type_context(db) {
+            scope = index
+                .parent_scope_id(scope.file_scope_id(db))
+                .expect("context-dependent scope has a parent")
+                .to_scope_id(db, file);
+        }
+        by_scope.entry(scope).or_default().push(name);
+    }
+
+    let mut snapshot = RecordingSnapshot {
+        types: Vec::new(),
+        metadata: Vec::new(),
+    };
+    for (scope, names) in by_scope {
+        let inference = infer_complete_scope_types(db, scope);
+        snapshot.types.extend(
+            inference
+                .expressions
+                .iter()
+                .map(|(expression, ty)| (expression, ty.display(db, &env).to_string())),
+        );
+        let metadata = inference
+            .extra
+            .as_deref()
+            .and_then(|extra| extra.place_load_metadata.as_deref());
+        for name in names {
+            let metadata =
+                metadata.and_then(|metadata| metadata.get(&ast::ExprRef::Name(name).into()));
+            if !crate::db::should_record_place_loads(db, file.file(db)) {
+                assert!(metadata.is_none());
+                continue;
+            }
+            let metadata = metadata.expect("requested place-load metadata is recorded");
+            snapshot.metadata.push((
+                metadata.range,
+                metadata.deferred_state,
+                recording_definition_texts(db, &metadata.resolution),
+            ));
+        }
+    }
+    snapshot
+}
+
+fn recording_definition_texts(db: &TestDb, resolution: &DefinitionResolution<'_>) -> Vec<String> {
+    resolution
+        .definitions()
+        .iter()
+        .map(|definition| {
+            let file = definition.program_file(db).python_file(db);
+            let module = parsed_module(db, file).load(db);
+            let source = ruff_db::source::source_text(db, file.file(db));
+            source[definition.full_range(db, &module).range()].to_string()
+        })
+        .collect()
+}
+
+struct RecordingNameCollector<'ast, 'name> {
+    name: &'name str,
+    names: Vec<&'ast ast::ExprName>,
+}
+
+impl<'ast> Visitor<'ast> for RecordingNameCollector<'ast, '_> {
+    fn visit_expr(&mut self, expression: &'ast ast::Expr) {
+        if let ast::Expr::Name(name) = expression
+            && name.ctx.is_load()
+            && name.id == self.name
+        {
+            self.names.push(name);
+        }
+        walk_expr(self, expression);
+    }
 }
