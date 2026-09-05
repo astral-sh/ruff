@@ -8,7 +8,7 @@ use crate::generated::{
 use std::borrow::Cow;
 use std::fmt;
 use std::fmt::Debug;
-use std::iter::FusedIterator;
+use std::iter::{FusedIterator, Once};
 use std::ops::{Deref, DerefMut};
 use std::slice::{Iter, IterMut};
 use std::sync::OnceLock;
@@ -517,28 +517,18 @@ impl FStringValue {
     /// Returns an iterator over the parts of this f-string, in source order.
     pub fn iter(&self) -> FStringParts<'_> {
         match &self.inner {
-            FStringValueInner::Single(fstring) => FStringParts {
-                single: Some(fstring),
-                concatenated: [].iter(),
-            },
-            FStringValueInner::Concatenated(parts) => FStringParts {
-                single: None,
-                concatenated: parts.iter(),
-            },
+            FStringValueInner::Single(fstring) => FStringParts::Single(std::iter::once(fstring)),
+            FStringValueInner::Concatenated(parts) => FStringParts::Concatenated(parts.iter()),
         }
     }
 
     /// Returns a mutable iterator over the parts of this f-string, in source order.
     pub fn iter_mut(&mut self) -> FStringPartsMut<'_> {
         match &mut self.inner {
-            FStringValueInner::Single(fstring) => FStringPartsMut {
-                single: Some(fstring),
-                concatenated: [].iter_mut(),
-            },
-            FStringValueInner::Concatenated(parts) => FStringPartsMut {
-                single: None,
-                concatenated: parts.iter_mut(),
-            },
+            FStringValueInner::Single(fstring) => FStringPartsMut::Single(std::iter::once(fstring)),
+            FStringValueInner::Concatenated(parts) => {
+                FStringPartsMut::Concatenated(parts.iter_mut())
+            }
         }
     }
 
@@ -642,10 +632,7 @@ pub enum FStringPart {
 
 impl FStringPart {
     pub fn quote_style(&self) -> Quote {
-        match self {
-            Self::Literal(string_literal) => string_literal.flags.quote_style(),
-            Self::FString(f_string) => f_string.flags.quote_style(),
-        }
+        FStringPartRef::from(self).quote_style()
     }
 
     pub fn is_empty_literal(&self) -> bool {
@@ -658,10 +645,7 @@ impl FStringPart {
 
 impl Ranged for FStringPart {
     fn range(&self) -> TextRange {
-        match self {
-            FStringPart::Literal(string_literal) => string_literal.range(),
-            FStringPart::FString(f_string) => f_string.range(),
-        }
+        FStringPartRef::from(self).range()
     }
 }
 
@@ -716,33 +700,35 @@ impl<'a> From<&'a mut FStringPart> for FStringPartMut<'a> {
 
 /// The iterator returned by [`FStringValue::iter`].
 #[derive(Clone)]
-pub struct FStringParts<'a> {
-    single: Option<&'a FString>,
-    concatenated: Iter<'a, FStringPart>,
+pub enum FStringParts<'a> {
+    Single(Once<&'a FString>),
+    Concatenated(Iter<'a, FStringPart>),
 }
 
 impl<'a> Iterator for FStringParts<'a> {
     type Item = FStringPartRef<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.single
-            .take()
-            .map(FStringPartRef::FString)
-            .or_else(|| self.concatenated.next().map(FStringPartRef::from))
+        match self {
+            Self::Single(single) => single.next().map(FStringPartRef::FString),
+            Self::Concatenated(parts) => parts.next().map(FStringPartRef::from),
+        }
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let len = usize::from(self.single.is_some()) + self.concatenated.len();
-        (len, Some(len))
+        match self {
+            Self::Single(single) => single.size_hint(),
+            Self::Concatenated(parts) => parts.size_hint(),
+        }
     }
 }
 
 impl DoubleEndedIterator for FStringParts<'_> {
     fn next_back(&mut self) -> Option<Self::Item> {
-        self.concatenated
-            .next_back()
-            .map(FStringPartRef::from)
-            .or_else(|| self.single.take().map(FStringPartRef::FString))
+        match self {
+            Self::Single(single) => single.next_back().map(FStringPartRef::FString),
+            Self::Concatenated(parts) => parts.next_back().map(FStringPartRef::from),
+        }
     }
 }
 
@@ -750,33 +736,35 @@ impl ExactSizeIterator for FStringParts<'_> {}
 impl FusedIterator for FStringParts<'_> {}
 
 /// The iterator returned by [`FStringValue::iter_mut`].
-pub struct FStringPartsMut<'a> {
-    single: Option<&'a mut FString>,
-    concatenated: IterMut<'a, FStringPart>,
+pub enum FStringPartsMut<'a> {
+    Single(Once<&'a mut FString>),
+    Concatenated(IterMut<'a, FStringPart>),
 }
 
 impl<'a> Iterator for FStringPartsMut<'a> {
     type Item = FStringPartMut<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.single
-            .take()
-            .map(FStringPartMut::FString)
-            .or_else(|| self.concatenated.next().map(FStringPartMut::from))
+        match self {
+            Self::Single(single) => single.next().map(FStringPartMut::FString),
+            Self::Concatenated(parts) => parts.next().map(FStringPartMut::from),
+        }
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let len = usize::from(self.single.is_some()) + self.concatenated.len();
-        (len, Some(len))
+        match self {
+            Self::Single(single) => single.size_hint(),
+            Self::Concatenated(parts) => parts.size_hint(),
+        }
     }
 }
 
 impl DoubleEndedIterator for FStringPartsMut<'_> {
     fn next_back(&mut self) -> Option<Self::Item> {
-        self.concatenated
-            .next_back()
-            .map(FStringPartMut::from)
-            .or_else(|| self.single.take().map(FStringPartMut::FString))
+        match self {
+            Self::Single(single) => single.next_back().map(FStringPartMut::FString),
+            Self::Concatenated(parts) => parts.next_back().map(FStringPartMut::from),
+        }
     }
 }
 
