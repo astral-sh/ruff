@@ -1,6 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, StmtFunctionDef};
-use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
@@ -66,12 +65,14 @@ pub(crate) fn ssl_with_bad_defaults(checker: &Checker, function_def: &StmtFuncti
                     *range,
                 );
             }
-            Expr::Attribute(attribute) if is_insecure_protocol(attribute.attr.as_str()) => {
+            Expr::Attribute(ast::ExprAttribute { attr, range, .. })
+                if is_insecure_protocol(attr.as_str()) =>
+            {
                 checker.report_diagnostic(
                     SslWithBadDefaults {
-                        protocol: attribute.attr.to_string(),
+                        protocol: attr.to_string(),
                     },
-                    attribute.range(),
+                    *range,
                 );
             }
             _ => {}

@@ -353,6 +353,7 @@ fn make_suggestion(group: &AppendGroup, generator: Generator) -> String {
         value: Box::new(first.receiver.clone().into()),
         attr: ast::Identifier::new("extend".to_string(), TextRange::default()),
         ctx: ast::ExprContext::Load,
+        range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     // Make the actual call `var.extend((elt1, elt2, ..., eltN))`

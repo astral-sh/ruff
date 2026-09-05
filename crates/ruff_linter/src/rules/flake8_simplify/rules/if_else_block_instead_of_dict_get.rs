@@ -199,6 +199,7 @@ pub(crate) fn if_else_block_instead_of_dict_get(checker: &Checker, stmt_if: &ast
         value: expected_subscript.clone(),
         attr: Identifier::new("get".to_string(), TextRange::default()),
         ctx: ExprContext::Load,
+        range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     let node3 = ast::ExprCall {
@@ -307,6 +308,7 @@ pub(crate) fn if_exp_instead_of_dict_get(
         value: expected_subscript.clone(),
         attr: Identifier::new("get".to_string(), TextRange::default()),
         ctx: ExprContext::Load,
+        range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     let fixed_node = ast::ExprCall {

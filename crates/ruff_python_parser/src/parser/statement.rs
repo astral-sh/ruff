@@ -777,7 +777,11 @@ impl<'src> Parser<'src> {
         if self.eat(TokenKind::Star) {
             let range = self.node_range(start);
             return ast::Alias {
-                name: ast::Identifier::new(Name::new_static("*"), range),
+                name: ast::Identifier {
+                    id: Name::new_static("*"),
+                    range,
+                    node_index: AtomicNodeIndex::NONE,
+                },
                 asname: None,
                 range,
                 node_index: AtomicNodeIndex::NONE,
@@ -850,7 +854,11 @@ impl<'src> Parser<'src> {
         // test_ok dotted_name_normalized_spaces
         // import a.b.c
         // import a .  b  . c
-        ast::Identifier::new(id, self.node_range(start))
+        ast::Identifier {
+            id,
+            range: self.node_range(start),
+            node_index: AtomicNodeIndex::NONE,
+        }
     }
 
     /// Parses a `pass` statement.
@@ -3045,7 +3053,11 @@ impl<'src> Parser<'src> {
                     range,
                     is_async: false,
                     decorator_list: decorators,
-                    name: ast::Identifier::new(Name::empty(), self.missing_node_range()),
+                    name: ast::Identifier {
+                        id: Name::empty(),
+                        range: self.missing_node_range(),
+                        node_index: AtomicNodeIndex::NONE,
+                    },
                     type_params: None,
                     parameters: Box::new(ast::Parameters {
                         range: self.missing_node_range(),

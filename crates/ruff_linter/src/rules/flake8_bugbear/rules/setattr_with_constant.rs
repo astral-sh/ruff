@@ -75,6 +75,7 @@ fn assignment(obj: &Expr, name: &str, value: &Expr, generator: Generator) -> Str
             value: Box::new(obj.clone()),
             attr: Identifier::new(name.to_string(), TextRange::default()),
             ctx: ExprContext::Store,
+            range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         })],
         value: Box::new(value.clone()),

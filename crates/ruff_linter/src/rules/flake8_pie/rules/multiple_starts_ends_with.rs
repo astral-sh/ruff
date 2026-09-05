@@ -193,6 +193,7 @@ pub(crate) fn multiple_starts_ends_with(checker: &Checker, expr: &Expr) {
                 value: Box::new(node1),
                 attr: Identifier::new(attr_name.to_string(), TextRange::default()),
                 ctx: ExprContext::Load,
+                range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             });
             let node3 = Expr::Call(ast::ExprCall {

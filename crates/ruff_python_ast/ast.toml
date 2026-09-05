@@ -490,8 +490,6 @@ derives = ["Default"]
 
 [Expr.nodes.ExprAttribute]
 doc = "See also [Attribute](https://docs.python.org/3/library/ast.html#ast.Attribute)"
-custom_debug = true
-custom_range = true
 fields = [
   { name = "value", type = "Expr" },
   { name = "attr", type = "Identifier" },

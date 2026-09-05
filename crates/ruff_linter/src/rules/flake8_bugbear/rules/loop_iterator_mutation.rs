@@ -10,7 +10,7 @@ use ruff_python_ast::{
     ExprTuple, Stmt, StmtAssign, StmtAugAssign, StmtDelete, StmtFor, StmtIf, StmtTry, StmtWhile,
     visitor::{self, Visitor},
 };
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::TextRange;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
@@ -304,6 +304,7 @@ impl<'a> LoopMutationsVisitor<'a> {
     /// Handle, e.g., `items.append(1)`.
     fn handle_call(&mut self, func: &Expr) {
         if let Expr::Attribute(ExprAttribute {
+            range,
             node_index: _,
             value,
             attr,
@@ -313,7 +314,7 @@ impl<'a> LoopMutationsVisitor<'a> {
             if is_mutating_function(attr.as_str()) {
                 // Find, e.g., `items.remove(1)`.
                 if ComparableExpr::from(self.iter) == ComparableExpr::from(value) {
-                    self.add_mutation(func.range());
+                    self.add_mutation(*range);
                 }
             }
         }

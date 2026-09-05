@@ -1,4 +1,4 @@
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::TextRange;
 
 use crate::visitor::transformer::{Transformer, walk_expr, walk_keyword};
 use crate::{self as ast};
@@ -98,11 +98,8 @@ impl Transformer for Relocator {
             Expr::EllipsisLiteral(ast::ExprEllipsisLiteral { range, .. }) => {
                 *range = self.range;
             }
-            Expr::Attribute(ast::ExprAttribute { attr, .. }) => {
-                if attr.end() > self.range.end() {
-                    attr.range = TextRange::empty(self.range.end());
-                }
-                attr.expression_start = self.range.start();
+            Expr::Attribute(ast::ExprAttribute { range, .. }) => {
+                *range = self.range;
             }
             Expr::Subscript(ast::ExprSubscript { range, .. }) => {
                 *range = self.range;
