@@ -2876,12 +2876,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 // self: `P`
                 // other: `P`
                 (Some(([], source_bound_typevar)), Some(([], target_bound_typevar))) => {
-                    let param_spec_matches = ConstraintSet::constrain_typevar(
+                    let param_spec_matches = ConstraintSet::constrain_typevar_equivalence_bound(
                         db,
                         env,
                         self.constraints,
                         source_bound_typevar,
-                        Type::TypeVar(target_bound_typevar),
                         Type::TypeVar(target_bound_typevar),
                     );
                     result.intersect(db, self.constraints, param_spec_matches);
@@ -3105,12 +3104,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         result.intersect(db, self.constraints, param_spec_prefix_matches);
                     } else {
                         // When the prefixes match exactly, we just relate the remaining tails.
-                        let param_spec_matches = ConstraintSet::constrain_typevar(
+                        let param_spec_matches = ConstraintSet::constrain_typevar_equivalence_bound(
                             db,
                             env,
                             self.constraints,
                             source_bound_typevar,
-                            Type::TypeVar(target_bound_typevar),
                             Type::TypeVar(target_bound_typevar),
                         );
                         result.intersect(db, self.constraints, param_spec_matches);

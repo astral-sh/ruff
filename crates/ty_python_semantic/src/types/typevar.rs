@@ -1581,6 +1581,17 @@ pub(crate) enum TypeVarDomain {
 }
 
 impl TypeVarDomain {
+    pub(crate) fn bottom(self, db: &dyn Db) -> Type<'_> {
+        match self {
+            TypeVarDomain::Type => Type::Never,
+            TypeVarDomain::ParameterSignature => {
+                Type::paramspec_value_callable(db, Parameters::bottom())
+            }
+            // TODO: Choose the correct top type once we support TypeVarTuple in constraint sets
+            TypeVarDomain::TypeTuple => Type::Never,
+        }
+    }
+
     pub(crate) fn top(self, db: &dyn Db) -> Type<'_> {
         match self {
             TypeVarDomain::Type => Type::object(),
