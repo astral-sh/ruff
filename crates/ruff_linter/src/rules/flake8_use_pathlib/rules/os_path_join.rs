@@ -121,7 +121,7 @@ pub(crate) fn os_path_join(checker: &Checker, call: &ExprCall, segment: &[&str])
         return;
     };
 
-    if !is_valid_args(&first_arg, args.as_slice(), module) {
+    if !is_valid_args(first_arg, args.as_slice(), module) {
         return;
     }
 
