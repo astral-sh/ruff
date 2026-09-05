@@ -1226,7 +1226,7 @@ impl<T, V> VariableLengthTuple<T, V> {
         self.suffix_elements().iter().copied()
     }
 
-    fn fixed_elements(&self) -> impl Iterator<Item = &T> + '_ {
+    fn fixed_elements(&self) -> impl ExactSizeIterator<Item = &T> + '_ {
         self.fixed_elements.iter()
     }
 
@@ -2515,7 +2515,7 @@ impl<T, V> Tuple<T, V> {
     }
 
     /// Returns an iterator of all of the fixed-length element types of this tuple.
-    pub(crate) fn fixed_elements(&self) -> impl Iterator<Item = &T> + '_ {
+    pub(crate) fn fixed_elements(&self) -> impl ExactSizeIterator<Item = &T> + '_ {
         match self {
             Tuple::Fixed(tuple) => Either::Left(tuple.all_elements().iter()),
             Tuple::Variable(tuple) => Either::Right(tuple.fixed_elements()),
