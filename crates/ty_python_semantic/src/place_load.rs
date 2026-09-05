@@ -596,7 +596,7 @@ impl<'db, 'ast> PlaceLoadResolution<'db, 'ast> {
         self.constraints.into_constraints()
     }
 
-    fn place_expr(&self) -> PlaceExprRef<'_> {
+    pub(crate) fn place_expr(&self) -> PlaceExprRef<'_> {
         PlaceExprRef::from(&self.place_expr)
     }
 

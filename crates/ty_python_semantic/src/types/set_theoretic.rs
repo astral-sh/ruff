@@ -8,7 +8,7 @@ use crate::place::{
 };
 use crate::types::class::KnownClass;
 use crate::types::enums::EnumComplement;
-use crate::types::{InstanceProjection, SymbolicType, Type, TypePair, TypeQualifiers};
+use crate::types::{InstanceProjection, Type, TypePair, TypeQualifiers};
 use crate::types::{TypeVarBoundOrConstraints, visitor};
 use crate::{Db, FxOrderSet};
 
@@ -323,7 +323,6 @@ impl<'db> UnionType<'db> {
         mut transform_fn: impl FnMut(&Type<'db>) -> Place<'db>,
     ) -> Place<'db> {
         let mut builder = UnionBuilder::new(db, env);
-        let mut symbolic_values = Vec::new();
 
         let mut all_unbound = true;
         let mut possibly_unbound = false;
@@ -340,7 +339,6 @@ impl<'db> UnionType<'db> {
                     origin: member_origin,
                     definedness: member_boundness,
                     provenance: member_provenance,
-                    symbolic,
                     ..
                 }) => {
                     origin = origin.merge(member_origin);
@@ -350,7 +348,6 @@ impl<'db> UnionType<'db> {
                     provenance = provenance.or(member_provenance);
 
                     all_unbound = false;
-                    symbolic_values.push((ty_member, symbolic));
                     builder.add_in_place(ty_member);
                 }
             }
@@ -360,7 +357,6 @@ impl<'db> UnionType<'db> {
             Place::Undefined
         } else {
             Place::Defined(DefinedPlace {
-                symbolic: SymbolicType::from_union(db, env, symbolic_values),
                 ty: builder
                     .recursively_defined(self.recursively_defined(db))
                     .build(),
@@ -383,7 +379,6 @@ impl<'db> UnionType<'db> {
         mut transform_fn: impl FnMut(&Type<'db>) -> PlaceAndQualifiers<'db>,
     ) -> PlaceAndQualifiers<'db> {
         let mut builder = UnionBuilder::new(db, env);
-        let mut symbolic_values = Vec::new();
         let mut qualifiers = TypeQualifiers::empty();
 
         let mut all_unbound = true;
@@ -405,7 +400,6 @@ impl<'db> UnionType<'db> {
                     origin: member_origin,
                     definedness: member_boundness,
                     provenance: member_provenance,
-                    symbolic,
                     ..
                 }) => {
                     origin = origin.merge(member_origin);
@@ -415,7 +409,6 @@ impl<'db> UnionType<'db> {
                     provenance = provenance.or(member_provenance);
 
                     all_unbound = false;
-                    symbolic_values.push((ty_member, symbolic));
                     builder.add_in_place(ty_member);
                 }
             }
@@ -425,7 +418,6 @@ impl<'db> UnionType<'db> {
                 Place::Undefined
             } else {
                 Place::Defined(DefinedPlace {
-                    symbolic: SymbolicType::from_union(db, env, symbolic_values),
                     ty: builder
                         .recursively_defined(self.recursively_defined(db))
                         .build(),
@@ -459,7 +451,7 @@ impl<'db> UnionType<'db> {
             if nested {
                 // list[T | Divergent] => list[Divergent]
                 let ty = ty.recursive_type_normalized_impl(db, env, div, nested)?;
-                if ty.same_divergent_marker(db, div) {
+                if ty.same_divergent_marker(db, div) && !ty.is_derived_marker(db) {
                     return Some(ty);
                 }
                 builder.add_in_place(ty);
@@ -1117,7 +1109,6 @@ impl<'db> IntersectionType<'db> {
             Place::Undefined
         } else {
             Place::Defined(DefinedPlace {
-                symbolic: None,
                 ty: builder.build(),
                 origin,
                 definedness: if any_definitely_bound {
@@ -1176,7 +1167,6 @@ impl<'db> IntersectionType<'db> {
                 Place::Undefined
             } else {
                 Place::Defined(DefinedPlace {
-                    symbolic: None,
                     ty: builder.build(),
                     origin,
                     definedness: if any_definitely_bound {

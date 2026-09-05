@@ -16,33 +16,61 @@
 
 use std::cell::RefCell;
 
+use ruff_python_ast::Operator;
 use rustc_hash::{FxHashMap, FxHashSet};
+use ty_python_core::scope::ScopeKind;
 
 use crate::Db;
-use crate::types::class::implicit_attributes::implicit_attribute_value;
-use crate::types::cycle_equations::{CycleEquations, Operation, opaque_passthrough};
+use crate::types::call::{CallArguments, CallDunderError};
+use crate::types::class::implicit_attributes::{
+    implicit_attribute_equations, implicit_attribute_value,
+};
+use crate::types::constraints::ConstraintSetBuilder;
+use crate::types::cycle_equations::{CycleEquations, Operation};
 use crate::types::cycle_variable::{CycleOwner, CycleVariable};
 use crate::types::infer::{
     InferenceRegion, infer_deferred_types, infer_definition_types, infer_expression_types,
-    infer_function_default_types, infer_statement_types_impl, infer_unpack_types,
+    infer_function_default_types, infer_scope_types, infer_statement_types_impl,
+    infer_unpack_types,
 };
-use crate::types::visitor::any_over_type_for_cycle_markers;
+use crate::types::set_theoretic::RecursivelyDefined;
+use crate::types::visitor::{any_over_type_for_cycle_markers, nesting_depth};
 use crate::types::{
-    DivergentType, ProgramEnvironment, Type, TypeContext, TypeMapping, UnionType,
-    member_lookup_value,
+    DivergentType, MemberLookupPolicy, ProgramEnvironment, Type, TypeContext, TypeMapping,
+    UnionBuilder, UnionType, member_lookup_value,
 };
 
 /// The resolved values of cycle variables, ready to substitute for their markers.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct CycleSolution<'db>(FxHashMap<CycleVariable<'db>, Type<'db>>);
+pub struct CycleSolution<'db> {
+    /// The values to substitute for the markers of the variables they resolve.
+    values: FxHashMap<CycleVariable<'db>, Type<'db>>,
+    /// The values of recursive variables, to be replaced by the markers of their variables
+    /// where they occur.
+    ///
+    /// A recursive value mentions its own variable, so substituting it would unfold the
+    /// recursion by one level. A query that infers such a value again from a result in which
+    /// it was unfolded nests it one level deeper on every cycle iteration; folding the value
+    /// back into its marker keeps the result at the depth the query inferred.
+    cuts: FxHashMap<Type<'db>, CycleVariable<'db>>,
+}
 
 impl<'db> CycleSolution<'db> {
     pub(crate) fn get(&self, variable: CycleVariable<'db>) -> Option<Type<'db>> {
-        self.0.get(&variable).copied()
+        self.values.get(&variable).copied()
+    }
+
+    /// The recursive variable whose value `ty` is, if any.
+    pub(crate) fn cut(&self, ty: Type<'db>) -> Option<CycleVariable<'db>> {
+        self.cuts.get(&ty).copied()
+    }
+
+    fn has_cuts(&self) -> bool {
+        !self.cuts.is_empty()
     }
 
     fn is_empty(&self) -> bool {
-        self.0.is_empty()
+        self.values.is_empty() && self.cuts.is_empty()
     }
 }
 
@@ -53,13 +81,16 @@ pub(crate) fn resolve_cycle_variables<'db>(
     solution: &CycleSolution<'db>,
     ty: Type<'db>,
 ) -> Type<'db> {
-    let mentions_resolved = any_over_type_for_cycle_markers(db, env, ty, |ty| {
-        matches!(
-            ty,
-            Type::Divergent(marker)
-                if marker.variable().is_some_and(|variable| solution.get(variable).is_some())
-        )
-    });
+    // A value to cut is a union, which the search does not present as a whole; a solution
+    // with cuts is applied to every type.
+    let mentions_resolved = solution.has_cuts()
+        || any_over_type_for_cycle_markers(db, env, ty, |ty| {
+            matches!(
+                ty,
+                Type::Divergent(marker)
+                    if marker.variable().is_some_and(|variable| solution.get(variable).is_some())
+            )
+        });
     if !mentions_resolved {
         return ty;
     }
@@ -82,10 +113,10 @@ enum SystemEquation<'db> {
 }
 
 impl<'db> SystemEquation<'db> {
-    fn inputs(&self) -> Vec<Type<'db>> {
+    fn inputs(&self, db: &'db dyn Db) -> Vec<Type<'db>> {
         match self {
             SystemEquation::Value(ty) => vec![*ty],
-            SystemEquation::Operation(operation) => operation.inputs().collect(),
+            SystemEquation::Operation(operation) => operation.inputs(db).to_vec(),
         }
     }
 }
@@ -100,6 +131,8 @@ pub(crate) struct CycleResolver<'a, 'db> {
     local: &'a FxHashMap<CycleVariable<'db>, Operation<'db>>,
     /// The value the query's root marker stands for, for a query with one main output.
     root: Option<Type<'db>>,
+    /// Another query whose root marker stands for the same value as `root`.
+    alias: Option<CycleOwner<'db>>,
 }
 
 impl<'a, 'db> CycleResolver<'a, 'db> {
@@ -116,7 +149,18 @@ impl<'a, 'db> CycleResolver<'a, 'db> {
             owner,
             local,
             root,
+            alias: None,
         }
+    }
+
+    /// Lets the root marker of `owner` stand for the same value as the query's own root.
+    ///
+    /// The value of an assignment `name = expression` is the value of the expression, so the
+    /// definition's root is known to the expression's query before the definition's own result
+    /// is, which still holds the previous cycle iteration's value.
+    pub(crate) fn with_alias(mut self, owner: CycleOwner<'db>) -> Self {
+        self.alias = Some(owner);
+        self
     }
 
     /// Solves the equations reachable from `outputs`.
@@ -150,7 +194,7 @@ impl<'a, 'db> CycleResolver<'a, 'db> {
             };
             worklist.extend(
                 equation
-                    .inputs()
+                    .inputs(db)
                     .into_iter()
                     .flat_map(|input| unmaterialized_markers(db, self.env, input)),
             );
@@ -160,7 +204,7 @@ impl<'a, 'db> CycleResolver<'a, 'db> {
             return None;
         }
         let mut solution = system.solve(db, self.env);
-        solution.0.retain(|variable, _| !variable.is_root(db));
+        solution.values.retain(|variable, _| !variable.is_root(db));
         (!solution.is_empty()).then_some(solution)
     }
 
@@ -169,6 +213,9 @@ impl<'a, 'db> CycleResolver<'a, 'db> {
         let db = self.db;
         let owner = variable.owner(db);
         let is_root = variable.is_root(db);
+        if is_root && self.alias == Some(owner) {
+            return self.root.map(SystemEquation::Value);
+        }
         if owner == self.owner {
             return if is_root {
                 self.root.map(SystemEquation::Value)
@@ -244,12 +291,19 @@ impl<'db> CycleOwner<'db> {
                 infer_statement_types_impl(db, statement).equations()
             }
             CycleOwner::Unpack(unpack) => Some(infer_unpack_types(db, unpack).equations()),
+            CycleOwner::Attribute(attribute) => Some(implicit_attribute_equations(db, attribute)),
+            // The expression that contains a comprehension already depends on the inference of
+            // the comprehension's scope.
+            CycleOwner::Region(InferenceRegion::Scope(scope, tcx))
+                if scope.scope(db).kind() == ScopeKind::Comprehension =>
+            {
+                infer_scope_types(db, scope, tcx).equations()
+            }
             // Depending on a whole scope's inference from another query would create needless
             // cycles, and the remaining owners never defer operations.
             CycleOwner::Region(
                 InferenceRegion::Scope(..) | InferenceRegion::FunctionDecorators(_),
             )
-            | CycleOwner::Attribute(_)
             | CycleOwner::Member(..)
             | CycleOwner::Query(_) => None,
         }
@@ -320,13 +374,58 @@ impl<'db> System<'db> {
         found.into_inner()
     }
 
+    /// The variables no evaluation can give a value: an input of their equation is nothing but
+    /// the marker of a variable the system does not define, of one that is itself stuck, or of
+    /// the variable itself.
+    ///
+    /// Such a variable is, for this solve, like a marker the system does not define: what
+    /// mentions it stays as it is, with the marker as an unresolved reference, rather than
+    /// being dropped as if the variable's value were still to come.
+    fn stuck(&self, db: &'db dyn Db) -> Vec<bool> {
+        let bare: Vec<Vec<Option<usize>>> = self
+            .equations
+            .iter()
+            .map(|equation| {
+                equation
+                    .inputs(db)
+                    .into_iter()
+                    .filter_map(|input| match input {
+                        Type::Divergent(marker)
+                            if marker.materialization_kind().is_none()
+                                && marker.variable().is_some() =>
+                        {
+                            Some(self.index_of(marker))
+                        }
+                        _ => None,
+                    })
+                    .collect()
+            })
+            .collect();
+        let mut evaluable = vec![false; self.variables.len()];
+        let mut changed = true;
+        while changed {
+            changed = false;
+            for (variable, bare) in bare.iter().enumerate() {
+                if !evaluable[variable]
+                    && bare.iter().all(|input| {
+                        input.is_some_and(|input| input != variable && evaluable[input])
+                    })
+                {
+                    evaluable[variable] = true;
+                    changed = true;
+                }
+            }
+        }
+        evaluable.into_iter().map(|evaluable| !evaluable).collect()
+    }
+
     fn solve(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> CycleSolution<'db> {
         let dependencies: Vec<Vec<usize>> = self
             .equations
             .iter()
             .map(|equation| {
                 let mut dependencies: Vec<_> = equation
-                    .inputs()
+                    .inputs(db)
                     .into_iter()
                     .flat_map(|input| self.mentioned(db, env, input))
                     .collect();
@@ -342,11 +441,13 @@ impl<'db> System<'db> {
             }
         }
 
+        let stuck = self.stuck(db);
         let mut solver = Solver {
             db,
             env,
             system: &self,
             values: vec![None; self.variables.len()],
+            stuck,
         };
         // Components come out with their dependencies first, so every variable a component reads
         // from outside itself already has its final value.
@@ -357,12 +458,34 @@ impl<'db> System<'db> {
     }
 }
 
+/// How many times one variable's value can change while its strongly connected component is
+/// iterated.
+///
+/// The iteration is bounded by the widenings applied to each variable's value: literal families
+/// are widened to their instance types, and a value that keeps nesting deeper, such as the result
+/// of a method `__iadd__` returning `Grow[list[T]]` for a `Grow[T]`, is frozen at its first
+/// depth. This cap guards against growth those widenings do not cover. What a solve leaves
+/// unresolved is refined by the next cycle iteration, where cycle recovery bounds the growth of
+/// the query results as it does without the solver.
+const MAX_EVALUATIONS_PER_VARIABLE: usize = 8;
+
+/// Where a type is resolved: the value of a root, an input of an operation, or the result of
+/// evaluating one.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Position {
+    Value,
+    Operand,
+    Result,
+}
+
 struct Solver<'a, 'db> {
     db: &'db dyn Db,
     env: &'a ProgramEnvironment<'db>,
     system: &'a System<'db>,
     /// The current value of each variable; `None` until an evaluation produces one.
     values: Vec<Option<Type<'db>>>,
+    /// The variables no evaluation can give a value; see [`System::stuck`].
+    stuck: Vec<bool>,
 }
 
 impl<'db> Solver<'_, 'db> {
@@ -374,46 +497,127 @@ impl<'db> Solver<'_, 'db> {
     fn solve_component(&mut self, component: &[usize], dependents: &[Vec<usize>]) {
         let in_component: FxHashSet<usize> = component.iter().copied().collect();
         let mut queued: Vec<bool> = vec![false; self.system.variables.len()];
+        let mut evaluations: Vec<usize> = vec![0; self.system.variables.len()];
+        let mut diverging: Vec<bool> = vec![false; self.system.variables.len()];
         let mut worklist: Vec<usize> = component.to_vec();
         for &variable in component {
             queued[variable] = true;
         }
         while let Some(variable) = worklist.pop() {
             queued[variable] = false;
-            let Some(new) = self.evaluate(variable) else {
+            if diverging[variable] || evaluations[variable] >= MAX_EVALUATIONS_PER_VARIABLE {
+                continue;
+            }
+            let evaluated = self.evaluate(variable);
+            let Some(new) = evaluated else {
+                // A value computed earlier from inputs that are pending now, or by an operation
+                // whose result turned out to pass a provisional query result through, is not a
+                // value of the equation anymore; it is withdrawn, and its dependents follow.
+                if self.values[variable].take().is_some() {
+                    evaluations[variable] += 1;
+                    for &dependent in &dependents[variable] {
+                        if in_component.contains(&dependent) && !queued[dependent] {
+                            queued[dependent] = true;
+                            worklist.push(dependent);
+                        }
+                    }
+                }
                 continue;
             };
-            let changed = match self.values[variable] {
-                None => {
-                    self.values[variable] = Some(new);
-                    true
+            let new = match self.values[variable] {
+                None => new,
+                // A root's value keeps the markers nested in it as references, so it does not
+                // change when the variables it references do. The operations that read it do
+                // see their new values, so they are re-evaluated all the same. Other roots are
+                // not: two roots that mention each other would re-evaluate each other forever.
+                Some(old)
+                    if old == new
+                        && matches!(self.system.equations[variable], SystemEquation::Value(_)) =>
+                {
+                    for &dependent in &dependents[variable] {
+                        if in_component.contains(&dependent)
+                            && !queued[dependent]
+                            && matches!(
+                                self.system.equations[dependent],
+                                SystemEquation::Operation(_)
+                            )
+                        {
+                            queued[dependent] = true;
+                            worklist.push(dependent);
+                        }
+                    }
+                    continue;
                 }
-                Some(old) if old == new => false,
+                Some(old) if old == new => continue,
                 Some(old) => {
-                    let joined =
-                        UnionType::from_elements_cycle_recovery(self.db, self.env, [old, new]);
-                    let changed = joined != old;
-                    self.values[variable] = Some(joined);
-                    changed
+                    // A value that keeps growing is one a loop keeps widening, like a counter
+                    // incremented on every iteration; literal unions are widened as they are for
+                    // loop-carried bindings so the fixed point stays finite.
+                    let mut joined = UnionBuilder::new(self.db, self.env)
+                        .cycle_recovery(true)
+                        .recursively_defined(RecursivelyDefined::Yes);
+                    joined.add_in_place(old);
+                    joined.add_in_place(new);
+                    let joined = joined.build();
+                    if joined == old {
+                        continue;
+                    }
+                    // A root's value grows as the markers nested in it are resolved; only the
+                    // result of an operation can nest deeper each time it is re-evaluated. A
+                    // result that mentions its own variable is a recursive type, which the
+                    // expansion cuts at that mention.
+                    if matches!(
+                        self.system.equations[variable],
+                        SystemEquation::Operation(_)
+                    ) && nesting_depth(self.db, self.env, joined)
+                        > nesting_depth(self.db, self.env, old)
+                        && !self
+                            .system
+                            .mentioned(self.db, self.env, joined)
+                            .contains(&variable)
+                    {
+                        // A recursive alias and its expansion nest differently but describe the
+                        // same type.
+                        if joined.is_equivalent_to(self.db, self.env, old) {
+                            continue;
+                        }
+                        // Re-evaluating an operation on a value that includes its own result
+                        // nests the result deeper, such as `__iadd__` returning `Grow[list[T]]`
+                        // for a `Grow[T]`; that has no finite fixed point. The variable stays
+                        // unresolved: its marker remains for cycle recovery to bound, as without
+                        // the solver.
+                        diverging[variable] = true;
+                        self.values[variable] = None;
+                        continue;
+                    }
+                    joined
                 }
             };
-            if changed {
-                for &dependent in &dependents[variable] {
-                    if in_component.contains(&dependent) && !queued[dependent] {
-                        queued[dependent] = true;
-                        worklist.push(dependent);
-                    }
+            self.values[variable] = Some(new);
+            evaluations[variable] += 1;
+            for &dependent in &dependents[variable] {
+                if in_component.contains(&dependent) && !queued[dependent] {
+                    queued[dependent] = true;
+                    worklist.push(dependent);
                 }
             }
         }
     }
 
+    /// The value of `variable`'s equation on the values found so far, or `None` while an input,
+    /// or every element of the result, has no value yet.
     fn evaluate(&self, variable: usize) -> Option<Type<'db>> {
         match &self.system.equations[variable] {
-            SystemEquation::Value(ty) => self.resolve_top(variable, *ty),
+            SystemEquation::Value(ty) => self.resolve_top(variable, *ty, Position::Value),
             SystemEquation::Operation(operation) => {
-                let operation = operation.map_inputs(|input| self.resolve_top(variable, input))?;
-                self.resolve_top(variable, operation.evaluate(self.db, self.env))
+                let operation = operation.map_inputs(self.db, |input| {
+                    self.resolve_top(variable, input, Position::Operand)
+                })?;
+                self.resolve_top(
+                    variable,
+                    operation.evaluate(self.db, self.env),
+                    Position::Result,
+                )
             }
         }
     }
@@ -424,11 +628,25 @@ impl<'db> Solver<'_, 'db> {
     /// A union element that mentions a variable without a value yet is dropped as well, so the
     /// remaining elements form the productive base; the element returns once the variable has a
     /// value and the equation is re-evaluated. Returns `None` when nothing remains.
-    fn resolve_top(&self, variable: usize, ty: Type<'db>) -> Option<Type<'db>> {
+    ///
+    /// A marker at the top level that stands for a value the system does not define, such as
+    /// the provisional result of a query that has produced nothing but its cycle-initial marker
+    /// yet, stands for no value either. In a value or an operand it is dropped like the marker
+    /// of a variable without a value yet, and a bare one leaves the operation pending: applying
+    /// the operation to the marker would pass it through like a dynamic type, and the result
+    /// would then name the operand instead of the operation's result. In the result of an
+    /// operation it means exactly that such a marker was passed through, by a query the
+    /// operation called that is still being evaluated in the cycle, so the whole result is
+    /// pending: a later cycle iteration re-evaluates the operation once the value is known.
+    fn resolve_top(&self, variable: usize, ty: Type<'db>, position: Position) -> Option<Type<'db>> {
+        let pending_outside = |marker: DivergentType<'db>| {
+            marker.materialization_kind().is_none() && marker.variable().is_some()
+        };
         match ty {
             Type::Divergent(marker) => match self.system.index_of(marker) {
                 Some(index) if index == variable => None,
                 Some(index) => self.values[index],
+                None if pending_outside(marker) => None,
                 None => Some(ty),
             },
             Type::Union(union) => {
@@ -444,6 +662,11 @@ impl<'db> Solver<'_, 'db> {
                                 elements.push(value);
                             }
                         }
+                        Type::Divergent(marker) if pending_outside(marker) => {
+                            if position == Position::Result {
+                                return None;
+                            }
+                        }
                         _ => {
                             if !self.mentions_pending(variable, element) {
                                 elements.push(element);
@@ -454,25 +677,33 @@ impl<'db> Solver<'_, 'db> {
                 if elements.is_empty() {
                     None
                 } else {
-                    Some(UnionType::from_elements_cycle_recovery(
-                        self.db, self.env, elements,
-                    ))
+                    // A loop-carried union stays marked as recursively defined, so the literal
+                    // widening that bounds loop-carried literals applies to the resolved values.
+                    let mut builder = UnionBuilder::new(self.db, self.env)
+                        .cycle_recovery(true)
+                        .recursively_defined(union.recursively_defined(self.db));
+                    for element in elements {
+                        builder.add_in_place(element);
+                    }
+                    Some(builder.build())
                 }
             }
             _ => Some(ty),
         }
     }
 
-    /// Whether `ty` mentions a variable other than `variable` that has no value yet.
+    /// Whether `ty` mentions a variable other than `variable` whose value is still to come.
     ///
     /// A nested mention of `variable` itself is a recursive reference, kept as it is: it becomes
-    /// the cut point that bounds the value's depth.
+    /// the cut point that bounds the value's depth. A mention of a stuck variable is kept too,
+    /// as an unresolved reference: dropping it would commit a value that lacks the part
+    /// depending on the variable, and with it the recursion through that part.
     fn mentions_pending(&self, variable: usize, ty: Type<'db>) -> bool {
         any_over_type_for_cycle_markers(self.db, self.env, ty, |ty| {
             if let Type::Divergent(marker) = ty
                 && let Some(index) = self.system.index_of(marker)
             {
-                index != variable && self.values[index].is_none()
+                index != variable && self.values[index].is_none() && !self.stuck[index]
             } else {
                 false
             }
@@ -507,6 +738,24 @@ impl<'db> Solver<'_, 'db> {
             .collect();
         let mut solution = CycleSolution::default();
         for component in strongly_connected_components(&references) {
+            // The values of mutually recursive variables, and of a variable whose value
+            // mentions itself, are recursive types. Their markers stay as they are, as the cut
+            // points of the recursion, and their values fold back into the markers.
+            if component.len() > 1
+                || component
+                    .iter()
+                    .any(|&index| references[index].contains(&index))
+            {
+                for &index in &component {
+                    let variable = self.system.variables[index];
+                    if let Some(value) = self.values[index]
+                        && !variable.is_root(self.db)
+                    {
+                        solution.cuts.insert(value, variable);
+                    }
+                }
+                continue;
+            }
             let expanded: Vec<_> = component
                 .iter()
                 .filter_map(|&index| {
@@ -517,19 +766,19 @@ impl<'db> Solver<'_, 'db> {
                     ))
                 })
                 .collect();
-            solution.0.extend(expanded);
+            solution.values.extend(expanded);
         }
         solution
     }
 }
 
 impl<'db> Operation<'db> {
-    /// Evaluates the operation on its inputs, which contain no markers at the top level.
+    /// Evaluates the operation on its inputs, whose top-level markers stand for no value.
     ///
     /// Errors are not reported: the query that recorded the operation reports them once it
     /// re-infers the operation on the resolved operand.
     fn evaluate(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
-        let result = match self {
+        match self {
             Operation::Subscript { value, key } => value
                 .subscript(db, env, *key, ruff_python_ast::ExprContext::Load)
                 .unwrap_or_else(|_| Type::unknown()),
@@ -559,10 +808,108 @@ impl<'db> Operation<'db> {
             Operation::Await { value } => {
                 value.try_await(db, env).unwrap_or_else(|_| Type::unknown())
             }
-        };
-        // A marker outside the system passes through like any dynamic type; the result must not
-        // keep naming the operand.
-        opaque_passthrough(db, env, self.inputs(), result)
+            Operation::Binary {
+                left,
+                right,
+                operator,
+                context,
+            } => context
+                .evaluate(db, env, *left, *right, *operator)
+                .return_type
+                .unwrap_or_else(Type::unknown),
+            Operation::Unary { operand, operator } => operand
+                .try_unary_operation(db, env, *operator, &mut |_| {})
+                .unwrap_or_else(|fallback| fallback),
+            Operation::Augmented {
+                left,
+                right,
+                operator,
+                context,
+            } => {
+                if let Type::Union(union) = left {
+                    return union.map(db, env, |left| {
+                        Operation::Augmented {
+                            left: *left,
+                            right: *right,
+                            operator: *operator,
+                            context: *context,
+                        }
+                        .evaluate(db, env)
+                    });
+                }
+                // Updating a typed dictionary preserves its schema, including on invalid updates;
+                // the query that recorded the operation validates the update.
+                if matches!((operator, left), (Operator::BitOr, Type::TypedDict(_))) {
+                    return *left;
+                }
+                let binary = || {
+                    context
+                        .evaluate(db, env, *left, *right, *operator)
+                        .return_type
+                        .unwrap_or_else(Type::unknown)
+                };
+                match left.try_call_dunder_with_policy(
+                    db,
+                    env,
+                    operator.in_place_dunder(),
+                    &mut CallArguments::positional([*right]),
+                    TypeContext::default(),
+                    MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                ) {
+                    Ok(bindings) => bindings.return_type(db, env),
+                    Err(CallDunderError::MethodNotAvailable) => binary(),
+                    Err(CallDunderError::PossiblyUnbound { bindings, .. }) => {
+                        UnionType::from_two_elements(
+                            db,
+                            env,
+                            bindings.return_type(db, env),
+                            binary(),
+                        )
+                    }
+                    Err(CallDunderError::CallError(..)) => Type::unknown(),
+                }
+            }
+            Operation::Call {
+                callable,
+                arguments,
+                tcx,
+            } => {
+                let arguments = arguments.to_arguments(db);
+                let constraints = ConstraintSetBuilder::new();
+                let result = callable
+                    .bindings(db, env)
+                    .match_parameters(db, env, &arguments)
+                    .check_types(db, env, &constraints, &arguments, *tcx, &[]);
+                result.map_or_else(
+                    |_| Type::unknown(),
+                    |bindings| bindings.return_type(db, env),
+                )
+            }
+            Operation::Narrow { value, narrowing } => narrowing.apply(db, env, *value),
+            Operation::MappingKey { value } => value
+                .unpack_keys_and_items(db, env)
+                .map(|(key, _)| key)
+                .unwrap_or_else(Type::unknown),
+            Operation::MappingValue { value } => value
+                .unpack_keys_and_items(db, env)
+                .map(|(_, value)| value)
+                .unwrap_or_else(Type::unknown),
+            Operation::TypeArgument { value, parameter } => {
+                let argument =
+                    |value: Type<'db>| value.class_specialization(db, env)?.1.get(db, *parameter);
+                match value {
+                    Type::Union(union) => union.try_map(db, env, |element| argument(*element)),
+                    value => argument(*value),
+                }
+                .unwrap_or_else(Type::unknown)
+            }
+            Operation::Tuple { elements } => elements.build(db, env),
+            Operation::ScopeExpression {
+                scope,
+                tcx,
+                expression,
+            } => infer_scope_types(db, *scope, *tcx).expression_type(*expression),
+        }
     }
 }
 

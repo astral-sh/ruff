@@ -36,6 +36,19 @@ pub(crate) enum CycleSlot {
     Root,
     /// The value of an expression, including an unpacking target.
     Expression(ExpressionNodeKey),
+    /// The result of an augmented assignment to an expression, whose own slot denotes the value
+    /// the assignment read.
+    Augmented(ExpressionNodeKey),
+    /// The value of an expression after the narrowing constraints applicable to it.
+    Narrowed(ExpressionNodeKey),
+    /// The key type of a mapping expanded by `**` into a dictionary display.
+    MappingKey(ExpressionNodeKey),
+    /// The value type of a mapping expanded by `**` into a dictionary display.
+    MappingValue(ExpressionNodeKey),
+    /// One position of the sequence a starred expression expands to.
+    Element(ExpressionNodeKey, usize),
+    /// One type argument of the collection an expression constructs.
+    TypeArgument(ExpressionNodeKey, usize),
 }
 
 /// The Salsa key of the query that seeded a cycle marker.
@@ -83,12 +96,23 @@ impl<'db> CycleVariable<'db> {
 
     /// The result of an operation on the value of `input`, recorded by the query `owner` for
     /// the output `slot`.
+    ///
+    /// An operation applied to its own result, which happens when the result of one cycle
+    /// iteration flows back into the operation in the next, is the same variable: the value the
+    /// operation yields at the fixed point. Deriving a fresh variable each time would give the
+    /// iteration an ever-growing chain of variables to converge on.
     pub(crate) fn derived(
         db: &'db dyn Db,
         owner: CycleOwner<'db>,
         slot: CycleSlot,
-        input: Self,
+        mut input: Self,
     ) -> Self {
+        while input.owner(db) == owner
+            && input.slot(db) == slot
+            && let Some(inner) = input.input(db)
+        {
+            input = inner;
+        }
         Self::new(db, input.head(db), owner, slot, Some(input))
     }
 

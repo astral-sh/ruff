@@ -277,7 +277,7 @@ mod place_state;
 
 pub(super) use exception_checkpoint::ExceptionCheckpointKey;
 use exception_checkpoint::{ExceptionCheckpointSnapshot, ExceptionCheckpointState};
-pub(crate) use place_state::LiveBinding;
+pub use place_state::LiveBinding;
 pub use place_state::ScopedDefinitionId;
 pub(super) use place_state::{FutureDefinitions, PreviousDefinitions};
 

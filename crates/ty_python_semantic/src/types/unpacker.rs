@@ -11,10 +11,6 @@ use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::Ranged;
 
 use crate::Db;
-use crate::types::infer::constraints::{
-    InferenceConstraints, InferenceOperation, InferenceOwner, InferenceSlot, InferenceVariable,
-    SymbolicType,
-};
 use crate::types::infer::{ExpressionInference, FrozenMap};
 use crate::types::tuple::promotion::TupleSizePromotionConstraints;
 use crate::types::tuple::{
@@ -22,8 +18,8 @@ use crate::types::tuple::{
     VariableLengthTuple,
 };
 use crate::types::{
-    CycleEquations, CycleOwner, CycleResolver, CycleSlot, DeferredOperations, InferencePromotion,
-    KnownClass, Operation, Type, TypeCheckDiagnostics, TypeContext, UnionBuilder, UnionType,
+    CycleEquations, CycleOwner, CycleResolver, CycleSlot, DeferredOperations, KnownClass,
+    Operation, Type, TypeCheckDiagnostics, TypeContext, UnionBuilder, UnionType,
     cycle_normalized_equations, infer_expression_types, resolve_cycle_variables,
 };
 use ty_python_core::ExpressionNodeKey;
@@ -37,7 +33,6 @@ pub(crate) struct Unpacker<'db, 'ast> {
     context: InferContext<'db, 'ast>,
     unpack: Unpack<'db>,
     targets: FxHashMap<ExpressionNodeKey, Type<'db>>,
-    symbolic: FxHashMap<ExpressionNodeKey, SymbolicType<'db>>,
     /// Operations deferred because the unpacked value's type is still being inferred.
     equations: DeferredOperations<'db>,
 }
@@ -71,7 +66,6 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                 module,
             ),
             targets: FxHashMap::default(),
-            symbolic: FxHashMap::default(),
             equations: DeferredOperations::new(CycleOwner::Unpack(unpack)),
             unpack,
         }
@@ -102,23 +96,6 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
         let value_expr = value.expression().node_ref(self.db()).node(self.module());
 
         let value_type = value_inference.expression_type(value_expr);
-        let mut symbolic = if matches!(value.kind(), UnpackKind::Assign) {
-            SymbolicType::from_sequence(
-                db,
-                self.context.program_environment(),
-                InferenceOwner::Unpack(self.unpack),
-                value_expr.into(),
-                |expression| {
-                    (
-                        value_inference.expression_type(expression),
-                        value_inference.symbolic_type(expression),
-                    )
-                },
-            )
-        } else {
-            None
-        }
-        .or_else(|| value_inference.symbolic_type(value_expr));
 
         let value_type = match value.kind() {
             UnpackKind::Assign => {
@@ -130,15 +107,6 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
             }
             UnpackKind::Iterable { mode } => {
                 let env = self.context.program_environment();
-                symbolic = symbolic.map(|symbolic| {
-                    symbolic.apply(
-                        db,
-                        env,
-                        InferenceOwner::Unpack(self.unpack),
-                        value_expr.into(),
-                        |value| InferenceOperation::Iterate { value, mode },
-                    )
-                });
                 let element_type = value_type
                     .try_iterate_with_mode(db, env, mode)
                     .map(|tuple| tuple.homogeneous_element_type(db, env))
@@ -161,15 +129,6 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
             }
             UnpackKind::ContextManager { mode } => {
                 let env = self.context.program_environment();
-                symbolic = symbolic.map(|symbolic| {
-                    symbolic.apply(
-                        db,
-                        env,
-                        InferenceOwner::Unpack(self.unpack),
-                        value_expr.into(),
-                        |value| InferenceOperation::Enter { value, mode },
-                    )
-                });
                 let entered_type = value_type
                     .try_enter_with_mode(db, env, mode)
                     .unwrap_or_else(|err| {
@@ -199,7 +158,6 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                 expression: matches!(value.kind(), UnpackKind::Assign).then_some(value_expr),
                 promote_literals: false,
             },
-            symbolic,
             value_inference,
         );
     }
@@ -236,7 +194,6 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
         target: &ast::Expr,
         value_expr: AnyNodeRef<'_>,
         value: UnpackElement<'db, 'ast>,
-        symbolic: Option<SymbolicType<'db>>,
         value_inference: &ExpressionInference<'db>,
     ) {
         let db = self.db();
@@ -244,13 +201,10 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
         let targets = match target {
             ast::Expr::Name(_) | ast::Expr::Attribute(_) | ast::Expr::Subscript(_) => {
                 self.targets.insert(target.into(), value.ty);
-                if let Some(symbolic) = symbolic {
-                    self.symbolic.insert(target.into(), symbolic);
-                }
                 return;
             }
             ast::Expr::Starred(starred) => {
-                self.unpack_inner(&starred.value, value_expr, value, symbolic, value_inference);
+                self.unpack_inner(&starred.value, value_expr, value, value_inference);
                 return;
             }
             ast::Expr::List(ast::ExprList { elts, .. })
@@ -264,10 +218,13 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
             }
         };
         let target_len = target_length(targets);
+        let equations = &self.equations;
         let literal = value.expression.and_then(|expression| {
-            literal_sequence(
-                expression.into(),
-                value.promote_literals,
+            let (values, promote) = literal_sequence_elements(expression, value.promote_literals)?;
+            let spread_length = single_spread_length(values, promote, target_len);
+            Some(literal_sequence(
+                values,
+                promote,
                 &|expression, promote| {
                     let ty = value_inference.expression_type(expression);
                     UnpackElement {
@@ -277,6 +234,31 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                     }
                 },
                 &|expression, promote, known_length| {
+                    // A starred expression whose value is still being inferred fills a known
+                    // number of positions with one deferred element each, so that the elements
+                    // keep their positions once the value is known.
+                    if let ast::Expr::Starred(starred) = expression
+                        && let iterable @ Type::Divergent(marker) =
+                            value_inference.expression_type(&starred.value)
+                        && marker.materialization_kind().is_none()
+                        && let Some(variable) = marker.variable()
+                        && let Some(length) = known_length.or(spread_length)
+                    {
+                        return Tuple::heterogeneous((0..length).map(|index| UnpackElement {
+                            ty: equations.defer(
+                                db,
+                                CycleSlot::Element(starred.value.as_ref().into(), index),
+                                variable,
+                                Operation::Unpack {
+                                    value: iterable,
+                                    length: TupleLength::Fixed(length),
+                                    index,
+                                },
+                            ),
+                            expression: None,
+                            promote_literals: promote,
+                        }));
+                    }
                     // The starred expression's inference has already reported iteration errors.
                     // For `a, *rest = [1, *items]`, retain the shape of `items`' iterator even
                     // though the enclosing list's type has erased positions and length.
@@ -290,9 +272,12 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                     }
                     sequence_from_type(db, &tuple)
                 },
-            )
+            ))
         });
 
+        // A value still being inferred iterates to its own marker, which would make the marker
+        // stand for each target. Each target's share of the value is deferred instead.
+        let mut deferred_markers = Vec::new();
         let sequences = if let Some(literal) = literal {
             vec![literal]
         } else {
@@ -307,12 +292,19 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
             };
             unpack_types
                 .iter()
-                .map(|ty| {
+                .filter_map(|ty| {
+                    if let Type::Divergent(marker) = ty
+                        && marker.materialization_kind().is_none()
+                        && marker.variable().is_some()
+                    {
+                        deferred_markers.push(*ty);
+                        return None;
+                    }
                     let tuple = ty.try_iterate(db, env).unwrap_or_else(|err| {
                         err.report_diagnostic(&self.context, *ty, value_expr);
                         Cow::Owned(TupleSpec::homogeneous(err.fallback_element_type(db, env)))
                     });
-                    sequence_from_type(db, &tuple)
+                    Some(sequence_from_type(db, &tuple))
                 })
                 .collect()
         };
@@ -397,34 +389,31 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
             }
         }
 
-        for (index, (target, (ty, expression, promote_literals))) in
+        for (index, (target, (mut ty, expression, promote_literals))) in
             targets.iter().zip(inferred_targets).enumerate()
         {
-            let symbolic = symbolic.map(|symbolic| {
-                symbolic.apply(
-                    db,
-                    env,
-                    InferenceOwner::Unpack(self.unpack),
-                    target.into(),
-                    |value| InferenceOperation::Unpack {
-                        value,
-                        length: target_len,
-                        index,
-                    },
-                )
-            });
-            let ty = self.equations.defer_passthrough(
-                db,
-                env,
-                value.ty,
-                ty.build(),
-                CycleSlot::Expression(target.into()),
-                |value| Operation::Unpack {
-                    value,
-                    length: target_len,
-                    index,
-                },
-            );
+            let slot = CycleSlot::Expression(target.into());
+            let operation = |value| Operation::Unpack {
+                value,
+                length: target_len,
+                index,
+            };
+            for &marker in &deferred_markers {
+                let Type::Divergent(divergent) = marker else {
+                    continue;
+                };
+                let Some(variable) = divergent.variable() else {
+                    continue;
+                };
+                ty.add_in_place(self.equations.defer(db, slot, variable, operation(marker)));
+            }
+            let mut ty = ty.build();
+            // The target's value can mention the target's own variable of an earlier cycle
+            // iteration, extracted from inside the unpacked value. A value that nests it is
+            // recursive; the marker stands for it.
+            if let Some(recursive) = self.equations.retain(db, env, slot, ty, operation) {
+                ty = Type::divergent_variable(recursive);
+            }
             self.unpack_inner(
                 target,
                 expression.map(AnyNodeRef::from).unwrap_or(value_expr),
@@ -433,7 +422,6 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                     expression,
                     promote_literals,
                 },
-                symbolic,
                 value_inference,
             );
         }
@@ -442,68 +430,33 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
     pub(crate) fn finish(mut self) -> UnpackResult<'db> {
         let db = self.db();
         let env = self.context.program_environment();
-        if !self.symbolic.is_empty() {
-            // Targets can refer to each other. Close all of their producers before solving any
-            // output, so each target sees the same complete group of equations.
-            let mut outputs: Vec<_> = self.targets.iter().map(|(key, ty)| (*key, *ty)).collect();
-            outputs.sort_unstable_by_key(|(key, _)| *key);
-            let mut constraints = InferenceConstraints::default();
-            for (target, ty) in &mut outputs {
-                if let Some(symbolic) = self.symbolic.get(target) {
-                    *ty = constraints.import(db, *symbolic);
-                }
-            }
-            for (target, ty) in &mut outputs {
-                *ty = constraints.define(
-                    db,
-                    env.program(db),
-                    InferenceOwner::Unpack(self.unpack),
-                    InferenceSlot::Expression(*target),
-                    *ty,
-                );
-            }
-            for (target, ty) in outputs {
-                let symbolic = constraints.finish(db, ty);
-                if let Some(resolved) = symbolic.resolve(db, env) {
-                    self.targets.insert(target, resolved);
-                }
-                self.symbolic.insert(target, symbolic);
-            }
-        }
         // The unpacking's root marker stands for whichever target it reached, so no target can
         // treat it as its own value; cycle recovery removes it instead.
+        let equations = self.equations.equations();
         let resolved: Vec<_> = self
             .targets
             .iter()
             .filter_map(|(target, ty)| {
-                let resolver = CycleResolver::new(
-                    db,
-                    env,
-                    CycleOwner::Unpack(self.unpack),
-                    self.equations.equations(),
-                    None,
-                );
+                let resolver =
+                    CycleResolver::new(db, env, CycleOwner::Unpack(self.unpack), &equations, None);
                 let solution = resolver.solve([*ty])?;
                 Some((*target, resolve_cycle_variables(db, env, &solution, *ty)))
             })
             .collect();
+        drop(equations);
         self.targets.extend(resolved);
         UnpackResult {
-            unpack: self.unpack,
             diagnostics: self.context.finish(),
             targets: FrozenMap::from(self.targets),
-            symbolic: FrozenMap::from(self.symbolic),
             equations: self.equations.finish(),
             cycle_recovery: None,
         }
     }
 }
 
-#[derive(Debug, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+#[derive(Debug, Default, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct UnpackResult<'db> {
-    unpack: Unpack<'db>,
     targets: FrozenMap<ExpressionNodeKey, Type<'db>>,
-    symbolic: FrozenMap<ExpressionNodeKey, SymbolicType<'db>>,
     /// Operations deferred because the unpacked value's type is still being inferred.
     equations: CycleEquations<'db>,
     diagnostics: TypeCheckDiagnostics,
@@ -515,24 +468,6 @@ pub(crate) struct UnpackResult<'db> {
 }
 
 impl<'db> UnpackResult<'db> {
-    /// Return the dependencies of a target whose type participates in a query cycle.
-    pub(crate) fn symbolic_type(
-        &self,
-        db: &'db dyn Db,
-        target: impl Into<ExpressionNodeKey>,
-    ) -> Option<SymbolicType<'db>> {
-        let target = target.into();
-        self.symbolic.get(&target).copied().or_else(|| {
-            self.cycle_recovery.map(|_| {
-                SymbolicType::initial(
-                    db,
-                    self.unpack.program_file(db).program(db),
-                    InferenceOwner::Unpack(self.unpack),
-                    InferenceSlot::Expression(target),
-                )
-            })
-        })
-    }
     /// Returns the inferred type for a given sub-expression of the left-hand side target
     /// of an unpacking assignment.
     ///
@@ -565,11 +500,9 @@ impl<'db> UnpackResult<'db> {
         &self.equations
     }
 
-    pub(crate) fn cycle_initial(unpack: Unpack<'db>, cycle_recovery: Type<'db>) -> Self {
+    pub(crate) fn cycle_initial(cycle_recovery: Type<'db>) -> Self {
         Self {
-            unpack,
             targets: FrozenMap::default(),
-            symbolic: FrozenMap::default(),
             equations: CycleEquations::default(),
             diagnostics: TypeCheckDiagnostics::default(),
             cycle_recovery: Some(cycle_recovery),
@@ -587,13 +520,6 @@ impl<'db> UnpackResult<'db> {
             let previous_ty = previous_cycle_result.expression_type(*expr);
             *ty = ty.cycle_normalized(db, env, previous_ty, cycle);
         }
-        self.symbolic = SymbolicType::cycle_normalized_map(
-            db,
-            env,
-            std::mem::take(&mut self.symbolic),
-            &previous_cycle_result.symbolic,
-            cycle,
-        );
         self.equations = cycle_normalized_equations(
             db,
             env,
@@ -682,9 +608,10 @@ fn assignment_values_for_target<'ast>(
     }
 
     let targets = sequence_elts(unpack_target)?;
+    let (values, promote) = literal_sequence_elements(value, false)?;
     let values = literal_sequence(
-        value.into(),
-        false,
+        values,
+        promote,
         &|expression, _| Some(expression),
         &|_, _, known_length| {
             if let Some(length) = known_length {
@@ -693,7 +620,7 @@ fn assignment_values_for_target<'ast>(
                 VariableLengthTuple::mixed([], vec![None], [])
             }
         },
-    )?;
+    );
     let matched = values
         .unpack(target_length(targets), Clone::clone, |_| None)
         .ok()?;
@@ -749,6 +676,22 @@ impl<'db> UnpackElement<'db, '_> {
     }
 }
 
+fn sequence_from_type<'db, 'ast>(
+    db: &'db dyn Db,
+    tuple: &TupleSpec<'db>,
+) -> Tuple<UnpackElement<'db, 'ast>, Vec<UnpackElement<'db, 'ast>>> {
+    match tuple {
+        Tuple::Fixed(values) => {
+            Tuple::heterogeneous(values.iter_all_elements().map(UnpackElement::from_type))
+        }
+        Tuple::Variable(values) => VariableLengthTuple::mixed(
+            values.iter_prefix_elements().map(UnpackElement::from_type),
+            vec![UnpackElement::from_type(values.variable().element_type(db))],
+            values.iter_suffix_elements().map(UnpackElement::from_type),
+        ),
+    }
+}
+
 impl<'db> Type<'db> {
     /// Infer one target of an unpacking using the ordinary positional and starred-target rules.
     pub(crate) fn unpacked_target(
@@ -788,92 +731,6 @@ impl<'db> Type<'db> {
     }
 }
 
-impl<'db> SymbolicType<'db> {
-    /// Retain literal positions and iterable expansions using already-inferred element types.
-    pub(crate) fn from_sequence(
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        owner: InferenceOwner<'db>,
-        expression: ast::ExprRef<'_>,
-        inferred: impl Fn(&ast::Expr) -> (Type<'db>, Option<Self>),
-    ) -> Option<Self> {
-        let sequence = literal_sequence(
-            expression,
-            false,
-            &|element, promote| (element, promote, None),
-            &|element, promote, known_length| {
-                VariableLengthTuple::mixed([], vec![(element, promote, known_length)], [])
-            },
-        )?;
-        let mut parts = Vec::new();
-        for element in sequence.into_all_elements_with_kind() {
-            match element {
-                TupleElement::Fixed(value)
-                | TupleElement::Prefix(value)
-                | TupleElement::Suffix(value) => parts.push(value),
-                TupleElement::Variable(values) => parts.extend(values),
-            }
-        }
-        if !parts.iter().any(|(expression, _, _)| {
-            let source = expression
-                .as_starred_expr()
-                .map_or(*expression, |starred| &starred.value);
-            inferred(source).1.is_some()
-        }) {
-            return None;
-        }
-        let mut constraints = InferenceConstraints::default();
-        let mut left = Type::empty_tuple(db, env);
-        for (index, (element, promote, right_length)) in parts.into_iter().enumerate() {
-            let source = element
-                .as_starred_expr()
-                .map_or(element, |starred| &starred.value);
-            let (ty, symbolic) = inferred(source);
-            let mut right = symbolic.map_or(ty, |symbolic| constraints.import(db, symbolic));
-            if promote {
-                let input = InferenceVariable::new(
-                    db,
-                    env.program(db),
-                    owner,
-                    InferenceSlot::Expression(source.into()),
-                );
-                right = constraints.promote(db, env, input, right, InferencePromotion::Regular);
-            }
-            if !element.is_starred_expr() {
-                right = Type::heterogeneous_tuple(db, env, [right]);
-            }
-            left = constraints.apply(
-                db,
-                env,
-                owner,
-                InferenceSlot::Component(expression.into(), index),
-                InferenceOperation::Concatenate {
-                    left,
-                    right,
-                    right_length,
-                },
-            );
-        }
-        Some(constraints.finish(db, left))
-    }
-}
-
-fn sequence_from_type<'db, 'ast>(
-    db: &'db dyn Db,
-    tuple: &TupleSpec<'db>,
-) -> Tuple<UnpackElement<'db, 'ast>, Vec<UnpackElement<'db, 'ast>>> {
-    match tuple {
-        Tuple::Fixed(values) => {
-            Tuple::heterogeneous(values.iter_all_elements().map(UnpackElement::from_type))
-        }
-        Tuple::Variable(values) => VariableLengthTuple::mixed(
-            values.iter_prefix_elements().map(UnpackElement::from_type),
-            vec![UnpackElement::from_type(values.variable().element_type(db))],
-            values.iter_suffix_elements().map(UnpackElement::from_type),
-        ),
-    }
-}
-
 /// Infers the fresh list made by a starred assignment target or sequence-pattern capture.
 /// Both `first, *rest = values` and `case [first, *rest]:` create a new list whose inferred
 /// literal elements can widen without changing the type of the original sequence.
@@ -905,40 +762,60 @@ pub(super) fn collected_list_type<'db, 'ast>(
 /// recursively; other starred expressions contribute the shape supplied by the caller. For
 /// `first, *rest, last = [1, *items, 2]`, the unknown width of `items` leaves both ends intact.
 fn literal_sequence<'ast, T: Clone>(
-    expression: ast::ExprRef<'ast>,
+    values: &'ast [ast::Expr],
     promote: bool,
     element: &impl Fn(&'ast ast::Expr, bool) -> T,
     spread: &impl Fn(&'ast ast::Expr, bool, Option<usize>) -> Tuple<T, Vec<T>>,
-) -> Option<Tuple<T, Vec<T>>> {
-    let (values, promote) = literal_sequence_elements(expression, promote)?;
-    Some(sequence_from_literal_elements(
-        values,
-        promote,
-        element,
-        spread,
-        &|builder, unpacked| {
-            builder.concat_with(unpacked, |suffix, left, right, prefix| {
-                // For `[*a, *b, *c, ...]`, retain the accumulated elements instead of copying
-                // them again for every expansion. Positions within this segment are unknown.
-                left.extend(suffix.iter().chain(prefix).chain(right).cloned());
-            })
-        },
-    ))
+) -> Tuple<T, Vec<T>> {
+    sequence_from_literal_elements(values, promote, element, spread, &|builder, unpacked| {
+        builder.concat_with(unpacked, |suffix, left, right, prefix| {
+            // For `[*a, *b, *c, ...]`, retain the accumulated elements instead of copying
+            // them again for every expansion. Positions within this segment are unknown.
+            left.extend(suffix.iter().chain(prefix).chain(right).cloned());
+        })
+    })
 }
 
-fn literal_sequence_elements(
-    mut expression: ast::ExprRef<'_>,
+/// The number of positions the only non-literal starred expression of a literal fills when the
+/// literal is unpacked into `target_len` targets: `first, second = [*items]` reads two elements
+/// from `items`.
+fn single_spread_length(
+    values: &[ast::Expr],
+    promote: bool,
+    target_len: TupleLength,
+) -> Option<usize> {
+    fn shape(values: &[ast::Expr], promote: bool) -> (usize, usize) {
+        values.iter().fold((0, 0), |(fixed, spreads), value| {
+            if let ast::Expr::Starred(starred) = value {
+                match literal_sequence_elements(&starred.value, promote) {
+                    Some((values, promote)) => {
+                        let (inner_fixed, inner_spreads) = shape(values, promote);
+                        (fixed + inner_fixed, spreads + inner_spreads)
+                    }
+                    None => (fixed, spreads + 1),
+                }
+            } else {
+                (fixed + 1, spreads)
+            }
+        })
+    }
+
+    let TupleLength::Fixed(length) = target_len else {
+        return None;
+    };
+    match shape(values, promote) {
+        (fixed, 1) => length.checked_sub(fixed),
+        _ => None,
+    }
+}
+
+pub(super) fn literal_sequence_elements(
+    expression: &ast::Expr,
     promote: bool,
 ) -> Option<(&[ast::Expr], bool)> {
     // `a, *rest = (items := [1, "two"])` has the same elements as the list itself.
-    while let ast::ExprRef::Named(named) = expression {
-        expression = named.value.as_ref().into();
-    }
-    let values = match expression {
-        ast::ExprRef::Tuple(tuple) => &tuple.elts,
-        ast::ExprRef::List(list) => &list.elts,
-        _ => return None,
-    };
+    let expression = expression.expression_value();
+    let values = sequence_elts(expression)?;
     let promote = promote || (expression.is_tuple_expr() && tuple_literal_needs_promotion(values));
     Some((values, promote))
 }
@@ -980,7 +857,7 @@ pub(super) fn sequence_from_literal_elements<'ast, T, V>(
     let mut builder = TupleBuilder::with_capacity(values.len());
     for value in values {
         if let ast::Expr::Starred(starred) = value {
-            let unpacked = literal_sequence_elements(starred.value.as_ref().into(), promote)
+            let unpacked = literal_sequence_elements(&starred.value, promote)
                 .map(|(values, promote)| {
                     sequence_from_literal_elements(values, promote, element, spread, concat)
                 })
@@ -995,7 +872,7 @@ pub(super) fn sequence_from_literal_elements<'ast, T, V>(
 
 /// The literal element count used when inferring expansions such as `(*{"key": 1},)`.
 /// An expansion within a set or dictionary, as in `{*items}` or `{**items}`, makes that count unknown.
-fn literal_iterable_length(expression: &ast::Expr) -> Option<usize> {
+pub(super) fn literal_iterable_length(expression: &ast::Expr) -> Option<usize> {
     match expression {
         ast::Expr::Set(ast::ExprSet { elts, .. }) => elts
             .iter()

@@ -7,7 +7,7 @@ use rustc_hash::FxHashMap;
 ///
 /// Analysis builds these tables with hash maps, but after construction they only need keyed
 /// lookup. A sorted slice avoids retaining hash-table capacity for every indexed file.
-#[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+#[derive(Debug, Clone, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub struct FrozenMap<K, V>(Box<[(K, V)]>);
 
 impl<K, V> FrozenMap<K, V> {

@@ -332,6 +332,68 @@ pub(super) fn walk_non_atomic_type<'db, V: TypeVisitor<'db> + ?Sized>(
     }
 }
 
+/// How deeply `ty` nests other types: `int` has depth 0, `list[int]` and `tuple[int]` depth 1.
+/// A union or intersection does not nest the types it combines, and a class object does not
+/// nest its class.
+pub(crate) fn nesting_depth<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+) -> usize {
+    struct DepthVisitor<'a, 'db> {
+        env: &'a ProgramEnvironment<'db>,
+        current: Cell<usize>,
+        deepest: Cell<usize>,
+        // A type that appears again inside itself is recursive; one that merely appears twice,
+        // like `list[int]` in `Grow[list[int]] | Grow[list[list[int]]]`, still counts each time.
+        active: ActiveRecursionDetector<Type<'db>>,
+    }
+
+    impl<'db> TypeVisitor<'db> for DepthVisitor<'_, 'db> {
+        fn program_environment(&self) -> &ProgramEnvironment<'db> {
+            self.env
+        }
+
+        fn should_visit_lazy_type_attributes(&self) -> bool {
+            false
+        }
+
+        fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+            let TypeKind::NonAtomic(non_atomic) = TypeKind::from(ty) else {
+                return;
+            };
+            let nests = match ty {
+                Type::Union(_) | Type::Intersection(_) | Type::ClassLiteral(_) => false,
+                Type::NominalInstance(nominal) => nominal.tuple_spec(db, self.env).is_some(),
+                _ => true,
+            };
+            self.active.visit(
+                &ty,
+                || {},
+                || {
+                    if nests {
+                        self.current.set(self.current.get() + 1);
+                        self.deepest.set(self.deepest.get().max(self.current.get()));
+                    }
+                    walk_non_atomic_type(db, non_atomic, self);
+                    if nests {
+                        self.current.set(self.current.get() - 1);
+                    }
+                },
+            );
+        }
+    }
+
+    let visitor = DepthVisitor {
+        env,
+        current: Cell::new(0),
+        deepest: Cell::new(0),
+        active: ActiveRecursionDetector::default(),
+    };
+    visitor.visit_type(db, ty);
+    visitor.deepest.get()
+}
+
 pub(crate) fn walk_type_with_recursion_guard<'db>(
     db: &'db dyn Db,
     ty: Type<'db>,

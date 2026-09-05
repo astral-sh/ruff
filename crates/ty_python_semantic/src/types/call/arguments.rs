@@ -4,21 +4,13 @@ use std::fmt::Display;
 
 use itertools::{Either, Itertools};
 use ruff_python_ast as ast;
-use ruff_python_ast::name::Name;
 use rustc_hash::FxHashMap;
-use salsa::plumbing::AsId;
-use ty_python_core::place::{PlaceExpr, ScopedPlaceId};
-use ty_python_core::place_table;
-use ty_python_core::scope::ScopeId;
-
-use super::{Binding, Bindings};
 
 use crate::ProgramEnvironment;
 use crate::types::enums::enum_metadata;
-use crate::types::infer::constraints::{InferenceConstraints, SymbolicType};
 use crate::types::tuple::Tuple;
 use crate::types::typed_dict::extract_unpacked_typed_dict_keys_from_value_type;
-use crate::types::{InternedType, KnownClass, Type, TypeContext, expand_type};
+use crate::types::{KnownClass, Type, TypeContext, expand_type};
 
 /// Maximum total number of expanded argument type combinations across all arguments
 /// in [`CallArguments::expand`].
@@ -52,21 +44,6 @@ pub(crate) struct CallArguments<'a, 'db> {
 struct CallArgument<'a, 'db> {
     argument: Argument<'a>,
     types: CallArgumentTypes<'db>,
-    // Retain the narrowing target when a call is evaluated again after its inputs are solved.
-    place: Option<(ScopeId<'db>, ScopedPlaceId)>,
-}
-
-/// An argument's ordinary type and the dependencies retained by that inference attempt.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct InferredArgument<'db> {
-    pub(crate) ty: Type<'db>,
-    pub(crate) symbolic: Option<SymbolicType<'db>>,
-}
-
-impl<'db> From<Type<'db>> for InferredArgument<'db> {
-    fn from(ty: Type<'db>) -> Self {
-        Self { ty, symbolic: None }
-    }
 }
 
 /// Inferred types for a given argument.
@@ -75,14 +52,14 @@ impl<'db> From<Type<'db>> for InferredArgument<'db> {
 /// with type context across multiple bindings.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(crate) struct CallArgumentTypes<'db> {
-    fallback_type: Option<InferredArgument<'db>>,
-    types: FxHashMap<Type<'db>, InferredArgument<'db>>,
+    fallback_type: Option<Type<'db>>,
+    types: FxHashMap<Type<'db>, Type<'db>>,
 }
 
 impl<'db> CallArgumentTypes<'db> {
     fn new(fallback_ty: Option<Type<'db>>) -> Self {
         Self {
-            fallback_type: fallback_ty.map(InferredArgument::from),
+            fallback_type: fallback_ty,
             types: FxHashMap::default(),
         }
     }
@@ -94,32 +71,26 @@ impl<'db> CallArgumentTypes<'db> {
         if let Ok(exact_ty) = self
             .types
             .values()
-            .map(|inferred| inferred.ty)
             .exactly_one()
-            .or_else(|_| {
-                self.types
-                    .values()
-                    .map(|inferred| inferred.ty)
-                    .all_equal_value()
-            })
+            .or_else(|_| self.types.values().all_equal_value())
         {
-            return Some(exact_ty);
+            return Some(*exact_ty);
         }
 
-        self.fallback_type.map(|inferred| inferred.ty)
+        self.fallback_type
     }
 
     /// Returns the type of this argument when inferred against the provided declared type.
     pub(crate) fn get_for_declared_type(&self, tcx: Type<'db>) -> Type<'db> {
         self.types
             .get(&tcx)
-            .map(|inferred| inferred.ty)
+            .copied()
             .or_else(|| self.get_default())
             .unwrap_or(Type::unknown())
     }
 
     /// Insert the type of this argument when inferred with the provided type context.
-    fn insert(&mut self, tcx: impl Into<TypeContext<'db>>, ty: InferredArgument<'db>) {
+    fn insert(&mut self, tcx: impl Into<TypeContext<'db>>, ty: Type<'db>) {
         match tcx.into().annotation {
             None => self.fallback_type = Some(ty),
             Some(tcx) => {
@@ -131,266 +102,18 @@ impl<'db> CallArgumentTypes<'db> {
     fn iter(&self) -> impl Iterator<Item = (TypeContext<'db>, Type<'db>)> {
         self.types
             .iter()
-            .map(|(tcx, inferred)| (TypeContext::new(Some(*tcx)), inferred.ty))
-            .chain(
-                self.fallback_type
-                    .map(|inferred| (TypeContext::default(), inferred.ty)),
-            )
-    }
-}
-
-/// Owned argument data for evaluating a call after its cyclic inputs have been solved.
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-pub(crate) struct CapturedCallArguments<'db> {
-    #[returns(ref)]
-    arguments: Box<[CapturedArgument<'db>]>,
-}
-
-impl get_size2::GetSize for CapturedCallArguments<'_> {}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
-pub(crate) struct CapturedArgument<'db> {
-    kind: CapturedArgumentKind,
-    place: Option<(ScopeId<'db>, ScopedPlaceId)>,
-    types: Box<[(Option<Type<'db>>, Type<'db>)]>,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
-enum CapturedArgumentKind {
-    Synthetic,
-    Positional,
-    Variadic,
-    Keyword(Name),
-    Keywords,
-}
-
-impl CapturedArgumentKind {
-    fn as_argument(&self) -> Argument<'_> {
-        match self {
-            Self::Synthetic => Argument::Synthetic,
-            Self::Positional => Argument::Positional,
-            Self::Variadic => Argument::Variadic,
-            Self::Keyword(name) => Argument::Keyword(name),
-            Self::Keywords => Argument::Keywords,
-        }
-    }
-}
-
-impl<'db> CapturedCallArguments<'db> {
-    /// Substitute dependencies in both declared-type keys and inferred argument types.
-    pub(crate) fn map(self, db: &'db dyn Db, mut f: impl FnMut(Type<'db>) -> Type<'db>) -> Self {
-        Self::new(
-            db,
-            self.arguments(db)
-                .iter()
-                .map(|argument| CapturedArgument {
-                    kind: argument.kind.clone(),
-                    place: argument.place,
-                    types: argument
-                        .types
-                        .iter()
-                        .map(|(tcx, ty)| (tcx.map(&mut f), f(*ty)))
-                        .collect(),
-                })
-                .collect::<Box<[_]>>(),
-        )
-    }
-
-    /// Restore the captured contexts for ordinary parameter matching and type checking.
-    pub(crate) fn to_arguments(self, db: &'db dyn Db) -> CallArguments<'db, 'db> {
-        CallArguments {
-            items: self
-                .arguments(db)
-                .iter()
-                .map(|argument| {
-                    let mut types = CallArgumentTypes::default();
-                    for (tcx, ty) in &argument.types {
-                        types.insert(TypeContext::new(*tcx), (*ty).into());
-                    }
-                    CallArgument {
-                        argument: argument.kind.as_argument(),
-                        types,
-                        place: argument.place,
-                    }
-                })
-                .collect(),
-        }
+            .map(|(tcx, ty)| (TypeContext::new(Some(*tcx)), *ty))
+            .chain(self.fallback_type.map(|ty| (TypeContext::default(), ty)))
     }
 }
 
 impl<'a, 'db> CallArguments<'a, 'db> {
-    /// Associate a type predicate's return type with the argument selected by call binding.
-    pub(crate) fn bind_type_guard_return_type(
-        &self,
-        db: &'db dyn Db,
-        return_ty: Type<'db>,
-        bindings: &Bindings<'db>,
-    ) -> Type<'db> {
-        let narrowed_argument_index = || {
-            bindings
-                .single_element()
-                .and_then(|binding| {
-                    binding
-                        .signature_type
-                        .as_function_literal()
-                        .or_else(|| binding.callable_type.as_function_literal())
-                        .map(|function| {
-                            usize::from(
-                                function.has_implicit_receiver(db) && binding.bound_type.is_none(),
-                            )
-                        })
-                })
-                .unwrap_or(0)
-        };
-
-        let find_narrowed_place = || {
-            // Use the call binding to find the argument that maps to the first parameter a type
-            // guard can narrow. This supports keyword arguments without falling back to a later
-            // parameter when the target is defaulted.
-            let matched_narrowed_argument_index = bindings.single_element().and_then(|binding| {
-                let has_implicit_receiver = binding
-                    .signature_type
-                    .as_function_literal()
-                    .or_else(|| binding.callable_type.as_function_literal())
-                    .is_some_and(|function| function.has_implicit_receiver(db));
-                let bound_argument_offset = usize::from(binding.bound_type.is_some());
-                let narrowed_parameter_index =
-                    usize::from(bound_argument_offset > 0 || has_implicit_receiver);
-                let narrowed_argument_index = |overload: &Binding<'db>| {
-                    overload
-                        .argument_matches()
-                        .iter()
-                        .enumerate()
-                        .skip(bound_argument_offset)
-                        .find_map(|(argument_index, matched_argument)| {
-                            matched_argument
-                                .parameters
-                                .iter()
-                                .any(|parameter| parameter.index == narrowed_parameter_index)
-                                .then_some(argument_index - bound_argument_offset)
-                        })
-                };
-                let mut matching_overloads = binding.matching_overloads();
-                let (_, first_overload) = matching_overloads.next()?;
-                let first_argument_index = narrowed_argument_index(first_overload);
-
-                Some(
-                    if matching_overloads.all(|(_, overload)| {
-                        narrowed_argument_index(overload) == first_argument_index
-                    }) {
-                        first_argument_index
-                    } else {
-                        None
-                    },
-                )
-            });
-
-            let argument = match matched_narrowed_argument_index {
-                Some(Some(argument_index)) => self.items.get(argument_index),
-                // The target parameter was omitted, so there is no expression to narrow.
-                Some(None) => None,
-                // Preserve positional behavior when there isn't a unique callable binding whose
-                // parameter mapping we can use.
-                None => self
-                    .items
-                    .iter()
-                    .filter(|argument| {
-                        matches!(argument.argument, Argument::Positional | Argument::Variadic)
-                    })
-                    .nth(narrowed_argument_index()),
-            }?;
-            argument.place
-        };
-
-        match return_ty {
-            Type::TypeIs(type_is) => match find_narrowed_place() {
-                Some((scope, place)) => type_is.bind(db, scope, place),
-                None => return_ty,
-            },
-            Type::TypeGuard(type_guard) => match find_narrowed_place() {
-                Some((scope, place)) => type_guard.bind(db, scope, place),
-                None => return_ty,
-            },
-            _ => return_ty,
-        }
-    }
-
-    /// Whether any inference attempt retained dependencies on a cyclic input.
-    pub(crate) fn has_symbolic_types(&self) -> bool {
-        self.items.iter().any(|argument| {
-            argument
-                .types
-                .fallback_type
-                .iter()
-                .chain(argument.types.types.values())
-                .any(|inferred| inferred.symbolic.is_some())
-        })
-    }
-
-    /// Retain every argument inference context without repeating expression inference.
-    pub(crate) fn capture(
-        &self,
-        db: &'db dyn Db,
-        constraints: &mut InferenceConstraints<'db>,
-    ) -> CapturedCallArguments<'db> {
-        let arguments = self
-            .items
-            .iter()
-            .map(|argument| {
-                let kind = match argument.argument {
-                    Argument::Synthetic => CapturedArgumentKind::Synthetic,
-                    Argument::Positional => CapturedArgumentKind::Positional,
-                    Argument::Variadic => CapturedArgumentKind::Variadic,
-                    Argument::Keyword(name) => CapturedArgumentKind::Keyword(Name::new(name)),
-                    Argument::Keywords => CapturedArgumentKind::Keywords,
-                };
-                let mut types: Vec<_> = argument
-                    .types
-                    .types
-                    .iter()
-                    .map(|(tcx, inferred)| (Some(*tcx), *inferred))
-                    .chain(
-                        argument
-                            .types
-                            .fallback_type
-                            .map(|inferred| (None, inferred)),
-                    )
-                    .map(|(tcx, inferred)| {
-                        let ty = inferred
-                            .symbolic
-                            .map_or(inferred.ty, |symbolic| constraints.import(db, symbolic));
-                        (tcx, ty)
-                    })
-                    .collect();
-                // Context-specific inference is redundant when every context produced the same
-                // type. Keep one fallback so cyclic calls do not alternate between equivalent
-                // context lists as their callable approximation changes.
-                if let Some((_, ty)) = types.first().copied()
-                    && types.iter().all(|(_, candidate)| *candidate == ty)
-                {
-                    types = vec![(None, ty)];
-                }
-                types.sort_unstable_by_key(|(tcx, _)| {
-                    tcx.map(|ty| InternedType::new(db, ty).as_id())
-                });
-                CapturedArgument {
-                    kind,
-                    place: argument.place,
-                    types: types.into_boxed_slice(),
-                }
-            })
-            .collect::<Box<[_]>>();
-        CapturedCallArguments::new(db, arguments)
-    }
-
     /// Create `CallArguments` from AST arguments. We will use the provided callback to obtain the
     /// type of each splatted argument, so that we can determine its length. All other arguments
     /// will remain uninitialized as `Unknown`.
     pub(crate) fn from_arguments(
-        db: &'db dyn Db,
-        scope: ScopeId<'db>,
         arguments: &'a ast::Arguments,
-        mut infer_argument_type: impl FnMut(&ast::ArgOrKeyword, &ast::Expr) -> InferredArgument<'db>,
+        mut infer_argument_type: impl FnMut(&ast::ArgOrKeyword, &ast::Expr) -> Type<'db>,
     ) -> Self {
         let mut call_arguments = Self {
             items: Vec::with_capacity(arguments.len()),
@@ -414,18 +137,9 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                     }
                 }
             };
-            let place = (!arg_or_keyword.is_variadic())
-                .then(|| PlaceExpr::try_from_expr(arg_or_keyword.value()))
-                .flatten()
-                .and_then(|place| place_table(db, scope).place_id(&place))
-                .map(|place| (scope, place));
             call_arguments.items.push(CallArgument {
                 argument,
-                place,
-                types: CallArgumentTypes {
-                    fallback_type: ty,
-                    types: FxHashMap::default(),
-                },
+                types: CallArgumentTypes::new(ty),
             });
         }
 
@@ -496,13 +210,13 @@ impl<'a, 'db> CallArguments<'a, 'db> {
         &mut self,
         index: usize,
         tcx: impl Into<TypeContext<'db>>,
-        ty: impl Into<InferredArgument<'db>>,
+        ty: Type<'db>,
     ) {
         self.items
             .get_mut(index)
             .expect("argument index should be valid")
             .types
-            .insert(tcx, ty.into());
+            .insert(tcx, ty);
     }
 
     pub(crate) fn clear_types(&mut self, index: usize) {
@@ -532,7 +246,6 @@ impl<'a, 'db> CallArguments<'a, 'db> {
             let mut items = Vec::with_capacity(self.items.len() + 1);
             items.push(CallArgument {
                 argument: Argument::Synthetic,
-                place: None,
                 types: CallArgumentTypes::new(bound_self),
             });
             items.extend(self.items.iter().cloned());
@@ -807,7 +520,6 @@ impl<'a, 'db> FromIterator<(Argument<'a>, Option<Type<'db>>)> for CallArguments<
             items.push(CallArgument {
                 argument,
                 types: CallArgumentTypes::new(ty),
-                place: None,
             });
         }
 

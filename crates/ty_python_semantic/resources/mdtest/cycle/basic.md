@@ -50,6 +50,36 @@ while 1:
     y = (y, *y)
 ```
 
+## Nesting a list in itself in a loop
+
+Each iteration wraps the list in a new one, so the loop variable is either the initial list or a
+list whose element is the loop variable again. The recursion is cut at the element rather than
+unfolded once per iteration.
+
+```py
+def nest(depth: int):
+    f = [0]
+    for _ in range(depth):
+        f = [f]
+    reveal_type(f)  # revealed: list[int] | list[Divergent]
+```
+
+The same holds when the variable is declared with a recursive type alias, whose value is still being
+inferred while the loop is.
+
+```py
+from typing import TypeAlias, TypeVar
+
+_T = TypeVar("_T")
+nested: TypeAlias = "list[nested[_T]]"
+
+def nest_declared(depth: int):
+    r: nested[int] = []
+    for _ in range(depth):
+        r = [r]
+    reveal_type(r)  # revealed: Divergent | list[Divergent]
+```
+
 ## Generic `NamedTuple` with recursive fields
 
 This is a regression test for <https://github.com/astral-sh/ty/issues/3872>. Computing the

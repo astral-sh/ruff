@@ -10,9 +10,9 @@ use crate::{
     place::{Place, PlaceAndQualifiers},
     types::{
         BoundTypeVarInstance, ClassBase, ClassType, DivergentType, DynamicType,
-        IntersectionBuilder, KnownClass, MemberLookupErrorKind, MemberLookupKey,
-        MemberLookupPolicy, MemberLookupResult, SpecialFormType, SubclassOfInner, SubclassOfType,
-        Type, TypeVarBoundOrConstraints, UnionBuilder,
+        IntersectionBuilder, KnownClass, MemberLookupErrorKind, MemberLookupPolicy,
+        MemberLookupResult, SpecialFormType, SubclassOfInner, SubclassOfType, Type,
+        TypeVarBoundOrConstraints, UnionBuilder,
         constraints::ConstraintSet,
         context::InferContext,
         diagnostic::{INVALID_SUPER_ARGUMENT, UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS},
@@ -990,17 +990,8 @@ impl<'db> BoundSuperType<'db> {
 
         let mut mro_after_pivot = self.skip_until_after_pivot(db, env, owner.iter_mro(db, env));
         let class_literal = class.class_literal(db);
-        let lookup =
-            MemberLookupKey::new(db, env.program(db), Type::BoundSuper(self), name, policy)
-                .inference_variable(db);
-        let result = class_literal.class_member_from_mro(
-            db,
-            env,
-            name,
-            policy,
-            lookup,
-            mro_after_pivot.clone(),
-        );
+        let result =
+            class_literal.class_member_from_mro(db, env, name, policy, mro_after_pivot.clone());
 
         // TODO: Here we are hard-coding that __class_getitem__ is the only member defined in
         // typing._Generic in the typeshed, and we are hard-coding its signature. Ideally we would

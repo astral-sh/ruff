@@ -2794,6 +2794,10 @@ x13.append(x13)
 reveal_type(x13)  # revealed: list[Divergent]
 ```
 
+Two lists that each contain the other are recursive types. The recursion is cut at the element type
+of the list that is inferred first, so the other list, whose elements are that list's values, shows
+one more level.
+
 ```py
 x14 = []
 x15 = []
@@ -2802,7 +2806,7 @@ x14.append(x15)
 x15.append(x14)
 
 reveal_type(x14)  # revealed: list[Divergent]
-reveal_type(x15)  # revealed: list[Divergent]
+reveal_type(x15)  # revealed: list[list[Divergent]]
 ```
 
 Collection-use constraints must converge when multiple collection literals are used in a container

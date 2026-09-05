@@ -33,10 +33,6 @@ use crate::types::constraints::{
 use crate::types::enums::enum_metadata;
 use crate::types::function::{AbstractMethodKind, DataclassTransformerParams};
 use crate::types::generics::{GenericContext, Specialization, walk_specialization};
-use crate::types::infer::constraints::{
-    InferenceConstraints, InferenceOperation, InferenceOwner, InferencePromotion, InferenceSlot,
-    InferenceVariable, SymbolicType,
-};
 use crate::types::infer::infer_definition_types;
 use crate::types::known_instance::DeprecatedInstance;
 use crate::types::member::Member;
@@ -50,9 +46,9 @@ use crate::types::tuple::TupleSpec;
 use crate::types::typevar::TypeVarSet;
 use crate::types::variance::VarianceOrigin;
 use crate::types::{
-    ApplyTypeMappingVisitor, CallableType, CallableTypes, DataclassParams, ErrorContext,
-    ErrorContextTree, FindLegacyTypeVarsVisitor, IntersectionType, TypeContext, TypeMapping,
-    TypingModule, UnionBuilder, VarianceInferable, VarianceTerm,
+    ApplyTypeMappingVisitor, CallableType, CallableTypes, CycleEquations, DataclassParams,
+    ErrorContext, ErrorContextTree, FindLegacyTypeVarsVisitor, IntersectionType, TypeContext,
+    TypeMapping, TypingModule, UnionBuilder, VarianceInferable, VarianceTerm,
 };
 use crate::{
     Db, FxIndexMap, FxOrderSet,
@@ -778,20 +774,17 @@ impl<'db> ClassLiteral<'db> {
         env: &ProgramEnvironment<'db>,
         name: &str,
         policy: MemberLookupPolicy,
-        lookup: InferenceVariable<'db>,
         mro_iter: impl Iterator<Item = ClassBase<'db>>,
     ) -> PlaceAndQualifiers<'db> {
         match self {
-            Self::Static(class) => {
-                class.class_member_from_mro(db, env, name, policy, lookup, mro_iter)
-            }
+            Self::Static(class) => class.class_member_from_mro(db, env, name, policy, mro_iter),
             Self::Dynamic(_)
             | Self::DynamicNamedTuple(_)
             | Self::DynamicTypedDict(_)
             | Self::DynamicEnum(_) => {
                 // Dynamic classes don't have inherited generic context and are never `object`.
-                let result = MroLookup::new(db, env, mro_iter)
-                    .class_member(name, policy, None, false, lookup);
+                let result =
+                    MroLookup::new(db, env, mro_iter).class_member(name, policy, None, false);
                 match result {
                     ClassMemberResult::Done(result) => result.finalize(db, env),
                     ClassMemberResult::TypedDict(module) => {
@@ -1948,7 +1941,7 @@ impl<'db> ClassType<'db> {
                 .map(|specialization| specialization.tuple_runtime_element_specialization(db));
             class_literal
                 .own_class_member(db, env, inherited_generic_context, specialization, name)
-                .apply_owner_specialization(db, specialization)
+                .map_type(|ty| ty.apply_optional_owner_specialization_to_member(db, specialization))
         };
 
         match name {
@@ -2263,7 +2256,9 @@ impl<'db> ClassType<'db> {
 
                 class_literal
                     .instance_member(db, env, specialization, name)
-                    .apply_owner_specialization(db, specialization)
+                    .map_type(|ty| {
+                        ty.apply_optional_owner_specialization_to_member(db, specialization)
+                    })
             }
         }
     }
@@ -2318,7 +2313,9 @@ impl<'db> ClassType<'db> {
                 generic
                     .origin(db)
                     .own_instance_member(db, env, name)
-                    .apply_owner_specialization(db, Some(specialization))
+                    .map_type(|ty| {
+                        ty.apply_optional_owner_specialization_to_member(db, Some(specialization))
+                    })
             }
         }
     }
@@ -2356,6 +2353,7 @@ impl<'db> ClassType<'db> {
         ImplicitAttribute {
             member,
             augmented_bindings,
+            equations: CycleEquations::default(),
         }
     }
 
@@ -2880,15 +2878,6 @@ impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
     }
 }
 
-/// The complete MRO bindings contributing to an augmented attribute's inferred type.
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-pub(crate) struct AugmentedAttribute<'db> {
-    #[returns(deref)]
-    bindings: Box<[(ClassType<'db>, Definition<'db>)]>,
-}
-
-impl get_size2::GetSize for AugmentedAttribute<'_> {}
-
 /// Performs member lookups over an MRO (Method Resolution Order).
 ///
 /// This struct encapsulates the shared logic for looking up class and instance
@@ -2930,24 +2919,17 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         bindings: &[(ClassType<'db>, AugmentedBindings<'db>)],
-    ) -> (Type<'db>, Provenance<'db>, Option<SymbolicType<'db>>) {
+    ) -> (Type<'db>, Provenance<'db>) {
         let mut union = UnionBuilder::new(db, env);
         let mut provenance = Provenance::Unknown;
-        let mut symbolic_values = Vec::new();
 
         for (class, bindings) in bindings {
             let (_, specialization) = class.class_literal_and_specialization(db);
 
             for definition in bindings.definitions(db) {
-                let inferred = infer_definition_types(db, *definition)
-                    .binding_place(*definition)
-                    .with_qualifiers(TypeQualifiers::empty())
-                    .apply_owner_specialization(db, specialization)
-                    .place;
-                let inferred_ty = inferred
-                    .ignore_possibly_undefined()
-                    .unwrap_or(Type::unknown());
-                symbolic_values.push((inferred_ty, inferred.symbolic()));
+                let inferred_ty = infer_definition_types(db, *definition)
+                    .binding_type(*definition)
+                    .apply_optional_specialization(db, specialization);
                 union = union.add(inferred_ty);
                 provenance = provenance.or(Provenance::SingleDefinition(*definition));
             }
@@ -2968,35 +2950,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
             inferred_ty
         };
 
-        let symbolic = SymbolicType::from_union(db, env, symbolic_values).map(|symbolic| {
-            let mut constraints = InferenceConstraints::default();
-            let value = constraints.import(db, symbolic);
-            let source = AugmentedAttribute::new(
-                db,
-                bindings
-                    .iter()
-                    .flat_map(|(class, bindings)| {
-                        bindings
-                            .definitions(db)
-                            .iter()
-                            .map(|definition| (*class, *definition))
-                    })
-                    .collect::<Vec<_>>()
-                    .into_boxed_slice(),
-            );
-            let value = constraints.apply(
-                db,
-                env,
-                InferenceOwner::AugmentedAttribute(source),
-                InferenceSlot::Root,
-                InferenceOperation::Promote {
-                    value,
-                    promotion: InferencePromotion::Attribute,
-                },
-            );
-            constraints.finish(db, value)
-        });
-        (inferred_ty, provenance, symbolic)
+        (inferred_ty, provenance)
     }
 
     /// Look up a class member by iterating through the MRO.
@@ -3019,7 +2973,6 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
         policy: MemberLookupPolicy,
         inherited_generic_context: Option<GenericContext<'db>>,
         is_self_object: bool,
-        lookup: InferenceVariable<'db>,
     ) -> ClassMemberResult<'db> {
         let db = self.db;
 
@@ -3028,7 +2981,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
             Err(LookupError::Undefined(TypeQualifiers::empty()));
         let mut pending_augmented_bindings = Vec::new();
 
-        for (index, superclass) in self.mro_iter.enumerate() {
+        for superclass in self.mro_iter {
             match superclass {
                 ClassBase::Generic | ClassBase::Protocol => {
                     // Skip over these very special class bases that aren't really classes.
@@ -3079,19 +3032,10 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                         && !pending_augmented_bindings.is_empty()
                     {
                         if !defined.origin.is_declared() {
-                            let (inferred_ty, inferred_provenance, inferred_symbolic) =
-                                Self::infer_augmented_bindings(
-                                    db,
-                                    &self.env,
-                                    &pending_augmented_bindings,
-                                );
-                            defined.symbolic = SymbolicType::from_union(
+                            let (inferred_ty, inferred_provenance) = Self::infer_augmented_bindings(
                                 db,
                                 &self.env,
-                                [
-                                    (defined.ty, defined.symbolic),
-                                    (inferred_ty, inferred_symbolic),
-                                ],
+                                &pending_augmented_bindings,
                             );
                             defined.ty = UnionType::from_two_elements(
                                 db,
@@ -3106,12 +3050,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                     }
 
                     lookup_result = lookup_result.or_else(|lookup_error| {
-                        lookup_error.or_fall_back_to(
-                            db,
-                            &self.env,
-                            lookup.lookup_part(db, index),
-                            member,
-                        )
+                        lookup_error.or_fall_back_to(db, &self.env, member)
                     });
                 }
                 ClassBase::TypedDict(module) => {
@@ -3141,7 +3080,6 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
     fn instance_member(self, name: &str) -> InstanceMemberResult<'db> {
         let db = self.db;
         let mut union = UnionBuilder::new(db, &self.env);
-        let mut symbolic_values = Vec::new();
         let mut union_qualifiers = TypeQualifiers::empty();
         let mut definitely_bound_member: Option<PlaceAndQualifiers<'db>> = None;
         let mut provenance = Provenance::Unknown;
@@ -3176,7 +3114,6 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                                 origin,
                                 definedness: boundness,
                                 provenance: member_provenance,
-                                symbolic,
                                 ..
                             }),
                         qualifiers,
@@ -3207,7 +3144,6 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                         // If the attribute is not definitely declared on this class, keep looking
                         // higher up in the MRO, and build a union of all inferred types (and
                         // possibly-declared types):
-                        symbolic_values.push((ty, symbolic));
                         union = union.add(ty);
                         provenance = provenance.or(member_provenance);
 
@@ -3216,13 +3152,11 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                         union_qualifiers |= qualifiers;
 
                         if !pending_augmented_bindings.is_empty() {
-                            let (inferred_ty, inferred_provenance, inferred_symbolic) =
-                                Self::infer_augmented_bindings(
-                                    db,
-                                    &self.env,
-                                    &pending_augmented_bindings,
-                                );
-                            symbolic_values.push((inferred_ty, inferred_symbolic));
+                            let (inferred_ty, inferred_provenance) = Self::infer_augmented_bindings(
+                                db,
+                                &self.env,
+                                &pending_augmented_bindings,
+                            );
                             union = union.add(inferred_ty);
                             provenance = provenance.or(inferred_provenance);
                             union_qualifiers |= TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE;
@@ -3256,19 +3190,15 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                                 return InstanceMemberResult::Done(class_member.inner);
                             }
 
-                            symbolic_values
-                                .push((class_member_ty, class_member.inner.place.symbolic()));
                             union = union.add(class_member_ty);
                             provenance = provenance.or(class_member_provenance);
                             union_qualifiers |= class_member.inner.qualifiers;
                         } else {
-                            let (inferred_ty, inferred_provenance, inferred_symbolic) =
-                                Self::infer_augmented_bindings(
-                                    db,
-                                    &self.env,
-                                    &pending_augmented_bindings,
-                                );
-                            symbolic_values.push((inferred_ty, inferred_symbolic));
+                            let (inferred_ty, inferred_provenance) = Self::infer_augmented_bindings(
+                                db,
+                                &self.env,
+                                &pending_augmented_bindings,
+                            );
                             union = union.add(inferred_ty);
                             provenance = provenance.or(inferred_provenance);
                             union_qualifiers |= TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE;
@@ -3296,7 +3226,6 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
             };
 
             Place::Defined(DefinedPlace {
-                symbolic: super::SymbolicType::from_union(db, &self.env, symbolic_values),
                 ty: union.build(),
                 origin: TypeOrigin::Inferred,
                 definedness: boundness,

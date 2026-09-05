@@ -24,10 +24,10 @@ use crate::{
         ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, CallArguments,
         CallableType, ClassBase, ClassLiteral, ClassType, DATACLASS_FLAGS, DataclassFlags,
         DataclassParams, GenericAlias, GenericContext, KnownClass, KnownInstanceType,
-        MaterializationKind, MemberLookupKey, MemberLookupPolicy, MetaclassCandidate,
-        MetaclassTransformInfo, Parameter, Parameters, PropertyInstanceType, Signature,
-        SpecialFormType, StaticMroError, SubclassOfType, Type, TypeContext, TypeMapping,
-        TypeVarVariance, TypingModule, UnionBuilder, UnionType,
+        MaterializationKind, MemberLookupPolicy, MetaclassCandidate, MetaclassTransformInfo,
+        Parameter, Parameters, PropertyInstanceType, Signature, SpecialFormType, StaticMroError,
+        SubclassOfType, Type, TypeContext, TypeMapping, TypeVarVariance, TypingModule,
+        UnionBuilder, UnionType,
         bound_super::BoundSuperType,
         call::{CallError, CallErrorKind},
         callable::CallableTypeKind,
@@ -45,7 +45,6 @@ use crate::{
         enums::{enum_metadata, is_enum_class_by_inheritance, try_unwrap_nonmember_value},
         function::{DataclassTransformerParams, KnownFunction},
         generics::Specialization,
-        infer::constraints::InferenceVariable,
         inferred_declaration,
         known_instance::DeprecatedInstance,
         member::{Member, class_member},
@@ -1357,17 +1356,6 @@ impl<'db> StaticClassLiteral<'db> {
         name: &str,
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
-        let lookup = MemberLookupKey::new(
-            db,
-            env.program(db),
-            specialization.map_or_else(
-                || Type::from(self),
-                |specialization| Type::GenericAlias(GenericAlias::new(db, self, specialization)),
-            ),
-            name,
-            policy,
-        )
-        .inference_variable(db);
         // An unspecialized MRO retains mappings such as `Parent[T@Child]`, so ordinary members
         // accessed through `Child` must use its default arguments. Constructor methods are different:
         // we add their class's type variables to the callable's generic context, so those variables
@@ -1385,34 +1373,22 @@ impl<'db> StaticClassLiteral<'db> {
                         env,
                         name,
                         policy,
-                        lookup,
                         self.iter_mro(db, Some(specialization)),
                     )
                 }
                 _ => {
-                    let member = self.class_member_from_mro(
-                        db,
-                        env,
-                        name,
-                        policy,
-                        lookup,
-                        self.iter_mro(db, None),
-                    );
+                    let member =
+                        self.class_member_from_mro(db, env, name, policy, self.iter_mro(db, None));
                     let specialization = generic_context.default_specialization(db, self.known(db));
                     // An inherited method's `Self` bound can still contain this class's type
                     // variables, so the default arguments must also specialize that bound.
-                    member.apply_owner_specialization(db, Some(specialization))
+                    member.map_type(|ty| {
+                        ty.apply_optional_owner_specialization_to_member(db, Some(specialization))
+                    })
                 }
             }
         } else {
-            self.class_member_from_mro(
-                db,
-                env,
-                name,
-                policy,
-                lookup,
-                self.iter_mro(db, specialization),
-            )
+            self.class_member_from_mro(db, env, name, policy, self.iter_mro(db, specialization))
         }
     }
 
@@ -1422,7 +1398,6 @@ impl<'db> StaticClassLiteral<'db> {
         env: &ProgramEnvironment<'db>,
         name: &str,
         policy: MemberLookupPolicy,
-        lookup: InferenceVariable<'db>,
         mro_iter: impl Iterator<Item = ClassBase<'db>>,
     ) -> PlaceAndQualifiers<'db> {
         fn into_function_like_callable<'d>(
@@ -1452,7 +1427,6 @@ impl<'db> StaticClassLiteral<'db> {
             policy,
             self.inherited_generic_context(db),
             self.is_known(db, KnownClass::Object),
-            lookup,
         );
 
         let mut member = match result {
@@ -1470,7 +1444,7 @@ impl<'db> StaticClassLiteral<'db> {
         // We generally treat dunder attributes with `Callable` types as function-like callables.
         // See `callables_as_descriptors.md` for more details.
         if name.starts_with("__") && name.ends_with("__") {
-            member = member.map_type(db, |ty| into_function_like_callable(db, env, ty));
+            member = member.map_type(|ty| into_function_like_callable(db, env, ty));
         }
 
         member
@@ -1555,7 +1529,7 @@ impl<'db> StaticClassLiteral<'db> {
         }
 
         let body_scope = self.body_scope(db);
-        let member = class_member(db, body_scope, name).map_type(db, |ty| {
+        let member = class_member(db, body_scope, name).map_type(|ty| {
             let ty = if name.starts_with("__") && name.ends_with("__") {
                 into_dunder_paramspec_callable(db, env, ty)
             } else {
@@ -2896,7 +2870,7 @@ impl<'db> StaticClassLiteral<'db> {
             InstanceMemberResult::TypedDict => KnownClass::TypedDictFallback
                 .to_instance(db, env)
                 .instance_member(db, env, name)
-                .map_type(db, |ty| {
+                .map_type(|ty| {
                     ty.apply_type_mapping(
                         db,
                         env,
@@ -3011,7 +2985,6 @@ impl<'db> StaticClassLiteral<'db> {
                             } else {
                                 Member {
                                     inner: Place::Defined(DefinedPlace {
-                                        symbolic: None,
                                         ty: UnionType::from_two_elements(
                                             db,
                                             env,
@@ -3076,7 +3049,6 @@ impl<'db> StaticClassLiteral<'db> {
                             {
                                 Member {
                                     inner: Place::Defined(DefinedPlace {
-                                        symbolic: None,
                                         ty: UnionType::from_two_elements(
                                             db,
                                             env,

@@ -273,7 +273,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 } else {
                     builder.infer_expression(expr, tcx)
                 }
-                .into()
             },
             &mut bindings,
             TypeContext::default(),

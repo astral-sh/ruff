@@ -31,9 +31,7 @@ use crate::lint::LintMetadata;
 use crate::place::{DefinedPlace, Definedness, Place};
 use crate::subscript::PyIndex;
 use crate::types::ProgramEnvironment;
-use crate::types::call::arguments::{
-    CallArgumentTypes, Expansion, InferredArgument, is_expandable_type,
-};
+use crate::types::call::arguments::{CallArgumentTypes, Expansion, is_expandable_type};
 use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, PathBound, PathBoundSolution, PathBounds, SolutionPaths,
@@ -991,33 +989,6 @@ impl<'db> Bindings<'db> {
     /// individual `Binding`s via `CallableBinding`'s `IntoIterator` implementation.
     pub(crate) fn iter_flat(&self) -> impl Iterator<Item = &CallableBinding<'db>> {
         self.elements.iter().flat_map(BindingsElement::callables)
-    }
-
-    /// Infer receiver arguments from matched overloads without retaining method-local variables.
-    pub(crate) fn inferred_receiver_types<'a>(
-        &'a self,
-        db: &'db dyn Db,
-        env: &'a ProgramEnvironment<'db>,
-        receiver: Type<'db>,
-    ) -> impl Iterator<Item = Type<'db>> + 'a {
-        let context = receiver
-            .class_specialization(db, env)
-            .and_then(|(class, _)| class.generic_context(db));
-        self.iter_flat()
-            .flat_map(CallableBinding::matching_overloads)
-            .filter_map(move |(_, overload)| {
-                let specialization = overload.merged_specialization(db)?;
-                let inferred = receiver.apply_specialization(db, specialization);
-                if let Some(context) = context
-                    && any_over_type(db, env, inferred, false, |ty| {
-                        ty.as_typevar()
-                            .is_some_and(|variable| !context.contains(db, variable.identity(db)))
-                    })
-                {
-                    return None;
-                }
-                Some(inferred)
-            })
     }
 
     /// Returns a mutable iterator over all `CallableBinding`s, flattening the two-level structure.
@@ -7348,7 +7319,7 @@ impl<'db> ArgumentTypeContext<'db> {
         self,
         arguments_types: &mut CallArguments<'_, 'db>,
         argument_index: usize,
-        inferred_ty: InferredArgument<'db>,
+        inferred_ty: Type<'db>,
     ) {
         match self {
             Self::Standard {

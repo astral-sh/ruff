@@ -15,9 +15,9 @@ use crate::{
     place::{DefinedPlace, Place, TypeOrigin, place_from_bindings, place_from_declarations},
     types::{
         CallArguments, ClassBase, ClassLiteral, ClassType, DataclassFlags, DisplaySettings,
-        KnownClass, KnownInstanceType, MemberLookupKey, MemberLookupPolicy, MetaclassCandidate,
-        Parameters, Signature, SpecialFormType, StaticClassLiteral, Type, TypeVarVariance,
-        TypingModule, binding_type,
+        KnownClass, KnownInstanceType, MemberLookupPolicy, MetaclassCandidate, Parameters,
+        Signature, SpecialFormType, StaticClassLiteral, Type, TypeVarVariance, TypingModule,
+        binding_type,
         call::Argument,
         class::{
             AbstractMethod, CodeGeneratorKind, Field, FieldKind, MetaclassErrorKind,
@@ -836,15 +836,6 @@ pub(crate) fn check_static_class_definitions<'db>(
                     env,
                     "__init_subclass__",
                     MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
-                    MemberLookupKey::new(
-                        db,
-                        env.program(db),
-                        Type::from(class),
-                        "__init_subclass__",
-                        MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
-                    )
-                    .inference_variable(db)
-                    .lookup_part(db, 1),
                     // skip(1) to skip the current class and only consider base classes.
                     class.iter_mro(db, None).skip(1),
                 )

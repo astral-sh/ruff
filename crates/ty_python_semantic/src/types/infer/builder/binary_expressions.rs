@@ -14,15 +14,12 @@ use crate::types::diagnostic::{
     DIVISION_BY_ZERO, report_unsupported_augmented_assignment, report_unsupported_binary_operation,
 };
 use crate::types::function::OverloadLiteral;
-use crate::types::infer::constraints::{
-    InferenceConstraints, InferenceOperation, InferenceOwner, InferenceSlot,
-};
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::typevar::TypeVarConstraints;
 use crate::types::{
-    DynamicType, InternedConstraintSet, KnownClass, KnownInstanceType, LiteralValueTypeKind,
-    MemberLookupPolicy, Type, TypeContext, TypeVarBoundOrConstraints, TypedDictType, UnionBuilder,
-    UnionTypeInstance, opaque_passthrough,
+    CycleSlot, DynamicType, InternedConstraintSet, KnownClass, KnownInstanceType,
+    LiteralValueTypeKind, MemberLookupPolicy, Operation, Type, TypeContext,
+    TypeVarBoundOrConstraints, TypedDictType, UnionBuilder, UnionTypeInstance,
 };
 
 enum BinaryExpressionOperandTypes<'db> {
@@ -60,18 +57,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         let (left_ty, right_ty) =
             match self.infer_binary_expression_operand_types(left, *op, right, tcx) {
-                BinaryExpressionOperandTypes::TypedDictResult(ty) => {
-                    self.store_binary_constraints(
-                        binary,
-                        self.expression_type(left.as_ref()),
-                        self.expression_type(right.as_ref()),
-                    );
-                    return ty;
-                }
+                BinaryExpressionOperandTypes::TypedDictResult(ty) => return ty,
                 BinaryExpressionOperandTypes::Inferred(left_ty, right_ty) => (left_ty, right_ty),
             };
 
-        self.store_binary_constraints(binary, left_ty, right_ty);
         let mut state = BinaryInferenceState::default();
         let return_type =
             self.infer_binary_expression_type(binary.into(), left_ty, right_ty, *op, &mut state);
@@ -80,51 +69,43 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             report_unsupported_binary_operation(&self.context, binary, left_ty, right_ty, *op);
             Type::unknown()
         });
-        opaque_passthrough(
-            self.db(),
-            self.program_environment(),
-            [left_ty, right_ty],
+        self.defer_binary_operation(
+            CycleSlot::Expression(ast::ExprRef::BinOp(binary).into()),
+            left_ty,
+            right_ty,
+            *op,
             return_type,
         )
     }
 
-    /// Retain both operands so a later solution uses the same binary operation.
-    fn store_binary_constraints(
+    /// Replaces the cycle markers that a binary operation passed through from an operand to its
+    /// result by variables defined by the operation on that operand alone.
+    pub(super) fn defer_binary_operation(
         &mut self,
-        binary: &ast::ExprBinOp,
+        slot: CycleSlot,
         left: Type<'db>,
         right: Type<'db>,
-    ) {
-        let left_symbolic = self
-            .symbolic
-            .get(&InferenceSlot::Expression(binary.left.as_ref().into()))
-            .copied();
-        let right_symbolic = self
-            .symbolic
-            .get(&InferenceSlot::Expression(binary.right.as_ref().into()))
-            .copied();
-        if left_symbolic.is_none() && right_symbolic.is_none() {
-            return;
-        }
+        operator: ast::Operator,
+        result: Type<'db>,
+    ) -> Type<'db> {
         let db = self.db();
         let env = self.program_environment();
-        let mut constraints = InferenceConstraints::default();
-        let left = left_symbolic.map_or(left, |symbolic| constraints.import(db, symbolic));
-        let right = right_symbolic.map_or(right, |symbolic| constraints.import(db, symbolic));
-        let slot = InferenceSlot::Expression(ast::ExprRef::BinOp(binary).into());
-        let result = constraints.apply(
-            db,
-            env,
-            InferenceOwner::Region(self.region),
-            slot,
-            InferenceOperation::Binary {
+        let context = self.binary_operation_context();
+        let result = self
+            .equations
+            .defer_passthrough(db, env, left, result, slot, |left| Operation::Binary {
                 left,
                 right,
-                operator: binary.op,
-                context: self.binary_operation_context(),
-            },
-        );
-        self.symbolic.insert(slot, constraints.finish(db, result));
+                operator,
+                context,
+            });
+        self.equations
+            .defer_passthrough(db, env, right, result, slot, |right| Operation::Binary {
+                left,
+                right,
+                operator,
+                context,
+            })
     }
 
     fn infer_pep_604_union_type_alias(

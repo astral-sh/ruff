@@ -20,9 +20,6 @@ use crate::types::diagnostic::{
 use crate::types::generics::{GenericContext, bind_typevar};
 use crate::types::infer::builder::annotation_expression::PEP613Policy;
 use crate::types::infer::builder::{ArgExpr, ArgumentsIter, MultiInferenceGuard};
-use crate::types::infer::constraints::{
-    InferenceConstraints, InferenceOperation, InferenceOwner, InferenceSlot,
-};
 use crate::types::infer::{InferenceFlags, TypeExpressionFlags};
 use crate::types::special_form::AliasSpec;
 use crate::types::subscript::{LegacyGenericOrigin, SubscriptError, SubscriptErrorKind};
@@ -32,11 +29,11 @@ use crate::types::typed_dict::{
 };
 use crate::types::typevar::{BindingContext, TypeVarSet};
 use crate::types::{
-    BoundTypeVarInstance, CallArguments, CallDunderError, CycleDetector, CycleSlot,
-    DisplaySettings, DynamicType, InternedType, KnownClass, KnownInstanceType, LintDiagnosticGuard,
-    MemberLookupPolicy, Operation, Parameter, Parameters, SpecialFormType, StaticClassLiteral,
-    Type, TypeAliasType, TypeAndQualifiers, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
-    UnionType, UnionTypeInstance, any_over_type, todo_type,
+    BoundTypeVarInstance, CallArguments, CallDunderError, CallableBinding, CycleDetector,
+    CycleSlot, DisplaySettings, DynamicType, InternedType, KnownClass, KnownInstanceType,
+    LintDiagnosticGuard, MemberLookupPolicy, Operation, Parameter, Parameters, SpecialFormType,
+    StaticClassLiteral, Type, TypeAliasType, TypeAndQualifiers, TypeContext, TypeMapping,
+    TypeVarBoundOrConstraints, UnionType, UnionTypeInstance, any_over_type, todo_type,
 };
 use crate::{Db, FxOrderSet, ProgramEnvironment};
 use ty_python_core::definition::Definition;
@@ -187,6 +184,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return Ok(self.infer_explicit_type_alias_specialization(subscript, value_ty, false));
         }
 
+        self.infer_subscript_load_impl(value_ty, subscript)
+    }
+
+    fn infer_subscript_load_impl(
+        &mut self,
+        value_ty: Type<'db>,
+        subscript: &ast::ExprSubscript,
+    ) -> Result<Type<'db>, Type<'db>> {
         let env = self.program_environment();
         let db = self.db();
 
@@ -210,19 +215,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if let Place::Defined(DefinedPlace {
                     ty,
                     definedness: Definedness::AlwaysDefined,
-                    symbolic,
                     ..
                 }) = place.place
                 {
                     // Even if we can obtain the subscript type based on the assignments, we still perform default type inference
                     // (to store the expression type and to report errors).
                     let slice_ty = self.infer_expression(slice, TypeContext::default());
-                    if let Some(symbolic) = symbolic {
-                        self.symbolic.insert(
-                            InferenceSlot::Expression(ast::ExprRef::Subscript(subscript).into()),
-                            symbolic,
-                        );
-                    }
                     return self
                         .infer_subscript_expression_types(
                             subscript,
@@ -484,8 +482,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let slice_ty = self.infer_expression(slice, TypeContext::default());
-        let ordinary = self
-            .infer_subscript_expression_types(subscript, value_ty, slice_ty, ExprContext::Load)
+        self.infer_subscript_expression_types(subscript, value_ty, slice_ty, ExprContext::Load)
             .map(|ty| self.narrow_expr_with_applicable_constraints(subscript, ty, &constraint_keys))
             .map_err(|recovery_ty| {
                 self.narrow_expr_with_applicable_constraints(
@@ -508,43 +505,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         key: slice_ty,
                     },
                 )
-            });
-        if let Some(source) = self
-            .symbolic
-            .get(&InferenceSlot::Expression(subscript.value.as_ref().into()))
-            .copied()
-        {
-            let mut constraints = InferenceConstraints::default();
-            let source = constraints.import(db, source);
-            let result = constraints.apply(
-                db,
-                env,
-                InferenceOwner::Region(self.region),
-                InferenceSlot::Expression(ast::ExprRef::Subscript(subscript).into()),
-                InferenceOperation::Subscript {
-                    value: source,
-                    key: slice_ty,
-                },
-            );
-            // Narrow the result, not just its ordinary approximation: later operations use it.
-            let symbolic = self.narrow_symbolic_expr(
-                subscript,
-                constraints.finish(db, result),
-                &constraint_keys,
-            );
-            if let Some(resolved) = symbolic.resolve(db, env) {
-                self.symbolic.insert(
-                    InferenceSlot::Expression(ast::ExprRef::Subscript(subscript).into()),
-                    symbolic,
-                );
-                return ordinary.map(|_| resolved).map_err(|_| resolved);
-            }
-            self.symbolic.insert(
-                InferenceSlot::Expression(ast::ExprRef::Subscript(subscript).into()),
-                symbolic,
-            );
-        }
-        ordinary
+            })
     }
 
     pub(super) fn infer_explicit_class_specialization(
@@ -1718,33 +1679,41 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         ArgumentsIter::synthesized(&ast_arguments),
                         &mut call_arguments,
                         &mut |builder, (_, expr, tcx)| {
-                            // The identity receiver supplies different parameter contexts from
-                            // those used to validate the assignment above.
-                            let ty = builder.infer_maybe_standalone_expression(expr, tcx);
-                            builder.inferred_argument(expr, ty)
+                            // TODO: The argument types have already been inferred and stored in `call_arguments`.
+                            // However, `object` would have been inferred to a be a collection with `Divergent`
+                            // element types, meaning the type context for a given argument, by which the inferred
+                            // type is keyed, may not be the same as the type context we get here. It is not immediately
+                            // clear how to retrieve those types, and so we just re-infer the argument expressions
+                            // for simplicity.
+                            builder.infer_maybe_standalone_expression(expr, tcx)
                         },
                         &mut identity_bindings,
                         TypeContext::default(),
                     );
 
                 if call_result.is_ok() && boundness == Definedness::AlwaysDefined {
-                    self.collection_use_constraints
-                        .entry(collection_def)
-                        .or_default()
-                        .extend(identity_bindings.inferred_receiver_types(
-                            db,
-                            env,
+                    for call_specialization in identity_bindings
+                        .iter_flat()
+                        .flat_map(CallableBinding::matching_overloads)
+                        .filter_map(|(_, identity_overload)| {
+                            identity_overload.merged_specialization(db)
+                        })
+                    {
+                        // Record the constraints on the receiver's generic context formed by
+                        // the arguments to this dunder call.
+                        let Some(constraints) = self.collection_use_constraint_from_specialization(
                             identity_instance,
-                        ));
-                }
-                if boundness == Definedness::AlwaysDefined {
-                    self.store_collection_receiver_constraints(
-                        collection_def,
-                        identity_instance,
-                        dunder_callable,
-                        &call_arguments,
-                        TypeContext::default(),
-                    );
+                            collection_generic_context,
+                            call_specialization,
+                        ) else {
+                            continue;
+                        };
+
+                        self.collection_use_constraints
+                            .entry(collection_def)
+                            .or_default()
+                            .insert(constraints);
+                    }
                 }
             }
         }

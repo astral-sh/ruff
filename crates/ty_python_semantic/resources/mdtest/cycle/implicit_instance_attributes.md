@@ -1566,6 +1566,74 @@ class Cyclic:
 reveal_type(Cyclic("").data)
 ```
 
+## Nesting an unpacked element in an attribute
+
+Each call wraps the attribute's element in one more list, so the attribute is a recursive type:
+either the initial list of integers or a list whose elements nest the previous element. The
+recursion is cut at the element, rather than unfolded once per call.
+
+```py
+class Nest:
+    def __init__(self):
+        self.value = [0]
+
+    def nest(self):
+        (element,) = self.value
+        self.value = [[element]]
+        reveal_type(self.value)  # revealed: list[list[Divergent]]
+
+reveal_type(Nest().value)  # revealed: list[int] | list[list[Divergent]]
+reveal_type(Nest().value[0])  # revealed: int | list[Divergent]
+```
+
+## Wrapping a guarded attribute in a list
+
+Narrowing the attribute before wrapping it makes the narrowed value recursive: it is either an
+integer or a list whose element is the narrowed value again. The recursion is cut at the narrowed
+value, and the attribute keeps the `None` the guard excludes.
+
+```py
+class Wrap:
+    def __init__(self, value: int | None):
+        self.value = value
+
+    def wrap(self, flag: bool):
+        if self.value is not None:
+            if flag:
+                self.value = [self.value]
+            reveal_type(self.value)  # revealed: int | list[Divergent]
+
+reveal_type(Wrap(0).value)  # revealed: int | None | list[Divergent]
+```
+
+## Wrapping guarded attributes assigned from a third attribute
+
+Two attributes can be assigned the same third attribute, guarded together and then each wrapped in a
+list. Wrapping one of them under a guard on the other makes its narrowed value depend on a value
+only the other attribute's guard defines; the recursion is still cut at the narrowed value rather
+than unfolded once per call.
+
+```py
+class Pair:
+    def __init__(self, both: int | None, left: int | None, right: int | None):
+        self.both = both
+        self.left = left
+        self.right = right
+
+    def normalize(self, flag: bool):
+        if self.both is not None:
+            self.left = self.right = self.both
+        if self.left is not None:
+            if flag:
+                self.left = [self.left]
+            if flag:
+                self.right = [self.right]
+
+# TODO: `list[Divergent]` would be more compact; the integer is part of the recursive value.
+reveal_type(Pair(0, 0, 0).left)  # revealed: int | None | list[Divergent | int]
+reveal_type(Pair(0, 0, 0).right)  # revealed: int | None | list[Divergent | int]
+```
+
 ## Cycle normalization preserves non-gradual variadic parameters
 
 Normalizing a recursive implicit-attribute type does not reinterpret specialized variadic parameters

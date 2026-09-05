@@ -277,9 +277,7 @@ impl<'db> TypedDictType<'db> {
                 if let Some(extra_items) = arguments.find_keyword("extra_items") {
                     let annotation =
                         definition_expression_annotation(db, class_definition, &extra_items.value)
-                            .map_type(db, |ty| {
-                                ty.apply_optional_specialization(db, specialization)
-                            });
+                            .map_type(|ty| ty.apply_optional_specialization(db, specialization));
                     return TypedDictOpenness::extra(
                         db,
                         annotation.inner_type(),
