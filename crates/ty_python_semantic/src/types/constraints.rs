@@ -103,6 +103,7 @@ use ty_python_core::Program;
 use ty_python_core::rank::RankBitBox;
 use ty_static::EnvVars;
 
+use crate::types::callable::CallableTypeKind;
 use crate::types::class::GenericAlias;
 use crate::types::constraints::projection::{ProjectionError, SolutionBudget};
 use crate::types::constraints::support::{Support, SupportId};
@@ -2261,14 +2262,23 @@ impl<'db> UpperBound<'db> {
         self.iter_clauses().any(|clause| clause.ty().is_union())
     }
 
-    fn is_satisfied_by(
+    /// Checks all clauses together, so symbolic bounds cannot use incompatible witnesses.
+    fn is_possibly_satisfied_by(
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        builder: &ConstraintSetBuilder<'db>,
         ty: Type<'db>,
     ) -> bool {
-        self.iter_clauses()
+        if self
+            .iter_clauses()
             .all(|clause| ty.is_constraint_set_assignable_to(db, env, clause.ty()))
+        {
+            return true;
+        }
+        let mut storage = builder.storage.borrow_mut();
+        let (when, source_order) = self.when_satisfied_by(db, env, &mut storage, ty);
+        !when.is_never_satisfied(db, env, &mut storage, source_order)
     }
 
     /// Returns the constraints under which `lower` is assignable to every stored upper clause.
@@ -3873,6 +3883,8 @@ pub(crate) enum PathBoundSolution<'db> {
     Unsolved,
     /// The bounds cannot be satisfied, so the entire path must be rejected.
     Unsatisfiable,
+    /// Evidence exists, but no supported solution can be selected. This is not a contradiction.
+    Unsupported,
     /// Computing the solution exceeded the type-construction budget. A previously known type
     /// can still be used as a conservative fallback, but is not a complete solution.
     BudgetExceeded {
@@ -3888,7 +3900,7 @@ impl<'db> PathBoundSolution<'db> {
             Self::BudgetExceeded { fallback } => Self::BudgetExceeded {
                 fallback: fallback.map(f),
             },
-            Self::Unsolved | Self::Unsatisfiable => self,
+            Self::Unsolved | Self::Unsatisfiable | Self::Unsupported => self,
         }
     }
 
@@ -3897,11 +3909,14 @@ impl<'db> PathBoundSolution<'db> {
     pub(crate) fn as_type(self) -> Option<Type<'db>> {
         match self {
             Self::Solved(ty) => Some(ty),
-            Self::Unsolved | Self::Unsatisfiable => None,
+            Self::Unsolved | Self::Unsatisfiable | Self::Unsupported => None,
             Self::BudgetExceeded { fallback } => fallback,
         }
     }
 }
+
+/// A retained path has evidence for which no supported solution can be selected.
+struct UnsupportedPath;
 
 /// The explicit lower and upper bounds inferred for one typevar on one BDD path.
 #[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
@@ -4345,6 +4360,7 @@ impl<'db> PathBounds<'db> {
     ///
     /// A genuinely unsolved variable does not invalidate a path. Budget exhaustion also retains
     /// the path's available bindings, but marks the resulting path family as incomplete.
+    /// Unsupported evidence on a retained path declines the whole family without partial bindings.
     pub(crate) fn solve_with(
         &self,
         choose: impl FnMut(TypeVarVariance, &PathBound<'db>) -> PathBoundSolution<'db>,
@@ -4368,9 +4384,10 @@ impl<'db> PathBounds<'db> {
         let mut solutions = Vec::with_capacity(paths.len());
         let mut exceeded_budget = false;
         for path in paths {
-            let Some((solution, path_exceeded_budget)) = Self::solve_path_with(path, &mut choose)
-            else {
-                continue;
+            let (solution, path_exceeded_budget) = match Self::solve_path_with(path, &mut choose) {
+                Ok(None) => continue,
+                Err(UnsupportedPath) => return Ok(Solutions::Unsupported),
+                Ok(Some(solution)) => solution,
             };
             check_solution(&solution)?;
             exceeded_budget |= path_exceeded_budget;
@@ -4388,18 +4405,25 @@ impl<'db> PathBounds<'db> {
     }
 
     /// Solves one complete path, retaining whether any of its bindings used a fallback.
-    /// A later unsatisfiable bound rejects the path even if an earlier bound exhausted its budget.
+    /// `Ok(None)` rejects a contradictory path; `Err` declines an unsupported retained path.
+    /// The boolean in a retained result indicates budget exhaustion.
+    /// A later contradiction rejects the path even after unsupported evidence or budget exhaustion.
     fn solve_path_with(
         path: &[PathBound<'db>],
         choose: &mut impl FnMut(TypeVarVariance, &PathBound<'db>) -> PathBoundSolution<'db>,
-    ) -> Option<(Solution<'db>, bool)> {
+    ) -> Result<Option<(Solution<'db>, bool)>, UnsupportedPath> {
         let mut solution = Vec::with_capacity(path.len());
         let mut exceeded_budget = false;
+        let mut unsupported = false;
         for path_bound in path {
             let ty = match choose(path_bound.variance(), path_bound) {
                 PathBoundSolution::Solved(ty) => Some(ty),
                 PathBoundSolution::Unsolved => None,
-                PathBoundSolution::Unsatisfiable => return None,
+                PathBoundSolution::Unsatisfiable => return Ok(None),
+                PathBoundSolution::Unsupported => {
+                    unsupported = true;
+                    None
+                }
                 PathBoundSolution::BudgetExceeded { fallback } => {
                     exceeded_budget = true;
                     fallback
@@ -4412,7 +4436,11 @@ impl<'db> PathBounds<'db> {
                 });
             }
         }
-        Some((solution, exceeded_budget))
+        if unsupported {
+            Err(UnsupportedPath)
+        } else {
+            Ok(Some((solution, exceeded_budget)))
+        }
     }
 
     /// The default solution selection logic for a single typevar on a single BDD path.
@@ -4426,6 +4454,12 @@ impl<'db> PathBounds<'db> {
         builder: &ConstraintSetBuilder<'db>,
         path_bound: &PathBound<'db>,
     ) -> PathBoundSolution<'db> {
+        if path_bound.bound_typevar.is_paramspec(db)
+            && path_bound.bound_typevar.paramspec_attr(db).is_none()
+        {
+            return Self::solve_paramspec(db, env, builder, path_bound);
+        }
+
         let preliminary = Self::preliminary_solve(db, env, builder, path_bound);
         let PathBoundSolution::Solved(solution) = preliminary else {
             return preliminary;
@@ -4443,6 +4477,49 @@ impl<'db> PathBounds<'db> {
         }
 
         PathBoundSolution::Solved(restricted)
+    }
+
+    /// Selects an existing parameter-list value without applying ordinary type materialization.
+    fn solve_paramspec(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        builder: &ConstraintSetBuilder<'db>,
+        path_bound: &PathBound<'db>,
+    ) -> PathBoundSolution<'db> {
+        let lower = path_bound.effective_lower(db, env);
+        if !path_bound
+            .upper
+            .is_possibly_satisfied_by(db, env, builder, lower)
+        {
+            return PathBoundSolution::Unsatisfiable;
+        }
+
+        let is_canonical = |ty: Type<'db>| match ty {
+            Type::Callable(callable) => callable.kind(db) == CallableTypeKind::ParamSpecValue,
+            Type::TypeVar(typevar) => {
+                typevar.is_paramspec(db)
+                    && typevar.paramspec_attr(db).is_none()
+                    && !typevar.is_same_typevar_as(db, path_bound.bound_typevar)
+            }
+            _ => false,
+        };
+
+        if path_bound.evidence_lower().is_some() && is_canonical(lower) {
+            return PathBoundSolution::Solved(lower);
+        }
+        if path_bound.has_upper_evidence()
+            && let Some(upper) = path_bound.as_single_upper_bound(db, env)
+            && is_canonical(upper)
+        {
+            return PathBoundSolution::Solved(upper);
+        }
+        if path_bound.evidence_lower().is_none() && !path_bound.has_upper_evidence() {
+            return PathBoundSolution::Unsolved;
+        }
+
+        // Compatible unions or intersections of parameter lists are not ParamSpec values. An
+        // omitted binding would lose their obligations when a consumer applies a default.
+        PathBoundSolution::Unsupported
     }
 
     /// Selects a preliminary solution to use as type context during generic call inference.
@@ -4474,17 +4551,13 @@ impl<'db> PathBounds<'db> {
                 // upper bound (which may include TypeVar bounds/constraints). The upper bound
                 // should only be used as a fallback when no concrete type was inferred.
                 if path_bound.evidence_lower.is_some() {
-                    if !path_bound.upper.is_satisfied_by(db, env, lower) {
-                        let mut storage = builder.storage.borrow_mut();
-                        let (when_upper, source_order) =
-                            path_bound
-                                .upper
-                                .when_satisfied_by(db, env, &mut storage, lower);
-                        if when_upper.is_never_satisfied(db, env, &mut storage, source_order) {
-                            // This path does not satisfy the accumulated upper bound, and is
-                            // therefore not a valid specialization.
-                            return PathBoundSolution::Unsatisfiable;
-                        }
+                    if !path_bound
+                        .upper
+                        .is_possibly_satisfied_by(db, env, builder, lower)
+                    {
+                        // This path does not satisfy the accumulated upper bound, and is
+                        // therefore not a valid specialization.
+                        return PathBoundSolution::Unsatisfiable;
                     }
 
                     if !is_possibly_constraint_set_assignable(
@@ -5118,6 +5191,8 @@ impl InteriorNode {
 pub(crate) enum Solutions<'db> {
     Unsatisfiable,
     Unconstrained,
+    /// At least one retained path has evidence that cannot be represented by a supported solution.
+    Unsupported,
     Constrained(SolutionPaths<'db>),
 }
 
@@ -5637,8 +5712,12 @@ mod tests {
     use crate::types::generics::ApplySpecialization;
     use crate::types::typevar::{
         TypeVarBoundOrConstraintsEvaluation, TypeVarConstraints, TypeVarDefaultEvaluation,
+        TypeVarIdentity, TypeVarKind,
     };
-    use crate::types::{BoundTypeVarInstance, KnownClass, SubclassOfType, TypeVarVariance};
+    use crate::types::{
+        BindingContext, BoundTypeVarInstance, KnownClass, ParamSpecAttrKind, Parameter, Signature,
+        SubclassOfType, TypeVarNonce, TypeVarVariance,
+    };
     use ruff_db::files::system_path_to_file;
     use ruff_db::system::DbWithWritableSystem;
     use ruff_python_ast::name::Name;
@@ -5650,6 +5729,22 @@ mod tests {
             &db.program_environment(),
             Name::new_static(name),
             TypeVarVariance::Invariant,
+        )
+    }
+
+    fn create_paramspec<'db>(db: &'db TestDb, name: &'static str) -> BoundTypeVarInstance<'db> {
+        let identity = TypeVarIdentity::new(
+            db,
+            Name::new_static(name),
+            None,
+            TypeVarKind::Pep695ParamSpec,
+        );
+        BoundTypeVarInstance::new(
+            db,
+            TypeVarInstance::new(db, identity, None, None, None),
+            BindingContext::Synthetic(db.program_environment().program(db)),
+            None,
+            TypeVarNonce::NONE,
         )
     }
 
@@ -6282,24 +6377,217 @@ mod tests {
         let db = setup_db();
         let db = &db;
         let env = db.program_environment();
-        let t = create_typevar(db, "T");
         let builder = ConstraintSetBuilder::new();
-        let path_bound = PathBound {
-            bound_typevar: t,
-            evidence_lower: None,
-            validity_lower: Type::Never,
-            upper: UpperBound::unconstrained(),
-            has_only_gradual_evidence: false,
-        };
+        for bound_typevar in [create_typevar(db, "T"), create_paramspec(db, "P")] {
+            let path_bound = PathBound {
+                bound_typevar,
+                evidence_lower: None,
+                validity_lower: Type::Never,
+                upper: UpperBound::unconstrained(),
+                has_only_gradual_evidence: false,
+            };
 
+            assert_eq!(
+                PathBounds::default_solve(db, &env, &builder, &path_bound),
+                PathBoundSolution::Unsolved
+            );
+            assert_eq!(PathBoundSolution::Unsolved.as_type(), None);
+            assert_eq!(
+                PathBounds::Constrained(Box::new([Box::new([path_bound])]))
+                    .solve(db, &env, &builder),
+                Solutions::Constrained(SolutionPaths::Complete(vec![vec![]]))
+            );
+        }
+    }
+
+    #[test]
+    fn paramspec_solution_preserves_callable_identity() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/a.py",
+            r#"
+from typing import overload
+
+@overload
+def callback[T](value: T, /) -> T: ...
+@overload
+def callback[**Q](*args: Q.args, **kwargs: Q.kwargs) -> int: ...
+"#,
+        )?;
+        let db = &db;
+        let env = db.program_environment();
+        let file = system_path_to_file(db, "/src/a.py")?;
+        let file = ProgramFile::new(db, file, env.program(db));
+        let function = global_symbol(db, file, "callback")
+            .place
+            .expect_type()
+            .as_function_literal()
+            .ok_or_else(|| anyhow::anyhow!("expected overloaded callback"))?;
+        let callable = function.into_callable_type(db).into_paramspec_value(db);
+        let expected = Type::Callable(callable);
+        let p = create_paramspec(db, "P");
+        let builder = ConstraintSetBuilder::new();
+
+        // Identity includes both overloads, their generic contexts, and neutral return types.
+        assert_eq!(callable.signatures(db).overloads.len(), 2);
+        for signature in callable.signatures(db) {
+            assert!(signature.generic_context.is_some());
+            assert_eq!(signature.return_ty, Type::unknown());
+        }
         assert_eq!(
-            PathBounds::default_solve(db, &env, &builder, &path_bound),
-            PathBoundSolution::Unsolved
+            PathBounds::default_solve(db, &env, &builder, &PathBound::exact(p, expected)),
+            PathBoundSolution::Solved(expected)
         );
-        assert_eq!(PathBoundSolution::Unsolved.as_type(), None);
+        Ok(())
+    }
+
+    #[test]
+    fn paramspec_solution_distinguishes_validity_from_evidence() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let p = create_paramspec(db, "P");
+        let parameters = |ty| {
+            Type::paramspec_value_callable(
+                db,
+                Parameters::standard([Parameter::positional_only(None).with_annotated_type(ty)]),
+            )
+        };
+        let integers = parameters(known_instance(db, KnownClass::Int));
+        let objects = parameters(Type::object());
+        let builder = ConstraintSetBuilder::new();
+
+        for (lower, upper, expected) in [
+            (
+                None,
+                ConstraintBound::Validity(integers),
+                PathBoundSolution::Unsolved,
+            ),
+            (
+                Some(ConstraintBound::Validity(objects)),
+                ConstraintBound::Evidence(integers),
+                PathBoundSolution::Solved(integers),
+            ),
+            (
+                Some(ConstraintBound::Validity(integers)),
+                ConstraintBound::Evidence(objects),
+                PathBoundSolution::Unsatisfiable,
+            ),
+            (
+                Some(ConstraintBound::Evidence(integers)),
+                ConstraintBound::Validity(objects),
+                PathBoundSolution::Unsatisfiable,
+            ),
+        ] {
+            let mut bounds = ConstraintBoundsBuilder::default();
+            if let Some(lower) = lower {
+                bounds.add_lower(db, &env, lower);
+            }
+            bounds.add_upper(db, &env, upper);
+            assert_eq!(
+                PathBounds::default_solve(db, &env, &builder, &bounds.finish(db, &env, p)),
+                expected
+            );
+        }
+    }
+
+    #[test]
+    fn paramspec_solution_requires_canonical_values_and_distinct_identities() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let p = create_paramspec(db, "P");
+        let q = create_paramspec(db, "Q");
+        let builder = ConstraintSetBuilder::new();
+        let regular =
+            Type::single_callable(db, Signature::new(Parameters::empty(), Type::unknown()));
+        let same_p = BoundTypeVarInstance::new(
+            db,
+            TypeVarInstance::new(
+                db,
+                p.typevar(db).identity(db),
+                None,
+                None,
+                Some(TypeVarDefaultEvaluation::Eager(Type::unknown())),
+            ),
+            p.binding_context(db),
+            None,
+            p.freshness(db),
+        );
+        assert_ne!(p, same_p);
+        assert!(p.is_same_typevar_as(db, same_p));
+
+        for lower in [
+            regular,
+            Type::object(),
+            Type::Never,
+            Type::TypeVar(same_p),
+            Type::TypeVar(q.with_paramspec_attr(db, ParamSpecAttrKind::Args)),
+            Type::TypeVar(q.with_paramspec_attr(db, ParamSpecAttrKind::Kwargs)),
+        ] {
+            let mut bounds = ConstraintBoundsBuilder::default();
+            bounds.add_lower(db, &env, ConstraintBound::Evidence(lower));
+            assert_eq!(
+                PathBounds::default_solve(db, &env, &builder, &bounds.finish(db, &env, p)),
+                PathBoundSolution::Unsupported
+            );
+        }
+
+        let fresh_p = BoundTypeVarInstance::new(
+            db,
+            p.typevar(db),
+            p.binding_context(db),
+            None,
+            p.freshness(db).increment(),
+        );
         assert_eq!(
-            PathBounds::Constrained(Box::new([Box::new([path_bound])])).solve(db, &env, &builder),
-            Solutions::Constrained(SolutionPaths::Complete(vec![vec![]]))
+            PathBounds::default_solve(
+                db,
+                &env,
+                &builder,
+                &PathBound::exact(p, Type::TypeVar(fresh_p)),
+            ),
+            PathBoundSolution::Solved(Type::TypeVar(fresh_p))
+        );
+    }
+
+    #[test]
+    fn paramspec_solution_checks_upper_bounds_jointly() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let p = create_paramspec(db, "P");
+        let t = create_typevar(db, "T");
+        let parameters = |ty| {
+            Type::paramspec_value_callable(
+                db,
+                Parameters::standard([Parameter::positional_only(None).with_annotated_type(
+                    KnownClass::List.to_specialized_instance(db, &env, &[ty]),
+                )]),
+            )
+        };
+        let lower = parameters(Type::TypeVar(t));
+        let integers = parameters(known_instance(db, KnownClass::Int));
+        let strings = parameters(known_instance(db, KnownClass::Str));
+        let builder = ConstraintSetBuilder::new();
+
+        // Either upper clause can bind T, but one T cannot satisfy both invariant lists.
+        for upper in [integers, strings] {
+            let mut bounds = ConstraintBoundsBuilder::default();
+            bounds.add_lower(db, &env, ConstraintBound::Evidence(lower));
+            bounds.add_upper(db, &env, ConstraintBound::Evidence(upper));
+            assert_eq!(
+                PathBounds::default_solve(db, &env, &builder, &bounds.finish(db, &env, p),),
+                PathBoundSolution::Solved(lower)
+            );
+        }
+        let mut bounds = ConstraintBoundsBuilder::default();
+        bounds.add_lower(db, &env, ConstraintBound::Evidence(lower));
+        bounds.add_upper(db, &env, ConstraintBound::Evidence(integers));
+        bounds.add_upper(db, &env, ConstraintBound::Evidence(strings));
+        assert_eq!(
+            PathBounds::default_solve(db, &env, &builder, &bounds.finish(db, &env, p)),
+            PathBoundSolution::Unsatisfiable
         );
     }
 
@@ -6369,12 +6657,17 @@ mod tests {
                 PathBoundSolution::Unsatisfiable,
             ),
             (
+                PathBoundSolution::Unsupported,
+                PathBoundSolution::Unsupported,
+            ),
+            (
                 PathBoundSolution::BudgetExceeded { fallback: None },
                 PathBoundSolution::BudgetExceeded { fallback: None },
             ),
         ] {
             assert_eq!(solution.map(|ty| ty.promote(db, &env)), expected);
         }
+        assert_eq!(PathBoundSolution::Unsupported.as_type(), None);
     }
 
     #[test]
@@ -6845,6 +7138,7 @@ class E: ...
             let paths = match &solutions {
                 Ok(Solutions::Unsatisfiable) => String::from("unsatisfiable"),
                 Ok(Solutions::Unconstrained) => String::from("unconstrained"),
+                Ok(Solutions::Unsupported) => String::from("unsupported"),
                 Ok(Solutions::Constrained(paths)) => paths
                     .as_slice()
                     .iter()

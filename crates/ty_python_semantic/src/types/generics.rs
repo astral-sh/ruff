@@ -2438,6 +2438,7 @@ pub(crate) struct SpecializationBuilder<'db, 'c> {
 enum LegacyTypeMappings<'db> {
     Available(FxHashMap<BoundTypeVarIdentity<'db>, UnionAccumulator<'db>>),
     BudgetExceeded,
+    Unsupported,
 }
 
 /// Correlated type-variable inference, together with the merged projection used by consumers
@@ -2549,6 +2550,7 @@ pub(crate) enum TypeVarInferenceFallback {
     Unsatisfiable,
     ExpandingCycle,
     BudgetExceeded,
+    Unsupported,
 }
 
 /// An owned projection before allocating a cached inference result. Correlated callers retain
@@ -2570,6 +2572,8 @@ enum ConstraintSetAnalysis<'db> {
     Constrained(SolutionPaths<'db>),
     /// A collection or result limit was exceeded. No partial family is safe to project.
     BudgetExceeded,
+    /// A supported solution could not be selected. No partial family is safe to project.
+    Unsupported,
 }
 
 impl<'db> ConstraintSetAnalysis<'db> {
@@ -2891,6 +2895,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             Ok(match solutions {
                 Solutions::Unsatisfiable => SolutionProjection::Unsatisfiable,
                 Solutions::Unconstrained => SolutionProjection::Unconstrained,
+                Solutions::Unsupported => return Err(ProjectionError::UnsupportedSolution),
                 Solutions::Constrained(solutions) => {
                     let mut merged_types = FxHashMap::default();
                     for solution in solutions.as_slice() {
@@ -2989,12 +2994,17 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     choose,
                 ));
             }
-            Err(_) => {
-                // A partial mapping may be narrower than the unvisited alternatives. Recover
-                // without choosing a witness or repeating the exhausted traversal/construction.
+            Err(error) => {
+                // A partial mapping is not an exhaustive answer. Recover without choosing a
+                // witness or repeating a failed projection, and preserve why it was unavailable.
                 return Ok(PendingInference {
                     merged_types: self.unknown_type_mappings(generic_context),
-                    solutions: Err(TypeVarInferenceFallback::BudgetExceeded),
+                    solutions: Err(match error {
+                        ProjectionError::UnsupportedSolution => {
+                            TypeVarInferenceFallback::Unsupported
+                        }
+                        _ => TypeVarInferenceFallback::BudgetExceeded,
+                    }),
                 });
             }
             Ok(SolutionProjection::Constrained(inference)) => inference,
@@ -3415,6 +3425,9 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             Ok(Solutions::Unsatisfiable) => ConstraintSetAnalysis::Unsatisfiable(failures),
             Ok(Solutions::Unconstrained) => ConstraintSetAnalysis::Unconstrained,
             Ok(Solutions::Constrained(solutions)) => ConstraintSetAnalysis::Constrained(solutions),
+            Ok(Solutions::Unsupported) | Err(ProjectionError::UnsupportedSolution) => {
+                ConstraintSetAnalysis::Unsupported
+            }
             Err(_) => ConstraintSetAnalysis::BudgetExceeded,
         }
     }
@@ -3432,7 +3445,14 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             self.types = LegacyTypeMappings::BudgetExceeded;
             return;
         }
-        if matches!(self.types, LegacyTypeMappings::BudgetExceeded) {
+        if matches!(analysis, ConstraintSetAnalysis::Unsupported) {
+            self.types = LegacyTypeMappings::Unsupported;
+            return;
+        }
+        if matches!(
+            self.types,
+            LegacyTypeMappings::BudgetExceeded | LegacyTypeMappings::Unsupported
+        ) {
             return;
         }
         let ConstraintSetAnalysis::Constrained(solutions) = analysis else {
@@ -4919,6 +4939,36 @@ mod tests {
             );
             assert_eq!(inference.merged_types(db), [Some(Type::unknown())]);
         }
+        Ok(())
+    }
+
+    #[test]
+    fn unsupported_inference_discards_partial_mappings() -> anyhow::Result<()> {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let [t, u] = create_typevars(db, ["T", "U"]);
+        let context = GenericContext::from_typevar_instances(db, &env, [t, u]);
+        let constraints = ConstraintSetBuilder::new();
+        let int = KnownClass::Int.to_instance(db, &env);
+        let mut builder = SpecializationBuilder::new(db, &env, &constraints, context);
+        builder.record_constraint_set([t, u].into_iter().when_all(db, &constraints, |typevar| {
+            ConstraintSet::constrain_typevar(db, &env, &constraints, typevar, int, int)
+        }));
+        let inference = builder
+            .solve_pending_with(SolutionBudget::default(), &mut |typevar, _| {
+                (typevar == u).then_some(PathBoundSolution::Unsupported)
+            })
+            .map_err(|()| anyhow::anyhow!("unsupported evidence is not unsatisfiable"))?;
+
+        assert_eq!(
+            inference.solutions(db),
+            &TypeVarInferenceSolutions::Unavailable(TypeVarInferenceFallback::Unsupported)
+        );
+        assert_eq!(
+            inference.merged_types(db),
+            [Some(Type::unknown()), Some(Type::unknown())]
+        );
         Ok(())
     }
 

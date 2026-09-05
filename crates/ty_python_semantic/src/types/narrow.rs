@@ -44,6 +44,7 @@ use ruff_python_stdlib::identifiers::is_identifier;
 
 use super::UnionType;
 use super::call::CallArguments;
+use super::constraints::projection::ProjectionError;
 use super::constraints::{ConstraintSetBuilder, Solutions};
 use super::equality::{
     ComparisonSoundnessPolicy, equality_exclusion_constraint, equality_truthiness,
@@ -895,9 +896,16 @@ fn specialize_narrowing_target_from_intersection<'db>(
         combined_constraints.intersect(db, &constraints, base_constraint);
     }
 
-    let solutions = combined_constraints
-        .solutions(db, env, generic_context.inferable_typevars(db))
-        .ok()?;
+    let solutions =
+        match combined_constraints.solutions(db, env, generic_context.inferable_typevars(db)) {
+            Ok(solutions) => solutions,
+            Err(ProjectionError::UnsupportedSolution) => {
+                // Retrying one base would discard constraints from the others. A gradual target
+                // would also widen inherited callable signatures, so use its top materialization.
+                return Some(target.top_materialization(db, env));
+            }
+            Err(_) => return None,
+        };
     let specialized_class =
         specialize_generic_class_from_solutions(db, env, target_class, solutions)?;
     Some(Type::instance(db, env, specialized_class))
@@ -1025,8 +1033,14 @@ fn specialize_generic_class_from_solutions<'db>(
     solutions: Solutions<'db>,
 ) -> Option<ClassType<'db>> {
     let generic_context = target_class.generic_context(db)?;
-    let Solutions::Constrained(solutions) = solutions else {
-        return None;
+    let solutions = match solutions {
+        Solutions::Constrained(solutions) => solutions,
+        Solutions::Unsupported => {
+            // Preserve the runtime class without widening the original subject's callable
+            // signatures when the caller intersects it with this recovery specialization.
+            return Some(target_class.top_materialization(db));
+        }
+        Solutions::Unsatisfiable | Solutions::Unconstrained => return None,
     };
     let [solution] = solutions.as_slice() else {
         return None;
