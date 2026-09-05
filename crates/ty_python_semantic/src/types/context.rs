@@ -15,6 +15,7 @@ use salsa::plumbing::{AsId, FromId, Id};
 use super::{Type, TypeCheckDiagnostics, infer_definition_types};
 
 use crate::diagnostic::DiagnosticGuard;
+use crate::importer::Importer;
 use crate::lint::LintSource;
 use crate::reachability::is_range_reachable;
 use crate::types::diagnostic::{INVALID_TYPE_FORM, UNBOUND_TYPE_VARIABLE};
@@ -201,6 +202,11 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
     /// The module for which the types are inferred.
     pub(crate) fn module(&self) -> &'ast ParsedModuleRef {
         self.module
+    }
+
+    /// Constructs an importer using the file's cached imports and source style.
+    pub(crate) fn importer(&self) -> Importer<'_> {
+        Importer::new(self.db, self.program_file, self.module)
     }
 
     pub(crate) fn scope(&self) -> ScopeId<'db> {

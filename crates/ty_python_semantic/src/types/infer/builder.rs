@@ -71,8 +71,8 @@ use crate::types::diagnostic::{
     INVALID_PARAMSPEC, INVALID_TYPE_ALIAS_TYPE, INVALID_TYPE_FORM, INVALID_TYPE_VARIABLE_BOUND,
     INVALID_TYPE_VARIABLE_CONSTRAINTS, INVALID_TYPE_VARIABLE_DEFAULT,
     POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_SUBMODULE, TypeCheckDiagnostics,
-    UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_REFERENCE,
-    UNSOUND_ASSIGNMENT, UNSOUND_YIELD, UNSUPPORTED_OPERATOR, UNUSED_AWAITABLE, YieldKind,
+    UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_REFERENCE, UNSOUND_ASSIGNMENT,
+    UNSOUND_YIELD, UNSUPPORTED_OPERATOR, UNUSED_AWAITABLE, YieldKind,
     autofix_with_notimplementederror, hint_if_stdlib_attribute_exists_on_other_versions,
     report_attempted_protocol_instantiation, report_bad_dunder_delattr_call,
     report_bad_dunder_delete_call, report_call_to_abstract_method,
@@ -85,8 +85,9 @@ use crate::types::diagnostic::{
     report_match_pattern_against_non_runtime_checkable_protocol,
     report_match_pattern_against_typed_dict, report_mismatched_type_name,
     report_possibly_missing_attribute, report_possibly_unresolved_reference,
-    report_too_many_positional_patterns_for_class_pattern, report_unsound_assignment,
-    report_unsound_yield, report_unsupported_augmented_assignment, report_unsupported_comparison,
+    report_too_many_positional_patterns_for_class_pattern, report_undefined_reveal,
+    report_unsound_assignment, report_unsound_yield, report_unsupported_augmented_assignment,
+    report_unsupported_comparison,
 };
 use crate::types::enums::{enum_ignored_names, is_enum_class_by_inheritance};
 use crate::types::function::{
@@ -10503,12 +10504,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return Place::Undefined.into();
         };
 
-        if !self.in_stub()
-            && !self.is_in_type_checking_block(self.scope(), name)
-            && let Some(builder) = self.context.report_lint(&UNDEFINED_REVEAL, name)
-        {
-            let mut diag = builder.into_diagnostic("`reveal_type` used without importing it");
-            diag.info("This is allowed for debugging convenience but will fail at runtime");
+        if !self.in_stub() && !self.is_in_type_checking_block(self.scope(), name) {
+            report_undefined_reveal(&self.context, name);
         }
 
         typing_extensions_symbol(self.db(), self.program_environment(), "reveal_type")
