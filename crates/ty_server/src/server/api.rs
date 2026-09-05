@@ -18,8 +18,9 @@ mod type_hierarchy;
 use self::traits::{NotificationHandler, RequestHandler};
 use super::{Result, schedule::BackgroundSchedule};
 use crate::session::client::Client;
+pub(super) use diagnostics::project_diagnostics_task;
 pub(crate) use diagnostics::{
-    publish_all_document_diagnostics, publish_diagnostics_if_needed, publish_settings_diagnostics,
+    ProjectDiagnosticsResult, publish_all_document_diagnostics, publish_diagnostics_if_needed,
 };
 use ruff_db::panic::PanicError;
 

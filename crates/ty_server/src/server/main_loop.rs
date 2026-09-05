@@ -14,12 +14,16 @@ pub(crate) type MainLoopReceiver = crossbeam::channel::Receiver<Event>;
 
 impl Server {
     pub(super) fn main_loop(&mut self) -> crate::Result<()> {
-        self.initialize(&Client::new(
+        let client = Client::new(
             self.main_loop_sender.clone(),
             self.connection.sender.clone(),
-        ));
+        );
+        self.initialize(&client);
 
         let mut scheduler = Scheduler::new(self.worker_threads);
+        let mut project_diagnostics_revision = Some(self.session.revision());
+        let mut project_diagnostics_in_flight = true;
+        scheduler.dispatch(api::project_diagnostics_task(), &mut self.session, client);
 
         while let Ok(next_event) = self.next_event() {
             let Some(next_event) = next_event else {
@@ -97,7 +101,7 @@ impl Server {
                         }
                     };
 
-                    scheduler.dispatch(task, &mut self.session, client);
+                    scheduler.dispatch(task, &mut self.session, client.clone());
                 }
                 Event::Action(action) => match action {
                     Action::SendResponse(response) => {
@@ -129,7 +133,7 @@ impl Server {
                             .is_pending(&request.id)
                         {
                             let task = api::request(request);
-                            scheduler.dispatch(task, &mut self.session, client);
+                            scheduler.dispatch(task, &mut self.session, client.clone());
                         } else {
                             tracing::debug!(
                                 "Request {}/{} was cancelled, not retrying",
@@ -156,10 +160,33 @@ impl Server {
                         // paths into account.
                         // self.try_register_file_watcher(&client);
                     }
+                    Action::ProjectDiagnosticsFinished(result) => {
+                        project_diagnostics_in_flight = false;
+                        match result {
+                            api::ProjectDiagnosticsResult::Completed(diagnostics) => {
+                                diagnostics.publish(&mut self.session, &client);
+                            }
+                            api::ProjectDiagnosticsResult::Cancelled => {
+                                project_diagnostics_revision = None;
+                            }
+                            api::ProjectDiagnosticsResult::Failed => {}
+                        }
+                    }
                 },
                 Event::PollUvEnvironments { project_root } => {
                     self.session.poll_uv_sync(&client, &project_root);
                 }
+            }
+
+            // A queued result still counts as in flight: deferred document notifications can
+            // otherwise fill the action queue while later worker tasks retain database snapshots.
+            // The next edit would wait for a queued snapshot whose worker cannot make progress.
+            if !project_diagnostics_in_flight
+                && project_diagnostics_revision != Some(self.session.revision())
+            {
+                project_diagnostics_revision = Some(self.session.revision());
+                project_diagnostics_in_flight = true;
+                scheduler.dispatch(api::project_diagnostics_task(), &mut self.session, client);
             }
         }
 
@@ -215,6 +242,9 @@ pub(crate) enum Action {
     /// Initialize the workspace after the server received
     /// the options from the client.
     InitializeWorkspaces(Vec<(Uri, ClientOptions)>),
+
+    /// Complete the outstanding project query before scheduling another snapshot.
+    ProjectDiagnosticsFinished(api::ProjectDiagnosticsResult),
 }
 
 #[derive(Debug)]

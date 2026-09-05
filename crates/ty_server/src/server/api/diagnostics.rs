@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::fmt::Write as _;
 use std::hash::{DefaultHasher, Hash as _, Hasher as _};
+use std::panic::AssertUnwindSafe;
 
 use lsp_types::{Code, PublishDiagnosticsNotification};
 use lsp_types::{
@@ -23,10 +24,12 @@ use ty_project::{Db as _, ProjectDatabase};
 
 use crate::capabilities::ResolvedClientCapabilities;
 use crate::document::{FileRangeExt, ToRangeExt};
+use crate::server::Action;
+use crate::server::schedule::{BackgroundSchedule, Task};
 use crate::session::client::Client;
 use crate::session::{DocumentHandle, GlobalSettings};
 use crate::system::{AnySystemPath, file_to_uri};
-use crate::{DIAGNOSTIC_NAME, Db, DiagnosticMode};
+use crate::{DIAGNOSTIC_NAME, Db};
 use crate::{PositionEncoding, Session};
 
 #[derive(Debug)]
@@ -239,7 +242,9 @@ pub(crate) fn publish_diagnostics_if_needed(
 /// Publishes the diagnostics for the given document snapshot using the [publish diagnostics
 /// notification].
 pub(super) fn publish_diagnostics(document: &DocumentHandle, session: &Session, client: &Client) {
-    if session.global_settings().diagnostic_mode().is_off() {
+    if session.global_settings().diagnostic_mode().is_off()
+        || session.has_project_diagnostics(document.uri())
+    {
         return;
     }
 
@@ -287,106 +292,132 @@ pub(super) fn publish_diagnostics(document: &DocumentHandle, session: &Session, 
     }
 }
 
-/// Publishes settings diagnostics for all the project at the given path
-/// using the [publish diagnostics notification].
+/// Computes diagnostics for files that clients do not request document diagnostics for.
 ///
-/// [publish diagnostics notification]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_publishDiagnostics
-pub(crate) fn publish_settings_diagnostics(
-    session: &mut Session,
-    client: &Client,
-    path: SystemPathBuf,
-) {
-    // Don't publish settings diagnostics for workspace that are already doing full diagnostics.
-    //
-    // Note we DO NOT respect the fact that clients support pulls because these are
-    // files they *specifically* won't pull diagnostics from us for, because we don't
-    // claim to be an LSP for them.
-    match session.global_settings().diagnostic_mode() {
-        DiagnosticMode::Workspace | DiagnosticMode::Off => {
+/// Dependency diagnostics can change when any Python file changes, even when the manifest
+/// is closed. Their project-wide import inventory must be computed on a background worker.
+pub(in crate::server) fn project_diagnostics_task() -> Task {
+    Task::background(BackgroundSchedule::Worker, |session| {
+        let revision = session.revision();
+        let encoding = session.position_encoding();
+        let capabilities = session.client_capabilities();
+        let settings = session.global_settings().clone();
+        // The snapshots are discarded on unwinding and never reused afterward.
+        let projects = AssertUnwindSafe(session.project_snapshots());
+
+        Box::new(move |client| {
+            let result = ruff_db::panic::catch_unwind(|| {
+                let projects = projects;
+                let mut project_diagnostics = Vec::with_capacity(projects.len());
+                // Drop each completed snapshot before checking the next project. An edit cancels
+                // projects in this order and would otherwise wait for an earlier snapshot.
+                for (root, db) in projects.0 {
+                    let mut diagnostics_by_uri: FxHashMap<Uri, Vec<Diagnostic>> =
+                        FxHashMap::default();
+
+                    // Workspace diagnostics already include these diagnostics. Empty results also
+                    // clear previously pushed diagnostics when the diagnostic mode changes.
+                    if settings.diagnostic_mode().is_open_files_only() {
+                        let diagnostics = db.project().check_settings(&db);
+                        for diagnostic in diagnostics
+                            .iter()
+                            .chain(ty_project::dependency::project_dependency_diagnostics(&db))
+                        {
+                            let Some(span) = diagnostic.primary_span() else {
+                                continue;
+                            };
+                            let Some(uri) = file_to_uri(&db, span.expect_ty_file()) else {
+                                continue;
+                            };
+                            if let Some((_, diagnostic)) = to_lsp_diagnostic(
+                                &db,
+                                diagnostic,
+                                encoding,
+                                capabilities,
+                                &settings,
+                            ) {
+                                diagnostics_by_uri.entry(uri).or_default().push(diagnostic);
+                            }
+                        }
+                    }
+
+                    project_diagnostics.push((root, diagnostics_by_uri));
+                }
+                ProjectDiagnostics {
+                    revision,
+                    projects: project_diagnostics,
+                }
+            });
+            // All snapshots are now released, including on cancellation. Sending an action can
+            // block on the bounded main-loop queue, so it must not retain a database snapshot.
+
+            let result = match result {
+                Ok(diagnostics) => ProjectDiagnosticsResult::Completed(diagnostics),
+                Err(error) if error.payload.downcast_ref::<salsa::Cancelled>().is_some() => {
+                    ProjectDiagnosticsResult::Cancelled
+                }
+                Err(error) => {
+                    tracing::error!("Failed to compute project diagnostics: {error}");
+                    ProjectDiagnosticsResult::Failed
+                }
+            };
+            client.queue_action(Action::ProjectDiagnosticsFinished(result));
+        })
+    })
+}
+
+#[derive(Debug)]
+pub(crate) enum ProjectDiagnosticsResult {
+    Completed(ProjectDiagnostics),
+    Cancelled,
+    Failed,
+}
+
+#[derive(Debug)]
+pub(crate) struct ProjectDiagnostics {
+    revision: u64,
+    projects: Vec<(SystemPathBuf, FxHashMap<Uri, Vec<Diagnostic>>)>,
+}
+
+impl ProjectDiagnostics {
+    pub(crate) fn publish(self, session: &mut Session, client: &Client) {
+        // Conversion runs in the background, so source or settings may have changed since then.
+        if self.revision != session.revision() {
             return;
         }
-        DiagnosticMode::OpenFilesOnly => {}
-    }
 
-    let session_encoding = session.position_encoding();
-    let client_capabilities = session.client_capabilities();
+        for (root, diagnostics_by_uri) in self.projects {
+            let state = session.project_state_mut(&AnySystemPath::System(root));
+            let mut previous =
+                std::mem::replace(&mut state.pushed_project_diagnostics, diagnostics_by_uri);
 
-    let project_path = AnySystemPath::System(path);
-
-    let (mut diagnostics_by_uri, old_untracked) = {
-        let state = session.project_state_mut(&project_path);
-        let db = &state.db;
-        let project = db.project();
-        let settings_diagnostics = project.check_settings(db);
-
-        // We need to send diagnostics if we have non-empty ones, or we have ones to clear.
-        // These will both almost always be empty so this function will almost always be a no-op.
-        if settings_diagnostics.is_empty()
-            && state.untracked_files_with_pushed_diagnostics.is_empty()
-        {
-            return;
-        }
-
-        // Group diagnostics by URI
-        let mut diagnostics_by_uri: FxHashMap<Uri, Vec<_>> = FxHashMap::default();
-        for diagnostic in settings_diagnostics {
-            if let Some(span) = diagnostic.primary_span() {
-                let file = span.expect_ty_file();
-                let Some(uri) = file_to_uri(db, file) else {
-                    tracing::debug!("Failed to convert file to URI at {}", file.path(db));
+            #[expect(
+                clippy::iter_over_hash_type,
+                reason = "diagnostic notifications for distinct document URIs are independent"
+            )]
+            for (uri, diagnostics) in &state.pushed_project_diagnostics {
+                if previous.remove(uri).as_ref() == Some(diagnostics) {
                     continue;
-                };
-                diagnostics_by_uri.entry(uri).or_default().push(diagnostic);
+                }
+                client.send_notification::<PublishDiagnosticsNotification>(
+                    PublishDiagnosticsParams {
+                        uri: uri.clone(),
+                        diagnostics: diagnostics.clone(),
+                        version: None,
+                    },
+                );
+            }
+
+            for uri in previous.into_keys() {
+                client.send_notification::<PublishDiagnosticsNotification>(
+                    PublishDiagnosticsParams {
+                        uri,
+                        diagnostics: Vec::new(),
+                        version: None,
+                    },
+                );
             }
         }
-
-        // Record the URIs we're sending non-empty diagnostics for, so we know to clear them
-        // the next time we publish settings diagnostics!
-        let old_untracked = std::mem::replace(
-            &mut state.untracked_files_with_pushed_diagnostics,
-            diagnostics_by_uri.keys().cloned().collect(),
-        );
-
-        (diagnostics_by_uri, old_untracked)
-    };
-
-    // Add empty diagnostics for any files that had diagnostics before but don't now.
-    // This will clear them (either the file is no longer relevant to us or fixed!)
-    for uri in old_untracked {
-        diagnostics_by_uri.entry(uri).or_default();
-    }
-
-    let db = session.project_db(&project_path);
-    let global_settings = session.global_settings();
-
-    // Send the settings diagnostics!
-    #[expect(
-        clippy::iter_over_hash_type,
-        reason = "diagnostic notifications for distinct document URIs are independent"
-    )]
-    for (uri, file_diagnostics) in diagnostics_by_uri {
-        // Convert diagnostics to LSP format
-        let lsp_diagnostics = file_diagnostics
-            .into_iter()
-            .filter_map(|diagnostic| {
-                Some(
-                    to_lsp_diagnostic(
-                        db,
-                        &diagnostic,
-                        session_encoding,
-                        client_capabilities,
-                        global_settings,
-                    )?
-                    .1,
-                )
-            })
-            .collect::<Vec<_>>();
-
-        client.send_notification::<PublishDiagnosticsNotification>(PublishDiagnosticsParams {
-            uri,
-            diagnostics: lsp_diagnostics,
-            version: None,
-        });
     }
 }
 

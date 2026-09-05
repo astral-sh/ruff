@@ -44,6 +44,7 @@ notify = { workspace = true }
 ordermap = { workspace = true, features = ["serde"] }
 parking_lot = { workspace = true }
 pep440_rs = { workspace = true, features = ["version-ranges"] }
+pep508_rs = { workspace = true }
 rayon = { workspace = true }
 regex = { workspace = true }
 regex-automata = { workspace = true }

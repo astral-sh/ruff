@@ -1634,6 +1634,16 @@
             }
           ]
         },
+        "unused-dependency": {
+          "title": "detects declared dependencies that are not imported",
+          "description": "## What it does\n\nChecks for declared dependencies that are not imported by a project or PEP 723 script.\n\nThe package name need not match its import name. For example, importing `PIL` counts as using the\n`pillow` dependency.\n\n## Why is this bad?\n\nAn unused dependency adds installation time and can impose unnecessary version constraints. Remove\nthe declaration if the dependency is no longer needed.\n\n## Rule status\n\nThis rule is disabled by default. Enable it with `--warn unused-dependency` or set\n`unused-dependency = \"warn\"` in the `rules` table of your ty configuration.\n\nIt requires uv dependency metadata, including module ownership. Enable uv workspace integration with\n`TY_UV=1`, or script integration with `TY_UV=scripts`. Project checks use an existing, synchronized\nenvironment; ty synchronizes PEP 723 script environments automatically.\n\nThe rule checks `project.dependencies`, `project.optional-dependencies`, and PEP 723 script\ndependencies. Dependency groups, conditional requirements, and distributions with no known\nimportable modules are not checked.\n\n## Known limitations\n\nProject checks require a complete scan of the project directory. Checking an individual file or\nsubdirectory, or configuring `src.include` or a nonempty `src.exclude`, does not report unused\nproject dependencies. Script checks include imports in local modules reached from the script, using\nthe script's own environment and declarations.\n\nImports in nested scopes, stub files, and `TYPE_CHECKING` blocks count as use. Literal calls to\n`importlib.import_module` and `__import__` also count. If a recognized dynamic import has an unknown\nmodule name, the rule does not report unused dependencies for that project or script.\n\nSome dependencies are used without imports, for example through command-line tools or plugin\ndiscovery. Their absence from the import inventory does not prove they can be removed. Review these\nuses before removing a dependency, or disable the rule for projects that rely on them.\n\n## Example\n\nFor a project with these dependencies:\n\n```toml\n[project]\ndependencies = [\"requests\", \"flask\"]\n```\n\nIf the project imports `requests` but never imports `flask`, ty reports the `flask` declaration.\nRemove it if the project no longer uses Flask.",
+          "default": "ignore",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "unused-ignore-comment": {
           "title": "detects unused `ty: ignore` comments",
           "description": "## What it does\n\nChecks for `ty: ignore` directives that are no longer applicable.\n\n## Why is this bad?\n\nA `ty: ignore` directive that no longer matches any diagnostic violations is likely included by\nmistake, and should be removed to avoid confusion.\n\n## Examples\n\n```py\n# error\na = 20 / 2  # ty: ignore[division-by-zero]\n```\n\nUse instead:\n\n```py\na = 20 / 2\n```\n\n## Options\n\nSet\n[`analysis.respect-type-ignore-comments`](https://docs.astral.sh/ty/reference/configuration/#respect-type-ignore-comments)\nto `false` to prevent this rule from reporting unused `type: ignore` comments.",
