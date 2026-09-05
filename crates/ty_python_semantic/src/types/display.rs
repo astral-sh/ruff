@@ -3005,12 +3005,15 @@ impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
         let db = self.db;
 
         // Markers of different cycle heads display the same, so elements that differ only in
-        // their markers would print as duplicates.
+        // their markers would print as duplicates. An element without markers duplicates
+        // nothing: the elements of a union are distinct.
         let mut elements: Vec<Type<'db>> = Vec::new();
         for element in self.ty.elements(db).iter().copied() {
-            if !elements.iter().any(|shown| {
-                shown.equals_modulo_cycle_markers(db, self.env, element, MarkerErasure::All)
-            }) {
+            if !element.mentions_cycle_marker(db, self.env)
+                || !elements.iter().any(|shown| {
+                    shown.equals_modulo_cycle_markers(db, self.env, element, MarkerErasure::All)
+                })
+            {
                 elements.push(element);
             }
         }

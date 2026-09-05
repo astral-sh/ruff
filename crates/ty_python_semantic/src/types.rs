@@ -2116,7 +2116,8 @@ impl<'db> Type<'db> {
         erasure: MarkerErasure,
     ) -> bool {
         self == other
-            || (self.mentions_cycle_marker(db, env)
+            || (self.same_shape_as(db, env, other)
+                && self.mentions_cycle_marker(db, env)
                 && other.mentions_cycle_marker(db, env)
                 && self.apply_type_mapping(
                     db,
@@ -2129,6 +2130,20 @@ impl<'db> Type<'db> {
                     &TypeMapping::EraseCycleMarkers(erasure),
                     TypeContext::default(),
                 ))
+    }
+
+    /// Whether `other` can equal this type once their cycle markers are erased: erasure keeps
+    /// the variant of a type, and the class of an instance.
+    ///
+    /// Checked before erasing, which walks both types in full: most pairs compared while a
+    /// union is built differ in their variant or class.
+    fn same_shape_as(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>, other: Self) -> bool {
+        match (self, other) {
+            (Type::NominalInstance(left), Type::NominalInstance(right)) => {
+                left.class(db, env).class_literal(db) == right.class(db, env).class_literal(db)
+            }
+            _ => std::mem::discriminant(&self) == std::mem::discriminant(&other),
+        }
     }
 
     /// The variable of the first marker at the top level of this type that stands for a value.

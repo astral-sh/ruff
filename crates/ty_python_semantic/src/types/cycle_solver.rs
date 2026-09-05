@@ -651,11 +651,13 @@ impl<'db> Solver<'_, 'db> {
             },
             Type::Union(union) => {
                 let mut elements = Vec::new();
+                let mut changed = false;
                 for &element in union.elements(self.db) {
                     match element {
                         Type::Divergent(marker)
                             if let Some(index) = self.system.index_of(marker) =>
                         {
+                            changed = true;
                             if index != variable
                                 && let Some(value) = self.values[index]
                             {
@@ -666,15 +668,23 @@ impl<'db> Solver<'_, 'db> {
                             if position == Position::Result {
                                 return None;
                             }
+                            changed = true;
                         }
                         _ => {
-                            if !self.mentions_pending(variable, element) {
+                            if self.mentions_pending(variable, element) {
+                                changed = true;
+                            } else {
                                 elements.push(element);
                             }
                         }
                     }
                 }
-                if elements.is_empty() {
+                // A union that keeps every element as it is stays as it is: rebuilding it
+                // compares each of its elements with every other one again, on every
+                // evaluation of a root whose markers are all nested.
+                if !changed {
+                    Some(ty)
+                } else if elements.is_empty() {
                     None
                 } else {
                     // A loop-carried union stays marked as recursively defined, so the literal
