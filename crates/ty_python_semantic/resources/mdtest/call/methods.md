@@ -1227,7 +1227,7 @@ static_assert(is_assignable_to(TypeOf[f], Callable[..., Any]))
 reveal_type(f.__get__)
 static_assert(is_assignable_to(TypeOf[f.__get__], Callable[..., Any]))
 
-# revealed: def __call__(self, *args: Any, **kwargs: Any) -> Any
+# revealed: def __call__(self, *args: Any, **kwargs: Any) -> object
 reveal_type(types.FunctionType.__call__)
 static_assert(is_assignable_to(TypeOf[types.FunctionType.__call__], Callable[..., Any]))
 
@@ -1288,7 +1288,7 @@ def _(
     # revealed: Overload[(instance: None, owner: type, /) -> Unknown, (instance: object, owner: type | None = None, /) -> Unknown]
     reveal_type(c)
 
-    # revealed: (self, *args: Any, **kwargs: Any) -> Any
+    # revealed: (self, *args: Any, **kwargs: Any) -> object
     reveal_type(d)
 
     # revealed: (obj: type) -> None
@@ -1317,6 +1317,35 @@ def _(
 
     # revealed: (prefix: str | tuple[str, ...], start: SupportsIndex | None = None, end: SupportsIndex | None = None, /) -> bool
     reveal_type(l)
+```
+
+## Calls to `types.FunctionType`
+
+A function with an unknown signature accepts arbitrary arguments, but its return type is `object`,
+not `Any`. It therefore cannot satisfy a callable that promises a more specific return type.
+
+```py
+from types import FunctionType
+from typing import Callable
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to
+
+def check(function: FunctionType) -> None:
+    reveal_type(function())  # revealed: object
+    reveal_type(function.__call__())  # revealed: object
+
+static_assert(is_assignable_to(FunctionType, Callable[..., object]))
+static_assert(not is_assignable_to(FunctionType, Callable[..., str]))
+```
+
+Narrowing a callable to `FunctionType` exposes function-only attributes without introducing `Any`
+into the callable's return type. See [ty#1495](https://github.com/astral-sh/ty/issues/1495).
+
+```py
+def check_narrowed_callable(function: Callable[[], int]) -> None:
+    if isinstance(function, FunctionType):
+        reveal_type(function.__name__)  # revealed: str
+        reveal_type(function())  # revealed: int
 ```
 
 [functions and methods]: https://docs.python.org/3/howto/descriptor.html#functions-and-methods

@@ -2213,10 +2213,12 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
 
     /// Returns the access that a candidate value must provide for this member.
     ///
-    /// A module-level callable can satisfy an ordinary or static method through direct member
+    /// A callback protocol's `__call__` method describes call syntax and is fully checked through
+    /// instance access, regardless of whether it is an ordinary, static, or class method. A
+    /// module-level callable can also satisfy an ordinary or static method through direct member
     /// access. A class object can likewise satisfy a class, static, or ordinary instance method;
-    /// special instance methods instead use special-method lookup through the meta-type. Neither
-    /// case needs a separate class-side check for the same member.
+    /// special instance methods instead use special-method lookup through the meta-type. None of
+    /// these cases needs a separate class-side check for the same member.
     fn implementation_access(
         &self,
         db: &'db dyn Db,
@@ -2225,16 +2227,17 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         mode: ProtocolMemberAccessMode,
     ) -> ProtocolMemberAccess<'db> {
         if mode == ProtocolMemberAccessMode::Class
-            && (matches!(
-                (ty, self.data.kind),
-                (
-                    Type::ModuleLiteral(_),
-                    ProtocolMemberKind::Method(
-                        _,
-                        ProtocolMethodKind::Instance | ProtocolMethodKind::Static
+            && ((self.is_method() && (self.name == "__call__" || is_class_object_type(ty)))
+                || matches!(
+                    (ty, self.data.kind),
+                    (
+                        Type::ModuleLiteral(_),
+                        ProtocolMemberKind::Method(
+                            _,
+                            ProtocolMethodKind::Instance | ProtocolMethodKind::Static
+                        )
                     )
-                )
-            ) || (is_class_object_type(ty) && self.is_method()))
+                ))
         {
             ProtocolMemberAccess::NONE
         } else {
