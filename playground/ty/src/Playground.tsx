@@ -45,7 +45,11 @@ export default function Playground() {
   if (sessionPromiseRef.current == null) {
     sessionPromiseRef.current = startPlayground().then((fetched) => {
       setVersion(fetched.version);
-      const workspace = new Workspace("/", PositionEncoding.Utf16, {});
+      const workspace = new Workspace(
+        "/",
+        PositionEncoding.Utf16,
+        JSON.parse(DEFAULT_SETTINGS),
+      );
       const session = new PlaygroundSession(
         fetched.monaco,
         workspace,
@@ -634,7 +638,7 @@ function updateOptions(
   content: string | null,
   setError: (error: string | null) => void,
 ) {
-  content = content ?? DEFAULT_SETTINGS;
+  content = content ?? "{}";
 
   try {
     const settings = JSON.parse(content);

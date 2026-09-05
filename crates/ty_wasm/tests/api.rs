@@ -1,6 +1,8 @@
 #![cfg(target_arch = "wasm32")]
 
-use ty_wasm::{DiagnosticTag, Position, PositionEncoding, SubDiagnosticSeverity, Workspace};
+use ty_wasm::{
+    DiagnosticTag, FileHandle, Position, PositionEncoding, SubDiagnosticSeverity, Workspace,
+};
 use wasm_bindgen_test::wasm_bindgen_test;
 
 #[wasm_bindgen_test]
@@ -59,6 +61,190 @@ fn check() {
         sub_diagnostics
             .iter()
             .all(|sub_diagnostic| sub_diagnostic.annotations.is_empty())
+    );
+}
+
+#[wasm_bindgen_test]
+fn restored_pyproject_preserves_defaults() {
+    ty_wasm::before_main();
+
+    let mut workspace = Workspace::new(
+        "/",
+        PositionEncoding::Utf32,
+        js_sys::JSON::parse(
+            r#"{
+                "environment": {"python-version": "3.14"},
+                "rules": {"undefined-reveal": "ignore"}
+            }"#,
+        )
+        .unwrap(),
+    )
+    .expect("Workspace to be created");
+    let file = workspace
+        .open_file(
+            "main.py",
+            "import sys\nreveal_type(sys.version_info.minor)\n",
+        )
+        .expect("File to be opened");
+    let pyproject = workspace
+        .open_file("pyproject.toml", "[project]\nrequires-python = '>=3.11'\n")
+        .expect("Configuration to be opened");
+
+    // Restoring a workspace without ty.json clears explicit options after opening its files.
+    workspace
+        .update_options(js_sys::JSON::parse("{}").unwrap())
+        .expect("Options to be updated");
+    assert_python_version(&workspace, &file, 11);
+
+    // A whitespace edit preserves both the configured version and unrelated defaults.
+    workspace
+        .update_file(&pyproject, "[project]\nrequires-python = '>=3.11'\n\n")
+        .expect("Configuration to be updated");
+    assert_python_version(&workspace, &file, 11);
+
+    workspace
+        .update_file(&pyproject, "[project]\nrequires-python = '>=3.12'\n")
+        .expect("Configuration to be updated");
+    assert_python_version(&workspace, &file, 12);
+
+    // Removing configuration restores the fallback version.
+    workspace
+        .close_file(pyproject)
+        .expect("Configuration to be removed");
+    assert_python_version(&workspace, &file, 14);
+}
+
+#[wasm_bindgen_test]
+fn explicit_options_override_configuration() {
+    ty_wasm::before_main();
+
+    // JSON options have the same precedence regardless of the restored file order.
+    for options_first in [true, false] {
+        let mut workspace = Workspace::new(
+            "/",
+            PositionEncoding::Utf32,
+            js_sys::JSON::parse(
+                r#"{
+                    "environment": {"python-version": "3.14"},
+                    "rules": {"undefined-reveal": "ignore"}
+                }"#,
+            )
+            .unwrap(),
+        )
+        .expect("Workspace to be created");
+        let file = workspace
+            .open_file(
+                "main.py",
+                "import sys\nreveal_type(sys.version_info.minor)\n",
+            )
+            .expect("File to be opened");
+        let options =
+            js_sys::JSON::parse(r#"{"environment": {"python-version": "3.10"}}"#).unwrap();
+        if options_first {
+            workspace
+                .update_options(options.clone())
+                .expect("Options to be updated");
+        }
+        let configuration = workspace
+            .open_file("ty.toml", "[environment]\npython-version = '3.11'\n")
+            .expect("Configuration to be opened");
+        if !options_first {
+            workspace
+                .update_options(options)
+                .expect("Options to be updated");
+        }
+        assert_python_version(&workspace, &file, 10);
+
+        // Editing TOML cannot replace an explicit JSON option.
+        workspace
+            .update_file(&configuration, "[environment]\npython-version = '3.12'\n")
+            .expect("Configuration to be updated");
+        assert_python_version(&workspace, &file, 10);
+
+        workspace
+            .update_options(
+                js_sys::JSON::parse(r#"{"environment": {"python-version": "3.13"}}"#).unwrap(),
+            )
+            .expect("Options to be updated");
+        assert_python_version(&workspace, &file, 13);
+
+        // Clearing JSON options reveals the current TOML value, not an older override.
+        workspace
+            .update_options(js_sys::JSON::parse("{}").unwrap())
+            .expect("Options to be updated");
+        assert_python_version(&workspace, &file, 12);
+    }
+}
+
+#[wasm_bindgen_test]
+fn explicit_options_update_with_invalid_configuration() {
+    ty_wasm::before_main();
+
+    for (invalid_toml, syntax_error) in [
+        ("[environment]\npython-version = ", true),
+        ("[analysis]\nallowed-unresolved-imports = ['']\n", false),
+    ] {
+        let mut workspace = Workspace::new(
+            "/",
+            PositionEncoding::Utf32,
+            js_sys::JSON::parse(
+                r#"{
+                    "environment": {"python-version": "3.14"},
+                    "rules": {"undefined-reveal": "ignore"}
+                }"#,
+            )
+            .unwrap(),
+        )
+        .expect("Workspace to be created");
+        let file = workspace
+            .open_file(
+                "main.py",
+                "import sys\nreveal_type(sys.version_info.minor)\n",
+            )
+            .expect("File to be opened");
+        let configuration = workspace
+            .open_file("ty.toml", invalid_toml)
+            .expect("Configuration to be opened");
+
+        // JSON options survive configuration errors, even if the update reports invalid settings.
+        let updated = workspace.update_options(
+            js_sys::JSON::parse(r#"{"environment": {"python-version": "3.10"}}"#).unwrap(),
+        );
+        if syntax_error {
+            // Syntax errors retain the last valid settings, allowing the update to succeed.
+            updated.expect("Options to be updated");
+            assert_python_version(&workspace, &file, 10);
+        }
+
+        workspace
+            .update_file(&configuration, "[environment]\npython-version = '3.11'\n")
+            .expect("Configuration to be repaired");
+        assert_python_version(&workspace, &file, 10);
+
+        // Clearing JSON options while TOML is invalid also persists through its repair.
+        workspace
+            .update_file(&configuration, invalid_toml)
+            .expect("Configuration to be updated");
+        let cleared = workspace.update_options(js_sys::JSON::parse("{}").unwrap());
+        if syntax_error {
+            cleared.expect("Options to be cleared");
+        }
+        workspace
+            .update_file(&configuration, "[environment]\npython-version = '3.12'\n")
+            .expect("Configuration to be repaired");
+        assert_python_version(&workspace, &file, 12);
+    }
+}
+
+#[track_caller]
+fn assert_python_version(workspace: &Workspace, file: &FileHandle, minor: u8) {
+    let diagnostics = workspace.check_file(file).expect("Check to succeed");
+    // In particular, the fallback suppression of undefined-reveal still applies.
+    assert_eq!(diagnostics.len(), 1);
+    assert_eq!(diagnostics[0].id(), "revealed-type");
+    assert_eq!(
+        diagnostics[0].message(),
+        format!("Revealed type: `Literal[{minor}]`").as_str()
     );
 }
 

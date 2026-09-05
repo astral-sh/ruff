@@ -117,7 +117,7 @@ pub struct Project {
 
     /// Diagnostics that were generated when resolving the project settings.
     #[returns(deref)]
-    settings_diagnostics: Vec<OptionDiagnostic>,
+    pub settings_diagnostics: Vec<OptionDiagnostic>,
 
     /// The mode in which the project should be checked.
     ///

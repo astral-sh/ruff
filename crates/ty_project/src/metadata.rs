@@ -496,6 +496,11 @@ impl ProjectMetadata {
         }
     }
 
+    /// Replaces all higher-precedence options previously applied to this project.
+    pub fn replace_override_options(&mut self, options: Options) {
+        self.override_options = Some(Box::new(options));
+    }
+
     pub(crate) fn environment(&self) -> &ProjectEnvironment {
         &self.environment
     }
