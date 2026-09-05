@@ -90,13 +90,425 @@ class _:
 a = A()
 # error: [unresolved-attribute]
 a.dynamically_added = 0
-# error: [unresolved-attribute]
+# The assignment is invalid, but establishes the attribute's presence for subsequent reads.
 reveal_type(a.dynamically_added)  # revealed: Literal[0]
 
 # error: [unresolved-reference]
 does.nt.exist = 0
 # error: [unresolved-reference]
 reveal_type(does.nt.exist)  # revealed: Literal[0]
+```
+
+### Presence after conditional assignments
+
+Assigning an undeclared attribute is still an error, but a subsequent read does not repeat the error
+when every branch assigns the attribute.
+
+```py
+class Item: ...
+
+def assigned_on_both_branches(item: Item, condition: bool):
+    if condition:
+        item.value = 1  # error: [unresolved-attribute]
+    else:
+        item.value = 2  # error: [unresolved-attribute]
+    reveal_type(item.value)  # revealed: Literal[1, 2]
+```
+
+An assignment on only one branch does not establish presence after the conditional.
+
+```py
+def assigned_on_one_branch(item: Item, condition: bool):
+    if condition:
+        item.value = 1  # error: [unresolved-attribute]
+    item.value  # error: [unresolved-attribute]
+```
+
+A branch that exits without reaching the read does not affect whether the attribute is present.
+
+```py
+def assigned_or_raised(item: Item, condition: bool):
+    if condition:
+        item.value = 1  # error: [unresolved-attribute]
+    else:
+        raise ValueError
+    reveal_type(item.value)  # revealed: Literal[1]
+```
+
+### Presence across calls and branch joins
+
+A call can mutate an object. Its arguments observe the preceding assignment, but later reads need
+new presence evidence. Forgetting presence preserves the inferred value type.
+
+```py
+class Item: ...
+
+def mutate(item: object) -> None: ...
+def after_call(item: Item):
+    item.value = 1  # error: [unresolved-attribute]
+    mutate(item.value)
+    # error: [unresolved-attribute]
+    reveal_type(item.value)  # revealed: Literal[1]
+    assert hasattr(item, "value")
+    item.value
+```
+
+Each branch can establish presence independently, through either an assignment or a guard.
+
+```py
+def separate_proofs(item: Item, condition: bool):
+    if condition:
+        item.value = 1  # error: [unresolved-attribute]
+    else:
+        assert hasattr(item, "value")
+    item.value
+
+def renewed_proof(item: Item, condition: bool):
+    item.value = 1  # error: [unresolved-attribute]
+    if condition:
+        mutate(item)
+        assert hasattr(item, "value")
+    item.value
+
+def missing_proof(item: Item, condition: bool):
+    item.value = 1  # error: [unresolved-attribute]
+    if condition:
+        mutate(item)
+    item.value  # error: [unresolved-attribute]
+```
+
+A call can mutate an object before raising, so its exception handler also needs fresh evidence. An
+assignment in the handler can establish presence for the join with the successful path.
+
+```py
+def caught_mutation(item: Item):
+    item.value = 1  # error: [unresolved-attribute]
+    try:
+        mutate(item)
+    except Exception:
+        item.value  # error: [unresolved-attribute]
+
+def renewed_in_handler(item: Item):
+    try:
+        mutate(item)
+        item.value = 1  # error: [unresolved-attribute]
+    except Exception:
+        item.value = 2  # error: [unresolved-attribute]
+    item.value
+```
+
+### Presence when an eager scope raises
+
+An eager class body can delete an attribute and then raise before the enclosing scope resumes. The
+handler cannot rely on the assignment from before the class body.
+
+```py
+class Item: ...
+
+def eager_exception(item: Item):
+    item.value = 1  # error: [unresolved-attribute]
+    try:
+        class Inner:
+            del item.value
+            raise ValueError
+
+    except Exception:
+        item.value  # error: [unresolved-attribute]
+```
+
+An attribute first read after a call in a class body cannot inherit stale presence. A new local
+assignment establishes presence even if an enclosing scope previously discarded its proof.
+
+```py
+def mutate(item: Item) -> None: ...
+def first_read_after_call(item: Item):
+    item.value = 1  # error: [unresolved-attribute]
+
+    class Inner:
+        mutate(item)
+        item.value  # error: [unresolved-attribute]
+
+def assigned_in_class(item: Item):
+    item.value = 1  # error: [unresolved-attribute]
+    mutate(item)
+
+    class Inner:
+        item.value = 2  # error: [unresolved-attribute]
+        item.value
+```
+
+### Presence after deletion in an eager scope
+
+An assignment in an enclosing scope establishes presence in an eager class body. Deleting the
+attribute in that class body invalidates this evidence, so a later read reports the missing
+attribute.
+
+```py
+class Item: ...
+
+item = Item()
+item.value = 1  # error: [unresolved-attribute]
+
+class Inner:
+    item.value
+    del item.value
+    item.value  # error: [unresolved-attribute]
+```
+
+A conditional deletion also invalidates presence after the branches join. Assigning the attribute
+again establishes presence for subsequent reads.
+
+```py
+def conditional_deletion(item: Item, condition: bool):
+    item.value = 1  # error: [unresolved-attribute]
+
+    class Inner:
+        if condition:
+            del item.value
+        item.value  # error: [unresolved-attribute]
+        item.value = 2  # error: [unresolved-attribute]
+        reveal_type(item.value)  # revealed: Literal[2]
+```
+
+An unreachable deletion does not invalidate presence from the enclosing scope.
+
+```py
+def unreachable_deletion(item: Item):
+    item.value = 1  # error: [unresolved-attribute]
+
+    class Inner:
+        if False:
+            del item.value
+        reveal_type(item.value)  # revealed: Literal[1]
+```
+
+### Presence after deletion across eager scopes
+
+A comprehension inside a class body observes deletions made before it runs. An earlier assignment in
+the enclosing function does not establish presence after that deletion.
+
+```py
+class Item: ...
+
+def deleted_before_comprehension(item: Item):
+    item.value = 1  # error: [unresolved-attribute]
+
+    class Inner:
+        del item.value
+        [item.value for _ in range(1)]  # error: [unresolved-attribute]
+```
+
+An unreachable deletion preserves the assigned type. The call that constructs the iterable clears
+presence evidence before the comprehension runs.
+
+```py
+def unreachable_deletion_before_comprehension(item: Item):
+    item.value = 1  # error: [unresolved-attribute]
+
+    class Inner:
+        if False:
+            del item.value
+        # error: [unresolved-attribute]
+        [reveal_type(item.value) for _ in range(1)]  # revealed: Literal[1]
+```
+
+### Presence after deletion across loop iterations
+
+A read before a deletion can still observe that deletion on a later iteration. An assignment before
+the class body does not establish that the attribute is present on every iteration.
+
+```py
+class Item: ...
+
+def deleted_on_previous_iteration(item: Item):
+    item.value = 1  # error: [unresolved-attribute]
+
+    class Inner:
+        for _ in range(2):
+            item.value  # error: [unresolved-attribute]
+            del item.value  # error: [unresolved-attribute]
+```
+
+The deletion also affects a read in a comprehension nested inside the loop.
+
+```py
+def deleted_on_previous_iteration_in_comprehension(item: Item):
+    item.value = 1  # error: [unresolved-attribute]
+
+    class Inner:
+        for _ in range(2):
+            [item.value for _ in range(1)]  # error: [unresolved-attribute]
+            del item.value  # error: [unresolved-attribute]
+```
+
+Assigning the attribute before each read establishes presence again, even when the previous
+iteration deleted it.
+
+```py
+def assigned_on_each_iteration(item: Item):
+    item.value = 1  # error: [unresolved-attribute]
+
+    class Inner:
+        for _ in range(2):
+            item.value = 2  # error: [unresolved-attribute]
+            item.value
+            del item.value
+```
+
+### Presence after receiver reassignment
+
+Reassigning the receiver discards evidence that an attribute was assigned on the previous object.
+
+```py
+class Item: ...
+
+def f(item: Item, other: Item):
+    item.value = 1  # error: [unresolved-attribute]
+    reveal_type(item.value)  # revealed: Literal[1]
+    item = other
+    item.value  # error: [unresolved-attribute]
+```
+
+### Presence after an eager scope exits
+
+A class body executes before the enclosing scope continues. Deleting an attribute in the class body
+invalidates an earlier assignment in the enclosing scope. Assigning it again restores presence.
+
+```py
+class Item: ...
+
+def deleted_in_class(item: Item):
+    item.value = 1  # error: [unresolved-attribute]
+
+    class Inner:
+        item.value
+        del item.value
+
+    item.value  # error: [unresolved-attribute]
+    [item.value for _ in range(1)]  # error: [unresolved-attribute]
+    item.value = 2  # error: [unresolved-attribute]
+    reveal_type(item.value)  # revealed: Literal[2]
+```
+
+The invalidation also reaches enclosing scopes through nested class bodies.
+
+```py
+def deleted_in_nested_class(item: Item):
+    item.value = 1  # error: [unresolved-attribute]
+
+    class Outer:
+        class Inner:
+            del item.value
+
+        item.value  # error: [unresolved-attribute]
+
+    item.value  # error: [unresolved-attribute]
+```
+
+A conditional deletion can leave the attribute missing. Eager scope boundaries conservatively clear
+presence even when the mutation is unreachable; the assigned type is preserved.
+
+```py
+def conditionally_deleted_in_class(item: Item, condition: bool):
+    item.value = 1  # error: [unresolved-attribute]
+
+    class Inner:
+        if condition:
+            del item.value
+
+    item.value  # error: [unresolved-attribute]
+
+def unreachable_deletion_in_class(item: Item):
+    item.value = 1  # error: [unresolved-attribute]
+
+    class Inner:
+        if False:
+            del item.value
+
+    # error: [unresolved-attribute]
+    reveal_type(item.value)  # revealed: Literal[1]
+```
+
+### Presence after receiver reassignment in an eager scope
+
+Replacing a member invalidates assignments to attributes of the previous object.
+
+```py
+class Item: ...
+
+class Box:
+    item: Item
+
+def replaced_in_class(box: Box):
+    box.item.value = 1  # error: [unresolved-attribute]
+
+    class Inner:
+        box.item = Item()
+
+    box.item.value  # error: [unresolved-attribute]
+```
+
+### Eager mutations across enclosing loop iterations
+
+A class body can delete an attribute before the next iteration reads it.
+
+```py
+class Item: ...
+
+def deleted_in_loop(item: Item):
+    item.value = 1  # error: [unresolved-attribute]
+    for _ in range(2):
+        item.value  # error: [unresolved-attribute]
+
+        class Inner:
+            del item.value  # error: [unresolved-attribute]
+```
+
+### Conservative eager scope boundaries
+
+A class-local receiver refers to a different object. We preserve the enclosing assignment's type,
+but conservatively discard presence when the class body finishes.
+
+```py
+class Item: ...
+
+item = Item()
+item.value = 1  # error: [unresolved-attribute]
+
+class Inner:
+    item = Item()
+    item.value = 2  # error: [unresolved-attribute]
+    del item.value
+
+# error: [unresolved-attribute]
+reveal_type(item.value)  # revealed: Literal[1]
+```
+
+A loop around the class body also clears presence.
+
+```py
+for _ in range(2):
+    class InLoop:
+        item = Item()
+        item.value = 2  # error: [unresolved-attribute]
+        del item.value
+
+    # error: [unresolved-attribute]
+    reveal_type(item.value)  # revealed: Literal[1]
+```
+
+A function body does not execute when the function is defined, including class bodies nested inside
+it.
+
+```py
+def outer(item: Item):
+    item.value = 1  # error: [unresolved-attribute]
+
+    def deferred():
+        class Inner:
+            del item.value  # error: [unresolved-attribute]
+
+    reveal_type(item.value)  # revealed: Literal[1]
 ```
 
 ### Narrowing chain
