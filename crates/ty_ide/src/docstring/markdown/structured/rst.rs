@@ -317,7 +317,7 @@ Summary.
         before the directive.
 
         **Changed in version 2.0:**<HB>
-           Directive text keeps its own wrapping.<HB>
+        Directive text keeps its own wrapping.<HB>
         <HB>
         The final sentence wraps<HB>
         after the directive.
