@@ -3574,6 +3574,12 @@ impl Arguments {
         self.len() == 0
     }
 
+    /// Return `true` if any argument is unpacked with `*` or `**`.
+    pub fn any_variadic(&self) -> bool {
+        self.args.iter().any(Expr::is_starred_expr)
+            || self.keywords.iter().any(|keyword| keyword.arg.is_none())
+    }
+
     /// Return the [`Keyword`] with the given name, or `None` if no such [`Keyword`] exists.
     pub fn find_keyword(&self, keyword_name: &str) -> Option<&Keyword> {
         self.keywords.iter().find(|keyword| {
