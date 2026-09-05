@@ -90,7 +90,7 @@ note: This is an unsafe fix and may change runtime behavior
 ### Chained call is not flattened
 
 `Path("a").resolve()` is a method call on the result of `Path(...)`, not a
-bare `Path(...)` call, so it is not falttened
+bare `Path(...)` call, so it is not flattened
 
 ```py
 from pathlib import Path
@@ -172,27 +172,22 @@ help: Replace with `Path(...) / ...`
 note: This is an unsafe fix and may change runtime behavior
 ```
 
-### `os.sep.join()` with a string literal
+### `os.sep.join()` with a non-literal argument
+
+When the argument is not a literal tuple or list, no fix is offered.
 
 ```py
 import os
 
-os.sep.join("XY...")  # snapshot: os-path-join
+parts = ["home", "user", "file.txt"]
+os.sep.join(parts)  # snapshot: os-path-join
 ```
 
 ```snapshot
 error[PTH118]: `os.sep.join()` should be replaced by `Path` with `/` operator
- --> src/mdtest_snippet.py:3:1
+ --> src/mdtest_snippet.py:4:1
   |
-3 | os.sep.join("XY...")  # snapshot: os-path-join
+4 | os.sep.join(parts)  # snapshot: os-path-join
   | ^^^^^^^^^^^
 help: Replace with `Path(...) / ...`
-  |
-1 | import os
-2 + import pathlib
-3 |
-  - os.sep.join("XY...")  # snapshot: os-path-join
-4 + pathlib.Path("X") / "Y" / "." / "." / "."  # snapshot: os-path-join
-  |
-note: This is an unsafe fix and may change runtime behavior
 ```

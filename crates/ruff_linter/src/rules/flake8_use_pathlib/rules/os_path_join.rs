@@ -37,8 +37,9 @@ use crate::{
 /// directly with strings, especially on older versions of Python.
 ///
 /// ## Fix Safety
-/// This rule's fix is always marked as unsafe because `pathlib.Path` and `os.stat` differ in their
-/// handling of `bytes` paths and file descriptors.
+/// This rule's fix is always marked as unsafe because `os.path.join` returns a plain string while
+/// `Path / ...` returns a `Path` object. They handle trailing separators, empty strings, and
+/// absolute path components differently.
 ///
 /// References
 /// - [Python documentation: `PurePath.joinpath`](https://docs.python.org/3/library/pathlib.html#pathlib.PurePath.joinpath)
@@ -138,27 +139,15 @@ pub(crate) fn os_path_join(checker: &Checker, call: &ExprCall, segment: &[&str])
             Joiner::Slash => " / ",
         };
 
-        let path_args = itertools::join(
-            args.iter().map(|arg| match arg {
-                JoinArg::Expr(expr) => locator.slice(expr.range()).to_string(),
-                JoinArg::Char(c) => format!("\"{}\"", c.escape_default()),
-            }),
-            separator,
-        );
+        let path_args =
+            itertools::join(args.iter().map(|arg| locator.slice(arg.range())), separator);
 
-        let base = match first_arg {
-            JoinArg::Expr(expr) => {
-                let arg_code = locator.slice(expr.range());
+        let arg_code = locator.slice(first_arg.range());
 
-                if is_pathlib_path_call(checker, expr) {
-                    arg_code.to_string()
-                } else {
-                    format!("{binding}({arg_code})")
-                }
-            }
-            JoinArg::Char(c) => {
-                format!("{binding}(\"{}\")", c.escape_default())
-            }
+        let base = if is_pathlib_path_call(checker, first_arg) {
+            arg_code.to_string()
+        } else {
+            format!("{binding}({arg_code})")
         };
 
         let replacement = match joiner {
@@ -181,17 +170,12 @@ pub(crate) fn os_path_join(checker: &Checker, call: &ExprCall, segment: &[&str])
     });
 }
 
-enum JoinArg<'a> {
-    Expr(&'a Expr),
-    Char(char),
-}
-
 /// Returns the first path component and the remaining components.
 fn get_args<'a>(
     checker: &Checker,
     arguments: &'a Arguments,
     module: &str,
-) -> Option<(JoinArg<'a>, Vec<JoinArg<'a>>)> {
+) -> Option<(&'a Expr, Vec<&'a Expr>)> {
     match module {
         "path" => {
             let mut args = arguments.args.iter();
@@ -205,10 +189,7 @@ fn get_args<'a>(
                 .into_iter()
                 .chain(args.flat_map(|arg| flatten(checker, arg, false)));
 
-            Some((
-                JoinArg::Expr(first),
-                rest.into_iter().map(JoinArg::Expr).collect(),
-            ))
+            Some((first, rest.collect()))
         }
 
         "sep" => {
@@ -223,10 +204,7 @@ fn get_args<'a>(
                     let first = elements.next()?;
                     let rest = elements;
 
-                    Some((
-                        JoinArg::Expr(first),
-                        rest.into_iter().map(JoinArg::Expr).collect(),
-                    ))
+                    Some((first, rest.collect()))
                 }
 
                 Expr::List(list) => {
@@ -235,19 +213,7 @@ fn get_args<'a>(
                     let first = elements.next()?;
                     let rest = elements;
 
-                    Some((
-                        JoinArg::Expr(first),
-                        rest.into_iter().map(JoinArg::Expr).collect(),
-                    ))
-                }
-
-                Expr::StringLiteral(lit) => {
-                    let mut chars = lit.value.chars();
-
-                    let first = chars.next()?;
-                    let rest = chars.map(JoinArg::Char).collect();
-
-                    Some((JoinArg::Char(first), rest))
+                    Some((first, rest.collect()))
                 }
 
                 _ => None,
@@ -289,31 +255,25 @@ fn flatten<'a>(checker: &Checker, expr: &'a Expr, keep_single: bool) -> Vec<&'a 
     vec![expr]
 }
 
-fn is_valid_args(first_arg: &JoinArg, args: &[JoinArg], module: &str) -> bool {
+fn is_valid_args(first_arg: &Expr, args: &[&Expr], module: &str) -> bool {
     match module {
         "path" => {
-            let JoinArg::Expr(first_arg) = first_arg else {
-                return false;
-            };
-
             !matches!(first_arg, Expr::Tuple(_) | Expr::List(_) | Expr::Dict(_))
-                && args.iter().all(|arg| {
-                    let JoinArg::Expr(expr) = arg else {
-                        return false;
-                    };
-
-                    !matches!(expr, Expr::Tuple(_) | Expr::List(_) | Expr::Dict(_))
-                })
+                && args
+                    .iter()
+                    .all(|expr| !matches!(expr, Expr::Tuple(_) | Expr::List(_) | Expr::Dict(_)))
         }
 
+        // For `os.sep.join(...)`, the argument is already validated to be a tuple or list
+        // by `get_args`, so we just need to ensure no empty string literals are present.
         "sep" => {
             !matches!(
                 first_arg,
-                JoinArg::Expr(Expr::StringLiteral(lit)) if lit.value.is_empty()
-            ) && args.iter().all(|arg| {
+                Expr::StringLiteral(lit) if lit.value.is_empty()
+            ) && args.iter().all(|expr| {
                 !matches!(
-                    arg,
-                    JoinArg::Expr(Expr::StringLiteral(lit)) if lit.value.is_empty()
+                    expr,
+                    Expr::StringLiteral(lit) if lit.value.is_empty()
                 )
             })
         }
