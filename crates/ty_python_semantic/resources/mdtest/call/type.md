@@ -1485,6 +1485,26 @@ def make_enum_chain(depth: int) -> type[object]:
     return current
 ```
 
+## Nested dynamic typed dictionaries in a loop
+
+A dynamically created typed dictionary can refer to the previous type in one of its fields, even
+when the new class is selected from a tuple. Other fields retain their declared types.
+
+```py
+from typing import Any, TypedDict
+
+def make_chain(depth: int, child: Any) -> type[object]:
+    current: type[object] = TypedDict("Leaf", {"child": int, "tag": str})
+    for _ in range(depth):
+        current = (TypedDict("Node", {"child": current, "tag": str}),)[0]
+    value = current(child=child, tag="ok")
+    reveal_type(value["tag"])  # revealed: str
+    # error: [invalid-assignment] "Invalid assignment to key "tag" with declared type `str` on TypedDict `Leaf`"
+    # error: [invalid-assignment] "Invalid assignment to key "tag" with declared type `str` on TypedDict `Node`"
+    value["tag"] = 0
+    return current
+```
+
 ## Special base classes
 
 Some special base classes work with dynamic class creation, but special semantics may not be fully

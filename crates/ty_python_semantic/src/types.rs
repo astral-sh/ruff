@@ -3475,10 +3475,11 @@ impl<'db> Type<'db> {
                 .map(|ty| TypeFormType::from_type_expression(db, ty)),
             Type::Divergent(_) => Some(self),
             Type::Dynamic(dynamic) => Some(Type::Dynamic(dynamic.recursive_type_normalized())),
-            Type::TypedDict(_) => {
-                // TODO: Normalize TypedDicts
-                Some(self)
-            }
+            // Dynamic classes store field types that can refer back to this cycle.
+            Type::TypedDict(TypedDictType::Class(class)) => class
+                .recursive_type_normalized_impl(db, env, div, nested)
+                .map(|class| Type::TypedDict(TypedDictType::Class(class))),
+            Type::TypedDict(TypedDictType::Synthesized(_)) => Some(self),
             Type::TypeAlias(_) => Some(self),
             Type::NewTypeInstance(newtype) => newtype
                 .recursive_type_normalized_impl(db, env, div, nested)
