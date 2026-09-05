@@ -1707,11 +1707,18 @@ fn resolve_component(
     let mut package_path = parent_directory.path().clone();
     package_path.push(module_name);
 
-    // Check for a regular package first (highest priority).
-    let package_directory = ModuleDirectory::new(context, package_path);
-    let init =
-        resolve_file_module_with_filter(&package_directory, context, "__init__", file_filter);
-    candidate.path = package_directory.into_path();
+    // Check for a regular package first (highest priority), but only if its directory may exist.
+    // A `tools.py` entry alone does not require probing `tools/__init__.py(i)`.
+    let init = if parent_directory.may_contain_directory(context, module_name) {
+        let package_directory = ModuleDirectory::new(context, package_path);
+        let init =
+            resolve_file_module_with_filter(&package_directory, context, "__init__", file_filter);
+        package_path = package_directory.into_path();
+        init
+    } else {
+        None
+    };
+    candidate.path = package_path;
     let package_path = &candidate.path;
     if let Some(init) = init {
         candidate.py_typed = package_path
