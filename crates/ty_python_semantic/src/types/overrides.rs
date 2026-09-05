@@ -622,6 +622,10 @@ fn check_class_declaration<'db>(
     let mut overridden_final_variable: Option<(ClassType<'db>, Option<Definition<'db>>)> = None;
     let is_private_member = is_mangled_private(member.name.as_str());
     let mut subclass_variable_kind: Option<Option<VariableKind>> = None;
+    // Whether this member is `__init__` or `__new__` decorated with `@override`. This is
+    // memoized like `subclass_variable_kind` above: it depends only on `member`, which is fixed
+    // for the whole call, so it would otherwise be recomputed on every MRO ancestor below.
+    let mut overridden_constructor_asserts_compatibility: Option<bool> = None;
 
     // Track the first superclass that defines this method (the "immediate parent" for this method).
     // We need this to check if parent itself already has an LSP violation with an ancestor.
@@ -847,8 +851,24 @@ fn check_class_declaration<'db>(
                 continue;
             };
 
-            // Constructor methods are not checked for Liskov compliance
-            if is_constructor_like_method(&member.name) {
+            // Constructor methods are not checked for Liskov compliance, since `__init__` and
+            // `__new__` routinely take different parameters in each subclass on purpose. An
+            // explicit `@override` on one of them is an exception: it asserts that the override
+            // is signature-compatible with the overridden method, so the typing spec requires the
+            // same assignability check as for any other overridden method.
+            // https://typing.python.org/en/latest/spec/class-compat.html#override
+            let overridden_constructor_asserts_compatibility =
+                *overridden_constructor_asserts_compatibility.get_or_insert_with(|| {
+                    matches!(member.name.as_str(), "__init__" | "__new__")
+                        && matches!(
+                            member.ty,
+                            Type::FunctionLiteral(function)
+                                if function.has_known_decorator(db, FunctionDecorators::OVERRIDE)
+                        )
+                });
+            if is_constructor_like_method(&member.name)
+                && !overridden_constructor_asserts_compatibility
+            {
                 continue;
             }
 
