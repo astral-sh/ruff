@@ -36,6 +36,7 @@ use std::borrow::Cow;
 use std::fmt;
 use std::iter::FusedIterator;
 
+use compact_str::format_compact;
 use rustc_hash::{FxBuildHasher, FxHashSet};
 
 use ruff_db::PythonFile;
@@ -51,7 +52,7 @@ use ruff_python_ast::{
 use crate::db::Db;
 use crate::module::{Module, ModuleKind};
 use crate::module_name::{ImportingFile, ModuleName};
-use crate::path::{ModulePath, SearchPath, SystemOrVendoredPathRef};
+use crate::path::{ModuleDirectory, ModulePath, SearchPath, SystemOrVendoredPathRef};
 use crate::strategy::MisconfigurationStrategy;
 use crate::typeshed::{TypeshedVersions, vendored_typeshed_versions};
 use crate::{ResolverEnvironment, ResolverFile, SearchPathSettings, SearchPathSettingsError};
@@ -1507,11 +1508,8 @@ impl<'db, 'name> NameResolver<'db, 'name> {
             }));
             // Defer file probes after stdlib until we know that stdlib does not win.
             pending_stub_paths.extend(stub_paths.after_stdlib.iter().filter(|search_path| {
-                candidate_may_exist(
-                    &self.context,
-                    &ModuleResolutionCandidate::stub(search_path),
-                    stub_name,
-                )
+                ModuleDirectory::new(&self.context, search_path.to_module_path())
+                    .may_contain_name(stub_name)
             }));
         }
 
@@ -1701,18 +1699,21 @@ fn resolve_component(
         return Err(());
     }
 
-    if !candidate_may_exist(context, candidate, module_name) {
+    let parent_directory = ModuleDirectory::new(context, candidate.path.clone());
+    if !parent_directory.may_contain_name(module_name) {
         return Err(());
     }
 
-    let package_path = &mut candidate.path;
+    let mut package_path = parent_directory.path().clone();
     package_path.push(module_name);
 
-    // Check for a regular package first (highest priority)
-    package_path.push("__init__");
-    if let Some(init) = resolve_file_module_with_filter(package_path, context, file_filter) {
-        // Remove the `__init__` component for any potential next step
-        package_path.pop();
+    // Check for a regular package first (highest priority).
+    let package_directory = ModuleDirectory::new(context, package_path);
+    let init =
+        resolve_file_module_with_filter(&package_directory, context, "__init__", file_filter);
+    candidate.path = package_directory.into_path();
+    let package_path = &candidate.path;
+    if let Some(init) = init {
         candidate.py_typed = package_path
             .py_typed(context)
             .inherit_parent(candidate.py_typed);
@@ -1725,9 +1726,9 @@ fn resolve_component(
     }
 
     // Check for a file module next
-    package_path.pop();
-
-    if let Some(file_module) = resolve_file_module_with_filter(package_path, context, file_filter) {
+    if let Some(file_module) =
+        resolve_file_module_with_filter(&parent_directory, context, module_name, file_filter)
+    {
         candidate.module = ResolvedModule::Module(file_module);
         return Ok(());
     }
@@ -1764,26 +1765,6 @@ fn resolve_component(
     Err(())
 }
 
-/// Uses the parent directory's entries to reject candidates that cannot exist without performing
-/// individual file-system probes for every supported module layout.
-fn candidate_may_exist(
-    context: &ResolverContext,
-    candidate: &ModuleResolutionCandidate,
-    module_name: &str,
-) -> bool {
-    let Some(parent) = candidate.path.to_system_path() else {
-        return true;
-    };
-
-    let Ok(listing) = directory_listing(context.db, &parent) else {
-        return false;
-    };
-
-    // Other suffixes are harmless false positives; the normal probes still determine whether the
-    // module exists.
-    listing.contains_name_with_prefix(module_name)
-}
-
 type ResolvedNames = Vec<ModuleResolutionCandidate>;
 
 /// If `module` exists on disk with an extension permitted by the resolver's mode, return its
@@ -1794,28 +1775,34 @@ pub(super) fn resolve_file_module(
     module: &ModulePath,
     resolver_state: &ResolverContext,
 ) -> Option<File> {
-    resolve_file_module_with_filter(module, resolver_state, ComponentFileFilter::ByMode)
+    let name = module.file_stem()?;
+    let mut parent = module.clone();
+    parent.pop();
+    resolve_file_module_with_filter(
+        &ModuleDirectory::new(resolver_state, parent),
+        resolver_state,
+        name,
+        ComponentFileFilter::ByMode,
+    )
 }
 
 fn resolve_file_module_with_filter(
-    module: &ModulePath,
+    directory: &ModuleDirectory,
     resolver_state: &ResolverContext,
+    name: &str,
     filter: ComponentFileFilter,
 ) -> Option<File> {
     let stub_file = if resolver_state.mode.is_typing() {
-        module.with_pyi_extension().to_file(resolver_state)
+        directory.resolve_file(resolver_state, &format_compact!("{name}.pyi"))
     } else {
         None
     };
+
     if filter == ComponentFileFilter::StubOnly {
         return stub_file;
     }
 
-    stub_file.or_else(|| {
-        module
-            .with_py_extension()
-            .and_then(|path| path.to_file(resolver_state))
-    })
+    stub_file.or_else(|| directory.resolve_file(resolver_state, &format_compact!("{name}.py")))
 }
 
 /// Determines whether a package is a legacy namespace package.

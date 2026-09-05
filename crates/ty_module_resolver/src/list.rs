@@ -1,13 +1,11 @@
 use std::borrow::Cow;
 use std::collections::btree_map::{BTreeMap, Entry};
 
-use ruff_db::files::directory_listing;
-
 use crate::ResolverEnvironment;
 use crate::db::Db;
 use crate::module::{Module, ModuleKind};
 use crate::module_name::ModuleName;
-use crate::path::{ModulePath, SearchPath, SystemOrVendoredPathRef};
+use crate::path::{ModuleDirectory, ModulePath, SearchPath, SystemOrVendoredPathRef};
 use crate::resolve::{ModuleResolveMode, ResolverContext, resolve_file_module, search_paths};
 
 /// List all available modules, including all sub-modules, sorted in lexicographic order.
@@ -98,7 +96,7 @@ fn list_modules_in<'db>(
     let mut lister = Lister::new(db, search_path.resolver_environment(db), path);
     match path.as_path() {
         SystemOrVendoredPathRef::System(system_search_path) => {
-            let Ok(listing) = directory_listing(db, system_search_path) else {
+            let Some(listing) = lister.directory.system_listing() else {
                 return vec![];
             };
             for (name, file_type) in listing.iter() {
@@ -136,6 +134,7 @@ impl get_size2::GetSize for ListedModule<'_> {}
 struct Lister<'db> {
     db: &'db dyn Db,
     search_path: &'db SearchPath,
+    directory: ModuleDirectory<'db>,
     resolver_environment: ResolverEnvironment<'db>,
     modules: BTreeMap<&'db ModuleName, ListedModule<'db>>,
 }
@@ -151,6 +150,10 @@ impl<'db> Lister<'db> {
         Lister {
             db,
             search_path,
+            directory: ModuleDirectory::new(
+                &ResolverContext::new(db, resolver_environment, ModuleResolveMode::Typing),
+                search_path.to_module_path(),
+            ),
             resolver_environment,
             modules: BTreeMap::new(),
         }
@@ -273,7 +276,7 @@ impl<'db> Lister<'db> {
             return;
         }
 
-        let Some(file) = module_path.to_file(&self.context()) else {
+        let Some(file) = self.directory.resolve_file(&self.context(), name) else {
             return;
         };
         self.add_module(
