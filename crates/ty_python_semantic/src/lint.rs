@@ -603,7 +603,7 @@ impl RuleSelection {
     }
 
     /// Returns the configured severity for the lint with the given id or `None` if the lint is disabled.
-    pub(crate) fn severity(&self, lint: LintId) -> Option<Severity> {
+    pub fn severity(&self, lint: LintId) -> Option<Severity> {
         self.lints.get(&lint).map(|(severity, _)| *severity)
     }
 
@@ -612,7 +612,7 @@ impl RuleSelection {
     }
 
     /// Returns `true` if the `lint` is enabled.
-    pub(crate) fn is_enabled(&self, lint: LintId) -> bool {
+    pub fn is_enabled(&self, lint: LintId) -> bool {
         self.severity(lint).is_some()
     }
 

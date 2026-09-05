@@ -1651,7 +1651,9 @@ impl<'db> DefinitionInference<'db> {
         self.types.declarations(owner)
     }
 
-    fn declaration_types(&self) -> impl ExactSizeIterator<Item = TypeAndQualifiers<'db>> {
+    pub(crate) fn declaration_types(
+        &self,
+    ) -> impl ExactSizeIterator<Item = TypeAndQualifiers<'db>> {
         self.types.declaration_types()
     }
 

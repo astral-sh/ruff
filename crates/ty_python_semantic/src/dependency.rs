@@ -10,6 +10,21 @@ use ty_module_resolver::{
 use ty_python_core::ProgramFile;
 
 use crate::Db;
+use crate::declare_lint;
+use crate::lint::{Level, LintStatus};
+
+mod imports;
+
+pub use imports::{ImportedModules, imported_modules};
+
+declare_lint! {
+    #[doc = include_str!("../resources/lint_docs/unused-dependency.md")]
+    pub static UNUSED_DEPENDENCY = {
+        summary: "detects declared dependencies that are not imported",
+        status: LintStatus::stable("0.0.76"),
+        default_level: Level::Ignore,
+    }
+}
 
 /// Returns the missing dependency for this import, if one can be identified.
 ///
@@ -39,6 +54,66 @@ pub struct DependencyMetadata {
 }
 
 impl DependencyMetadata {
+    /// Record the distributions used by a file's imports.
+    ///
+    /// Module ownership describes runtime distributions, so also resolve the implementation when
+    /// type checking selected a stub. Ambiguous namespace ownership counts as use: it does not
+    /// establish that any owner is unused.
+    pub fn record_used_dependencies(
+        &self,
+        db: &dyn Db,
+        file: ProgramFile<'_>,
+        imports: &ImportedModules<'_>,
+        used: &mut BTreeSet<CompactString>,
+    ) {
+        for module in imports.modules.iter().copied() {
+            self.record_module_owners(db, module, used);
+            if let Some(runtime) = resolve_real_module(
+                db,
+                ImportingFile::File(file.file(db), file.resolver_environment(db)),
+                module.name(db),
+            ) {
+                self.record_module_owners(db, runtime, used);
+            }
+        }
+
+        // Import resolution can fail for native extensions or unavailable stubs. The package
+        // manager can still identify their distribution from the imported module's name.
+        for name in &imports.unresolved {
+            self.record_named_module_owners(name, used);
+        }
+    }
+
+    fn record_module_owners(
+        &self,
+        db: &dyn Db,
+        module: Module<'_>,
+        used: &mut BTreeSet<CompactString>,
+    ) {
+        if let Some(owner) = self.owner(db, module) {
+            used.insert(owner.clone());
+            return;
+        }
+
+        if module.search_path(db).is_none_or(|path| {
+            path.is_site_packages()
+                || path.is_editable()
+                || (path.is_standard_library()
+                    && module.name(db).first_component() == "typing_extensions")
+        }) {
+            self.record_named_module_owners(module.name(db), used);
+        }
+    }
+
+    fn record_named_module_owners(&self, name: &ModuleName, used: &mut BTreeSet<CompactString>) {
+        if let Some(owners) = name
+            .ancestors()
+            .find_map(|name| self.module_owners.get(&name))
+        {
+            used.extend(owners.iter().cloned());
+        }
+    }
+
     /// Check whether `importing_file` is allowed to import `imported_module`.
     ///
     /// Use the script's own declarations or the nearest containing project's declarations.
