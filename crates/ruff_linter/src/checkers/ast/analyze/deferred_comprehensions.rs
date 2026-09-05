@@ -18,7 +18,7 @@ pub(crate) fn deferred_comprehensions(checker: &mut Checker) {
             .and_then(|expr| match expr {
                 Expr::ListComp(comp) => Some(comp.generators.as_slice()),
                 Expr::SetComp(comp) => Some(comp.generators.as_slice()),
-                Expr::DictComp(comp) => Some(comp.generators.as_slice()),
+                Expr::DictComp(comp) => Some(comp.generators.as_ref()),
                 Expr::Generator(generator) => Some(generator.generators.as_slice()),
                 _ => None,
             })

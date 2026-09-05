@@ -26,12 +26,12 @@ impl NeedsParentheses for ExprCompare {
     ) -> OptionalParentheses {
         if parent.is_expr_await() {
             OptionalParentheses::Always
-        } else if let Ok(string) = StringLike::try_from(&*self.left) {
+        } else if let Ok(string) = StringLike::try_from(&self.operands[0]) {
             // Multiline strings are guaranteed to never fit, avoid adding unnecessary parentheses
             if !string.is_implicit_concatenated()
                 && string.is_multiline(context)
                 && !context.comments().has(string)
-                && self.comparators.first().is_some_and(|right| {
+                && self.operands.get(1).is_some_and(|right| {
                     has_parentheses(right, context).is_some() && !context.comments().has(right)
                 })
             {

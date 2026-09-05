@@ -87,13 +87,16 @@ pub(crate) fn not_tests(checker: &Checker, unary_op: &ast::ExprUnaryOp) {
     }
 
     let Expr::Compare(ast::ExprCompare {
-        left,
         ops,
-        comparators,
+        operands,
         range: _,
         node_index: _,
     }) = unary_op.operand.as_ref()
     else {
+        return;
+    };
+
+    let Some((left, comparators)) = operands.split_first() else {
         return;
     };
 

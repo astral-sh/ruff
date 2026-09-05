@@ -185,9 +185,9 @@ pub(crate) fn key_in_dict_compare(checker: &Checker, compare: &ast::ExprCompare)
         return;
     }
 
-    let [right] = &*compare.comparators else {
+    let [left, right] = &*compare.operands else {
         return;
     };
 
-    key_in_dict(checker, &compare.left, right, *op, compare.into());
+    key_in_dict(checker, left, right, *op, compare.into());
 }

@@ -734,7 +734,7 @@ impl<'src> Parser<'src> {
             return ast::Arguments {
                 range: self.node_range(start),
                 node_index: AtomicNodeIndex::NONE,
-                args: Box::default(),
+                args: ThinVec::new(),
                 keywords: ThinVec::default(),
             };
         }
@@ -871,7 +871,7 @@ impl<'src> Parser<'src> {
         let arguments = ast::Arguments {
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
-            args: self.expr_scratch.take(args_snapshot),
+            args: self.expr_scratch.take_thin_vec(args_snapshot),
             keywords,
         };
 
@@ -1240,7 +1240,8 @@ impl<'src> Parser<'src> {
     ) -> ast::ExprCompare {
         self.bump_cmp_op(op);
 
-        let comparators_snapshot = self.expr_scratch.snapshot();
+        let operands_snapshot = self.expr_scratch.snapshot();
+        self.expr_scratch.push(lhs);
         let mut operators = vec![op];
 
         let mut progress = ParserProgress::default();
@@ -1272,9 +1273,8 @@ impl<'src> Parser<'src> {
         }
 
         ast::ExprCompare {
-            left: Box::new(lhs),
             ops: operators.into_boxed_slice(),
-            comparators: self.expr_scratch.take(comparators_snapshot),
+            operands: self.expr_scratch.take(operands_snapshot),
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
         }
@@ -2666,7 +2666,7 @@ impl<'src> Parser<'src> {
         ast::ExprDictComp {
             key: key.map(Box::new),
             value: Box::new(value),
-            generators,
+            generators: generators.into_boxed_slice(),
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
         }
