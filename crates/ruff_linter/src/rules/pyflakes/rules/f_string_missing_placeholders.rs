@@ -1,8 +1,6 @@
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::traversal::{self, EnclosingSuite};
-use ruff_python_ast::{self as ast, Expr, Stmt};
-use ruff_python_semantic::ScopeKind;
+use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::Locator;
@@ -56,17 +54,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// See [#10885](https://github.com/astral-sh/ruff/issues/10885) for more.
 ///
 /// ## Fix safety
-/// The fix is marked unsafe when the f-string sits in a docstring position, because removing
-/// the `f` prefix turns it into a string literal and the program starts exposing it as
-/// documentation. This covers the first statement of a module, class or function body, and a
-/// statement following a simple assignment at module level or in a class body:
-///
-/// ```python
-/// f"Not a docstring."
-///
-/// a = 1
-/// f"Not an attribute docstring."
-/// ```
+/// The fix is marked unsafe when it would create a docstring.
 ///
 /// ## References
 /// - [PEP 498 – Literal String Interpolation](https://peps.python.org/pep-0498/)
@@ -96,7 +84,7 @@ pub(crate) fn f_string_missing_placeholders(checker: &Checker, expr: &ast::ExprF
         return;
     }
 
-    let applicability = if fix_creates_docstring(checker, expr) {
+    let applicability = if checker.in_docstring_position(expr.range()) {
         Applicability::Unsafe
     } else {
         Applicability::Safe
@@ -117,69 +105,11 @@ pub(crate) fn f_string_missing_placeholders(checker: &Checker, expr: &ast::ExprF
 
         let mut diagnostic =
             checker.report_diagnostic(FStringMissingPlaceholders, f_string.range());
-        diagnostic.set_fix(convert_f_string_to_regular_string(
-            prefix_range,
-            f_string.range(),
-            checker.locator(),
+        diagnostic.set_fix(Fix::applicable_edit(
+            convert_f_string_to_regular_string(prefix_range, f_string.range(), checker.locator()),
             applicability,
         ));
     }
-}
-
-/// Returns `true` if dropping the `f` prefix would place a string literal in a docstring
-/// position: the first statement of a module, class or function body, or the statement
-/// following a simple assignment at module level or in a class body.
-fn fix_creates_docstring(checker: &Checker, expr: &ast::ExprFString) -> bool {
-    let semantic = checker.semantic();
-    let stmt = semantic.current_statement();
-
-    // The f-string has to make up the entire statement; a nested one never becomes a docstring.
-    let Some(ast::StmtExpr { value, .. }) = stmt.as_expr_stmt() else {
-        return false;
-    };
-    if value.range() != expr.range() {
-        return false;
-    }
-
-    let at_top_level = semantic.at_top_level();
-    let parent = semantic.current_statement_parent();
-
-    let suite = if at_top_level {
-        // At module level there is no parent statement, so take the body from the definitions.
-        semantic
-            .definitions
-            .python_ast()
-            .and_then(|body| EnclosingSuite::new(body, stmt.into()))
-    } else {
-        parent.and_then(|parent| traversal::suite(stmt, parent))
-    };
-    let Some(suite) = suite else {
-        return false;
-    };
-
-    let in_docstring_body = match parent {
-        None => at_top_level,
-        Some(Stmt::FunctionDef(_) | Stmt::ClassDef(_)) => true,
-        Some(_) => false,
-    };
-    if in_docstring_body && suite.first() == Some(stmt) {
-        return true;
-    }
-
-    // Attribute docstrings follow a simple assignment, at module level or in a class body.
-    if at_top_level || matches!(semantic.current_scope().kind, ScopeKind::Class(_)) {
-        match suite.previous_sibling() {
-            Some(Stmt::Assign(ast::StmtAssign { targets, .. })) => {
-                return matches!(targets.as_slice(), [Expr::Name(_)]);
-            }
-            Some(Stmt::AnnAssign(ast::StmtAnnAssign { target, .. })) => {
-                return target.is_name_expr();
-            }
-            _ => {}
-        }
-    }
-
-    false
 }
 
 /// Unescape an f-string body by replacing `{{` with `{` and `}}` with `}`.
@@ -191,13 +121,12 @@ fn unescape_f_string(content: &str) -> String {
     content.replace("{{", "{").replace("}}", "}")
 }
 
-/// Generate a [`Fix`] to rewrite an f-string as a regular string.
+/// Generate an [`Edit`] to rewrite an f-string as a regular string.
 fn convert_f_string_to_regular_string(
     prefix_range: TextRange,
     node_range: TextRange,
     locator: &Locator,
-    applicability: Applicability,
-) -> Fix {
+) -> Edit {
     // Extract the f-string body.
     let mut content =
         unescape_f_string(locator.slice(TextRange::new(prefix_range.end(), node_range.end())));
@@ -214,8 +143,5 @@ fn convert_f_string_to_regular_string(
         content.insert(0, ' ');
     }
 
-    Fix::applicable_edit(
-        Edit::replacement(content, prefix_range.start(), node_range.end()),
-        applicability,
-    )
+    Edit::replacement(content, prefix_range.start(), node_range.end())
 }

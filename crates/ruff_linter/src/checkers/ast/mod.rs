@@ -37,6 +37,7 @@ use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::str::Quote;
 use ruff_python_ast::token::Tokens;
+use ruff_python_ast::traversal::EnclosingSuite;
 use ruff_python_ast::visitor::{Visitor, walk_except_handler, walk_pattern};
 use ruff_python_ast::{
     self as ast, AnyParameterRef, ArgOrKeyword, Comprehension, ElifElseClause, ExceptHandler, Expr,
@@ -669,6 +670,48 @@ impl<'a> Checker<'a> {
     /// Return the current [`DocstringState`].
     pub(crate) fn docstring_state(&self) -> DocstringState {
         self.docstring_state
+    }
+
+    /// Returns `true` if the expression spanning `range` sits in a docstring position: it makes
+    /// up the whole of the current expression statement, and that statement is either the first
+    /// in a module, class or function body, or follows a simple assignment at module level or
+    /// in a class body (an attribute docstring).
+    ///
+    /// This only checks the position. Whether the expression is of a type that Python treats as
+    /// a docstring (a plain string literal) is up to the caller.
+    pub(crate) fn in_docstring_position(&self, range: TextRange) -> bool {
+        let stmt = self.semantic.current_statement();
+        let Some(ast::StmtExpr { value, .. }) = stmt.as_expr_stmt() else {
+            return false;
+        };
+        if value.range() != range {
+            return false;
+        }
+
+        let parent = self.semantic.current_statement_parent();
+        let body: &[Stmt] = match parent {
+            Some(Stmt::FunctionDef(function)) => &function.body,
+            Some(Stmt::ClassDef(class)) => &class.body,
+            // No parent statement: the statement is at module level.
+            None => self.module.python_ast,
+            _ => return false,
+        };
+        let Some(suite) = EnclosingSuite::new(body, stmt.into()) else {
+            return false;
+        };
+
+        // Attribute docstrings are only recognized at module level and in class bodies.
+        let in_function = matches!(parent, Some(Stmt::FunctionDef(_)));
+        match suite.previous_sibling() {
+            None => true,
+            Some(Stmt::Assign(ast::StmtAssign { targets, .. })) => {
+                !in_function && matches!(targets.as_slice(), [Expr::Name(_)])
+            }
+            Some(Stmt::AnnAssign(ast::StmtAnnAssign { target, .. })) => {
+                !in_function && target.is_name_expr()
+            }
+            Some(_) => false,
+        }
     }
 }
 
