@@ -77,6 +77,7 @@ SECTIONS: list[Section] = [
     Section("Contributing", "contributing.md", generated=True),
     Section("Proposing Lint Rules", "rule-proposals.md", generated=False),
     Section("Migrating to Categories", "migrating-to-categories.md", generated=False),
+    Section("Rules by Category", "rules-by-category.md", generated=True),
 ]
 
 LINK_REWRITES: dict[str, str] = {
@@ -235,6 +236,20 @@ def main() -> None:
                     ["cargo", "dev", "generate-default-rules"],
                     encoding="utf-8",
                 )
+            elif filename == "rules-by-category.md":
+                file_content = (
+                    "In [preview](preview.md), Ruff supports rule categories in addition to "
+                    "the Flake8-style linter groups shown on the main [Rules](rules.md) page.\n\n"
+                    "By default, the rules in the `correctness`, `suspicious`, `complexity`, "
+                    "`performance`, and `style` categories are enabled.\n\n"
+                    "See [Rule Categories](linter.md#rule-categories) for more details on the "
+                    "categories themselves and [Migrating to Categories](migrating-to-categories.md) "
+                    "for a migration guide.\n\n"
+                )
+                file_content += subprocess.check_output(
+                    ["cargo", "dev", "generate-rules-table", "--by-category"],
+                    encoding="utf-8",
+                )
             else:
                 block = content.split(f"<!-- Begin section: {title} -->\n\n")
                 if len(block) != 2:
@@ -249,7 +264,11 @@ def main() -> None:
                 file_content = block[0]
 
                 if filename == "rules.md":
-                    file_content += "\n" + subprocess.check_output(
+                    file_content += (
+                        "\nRules below are grouped by their original linter. "
+                        "You can also browse [rules by category](rules-by-category.md).\n\n"
+                    )
+                    file_content += subprocess.check_output(
                         ["cargo", "dev", "generate-rules-table"],
                         encoding="utf-8",
                     )
