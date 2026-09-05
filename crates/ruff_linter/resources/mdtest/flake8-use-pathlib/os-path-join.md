@@ -14,16 +14,14 @@ path components.
 import os
 
 p = "foo"
-q = "bar"
-
 os.path.join((p))  # snapshot: os-path-join
 ```
 
 ```snapshot
 error[PTH118]: `os.path.join()` should be replaced by `Path` with `/` operator
- --> src/mdtest_snippet.py:6:1
+ --> src/mdtest_snippet.py:4:1
   |
-6 | os.path.join((p))  # snapshot: os-path-join
+4 | os.path.join((p))  # snapshot: os-path-join
   | ^^^^^^^^^^^^
 help: Replace with `Path(...) / ...`
   |
@@ -31,10 +29,87 @@ help: Replace with `Path(...) / ...`
 2 + import pathlib
 3 |
 4 | p = "foo"
-5 | q = "bar"
-6 |
   - os.path.join((p))  # snapshot: os-path-join
-7 + pathlib.Path(p)  # snapshot: os-path-join
+5 + pathlib.Path(p)  # snapshot: os-path-join
+  |
+note: This is an unsafe fix and may change runtime behavior
+```
+
+## Nested `Path(...)` arguments
+
+Nested `Path(...)` calls are flattened into their leaf arguments
+
+### Nested `Path(...)` argument as the first argument
+
+```py
+from pathlib import Path
+import os
+
+os.path.join(Path(Path("a"), Path("b")), "c")  # snapshot: os-path-join
+```
+
+```snapshot
+error[PTH118]: `os.path.join()` should be replaced by `Path` with `/` operator
+ --> src/mdtest_snippet.py:4:1
+  |
+4 | os.path.join(Path(Path("a"), Path("b")), "c")  # snapshot: os-path-join
+  | ^^^^^^^^^^^^
+help: Replace with `Path(...) / ...`
+  |
+3 |
+  - os.path.join(Path(Path("a"), Path("b")), "c")  # snapshot: os-path-join
+4 + Path("a") / "b" / "c"  # snapshot: os-path-join
+  |
+note: This is an unsafe fix and may change runtime behavior
+```
+
+### Nested `Path(...)` argument among the remaining arguments
+
+```py
+from pathlib import Path
+import os
+
+os.path.join("root", Path(Path("e"), Path("f")))  # snapshot: os-path-join
+```
+
+```snapshot
+error[PTH118]: `os.path.join()` should be replaced by `Path` with `/` operator
+ --> src/mdtest_snippet.py:4:1
+  |
+4 | os.path.join("root", Path(Path("e"), Path("f")))  # snapshot: os-path-join
+  | ^^^^^^^^^^^^
+help: Replace with `Path(...) / ...`
+  |
+3 |
+  - os.path.join("root", Path(Path("e"), Path("f")))  # snapshot: os-path-join
+4 + Path("root") / "e" / "f"  # snapshot: os-path-join
+  |
+note: This is an unsafe fix and may change runtime behavior
+```
+
+### Chained call is not flattened
+
+`Path("a").resolve()` is a method call on the result of `Path(...)`, not a
+bare `Path(...)` call, so it is not falttened
+
+```py
+from pathlib import Path
+import os
+
+os.path.join("root", "a", "b", Path("c").resolve(), Path("d"), Path(Path("e"), Path("f")))  # snapshot: os-path-join
+```
+
+```snapshot
+error[PTH118]: `os.path.join()` should be replaced by `Path` with `/` operator
+ --> src/mdtest_snippet.py:4:1
+  |
+4 | os.path.join("root", "a", "b", Path("c").resolve(), Path("d"), Path(Path("e"), Path("f")))  # snapshot: os-path-join
+  | ^^^^^^^^^^^^
+help: Replace with `Path(...) / ...`
+  |
+3 |
+  - os.path.join("root", "a", "b", Path("c").resolve(), Path("d"), Path(Path("e"), Path("f")))  # snapshot: os-path-join
+4 + Path("root") / "a" / "b" / Path("c").resolve() / "d" / "e" / "f"  # snapshot: os-path-join
   |
 note: This is an unsafe fix and may change runtime behavior
 ```
@@ -47,15 +122,14 @@ Starred arguments use `Path.joinpath()` instead of `/`.
 import os
 
 parts = ("foo", "bar")
-
 os.path.join("root", *parts)  # snapshot: os-path-join
 ```
 
 ```snapshot
 error[PTH118]: `os.path.join()` should be replaced by `Path.joinpath()`
- --> src/mdtest_snippet.py:5:1
+ --> src/mdtest_snippet.py:4:1
   |
-5 | os.path.join("root", *parts)  # snapshot: os-path-join
+4 | os.path.join("root", *parts)  # snapshot: os-path-join
   | ^^^^^^^^^^^^
 help: Replace with `Path(...).joinpath(...)`
   |
@@ -63,9 +137,8 @@ help: Replace with `Path(...).joinpath(...)`
 2 + import pathlib
 3 |
 4 | parts = ("foo", "bar")
-5 |
   - os.path.join("root", *parts)  # snapshot: os-path-join
-6 + pathlib.Path("root").joinpath(*parts)  # snapshot: os-path-join
+5 + pathlib.Path("root").joinpath(*parts)  # snapshot: os-path-join
   |
 note: This is an unsafe fix and may change runtime behavior
 ```
@@ -74,17 +147,52 @@ note: This is an unsafe fix and may change runtime behavior
 
 A literal tuple or list passed to `os.sep.join()` can be converted into `Path` components.
 
+### `os.sep.join() is tuple or list`
+
 ```py
 import os
 
-os.sep.join("foo")  # snapshot: os-path-join
+os.sep.join(["home", "user", "file.txt"]) # snapshot: os-path-join
 ```
 
 ```snapshot
 error[PTH118]: `os.sep.join()` should be replaced by `Path` with `/` operator
  --> src/mdtest_snippet.py:3:1
   |
-3 | os.sep.join("foo")  # snapshot: os-path-join
+3 | os.sep.join(["home", "user", "file.txt"]) # snapshot: os-path-join
   | ^^^^^^^^^^^
 help: Replace with `Path(...) / ...`
+  |
+1 | import os
+2 + import pathlib
+3 |
+  - os.sep.join(["home", "user", "file.txt"]) # snapshot: os-path-join
+4 + pathlib.Path("home") / "user" / "file.txt" # snapshot: os-path-join
+  |
+note: This is an unsafe fix and may change runtime behavior
+```
+
+### `os.sep.join()` with a string literal
+
+```py
+import os
+
+os.sep.join("XY...")  # snapshot: os-path-join
+```
+
+```snapshot
+error[PTH118]: `os.sep.join()` should be replaced by `Path` with `/` operator
+ --> src/mdtest_snippet.py:3:1
+  |
+3 | os.sep.join("XY...")  # snapshot: os-path-join
+  | ^^^^^^^^^^^
+help: Replace with `Path(...) / ...`
+  |
+1 | import os
+2 + import pathlib
+3 |
+  - os.sep.join("XY...")  # snapshot: os-path-join
+4 + pathlib.Path("X") / "Y" / "." / "." / "."  # snapshot: os-path-join
+  |
+note: This is an unsafe fix and may change runtime behavior
 ```
