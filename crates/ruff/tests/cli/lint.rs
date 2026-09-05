@@ -3343,9 +3343,11 @@ fn checks_notebooks_in_stable() -> anyhow::Result<()> {
 fn nested_implicit_namespace_package() -> Result<()> {
     let fixture = CliTest::new()?;
 
+    fixture.write_file("__init__.py", "")?;
     fixture.write_file("foo/__init__.py", "")?;
     fixture.write_file("foo/bar/baz/__init__.py", "")?;
     fixture.write_file("foo/bar/baz/bop.py", "")?;
+    fixture.write_file("tests/unit/__init__.py", "")?;
 
     assert_cmd_snapshot!(fixture
         .check_command()

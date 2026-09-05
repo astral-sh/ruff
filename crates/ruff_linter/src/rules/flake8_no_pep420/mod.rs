@@ -15,12 +15,20 @@ mod tests {
     use crate::test::{test_path, test_resource_path};
 
     #[test_case(Path::new("test_fail_empty"), Path::new("example.py"))]
+    #[test_case(
+        Path::new("test_fail_nested_tests"),
+        Path::new("package/tests/test_nested.py")
+    )]
     #[test_case(Path::new("test_fail_nonempty"), Path::new("example.py"))]
     #[test_case(Path::new("test_ignored"), Path::new("example.py"))]
     #[test_case(Path::new("test_pass_init"), Path::new("example.py"))]
     #[test_case(Path::new("test_pass_namespace_package"), Path::new("example.py"))]
     #[test_case(Path::new("test_pass_pep723"), Path::new("script.py"))]
     #[test_case(Path::new("test_pass_pyi"), Path::new("example.pyi"))]
+    #[test_case(
+        Path::new("test_pass_pytest"),
+        Path::new("tests/test_more/test_other_thing.py")
+    )]
     #[test_case(Path::new("test_pass_script"), Path::new("script"))]
     #[test_case(Path::new("test_pass_shebang"), Path::new("example.py"))]
     fn default(path: &Path, filename: &Path) -> Result<()> {
@@ -30,15 +38,17 @@ mod tests {
             path.display(),
             filename.display()
         ));
-        let diagnostics = test_path(
-            p.as_path(),
-            &LinterSettings {
-                namespace_packages: vec![test_resource_path(
-                    "fixtures/flake8_no_pep420/test_pass_namespace_package",
-                )],
-                ..LinterSettings::for_rule(Rule::ImplicitNamespacePackage)
-            },
-        )?;
+        let mut settings = LinterSettings {
+            namespace_packages: vec![test_resource_path(
+                "fixtures/flake8_no_pep420/test_pass_namespace_package",
+            )],
+            ..LinterSettings::for_rule(Rule::ImplicitNamespacePackage)
+        };
+        if path == Path::new("test_pass_pytest") {
+            settings.project_root =
+                test_resource_path("fixtures/flake8_no_pep420/test_pass_pytest");
+        }
+        let diagnostics = test_path(p.as_path(), &settings)?;
         insta::with_settings!({filters => vec![(r"\\", "/")]}, {
             assert_diagnostics!(snapshot, diagnostics);
         });
