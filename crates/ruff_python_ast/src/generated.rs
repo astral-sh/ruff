@@ -3870,6 +3870,12 @@ impl ruff_text_size::Ranged for crate::ExprEllipsisLiteral {
     }
 }
 
+impl ruff_text_size::Ranged for crate::ExprAttribute {
+    fn range(&self) -> ruff_text_size::TextRange {
+        self.range
+    }
+}
+
 impl ruff_text_size::Ranged for crate::ExprSubscript {
     fn range(&self) -> ruff_text_size::TextRange {
         self.range
@@ -9870,10 +9876,11 @@ pub struct ExprEllipsisLiteral {
 }
 
 /// See also [Attribute](https://docs.python.org/3/library/ast.html#ast.Attribute)
-#[derive(Clone, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprAttribute {
     pub node_index: crate::AtomicNodeIndex,
+    pub range: ruff_text_size::TextRange,
     pub value: Box<Expr>,
     pub attr: crate::Identifier,
     pub ctx: crate::ExprContext,
@@ -10892,6 +10899,7 @@ impl ExprAttribute {
             value,
             attr,
             ctx: _,
+            range: _,
             node_index: _,
         } = self;
         visitor.visit_expr(value);

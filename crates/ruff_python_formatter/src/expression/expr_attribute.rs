@@ -28,6 +28,7 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
     fn fmt_fields(&self, item: &ExprAttribute, f: &mut PyFormatter) -> FormatResult<()> {
         let ExprAttribute {
             value,
+            range: _,
             node_index: _,
             attr,
             ctx: _,

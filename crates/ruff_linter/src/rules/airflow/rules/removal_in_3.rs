@@ -108,8 +108,8 @@ pub(crate) fn airflow_3_removal_expr(checker: &Checker, expr: &Expr) {
             check_method(checker, call_expr);
             check_context_key_usage_in_call(checker, call_expr);
         }
-        Expr::Attribute(attribute_expr) => {
-            check_name(checker, expr, expr.range());
+        Expr::Attribute(attribute_expr @ ExprAttribute { range, .. }) => {
+            check_name(checker, expr, *range);
             check_class_attribute(checker, attribute_expr);
             check_removed_attribute_access_on_context_key(checker, attribute_expr);
         }

@@ -119,6 +119,7 @@ fn generate_del_statement(obj: &Expr, attr_name: &str, generator: Generator) -> 
             value: Box::new(obj.clone()),
             attr: Identifier::new(attr_name.to_string(), TextRange::default()),
             ctx: ExprContext::Del,
+            range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         })],
         range: TextRange::default(),

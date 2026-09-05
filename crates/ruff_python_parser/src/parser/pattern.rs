@@ -751,7 +751,11 @@ impl Parser<'_> {
                             ),
                             &pattern,
                         );
-                        ast::Identifier::new(Name::empty(), parser.missing_node_range())
+                        ast::Identifier {
+                            id: Name::empty(),
+                            range: parser.missing_node_range(),
+                            node_index: AtomicNodeIndex::NONE,
+                        }
                     };
 
                     let value_pattern = parser.parse_match_pattern(AllowStarPattern::No);

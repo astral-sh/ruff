@@ -435,6 +435,7 @@ impl UnittestAssert {
                     value: Box::new(node.into()),
                     attr: Identifier::new("search".to_string(), TextRange::default()),
                     ctx: ExprContext::Load,
+                    range: TextRange::default(),
                     node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 };
                 let node2 = ast::ExprCall {

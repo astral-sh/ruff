@@ -346,6 +346,7 @@ impl<'a> ReFunc<'a> {
             value: Box::new(self.string.clone()),
             attr: Identifier::new(method, TextRange::default()),
             ctx: ExprContext::Load,
+            range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         });
         Expr::Call(ExprCall {
