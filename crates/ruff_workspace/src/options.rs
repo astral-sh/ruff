@@ -35,6 +35,7 @@ use ruff_linter::rules::{
 };
 use ruff_linter::settings::types::{
     IdentifierPattern, Language, OutputFormat, PreviewMode, PythonVersion, RequiredVersion,
+    RuntimeEvaluatedAnnotationLocations,
 };
 use ruff_linter::{UnresolvedRuleSelector, warn_user_once};
 use ruff_macros::{CombineOptions, OptionsMetadata};
@@ -611,6 +612,53 @@ pub struct LintOptions {
         "#
     )]
     pub future_annotations: Option<bool>,
+
+    /// Targets the annotation for a set of specified objects and treats
+    /// them as either runtime-required or runtime-ambiguous.
+    ///
+    /// A common example for a runtime-required base class is Pydantic's
+    /// `pydantic.BaseModel`, where all of the annotations need to be evaluated
+    /// at runtime by pydantic. This prevents relevant imports from being
+    /// moved into type checking blocks and helps detect imports that need
+    /// to be moved out of type checking blocks.
+    ///
+    /// A common example for a runtime-ambiguous base class is SQLAlchemy's
+    /// `sqlalchemy.orm.DeclarativeBase`, where it requires `Mapped` and most
+    /// types to be available at runtime, but models may be referenced via
+    /// their name as a forward-reference. So some annotations are runtime-required
+    /// but others are not, hence runtime-ambiguous. This prevents relevant
+    /// imports from being moved at all, it will be assumed they are already
+    /// correct, the way they are.
+    ///
+    /// `base-classes` directly targets a specific base class and its direct
+    /// descendants, whereas `decorators` targets any classes or functions
+    /// decorated with one of the decorators.
+    ///
+    /// `decorators` also supports framework decorators like FastAPI's `fastapi.FastAPI.get`
+    /// which will work across assignments in the same module.
+    ///
+    /// For example:
+    /// ```python
+    /// from fastapi import FastAPI
+    ///
+    /// app = FastAPI("app")
+    ///
+    /// @app.get("/home")
+    /// def home() -> str: ...
+    /// ```
+    ///
+    /// Here `app.get` will correctly be identified as `fastapi.FastAPI.get`.
+    ///
+    #[option(
+        default = "{}",
+        value_type = "{ base-classes = { runtime = list[str], ambiguous = list[str]}, decorators = { runtime = list[str], ambiguous = list[str] }}",
+        scope = "runtime-evaluated-annotations",
+        example = r#"
+            base-classes = { required = ["pydantic.BaseModel"], ambiguous = ["sqlalchemy.orm.DeclarativeBase"] }
+            decorators = { required = ["pydantic.validate_call", "attrs.define"] }
+        "#
+    )]
+    pub runtime_evaluated_annotations: Option<RuntimeEvaluatedAnnotationLocations>,
 }
 
 pub(crate) fn validate_required_version(required_version: &RequiredVersion) -> anyhow::Result<()> {
@@ -2341,10 +2389,14 @@ pub struct Flake8TypeCheckingOptions {
         default = "[]",
         value_type = "list[str]",
         example = r#"
-            runtime-evaluated-base-classes = ["pydantic.BaseModel", "sqlalchemy.orm.DeclarativeBase"]
+            runtime-evaluated-base-classes = ["pydantic.BaseModel"]
         "#
     )]
-    runtime_evaluated_base_classes: Option<Vec<String>>,
+    #[deprecated(
+        since = "0.17.0",
+        note = "The `runtime-evaluated-base-classes` option has been moved to `lint.runtime-evaluated-annotations.base-classes.required`."
+    )]
+    pub(crate) runtime_evaluated_base_classes: Option<Vec<String>>,
 
     /// Exempt classes and functions decorated with any of the enumerated
     /// decorators from being moved into type-checking blocks.
@@ -2373,7 +2425,11 @@ pub struct Flake8TypeCheckingOptions {
             runtime-evaluated-decorators = ["pydantic.validate_call", "attrs.define"]
         "#
     )]
-    runtime_evaluated_decorators: Option<Vec<String>>,
+    #[deprecated(
+        since = "0.17.0",
+        note = "The `runtime-evaluated-decorators` option has been moved to `lint.runtime-evaluated-annotations.decorators.required`."
+    )]
+    pub(crate) runtime_evaluated_decorators: Option<Vec<String>>,
 
     /// Whether to add quotes around type annotations, if doing so would allow
     /// the corresponding import to be moved into a type-checking block.
@@ -2435,8 +2491,6 @@ impl Flake8TypeCheckingOptions {
             exempt_modules: self
                 .exempt_modules
                 .unwrap_or_else(|| vec!["typing".to_string()]),
-            runtime_required_base_classes: self.runtime_evaluated_base_classes.unwrap_or_default(),
-            runtime_required_decorators: self.runtime_evaluated_decorators.unwrap_or_default(),
             quote_annotations: self.quote_annotations.unwrap_or_default(),
         }
     }
@@ -4340,6 +4394,7 @@ pub struct LintOptionsWire {
     preview: Option<bool>,
     typing_extensions: Option<bool>,
     future_annotations: Option<bool>,
+    runtime_evaluated_annotations: Option<RuntimeEvaluatedAnnotationLocations>,
 }
 
 impl From<LintOptionsWire> for LintOptions {
@@ -4396,6 +4451,7 @@ impl From<LintOptionsWire> for LintOptions {
             preview,
             typing_extensions,
             future_annotations,
+            runtime_evaluated_annotations,
         } = value;
 
         LintOptions {
@@ -4453,6 +4509,7 @@ impl From<LintOptionsWire> for LintOptions {
             preview,
             typing_extensions,
             future_annotations,
+            runtime_evaluated_annotations,
         }
     }
 }

@@ -1030,6 +1030,68 @@ impl Display for CompiledPerFileTargetVersionList {
     }
 }
 
+// A collection of annotation locations that should be treated as either
+// runtime-required or runtime-ambiguous, in order to better support libraries
+// like Pydantic or SQLAlchemy that either require all or an indeterminable
+// subset of annotations on the targeted objects to be available at runtime.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, CacheKey, Default)]
+#[serde(deny_unknown_fields, rename_all = "kebab-case")]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct RuntimeEvaluatedAnnotationLocations {
+    #[serde(default)]
+    pub base_classes: RuntimeEvaluatedAnnotationLocation,
+    #[serde(default)]
+    pub decorators: RuntimeEvaluatedAnnotationLocation,
+}
+
+impl Display for RuntimeEvaluatedAnnotationLocations {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "{{")?;
+        write!(f, "\tbase_classes = ")?;
+        writeln!(f, "{},", self.base_classes)?;
+        write!(f, "\tdecorators = ")?;
+        writeln!(f, "{}", self.decorators)?;
+        write!(f, "}}")
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, CacheKey, Default)]
+#[serde(deny_unknown_fields, rename_all = "kebab-case")]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct RuntimeEvaluatedAnnotationLocation {
+    #[serde(default)]
+    pub required: Vec<String>,
+    #[serde(default)]
+    pub ambiguous: Vec<String>,
+}
+
+impl Display for RuntimeEvaluatedAnnotationLocation {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "{{")?;
+        write!(f, "\t\trequired = ")?;
+        if self.required.is_empty() {
+            writeln!(f, "[],")?;
+        } else {
+            writeln!(f, "[")?;
+            for qualified_name in &self.required {
+                writeln!(f, "\t\t\t{qualified_name},")?;
+            }
+            writeln!(f, "\t\t],")?;
+        }
+        write!(f, "\t\tambiguous = ")?;
+        if self.ambiguous.is_empty() {
+            writeln!(f, "[]")?;
+        } else {
+            writeln!(f, "[")?;
+            for qualified_name in &self.ambiguous {
+                writeln!(f, "\t\t\t{qualified_name},")?;
+            }
+            writeln!(f, "\t\t]")?;
+        }
+        write!(f, "\t}}")
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::IdentifierPattern;
