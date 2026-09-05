@@ -25,6 +25,7 @@ use super::interpolated_string::{InterpolatedStringContext, InterpolatedStringLa
 pub(crate) struct FormatInterpolatedStringElement<'a> {
     element: &'a InterpolatedStringElement,
     context: InterpolatedStringContext,
+    in_format_spec: bool,
 }
 
 impl<'a> FormatInterpolatedStringElement<'a> {
@@ -32,7 +33,17 @@ impl<'a> FormatInterpolatedStringElement<'a> {
         element: &'a InterpolatedStringElement,
         context: InterpolatedStringContext,
     ) -> Self {
-        Self { element, context }
+        Self {
+            element,
+            context,
+            in_format_spec: false,
+        }
+    }
+
+    /// Marks this element as belonging to the format spec of an enclosing replacement field.
+    fn in_format_spec(mut self) -> Self {
+        self.in_format_spec = true;
+        self
     }
 }
 
@@ -43,7 +54,12 @@ impl Format<PyFormatContext<'_>> for FormatInterpolatedStringElement<'_> {
                 FormatFStringLiteralElement::new(string_literal, self.context.flags()).fmt(f)
             }
             InterpolatedStringElement::Interpolation(expression) => {
-                FormatInterpolatedElement::new(expression, self.context).fmt(f)
+                let element = FormatInterpolatedElement::new(expression, self.context);
+                if self.in_format_spec {
+                    element.in_format_spec().fmt(f)
+                } else {
+                    element.fmt(f)
+                }
             }
         }
     }
@@ -80,6 +96,7 @@ impl Format<PyFormatContext<'_>> for FormatFStringLiteralElement<'_> {
 pub(crate) struct FormatInterpolatedElement<'a> {
     element: &'a InterpolatedElement,
     context: InterpolatedStringContext,
+    in_format_spec: bool,
 }
 
 impl<'a> FormatInterpolatedElement<'a> {
@@ -87,7 +104,17 @@ impl<'a> FormatInterpolatedElement<'a> {
         element: &'a InterpolatedElement,
         context: InterpolatedStringContext,
     ) -> Self {
-        Self { element, context }
+        Self {
+            element,
+            context,
+            in_format_spec: false,
+        }
+    }
+
+    /// Marks this replacement field as belonging to the format spec of an enclosing field.
+    fn in_format_spec(mut self) -> Self {
+        self.in_format_spec = true;
+        self
     }
 }
 
@@ -194,13 +221,21 @@ impl Format<PyFormatContext<'_>> for FormatInterpolatedElement<'_> {
 
             let item = format_with(|f: &mut PyFormatter| {
                 // Update the context to be inside the f-string expression element.
-                let state = match f.context().interpolated_string_state() {
-                    InterpolatedStringState::InsideInterpolatedElement(_)
-                    | InterpolatedStringState::NestedInterpolatedElement(_) => {
-                        InterpolatedStringState::NestedInterpolatedElement(context)
-                    }
-                    InterpolatedStringState::Outside => {
-                        InterpolatedStringState::InsideInterpolatedElement(context)
+                // A field in a format spec belongs to the same string as the field enclosing
+                // it, so it is not a further level of nesting: only entering another string
+                // literal is. Deepening here made pre-3.12 targets preserve the inner quotes
+                // and reuse the outer quote character, which is a syntax error before PEP 701.
+                let state = if self.in_format_spec {
+                    f.context().interpolated_string_state()
+                } else {
+                    match f.context().interpolated_string_state() {
+                        InterpolatedStringState::InsideInterpolatedElement(_)
+                        | InterpolatedStringState::NestedInterpolatedElement(_) => {
+                            InterpolatedStringState::NestedInterpolatedElement(context)
+                        }
+                        InterpolatedStringState::Outside => {
+                            InterpolatedStringState::InsideInterpolatedElement(context)
+                        }
                     }
                 };
                 let f = &mut WithInterpolatedStringState::new(state, f);
@@ -229,7 +264,9 @@ impl Format<PyFormatContext<'_>> for FormatInterpolatedElement<'_> {
                     token(":").fmt(f)?;
 
                     for element in &format_spec.elements {
-                        FormatInterpolatedStringElement::new(element, context).fmt(f)?;
+                        FormatInterpolatedStringElement::new(element, context)
+                            .in_format_spec()
+                            .fmt(f)?;
                     }
                 }
 
