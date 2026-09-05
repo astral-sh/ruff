@@ -173,6 +173,77 @@ warning[redundant-condition]: An empty tuple is always falsy
    |            ^^^^^^^^^^^^^^^^ Inferred type is `tuple[()]`
 ```
 
+Annotating a variable as `tuple[X]` is almost always a mistake (the user almost always meant to
+write `tuple[X, ...]`), so we point to the annotation and suggest an arbitrary-length tuple instead:
+
+```py
+class Bar:
+    def __init__(self):
+        self.single_element_tuple: tuple[int] = (42,)
+
+    def first_method(self):
+        self.single_element_tuple = (56,)
+
+    def other_method(self, y: tuple[str]):
+        if self.single_element_tuple:  # snapshot: redundant-condition
+            pass
+
+        if y:  # snapshot: redundant-condition
+            pass
+```
+
+```snapshot
+warning[redundant-condition]: A 1-element tuple is always truthy
+  --> src/mdtest_snippet.py:51:12
+   |
+51 |         if self.single_element_tuple:  # snapshot: redundant-condition
+   |            ^^^^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `tuple[int]`
+   |
+  ::: src/mdtest_snippet.py:45:36
+   |
+45 |         self.single_element_tuple: tuple[int] = (42,)
+   |                                    ----------
+   |                                    |
+   |                                    Inferred as a 1-element tuple due to this annotation
+   |                                    Did you mean `tuple[int, ...]`?
+
+
+warning[redundant-condition]: A 1-element tuple is always truthy
+  --> src/mdtest_snippet.py:54:12
+   |
+50 |     def other_method(self, y: tuple[str]):
+   |                               ----------
+   |                               |
+   |                               Inferred as a 1-element tuple due to this annotation
+   |                               Did you mean `tuple[str, ...]`?
+51 |         if self.single_element_tuple:  # snapshot: redundant-condition
+52 |             pass
+53 |
+54 |         if y:  # snapshot: redundant-condition
+   |            ^ Inferred type is `tuple[str]`
+```
+
+If the original tuple annotation was variadic, our suggested hint suggests a variadic replacement:
+
+```py
+def f(*args: *tuple[int]):
+    if args:  # snapshot: redundant-condition
+        pass
+```
+
+```snapshot
+warning[redundant-condition]: A 1-element tuple is always truthy
+  --> src/mdtest_snippet.py:57:8
+   |
+56 | def f(*args: *tuple[int]):
+   |              -----------
+   |              |
+   |              Inferred as a 1-element tuple due to this annotation
+   |              Did you mean `*tuple[int, ...]`?
+57 |     if args:  # snapshot: redundant-condition
+   |        ^^^^ Inferred type is `tuple[int]`
+```
+
 And testing `None`:
 
 ```py
@@ -184,9 +255,9 @@ if X:  # snapshot: redundant-condition
 
 ```snapshot
 warning[redundant-condition]: `None` is always falsy
-  --> src/mdtest_snippet.py:45:4
+  --> src/mdtest_snippet.py:61:4
    |
-45 | if X:  # snapshot: redundant-condition
+61 | if X:  # snapshot: redundant-condition
    |    ^
 ```
 
@@ -214,16 +285,16 @@ assert "this asserts that a string literal is truthy -- strange, but it comes up
 
 ```snapshot
 warning[redundant-condition]: A nonempty string is always truthy
-  --> src/mdtest_snippet.py:50:4
+  --> src/mdtest_snippet.py:66:4
    |
-50 | if x:  # snapshot: redundant-condition
+66 | if x:  # snapshot: redundant-condition
    |    ^ Inferred type is `Literal["foo"]`
 
 
 warning[redundant-condition]: An empty string is always falsy
-  --> src/mdtest_snippet.py:53:4
+  --> src/mdtest_snippet.py:69:4
    |
-53 | if y:  # snapshot: redundant-condition
+69 | if y:  # snapshot: redundant-condition
    |    ^ Inferred type is `Literal[""]`
 ```
 
@@ -239,9 +310,9 @@ def f(x: Literal["a", "b"]):
 
 ```snapshot
 warning[redundant-condition]: A nonempty string is always truthy
-  --> src/mdtest_snippet.py:67:8
+  --> src/mdtest_snippet.py:83:8
    |
-67 |     if x:  # snapshot: redundant-condition
+83 |     if x:  # snapshot: redundant-condition
    |        ^ Inferred type is `Literal["a", "b"]`
 ```
 
@@ -289,31 +360,31 @@ def test(
 
 ```snapshot
 warning[redundant-condition]: A TypedDict with 2 required fields is always truthy
-  --> src/mdtest_snippet.py:90:8
-   |
-90 |     if never_empty:  # snapshot: redundant-condition
-   |        ^^^^^^^^^^^ Inferred type is `NeverEmpty`
-   |
-  ::: src/mdtest_snippet.py:71:7
-   |
-71 | class NeverEmpty(TypedDict):
-   |       ---------- `NeverEmpty` defined here
-72 |     x: int
-   |     ------ First required field defined here
+   --> src/mdtest_snippet.py:106:8
+    |
+106 |     if never_empty:  # snapshot: redundant-condition
+    |        ^^^^^^^^^^^ Inferred type is `NeverEmpty`
+    |
+   ::: src/mdtest_snippet.py:87:7
+    |
+ 87 | class NeverEmpty(TypedDict):
+    |       ---------- `NeverEmpty` defined here
+ 88 |     x: int
+    |     ------ First required field defined here
 
 
 warning[redundant-condition]: A TypedDict with 1 required field is always truthy
-  --> src/mdtest_snippet.py:93:8
-   |
-93 |     if also_never_empty:  # snapshot: redundant-condition
-   |        ^^^^^^^^^^^^^^^^ Inferred type is `AlsoNeverEmpty`
-   |
-  ::: src/mdtest_snippet.py:75:7
-   |
-75 | class AlsoNeverEmpty(TypedDict, total=False):
-   |       -------------- `AlsoNeverEmpty` defined here
-76 |     x: Required[int]
-   |     ---------------- Required field declared here
+   --> src/mdtest_snippet.py:109:8
+    |
+109 |     if also_never_empty:  # snapshot: redundant-condition
+    |        ^^^^^^^^^^^^^^^^ Inferred type is `AlsoNeverEmpty`
+    |
+   ::: src/mdtest_snippet.py:91:7
+    |
+ 91 | class AlsoNeverEmpty(TypedDict, total=False):
+    |       -------------- `AlsoNeverEmpty` defined here
+ 92 |     x: Required[int]
+    |     ---------------- Required field declared here
 ```
 
 and testing an object that is known to be always truthy due to it being `@final` and not defining
@@ -329,9 +400,9 @@ def f(x: Pattern[str]):
 
 ```snapshot
 warning[redundant-condition]: Condition is always truthy
-   --> src/mdtest_snippet.py:109:8
+   --> src/mdtest_snippet.py:125:8
     |
-109 |     if x:  # snapshot: redundant-condition
+125 |     if x:  # snapshot: redundant-condition
     |        ^ Inferred type is `Pattern[str]`
 info: `Pattern` instances are always truthy because `Pattern` cannot be subclassed and does not define `__bool__` or `__len__`
    --> stdlib/re.pyi:285:1
@@ -433,6 +504,152 @@ def check(value: Record):
     if "x" in value:
         if value:  # error: [redundant-condition] "A TypedDict with 1 required field is always truthy"
             pass
+```
+
+## One-element tuple annotation hints
+
+A named tuple or another tuple subclass can deliberately have exactly one element. An annotation
+naming that class is not a mistaken use of `tuple[T]`, so we report its truthiness without
+suggesting an arbitrary-length tuple annotation.
+
+```py
+from typing import NamedTuple
+
+class Record(NamedTuple):
+    value: int
+
+class SingleTuple(tuple[int]):
+    pass
+
+def check(record: Record, single: SingleTuple):
+    if record:  # snapshot: redundant-condition
+        print(record.value)
+    if single:  # snapshot: redundant-condition
+        pass
+```
+
+```snapshot
+warning[redundant-condition]: A 1-element tuple is always truthy
+  --> src/mdtest_snippet.py:10:8
+   |
+10 |     if record:  # snapshot: redundant-condition
+   |        ^^^^^^ Inferred type is `Record`
+   |
+  ::: src/mdtest_snippet.py:3:7
+   |
+ 3 | class Record(NamedTuple):
+   |       ------ `Record` defined here
+
+
+warning[redundant-condition]: A 1-element tuple is always truthy
+  --> src/mdtest_snippet.py:12:8
+   |
+12 |     if single:  # snapshot: redundant-condition
+   |        ^^^^^^ Inferred type is `SingleTuple`
+   |
+  ::: src/mdtest_snippet.py:6:7
+   |
+ 6 | class SingleTuple(tuple[int]):
+   |       ----------- `SingleTuple` defined here
+```
+
+An implicit type alias for `tuple[T]` still refers to the built-in tuple type, so it remains
+eligible for the annotation hint.
+
+```py
+IntTuple = tuple[int]
+
+def check_alias(value: IntTuple):
+    if value:  # snapshot: redundant-condition
+        pass
+```
+
+```snapshot
+warning[redundant-condition]: A 1-element tuple is always truthy
+  --> src/mdtest_snippet.py:17:8
+   |
+16 | def check_alias(value: IntTuple):
+   |                        --------
+   |                        |
+   |                        Inferred as a 1-element tuple due to this annotation
+   |                        Did you mean `tuple[int, ...]`?
+17 |     if value:  # snapshot: redundant-condition
+   |        ^^^^^ Inferred type is `tuple[int]`
+```
+
+The diagnostic still explains the one-element annotation when the suggested replacement would
+contain notation that cannot be used in a Python annotation, such as a type variable's scope suffix.
+In these cases, we omit the replacement suggestion, including when the type variable is nested
+inside another generic type.
+
+```py
+def check_generic[T](value: tuple[T]):
+    if value:  # snapshot: redundant-condition
+        pass
+
+def check_nested_generic[T](value: tuple[list[T]]):
+    if value:  # snapshot: redundant-condition
+        pass
+```
+
+```snapshot
+warning[redundant-condition]: A 1-element tuple is always truthy
+  --> src/mdtest_snippet.py:20:8
+   |
+19 | def check_generic[T](value: tuple[T]):
+   |                             -------- Inferred as a 1-element tuple due to this annotation
+20 |     if value:  # snapshot: redundant-condition
+   |        ^^^^^ Inferred type is `tuple[T@check_generic]`
+
+
+warning[redundant-condition]: A 1-element tuple is always truthy
+  --> src/mdtest_snippet.py:24:8
+   |
+23 | def check_nested_generic[T](value: tuple[list[T]]):
+   |                                    -------------- Inferred as a 1-element tuple due to this annotation
+24 |     if value:  # snapshot: redundant-condition
+   |        ^^^^^ Inferred type is `tuple[list[T@check_nested_generic]]`
+```
+
+## Tuple annotations in dependencies
+
+A one-element tuple annotation in a dependency also explains why the condition is redundant. The
+suggestion refers to the dependency's author, since the annotation is outside first-party code.
+
+```toml
+[environment]
+python = "/.venv"
+```
+
+`/.venv/<path-to-site-packages>/records.pyi`:
+
+```pyi
+values: tuple[str]
+```
+
+`main.py`:
+
+```py
+import records
+
+if records.values:  # snapshot: redundant-condition
+    pass
+```
+
+```snapshot
+warning[redundant-condition]: A 1-element tuple is always truthy
+ --> src/main.py:3:4
+  |
+3 | if records.values:  # snapshot: redundant-condition
+  |    ^^^^^^^^^^^^^^ Inferred type is `tuple[str]`
+  |
+ ::: .venv/<path-to-site-packages>/records.pyi:1:9
+  |
+1 | values: tuple[str]
+  |         ----------
+  |         |
+  |         Inferred as a 1-element tuple due to this annotation
+  |         The author of this code might have meant `tuple[str, ...]`?
 ```
 
 ## Other boolean contexts
@@ -923,6 +1140,15 @@ def test(x: tuple[int]):  # the user probably meant to use `tuple[int, ...]` her
 error[redundant-condition-strict]: `x` always has length 1
   --> src/mdtest_snippet.py:28:8
    |
+23 | def test(x: tuple[int]):  # the user probably meant to use `tuple[int, ...]` here
+   |             ----------
+   |             |
+   |             Inferred as a 1-element tuple due to this annotation
+   |             Did you mean `tuple[int, ...]`?
+24 |     # error: [redundant-condition-strict] "`x` always has length 1"
+25 |     if len(x) == 1:
+26 |         pass
+27 |
 28 |     if len(x) == 2:  # snapshot: redundant-condition-strict
    |        ^^^^-^^^^^^
    |            |
