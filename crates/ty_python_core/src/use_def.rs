@@ -838,8 +838,15 @@ struct FullUseDefMapData<'db> {
 }
 
 impl FullUseDefMapData<'_> {
-    /// Recognizes the complete retained state of a scope with one unconditional binding per
-    /// symbol. Checking the state itself also handles simple scopes that are not stub functions.
+    /// Returns declaration flags if every retained field can be reconstructed from the definitions.
+    /// Each symbol must have one unused, unconditional binding, with definition ID equal to the
+    /// symbol index plus one. Declarations and reachable histories must match that binding and
+    /// the implicit initial state. Checking the data makes this independent of the scope's syntax.
+    ///
+    /// For example, this function body only needs to retain whether each parameter is declared:
+    /// ```python
+    /// def f(untyped, typed: int): ...
+    /// ```
     fn simple_symbol_declarations(
         &self,
         definitions: &RetainedDefinitions<'_>,
@@ -883,9 +890,8 @@ impl FullUseDefMapData<'_> {
             if binding.binding() != definition
                 || binding.narrowing_constraint() != ScopedNarrowingConstraint::ALWAYS_TRUE
                 || binding.reachability_constraint() != ScopedReachabilityConstraintId::ALWAYS_TRUE
-                || reachable_bindings.len() != 2
-                || reachable_bindings.first() != ALWAYS_UNBOUND_BINDINGS.as_slice().first()
-                || &reachable_bindings[1..] != end_bindings
+                || reachable_bindings.strip_prefix(ALWAYS_UNBOUND_BINDINGS.as_slice())
+                    != Some(end_bindings)
             {
                 return None;
             }
@@ -899,10 +905,8 @@ impl FullUseDefMapData<'_> {
                 return None;
             }
             let is_declared = if declaration.declaration == definition {
-                if reachable_declarations.len() != 2
-                    || reachable_declarations.first()
-                        != ALWAYS_UNDECLARED_DECLARATIONS.as_slice().first()
-                    || &reachable_declarations[1..] != end_declarations
+                if reachable_declarations.strip_prefix(ALWAYS_UNDECLARED_DECLARATIONS.as_slice())
+                    != Some(end_declarations)
                 {
                     return None;
                 }
@@ -1021,18 +1025,8 @@ pub struct UseDefMap<'db> {
 }
 
 impl<'db> UseDefMap<'db> {
-    fn from_full(all_definitions: RetainedDefinitions<'db>, data: FullUseDefMapData<'db>) -> Self {
-        let data = if let Some(declared) = data.simple_symbol_declarations(&all_definitions) {
-            UseDefMapData::Simple(declared)
-        } else {
-            UseDefMapData::Full(Box::new(data))
-        };
-        Self {
-            all_definitions,
-            data,
-        }
-    }
-
+    /// Returns retained tables, or shared empty tables for a simple scope.
+    /// Symbol histories in simple scopes are reconstructed separately and are absent here.
     fn full_data(&self) -> &FullUseDefMapData<'db> {
         match &self.data {
             UseDefMapData::Simple(_) => &EMPTY_USE_DEF_MAP_DATA,
@@ -1327,14 +1321,11 @@ impl<'db> UseDefMap<'db> {
         &self,
         definition: Definition<'db>,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
-        let bindings = self
-            .full_data()
-            .definitions_by_definition
-            .get(&definition)
-            .map_or_else(
-                || ALWAYS_UNBOUND_BINDINGS.as_slice(),
-                |definitions| &self.full_data().interned_bindings[definitions.bindings],
-            );
+        let data = self.full_data();
+        let bindings = data.definitions_by_definition.get(&definition).map_or_else(
+            || ALWAYS_UNBOUND_BINDINGS.as_slice(),
+            |definitions| &data.interned_bindings[definitions.bindings],
+        );
         self.bindings_iterator(bindings, BoundnessAnalysis::BasedOnUnboundVisibility)
     }
 
@@ -1342,18 +1333,15 @@ impl<'db> UseDefMap<'db> {
         &self,
         binding: Definition<'db>,
     ) -> DeclarationsIterator<'_, 'db> {
-        let declarations = self
-            .full_data()
-            .definitions_by_definition
-            .get(&binding)
-            .map_or_else(
-                || ALWAYS_UNDECLARED_DECLARATIONS.as_slice(),
-                |definitions| {
-                    &self.full_data().interned_declarations[definitions
-                        .declarations
-                        .expect("binding definition should have retained declarations")]
-                },
-            );
+        let data = self.full_data();
+        let declarations = data.definitions_by_definition.get(&binding).map_or_else(
+            || ALWAYS_UNDECLARED_DECLARATIONS.as_slice(),
+            |definitions| {
+                &data.interned_declarations[definitions
+                    .declarations
+                    .expect("binding definition should have retained declarations")]
+            },
+        );
         self.declarations_iterator(declarations, BoundnessAnalysis::BasedOnUnboundVisibility)
     }
 
@@ -1466,6 +1454,9 @@ impl<'db> UseDefMap<'db> {
         }
     }
 
+    /// Reconstructs a simple scope's sole binding for `symbol`.
+    /// Reachable histories include the initial unbound entry, but assume the symbol is bound;
+    /// end-of-scope histories contain only the binding.
     fn simple_bindings_iterator(
         &self,
         symbol: ScopedSymbolId,
@@ -1499,6 +1490,9 @@ impl<'db> UseDefMap<'db> {
         }
     }
 
+    /// Reconstructs declarations for a symbol in a simple scope.
+    /// An undeclared symbol has only the implicit undeclared entry. A declared symbol has its
+    /// declaration, preceded by the implicit entry when iterating the reachable history.
     fn simple_declarations_iterator(
         &self,
         symbol: ScopedSymbolId,
@@ -3349,19 +3343,25 @@ impl<'db> UseDefMapBuilder<'db> {
         });
         let all_definitions = RetainedDefinitions::new(self.all_definitions);
 
-        UseDefMap::from_full(
+        let data = FullUseDefMapData {
+            constraint_tables,
+            interned_bindings: Arc::new(interned_bindings),
+            interned_declarations: Arc::new(interned_declarations),
+            range_reachability: self.range_reachability.into_boxed_slice(),
+            symbol_states,
+            definitions_by_definition,
+            extra,
+            end_of_scope_reachability: self.reachability,
+        };
+        let data = if let Some(declared) = data.simple_symbol_declarations(&all_definitions) {
+            UseDefMapData::Simple(declared)
+        } else {
+            UseDefMapData::Full(Box::new(data))
+        };
+        UseDefMap {
             all_definitions,
-            FullUseDefMapData {
-                constraint_tables,
-                interned_bindings: Arc::new(interned_bindings),
-                interned_declarations: Arc::new(interned_declarations),
-                range_reachability: self.range_reachability.into_boxed_slice(),
-                symbol_states,
-                definitions_by_definition,
-                extra,
-                end_of_scope_reachability: self.reachability,
-            },
-        )
+            data,
+        }
     }
 
     fn zip_place_states<I: Idx, T>(

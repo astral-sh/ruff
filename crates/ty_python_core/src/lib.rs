@@ -1176,6 +1176,7 @@ mod tests {
     use super::*;
 
     use crate::{
+        BoundnessAnalysis::{AssumeBound, BasedOnUnboundVisibility},
         ast_ids::{HasScopedUseId, ScopedUseId},
         db::tests::{TestDb, TestDbBuilder},
         definition::{
@@ -1526,45 +1527,41 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
         };
         let table = index.place_table(scope);
         let use_def = index.use_def_map(scope);
-        let bindings = |iter: BindingWithConstraintsIterator<'_, '_>, assume_bound: bool| {
-            assert_matches!(
-                (iter.boundness_analysis(), assume_bound),
-                (BoundnessAnalysis::AssumeBound, true)
-                    | (BoundnessAnalysis::BasedOnUnboundVisibility, false)
-            );
-            iter.map(|binding| {
-                assert_eq!(
-                    binding.narrowing_constraint.constraint(),
-                    ScopedNarrowingConstraint::ALWAYS_TRUE
-                );
-                assert_eq!(
-                    binding.reachability_constraint,
-                    ScopedReachabilityConstraintId::ALWAYS_TRUE
-                );
-                (
-                    binding.binding_order.as_u32(),
-                    binding.binding.definition().is_some(),
-                )
-            })
-            .collect::<Vec<_>>()
+        let bindings = |iter: BindingWithConstraintsIterator<'_, '_>| {
+            let boundness = iter.boundness_analysis();
+            let entries = iter
+                .map(|binding| {
+                    assert_eq!(
+                        binding.narrowing_constraint.constraint(),
+                        ScopedNarrowingConstraint::ALWAYS_TRUE
+                    );
+                    assert_eq!(
+                        binding.reachability_constraint,
+                        ScopedReachabilityConstraintId::ALWAYS_TRUE
+                    );
+                    (
+                        binding.binding_order.as_u32(),
+                        binding.binding.definition().is_some(),
+                    )
+                })
+                .collect::<Vec<_>>();
+            (boundness, entries)
         };
-        let declarations = |iter: DeclarationsIterator<'_, '_>, assume_bound: bool| {
-            assert_matches!(
-                (iter.boundness_analysis(), assume_bound),
-                (BoundnessAnalysis::AssumeBound, true)
-                    | (BoundnessAnalysis::BasedOnUnboundVisibility, false)
-            );
-            iter.map(|declaration| {
-                assert_eq!(
-                    declaration.reachability_constraint,
-                    ScopedReachabilityConstraintId::ALWAYS_TRUE
-                );
-                (
-                    declaration.declaration_order.as_u32(),
-                    declaration.declaration.definition().is_some(),
-                )
-            })
-            .collect::<Vec<_>>()
+        let declarations = |iter: DeclarationsIterator<'_, '_>| {
+            let boundness = iter.boundness_analysis();
+            let entries = iter
+                .map(|declaration| {
+                    assert_eq!(
+                        declaration.reachability_constraint,
+                        ScopedReachabilityConstraintId::ALWAYS_TRUE
+                    );
+                    (
+                        declaration.declaration_order.as_u32(),
+                        declaration.declaration.definition().is_some(),
+                    )
+                })
+                .collect::<Vec<_>>();
+            (boundness, entries)
         };
 
         assert_eq!(
@@ -1585,20 +1582,20 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
             let symbol = table.symbol_id(name).unwrap();
             let definition = use_def.first_public_binding(symbol).unwrap();
             assert_eq!(
-                bindings(use_def.end_of_scope_symbol_bindings(symbol), false),
-                vec![(order, true)]
+                bindings(use_def.end_of_scope_symbol_bindings(symbol)),
+                (BasedOnUnboundVisibility, vec![(order, true)])
             );
             assert_eq!(
-                bindings(use_def.reachable_symbol_bindings(symbol), true),
-                vec![(0, false), (order, true)]
+                bindings(use_def.reachable_symbol_bindings(symbol)),
+                (AssumeBound, vec![(0, false), (order, true)])
             );
             assert_eq!(
-                bindings(use_def.bindings_at_definition(definition), false),
-                vec![(0, false)]
+                bindings(use_def.bindings_at_definition(definition)),
+                (BasedOnUnboundVisibility, vec![(0, false)])
             );
             assert_eq!(
-                declarations(use_def.declarations_at_binding(definition), false),
-                vec![(0, false)]
+                declarations(use_def.declarations_at_binding(definition)),
+                (BasedOnUnboundVisibility, vec![(0, false)])
             );
 
             let (end, reachable) = if declared {
@@ -1607,12 +1604,12 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
                 (vec![(0, false)], vec![(0, false)])
             };
             assert_eq!(
-                declarations(use_def.end_of_scope_symbol_declarations(symbol), false),
-                end
+                declarations(use_def.end_of_scope_symbol_declarations(symbol)),
+                (BasedOnUnboundVisibility, end)
             );
             assert_eq!(
-                declarations(use_def.reachable_symbol_declarations(symbol), true),
-                reachable
+                declarations(use_def.reachable_symbol_declarations(symbol)),
+                (AssumeBound, reachable)
             );
         }
 
