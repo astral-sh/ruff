@@ -22,6 +22,36 @@ if not (lambda: f):  # error: [redundant-condition] "always truthy"
     f = 0
 ```
 
+## Comprehension elements depending on pattern bindings
+
+The lambdas in the match subject refer to a name rebound in the cases. Inferring their return types
+depends on the cases' reachability. Checking whether the subject completes must not require those
+return types or the comprehension's element type, since lambdas and comprehensions have inhabited
+types regardless.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+type value = int
+
+# error: [redundant-condition] "always truthy"
+match {0 for _ in [0] if value} and (lambda: value) and [lambda: value for _ in [0]]:
+    case unknown.member:  # error: [unresolved-reference]
+        pass
+    case []:
+        assert (0).missing  # error: [unresolved-attribute]
+        value = 0  # error: [invalid-assignment]
+    case captured:
+        match captured:
+            case []:
+                def value() -> captured:
+                    pass
+
+```
+
 ## Function signature
 
 Deferred annotations can result in cycles in resolving a function signature:

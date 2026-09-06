@@ -3728,7 +3728,21 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         // Like terminal calls in expression statements, completion is only relevant to
         // executable files. In stubs, inferring a version guard can itself depend on the
         // guarded definitions in `builtins` or `typing`, introducing inference cycles.
-        if self.source_type.is_stub() || node.is_literal_expr() {
+        if self.source_type.is_stub() {
+            return ScopedReachabilityConstraintId::ALWAYS_TRUE;
+        }
+        // These expressions have inhabited types regardless of a lambda's return type or a
+        // comprehension's element types. Inferring those types just to establish completion
+        // can create cycles through bindings whose reachability depends on this expression.
+        if node.is_literal_expr()
+            || matches!(
+                node,
+                ast::Expr::Lambda(_)
+                    | ast::Expr::ListComp(_)
+                    | ast::Expr::SetComp(_)
+                    | ast::Expr::DictComp(_)
+            )
+        {
             return ScopedReachabilityConstraintId::ALWAYS_TRUE;
         }
         // Visiting `not` already gates both outcomes on its operand completing. Its boolean
