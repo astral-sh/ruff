@@ -36,6 +36,7 @@ use std::borrow::Cow;
 use std::fmt;
 use std::iter::FusedIterator;
 
+use compact_str::format_compact;
 use rustc_hash::{FxBuildHasher, FxHashSet};
 
 use ruff_db::PythonFile;
@@ -51,7 +52,7 @@ use ruff_python_ast::{
 use crate::db::Db;
 use crate::module::{Module, ModuleKind};
 use crate::module_name::{ImportingFile, ModuleName};
-use crate::path::{ModulePath, SearchPath, SystemOrVendoredPathRef};
+use crate::path::{ModuleDirectory, ModulePath, SearchPath, SystemOrVendoredPathRef};
 use crate::strategy::MisconfigurationStrategy;
 use crate::typeshed::{TypeshedVersions, vendored_typeshed_versions};
 use crate::{ResolverEnvironment, ResolverFile, SearchPathSettings, SearchPathSettingsError};
@@ -1202,7 +1203,7 @@ fn resolve_name<'db>(
     resolver_environment: ResolverEnvironment<'db>,
     name: &ModuleName,
     mode: ModuleResolveMode,
-) -> Option<ResolvedNames> {
+) -> Option<ResolvedNames<'db>> {
     let resolver = NameResolver::new(db, resolver_environment, name, mode);
 
     match mode {
@@ -1225,7 +1226,7 @@ fn desperately_resolve_name<'db>(
     resolver_environment: ResolverEnvironment<'db>,
     name: &ModuleName,
     mode: ModuleResolveMode,
-) -> Option<ResolvedNames> {
+) -> Option<ResolvedNames<'db>> {
     let importing_file = ResolverFile::new(db, importing_file, resolver_environment);
     let search_paths = absolute_desperate_search_paths(db, importing_file).unwrap_or_default();
     let resolver = NameResolver::new(db, resolver_environment, name, mode);
@@ -1275,26 +1276,67 @@ enum CandidatePrecedence {
     SearchPathOrder,
 }
 
+/// A resolution candidate retaining the directory searched for its next component.
+///
+/// Consider resolving `acme.tools` in this layout:
+///
+/// ```text
+/// acme/
+/// |-- __init__.py
+/// `-- tools.py
+/// ```
+///
+/// Resolving `acme` obtains its directory listing to inspect `__init__.py`.
+/// Retaining that listing lets resolution of `tools` reuse it. The relevant
+/// calls and retained data are:
+///
+/// ```text
+/// NameResolver::discover_roots
+/// `-- resolve_component                         // resolve acme
+///     |-- ModuleDirectory::new
+///     |   `-- directory_listing                 // obtain acme/ listing
+///     |-- resolve_file_module_with_filter       // inspect __init__.pyi/.py
+///     `-- [retain package_directory in candidate.directory]
+///
+/// NameResolver::resolve_remaining
+/// `-- resolve_component                         // resolve tools within acme
+///     |-- ModuleDirectory::may_contain_name     // reuse listing: tools* exists
+///     |-- ModuleDirectory::may_contain_directory // no tools/: skip initializers
+///     `-- resolve_file_module_with_filter
+///         `-- ModuleDirectory::resolve_file     // exact filename and file status
+///             `-- ModulePath::to_file_unchecked
+///                 `-- system_path_to_file
+/// ```
+///
+/// `directory_listing` already caches directory contents through Salsa. Retaining
+/// its result avoids repeated calls to retrieve that listing for the name check
+/// and each file attempt. Checking its entries also avoids constructing paths for
+/// absent alternatives such as `acme/tools/__init__.pyi`.
 #[derive(Debug, Clone)]
-struct ModuleResolutionCandidate {
-    path: ModulePath,
+struct ModuleResolutionCandidate<'db> {
+    /// The resolved package's directory, or the containing directory for a terminal file module.
+    directory: ModuleDirectory<'db>,
     module: ResolvedModule,
     py_typed: PyTyped,
     precedence: CandidatePrecedence,
 }
 
-impl ModuleResolutionCandidate {
-    fn root(search_path: &SearchPath) -> Self {
-        Self::with_precedence(search_path, CandidatePrecedence::SearchPathOrder)
+impl<'db> ModuleResolutionCandidate<'db> {
+    fn root(context: &ResolverContext<'db>, search_path: &SearchPath) -> Self {
+        Self::with_precedence(context, search_path, CandidatePrecedence::SearchPathOrder)
     }
 
-    fn stub(search_path: &SearchPath) -> Self {
-        Self::with_precedence(search_path, CandidatePrecedence::StubPackage)
+    fn stub(context: &ResolverContext<'db>, search_path: &SearchPath) -> Self {
+        Self::with_precedence(context, search_path, CandidatePrecedence::StubPackage)
     }
 
-    fn with_precedence(search_path: &SearchPath, precedence: CandidatePrecedence) -> Self {
+    fn with_precedence(
+        context: &ResolverContext<'db>,
+        search_path: &SearchPath,
+        precedence: CandidatePrecedence,
+    ) -> Self {
         Self {
-            path: search_path.to_module_path(),
+            directory: ModuleDirectory::new(context, search_path.to_module_path()),
             module: ResolvedModule::NamespacePackage,
             py_typed: PyTyped::Untyped,
             precedence,
@@ -1312,7 +1354,7 @@ impl ModuleResolutionCandidate {
     }
 
     // This is the module we were actually interested in resolving, complete the resolution
-    fn into_module<'db>(
+    fn into_module(
         self,
         db: &'db dyn Db,
         resolver_environment: ResolverEnvironment<'db>,
@@ -1336,7 +1378,7 @@ impl ModuleResolutionCandidate {
                     resolver_environment,
                     Cow::Borrowed(name),
                     ModuleKind::Package,
-                    self.path.into_search_path(),
+                    self.directory.into_path().into_search_path(),
                 )
             }
             ResolvedModule::RegularPackage(file) => {
@@ -1350,7 +1392,7 @@ impl ModuleResolutionCandidate {
                     resolver_environment,
                     Cow::Borrowed(name),
                     ModuleKind::Package,
-                    self.path.into_search_path(),
+                    self.directory.into_path().into_search_path(),
                 )
             }
             ResolvedModule::Module(file) => {
@@ -1361,7 +1403,7 @@ impl ModuleResolutionCandidate {
                     resolver_environment,
                     Cow::Borrowed(name),
                     ModuleKind::Module,
-                    self.path.into_search_path(),
+                    self.directory.into_path().into_search_path(),
                 )
             }
         }
@@ -1384,9 +1426,13 @@ impl ModuleResolutionCandidate {
 
     fn to_str<'a>(&self, db: &'a dyn Db) -> Cow<'a, str> {
         match self.module {
-            ResolvedModule::NamespacePackage => {
-                Cow::Owned(self.path.to_system_path().unwrap_or_default().to_string())
-            }
+            ResolvedModule::NamespacePackage => Cow::Owned(
+                self.directory
+                    .path()
+                    .to_system_path()
+                    .unwrap_or_default()
+                    .to_string(),
+            ),
             ResolvedModule::LegacyNamespacePackage(file) => Cow::Borrowed(file.path(db).as_str()),
             ResolvedModule::RegularPackage(file) => Cow::Borrowed(file.path(db).as_str()),
             ResolvedModule::Module(file) => Cow::Borrowed(file.path(db).as_str()),
@@ -1420,7 +1466,7 @@ impl<'db, 'name> NameResolver<'db, 'name> {
     /// This includes PEP 561 stub packages and user-provided stub overlays, with runtime source as
     /// a fallback when no stub provides the requested module. A stub overlay may use runtime
     /// packages as parents, but its final module must come from a stub file.
-    fn resolve_typing(&self, stub_packages: &StubPackageIndex) -> Option<ResolvedNames> {
+    fn resolve_typing(&self, stub_packages: &StubPackageIndex) -> Option<ResolvedNames<'db>> {
         if self.name.components().nth(1).is_none() {
             let candidates = self.discover_roots(
                 search_paths(
@@ -1471,7 +1517,7 @@ impl<'db, 'name> NameResolver<'db, 'name> {
     /// These paths can contain PEP 561 stub packages, but never user-provided extra paths, so this
     /// indexes them for stub packages without performing a separate stub-overlay pass. Runtime
     /// resolution instead ignores stub packages and `.pyi` files entirely.
-    fn resolve_desperate_typing(&self, search_paths: &[SearchPath]) -> Option<ResolvedNames> {
+    fn resolve_desperate_typing(&self, search_paths: &[SearchPath]) -> Option<ResolvedNames<'db>> {
         let stub_packages =
             StubPackageIndex::from_search_paths(self.context.db, search_paths.iter());
         let candidates = self.discover_roots(search_paths.iter(), stub_packages.all());
@@ -1485,7 +1531,7 @@ impl<'db, 'name> NameResolver<'db, 'name> {
     fn resolve_runtime<'a>(
         &self,
         search_paths: impl Iterator<Item = &'a SearchPath>,
-    ) -> Option<ResolvedNames> {
+    ) -> Option<ResolvedNames<'db>> {
         let candidates = self.discover_roots(search_paths, StubPackagePaths::default());
         self.resolve_remaining(candidates, ComponentFileFilter::ByMode)
     }
@@ -1494,7 +1540,7 @@ impl<'db, 'name> NameResolver<'db, 'name> {
         &self,
         search_paths: impl Iterator<Item = &'a SearchPath>,
         stub_paths: StubPackagePaths<'_>,
-    ) -> ResolvedNames {
+    ) -> ResolvedNames<'db> {
         let root_component = self.name.first_component();
         let mut cur_candidates = Vec::new();
         let stub_name = (!stub_paths.is_empty() && !self.is_non_shadowable)
@@ -1507,11 +1553,8 @@ impl<'db, 'name> NameResolver<'db, 'name> {
             }));
             // Defer file probes after stdlib until we know that stdlib does not win.
             pending_stub_paths.extend(stub_paths.after_stdlib.iter().filter(|search_path| {
-                candidate_may_exist(
-                    &self.context,
-                    &ModuleResolutionCandidate::stub(search_path),
-                    stub_name,
-                )
+                ModuleDirectory::new(&self.context, search_path.to_module_path())
+                    .may_contain_name(stub_name)
             }));
         }
 
@@ -1529,7 +1572,7 @@ impl<'db, 'name> NameResolver<'db, 'name> {
             // A terminal candidate can stop the search unless a matching post-stdlib stub package
             // could still override it. A terminal stdlib candidate always stops the search.
             let can_stop = is_stdlib || pending_stub_paths.is_empty();
-            let mut candidate = ModuleResolutionCandidate::root(search_path);
+            let mut candidate = ModuleResolutionCandidate::root(&self.context, search_path);
             let resolved = resolve_component(
                 &self.context,
                 &mut candidate,
@@ -1561,9 +1604,9 @@ impl<'db, 'name> NameResolver<'db, 'name> {
 
     fn resolve_remaining(
         &self,
-        mut cur_candidates: ResolvedNames,
+        mut cur_candidates: ResolvedNames<'db>,
         final_filter: ComponentFileFilter,
-    ) -> Option<ResolvedNames> {
+    ) -> Option<ResolvedNames<'db>> {
         if cur_candidates.is_empty() {
             return None;
         }
@@ -1610,12 +1653,12 @@ impl<'db, 'name> NameResolver<'db, 'name> {
     }
 }
 
-fn resolve_stub_package_in_search_path(
-    context: &ResolverContext,
+fn resolve_stub_package_in_search_path<'db>(
+    context: &ResolverContext<'db>,
     search_path: &SearchPath,
     stub_name: &str,
-) -> Option<ModuleResolutionCandidate> {
-    let mut candidate = ModuleResolutionCandidate::stub(search_path);
+) -> Option<ModuleResolutionCandidate<'db>> {
+    let mut candidate = ModuleResolutionCandidate::stub(context, search_path);
     resolve_component(
         context,
         &mut candidate,
@@ -1636,11 +1679,11 @@ fn resolve_stub_package_in_search_path(
     }
 }
 
-fn normalize_candidates(
+fn normalize_candidates<'db>(
     db: &dyn Db,
-    mut candidates: ResolvedNames,
+    mut candidates: ResolvedNames<'db>,
     has_remaining_components: bool,
-) -> ResolvedNames {
+) -> ResolvedNames<'db> {
     let best_concrete_precedence = candidates
         .iter()
         .filter(|candidate| !candidate.is_any_namespace_package())
@@ -1687,9 +1730,9 @@ fn normalize_candidates(
 }
 
 /// Resolves one component relative to the candidate's current package.
-fn resolve_component(
-    context: &ResolverContext,
-    candidate: &mut ModuleResolutionCandidate,
+fn resolve_component<'db>(
+    context: &ResolverContext<'db>,
+    candidate: &mut ModuleResolutionCandidate<'db>,
     module_name: &str,
     file_filter: ComponentFileFilter,
 ) -> Result<(), ()> {
@@ -1701,33 +1744,41 @@ fn resolve_component(
         return Err(());
     }
 
-    if !candidate_may_exist(context, candidate, module_name) {
+    let parent_directory = &candidate.directory;
+    if !parent_directory.may_contain_name(module_name) {
         return Err(());
     }
 
-    let package_path = &mut candidate.path;
-    package_path.push(module_name);
-
-    // Check for a regular package first (highest priority)
-    package_path.push("__init__");
-    if let Some(init) = resolve_file_module_with_filter(package_path, context, file_filter) {
-        // Remove the `__init__` component for any potential next step
-        package_path.pop();
-        candidate.py_typed = package_path
-            .py_typed(context)
-            .inherit_parent(candidate.py_typed);
-        if is_legacy_namespace_package(package_path, context, init) {
-            candidate.module = ResolvedModule::LegacyNamespacePackage(init);
-        } else {
-            candidate.module = ResolvedModule::RegularPackage(init);
+    // Check for a regular package first (highest priority), but only if its directory may exist.
+    // A `tools.py` entry alone does not require probing `tools/__init__.py(i)`.
+    let package_directory = if parent_directory.may_contain_directory(context, module_name) {
+        let mut package_path = parent_directory.path().clone();
+        package_path.push(module_name);
+        let directory = ModuleDirectory::new(context, package_path);
+        if let Some(init) =
+            resolve_file_module_with_filter(&directory, context, "__init__", file_filter)
+        {
+            let package_path = directory.path();
+            candidate.py_typed = package_path
+                .py_typed(context)
+                .inherit_parent(candidate.py_typed);
+            candidate.module = if is_legacy_namespace_package(package_path, context, init) {
+                ResolvedModule::LegacyNamespacePackage(init)
+            } else {
+                ResolvedModule::RegularPackage(init)
+            };
+            candidate.directory = directory;
+            return Ok(());
         }
-        return Ok(());
-    }
+        Some(directory)
+    } else {
+        None
+    };
 
-    // Check for a file module next
-    package_path.pop();
-
-    if let Some(file_module) = resolve_file_module_with_filter(package_path, context, file_filter) {
+    // A file module is terminal; keep its containing directory for its search-path origin.
+    if let Some(file_module) =
+        resolve_file_module_with_filter(parent_directory, context, module_name, file_filter)
+    {
         candidate.module = ResolvedModule::Module(file_module);
         return Ok(());
     }
@@ -1751,40 +1802,23 @@ fn resolve_component(
     // `VERSIONS` file into consideration.
     // A namespace package is not backed by a file, so it cannot satisfy a stub-only lookup.
     if file_filter != ComponentFileFilter::StubOnly
-        && !package_path.search_path().is_standard_library()
-        && package_path.is_directory(context)
+        && let Some(directory) = package_directory
+        && !directory.path().search_path().is_standard_library()
+        && directory.path().is_directory(context)
     {
-        candidate.py_typed = package_path
+        candidate.py_typed = directory
+            .path()
             .py_typed(context)
             .inherit_parent(candidate.py_typed);
         candidate.module = ResolvedModule::NamespacePackage;
+        candidate.directory = directory;
         return Ok(());
     }
 
     Err(())
 }
 
-/// Uses the parent directory's entries to reject candidates that cannot exist without performing
-/// individual file-system probes for every supported module layout.
-fn candidate_may_exist(
-    context: &ResolverContext,
-    candidate: &ModuleResolutionCandidate,
-    module_name: &str,
-) -> bool {
-    let Some(parent) = candidate.path.to_system_path() else {
-        return true;
-    };
-
-    let Ok(listing) = directory_listing(context.db, &parent) else {
-        return false;
-    };
-
-    // Other suffixes are harmless false positives; the normal probes still determine whether the
-    // module exists.
-    listing.contains_name_with_prefix(module_name)
-}
-
-type ResolvedNames = Vec<ModuleResolutionCandidate>;
+type ResolvedNames<'db> = Vec<ModuleResolutionCandidate<'db>>;
 
 /// If `module` exists on disk with an extension permitted by the resolver's mode, return its
 /// [`File`].
@@ -1794,28 +1828,34 @@ pub(super) fn resolve_file_module(
     module: &ModulePath,
     resolver_state: &ResolverContext,
 ) -> Option<File> {
-    resolve_file_module_with_filter(module, resolver_state, ComponentFileFilter::ByMode)
+    let name = module.file_stem()?;
+    let mut parent = module.clone();
+    parent.pop();
+    resolve_file_module_with_filter(
+        &ModuleDirectory::new(resolver_state, parent),
+        resolver_state,
+        name,
+        ComponentFileFilter::ByMode,
+    )
 }
 
 fn resolve_file_module_with_filter(
-    module: &ModulePath,
+    directory: &ModuleDirectory,
     resolver_state: &ResolverContext,
+    name: &str,
     filter: ComponentFileFilter,
 ) -> Option<File> {
     let stub_file = if resolver_state.mode.is_typing() {
-        module.with_pyi_extension().to_file(resolver_state)
+        directory.resolve_file(resolver_state, &format_compact!("{name}.pyi"))
     } else {
         None
     };
+
     if filter == ComponentFileFilter::StubOnly {
         return stub_file;
     }
 
-    stub_file.or_else(|| {
-        module
-            .with_py_extension()
-            .and_then(|path| path.to_file(resolver_state))
-    })
+    stub_file.or_else(|| directory.resolve_file(resolver_state, &format_compact!("{name}.py")))
 }
 
 /// Determines whether a package is a legacy namespace package.

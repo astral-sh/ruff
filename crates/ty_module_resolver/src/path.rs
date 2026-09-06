@@ -6,10 +6,10 @@ use std::sync::Arc;
 
 use camino::{Utf8Path, Utf8PathBuf};
 use ruff_db::files::{
-    File, FilePath, directory_listing, system_path_to_file, vendored_path_to_file,
+    DirectoryListing, File, FilePath, directory_listing, system_path_to_file, vendored_path_to_file,
 };
 use ruff_db::source::source_text;
-use ruff_db::system::{System, SystemPath, SystemPathBuf};
+use ruff_db::system::{FileType, System, SystemPath, SystemPathBuf};
 use ruff_db::vendored::{VendoredPath, VendoredPathBuf};
 
 use crate::Db;
@@ -84,6 +84,14 @@ impl ModulePath {
 
     pub(crate) fn pop(&mut self) -> bool {
         self.relative_path.pop()
+    }
+
+    /// Returns the last path component without its extension.
+    ///
+    /// For example, `acme/tools` and `acme/tools.py` yield `tools`,
+    /// while `acme/__init__.pyi` yields `__init__`.
+    pub(super) fn file_stem(&self) -> Option<&str> {
+        self.relative_path.file_stem()
     }
 
     pub(super) fn search_path(&self) -> &SearchPath {
@@ -226,8 +234,30 @@ impl ModulePath {
         }
     }
 
+    /// Returns the path within the vendored filesystem, if this is a vendored module.
+    pub(crate) fn to_vendored_path(&self) -> Option<VendoredPathBuf> {
+        Some(
+            self.search_path
+                .as_vendored_path()?
+                .join(&self.relative_path),
+        )
+    }
+
+    /// Returns the file at this path, checking its exact filename and availability
+    /// for the configured Python version.
+    ///
+    /// Callers resolving several files in one directory can reuse a [`ModuleDirectory`].
+    #[cfg(test)]
     #[must_use]
     pub(super) fn to_file(&self, resolver: &ResolverContext) -> Option<File> {
+        let filename = self.relative_path.file_name()?;
+        let mut parent = self.clone();
+        parent.pop();
+        ModuleDirectory::new(resolver, parent).resolve_file(resolver, filename)
+    }
+
+    /// Converts a filename already checked by `ModuleDirectory::resolve_file`.
+    fn to_file_unchecked(&self, resolver: &ResolverContext) -> Option<File> {
         let db = resolver.db;
         let ModulePath {
             search_path,
@@ -238,17 +268,17 @@ impl ModulePath {
             | SearchPathInner::FirstParty(search_path)
             | SearchPathInner::SitePackages(search_path)
             | SearchPathInner::Editable(search_path) => {
-                system_path_to_file_if_listed(db, &search_path.join(relative_path))
+                system_path_to_file(db, search_path.join(relative_path)).ok()
             }
             SearchPathInner::StandardLibraryReal(search_path) => {
-                system_path_to_file_if_listed(db, &search_path.join(relative_path))
+                system_path_to_file(db, search_path.join(relative_path)).ok()
             }
             SearchPathInner::StandardLibraryCustom(stdlib_root) => {
                 match query_stdlib_version(relative_path, resolver) {
                     TypeshedVersionsQueryResult::DoesNotExist => None,
                     TypeshedVersionsQueryResult::Exists
                     | TypeshedVersionsQueryResult::MaybeExists => {
-                        system_path_to_file_if_listed(db, &stdlib_root.join(relative_path))
+                        system_path_to_file(db, stdlib_root.join(relative_path)).ok()
                     }
                 }
             }
@@ -315,6 +345,7 @@ impl ModulePath {
         }
     }
 
+    #[cfg(test)]
     #[must_use]
     pub(crate) fn with_pyi_extension(&self) -> Self {
         let ModulePath {
@@ -327,6 +358,7 @@ impl ModulePath {
         }
     }
 
+    #[cfg(test)]
     #[must_use]
     pub(crate) fn with_py_extension(&self) -> Option<Self> {
         if self.is_standard_library() {
@@ -385,6 +417,100 @@ impl PartialEq<ModulePath> for VendoredPathBuf {
     }
 }
 
+/// A directory path bound to its entries for exact filename lookup.
+///
+/// The path cannot be changed independently of the listing. File lookup always checks
+/// the entry's spelling before querying its status, even on case-insensitive filesystems.
+/// Filesystem entries borrow Salsa's cached listing; vendored files use the archive.
+#[derive(Debug, Clone)]
+pub(crate) struct ModuleDirectory<'db> {
+    path: ModulePath,
+    listing: Option<&'db DirectoryListing>,
+}
+
+impl<'db> ModuleDirectory<'db> {
+    /// Reads the entries for `path`, retaining them with that path.
+    pub(crate) fn new(context: &ResolverContext<'db>, path: ModulePath) -> Self {
+        let listing = path
+            .to_system_path()
+            .and_then(|path| directory_listing(context.db, &path).ok());
+        Self { path, listing }
+    }
+
+    /// Returns the directory's path without permitting it to change.
+    pub(crate) fn path(&self) -> &ModulePath {
+        &self.path
+    }
+
+    /// Consumes the directory, discarding its listing and returning its path.
+    pub(crate) fn into_path(self) -> ModulePath {
+        self.path
+    }
+
+    /// Returns the cached filesystem listing, if this is an accessible filesystem directory.
+    pub(crate) fn system_listing(&self) -> Option<&'db DirectoryListing> {
+        self.listing
+    }
+
+    /// Returns whether an entry could provide this module name.
+    ///
+    /// Other suffixes are harmless false positives; file lookup checks the exact name.
+    /// Vendored paths are checked directly against the archive during file lookup.
+    pub(crate) fn may_contain_name(&self, name: &str) -> bool {
+        self.path.search_path.as_vendored_path().is_some()
+            || self
+                .listing
+                .is_some_and(|listing| listing.contains_name_with_prefix(name))
+    }
+
+    /// Returns whether a child could be a directory, leaving symlink targets unchecked.
+    pub(crate) fn may_contain_directory(&self, context: &ResolverContext, name: &str) -> bool {
+        if let Some(path) = self.path.to_vendored_path() {
+            context.vendored().is_directory(path.join(name))
+        } else {
+            matches!(
+                self.listing.and_then(|listing| listing.file_type(name)),
+                Some(FileType::Directory | FileType::Symlink)
+            )
+        }
+    }
+
+    /// Resolves one exact filename in this directory, validating file status,
+    /// symlink targets, and typeshed availability for the configured Python version.
+    ///
+    /// Only a single filename component is accepted. Callers cannot substitute another
+    /// directory's listing or bypass exact spelling checks before file conversion.
+    pub(crate) fn resolve_file(&self, context: &ResolverContext, filename: &str) -> Option<File> {
+        if Utf8Path::new(filename).file_name() != Some(filename) || filename.contains('\\') {
+            return None;
+        }
+
+        // Typeshed supplies stubs, including when a runtime lookup reaches a custom
+        // typeshed directory. The real standard library still permits `.py` files.
+        if self.path.is_standard_library() && Utf8Path::new(filename).extension() == Some("py") {
+            return None;
+        }
+
+        // The filesystem can accept a differently cased filename, so check the listing
+        // first. Symlinks remain candidates until file conversion checks their targets.
+        // This also avoids constructing and interning paths for absent alternatives.
+        if self.path.search_path.as_vendored_path().is_none()
+            && !matches!(
+                self.listing.and_then(|listing| listing.file_type(filename)),
+                Some(FileType::File | FileType::Symlink)
+            )
+        {
+            return None;
+        }
+
+        let path = ModulePath {
+            search_path: self.path.search_path.clone(),
+            relative_path: self.path.relative_path.join(filename),
+        };
+        path.to_file_unchecked(context)
+    }
+}
+
 fn directory_contains_file(db: &dyn Db, directory: &SystemPath, names: &[&str]) -> bool {
     let Ok(listing) = directory_listing(db, directory) else {
         return false;
@@ -393,19 +519,6 @@ fn directory_contains_file(db: &dyn Db, directory: &SystemPath, names: &[&str]) 
     names
         .iter()
         .any(|name| listing.entry_is_file(db, directory, name))
-}
-
-fn system_path_to_file_if_listed(db: &dyn Db, path: &SystemPath) -> Option<File> {
-    let Some((parent, name)) = path.parent().zip(path.file_name()) else {
-        return system_path_to_file(db, path).ok();
-    };
-
-    let listing = directory_listing(db, parent).ok()?;
-    if listing.entry_is_file(db, parent, name) {
-        system_path_to_file(db, path).ok()
-    } else {
-        None
-    }
 }
 
 fn system_path_is_directory(db: &dyn Db, path: &SystemPath) -> bool {
