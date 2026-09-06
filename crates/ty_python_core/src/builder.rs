@@ -524,7 +524,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         // Note `node` is guaranteed to be a child of `self.module`
         let node_with_kind = node.to_kind(self.module);
 
-        let scope = Scope::new(parent, node_with_kind, children_start..children_start);
+        let scope = Scope::new(
+            parent,
+            node_with_kind,
+            children_start..children_start,
+            self.active_boolean_test_scope.is_some(),
+        );
         let scope_kind = scope.kind();
         self.exception_context_stack_manager.enter_nested_scope();
 

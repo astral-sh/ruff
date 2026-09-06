@@ -133,6 +133,9 @@ pub struct Scope {
 
     /// The range of [`FileScopeId`]s that are descendants of this scope.
     descendants: Range<FileScopeId>,
+
+    /// Whether this scope's defining expression is nested in a boolean test.
+    in_boolean_test: bool,
 }
 
 impl Scope {
@@ -140,16 +143,24 @@ impl Scope {
         parent: Option<FileScopeId>,
         node: NodeWithScopeKind,
         descendants: Range<FileScopeId>,
+        in_boolean_test: bool,
     ) -> Self {
         Scope {
             parent,
             node,
             descendants,
+            in_boolean_test,
         }
     }
 
     pub fn parent(&self) -> Option<FileScopeId> {
         self.parent
+    }
+
+    /// Whether this scope occurs within an enclosing expression that Python tests for truthiness.
+    /// For example, the comprehension scope in `if any(x for x in items if predicate(x)):` does.
+    pub fn is_in_boolean_test(&self) -> bool {
+        self.in_boolean_test
     }
 
     pub fn node(&self) -> &NodeWithScopeKind {

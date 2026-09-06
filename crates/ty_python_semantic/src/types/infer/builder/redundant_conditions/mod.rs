@@ -2,7 +2,8 @@
 //! These may be reported under either `redundant-condition` or `redundant-condition-strict`.
 //!
 //! This module classifies tests and selects which expressions to report. [`exemptions`] handles
-//! assertions, defensive branches, and environment checks; [`diagnostic`] builds messages and fixes.
+//! assertions, defensive branches, calls returning `None`, and environment checks;
+//! [`diagnostic`] builds messages and fixes.
 //!
 //! ## How we check compound conditions
 //!
@@ -67,7 +68,7 @@ use crate::{
     },
 };
 
-use self::exemptions::RedundantConditionContext;
+pub(super) use self::exemptions::RedundantConditionContext;
 
 /// Classification of a redundant condition.
 ///
@@ -298,7 +299,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// always false.
     ///
     /// Tests in a different scope, such as a lambda body, are checked when that scope is inferred.
-    pub(super) fn check_condition_redundancy(&self, test: &ast::Expr, test_type: Type<'db>) {
+    pub(super) fn check_condition_redundancy(
+        &self,
+        test: &ast::Expr,
+        test_type: Type<'db>,
+        context: RedundantConditionContext,
+    ) {
         if !self.should_check_redundant_conditions() {
             return;
         }
@@ -316,7 +322,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 truthiness,
                 evaluation: ExpressionContext::Condition,
             },
-            RedundantConditionContext::Standalone,
+            context,
         ) {
             self.report_redundant_condition(&condition);
         }
@@ -376,7 +382,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 truthiness: operand_truthiness,
                 evaluation: ExpressionContext::Value,
             },
-            RedundantConditionContext::Standalone,
+            RedundantConditionContext::Expression,
         ) {
             self.report_redundant_condition(&condition);
         }

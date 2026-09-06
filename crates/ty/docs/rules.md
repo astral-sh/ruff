@@ -4903,39 +4903,37 @@ def f(): ...
 value = not f  # error: [redundant-condition]
 ```
 
-**Known issues and workarounds**
+**Calls returning `None`**
 
 
-This rule can sometimes trigger on code that is not incorrect, but could be written in a clearer
-way. For example, the rule will flag this code:
+Calls returning `None` are often used for their side effects in conditional expressions,
+comprehension filters, and standalone `not` expressions. Both redundant-condition rules exempt these
+calls, including calls used as operands of `and`, `or`, and `not` in these contexts:
 
 ```py
 def find_duplicate_coordinates(coordinates: list[tuple[int, int]]):
     seen: set[tuple[int, int]] = set()
-    # error: [redundant-condition] "Expression `seen.add(coord)` is always falsy (has type `None`)"
     duplicates = {coord for coord in coordinates if coord in seen or seen.add(coord)}
     print(f"Duplicates are {duplicates}")
 ```
 
-The error here is triggered due to `seen.add(coord)` being used in a boolean expression, despite the
-fact that `set.add()` always returns `None`. Here this is deliberate: `set.add()` is being used for
-its side effect.
+Here, `seen.add(coord)` records each new coordinate while its `None` result excludes that coordinate
+from the set of duplicates.
 
-To workaround this issue, the above code could be rewritten like this, which may also be easier for
-some readers to understand:
+The exemption does not apply when these expressions are nested inside an outer boolean test, or when
+the call itself is a statement condition:
 
 ```py
-def find_duplicate_coordinates(coordinates: list[tuple[int, int]]):
-    seen: set[tuple[int, int]] = set()
-    duplicates: set[tuple[int, int]] = set()
+def record() -> None: ...
 
-    for coord in coordinates:
-        if coord in seen:
-            duplicates.add(coord)
-        else:
-            seen.add(coord)
 
-    print(f"Duplicates are {duplicates}")
+def check(flag: bool, other_flag: bool):
+    if record():  # error: [redundant-condition]
+        pass
+    if not record():  # error: [redundant-condition]
+        pass
+    if flag if record() else other_flag:  # error: [redundant-condition]
+        pass
 ```
 
 ## `redundant-condition-strict`
@@ -5078,6 +5076,19 @@ def do_something(coinflip: bool):
 
 Unlike `and` and `or`, however, `not` explicitly converts its operand to a boolean, so the rule
 checks `not` expressions in every context.
+
+Both redundant-condition rules exempt calls returning `None` in conditional expressions,
+comprehension filters, and standalone `not` expressions, provided these expressions are not nested
+inside an outer boolean test. Such calls are often used for their side effects. This includes calls
+containing walrus arguments that would otherwise be reported by this rule:
+
+```py
+def record(value: int) -> None: ...
+
+
+selected = 1 if record(value := 1) else 2
+negated = not record(value := 2)
+```
 
 Another exemption applied by this rule concerns `assert`-statement tests. A common pattern in Python
 code is to use defensive `assert`s to enforce behaviour at runtime, even when the asserted condition

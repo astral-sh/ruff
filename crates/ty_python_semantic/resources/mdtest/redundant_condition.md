@@ -3913,6 +3913,150 @@ unreachable region, so we special-case a literal `None` too:
 assert None  # no diagnostic
 ```
 
+## Calls returning `None` in expression tests
+
+Calls returning `None` are often used for their side effects in conditional expressions,
+comprehension filters, and standalone `not` expressions. We exempt these calls from both rules,
+including when they are operands of `and`, `or`, or `not` in these contexts.
+
+```py
+def record(value: object) -> None: ...
+def expression_tests(flag: bool):
+    selected = 1 if record(flag) else 2
+    selected = 1 if flag and record(flag) else 2
+    selected = 1 if flag or record(flag) else 2
+    selected = 1 if not record(flag) else 2
+    negated = not record(flag)
+    negated = not (flag or record(flag))
+    negated = not not record(flag)
+```
+
+The same exemption applies to every kind of comprehension and to generator expressions. For example,
+`seen.add(item)` below records each new item while its `None` result excludes that item from the set
+of duplicates.
+
+```py
+def comprehension_tests(items: list[int]):
+    recorded = [item for item in items if record(item)]
+    recorded_set = {item for item in items if not record(item)}
+    recorded_dict = {item: item for item in items if record(item)}
+    recorded_generator = (item for item in items if not record(item))
+
+    seen: set[int] = set()
+    duplicates = {item for item in items if item in seen or seen.add(item)}
+```
+
+A call containing a walrus expression would normally fall under `redundant-condition-strict`. It is
+also exempt if it returns `None` in one of these contexts.
+
+```py
+def calls_with_walruses(items: list[int]):
+    selected = 1 if record(value := 1) else 2
+    negated = not record(value := 2)
+    recorded = [item for item in items if record(value := item)]
+```
+
+## Calls returning `None` in statement conditions
+
+Calls returning `None` are still reported in statement conditions. In these contexts, relying on the
+call's falsy result is more likely to be a mistake.
+
+```py
+def record(value: object = None) -> None: ...
+def statement_tests(flag: bool):
+    if record():  # error: [redundant-condition]
+        pass
+    elif record(value := 1):  # error: [redundant-condition-strict]
+        pass
+    while record():  # error: [redundant-condition]
+        pass
+    match flag:
+        case _ if record():  # error: [redundant-condition]
+            pass
+    assert record()  # error: [redundant-condition]
+```
+
+Conditional and `not` expressions nested in an outer boolean test do not receive the exemption. This
+includes tests inside call arguments, even though they do not directly determine the enclosing
+call's truthiness.
+
+```py
+def accepts(value: object) -> bool:
+    return bool(value)
+
+def nested_tests(flag: bool, other_flag: bool):
+    if not record():  # error: [redundant-condition]
+        pass
+    if flag if record() else other_flag:  # error: [redundant-condition]
+        pass
+    if accepts(not record()):  # error: [redundant-condition]
+        pass
+    if accepts(1 if record(value := 1) else 2):  # error: [redundant-condition-strict]
+        pass
+    selected = 1 if accepts(not record()) else 2  # error: [redundant-condition]
+```
+
+Comprehensions, generators, and lambdas have their own scopes, but tests within them can still be
+nested in an outer boolean condition. These tests are also reported. The final two expressions are
+outside those conditions, so the exemption applies again.
+
+```py
+def nested_scopes(items: list[int]):
+    if [item for item in items if record(item)]:  # error: [redundant-condition]
+        pass
+    if {item for item in items if not record(item)}:  # error: [redundant-condition]
+        pass
+    if {item: item for item in items if record(item)}:  # error: [redundant-condition]
+        pass
+    if any(item for item in items if not record(item)):  # error: [redundant-condition]
+        pass
+    if accepts(lambda: not record()):  # error: [redundant-condition]
+        pass
+    if accepts(lambda: 1 if record() else 2):  # error: [redundant-condition]
+        pass
+
+    recorded = [item for item in items if record(item)]
+    negate = lambda: not record()
+```
+
+## Other always-falsy expression tests
+
+The exemption requires a call whose inferred return type is `None`. We still report other
+always-falsy return types, saved `None` values, and calls wrapped in a walrus expression.
+
+```py
+from typing import Literal
+
+def empty() -> Literal[""]:
+    return ""
+
+def false() -> Literal[False]:
+    return False
+
+def record() -> None: ...
+def other_tests(value: None):
+    selected = 1 if empty() else 2  # error: [redundant-condition]
+    negated = not empty()  # error: [redundant-condition]
+    filtered = [item for item in range(3) if empty()]  # error: [redundant-condition]
+    negated = not false()  # error: [redundant-condition-strict]
+
+    selected = 1 if value else 2  # error: [redundant-condition]
+    negated = not value  # error: [redundant-condition]
+    filtered = [item for item in range(3) if value]  # error: [redundant-condition]
+
+    selected = 1 if (saved := record()) else 2  # error: [redundant-condition-strict]
+    negated = not (saved := record())  # error: [redundant-condition-strict]
+    filtered = [item for item in range(3) if (saved := record())]  # error: [redundant-condition-strict]
+```
+
+An awaited call is an `await` expression, so it does not receive the call exemption.
+
+```py
+async def async_record() -> None: ...
+async def awaited_test():
+    negated = not await async_record()  # error: [redundant-condition]
+```
+
 ## Defensive assertions
 
 Assertion tests and their subexpressions are exempt from both rules when their inferred value type
