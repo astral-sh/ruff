@@ -541,6 +541,7 @@ fn accumulate_constraint<'db>(
 }
 
 const COMPLETION_PREDICATE_CHUNK_SIZE: usize = 16;
+const COMPLETION_PREDICATE_PREFIX_THRESHOLD: usize = 256;
 const REACHABILITY_EVALUATION_CHUNK_SIZE: usize = 256;
 const CONTROL_FLOW_REACHABILITY_CHECKPOINT_INTERVAL: usize = 16;
 const NARROWING_EVALUATION_CHECKPOINT_INTERVAL: usize = 8;
@@ -581,30 +582,22 @@ fn predicate_scope<'db>(db: &'db dyn Db, predicate: &Predicate<'db>) -> ScopeId<
 /// incomplete block is left for the reachability walk: it can add at most 15 nested completion
 /// queries, and analyzing it eagerly would bypass the range query's cycle recovery and could introduce a
 /// divergent inference cycle. For large scopes, keeping the complete-block pass unconditional
-/// ensures that tracked callers record the same dependencies on every thread. Small scopes do not
-/// need prefix warming to bound the Salsa stack, so their predicates are evaluated entirely on demand.
+/// ensures that tracked callers record the same dependencies on every thread. Scopes with at most
+/// [`COMPLETION_PREDICATE_PREFIX_THRESHOLD`] completion predicates are evaluated entirely on demand:
+/// their dependency chains are already bounded, and range queries would add overhead.
 fn analyze_completion_prefix<'db>(
     db: &'db dyn Db,
     predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
     root_predicate: ScopedPredicateId,
 ) -> bool {
-    let scope = predicate_scope(db, &predicates[root_predicate]);
-    let has_many_completions = predicates
-        .iter()
-        .filter(|predicate| {
-            matches!(
-                predicate.node,
-                PredicateNode::IsNonTerminalCall(_) | PredicateNode::ExpressionCanComplete { .. }
-            )
-        })
-        .nth(COMPLETION_PREDICATE_CHUNK_SIZE)
-        .is_some();
-
-    if !has_many_completions {
+    if predicates.len() <= COMPLETION_PREDICATE_PREFIX_THRESHOLD {
         return false;
     }
-
+    let scope = predicate_scope(db, &predicates[root_predicate]);
     let completion_predicates = completion_predicates(db, scope);
+    if completion_predicates.len() <= COMPLETION_PREDICATE_PREFIX_THRESHOLD {
+        return false;
+    }
     let completion_count =
         completion_predicates.partition_point(|predicate| *predicate <= root_predicate);
     let mut start = 0;
@@ -624,8 +617,9 @@ fn analyze_completion_prefix<'db>(
 
 /// Returns completion predicates for statement calls and boolean evaluation boundaries in source order.
 ///
-/// This tracked index is used only once a scope exceeds [`COMPLETION_PREDICATE_CHUNK_SIZE`], avoiding
-/// a persistent allocation for the common case of scopes with few completion predicates.
+/// Only scopes with more than [`COMPLETION_PREDICATE_PREFIX_THRESHOLD`] predicates use this
+/// tracked index. Smaller scopes need no persistent allocation; larger scopes reuse the index
+/// both to count completion predicates and to find the prefix that needs analysis.
 #[salsa::tracked(returns(deref), heap_size = get_size2::GetSize::get_heap_size)]
 fn completion_predicates<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Box<[ScopedPredicateId]> {
     use_def_map(db, scope)
@@ -871,17 +865,9 @@ fn evaluate_reachability_checkpoint<'db>(
 ) -> Truthiness {
     let use_def = use_def_map(db, scope);
     let predicates = use_def.predicates();
-    let has_many_completions = predicates
-        .iter()
-        .filter(|predicate| {
-            matches!(
-                predicate.node,
-                PredicateNode::IsNonTerminalCall(_) | PredicateNode::ExpressionCanComplete { .. }
-            )
-        })
-        .nth(COMPLETION_PREDICATE_CHUNK_SIZE)
-        .is_some();
-    let completion_predicates = has_many_completions.then(|| completion_predicates(db, scope));
+    let completion_predicates = (predicates.len() > COMPLETION_PREDICATE_PREFIX_THRESHOLD)
+        .then(|| completion_predicates(db, scope))
+        .filter(|predicates| predicates.len() > COMPLETION_PREDICATE_PREFIX_THRESHOLD);
     ReachabilityEvaluator {
         scope,
         constraints: use_def.reachability_constraints(),
@@ -2356,7 +2342,7 @@ mod tests {
             "        other.target.ping() and None\n",
             "        None if other.target.ping() else None\n",
         )
-        .repeat(COMPLETION_PREDICATE_CHUNK_SIZE + 1);
+        .repeat(COMPLETION_PREDICATE_PREFIX_THRESHOLD + 1);
         let a = format!(
             r#"from b import B
 
@@ -2417,7 +2403,7 @@ class TargetB:
             let mut db = setup_db();
             let source = format!(
                 "from dependency import callback\n\ndef f() -> None:\n{}",
-                format!("    {expression}\n").repeat(COMPLETION_PREDICATE_CHUNK_SIZE + 1)
+                format!("    {expression}\n").repeat(COMPLETION_PREDICATE_PREFIX_THRESHOLD + 1)
             );
             db.write_files([
                 ("/src/dependency.py", "def callback() -> None: ..."),
