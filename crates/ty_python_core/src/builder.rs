@@ -3731,6 +3731,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         if self.source_type.is_stub() || node.is_literal_expr() {
             return ScopedReachabilityConstraintId::ALWAYS_TRUE;
         }
+        // Visiting `not` already gates both outcomes on its operand completing. Its boolean
+        // result needs no additional completion predicate when an enclosing test consumes it.
+        if matches!(node, ast::Expr::UnaryOp(unary) if unary.op == ast::UnaryOp::Not) {
+            return ScopedReachabilityConstraintId::ALWAYS_TRUE;
+        }
         let expression = self
             .expressions_by_node
             .get(&node.into())

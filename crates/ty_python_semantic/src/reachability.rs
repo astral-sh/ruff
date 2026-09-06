@@ -544,6 +544,8 @@ const COMPLETION_PREDICATE_CHUNK_SIZE: usize = 16;
 const REACHABILITY_EVALUATION_CHUNK_SIZE: usize = 256;
 const CONTROL_FLOW_REACHABILITY_CHECKPOINT_INTERVAL: usize = 16;
 const NARROWING_EVALUATION_CHECKPOINT_INTERVAL: usize = 8;
+
+type ReachabilityCacheEntries = RefCell<Vec<Option<Truthiness>>>;
 fn predicate_scope<'db>(db: &'db dyn Db, predicate: &Predicate<'db>) -> ScopeId<'db> {
     match predicate.node {
         PredicateNode::Expression(expression)
@@ -696,6 +698,7 @@ fn evaluate_reachability_constraint<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
     id: ScopedReachabilityConstraintId,
+    cache: Option<&ReachabilityCacheEntries>,
 ) -> Truthiness {
     if let Some(reachability) = terminal_reachability(id) {
         return reachability;
@@ -708,15 +711,13 @@ fn evaluate_reachability_constraint<'db>(
     let has_many_completions = analyze_completion_prefix(db, predicates, root_predicate);
     let completion_predicates = has_many_completions.then(|| completion_predicates(db, scope));
 
-    evaluate_reachability_path(
-        db,
+    ReachabilityEvaluator {
         scope,
         constraints,
         predicates,
         completion_predicates,
-        id,
-        true,
-    )
+    }
+    .evaluate(db, id, true, cache)
 }
 
 /// Evaluates the normal continuation captured by a deferred `finally` predicate.
@@ -740,7 +741,7 @@ fn evaluate_finally_continuation<'db>(
     scope: ScopeId<'db>,
     continuation: ScopedReachabilityConstraintId,
 ) -> Truthiness {
-    evaluate_reachability_constraint(db, scope, continuation)
+    evaluate_reachability_constraint(db, scope, continuation, None)
 }
 
 fn terminal_reachability(id: ScopedReachabilityConstraintId) -> Option<Truthiness> {
@@ -775,44 +776,75 @@ fn is_reachability_checkpoint(
         && (checkpoint_position + 1).is_multiple_of(CONTROL_FLOW_REACHABILITY_CHECKPOINT_INTERVAL)
 }
 
-/// Walks a reachability decision diagram until it reaches a terminal or reusable checkpoint.
-///
-/// `use_checkpoint` is false only when entering from a checkpoint query. In that case, the first
-/// node is evaluated directly to prevent the query from immediately calling itself again.
-///
-/// General checkpoints are created only after traversing a genuinely long path. Their positions
-/// depend on stable predicate IDs, so adjacent roots reuse the same suffix without requiring an
-/// additional retained scope-wide index or allocating tracked queries for short, ordinary paths.
-fn evaluate_reachability_path<'db>(
-    db: &'db dyn Db,
+struct ReachabilityEvaluator<'a, 'db> {
     scope: ScopeId<'db>,
-    constraints: &ReachabilityConstraints,
-    predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
-    completion_predicates: Option<&[ScopedPredicateId]>,
-    mut id: ScopedReachabilityConstraintId,
-    mut use_checkpoint: bool,
-) -> Truthiness {
-    let env = ProgramEnvironment::from_scope(scope);
-    let mut visited = 0;
+    constraints: &'a ReachabilityConstraints,
+    predicates: &'a IndexSlice<ScopedPredicateId, Predicate<'db>>,
+    completion_predicates: Option<&'a [ScopedPredicateId]>,
+}
 
-    loop {
-        if let Some(reachability) = terminal_reachability(id) {
-            return reachability;
-        }
+impl ReachabilityEvaluator<'_, '_> {
+    /// Walks a decision diagram until it reaches a terminal or reusable checkpoint.
+    ///
+    /// `use_checkpoint` is false only when entering from a checkpoint query. In that case, the
+    /// first node is evaluated directly to prevent the query from immediately calling itself again.
+    ///
+    /// General checkpoints are created only after traversing a long path. Their positions depend
+    /// on stable predicate IDs, so adjacent roots reuse the same suffix without allocating tracked
+    /// queries for short, ordinary paths.
+    fn evaluate(
+        &self,
+        db: &dyn Db,
+        mut id: ScopedReachabilityConstraintId,
+        mut use_checkpoint: bool,
+        cache: Option<&ReachabilityCacheEntries>,
+    ) -> Truthiness {
+        let env = ProgramEnvironment::from_scope(self.scope);
+        let mut visited = 0;
+        let mut path = SmallVec::<[ScopedReachabilityConstraintId; 16]>::new();
 
-        let node = constraints.get_interior_node(id);
-        if use_checkpoint && is_reachability_checkpoint(completion_predicates, node.atom(), visited)
-        {
-            return evaluate_reachability_checkpoint(db, scope, id);
-        }
+        let result = loop {
+            if let Some(reachability) = terminal_reachability(id) {
+                break reachability;
+            }
 
-        id = match analyze_single(db, &env, &predicates[node.atom()]) {
-            Truthiness::AlwaysTrue => node.if_true(),
-            Truthiness::Ambiguous => node.if_ambiguous(),
-            Truthiness::AlwaysFalse => node.if_false(),
+            if let Some(cache) = cache
+                && let Some(result) = cache.borrow().get(id.index()).copied().flatten()
+            {
+                break result;
+            }
+            if cache.is_some() {
+                path.push(id);
+            }
+            let node = self.constraints.get_interior_node(id);
+            if use_checkpoint
+                && is_reachability_checkpoint(self.completion_predicates, node.atom(), visited)
+            {
+                break evaluate_reachability_checkpoint(db, self.scope, id);
+            }
+
+            id = match analyze_single(db, &env, &self.predicates[node.atom()]) {
+                Truthiness::AlwaysTrue => node.if_true(),
+                Truthiness::Ambiguous => node.if_ambiguous(),
+                Truthiness::AlwaysFalse => node.if_false(),
+            };
+            use_checkpoint = true;
+            visited += 1;
         };
-        use_checkpoint = true;
-        visited += 1;
+
+        // Every node on the evaluated path has the same result. Keep its suffixes in the
+        // inference-local cache so other bindings can reuse them without walking them again.
+        if let Some(cache) = cache {
+            let mut entries = cache.borrow_mut();
+            for id in path {
+                let index = id.index();
+                if entries.len() <= index {
+                    entries.resize(index + 1, None);
+                }
+                entries[index] = Some(result);
+            }
+        }
+        result
     }
 }
 
@@ -845,15 +877,13 @@ fn evaluate_reachability_checkpoint<'db>(
         .nth(COMPLETION_PREDICATE_CHUNK_SIZE)
         .is_some();
     let completion_predicates = has_many_completions.then(|| completion_predicates(db, scope));
-    evaluate_reachability_path(
-        db,
+    ReachabilityEvaluator {
         scope,
-        use_def.reachability_constraints(),
+        constraints: use_def.reachability_constraints(),
         predicates,
         completion_predicates,
-        id,
-        false,
-    )
+    }
+    .evaluate(db, id, false, None)
 }
 
 pub(crate) trait ReachabilityConstraintsExtension<'db> {
@@ -880,15 +910,13 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
 
         let root_predicate = self.get_interior_node(id).atom();
         analyze_completion_prefix(db, predicates, root_predicate);
-        evaluate_reachability_path(
-            db,
-            predicate_scope(db, &predicates[root_predicate]),
-            self,
+        ReachabilityEvaluator {
+            scope: predicate_scope(db, &predicates[root_predicate]),
+            constraints: self,
             predicates,
-            None,
-            id,
-            true,
-        )
+            completion_predicates: None,
+        }
+        .evaluate(db, id, true, None)
     }
 }
 
@@ -1385,8 +1413,7 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                             .contains(node.atom, self.place)
                             || matches!(
                                 predicate.node,
-                                PredicateNode::ExpressionCanComplete { .. }
-                                    | PredicateNode::ContextManagerSuppresses { .. }
+                                PredicateNode::ContextManagerSuppresses { .. }
                                     | PredicateNode::FinallyNormalPathImpossible { .. }
                             ))
                     {
@@ -1841,6 +1868,26 @@ fn analyze_non_empty_iterable(db: &dyn Db, iterable: Expression) -> Truthiness {
     }
 }
 
+/// Cache the whole predicate so repeated reachability walks can reuse one query result
+/// instead of looking up the expression's type and suppression behavior separately.
+#[salsa::tracked(
+    returns(copy),
+    cycle_initial = |_, _, _, _| false,
+    heap_size = get_size2::GetSize::get_heap_size
+)]
+fn context_manager_suppresses<'db>(
+    db: &'db dyn Db,
+    expression: Expression<'db>,
+    is_async: bool,
+) -> bool {
+    let env = ProgramEnvironment::from_scope(expression.scope(db));
+    infer_same_file_expression_type(db, expression, TypeContext::default()).can_suppress_exceptions(
+        db,
+        &env,
+        EvaluationMode::from_is_async(is_async),
+    )
+}
+
 /// Evaluate a condition without re-testing intermediate short-circuit results.
 ///
 /// `None` means evaluation cannot produce a result, as for an operand narrowed to `Never`.
@@ -1979,11 +2026,8 @@ fn analyze_single(db: &dyn Db, env: &ProgramEnvironment<'_>, predicate: &Predica
         PredicateNode::ContextManagerSuppresses {
             expression,
             is_async,
-        } => Truthiness::from(
-            infer_same_file_expression_type(db, expression, TypeContext::default())
-                .can_suppress_exceptions(db, env, EvaluationMode::from_is_async(is_async)),
-        )
-        .negate_if(!predicate.is_positive),
+        } => Truthiness::from(context_manager_suppresses(db, expression, is_async))
+            .negate_if(!predicate.is_positive),
         PredicateNode::FinallyNormalPathImpossible {
             scope,
             continuation,
@@ -2103,7 +2147,7 @@ pub(crate) fn evaluate_reachability(
 pub(crate) struct ReachabilityEvaluationCache<'db> {
     primary_scope: ScopeId<'db>,
     primary_constraints: usize,
-    primary_entries: RefCell<Vec<Option<Truthiness>>>,
+    primary_entries: ReachabilityCacheEntries,
     other_entries: RefCell<FxHashMap<(usize, ScopedReachabilityConstraintId), Truthiness>>,
 }
 
@@ -2155,7 +2199,7 @@ impl<'db> ReachabilityEvaluationCache<'db> {
                 return result;
             }
 
-            let result = evaluate_reachability_constraint(db, scope, id);
+            let result = evaluate_reachability_constraint(db, scope, id, None);
             self.other_entries.borrow_mut().insert(key, result);
             return result;
         }
@@ -2165,13 +2209,7 @@ impl<'db> ReachabilityEvaluationCache<'db> {
             return result;
         }
 
-        let result = evaluate_reachability_constraint(db, self.primary_scope, id);
-        let mut entries = self.primary_entries.borrow_mut();
-        if entries.len() <= index {
-            entries.resize(index + 1, None);
-        }
-        entries[index] = Some(result);
-        result
+        evaluate_reachability_constraint(db, self.primary_scope, id, Some(&self.primary_entries))
     }
 }
 
@@ -2359,6 +2397,7 @@ class TargetB:
                         &db,
                         scope,
                         use_def.end_of_scope_reachability(),
+                        None,
                     )
                     .may_be_true()
                 );
@@ -2373,8 +2412,13 @@ class TargetB:
             let scope = function_scope.to_scope_id(&db, program_file);
             let use_def = use_def_map(&db, scope);
             assert!(
-                evaluate_reachability_constraint(&db, scope, use_def.end_of_scope_reachability(),)
-                    .is_always_false()
+                evaluate_reachability_constraint(
+                    &db,
+                    scope,
+                    use_def.end_of_scope_reachability(),
+                    None
+                )
+                .is_always_false()
             );
         }
         Ok(())
