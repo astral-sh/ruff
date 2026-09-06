@@ -747,14 +747,12 @@ struct Conjunctions<'db> {
 
 impl<'db> Conjunctions<'db> {
     fn singleton(ty: Type<'db>) -> Self {
-        Self {
-            conjuncts: smallvec![NarrowingOperation::Intersection(ty)],
-        }
+        Self::from_operation(NarrowingOperation::Intersection(ty))
     }
 
-    fn generic_filtering(ty: Type<'db>) -> Self {
+    fn from_operation(operation: NarrowingOperation<'db>) -> Self {
         Self {
-            conjuncts: smallvec![NarrowingOperation::GenericFiltering(ty)],
+            conjuncts: smallvec![operation],
         }
     }
 
@@ -1071,30 +1069,32 @@ fn specialize_generic_class_from_solutions<'db>(
 ///
 /// For example:
 /// - `f(x) and g(x)` where f returns `TypeIs[A]` and g returns `TypeGuard[B]`
-///   => and
-///   ===> `NarrowingConstraint { intersection_disjuncts: [A], replacement_disjuncts: [] }`
-///   ===> `NarrowingConstraint { intersection_disjuncts: [], replacement_disjuncts: [B] }`
-///   => `NarrowingConstraint { intersection_disjuncts: [], replacement_disjuncts: [B] }`
-///   => evaluates to `B` (`TypeGuard` clobbers any previous type information)
+///   combines `Intersection(A)` and `Replacement(B)` into `Replacement(B)`. It evaluates to `B`
+///   because `TypeGuard` replaces previously known type information.
 ///
 /// - `f(x) or g(x)` where f returns `TypeIs[A]` and g returns `TypeGuard[B]`
-///   => or
-///   ===> `NarrowingConstraint { intersection_disjuncts: [A], replacement_disjuncts: [] }`
-///   ===> `NarrowingConstraint { intersection_disjuncts: [], replacement_disjuncts: [B] }`
-///   => `NarrowingConstraint { intersection_disjuncts: [A], replacement_disjuncts: [B] }`
-///   => evaluates to `(P & A) | B`, where `P` is our previously-known type
+///   keeps both disjuncts and evaluates to `(P & A) | B`, where `P` is the previously known type.
+#[derive(Hash, PartialEq, Debug, Eq, Clone, Default, get_size2::GetSize, salsa::SalsaValue)]
+pub(crate) struct NarrowingConstraint<'db>(NarrowingConstraintKind<'db>);
+
+/// Store a single narrowing operation inline; only combined conditions need a separate payload.
+#[derive(Hash, PartialEq, Debug, Eq, Clone, Default, get_size2::GetSize, salsa::SalsaValue)]
+enum NarrowingConstraintKind<'db> {
+    #[default]
+    Empty,
+    Intersection(NarrowingOperation<'db>),
+    Replacement(NarrowingOperation<'db>),
+    Combined(Box<CombinedNarrowingConstraint<'db>>),
+}
+
 #[derive(Hash, PartialEq, Debug, Eq, Clone, get_size2::GetSize, salsa::SalsaValue)]
-pub(crate) struct NarrowingConstraint<'db> {
-    /// Intersection constraint (from `isinstance()` narrowing comparisons, `TypeIs`, and
-    /// similar). We keep these as a disjunction of conjunctions to avoid constructing
-    /// union/intersection types while merging constraints.
+struct CombinedNarrowingConstraint<'db> {
+    /// Intersection constraints are retained as disjunctions of conjunctions to avoid eagerly
+    /// constructing union and intersection types when combining conditions.
     intersection_disjuncts: SmallVec<[Conjunctions<'db>; 1]>,
 
-    /// "Replacement" constraints: instead of intersecting the previous type with a new type,
-    /// the previous type is simply replaced wholesale with the new type. A common use case for
-    /// these constraints is `typing.TypeGuard`. We can't eagerly union disjunctions because
-    /// `TypeGuard` clobbers the previously-known type; within each replacement disjunct, however,
-    /// we may eagerly intersect conjunctions with a later intersection narrowing.
+    /// Replacement constraints, such as `TypeGuard`, replace the previously known type.
+    /// An intersection following a replacement still applies within its disjunct.
     replacement_disjuncts: SmallVec<[Conjunctions<'db>; 1]>,
 }
 
@@ -1102,28 +1102,106 @@ impl<'db> NarrowingConstraint<'db> {
     /// Create an "intersection" constraint: the previous type will be
     /// intersected with this constraint
     pub(crate) fn intersection(constraint: Type<'db>) -> Self {
-        Self {
-            intersection_disjuncts: smallvec_inline![Conjunctions::singleton(constraint)],
-            replacement_disjuncts: smallvec![],
-        }
+        Self(NarrowingConstraintKind::Intersection(
+            NarrowingOperation::Intersection(constraint),
+        ))
     }
 
     /// Create an intersection constraint that preserves generic arguments already known about
     /// the subject when narrowing it to a subclass.
     fn generic_filtering(constraint: Type<'db>) -> Self {
-        Self {
-            intersection_disjuncts: smallvec_inline![Conjunctions::generic_filtering(constraint)],
-            replacement_disjuncts: smallvec![],
-        }
+        Self(NarrowingConstraintKind::Intersection(
+            NarrowingOperation::GenericFiltering(constraint),
+        ))
     }
 
     /// Create a "replacement" constraint: the previous type will be
     /// replaced wholesale with this constraint
     fn replacement(constraint: Type<'db>) -> Self {
-        Self {
-            intersection_disjuncts: smallvec![],
-            replacement_disjuncts: smallvec_inline![Conjunctions::singleton(constraint)],
+        Self(NarrowingConstraintKind::Replacement(
+            NarrowingOperation::Intersection(constraint),
+        ))
+    }
+
+    fn from_disjuncts(
+        intersection_disjuncts: SmallVec<[Conjunctions<'db>; 1]>,
+        replacement_disjuncts: SmallVec<[Conjunctions<'db>; 1]>,
+    ) -> Self {
+        match (
+            intersection_disjuncts.as_slice(),
+            replacement_disjuncts.as_slice(),
+        ) {
+            ([], []) => Self(NarrowingConstraintKind::Empty),
+            ([conjunctions], []) if let [operation] = conjunctions.conjuncts.as_slice() => {
+                Self(NarrowingConstraintKind::Intersection(*operation))
+            }
+            ([], [conjunctions]) if let [operation] = conjunctions.conjuncts.as_slice() => {
+                Self(NarrowingConstraintKind::Replacement(*operation))
+            }
+            _ => Self(NarrowingConstraintKind::Combined(Box::new(
+                CombinedNarrowingConstraint {
+                    intersection_disjuncts,
+                    replacement_disjuncts,
+                },
+            ))),
         }
+    }
+
+    fn into_disjuncts(
+        self,
+    ) -> (
+        SmallVec<[Conjunctions<'db>; 1]>,
+        SmallVec<[Conjunctions<'db>; 1]>,
+    ) {
+        match self.0 {
+            NarrowingConstraintKind::Empty => (smallvec![], smallvec![]),
+            NarrowingConstraintKind::Intersection(operation) => (
+                smallvec_inline![Conjunctions::from_operation(operation)],
+                smallvec![],
+            ),
+            NarrowingConstraintKind::Replacement(operation) => (
+                smallvec![],
+                smallvec_inline![Conjunctions::from_operation(operation)],
+            ),
+            NarrowingConstraintKind::Combined(combined) => (
+                combined.intersection_disjuncts,
+                combined.replacement_disjuncts,
+            ),
+        }
+    }
+
+    fn has_intersection_disjuncts(&self) -> bool {
+        match &self.0 {
+            NarrowingConstraintKind::Intersection(_) => true,
+            NarrowingConstraintKind::Combined(combined) => {
+                !combined.intersection_disjuncts.is_empty()
+            }
+            NarrowingConstraintKind::Empty | NarrowingConstraintKind::Replacement(_) => false,
+        }
+    }
+
+    fn disjuncts(&self, intersection: bool) -> impl Iterator<Item = Cow<'_, Conjunctions<'db>>> {
+        let single = match (intersection, &self.0) {
+            (true, NarrowingConstraintKind::Intersection(operation))
+            | (false, NarrowingConstraintKind::Replacement(operation)) => {
+                Some(Conjunctions::from_operation(*operation))
+            }
+            _ => None,
+        };
+        let combined = match (intersection, &self.0) {
+            (true, NarrowingConstraintKind::Combined(combined)) => {
+                combined.intersection_disjuncts.as_slice()
+            }
+            (false, NarrowingConstraintKind::Combined(combined)) => {
+                combined.replacement_disjuncts.as_slice()
+            }
+            _ => &[],
+        };
+
+        single
+            .into_iter()
+            .map(Cow::Owned)
+            .chain(combined.iter().map(Cow::Borrowed))
     }
 
     /// Merge two constraints, taking their intersection but respecting "replacement" semantics (with
@@ -1141,14 +1219,16 @@ impl<'db> NarrowingConstraint<'db> {
         //
         // We also intersect each LHS `replacement_disjunct` with every RHS intersection disjunct
         // to form new additional `replacement_disjuncts`.
-        if other.intersection_disjuncts.is_empty() {
+        if !other.has_intersection_disjuncts() {
             return other;
         }
 
+        let (other_intersection_disjuncts, mut new_replacement_disjuncts) = other.into_disjuncts();
         let mut new_intersection_disjuncts = smallvec![];
-        for intersection_disjunct in &self.intersection_disjuncts {
-            for other_intersection_disjunct in &other.intersection_disjuncts {
+        for intersection_disjunct in self.disjuncts(true) {
+            for other_intersection_disjunct in &other_intersection_disjuncts {
                 let merged = intersection_disjunct
+                    .as_ref()
                     .clone()
                     .and_with(other_intersection_disjunct.clone());
                 if !new_intersection_disjuncts.contains(&merged) {
@@ -1158,9 +1238,10 @@ impl<'db> NarrowingConstraint<'db> {
         }
 
         let mut additional_replacement_disjuncts: SmallVec<[Conjunctions<'db>; 1]> = smallvec![];
-        for replacement_disjunct in &self.replacement_disjuncts {
-            for other_intersection_disjunct in &other.intersection_disjuncts {
+        for replacement_disjunct in self.disjuncts(false) {
+            for other_intersection_disjunct in &other_intersection_disjuncts {
                 let merged = replacement_disjunct
+                    .as_ref()
                     .clone()
                     .and_with(other_intersection_disjunct.clone());
                 if !additional_replacement_disjuncts.contains(&merged) {
@@ -1169,22 +1250,28 @@ impl<'db> NarrowingConstraint<'db> {
             }
         }
 
-        let mut new_replacement_disjuncts = other.replacement_disjuncts;
-
         new_replacement_disjuncts.extend(additional_replacement_disjuncts);
 
-        NarrowingConstraint {
-            intersection_disjuncts: new_intersection_disjuncts,
-            replacement_disjuncts: new_replacement_disjuncts,
-        }
+        Self::from_disjuncts(new_intersection_disjuncts, new_replacement_disjuncts)
     }
 
     /// Merge two constraints with OR semantics (union/disjunction).
     fn merge_constraint_or(&mut self, other: Self) {
-        self.intersection_disjuncts
-            .extend(other.intersection_disjuncts);
-        self.replacement_disjuncts
-            .extend(other.replacement_disjuncts);
+        if let NarrowingConstraintKind::Combined(combined) = &mut self.0 {
+            let (intersection_disjuncts, replacement_disjuncts) = other.into_disjuncts();
+            combined
+                .intersection_disjuncts
+                .extend(intersection_disjuncts);
+            combined.replacement_disjuncts.extend(replacement_disjuncts);
+            return;
+        }
+
+        let (mut intersection_disjuncts, mut replacement_disjuncts) =
+            std::mem::take(self).into_disjuncts();
+        let (other_intersection_disjuncts, other_replacement_disjuncts) = other.into_disjuncts();
+        intersection_disjuncts.extend(other_intersection_disjuncts);
+        replacement_disjuncts.extend(other_replacement_disjuncts);
+        *self = Self::from_disjuncts(intersection_disjuncts, replacement_disjuncts);
     }
 
     /// Evaluate the type this effectively constrains to
@@ -1195,15 +1282,26 @@ impl<'db> NarrowingConstraint<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Type<'db> {
-        let mut union = UnionBuilder::new(db, env);
-        for conjunctions in self
-            .replacement_disjuncts
-            .into_iter()
-            .chain(self.intersection_disjuncts)
-        {
-            union.add_in_place(conjunctions.evaluate_constraint_type(db, env));
+        match self.0 {
+            NarrowingConstraintKind::Intersection(operation)
+            | NarrowingConstraintKind::Replacement(operation) => {
+                let mut union = UnionBuilder::new(db, env);
+                union.add_in_place(operation.ty());
+                union.build()
+            }
+            NarrowingConstraintKind::Empty => Type::Never,
+            NarrowingConstraintKind::Combined(combined) => {
+                let mut union = UnionBuilder::new(db, env);
+                for conjunctions in combined
+                    .replacement_disjuncts
+                    .into_iter()
+                    .chain(combined.intersection_disjuncts)
+                {
+                    union.add_in_place(conjunctions.evaluate_constraint_type(db, env));
+                }
+                union.build()
+            }
         }
-        union.build()
     }
 }
 
