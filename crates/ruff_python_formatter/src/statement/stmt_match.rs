@@ -53,16 +53,13 @@ impl FormatNodeRule<StmtMatch> for FormatStmtMatch {
         while let Some(case) = cases.get(case_index) {
             let leading_case_comments = comments.leading(case);
             let Some(format_off_index) = leading_case_comments.iter().position(|comment| {
-                comment.line_position().is_own_line() && comment.is_suppression_off_comment(source)
+                comment.is_unformatted()
+                    && comment.line_position().is_own_line()
+                    && comment.is_suppression_off_comment(source)
             }) else {
                 let last_suite_in_statement = Some(case) == cases.last();
                 if case_index == 0 {
-                    write!(
-                        f,
-                        [block_indent(
-                            &case.format().with_options(last_suite_in_statement)
-                        )]
-                    )?;
+                    write!(f, [block_indent(&case.format())])?;
                 } else {
                     let last_case = &cases[case_index - 1];
                     write!(
@@ -127,10 +124,15 @@ impl FormatNodeRule<StmtMatch> for FormatStmtMatch {
                         comments.leading(&cases[on_case_index])
                     };
                     let format_on_comment = &on_comments[on_index];
-                    let last_suppressed_case = on_case_index - usize::from(!is_trailing);
+                    let last_suppressed_case = is_trailing
+                        .then_some(on_case_index)
+                        .or_else(|| on_case_index.checked_sub(1))
+                        .filter(|index| *index >= case_index);
 
-                    for suppressed_case in &cases[case_index..=last_suppressed_case] {
-                        comments.mark_verbatim_node_comments_formatted(suppressed_case.into());
+                    if let Some(last_suppressed_case) = last_suppressed_case {
+                        for suppressed_case in &cases[case_index..=last_suppressed_case] {
+                            comments.mark_verbatim_node_comments_formatted(suppressed_case.into());
+                        }
                     }
 
                     if is_trailing {

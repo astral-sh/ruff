@@ -5,3 +5,24 @@ match left, right:
     case x,    None: pass
     case x,    y   : pass
     # fmt: on
+
+
+match same_case:
+    # fmt: off
+    # fmt: on
+    case value   : pass
+
+
+match next_case:
+    # fmt: off
+    case value   : pass
+    # fmt: on
+    case other   : pass
+
+
+match outer:
+    case value:
+        match left, right:
+            # fmt: off
+            case None, y   : pass
+            # fmt: on
