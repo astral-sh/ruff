@@ -13,6 +13,9 @@ positives, it excludes conditions that meet any of these criteria:
     rather than the inferred type of the boolean test.
 - The condition uses a walrus operator (`:=`). The assignment's side effect may be intentional, even
     when its result has fixed truthiness.
+- Any subexpression of the test has type `types.NotImplementedType`. Operator annotations often omit
+    `NotImplemented` even when the implementation can return it, so checks involving this sentinel
+    can still be useful at runtime.
 
 ## Why is this bad?
 
