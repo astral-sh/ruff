@@ -5,7 +5,9 @@ use ruff_python_ast::ExprCall;
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::preview::is_fix_os_path_getmtime_enabled;
-use crate::rules::flake8_use_pathlib::helpers::check_os_pathlib_single_arg_calls;
+use crate::rules::flake8_use_pathlib::helpers::{
+    check_os_pathlib_single_arg_calls, is_file_descriptor,
+};
 use crate::{FixAvailability, Violation};
 
 /// ## What it does
@@ -68,6 +70,16 @@ impl Violation for OsPathGetmtime {
 /// PTH204
 pub(crate) fn os_path_getmtime(checker: &Checker, call: &ExprCall, segments: &[&str]) {
     if segments != ["os", "path", "getmtime"] {
+        return;
+    }
+
+    // `os.path.getmtime` delegates to `os.stat`, so it also accepts a file descriptor, which
+    // `pathlib` doesn't support.
+    if call
+        .arguments
+        .find_argument_value("filename", 0)
+        .is_some_and(|expr| is_file_descriptor(expr, checker.semantic()))
+    {
         return;
     }
 
