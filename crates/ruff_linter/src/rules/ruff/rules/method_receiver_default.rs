@@ -1,7 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::{self as ast};
-use ruff_python_semantic::analyze::function_type::{self, FunctionType, is_class_method};
+use ruff_python_semantic::analyze::function_type::is_class_method;
 use ruff_python_semantic::{Scope, ScopeKind};
 use ruff_text_size::Ranged;
 
@@ -68,7 +68,6 @@ impl Violation for MethodReceiverDefault {
 /// RUF077 — Method receiver parameter should not have a default value
 pub(crate) fn method_receiver_default(checker: &Checker, scope: &Scope) {
     let ScopeKind::Function(ast::StmtFunctionDef {
-        name,
         parameters,
         decorator_list,
         ..
@@ -87,8 +86,23 @@ pub(crate) fn method_receiver_default(checker: &Checker, scope: &Scope) {
         return;
     };
 
-    // Determine whether this function has a bound receiver parameter.
-    if !has_receiver_parameter(name.as_str(), decorator_list, parent_scope, checker) {
+    // A function with no decorators is always a method (this also covers an implicit
+    // classmethod like `__init_subclass__`), so its first parameter is always a receiver. A
+    // function with exactly one decorator has a receiver only if that decorator is the one that
+    // makes it a `@classmethod`; any other single decorator (e.g. `@staticmethod`, `@override`,
+    // a custom wrapper) or more than one decorator could change how the first parameter is
+    // bound, so we bail out rather than risk a false positive.
+    let has_receiver = match decorator_list.as_slice() {
+        [] => true,
+        [decorator] => is_class_method(
+            decorator,
+            semantic,
+            &checker.settings().pep8_naming.classmethod_decorators,
+        ),
+        _ => false,
+    };
+
+    if !has_receiver {
         return;
     }
 
@@ -120,49 +134,4 @@ pub(crate) fn method_receiver_default(checker: &Checker, scope: &Scope) {
     checker
         .report_diagnostic(MethodReceiverDefault, default_expr.range())
         .set_fix(Fix::unsafe_edit(edit));
-}
-
-/// Determine whether a function has a bound receiver parameter.
-fn has_receiver_parameter(
-    name: &str,
-    decorator_list: &[ast::Decorator],
-    parent_scope: &Scope,
-    checker: &Checker,
-) -> bool {
-    let semantic = checker.semantic();
-
-    let function_kind = function_type::classify(
-        name,
-        decorator_list,
-        parent_scope,
-        semantic,
-        &checker.settings().pep8_naming.classmethod_decorators,
-        &checker.settings().pep8_naming.staticmethod_decorators,
-    );
-
-    match function_kind {
-        // Trust the classification when there are no decorators at all (this is how an implicit
-        // classmethod like `__init_subclass__` is classified) or when there is exactly one
-        // decorator and it's the one that makes the function a classmethod. Otherwise, an
-        // unrelated decorator (`@some_decorator`) or a stacked one alongside `@classmethod` could
-        // change how the receiver is bound, so we bail out rather than risk a false positive —
-        // even for an implicit classmethod with an unrelated decorator attached.
-        FunctionType::ClassMethod => match decorator_list {
-            [] => true,
-            [decorator]
-                if is_class_method(
-                    decorator,
-                    semantic,
-                    &checker.settings().pep8_naming.classmethod_decorators,
-                ) =>
-            {
-                true
-            }
-            _ => false,
-        },
-        FunctionType::NewMethod if decorator_list.is_empty() => true,
-        FunctionType::Method if decorator_list.is_empty() => true,
-        FunctionType::Function => false,
-        _ => false,
-    }
 }
