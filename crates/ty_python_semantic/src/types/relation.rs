@@ -3767,6 +3767,11 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 })
             }
 
+            (Type::TypeIs(_) | Type::TypeGuard(_), Type::LiteralValue(literal))
+            | (Type::LiteralValue(literal), Type::TypeIs(_) | Type::TypeGuard(_)) => {
+                ConstraintSet::from_bool(self.constraints, !literal.is_bool())
+            }
+
             (Type::TypeIs(_) | Type::TypeGuard(_), Type::NominalInstance(instance))
             | (Type::NominalInstance(instance), Type::TypeIs(_) | Type::TypeGuard(_)) => {
                 // A boolean literal must be an instance of exactly `bool`
