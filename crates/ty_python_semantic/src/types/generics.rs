@@ -2301,6 +2301,29 @@ impl<'db> ApplySpecialization<'_, 'db> {
         }
     }
 
+    /// Returns whether any type variable might map to a union.
+    ///
+    /// If no substitution is a union, callable specialization cannot need `ParamSpec`
+    /// expansion. Checking the substitution values avoids reading function signatures
+    /// merely to rule out that expansion. Overrides conservatively include the underlying
+    /// mapping, even if they replace its last union-valued substitution.
+    pub(super) fn may_map_to_union(self, db: &'db dyn Db) -> bool {
+        match self {
+            Self::Specialization { specialization, .. } | Self::TypeAlias(specialization) => {
+                specialization.types(db).iter().any(|ty| ty.is_union())
+            }
+            Self::Partial { types, .. } => types.iter().any(|ty| ty.is_union()),
+            Self::ReturnCallables(_) => false,
+            Self::Single(_, ty) => ty.is_union(),
+            Self::WithBindings {
+                specialization,
+                bindings,
+            } => {
+                bindings.iter().any(|(_, ty)| ty.is_union()) || specialization.may_map_to_union(db)
+            }
+        }
+    }
+
     /// Returns the type that a typevar is mapped to, or None if the typevar isn't part of this
     /// mapping.
     pub(crate) fn get(

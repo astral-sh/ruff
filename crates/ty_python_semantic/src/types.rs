@@ -466,6 +466,10 @@ pub(crate) struct ApplyTypeMappingVisitor<'env, 'db> {
     promotion: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
     skip_promotion: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
     materialization_equivalence: OnceCell<MaterializationEquivalenceVisitor<'db>>,
+    /// Whether the specialization can require union-valued `ParamSpec` expansion.
+    /// The substitution values stay fixed for this visitor, including when materialization
+    /// polarity flips. Each `ParamSpec` expansion starts a new visitor for its bindings.
+    specialization_may_map_to_union: OnceCell<bool>,
 }
 
 impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
@@ -482,6 +486,7 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
             promotion: OnceCell::default(),
             skip_promotion: OnceCell::default(),
             materialization_equivalence: OnceCell::default(),
+            specialization_may_map_to_union: OnceCell::default(),
         }
     }
 
@@ -8722,6 +8727,13 @@ impl<'db> Type<'db> {
         if let TypeMapping::ApplySpecialization(specialization)
         | TypeMapping::ApplySpecializationWithMaterialization { specialization, .. } =
             type_mapping
+            && matches!(
+                self,
+                Type::FunctionLiteral(_) | Type::BoundMethod(_) | Type::Callable(_)
+            )
+            && *visitor
+                .specialization_may_map_to_union
+                .get_or_init(|| specialization.may_map_to_union(db))
         {
             let function_signatures = |function: FunctionType<'db>| {
                 if specialization.preserves_lazy_signatures() {
