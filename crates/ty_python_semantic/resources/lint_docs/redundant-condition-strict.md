@@ -138,14 +138,26 @@ This kind of defensive behaviour is often reasonable, since the author of a libr
 that end users of the library will run a type checker on code calling into the library, meaning that
 it's entirely possible at runtime for an object passed into the `x`a parameter above to be a `str`
 (for example) even though the parameter annotation states that only `int`s can ever be passed in.
-This rule therefore also exempts all assertion tests or subexpressions that evaluate to a subtype of
-`int` or `bool`:
+This rule therefore exempts assertion tests or subexpressions that evaluate to a subtype of `int` or
+`bool`, unless the complete assertion test has an always-falsy type and a nontrivial statement
+follows it in the same suite. In that case, the assertion makes the following code unreachable,
+which suggests a mistake:
 
-`redundant-condition-strict` can still trigger on `assert` statements in some contexts, however. For
-example, `redundant-condition-strict` will be emitted on the below example, where the left-hand side
-of the `and` expression is always true and not a subtype of `bool` or `int`, but where the condition
-is nonetheless excluded from the enabled-by-default `redundant-condition` rule due to the use of the
-walrus operator:
+```py
+def process(value: int) -> None:
+    assert value is None  # error: [redundant-condition-strict]
+    print(value)
+```
+
+Trailing `pass` statements, ellipses, and string literals do not count as nontrivial statements. A
+failing assertion followed only by these statements, or by no statements, remains exempt because it
+can deliberately mark an unreachable path. Literal tests such as `assert False` and environment
+checks such as `assert sys.platform == "win32"` retain their exemptions even when more code follows.
+
+`redundant-condition-strict` also reports some assertions involving walrus operators. For example,
+it reports the assertion below, where the left-hand side of the `and` expression is always true and
+not a subtype of `bool` or `int`, but where the condition is nonetheless excluded from the
+enabled-by-default `redundant-condition` rule due to the use of the walrus operator:
 
 ```py
 def func() -> bool:

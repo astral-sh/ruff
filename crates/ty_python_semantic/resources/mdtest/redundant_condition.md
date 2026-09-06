@@ -3917,8 +3917,10 @@ assert None  # no diagnostic
 
 Assertion tests and their subexpressions are exempt from both rules when their inferred value type
 is a subtype of `bool` or `int`, or when their truthiness is fixed only by short-circuit evaluation.
-Other always-truthy or always-falsy values remain eligible for the ordinary rule, or the strict rule
-if they contain a walrus expression. These exemptions avoid false positives on defensive assertions
+The exception is an assertion whose complete test has an always-falsy type and is followed by a
+nontrivial statement in the same suite; these cases are covered in the next section. Other
+always-truthy or always-falsy values remain eligible for the ordinary rule, or the strict rule if
+they contain a walrus expression. These exemptions avoid false positives on defensive assertions
 such as the following, which are common in well written Python code:
 
 ```py
@@ -3953,15 +3955,18 @@ def accepts(value: bool) -> bool:
 
 def ambiguous_boolean_and(value: int, flag: bool):
     assert flag and value is not None  # no diagnostic
+    print(value)
 
 def ambiguous_boolean_or(value: int, flag: bool):
     assert flag or value is None  # no diagnostic
+    print(value)
 
 def ambiguous_short_circuit(other: object, flag: bool):
     assert flag and (other or True)  # no diagnostic
 
 def nested_boolean_assertion(value: int, flag: bool):
     assert flag and accepts(not (value is None))  # no diagnostic
+    print(value)
 ```
 
 Short-circuit conditions remain exempt when they are the complete assertion, whether they always
@@ -3971,6 +3976,7 @@ succeed or always fail:
 def short_circuit_assertion(value: object):
     assert value or True  # no diagnostic
     assert value and False  # no diagnostic
+    print(value)
 ```
 
 The strict rule can still fire in assertion tests that use a walrus expression when their inferred
@@ -3988,6 +3994,82 @@ Always falsy variables that are not AST literals are still reported as redundant
 def failing_assertion(value: None):
     # error: [redundant-condition] "`None` is always falsy"
     assert value
+```
+
+## Failing assertions before further statements
+
+The strict rule reports boolean and integer assertion tests that always fail when a nontrivial
+statement follows in the same suite. The following code is unreachable, which suggests that the
+assertion is a mistake:
+
+```py
+from typing import Literal
+
+def false_boolean(value: Literal[False]):
+    assert value  # error: [redundant-condition-strict]
+    print("unreachable")
+
+def zero_integer(value: Literal[0]):
+    assert value  # error: [redundant-condition-strict]
+    pass
+    ...
+    print("unreachable")
+
+def false_comparison(value: int):
+    assert value is None  # error: [redundant-condition-strict] "always false"
+    print("unreachable")
+
+def negated_comparison(value: int):
+    assert not isinstance(value, int)  # error: [redundant-condition-strict]
+    print("unreachable")
+```
+
+A failing assertion at the end of a suite can deliberately mark an unreachable path. Trailing
+`pass`, ellipses, and string literals do not affect this exemption:
+
+```py
+def terminal_assertion(value: Literal[False]):
+    print("before the assertion")
+    assert value  # no diagnostic
+
+def trivial_following_statements(value: Literal[0]):
+    assert value  # no diagnostic
+    pass
+    ...
+    "unreachable"
+
+def terminal_branch(value: int, flag: bool):
+    if flag:
+        assert value is None  # no diagnostic
+    print("outside the assertion's suite")
+```
+
+Boolean tests nested in call arguments remain exempt even when the call's return type makes the
+complete assertion always fail. Only the complete assertion makes the following statement
+unreachable:
+
+```py
+def rejects(value: bool) -> Literal[False]:
+    return False
+
+def nested_test(value: int):
+    assert rejects(not (value is None))  # error: [redundant-condition-strict]
+    print("unreachable")
+```
+
+Literal assertion tests and environment checks retain their own exemptions even when nontrivial
+statements follow:
+
+```py
+import sys
+
+def literal_assertion():
+    assert False  # no diagnostic
+    print("unreachable")
+
+def environment_assertion():
+    assert sys.platform != "linux"  # no diagnostic
+    print("platform-specific code")
 ```
 
 ## `sys.version_info` checks, `sys.platform` checks, `os.name` checks, `if TYPE_CHECKING` checks

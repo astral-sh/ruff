@@ -77,7 +77,8 @@ enum ConditionKind {
     /// A condition whose value type is assignable to `int`, including `bool`.
     ///
     /// These tests commonly enforce runtime invariants, so they are only flagged by the
-    /// opt-in `redundant-condition-strict` rule and are exempted entirely in `assert` tests.
+    /// opt-in `redundant-condition-strict` rule. In `assert` tests, they are exempt unless an
+    /// always-falsy test makes a following nontrivial statement in the same suite unreachable.
     ///
     /// ```python
     /// def check(value: str):
@@ -396,8 +397,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// ## Assertions
     ///
     /// Assertions commonly check runtime invariants, so tests classified as
-    /// [`ConditionKind::Boolean`] or [`ConditionKind::ShortCircuit`] are exempt. This applies to
-    /// both complete assertion tests and their subexpressions:
+    /// [`ConditionKind::Boolean`] or [`ConditionKind::ShortCircuit`] are generally exempt,
+    /// including subexpressions. A complete assertion test with an always-falsy type is reported
+    /// when a nontrivial statement follows it in the same suite. Always-truthy tests remain exempt:
     ///
     /// ```python
     /// from typing import Literal
@@ -472,6 +474,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 ast::Stmt::Assert(assert_statement) => {
                     let test_type = self.expression_type(&assert_statement.test);
                     let truthiness = self.condition_truthiness(&assert_statement.test);
+                    let has_unreachable_statements = test_type
+                        .bool(self.db(), self.program_environment())
+                        .is_always_false()
+                        && suite[i + 1..]
+                            .iter()
+                            .any(|stmt| !is_trivial_statement(stmt));
                     for condition in self.redundant_conditions(
                         BooleanTest {
                             expression: &assert_statement.test,
@@ -479,7 +487,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             truthiness,
                             evaluation: ExpressionContext::Condition,
                         },
-                        RedundantConditionContext::Assertion,
+                        RedundantConditionContext::Assertion {
+                            has_unreachable_statements,
+                        },
                     ) {
                         self.report_redundant_condition(&condition);
                     }

@@ -65,7 +65,9 @@ pub(super) enum RedundantConditionContext {
 
     /// A test within an assertion, including the complete assertion and tests in call arguments.
     ///
-    /// Tests classified as [`ConditionKind::Boolean`] or [`ConditionKind::ShortCircuit`] are exempt.
+    /// Tests classified as [`ConditionKind::Boolean`] are exempt unless the complete assertion
+    /// has an always-falsy type and makes a following nontrivial statement unreachable.
+    /// Tests classified as [`ConditionKind::ShortCircuit`] are always exempt.
     /// Other always-truthy or always-falsy values remain eligible for `redundant-condition`, or
     /// `redundant-condition-strict` if classified as [`ConditionKind::ContainsWalrus`].
     ///
@@ -78,7 +80,11 @@ pub(super) enum RedundantConditionContext {
     ///
     /// An uncalled function in `assert not ready` is still reported: the function itself is an
     /// always-truthy value even though the complete assertion always fails.
-    Assertion,
+    Assertion {
+        /// The complete assertion test has an always-falsy type and is followed by a nontrivial
+        /// statement in the same suite. Independent nested tests do not inherit this flag.
+        has_unreachable_statements: bool,
+    },
 
     /// Whether the branches of an `if` or `elif` test reject unexpected input or an
     /// unsupported operation.
@@ -176,10 +182,13 @@ impl RedundantConditionContext {
         condition: &RedundantCondition<'_, '_>,
     ) -> bool {
         let defensive = match self {
-            Self::Assertion => matches!(
-                &condition.kind,
-                ConditionKind::Boolean | ConditionKind::ShortCircuit
-            ),
+            Self::Assertion {
+                has_unreachable_statements,
+            } => match condition.kind {
+                ConditionKind::Boolean => condition.is_truthy || !has_unreachable_statements,
+                ConditionKind::ShortCircuit => true,
+                ConditionKind::ContainsWalrus | ConditionKind::Value => false,
+            },
             Self::DefensiveExit {
                 truthy_branch,
                 falsy_branch,
@@ -304,7 +313,9 @@ impl RedundantConditionContext {
     pub(super) const fn nested_test(self) -> Self {
         match self {
             // Assertions also exempt boolean tests embedded in calls or other value expressions.
-            Self::Assertion => self,
+            Self::Assertion { .. } => Self::Assertion {
+                has_unreachable_statements: false,
+            },
             Self::Standalone | Self::DefensiveExit { .. } => Self::Standalone,
         }
     }
