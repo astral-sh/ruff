@@ -79,3 +79,17 @@ t'{ ("implicit " "concatenation", ["more", "strings"]) }'
 # Inner implicit concatenation with escaped quotes.
 f'{ ("implicit " "concatenation", ["'single'", "\"double\""]) }'
 t'{ ("implicit " "concatenation", ["'single'", "\"double\""]) }'
+
+# Nested string literals inside a format spec. The field belongs to the same string as the
+# field enclosing it, so it follows the same rules as an ordinary interpolation rather than
+# counting as a further level of nesting.
+f'{v:,.{d["n"]}f}'
+t'{v:,.{d["n"]}f}'
+f'{v:{"width"}}'
+t'{v:{"width"}}'
+
+# An interpolated string inside a format spec is still a further level of nesting, so the
+# innermost quotes are preserved before 3.12. Triple quoted outside so that the input is
+# not itself a pre-3.12 syntax error.
+f'''{v:{f"{d['n']}"}}'''
+t'''{v:{f"{d['n']}"}}'''
