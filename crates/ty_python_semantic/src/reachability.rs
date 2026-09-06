@@ -530,11 +530,11 @@ fn analyze_pattern_predicate<'db>(db: &'db dyn Db, predicate: PatternPredicate<'
 /// AND a new optional narrowing constraint with an accumulated one.
 fn accumulate_constraint<'db>(
     accumulated: Option<NarrowingConstraint<'db>>,
-    new: Option<NarrowingConstraint<'db>>,
+    new: Option<&NarrowingConstraint<'db>>,
 ) -> Option<NarrowingConstraint<'db>> {
     match (accumulated, new) {
         (Some(acc), Some(new_c)) => Some(new_c.merge_constraint_and(acc)),
-        (None, Some(new_c)) => Some(new_c),
+        (None, Some(new_c)) => Some(new_c.clone()),
         (Some(acc), None) => Some(acc),
         (None, None) => None,
     }
@@ -1059,6 +1059,7 @@ pub(crate) struct NarrowingProjector<'a, 'db> {
     predicate_narrowing_targets: &'a PredicateNarrowingTargets,
     place: ScopedPlaceId,
     base_ty: Type<'db>,
+    predicate_cache: Option<&'a ReachabilityEvaluationCache<'db>>,
     /// Checkpoint entries retain narrowed types, so projections are specific to the binding type.
     project_cache: FxHashMap<(ScopedNarrowingConstraint, Type<'db>), ProjectedNarrowingNodeId>,
     graph: ProjectedNarrowingGraph<'db>,
@@ -1084,10 +1085,20 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
             predicate_narrowing_targets,
             place,
             base_ty,
+            predicate_cache: None,
             project_cache: FxHashMap::default(),
             graph: ProjectedNarrowingGraph::default(),
             narrowed_cache: FxHashMap::default(),
         }
+    }
+
+    /// Reuses predicate evaluations across narrowing projections in the same inference region.
+    pub(crate) fn with_reachability_cache(
+        mut self,
+        cache: Option<&'a ReachabilityEvaluationCache<'db>>,
+    ) -> Self {
+        self.predicate_cache = cache;
+        self
     }
 
     /// Narrows a binding while reusing projections and shared suffixes from earlier bindings.
@@ -1146,32 +1157,23 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
         narrowed
     }
 
-    /// Returns the cached positive and negative narrowing constraints for a predicate.
-    fn predicate_constraints(
-        &mut self,
-        predicate_id: ScopedPredicateId,
-    ) -> (
-        Option<NarrowingConstraint<'db>>,
-        Option<NarrowingConstraint<'db>>,
-    ) {
+    /// Caches a predicate's narrowing constraints and reports whether either polarity narrows this place.
+    fn predicate_has_constraints(&mut self, predicate_id: ScopedPredicateId) -> bool {
         if !self
             .predicate_narrowing_targets
             .contains(predicate_id, self.place)
         {
-            return (None, None);
+            return false;
         }
 
-        let db = self.db;
-        if let Some(cached) = self.graph.predicate_constraints_cache.get(&predicate_id) {
-            return cached.clone();
-        }
-
-        let constraints =
-            infer_narrowing_constraints(db, self.predicates[predicate_id], self.place);
-        self.graph
+        let (positive, negative) = self
+            .graph
             .predicate_constraints_cache
-            .insert(predicate_id, constraints.clone());
-        constraints
+            .entry(predicate_id)
+            .or_insert_with(|| {
+                infer_narrowing_constraints(self.db, self.predicates[predicate_id], self.place)
+            });
+        positive.is_some() || negative.is_some()
     }
 
     /// Interns a projected node, collapsing nodes with identical branches.
@@ -1421,8 +1423,7 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                 }
                 Action::AnalyzeNonTerminal(id) => {
                     let node = self.constraints.get_interior_node(id);
-                    let predicate = self.predicates[node.atom];
-                    let branch = match analyze_single(db, self.env, &predicate) {
+                    let branch = match self.predicate_truthiness(node.atom) {
                         Truthiness::AlwaysTrue => node.if_true,
                         Truthiness::AlwaysFalse => node.if_false,
                         Truthiness::Ambiguous => {
@@ -1447,13 +1448,11 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                     let if_true = self.projected_node(node.if_true);
                     let if_uncertain = self.projected_node(node.if_uncertain);
                     let if_false = self.projected_node(node.if_false);
-                    let (pos_constraint, neg_constraint) = self.predicate_constraints(node.atom);
-
-                    let projected = if pos_constraint.is_none() && neg_constraint.is_none() {
+                    let projected = if !self.predicate_has_constraints(node.atom) {
                         // This node represents `if_uncertain || (P && if_true) || (!P && if_false)`.
                         // Since the predicate `P` cannot narrow this place, remove it while retaining only branches that `P` can take.
                         // Including a statically unreachable branch could erase narrowing from the reachable branch.
-                        match analyze_single(self.db, self.env, &self.predicates[node.atom]) {
+                        match self.predicate_truthiness(node.atom) {
                             Truthiness::AlwaysTrue => self.or(if_true, if_uncertain),
                             Truthiness::AlwaysFalse => self.or(if_false, if_uncertain),
                             Truthiness::Ambiguous => {
@@ -1482,6 +1481,13 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
             ScopedNarrowingConstraint::ALWAYS_TRUE => ProjectedNarrowingNodeId::ALWAYS_TRUE,
             ScopedNarrowingConstraint::ALWAYS_FALSE => ProjectedNarrowingNodeId::ALWAYS_FALSE,
             _ => self.project_cache[&(id, self.base_ty)],
+        }
+    }
+
+    fn predicate_truthiness(&self, id: ScopedPredicateId) -> Truthiness {
+        match self.predicate_cache {
+            Some(cache) => cache.analyze_predicate(self.db, self.env, self.predicates, id),
+            None => analyze_single(self.db, self.env, &self.predicates[id]),
         }
     }
 }
@@ -1551,25 +1557,26 @@ impl<'db> ProjectedNarrowingContext<'_, 'db> {
                 }
             };
             let (pos_constraint, neg_constraint) =
-                self.graph.predicate_constraints_cache[&node.atom].clone();
+                &self.graph.predicate_constraints_cache[&node.atom];
 
             if node.if_true == ProjectedNarrowingNodeId::ALWAYS_FALSE
                 && node.if_uncertain == ProjectedNarrowingNodeId::ALWAYS_FALSE
             {
-                let false_accumulated = accumulate_constraint(accumulated, neg_constraint);
+                let false_accumulated = accumulate_constraint(accumulated, neg_constraint.as_ref());
                 self.narrow(node.if_false, false_accumulated)
             } else if node.if_false == ProjectedNarrowingNodeId::ALWAYS_FALSE
                 && node.if_uncertain == ProjectedNarrowingNodeId::ALWAYS_FALSE
             {
-                let true_accumulated = accumulate_constraint(accumulated, pos_constraint);
+                let true_accumulated = accumulate_constraint(accumulated, pos_constraint.as_ref());
                 self.narrow(node.if_true, true_accumulated)
             } else {
-                let true_accumulated = accumulate_constraint(accumulated.clone(), pos_constraint);
+                let true_accumulated =
+                    accumulate_constraint(accumulated.clone(), pos_constraint.as_ref());
                 let true_ty = self.narrow(node.if_true, true_accumulated);
 
                 let uncertain_ty = self.narrow(node.if_uncertain, accumulated.clone());
 
-                let false_accumulated = accumulate_constraint(accumulated, neg_constraint);
+                let false_accumulated = accumulate_constraint(accumulated, neg_constraint.as_ref());
                 let false_ty = self.narrow(node.if_false, false_accumulated);
 
                 let true_or_uncertain =
@@ -2060,6 +2067,7 @@ pub(crate) struct ReachabilityEvaluationCache<'db> {
     primary_constraints: usize,
     primary_entries: RefCell<Vec<Option<Truthiness>>>,
     other_entries: RefCell<FxHashMap<(usize, ScopedReachabilityConstraintId), Truthiness>>,
+    predicate_entries: RefCell<FxHashMap<(usize, ScopedPredicateId), Truthiness>>,
 }
 
 impl<'db> ReachabilityEvaluationCache<'db> {
@@ -2077,7 +2085,27 @@ impl<'db> ReachabilityEvaluationCache<'db> {
             primary_constraints: std::ptr::from_ref(primary_constraints).addr(),
             primary_entries: RefCell::new(Vec::new()),
             other_entries: RefCell::new(FxHashMap::default()),
+            predicate_entries: RefCell::new(FxHashMap::default()),
         }
+    }
+
+    /// Reuses predicate truthiness across narrowing projections.
+    /// The predicate table's address distinguishes IDs from different use-def maps.
+    fn analyze_predicate(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
+        id: ScopedPredicateId,
+    ) -> Truthiness {
+        debug_assert_eq!(env.program(db), self.primary_scope.program(db));
+        let key = (predicates.raw.as_ptr().addr(), id);
+        if let Some(result) = self.predicate_entries.borrow().get(&key).copied() {
+            return result;
+        }
+        let result = analyze_single(db, env, &predicates[id]);
+        self.predicate_entries.borrow_mut().insert(key, result);
+        result
     }
 
     /// Evaluates `id`, reusing a cached result when possible.

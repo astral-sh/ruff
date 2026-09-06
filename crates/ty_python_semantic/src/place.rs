@@ -1850,6 +1850,7 @@ fn place_from_bindings_impl<'db>(
                             binding.place(db),
                             binding_ty,
                         )
+                        .with_reachability_cache(reachability_cache)
                     })
                     .narrow(constraint, binding_ty),
             };
