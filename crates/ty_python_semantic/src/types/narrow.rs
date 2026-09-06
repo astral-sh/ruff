@@ -111,6 +111,7 @@ pub(crate) fn infer_narrowing_constraints<'db>(
         }
         PredicateNode::ContextManagerSuppresses { .. }
         | PredicateNode::ExpressionCanComplete { .. }
+        | PredicateNode::BoolCallCanComplete(_)
         | PredicateNode::FinallyNormalPathImpossible { .. }
         | PredicateNode::IsNonTerminalCall(_)
         | PredicateNode::IsNonEmptyIterable(_)
@@ -1590,6 +1591,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             }
             PredicateNode::ContextManagerSuppresses { .. }
             | PredicateNode::ExpressionCanComplete { .. }
+            | PredicateNode::BoolCallCanComplete(_)
             | PredicateNode::FinallyNormalPathImpossible { .. }
             | PredicateNode::IsNonTerminalCall(_) => return None,
             PredicateNode::IsNonEmptyIterable(_) => return None,
@@ -3315,7 +3317,9 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             PredicateNode::SubjectElementPattern(subject_element) => {
                 subject_element.pattern.scope(db)
             }
-            PredicateNode::IsNonTerminalCall(call) => call.callable(db).scope(db),
+            PredicateNode::IsNonTerminalCall(call) | PredicateNode::BoolCallCanComplete(call) => {
+                call.callable(db).scope(db)
+            }
             PredicateNode::IsNonEmptyIterable(expression) => expression.scope(db),
             PredicateNode::StarImportPlaceholder(definition) => definition.scope(db),
         }

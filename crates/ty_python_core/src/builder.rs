@@ -2412,6 +2412,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     }
                     PredicateNode::SubjectElementPattern(_)
                     | PredicateNode::ExpressionCanComplete { .. }
+                    | PredicateNode::BoolCallCanComplete(_)
                     | PredicateNode::IsNonTerminalCall(_)
                     | PredicateNode::ContextManagerSuppresses { .. }
                     | PredicateNode::FinallyNormalPathImpossible { .. }
@@ -3770,11 +3771,25 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             .get(&node.into())
             .copied()
             .unwrap_or_else(|| self.add_standalone_expression_impl(node, kind, None));
-        let predicate = self.add_predicate(PredicateOrLiteral::Predicate(Predicate {
-            node: PredicateNode::ExpressionCanComplete {
+        let node = if let ast::Expr::Call(call) = node
+            && call
+                .func
+                .as_name_expr()
+                .is_some_and(|name| name.id == "bool")
+        {
+            let callable =
+                self.add_standalone_expression_impl(&call.func, ExpressionKind::Callee, None);
+            PredicateNode::BoolCallCanComplete(CallableAndCallExpr::new(
+                self.db, callable, expression, false,
+            ))
+        } else {
+            PredicateNode::ExpressionCanComplete {
                 expression,
                 context,
-            },
+            }
+        };
+        let predicate = self.add_predicate(PredicateOrLiteral::Predicate(Predicate {
+            node,
             is_positive: true,
         }));
         self.current_reachability_constraints_mut()

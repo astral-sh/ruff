@@ -2751,7 +2751,7 @@ produce redundant-condition diagnostics, even when their inferred types have fix
 conditional expression cannot select either branch if its test never returns.
 
 ```py
-from typing import Never
+from typing import Callable, Never
 
 def die() -> Never:
     raise RuntimeError
@@ -2809,12 +2809,13 @@ def nested_conditional():
         pass
 ```
 
-A statement condition that never returns reaches neither outcome. Tests in the body, the `else`
-branch, and subsequent statements are unreachable.
+A statement condition that never returns reaches neither outcome, including when the callable
+shadows the builtin `bool`. Tests in the body, the `else` branch, and subsequent statements are
+unreachable.
 
 ```py
-def statement_condition():
-    if die():
+def statement_condition(bool: Callable[[], Never]):
+    if bool():
         if "yes":  # no diagnostic
             pass
     else:

@@ -201,7 +201,7 @@ use crate::{
     dunder_all::dunder_all_names,
     place::{DefinedPlace, Definedness, Place, RequiresExplicitReExport, imported_symbol},
     types::{
-        CallableTypes, ComparisonSoundnessPolicy, EnumClassLiteral, KnownInstanceType,
+        CallableTypes, ComparisonSoundnessPolicy, EnumClassLiteral, KnownClass, KnownInstanceType,
         NarrowingConstraint, SpecialFormType, Type, TypeContext, UnionType, callable_pattern_type,
         definite_match_pattern_type, definite_match_pattern_type_for_subject, equality_truthiness,
         expand_type, infer_expression_types, infer_narrowing_constraints,
@@ -554,7 +554,9 @@ fn predicate_scope<'db>(db: &'db dyn Db, predicate: &Predicate<'db>) -> ScopeId<
         | PredicateNode::ChainedComparisonCondition(expression)
         | PredicateNode::ContextManagerSuppresses { expression, .. }
         | PredicateNode::ExpressionCanComplete { expression, .. } => expression.scope(db),
-        PredicateNode::IsNonTerminalCall(call) => call.callable(db).scope(db),
+        PredicateNode::IsNonTerminalCall(call) | PredicateNode::BoolCallCanComplete(call) => {
+            call.callable(db).scope(db)
+        }
         PredicateNode::Pattern(pattern) => pattern.scope(db),
         PredicateNode::FinallyNormalPathImpossible { scope, .. } => scope,
         PredicateNode::OrPatternAlternative(scope) => scope,
@@ -630,7 +632,9 @@ fn completion_predicates<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Box<[Scop
         .filter_map(|(id, predicate)| {
             matches!(
                 predicate.node,
-                PredicateNode::IsNonTerminalCall(_) | PredicateNode::ExpressionCanComplete { .. }
+                PredicateNode::IsNonTerminalCall(_)
+                    | PredicateNode::ExpressionCanComplete { .. }
+                    | PredicateNode::BoolCallCanComplete(_)
             )
             .then_some(id)
         })
@@ -1433,6 +1437,7 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                             || matches!(
                                 predicate.node,
                                 PredicateNode::ExpressionCanComplete { .. }
+                                    | PredicateNode::BoolCallCanComplete(_)
                                     | PredicateNode::ContextManagerSuppresses { .. }
                                     | PredicateNode::FinallyNormalPathImpossible { .. }
                             ))
@@ -1469,6 +1474,7 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                         predicate.node,
                         PredicateNode::IsNonTerminalCall(_)
                             | PredicateNode::ExpressionCanComplete { .. }
+                            | PredicateNode::BoolCallCanComplete(_)
                             | PredicateNode::ContextManagerSuppresses { .. }
                             | PredicateNode::FinallyNormalPathImpossible { .. }
                     );
@@ -2027,6 +2033,16 @@ fn expression_value_can_complete<'db>(db: &'db dyn Db, expression: Expression<'d
     )
 }
 
+fn inferred_expression_can_complete<'db>(db: &'db dyn Db, expression: Expression<'db>) -> bool {
+    if expression.kind(db) == ExpressionKind::BooleanTest {
+        infer_expression_types(db, expression, TypeContext::default())
+            .boolean_test_completion()
+            .unwrap_or(true)
+    } else {
+        expression_value_can_complete(db, expression)
+    }
+}
+
 fn analyze_single(db: &dyn Db, env: &ProgramEnvironment<'_>, predicate: &Predicate) -> Truthiness {
     let _span = tracing::trace_span!("analyze_single", ?predicate).entered();
 
@@ -2044,14 +2060,21 @@ fn analyze_single(db: &dyn Db, env: &ProgramEnvironment<'_>, predicate: &Predica
             context,
         } => Truthiness::from(match context {
             ExpressionContext::Condition => analyze_condition(db, expression).is_some(),
-            ExpressionContext::Value if expression.kind(db) == ExpressionKind::BooleanTest => {
-                infer_expression_types(db, expression, TypeContext::default())
-                    .boolean_test_completion()
-                    .unwrap_or(true)
-            }
-            ExpressionContext::Value => expression_value_can_complete(db, expression),
+            ExpressionContext::Value => inferred_expression_can_complete(db, expression),
         })
         .negate_if(!predicate.is_positive),
+        PredicateNode::BoolCallCanComplete(call) => {
+            let callable_type =
+                infer_same_file_expression_type(db, call.callable(db), TypeContext::default());
+            // `bool` has an inhabited return type regardless of its argument's type. Avoid
+            // pulling argument inference into reachability when the callee confirms this case.
+            Truthiness::from(
+                matches!(callable_type, Type::ClassLiteral(class)
+                    if class.is_known(db, KnownClass::Bool))
+                    || inferred_expression_can_complete(db, call.call_expr(db)),
+            )
+            .negate_if(!predicate.is_positive)
+        }
         PredicateNode::ChainedComparisonCondition(test_expr) => {
             let inference = infer_expression_types(db, test_expr, TypeContext::default());
             let expression = test_expr.node_ref(db);

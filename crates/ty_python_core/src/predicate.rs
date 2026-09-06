@@ -176,6 +176,10 @@ pub enum PredicateNode<'db> {
         expression: Expression<'db>,
         context: ExpressionContext,
     },
+    /// Whether a direct `bool(...)` call can produce a result. Resolving its callee can establish
+    /// an inhabited result without inferring argument types; shadowed names require full inference.
+    /// The interned call descriptor keeps `PredicateNode` compact.
+    BoolCallCanComplete(CallableAndCallExpr<'db>),
     /// Whether a context manager's exit return type allows an exception to be suppressed.
     ///
     /// Resolved during type inference because the context manager's type is unavailable during
