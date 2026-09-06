@@ -160,6 +160,7 @@ use ty_python_core::{ExpressionNodeKey, Statement};
 
 mod annotation_expression;
 mod attribute_assignment;
+mod attribute_read_recovery;
 mod binary_expressions;
 mod class;
 mod dict;
@@ -10888,6 +10889,28 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 }
                             }
                         }
+                        return fallback();
+                    }
+
+                    if !bound_on_instance
+                        && attribute.ctx.is_load()
+                        && assigned_type.is_some()
+                        && attribute_read_recovery::eligible_reads(db, self.scope())
+                            .contains(&ast::ExprRef::Attribute(attribute).into())
+                        // Modules reject undeclared assignments directly. For other receivers,
+                        // a custom setter can accept a write without making it readable.
+                        && (matches!(value_type, Type::ModuleLiteral(_))
+                            || value_type
+                                .member_lookup_with_policy(
+                                    db,
+                                    env,
+                                    "__setattr__",
+                                    MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
+                                        | MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                                )
+                                .place
+                                .is_undefined())
+                    {
                         return fallback();
                     }
 
