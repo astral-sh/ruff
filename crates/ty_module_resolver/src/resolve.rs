@@ -603,15 +603,25 @@ fn absolute_desperate_search_paths(
         // added as a search-path at runtime. Notably this reflects pytest's default mode where
         // it adds every dir with a .py to the search-paths (making all test files root modules),
         // unless they see an `__init__.py`, in which case they assume you don't want that.
-        let isnt_regular_package = !listing.entry_is_file(db, &candidate_path, "__init__.py")
+        //
+        // However, PEP-420 namespace packages (directories without `__init__.py`) should NOT be
+        // added as desperate search paths, because they can shadow stdlib modules. For example,
+        // if `src/example/` is a namespace package with `src/example/typing.py`, resolving `typing`
+        // would incorrectly find the sibling module instead of stdlib `typing`.
+        //
+        // A directory is a PEP-420 namespace package if it has no `__init__.py` or `__init__.pyi`.
+        // Since we already have a successful `directory_listing`, we know `candidate_path` is a
+        // directory, so we only need to check for the absence of `__init__.py` files.
+        let is_namespace_package = !listing.entry_is_file(db, &candidate_path, "__init__.py")
             && !listing.entry_is_file(db, &candidate_path, "__init__.pyi");
+
         // Any dir with a pyproject.toml or ty.toml is a valid relative desperate search-path and
         // we want all of those to also be valid absolute desperate search-paths. It doesn't
         // make any sense for a folder to have `pyproject.toml` and `__init__.py` but let's
         // not let something cursed and spooky happen, ok? d
-        if isnt_regular_package
-            || listing.entry_is_file(db, &candidate_path, "pyproject.toml")
-            || listing.entry_is_file(db, &candidate_path, "ty.toml")
+        if !is_namespace_package
+            && (listing.entry_is_file(db, &candidate_path, "pyproject.toml")
+                || listing.entry_is_file(db, &candidate_path, "ty.toml"))
         {
             let search_path = SearchPath::first_party(system, candidate_path).ok()?;
             search_paths.push(search_path);
