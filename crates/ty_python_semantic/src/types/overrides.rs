@@ -1012,8 +1012,11 @@ fn method_override_types<'db>(
     superclass_type: Type<'db>,
 ) -> Option<(Type<'db>, Type<'db>)> {
     let (subclass_type, superclass_type) = match (subclass_type, superclass_type) {
-        (Type::BoundMethod(subclass_method), Type::BoundMethod(superclass_method)) => {
-            let superclass_signature = superclass_method.function(db).signature(db);
+        (Type::BoundMethod(subclass_method), Type::BoundMethod(superclass_method))
+            if let Some(subclass_function) = subclass_method.function(db)
+                && let Some(superclass_function) = superclass_method.function(db) =>
+        {
+            let superclass_signature = superclass_function.signature(db);
             let explicit_receiver = match superclass_signature.overloads.as_slice() {
                 [signature] => signature
                     .parameters()
@@ -1040,13 +1043,13 @@ fn method_override_types<'db>(
             // Both signatures describe calls on the subclass. In particular, inherited `Self`
             // annotations refer to the subclass even when the receiver is implicitly annotated.
             (
-                Type::Callable(subclass_method.into_callable_type_with_receiver(
+                Type::Callable(subclass_function.into_bound_callable_with_receiver(
                     db,
                     env,
                     receiver,
                     typing_self_type,
                 )),
-                Type::Callable(superclass_method.into_callable_type_with_receiver(
+                Type::Callable(superclass_function.into_bound_callable_with_receiver(
                     db,
                     env,
                     receiver,

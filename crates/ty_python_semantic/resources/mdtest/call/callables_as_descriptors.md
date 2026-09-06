@@ -422,6 +422,253 @@ C.f2(1)
 C().f2(1)
 ```
 
+## Decorators returning unions of callables
+
+A decorator can return a union of callables with different signatures. `staticmethod` accepts the
+union and leaves each signature unchanged.
+
+```py
+from collections.abc import Callable
+
+def static_decorator(function: object) -> Callable[[int], int] | Callable[[int, str], str]:
+    raise NotImplementedError
+
+class C:
+    @staticmethod
+    @static_decorator
+    def static() -> None: ...
+
+reveal_type(C.static)  # revealed: ((int, /) -> int) | ((int, str, /) -> str)
+reveal_type(C().static)  # revealed: ((int, /) -> int) | ((int, str, /) -> str)
+```
+
+`classmethod` binds the first parameter of each alternative to the class. This also works when the
+union is expressed through a type alias.
+
+```py
+type ClassCallables = Callable[[type, int], int] | Callable[[type, int, str], str]
+
+def class_decorator(function: object) -> ClassCallables:
+    raise NotImplementedError
+
+class D:
+    @classmethod
+    @class_decorator
+    def class_method(cls) -> None: ...
+
+reveal_type(D.class_method)  # revealed: ((int, /) -> int) | ((int, str, /) -> str)
+reveal_type(D().class_method)  # revealed: ((int, /) -> int) | ((int, str, /) -> str)
+```
+
+## Decorators returning a possibly non-callable value
+
+A decorator might return a non-callable value. We report an error when `staticmethod` is applied to
+such a return type.
+
+```py
+from collections.abc import Callable
+
+def maybe_callable(function: object) -> Callable[[], int] | int:
+    raise NotImplementedError
+
+class Invalid:
+    # error: [invalid-argument-type]
+    @staticmethod
+    @maybe_callable
+    def method() -> None: ...
+```
+
+## Callable wrappers retain attributes and overloads
+
+An object returned by a decorator can have attributes and an overloaded `__call__` method. Here,
+`Wrapper` exposes a `reset` method and returns its second argument, with overloads for `int` and
+`str`.
+
+```py
+from collections.abc import Callable
+from typing import overload
+
+class Wrapper:
+    def __init__(self, function: Callable[..., object]) -> None: ...
+    def reset(self) -> None: ...
+    @overload
+    def __call__(self, receiver: object, value: int) -> int: ...
+    @overload
+    def __call__(self, receiver: object, value: str) -> str: ...
+    def __call__(self, receiver: object, value: int | str) -> int | str:
+        return value
+```
+
+Accessing a staticmethod through a class or instance returns the wrapper unchanged. Its attributes
+remain accessible, and each call uses the matching overload's return type.
+
+```py
+class C:
+    @staticmethod
+    @Wrapper
+    def static(receiver: object, value: int | str) -> int | str:
+        return value
+
+C.static.reset()
+reveal_type(C.static(None, 1))  # revealed: int
+reveal_type(C().static(None, "a"))  # revealed: str
+```
+
+Accessing a classmethod supplies the class as the wrapper's first argument. The bound method also
+exposes the wrapper's attributes and preserves its overloads.
+
+```py
+class D:
+    @classmethod
+    @Wrapper
+    def class_method(cls, value: int | str) -> int | str:
+        return value
+
+D().class_method.reset()
+reveal_type(D.class_method(1))  # revealed: int
+reveal_type(D().class_method("a"))  # revealed: str
+```
+
+Calling `staticmethod` and `classmethod` explicitly has the same effect as using them as decorators.
+
+```py
+class Explicit:
+    static = staticmethod(C.static)
+    class_method = classmethod(C.static)
+
+Explicit.static.reset()
+Explicit().class_method.reset()
+reveal_type(Explicit.static(None, 1))  # revealed: int
+reveal_type(Explicit().static(None, "a"))  # revealed: str
+reveal_type(Explicit.class_method(1))  # revealed: int
+reveal_type(Explicit().class_method("a"))  # revealed: str
+
+# error: [no-matching-overload]
+Explicit.class_method(None)
+```
+
+A bound classmethod is assignable to a `Callable` whose signature matches one of its overloads after
+the class argument has been supplied.
+
+```py
+method: Callable[[int], int] = Explicit.class_method
+```
+
+The bound method's `__self__` attribute identifies the class, and `__func__` exposes the wrapper.
+Calling `__call__` explicitly also supplies the class argument.
+
+```py
+reveal_type(Explicit.class_method.__self__)  # revealed: <class 'Explicit'>
+reveal_type(Explicit.class_method.__func__)  # revealed: Wrapper
+reveal_type(Explicit.class_method.__call__(1))  # revealed: int
+```
+
+## Generic inference for method wrappers
+
+When a generic function returns a mutable container, inference can widen literal types in its
+argument. A method wrapper remains assignable to the inferred type when its callable's return type
+widens from a string literal to `str`.
+
+```py
+def as_list[T](value: T) -> list[T]:
+    return [value]
+
+reveal_type(as_list(classmethod(lambda cls: ""))[0].__func__(object))  # revealed: str
+reveal_type(as_list(staticmethod(lambda: ""))[0]())  # revealed: str
+```
+
+## Type relations between method wrappers
+
+Wrappers of the same kind preserve the type relationships between their wrapped callables. A
+callable returning `str` can be used where one returning `object` is expected, but the reverse is
+not safe. The wrapper types overlap because they can contain the same callable.
+
+```py
+from typing import Callable
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_assignable_to, is_disjoint_from, is_subtype_of
+
+def _(str_fn: Callable[[object], str], object_fn: Callable[[object], object]):
+    str_class = classmethod(str_fn)
+    object_class = classmethod(object_fn)
+    str_static = staticmethod(str_fn)
+    object_static = staticmethod(object_fn)
+
+    static_assert(is_subtype_of(TypeOf[str_class], TypeOf[object_class]))
+    static_assert(not is_assignable_to(TypeOf[object_class], TypeOf[str_class]))
+    static_assert(not is_disjoint_from(TypeOf[str_class], TypeOf[object_class]))
+
+    static_assert(is_subtype_of(TypeOf[str_static], TypeOf[object_static]))
+    static_assert(not is_assignable_to(TypeOf[object_static], TypeOf[str_static]))
+    static_assert(not is_disjoint_from(TypeOf[str_static], TypeOf[object_static]))
+```
+
+A classmethod and a staticmethod are distinct descriptor types, even if they wrap the same callable.
+
+```py
+    static_assert(not is_assignable_to(TypeOf[str_class], TypeOf[str_static]))
+    static_assert(not is_assignable_to(TypeOf[str_static], TypeOf[str_class]))
+    static_assert(is_disjoint_from(TypeOf[str_class], TypeOf[str_static]))
+```
+
+The wrapped object's attributes also matter. Sharing a call signature does not make a base-class
+instance assignable to a subclass that provides additional attributes.
+
+```py
+class Base:
+    def __call__(self, cls: object) -> str:
+        return ""
+
+class Derived(Base):
+    extra: int
+
+def _(base: Base, derived: Derived):
+    base_method = classmethod(base)
+    derived_method = classmethod(derived)
+
+    static_assert(is_subtype_of(TypeOf[derived_method], TypeOf[base_method]))
+    static_assert(not is_assignable_to(TypeOf[base_method], TypeOf[derived_method]))
+    static_assert(not is_disjoint_from(TypeOf[base_method], TypeOf[derived_method]))
+```
+
+Descriptors wrapping distinct function objects are disjoint, even when those functions have the same
+signature.
+
+```py
+def first(cls: object) -> None: ...
+def second(cls: object) -> None: ...
+
+first_method = classmethod(first)
+second_method = classmethod(second)
+static_assert(is_disjoint_from(TypeOf[first_method], TypeOf[second_method]))
+```
+
+## Decorators returning a different function
+
+An inner decorator can replace a method with a function defined elsewhere. The outer `classmethod`
+decorator binds that replacement function to the class, even though the replacement's own definition
+has no decorators.
+
+```py
+def replacement(cls: type, value: int) -> int:
+    return value
+
+class C:
+    @classmethod
+    @(lambda original: replacement)
+    def method(cls, value: int) -> int:
+        return value
+
+reveal_type(C.method(1))  # revealed: int
+reveal_type(C().method(1))  # revealed: int
+```
+
+The bound method's `__func__` refers to the replacement function.
+
+```py
+reveal_type(C.method.__func__)  # revealed: def replacement(cls: type, value: int) -> int
+```
+
 ## Types are not bound-method descriptors
 
 ```toml

@@ -1859,6 +1859,17 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     })
             }
 
+            // The read-only `__func__` and `__wrapped__` attributes expose the complete wrapped
+            // object, so its attributes matter here as well as its call signature.
+            (
+                Type::KnownInstance(KnownInstanceType::MethodWrapper(source_wrapper)),
+                Type::KnownInstance(KnownInstanceType::MethodWrapper(target_wrapper)),
+            ) if source_wrapper.kind(db) == target_wrapper.kind(db) => {
+                self.with_recursion_guard(db, source, target, || {
+                    self.check_type_pair(db, source_wrapper.wrapped(db), target_wrapper.wrapped(db))
+                })
+            }
+
             (
                 Type::KnownInstance(KnownInstanceType::FunctoolsPartial(source_partial)),
                 Type::KnownInstance(KnownInstanceType::FunctoolsPartial(target_partial)),
@@ -3422,6 +3433,17 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 !left_sentinel.is_same_sentinel(db, right_sentinel),
             ),
 
+            // Distinct wrapper types can describe the same descriptor when their wrapped types
+            // overlap; they do not necessarily represent distinct objects.
+            (
+                Type::KnownInstance(KnownInstanceType::MethodWrapper(left_wrapper)),
+                Type::KnownInstance(KnownInstanceType::MethodWrapper(right_wrapper)),
+            ) if left_wrapper.kind(db) == right_wrapper.kind(db) => nontrivial_check(self, || {
+                self.with_recursion_guard(db, left, right, || {
+                    self.check_type_pair(db, left_wrapper.wrapped(db), right_wrapper.wrapped(db))
+                })
+            }),
+
             // These types are disjoint whenever their represented objects differ.
             (
                 // `LiteralString` can represent different strings and is handled above.
@@ -3840,8 +3862,15 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             // A `BoundMethod` type includes instances of the same method bound to a
             // subtype/subclass of the self type.
             (Type::BoundMethod(a), Type::BoundMethod(b)) => {
-                let a_function = a.function(db);
-                let b_function = b.function(db);
+                let (Some(a_function), Some(b_function)) = (a.function(db), b.function(db)) else {
+                    return nontrivial_check(self, || {
+                        self.check_type_pair(db, a.func(db), b.func(db)).or(
+                            db,
+                            self.constraints,
+                            || self.check_type_pair(db, a.self_instance(db), b.self_instance(db)),
+                        )
+                    });
+                };
                 if a_function.name(db) != b_function.name(db) {
                     // We typically ask about `BoundMethod` disjointness when we're looking at a
                     // method call on an intersection type like `A & B`. In that case, the same
