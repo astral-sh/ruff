@@ -3792,7 +3792,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             is_positive: true,
         }));
         self.current_reachability_constraints_mut()
-            .add_atom(predicate)
+            .add_boolean_atom(predicate)
     }
 
     /// Keeps short-circuit flow snapshots out of the common recursive expression-visitor frame.
@@ -4810,7 +4810,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         self.record_ambiguous_reachability();
                         let reachability_constraint = self
                             .current_reachability_constraints_mut()
-                            .add_atom(predicate_id);
+                            .add_boolean_atom(predicate_id);
                         let narrowing_constraint = self
                             .current_use_def_map_mut()
                             .narrowing_constraints
@@ -5296,7 +5296,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                         let reachability_constraint = self
                             .current_reachability_constraints_mut()
-                            .add_atom(predicate_id);
+                            .add_boolean_atom(predicate_id);
                         let narrowing_constraint = self
                             .current_use_def_map_mut()
                             .narrowing_constraints
@@ -5337,7 +5337,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         let post_finally_state = self.flow_snapshot();
                         let terminal_reachability = self
                             .current_reachability_constraints_mut()
-                            .add_atom(predicate_id);
+                            .add_boolean_atom(predicate_id);
                         let terminal_narrowing = self
                             .current_use_def_map_mut()
                             .narrowing_constraints
@@ -5611,7 +5611,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                         let reachability_constraint = self
                             .current_reachability_constraints_mut()
-                            .add_atom(predicate_id);
+                            .add_boolean_atom(predicate_id);
                         self.current_use_def_map_mut()
                             .record_non_terminal_call_constraints(
                                 reachability_constraint,

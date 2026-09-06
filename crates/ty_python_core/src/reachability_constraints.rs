@@ -374,6 +374,27 @@ impl ReachabilityConstraintsBuilder {
         &mut self,
         predicate: ScopedPredicateId,
     ) -> ScopedReachabilityConstraintId {
+        self.add_atom_with_ambiguous_branch(predicate, AMBIGUOUS)
+    }
+
+    /// Adds a predicate whose analysis always returns `true` or `false`.
+    ///
+    /// Completion checks never produce `Ambiguous`, so their ambiguous edge is unused. Giving
+    /// that edge a constant false value avoids constructing `Ambiguous AND previous` when a
+    /// completion check is added to existing control flow. A sequence of completion checks can
+    /// then share its preceding graph without copying an ambiguous version of every prefix.
+    pub(crate) fn add_boolean_atom(
+        &mut self,
+        predicate: ScopedPredicateId,
+    ) -> ScopedReachabilityConstraintId {
+        self.add_atom_with_ambiguous_branch(predicate, ALWAYS_FALSE)
+    }
+
+    fn add_atom_with_ambiguous_branch(
+        &mut self,
+        predicate: ScopedPredicateId,
+        if_ambiguous: ScopedReachabilityConstraintId,
+    ) -> ScopedReachabilityConstraintId {
         if predicate == ScopedPredicateId::ALWAYS_FALSE {
             ALWAYS_FALSE
         } else if predicate == ScopedPredicateId::ALWAYS_TRUE {
@@ -382,7 +403,7 @@ impl ReachabilityConstraintsBuilder {
             self.add_interior(InteriorNode {
                 atom: predicate,
                 if_true: ALWAYS_TRUE,
-                if_ambiguous: AMBIGUOUS,
+                if_ambiguous,
                 if_false: ALWAYS_FALSE,
             })
         }
@@ -561,5 +582,88 @@ impl ReachabilityConstraintsBuilder {
         });
         self.and_cache.insert((a, b), result);
         result
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use ruff_index::Idx;
+
+    use super::{
+        ALWAYS_FALSE, ALWAYS_TRUE, AMBIGUOUS, ReachabilityConstraintsBuilder,
+        ScopedReachabilityConstraintId,
+    };
+    use crate::Truthiness;
+    use crate::predicate::ScopedPredicateId;
+
+    fn evaluate(
+        constraints: &ReachabilityConstraintsBuilder,
+        mut root: ScopedReachabilityConstraintId,
+        values: &[Truthiness],
+    ) -> Truthiness {
+        loop {
+            match root {
+                ALWAYS_TRUE => return Truthiness::AlwaysTrue,
+                AMBIGUOUS => return Truthiness::Ambiguous,
+                ALWAYS_FALSE => return Truthiness::AlwaysFalse,
+                _ => {
+                    let node = constraints.interiors[root];
+                    root = match values[node.atom.index()] {
+                        Truthiness::AlwaysTrue => node.if_true,
+                        Truthiness::Ambiguous => node.if_ambiguous,
+                        Truthiness::AlwaysFalse => node.if_false,
+                    };
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn boolean_gates_preserve_ambiguous_conditions() {
+        // Completion gates can precede or follow ordinary conditions in predicate order.
+        for condition_index in [0, 1] {
+            let mut constraints = ReachabilityConstraintsBuilder::default();
+            let condition = constraints.add_atom(ScopedPredicateId::new(condition_index));
+            let completion =
+                constraints.add_boolean_atom(ScopedPredicateId::new(1 - condition_index));
+            let positive = constraints.add_and_constraint(condition, completion);
+            let negative_condition = constraints.add_not_constraint(condition);
+            let negative = constraints.add_and_constraint(negative_condition, completion);
+            let merged = constraints.add_or_constraint(positive, negative);
+
+            for condition in [
+                Truthiness::AlwaysTrue,
+                Truthiness::Ambiguous,
+                Truthiness::AlwaysFalse,
+            ] {
+                for completion in [Truthiness::AlwaysTrue, Truthiness::AlwaysFalse] {
+                    let mut values = [completion; 2];
+                    values[condition_index] = condition;
+                    assert_eq!(
+                        evaluate(&constraints, positive, &values),
+                        condition.and(completion)
+                    );
+                    assert_eq!(
+                        evaluate(&constraints, negative, &values),
+                        condition.negate().and(completion)
+                    );
+                    assert_eq!(evaluate(&constraints, merged, &values), completion);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn completion_sequences_reuse_previous_graph() {
+        const COUNT: usize = 512;
+        let mut constraints = ReachabilityConstraintsBuilder::default();
+        let mut root = constraints.add_atom(ScopedPredicateId::new(0));
+        for index in 1..=COUNT {
+            let completion = constraints.add_boolean_atom(ScopedPredicateId::new(index));
+            root = constraints.add_and_constraint(root, completion);
+        }
+
+        // Each gate adds its atom and a gated root while sharing the preceding graph.
+        assert!(constraints.interiors.len() <= 2 * COUNT + 1);
     }
 }
