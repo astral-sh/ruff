@@ -102,15 +102,23 @@ impl PredicateOrLiteral<'_> {
     }
 }
 
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+/// A stable key for call-completion queries. Creating it while building predicates lets cached
+/// queries use its ID directly, without looking up its components in Salsa's intern table again.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct CallableAndCallExpr<'db> {
+    #[returns(copy)]
     pub callable: Expression<'db>,
+    #[returns(copy)]
     pub call_expr: Expression<'db>,
     /// Whether the call is wrapped in an `await` expression. If `true`, `call_expr` refers to the
     /// `await` expression rather than the call itself. This is used to detect terminal `await`s of
     /// async functions that return `Never`.
+    #[returns(copy)]
     pub is_await: bool,
 }
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for CallableAndCallExpr<'_> {}
 
 /// A call whose completion determines whether an expression statement can continue.
 #[derive(Debug)]
@@ -168,10 +176,6 @@ pub enum PredicateNode<'db> {
         expression: Expression<'db>,
         context: ExpressionContext,
     },
-    /// Whether a call used as a boolean test can produce a result. Callable signatures can
-    /// often determine completion without inferring the arguments or selecting an overload.
-    /// Unsupported callable forms are inferred in full to detect uninhabited results.
-    CallCanComplete(CallableAndCallExpr<'db>),
     /// Whether a context manager's exit return type allows an exception to be suppressed.
     ///
     /// Resolved during type inference because the context manager's type is unavailable during

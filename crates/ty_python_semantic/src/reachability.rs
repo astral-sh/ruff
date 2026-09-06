@@ -553,10 +553,7 @@ fn predicate_scope<'db>(db: &'db dyn Db, predicate: &Predicate<'db>) -> ScopeId<
         | PredicateNode::ChainedComparisonCondition(expression)
         | PredicateNode::ContextManagerSuppresses { expression, .. }
         | PredicateNode::ExpressionCanComplete { expression, .. } => expression.scope(db),
-        PredicateNode::IsNonTerminalCall(CallableAndCallExpr { callable, .. })
-        | PredicateNode::CallCanComplete(CallableAndCallExpr { callable, .. }) => {
-            callable.scope(db)
-        }
+        PredicateNode::IsNonTerminalCall(call) => call.callable(db).scope(db),
         PredicateNode::Pattern(pattern) => pattern.scope(db),
         PredicateNode::FinallyNormalPathImpossible { scope, .. } => scope,
         PredicateNode::OrPatternAlternative(scope) => scope,
@@ -591,22 +588,13 @@ fn analyze_completion_prefix<'db>(
     predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
     root_predicate: ScopedPredicateId,
 ) -> bool {
-    // A complete block needs at least this many preceding predicates, even if all of them
-    // concern completion. Short scopes cannot require the cached index either.
-    if predicates.len() <= COMPLETION_PREDICATE_CHUNK_SIZE
-        || root_predicate.index() + 1 < COMPLETION_PREDICATE_CHUNK_SIZE
-    {
-        return false;
-    }
     let scope = predicate_scope(db, &predicates[root_predicate]);
     let has_many_completions = predicates
         .iter()
         .filter(|predicate| {
             matches!(
                 predicate.node,
-                PredicateNode::IsNonTerminalCall(_)
-                    | PredicateNode::ExpressionCanComplete { .. }
-                    | PredicateNode::CallCanComplete(_)
+                PredicateNode::IsNonTerminalCall(_) | PredicateNode::ExpressionCanComplete { .. }
             )
         })
         .nth(COMPLETION_PREDICATE_CHUNK_SIZE)
@@ -646,9 +634,7 @@ fn completion_predicates<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Box<[Scop
         .filter_map(|(id, predicate)| {
             matches!(
                 predicate.node,
-                PredicateNode::IsNonTerminalCall(_)
-                    | PredicateNode::ExpressionCanComplete { .. }
-                    | PredicateNode::CallCanComplete(_)
+                PredicateNode::IsNonTerminalCall(_) | PredicateNode::ExpressionCanComplete { .. }
             )
             .then_some(id)
         })
@@ -883,9 +869,7 @@ fn evaluate_reachability_checkpoint<'db>(
         .filter(|predicate| {
             matches!(
                 predicate.node,
-                PredicateNode::IsNonTerminalCall(_)
-                    | PredicateNode::ExpressionCanComplete { .. }
-                    | PredicateNode::CallCanComplete(_)
+                PredicateNode::IsNonTerminalCall(_) | PredicateNode::ExpressionCanComplete { .. }
             )
         })
         .nth(COMPLETION_PREDICATE_CHUNK_SIZE)
@@ -1431,7 +1415,6 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                             || matches!(
                                 predicate.node,
                                 PredicateNode::ExpressionCanComplete { .. }
-                                    | PredicateNode::CallCanComplete(_)
                                     | PredicateNode::ContextManagerSuppresses { .. }
                                     | PredicateNode::FinallyNormalPathImpossible { .. }
                             ))
@@ -1468,7 +1451,6 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                         predicate.node,
                         PredicateNode::IsNonTerminalCall(_)
                             | PredicateNode::ExpressionCanComplete { .. }
-                            | PredicateNode::CallCanComplete(_)
                             | PredicateNode::ContextManagerSuppresses { .. }
                             | PredicateNode::FinallyNormalPathImpossible { .. }
                     );
@@ -1798,8 +1780,8 @@ fn analyze_single_pattern_predicate_kind<'db>(
 /// dependency cannot make subsequent code unreachable.
 #[salsa::tracked(
     returns(copy),
-    cycle_initial = |_, _, _, _, _| Truthiness::AlwaysTrue,
-    cycle_fn = |_, cycle: &salsa::Cycle, previous: &Truthiness, result: Truthiness, _, _, _| {
+    cycle_initial = |_, _, _| Truthiness::AlwaysTrue,
+    cycle_fn = |_, cycle: &salsa::Cycle, previous: &Truthiness, result: Truthiness, _| {
         // A call can determine whether its own target is reachable, as with `sys.exit()` before
         // `import sys` in a loop. Expression inference can lose its previous result when it stops
         // being a cycle head, so widen the predicate itself to ensure convergence. Delay widening
@@ -1812,12 +1794,8 @@ fn analyze_single_pattern_predicate_kind<'db>(
     },
     heap_size = get_size2::GetSize::get_heap_size
 )]
-fn analyze_non_terminal_call<'db>(
-    db: &'db dyn Db,
-    callable: Expression<'db>,
-    call_expr: Expression<'db>,
-    is_await: bool,
-) -> Truthiness {
+fn analyze_non_terminal_call<'db>(db: &'db dyn Db, call: CallableAndCallExpr<'db>) -> Truthiness {
+    let callable = call.callable(db);
     let env = ProgramEnvironment::from_scope(callable.scope(db));
     // We first infer just the type of the callable. In the most likely case that the function is
     // not marked with `NoReturn`, or that it always returns `NoReturn`, doing so allows us to avoid
@@ -1827,8 +1805,8 @@ fn analyze_non_terminal_call<'db>(
     // add them on all statement-level function calls.
     let ty = infer_same_file_expression_type(db, callable, TypeContext::default());
 
-    is_non_terminal_call(db, &env, ty, is_await, || {
-        infer_same_file_expression_type(db, call_expr, TypeContext::default())
+    is_non_terminal_call(db, &env, ty, call.is_await(db), || {
+        infer_same_file_expression_type(db, call.call_expr(db), TypeContext::default())
     })
 }
 
@@ -1841,29 +1819,23 @@ pub(crate) fn is_non_terminal_call<'db>(
     is_await: bool,
     call_type: impl FnOnce() -> Type<'db>,
 ) -> Truthiness {
-    try_is_non_terminal_call(db, env, ty, is_await, call_type).unwrap_or(Truthiness::AlwaysTrue)
-}
-
-fn try_is_non_terminal_call<'db>(
-    db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
-    ty: Type<'db>,
-    is_await: bool,
-    call_type: impl FnOnce() -> Type<'db>,
-) -> Option<Truthiness> {
     // Short-circuit for well-known types that are known not to return `Never` when called. Without
     // the short-circuit, we've seen that threads keep blocking each other because they all try to
     // acquire Salsa's `CallableType` lock that ensures each type is only interned once. The lock is
     // so heavily congested because there are only very few dynamic types, in which case Salsa's
     // sharding the locks by value doesn't help much. See <https://github.com/astral-sh/ty/issues/968>.
     if matches!(ty, Type::Dynamic(_)) {
-        return Some(Truthiness::AlwaysTrue);
+        return Truthiness::AlwaysTrue;
     }
 
-    let callable = ty
+    let overloads_iterator = if let Some(callable) = ty
         .try_upcast_to_callable(db, env)
-        .and_then(CallableTypes::exactly_one)?;
-    let overloads_iterator = callable.signatures(db).overloads.iter();
+        .and_then(CallableTypes::exactly_one)
+    {
+        callable.signatures(db).overloads.iter()
+    } else {
+        return Truthiness::AlwaysTrue;
+    };
 
     let mut no_overloads_return_never = true;
     let mut all_overloads_return_never = true;
@@ -1877,11 +1849,11 @@ fn try_is_non_terminal_call<'db>(
     }
 
     if no_overloads_return_never && !any_overload_is_generic && !is_await {
-        Some(Truthiness::AlwaysTrue)
+        Truthiness::AlwaysTrue
     } else if all_overloads_return_never || call_type().is_equivalent_to(db, env, Type::Never) {
-        Some(Truthiness::AlwaysFalse)
+        Truthiness::AlwaysFalse
     } else {
-        Some(Truthiness::AlwaysTrue)
+        Truthiness::AlwaysTrue
     }
 }
 
@@ -1896,11 +1868,25 @@ fn analyze_non_empty_iterable(db: &dyn Db, iterable: Expression) -> Truthiness {
 
 /// Cache the whole predicate so repeated reachability walks can reuse one query result
 /// instead of looking up the expression's type and suppression behavior separately.
+/// Separate sync and async queries use the expression directly as their Salsa key.
 #[salsa::tracked(
     returns(copy),
-    cycle_initial = |_, _, _, _| false,
+    cycle_initial = |_, _, _| false,
     heap_size = get_size2::GetSize::get_heap_size
 )]
+fn sync_context_manager_suppresses<'db>(db: &'db dyn Db, expression: Expression<'db>) -> bool {
+    context_manager_suppresses(db, expression, false)
+}
+
+#[salsa::tracked(
+    returns(copy),
+    cycle_initial = |_, _, _| false,
+    heap_size = get_size2::GetSize::get_heap_size
+)]
+fn async_context_manager_suppresses<'db>(db: &'db dyn Db, expression: Expression<'db>) -> bool {
+    context_manager_suppresses(db, expression, true)
+}
+
 fn context_manager_suppresses<'db>(
     db: &'db dyn Db,
     expression: Expression<'db>,
@@ -2018,33 +2004,6 @@ fn expression_value_can_complete<'db>(db: &'db dyn Db, expression: Expression<'d
     )
 }
 
-#[salsa::tracked(
-    returns(copy),
-    cycle_initial = |_, _, _, _, _| true,
-    cycle_fn = |_, cycle: &salsa::Cycle, previous: &bool, result: bool, _, _, _| {
-        if cycle.iteration() > crate::TAINTED_CYCLES {
-            *previous || result
-        } else {
-            result
-        }
-    },
-    heap_size = get_size2::GetSize::get_heap_size
-)]
-fn expression_call_can_complete<'db>(
-    db: &'db dyn Db,
-    callable: Expression<'db>,
-    expression: Expression<'db>,
-    is_await: bool,
-) -> bool {
-    let env = ProgramEnvironment::from_scope(callable.scope(db));
-    let callable_type = infer_same_file_expression_type(db, callable, TypeContext::default());
-    let call_type = || infer_same_file_expression_type(db, expression, TypeContext::default());
-    try_is_non_terminal_call(db, &env, callable_type, is_await, call_type).map_or_else(
-        || !call_type().is_equivalent_to(db, &env, Type::Never),
-        Truthiness::is_always_true,
-    )
-}
-
 fn analyze_single(db: &dyn Db, env: &ProgramEnvironment<'_>, predicate: &Predicate) -> Truthiness {
     let _span = tracing::trace_span!("analyze_single", ?predicate).entered();
 
@@ -2065,13 +2024,6 @@ fn analyze_single(db: &dyn Db, env: &ProgramEnvironment<'_>, predicate: &Predica
             ExpressionContext::Value => expression_value_can_complete(db, expression),
         })
         .negate_if(!predicate.is_positive),
-        PredicateNode::CallCanComplete(call) => Truthiness::from(expression_call_can_complete(
-            db,
-            call.callable,
-            call.call_expr,
-            call.is_await,
-        ))
-        .negate_if(!predicate.is_positive),
         PredicateNode::ChainedComparisonCondition(test_expr) => {
             let inference = infer_expression_types(db, test_expr, TypeContext::default());
             let expression = test_expr.node_ref(db);
@@ -2083,8 +2035,12 @@ fn analyze_single(db: &dyn Db, env: &ProgramEnvironment<'_>, predicate: &Predica
         PredicateNode::ContextManagerSuppresses {
             expression,
             is_async,
-        } => Truthiness::from(context_manager_suppresses(db, expression, is_async))
-            .negate_if(!predicate.is_positive),
+        } => Truthiness::from(if is_async {
+            async_context_manager_suppresses(db, expression)
+        } else {
+            sync_context_manager_suppresses(db, expression)
+        })
+        .negate_if(!predicate.is_positive),
         PredicateNode::FinallyNormalPathImpossible {
             scope,
             continuation,
@@ -2092,12 +2048,9 @@ fn analyze_single(db: &dyn Db, env: &ProgramEnvironment<'_>, predicate: &Predica
             evaluate_finally_continuation(db, scope, continuation).is_always_false(),
         )
         .negate_if(!predicate.is_positive),
-        PredicateNode::IsNonTerminalCall(CallableAndCallExpr {
-            callable,
-            call_expr,
-            is_await,
-        }) => analyze_non_terminal_call(db, callable, call_expr, is_await)
-            .negate_if(!predicate.is_positive),
+        PredicateNode::IsNonTerminalCall(call) => {
+            analyze_non_terminal_call(db, call).negate_if(!predicate.is_positive)
+        }
         PredicateNode::Pattern(inner) => analyze_pattern_predicate(db, inner),
         PredicateNode::OrPatternAlternative(_) => Truthiness::Ambiguous,
         PredicateNode::SubjectElementPattern(subject_element) => {
@@ -2228,9 +2181,10 @@ impl<'db> ReachabilityEvaluationCache<'db> {
 
     /// Evaluates `id`, reusing a cached result when possible.
     ///
-    /// Trivial constraint ids return immediately and are not stored. The primary graph's identity
-    /// already determines its scope, so cache hits need no predicate or scope lookup. Other
-    /// constraints are cached by graph identity and id.
+    /// Trivial constraint ids return immediately and are not stored. For interior nodes, the
+    /// predicate determines whether the constraint belongs to the primary scope. A primary-scope
+    /// constraint from the primary graph is cached by dense index; all other constraints are cached
+    /// by graph identity and id.
     fn evaluate(
         &self,
         db: &'db dyn Db,
@@ -2245,16 +2199,16 @@ impl<'db> ReachabilityEvaluationCache<'db> {
             _ => {}
         }
 
+        let predicate = predicates[constraints.get_interior_node(id).atom()];
         let constraints_key = std::ptr::from_ref(constraints).addr();
+        let scope = predicate_scope(db, &predicate);
 
-        if constraints_key != self.primary_constraints {
+        if scope != self.primary_scope || constraints_key != self.primary_constraints {
             let key = (constraints_key, id);
             if let Some(result) = self.other_entries.borrow().get(&key).copied() {
                 return result;
             }
 
-            let predicate = predicates[constraints.get_interior_node(id).atom()];
-            let scope = predicate_scope(db, &predicate);
             let result = evaluate_reachability_constraint(db, scope, id, None);
             self.other_entries.borrow_mut().insert(key, result);
             return result;
