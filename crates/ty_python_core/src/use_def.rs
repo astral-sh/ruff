@@ -1782,6 +1782,9 @@ impl PendingReachability {
             self.narrowing_constraint_between(branch_ancestor, branch, narrowing_constraints);
         let merged_narrowing =
             narrowing_constraints.add_or_constraint(current_narrowing, branch_narrowing);
+        // Consecutive places often share their last applied reachability node, so their
+        // merged path constraint can be reused even when they have distinct place states.
+        let mut last_merged_reachability = None;
         let mut branch_states = branch_states.into_iter();
         for current in current_states {
             let Some(mut branch_state) = branch_states.next() else {
@@ -1819,18 +1822,25 @@ impl PendingReachability {
                         .record_narrowing_constraint(narrowing_constraints, merged_narrowing);
                 }
 
-                let current_constraint = self.constraint_between(
-                    current.reachability,
-                    self.current,
-                    reachability_constraints,
-                );
-                let branch_constraint = self.constraint_between(
-                    branch_state.reachability,
-                    branch,
-                    reachability_constraints,
-                );
-                let merged_constraint = reachability_constraints
-                    .add_or_constraint(current_constraint, branch_constraint);
+                let merged_constraint = match last_merged_reachability {
+                    Some((ancestor, constraint)) if ancestor == current.reachability => constraint,
+                    _ => {
+                        let current_constraint = self.constraint_between(
+                            current.reachability,
+                            self.current,
+                            reachability_constraints,
+                        );
+                        let branch_constraint = self.constraint_between(
+                            current.reachability,
+                            branch,
+                            reachability_constraints,
+                        );
+                        let merged_constraint = reachability_constraints
+                            .add_or_constraint(current_constraint, branch_constraint);
+                        last_merged_reachability = Some((current.reachability, merged_constraint));
+                        merged_constraint
+                    }
+                };
                 if merged_constraint != ScopedReachabilityConstraintId::ALWAYS_TRUE {
                     Rc::make_mut(&mut current.state).record_reachability_constraint(
                         reachability_constraints,
@@ -2923,14 +2933,16 @@ impl<'db> UseDefMapBuilder<'db> {
             &mut self.narrowing_constraints,
             &mut self.reachability_constraints,
         );
-        self.pending_reachability.merge_place_states(
-            &mut self.member_states,
-            snapshot.member_states,
-            branch,
-            snapshot.reachability,
-            &mut self.narrowing_constraints,
-            &mut self.reachability_constraints,
-        );
+        if !self.member_states.is_empty() {
+            self.pending_reachability.merge_place_states(
+                &mut self.member_states,
+                snapshot.member_states,
+                branch,
+                snapshot.reachability,
+                &mut self.narrowing_constraints,
+                &mut self.reachability_constraints,
+            );
+        }
 
         self.reachability = self
             .reachability_constraints
