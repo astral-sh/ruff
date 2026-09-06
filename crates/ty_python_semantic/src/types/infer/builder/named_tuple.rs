@@ -381,18 +381,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
             },
             None => {
-                let call_node_index = call_expr.node_index.load();
                 let scope = self.scope();
-                let scope_anchor = scope
-                    .node(db)
-                    .node_index()
-                    .unwrap_or(ast::NodeIndex::from(0));
-                let anchor_u32 = scope_anchor
-                    .as_u32()
-                    .expect("scope anchor should not be NodeIndex::NONE");
-                let call_u32 = call_node_index
-                    .as_u32()
-                    .expect("call node should not be NodeIndex::NONE");
                 let spec = match kind {
                     NamedTupleKind::Collections => self.infer_collections_namedtuple_fields(
                         rename_type,
@@ -404,7 +393,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 };
                 DynamicNamedTupleAnchor::ScopeOffset {
                     scope,
-                    offset: call_u32 - anchor_u32,
+                    offset: self.dynamic_class_scope_offset(call_expr),
                     spec,
                 }
             }

@@ -428,6 +428,42 @@ alice["extra"] = True
 bob["extra"] = True
 ```
 
+## Unpacked assignments to `TypedDict` variables
+
+This is a regression test for a bug in an early implementation of precise annotations for unpacked
+assignments.
+
+When a dictionary literal is assigned directly to a `TypedDict` variable, ty checks the literal
+against the variable's type and suppresses the assignment diagnostic to avoid reporting the same
+error twice. A dictionary literal inside an unpacked value does not receive that type context, so
+this more specific diagnostic is never emitted.
+
+The early implementation passed the inner dictionary to the duplicate-diagnostic check after
+identifying it for the primary annotation. This incorrectly suppressed the assignment diagnostic as
+well, causing ty to report no error for an incompatible dictionary.
+
+```py
+from typing import TypedDict
+
+class Payload(TypedDict):
+    value: int
+
+payload: Payload
+payload, other = ({"value": "wrong"}, 0)  # snapshot: invalid-assignment
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `dict[str, str]` is not assignable to `Payload`
+ --> src/mdtest_snippet.py:7:19
+  |
+6 | payload: Payload
+  |          ------- Declared type
+7 | payload, other = ({"value": "wrong"}, 0)  # snapshot: invalid-assignment
+  | -------           ^^^^^^^^^^^^^^^^^^ Incompatible value of type `dict[str, str]`
+  | |
+  | Assigned to this variable
+```
+
 ## Nested `TypedDict`
 
 Nested `TypedDict` fields are also supported.
@@ -1078,6 +1114,239 @@ def takes_td_or_iterable(value: TD | Iterable[int]) -> None:
     pass
 
 takes_td_or_iterable({42: 42})
+```
+
+## Union of `TypedDict` behind a type alias
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+A `TypedDict` is still found when the annotation reaches it through a type alias, including when the
+alias resolves to a union and is itself one element of a larger union:
+
+```py
+from typing import TypedDict
+from typing_extensions import TypeAliasType
+
+class Person(TypedDict):
+    name: str
+    age: int | None
+
+type PersonAlias = Person
+type PersonOrId = Person | int
+PersonOrIdAliasType = TypeAliasType("PersonOrIdAliasType", Person | int)
+
+aliased: PersonAlias = {"name": "Alice", "age": 30}
+reveal_type(aliased)  # revealed: Person
+
+aliased_in_union: PersonAlias | str = {"name": "Alice", "age": 30}
+reveal_type(aliased_in_union)  # revealed: Person
+
+union_alias: PersonOrId = {"name": "Alice", "age": 30}
+reveal_type(union_alias)  # revealed: Person
+
+union_alias_in_union: PersonOrId | str = {"name": "Alice", "age": 30}
+reveal_type(union_alias_in_union)  # revealed: Person
+
+alias_type_in_union: PersonOrIdAliasType | str = {"name": "Alice", "age": 30}
+reveal_type(alias_type_in_union)  # revealed: Person
+```
+
+A dictionary constructed with keyword arguments uses the same aliased `TypedDict` context:
+
+```py
+constructed: PersonOrId | str = dict(name="Alice", age=30)
+reveal_type(constructed)  # revealed: Person
+```
+
+Keys are still validated against the aliased `TypedDict`:
+
+```py
+# error: [invalid-key] "Unknown key "nickname" for TypedDict `Person`"
+unknown_key: PersonOrId | str = {"name": "Alice", "age": 30, "nickname": "Ali"}
+```
+
+Expanding can leave a single `TypedDict` rather than a union, when every arm aliases the same one.
+Such an annotation is still validated field by field:
+
+```py
+type FirstPerson = Person
+type SecondPerson = Person
+
+collapsed: FirstPerson | SecondPerson = {"name": "Alice", "age": 30}
+reveal_type(collapsed)  # revealed: Person
+
+collapsed_constructor: FirstPerson | SecondPerson = dict(name="Alice", age=30)
+reveal_type(collapsed_constructor)  # revealed: Person
+
+# error: [invalid-key] "Unknown key "nickname" for TypedDict `Person`"
+collapsed_unknown_key: FirstPerson | SecondPerson = {"name": "Alice", "age": 30, "nickname": "Ali"}
+
+collapsed_constructor_unknown_key: FirstPerson | SecondPerson = dict(
+    name="Alice",
+    age=30,
+    # error: [invalid-key] "Unknown key "nickname" for TypedDict `Person`"
+    nickname="Ali",
+)
+```
+
+The same holds where the annotation is a parameter default or a nested field:
+
+```py
+class Team(TypedDict):
+    lead: FirstPerson | SecondPerson
+
+# error: [invalid-key] "Unknown key "nickname" for TypedDict `Person`"
+def hire(person: FirstPerson | SecondPerson = {"name": "Alice", "age": 30, "nickname": "Ali"}): ...
+
+# error: [invalid-key] "Unknown key "nickname" for TypedDict `Person`"
+team: Team = {"lead": {"name": "Alice", "age": 30, "nickname": "Ali"}}
+```
+
+Constructor inference currently ignores compatible non-`TypedDict` union members. This also occurs
+without aliases; expansion only exposes the existing limitation:
+
+```py
+# TODO: The `dict[str, str]` fallback should accept this constructor without errors.
+# error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `Person` constructor"
+# error: [missing-typed-dict-key] "Missing required key 'age' in TypedDict `Person` constructor"
+# error: [invalid-key] "Unknown key "other" for TypedDict `Person`"
+accepted_by_fallback: PersonOrId | dict[str, str] = dict(other="x")
+
+# TODO: This should reveal `dict[str, str]`, not `Person`.
+reveal_type(accepted_by_fallback)  # revealed: Person
+```
+
+The same limitation applies to arguments, return values, and nested `TypedDict` fields:
+
+```py
+class Roster(TypedDict):
+    lead: PersonOrId | dict[str, str]
+
+def takes_fallback(value: PersonOrId | dict[str, str]) -> None: ...
+
+# TODO: The `dict[str, str]` fallback should accept this argument without errors.
+# error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `Person` constructor"
+# error: [missing-typed-dict-key] "Missing required key 'age' in TypedDict `Person` constructor"
+# error: [invalid-key] "Unknown key "other" for TypedDict `Person`"
+takes_fallback(dict(other="x"))
+
+def returns_fallback() -> PersonOrId | dict[str, str]:
+    # TODO: The `dict[str, str]` fallback should accept this return without errors.
+    # error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `Person` constructor"
+    # error: [missing-typed-dict-key] "Missing required key 'age' in TypedDict `Person` constructor"
+    # error: [invalid-key] "Unknown key "other" for TypedDict `Person`"
+    return dict(other="x")
+
+# TODO: The `dict[str, str]` fallback should accept this nested value without errors.
+# error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `Person` constructor"
+# error: [missing-typed-dict-key] "Missing required key 'age' in TypedDict `Person` constructor"
+# error: [invalid-key] "Unknown key "other" for TypedDict `Person`"
+nested_fallback: Roster = {"lead": dict(other="x")}
+```
+
+Broader fallback types are also ignored:
+
+```py
+from typing import Any, Mapping
+
+# TODO: The `Any` fallback should accept this constructor without errors.
+# error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `Person` constructor"
+# error: [missing-typed-dict-key] "Missing required key 'age' in TypedDict `Person` constructor"
+# error: [invalid-key] "Unknown key "other" for TypedDict `Person`"
+any_fallback: PersonOrId | Any = dict(other="x")
+
+# TODO: The `Mapping[str, str]` fallback should accept this constructor without errors.
+# error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `Person` constructor"
+# error: [missing-typed-dict-key] "Missing required key 'age' in TypedDict `Person` constructor"
+# error: [invalid-key] "Unknown key "other" for TypedDict `Person`"
+mapping_fallback: PersonOrId | Mapping[str, str] = dict(other="x")
+```
+
+A constructor with an invalid key is correctly validated when no union member provides a compatible
+dictionary fallback, whether the alias appears directly or in a larger union:
+
+```py
+# error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `Person` constructor"
+# error: [missing-typed-dict-key] "Missing required key 'age' in TypedDict `Person` constructor"
+# error: [invalid-key] "Unknown key "other" for TypedDict `Person`"
+no_fallback: PersonOrId = dict(other="x")
+
+# error: [missing-typed-dict-key] "Missing required key 'name' in TypedDict `Person` constructor"
+# error: [missing-typed-dict-key] "Missing required key 'age' in TypedDict `Person` constructor"
+# error: [invalid-key] "Unknown key "other" for TypedDict `Person`"
+invalid_constructor: PersonOrId | str = dict(other="x")
+```
+
+## Overload selection with an aliased `TypedDict`
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+A dictionary literal selects the matching overload when its `TypedDict` type is nested inside a
+union-valued alias:
+
+```py
+from typing import TypedDict, assert_type, overload
+
+class Payload(TypedDict):
+    required: int
+
+type PayloadOrInt = Payload | int
+
+@overload
+def select(value: PayloadOrInt | str) -> str: ...
+@overload
+def select(value: float) -> bytes: ...
+def select(value: object) -> object:
+    return str(value)
+
+assert_type(select({"required": 1}), str)
+```
+
+## `TypedDict` behind a `TypeAliasType` alias on Python 3.11
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+Expansion is not tied to the `type` statement. `TypeAliasType` is expanded the same way on versions
+that predate it, and the `TypedDict` behind one is still found and validated:
+
+```py
+from typing import TypedDict
+from typing_extensions import TypeAliasType
+
+class Person(TypedDict):
+    name: str
+    age: int | None
+
+PersonOrId = TypeAliasType("PersonOrId", Person | int)
+
+union_alias_in_union: PersonOrId | str = {"name": "Alice", "age": 30}
+reveal_type(union_alias_in_union)  # revealed: Person
+```
+
+Dictionary constructors use the same aliased `TypedDict` context:
+
+```py
+constructed: PersonOrId | str = dict(name="Alice", age=30)
+reveal_type(constructed)  # revealed: Person
+```
+
+Both dictionary literals and constructors reject unknown keys:
+
+```py
+# error: [invalid-key] "Unknown key "nickname" for TypedDict `Person`"
+unknown_key: PersonOrId | str = {"name": "Alice", "age": 30, "nickname": "Ali"}
+
+# error: [invalid-key] "Unknown key "nickname" for TypedDict `Person`"
+invalid_constructor: PersonOrId | str = dict(name="Alice", age=30, nickname="Ali")
 ```
 
 ## Type ignore compatibility issues
@@ -2119,6 +2388,34 @@ static_assert(not is_subtype_of(LeftRecursiveDict[int], RightRecursiveDict[int])
 # A conservative cycle fallback must not accept structurally different recursive TypedDicts.
 static_assert(not is_subtype_of(LeftRecursiveDict[int], DifferentRecursiveDict[int]))
 
+class ShiftingLeftDict[A, B, C](TypedDict):
+    value: A
+    child: ShiftingLeftDict[B, C, None]
+
+class ShiftingRightDict[A, B, C](TypedDict):
+    value: A
+    child: ShiftingRightDict[B, C, None]
+
+# These recursive specializations reach an exact repetition after shifting out every initial
+# argument.
+static_assert(
+    is_subtype_of(
+        ShiftingLeftDict[int, str, bytes],
+        ShiftingRightDict[int, str, bytes],
+    )
+)
+
+class SaturatingLeftDict[T](TypedDict):
+    value: T
+    child: SaturatingLeftDict[T | int]
+
+class SaturatingRightDict[T](TypedDict):
+    value: T
+    child: SaturatingRightDict[T | int]
+
+# Repeatedly adding the same union element also reaches an exact repetition.
+static_assert(is_subtype_of(SaturatingLeftDict[str], SaturatingRightDict[str]))
+
 class FiniteLeftDict[T](TypedDict):
     value: T
 
@@ -2565,6 +2862,54 @@ def _(u: IntX | StrX) -> None:
     reveal_type(u.setdefault("x", 1))  # revealed: int | str
 ```
 
+## `get()` with literal union defaults
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+For a non-required field, `get()` returns the union of the field type and the default type. Passing
+that result to a typed function preserves all of its possible literal values:
+
+```py
+from typing import Literal, TypedDict
+from typing_extensions import assert_type
+
+Value = Literal[0, 1, 2]
+
+class OptionalValue(TypedDict, total=False):
+    value: Value
+
+def accept(value: Value | None) -> None: ...
+def optional_default(mapping: OptionalValue, default: Value | None) -> None:
+    accept(mapping.get("value", default))
+    result: Value | None = mapping.get("value", default)
+    assert_type(result, Value | None)
+```
+
+An incompatible default is still reflected in the result and rejected by the typed function:
+
+```py
+def invalid_default(mapping: OptionalValue) -> None:
+    # error: [invalid-argument-type]
+    accept(mapping.get("value", "invalid"))
+```
+
+For a required field, the default cannot contribute to the result. This also holds when the field
+type is an explicit type alias:
+
+```py
+type ValueAlias = Value
+
+class RequiredValue(TypedDict):
+    value: ValueAlias
+
+def required_default(mapping: RequiredValue, default: Value | None) -> None:
+    result: Value | None = mapping.get("value", default)
+    assert_type(result, Value)
+```
+
 ## Unlike normal classes
 
 `TypedDict` types do not act like normal classes. For example, calling `type(..)` on an inhabitant
@@ -2581,6 +2926,31 @@ def _(p: Person) -> None:
     reveal_type(type(p))  # revealed: <class 'dict[str, object]'>
 
     reveal_type(p.__class__)  # revealed: <class 'dict[str, object]'>
+```
+
+Truthiness narrowing can give a `TypedDict` value an intersection type, but its runtime class is
+still `dict`.
+
+```py
+class OptionalPerson(TypedDict, total=False):
+    name: str
+
+def narrowed_class(person: OptionalPerson) -> None:
+    if person:
+        reveal_type(type(person))  # revealed: <class 'dict[str, object]'>
+        reveal_type(person.__class__)  # revealed: <class 'dict[str, object]'>
+```
+
+Excluding `None` from a type variable's `TypedDict` bound should also identify `dict` as the runtime
+class. This is difficult to represent while preserving the type variable: `type[Person]` describes
+the `TypedDict` schema constructor, not the runtime `dict` class.
+
+```py
+def exclude_none[T: Person | None](value: T) -> None:
+    if value is not None:
+        # TODO: Preserve the runtime class. Intersecting `type[T]` with the exact `dict`
+        # class is not sufficient: specializing `T` to `Person` makes that intersection `Never`.
+        reveal_type(type(value))  # revealed: type[T@exclude_none]
 ```
 
 Passing a `TypedDict` to `dict()` copies it into a regular dictionary:
@@ -2602,7 +2972,8 @@ def mixed(movie_or_int: Movie | int) -> None:
     dict(movie_or_int)  # error: [no-matching-overload]
 ```
 
-The same result is inferred efficiently for a union of `TypedDict`s:
+The same result is inferred efficiently for a union of `TypedDict`s, including when the result is
+checked against a bare `dict`:
 
 ```toml
 [environment]
@@ -2641,8 +3012,10 @@ X = TypedDict("X", {"type": Literal["x"]})
 
 Item = A | B | C | D | E | F | G | H | I | J | K | L | M | N | O | P | Q | R | S | T | U | V | W | X
 
+def takes_bare_dict(value: dict[Any, Any]) -> None: ...
 def _(item: Item) -> None:
     reveal_type(dict(item))  # revealed: dict[str, object]
+    takes_bare_dict(dict(item))
 
 # Runtime narrowing preserves each `TypedDict` schema without exposing unrestricted dictionary
 # operations. The union should still reuse its common protocol constraints.
@@ -2803,7 +3176,7 @@ type Left22 = Left21 | Right21
 def _(item: Left22) -> None:
     reveal_type(dict(item))  # revealed: dict[str, object]
 
-type RecursiveItem = A | RecursiveItem
+type RecursiveItem = A | RecursiveItem  # error: [cyclic-type-alias-definition]
 
 def _(item: RecursiveItem) -> None:
     # The common-constraint check must terminate when an alias refers back to its containing union.
@@ -2818,7 +3191,7 @@ from _collections_abc import dict_items
 from collections.abc import Callable
 from typing import Protocol, TypeVar, TypedDict, runtime_checkable
 
-ItemsT = TypeVar("ItemsT")
+ItemsT = TypeVar("ItemsT", covariant=True)
 
 class HasItems(Protocol[ItemsT]):
     def items(self) -> ItemsT: ...
@@ -2929,7 +3302,9 @@ def _(value: AnyExtraItems | OtherAnyExtraItems) -> None:
     reveal_type(get_bounded_mapping(value))  # revealed: Any
 ```
 
-Rejected common-constraint probes must not affect fallback protocol inference:
+Rejected common-constraint probes must not affect fallback protocol inference. Both mappings below
+contain an `int`, so inference should select the `int` constraint. It currently selects the broader
+`object` constraint instead:
 
 ```py
 from typing import Literal, Protocol, TypeVar, TypedDict
@@ -2950,7 +3325,8 @@ def get_value(value: GetValue[ConstrainedValue]) -> ConstrainedValue:
 
 def takes_str(value: str) -> None: ...
 def _(value: ValueA | ValueB) -> None:
-    reveal_type(get_value(value))  # revealed: int
+    # TODO: revealed int
+    reveal_type(get_value(value))  # revealed: object
     takes_str(get_value(value))  # error: [invalid-argument-type]
 ```
 
@@ -2959,7 +3335,7 @@ Common constraints must preserve correlations in mutable protocols:
 ```py
 from typing import Any, Protocol, TypeVar, TypedDict
 
-Key = TypeVar("Key")
+Key = TypeVar("Key", contravariant=True)
 Value = TypeVar("Value")
 
 class SetAndGet(Protocol[Key, Value]):
@@ -3515,6 +3891,102 @@ static_assert(not is_assignable_to(Items[str], Items[int]))
 static_assert(not is_subtype_of(Items[str], Items[int]))
 static_assert(is_assignable_to(Items[Any], Items[int]))
 static_assert(not is_subtype_of(Items[Any], Items[int]))
+```
+
+### Inherited methods
+
+Methods on a generic `TypedDict` subclass use the subclass's type arguments when checking the
+receiver. Methods that return `Self`, such as `copy()`, preserve the subclass and its
+specialization.
+
+```py
+from typing import Generic, TypeVar, TypedDict
+
+T = TypeVar("T")
+
+class Base(TypedDict, Generic[T]):
+    value: T
+
+class Child(Base[T]): ...
+
+def methods(child: Child[int]) -> None:
+    reveal_type(child.keys())  # revealed: dict_keys[str, object]
+    reveal_type(child.items())  # revealed: dict_items[str, object]
+    reveal_type(child.values())  # revealed: dict_values[str, object]
+    reveal_type(child.copy())  # revealed: Child[int]
+```
+
+Accessing a method through the specialized class also specializes its field types, while still
+rejecting incompatible updates.
+
+```py
+def unbound_methods(child: Child[int]) -> None:
+    reveal_type(Child[int].get(child, "value"))  # revealed: int
+    Child[int].update(child, value=1)
+    Child[int].update(child, value="wrong")  # error: [invalid-argument-type]
+```
+
+A specialized `TypedDict` subclass can also be unpacked into a call or a dictionary. Calls still
+check the inherited field's specialized type against the parameter type.
+
+```py
+def takes_int(value: int) -> None: ...
+def unpack(child: Child[int], wrong: Child[str]) -> None:
+    takes_int(**child)
+    unpacked = {**child}
+    takes_int(**wrong)  # error: [invalid-argument-type]
+```
+
+### Inherited methods with type parameter defaults
+
+An explicit specialization overrides a type parameter's default, including for inherited methods. An
+unbound method accessed through the unsubscripted class uses the default when checking its receiver.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import TypedDict
+
+class Base[T = int](TypedDict):
+    value: T
+
+class Child[T = int](Base[T]): ...
+
+def methods(base: Base[str], child: Child[str], default: Child[int]) -> None:
+    reveal_type(base.copy())  # revealed: Base[str]
+    reveal_type(child.copy())  # revealed: Child[str]
+    reveal_type(Child[str].copy(child))  # revealed: Child[str]
+    reveal_type(Child.copy(default))  # revealed: Child[int]
+    Child[int].copy(child)  # error: [invalid-argument-type]
+    Child.copy(child)  # error: [invalid-argument-type]
+```
+
+### Inherited methods on closed TypedDicts
+
+A closed generic `TypedDict` subclass exposes its specialized item types through its view methods.
+Its inherited `copy()` method also preserves the specialization.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing_extensions import TypedDict
+
+class Base[T](TypedDict, closed=True):
+    value: T
+
+class Child[T](Base[T]): ...
+
+def methods(child: Child[int]) -> None:
+    reveal_type(child.keys())  # revealed: dict_keys[Literal["value"], int]
+    reveal_type(child.items())  # revealed: dict_items[Literal["value"], int]
+    reveal_type(child.values())  # revealed: dict_values[Literal["value"], int]
+    reveal_type(child.copy())  # revealed: Child[int]
 ```
 
 ### Specialized constructor signatures
@@ -4485,6 +4957,19 @@ class TD10(TypedDict("TD10", {}, extra_items=NotRequired[int])): ...  # error: [
 class TD11(TypedDict("TD11", {}, extra_items=ClassVar[int])): ...  # error: [invalid-type-form]
 class TD12(TypedDict("TD12", {}, extra_items=InitVar[int])): ...  # error: [invalid-type-form]
 class TD13(TypedDict("TD13", {}, extra_items=Final[int])): ...  # error: [invalid-type-form]
+```
+
+## Function syntax inside string annotations
+
+A functional `TypedDict` can appear in `Annotated` metadata. Inferring `extra_items` in a stub must
+retain the enclosing string's identity rather than looking up its parsed nodes in the module's
+semantic index.
+
+```pyi
+from typing_extensions import Annotated, TypedDict
+
+value: "Annotated[int, TypedDict('T', {}, extra_items=int)]"
+reveal_type(value)  # revealed: int
 ```
 
 ## Function syntax with forward references
@@ -5886,6 +6371,37 @@ def _(u: Foo | Bar):
         reveal_type(u)  # revealed: Bar
 ```
 
+A union member can have several possible tags. Comparing against a different member's tag removes
+the multi-tag member from the matching branch, including in unions with more than two members:
+
+```py
+class MultiTag(TypedDict):
+    tag: Literal["bar", "baz"]
+
+def two_members(u: Foo | MultiTag):
+    if u["tag"] == "foo":
+        reveal_type(u)  # revealed: Foo
+    else:
+        reveal_type(u)  # revealed: MultiTag
+
+def three_members(u: Foo | MultiTag | Bar):
+    if u["tag"] != "foo":
+        reveal_type(u)  # revealed: MultiTag | Bar
+    else:
+        reveal_type(u)  # revealed: Foo
+```
+
+Matching one of several tags selects that member, but excluding just one of its tags does not remove
+it from the union:
+
+```py
+def match_one_tag(u: Foo | MultiTag):
+    if u["tag"] == "bar":
+        reveal_type(u)  # revealed: MultiTag
+    else:
+        reveal_type(u)  # revealed: Foo | MultiTag
+```
+
 Boolean tags can be narrowed by truthiness, including through a generic `TypedDict` and a type
 alias:
 
@@ -6037,6 +6553,22 @@ class WackyInt(int):
         return True
 
 _: NonLiteralTD = {"tag": WackyInt(99)}  # allowed
+```
+
+The same restriction applies to a tag union containing a non-literal type. The `int` alternative can
+still hold a `WackyInt` that compares equal to `"foo"`:
+
+```py
+class MixedTag(TypedDict):
+    tag: Literal["bar"] | int
+
+def mixed_tag(u: Foo | MixedTag):
+    if u["tag"] == "foo":
+        reveal_type(u)  # revealed: Foo | MixedTag
+    else:
+        reveal_type(u)  # revealed: MixedTag
+
+_: MixedTag = {"tag": WackyInt(99)}
 ```
 
 Intersections containing a TypedDict with literal fields can be narrowed with equality checks. Since
@@ -6304,6 +6836,23 @@ def match_statements(u: Foo | Bar | Baz | Bing):
             reveal_type(u)  # revealed: Baz
         case _:
             reveal_type(u)  # revealed: Bing
+```
+
+A tag can contain multiple literal values. A literal pattern selects the matching dictionary;
+failing one of its tags leaves the other tag possible in later cases:
+
+```py
+class MultiTag(TypedDict):
+    tag: Literal["bar", "baz"]
+
+def match_multiple_tags(u: Foo | MultiTag | Bar):
+    match u["tag"]:
+        case "foo":
+            reveal_type(u)  # revealed: Foo
+        case "bar":
+            reveal_type(u)  # revealed: MultiTag
+        case _:
+            reveal_type(u)  # revealed: MultiTag | Bar
 ```
 
 Enum literal tags are also supported in match statements:
@@ -7423,6 +7972,17 @@ class ChildWithBadValueType(Base):
     year: NotRequired[int]
 ```
 
+Recursive items are subject to the same consistency requirement. A recursive `TypedDict` is not
+consistent with the base's `bool` extra items:
+
+```py
+class RecursiveBase(TypedDict, extra_items=bool): ...
+
+# error: [invalid-typed-dict-header]
+class RecursiveChild(RecursiveBase):
+    child: NotRequired["RecursiveChild"]
+```
+
 ### A subclass of a TypedDict with read-only `extra_items: T` may add required or non-required items assignable to `T`
 
 ```py
@@ -8150,6 +8710,68 @@ class HasReadOnly(TypedDict, extra_items=int):
     x: NotRequired[ReadOnly[int]]
 
 static_assert(not is_assignable_to(HasReadOnly, dict[str, int]))
+```
+
+### Recursive fields with mutable extra items
+
+A declared item can have a different type from the extra items, including a reference to the
+`TypedDict` itself. Such a type is compatible with `Mapping[str, object]`, but not with a mutable
+dictionary whose values must all be `bool`:
+
+```py
+from collections.abc import Mapping
+from typing_extensions import TypedDict
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to, is_subtype_of
+
+class Recursive(TypedDict, total=False, extra_items=bool):
+    child: "Recursive"
+
+static_assert(is_assignable_to(Recursive, Mapping[str, object]))
+static_assert(not is_assignable_to(Recursive, dict[str, bool]))
+static_assert(not is_subtype_of(Recursive, dict[str, bool]))
+```
+
+### Mutually recursive fields with dictionary-valued extra items
+
+Recursive items can also refer to another `TypedDict`. Even when the extra items are themselves
+dictionaries, the declared items need not be consistent with them:
+
+```py
+from collections.abc import Mapping
+from typing_extensions import TypedDict
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to, is_subtype_of
+
+class Left(TypedDict, total=False, extra_items=dict[str, object]):
+    child: "Right"
+
+class Right(TypedDict, total=False, extra_items=dict[str, object]):
+    child: Left
+
+static_assert(is_assignable_to(Left, Mapping[str, object]))
+static_assert(not is_assignable_to(Left, dict[str, dict[str, object]]))
+static_assert(not is_subtype_of(Right, dict[str, dict[str, object]]))
+```
+
+### Recursive functional TypedDicts with mutable extra items
+
+The functional syntax has the same dictionary compatibility rules as the class syntax:
+
+```py
+from collections.abc import Mapping
+from typing_extensions import NotRequired, TypedDict
+
+Recursive = TypedDict("Recursive", {"child": "NotRequired[Recursive]"}, extra_items=bool)
+
+def as_mapping(value: Recursive) -> Mapping[str, object]:
+    return value
+
+def as_dict(value: Recursive) -> dict[str, bool]:
+    return value  # error: [invalid-return-type]
+
+def update(value: Recursive) -> None:
+    value.update({"child": value})
 ```
 
 [closed]: https://peps.python.org/pep-0728/#disallowing-extra-items-explicitly

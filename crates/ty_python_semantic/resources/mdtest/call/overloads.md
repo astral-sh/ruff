@@ -264,6 +264,109 @@ def _(a: A, bc: B | C, cd: C | D):
     reveal_type(f(*(a, cd)))  # revealed: Unknown
 ```
 
+### Expanding a keyword argument after unpacking into a variadic parameter
+
+Valid unpacked positional arguments must not prevent expansion of an unrelated union-typed keyword
+argument. The positional arguments may come from an empty tuple, a fixed-length tuple, a
+variable-length tuple, or a list.
+
+`overloaded.pyi`:
+
+```pyi
+from typing import overload
+
+@overload
+def f(*values: str, kind: int) -> int: ...
+@overload
+def f(*values: str, kind: None) -> str: ...
+```
+
+Expanding `kind` matches one overload when its value is an `int` and the other when its value is
+`None`, independently of how the positional arguments are provided. An incompatible positional
+argument must still fail to match either overload.
+
+```py
+from overloaded import f
+
+def _(one: tuple[str], many: tuple[str, ...], items: list[str], kind: int | None) -> None:
+    reveal_type(f("a", kind=kind))  # revealed: int | str
+    reveal_type(f(*(), kind=kind))  # revealed: int | str
+    reveal_type(f(*one, kind=kind))  # revealed: int | str
+    reveal_type(f(*many, kind=kind))  # revealed: int | str
+    reveal_type(f(*items, kind=kind))  # revealed: int | str
+
+def _(invalid: tuple[int], kind: int | None) -> None:
+    # error: [no-matching-overload]
+    reveal_type(f(*invalid, kind=kind))  # revealed: Unknown
+```
+
+### Expanding a keyword argument with an unpacked variadic annotation
+
+An unpacked variadic annotation can specify a different expected type for each positional argument.
+Unpacked arguments must be checked against their corresponding element types while an unrelated
+union-typed keyword argument is expanded.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+`overloaded.pyi`:
+
+```pyi
+from typing import overload
+
+@overload
+def f(*values: *tuple[str, int], kind: int) -> int: ...
+@overload
+def f(*values: *tuple[str, int], kind: None) -> str: ...
+@overload
+def suffix[T: str, *Parts](*values: *tuple[*Parts, T], kind: int) -> int: ...
+@overload
+def suffix[T: str, *Parts](*values: *tuple[*Parts, T], kind: None) -> str: ...
+```
+
+Both directly supplied arguments and an unpacked tuple satisfy the heterogeneous annotation. A
+generic variadic prefix also permits expansion when the fixed suffix has a compatible type.
+
+```py
+from overloaded import f, suffix
+
+def _(values: tuple[str, int], kind: int | None) -> None:
+    reveal_type(f("a", 1, kind=kind))  # revealed: int | str
+    reveal_type(f(*values, kind=kind))  # revealed: int | str
+
+def _(pair: tuple[int, str], kind: int | None) -> None:
+    reveal_type(suffix(*pair, kind=kind))  # revealed: int | str
+```
+
+### Expanding a keyword argument after unpacking into positional parameters
+
+Expanding a union-typed keyword argument must also work when a fixed-length tuple supplies ordinary
+positional parameters with different types instead of a variadic parameter.
+
+`overloaded.pyi`:
+
+```pyi
+from typing import overload
+
+@overload
+def f(value: str, count: int, *, kind: int) -> int: ...
+@overload
+def f(value: str, count: int, *, kind: None) -> str: ...
+```
+
+Both the direct positional arguments and the unpacked tuple select the same overloads after `kind`
+is expanded.
+
+```py
+from overloaded import f
+
+def _(values: tuple[str, int], kind: int | None) -> None:
+    reveal_type(f("a", 1, kind=kind))  # revealed: int | str
+    reveal_type(f(*values, kind=kind))  # revealed: int | str
+```
+
 ### Generics (legacy)
 
 `overloaded.pyi`:
@@ -755,7 +858,7 @@ class Foo:
 from overloaded import A, B, C, Foo, f
 from typing_extensions import Any, reveal_type
 
-def _(ab: A | B, a: int | Any):
+def _(ab: A | B, a: int | Any, invalid: tuple[C]):
     reveal_type(f(a1=a, a2=a, a3=a))  # revealed: C
     reveal_type(f(A(), a1=a, a2=a, a3=a))  # revealed: A
     reveal_type(f(B(), a1=a, a2=a, a3=a))  # revealed: B
@@ -800,6 +903,25 @@ def _(ab: A | B, a: int | Any):
             a28=a,
             a29=a,
             a30=a,
+        )
+    )
+
+    # An incompatible element in a definitely nonempty splat must also prevent expansion of the
+    # nine union-typed keyword arguments.
+    reveal_type(
+        # error: [no-matching-overload]
+        # revealed: Unknown
+        f(
+            *invalid,
+            a1=a,
+            a2=a,
+            a3=a,
+            a4=a,
+            a5=a,
+            a6=a,
+            a7=a,
+            a8=a,
+            a9=a,
         )
     )
 

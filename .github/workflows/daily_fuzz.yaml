@@ -16,12 +16,15 @@ concurrency:
   cancel-in-progress: true
 
 env:
+  UV_LOCKED: 1
   CARGO_INCREMENTAL: 0
   CARGO_NET_RETRY: 10
   CARGO_TERM_COLOR: always
   RUSTUP_MAX_RETRIES: 10
   # Line-tables-only debug info: faster builds, backtraces still work.
   CARGO_PROFILE_DEV_DEBUG: line-tables-only
+  CARGO_PROFILE_DEV_LTO: "false"
+  CARGO_PROFILE_DEV_OPT_LEVEL: 0
   PACKAGE_NAME: ruff
   FORCE_COLOR: 1
 
@@ -36,9 +39,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
-          version: "0.12.1"
+          version: "0.12.9"
       - name: "Install Rust toolchain"
         run: rustup show
       - name: "Install mold"

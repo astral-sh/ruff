@@ -13,6 +13,7 @@ on:
     - cron: 0 5 * * 3
 
 env:
+  UV_LOCKED: 1
   CARGO_INCREMENTAL: 0
   CARGO_NET_RETRY: 10
   CARGO_TERM_COLOR: always
@@ -20,23 +21,25 @@ env:
   RUST_BACKTRACE: 1
   # Line-tables-only debug info: faster builds, backtraces still work.
   CARGO_PROFILE_PROFILING_DEBUG: line-tables-only
-  ECOSYSTEM_ANALYZER_COMMIT: 27b644f296d70fccacb7d7c23c91c5d6ccd8713d
 
 jobs:
   ty-ecosystem-report:
     name: Create ecosystem report
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-32' || 'ubuntu-latest' }}
     timeout-minutes: 40
+    env:
+      # Enable experimental support for installing PEP 723 script dependencies.
+      TY_UV: scripts
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
       - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           enable-cache: true
-          version: "0.12.1"
+          version: "0.12.9"
 
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
@@ -58,9 +61,10 @@ jobs:
           mkdir -p ~/.config/ty
           cp .github/ty-ecosystem.toml ~/.config/ty/ty.toml
 
-          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@$ECOSYSTEM_ANALYZER_COMMIT"
-
-          ecosystem-analyzer \
+          uv run \
+            --locked \
+            --only-group=ty-ecosystem \
+            ecosystem-analyzer \
             --verbose \
             --repository . \
             --flaky-runs 20 \
@@ -70,7 +74,10 @@ jobs:
 
           mkdir dist
 
-          ecosystem-analyzer \
+          uv run \
+            --locked \
+            --only-group=ty-ecosystem \
+            ecosystem-analyzer \
             generate-report \
             --max-diagnostics-per-project=1000 \
             ecosystem-diagnostics.json \

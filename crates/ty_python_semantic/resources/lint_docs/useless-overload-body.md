@@ -4,10 +4,10 @@ Checks for various `@overload`-decorated functions that have non-stub bodies.
 
 ## Why is this bad?
 
-Functions decorated with `@overload` are ignored at runtime; they are overridden
-by the implementation function that follows the series of overloads. While it is
-not illegal to provide a body for an `@overload`-decorated function, it may indicate
-a misunderstanding of how the `@overload` decorator works.
+Functions decorated with `@overload` are ignored at runtime; they are overridden by the
+implementation function that follows the series of overloads. While it is not illegal to provide a
+body for an `@overload`-decorated function, it may indicate a misunderstanding of how the
+`@overload` decorator works.
 
 ## Example
 

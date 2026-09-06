@@ -48,7 +48,7 @@ mod tests {
     #[test_case(Rule::StdlibModuleShadowing, Path::new("A005/modules/package/xml.py"))]
     #[test_case(Rule::BuiltinLambdaArgumentShadowing, Path::new("A006.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_builtins").join(path).as_path(),
             &LinterSettings {
@@ -90,11 +90,7 @@ mod tests {
         false
     )]
     fn non_strict_checking(rule_code: Rule, path: &Path, strict: bool) -> Result<()> {
-        let snapshot = format!(
-            "{}_{}_{strict}",
-            rule_code.noqa_code(),
-            path.to_string_lossy()
-        );
+        let snapshot = format!("{}_{}_{strict}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_builtins").join(path).as_path(),
             &LinterSettings {
@@ -115,7 +111,7 @@ mod tests {
         Path::new("A005/modules/utils/logging.py")
     )]
     fn non_strict_checking_src(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}_src", rule_code.noqa_code(), path.to_string_lossy());
+        let snapshot = format!("{}_{}_src", rule_code.name(), path.to_string_lossy());
         let src = Path::new("fixtures/flake8_builtins");
         let diagnostics = test_path(
             Path::new("flake8_builtins").join(path).as_path(),
@@ -139,7 +135,7 @@ mod tests {
         Path::new("A005/modules/utils/logging.py")
     )]
     fn non_strict_checking_root(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}_root", rule_code.noqa_code(), path.to_string_lossy());
+        let snapshot = format!("{}_{}_root", rule_code.name(), path.to_string_lossy());
         let src = Path::new("fixtures/flake8_builtins");
         let diagnostics = test_path(
             Path::new("flake8_builtins").join(path).as_path(),
@@ -164,7 +160,7 @@ mod tests {
     fn builtins_ignorelist(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "{}_{}_builtins_ignorelist",
-            rule_code.noqa_code(),
+            rule_code.name(),
             path.to_string_lossy()
         );
 
@@ -207,7 +203,7 @@ mod tests {
     fn builtins_allowed_modules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "{}_{}_builtins_allowed_modules",
-            rule_code.noqa_code(),
+            rule_code.name(),
             path.to_string_lossy()
         );
 
@@ -229,7 +225,7 @@ mod tests {
 
     #[test_case(Rule::BuiltinImportShadowing, Path::new("A004.py"))]
     fn rules_py312(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}_py38", rule_code.noqa_code(), path.to_string_lossy());
+        let snapshot = format!("{}_{}_py38", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_builtins").join(path).as_path(),
             &LinterSettings::for_rule(rule_code).with_target_version(PythonVersion::PY38),

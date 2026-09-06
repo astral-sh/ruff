@@ -318,7 +318,7 @@ def func[**P2](c: Callable[P2, None]):
 
 P2 = ParamSpec("P2")
 
-# error: [invalid-type-arguments] "ParamSpec `P2` is unbound"
+# error: [unbound-type-variable] "Type variable `P2` is not bound to any outer generic context"
 reveal_type(OnlyParamSpec[P2]().attr)  # revealed: (...) -> None
 
 # error: [invalid-type-arguments] "No type argument provided for required type variable `P1` of class `OnlyParamSpec`"
@@ -378,7 +378,7 @@ reveal_type(TypeVarAndParamSpec[int, [str]]().attr)  # revealed: (str, /) -> int
 reveal_type(TypeVarAndParamSpec[int, ...]().attr)  # revealed: (...) -> int
 reveal_type(ParamSpecAndTypeVar[[int, str], str]().attr)  # revealed: (int, str, /) -> str
 
-# error: [invalid-type-arguments] "ParamSpec `P2` is unbound"
+# error: [unbound-type-variable] "Type variable `P2` is not bound to any outer generic context"
 reveal_type(TypeVarAndParamSpec[int, P2]().attr)  # revealed: (...) -> int
 # error: [invalid-type-arguments] "Type argument for `ParamSpec` must be"
 reveal_type(TypeVarAndParamSpec[int, int]().attr)  # revealed: (...) -> int
@@ -461,6 +461,25 @@ def takes_int_job(job: Job[[int]]) -> None:
 takes_int_job(named_job)
 takes_int_job(defaulted_job)
 takes_int_job(wrong_job)  # error: [invalid-argument-type]
+```
+
+A fixed `ParamSpec` can contain required parameters. A wrapper around such a callback cannot be used
+as a wrapper around a callback that accepts no arguments.
+
+```py
+def erase_parameters[**P](job: Job[P]) -> Job[[]]:
+    return job  # error: [invalid-return-type]
+```
+
+The same restriction applies in the other direction when a class consumes callbacks. A consumer of
+callbacks with no parameters cannot accept a callback with arbitrary required parameters.
+
+```py
+class CallbackConsumer[**P]:
+    def consume(self, callback: Callable[P, None]) -> None: ...
+
+def broaden_parameters[**P](consumer: CallbackConsumer[[]]) -> CallbackConsumer[P]:
+    return consumer  # error: [invalid-return-type]
 ```
 
 ## `ParamSpec` cannot specialize a `TypeVar`, and vice versa
@@ -618,6 +637,96 @@ reveal_type(f3(y="a", x=1))  # revealed: bool
 f3(1)
 # error: [invalid-argument-type] "Argument is incorrect: Expected `int`, found `Literal["a"]`"
 f3("a", "b")
+```
+
+### Prefer the declared parameter list
+
+We prefer the declared parameter list of a `ParamSpec` when it is compatible with the callback's
+inferred parameter list:
+
+```py
+from typing import Callable
+
+class Callback[**P]:
+    def __init__(self, callback: Callable[P, None]) -> None: ...
+
+def accepts_object(value: object, /) -> None: ...
+
+x1 = Callback(accepts_object)
+reveal_type(x1)  # revealed: Callback[(value: object, /)]
+
+x2: Callback[[int]] = Callback(accepts_object)
+reveal_type(x2)  # revealed: Callback[(int, /)]
+```
+
+If the parameter lists are incompatible, we ignore the declared type in the invalid assignment
+diagnostic:
+
+```py
+def no_args() -> None: ...
+
+# error: [invalid-assignment] "Object of type `Callback[()]` is not assignable to `Callback[(int, /)]`"
+x3: Callback[[int]] = Callback(no_args)
+reveal_type(x3)  # revealed: Callback[(int, /)]
+```
+
+When no argument constrains the `ParamSpec`, the declared type supplies its parameter list:
+
+```py
+def make[**P]() -> Callback[P]:
+    raise NotImplementedError
+
+reveal_type(make())  # revealed: Callback[(...)]
+
+x4: Callback[[int, str]] = make()
+reveal_type(x4)  # revealed: Callback[(int, str, /)]
+```
+
+### Preserve callback parameters in nested calls
+
+The outer call checks forwarded arguments against the inferred parameter list of the wrapped
+callback:
+
+```py
+from typing import Callable
+
+def wrap[**P](callback: Callable[P, None]) -> Callable[P, None]:
+    return callback
+
+def accept[**P](callback: Callable[P, None], *args: P.args, **kwargs: P.kwargs) -> None: ...
+def no_args() -> None: ...
+
+reveal_type(wrap(no_args))  # revealed: () -> None
+
+accept(wrap(no_args))  # ok
+accept(wrap(no_args), 1)  # error: [too-many-positional-arguments]
+```
+
+Keyword-only parameters are also preserved:
+
+```py
+def keyword_only(*, value: int) -> None: ...
+
+accept(wrap(keyword_only), value=1)
+accept(wrap(keyword_only), value="incorrect")  # error: [invalid-argument-type]
+```
+
+### Preserve an unpacked required suffix
+
+A `ParamSpec` preserves a named positional prefix and the required suffix of an unpacked variadic
+parameter when inferring a callback signature.
+
+```py
+from typing import Callable
+
+def preserve[**P](callback: Callable[P, None]) -> Callable[P, None]:
+    return callback
+
+def named_prefix_and_suffix(name: int, *args: *tuple[*tuple[int, ...], int]) -> None: ...
+
+# TODO: Preserve the unpacked tuple instead of exposing synthetic comparison parameters.
+# Should reveal `(name: int, *args: *tuple[*tuple[int, ...], int]) -> None`.
+reveal_type(preserve(named_prefix_and_suffix))  # revealed: (name: int, *args: int, int, /) -> None
 ```
 
 ### Return type change using the same `ParamSpec` multiple times
@@ -861,6 +970,37 @@ to_thread_like(
 )
 ```
 
+This also applies when the parameter type is a bare type variable:
+
+```py
+from ty_extensions._internal import Unknown
+
+class Payload(TypedDict):
+    x: int
+
+def forward[**P](function: Callable[P, None], /, *args: P.args, **kwargs: P.kwargs) -> None:
+    function(*args, **kwargs)
+
+def pair[T](first: T, second: T) -> None: ...
+def _(payload: Payload):
+    forward(pair, reveal_type({"x": 1}), payload)  # revealed: Payload
+    forward(pair, payload, reveal_type({"x": 1}))  # revealed: Payload
+
+def triple[T](first: T, second: T, third: T) -> None: ...
+def _(payload: Payload, unknown: Unknown):
+    # TODO: This should reveal `Payload`.
+    forward(triple, reveal_type({"x": 1}), payload, unknown)  # revealed: dict[str, int]
+```
+
+We use a type-variable default as type context when the forwarded arguments do not otherwise
+constrain it:
+
+```py
+def default[T = Callable[[int], int]](callback: T) -> None: ...
+
+forward(default, lambda x: reveal_type(x))  # revealed: int
+```
+
 ### Specializing `ParamSpec` with another `ParamSpec`
 
 ```py
@@ -901,6 +1041,107 @@ def with_final[**P](foo: FooWithFinal[P]) -> None:
     reveal_type(foo.kwargs)  # revealed: P@with_final.kwargs
 ```
 
+### `ParamSpec` inference from unions
+
+A `ParamSpec` inferred from a union of protocols can have more than one parameter list. Calling a
+specialized method requires arguments to be accepted by every member of that union:
+
+```py
+from typing import Protocol
+
+class Callback[**P](Protocol):
+    def call(self, *args: P.args, **kwargs: P.kwargs) -> None: ...
+
+def identity[**P](callback: Callback[P]) -> Callback[P]:
+    return callback
+
+def _(callback: Callback[[object, int]] | Callback[[str, object]]) -> None:
+    f = identity(callback)
+    # revealed: (bound method Callback[((object, int, /)) | ((str, object, /))].call(object, int, /) -> None) | (bound method Callback[((object, int, /)) | ((str, object, /))].call(str, object, /) -> None)
+    reveal_type(f.call)
+
+    f.call("value", 1)
+    f.call(1, 1)  # error: [invalid-argument-type]
+    f.call("value", "value")  # error: [invalid-argument-type]
+```
+
+This also applies when returning a `Callable` type:
+
+```py
+from typing import Callable
+
+def as_callable[**P](callback: Callback[P]) -> Callable[P, None]:
+    return callback.call
+
+def _(callback: Callback[[object, int]] | Callback[[str, object]]) -> None:
+    f = as_callable(callback)
+    reveal_type(f)  # revealed: ((object, int, /) -> None) | ((str, object, /) -> None)
+
+    f("value", 1)
+    f(1, 1)  # error: [invalid-argument-type]
+    f("value", "value")  # error: [invalid-argument-type]
+```
+
+A union inferred for `P` is preserved in return position as well:
+
+```py
+type Inner[**P, R] = Callable[P, R]
+
+def nested[**P, R](callback: Callback[P], value: R) -> Callable[P, Inner[P, R]]:
+    raise NotImplementedError
+
+def _(callback: Callback[[object, int]] | Callback[[str, object]], value: int) -> None:
+    outer = nested(callback, value)
+    # revealed: ((object, int, /) -> Inner[(object, int, /), int]) | ((str, object, /) -> Inner[(str, object, /), int])
+    reveal_type(outer)
+
+    inner = outer("value", 1)
+    reveal_type(inner)  # revealed: ((object, int, /) -> int) | ((str, object, /) -> int)
+
+    inner("value", 1)
+    inner(1, 1)  # error: [invalid-argument-type]
+    inner("value", "value")  # error: [invalid-argument-type]
+```
+
+### Bounded expansion of union-valued `ParamSpec`s
+
+Specializing an overloaded method with several union-valued `ParamSpec`s leads to exponential
+blowup, so we bound the expansion to 64 callable types, otherwise falling back to `Unknown`.
+
+```py
+from typing import Literal, Protocol, overload
+
+class Callback[**P](Protocol):
+    def call(self, *args: P.args, **kwargs: P.kwargs) -> None: ...
+
+class Combined[**P, **Q, **R](Protocol):
+    @overload
+    def call(self) -> int: ...
+    @overload
+    def call(self, tag: Literal[0], /, *args: P.args, **kwargs: P.kwargs) -> None: ...
+    @overload
+    def call(self, tag: Literal[1], /, *args: Q.args, **kwargs: Q.kwargs) -> None: ...
+    @overload
+    def call(self, tag: Literal[2], /, *args: R.args, **kwargs: R.kwargs) -> None: ...
+    @overload
+    def call(self, tag: Literal[3], /, *args: P.args, **kwargs: P.kwargs) -> None: ...
+
+def combine[**P, **Q, **R](p: Callback[P], q: Callback[Q], r: Callback[R]) -> Combined[P, Q, R]:
+    raise NotImplementedError
+
+type FourCallbacks = Callback[[int]] | Callback[[str]] | Callback[[bytes]] | Callback[[None]]
+
+def _(x: FourCallbacks) -> None:
+    # The cartesian product produces a union of 64 elements.
+    f = combine(x, x, x).call
+    reveal_type(f())  # revealed: int
+
+def _(x: FourCallbacks, y: FourCallbacks | Callback[[list[int]]]) -> None:
+    # The cartesian product would have produced a union of 80 elements.
+    f = combine(x, x, y).call
+    reveal_type(f)  # revealed: Unknown
+```
+
 ### Specializing `Self` when `ParamSpec` is involved
 
 ```py
@@ -913,6 +1154,212 @@ foo = Foo[int, str]()
 reveal_type(foo)  # revealed: Foo[(int, str, /)]
 reveal_type(foo.method)  # revealed: bound method Foo[(int, str, /)].method(int, str, /) -> str
 reveal_type(foo.method(1, "a"))  # revealed: str
+```
+
+### Specializing explicit instance receivers with `ParamSpec`
+
+Specializing a `ParamSpec` preserves inference from an explicit receiver annotation. The writable
+`value` attribute makes `Box` invariant in `T`, so binding `get` to a `Box[int, [str]]` instance
+fixes `U` to `int` before the method is called.
+
+```py
+class Box[T, **P]:
+    value: T
+
+    def get[U](self: "Box[U, P]", *args: P.args, **kwargs: P.kwargs) -> U:
+        return self.value
+
+def check(box: Box[int, [str]]) -> None:
+    reveal_type(box.get)  # revealed: bound method Box[int, (str, /)].get(str, /) -> int
+```
+
+### Specializing explicit class method receivers with `ParamSpec`
+
+A class method's explicit `cls` annotation also determines a method-scoped type variable when the
+method is bound. Specializing `Factory` with a concrete parameter list preserves that binding, so
+`make` returns the specialized `Factory` type.
+
+```py
+class Factory[**P]:
+    @classmethod
+    def make[T](cls: type[T], *args: P.args, **kwargs: P.kwargs) -> T:
+        return cls()
+
+# revealed: bound method <class 'Factory[(int, /)]'>.make(int, /) -> Factory[(int, /)]
+reveal_type(Factory[[int]].make)
+```
+
+### `ParamSpec` inferred from classmethod receivers
+
+The class object bound to `cls` determines the constructor parameters represented by `P`. The bound
+method accepts those parameters, preserving their names, kinds, and defaults.
+
+```py
+from typing import Callable
+
+class Factory:
+    def __init__(self, value: int, *, label: str = "") -> None: ...
+    @classmethod
+    def make[**P](cls: Callable[P, "Factory"], *args: P.args, **kwargs: P.kwargs) -> "Factory":
+        return cls(*args, **kwargs)
+
+# revealed: bound method <class 'Factory'>.make(value: int, *, label: str = "") -> Factory
+reveal_type(Factory.make)
+reveal_type(Factory.make(1))  # revealed: Factory
+Factory.make(value=1, label="label")
+
+make: Callable[[int], Factory] = Factory.make
+```
+
+Calls and callback assignments are checked against the constructor signature. In particular, the
+required parameter cannot be omitted, and the optional keyword-only parameter cannot be positional.
+
+```py
+Factory.make()  # error: [missing-argument] "No argument provided for required parameter `value`"
+Factory.make("wrong")  # error: [invalid-argument-type] "Expected `int`"
+Factory.make(1, label=2)  # error: [invalid-argument-type] "Expected `str`"
+Factory.make(1, "label")  # error: [too-many-positional-arguments]
+Factory.make(1, unexpected=True)  # error: [unknown-argument]
+
+wrong_factory: Callable[[str], Factory] = Factory.make  # error: [invalid-assignment]
+```
+
+### `ParamSpec` inferred from callable instance receivers
+
+An instance method can infer `P` from the bound instance's `__call__` signature. If the callable is
+generic, its type parameters remain available for inference from the forwarded arguments.
+
+```py
+from typing import Callable
+
+class Callback:
+    def __call__[T](self, value: T) -> T:
+        return value
+
+    def call[**P, R](self: Callable[P, R], *args: P.args, **kwargs: P.kwargs) -> R:
+        return self(*args, **kwargs)
+
+callback = Callback()
+
+# revealed: bound method Callback.call[T](value: T) -> T
+reveal_type(callback.call)
+reveal_type(callback.call(value=1))  # revealed: Literal[1]
+reveal_type(callback.call("value"))  # revealed: Literal["value"]
+callback.call()  # error: [missing-argument] "No argument provided for required parameter `value`"
+callback.call(1, 2)  # error: [too-many-positional-arguments]
+```
+
+### Overloaded methods with generic receivers
+
+The mutable callback attribute makes `Wrapper` invariant in `P`, so its receiver determines each
+overload's `Q` exactly. The prepended flag determines the return type.
+
+```py
+from typing import Callable, Literal, overload
+
+class Wrapper[**P]:
+    def __init__(self, callback: Callable[P, int]) -> None:
+        self.callback = callback
+
+    @overload
+    def call[**Q](self: "Wrapper[Q]", as_str: Literal[False], /, *args: Q.args, **kwargs: Q.kwargs) -> int: ...
+    @overload
+    def call[**Q](self: "Wrapper[Q]", as_str: Literal[True], /, *args: Q.args, **kwargs: Q.kwargs) -> str: ...
+    def call(self, as_str: bool, /, *args: P.args, **kwargs: P.kwargs) -> int | str:
+        result = self.callback(*args, **kwargs)
+        return str(result) if as_str else result
+
+def callback(value: int) -> int:
+    return value
+
+wrapper = Wrapper(callback)
+
+# revealed: Overload[(as_str: Literal[False], /, value: int) -> int, (as_str: Literal[True], /, value: int) -> str]
+reveal_type(wrapper.call)
+reveal_type(wrapper.call(False, 1))  # revealed: int
+reveal_type(wrapper.call(True, value=1))  # revealed: str
+wrapper.call(False)  # error: [no-matching-overload]
+wrapper.call(True, "wrong")  # error: [no-matching-overload]
+```
+
+When the callback is overloaded, each method overload expands into multiple signatures. A failed
+call lists each method overload declaration only once.
+
+```py
+@overload
+def overloaded_callback(value: int) -> int: ...
+@overload
+def overloaded_callback(*, label: str) -> int: ...
+def overloaded_callback(value: int = 0, *, label: str = "") -> int:
+    return value
+
+overloaded_wrapper = Wrapper(overloaded_callback)
+overloaded_wrapper.call(False, b"wrong")  # snapshot: no-matching-overload
+```
+
+```snapshot
+error[no-matching-overload]: No overload of bound method `Wrapper.call` matches arguments
+  --> src/mdtest_snippet.py:34:1
+   |
+34 | overloaded_wrapper.call(False, b"wrong")  # snapshot: no-matching-overload
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+info: First overload defined here
+ --> src/mdtest_snippet.py:7:5
+  |
+7 | /     @overload
+8 | |     def call[**Q](self: "Wrapper[Q]", as_str: Literal[False], /, *args: Q.args, **kwargs: Q.kwargs) -> int: ...
+  | |_______________________________________________________________________________________________________________^ First overload defined here
+info: Possible overloads for bound method `call`:
+info:   [**Q](self: Wrapper[Q], as_str: Literal[False], /, *args: Q.args, **kwargs: Q.kwargs) -> int
+info:   [**Q](self: Wrapper[Q], as_str: Literal[True], /, *args: Q.args, **kwargs: Q.kwargs) -> str
+info: Overload implementation defined here
+  --> src/mdtest_snippet.py:11:9
+   |
+11 |     def call(self, as_str: bool, /, *args: P.args, **kwargs: P.kwargs) -> int | str:
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+```
+
+### Classmethod receivers with overloaded constructors
+
+A classmethod forwards each constructor overload independently. A call supplies either an integer
+value or a keyword-only string label, not both.
+
+```py
+from typing import Callable, overload
+
+class Factory:
+    @overload
+    def __init__(self, value: int) -> None: ...
+    @overload
+    def __init__(self, *, label: str) -> None: ...
+    def __init__(self, value: int = 0, *, label: str = "") -> None: ...
+    @classmethod
+    def make[**P](cls: Callable[P, "Factory"], *args: P.args, **kwargs: P.kwargs) -> "Factory":
+        return cls(*args, **kwargs)
+
+# revealed: Overload[(value: int) -> Factory, (*, label: str) -> Factory]
+reveal_type(Factory.make)
+reveal_type(Factory.make(1))  # revealed: Factory
+reveal_type(Factory.make(label="label"))  # revealed: Factory
+
+Factory.make()  # snapshot: no-matching-overload
+Factory.make(1, label="label")  # error: [no-matching-overload]
+```
+
+```snapshot
+error[no-matching-overload]: No overload of bound method `Factory.make` matches arguments
+  --> src/mdtest_snippet.py:18:1
+   |
+18 | Factory.make()  # snapshot: no-matching-overload
+   | ^^^^^^^^^^^^^^
+info: Possible overloads for bound method `make`:
+info:   (value: int) -> Factory
+info:   (*, label: str) -> Factory
+info: Overload implementation defined here
+  --> src/mdtest_snippet.py:10:9
+   |
+10 |     def make[**P](cls: Callable[P, "Factory"], *args: P.args, **kwargs: P.kwargs) -> "Factory":
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ```
 
 ### Gradual types propagate through `ParamSpec` inference
@@ -1502,6 +1949,89 @@ reveal_type(generic_context(c.generic_method))
 reveal_type(c.generic_method)  # revealed: [T](value: T) -> T
 reveal_type(c.generic_method(100))  # revealed: Literal[100]
 reveal_type(c.generic_method([1, 2, 3]))  # revealed: list[int]
+```
+
+### Callables inferred against gradual return types
+
+A decorator accepting `Callable[P, Any]` preserves any type variables scoped to the callable,
+instead of eagerly specializing them to `Any`:
+
+```py
+from collections.abc import Callable
+from typing import Any, overload
+
+class Wrapper[**P]:
+    def __call__(self, *args: P.args, **kwargs: P.kwargs) -> Any:
+        raise NotImplementedError
+
+def decorate[**P](callback: Callable[P, Any]) -> Wrapper[P]:
+    raise NotImplementedError
+
+@decorate
+def identity[T](value: T) -> T:
+    return value
+
+reveal_type(identity)  # revealed: Wrapper[(value: T@identity)]
+reveal_type(identity(1))  # revealed: Any
+```
+
+This also applies to type variables from an enclosing scope:
+
+```py
+def _[T](callback: Callable[[T], T], value: T) -> None:
+    f = decorate(callback)
+    reveal_type(f)  # revealed: Wrapper[(T@_, /)]
+    reveal_type(f(value))  # revealed: Any
+```
+
+The same applies when the return type is an alias for `Any`:
+
+```py
+type Anything = Any
+
+def decorate_alias[**P](callback: Callable[P, Anything]) -> Wrapper[P]:
+    raise NotImplementedError
+
+def _[T](callback: Callable[[T], T]) -> None:
+    reveal_type(decorate_alias(callback))  # revealed: Wrapper[(T@_, /)]
+```
+
+Type variables shared by multiple overloads are preserved as well:
+
+```py
+def _[T](value: T) -> None:
+    @overload
+    def callback(value: T) -> T: ...
+    @overload
+    def callback(value: T, count: int) -> T: ...
+    def callback(value: T, count: int = 1) -> T:
+        return value
+
+    # revealed: Wrapper[Overload[(value: T@_) -> Unknown, (value: T@_, count: int) -> Unknown]]
+    reveal_type(decorate(callback))
+```
+
+A local return type variable is inferred from the argument, even when it appears in a nested
+callable with a `ParamSpec`:
+
+```py
+def make[**P, R](consume: Callable[[Callable[P, R]], None]) -> Callable[P, R]:
+    raise NotImplementedError
+
+def _[**P](consume: Callable[[Callable[P, Any]], None]) -> None:
+    reveal_type(make(consume))  # revealed: (**P@_) -> Any
+```
+
+The inferred return type also takes precedence over a type parameter default:
+
+```py
+def make_with_default[**P, R = bytes](consume: Callable[[Callable[P, R]], None]) -> Callable[P, R]:
+    raise NotImplementedError
+
+def _[**P](consume: Callable[[Callable[P, Any]], None], *args: P.args, **kwargs: P.kwargs) -> str:
+    callback = make_with_default(consume)
+    reveal_type(callback)  # revealed: (**P@_) -> Any
+    return callback(*args, **kwargs)
 ```
 
 ## Callable protocols with `ParamSpec` and class constructors

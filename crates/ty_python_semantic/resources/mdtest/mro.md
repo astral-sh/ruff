@@ -691,7 +691,7 @@ reveal_mro(Sub)
 ```py
 from typing_extensions import Protocol, TypeVar, Generic
 
-T = TypeVar("T")
+T = TypeVar("T", covariant=True)
 
 class Foo(Protocol): ...
 class Bar(Protocol[T]): ...

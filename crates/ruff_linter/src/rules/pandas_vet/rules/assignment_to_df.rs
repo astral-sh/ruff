@@ -2,7 +2,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
-use crate::{Violation, checkers::ast::Checker};
+use crate::{Violation, checkers::ast::Checker, codes::Category};
 
 /// ## Removed
 ///
@@ -32,7 +32,7 @@ use crate::{Violation, checkers::ast::Checker};
 /// animals = pd.read_csv("animals.csv")
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(removed_since = "0.13.0")]
+#[violation_metadata(removed_since = "0.13.0", category = Category::Pedantic)]
 pub(crate) struct PandasDfVariableName;
 
 impl Violation for PandasDfVariableName {

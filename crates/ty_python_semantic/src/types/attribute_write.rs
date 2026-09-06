@@ -9,14 +9,18 @@
 
 use crate::Db;
 use ty_module_resolver::KnownModule;
+use ty_python_core::use_def_map;
 
 use super::call::CallArguments;
 use super::callable::CallableTypeKind;
 use super::{
-    IntersectionType, KnownClass, KnownInstanceType, MemberLookupPolicy, Type, TypeQualifiers,
+    IntersectionType, KnownClass, KnownInstanceType, MemberLookupPolicy, Parameter, Signature,
+    Type, TypeQualifiers, TypeVarBoundOrConstraints, UnionType,
 };
 use crate::ProgramEnvironment;
-use crate::place::{DefinedPlace, Definedness, Place, PlaceAndQualifiers, builtins_symbol};
+use crate::place::{
+    DefinedPlace, Definedness, Place, PlaceAndQualifiers, builtins_symbol, place_from_bindings,
+};
 
 /// The operation required to write an attribute.
 ///
@@ -106,7 +110,8 @@ pub(super) enum InstanceAttributeWriteMember<'db> {
 ///
 /// A data descriptor on the metaclass takes precedence over the class object's own attributes,
 /// which in turn take precedence over definitely non-data metaclass members. If the metaclass
-/// member is absent or possibly undefined, the class object's own attributes form the fallback.
+/// member is absent, possibly undefined, or could be a non-data descriptor, the class object's own
+/// attributes form the fallback.
 pub(super) enum ClassAttributeWriteMember<'db> {
     /// A metaclass member governs the write, optionally alongside a class-attribute fallback.
     Explicit {
@@ -150,7 +155,7 @@ impl ExplicitAttributeWriteRequirement<'_> {
     }
 }
 
-/// A write target found through a possibly absent fallback lookup.
+/// A receiver-level write target that can govern the write instead of the type member.
 pub(super) enum FallbackAttributeWriteRequirement<'db> {
     /// Check the value against `ty`, retaining whether the declaration may be absent at runtime.
     AssignableTo {
@@ -184,8 +189,8 @@ pub(super) enum FallbackAttributeWriteRequirement<'db> {
 /// ```
 pub(super) enum AssignmentAttributeMembers<'db> {
     /// The type member governs the write, as `Meta.data` does above because it is a data descriptor.
-    /// If the type member may be missing, the corresponding receiver member (`C.data`) is retained
-    /// as `receiver_fallback`.
+    /// If the type member may be missing or may be a non-data descriptor, the corresponding
+    /// receiver member (`C.data`) is retained as `receiver_fallback`.
     TypeMember {
         member: PlaceAndQualifiers<'db>,
         receiver_fallback: Option<PlaceAndQualifiers<'db>>,
@@ -278,6 +283,7 @@ pub(super) fn attribute_write_requirement<'db>(
         | Type::SpecialForm(..)
         | Type::KnownInstance(..)
         | Type::PropertyInstance(..)
+        | Type::SlotDescriptor(..)
         | Type::FunctionLiteral(..)
         | Type::Callable(..)
         | Type::BoundMethod(_)
@@ -318,7 +324,9 @@ pub(super) fn attribute_write_requirement<'db>(
             {
                 builtins_symbol(db, env, attribute)
             } else {
-                module.static_member(db, env, attribute)
+                module
+                    .static_member(db, env, attribute)
+                    .map_or_else(|_| Place::Undefined.into(), |member| member.member(db))
             };
             AttributeWriteRequirement::Module(match symbol.place {
                 Place::Defined(DefinedPlace { ty, .. }) => Some(ty),
@@ -371,19 +379,37 @@ fn instance_attribute_write_member_requirement<'db>(
         PlaceAndQualifiers {
             place: Place::Defined(DefinedPlace { ty, .. }),
             qualifiers,
-        } => InstanceAttributeWriteMember::Explicit {
-            member: explicit_attribute_write_requirement(
+        } => {
+            let member = explicit_attribute_write_requirement(
                 db,
                 env,
                 object_ty,
                 attribute,
                 ty.bind_self_typevars(db, env, object_ty),
                 qualifiers,
-            ),
-            fallback: receiver_fallback.map(|fallback| {
-                instance_fallback_write_requirement(db, env, object_ty, attribute, fallback)
-            }),
-        },
+            );
+
+            // Built-in classes can expose writable C-level descriptors that their stubs model as
+            // plain annotations. Only a known slot layout rules out that additional storage.
+            if matches!(
+                member,
+                ExplicitAttributeWriteRequirement::AssignableTo { .. }
+            ) && ty.is_definitely_non_data_descriptor(db, env)
+                && object_ty
+                    .nominal_class(db, env)
+                    .and_then(|class| class.static_class_literal(db))
+                    .is_some_and(|(class, _)| class.lacks_instance_storage(db, attribute))
+            {
+                return InstanceAttributeWriteMember::SetAttr;
+            }
+
+            InstanceAttributeWriteMember::Explicit {
+                member,
+                fallback: receiver_fallback.map(|fallback| {
+                    instance_fallback_write_requirement(db, env, object_ty, attribute, fallback)
+                }),
+            }
+        }
         PlaceAndQualifiers {
             place: Place::Undefined,
             ..
@@ -440,16 +466,32 @@ fn class_attribute_write_requirement<'db>(
 
     let member = match type_member {
         PlaceAndQualifiers {
-            place: Place::Defined(DefinedPlace { ty, .. }),
+            place: Place::Defined(place @ DefinedPlace { ty, .. }),
             qualifiers,
-        } => ClassAttributeWriteMember::Explicit {
-            member: explicit_attribute_write_requirement(
-                db, env, object_ty, attribute, ty, qualifiers,
-            ),
-            fallback: receiver_fallback.map(|fallback| {
-                class_fallback_write_requirement(db, env, object_ty, class_attr_self_ty, fallback)
-            }),
-        },
+        } => {
+            let descriptor_ty = receiver_fallback
+                .and_then(|_| possible_class_attribute_descriptor(db, env, place))
+                .unwrap_or(ty);
+            ClassAttributeWriteMember::Explicit {
+                member: explicit_attribute_write_requirement(
+                    db,
+                    env,
+                    object_ty,
+                    attribute,
+                    descriptor_ty,
+                    qualifiers,
+                ),
+                fallback: receiver_fallback.map(|fallback| {
+                    class_fallback_write_requirement(
+                        db,
+                        env,
+                        object_ty,
+                        class_attr_self_ty,
+                        fallback,
+                    )
+                }),
+            }
+        }
         PlaceAndQualifiers {
             place: Place::Undefined,
             ..
@@ -478,7 +520,50 @@ fn class_attribute_write_requirement<'db>(
     AttributeWriteRequirement::Class { object_ty, member }
 }
 
+/// Recover the concrete descriptor hidden by an uncertain metaclass-member annotation.
+///
+/// The declared type describes the descriptor object, not the values accepted by its setter.
+/// Inspecting the binding preserves the setter's actual value contract:
+///
+/// ```python
+/// class DescriptorMeta(type):
+///     def __set__(self, instance: object, value: str) -> None: ...
+///
+/// class Descriptor(metaclass=DescriptorMeta): ...
+///
+/// class Meta(type):
+///     attribute: type[object] = Descriptor
+/// ```
+fn possible_class_attribute_descriptor<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    member: DefinedPlace<'db>,
+) -> Option<Type<'db>> {
+    if member.ty.is_data_descriptor(db, env) || member.ty.is_definitely_non_data_descriptor(db, env)
+    {
+        return None;
+    }
+
+    let definition = member.provenance.definition()?;
+    let use_def = use_def_map(db, definition.scope(db));
+    let descriptor_ty =
+        place_from_bindings(db, env, use_def.end_of_scope_bindings(definition.place(db)))
+            .place
+            .ignore_possibly_undefined()?;
+    let descriptor_ty = match descriptor_ty.resolve_type_alias(db) {
+        Type::TypeForm(typeform) => typeform.type_argument(db).to_meta_type(db, env),
+        descriptor_ty => descriptor_ty,
+    };
+
+    descriptor_ty
+        .is_data_descriptor(db, env)
+        .then_some(descriptor_ty)
+}
+
 /// Convert an explicitly resolved member into either a descriptor call or a direct type check.
+///
+/// A slot descriptor writes directly to instance storage, so the receiver's instance declaration
+/// determines its write type even when a subclass overrides the slot owner's annotation.
 ///
 /// Descriptor behavior is used only when `__set__` is found with
 /// [`MemberLookupPolicy::REQUIRE_CONCRETE`]. An `Any` or `Unknown` base therefore does not cause an
@@ -491,6 +576,24 @@ fn explicit_attribute_write_requirement<'db>(
     attr_ty: Type<'db>,
     qualifiers: TypeQualifiers,
 ) -> ExplicitAttributeWriteRequirement<'db> {
+    if matches!(attr_ty, Type::SlotDescriptor(_))
+        && let PlaceAndQualifiers {
+            place: Place::Defined(DefinedPlace { ty, .. }),
+            qualifiers: storage_qualifiers,
+        } = object_ty.instance_member(db, env, attribute)
+    {
+        return ExplicitAttributeWriteRequirement::AssignableTo {
+            ty: effective_write_type(
+                db,
+                env,
+                object_ty,
+                attribute,
+                ty.bind_self_typevars(db, env, object_ty),
+            ),
+            qualifiers: qualifiers.union(storage_qualifiers),
+        };
+    }
+
     if let Place::Defined(DefinedPlace { ty: setter_ty, .. }) = attr_ty
         .class_member_with_policy(db, env, "__set__", MemberLookupPolicy::REQUIRE_CONCRETE)
         .place
@@ -625,37 +728,64 @@ pub(super) fn property_setter_returns_never<'db>(
     })
 }
 
-/// Return the class member that takes precedence over a definitely non-data metaclass member.
-fn class_member_preceding_non_data_metaclass_member<'db>(
+/// Resolve class-object members when a class attribute can shadow its metaclass member.
+///
+/// A definitely non-data metaclass member is shadowed entirely. If the metaclass member's
+/// descriptor status is uncertain, both members remain possible write targets.
+///
+/// ```python
+/// class Meta(type):
+///     attribute = object()
+///
+/// class C(metaclass=Meta):
+///     attribute: int
+///
+/// C.attribute = 1
+/// ```
+fn class_object_assignment_members<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     object_ty: Type<'db>,
     attribute: &str,
     type_member: PlaceAndQualifiers<'db>,
-) -> Option<PlaceAndQualifiers<'db>> {
+) -> Option<AssignmentAttributeMembers<'db>> {
     if !matches!(
         object_ty,
         Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..)
-    ) || !type_member
-        .place
-        .ignore_possibly_undefined()?
-        .is_definitely_non_data_descriptor(db, env)
+    ) {
+        return None;
+    }
+
+    let type_member_ty = type_member.place.ignore_possibly_undefined()?;
+    let definitely_non_data_descriptor = type_member_ty.is_definitely_non_data_descriptor(db, env);
+    if !definitely_non_data_descriptor
+        && (type_member_ty.is_divergent() || type_member_ty.is_data_descriptor(db, env))
     {
         return None;
     }
 
-    object_ty
+    let receiver_member = object_ty
         .find_name_in_mro_with_policy(db, env, attribute, MemberLookupPolicy::default())
-        .filter(|class_attr| !class_attr.place.is_undefined())
+        .filter(|class_attr| !class_attr.place.is_undefined())?;
+
+    Some(if definitely_non_data_descriptor {
+        AssignmentAttributeMembers::ReceiverMember(receiver_member)
+    } else {
+        AssignmentAttributeMembers::TypeMember {
+            member: type_member,
+            receiver_fallback: Some(receiver_member),
+        }
+    })
 }
 
 /// Return the members considered by attribute assignment in lookup-precedence order.
 ///
 /// The type member comes from class-member lookup. A member found directly on the receiver is
 /// queried when the type member is absent or possibly undefined. For class objects, a class-MRO
-/// member instead takes precedence over a definitely non-data metaclass member. Composite and
-/// dynamic receiver types return `None`; their callers either decompose them before this point or
-/// handle them without member lookup.
+/// member instead takes precedence over a definitely non-data metaclass member and remains an
+/// alternative when the metaclass member's descriptor status is uncertain. Composite and dynamic
+/// receiver types return `None`; their callers either decompose them before this point or handle
+/// them without member lookup.
 ///
 /// This helper deliberately does not bind `Self` or interpret descriptors so that assignment,
 /// protocol compatibility, and `Final` validation share exactly the same lookup precedence.
@@ -680,10 +810,10 @@ pub(super) fn assignment_attribute_members<'db>(
     } else {
         object_ty.class_member(db, env, attribute)
     };
-    if let Some(receiver_member) =
-        class_member_preceding_non_data_metaclass_member(db, env, object_ty, attribute, type_member)
+    if let Some(members) =
+        class_object_assignment_members(db, env, object_ty, attribute, type_member)
     {
-        return Some(AssignmentAttributeMembers::ReceiverMember(receiver_member));
+        return Some(members);
     }
     let needs_receiver_fallback = matches!(
         type_member.place,
@@ -700,6 +830,7 @@ pub(super) fn assignment_attribute_members<'db>(
             | Type::SpecialForm(..)
             | Type::KnownInstance(..)
             | Type::PropertyInstance(..)
+            | Type::SlotDescriptor(..)
             | Type::FunctionLiteral(..)
             | Type::Callable(..)
             | Type::BoundMethod(_)
@@ -734,5 +865,182 @@ pub(super) fn assignment_attribute_members<'db>(
     Some(AssignmentAttributeMembers::TypeMember {
         member: type_member,
         receiver_fallback,
+    })
+}
+
+/// The values accepted by a descriptor setter, when representable as a single type.
+#[derive(Copy, Clone)]
+pub(super) enum DescriptorSetterDomain<'db> {
+    Missing,
+    Known(Type<'db>),
+    Deferred,
+}
+
+/// Derive the values accepted by every possible descriptor setter when they fit in [`Type`].
+pub(super) fn descriptor_setter_domain<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    descriptor_ty: Type<'db>,
+    receiver_ty: Type<'db>,
+) -> DescriptorSetterDomain<'db> {
+    match descriptor_ty {
+        Type::Union(union) => {
+            let mut write_types = Vec::with_capacity(union.elements(db).len());
+            for descriptor_ty in union.elements(db) {
+                match single_descriptor_setter_domain(db, env, *descriptor_ty, receiver_ty) {
+                    DescriptorSetterDomain::Missing => return DescriptorSetterDomain::Missing,
+                    DescriptorSetterDomain::Known(write_ty) => write_types.push(write_ty),
+                    DescriptorSetterDomain::Deferred => return DescriptorSetterDomain::Deferred,
+                }
+            }
+            IntersectionType::bounded_from_elements(db, env, write_types).map_or(
+                DescriptorSetterDomain::Deferred,
+                DescriptorSetterDomain::Known,
+            )
+        }
+        _ => single_descriptor_setter_domain(db, env, descriptor_ty, receiver_ty),
+    }
+}
+
+/// Derive the values accepted by one possible runtime descriptor.
+fn single_descriptor_setter_domain<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    descriptor_ty: Type<'db>,
+    receiver_ty: Type<'db>,
+) -> DescriptorSetterDomain<'db> {
+    let Place::Defined(DefinedPlace {
+        ty: setter_ty,
+        definedness: Definedness::AlwaysDefined,
+        ..
+    }) = descriptor_ty
+        .member_lookup_with_policy(
+            db,
+            env,
+            "__set__",
+            MemberLookupPolicy::REQUIRE_CONCRETE | MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+        )
+        .place
+    else {
+        return DescriptorSetterDomain::Missing;
+    };
+
+    let Some(callables) = setter_ty.try_upcast_to_callable(db, env) else {
+        return DescriptorSetterDomain::Deferred;
+    };
+    let mut callable_domains = Vec::with_capacity(callables.iter().len());
+    for callable in &callables {
+        let mut write_types = Vec::new();
+        for signature in callable.signatures(db) {
+            match descriptor_setter_signature_domain(db, env, signature, descriptor_ty, receiver_ty)
+            {
+                DescriptorSetterSignatureDomain::Inapplicable => {}
+                DescriptorSetterSignatureDomain::Known(write_ty) => write_types.push(write_ty),
+                DescriptorSetterSignatureDomain::Deferred => {
+                    return DescriptorSetterDomain::Deferred;
+                }
+            }
+        }
+        callable_domains.push(UnionType::from_elements(db, env, write_types));
+    }
+    IntersectionType::bounded_from_elements(db, env, callable_domains).map_or(
+        DescriptorSetterDomain::Deferred,
+        DescriptorSetterDomain::Known,
+    )
+}
+
+enum DescriptorSetterSignatureDomain<'db> {
+    Inapplicable,
+    Known(Type<'db>),
+    Deferred,
+}
+
+/// Derive the values accepted by one `__set__` overload when they fit in [`Type`].
+fn descriptor_setter_signature_domain<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    signature: &Signature<'db>,
+    descriptor_ty: Type<'db>,
+    receiver_ty: Type<'db>,
+) -> DescriptorSetterSignatureDomain<'db> {
+    let parameters = signature.parameters();
+    let missing_required_parameter = || {
+        if parameters.is_gradual() || parameters.as_slice().iter().any(Parameter::is_variadic) {
+            DescriptorSetterSignatureDomain::Deferred
+        } else {
+            DescriptorSetterSignatureDomain::Inapplicable
+        }
+    };
+    let Some(trailing_parameters) = parameters.as_slice().get(2..) else {
+        return missing_required_parameter();
+    };
+    if !trailing_parameters.iter().all(|parameter| {
+        parameter.has_default()
+            || ((parameters.is_standard() || parameters.is_gradual())
+                && (parameter.is_variadic() || parameter.is_keyword_variadic()))
+    }) {
+        return DescriptorSetterSignatureDomain::Inapplicable;
+    }
+
+    let Some(receiver_parameter) = parameters.get_positional(0) else {
+        return missing_required_parameter();
+    };
+    let receiver_parameter =
+        receiver_parameter
+            .annotated_type()
+            .bind_self_typevars(db, env, descriptor_ty);
+    if contains_signature_typevar(db, env, signature, receiver_parameter) {
+        return DescriptorSetterSignatureDomain::Deferred;
+    }
+    if !receiver_ty.is_assignable_to(db, env, receiver_parameter) {
+        return DescriptorSetterSignatureDomain::Inapplicable;
+    }
+
+    let Some(write_parameter) = parameters.get_positional(1) else {
+        return missing_required_parameter();
+    };
+    let write_ty = write_parameter
+        .annotated_type()
+        .bind_self_typevars(db, env, descriptor_ty);
+    if !contains_signature_typevar(db, env, signature, write_ty) {
+        return DescriptorSetterSignatureDomain::Known(write_ty);
+    }
+
+    let Type::TypeVar(typevar) = write_ty else {
+        return DescriptorSetterSignatureDomain::Deferred;
+    };
+    let Some(generic_context) = signature.generic_context else {
+        return DescriptorSetterSignatureDomain::Deferred;
+    };
+    if !generic_context.contains(db, typevar.identity(db))
+        || !typevar
+            .binding_context(db)
+            .definition()
+            .is_some_and(|definition| definition.kind(db).is_function_def())
+    {
+        return DescriptorSetterSignatureDomain::Deferred;
+    }
+
+    match typevar.typevar(db).bound_or_constraints(db, env) {
+        None => DescriptorSetterSignatureDomain::Known(Type::object()),
+        Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+            DescriptorSetterSignatureDomain::Known(bound.bind_self_typevars(db, env, descriptor_ty))
+        }
+        Some(TypeVarBoundOrConstraints::Constraints(_)) => {
+            DescriptorSetterSignatureDomain::Deferred
+        }
+    }
+}
+
+fn contains_signature_typevar<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    signature: &Signature<'db>,
+    ty: Type<'db>,
+) -> bool {
+    signature.generic_context.is_some_and(|generic_context| {
+        super::visitor::any_over_type(db, env, ty, true, |ty| {
+            matches!(ty, Type::TypeVar(typevar) if generic_context.contains(db, typevar.identity(db)))
+        })
     })
 }

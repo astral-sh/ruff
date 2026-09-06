@@ -14,8 +14,8 @@ index d46b694a7e..1db97b1893 100644
  
  # HACK: `obj: Never` typing matches if object argument is using `Any` type.
  @overload
--def is_dataclass(obj: Never) -> TypeIs[DataclassInstance | type[DataclassInstance]]:  # type: ignore[narrowed-type-not-subtype]  # pyright: ignore[reportGeneralTypeIssues]  # ty:ignore[invalid-type-guard-definition]
-+def is_dataclass(obj: Never) -> TypeIs[Top[DataclassInstance | type[DataclassInstance]]]:  # type: ignore[narrowed-type-not-subtype]  # pyright: ignore[reportGeneralTypeIssues]  # ty:ignore[invalid-type-guard-definition]
+-def is_dataclass(obj: Never) -> TypeIs[DataclassInstance | type[DataclassInstance]]:  # type: ignore[narrowed-type-not-subtype]  # pyright: ignore[reportGeneralTypeIssues]  # ty:ignore[invalid-type-guard-definition]  # pyrefly: ignore [bad-function-definition]
++def is_dataclass(obj: Never) -> TypeIs[Top[DataclassInstance | type[DataclassInstance]]]:  # type: ignore[narrowed-type-not-subtype]  # pyright: ignore[reportGeneralTypeIssues]  # ty:ignore[invalid-type-guard-definition]  # pyrefly: ignore [bad-function-definition]
      """Returns True if obj is a dataclass or an instance of a
      dataclass.
      """

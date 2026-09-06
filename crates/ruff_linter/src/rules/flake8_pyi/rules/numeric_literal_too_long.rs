@@ -4,6 +4,7 @@ use ruff_text_size::{Ranged, TextSize};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
@@ -30,7 +31,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// def foo(arg: int = ...) -> None: ...
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.271")]
+#[violation_metadata(stable_since = "v0.0.271", category = Category::Pedantic)]
 pub(crate) struct NumericLiteralTooLong;
 
 impl AlwaysFixableViolation for NumericLiteralTooLong {

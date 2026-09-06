@@ -23,18 +23,20 @@ use crate::types::infer::{InferenceFlags, TypeExpressionFlags};
 use crate::types::special_form::AliasSpec;
 use crate::types::subscript::{LegacyGenericOrigin, SubscriptError, SubscriptErrorKind};
 use crate::types::tuple::{Tuple, TupleSpecBuilder, TupleType, VariableSegment};
-use crate::types::typed_dict::{TypedDictAssignmentKind, TypedDictKeyAssignment};
-use crate::types::typevar::TypeVarSet;
+use crate::types::typed_dict::{
+    TypedDictAssignmentKind, TypedDictExtraItems, TypedDictKeyAssignment,
+};
+use crate::types::typevar::{BindingContext, TypeVarSet};
 use crate::types::{
     BoundTypeVarInstance, CallArguments, CallDunderError, CallableBinding, CycleDetector,
-    DynamicType, InternedType, KnownClass, KnownInstanceType, LintDiagnosticGuard,
+    DisplaySettings, DynamicType, InternedType, KnownClass, KnownInstanceType, LintDiagnosticGuard,
     MemberLookupPolicy, Parameter, Parameters, SpecialFormType, StaticClassLiteral, Type,
-    TypeAliasType, TypeAndQualifiers, TypeContext, TypeVarBoundOrConstraints, UnionType,
-    UnionTypeInstance, any_over_type, todo_type,
+    TypeAliasType, TypeAndQualifiers, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
+    UnionType, UnionTypeInstance, any_over_type, todo_type,
 };
 use crate::{Db, FxOrderSet, ProgramEnvironment};
 use ty_python_core::definition::Definition;
-use ty_python_core::place::{PlaceExpr, PlaceExprRef};
+use ty_python_core::place::PlaceExpr;
 use ty_python_core::scope::FileScopeId;
 use ty_python_core::{SemanticIndex, place_table};
 
@@ -136,12 +138,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = subscript;
 
         match ctx {
-            ExprContext::Load => self.infer_subscript_load(subscript),
+            ExprContext::Load => self
+                .infer_subscript_load(subscript)
+                .unwrap_or_else(|recovery_ty| recovery_ty),
             ExprContext::Store => {
                 let value_ty = self.infer_expression(value, TypeContext::default());
                 self.store_typed_dict_key_expected_type(slice, value_ty);
                 let slice_ty = self.infer_expression(slice, TypeContext::default());
-                self.infer_subscript_expression_types(subscript, value_ty, slice_ty, *ctx);
+                let _ = self.infer_subscript_expression_types(subscript, value_ty, slice_ty, *ctx);
                 Type::Never
             }
             ExprContext::Del => {
@@ -154,20 +158,29 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ExprContext::Invalid => {
                 let value_ty = self.infer_expression(value, TypeContext::default());
                 let slice_ty = self.infer_expression(slice, TypeContext::default());
-                self.infer_subscript_expression_types(subscript, value_ty, slice_ty, *ctx);
+                let _ = self.infer_subscript_expression_types(subscript, value_ty, slice_ty, *ctx);
                 Type::unknown()
             }
         }
     }
 
-    pub(super) fn infer_subscript_load(&mut self, subscript: &ast::ExprSubscript) -> Type<'db> {
+    /// Infer a subscript load, returning its inferred type when the subscription succeeds.
+    ///
+    /// If the subscription fails, report the error and return the type that should be used to
+    /// continue inference. This recovery type may be `Unknown` or, for example, the return type of
+    /// `__getitem__` when its arguments are invalid. Keeping it separate from a successful result
+    /// lets augmented assignments check their right-hand side without attempting a failed store.
+    pub(super) fn infer_subscript_load(
+        &mut self,
+        subscript: &ast::ExprSubscript,
+    ) -> Result<Type<'db>, Type<'db>> {
         let value_ty = self.infer_expression(&subscript.value, TypeContext::default());
 
         // If we have an implicit type alias like `MyList = list[T]`, and if `MyList` is being
         // used in another implicit type alias like `Numbers = MyList[int]`, then we infer the
         // right hand side as a value expression, and need to handle the specialization here.
         if value_ty.is_generic_alias() {
-            return self.infer_explicit_type_alias_specialization(subscript, value_ty, false);
+            return Ok(self.infer_explicit_type_alias_specialization(subscript, value_ty, false));
         }
 
         self.infer_subscript_load_impl(value_ty, subscript)
@@ -177,7 +190,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         &mut self,
         value_ty: Type<'db>,
         subscript: &ast::ExprSubscript,
-    ) -> Type<'db> {
+    ) -> Result<Type<'db>, Type<'db>> {
         let env = self.program_environment();
         let db = self.db();
 
@@ -186,7 +199,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             node_index: _,
             value: _,
             slice,
-            ctx: expr_context,
+            ctx: _,
         } = subscript;
 
         self.store_typed_dict_key_expected_type(slice, value_ty);
@@ -196,10 +209,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // If `value` is a valid reference, we attempt type narrowing by assignment.
         if !value_ty.is_unknown() {
             if let Some(expr) = PlaceExpr::try_from_expr(subscript) {
-                let (place, keys) = self.infer_place_load(
-                    PlaceExprRef::from(&expr),
-                    ast::ExprRef::Subscript(subscript),
-                );
+                let (place, keys) = self.infer_place_load(expr, ast::ExprRef::Subscript(subscript));
                 constraint_keys.extend(keys);
                 if let Place::Defined(DefinedPlace {
                     ty,
@@ -210,21 +220,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // Even if we can obtain the subscript type based on the assignments, we still perform default type inference
                     // (to store the expression type and to report errors).
                     let slice_ty = self.infer_expression(slice, TypeContext::default());
-                    self.infer_subscript_expression_types(
-                        subscript,
-                        value_ty,
-                        slice_ty,
-                        *expr_context,
-                    );
-                    return ty;
+                    return self
+                        .infer_subscript_expression_types(
+                            subscript,
+                            value_ty,
+                            slice_ty,
+                            ExprContext::Load,
+                        )
+                        .map(|_| ty)
+                        .map_err(|_| ty);
                 }
             }
         }
 
-        let tuple_generic_alias = |env: &ProgramEnvironment<'db>, tuple: Option<TupleType<'db>>| {
-            let tuple = tuple.unwrap_or_else(|| TupleType::homogeneous(db, env, Type::unknown()));
-            Type::from(tuple.to_class_type(db))
-        };
+        let tuple_generic_alias = |tuple: TupleType<'db>| Type::from(tuple.to_class_type(db));
 
         match value_ty {
             Type::ClassLiteral(class) => {
@@ -235,43 +244,47 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // updating all of the subscript logic below to use custom callables for all of the _other_
                 // special cases, too.
                 if class.is_tuple(db) {
-                    return tuple_generic_alias(env, self.infer_tuple_type_expression(subscript));
+                    return Ok(tuple_generic_alias(
+                        self.infer_tuple_type_expression(subscript),
+                    ));
                 } else if class.is_known(db, KnownClass::Type) {
                     let argument_ty = self.infer_type_expression(slice);
-                    return Type::KnownInstance(KnownInstanceType::TypeGenericAlias(
+                    return Ok(Type::KnownInstance(KnownInstanceType::TypeGenericAlias(
                         InternedType::new(db, argument_ty),
-                    ));
+                    )));
                 }
 
                 if let Some(generic_context) = class.generic_context(db)
                     && let Some(class) = class.as_static()
                 {
-                    return self.infer_explicit_class_specialization(
+                    return Ok(self.infer_explicit_class_specialization(
                         subscript,
                         value_ty,
                         class,
                         generic_context,
-                    );
+                    ));
                 }
             }
             Type::KnownInstance(KnownInstanceType::TypeAliasType(type_alias)) => {
                 if let Some(generic_context) = type_alias.generic_context(db) {
-                    return self.infer_explicit_type_alias_type_specialization(
+                    return Ok(self.infer_explicit_type_alias_type_specialization(
                         subscript,
                         value_ty,
                         type_alias,
                         generic_context,
-                    );
+                    ));
                 }
             }
             Type::SpecialForm(special_form) => match special_form {
                 SpecialFormType::Tuple => {
-                    return tuple_generic_alias(env, self.infer_tuple_type_expression(subscript));
+                    return Ok(tuple_generic_alias(
+                        self.infer_tuple_type_expression(subscript),
+                    ));
                 }
                 SpecialFormType::Literal => match self.infer_literal_parameter_type(slice) {
                     Ok(result) => {
-                        return Type::KnownInstance(KnownInstanceType::Literal(InternedType::new(
-                            db, result,
+                        return Ok(Type::KnownInstance(KnownInstanceType::Literal(
+                            InternedType::new(db, result),
                         )));
                     }
                     Err(nodes) => {
@@ -282,19 +295,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             };
                             builder.into_diagnostic(
                                 "Type arguments for `Literal` must be `None`, \
-                            a literal value (int, bool, str, or bytes), or an enum member",
+                                a literal value (int, bool, str, or bytes), \
+                                or an enum member",
                             );
                         }
-                        return Type::unknown();
+                        return Ok(Type::unknown());
                     }
                 },
                 SpecialFormType::Annotated => {
-                    return self
+                    return Ok(self
                         .parse_subscription_of_annotated_special_form(
                             subscript,
                             AnnotatedExprContext::TypeExpression,
                         )
-                        .inner_type();
+                        .inner_type());
                 }
                 SpecialFormType::Optional => {
                     if matches!(**slice, ast::Expr::Tuple(_))
@@ -310,9 +324,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                     // `Optional[None]` is equivalent to `None`:
                     if ty.is_none(db) {
-                        return ty;
+                        return Ok(ty);
                     }
-                    return Type::KnownInstance(KnownInstanceType::UnionType(
+                    return Ok(Type::KnownInstance(KnownInstanceType::UnionType(
                         UnionTypeInstance::new(
                             db,
                             None,
@@ -323,7 +337,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 Type::none(db, env),
                             )),
                         ),
-                    ));
+                    )));
                 }
                 SpecialFormType::Union => match **slice {
                     ast::Expr::Tuple(ref tuple) => {
@@ -346,18 +360,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             );
                         }
 
-                        return union_type;
+                        return Ok(union_type);
                     }
                     _ => {
-                        return self.infer_expression(slice, TypeContext::default());
+                        return Ok(self.infer_expression(slice, TypeContext::default()));
                     }
                 },
                 SpecialFormType::Type => {
                     // Similar to the branch above that handles `type[…]`, handle `typing.Type[…]`
                     let argument_ty = self.infer_type_expression(slice);
-                    return Type::KnownInstance(KnownInstanceType::TypeGenericAlias(
+                    return Ok(Type::KnownInstance(KnownInstanceType::TypeGenericAlias(
                         InternedType::new(db, argument_ty),
-                    ));
+                    )));
                 }
                 SpecialFormType::TypingCallable | SpecialFormType::CollectionsAbcCallable => {
                     let callable = self
@@ -365,7 +379,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .as_callable()
                         .expect("always returns Type::Callable");
 
-                    return Type::KnownInstance(KnownInstanceType::Callable(callable));
+                    return Ok(Type::KnownInstance(KnownInstanceType::Callable(callable)));
                 }
                 SpecialFormType::Unpack => {
                     self.store_type_expression_flags(
@@ -383,19 +397,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         previously_in_unpack_type_argument,
                     );
 
-                    return if matches!(
-                        inner_ty,
-                        Type::TypeVar(typevar) if typevar.is_typevartuple(db)
-                    ) || inner_ty.exact_tuple_instance_spec(db).is_some()
-                    {
-                        inner_ty
-                    } else {
-                        self.store_type_expression_flags(
-                            ast::ExprRef::from(subscript),
-                            TypeExpressionFlags::INVALID_UNPACK,
-                        );
-                        Type::unknown()
-                    };
+                    return Ok(
+                        if matches!(
+                            inner_ty,
+                            Type::TypeVar(typevar) if typevar.is_typevartuple(db)
+                        ) || inner_ty.exact_tuple_instance_spec(db).is_some()
+                        {
+                            inner_ty
+                        } else {
+                            self.store_type_expression_flags(
+                                ast::ExprRef::from(subscript),
+                                TypeExpressionFlags::INVALID_UNPACK,
+                            );
+                            Type::unknown()
+                        },
+                    );
                 }
                 SpecialFormType::LegacyStdlibAlias(alias) => {
                     let AliasSpec {
@@ -431,10 +447,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .map(|arg| self.infer_type_expression(arg))
                         .collect();
 
-                    return class
+                    return Ok(class
                         .to_specialized_class_type(db, env, arg_types)
                         .map(Type::from)
-                        .unwrap_or_else(Type::unknown);
+                        .unwrap_or_else(Type::unknown));
                 }
                 _ => {}
             },
@@ -445,7 +461,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | KnownInstanceType::Callable(_)
                 | KnownInstanceType::TypeGenericAlias(_),
             ) => {
-                return self.infer_explicit_type_alias_specialization(subscript, value_ty, false);
+                return Ok(
+                    self.infer_explicit_type_alias_specialization(subscript, value_ty, false)
+                );
             }
             Type::Dynamic(DynamicType::Unknown) => {
                 let slice_ty = self.infer_expression(slice, TypeContext::default());
@@ -457,15 +475,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     &mut variables,
                 );
                 let generic_context = GenericContext::from_typevar_instances(db, env, variables);
-                return Type::Dynamic(DynamicType::UnknownGeneric(generic_context));
+                return Ok(Type::Dynamic(DynamicType::UnknownGeneric(generic_context)));
             }
             _ => {}
         }
 
         let slice_ty = self.infer_expression(slice, TypeContext::default());
-        let result_ty =
-            self.infer_subscript_expression_types(subscript, value_ty, slice_ty, *expr_context);
-        self.narrow_expr_with_applicable_constraints(subscript, result_ty, &constraint_keys)
+        self.infer_subscript_expression_types(subscript, value_ty, slice_ty, ExprContext::Load)
+            .map(|ty| self.narrow_expr_with_applicable_constraints(subscript, ty, &constraint_keys))
+            .map_err(|recovery_ty| {
+                self.narrow_expr_with_applicable_constraints(
+                    subscript,
+                    recovery_ty,
+                    &constraint_keys,
+                )
+            })
     }
 
     pub(super) fn infer_explicit_class_specialization(
@@ -996,9 +1020,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // against bounds/constraints, but recording the expression for deferred
                     // checking at end of scope. This would avoid a lot of cycles caused by eagerly
                     // doing assignment checks here.
-                    match typevar.typevar(db).bound_or_constraints(db, env) {
+                    let bound_or_constraints = typevar.typevar(db).bound_or_constraints(db, env);
+                    let type_to_check = if bound_or_constraints.is_some() {
+                        // Defaults such as `Box[T]` may be inferred before `T` has a binding context.
+                        // Bind only the copy used for validation, so the original default can later
+                        // be bound to each generic that uses it.
+                        provided_type.apply_type_mapping(
+                            db,
+                            env,
+                            &TypeMapping::BindLegacyTypevars(BindingContext::Synthetic(
+                                env.program(db),
+                            )),
+                            TypeContext::default(),
+                        )
+                    } else {
+                        provided_type
+                    };
+                    match bound_or_constraints {
                         Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                            if provided_type
+                            if type_to_check
                                 .when_assignable_to(db, env, bound, &constraints, TypeVarSet::None)
                                 .is_never_satisfied(db, env)
                             {
@@ -1009,12 +1049,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     let mut diagnostic = builder.into_diagnostic(format_args!(
                                         "Type `{}` is not assignable to upper bound `{}` \
                                             of type variable `{}`",
-                                        provided_type.display(db, env),
+                                        type_to_check.display(db, env),
                                         bound.display(db, env),
                                         typevar.identity(db).display(db),
                                     ));
                                     add_typevar_definition(db, &mut diagnostic, typevar);
-                                    provided_type
+                                    type_to_check
                                         .assignability_error_context(db, env, bound)
                                         .attach_to(db, env, &mut diagnostic);
                                 }
@@ -1029,7 +1069,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             // to _at least one_ of the individual constraints, not to the union of
                             // all of them. `int | str` is not a valid specialization of a typevar
                             // constrained to `(int, str)`.
-                            if provided_type
+                            if type_to_check
                                 .when_assignable_to(
                                     db,
                                     env,
@@ -1046,7 +1086,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     let mut diagnostic = builder.into_diagnostic(format_args!(
                                         "Type `{}` does not satisfy constraints `{}` \
                                             of type variable `{}`",
-                                        provided_type.display(db, env),
+                                        type_to_check.display(db, env),
                                         typevar_constraints
                                             .elements(db)
                                             .iter()
@@ -1396,13 +1436,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         Err(())
     }
 
+    /// Infer a subscription and report failures while preserving their recovery types.
     pub(super) fn infer_subscript_expression_types(
         &self,
         subscript: &ast::ExprSubscript,
         value_ty: Type<'db>,
         slice_ty: Type<'db>,
         expr_context: ExprContext,
-    ) -> Type<'db> {
+    ) -> Result<Type<'db>, Type<'db>> {
         let env = self.program_environment();
         let db = self.db();
 
@@ -1462,7 +1503,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     SubscriptErrorKind::MultipleTypeVarTuples { origin },
                 );
                 error.report_diagnostics(&self.context, subscript);
-                return error.result_type();
+                return Err(error.result_type());
             }
             if has_invalid_unpack_argument {
                 let error = SubscriptError::new(
@@ -1473,7 +1514,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     },
                 );
                 error.report_diagnostics(&self.context, subscript);
-                return error.result_type();
+                return Err(error.result_type());
             }
         }
 
@@ -1516,9 +1557,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             _ => value_ty.subscript(db, env, slice_ty, expr_context),
         };
 
-        subscript_result.unwrap_or_else(|e| {
-            e.report_diagnostics(&self.context, subscript);
-            e.result_type()
+        subscript_result.map_err(|error| {
+            error.report_diagnostics(&self.context, subscript);
+            error.result_type()
         })
     }
 
@@ -1553,6 +1594,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         &mut self,
         target: &ast::ExprSubscript,
         rhs_value: &ast::Expr,
+        object_ty: Type<'db>,
+        infer_slice_ty: &mut dyn FnMut(&mut Self, TypeContext<'db>) -> Type<'db>,
         infer_rhs_value: &mut dyn FnMut(&mut Self, TypeContext<'db>) -> Type<'db>,
     ) -> bool {
         let env = self.program_environment();
@@ -1566,15 +1609,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let db = self.db();
 
-        let object_ty = self.infer_expression(object, TypeContext::default());
         self.store_typed_dict_key_expected_type(slice, object_ty);
-        let mut infer_slice_ty = |builder: &mut Self, tcx| builder.infer_expression(slice, tcx);
 
         let is_valid_assignment = self.validate_subscript_assignment_impl(
             target,
             None,
             object_ty,
-            &mut infer_slice_ty,
+            infer_slice_ty,
             rhs_value,
             infer_rhs_value,
             true,
@@ -1638,7 +1679,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     for call_specialization in identity_bindings
                         .iter_flat()
                         .flat_map(CallableBinding::matching_overloads)
-                        .filter_map(|(_, identity_overload)| identity_overload.specialization(db))
+                        .filter_map(|(_, identity_overload)| {
+                            identity_overload.merged_specialization(db)
+                        })
                     {
                         // Record the constraints on the receiver's generic context formed by
                         // the arguments to this dunder call.
@@ -1795,7 +1838,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 .report_lint(&INVALID_ASSIGNMENT, rhs_value_node)
                         {
                             let mut diagnostic = builder.into_diagnostic(format_args!(
-                                "Cannot assign value of type `{}` to key of type `{}` on TypedDict `{}`",
+                                "Cannot assign value of type `{}` to key of type `{}` \
+                                on TypedDict `{}`",
                                 rhs_value_ty.display(db, env),
                                 slice_ty.display(db, env),
                                 object_ty.display(db, env),
@@ -1821,7 +1865,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             .report_lint(&INVALID_ASSIGNMENT, target.slice.as_ref())
                         {
                             let mut diagnostic = builder.into_diagnostic(format_args!(
-                                "Cannot assign value of type `{assigned_d}` to key of type `{}` on TypedDict `{value_d}`",
+                                "Cannot assign value of type `{assigned_d}` to key of type `{}` \
+                                on TypedDict `{value_d}`",
                                 slice_ty.display(db, env)
                             ));
                             attach_original_type_info(&mut diagnostic);
@@ -1832,7 +1877,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             .report_lint(&INVALID_KEY, target.slice.as_ref())
                         {
                             let mut diagnostic = builder.into_diagnostic(format_args!(
-                                "TypedDict `{value_d}` can only be subscripted with a string literal key, got key of type `{}`.",
+                                "TypedDict `{value_d}` can only be subscripted \
+                                with a string literal key, got key of type `{}`.",
                                 slice_ty.display(db, env)
                             ));
                             attach_original_type_info(&mut diagnostic);
@@ -1971,14 +2017,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                             target.range.cover(rhs_value_node.range()),
                                         )
                                     {
-                                        let assigned_d = rhs_value_ty.display(db, env);
-                                        let object_d = object_ty.display(db, env);
+                                        let settings =
+                                            DisplaySettings::from_possibly_ambiguous_types(
+                                                db,
+                                                env,
+                                                [rhs_value_ty, object_ty, slice_ty],
+                                            );
+                                        let assigned_d =
+                                            rhs_value_ty.display_with(db, env, settings.clone());
+                                        let object_d =
+                                            object_ty.display_with(db, env, settings.clone());
 
                                         let mut diagnostic = builder.into_diagnostic(format_args!(
-                                                    "Invalid subscript assignment with key of type `{}` and value of \
-                                                     type `{assigned_d}` on object of type `{object_d}`",
-                                                    slice_ty.display(db, env),
-                                                ));
+                                            "Invalid subscript assignment with key of type `{}` \
+                                            and value of type `{assigned_d}` \
+                                            on object of type `{object_d}`",
+                                            slice_ty.display_with(db, env, settings),
+                                        ));
 
                                         // Special diagnostic for dictionaries
                                         if let Some([expected_key_ty, expected_value_ty]) =
@@ -2026,10 +2081,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                         self.context.report_lint(&CALL_NON_CALLABLE, target)
                                 {
                                     let mut diagnostic = builder.into_diagnostic(format_args!(
-                                            "Method `__setitem__` of type `{}` may not be callable on object of type `{}`",
-                                            bindings.callable_type().display(db, env),
-                                            object_ty.display(db, env),
-                                        ));
+                                        "Method `__setitem__` of type `{}` may not be callable \
+                                        on object of type `{}`",
+                                        bindings.callable_type().display(db, env),
+                                        object_ty.display(db, env),
+                                    ));
                                     attach_original_type_info(&mut diagnostic);
                                 }
                             }
@@ -2168,145 +2224,136 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 }
 
-                match object_ty.try_call_dunder(
+                let Err(err) = object_ty.try_call_dunder(
                     db,
                     env,
                     "__delitem__",
                     CallArguments::positional([slice_ty]),
                     TypeContext::default(),
-                ) {
-                    Ok(_) => {}
-                    Err(err) => {
-                        match err {
-                            CallDunderError::PossiblyUnbound { .. } => {
-                                if let Some(builder) = self
-                                    .context
-                                    .report_lint(&POSSIBLY_MISSING_IMPLICIT_CALL, target)
+                ) else {
+                    return;
+                };
+
+                match err {
+                    CallDunderError::PossiblyUnbound { .. } => {
+                        if let Some(builder) = self
+                            .context
+                            .report_lint(&POSSIBLY_MISSING_IMPLICIT_CALL, target)
+                        {
+                            let mut diagnostic = builder.into_diagnostic(format_args!(
+                                "Method `__delitem__` of type `{}` may be missing",
+                                object_ty.display(db, env),
+                            ));
+                            attach_original_type_info(&mut diagnostic);
+                        }
+                    }
+                    CallDunderError::CallError(call_error_kind, bindings, _) => {
+                        match call_error_kind {
+                            CallErrorKind::NotCallable => {
+                                if let Some(builder) =
+                                    self.context.report_lint(&CALL_NON_CALLABLE, target)
                                 {
                                     let mut diagnostic = builder.into_diagnostic(format_args!(
-                                        "Method `__delitem__` of type `{}` may be missing",
+                                        "Method `__delitem__` of type `{}` \
+                                        is not callable on object of type `{}`",
+                                        bindings.callable_type().display(db, env),
                                         object_ty.display(db, env),
                                     ));
                                     attach_original_type_info(&mut diagnostic);
                                 }
                             }
-                            CallDunderError::CallError(call_error_kind, bindings, _) => {
-                                match call_error_kind {
-                                    CallErrorKind::NotCallable => {
-                                        if let Some(builder) =
-                                            self.context.report_lint(&CALL_NON_CALLABLE, target)
-                                        {
-                                            let mut diagnostic = builder.into_diagnostic(format_args!(
-                                            "Method `__delitem__` of type `{}` is not callable \
-                                             on object of type `{}`",
-                                            bindings.callable_type().display(db, env),
-                                            object_ty.display(db, env),
-                                        ));
-                                            attach_original_type_info(&mut diagnostic);
-                                        }
-                                    }
-                                    CallErrorKind::BindingError => {
-                                        // For deletions of string literal keys on `TypedDict`, provide
-                                        // a more detailed diagnostic.
-                                        if let Some(typed_dict) = object_ty.as_typed_dict() {
-                                            if let Some(string_literal) =
-                                                slice_ty.as_string_literal()
-                                            {
-                                                let key = string_literal.value(db);
-                                                let items = typed_dict.items(db);
+                            CallErrorKind::BindingError => {
+                                // For deletions of string literal keys on `TypedDict`, provide
+                                // a more detailed diagnostic.
+                                if let Some(typed_dict) = object_ty.as_typed_dict() {
+                                    if let Some(string_literal) = slice_ty.as_string_literal() {
+                                        let key = string_literal.value(db);
+                                        let items = typed_dict.items(db);
 
-                                                if let Some(field) = items.get(key) {
-                                                    // Key exists but is required (i.e., can't be deleted).
-                                                    report_cannot_delete_typed_dict_key(
-                                                        &self.context,
-                                                        (&*target.slice).into(),
-                                                        typed_dict,
-                                                        key,
-                                                        Some(field),
-                                                        TypedDictDeleteErrorKind::RequiredKey,
-                                                    );
-                                                } else if typed_dict
-                                                    .explicit_extra_items(db)
-                                                    .is_some_and(|extra_items| {
-                                                        extra_items.is_read_only()
-                                                    })
-                                                {
-                                                    report_cannot_delete_typed_dict_key(
-                                                        &self.context,
-                                                        (&*target.slice).into(),
-                                                        typed_dict,
-                                                        key,
-                                                        None,
-                                                        TypedDictDeleteErrorKind::ReadOnlyExtraItem,
-                                                    );
-                                                } else {
-                                                    // Key doesn't exist.
-                                                    report_cannot_delete_typed_dict_key(
-                                                        &self.context,
-                                                        (&*target.slice).into(),
-                                                        typed_dict,
-                                                        key,
-                                                        None,
-                                                        TypedDictDeleteErrorKind::UnknownKey,
-                                                    );
-                                                }
-                                            } else {
-                                                // Non-string-literal key on `TypedDict`.
-                                                if let Some(builder) = self
-                                                    .context
-                                                    .report_lint(&INVALID_ARGUMENT_TYPE, target)
-                                                {
-                                                    let mut diagnostic = builder.into_diagnostic(format_args!(
-                                                    "Method `__delitem__` of type `{}` cannot be called \
-                                                     with key of type `{}` on object of type `{}`",
+                                        if let Some(field) = items.get(key) {
+                                            // Key exists but is required (i.e., can't be deleted).
+                                            report_cannot_delete_typed_dict_key(
+                                                &self.context,
+                                                (&*target.slice).into(),
+                                                typed_dict,
+                                                key,
+                                                Some(field),
+                                                TypedDictDeleteErrorKind::RequiredKey,
+                                            );
+                                        } else if typed_dict
+                                            .explicit_extra_items(db)
+                                            .is_some_and(TypedDictExtraItems::is_read_only)
+                                        {
+                                            report_cannot_delete_typed_dict_key(
+                                                &self.context,
+                                                (&*target.slice).into(),
+                                                typed_dict,
+                                                key,
+                                                None,
+                                                TypedDictDeleteErrorKind::ReadOnlyExtraItem,
+                                            );
+                                        } else {
+                                            // Key doesn't exist.
+                                            report_cannot_delete_typed_dict_key(
+                                                &self.context,
+                                                (&*target.slice).into(),
+                                                typed_dict,
+                                                key,
+                                                None,
+                                                TypedDictDeleteErrorKind::UnknownKey,
+                                            );
+                                        }
+                                    } else {
+                                        // Non-string-literal key on `TypedDict`.
+                                        if let Some(builder) =
+                                            self.context.report_lint(&INVALID_ARGUMENT_TYPE, target)
+                                        {
+                                            let mut diagnostic =
+                                                builder.into_diagnostic(format_args!(
+                                                    "Method `__delitem__` of type `{}` \
+                                                    cannot be called with key of type \
+                                                    `{}` on object of type `{}`",
                                                     bindings.callable_type().display(db, env),
                                                     slice_ty.display(db, env),
                                                     object_ty.display(db, env),
                                                 ));
-                                                    attach_original_type_info(&mut diagnostic);
-                                                }
-                                            }
-                                        } else {
-                                            // Non-`TypedDict` object
-                                            if let Some(builder) = self
-                                                .context
-                                                .report_lint(&INVALID_ARGUMENT_TYPE, target)
-                                            {
-                                                let mut diagnostic = builder.into_diagnostic(format_args!(
-                                                "Method `__delitem__` of type `{}` cannot be called \
-                                                 with key of type `{}` on object of type `{}`",
-                                                bindings.callable_type().display(db, env),
-                                                slice_ty.display(db, env),
-                                                object_ty.display(db, env),
-                                            ));
-                                                attach_original_type_info(&mut diagnostic);
-                                            }
-                                        }
-                                    }
-                                    CallErrorKind::PossiblyNotCallable => {
-                                        if let Some(builder) =
-                                            self.context.report_lint(&CALL_NON_CALLABLE, target)
-                                        {
-                                            let mut diagnostic = builder.into_diagnostic(format_args!(
-                                            "Method `__delitem__` of type `{}` may not be callable \
-                                             on object of type `{}`",
-                                            bindings.callable_type().display(db, env),
-                                            object_ty.display(db, env),
-                                        ));
                                             attach_original_type_info(&mut diagnostic);
                                         }
                                     }
+                                } else {
+                                    // Non-`TypedDict` object
+                                    if let Some(builder) =
+                                        self.context.report_lint(&INVALID_ARGUMENT_TYPE, target)
+                                    {
+                                        let mut diagnostic = builder.into_diagnostic(format_args!(
+                                            "Method `__delitem__` of type `{}` cannot \
+                                            be called with key of type `{}` on \
+                                            object of type `{}`",
+                                            bindings.callable_type().display(db, env),
+                                            slice_ty.display(db, env),
+                                            object_ty.display(db, env),
+                                        ));
+                                        attach_original_type_info(&mut diagnostic);
+                                    }
                                 }
                             }
-                            CallDunderError::MethodNotAvailable => {
-                                report_not_subscriptable(
-                                    &self.context,
-                                    target,
-                                    object_ty,
-                                    "__delitem__",
-                                );
+                            CallErrorKind::PossiblyNotCallable => {
+                                if let Some(builder) =
+                                    self.context.report_lint(&CALL_NON_CALLABLE, target)
+                                {
+                                    let mut diagnostic = builder.into_diagnostic(format_args!(
+                                        "Method `__delitem__` of type `{}` may not be \
+                                        callable on object of type `{}`",
+                                        bindings.callable_type().display(db, env),
+                                        object_ty.display(db, env),
+                                    ));
+                                    attach_original_type_info(&mut diagnostic);
+                                }
                             }
                         }
+                    }
+                    CallDunderError::MethodNotAvailable => {
+                        report_not_subscriptable(&self.context, target, object_ty, "__delitem__");
                     }
                 }
             }

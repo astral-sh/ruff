@@ -1238,6 +1238,40 @@ fn rule_name_selector_cli_preview_enabled() -> Result<()> {
 }
 
 #[test]
+fn rule_category_selector_cli_preview_disabled() -> Result<()> {
+    let fixture = unknown_rule_selector_test()?;
+
+    assert_cmd_snapshot!(fixture.check_command().args(["--select", "restriction"]), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: Invalid selector `restriction` in `select` from the CLI. Selecting rules by category requires preview mode
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn rule_category_selector_cli_preview_enabled() -> Result<()> {
+    let fixture = CliTest::with_file("test.py", "assert True")?;
+
+    assert_cmd_snapshot!(fixture.check_command().args(["--select", "restriction", "--preview"]), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:1:1: assert: Use of `assert` detected
+    Found 1 error.
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+#[test]
 fn rule_name_selector_config_preview_disabled() -> Result<()> {
     let fixture = unknown_rule_selector_test()?;
     fixture.write_file("ruff.toml", r#"lint = { select = ["unused-import"] }"#)?;
@@ -1509,9 +1543,10 @@ fn complex_config_setting_overridden_via_cli() -> Result<()> {
 }
 
 #[test]
-fn deprecated_config_option_overridden_via_cli() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
+fn deprecated_config_option_overridden_via_cli() -> Result<()> {
+    let test = CliTest::new()?;
+
+    assert_cmd_snapshot!(test.check_command()
         .args(["--config", "select=['N801']", "-"])
         .pass_stdin("class lowercase: ..."),
         @"
@@ -1525,6 +1560,8 @@ fn deprecated_config_option_overridden_via_cli() {
     warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in your `--config` CLI arguments:
       - 'select' -> 'lint.select'
     ");
+
+    Ok(())
 }
 
 #[test]
@@ -3519,30 +3556,36 @@ fn required_import_set_conflicts_with_pyi025() {
 
 // https://github.com/astral-sh/ruff/issues/20891
 #[test]
-fn required_import_set_aliased_as_abstract_set_no_conflict() {
+fn required_import_set_aliased_as_abstract_set_no_conflict() -> Result<()> {
+    let test = CliTest::new()?;
+
     assert_cmd_snapshot!(
-        Command::new(get_cargo_bin(BIN_NAME))
-            .args(STDIN_BASE_OPTIONS)
+        test.check_command()
             .arg("--config")
             .arg(r#"lint.isort.required-imports = ["from collections.abc import Set as AbstractSet"]"#)
             .args(["--select", "I002,PYI025"])
             .arg("-")
             .pass_stdin("1")
     );
+
+    Ok(())
 }
 
 // https://github.com/astral-sh/ruff/issues/20891
 #[test]
-fn required_import_set_without_pyi025_no_conflict() {
+fn required_import_set_without_pyi025_no_conflict() -> Result<()> {
+    let test = CliTest::new()?;
+
     assert_cmd_snapshot!(
-        Command::new(get_cargo_bin(BIN_NAME))
-            .args(STDIN_BASE_OPTIONS)
+        test.check_command()
             .arg("--config")
             .arg(r#"lint.isort.required-imports = ["from collections.abc import Set"]"#)
             .args(["--select", "I002"])
             .arg("-")
             .pass_stdin("1")
     );
+
+    Ok(())
 }
 
 // https://github.com/astral-sh/ruff/issues/19842
@@ -4417,6 +4460,54 @@ fn output_format_show_fixes(output_format: &str) -> Result<()> {
             "--show-fixes",
             "input.py",
         ])
+    );
+
+    Ok(())
+}
+
+/// Rule codes in `--statistics` output link to the rule documentation, as they do in the concise
+/// and full output formats.
+#[test]
+fn statistics_hyperlinks() -> Result<()> {
+    let fixture = CliTest::with_settings(|_project_dir, mut settings| {
+        // Spell out the hyperlink escapes to keep the snapshot readable, filtering them before
+        // the fixture rewrites the backslash in their `ESC \` terminators. The colors are absent
+        // because test builds enable `colored`'s `no-color` feature; the last filter only keeps
+        // stray escapes out of the snapshot if that ever changes.
+        settings.add_filter(r"\x1b\]8;;(.+?)\x1b\\", "<link ${1}>");
+        settings.add_filter(r"\x1b\]8;;\x1b\\", "</link>");
+        settings.add_filter(r"\x1b", "<ESC>");
+        settings
+    })?;
+    fixture.write_file("input.py", "import os as os, math")?;
+
+    assert_cmd_snapshot!(
+        fixture
+            .command()
+            .args([
+                "check",
+                "--no-cache",
+                "--select",
+                "F401,PLC0414",
+                "--statistics",
+                "--color",
+                "always",
+                "input.py",
+            ])
+            // Hyperlink support is otherwise detected from the terminal, which varies between
+            // local runs and CI.
+            .env("FORCE_HYPERLINK", "1"),
+        @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    1	<link https://docs.astral.sh/ruff/rules/unused-import>F401</link>   	[*] unused-import
+    1	<link https://docs.astral.sh/ruff/rules/useless-import-alias>PLC0414</link>	[ ] useless-import-alias
+    Found 2 errors.
+    [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
+
+    ----- stderr -----
+    ",
     );
 
     Ok(())

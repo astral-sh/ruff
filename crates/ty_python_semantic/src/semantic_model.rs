@@ -16,6 +16,7 @@ use ty_module_resolver::{
 
 use crate::Db;
 use crate::place::implicit_globals::all_implicit_module_globals;
+use crate::place::{builtins_module_scope, implicit_builtins_symbol_scope};
 use crate::types::ide_support::{ImportAliasResolution, definition_for_name};
 use crate::types::list_members::{all_members, all_reachable_members};
 use crate::types::{
@@ -89,12 +90,45 @@ impl<'db> SemanticModel<'db> {
         line_index(self.db, self.file())
     }
 
+    /// Returns whether `name` refers to a standard builtin in the scope containing `node`.
+    ///
+    /// This method uses a simplified implementation of name resolution: any binding or declaration
+    /// in a visible scope shadows the builtin, even if it does not reach `node`. As a result, it
+    /// can return `false` when the builtin is actually available. That is acceptable when deciding
+    /// whether to offer an autofix: we can safely omit the fix in edge cases where resolving the
+    /// name precisely would require more complex analysis.
+    ///
+    /// Definitions in a project-level `__builtins__.pyi` also shadow standard builtins.
+    pub(crate) fn definitely_has_builtin_binding(
+        &self,
+        name: &str,
+        node: ast::AnyNodeRef<'_>,
+    ) -> bool {
+        let index = semantic_index(self.db, self.program_file());
+        let Some(scope) = self.scope(node) else {
+            return false;
+        };
+
+        if index.visible_ancestor_scopes(scope).any(|(scope, _)| {
+            index
+                .place_table(scope)
+                .symbol_by_name(name)
+                .is_some_and(|symbol| symbol.is_bound() || symbol.is_declared())
+        }) {
+            return false;
+        }
+
+        let env = self.program_environment();
+        implicit_builtins_symbol_scope(self.db, &env, name)
+            .is_some_and(|scope| Some(scope) == builtins_module_scope(self.db, &env))
+    }
+
     /// Returns a map from symbol name to that symbol's
     /// type and definition site (if available).
     ///
     /// The symbols are the symbols in scope at the given
     /// AST node.
-    pub fn members_in_scope_at(
+    pub(crate) fn members_in_scope_at(
         &self,
         node: ast::AnyNodeRef<'_>,
     ) -> FxHashMap<Name, MemberDefinition<'db>> {
@@ -668,9 +702,9 @@ impl<'db> SemanticModel<'db> {
 
 /// The type and definition of a symbol.
 #[derive(Clone, Debug)]
-pub struct MemberDefinition<'db> {
-    pub ty: Type<'db>,
-    pub first_reachable_definition: Definition<'db>,
+pub(crate) struct MemberDefinition<'db> {
+    pub(crate) ty: Type<'db>,
+    pub(crate) first_reachable_definition: Definition<'db>,
 }
 
 /// A classification of symbol names.
@@ -752,7 +786,7 @@ pub trait HasDefinition {
     fn definition<'db>(&self, model: &SemanticModel<'db>) -> Definition<'db>;
 }
 
-pub(crate) trait HasOptionalDefinition {
+trait HasOptionalDefinition {
     /// Returns the definition of `self`, if it has one.
     ///
     /// ## Panics

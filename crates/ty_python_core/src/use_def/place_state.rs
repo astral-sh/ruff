@@ -50,7 +50,8 @@ use crate::ReachabilityConstraintsBuilder;
 use crate::narrowing_constraints::{NarrowingConstraintsBuilder, ScopedNarrowingConstraint};
 use crate::reachability_constraints::ScopedReachabilityConstraintId;
 
-/// A newtype-index for a definition in a particular scope.
+/// An index into a scope's use-def history. A combined definition can have separate declaration
+/// and binding entries when they take effect at different points in control flow.
 #[newtype_index]
 #[derive(Ord, PartialOrd, get_size2::GetSize)]
 pub struct ScopedDefinitionId;
@@ -61,7 +62,7 @@ impl ScopedDefinitionId {
     /// unbound or undeclared at a given usage site.
     /// When creating a use-def-map builder, we always add an empty `DefinitionState::Undefined` definition
     /// at index 0, so this ID is always present.
-    pub(crate) const UNBOUND: ScopedDefinitionId = ScopedDefinitionId::from_u32(0);
+    const UNBOUND: ScopedDefinitionId = ScopedDefinitionId::from_u32(0);
 
     pub(crate) fn is_unbound(self) -> bool {
         self == Self::UNBOUND

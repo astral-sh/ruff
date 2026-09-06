@@ -489,6 +489,36 @@ class Child(Parent):
         assert_type(self.create(), Self)
 ```
 
+Truthiness narrowing must also preserve `Self` when an instance accesses a class method.
+
+```py
+from typing import Self, assert_type
+
+class MaybeEmpty:
+    @classmethod
+    def create(cls, other: Self) -> Self:
+        return cls()
+
+    def copy_if_empty(self, other: Self) -> Self:
+        if not self:
+            assert_type(self.create(other), Self)
+            return self.create(other)
+        return self
+```
+
+A mixin narrowed to an unrelated class can also call that class's class methods.
+
+```py
+class Base:
+    @classmethod
+    def warn(cls) -> None: ...
+
+class Mixin:
+    def method(self) -> None:
+        assert isinstance(self, Base)
+        self.warn()
+```
+
 ## Attributes
 
 ```py
@@ -528,6 +558,20 @@ class MyClass:
 
 def _(c: MyClass):
     c.field = c
+```
+
+A generic type alias preserves `Self` when it is used in an attribute annotation:
+
+```py
+type Identity[T] = T
+
+class AliasedNode:
+    parent: Identity[Self]
+
+    def __init__(self) -> None:
+        self.parent = self
+
+reveal_type(AliasedNode().parent)  # revealed: AliasedNode
 ```
 
 Self from class body annotations and method signatures represent the same logical type variable.
@@ -632,6 +676,25 @@ class Container(Generic[T]):
 int_container: Container[int] = Container[int]()
 reveal_type(int_container)  # revealed: Container[int]
 reveal_type(int_container.set_value(1))  # revealed: Container[int]
+```
+
+## Unbound inherited methods on generic classes
+
+When an inherited method returns `Self`, its return type is the type of the instance passed to it.
+This includes the subclass and its type arguments, even when the call uses `Child` rather than
+`Child[int]`.
+
+```py
+from typing import Self
+
+class Parent[T]:
+    def get_self(self) -> Self:
+        return self
+
+class Child[U](Parent[U]): ...
+
+def _(child: Child[int]):
+    reveal_type(Child.get_self(child))  # revealed: Child[int]
 ```
 
 ## Generic class with bounded type variable
@@ -1373,6 +1436,48 @@ class D(C): ...
 reveal_type(D().instance_method)
 # revealed: bound method <class 'D'>.class_method() -> D
 reveal_type(D.class_method)
+```
+
+A generic type alias does not prevent binding `Self` in the method signature:
+
+```py
+from typing import Self
+
+type Identity[T] = T
+
+class Aliased:
+    def copy(self, other: Identity[Self]) -> Identity[Self]:
+        return other
+
+# revealed: bound method Aliased.copy(other: Aliased) -> Aliased
+reveal_type(Aliased().copy)
+```
+
+`Self` also binds in a parameter annotation when the return type does not contain `Self`:
+
+```py
+class ParameterOnly:
+    def consume(self, other: Identity[Self]) -> None: ...
+
+# revealed: bound method ParameterOnly.consume(other: ParameterOnly) -> None
+reveal_type(ParameterOnly().consume)
+
+ParameterOnly().consume(ParameterOnly())
+ParameterOnly().consume(object())  # error: [invalid-argument-type]
+```
+
+Nested uses of the same alias still bind `Self` to the concrete receiver, including when a subclass
+inherits the method:
+
+```py
+class NestedAlias:
+    def copy(self, other: Identity[Identity[Self]]) -> Identity[Identity[Self]]:
+        return other
+
+class NestedChild(NestedAlias): ...
+
+# revealed: bound method NestedChild.copy(other: NestedChild) -> NestedChild
+reveal_type(NestedChild().copy)
 ```
 
 In nested functions `self` binds to the method. So in the following example the `self` in `C.b` is

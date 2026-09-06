@@ -1,6 +1,6 @@
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+requires = ["uv_build>=0.12.3,<0.13"]
+build-backend = "uv_build"
 
 [project]
 name = "ruff-ecosystem"
@@ -12,5 +12,19 @@ dependencies = ["unidiff==1.0.0", "tomli_w==1.2.0", "tomli==2.4.1"]
 ruff-ecosystem = "ruff_ecosystem.cli:entrypoint"
 
 [tool.ruff.lint]
-ignore = ["T100"]
+ignore = [
+    # We're not worried enough about briefly blocking the event loop to add more dependencies.
+    "blocking-path-method-in-async-function",
+    "debugger",
+    "repeated-append",
+]
 preview = true
+
+[tool.uv]
+no-build = true
+no-binary-package = ["ruff-ecosystem"]
+# Pin the isolated build environment for source-build exceptions.
+build-constraint-dependencies = ["uv-build==0.12.3"]
+
+[tool.uv.build-backend]
+module-root = ""

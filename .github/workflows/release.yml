@@ -14,8 +14,7 @@
 # title/body based on your changelogs.
 
 name: Release
-permissions:
-  "contents": "write"
+permissions: {}
 
 # This task will run whenever you workflow_dispatch with a tag that looks like a version
 # like "1.0.0", "v0.1.0-prerelease.1", "my-app/0.1.0", "releases/v1.0.0", etc.
@@ -49,6 +48,9 @@ on:
         type: string
 
 env:
+  UV_LOCKED: 1
+  # Release actions must not consume shared GitHub Actions caches.
+  ACTIONS_CACHE_MODE: none
   CARGO_DIST_VERSION: "0.31.0"
   CARGO_DIST_CHECKSUM: "cd355dab0b4c02fb59038fef87655550021d07f45f1d82f947a34ef98560abb8"
 
@@ -71,7 +73,9 @@ jobs:
 
   # Run 'dist plan' (or host) to determine what tasks we need to do
   plan:
-    runs-on: "depot-ubuntu-latest-4"
+    permissions:
+      "contents": "read"
+    runs-on: "depot-ubuntu-24.04-4"
     outputs:
       val: ${{ steps.plan.outputs.manifest }}
       tag: ${{ (inputs.tag != 'dry-run' && inputs.tag) || '' }}
@@ -102,11 +106,18 @@ jobs:
       # (PRs run on the *source* but secrets are usually on the *target* -- that's *good*
       # but also really annoying to build CI around when it needs secrets to work right.)
       - id: plan
+        shell: bash
         run: |
-          dist ${{ (inputs.tag && inputs.tag != 'dry-run' && format('host --steps=create --tag={0}', inputs.tag)) || 'plan' }} --output-format=json > plan-dist-manifest.json
+          dist_args=(plan)
+          if [[ -n "$DIST_TAG_FLAG" ]]; then
+            dist_args=(host --steps=create "$DIST_TAG_FLAG")
+          fi
+          dist "${dist_args[@]}" --output-format=json > plan-dist-manifest.json
           echo "dist ran successfully"
           cat plan-dist-manifest.json
           echo "manifest=$(jq -c "." plan-dist-manifest.json)" >> "$GITHUB_OUTPUT"
+        env:
+          DIST_TAG_FLAG: ${{ inputs.tag && inputs.tag != 'dry-run' && format('--tag={0}', inputs.tag) || '' }}
       - name: "Upload dist-manifest.json"
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
         with:
@@ -120,7 +131,7 @@ jobs:
     uses: $/.github/workflows/build-binaries.yml
     with:
       plan: ${{ needs.plan.outputs.val }}
-    secrets: inherit
+    secrets: inherit # zizmor: ignore[secrets-inherit]
 
   custom-build-docker:
     needs:
@@ -130,7 +141,7 @@ jobs:
     uses: $/.github/workflows/build-docker.yml
     with:
       plan: ${{ needs.plan.outputs.val }}
-    secrets: inherit
+    secrets: inherit # zizmor: ignore[secrets-inherit]
     permissions:
       "attestations": "write"
       "contents": "read"
@@ -144,7 +155,58 @@ jobs:
     uses: $/.github/workflows/build-wasm.yml
     with:
       plan: ${{ needs.plan.outputs.val }}
-    secrets: inherit
+    secrets: inherit # zizmor: ignore[secrets-inherit]
+
+  # The custom binary jobs produce checksum sidecars outside cargo-dist.
+  # Include them in a local manifest before generating the installers.
+  generate-checksum-manifest:
+    needs:
+      - plan
+      - custom-build-binaries
+    if: ${{ needs.plan.outputs.publishing == 'true' || fromJson(needs.plan.outputs.val).ci.github.pr_run_mode == 'upload' || inputs.tag == 'dry-run' }}
+    permissions:
+      "contents": "read"
+    runs-on: "depot-ubuntu-24.04-4"
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: false
+          submodules: recursive
+      - name: "Install uv"
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: "0.12.6"
+          enable-cache: false
+      - name: Install cached dist
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: cargo-dist-cache
+          path: ~/.cargo/bin/
+      - run: chmod +x ~/.cargo/bin/dist
+      - name: Fetch local artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          pattern: artifacts-*
+          path: target/distrib/
+          merge-multiple: true
+      - name: Generate local dist manifest
+        shell: bash
+        env:
+          DIST_TAG_FLAG: ${{ needs.plan.outputs.tag-flag }}
+        run: |
+          dist_args=()
+          if [[ -n "$DIST_TAG_FLAG" ]]; then
+            dist_args+=("$DIST_TAG_FLAG")
+          fi
+          temp_manifest=target/local-dist-manifest.json.tmp
+          dist manifest "${dist_args[@]}" --output-format=json --no-local-paths --artifacts=local > "$temp_manifest"
+          uv run --locked scripts/patch-dist-manifest-checksums.py --manifest "$temp_manifest" --artifacts-dir target/distrib
+          mv "$temp_manifest" target/distrib/local-dist-manifest.json
+      - name: Upload synthesized local dist manifest
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
+        with:
+          name: artifacts-build-local-manifest
+          path: target/distrib/local-dist-manifest.json
 
   # Build and package all the platform-agnostic(ish) things
   build-global-artifacts:
@@ -153,7 +215,10 @@ jobs:
       - custom-build-binaries
       - custom-build-docker
       - custom-build-wasm
-    runs-on: "depot-ubuntu-latest-4"
+      - generate-checksum-manifest
+    permissions:
+      "contents": "read"
+    runs-on: "depot-ubuntu-24.04-4"
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       BUILD_MANIFEST_NAME: target/distrib/global-dist-manifest.json
@@ -178,7 +243,11 @@ jobs:
       - id: cargo-dist
         shell: bash
         run: |
-          dist build ${{ needs.plan.outputs.tag-flag }} --output-format=json "--artifacts=global" > dist-manifest.json
+          dist_args=()
+          if [[ -n "$DIST_TAG_FLAG" ]]; then
+            dist_args+=("$DIST_TAG_FLAG")
+          fi
+          dist build "${dist_args[@]}" --output-format=json "--artifacts=global" > dist-manifest.json
           echo "dist ran successfully"
 
           # Parse out what we just built and upload it to scratch storage
@@ -187,6 +256,8 @@ jobs:
           echo "EOF" >> "$GITHUB_OUTPUT"
 
           cp dist-manifest.json "$BUILD_MANIFEST_NAME"
+        env:
+          DIST_TAG_FLAG: ${{ needs.plan.outputs.tag-flag }}
       - name: "Upload artifacts"
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
         with:
@@ -202,11 +273,14 @@ jobs:
       - custom-build-docker
       - custom-build-wasm
       - build-global-artifacts
-    # Only run if we're "publishing", and only if plan, local and global didn't fail (skipped is fine)
-    if: ${{ always() && needs.plan.result == 'success' && needs.plan.outputs.publishing == 'true' && (needs.build-global-artifacts.result == 'skipped' || needs.build-global-artifacts.result == 'success') && (needs.custom-build-binaries.result == 'skipped' || needs.custom-build-binaries.result == 'success') && (needs.custom-build-docker.result == 'skipped' || needs.custom-build-docker.result == 'success') && (needs.custom-build-wasm.result == 'skipped' || needs.custom-build-wasm.result == 'success') }}
+      - generate-checksum-manifest
+    # Require checksums for all built archives before publishing. Other build jobs may be skipped.
+    if: ${{ always() && needs.plan.result == 'success' && needs.plan.outputs.publishing == 'true' && needs.generate-checksum-manifest.result == 'success' && (needs.build-global-artifacts.result == 'skipped' || needs.build-global-artifacts.result == 'success') && (needs.custom-build-binaries.result == 'skipped' || needs.custom-build-binaries.result == 'success') && (needs.custom-build-docker.result == 'skipped' || needs.custom-build-docker.result == 'success') && (needs.custom-build-wasm.result == 'skipped' || needs.custom-build-wasm.result == 'success') }}
+    permissions:
+      "contents": "read"
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    runs-on: "depot-ubuntu-latest-4"
+    runs-on: "depot-ubuntu-24.04-4"
     outputs:
       val: ${{ steps.host.outputs.manifest }}
     steps:
@@ -231,10 +305,16 @@ jobs:
       - id: host
         shell: bash
         run: |
-          dist host ${{ needs.plan.outputs.tag-flag }} --steps=upload --steps=release --output-format=json > dist-manifest.json
+          dist_args=()
+          if [[ -n "$DIST_TAG_FLAG" ]]; then
+            dist_args+=("$DIST_TAG_FLAG")
+          fi
+          dist host "${dist_args[@]}" --steps=upload --steps=release --output-format=json > dist-manifest.json
           echo "artifacts uploaded and released successfully"
           cat dist-manifest.json
           echo "manifest=$(jq -c "." dist-manifest.json)" >> "$GITHUB_OUTPUT"
+        env:
+          DIST_TAG_FLAG: ${{ needs.plan.outputs.tag-flag }}
       - name: "Upload dist-manifest.json"
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
         with:
@@ -251,7 +331,7 @@ jobs:
     uses: $/.github/workflows/publish-pypi.yml
     with:
       plan: ${{ needs.plan.outputs.val }}
-    secrets: inherit
+    secrets: inherit # zizmor: ignore[secrets-inherit]
     # publish jobs get escalated permissions
     permissions:
       "id-token": "write"
@@ -266,7 +346,7 @@ jobs:
     uses: $/.github/workflows/publish-wasm.yml
     with:
       plan: ${{ needs.plan.outputs.val }}
-    secrets: inherit
+    secrets: inherit # zizmor: ignore[secrets-inherit]
     # publish jobs get escalated permissions
     permissions:
       "contents": "read"
@@ -284,7 +364,7 @@ jobs:
     uses: $/.github/workflows/publish-crates.yml
     with:
       plan: ${{ needs.plan.outputs.val }}
-    secrets: inherit
+    secrets: inherit # zizmor: ignore[secrets-inherit]
     # publish jobs get escalated permissions
     permissions:
       "contents": "read"
@@ -304,7 +384,7 @@ jobs:
     # `custom-publish-crates` is intentionally not a dependency because a crates.io outage should
     # not block the rest of the release.
     if: ${{ always() && needs.host.result == 'success' && needs.release-gate.result == 'success' && (needs.custom-publish-pypi.result == 'skipped' || needs.custom-publish-pypi.result == 'success') && (needs.custom-publish-wasm.result == 'skipped' || needs.custom-publish-wasm.result == 'success') }}
-    runs-on: "depot-ubuntu-latest-4"
+    runs-on: "depot-ubuntu-24.04-4"
     permissions:
       "attestations": "write"
       "contents": "write"
@@ -342,11 +422,12 @@ jobs:
           ANNOUNCEMENT_TITLE: "${{ fromJson(needs.host.outputs.val).announcement_title }}"
           ANNOUNCEMENT_BODY: "${{ fromJson(needs.host.outputs.val).announcement_github_body }}"
           RELEASE_COMMIT: "${{ github.sha }}"
+          NEEDS_PLAN_OUTPUTS_TAG: ${{ needs.plan.outputs.tag }}
         run: |
           # Write and read notes from a file to avoid quoting breaking things
           echo "$ANNOUNCEMENT_BODY" > $RUNNER_TEMP/notes.txt
 
-          gh release create "${{ needs.plan.outputs.tag }}" --target "$RELEASE_COMMIT" $PRERELEASE_FLAG --title "$ANNOUNCEMENT_TITLE" --notes-file "$RUNNER_TEMP/notes.txt" artifacts/*
+          gh release create "${NEEDS_PLAN_OUTPUTS_TAG}" --target "$RELEASE_COMMIT" $PRERELEASE_FLAG --title "$ANNOUNCEMENT_TITLE" --notes-file "$RUNNER_TEMP/notes.txt" artifacts/*
 
   custom-notify-dependents:
     needs:
@@ -355,7 +436,7 @@ jobs:
     uses: $/.github/workflows/notify-dependents.yml
     with:
       plan: ${{ needs.plan.outputs.val }}
-    secrets: inherit
+    secrets: inherit # zizmor: ignore[secrets-inherit]
 
   custom-publish-docs:
     needs:
@@ -364,7 +445,9 @@ jobs:
     uses: $/.github/workflows/publish-docs.yml
     with:
       plan: ${{ needs.plan.outputs.val }}
-    secrets: inherit
+    secrets: inherit # zizmor: ignore[secrets-inherit]
+    permissions:
+      "contents": "read"
 
   custom-publish-playground:
     needs:
@@ -373,7 +456,7 @@ jobs:
     uses: $/.github/workflows/publish-playground.yml
     with:
       plan: ${{ needs.plan.outputs.val }}
-    secrets: inherit
+    secrets: inherit # zizmor: ignore[secrets-inherit]
 
   custom-publish-versions:
     needs:
@@ -382,7 +465,7 @@ jobs:
     uses: $/.github/workflows/publish-versions.yml
     with:
       plan: ${{ needs.plan.outputs.val }}
-    secrets: inherit
+    secrets: inherit # zizmor: ignore[secrets-inherit]
 
   custom-publish-mirror:
     needs:
@@ -391,6 +474,6 @@ jobs:
     uses: $/.github/workflows/publish-mirror.yml
     with:
       plan: ${{ needs.plan.outputs.val }}
-    secrets: inherit
+    secrets: inherit # zizmor: ignore[secrets-inherit]
     permissions:
       "contents": "read"

@@ -403,7 +403,7 @@ def fields(class_or_instance: DataclassInstance | type[DataclassInstance]) -> tu
 
 # HACK: `obj: Never` typing matches if object argument is using `Any` type.
 @overload
-def is_dataclass(obj: Never) -> TypeIs[Top[DataclassInstance | type[DataclassInstance]]]:  # type: ignore[narrowed-type-not-subtype]  # pyright: ignore[reportGeneralTypeIssues]  # ty:ignore[invalid-type-guard-definition]
+def is_dataclass(obj: Never) -> TypeIs[Top[DataclassInstance | type[DataclassInstance]]]:  # type: ignore[narrowed-type-not-subtype]  # pyright: ignore[reportGeneralTypeIssues]  # ty:ignore[invalid-type-guard-definition]  # pyrefly: ignore [bad-function-definition]
     """Returns True if obj is a dataclass or an instance of a
     dataclass.
     """

@@ -5,6 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for membership tests on empty collections (such as `list`, `tuple`, `set`, or `dict`).
@@ -25,7 +26,7 @@ use crate::checkers::ast::Checker;
 /// print("got it!")
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.15.0")]
+#[violation_metadata(stable_since = "0.15.0", category = Category::Correctness)]
 pub(crate) struct InEmptyCollection;
 
 impl Violation for InEmptyCollection {
@@ -80,7 +81,7 @@ fn is_empty(expr: &Expr, semantic: &SemanticModel) -> bool {
         Expr::Call(ast::ExprCall {
             func,
             arguments,
-            range: _,
+            range_start: _,
             node_index: _,
         }) => {
             if arguments.is_empty() {

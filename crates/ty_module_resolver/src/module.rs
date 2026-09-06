@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::debug_assert_matches;
 use std::fmt::Formatter;
 use std::str::FromStr;
 
@@ -55,7 +56,7 @@ impl<'db> Module<'db> {
     }
 
     /// The resolver environment used to resolve this module.
-    pub fn resolver_environment(self, db: &'db dyn Database) -> ResolverEnvironment<'db> {
+    fn resolver_environment(self, db: &'db dyn Database) -> ResolverEnvironment<'db> {
         match self {
             Module::File(module) => module.resolver_environment(db),
             Module::Namespace(module) => module.resolver_environment(db),
@@ -204,11 +205,7 @@ fn all_submodule_names_for_package<'db>(
     }
 
     let path = SystemOrVendoredPathRef::try_from_file(db, module.file(db))?;
-    debug_assert!(
-        matches!(path.file_name(), Some("__init__.py" | "__init__.pyi")),
-        "expected package file `{:?}` to be `__init__.py` or `__init__.pyi`",
-        path.file_name(),
-    );
+    debug_assert_matches!(path.file_name(), Some("__init__.py" | "__init__.pyi"));
 
     let resolver_environment = module.resolver_environment(db);
     Some(match path.parent()? {
@@ -382,6 +379,9 @@ pub enum KnownModule {
     TyExtensionsPydantic,
     #[strum(serialize = "importlib")]
     ImportLib,
+    /// The standard-library `unittest.case` module.
+    #[strum(serialize = "unittest.case")]
+    UnittestCase,
     #[strum(serialize = "unittest.mock")]
     UnittestMock,
     Uuid,
@@ -404,6 +404,13 @@ pub enum KnownModule {
     PydanticSettingsMain,
     #[strum(serialize = "pydantic.types")]
     PydanticTypes,
+    Pytest,
+    #[strum(serialize = "_pytest.config")]
+    PytestConfig,
+    #[strum(serialize = "_pytest.fixtures")]
+    PytestFixtures,
+    #[strum(serialize = "_pytest.mark.structures")]
+    PytestMarkStructures,
 }
 
 impl KnownModule {
@@ -436,6 +443,7 @@ impl KnownModule {
             Self::TyExtensionsPydantic => "ty_extensions.pydantic",
             Self::ImportLib => "importlib",
             Self::Warnings => "warnings",
+            Self::UnittestCase => "unittest.case",
             Self::UnittestMock => "unittest.mock",
             Self::Uuid => "uuid",
             Self::Templatelib => "string.templatelib",
@@ -448,6 +456,10 @@ impl KnownModule {
             Self::PydanticRootModel => "pydantic.root_model",
             Self::PydanticSettingsMain => "pydantic_settings.main",
             Self::PydanticTypes => "pydantic.types",
+            Self::Pytest => "pytest",
+            Self::PytestConfig => "_pytest.config",
+            Self::PytestFixtures => "_pytest.fixtures",
+            Self::PytestMarkStructures => "_pytest.mark.structures",
         }
     }
 
@@ -477,7 +489,11 @@ impl KnownModule {
             | Self::PydanticMain
             | Self::PydanticRootModel
             | Self::PydanticSettingsMain
-            | Self::PydanticTypes => true,
+            | Self::PydanticTypes
+            | Self::Pytest
+            | Self::PytestConfig
+            | Self::PytestFixtures
+            | Self::PytestMarkStructures => true,
             Self::Builtins
             | Self::Enum
             | Self::Types
@@ -505,6 +521,7 @@ impl KnownModule {
             | Self::TyExtensionsInternal
             | Self::TyExtensionsPydantic
             | Self::ImportLib
+            | Self::UnittestCase
             | Self::UnittestMock
             | Self::Uuid
             | Self::Warnings

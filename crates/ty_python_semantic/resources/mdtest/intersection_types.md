@@ -1401,6 +1401,153 @@ def f(c: C):
     reveal_type(c.x)  # revealed: ~AlwaysFalsy
 ```
 
+## Meta-types of intersections
+
+### Positive class constraints
+
+The class of an intersection must satisfy the class constraints supplied by every positive element.
+Instantiating the resulting class intersection recovers the corresponding instance intersection.
+
+```py
+class Left: ...
+class Right: ...
+
+def positive(value: Left & Right) -> None:
+    reveal_type(value.__class__)  # revealed: type[Left] & type[Right]
+    reveal_type(type(value))  # revealed: type[Left] & type[Right]
+    reveal_type(type(value)())  # revealed: Left & Right
+```
+
+### Bounded type variables
+
+Projecting an intersection into its class type preserves a bounded type variable instead of
+replacing it with its upper bound. An unrelated positive class constraint is preserved too.
+
+```py
+class Bound: ...
+class Other: ...
+
+def preserve[T: Bound](value: T & Other) -> None:
+    reveal_type(type(value))  # revealed: type[T@preserve] & type[Other]
+    reveal_type(type(value)())  # revealed: T@preserve & Other
+```
+
+### Excluded alternatives in type-variable bounds
+
+Excluding an alternative from a type variable's union bound can reveal a definite class. Preserve
+both that class constraint and the original type variable in the resulting class type.
+
+```py
+class Bound:
+    label = "bound"
+
+def exclude_none[T: Bound | None](value: T) -> None:
+    if value is not None:
+        reveal_type(type(value))  # revealed: type[T@exclude_none] & type[Bound]
+        reveal_type(type(value).label)  # revealed: str
+```
+
+### Excluded alternatives in class-object bounds
+
+If the remaining bound is a class object, its class is its metaclass. Preserve that metaclass
+constraint alongside the original type variable.
+
+```py
+class Meta(type): ...
+class Bound(metaclass=Meta): ...
+
+def accepts_meta(value: type[Meta]) -> None: ...
+def exclude_none[T: type[Bound] | None](value: T) -> None:
+    if value is not None:
+        reveal_type(type(value))  # revealed: type[T@exclude_none] & type[Meta]
+        accepts_meta(type(value))
+```
+
+For a final class, the metaclass is known exactly. This also holds for a specialized generic class.
+
+```py
+from typing import final
+
+@final
+class FinalBound(metaclass=Meta): ...
+
+@final
+class FinalGenericBound[U](metaclass=Meta): ...
+
+def exclude_none_final[T: type[FinalBound] | None](value: T) -> None:
+    if value is not None:
+        reveal_type(type(value))  # revealed: type[T@exclude_none_final] & <class 'Meta'>
+        accepts_meta(type(value))
+
+def exclude_none_generic[T: type[FinalGenericBound[int]] | None](value: T) -> None:
+    if value is not None:
+        reveal_type(type(value))  # revealed: type[T@exclude_none_generic] & <class 'Meta'>
+        accepts_meta(type(value))
+```
+
+### Truthiness refinements
+
+Whether an individual object is truthy or falsy does not constrain its runtime class. Both positive
+and negative truthiness refinements must therefore disappear from its meta-type.
+
+```py
+from ty_extensions import AlwaysFalsy
+
+class Base: ...
+
+def truthiness(falsy: Base & AlwaysFalsy, not_falsy: Base & ~AlwaysFalsy) -> None:
+    reveal_type(type(falsy))  # revealed: type[Base]
+    reveal_type(type(not_falsy))  # revealed: type[Base]
+```
+
+### Truthiness-narrowed `Self`
+
+Truthiness describes an individual instance, not its class. Narrowing `Self` by truthiness must
+therefore preserve `type[Self]` while discarding the value-only refinement.
+
+```py
+from typing import Self
+
+class Base:
+    def __bool__(self) -> bool:
+        return True
+
+    def clone(self: Self) -> Self:
+        if not self:
+            return self
+
+        reveal_type(self)  # revealed: Self@clone & ~AlwaysFalsy
+        reveal_type(type(self))  # revealed: type[Self@clone]
+        return type(self)()
+```
+
+### Negative value constraints
+
+Excluding particular instance values does not exclude their classes: a nonzero integer can still
+have class `int`.
+
+```py
+from typing import Literal
+
+def nonzero(value: int & ~Literal[0]) -> None:
+    reveal_type(type(value))  # revealed: type[int]
+```
+
+### Intersections without a positive class constraint
+
+A pure negation supplies no positive class bound, and a truthiness constraint describes only an
+instance value. Both conservatively project to the unconstrained class type.
+
+```py
+from ty_extensions import AlwaysTruthy
+
+class Excluded: ...
+
+def unconstrained(negative: ~Excluded, truthy: AlwaysTruthy & ~Excluded) -> None:
+    reveal_type(type(negative))  # revealed: type
+    reveal_type(type(truthy))  # revealed: type
+```
+
 ## Methods on intersections
 
 ### The same method from a common base

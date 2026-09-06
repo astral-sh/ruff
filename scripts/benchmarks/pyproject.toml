@@ -1,6 +1,6 @@
 [project]
 name = "scripts"
-version = "0.16.2"
+version = "0.16.6"
 description = ""
 authors = ["Charles Marsh <charlie.r.marsh@gmail.com>"]
 
@@ -23,3 +23,7 @@ linter = [
     "pylint",
     "isort",
 ]
+
+[tool.uv]
+no-build = true
+exclude-newer = "P7D"

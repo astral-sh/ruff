@@ -9,6 +9,7 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use super::generate_union_fix;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -36,7 +37,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: `typing.Union`](https://docs.python.org/3/library/typing.html#typing.Union)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.262")]
+#[violation_metadata(stable_since = "v0.0.262", category = Category::Correctness)]
 pub(crate) struct DuplicateUnionMember {
     duplicate_name: String,
 }

@@ -13,6 +13,7 @@ on:
       - "!crates/ty_wasm/**"
       - "crates/ruff_db/**"
       - "crates/ruff_python_ast/**"
+      - "crates/ruff_python_edits/**"
       - "crates/ruff_python_parser/**"
       - "scripts/memory_report.py"
       - ".github/workflows/memory_report.yaml"
@@ -29,6 +30,7 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
+  UV_LOCKED: 1
   CARGO_INCREMENTAL: 0
   CARGO_NET_RETRY: 10
   CARGO_TERM_COLOR: always
@@ -61,9 +63,9 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
-          version: "0.12.1"
+          version: "0.12.9"
           enable-cache: true
 
       - name: Install Rust toolchain
@@ -88,7 +90,8 @@ jobs:
             cargo build --bin ty --profile profiling
             mv target/profiling/ty ty-new
 
-            MERGE_BASE="$(git merge-base "$GITHUB_SHA" "origin/$GITHUB_BASE_REF")"
+            # The first parent contains any preceding layers in a stacked pull request.
+            MERGE_BASE="$(git rev-parse "${GITHUB_SHA}^1")"
             git checkout -b old_commit "$MERGE_BASE"
             echo "old commit (merge base)"
             git rev-list --format=%s --max-count=1 old_commit

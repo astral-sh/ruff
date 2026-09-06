@@ -6,6 +6,7 @@ use ruff_python_semantic::{Scope, ScopeKind};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -49,7 +50,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// `@typing.override`) is not flagged, even though such decorators typically leave the receiver
 /// binding unchanged, because an arbitrary decorator could alter it.
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "NEXT_RUFF_VERSION")]
+#[violation_metadata(preview_since = "NEXT_RUFF_VERSION", category = Category::Suspicious)]
 pub(crate) struct MethodReceiverDefault;
 
 impl Violation for MethodReceiverDefault {

@@ -633,6 +633,9 @@ class Misc:
     master: Misc | None
     tk: _tkinter.TkappType
     children: dict[str, Widget]
+    if sys.version_info >= (3, 15):
+        __iter__: ClassVar[None]  # prevent using __getitem__ for iteration
+
     def destroy(self) -> None:
         """Internal function.
 
@@ -3984,8 +3987,8 @@ class Entry(Widget, XView):
         insertofftime: int = 300,
         insertontime: int = 600,
         insertwidth: float | str = ...,
-        invalidcommand: str | list[str] | tuple[str, ...] | Callable[[], bool] = "",
-        invcmd: str | list[str] | tuple[str, ...] | Callable[[], bool] = "",  # same as invalidcommand
+        invalidcommand: str | list[str] | tuple[str, ...] | Callable[[], object] = "",
+        invcmd: str | list[str] | tuple[str, ...] | Callable[[], object] = "",  # same as invalidcommand
         justify: Literal["left", "center", "right"] = "left",
         name: str = ...,
         readonlybackground: str = ...,
@@ -4042,8 +4045,8 @@ class Entry(Widget, XView):
         insertofftime: int = ...,
         insertontime: int = ...,
         insertwidth: float | str = ...,
-        invalidcommand: str | list[str] | tuple[str, ...] | Callable[[], bool] = ...,
-        invcmd: str | list[str] | tuple[str, ...] | Callable[[], bool] = ...,
+        invalidcommand: str | list[str] | tuple[str, ...] | Callable[[], object] = ...,
+        invcmd: str | list[str] | tuple[str, ...] | Callable[[], object] = ...,
         justify: Literal["left", "center", "right"] = ...,
         readonlybackground: str = ...,
         relief: Literal["raised", "sunken", "flat", "ridge", "solid", "groove"] = ...,
@@ -6383,6 +6386,9 @@ class Image(_Image):
 
     name: Incomplete
     tk: _tkinter.TkappType
+    if sys.version_info >= (3, 15):
+        __iter__: ClassVar[None]  # prevent using __getitem__ for iteration
+
     def __init__(self, imgtype, name=None, cnf={}, master: Misc | _tkinter.TkappType | None = None, **kw) -> None: ...
     def __del__(self) -> None: ...
     def __setitem__(self, key, value) -> None: ...
@@ -6752,8 +6758,8 @@ class Spinbox(Widget, XView):
         insertofftime: int = 300,
         insertontime: int = 600,
         insertwidth: float | str = ...,
-        invalidcommand: str | list[str] | tuple[str, ...] | Callable[[], bool] = "",
-        invcmd: str | list[str] | tuple[str, ...] | Callable[[], bool] = "",
+        invalidcommand: str | list[str] | tuple[str, ...] | Callable[[], object] = "",
+        invcmd: str | list[str] | tuple[str, ...] | Callable[[], object] = "",
         justify: Literal["left", "center", "right"] = "left",
         name: str = ...,
         readonlybackground: str = ...,
@@ -6839,8 +6845,8 @@ class Spinbox(Widget, XView):
         insertofftime: int = ...,
         insertontime: int = ...,
         insertwidth: float | str = ...,
-        invalidcommand: str | list[str] | tuple[str, ...] | Callable[[], bool] = ...,
-        invcmd: str | list[str] | tuple[str, ...] | Callable[[], bool] = ...,
+        invalidcommand: str | list[str] | tuple[str, ...] | Callable[[], object] = ...,
+        invcmd: str | list[str] | tuple[str, ...] | Callable[[], object] = ...,
         justify: Literal["left", "center", "right"] = ...,
         readonlybackground: str = ...,
         relief: Literal["raised", "sunken", "flat", "ridge", "solid", "groove"] = ...,

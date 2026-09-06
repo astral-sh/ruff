@@ -11,7 +11,6 @@ use crate::types::diagnostic::{
     INVALID_ARGUMENT_TYPE, INVALID_TYPE_FORM, MISSING_ARGUMENT, TOO_MANY_POSITIONAL_ARGUMENTS,
     UNKNOWN_ARGUMENT, report_mismatched_type_name,
 };
-use crate::types::infer::builder::DeferredExpressionState;
 use crate::types::special_form::TypeQualifier;
 use crate::types::typed_dict::{
     TypedDictOpenness, TypedDictSchema, collect_guaranteed_keyword_keys,
@@ -19,8 +18,8 @@ use crate::types::typed_dict::{
     validate_typed_dict_constructor, validate_typed_dict_dict_literal,
 };
 use crate::types::{
-    ClassType, IntersectionType, KnownClass, Type, TypeAndQualifiers, TypeContext, TypedDictModule,
-    TypedDictType, any_over_type,
+    ClassType, IntersectionType, KnownClass, Type, TypeAndQualifiers, TypeContext, TypedDictType,
+    TypingModule, any_over_type,
 };
 use crate::{Db, ProgramEnvironment, TypeQualifiers};
 use ty_python_core::definition::Definition;
@@ -99,7 +98,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         &mut self,
         call_expr: &ast::ExprCall,
         definition: Option<Definition<'db>>,
-        typed_dict_module: TypedDictModule,
+        typed_dict_module: TypingModule,
     ) -> Type<'db> {
         let env = self.program_environment();
         let db = self.db();
@@ -173,7 +172,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let mut closed = false;
         let mut extra_items = None;
         let supports_pep_728 = self.in_stub()
-            || typed_dict_module == TypedDictModule::TypingExtensions
+            || typed_dict_module == TypingModule::TypingExtensions
             || self.program_environment().python_version(db) >= PythonVersion::PY315;
 
         for kw in keywords {
@@ -331,19 +330,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let anchor = match definition {
             Some(definition) => DynamicTypedDictAnchor::Definition(definition),
             None => {
-                let call_node_index = call_expr.node_index.load();
-                let scope_anchor = scope.node(db).node_index().unwrap_or(NodeIndex::from(0));
-                let anchor_u32 = scope_anchor
-                    .as_u32()
-                    .expect("scope anchor should not be NodeIndex::NONE");
-                let call_u32 = call_node_index
-                    .as_u32()
-                    .expect("call node should not be NodeIndex::NONE");
                 let schema = self.infer_dangling_typeddict_spec(fields_arg, total);
 
                 DynamicTypedDictAnchor::ScopeOffset {
                     scope,
-                    offset: call_u32 - anchor_u32,
+                    offset: self.dynamic_class_scope_offset(call_expr),
                     schema,
                     openness: extra_items.unwrap_or(if closed {
                         TypedDictOpenness::Closed
@@ -817,12 +808,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     }
 
     pub(super) fn infer_extra_items_kwarg(&mut self, value: &ast::Expr) -> TypeAndQualifiers<'db> {
-        let state = if self.in_stub() {
-            DeferredExpressionState::Deferred
-        } else {
-            self.deferred_state
-        };
-        let annotation = self.infer_annotation_expression(value, state);
+        let annotation = self.infer_annotation_expression(value, self.deferred_state);
         for qualifier in TypeQualifier::iter() {
             if qualifier != TypeQualifier::ReadOnly
                 && annotation

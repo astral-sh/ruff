@@ -386,6 +386,9 @@ class Counter(dict[_T, int], Generic[_T]):
     or multiset.  Elements are stored as dictionary keys and their counts
     are stored as dictionary values.
 
+    When constructed from a Mapping or Counter, the original object's
+    values will be used as the initial counts.
+
     >>> c = Counter('abcdeabcdabcaba')  # count elements from a string
 
     >>> c.most_common(3)                # three most common elements
@@ -680,17 +683,17 @@ class _OrderedDictValuesView(ValuesView[_VT_co]):
 # pyright doesn't have a specific error code for subclassing error!
 @final
 @type_check_only
-class _odict_keys(dict_keys[_KT_co, _VT_co]):  # type: ignore[misc]  # pyright: ignore[reportGeneralTypeIssues]  # ty:ignore[subclass-of-final-class]
+class _odict_keys(dict_keys[_KT_co, _VT_co]):  # type: ignore[misc]  # pyright: ignore[reportGeneralTypeIssues]  # ty:ignore[subclass-of-final-class]  # pyrefly: ignore [invalid-inheritance]
     def __reversed__(self) -> Iterator[_KT_co]: ...
 
 @final
 @type_check_only
-class _odict_items(dict_items[_KT_co, _VT_co]):  # type: ignore[misc]  # pyright: ignore[reportGeneralTypeIssues]  # ty:ignore[subclass-of-final-class]
+class _odict_items(dict_items[_KT_co, _VT_co]):  # type: ignore[misc]  # pyright: ignore[reportGeneralTypeIssues]  # ty:ignore[subclass-of-final-class]  # pyrefly: ignore [invalid-inheritance]
     def __reversed__(self) -> Iterator[tuple[_KT_co, _VT_co]]: ...
 
 @final
 @type_check_only
-class _odict_values(dict_values[_KT_co, _VT_co]):  # type: ignore[misc]  # pyright: ignore[reportGeneralTypeIssues]  # ty:ignore[subclass-of-final-class]
+class _odict_values(dict_values[_KT_co, _VT_co]):  # type: ignore[misc]  # pyright: ignore[reportGeneralTypeIssues]  # ty:ignore[subclass-of-final-class]  # pyrefly: ignore [invalid-inheritance]
     def __reversed__(self) -> Iterator[_VT_co]: ...
 
 @disjoint_base

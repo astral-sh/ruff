@@ -12,7 +12,7 @@ use crate::types::infer::builder::{
     },
 };
 use crate::types::{KnownClass, SubclassOfType, Type, TypeContext, definition_expression_type};
-use ruff_python_ast::{self as ast, HasNodeIndex, NodeIndex};
+use ruff_python_ast as ast;
 use ty_python_core::definition::Definition;
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
@@ -231,22 +231,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // Create the anchor for identifying this dynamic class.
         // - For assigned `type()` calls, the Definition uniquely identifies the class,
         //   and bases inference is deferred.
-        // - For dangling calls, compute a relative offset from the scope's node index,
+        // - For dangling calls, locate the call relative to the enclosing scope,
         //   and store the explicit bases directly (since they were inferred eagerly).
         let anchor = if let Some(def) = definition {
             // Register for deferred inference to infer bases and validate later.
             self.deferred.insert(def);
             DynamicClassAnchor::Definition(def)
         } else {
-            let call_node_index = call_expr.node_index().load();
-            let scope_anchor = scope.node(db).node_index().unwrap_or(NodeIndex::from(0));
-            let anchor_u32 = scope_anchor
-                .as_u32()
-                .expect("scope anchor should not be NodeIndex::NONE");
-            let call_u32 = call_node_index
-                .as_u32()
-                .expect("call node should not be NodeIndex::NONE");
-
             // Use [Unknown] as fallback if bases extraction failed (e.g., not a tuple).
             let anchor_bases = explicit_bases
                 .clone()
@@ -254,7 +245,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
             DynamicClassAnchor::ScopeOffset {
                 scope,
-                offset: call_u32 - anchor_u32,
+                offset: self.dynamic_class_scope_offset(call_expr),
                 explicit_bases: anchor_bases,
             }
         };

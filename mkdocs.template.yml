@@ -52,6 +52,9 @@ markdown_extensions:
       anchor_linenums: true
   - pymdownx.inlinehilite:
   - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
   - markdown.extensions.attr_list:
   - pymdownx.keys:
   - pymdownx.tasklist:

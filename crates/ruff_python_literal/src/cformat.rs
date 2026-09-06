@@ -74,6 +74,12 @@ pub enum CFormatType {
     String(CFormatConversion),
 }
 
+#[derive(Debug, PartialEq, Copy, Clone)]
+pub enum CFormatContext {
+    Str,
+    Bytes,
+}
+
 #[derive(Debug, PartialEq)]
 pub enum CFormatPrecision {
     Quantity(CFormatQuantity),
@@ -123,14 +129,17 @@ impl FromStr for CFormatSpec {
             return Err((CFormatErrorType::MissingModuloSign, 1));
         }
 
-        CFormatSpec::parse(&mut chars)
+        CFormatSpec::parse(&mut chars, CFormatContext::Str)
     }
 }
 
 pub type ParseIter<I> = Peekable<Enumerate<I>>;
 
 impl CFormatSpec {
-    pub fn parse<T, I>(iter: &mut ParseIter<I>) -> Result<Self, ParsingError>
+    pub fn parse<T, I>(
+        iter: &mut ParseIter<I>,
+        context: CFormatContext,
+    ) -> Result<Self, ParsingError>
     where
         T: Into<char> + Copy,
         I: Iterator<Item = T>,
@@ -140,7 +149,7 @@ impl CFormatSpec {
         let min_field_width = parse_quantity(iter)?;
         let precision = parse_precision(iter)?;
         consume_length(iter);
-        let (format_type, format_char) = parse_format_type(iter)?;
+        let (format_type, format_char) = parse_format_type(iter, context)?;
 
         Ok(CFormatSpec {
             mapping_key,
@@ -204,7 +213,10 @@ where
     }
 }
 
-fn parse_format_type<T, I>(iter: &mut ParseIter<I>) -> Result<(CFormatType, char), ParsingError>
+fn parse_format_type<T, I>(
+    iter: &mut ParseIter<I>,
+    context: CFormatContext,
+) -> Result<(CFormatType, char), ParsingError>
 where
     T: Into<char>,
     I: Iterator<Item = T>,
@@ -234,7 +246,9 @@ where
         'c' => CFormatType::Character,
         'r' => CFormatType::String(CFormatConversion::Repr),
         's' => CFormatType::String(CFormatConversion::Str),
-        'b' => CFormatType::String(CFormatConversion::Bytes),
+        // `%b` is only valid for bytes formatting (e.g. `b"%b" % b"x"`), not for string
+        // formatting.
+        'b' if context == CFormatContext::Bytes => CFormatType::String(CFormatConversion::Bytes),
         'a' => CFormatType::String(CFormatConversion::Ascii),
         _ => return Err((CFormatErrorType::UnsupportedFormatChar(c), index)),
     };
@@ -363,9 +377,11 @@ impl CFormatBytes {
                             CFormatPart::Literal(std::mem::take(&mut literal)),
                         ));
                     }
-                    let spec = CFormatSpec::parse(iter).map_err(|err| CFormatError {
-                        typ: err.0,
-                        index: err.1,
+                    let spec = CFormatSpec::parse(iter, CFormatContext::Bytes).map_err(|err| {
+                        CFormatError {
+                            typ: err.0,
+                            index: err.1,
+                        }
                     })?;
                     parts.push((index, CFormatPart::Spec(spec)));
                     if let Some(&(index, _)) = iter.peek() {
@@ -418,9 +434,11 @@ impl CFormatString {
                             CFormatPart::Literal(std::mem::take(&mut literal)),
                         ));
                     }
-                    let spec = CFormatSpec::parse(iter).map_err(|err| CFormatError {
-                        typ: err.0,
-                        index: err.1,
+                    let spec = CFormatSpec::parse(iter, CFormatContext::Str).map_err(|err| {
+                        CFormatError {
+                            typ: err.0,
+                            index: err.1,
+                        }
                     })?;
                     parts.push((index, CFormatPart::Spec(spec)));
                     if let Some(&(index, _)) = iter.peek() {

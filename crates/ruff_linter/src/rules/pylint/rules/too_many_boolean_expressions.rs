@@ -5,6 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for too many Boolean expressions in an `if` statement.
@@ -26,7 +27,7 @@ use crate::checkers::ast::Checker;
 /// ## Options
 /// - `lint.pylint.max-bool-expr`
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.1.1")]
+#[violation_metadata(preview_since = "v0.1.1", category = Category::Pedantic)]
 pub(crate) struct TooManyBooleanExpressions {
     expressions: usize,
     max_expressions: usize,

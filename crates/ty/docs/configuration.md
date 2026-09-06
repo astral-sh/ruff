@@ -364,6 +364,10 @@ your environment from an activated Conda environment, and will look for a `.venv
 in the project root if none of the above apply. Failing that, ty will look for a `python3`
 or `python` binary available in `PATH`.
 
+Scripts with inline metadata use their own Python environment. They can use an explicitly
+configured environment, an activated environment, or an environment selected by the editor.
+Unlike projects, they do not automatically use a `.venv` directory.
+
 [`sys.prefix`]: https://docs.python.org/3/library/sys.html#sys.prefix
 
 **Default value**: `null`
@@ -446,6 +450,9 @@ to determine a value:
    and attempt to infer the Python version of that environment
 3. Fall back to the default value (see below)
 
+Scripts with inline metadata use their `requires-python` field instead of
+`project.requires-python`. They do not inherit the Python version of the enclosing project.
+
 For some language features, ty can also understand conditionals based on comparisons
 with `sys.version_info`. These are commonly found in typeshed, for example,
 to reflect the differing contents of the standard library across Python versions.
@@ -485,6 +492,9 @@ if they exist and are not packages (i.e. they do not contain `__init__.py` or `_
 * `./src`
 * `./<project-name>` (if a `./<project-name>/<project-name>` directory exists)
 * `./python`
+
+Scripts with inline metadata have no first-party roots by default because they are
+single-file programs. Set `root = ["."]` to allow importing local modules.
 
 **Default value**: `null`
 

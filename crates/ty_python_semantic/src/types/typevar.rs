@@ -17,8 +17,9 @@ use crate::{
     types::{
         ApplySpecialization, ApplyTypeMappingVisitor, CycleDetector, DynamicType, GenericContext,
         InstanceProjection, IntersectionType, KnownClass, KnownInstanceType, MaterializationKind,
-        Parameter, Parameters, Type, TypeAliasType, TypeContext, TypeMapping, TypeVarVariance,
-        UnionBuilder, UnionType, any_over_type, binding_type, definition_expression_type,
+        Parameter, Parameters, Specialization, Type, TypeAliasType, TypeContext, TypeMapping,
+        TypeVarVariance, UnionBuilder, UnionType, any_over_type,
+        any_over_type_including_alias_arguments, binding_type, definition_expression_type,
         tuple::Tuple,
         variance::VarianceInferable,
         visitor::{self, TypeCollector, TypeVisitor, walk_type_with_recursion_guard},
@@ -61,6 +62,36 @@ impl<'db> Type<'db> {
         })
     }
 
+    /// Returns whether this type might reference `typevar_id`, including type-alias arguments.
+    ///
+    /// Other non-lazy type-variable visitors stop at type aliases because inspecting an alias's
+    /// value can trigger lazy inference or expand a recursive definition. Receiver specialization
+    /// still needs to notice `T` in `Alias[T]`, so this visitor inspects the already-available
+    /// specialization arguments without evaluating the alias body.
+    ///
+    /// This deliberately over-approximates: `type Alias[T] = int` does not actually depend on
+    /// `T`, and specialization can also erase an argument. That can cause an unnecessary
+    /// receiver-specialization attempt, but actual receiver constraints are still solved before
+    /// changing the signature. Applying the same traversal to visitors that use type-variable
+    /// occurrences to drive inference or diagnostics can instead change behavior.
+    ///
+    /// TODO: Explore whether other type-variable visitors can safely inspect alias arguments,
+    /// accounting for unused parameters and arguments erased by specialization.
+    pub(crate) fn references_typevar_through_aliases(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        typevar_id: TypeVarIdentity<'db>,
+    ) -> bool {
+        any_over_type_including_alias_arguments(db, env, self, |ty| match ty {
+            Type::TypeVar(typevar) => typevar_id == typevar.typevar(db).identity(db),
+            Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => {
+                typevar_id == typevar.identity(db)
+            }
+            _ => false,
+        })
+    }
+
     pub(crate) fn has_non_self_typevar(
         self,
         db: &'db dyn Db,
@@ -95,6 +126,17 @@ impl<'db> Type<'db> {
     ) -> bool {
         any_over_type(db, env, self, false, |ty| {
             matches!(ty, Type::Dynamic(DynamicType::UnspecializedTypeVar))
+        })
+    }
+
+    pub(crate) fn has_provisional_marker(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> bool {
+        any_over_type(db, env, self, false, |ty| {
+            ty.as_dynamic()
+                .is_some_and(DynamicType::is_provisional_marker)
         })
     }
 }
@@ -165,11 +207,15 @@ pub(super) fn walk_type_var_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
         typevar.bound_or_constraints(db, visitor.program_environment())
     } else {
         match typevar._bound_or_constraints(db) {
-            _ if visitor.should_visit_lazy_type_attributes() => {
-                typevar.bound_or_constraints(db, visitor.program_environment())
-            }
             Some(TypeVarBoundOrConstraintsEvaluation::Eager(bound_or_constraints)) => {
                 Some(bound_or_constraints)
+            }
+            Some(
+                TypeVarBoundOrConstraintsEvaluation::LazyUpperBound
+                | TypeVarBoundOrConstraintsEvaluation::LazyConstraints,
+            ) => {
+                visitor.notify_skipped_lazy_type_attributes();
+                None
             }
             _ => None,
         }
@@ -181,6 +227,10 @@ pub(super) fn walk_type_var_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     } else {
         match typevar._default(db) {
             Some(TypeVarDefaultEvaluation::Eager(default_type)) => Some(default_type),
+            Some(TypeVarDefaultEvaluation::Lazy) => {
+                visitor.notify_skipped_lazy_type_attributes();
+                None
+            }
             _ => None,
         }
     } {
@@ -668,6 +718,7 @@ impl<'db> TypeVarInstance<'db> {
                     | DynamicType::Unknown
                     | DynamicType::UnknownGeneric(_)
                     | DynamicType::UnspecializedTypeVar
+                    | DynamicType::UnknownLambdaParameter
                     | DynamicType::InvalidConcatenateUnknown
                     | DynamicType::AmbiguousOverload => Parameters::unknown(),
                 },
@@ -774,7 +825,7 @@ impl<'db> TypeVarInstance<'db> {
 /// `0` is reserved for source-level, non-freshened typevars. Positive values identify fresh
 /// occurrences.
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct TypeVarNonce(u32);
+pub(crate) struct TypeVarNonce(u32);
 
 // This type does not have any heap storage.
 impl get_size2::GetSize for TypeVarNonce {}
@@ -1159,6 +1210,23 @@ impl<'db> BoundTypeVarInstance<'db> {
         Self::new(db, typevar, binding_context, None, TypeVarNonce::NONE)
     }
 
+    /// Applies a specialization to this occurrence's declared upper bound or constraints, if any.
+    fn apply_specialization_to_bound_or_constraints(
+        self,
+        db: &'db dyn Db,
+        specialization: Specialization<'db>,
+        env: &ProgramEnvironment<'db>,
+    ) -> Self {
+        self.map_bound_or_constraints(db, |original| {
+            let original = original?;
+            let mapping = TypeMapping::ApplySpecialization(ApplySpecialization::specialization(
+                specialization,
+            ));
+            let visitor = ApplyTypeMappingVisitor::new(env);
+            Some(original.apply_type_mapping_impl(db, &mapping, &visitor))
+        })
+    }
+
     /// Returns an identical type variable with its `TypeVarBoundOrConstraints` mapped by the
     /// provided closure.
     pub(crate) fn map_bound_or_constraints(
@@ -1198,7 +1266,10 @@ impl<'db> BoundTypeVarInstance<'db> {
             None => match self.binding_context(db) {
                 BindingContext::Definition(definition) => polarity.compose_thunk(|| {
                     let env = ProgramEnvironment::from_definition(definition);
-                    match binding_type(db, definition).variance_of(db, &env, self.identity(db)) {
+                    match binding_type(db, definition)
+                        .variance_of(db, &env, self.identity(db))
+                        .evaluate(db)
+                    {
                         // When both directions are valid, the typing spec selects covariance.
                         TypeVarVariance::Bivariant => TypeVarVariance::Covariant,
                         variance => variance,
@@ -1237,9 +1308,25 @@ impl<'db> BoundTypeVarInstance<'db> {
                 })
             };
 
+        let possibly_apply_to_self = |specialization: &ApplySpecialization<'a, 'db>| {
+            if self.typevar(db).is_self(db)
+                && specialization.specialize_self_domain()
+                && let Some(specialization) = specialization.as_specialization(db)
+            {
+                Type::TypeVar(self.apply_specialization_to_bound_or_constraints(
+                    db,
+                    specialization,
+                    visitor.env,
+                ))
+            } else {
+                Type::TypeVar(self)
+            }
+        };
+
         match type_mapping {
             TypeMapping::ApplySpecialization(specialization) => {
-                mapped_specialization_type(specialization).unwrap_or(Type::TypeVar(self))
+                mapped_specialization_type(specialization)
+                    .unwrap_or_else(|| possibly_apply_to_self(specialization))
             }
             TypeMapping::ApplySpecializationWithMaterialization {
                 specialization,
@@ -1273,7 +1360,7 @@ impl<'db> BoundTypeVarInstance<'db> {
                         }
                     }
                 })
-                .unwrap_or(Type::TypeVar(self)),
+                .unwrap_or_else(|| possibly_apply_to_self(specialization)),
             TypeMapping::BindSelf(binding) => {
                 if binding.should_bind(db, visitor.env, self) {
                     binding.self_type()
@@ -1313,7 +1400,11 @@ impl<'db> BoundTypeVarInstance<'db> {
             | TypeMapping::EagerExpansion
             | TypeMapping::RescopeReturnCallables(_) => Type::TypeVar(self),
             TypeMapping::Materialize(materialization_kind) => {
-                Type::TypeVar(self.materialize_impl(db, *materialization_kind, visitor))
+                if visitor.materialize_typevar_bounds_and_defaults {
+                    Type::TypeVar(self.materialize_impl(db, *materialization_kind, visitor))
+                } else {
+                    Type::TypeVar(self)
+                }
             }
         }
     }
@@ -1614,7 +1705,7 @@ impl<'db> BindingContext<'db> {
         }
     }
 
-    pub(crate) fn program(self, db: &'db dyn Db) -> Program<'db> {
+    fn program(self, db: &'db dyn Db) -> Program<'db> {
         match self {
             Self::Definition(definition) => definition.program(db),
             Self::Synthetic(program) => program,
@@ -1627,7 +1718,7 @@ impl<'db> BindingContext<'db> {
 }
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, get_size2::GetSize)]
-pub enum ParamSpecAttrKind {
+pub(crate) enum ParamSpecAttrKind {
     Args,
     Kwargs,
 }
@@ -2059,7 +2150,7 @@ pub enum TypeVarBoundOrConstraints<'db> {
     Constraints(TypeVarConstraints<'db>),
 }
 
-pub(super) fn walk_type_var_bounds<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
+fn walk_type_var_bounds<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     bounds: TypeVarBoundOrConstraints<'db>,
     visitor: &V,

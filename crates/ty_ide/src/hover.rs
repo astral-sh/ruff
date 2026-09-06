@@ -5,8 +5,7 @@ use ruff_db::files::FileRange;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextSize};
-use std::fmt;
-use std::fmt::Formatter;
+use std::fmt::{self, Display};
 use ty_python_core::ProgramFile;
 use ty_python_semantic::ProgramEnvironment;
 use ty_python_semantic::types::ide_support::{resolved_call_signature, typed_dict_key_hover};
@@ -230,12 +229,21 @@ pub struct Hover<'db> {
 
 impl<'db> Hover<'db> {
     /// Renders the hover to a string using the specified markup kind.
-    pub const fn display<'a>(&'a self, db: &'db dyn Db, kind: MarkupKind) -> DisplayHover<'db, 'a> {
-        DisplayHover {
-            db,
-            hover: self,
-            kind,
-        }
+    pub const fn display<'a>(&'a self, db: &'db dyn Db, kind: MarkupKind) -> impl Display {
+        std::fmt::from_fn(move |f| {
+            let mut first = true;
+            let env = ProgramEnvironment::from_file(self.program_file);
+            for content in &self.contents {
+                if !first {
+                    kind.horizontal_line().fmt(f)?;
+                }
+
+                content.display(db, &env, kind).fmt(f)?;
+                first = false;
+            }
+
+            Ok(())
+        })
     }
 
     fn iter(&self) -> std::slice::Iter<'_, HoverContent<'db>> {
@@ -258,30 +266,6 @@ impl<'a, 'db> IntoIterator for &'a Hover<'db> {
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
-    }
-}
-
-pub struct DisplayHover<'db, 'a> {
-    db: &'db dyn Db,
-    hover: &'a Hover<'db>,
-    kind: MarkupKind,
-}
-
-impl fmt::Display for DisplayHover<'_, '_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let db = self.db;
-        let mut first = true;
-        let env = ProgramEnvironment::from_file(self.hover.program_file);
-        for content in &self.hover.contents {
-            if !first {
-                self.kind.horizontal_line().fmt(f)?;
-            }
-
-            content.display(db, &env, self.kind).fmt(f)?;
-            first = false;
-        }
-
-        Ok(())
     }
 }
 

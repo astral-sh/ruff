@@ -774,6 +774,18 @@ def f(flag: bool):
         flag and (x := 38),
         flag and (x := 36),
         flag and (x := 36),
+        flag and (x := 39),
+        flag and (x := 40),
+        flag and (x := 41),
+        flag and (x := 42),
+        flag and (x := 43),
+        flag and (x := 44),
+        flag and (x := 45),
+        flag and (x := 46),
+        flag and (x := 47),
+        flag and (x := 48),
+        flag and (x := 49),
+        flag and (x := 50),
     )
 
     # Normally this `nonlocal` write would make us infer `int` for `y`, but now we ignore it.

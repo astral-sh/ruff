@@ -202,6 +202,7 @@ PTH116 `os.stat()` should be replaced by `Path.stat()`, `Path.owner()`, or `Path
 26 | isabs(p)
 27 | join(p, q)
    |
+help: Replace with `Path(...).stat()`
 
 PTH117 `os.path.isabs()` should be replaced by `Path.is_absolute()`
   --> import_from.py:26:1

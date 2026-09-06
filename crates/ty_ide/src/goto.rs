@@ -26,6 +26,7 @@ use ty_python_semantic::{Db as SemanticDb, ResolvedDefinition};
 use ty_python_semantic::{
     HasDefinition, HasType, ImportAliasResolution, ProgramEnvironment, SemanticModel,
     TypeQualifiers, definitions_for_imported_symbol, definitions_for_name,
+    fixture_bindings_for_parameter,
 };
 
 #[derive(Clone, Debug)]
@@ -344,8 +345,27 @@ impl<'db> Definitions<'db> {
         model: &SemanticModel<'db>,
         goto_target: &GotoTarget<'_>,
     ) -> Option<Definitions<'db>> {
-        let definitions = self.goto_declaration(model, goto_target)?;
-        Some(definitions.map_stubs(model.db()))
+        let mut definitions = self;
+
+        if let GotoTarget::Parameter(parameter) = goto_target {
+            let fixture_bindings =
+                fixture_bindings_for_parameter(model.db(), parameter.definition(model));
+
+            if !fixture_bindings.is_empty() {
+                definitions = Self::new(
+                    fixture_bindings
+                        .iter()
+                        .map(|binding| ResolvedDefinition::Definition(binding.fixture()))
+                        .collect(),
+                );
+            }
+        }
+
+        Some(
+            definitions
+                .goto_declaration(model, goto_target)?
+                .map_stubs(model.db()),
+        )
     }
 
     /// Map definitions from stub files to corresponding source implementations.

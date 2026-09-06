@@ -376,6 +376,157 @@ class UnionC(metaclass=UnionMeta):
 reveal_type(UnionC.attribute)  # revealed: Any | Literal["descriptor"]
 ```
 
+### `TypeForm` metaclass attributes
+
+A `TypeForm` argument describes the instances produced by a type form, not the runtime type form
+value itself. A metaclass attribute typed as `TypeForm[Descriptor]` can therefore be a class whose
+own metaclass makes it a data descriptor, and must continue to take precedence over a class
+attribute with the same name when assigning to the attribute:
+
+```py
+from typing_extensions import TypeForm
+
+class DescriptorMeta(type):
+    def __set__(self, instance: object, value: str) -> None:
+        pass
+
+class Descriptor(metaclass=DescriptorMeta): ...
+
+class Meta(type):
+    attribute: TypeForm[Descriptor] = Descriptor
+
+class C(metaclass=Meta):
+    attribute: int = 1
+
+C.attribute = 1  # error: [invalid-assignment]
+# error: [invalid-assignment]
+C.attribute = Descriptor  # error: [invalid-assignment]
+```
+
+A quoted type expression remains valid when both possible write targets accept the same runtime
+string:
+
+```py
+class StringC(metaclass=Meta):
+    attribute: str = ""
+
+StringC.attribute = "valid"
+StringC.attribute = "Descriptor"
+```
+
+The descriptor setter still rejects a class object even when the fallback attribute accepts that
+same class object:
+
+```py
+class TypeFormC(metaclass=Meta):
+    attribute: TypeForm[Descriptor] = Descriptor
+
+TypeFormC.attribute = Descriptor  # error: [invalid-assignment]
+```
+
+The same contextual check applies when the metaclass attribute can also hold an ordinary string:
+
+```py
+class UnionMeta(type):
+    attribute: TypeForm[Descriptor] | str = Descriptor
+
+class UnionC(metaclass=UnionMeta):
+    attribute: int = 1
+
+UnionC.attribute = 1  # error: [invalid-assignment]
+```
+
+### Bounded class-object metaclass attributes
+
+An inexact `type[Base]` attribute can hold a subclass whose custom metaclass makes the class object
+a data descriptor. It must therefore continue to take precedence over a class attribute with the
+same name when assigning to the attribute:
+
+```py
+class Base: ...
+
+class DescriptorMeta(type):
+    def __set__(self, instance: object, value: str) -> None:
+        pass
+
+class Descriptor(Base, metaclass=DescriptorMeta): ...
+
+class Meta(type):
+    attribute: type[Base] = Descriptor
+
+class C(metaclass=Meta):
+    attribute: int = 1
+
+C.attribute = 1  # error: [invalid-assignment]
+# error: [invalid-assignment]
+C.attribute = Descriptor  # error: [invalid-assignment]
+```
+
+An assignment succeeds when both the possible descriptor setter and class attribute accept the
+assigned string:
+
+```py
+class StringC(metaclass=Meta):
+    attribute: str = ""
+
+StringC.attribute = "valid"
+```
+
+An assignment fails when the class attribute accepts the assigned class but the descriptor setter
+does not:
+
+```py
+class ClassC(metaclass=Meta):
+    attribute: type[Base] = Base
+
+ClassC.attribute = Base  # error: [invalid-assignment]
+```
+
+### Broad class-object metaclass attributes
+
+Both `type[object]` and bare `type` can contain a class whose metaclass implements `__set__`. Their
+possible descriptor setters must therefore be checked independently of the class-attribute fallback:
+
+```py
+class Base: ...
+
+class DescriptorMeta(type):
+    def __set__(self, instance: object, value: str) -> None:
+        pass
+
+class Descriptor(Base, metaclass=DescriptorMeta): ...
+
+class ObjectMeta(type):
+    attribute: type[object] = Descriptor
+
+class ObjectStringC(metaclass=ObjectMeta):
+    attribute: str = ""
+
+ObjectStringC.attribute = "valid"
+
+class ObjectClassC(metaclass=ObjectMeta):
+    attribute: type[Base] = Base
+
+ObjectClassC.attribute = Base  # error: [invalid-assignment]
+```
+
+The unparameterized spelling follows the same descriptor and class-attribute paths:
+
+```py
+class BareMeta(type):
+    attribute: type = Descriptor
+
+class BareStringC(metaclass=BareMeta):
+    attribute: str = ""
+
+BareStringC.attribute = "valid"
+
+class BareClassC(metaclass=BareMeta):
+    attribute: type[Base] = Base
+
+BareClassC.attribute = Base  # error: [invalid-assignment]
+```
+
 ### Class objects with unknown metaclasses
 
 A `type[Any]` value could contain a class whose metaclass implements the descriptor protocol. We
@@ -739,6 +890,30 @@ c.name = None
 c.name = 42
 ```
 
+### Writing to a property's documentation
+
+A property stores its documentation in a writable descriptor even though property instances do not
+have an instance dictionary.
+
+```py
+class Example:
+    @property
+    def value(self) -> int:
+        return 1
+
+    value.__doc__ = "Updated documentation"
+```
+
+A property created directly has the same writable `__doc__` attribute. Assignments must still
+respect its `str | None` annotation, and arbitrary instance attributes remain unsupported.
+
+```py
+descriptor = property(lambda instance: 1)
+descriptor.__doc__ = None
+descriptor.__doc__ = 1  # error: [invalid-assignment]
+descriptor.extra = 1  # error: [unresolved-attribute]
+```
+
 ### Overriding properties in subclasses
 
 When a subclass overrides a property, accessing other inherited properties from within the
@@ -1044,7 +1219,7 @@ python-version = "3.12"
 ```
 
 ```py
-type Recursive = int | Recursive
+type Recursive = int | Recursive  # error: [cyclic-type-alias-definition]
 
 class C:
     value: Recursive = 1
@@ -1052,10 +1227,10 @@ class C:
 C().value
 ```
 
-### Property getters reject invalid receiver specializations
+### Property getters do not infer fixed owner type variables
 
-A property getter checks the same specialized receiver as an ordinary method. A generic alias with
-alternatives that impose different type-variable bounds can produce an invalid property access.
+A property getter treats type variables fixed by the owner specialization as evidence, not as
+inference targets.
 
 ```py
 from collections.abc import Callable
@@ -1078,9 +1253,11 @@ AnyCallback = TypeVar("AnyCallback", bound=Callable[..., str])
 Command = A[AnyCallback] | B[AnyCallback]
 Callback = TypeVar("Callback", bound=Callable[[int], str])
 
+# TODO: `Command[Callback]` produces `B[Callback]`, but `Callback` does not satisfy `BItem`'s
+# upper bound. Report this at `Command[Callback]` once specialization validation can prove that
+# every possible specialization of a symbolic assignment satisfies the destination domain.
 def access(value: Callback | Command[Callback]) -> None:
     if isinstance(value, A | B):
-        # error: [invalid-attribute-access]
         value.callback
 ```
 
@@ -1207,6 +1384,37 @@ def descriptor_value(descriptor: Descriptor) -> None:
         C().value
 ```
 
+### Intersection receivers preserve their complete owner type
+
+A descriptor can require its owner to satisfy both classes in an intersection.
+
+```py
+from __future__ import annotations
+
+class Descriptor:
+    def __get__(self, instance: object, owner: type[Left] & type[Right]) -> int:
+        return 1
+
+class Left:
+    value = Descriptor()
+
+class Right: ...
+
+def receiver(value: Left & Right) -> None:
+    # Only `Left` supplies the descriptor, but its owner must retain `Right` too.
+    # Passing `type[Left]` instead of `type[Left] & type[Right]` would cause an
+    # `invalid-attribute-access` error.
+    reveal_type(value.value)  # revealed: int
+```
+
+A receiver known only to be `Left` does not satisfy the descriptor's owner type.
+
+```py
+def incomplete_owner(value: Left) -> None:
+    # error: [invalid-attribute-access] "Expected `type[Left] & type[Right]`, found `type[Left]`"
+    value.value
+```
+
 ### Every `__get__` definition must accept the call
 
 A conditionally defined method can have several callable signatures. The access is invalid if any
@@ -1287,6 +1495,24 @@ class C:
 reveal_type(C().value)  # revealed: int
 ```
 
+### An unknown `__getattribute__` can bypass descriptors
+
+A dynamic base may provide an attribute interceptor that avoids a malformed descriptor, so the
+descriptor access cannot be guaranteed to fail.
+
+```py
+from typing import Any
+
+class Descriptor:
+    def __get__(self) -> int:
+        return 1
+
+class C(Any):
+    value = Descriptor()
+
+reveal_type(C().value)  # revealed: int
+```
+
 ### An instance `__getattribute__` may delegate to descriptor lookup
 
 The return annotation of an override does not establish whether it delegates to the default
@@ -1305,6 +1531,27 @@ class C:
         return super().__getattribute__(name)
 
 C().value
+```
+
+### An invalid `__getattribute__` runs before descriptors
+
+A malformed `__getattribute__` fails before it can invoke a malformed descriptor. The diagnostic
+therefore describes the `__getattribute__` call while preserving the descriptor's return type.
+
+```py
+class Descriptor:
+    def __get__(self) -> int:
+        return 1
+
+class C:
+    value = Descriptor()
+
+    # error: [invalid-method-override]
+    def __getattribute__(self) -> str:
+        return "fallback"
+
+# error: [invalid-attribute-access] "Invalid access to attribute `value` on type `C`"
+reveal_type(C().value)  # revealed: int
 ```
 
 ### An assigned instance attribute shadows a non-data descriptor
@@ -1672,6 +1919,29 @@ class Example:
     @wrapper
     def __call__(self) -> None:
         pass
+```
+
+An invalid descriptor receiver must not discard the inferred `ParamSpec` for its bound callable.
+Even though `Concatenate` makes the receiver positional-only, the remaining parameters still retain
+their precise types.
+
+```py
+class Decorator(Generic[P]):
+    def __call__(self, *args: P.args, **kwargs: P.kwargs) -> None: ...
+    def __get__(self: "Decorator[Concatenate[Any, P2]]", instance: Any, owner: Any) -> "Decorator[P2]":
+        raise NotImplementedError
+
+def decorate(fn: Callable[P, Any]) -> Decorator[P]:
+    raise NotImplementedError
+
+class Decorated:
+    @decorate
+    def method(self, value: str) -> None: ...
+
+# error: [invalid-attribute-access]
+bound = Decorated().method
+reveal_type(bound)  # revealed: Decorator[(value: str)]
+bound(1)  # error: [invalid-argument-type]
 ```
 
 [descriptors]: https://docs.python.org/3/howto/descriptor.html

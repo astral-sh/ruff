@@ -5,6 +5,7 @@ use ruff_text_size::{Ranged, TextLen, TextRange};
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::docstrings::Docstring;
 use crate::rules::pydocstyle::helpers::normalize_word;
 use crate::rules::pydocstyle::settings::Settings;
@@ -46,7 +47,7 @@ use crate::rules::pydocstyle::settings::Settings;
 ///
 /// [Google Python style guide]: https://google.github.io/styleguide/pyguide.html#383-functions-and-methods
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.15.18")]
+#[violation_metadata(preview_since = "0.15.18", category = Category::Pedantic)]
 pub(crate) struct PropertyDocstringStartsWithVerb {
     first_word: String,
 }

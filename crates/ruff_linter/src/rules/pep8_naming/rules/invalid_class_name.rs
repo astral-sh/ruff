@@ -5,6 +5,7 @@ use ruff_python_ast::identifier::Identifier;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::pep8_naming::settings::IgnoreNames;
 
 /// ## What it does
@@ -41,7 +42,7 @@ use crate::rules::pep8_naming::settings::IgnoreNames;
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#class-names
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.77")]
+#[violation_metadata(stable_since = "v0.0.77", category = Category::Pedantic)]
 pub(crate) struct InvalidClassName {
     name: String,
 }

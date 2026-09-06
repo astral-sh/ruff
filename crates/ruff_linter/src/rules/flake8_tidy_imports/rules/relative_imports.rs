@@ -7,6 +7,7 @@ use ruff_python_codegen::Generator;
 use ruff_python_stdlib::identifiers::is_identifier;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 use crate::rules::flake8_tidy_imports::settings::Strictness;
@@ -54,7 +55,7 @@ use crate::rules::flake8_tidy_imports::settings::Strictness;
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#imports
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.169")]
+#[violation_metadata(stable_since = "v0.0.169", category = Category::Restriction)]
 pub(crate) struct RelativeImports {
     strictness: Strictness,
 }

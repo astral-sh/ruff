@@ -1,6 +1,6 @@
 [package]
 name = "ruff_annotate_snippets"
-version = "0.0.8"
+version = "0.0.12"
 description = "This is an internal component crate of Ruff"
 authors = { workspace = true }
 edition = { workspace = true }
@@ -56,7 +56,6 @@ filter_map_next = "warn"
 flat_map_option = "warn"
 float_cmp_const = "warn"
 fn_params_excessive_bools = "warn"
-from_iter_instead_of_collect = "warn"
 if_same_then_else = "allow"
 implicit_clone = "warn"
 imprecise_flops = "warn"

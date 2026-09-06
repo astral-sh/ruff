@@ -5,6 +5,7 @@ use ruff_python_ast::{self as ast, CmpOp, Stmt};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::snippet::SourceCodeSnippet;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
@@ -46,7 +47,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// - [Python documentation: `max`](https://docs.python.org/3/library/functions.html#max)
 /// - [Python documentation: `min`](https://docs.python.org/3/library/functions.html#min)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.6.0")]
+#[violation_metadata(stable_since = "0.6.0", category = Category::Complexity)]
 pub(crate) struct IfStmtMinMax {
     min_max: MinMax,
     replacement: SourceCodeSnippet,

@@ -5,6 +5,7 @@ use ruff_python_semantic::analyze::function_type;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use ruff_python_ast::PythonVersion;
 
 /// ## What it does
@@ -40,7 +41,7 @@ use ruff_python_ast::PythonVersion;
 /// [PEP 484]: https://peps.python.org/pep-0484/#positional-only-arguments
 /// [PEP 570]: https://peps.python.org/pep-0570
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.8.0")]
+#[violation_metadata(stable_since = "0.8.0", category = Category::Style)]
 pub(crate) struct Pep484StylePositionalOnlyParameter;
 
 impl Violation for Pep484StylePositionalOnlyParameter {

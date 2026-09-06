@@ -516,6 +516,13 @@ pub struct Options {
     pub analyze: Option<AnalyzeOptions>,
 }
 
+impl Options {
+    /// Deserialize inline configuration in one crate, avoiding repeated code generation.
+    pub fn from_toml_table(table: toml::Table) -> Result<Self, toml::de::Error> {
+        table.try_into()
+    }
+}
+
 /// Configures how Ruff checks your code.
 ///
 /// Options specified in the `lint` section take precedence over the deprecated top-level settings.
@@ -611,7 +618,8 @@ pub(crate) fn validate_required_version(required_version: &RequiredVersion) -> a
         .expect("RUFF_PKG_VERSION is not a valid PEP 440 version specifier");
     if !required_version.contains(&ruff_pkg_version) {
         return Err(anyhow::anyhow!(
-            "Required version `{required_version}` does not match the running version `{RUFF_PKG_VERSION}`"
+            "Required version `{required_version}` does not match the running version \
+            `{RUFF_PKG_VERSION}`"
         ));
     }
     Ok(())
@@ -730,9 +738,9 @@ pub struct LintCommonOptions {
             extend-ignore = ["F841"]
         "#
     )]
-    #[deprecated(
-        note = "The `extend-ignore` option is now interchangeable with [`ignore`](#lint_ignore). Please update your configuration to use the [`ignore`](#lint_ignore) option instead."
-    )]
+    #[deprecated(note = "The `extend-ignore` option is now interchangeable with \
+        [`ignore`](#lint_ignore). Please update your configuration to use the \
+        [`ignore`](#lint_ignore) option instead.")]
     pub extend_ignore: Option<Vec<UnresolvedRuleSelector>>,
 
     /// A list of rule codes or prefixes to enable, in addition to those
@@ -778,9 +786,9 @@ pub struct LintCommonOptions {
 
     /// A list of rule codes or prefixes to consider non-auto-fixable, in addition to those
     /// specified by [`unfixable`](#lint_unfixable).
-    #[deprecated(
-        note = "The `extend-unfixable` option is now interchangeable with [`unfixable`](#lint_unfixable). Please update your configuration to use the `unfixable` option instead."
-    )]
+    #[deprecated(note = "The `extend-unfixable` option is now interchangeable with \
+        [`unfixable`](#lint_unfixable). Please update your configuration to \
+        use the `unfixable` option instead.")]
     pub extend_unfixable: Option<Vec<UnresolvedRuleSelector>>,
 
     /// A list of rule codes or prefixes that are unsupported by Ruff, but should be
@@ -811,13 +819,16 @@ pub struct LintCommonOptions {
     pub fixable: Option<Vec<UnresolvedRuleSelector>>,
 
     /// A list of rule codes or prefixes to ignore. Prefixes can specify exact
-    /// rules (like `F841`), entire categories (like `F`), or anything in
+    /// rules (like `F841`), entire groups (like `F`), or anything in
     /// between.
     ///
     /// When breaking ties between enabled and disabled rules (via `select` and
     /// `ignore`, respectively), more specific prefixes override less
     /// specific prefixes. `ignore` takes precedence over `select` if the same
     /// prefix appears in both.
+    ///
+    /// In preview, categories like `correctness` and `suspicious` can be used
+    /// in addition to rule codes and linter group prefixes.
     #[option(
         default = "[]",
         value_type = "list[RuleSelector]",
@@ -868,7 +879,10 @@ pub struct LintCommonOptions {
     )]
     #[deprecated(
         since = "0.4.4",
-        note = "`ignore-init-module-imports` will be removed in a future version because F401 now recommends appropriate fixes for unused imports in `__init__.py` (currently in preview mode). See documentation for more information and please update your configuration."
+        note = "`ignore-init-module-imports` will be removed in a future version because F401 now \
+            recommends appropriate fixes for unused imports in `__init__.py` (currently in \
+            preview mode). See documentation for more information and please update your \
+            configuration."
     )]
     pub ignore_init_module_imports: Option<bool>,
 
@@ -898,13 +912,16 @@ pub struct LintCommonOptions {
     pub logger_objects: Option<Vec<String>>,
 
     /// A list of rule codes or prefixes to enable. Prefixes can specify exact
-    /// rules (like `F841`), entire categories (like `F`), or anything in
+    /// rules (like `F841`), entire groups (like `F`), or anything in
     /// between.
     ///
     /// When breaking ties between enabled and disabled rules (via `select` and
     /// `ignore`, respectively), more specific prefixes override less
     /// specific prefixes. `ignore` takes precedence over `select` if the
     /// same prefix appears in both.
+    ///
+    /// In preview, categories like `correctness` and `suspicious` can be used
+    /// in addition to rule codes and linter group prefixes.
     #[option(
         default = r#"See https://docs.astral.sh/ruff/default-rules/ or run `ruff check --show-settings --isolated`"#,
         value_type = "list[RuleSelector]",
@@ -1075,6 +1092,8 @@ pub struct LintCommonOptions {
     /// A list of mappings from file pattern to rule codes or prefixes to
     /// exclude, when considering any matching files. An initial '!' negates
     /// the file pattern.
+    ///
+    /// For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).
     #[option(
         default = "{}",
         value_type = "dict[str, list[RuleSelector]]",
@@ -1085,6 +1104,8 @@ pub struct LintCommonOptions {
             "path/to/file.py" = ["E402"]
             # Ignore `D` rules everywhere except for the `src/` directory.
             "!src/**.py" = ["D"]
+            # Ignore check for packages that are missing an `__init__.py` file.
+            "{benchmark,scripts,.github/action-name/}/*.py" = ["INP001"]
         "#
     )]
     pub per_file_ignores: Option<FxHashMap<String, Vec<UnresolvedRuleSelector>>>,
@@ -1390,7 +1411,8 @@ pub struct Flake8BuiltinsOptions {
     )]
     #[deprecated(
         since = "0.10.0",
-        note = "`builtins-allowed-modules` has been renamed to `allowed-modules`. Use that instead."
+        note = "`builtins-allowed-modules` has been renamed to `allowed-modules`. \
+            Use that instead."
     )]
     pub(crate) builtins_allowed_modules: Option<Vec<String>>,
 
@@ -1414,7 +1436,8 @@ pub struct Flake8BuiltinsOptions {
     )]
     #[deprecated(
         since = "0.10.0",
-        note = "`builtins-strict-checking` has been renamed to `strict-checking`. Use that instead."
+        note = "`builtins-strict-checking` has been renamed to `strict-checking`. \
+            Use that instead."
     )]
     pub(crate) builtins_strict_checking: Option<bool>,
 
@@ -1786,7 +1809,8 @@ impl Flake8ImportConventionsOptions {
             let normalized_alias = alias.nfkc().collect::<String>();
             if normalized_alias == "__debug__" {
                 anyhow::bail!(
-                    "Invalid alias for module '{module}': alias normalizes to '__debug__', which is not allowed."
+                    "Invalid alias for module '{module}': alias normalizes to '__debug__', \
+                    which is not allowed."
                 );
             }
             normalized_aliases.insert(module, normalized_alias);
@@ -2952,7 +2976,8 @@ impl IsortOptions {
         let lines_between_types = self.lines_between_types.unwrap_or_default();
         if force_sort_within_sections && lines_between_types != 0 {
             warn_user_once!(
-                "`lines-between-types` is ignored when `force-sort-within-sections` is set to `true`"
+                "`lines-between-types` is ignored when `force-sort-within-sections` \
+                is set to `true`"
             );
         }
 
@@ -3774,7 +3799,8 @@ pub struct RuffOptions {
     )]
     #[deprecated(
         since = "0.10.0",
-        note = "The `extend-markup-names` option has been moved to the `flake8-bandit` section of the configuration."
+        note = "The `extend-markup-names` option has been moved to the `flake8-bandit` section of \
+            the configuration."
     )]
     extend_markup_names: Option<Vec<String>>,
 
@@ -3810,7 +3836,8 @@ pub struct RuffOptions {
     )]
     #[deprecated(
         since = "0.10.0",
-        note = "The `allowed-markup-names` option has been moved to the `flake8-bandit` section of the configuration."
+        note = "The `allowed-markup-names` option has been moved to the `flake8-bandit` section \
+            of the configuration."
     )]
     allowed_markup_calls: Option<Vec<String>>,
     /// Whether to require `__init__.py` files to contain no code at all, including imports and

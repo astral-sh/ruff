@@ -24,6 +24,55 @@ class Table:
 {0: reveal_type(x) for x in range(3)}
 ```
 
+## Invalid comprehension filters
+
+A filter in any comprehension form must support boolean conversion:
+
+```py
+class NotBoolable:
+    __bool__ = None
+
+[x for x in range(3) if NotBoolable()]  # error: [unsupported-bool-conversion]
+{x for x in range(3) if NotBoolable()}  # error: [unsupported-bool-conversion]
+{x: x for x in range(3) if NotBoolable()}  # error: [unsupported-bool-conversion]
+(x for x in range(3) if NotBoolable())  # error: [unsupported-bool-conversion]
+```
+
+Every filter is checked, including filters on subsequent `for` clauses:
+
+```py
+[
+    x
+    for x in range(3)
+    if NotBoolable()  # error: [unsupported-bool-conversion]
+    if NotBoolable()  # error: [unsupported-bool-conversion]
+]
+
+[
+    x
+    for x in range(3)
+    if NotBoolable()  # error: [unsupported-bool-conversion]
+    for y in range(3)
+    if NotBoolable()  # error: [unsupported-bool-conversion]
+]
+```
+
+The final operand of a boolean expression is converted when it becomes the filter condition:
+
+```py
+[x for x in range(3) if True and NotBoolable()]  # error: [unsupported-bool-conversion]
+```
+
+Filter validation also rejects a `__bool__` method with an invalid return type:
+
+```py
+class InvalidBoolReturn:
+    def __bool__(self) -> str:
+        return "invalid"
+
+[x for x in range(3) if InvalidBoolReturn()]  # error: [unsupported-bool-conversion]
+```
+
 ## Nested comprehension
 
 ```py
@@ -345,6 +394,26 @@ async def _():
     # error: [not-iterable] "Object of type `range` is not async-iterable"
     # revealed: Unknown
     [reveal_type(x) async for x in range(3)]
+```
+
+### Invalid async comprehension filters
+
+Filters in asynchronous comprehensions also require valid boolean conversion:
+
+```py
+from collections.abc import AsyncIterator
+
+class NotBoolable:
+    __bool__ = None
+
+async def items() -> AsyncIterator[int]:
+    yield 1
+
+async def invalid_filters() -> None:
+    [x async for x in items() if NotBoolable()]  # error: [unsupported-bool-conversion]
+    {x async for x in items() if NotBoolable()}  # error: [unsupported-bool-conversion]
+    {x: x async for x in items() if NotBoolable()}  # error: [unsupported-bool-conversion]
+    (x async for x in items() if NotBoolable())  # error: [unsupported-bool-conversion]
 ```
 
 ## Comprehension value type

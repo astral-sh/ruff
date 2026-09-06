@@ -110,8 +110,9 @@ impl<'db> BoundSuperError<'db> {
                     let env = context.program_environment();
                     if let Some(typevar_context) = typevar_context {
                         let mut diagnostic = builder.into_diagnostic(format_args!(
-                            "`{owner}` is a type variable with an abstract/structural type as \
-                            its bounds or constraints, in `super({pivot_class}, {owner})` call",
+                            "`{owner}` is a type variable \
+                            with an abstract/structural type as its bounds or constraints, \
+                            in `super({pivot_class}, {owner})` call",
                             pivot_class = pivot_class.display(db, env),
                             owner = owner_type.display(db, env),
                         ));
@@ -167,9 +168,11 @@ impl<'db> BoundSuperError<'db> {
                     if let Some(typevar_context) = typevar_context {
                         Self::describe_typevar(db, env, &mut diagnostic, *typevar_context);
                         diagnostic.info(format_args!(
-                            "`{bounds_or_constraints}` is not an instance or subclass of `{pivot_class}`",
-                            bounds_or_constraints =
-                                typevar_context.bound_or_constraints_type(db, env).display(db, env),
+                            "`{bounds_or_constraints}` is not an instance or subclass of \
+                             `{pivot_class}`",
+                            bounds_or_constraints = typevar_context
+                                .bound_or_constraints_type(db, env)
+                                .display(db, env),
                             pivot_class = pivot_class.display(db, env),
                         ));
                         let typevar = typevar_context.typevar(context.db());
@@ -863,6 +866,9 @@ impl<'db> BoundSuperType<'db> {
             Type::PropertyInstance(property) => {
                 return delegate_to(property.instance_fallback(db, env));
             }
+            Type::SlotDescriptor(_) => {
+                return delegate_to(KnownClass::MemberDescriptorType.to_instance(db, env));
+            }
             Type::BoundSuper(_) => {
                 return delegate_to(KnownClass::Super.to_instance(db, env));
             }
@@ -950,6 +956,11 @@ impl<'db> BoundSuperType<'db> {
             db,
             member,
             descriptor_error.map(MemberLookupErrorKind::DescriptorGet),
+            instance
+                .and_then(|_| attribute.place.ignore_possibly_undefined())
+                .and_then(|ty| ty.property_deprecations(db))
+                // `super` delegates reads to the owner's descriptors, but not writes or deletions.
+                .map(|properties| properties.getters_only(db)),
         ))
     }
 

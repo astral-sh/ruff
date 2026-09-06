@@ -1,3 +1,4 @@
+use std::cell::OnceCell;
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, binary_heap};
 use ty_python_semantic::ProgramEnvironment;
@@ -10,16 +11,16 @@ use ruff_python_ast::find_node::{CoveringNode, covering_node};
 use ruff_python_ast::name::{Name, UnqualifiedName};
 use ruff_python_ast::str::Quote;
 use ruff_python_ast::token::{Token, TokenKind, Tokens};
-use ruff_python_ast::{self as ast, AnyNodeRef, PySourceType};
-use ruff_python_codegen::Stylist;
+use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_python_literal::escape::{Escape, UnicodeEscape};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::FxHashSet;
 use ty_module_resolver::{
     ImportingFile, KnownModule, Module, ModuleName, resolve_real_shadowable_module,
 };
-use ty_python_core::ProgramFile;
+use ty_python_core::{ProgramFile, semantic_index};
 use ty_python_semantic::HasType;
+use ty_python_semantic::importer::{ImportRequest, Importer};
 use ty_python_semantic::types::{SpecialFormType, UnionType};
 use ty_python_semantic::{
     Completion as SemanticCompletion, NameKind, SemanticModel,
@@ -28,7 +29,6 @@ use ty_python_semantic::{
 
 use crate::docstring::Docstring;
 use crate::goto::Definitions;
-use crate::importer::{ImportRequest, Importer};
 use crate::symbols::QueryPattern;
 use crate::{Db, all_symbols, signature_help};
 
@@ -525,12 +525,7 @@ impl<'db> CompletionBuilder<'db> {
         let kind = self
             .kind
             .or_else(|| self.ty.and_then(|ty| completion_kind_from_type(db, ty)));
-        let relevance = Relevance::new(
-            collection_context,
-            query,
-            &self,
-            program_file.file(db).source_type(db),
-        );
+        let relevance = Relevance::new(db, program_file, collection_context, query, &self);
         let (label, insert, insert_text_format, command) =
             if collection_context.should_complete_callable_parentheses(kind) {
                 let label = self.insert.unwrap_or_else(|| self.name.clone());
@@ -838,8 +833,13 @@ impl<'m> Context<'m> {
         settings: &CompletionSettings,
         capabilities: CompletionCapabilities,
     ) -> CollectionContext<'db> {
+        let type_checking_block = Some(TypeCheckingBlock::at_cursor(self.cursor.range));
+
         match self.kind {
-            ContextKind::Keywords(_) | ContextKind::Import(_) => CollectionContext::none(),
+            ContextKind::Keywords(_) | ContextKind::Import(_) => CollectionContext {
+                type_checking_block,
+                ..CollectionContext::none()
+            },
             ContextKind::NonImport(_) => {
                 let env = model.program_environment();
                 let exception_ty = self.cursor.exception_ty(db, &env);
@@ -859,6 +859,7 @@ impl<'m> Context<'m> {
                 CollectionContext {
                     exception_ty,
                     is_raising_exception: exception_ty.is_some(),
+                    type_checking_block,
                     complete_class_parentheses: complete_callable_parentheses
                         && existing_class_bases.is_none()
                         && !self.cursor.suppress_class_parentheses(model),
@@ -1630,6 +1631,40 @@ impl UserQuery {
     }
 }
 
+#[derive(Clone, Debug)]
+struct TypeCheckingBlock {
+    range: TextRange,
+    is_inside: OnceCell<bool>,
+}
+
+impl TypeCheckingBlock {
+    fn at_cursor(range: TextRange) -> Self {
+        Self {
+            range,
+            is_inside: OnceCell::new(),
+        }
+    }
+
+    fn is_inside<'db>(&self, db: &'db dyn Db, file: ProgramFile<'db>) -> bool {
+        // Most completions are ranked independently of `TYPE_CHECKING`, so only query the
+        // semantic index when a typing-only completion needs to know the cursor's context.
+        *self.is_inside.get_or_init(|| {
+            let parsed = parsed_module(db, file.python_file(db)).load(db);
+            let index = semantic_index(db, file);
+
+            covering_node(parsed.syntax().into(), self.range)
+                .ancestors()
+                .find_map(|node| {
+                    let ast::AnyNodeRef::StmtIf(statement) = node else {
+                        return None;
+                    };
+                    index.try_expression_scope_id(statement.test.as_ref())
+                })
+                .is_some_and(|scope| index.is_in_type_checking_block(scope, self.range))
+        })
+    }
+}
+
 /// Context used to help filter completions when collecting them.
 #[derive(Clone, Debug, Default)]
 struct CollectionContext<'db> {
@@ -1640,6 +1675,8 @@ struct CollectionContext<'db> {
     exception_ty: Option<Type<'db>>,
     /// Whether we're in an exception context (`raise` or `except`) or not.
     is_raising_exception: bool,
+    /// Whether the cursor is inside a type-checking-only block, if a cursor is available.
+    type_checking_block: Option<TypeCheckingBlock>,
     /// Names of base classes that are already specified in the class definition,
     /// including the class being defined (unless its name was previously bound).
     /// Used to filter out duplicate and self-referential base class suggestions.
@@ -1795,11 +1832,12 @@ impl Relevance {
     ///
     /// A smaller rank means the completion should appear higher in the
     /// results shown to end users.
-    fn new(
-        _ctx: &CollectionContext,
+    fn new<'db>(
+        db: &'db dyn Db,
+        program_file: ProgramFile<'db>,
+        ctx: &CollectionContext,
         query: &UserQuery,
         c: &CompletionBuilder,
-        source_type: PySourceType,
     ) -> Relevance {
         Relevance {
             definitively_usable: if c.is_context_specific {
@@ -1823,10 +1861,9 @@ impl Relevance {
             } else {
                 Sort::Even
             },
+            // We only up-rank top-level modules.
+            // Doing this for sub-modules generates too much noise.
             is_module: if c.kind == Some(CompletionKind::Module)
-                // We only up-rank top-level modules.
-                // Doing this for sub-modules generates too
-                // much noise.
                 && !c
                     .qualified
                     .as_ref()
@@ -1837,7 +1874,13 @@ impl Relevance {
             } else {
                 Sort::Even
             },
-            type_check_only: if c.is_type_check_only && !source_type.is_stub() {
+            type_check_only: if c.is_type_check_only
+                && !program_file.file(db).source_type(db).is_stub()
+                && !ctx
+                    .type_checking_block
+                    .as_ref()
+                    .is_some_and(|block| block.is_inside(db, program_file))
+            {
                 Sort::Lower
             } else {
                 Sort::Even
@@ -2339,9 +2382,7 @@ fn add_unimported_completions<'db>(
     }
 
     let source_file = file.file(db);
-    let source = source_text(db, source_file);
-    let stylist = Stylist::from_tokens(parsed.tokens(), source.as_str());
-    let importer = Importer::new(db, &stylist, file, source.as_str(), parsed);
+    let importer = Importer::new(db, file, parsed);
     let members = importer.members_in_scope_at(scoped.node, scoped.node.start());
     let importing_file = ImportingFile::File(source_file, file.resolver_environment(db));
 
@@ -3259,6 +3300,7 @@ fn completion_kind_from_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Comp
             // "struct" here as a more general "object." ---AG
             Type::NominalInstance(_)
             | Type::PropertyInstance(_)
+            | Type::SlotDescriptor(_)
             | Type::BoundSuper(_)
             | Type::TypedDict(_)
             | Type::NewTypeInstance(_)
@@ -4959,18 +5001,18 @@ C.<CURSOR>
         __name__ :: str
         __ne__ :: def __ne__(self, value: object, /) -> bool
         __new__ :: def __new__[Self](cls) -> Self
-        __or__ :: bound method <class 'C'>.__or__[Self](value: Any, /) -> UnionType | Self
+        __or__ :: bound method <class 'C'>.__or__(value: Any, /) -> UnionType | <class 'C'>
         __prepare__ :: bound method <class 'Meta'>.__prepare__(name: str, bases: tuple[type, ...], /, **kwds: Any) -> MutableMapping[str, object]
         __qualname__ :: str
         __reduce__ :: def __reduce__(self) -> str | tuple[Any, ...]
         __reduce_ex__ :: def __reduce_ex__(self, protocol: SupportsIndex, /) -> str | tuple[Any, ...]
         __repr__ :: def __repr__(self) -> str
-        __ror__ :: bound method <class 'C'>.__ror__[Self](value: Any, /) -> UnionType | Self
+        __ror__ :: bound method <class 'C'>.__ror__(value: Any, /) -> UnionType | <class 'C'>
         __setattr__ :: def __setattr__(self, name: str, value: Any, /) -> None
         __sizeof__ :: def __sizeof__(self) -> int
         __str__ :: def __str__(self) -> str
         __subclasscheck__ :: bound method <class 'C'>.__subclasscheck__(subclass: type, /) -> bool
-        __subclasses__ :: bound method <class 'C'>.__subclasses__[Self]() -> list[Self]
+        __subclasses__ :: bound method <class 'C'>.__subclasses__[_T]() -> list[type[_T]]
         __subclasshook__ :: bound method <class 'C'>.__subclasshook__(subclass: type, /) -> bool
         __text_signature__ :: str | None
         __type_params__ :: tuple[TypeVar | ParamSpec | TypeVarTuple, ...]
@@ -5039,7 +5081,7 @@ Meta.<CURSOR>
                 __sizeof__ :: def __sizeof__(self) -> int
                 __str__ :: def __str__(self) -> str
                 __subclasscheck__ :: def __subclasscheck__(self, subclass: type, /) -> bool
-                __subclasses__ :: def __subclasses__[Self](self: Self) -> list[Self]
+                __subclasses__ :: def __subclasses__[_T](self: type[_T]) -> list[type[_T]]
                 __subclasshook__ :: bound method <class 'Meta'>.__subclasshook__(subclass: type, /) -> bool
                 __text_signature__ :: str | None
                 __type_params__ :: tuple[TypeVar | ParamSpec | TypeVarTuple, ...]
@@ -5158,18 +5200,18 @@ Quux.<CURSOR>
         __name__ :: str
         __ne__ :: def __ne__(self, value: object, /) -> bool
         __new__ :: def __new__[Self](cls) -> Self
-        __or__ :: bound method <class 'Quux'>.__or__[Self](value: Any, /) -> UnionType | Self
+        __or__ :: bound method <class 'Quux'>.__or__(value: Any, /) -> UnionType | <class 'Quux'>
         __prepare__ :: bound method <class 'type'>.__prepare__(name: str, bases: tuple[type, ...], /, **kwds: Any) -> MutableMapping[str, object]
         __qualname__ :: str
         __reduce__ :: def __reduce__(self) -> str | tuple[Any, ...]
         __reduce_ex__ :: def __reduce_ex__(self, protocol: SupportsIndex, /) -> str | tuple[Any, ...]
         __repr__ :: def __repr__(self) -> str
-        __ror__ :: bound method <class 'Quux'>.__ror__[Self](value: Any, /) -> UnionType | Self
+        __ror__ :: bound method <class 'Quux'>.__ror__(value: Any, /) -> UnionType | <class 'Quux'>
         __setattr__ :: def __setattr__(self, name: str, value: Any, /) -> None
         __sizeof__ :: def __sizeof__(self) -> int
         __str__ :: def __str__(self) -> str
         __subclasscheck__ :: bound method <class 'Quux'>.__subclasscheck__(subclass: type, /) -> bool
-        __subclasses__ :: bound method <class 'Quux'>.__subclasses__[Self]() -> list[Self]
+        __subclasses__ :: bound method <class 'Quux'>.__subclasses__[_T]() -> list[type[_T]]
         __subclasshook__ :: bound method <class 'Quux'>.__subclasshook__(subclass: type, /) -> bool
         __text_signature__ :: str | None
         __type_params__ :: tuple[TypeVar | ParamSpec | TypeVarTuple, ...]
@@ -5221,14 +5263,14 @@ Answer.<CURSOR>
                 __flags__ :: int
                 __format__ :: def __format__(self, format_spec: str) -> str
                 __getattribute__ :: def __getattribute__(self, name: str, /) -> Any
-                __getitem__ :: bound method <class 'Answer'>.__getitem__[_EnumMemberT](name: str) -> _EnumMemberT
+                __getitem__ :: bound method <class 'Answer'>.__getitem__(name: str) -> Answer
                 __getstate__ :: def __getstate__(self) -> object
                 __hash__ :: def __hash__(self) -> int
                 __init__ :: def __init__(self) -> None
                 __init_subclass__ :: bound method <class 'Answer'>.__init_subclass__() -> None
                 __instancecheck__ :: bound method <class 'Answer'>.__instancecheck__(instance: Any, /) -> bool
                 __itemsize__ :: int
-                __iter__ :: bound method <class 'Answer'>.__iter__[_EnumMemberT]() -> Iterator[_EnumMemberT]
+                __iter__ :: bound method <class 'Answer'>.__iter__() -> Iterator[Answer]
                 __len__ :: bound method <class 'Answer'>.__len__() -> int
                 __members__ :: MappingProxyType[str, Answer]
                 __module__ :: str
@@ -5236,19 +5278,19 @@ Answer.<CURSOR>
                 __name__ :: str
                 __ne__ :: def __ne__(self, value: object, /) -> bool
                 __new__ :: def __new__[Self](cls, value: object) -> Self
-                __or__ :: bound method <class 'Answer'>.__or__[Self](value: Any, /) -> UnionType | Self
+                __or__ :: bound method <class 'Answer'>.__or__(value: Any, /) -> UnionType | <class 'Answer'>
                 __order__ :: str
                 __prepare__ :: bound method <class 'EnumMeta'>.__prepare__(cls: str, bases: tuple[type, ...], **kwds: Any) -> _EnumDict
                 __qualname__ :: str
                 __reduce__ :: def __reduce__(self) -> str | tuple[Any, ...]
                 __repr__ :: def __repr__(self) -> str
-                __reversed__ :: bound method <class 'Answer'>.__reversed__[_EnumMemberT]() -> Iterator[_EnumMemberT]
-                __ror__ :: bound method <class 'Answer'>.__ror__[Self](value: Any, /) -> UnionType | Self
+                __reversed__ :: bound method <class 'Answer'>.__reversed__() -> Iterator[Answer]
+                __ror__ :: bound method <class 'Answer'>.__ror__(value: Any, /) -> UnionType | <class 'Answer'>
                 __setattr__ :: def __setattr__(self, name: str, value: Any, /) -> None
                 __sizeof__ :: def __sizeof__(self) -> int
                 __str__ :: def __str__(self) -> str
                 __subclasscheck__ :: bound method <class 'Answer'>.__subclasscheck__(subclass: type, /) -> bool
-                __subclasses__ :: bound method <class 'Answer'>.__subclasses__[Self]() -> list[Self]
+                __subclasses__ :: bound method <class 'Answer'>.__subclasses__[_T]() -> list[type[_T]]
                 __subclasshook__ :: bound method <class 'Answer'>.__subclasshook__(subclass: type, /) -> bool
                 __text_signature__ :: str | None
                 __type_params__ :: tuple[TypeVar | ParamSpec | TypeVarTuple, ...]
@@ -6624,6 +6666,49 @@ from sys import (
 ",
         );
         builder.build().contains("getsizeof");
+    }
+
+    #[test]
+    fn from_import_with_bare_annotation() {
+        let builder = CursorTest::builder()
+            .source("module.py", "declared: int\nvalue = 1")
+            .source("main.py", "from module import val<CURSOR>")
+            .completion_test_builder();
+
+        builder.build().contains("value");
+    }
+
+    #[test]
+    fn from_import_with_separate_annotation_and_assignment() {
+        let builder = CursorTest::builder()
+            .source("module.py", "value: int\nvalue = 1")
+            .source("main.py", "from module import val<CURSOR>")
+            .completion_test_builder();
+
+        let test = builder.build();
+        assert!(
+            test.completions()
+                .iter()
+                .any(|completion| completion.name == "value" && !completion.is_type_check_only)
+        );
+    }
+
+    #[test]
+    fn from_import_with_type_checking_annotation() {
+        let builder = CursorTest::builder()
+            .source(
+                "module.py",
+                "from typing import TYPE_CHECKING\nif TYPE_CHECKING:\n    value: int",
+            )
+            .source("main.py", "from module import val<CURSOR>")
+            .completion_test_builder();
+
+        let test = builder.build();
+        assert!(
+            test.completions()
+                .iter()
+                .any(|completion| completion.name == "value" && completion.is_type_check_only)
+        );
     }
 
     #[test]

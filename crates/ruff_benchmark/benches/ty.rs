@@ -14,11 +14,12 @@ use ruff_db::files::{File, system_path_to_file};
 use ruff_db::source::source_text;
 use ruff_db::system::{InMemorySystem, MemoryFileSystem, SystemPath, SystemPathBuf, TestSystem};
 use ruff_ranged_value::RangedValue;
-use ty_project::metadata::options::{AnalysisOptions, EnvironmentOptions, Options};
+use ty_project::metadata::options::{AnalysisOptions, EnvironmentOptions, Options, Rules};
 use ty_project::metadata::python_version::SupportedPythonVersion;
 use ty_project::metadata::value::RelativePathBuf;
 use ty_project::watch::{ChangeEvent, ChangedKind};
 use ty_project::{CheckMode, Db, ProjectDatabase, ProjectMetadata};
+use ty_python_semantic::lint::Level;
 
 mod ty_shared;
 
@@ -584,9 +585,12 @@ fn benchmark_narrowed_str_enum_comparison(criterion: &mut Criterion) {
 fn benchmark_optional_str_enum_comparison(criterion: &mut Criterion) {
     const NUM_ENUM_MEMBERS: usize = 256;
 
-    let mut code =
-        "from dataclasses import dataclass\nfrom enum import StrEnum\n\nclass ModelSlug(StrEnum):\n"
-            .to_string();
+    let mut code = "from dataclasses import dataclass
+from enum import StrEnum
+
+class ModelSlug(StrEnum):
+"
+    .to_string();
     for index in 0..NUM_ENUM_MEMBERS {
         writeln!(&mut code, "    M{index} = \"m{index}\"").ok();
     }
@@ -620,9 +624,12 @@ def belongs(slug: ModelSlug, category: Category) -> bool:
 fn benchmark_enum_literal_union_comparison(criterion: &mut Criterion) {
     const NUM_ENUM_MEMBERS: usize = 256;
 
-    let mut code =
-        "from enum import StrEnum\nfrom typing import Literal\n\nclass LargeEnum(StrEnum):\n"
-            .to_string();
+    let mut code = "from enum import StrEnum
+from typing import Literal
+
+class LargeEnum(StrEnum):
+"
+    .to_string();
     for index in 0..NUM_ENUM_MEMBERS {
         writeln!(&mut code, "    VALUE_{index} = \"value_{index}\"").ok();
     }
@@ -668,7 +675,13 @@ fn benchmark_cross_str_enum_comparison(criterion: &mut Criterion) {
         }
     }
     code.push_str(
-        "\n\ndef compare(left: Left, right: Right):\n    if left != right:\n        return\n    return left == right\n",
+        "
+
+def compare(left: Left, right: Right):
+    if left != right:
+        return
+    return left == right
+",
     );
 
     benchmark_enum_comparison(criterion, "ty_micro[cross_str_enum_comparison]", &code);
@@ -700,7 +713,11 @@ fn benchmark_mixed_str_enum_comparison(criterion: &mut Criterion) {
     };
     writeln!(
         &mut code,
-        "\ndef compare(left: {}, right: {}):\n    if left != right:\n        return\n    return left == right",
+        "
+def compare(left: {}, right: {}):
+    if left != right:
+        return
+    return left == right",
         class_union("Left"),
         class_union("Right"),
     )
@@ -847,6 +864,132 @@ fn benchmark_many_protocol_members_mismatch(criterion: &mut Criterion) {
     });
 }
 
+/// Regression benchmarks for ty#4269: recursive protocol inference and assignment diagnostics.
+///
+/// Explicit receiver annotations can repeatedly expand inherited recursive protocol members
+/// during constructor inference or diagnostic collection.
+fn benchmark_inherited_recursive_protocol(criterion: &mut Criterion) {
+    const NUM_METHODS: usize = 8;
+
+    setup_rayon();
+
+    let mut code = "\
+from __future__ import annotations
+
+from collections.abc import Callable, Iterable
+from typing import Protocol
+
+class Chain[T](Protocol):
+    def value(self) -> T: ...
+"
+    .to_string();
+
+    for i in 0..NUM_METHODS {
+        writeln!(
+            &mut code,
+            "    def method_{i}[A, B](self: Chain[tuple[A, B]], callback: Callable[[A, B], T]) -> Chain[T]: ..."
+        )
+        .ok();
+    }
+
+    code.push_str("\nclass Concrete[T](Chain[T]):\n");
+    code.push_str("    def __init__(self, values: Iterable[T]) -> None: ...\n");
+
+    for (name, scenario, expected_diagnostics) in [
+        (
+            "ty_micro[inherited_recursive_protocol_constructor]",
+            "\nvalue: Chain[int] = Concrete(())\n",
+            0,
+        ),
+        (
+            "ty_micro[inherited_recursive_protocol_diagnostic]",
+            "\ndef diagnose[T](value: Concrete[T]) -> None:\n    invalid: Chain[int] = value\n",
+            1,
+        ),
+    ] {
+        let code = format!("{code}{scenario}");
+        criterion.bench_function(name, |b| {
+            b.iter_batched_ref(
+                || setup_micro_case(&code),
+                |case| assert_eq!(case.db.check().len(), expected_diagnostics),
+                BatchSize::SmallInput,
+            );
+        });
+    }
+}
+
+/// Regression benchmark for ty#4269: inherited receiver binding with nested type variables.
+///
+/// The nominal relation constrains `T` inside the source's union argument. Ignoring that
+/// evidence repeatedly expands the recursive overloads while binding `chain`.
+fn benchmark_nested_recursive_protocol_receiver(criterion: &mut Criterion) {
+    setup_rayon();
+
+    let code = r#"
+from __future__ import annotations
+
+from typing import Protocol, overload
+
+class Chain[T](Protocol):
+    def value(self) -> T: ...
+    @overload
+    def chain[S, O1](self: Chain[S], o1: O1, /) -> Chain[S | O1]: ...
+    @overload
+    def chain[S, O1, O2](self: Chain[S], o1: O1, o2: O2, /) -> Chain[S | O1 | O2]: ...
+    @overload
+    def chain[S, O1, O2, O3](self: Chain[S], o1: O1, o2: O2, o3: O3, /) -> Chain[S | O1 | O2 | O3]: ...
+    def chain[S, O](self: Chain[S], *others: O) -> Chain[S | O]: ...
+
+class Concrete[T](Chain[T]): ...
+
+def check[T, S](base: Concrete[T | list[T]], *others: S) -> None:
+    base.chain(*others)
+"#;
+
+    criterion.bench_function("ty_micro[nested_recursive_protocol_receiver]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(code),
+            |case| assert_eq!(case.db.check().len(), 0),
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+/// Regression benchmark for ty#4269: materialized recursive protocol comparisons.
+///
+/// Comparing the tuple-specific receiver with the gradual overload can repeatedly expand
+/// `child` into deeper tuple specializations. The finite `value` requirement establishes the
+/// needed constraints without that expansion.
+fn benchmark_materialized_recursive_protocol_overload(criterion: &mut Criterion) {
+    setup_rayon();
+
+    let code = r#"
+from __future__ import annotations
+
+from collections.abc import Callable
+from typing import Any, Protocol, overload
+
+class Chain[T](Protocol):
+    def value(self) -> T: ...
+    def child(self) -> Chain[tuple[T]]: ...
+    @overload
+    def map_star[A, B, R](self: Chain[tuple[A, B]], callback: Callable[[A, B], R]) -> Chain[R]: ...
+    @overload
+    def map_star[R](self: Chain[tuple[Any, ...]], callback: Callable[..., R]) -> Chain[R]: ...
+
+def check(value: Chain[tuple[int, str]]) -> None:
+    value.map_star(lambda first, second: 1)
+"#;
+
+    criterion.bench_function("ty_micro[materialized_recursive_protocol_overload]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(code),
+            |case| assert_eq!(case.db.check().len(), 0),
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 /// Regression benchmark for large calls to a gradual variadic tail.
 ///
 /// Without the gradual-call shortcut, every positional argument type is folded into the same
@@ -909,6 +1052,45 @@ accepts_objects(
     code.push_str(")\n");
 
     criterion.bench_function("ty_micro[vararg_parameter_type_accumulation]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+/// Regression benchmark for contextual inference of `TypedDict.get` with a large literal union.
+///
+/// Passing the result to a typed function should not retry inference against each literal in the
+/// expected type: <https://github.com/astral-sh/ty/issues/4419>.
+fn benchmark_typed_dict_get_large_literal_union(criterion: &mut Criterion) {
+    const NUM_LITERAL_MEMBERS: usize = 1024;
+
+    setup_rayon();
+
+    let mut code = "from typing import Literal, TypedDict\n\nIcon = Literal[\n".to_string();
+    for i in 0..NUM_LITERAL_MEMBERS {
+        writeln!(&mut code, r#"    "icon_{i}","#).ok();
+    }
+    code.push_str(
+        r#"]
+
+class Message(TypedDict, total=False):
+    icon: Icon
+
+def accept_icon(icon: Icon | None) -> None: ...
+
+def check(message: Message, default: Icon | None) -> None:
+    accept_icon(message.get("icon", default))
+"#,
+    );
+
+    criterion.bench_function("ty_micro[typed_dict_get_large_literal_union]", |b| {
         b.iter_batched_ref(
             || setup_micro_case(&code),
             |case| {
@@ -1136,7 +1318,14 @@ fn literal_equality_fallthrough_code() -> String {
 }
 
 fn literal_or_pattern_reachability_code() -> String {
-    let mut code = "from typing import Any\n\ndef check(item: Any) -> None:\n    x: int\n    match item:\n        case ".to_string();
+    let mut code = "\
+from typing import Any
+
+def check(item: Any) -> None:
+    x: int
+    match item:
+        case "
+        .to_string();
 
     for index in 0..NUM_LITERAL_OR_PATTERN_ALTERNATIVES {
         if index > 0 {
@@ -1229,6 +1418,39 @@ fn benchmark_literal_equality_fallthrough_guarded_any(criterion: &mut Criterion)
         "ty_micro[literal_equality_fallthrough_guarded_any]",
         &literal_equality_fallthrough_code(),
     );
+}
+
+/// Regression benchmark for <https://github.com/astral-sh/ty/issues/4256>.
+///
+/// Excluding rejected gradual string literals must not expand the complement of each intersection
+/// into exponentially many equivalent alternatives.
+fn benchmark_gradual_literal_union_equality(criterion: &mut Criterion) {
+    setup_rayon();
+
+    let mut code = String::from(
+        "from typing import Any, Literal\nfrom ty_extensions import Intersection\n\ndef check(value: (\n",
+    );
+    for index in 0..20 {
+        writeln!(
+            &mut code,
+            "    {}Intersection[Any, Literal[\"{index}\"]]",
+            if index == 0 { "" } else { "| " },
+        )
+        .ok();
+    }
+    code.push_str(")) -> None:\n    assert value == \"0\"\n    repr(value)\n");
+
+    criterion.bench_function("ty_micro[gradual_literal_union_equality]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
 }
 
 /// Regression benchmark for <https://github.com/astral-sh/ty/issues/3880>.
@@ -1335,6 +1557,122 @@ fn benchmark_repeated_statement_calls(criterion: &mut Criterion) {
             );
         });
     }
+
+    for (name, parameters, statement) in [
+        (
+            "ty_micro[repeated_statement_calls_in_try]",
+            "value: str",
+            "        value.upper()\n",
+        ),
+        (
+            "ty_micro[repeated_statement_calls_in_try_with_if_branches]",
+            "value: str, flag: bool",
+            "        if flag is True:\n            pass\n        value.upper()\n",
+        ),
+    ] {
+        let mut code = format!("def f({parameters}) -> None:\n");
+        for index in 0..800 {
+            writeln!(&mut code, "    local_{index} = {index}").ok();
+        }
+        code.push_str("    try:\n");
+        code.push_str(&statement.repeat(800));
+        code.push_str("    except Exception:\n        pass\n");
+
+        criterion.bench_function(name, |b| {
+            b.iter_batched_ref(
+                || setup_micro_case(&code),
+                |case| {
+                    let Case { db } = case;
+                    let result = db.check();
+                    assert_eq!(result.len(), 0);
+                },
+                BatchSize::SmallInput,
+            );
+        });
+    }
+}
+
+/// Exercises repeated control-flow gates with and without interleaved statement-call predicates.
+///
+/// Each suppressing context manager merges the old binding with a reassigned binding. Repeating
+/// this pattern can accumulate unnecessary narrowing gates and repeatedly evaluate the same
+/// reachability suffixes, while interleaved calls can make simple checkpoint selection miss every
+/// suppression predicate.
+fn benchmark_repeated_suppressing_context_managers(criterion: &mut Criterion) {
+    setup_rayon();
+
+    let cases = [
+        (
+            "ty_micro[repeated_suppressing_context_managers]",
+            "    with suppress(ValueError):\n        value = may_raise(value)\n",
+            320,
+        ),
+        (
+            "ty_micro[repeated_suppressing_context_managers_interleaved_calls]",
+            "    with suppress(ValueError):\n        value = may_raise(value)\n    may_raise(value)\n",
+            160,
+        ),
+    ];
+
+    for (name, statement, repetitions) in cases {
+        let mut code = String::from(
+            "from contextlib import suppress\n\ndef may_raise(value: int) -> int:\n    return value\n\ndef f() -> int:\n    value = 0\n",
+        );
+        code.push_str(&statement.repeat(repetitions));
+        code.push_str("    return value\n");
+
+        criterion.bench_function(name, |b| {
+            b.iter_batched_ref(
+                || setup_micro_case(&code),
+                |case| {
+                    let Case { db } = case;
+                    let result = db.check();
+                    assert_eq!(result.len(), 0);
+                },
+                BatchSize::SmallInput,
+            );
+        });
+    }
+}
+
+/// Exercises overlapping narrowing histories for repeated conditional assignments.
+///
+/// Every `isinstance` check narrows the same place, while each conditional assignment preserves
+/// the earlier binding on another path. Suppressing context managers add additional path gates to
+/// the same narrowing histories.
+fn benchmark_repeated_narrowed_assignments(criterion: &mut Criterion) {
+    setup_rayon();
+
+    let cases = [
+        (
+            "ty_micro[repeated_narrowed_assignments]",
+            "    if isinstance(value, int):\n        value = may_raise(value)\n",
+        ),
+        (
+            "ty_micro[repeated_narrowed_assignments_suppressing_context_managers]",
+            "    with suppress(ValueError):\n        if isinstance(value, int):\n            value = may_raise(value)\n",
+        ),
+    ];
+
+    for (name, statement) in cases {
+        let mut code = String::from(
+            "from contextlib import suppress\n\ndef may_raise(value: int) -> int:\n    return value\n\ndef f(value: int | str) -> int | str:\n",
+        );
+        code.push_str(&statement.repeat(320));
+        code.push_str("    return value\n");
+
+        criterion.bench_function(name, |b| {
+            b.iter_batched_ref(
+                || setup_micro_case(&code),
+                |case| {
+                    let Case { db } = case;
+                    let result = db.check();
+                    assert_eq!(result.len(), 0);
+                },
+                BatchSize::SmallInput,
+            );
+        });
+    }
 }
 
 struct ProjectBenchmark<'a> {
@@ -1342,6 +1680,7 @@ struct ProjectBenchmark<'a> {
     fs: MemoryFileSystem,
     max_diagnostics: usize,
     freeze_inputs: bool,
+    rules: Option<Rules>,
 }
 
 impl<'a> ProjectBenchmark<'a> {
@@ -1356,6 +1695,7 @@ impl<'a> ProjectBenchmark<'a> {
             fs,
             max_diagnostics,
             freeze_inputs: false,
+            rules: None,
         }
     }
 
@@ -1376,6 +1716,7 @@ impl<'a> ProjectBenchmark<'a> {
                 python: Some(RelativePathBuf::cli(SystemPath::new(".venv"))),
                 ..EnvironmentOptions::default()
             }),
+            rules: self.rules.clone(),
             ..Options::default()
         });
 
@@ -1421,7 +1762,8 @@ fn bench_project_named(
                 .join("\n  ");
             assert!(
                 diagnostics <= max_diagnostics,
-                "{project_name}: Expected <={max_diagnostics} diagnostics but got {diagnostics}:\n  {details}",
+                "{project_name}: Expected <={max_diagnostics} diagnostics \
+                but got {diagnostics}:\n  {details}",
             );
         }
     }
@@ -1475,6 +1817,18 @@ fn attrs(criterion: &mut Criterion) {
     // Keep one real-world benchmark frozen to catch regressions from newly added inputs.
     let frozen_benchmark = benchmark.freeze_inputs();
     bench_project_named(&frozen_benchmark, criterion, "attrs (frozen inputs)");
+
+    let all_rules_benchmark = ProjectBenchmark {
+        freeze_inputs: false,
+        rules: Some(Rules::from_iter([(
+            RangedValue::cli("all".to_owned()),
+            RangedValue::cli(Level::Error),
+        )])),
+        max_diagnostics: 100,
+        ..frozen_benchmark
+    };
+
+    bench_project_named(&all_rules_benchmark, criterion, "attrs (all rules)");
 }
 
 fn anyio(criterion: &mut Criterion) {
@@ -1531,16 +1885,23 @@ criterion_group!(
     benchmark_mixed_str_enum_comparison,
     benchmark_many_enum_members_2,
     benchmark_many_protocol_members_mismatch,
+    benchmark_inherited_recursive_protocol,
+    benchmark_nested_recursive_protocol_receiver,
+    benchmark_materialized_recursive_protocol_overload,
     benchmark_vararg_parameter_type_accumulation,
+    benchmark_typed_dict_get_large_literal_union,
     benchmark_very_large_tuple,
     benchmark_large_union_narrowing,
     benchmark_large_isinstance_narrowing,
     benchmark_literal_match_fallthrough,
     benchmark_literal_match_fallthrough_guarded_any,
     benchmark_literal_equality_fallthrough_guarded_any,
+    benchmark_gradual_literal_union_equality,
     benchmark_literal_or_pattern_reachability,
     benchmark_typeis_narrowing,
     benchmark_repeated_statement_calls,
+    benchmark_repeated_suppressing_context_managers,
+    benchmark_repeated_narrowed_assignments,
 );
 criterion_group!(project, anyio, attrs, hydra, datetype);
 criterion_main!(check_file, micro, project);

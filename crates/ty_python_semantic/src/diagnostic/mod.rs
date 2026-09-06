@@ -27,15 +27,19 @@ pub fn inferred_python_version_source_annotation(
     source: &PythonVersionSource,
 ) -> Option<Annotation> {
     match source {
-        PythonVersionSource::ConfigFile(source) => source.span(db).map(Annotation::primary),
-        PythonVersionSource::PyvenvCfgFile(source) => source.span(db).map(Annotation::primary),
+        PythonVersionSource::ConfigFile(source) | PythonVersionSource::PyvenvCfgFile(source) => {
+            source.span(db).map(Annotation::primary)
+        }
+        PythonVersionSource::ScriptMetadata(span) => {
+            span.range().map(|_| Annotation::primary(span.clone()))
+        }
         PythonVersionSource::InstallationDirectoryLayout { source, .. } => source
             .as_ref()
             .and_then(|source| source.span(db))
             .map(Annotation::primary),
         PythonVersionSource::Cli
         | PythonVersionSource::Editor
-        | PythonVersionSource::UvWorkspace
+        | PythonVersionSource::UvMetadata
         | PythonVersionSource::Default => None,
     }
 }
@@ -72,6 +76,18 @@ pub(crate) fn add_inferred_python_version_hint_to_diagnostic(
                 ));
             }
         }
+        source @ crate::PythonVersionSource::ScriptMetadata(_) => {
+            let mut sub_diagnostic = SubDiagnostic::new(
+                SubDiagnosticSeverity::Info,
+                format_args!(
+                    "Python {version} was assumed when {action} because it was specified in script metadata"
+                ),
+            );
+            if let Some(annotation) = inferred_python_version_source_annotation(db, source) {
+                sub_diagnostic.annotate(annotation.message("Python version configured here"));
+            }
+            diagnostic.sub(sub_diagnostic);
+        }
         source @ crate::PythonVersionSource::PyvenvCfgFile(_) => {
             if let Some(annotation) = inferred_python_version_source_annotation(db, source) {
                 let mut sub_diagnostic = SubDiagnostic::new(
@@ -101,9 +117,9 @@ pub(crate) fn add_inferred_python_version_hint_to_diagnostic(
                 because it's the version of the selected Python interpreter in your editor",
             ));
         }
-        crate::PythonVersionSource::UvWorkspace => {
+        crate::PythonVersionSource::UvMetadata => {
             diagnostic.info(format_args!(
-                "Python {version} was assumed when {action} because it was provided by uv workspace metadata",
+                "Python {version} was assumed when {action} because it was provided by uv metadata",
             ));
         }
         crate::PythonVersionSource::InstallationDirectoryLayout {

@@ -3,16 +3,14 @@ use ty_python_semantic::ProgramEnvironment;
 
 use rustc_hash::FxHashMap;
 
-use crate::importer::{ImportAction, ImportRequest, Importer, MembersInScope};
 use crate::{Db, HasNavigationTargets, NavigationTarget};
 use ruff_db::parsed::parsed_module;
-use ruff_db::source::source_text;
 use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor, TraversalSignal};
 use ruff_python_ast::{AnyNodeRef, ArgOrKeyword, Expr, ExprUnaryOp, Stmt, UnaryOp};
-use ruff_python_codegen::Stylist;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use ty_module_resolver::file_to_module;
 use ty_python_core::ProgramFile;
+use ty_python_semantic::importer::{ImportAction, ImportRequest, Importer, MembersInScope};
 use ty_python_semantic::types::ide_support::inlay_hint_call_argument_details;
 use ty_python_semantic::types::{Type, TypeDetail};
 use ty_python_semantic::{HasType, SemanticModel};
@@ -297,11 +295,7 @@ pub fn inlay_hints(
     settings: &InlayHintSettings,
 ) -> Vec<InlayHint> {
     let ast = parsed_module(db, file.python_file(db)).load(db);
-    let source_file = file.file(db);
-
-    let source = source_text(db, source_file);
-    let stylist = Stylist::from_tokens(ast.tokens(), source.as_str());
-    let importer = Importer::new(db, &stylist, file, source.as_str(), &ast);
+    let importer = Importer::new(db, file, &ast);
 
     let mut visitor = InlayHintVisitor::new(db, file, importer, range, settings);
 
@@ -622,19 +616,23 @@ fn type_hint_is_excessive_for_expr(expr: &Expr) -> bool {
         Expr::Tuple(expr_tuple) => expr_tuple.elts.iter().all(type_hint_is_excessive_for_expr),
 
         // Various Literal[...] types which are always excessive to hint
-        | Expr::BytesLiteral(_)
+        Expr::BytesLiteral(_)
         | Expr::NumberLiteral(_)
         | Expr::BooleanLiteral(_)
-        | Expr::StringLiteral(_)
+        | Expr::StringLiteral(_) => true,
         // `None` isn't terribly verbose, but still redundant
-        | Expr::NoneLiteral(_)
+        Expr::NoneLiteral(_) => true,
         // This one expands to `str` which isn't verbose but is redundant
-        | Expr::FString(_)
+        Expr::FString(_) => true,
         // This one expands to `Template` which isn't verbose but is redundant
-        | Expr::TString(_)=> true,
+        Expr::TString(_) => true,
 
         // You too `+1 and `-1`, get back here
-        Expr::UnaryOp(ExprUnaryOp { op: UnaryOp::UAdd | UnaryOp::USub, operand, .. }) => matches!(**operand, Expr::NumberLiteral(_)),
+        Expr::UnaryOp(ExprUnaryOp {
+            op: UnaryOp::UAdd | UnaryOp::USub,
+            operand,
+            ..
+        }) => matches!(**operand, Expr::NumberLiteral(_)),
 
         // Everything else is reasonable
         _ => false,
@@ -6014,7 +6012,7 @@ Source with applied edits:
 
         def foo(x: int, *y: bool, z: str | int | list[str]): ...
 
-        a[: def foo(x: int, *y: bool, *, z: str | int | list[str]) -> Unknown] = foo
+        a[: def foo(x: int, *y: bool, z: str | int | list[str]) -> Unknown] = foo
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
           --> stdlib/builtins.pyi:LL:7
@@ -6024,7 +6022,7 @@ Source with applied edits:
         info: Source
           --> main2.py:LL:16
            |
-        LL | a[: def foo(x: int, *y: bool, *, z: str | int | list[str]) -> Unknown] = foo
+        LL | a[: def foo(x: int, *y: bool, z: str | int | list[str]) -> Unknown] = foo
            |                ^^^
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -6035,7 +6033,7 @@ Source with applied edits:
         info: Source
           --> main2.py:LL:25
            |
-        LL | a[: def foo(x: int, *y: bool, *, z: str | int | list[str]) -> Unknown] = foo
+        LL | a[: def foo(x: int, *y: bool, z: str | int | list[str]) -> Unknown] = foo
            |                         ^^^^
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -6044,10 +6042,10 @@ Source with applied edits:
         LL | class str(Sequence[str]):
            |       ^^^
         info: Source
-          --> main2.py:LL:37
+          --> main2.py:LL:34
            |
-        LL | a[: def foo(x: int, *y: bool, *, z: str | int | list[str]) -> Unknown] = foo
-           |                                     ^^^
+        LL | a[: def foo(x: int, *y: bool, z: str | int | list[str]) -> Unknown] = foo
+           |                                  ^^^
 
         info[inlay-hint-location]: Inlay Hint Target
           --> stdlib/builtins.pyi:LL:7
@@ -6055,10 +6053,10 @@ Source with applied edits:
         LL | class int:
            |       ^^^
         info: Source
-          --> main2.py:LL:43
+          --> main2.py:LL:40
            |
-        LL | a[: def foo(x: int, *y: bool, *, z: str | int | list[str]) -> Unknown] = foo
-           |                                           ^^^
+        LL | a[: def foo(x: int, *y: bool, z: str | int | list[str]) -> Unknown] = foo
+           |                                        ^^^
 
         info[inlay-hint-location]: Inlay Hint Target
           --> stdlib/builtins.pyi:LL:7
@@ -6066,10 +6064,10 @@ Source with applied edits:
         LL | class list(MutableSequence[_T]):
            |       ^^^^
         info: Source
-          --> main2.py:LL:49
+          --> main2.py:LL:46
            |
-        LL | a[: def foo(x: int, *y: bool, *, z: str | int | list[str]) -> Unknown] = foo
-           |                                                 ^^^^
+        LL | a[: def foo(x: int, *y: bool, z: str | int | list[str]) -> Unknown] = foo
+           |                                              ^^^^
 
         info[inlay-hint-location]: Inlay Hint Target
           --> stdlib/builtins.pyi:LL:7
@@ -6077,10 +6075,10 @@ Source with applied edits:
         LL | class str(Sequence[str]):
            |       ^^^
         info: Source
-          --> main2.py:LL:54
+          --> main2.py:LL:51
            |
-        LL | a[: def foo(x: int, *y: bool, *, z: str | int | list[str]) -> Unknown] = foo
-           |                                                      ^^^
+        LL | a[: def foo(x: int, *y: bool, z: str | int | list[str]) -> Unknown] = foo
+           |                                                   ^^^
 
         info[inlay-hint-location]: Inlay Hint Target
           --> stdlib/ty_extensions/_internal.pyi:LL:1
@@ -6088,10 +6086,10 @@ Source with applied edits:
         LL | Unknown: _SpecialForm
            | ^^^^^^^
         info: Source
-          --> main2.py:LL:63
+          --> main2.py:LL:60
            |
-        LL | a[: def foo(x: int, *y: bool, *, z: str | int | list[str]) -> Unknown] = foo
-           |                                                               ^^^^^^^
+        LL | a[: def foo(x: int, *y: bool, z: str | int | list[str]) -> Unknown] = foo
+           |                                                            ^^^^^^^
         ");
     }
 

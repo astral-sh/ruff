@@ -30,8 +30,9 @@ impl<'db> Type<'db> {
     /// unsound.
     ///
     /// Preserve negations that constrain the object itself, such as `~None`, `~SomeClass`, and
-    /// `~Literal[1]`. A `NewType` tag, type-variable selection, or type-guard proof can differ
-    /// between views. Retain the existing conservative handling of negated string types.
+    /// `~Literal[1]`. A `NewType` tag, type-variable selection, type-guard proof, or literal-string
+    /// origin can differ between views. A negated string literal excludes its runtime value only
+    /// when another constraint already establishes that the string has literal origin.
     ///
     /// A type variable can also hide a `NewType` tag: even a variable bounded by `int` can be
     /// instantiated as an integer `NewType`. Expand variables to their upcast bounds or constraints
@@ -73,20 +74,26 @@ impl<'db> Type<'db> {
                     union.map(db, env, |element| upcast(db, env, *element, visitor))
                 }
                 Type::Intersection(intersection) => {
+                    let has_literal_string_origin = intersection
+                        .positive(db)
+                        .iter()
+                        .any(|element| element.is_subtype_of(db, env, Type::literal_string()));
                     let mut builder = IntersectionBuilder::new(db, env);
                     for element in intersection.positive(db) {
                         builder = builder.add_positive(upcast(db, env, *element, visitor));
                     }
                     for element in intersection.negative(db) {
-                        // Static tags and predicate proofs can differ between views. Retain the
-                        // existing conservative handling of negated string types.
+                        // Static tags, predicate proofs, and literal-string origin can differ
+                        // between views. Once literal origin is known, an excluded string literal
+                        // also excludes its runtime value and must be preserved.
                         match element.resolve_type_alias(db) {
                             Type::NewTypeInstance(_)
                             | Type::TypeVar(_)
                             | Type::TypeIs(_)
                             | Type::TypeGuard(_) => continue,
                             Type::LiteralValue(literal)
-                                if literal.is_literal_string() || literal.is_string() =>
+                                if literal.is_literal_string()
+                                    || literal.is_string() && !has_literal_string_origin =>
                             {
                                 continue;
                             }

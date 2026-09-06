@@ -29,6 +29,10 @@ f"{H:s} {W:z}"  # [bad-format-character]
 
 f"{1:z}"  # [bad-format-character]
 
-## False negatives
+## Supporting concatenated strings
 
 print(("%" "z") % 1)
+
+## `%b` is only valid for bytes formatting.
+"%b" % b"25"
+b"%b" % b"25"

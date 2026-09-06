@@ -77,6 +77,29 @@ def _(x: object):
         reveal_type(c)  # revealed: C[Top[(...)]]
 ```
 
+## Unpacked variadic signatures
+
+Display an unpacked variadic as one parameter, including its fixed prefix and required suffix.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+def mixed(
+    prefix: bytes,
+    /,
+    label: str,
+    *args: *tuple[bool, *tuple[int, ...], bytes, str],
+    flag: bool = False,
+    **kwargs: bytes,
+) -> None: ...
+
+# revealed: def mixed(prefix: bytes, /, label: str, *args: *tuple[bool, *tuple[int, ...], bytes, str], flag: bool = False, **kwargs: bytes) -> None
+reveal_type(mixed)
+```
+
 ## Type aliases are not expanded unless necessary
 
 ```toml

@@ -311,9 +311,8 @@ pub struct EnumClassLiteral<'db> {
     pub(super) aliases_are_known: bool,
     /// Whether the canonical members exhaust the runtime values of this enum class.
     ///
-    /// `Flag` classes, transforming metaclasses, and enums with a custom `_missing_` method can
-    /// create runtime members beyond those declared in the class body, so their declared members
-    /// are not a closed value set.
+    /// `Flag` classes and transforming metaclasses can create runtime members beyond those
+    /// declared in the class body, so their declared members are not a closed value set.
     #[returns(copy)]
     pub(crate) members_are_exhaustive: bool,
 }
@@ -354,8 +353,7 @@ fn enum_class_literal<'db>(
             db,
             &env,
             KnownClass::Flag.to_subclass_of(db, &env),
-        )
-        && !enum_has_custom_missing(db, class);
+        );
 
     Some(EnumClassLiteral::new(
         db,
@@ -365,20 +363,6 @@ fn enum_class_literal<'db>(
         metadata.aliases_are_known,
         members_are_exhaustive,
     ))
-}
-
-/// Return whether enum construction may create pseudo-members through a custom `_missing_` method.
-fn enum_has_custom_missing<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> bool {
-    let ClassLiteral::Static(class) = class else {
-        return false;
-    };
-
-    class
-        .iter_mro(db, None)
-        .filter_map(ClassBase::into_class)
-        .take_while(|base| base.known(db) != Some(KnownClass::Enum))
-        .filter_map(|base| base.class_literal(db).as_static())
-        .any(|base| custom_enum_method(db, base.body_scope(db), "_missing_").is_some())
 }
 
 impl<'db> EnumClassLiteral<'db> {
@@ -1547,9 +1531,27 @@ fn inherited_user_defined_mixin_new<'db>(
         .iter_mro(db, None)
         .skip(1)
         .filter_map(ClassBase::into_class)
-        .filter_map(|class| class.class_literal(db).as_static())
-        .filter(|base| base.known(db).is_none())
-        .find_map(|base| custom_enum_method(db, base.body_scope(db), "__new__"))
+        .find_map(|class_type| {
+            let (base, specialization) = class_type.static_class_literal(db)?;
+            if base.known(db).is_some() {
+                return None;
+            }
+            let binding = custom_enum_method(db, base.body_scope(db), "__new__")?;
+            // The mixin may be inherited as a specialized generic alias (`Mixin[str]`). Apply that
+            // specialization, so that members are checked against the specialized `__new__`
+            // signature instead of one with free typevars.
+            let EnumMethodBinding::Function(function) = binding else {
+                return Some(EnumMethodBinding::Opaque);
+            };
+            Some(
+                match Type::FunctionLiteral(function)
+                    .apply_optional_owner_specialization_to_member(db, specialization)
+                {
+                    Type::FunctionLiteral(function) => EnumMethodBinding::Function(function),
+                    _ => EnumMethodBinding::Opaque,
+                },
+            )
+        })
 }
 
 /// Looks up a resolvable method inherited from a known enum class.

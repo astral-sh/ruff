@@ -8,6 +8,7 @@ use ruff_python_trivia::PythonWhitespace;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::linter::float::as_non_finite_float_string_literal;
 use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## What it does
@@ -51,7 +52,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: `decimal`](https://docs.python.org/3/library/decimal.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.12.0")]
+#[violation_metadata(stable_since = "0.12.0", category = Category::Complexity)]
 pub(crate) struct VerboseDecimalConstructor {
     replacement: String,
 }

@@ -87,7 +87,6 @@ pub fn goto_implementation(
         .project()
         .files(db)
         .iter()
-        .copied()
         .filter(|candidate| *candidate != source_file)
         .collect();
     candidate_files.push(source_file);

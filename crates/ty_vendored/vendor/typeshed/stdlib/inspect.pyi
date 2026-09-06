@@ -308,9 +308,9 @@ def isgeneratorfunction(obj: Callable[..., Generator[Any, Any, Any]]) -> bool:
     See help(isfunction) for a list of attributes.
     """
 @overload
-def isgeneratorfunction(obj: Callable[_P, Any]) -> TypeGuard[Callable[_P, GeneratorType[Any, Any, Any]]]: ...
+def isgeneratorfunction(obj: Callable[_P, Any]) -> TypeGuard[Callable[_P, Generator[Any, Any, Any]]]: ...
 @overload
-def isgeneratorfunction(obj: object) -> TypeGuard[Callable[..., GeneratorType[Any, Any, Any]]]: ...
+def isgeneratorfunction(obj: object) -> TypeGuard[Callable[..., Generator[Any, Any, Any]]]: ...
 
 @overload
 def iscoroutinefunction(obj: Callable[..., Coroutine[Any, Any, Any]]) -> bool:
@@ -320,11 +320,11 @@ def iscoroutinefunction(obj: Callable[..., Coroutine[Any, Any, Any]]) -> bool:
     be marked via markcoroutinefunction.
     """
 @overload
-def iscoroutinefunction(obj: Callable[_P, Awaitable[_T]]) -> TypeGuard[Callable[_P, CoroutineType[Any, Any, _T]]]: ...
+def iscoroutinefunction(obj: Callable[_P, Awaitable[_T]]) -> TypeGuard[Callable[_P, Coroutine[Any, Any, _T]]]: ...
 @overload
-def iscoroutinefunction(obj: Callable[_P, object]) -> TypeGuard[Callable[_P, CoroutineType[Any, Any, Any]]]: ...
+def iscoroutinefunction(obj: Callable[_P, object]) -> TypeGuard[Callable[_P, Coroutine[Any, Any, Any]]]: ...
 @overload
-def iscoroutinefunction(obj: object) -> TypeGuard[Callable[..., CoroutineType[Any, Any, Any]]]: ...
+def iscoroutinefunction(obj: object) -> TypeGuard[Callable[..., Coroutine[Any, Any, Any]]]: ...
 
 def isgenerator(object: object) -> TypeIs[GeneratorType[object, Never, object]]:
     """Return true if the object is a generator.
@@ -359,9 +359,9 @@ def isasyncgenfunction(obj: Callable[..., AsyncGenerator[Any, Any]]) -> bool:
     syntax and have "yield" expressions in their body.
     """
 @overload
-def isasyncgenfunction(obj: Callable[_P, Any]) -> TypeGuard[Callable[_P, AsyncGeneratorType[Any, Any]]]: ...
+def isasyncgenfunction(obj: Callable[_P, Any]) -> TypeGuard[Callable[_P, AsyncGenerator[Any, Any]]]: ...
 @overload
-def isasyncgenfunction(obj: object) -> TypeGuard[Callable[..., AsyncGeneratorType[Any, Any]]]: ...
+def isasyncgenfunction(obj: object) -> TypeGuard[Callable[..., AsyncGenerator[Any, Any]]]: ...
 
 @type_check_only
 class _SupportsSet(Protocol[_T_contra, _V_contra]):
@@ -462,18 +462,18 @@ def isroutine(
 def ismethoddescriptor(object: object) -> TypeIs[MethodDescriptorType]:
     """Return true if the object is a method descriptor.
 
-    But not if ismethod() or isclass() or isfunction() are true.
+    But not if ismethod(), isclass() or isfunction() is true.
 
-    This is new in Python 2.2, and, for example, is true of int.__add__.
-    An object passing this test has a __get__ attribute, but not a
-    __set__ attribute or a __delete__ attribute. Beyond that, the set
-    of attributes varies; __name__ is usually sensible, and __doc__
-    often is.
+    An object passing this test (for example, int.__add__) has a __get__
+    attribute, but not a __set__ attribute or a __delete__ attribute.
+    Beyond that, the set of attributes varies; __name__ is usually
+    sensible, and __doc__ often is.
 
     Methods implemented via descriptors that also pass one of the other
-    tests return false from the ismethoddescriptor() test, simply because
-    the other tests promise more -- you can, e.g., count on having the
-    __func__ attribute (etc) when an object passes ismethod().
+    tests (ismethod(), isclass(), isfunction()) make this function return
+    false, simply because those other tests promise more -- you can, for
+    example, count on having the __func__ attribute when an object passes
+    ismethod().
     """
 
 def ismemberdescriptor(object: object) -> TypeIs[MemberDescriptorType]:
@@ -496,8 +496,13 @@ def isgetsetdescriptor(object: object) -> TypeIs[GetSetDescriptorType]:
 def isdatadescriptor(object: object) -> TypeIs[_SupportsSet[Never, Never] | _SupportsDelete[Never]]:
     """Return true if the object is a data descriptor.
 
+    But not if ismethod(), isclass() or isfunction() is true.
+
     Data descriptors have a __set__ or a __delete__ attribute.  Examples are
-    properties (defined in Python) and getsets and members (defined in C).
+    properties, getsets, and members.  For the latter two (defined only in C
+    extension modules) more specific tests are available as well:
+    isgetsetdescriptor() and ismemberdescriptor(), respectively.
+
     Typically, data descriptors will also have __name__ and __doc__ attributes
     (properties, getsets, and members have both of these attributes), but this
     is not guaranteed.

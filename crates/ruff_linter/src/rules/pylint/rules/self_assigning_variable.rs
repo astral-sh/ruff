@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for self-assignment of variables.
@@ -24,7 +25,7 @@ use crate::checkers::ast::Checker;
 /// country = "Poland"
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.281")]
+#[violation_metadata(stable_since = "v0.0.281", category = Category::Suspicious)]
 pub(crate) struct SelfAssigningVariable {
     name: String,
 }

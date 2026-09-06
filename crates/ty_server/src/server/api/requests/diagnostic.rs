@@ -55,24 +55,22 @@ impl BackgroundDocumentRequestHandler for DocumentDiagnosticRequestHandler {
                 }
                 .into()
             }
-            new_id => {
-                RelatedFullDocumentDiagnosticReport {
-                    related_documents: None,
-                    full_document_diagnostic_report: FullDocumentDiagnosticReport {
-                        result_id: new_id,
-                        // SAFETY: Pull diagnostic requests are only called for text documents, not for
-                        // notebook documents.
-                        items: diagnostics
-                            .to_lsp_diagnostics(
-                                db,
-                                snapshot.resolved_client_capabilities(),
-                                snapshot.global_settings(),
-                            )
-                            .expect_text_document(),
-                    },
-                }
-                .into()
+            new_id => RelatedFullDocumentDiagnosticReport {
+                related_documents: None,
+                full_document_diagnostic_report: FullDocumentDiagnosticReport {
+                    result_id: new_id,
+                    // A notebook is checked as a whole, but a pull response only includes
+                    // diagnostics for the requested cell.
+                    items: diagnostics
+                        .to_lsp_diagnostics(
+                            db,
+                            snapshot.resolved_client_capabilities(),
+                            snapshot.global_settings(),
+                        )
+                        .into_document_diagnostics(snapshot.uri()),
+                },
             }
+            .into(),
         };
 
         Ok(report)

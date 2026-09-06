@@ -987,6 +987,126 @@ type RecursiveGradual = Covariant[RecursiveGradual] | Invariant[Any]
 static_assert(is_subtype_of(Covariant[RecursiveGradual], Covariant[object]))
 ```
 
+## Generic protocol materializations
+
+Every gradual type is a supertype of its bottom materialization and a subtype of its top
+materialization. Here, we check this for generic protocols:
+
+```py
+from typing import Any, Protocol
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import is_subtype_of
+
+class Unbounded[T](Protocol):
+    def read(self) -> T: ...
+    def other(self) -> Any: ...
+
+static_assert(is_subtype_of(Unbounded[Any], Top[Unbounded[Any]]))
+static_assert(is_subtype_of(Bottom[Unbounded[Any]], Unbounded[Any]))
+static_assert(is_subtype_of(Bottom[Unbounded[Any]], Top[Unbounded[Any]]))
+static_assert(not is_subtype_of(Unbounded[Any], Bottom[Unbounded[Any]]))
+static_assert(not is_subtype_of(Top[Unbounded[Any]], Unbounded[Any]))
+static_assert(not is_subtype_of(Top[Unbounded[Any]], Bottom[Unbounded[Any]]))
+```
+
+The same relations hold when the type parameter has a bound:
+
+```py
+class Bounded[T: str](Protocol):
+    def read(self) -> T: ...
+    def other(self) -> Any: ...
+
+static_assert(is_subtype_of(Bounded[Any], Top[Bounded[Any]]))
+static_assert(is_subtype_of(Bottom[Bounded[Any]], Bounded[Any]))
+static_assert(is_subtype_of(Bottom[Bounded[Any]], Top[Bounded[Any]]))
+static_assert(not is_subtype_of(Bounded[Any], Bottom[Bounded[Any]]))
+static_assert(not is_subtype_of(Top[Bounded[Any]], Bounded[Any]))
+static_assert(not is_subtype_of(Top[Bounded[Any]], Bottom[Bounded[Any]]))
+```
+
+These relations also hold between distinct protocols with the same members:
+
+```py
+class EquivalentBounded[T: str](Protocol):
+    def read(self) -> T: ...
+    def other(self) -> Any: ...
+
+static_assert(is_subtype_of(Bounded[Any], Top[EquivalentBounded[Any]]))
+static_assert(is_subtype_of(Bottom[Bounded[Any]], EquivalentBounded[Any]))
+static_assert(is_subtype_of(Bottom[Bounded[Any]], Top[EquivalentBounded[Any]]))
+static_assert(not is_subtype_of(Bounded[Any], Bottom[EquivalentBounded[Any]]))
+static_assert(not is_subtype_of(Top[Bounded[Any]], EquivalentBounded[Any]))
+static_assert(not is_subtype_of(Top[Bounded[Any]], Bottom[EquivalentBounded[Any]]))
+```
+
+The same relations also hold when the type parameter has constraints:
+
+```py
+class Constrained[T: (str, bytes)](Protocol):
+    def read(self) -> T: ...
+    def other(self) -> Any: ...
+
+static_assert(is_subtype_of(Constrained[Any], Top[Constrained[Any]]))
+static_assert(is_subtype_of(Bottom[Constrained[Any]], Constrained[Any]))
+static_assert(is_subtype_of(Bottom[Constrained[Any]], Top[Constrained[Any]]))
+static_assert(not is_subtype_of(Constrained[Any], Bottom[Constrained[Any]]))
+static_assert(not is_subtype_of(Top[Constrained[Any]], Constrained[Any]))
+static_assert(not is_subtype_of(Top[Constrained[Any]], Bottom[Constrained[Any]]))
+static_assert(not is_subtype_of(Constrained[str], Top[Constrained[bytes]]))
+```
+
+A bound also limits the parameter type of a contravariant protocol. The same structural relations
+hold between distinct protocols with this method:
+
+```py
+class Writer[T: str](Protocol):
+    def write(self, value: T) -> None: ...
+
+class EquivalentWriter[T: str](Protocol):
+    def write(self, value: T) -> None: ...
+
+static_assert(is_subtype_of(Writer[Any], Top[EquivalentWriter[Any]]))
+static_assert(is_subtype_of(Bottom[Writer[Any]], EquivalentWriter[Any]))
+static_assert(is_subtype_of(Bottom[Writer[Any]], Top[EquivalentWriter[Any]]))
+static_assert(not is_subtype_of(Writer[Any], Bottom[EquivalentWriter[Any]]))
+static_assert(not is_subtype_of(Top[Writer[Any]], EquivalentWriter[Any]))
+static_assert(not is_subtype_of(Top[Writer[Any]], Bottom[EquivalentWriter[Any]]))
+```
+
+Constraints also limit both the read and write types of a mutable attribute. These protocols are
+invariant, and their structural relations still respect the materialization directions:
+
+```py
+class Cell[T: (str, bytes)](Protocol):
+    value: T
+
+class EquivalentCell[T: (str, bytes)](Protocol):
+    value: T
+
+static_assert(is_subtype_of(Cell[Any], Top[EquivalentCell[Any]]))
+static_assert(is_subtype_of(Bottom[Cell[Any]], EquivalentCell[Any]))
+static_assert(is_subtype_of(Bottom[Cell[Any]], Top[EquivalentCell[Any]]))
+static_assert(not is_subtype_of(Cell[Any], Bottom[EquivalentCell[Any]]))
+static_assert(not is_subtype_of(Top[Cell[Any]], EquivalentCell[Any]))
+static_assert(not is_subtype_of(Top[Cell[Any]], Bottom[EquivalentCell[Any]]))
+```
+
+If a class inherits from the protocol explicitly, we treat it as a subtype, even if it has invalid
+overrides:
+
+```py
+class InvalidOverride(Bounded[str]):
+    # TODO: this should be an invalid-override error (https://github.com/astral-sh/ty/issues/2156)
+    read = None
+
+static_assert(is_subtype_of(InvalidOverride, Bounded[str]))
+static_assert(is_subtype_of(InvalidOverride, Top[Bounded[str]]))
+static_assert(is_subtype_of(InvalidOverride, Top[Bounded[Any]]))
+static_assert(not is_subtype_of(InvalidOverride, Bottom[Bounded[str]]))
+static_assert(not is_subtype_of(InvalidOverride, Bottom[Bounded[Any]]))
+static_assert(not is_subtype_of(InvalidOverride, Top[EquivalentBounded[Any]]))
+```
+
 ## Callable
 
 The general principle is that a callable type is a subtype of another if it's more flexible in what
@@ -1426,6 +1546,21 @@ static_assert(is_subtype_of(StringSuffix, Callable[[*tuple[object, ...], int, st
 static_assert(is_subtype_of(IntegerStringSuffix, Callable[[*tuple[int, ...], int, str], None]))
 ```
 
+A named positional prefix cannot make a callback with a required unpacked suffix compatible with a
+target that accepts no positional arguments.
+
+```py
+def named_prefix_and_suffix(name: int, *args: *tuple[*tuple[int, ...], int]) -> None: ...
+def accepts_no_positional_arguments() -> None: ...
+
+static_assert(
+    not is_subtype_of(
+        RegularCallableTypeOf[named_prefix_and_suffix],
+        RegularCallableTypeOf[accepts_no_positional_arguments],
+    )
+)
+```
+
 A positional parameter cannot also be filled by a target keyword argument.
 
 ```py
@@ -1448,6 +1583,71 @@ def rejects_named_keyword(*args: *tuple[*tuple[int, ...], int], a: Never = cast(
 
 static_assert(is_subtype_of(OccupiesKeyword, RegularCallableTypeOf[rejects_keywords]))
 static_assert(is_subtype_of(OccupiesKeyword, RegularCallableTypeOf[rejects_named_keyword]))
+```
+
+Variadic target keywords must be compatible with optional source keyword-only parameters unless an
+occupied target prefix prevents the corresponding name from being passed.
+
+```py
+def optional_keyword_source(*args: object, flag: int = 0, **kwargs: str) -> None: ...
+def unprotected_keyword_target(*args: *tuple[*tuple[int, ...], int], **kwargs: str) -> None: ...
+def protected_keyword_target(flag: int, *args: *tuple[*tuple[int, ...], int], **kwargs: str) -> None: ...
+
+static_assert(
+    not is_subtype_of(
+        RegularCallableTypeOf[optional_keyword_source],
+        RegularCallableTypeOf[unprotected_keyword_target],
+    )
+)
+static_assert(
+    is_subtype_of(
+        RegularCallableTypeOf[optional_keyword_source],
+        RegularCallableTypeOf[protected_keyword_target],
+    )
+)
+```
+
+Passing a target argument positionally cannot satisfy a required source keyword-only parameter. A
+required target keyword-only parameter with the same name does satisfy it.
+
+```py
+def requires_named_keyword(*args: int, a: int) -> None: ...
+def positional_keyword_target(a: int, *args: *tuple[*tuple[int, ...], int]) -> None: ...
+def required_keyword_target(*args: *tuple[*tuple[int, ...], int], a: int) -> None: ...
+
+static_assert(
+    not is_subtype_of(
+        RegularCallableTypeOf[requires_named_keyword],
+        RegularCallableTypeOf[positional_keyword_target],
+    )
+)
+static_assert(
+    is_subtype_of(
+        RegularCallableTypeOf[requires_named_keyword],
+        RegularCallableTypeOf[required_keyword_target],
+    )
+)
+```
+
+The same mismatch produces an assignment diagnostic when the target signature is used as an
+annotation.
+
+```py
+type PositionalKeywordTarget = RegularCallableTypeOf[positional_keyword_target]
+
+# error: [invalid-assignment]
+callback: PositionalKeywordTarget = requires_named_keyword
+```
+
+A positional-only target prefix cannot prevent variadic keywords from colliding with an occupied
+source parameter. A matching positional-or-keyword target prefix does prevent that collision.
+
+```py
+def unprotected_positional_prefix(a: int, /, *args: *tuple[*tuple[int, ...], int], **kwargs: int) -> None: ...
+def protected_positional_prefix(a: int, *args: *tuple[*tuple[int, ...], int], **kwargs: int) -> None: ...
+
+static_assert(not is_subtype_of(OccupiesKeyword, RegularCallableTypeOf[unprotected_positional_prefix]))
+static_assert(is_subtype_of(OccupiesKeyword, RegularCallableTypeOf[protected_positional_prefix]))
 ```
 
 Equivalent empty or fixed-length unpacked parameters are compatible, but cannot be reused for
@@ -2330,6 +2530,55 @@ static_assert(not is_subtype_of(TypeOf[a.f], Callable[[float], int]))
 static_assert(not is_subtype_of(TypeOf[A.g], Callable[[], int]))
 
 static_assert(is_subtype_of(TypeOf[A.f], Callable[[A, int], int]))
+```
+
+### Bound receivers and `Self`
+
+A bound method exposes its captured receiver through the read-only `__self__` attribute. A method
+bound to a subclass can therefore be a subtype of the same method bound to its base class, but not
+the reverse. A `Self` return type follows the same direction.
+
+```py
+from typing import Self
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_subtype_of
+
+class Base:
+    def plain(self) -> int:
+        return 0
+
+    def returns_self(self) -> Self:
+        return self
+
+    def accepts_self(self, other: Self) -> None: ...
+    @classmethod
+    def make(cls) -> Self:
+        return cls()
+
+class Child(Base): ...
+
+def check(base: Base, child: Child):
+    static_assert(is_subtype_of(TypeOf[child.plain], TypeOf[base.plain]))
+    static_assert(not is_subtype_of(TypeOf[base.plain], TypeOf[child.plain]))
+    static_assert(is_subtype_of(TypeOf[child.returns_self], TypeOf[base.returns_self]))
+    static_assert(not is_subtype_of(TypeOf[base.returns_self], TypeOf[child.returns_self]))
+```
+
+`Self` in a remaining parameter is contravariant: a method that requires a `Child` cannot replace
+one that accepts any `Base`. The reverse substitution still fails the captured-receiver requirement.
+
+```py
+def check_parameters(base: Base, child: Child):
+    static_assert(not is_subtype_of(TypeOf[child.accepts_self], TypeOf[base.accepts_self]))
+    static_assert(not is_subtype_of(TypeOf[base.accepts_self], TypeOf[child.accepts_self]))
+```
+
+Classmethods capture the class object, while `Self` in their return type describes an instance.
+
+```py
+def check_classmethods(base: Base, child: Child):
+    static_assert(is_subtype_of(TypeOf[child.make], TypeOf[base.make]))
+    static_assert(not is_subtype_of(TypeOf[base.make], TypeOf[child.make]))
 ```
 
 ### Overloads

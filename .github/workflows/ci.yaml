@@ -17,9 +17,14 @@ defaults:
     shell: bash
 
 env:
+  UV_LOCKED: 1
   CARGO_INCREMENTAL: 0
   CARGO_NET_RETRY: 10
+  CARGO_PROFILE_DEV_LTO: "false"
+  CARGO_PROFILE_DEV_OPT_LEVEL: 0
   CARGO_TERM_COLOR: always
+  # renovate: datasource=github-releases depName=astral-sh/hawk
+  HAWK_VERSION: 0.1.13
   RUSTUP_MAX_RETRIES: 10
   PACKAGE_NAME: ruff
   PYTHON_VERSION: "3.14"
@@ -32,6 +37,7 @@ jobs:
     name: "Determine changes"
     runs-on: ubuntu-latest
     outputs:
+      comparison_base: ${{ steps.merge_base.outputs.sha }}
       # Flag that is raised when any code that affects parser is changed
       parser: ${{ steps.check_parser.outputs.changed }}
       # Flag that is raised when any code that affects linter is changed
@@ -51,6 +57,8 @@ jobs:
       playground: ${{ steps.check_playground.outputs.changed }}
       # Flag that is set to "true" when code related to the benchmarks changes.
       benchmarks: ${{ steps.check_benchmarks.outputs.changed }}
+      # Flag that is set to "true" when release build inputs change.
+      release: ${{ steps.check_release.outputs.changed }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -65,8 +73,28 @@ jobs:
         env:
           BASE_REF: ${{ github.event.pull_request.base.ref || 'main' }}
         run: |
-          sha=$(git merge-base HEAD "origin/${BASE_REF}")
+          if [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
+            # The first parent contains any preceding layers in a stacked pull request.
+            sha="$(git rev-parse "${GITHUB_SHA}^1")"
+          else
+            sha="$(git merge-base HEAD "origin/${BASE_REF}")"
+          fi
           echo "sha=${sha}" >> "$GITHUB_OUTPUT"
+
+      - name: Check if release build inputs changed
+        id: check_release
+        env:
+          MERGE_BASE: ${{ steps.merge_base.outputs.sha }}
+        run: |
+          if git diff --quiet "${MERGE_BASE}...HEAD" -- \
+            ':pyproject.toml' \
+            ':.github/workflows/build-binaries.yml' \
+            ':scripts/build_ruff_pgo.py' \
+          ; then
+              echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+              echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Check if the parser code changed
         id: check_parser
@@ -214,6 +242,7 @@ jobs:
             ':crates/ruff_db/**' \
             ':crates/ruff_annotate_snippets/**' \
             ':crates/ruff_python_ast/**' \
+            ':crates/ruff_python_edits/**' \
             ':crates/ruff_python_parser/**' \
             ':crates/ruff_python_trivia/**' \
             ':crates/ruff_source_file/**' \
@@ -301,6 +330,30 @@ jobs:
       - name: "Clippy (wasm)"
         run: cargo clippy -p ruff_wasm -p ty_wasm --target wasm32-unknown-unknown --all-features --locked -- -D warnings
 
+  hawk:
+    name: "cargo hawk"
+    runs-on: ubuntu-latest
+    needs: determine_changes
+    if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        with:
+          workspaces: ". -> target/hawk"
+          cache-workspace-crates: "false"
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: "Install Rust toolchain"
+        run: rustup toolchain install 1.98.0
+      - name: "Install Hawk"
+        run: |
+          curl --proto '=https' --tlsv1.2 -LsSf \
+            "https://github.com/astral-sh/hawk/releases/download/${HAWK_VERSION}/cargo-hawk-installer.sh" | sh
+      - name: "Hawk"
+        run: cargo +1.98.0 hawk check --target-dir target/hawk -D warnings
+
   cargo-publish-dry-run:
     name: "cargo publish dry-run"
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-8' || 'ubuntu-latest' }}
@@ -338,16 +391,10 @@ jobs:
         run: rustup show
       - name: "Install mold"
         uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
-      - name: "Install cargo nextest and insta"
-        uses: taiki-e/install-action@18b1216eba7f8039b0f8d131d5473787f0edce68 # v2.85.3
-        with:
-          tool: |
-            cargo-nextest
-            cargo-insta
       - name: "Install uv"
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
-          version: "0.12.1"
+          version: "0.12.9"
           enable-cache: "true"
       - name: ty mdtests (GitHub annotations)
         if: ${{ needs.determine_changes.outputs.ty == 'true' }}
@@ -358,15 +405,22 @@ jobs:
         # This step is just to get nice GitHub annotations on the PR diff in the files-changed tab.
         run: cargo test -p ty_python_semantic --test mdtest || true
       - name: "Run tests"
-        run: cargo insta test --all-features --unreferenced reject --test-runner nextest --disable-nextest-doctest
+        env:
+          # Tests create disposable uv projects that must be resolved without a lockfile.
+          UV_LOCKED: 0
+        run: uv run --locked --only-dev cargo insta test --all-features --unreferenced reject --test-runner nextest --disable-nextest-doctest
       - name: "Run doctests"
         run: cargo test --doc --all-features
       - name: Dogfood ty on py-fuzzer
-        run: uv run --project=./python/py-fuzzer cargo run -p ty check --project=./python/py-fuzzer
-      - name: Dogfood ty on the scripts directory
-        run: uv run --project=./scripts cargo run -p ty check --project=./scripts
+        run: uv run --quiet --project=./python/py-fuzzer cargo run --quiet -p ty check --project=./python/py-fuzzer --color=always
       - name: Dogfood ty on ty_benchmark
-        run: uv run --project=./scripts/ty_benchmark cargo run -p ty check --project=./scripts/ty_benchmark
+        run: uv run --quiet --project=./scripts/ty_benchmark cargo run --quiet -p ty check --project=./scripts/ty_benchmark --color=always
+      - name: Dogfood ty on scripts
+        env:
+          # Enable experimental support for installing PEP 723 script dependencies.
+          TY_UV: scripts
+          UV_LOCKED: "true"
+        run: cargo run --quiet -p ty check scripts/*.py --color=always
       # Check for broken links in the documentation.
       - run: cargo doc --all --no-deps
         env:
@@ -404,17 +458,16 @@ jobs:
         run: rustup show
       - name: "Install mold"
         uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
-      - name: "Install cargo nextest"
-        uses: taiki-e/install-action@18b1216eba7f8039b0f8d131d5473787f0edce68 # v2.85.3
-        with:
-          tool: cargo-nextest
       - name: "Install uv"
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
-          version: "0.12.1"
+          version: "0.12.9"
           enable-cache: "true"
       - name: "Run tests"
-        run: cargo nextest run --cargo-profile profiling --all-features
+        env:
+          # Tests create disposable uv projects that must be resolved without a lockfile.
+          UV_LOCKED: 0
+        run: uv run --locked --only-dev cargo nextest run --cargo-profile profiling --all-features
       - name: "Run doctests"
         run: cargo test --doc --profile profiling --all-features
 
@@ -443,18 +496,17 @@ jobs:
           cache-bin: "false"
       - name: "Install Rust toolchain"
         run: rustup show
-      - name: "Install cargo nextest"
-        uses: taiki-e/install-action@18b1216eba7f8039b0f8d131d5473787f0edce68 # v2.85.3
-        with:
-          tool: cargo-nextest
       - name: "Install uv"
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
-          version: "0.12.1"
+          version: "0.12.9"
           enable-cache: "true"
       - name: "Run tests"
+        env:
+          # Tests create disposable uv projects that must be resolved without a lockfile.
+          UV_LOCKED: 0
         run: |
-          cargo nextest run --all-features --profile ci
+          uv run --locked --only-dev cargo nextest run --all-features --profile ci
           cargo test --all-features --doc
 
   cargo-test-wasm:
@@ -474,7 +526,7 @@ jobs:
         run: rustup target add wasm32-unknown-unknown
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: 24
+          node-version: 24.19.0
           cache: "npm"
           cache-dependency-path: playground/package-lock.json
       - uses: jetli/wasm-pack-action@0d096b08b4e5a7de8c28de67e11e945404e9eefa # v0.4.0
@@ -491,7 +543,7 @@ jobs:
 
   cargo-build-msrv:
     name: "cargo build (msrv)"
-    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-latest-8' || 'ubuntu-latest' }}
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-24.04-8' || 'ubuntu-latest' }}
     needs: determine_changes
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
     timeout-minutes: 20
@@ -539,12 +591,10 @@ jobs:
         run: rustup show
       - name: "Install mold"
         uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
-      - name: "Install cargo-binstall"
-        uses: cargo-bins/cargo-binstall@e00d2c94cc0067b77737821097a62d91c0301baa # v1.21.1
-      - name: "Install cargo-fuzz"
-        # Download the latest version from quick install and not the github releases because github releases only has MUSL targets.
-        run: cargo binstall cargo-fuzz --force  --disable-strategies crate-meta-data --no-confirm
-      - run: cargo fuzz build -s none
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: "0.12.9"
+      - run: uv run --only-dev cargo fuzz build -s none
 
   fuzz-parser:
     name: "fuzz parser"
@@ -558,9 +608,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
-          version: "0.12.1"
+          version: "0.12.9"
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           shared-key: ruff-linux-debug
@@ -600,9 +650,9 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
-      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
-          version: "0.12.1"
+          version: "0.12.9"
       - name: "Install Rust toolchain"
         run: rustup component add rustfmt
       # Run all code generation scripts, and verify that the current output is
@@ -611,11 +661,11 @@ jobs:
       - run: python crates/ruff_python_formatter/generate.py
       - run: test -z "$(git status --porcelain)"
       # Verify that adding a plugin or rule produces clean code.
-      - run: ./scripts/add_rule.py --name DoTheThing --prefix F --code 999 --linter pyflakes
+      - run: ./scripts/add_rule.py --name DoTheThing --prefix F --code 999 --linter pyflakes --category correctness
       - run: cargo check
       - run: |
           ./scripts/add_plugin.py test --url https://pypi.org/project/-test/0.1.0/ --prefix TST
-          ./scripts/add_rule.py --name FirstRule --prefix TST --code 001 --linter test
+          ./scripts/add_rule.py --name FirstRule --prefix TST --code 001 --linter test --category correctness
       - run: cargo check
       # Lint/format/type-check py-fuzzer
       # (dogfooding with ty is done in a separate job)
@@ -625,7 +675,7 @@ jobs:
 
   ecosystem:
     name: "ecosystem"
-    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-latest-8' || 'ubuntu-latest' }}
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-24.04-8' || 'ubuntu-latest' }}
     needs: determine_changes
     # Only runs on pull requests, since that is the only we way we can find the base version for comparison.
     # Ecosystem check needs linter and/or formatter changes.
@@ -642,14 +692,14 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.pull_request.base.ref }}
+          ref: ${{ needs.determine_changes.outputs.comparison_base }}
           persist-credentials: false
 
-      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           activate-environment: true
-          version: "0.12.1"
+          version: "0.12.9"
 
       - name: "Install Rust toolchain"
         run: rustup show
@@ -685,7 +735,7 @@ jobs:
           # Set pipefail to avoid hiding errors with tee
           set -eo pipefail
 
-          ruff-ecosystem check ./target/debug/ruff-baseline ./target/debug/ruff --cache ./checkouts --output-format markdown | tee ecosystem-result-check-stable
+          ruff-ecosystem check ./target/debug/ruff-baseline ./target/debug/ruff --cache "$RUNNER_TEMP/ruff-ecosystem-checkouts" --output-format markdown | tee ecosystem-result-check-stable
 
           cat ecosystem-result-check-stable > "$GITHUB_STEP_SUMMARY"
           echo "### Linter (stable)"  > ecosystem-result
@@ -698,7 +748,7 @@ jobs:
           # Set pipefail to avoid hiding errors with tee
           set -eo pipefail
 
-          ruff-ecosystem check ./target/debug/ruff-baseline ./target/debug/ruff --cache ./checkouts --output-format markdown --force-preview | tee ecosystem-result-check-preview
+          ruff-ecosystem check ./target/debug/ruff-baseline ./target/debug/ruff --cache "$RUNNER_TEMP/ruff-ecosystem-checkouts" --output-format markdown --force-preview | tee ecosystem-result-check-preview
 
           cat ecosystem-result-check-preview > "$GITHUB_STEP_SUMMARY"
           echo "### Linter (preview)" >> ecosystem-result
@@ -711,7 +761,7 @@ jobs:
           # Set pipefail to avoid hiding errors with tee
           set -eo pipefail
 
-          ruff-ecosystem format ./target/debug/ruff-baseline ./target/debug/ruff --cache ./checkouts --output-format markdown | tee ecosystem-result-format-stable
+          ruff-ecosystem format ./target/debug/ruff-baseline ./target/debug/ruff --cache "$RUNNER_TEMP/ruff-ecosystem-checkouts" --output-format markdown | tee ecosystem-result-format-stable
 
           cat ecosystem-result-format-stable > "$GITHUB_STEP_SUMMARY"
           echo "### Formatter (stable)" >> ecosystem-result
@@ -724,7 +774,7 @@ jobs:
           # Set pipefail to avoid hiding errors with tee
           set -eo pipefail
 
-          ruff-ecosystem format ./target/debug/ruff-baseline ./target/debug/ruff --cache ./checkouts --output-format markdown --force-preview | tee ecosystem-result-format-preview
+          ruff-ecosystem format ./target/debug/ruff-baseline ./target/debug/ruff --cache "$RUNNER_TEMP/ruff-ecosystem-checkouts" --output-format markdown --force-preview | tee ecosystem-result-format-preview
 
           cat ecosystem-result-format-preview > "$GITHUB_STEP_SUMMARY"
           echo "### Formatter (preview)" >> ecosystem-result
@@ -761,9 +811,9 @@ jobs:
       # Faster to do this separately than to use `fetch-depth: 0` with `actions/checkout`
       - name: Fetch full history without tags
         run: git fetch --no-tags --filter=blob:none --unshallow origin
-      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
-          version: "0.12.1"
+          version: "0.12.9"
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
@@ -774,6 +824,7 @@ jobs:
       - name: Fuzz
         env:
           FORCE_COLOR: 1
+          MERGE_BASE: ${{ needs.determine_changes.outputs.comparison_base }}
           # Line-tables-only debug info: faster builds, backtraces still work.
           CARGO_PROFILE_PROFILING_DEBUG: line-tables-only
         run: |
@@ -782,7 +833,6 @@ jobs:
           cargo build --profile=profiling --bin=ty
           mv target/profiling/ty ty-new
 
-          MERGE_BASE="$(git merge-base "$GITHUB_SHA" "origin/$GITHUB_BASE_REF")"
           git checkout -b old_commit "$MERGE_BASE"
           echo "old commit (merge base)"
           git rev-list --format=%s --max-count=1 old_commit
@@ -811,9 +861,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: cargo-bins/cargo-binstall@e00d2c94cc0067b77737821097a62d91c0301baa # v1.21.1
-      - run: cargo binstall --no-confirm cargo-shear@1.12.4
-      - run: cargo shear --deny-warnings
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: "0.12.9"
+      - run: uv run --only-dev cargo shear --deny-warnings
 
   ty-completion-evaluation:
     name: "ty completion evaluation"
@@ -827,9 +878,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
-          version: "0.12.1"
+          version: "0.12.9"
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
@@ -872,6 +923,28 @@ jobs:
       - name: "Remove wheels from cache"
         run: rm -rf target/wheels
 
+  pgo:
+    name: "PGO"
+    runs-on: depot-ubuntu-24.04-8
+    needs: determine_changes
+    if: ${{ needs.determine_changes.outputs.release == 'true' && !contains(github.event.pull_request.labels.*.name, 'no-build') }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          architecture: x64
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: "Install LLVM profiling tools"
+        run: rustup component add llvm-tools-preview
+      - name: "Run PGO pipeline"
+        run: python scripts/build_ruff_pgo.py --debug
+
   prek:
     name: "prek"
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-16' || 'ubuntu-latest' }}
@@ -880,9 +953,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
-          version: "0.12.1"
+          version: "0.12.9"
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
@@ -896,7 +969,7 @@ jobs:
           echo '```console' > "$GITHUB_STEP_SUMMARY"
           # Enable color output for prek and remove it for the summary
           # Use --hook-stage=manual to enable slower hooks that are skipped by default
-          SKIP=rustfmt uv run --only-group dev --locked prek run --all-files --show-diff-on-failure --color always --hook-stage manual | \
+          SKIP=rustfmt uv run --only-dev --locked prek run --all-files --show-diff-on-failure --color always --hook-stage manual | \
             tee >(sed -E 's/\x1B\[([0-9]{1,2}(;[0-9]{1,2})*)?[mGK]//g' >> "$GITHUB_STEP_SUMMARY") >&1
           exit_code="${PIPESTATUS[0]}"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
@@ -916,21 +989,18 @@ jobs:
       - name: "Install Rust toolchain"
         run: rustup show
       - name: Install uv
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           python-version: 3.13
-          activate-environment: true
-          version: "0.12.1"
-      - name: "Install dependencies"
-        run: uv pip install -r docs/requirements.txt
+          version: "0.12.9"
       - name: "Update README File"
-        run: python scripts/transform_readme.py --target mkdocs
+        run: uv run scripts/transform_readme.py --target mkdocs
       - name: "Generate docs"
-        run: python scripts/generate_mkdocs.py
+        run: uv run scripts/generate_mkdocs.py
       - name: "Check docs formatting"
-        run: python scripts/check_docs_formatted.py
+        run: uv run scripts/check_docs_formatted.py
       - name: "Build docs"
-        run: mkdocs build --strict -f mkdocs.yml
+        run: uv run --only-group=docs mkdocs build --strict -f mkdocs.yml
 
   check-formatter-instability-and-black-similarity:
     name: "formatter instabilities and black similarity"
@@ -990,29 +1060,22 @@ jobs:
           repository: "astral-sh/ruff-lsp"
           path: ruff-lsp
 
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
-          # installation fails on 3.13 and newer
+          # ruff-lsp's archived CI only tested through Python 3.12.
           python-version: "3.12"
 
-      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
-
       - name: Install ruff-lsp dependencies
-        run: |
-          cd ruff-lsp
-          uv venv
-          uv pip install --no-deps -r requirements.txt
-          uv pip install --no-deps -r requirements-dev.txt
+        run: uv sync --locked --only-group ruff-lsp-test --python 3.12
 
       - name: Run ruff-lsp tests
         run: |
           # Setup development binary
-          export PATH="${PWD}/target/debug:${PATH}"
+          export PATH="${PWD}/target/debug:${PWD}/.venv/bin:${PATH}"
           ruff version
 
           cd ruff-lsp
-          uv pip uninstall ruff
-          uv run --no-sync pytest
+          pytest
 
   check-playground:
     name: "check playground"
@@ -1032,15 +1095,25 @@ jobs:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: 24
+          node-version: 24.19.0
           cache: "npm"
-          cache-dependency-path: playground/package-lock.json
+          cache-dependency-path: |
+            playground/package-lock.json
+            playground/deploy/package-lock.json
       - uses: jetli/wasm-bindgen-action@20b33e20595891ab1a0ed73145d8a21fc96e7c29 # v0.2.0
+      - name: "Check deployment dependencies"
+        env:
+          WRANGLER_SEND_METRICS: "false"
+          WRANGLER_SEND_ERROR_REPORTS: "false"
+        run: |
+          npm ci --ignore-scripts
+          ./node_modules/.bin/wrangler --version
+        working-directory: playground/deploy
       - name: "Install Node dependencies"
         run: npm ci --ignore-scripts
         working-directory: playground
       - name: "Build playgrounds"
-        run: npm run dev:wasm
+        run: npm run dev:build
         working-directory: playground
       - name: "Run TypeScript checks"
         run: npm run check
@@ -1051,7 +1124,7 @@ jobs:
 
   benchmarks-instrumented-ruff:
     name: "benchmarks instrumented (ruff)"
-    runs-on: ubuntu-24.04
+    runs-on: depot-ubuntu-24.04
     needs: determine_changes
     if: |
       github.repository == 'astral-sh/ruff' &&
@@ -1075,26 +1148,32 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
-      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
-          version: "0.12.1"
+          version: "0.12.9"
 
       - name: "Install Rust toolchain"
         run: rustup show
 
-      - name: "Install codspeed"
-        uses: taiki-e/install-action@18b1216eba7f8039b0f8d131d5473787f0edce68 # v2.85.3
-        with:
-          tool: cargo-codspeed
-
       - name: "Build benchmarks"
-        run: cargo codspeed build -m simulation -m memory --features "codspeed,ruff_instrumented" --profile profiling --no-default-features -p ruff_benchmark --bench formatter --bench lexer --bench linter --bench parser
+        run: uv run --only-dev cargo codspeed build -m simulation -m memory --features "codspeed,ruff_instrumented" --profile profiling --no-default-features -p ruff_benchmark --bench formatter --bench lexer --bench linter --bench parser
+
+      - name: "Configure apt mirror fallback"
+        run: |
+          # Let CodSpeed's dependency installation move past unhealthy mirrors quickly.
+          cat /etc/apt/apt-mirrors.txt
+          printf '%s\n' \
+            'Acquire::Retries "0";' \
+            'Acquire::http::Timeout "10";' \
+            'Acquire::https::Timeout "10";' \
+            | sudo tee /etc/apt/apt.conf.d/80-retries > /dev/null
 
       - name: "Run benchmarks"
-        uses: CodSpeedHQ/action@f22792bfac16f3e14eb9fbea76f4a48e9cc22b93 # v4.19.1
+        uses: CodSpeedHQ/action@0ca9cbbf4623b599a6c3ed4fc8a922942705d9f1 # v5.0.2
         with:
           mode: "simulation,memory"
-          run: cargo codspeed run
+          run: uv run --only-dev cargo codspeed run
 
   benchmarks-instrumented-ty-build:
     name: "benchmarks instrumented ty (build)"
@@ -1118,16 +1197,15 @@ jobs:
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
 
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: "0.12.9"
+
       - name: "Install Rust toolchain"
         run: rustup show
 
-      - name: "Install codspeed"
-        uses: taiki-e/install-action@18b1216eba7f8039b0f8d131d5473787f0edce68 # v2.85.3
-        with:
-          tool: cargo-codspeed
-
       - name: "Build benchmarks"
-        run: cargo codspeed build -m simulation -m memory --features "codspeed,module_resolution,ty_instrumented" --profile profiling --no-default-features -p ruff_benchmark --bench module_resolution --bench ty --bench ty_constraint_set
+        run: uv run --only-dev cargo codspeed build -m simulation -m memory --features "codspeed,module_resolution,ty_instrumented" --profile profiling --no-default-features -p ruff_benchmark --bench module_resolution --bench ty --bench ty_constraint_set
 
       - name: "Upload benchmark binary"
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -1140,7 +1218,7 @@ jobs:
 
   benchmarks-instrumented-ty-run:
     name: "benchmarks instrumented ty (${{ matrix.mode }}: ${{ matrix.name }})"
-    runs-on: ubuntu-24.04
+    runs-on: depot-ubuntu-24.04
     needs: benchmarks-instrumented-ty-build
     timeout-minutes: 20
     permissions:
@@ -1183,14 +1261,9 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
-          version: "0.12.1"
-
-      - name: "Install codspeed"
-        uses: taiki-e/install-action@18b1216eba7f8039b0f8d131d5473787f0edce68 # v2.85.3
-        with:
-          tool: cargo-codspeed
+          version: "0.12.9"
 
       - name: "Download benchmark binary"
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -1202,11 +1275,22 @@ jobs:
         # codspeed keeps changing the paths to the executable, so we have to be a bit more flexible
         run: find target/codspeed -type f -exec chmod +x {} +
 
+      - name: "Configure apt mirror fallback"
+        if: matrix.mode == 'simulation'
+        run: |
+          # Let CodSpeed's dependency installation move past unhealthy mirrors quickly.
+          cat /etc/apt/apt-mirrors.txt
+          printf '%s\n' \
+            'Acquire::Retries "0";' \
+            'Acquire::http::Timeout "10";' \
+            'Acquire::https::Timeout "10";' \
+            | sudo tee /etc/apt/apt.conf.d/80-retries > /dev/null
+
       - name: "Run benchmarks"
-        uses: CodSpeedHQ/action@f22792bfac16f3e14eb9fbea76f4a48e9cc22b93 # v4.19.1
+        uses: CodSpeedHQ/action@0ca9cbbf4623b599a6c3ed4fc8a922942705d9f1 # v5.0.2
         with:
           mode: ${{ matrix.mode }}
-          run: cargo codspeed run --bench "${{ matrix.target }}" "${{ matrix.filter }}"
+          run: uv run --only-dev cargo codspeed run --bench "${{ matrix.target }}" "${{ matrix.filter }}"
 
   benchmarks-walltime-build:
     name: "benchmarks walltime (build)"
@@ -1234,20 +1318,15 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
-      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
-          version: "0.12.1"
+          version: "0.12.9"
 
       - name: "Install Rust toolchain"
         run: rustup show
 
-      - name: "Install codspeed"
-        uses: taiki-e/install-action@18b1216eba7f8039b0f8d131d5473787f0edce68 # v2.85.3
-        with:
-          tool: cargo-codspeed
-
       - name: "Build benchmarks"
-        run: cargo codspeed build -m walltime --features "codspeed,ty_walltime" --profile profiling --no-default-features -p ruff_benchmark --bench ty_walltime
+        run: uv run --only-dev cargo codspeed build -m walltime --features "codspeed,ty_walltime" --profile profiling --no-default-features -p ruff_benchmark --bench ty_walltime --bench ty_script
 
       - name: "Upload benchmark binary"
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -1269,6 +1348,8 @@ jobs:
     strategy:
       matrix:
         benchmark:
+          - name: script
+            target: ty_script
           - name: sympy
             target: ty_walltime
             filter: sympy
@@ -1287,14 +1368,9 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
-          version: "0.12.1"
-
-      - name: "Install codspeed"
-        uses: taiki-e/install-action@18b1216eba7f8039b0f8d131d5473787f0edce68 # v2.85.3
-        with:
-          tool: cargo-codspeed
+          version: "0.12.9"
 
       - name: "Download benchmark binary"
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -1307,15 +1383,17 @@ jobs:
         run: find target/codspeed -type f -exec chmod +x {} +
 
       - name: "Run benchmarks"
-        uses: CodSpeedHQ/action@f22792bfac16f3e14eb9fbea76f4a48e9cc22b93 # v4.19.1
+        uses: CodSpeedHQ/action@0ca9cbbf4623b599a6c3ed4fc8a922942705d9f1 # v5.0.2
         env:
           # enabling walltime flamegraphs adds ~6 minutes to the CI time, and they don't
           # appear to provide much useful insight for our walltime benchmarks right now
           # (see https://github.com/astral-sh/ruff/pull/20419)
           CODSPEED_PERF_ENABLED: false
+          # Benchmarks manage any disposable uv environments they create.
+          UV_LOCKED: 0
         with:
           mode: walltime
-          run: cargo codspeed run --bench "${{ matrix.benchmark.target }}" -m walltime "${{ matrix.benchmark.filter }}"
+          run: uv run --locked --only-dev cargo codspeed run --bench "${{ matrix.benchmark.target }}" -m walltime "${{ matrix.benchmark.filter }}"
 
   required-checks-passed:
     name: "all required checks passed"
@@ -1323,6 +1401,7 @@ jobs:
     needs:
       - cargo-fmt
       - cargo-clippy
+      - hawk
       - cargo-test-linux
       - cargo-test-wasm
       - cargo-build-msrv

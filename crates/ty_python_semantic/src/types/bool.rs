@@ -5,9 +5,9 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::types::{
     CallArguments, CallDunderError, ClassType, CycleDetector, KnownClass, KnownInstanceType,
-    LiteralValueTypeKind, SubclassOfInner, Type, TypeContext, TypeVarBoundOrConstraints, UnionType,
-    call::CallErrorKind, constraints::ConstraintSetBuilder, context::InferContext,
-    diagnostic::UNSUPPORTED_BOOL_CONVERSION, typed_dict::TypedDictField,
+    LiteralValueTypeKind, PropertyInstanceClass, SubclassOfInner, Type, TypeContext,
+    TypeVarBoundOrConstraints, UnionType, call::CallErrorKind, constraints::ConstraintSetBuilder,
+    context::InferContext, diagnostic::UNSUPPORTED_BOOL_CONVERSION, typed_dict::TypedDictField,
 };
 use ty_python_core::Truthiness;
 
@@ -25,6 +25,23 @@ impl<'db> Type<'db> {
             &TryBoolVisitor::new(Ok(Truthiness::Ambiguous)),
         )
         .unwrap_or_else(|err| err.fallback_truthiness())
+    }
+
+    /// Like [`Self::bool`], but returns `None` for a type equivalent to [`Type::Never`].
+    ///
+    /// An uninhabited type cannot produce either boolean outcome, unlike
+    /// [`Truthiness::Ambiguous`]. Condition analysis uses this distinction to retain the
+    /// short-circuit outcome of expressions like `flag and stop()`, where `stop` returns `Never`.
+    /// The equivalence check also handles aliases and type variables bounded by `Never`.
+    ///
+    /// This classifies a value type, not a compound condition's evaluation. It preserves
+    /// [`Self::bool`]'s error fallback and conservative handling of `__bool__` returning `Never`.
+    pub(crate) fn bool_if_inhabited(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Option<Truthiness> {
+        (!self.is_equivalent_to(db, env, Type::Never)).then(|| self.bool(db, env))
     }
 
     /// Resolves the boolean value of a type.
@@ -226,6 +243,8 @@ impl<'db> Type<'db> {
         };
 
         let truthiness = match self {
+            Type::Callable(callable) if callable.is_function_like(db) => Truthiness::AlwaysTrue,
+
             Type::Dynamic(_)
             | Type::Divergent(_)
             | Type::Never
@@ -256,6 +275,17 @@ impl<'db> Type<'db> {
                 Truthiness::from(*is_non_empty)
             }
 
+            Type::PropertyInstance(property)
+                if let PropertyInstanceClass::Subclass(class) = property.instance_class(db) =>
+            {
+                Type::instance(db, env, class).try_bool_impl(
+                    db,
+                    env,
+                    allow_short_circuit,
+                    visitor,
+                )?
+            }
+
             Type::FunctionLiteral(_)
             | Type::BoundMethod(_)
             | Type::WrapperDescriptor(_)
@@ -264,6 +294,7 @@ impl<'db> Type<'db> {
             | Type::DataclassTransformer(_)
             | Type::ModuleLiteral(_)
             | Type::PropertyInstance(_)
+            | Type::SlotDescriptor(_)
             | Type::BoundSuper(_)
             | Type::KnownInstance(_)
             | Type::SpecialForm(_)

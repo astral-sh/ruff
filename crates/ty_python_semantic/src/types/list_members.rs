@@ -16,10 +16,11 @@ use crate::{
         DefinedPlace, Place, PlaceWithDefinition, imported_symbol, place_from_bindings,
         place_from_declarations,
     },
+    reachability::ReachabilityConstraintsExtension,
     types::{
         ClassBase, ClassLiteral, KnownClass, ProgramEnvironment, StaticClassLiteral,
         SubclassOfInner, Type, TypeVarBoundOrConstraints, class::CodeGeneratorKind,
-        exists_at_runtime,
+        function::FunctionType, infer_definition_types, may_exist_at_runtime,
     },
 };
 use ty_python_core::{
@@ -314,7 +315,7 @@ impl<'db> AllMembers<'db> {
                             db,
                             env,
                             ty,
-                            class_literal.metaclass(db),
+                            class_type.inferred_metaclass(db).for_inheritance(db, env),
                         );
                     }
                 }
@@ -358,6 +359,7 @@ impl<'db> AllMembers<'db> {
 
             Type::LiteralValue(_)
             | Type::PropertyInstance(_)
+            | Type::SlotDescriptor(_)
             | Type::FunctionLiteral(_)
             | Type::BoundMethod(_)
             | Type::KnownBoundMethod(_)
@@ -451,7 +453,7 @@ impl<'db> AllMembers<'db> {
                         is_type_check_only: defined
                             .provenance
                             .definition()
-                            .is_some_and(|definition| !exists_at_runtime(db, definition)),
+                            .is_some_and(|definition| !may_exist_at_runtime(db, definition)),
                     });
                 }
 
@@ -504,6 +506,8 @@ impl<'db> AllMembers<'db> {
             .filter_map(ClassBase::into_class)
             .filter_map(|class| class.static_class_literal(db).map(|(lit, _)| lit))
         {
+            self.extend_with_slot_members(db, env, ty, parent);
+
             let parent_scope = parent.body_scope(db);
             for memberdef in all_end_of_scope_members(db, parent_scope) {
                 let result = ty.member(db, env, memberdef.member.name.as_str());
@@ -516,6 +520,38 @@ impl<'db> AllMembers<'db> {
                     is_type_check_only: memberdef.member.is_type_check_only,
                 });
             }
+        }
+    }
+
+    /// Includes slot descriptors that are generated outside the class-body symbol table.
+    ///
+    /// ```python
+    /// class Example:
+    ///     __slots__ = ("value",)
+    /// ```
+    ///
+    /// Both `Example` and `Example()` expose `value` even without an explicit attribute binding.
+    fn extend_with_slot_members(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+        class_literal: StaticClassLiteral<'db>,
+    ) {
+        let Some(slots) = class_literal.slot_names(db) else {
+            return;
+        };
+
+        for name in slots {
+            let result = ty.member(db, env, name);
+            let Some(ty) = result.place.ignore_possibly_undefined() else {
+                continue;
+            };
+            self.members.insert(Member {
+                name: name.clone(),
+                ty,
+                is_type_check_only: false,
+            });
         }
     }
 
@@ -551,6 +587,9 @@ impl<'db> AllMembers<'db> {
         let class_body_scope = class_literal.body_scope(db);
         let program_file = class_body_scope.program_file(db);
         let index = semantic_index(db, program_file);
+
+        self.extend_with_slot_members(db, env, ty, class_literal);
+
         for function_scope_id in attribute_scopes(db, class_body_scope) {
             for place_expr in index.place_table(function_scope_id).members() {
                 let Some(name) = place_expr.as_instance_attribute() else {
@@ -682,6 +721,83 @@ pub struct Member<'db> {
     pub(crate) is_type_check_only: bool,
 }
 
+impl<'db> Member<'db> {
+    /// Recover local functions retained in the exposed type, including property accessors.
+    /// Unlike [`Self::local_functions`], this does not recover definitions replaced by decorators.
+    fn local_functions_from_type(
+        &self,
+        db: &'db dyn Db,
+        scope: ScopeId<'db>,
+    ) -> smallvec::SmallVec<[FunctionType<'db>; 1]> {
+        let mut functions = smallvec::SmallVec::<[FunctionType<'db>; 1]>::new();
+        let mut types: smallvec::SmallVec<[Type<'db>; 1]> = smallvec::smallvec![self.ty];
+        let mut index = 0;
+
+        while let Some(ty) = types.get(index).copied() {
+            index += 1;
+            match ty {
+                Type::PropertyInstance(property) => {
+                    for accessor in [
+                        property.getter(db),
+                        property.setter(db),
+                        property.deleter(db),
+                    ]
+                    .into_iter()
+                    .flatten()
+                    {
+                        functions.extend(extract_underlying_functions(db, accessor));
+                    }
+                }
+                Type::Union(union) => {
+                    types.extend(union.elements(db).iter().copied());
+                }
+                _ => functions.extend(extract_underlying_functions(db, ty)),
+            }
+        }
+
+        functions
+            .into_iter()
+            .filter(|function| is_local_member_function(db, *function, &self.name, scope))
+            .collect()
+    }
+
+    /// Recover source methods for a class member, including retained property accessors.
+    ///
+    /// The exposed type and the source functions serve different purposes: decorators can replace
+    /// a function's type while its definition still carries exclusions or diagnostic locations.
+    /// Functions recovered from the type must belong to this member, so aliases and replacements
+    /// from another class are not treated as local method definitions.
+    pub(super) fn local_functions(
+        &self,
+        db: &'db dyn Db,
+        scope: ScopeId<'db>,
+    ) -> smallvec::SmallVec<[FunctionType<'db>; 1]> {
+        let member_functions = self.local_functions_from_type(db, scope);
+        let mut functions = smallvec::SmallVec::<[FunctionType<'db>; 1]>::new();
+        for definition in end_of_scope_function_definitions(db, scope, &self.name) {
+            let function = member_functions
+                .iter()
+                .copied()
+                .find(|function| function.contains_definition(db, definition))
+                .or_else(|| infer_definition_types(db, definition).function_type(definition));
+
+            if let Some(function) = function
+                && !functions.contains(&function)
+            {
+                functions.push(function);
+            }
+        }
+
+        // A property can retain a getter even though only its setter is an end-of-scope binding.
+        let additional_functions: smallvec::SmallVec<[_; 1]> = member_functions
+            .into_iter()
+            .filter(|function| !functions.contains(function))
+            .collect();
+        functions.extend(additional_functions);
+        functions
+    }
+}
+
 impl std::hash::Hash for Member<'_> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.name.hash(state);
@@ -705,6 +821,70 @@ impl<'db> Ord for Member<'db> {
 impl<'db> PartialOrd for Member<'db> {
     fn partial_cmp(&self, rhs: &Member<'db>) -> Option<Ordering> {
         Some(self.cmp(rhs))
+    }
+}
+
+/// Return reachable function definitions that bind `member_name` at the end of `subclass_scope`.
+fn end_of_scope_function_definitions<'db>(
+    db: &'db dyn Db,
+    subclass_scope: ScopeId<'db>,
+    member_name: &Name,
+) -> smallvec::SmallVec<[Definition<'db>; 1]> {
+    let table = place_table(db, subclass_scope);
+    let Some(symbol_id) = table.symbol_id(member_name) else {
+        return smallvec::smallvec![];
+    };
+
+    let use_def = use_def_map(db, subclass_scope);
+    let predicates = use_def.predicates();
+    let reachability_constraints = use_def.reachability_constraints();
+    use_def
+        .end_of_scope_symbol_bindings(symbol_id)
+        .filter_map(|binding| {
+            let definition = binding.binding.definition()?;
+            let reachability =
+                reachability_constraints.evaluate(db, predicates, binding.reachability_constraint);
+            if reachability.is_always_false() || !definition.kind(db).is_function_def() {
+                return None;
+            }
+
+            Some(definition)
+        })
+        .collect()
+}
+
+fn is_local_member_function<'db>(
+    db: &'db dyn Db,
+    function: FunctionType<'db>,
+    member_name: &Name,
+    member_scope: ScopeId<'db>,
+) -> bool {
+    function.python_file(db) == member_scope.python_file(db)
+        && function.definition(db).scope(db) == member_scope
+        && function.name(db) == member_name
+}
+
+/// Extract callable functions represented by a type.
+/// These may be defined in files other than the one being checked.
+pub(super) fn extract_underlying_functions<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+) -> smallvec::SmallVec<[FunctionType<'db>; 1]> {
+    match ty {
+        Type::FunctionLiteral(function) => smallvec::smallvec_inline![function],
+        Type::BoundMethod(method) => smallvec::smallvec_inline![method.function(db)],
+        Type::PropertyInstance(property) => property.getter(db).map_or_else(
+            || smallvec::smallvec![],
+            |getter| extract_underlying_functions(db, getter),
+        ),
+        Type::Union(union) => {
+            let mut functions = smallvec::smallvec![];
+            for member in union.elements(db) {
+                functions.extend(extract_underlying_functions(db, *member));
+            }
+            functions
+        }
+        _ => smallvec::smallvec![],
     }
 }
 

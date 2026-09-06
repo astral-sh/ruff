@@ -7,6 +7,7 @@ mod python_environment;
 mod rule;
 mod rule_selection;
 mod scripts;
+mod server;
 mod uv_workspace;
 
 use anyhow::Context as _;
@@ -982,11 +983,29 @@ impl CliTest {
     }
 
     pub(crate) fn command(&self) -> Command {
+        self.command_with_subcommand("check")
+    }
+
+    fn command_with_subcommand(&self, subcommand: &str) -> Command {
         let mut command = Command::new(&self.ty_binary_path);
-        command.current_dir(&self.project_dir).arg("check");
+        command.current_dir(&self.project_dir).arg(subcommand);
 
         // Unset all environment variables because they can affect test behavior.
         command.env_clear();
+        // Point user config discovery at a test-local directory to avoid picking up host config.
+        command.env(
+            user_config_directory_env_var(),
+            self.user_config_directory(),
+        );
+
+        command
+    }
+
+    #[cfg(feature = "test-uv")]
+    pub(crate) fn command_inheriting_environment(&self) -> Command {
+        let mut command = Command::new(&self.ty_binary_path);
+        command.current_dir(&self.project_dir).arg("check");
+
         // Point user config discovery at a test-local directory to avoid picking up host config.
         command.env(
             user_config_directory_env_var(),

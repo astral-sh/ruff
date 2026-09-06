@@ -202,6 +202,7 @@ PTH116 `os.stat()` should be replaced by `Path.stat()`, `Path.owner()`, or `Path
 24 | os.path.isabs(p)
 25 | os.path.join(p, q)
    |
+help: Replace with `Path(...).stat()`
 
 PTH117 `os.path.isabs()` should be replaced by `Path.is_absolute()`
   --> full_name.py:24:1

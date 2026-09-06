@@ -1025,7 +1025,7 @@ In the future, this property will contain the last metadata change time.""")
 # At runtime it inherits from ABC and is not a Protocol, but it will be
 # on the allowlist for use as a Protocol starting in 3.14.
 @runtime_checkable
-class PathLike(ABC, Protocol[AnyStr_co]):  # type: ignore[misc]  # pyright: ignore[reportGeneralTypeIssues]  # ty:ignore[invalid-protocol]
+class PathLike(ABC, Protocol[AnyStr_co]):  # type: ignore[misc]  # pyright: ignore[reportGeneralTypeIssues]  # ty:ignore[invalid-protocol]  # pyrefly: ignore [invalid-inheritance]
     """Abstract base class for implementing the file system path protocol."""
 
     __slots__ = ()

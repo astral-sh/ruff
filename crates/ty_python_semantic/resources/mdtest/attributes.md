@@ -195,6 +195,19 @@ reveal_type(C.inferred_from_value)  # revealed: Unknown
 C.inferred_from_value = "overwritten on class"
 ```
 
+#### Bound methods assigned on narrowed receivers
+
+A bound method keeps the receiver that was used to access it. If `self` is narrowed before the bound
+method is assigned to an inferred instance attribute, the captured receiver remains assignable to
+the receiver used by the inferred attribute type.
+
+```py
+class C:
+    def method(self) -> None:
+        if not isinstance(self, str):
+            self.saved_method = self.method
+```
+
 #### Variable defined in multiple methods
 
 If we see multiple un-annotated assignments to a single attribute (`self.x` below), we build the
@@ -259,6 +272,9 @@ reveal_type(c_instance.b)  # revealed: int
 
 #### Augmented assignments
 
+An augmented assignment contributes its result to an instance attribute that already has an
+independent binding.
+
 ```py
 class Weird:
     def __iadd__(self, other: None) -> str:
@@ -269,9 +285,377 @@ class C:
         self.w = Weird()
         self.w += None
 
-# TODO: Mypy and pyright do not support this, but it would be great if we could
-# infer `str` here (`Weird` is not a possible type for the `w` attribute).
-reveal_type(C().w)  # revealed: Weird
+# TODO: Infer only `str`, since the initial `Weird` value has been overwritten.
+reveal_type(C().w)  # revealed: Weird | str
+```
+
+#### Augmented assignments with stable recursive inference
+
+An independently initialized buffer updated from multiple methods must retain its concrete type,
+even when augmented assignments recursively look up that attribute.
+
+```toml
+[rules]
+unsound-return-statement = "error"
+```
+
+```py
+class Buffer:
+    def __init__(self) -> None:
+        self.reset()
+
+    def append(self, value: bytes) -> None:
+        if value:
+            self.content += b","
+        self.content += value
+
+    def reset(self) -> None:
+        self.content = bytearray()
+
+    def finish(self) -> bytearray:
+        self.content += b"]"
+        return self.content
+
+reveal_type(Buffer().content)  # revealed: bytearray
+```
+
+The same cycle recovery also preserves a concrete integer attribute.
+
+```py
+class Counter:
+    def __init__(self) -> None:
+        self.reset()
+
+    def increment(self, value: int) -> None:
+        self.value += value
+
+    def reset(self) -> None:
+        self.value = 0
+
+    def finish(self) -> int:
+        self.value += 1
+        return self.value
+
+reveal_type(Counter().value)  # revealed: int
+```
+
+#### Augmented assignments to narrowed optional attributes
+
+Once an optional attribute has been narrowed to its non-`None` value, augmented assignments must not
+introduce `Unknown` into its instance attribute type.
+
+```toml
+[rules]
+unsound-return-statement = "error"
+```
+
+```py
+class Counter:
+    def __init__(self, value: int | None) -> None:
+        self.value = value
+
+    def update(self, decrement: bool) -> None:
+        if self.value is None:
+            return
+
+        if decrement:
+            self.value -= 1
+        else:
+            self.value += 1
+
+    def current(self) -> int | None:
+        return self.value
+
+reveal_type(Counter(0).value)  # revealed: int | None
+```
+
+#### Augmented assignments to unannotated class-level defaults
+
+An unannotated class-level default can supply the initial value read by an augmented assignment. The
+instance attribute can then contain either the original value or the result of the operation.
+
+```py
+class After:
+    def __iadd__(self, other: int) -> "After":
+        return self
+
+class Before:
+    def __iadd__(self, other: int) -> After:
+        return After()
+
+class C:
+    value = Before()
+
+    def update(self) -> None:
+        self.value += 1  # error: [invalid-assignment]
+
+reveal_type(C().value)  # revealed: Before | After
+```
+
+#### Augmented assignments to conditionally defined class-level defaults
+
+A conditional class default must not hide the dynamic fallback used when that default is absent.
+
+```py
+class After:
+    def __iadd__(self, other: int) -> "After":
+        return self
+
+class Before:
+    def __iadd__(self, other: int) -> After:
+        return After()
+
+class FallbackAfter:
+    def __iadd__(self, other: int) -> "FallbackAfter":
+        return self
+
+class Fallback:
+    def __iadd__(self, other: int) -> FallbackAfter:
+        return FallbackAfter()
+
+def flag() -> bool:
+    return True
+
+class C:
+    if flag():
+        value = Before()
+
+    def __getattr__(self, name: str) -> Fallback:
+        return Fallback()
+
+    def update(self) -> None:
+        # error: [invalid-assignment]
+        # error: [possibly-missing-attribute]
+        self.value += 1
+
+reveal_type(C().value)  # revealed: Before | After | FallbackAfter | Fallback
+```
+
+#### Augmented assignments with expanding generic results
+
+An augmented assignment can repeatedly expand a generic attribute's type arguments. Inference must
+still converge when the initial value comes from a class-level default.
+
+```py
+from __future__ import annotations
+
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Grow(Generic[T]):
+    def __iadd__(self, other: int) -> Grow[list[T]]:
+        raise NotImplementedError
+
+class Counter:
+    value = Grow[int]()
+
+    def update(self) -> None:
+        self.value += 1  # error: [invalid-assignment]
+
+reveal_type(Counter().value)  # revealed: Grow[int] | Grow[list[int]]
+```
+
+An independently initialized attribute must use the same bounded cycle recovery.
+
+```py
+class InitializedCounter:
+    def __init__(self) -> None:
+        self.value = Grow[int]()
+
+    def update(self) -> None:
+        self.value += 1  # error: [invalid-assignment]
+
+reveal_type(InitializedCounter().value)  # revealed: Grow[int] | Grow[list[int]]
+```
+
+#### Augmented assignments with expanding tuple results
+
+Repeatedly nesting an independently initialized tuple must converge instead of exhausting Salsa's
+cycle-iteration limit.
+
+```py
+class C:
+    def __init__(self) -> None:
+        self.value = (1,)
+
+    def update(self) -> None:
+        self.value += (self.value,)
+
+reveal_type(C().value)  # revealed: tuple[int] | tuple[Divergent, ...]
+```
+
+#### Augmented assignments to inherited instance attributes
+
+An instance attribute established by a superclass can supply the initial value read by an augmented
+assignment in a subclass.
+
+```py
+class After:
+    def __iadd__(self, other: int) -> "After":
+        return self
+
+class Before:
+    def __iadd__(self, other: int) -> After:
+        return After()
+
+class Base:
+    def __init__(self) -> None:
+        self.value = Before()
+
+class Child(Base):
+    def update(self) -> None:
+        self.value += 1
+
+reveal_type(Child().value)  # revealed: Before | After
+```
+
+#### Augmented assignments preserve inherited instance bindings beneath class defaults
+
+A superclass initializer writes instance storage even when a subclass defines a class-level default
+with the same name. Both initial values and their augmented-assignment results remain possible.
+
+```py
+class AfterA:
+    def __iadd__(self, other: int) -> "AfterA":
+        return self
+
+class AfterB:
+    def __iadd__(self, other: int) -> "AfterB":
+        return self
+
+class BeforeA:
+    def __iadd__(self, other: int) -> AfterA:
+        return AfterA()
+
+class BeforeB:
+    def __iadd__(self, other: int) -> AfterB:
+        return AfterB()
+
+class Base:
+    def __init__(self) -> None:
+        self.value = BeforeA()
+
+class Child(Base):
+    value = BeforeB()
+
+    def update(self) -> None:
+        self.value += 1  # error: [invalid-assignment]
+
+reveal_type(Child().value)  # revealed: BeforeB | AfterB | AfterA | BeforeA
+```
+
+#### Augmented assignments preserve subclass attribute bindings
+
+An augmented assignment inherited from an intermediate class must not discard instance attributes
+that subclasses establish independently.
+
+```py
+from typing import Any
+
+class Base:
+    value = 0
+
+class Middle(Base):
+    def increment(self) -> None:
+        self.value += 1
+
+class Child(Middle):
+    def set(self, value: Any) -> None:
+        self.value = value
+
+reveal_type(Child().value)  # revealed: int | Any
+```
+
+An untyped subclass binding is likewise preserved.
+
+```py
+class UnknownChild(Middle):
+    def set(self, value) -> None:
+        self.value = value
+
+reveal_type(UnknownChild().value)  # revealed: int | Unknown
+```
+
+An explicitly annotated class-level default also preserves subclass bindings.
+
+```py
+class AnnotatedBase:
+    value: int = 0
+
+class AnnotatedMiddle(AnnotatedBase):
+    def increment(self) -> None:
+        self.value += 1
+
+class AnnotatedChild(AnnotatedMiddle):
+    def set(self, value: Any) -> None:
+        self.value = value
+
+reveal_type(AnnotatedChild().value)  # revealed: int | Any
+```
+
+#### Augmented assignments with gradual operands
+
+An augmented assignment with an `Any` or untyped operand contributes its gradual result to the
+inferred instance attribute.
+
+```py
+from typing import Any
+
+class C:
+    def __init__(self, any_value: Any, unknown_value) -> None:
+        self.from_any = 0.0
+        self.from_any += any_value
+
+        self.from_unknown = 0
+        self.from_unknown += unknown_value
+
+reveal_type(C(0, 0).from_any)  # revealed: float | Any
+reveal_type(C(0, 0).from_unknown)  # revealed: int | Unknown
+```
+
+#### Augmented assignments to possible data descriptors
+
+An augmented assignment to a data descriptor passes its result to `__set__` rather than creating
+instance storage. When a class default might be a descriptor, preserve the existing attribute types
+without exposing the descriptor's write-only result.
+
+```py
+class After:
+    def __iadd__(self, other: int) -> "After":
+        return self
+
+class Before:
+    def __iadd__(self, other: int) -> After:
+        return After()
+
+class DescriptorAfter:
+    def __iadd__(self, other: int) -> "DescriptorAfter":
+        return self
+
+class DescriptorValue:
+    def __iadd__(self, other: int) -> DescriptorAfter:
+        return DescriptorAfter()
+
+class Descriptor:
+    def __get__(self, instance: object, owner: type[object]) -> DescriptorValue:
+        return DescriptorValue()
+
+    def __set__(self, instance: object, value: DescriptorAfter) -> None: ...
+
+def flag() -> bool:
+    return True
+
+class C:
+    value = Descriptor() if flag() else Before()
+
+    def update(self) -> None:
+        # error: [invalid-assignment]
+        # error: [invalid-assignment]
+        self.value += 1
+
+# TODO: Include `After` from the non-descriptor branch without including `DescriptorAfter`.
+reveal_type(C().value)  # revealed: DescriptorValue | Before
 ```
 
 #### Nested augmented assignments after narrowing
@@ -339,7 +723,7 @@ class C:
 
 c_instance = C()
 reveal_type(c_instance.a)  # revealed: int
-reveal_type(c_instance.b)  # revealed: list[Literal[2, 3]]
+reveal_type(c_instance.b)  # revealed: list[int]
 ```
 
 #### Attributes defined in for-loop (unpacking)
@@ -600,7 +984,11 @@ reveal_type(D().x)  # revealed: Unknown
 If `staticmethod` is something else, that should not influence the behavior:
 
 ```py
-def staticmethod(f):
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def staticmethod(f: T) -> T:
     return f
 
 class C:
@@ -832,6 +1220,53 @@ reveal_type(c_instance.pure_class_variable)  # revealed: str
 c_instance.pure_class_variable = "value set on instance"
 ```
 
+#### Augmented assignments in class methods
+
+A classmethod can establish an implicit class variable and then augment it with an operation that
+changes its type. Both the initial value and the augmented result remain possible.
+
+```py
+class After: ...
+
+class Before:
+    def __iadd__(self, other: int) -> After:
+        return After()
+
+class Example:
+    @classmethod
+    def update(cls) -> None:
+        cls.value = Before()
+        cls.value += 1
+
+reveal_type(Example.value)  # revealed: Before | After
+```
+
+#### Augmented assignments to inherited class variables
+
+A classmethod can read an inherited class variable before storing its augmented result on the
+subclass. Class-member lookup must preserve the deferred assignment until it finds that inherited
+value.
+
+```py
+class After:
+    def __iadd__(self, other: int) -> "After":
+        return self
+
+class Before:
+    def __iadd__(self, other: int) -> After:
+        return After()
+
+class Parent:
+    value = Before()
+
+class Child(Parent):
+    @classmethod
+    def update(cls) -> None:
+        cls.value += 1
+
+reveal_type(Child.value)  # revealed: Before | After
+```
+
 ### Instance variables with class-level default values
 
 These are instance attributes, but the fact that we can see that they have a binding (not a
@@ -867,6 +1302,29 @@ C.variable_with_class_default1 = "overwritten on class"
 
 reveal_type(C.variable_with_class_default1)  # revealed: Literal["overwritten on class"]
 reveal_type(c_instance.variable_with_class_default1)  # revealed: Literal["value set on instance"]
+```
+
+#### Augmented assignments to overriding class-level defaults
+
+An unannotated class-level default supplies the initial value for an augmented assignment, even when
+another branch of a diamond declares a wider instance attribute.
+
+```py
+class Base:
+    value: int | None = None
+
+class First(Base): ...
+
+class Second(Base):
+    value: int | None
+
+class Child(First, Second):
+    value = 1
+
+    def update(self) -> None:
+        self.value |= 2
+
+reveal_type(Child().value)  # revealed: int
 ```
 
 #### Descriptor attributes as class variables
@@ -1298,6 +1756,26 @@ class InitializedDerived(DeclaringBase, metaclass=DerivedInitializingMeta): ...
 reveal_type(InitializedDerived.inherited_attr)  # revealed: int
 ```
 
+An attribute initialized by the metaclass also takes precedence over an inherited generic
+declaration. Access through the generic subclass refers to the ordinary `int` attribute installed by
+the metaclass, so reads, writes, and deletion are allowed.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class GenericDeclaringBase(Generic[T]):
+    inherited_attr: T | int
+
+class GenericInitializedDerived(GenericDeclaringBase[T], metaclass=DerivedInitializingMeta): ...
+
+reveal_type(GenericInitializedDerived.inherited_attr)  # revealed: int
+reveal_type(GenericInitializedDerived[str].inherited_attr)  # revealed: int
+GenericInitializedDerived[str].inherited_attr = 2
+del GenericInitializedDerived[str].inherited_attr
+```
+
 An assignment through `cls` in an arbitrary metaclass method also writes to the constructed class
 object if that method is called. Class-object lookup currently treats such an inferred write as
 definitely present and drops an inherited value.
@@ -1569,6 +2047,47 @@ class UsesGeneratedDescriptor(metaclass=DescriptorMeta):
 reveal_type(UsesGeneratedDescriptor().generated_descriptor)  # revealed: Literal["descriptor"]
 ```
 
+An augmented assignment to a data descriptor on a metaclass calls the descriptor's `__set__` method.
+It does not store an attribute on the class, so the attribute is unavailable on instances.
+
+```py
+class AugmentedDescriptor:
+    def __get__(self, instance: object, owner: type[object]) -> int:
+        return 1
+
+    def __set__(self, instance: object, value: int) -> None: ...
+
+class AugmentedDescriptorMeta(type):
+    descriptor_value = AugmentedDescriptor()
+
+    def update(cls) -> None:
+        cls.descriptor_value += 1
+
+class UsesAugmentedDescriptor(metaclass=AugmentedDescriptorMeta): ...
+
+# error: [unresolved-attribute]
+reveal_type(UsesAugmentedDescriptor().descriptor_value)  # revealed: Unknown
+```
+
+A metaclass default that might be a data descriptor likewise must not expose a class attribute on
+constructed instances.
+
+```py
+def choose_descriptor() -> bool:
+    return True
+
+class MaybeAugmentedDescriptorMeta(type):
+    descriptor_value = AugmentedDescriptor() if choose_descriptor() else 1
+
+    def update(cls) -> None:
+        cls.descriptor_value += 1  # error: [invalid-assignment]
+
+class UsesMaybeAugmentedDescriptor(metaclass=MaybeAugmentedDescriptorMeta): ...
+
+# error: [unresolved-attribute]
+reveal_type(UsesMaybeAugmentedDescriptor().descriptor_value)  # revealed: Unknown
+```
+
 When a metaclass declaration uses a union, only the data descriptors in that union take precedence
 over an instance attribute. A non-descriptor member and the instance attribute both remain possible:
 
@@ -1593,6 +2112,22 @@ A dynamic base likewise supplies the fallback for the non-descriptor members of 
 class UsesMaybeGeneratedDescriptorWithDynamicBase(DynamicGeneratedBase, metaclass=MaybeDescriptorMeta): ...
 
 reveal_type(UsesMaybeGeneratedDescriptorWithDynamicBase().generated_descriptor)  # revealed: Literal["descriptor"] | Any
+```
+
+A union alias must not hide a non-descriptor member: the same dynamic fallback remains possible
+after expanding it:
+
+```py
+from typing_extensions import TypeAliasType
+
+GeneratedDescriptorOrInt = TypeAliasType("GeneratedDescriptorOrInt", GeneratedDescriptor | int)
+
+class AliasedDescriptorMeta(MaybeDescriptorMeta):
+    generated_descriptor: GeneratedDescriptorOrInt | GeneratedDescriptor
+
+class UsesAliasedDescriptorWithDynamicBase(DynamicGeneratedBase, metaclass=AliasedDescriptorMeta): ...
+
+reveal_type(UsesAliasedDescriptorWithDynamicBase().generated_descriptor)  # revealed: Literal["descriptor"] | Any
 ```
 
 Dynamic bases are ignored when descriptor detection requires a concrete `__get__` method:
@@ -2786,6 +3321,8 @@ def _(ns: argparse.Namespace):
 
 ## Classes with custom `__getattribute__` methods
 
+### Basic
+
 If a type provides a custom `__getattribute__`, we use its return type as the type for unknown
 attributes. Note that this behavior differs from runtime, where `__getattribute__` is called
 unconditionally, even for known attributes. The rationale for doing this is that it allows users to
@@ -2842,6 +3379,113 @@ class ThisFails:
 
 # error: [unresolved-attribute]
 ThisFails().x
+```
+
+### Invalid `__getattribute__` calls
+
+An invalid `__getattribute__` call fails before Python can look up either a defined or missing
+attribute. A defined member retains its declared type, while a missing member uses the method's
+return type for error recovery.
+
+```py
+class InvalidGetAttribute:
+    defined: bool = True
+
+    # error: [invalid-method-override]
+    def __getattribute__(self) -> str:
+        return "fallback"
+
+InvalidGetAttribute().missing  # snapshot: invalid-attribute-access
+
+# error: [invalid-attribute-access] "Invalid access to attribute `missing` on type `InvalidGetAttribute`"
+reveal_type(InvalidGetAttribute().missing)  # revealed: str
+
+# error: [invalid-attribute-access] "Invalid access to attribute `defined` on type `InvalidGetAttribute`"
+reveal_type(InvalidGetAttribute().defined)  # revealed: bool
+
+# error: [invalid-attribute-access] "Invalid access to attribute `__getattribute__` on type `InvalidGetAttribute`"
+InvalidGetAttribute().__getattribute__
+```
+
+```snapshot
+error[invalid-attribute-access]: Invalid access to attribute `missing` on type `InvalidGetAttribute`
+ --> src/mdtest_snippet.py:8:1
+  |
+8 | InvalidGetAttribute().missing  # snapshot: invalid-attribute-access
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Too many positional arguments to bound method `InvalidGetAttribute.__getattribute__`: expected 1, got 2
+info: This access implicitly calls `__getattribute__`
+info: Method signature here
+ --> src/mdtest_snippet.py:5:9
+  |
+5 |     def __getattribute__(self) -> str:
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+```
+
+An incompatible type for the attribute name also makes the implicit call invalid.
+
+```py
+class InvalidNameType:
+    # error: [invalid-method-override]
+    def __getattribute__(self, name: int) -> bytes:
+        return b"fallback"
+
+# error: [invalid-attribute-access] "Invalid access to attribute `missing` on type `InvalidNameType`"
+reveal_type(InvalidNameType().missing)  # revealed: bytes
+```
+
+### Inherited invalid `__getattribute__` calls
+
+An invalid interceptor inherited from a base class also prevents access to attributes declared on
+the subclass.
+
+```py
+class InvalidBase:
+    # error: [invalid-method-override]
+    def __getattribute__(self) -> int:
+        return 1
+
+class Child(InvalidBase):
+    defined: str = "hello"
+
+# error: [invalid-attribute-access] "Invalid access to attribute `defined` on type `Child`"
+reveal_type(Child().defined)  # revealed: str
+```
+
+### Invalid `__getattribute__` installed by a metaclass
+
+A metaclass can install an invalid interceptor in the namespace of each class it creates.
+
+```py
+def invalid_getattribute(self) -> int:
+    return 1
+
+class Meta(type):
+    def __init__(cls, name: str, bases: tuple[type, ...], namespace: dict[str, object]) -> None:
+        # error: [invalid-assignment]
+        cls.__getattribute__ = invalid_getattribute
+
+class Example(metaclass=Meta):
+    defined: str = "hello"
+
+# error: [invalid-attribute-access] "Invalid access to attribute `defined` on type `Example`"
+reveal_type(Example().defined)  # revealed: str
+```
+
+### Invalid `__getattribute__` takes precedence over `__getattr__`
+
+An invalid `__getattribute__` raises before Python can call an otherwise valid `__getattr__` method.
+
+```py
+class CustomAccess:
+    # error: [invalid-method-override]
+    def __getattribute__(self) -> int:
+        return 1
+
+    def __getattr__(self, name: str) -> str:
+        return "fallback"
+
+# error: [invalid-attribute-access] "Invalid access to attribute `missing` on type `CustomAccess`"
+reveal_type(CustomAccess().missing)  # revealed: int
 ```
 
 ## Metaclasses with custom `__getattr__` methods
@@ -2966,6 +3610,50 @@ class Meta(type):
 class Foo(metaclass=Meta): ...
 
 reveal_type(Foo.whatever)  # revealed: int
+```
+
+### Invalid `__getattribute__` calls
+
+A malformed metaclass `__getattribute__` prevents access to both defined and missing class
+attributes. Their original types remain available for error recovery.
+
+```py
+class Meta(type):
+    # error: [invalid-method-override]
+    def __getattribute__(cls) -> int:
+        return 1
+
+class Foo(metaclass=Meta):
+    defined: str = "hello"
+
+# error: [invalid-attribute-access] "Invalid access to attribute `missing` on type `<class 'Foo'>`"
+reveal_type(Foo.missing)  # revealed: int
+
+# error: [invalid-attribute-access] "Invalid access to attribute `defined` on type `<class 'Foo'>`"
+reveal_type(Foo.defined)  # revealed: str
+
+# error: [invalid-attribute-access] "Invalid access to attribute `__getattribute__` on type `<class 'Foo'>`"
+Foo.__getattribute__
+```
+
+### Inherited invalid `__getattribute__` calls
+
+A malformed interceptor inherited by a metaclass still runs before looking up attributes declared on
+the class object.
+
+```py
+class InvalidBaseMeta(type):
+    # error: [invalid-method-override]
+    def __getattribute__(cls) -> int:
+        return 1
+
+class Meta(InvalidBaseMeta): ...
+
+class Foo(metaclass=Meta):
+    defined: str = "hello"
+
+# error: [invalid-attribute-access] "Invalid access to attribute `defined` on type `<class 'Foo'>`"
+reveal_type(Foo.defined)  # revealed: str
 ```
 
 ### Class attributes take precedence
@@ -3471,6 +4159,26 @@ reveal_type(f.__class__)  # revealed: <class 'FunctionType'>
 class Foo: ...
 
 reveal_type(Foo.__class__)  # revealed: <class 'type'>
+```
+
+## `__class__` on recursive aliases
+
+For a recursive alias that contains both instances and classes, `value.__class__` agrees with
+`type(value)`. Repeated queries retain both the instance classes and their possible metaclasses.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+type Meta[T] = type[T]
+type Recursive = int | Meta[Recursive]
+
+def recursive_class(value: Recursive):
+    reveal_type(type(value))  # revealed: type[int | type]
+    reveal_type(value.__class__)  # revealed: type[int | type]
+    reveal_type(type(value))  # revealed: type[int | type]
 ```
 
 ## Module attributes
@@ -4126,6 +4834,7 @@ declarations.
 from unknown_library import unknown_decorator
 
 class C:
+    # error: [dynamic-function-decorator-return]
     @unknown_decorator
     def f(self):
         self.x: int = 1
@@ -4138,6 +4847,7 @@ class D:
     def __init__(self):
         self.x: int = 1
 
+    # error: [dynamic-function-decorator-return]
     @unknown_decorator
     def f(self):
         self.x = 2
@@ -4256,6 +4966,19 @@ class F:
         self.x = make_homogeneous_tuple(other.x)
 
 reveal_type(F().x)  # revealed: tuple[Divergent, ...]
+```
+
+A homogeneous tuple of `Divergent` has gradual length, so it is assignable to a fixed-length tuple.
+This allows a recursively inferred instance attribute to retain an empty tuple as its class default:
+
+```py
+class G:
+    x = ()
+
+    def f(self):
+        self.x = tuple(self.x)
+
+reveal_type(G().x)  # revealed: tuple[Divergent, ...]
 ```
 
 ## Attributes of standard library modules that aren't yet defined
