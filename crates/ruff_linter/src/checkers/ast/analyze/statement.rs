@@ -1365,6 +1365,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::DefaultExceptNotLast) {
                 pyflakes::rules::default_except_not_last(checker, handlers, checker.locator);
             }
+            if checker.is_rule_enabled(Rule::CancellationExceptionWithoutReraise) {
+                flake8_async::rules::cancellation_exception_without_reraise(checker, handlers);
+            }
             if checker.any_rule_enabled(&[
                 Rule::DuplicateHandlerException,
                 Rule::DuplicateTryBlockException,
