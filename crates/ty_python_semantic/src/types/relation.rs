@@ -3422,6 +3422,12 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 !left_sentinel.is_same_sentinel(db, right_sentinel),
             ),
 
+            (Type::FunctionLiteral(left), Type::FunctionLiteral(right)) => {
+                // Substituting a function's signature preserves the function object. Compare the
+                // underlying literals, since different signatures can describe the same function.
+                ConstraintSet::from_bool(self.constraints, left.literal(db) != right.literal(db))
+            }
+
             // These types are disjoint whenever their represented objects differ.
             (
                 // `LiteralString` can represent different strings and is handled above.

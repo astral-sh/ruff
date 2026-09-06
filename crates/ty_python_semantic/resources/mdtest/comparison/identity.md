@@ -56,6 +56,31 @@ reveal_type(list[int] is list[int])  # revealed: bool
 reveal_type(list[int] is not list[int])  # revealed: bool
 ```
 
+## Function identity after generic substitution
+
+Passing a function through a generic identity function preserves the function object. Substituting
+the return type does not make it disjoint from the original function.
+
+```py
+from typing import TypeVar
+
+F = TypeVar("F")
+
+def identity(value: F) -> F:
+    return value
+
+def f():
+    pass
+
+def g():
+    pass
+
+reveal_type(identity(f) is f)  # revealed: bool
+reveal_type(f is identity(f))  # revealed: bool
+reveal_type(identity(f) is not f)  # revealed: bool
+reveal_type(identity(f) is g)  # revealed: Literal[False]
+```
+
 ## Identity comparisons with NewTypes
 
 Two variables cannot share the same memory address if they have disjoint nominal-instance backing

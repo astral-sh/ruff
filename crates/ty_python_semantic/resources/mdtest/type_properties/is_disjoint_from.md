@@ -497,6 +497,31 @@ static_assert(not is_disjoint_from(TypeOf[f], FunctionType))
 static_assert(not is_disjoint_from(TypeOf[f], object))
 ```
 
+### Specialized function literals
+
+Specializing an unbound method changes its signature but preserves the function object. Different
+specializations of the same function are therefore not disjoint.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_disjoint_from
+
+class C[T]:
+    def method(self, value: T) -> T:
+        return value
+
+int_method = C[int].method
+str_method = C[str].method
+static_assert(not is_disjoint_from(TypeOf[int_method], TypeOf[str_method]))
+reveal_type(int_method(C[int](), 1))  # revealed: int
+reveal_type(str_method(C[str](), "a"))  # revealed: str
+```
+
 ### Bound methods
 
 Bound methods are disjoint when their names or possible receiver types cannot overlap.
