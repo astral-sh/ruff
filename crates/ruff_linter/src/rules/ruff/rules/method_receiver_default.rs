@@ -1,11 +1,12 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::{self as ast};
 use ruff_python_semantic::analyze::function_type::{self, FunctionType, is_class_method};
 use ruff_python_semantic::{Scope, ScopeKind};
 use ruff_text_size::Ranged;
 
-use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for default values on receiver parameters (e.g., `self`, `cls`) in method definitions.
@@ -36,11 +37,24 @@ use crate::checkers::ast::Checker;
 ///     def build(cls): ...
 /// ```
 ///
+/// ## Fix safety
+/// This fix is always marked as unsafe. Removing the default changes behavior for a caller that
+/// invokes the method directly through the class rather than through an instance (e.g.
+/// `A.method()` instead of `A().method()`), relying on the receiver parameter's default value.
+///
+/// ## Known limitations
+/// To avoid false positives, this rule only flags an undecorated method, an undecorated
+/// `__new__`, or a method whose sole decorator is the one that makes it a `@classmethod`. A
+/// method with any other decorator (including common ones like `@property`, `@x.setter`, or
+/// `@typing.override`) is not flagged, even though such decorators typically leave the receiver
+/// binding unchanged, because an arbitrary decorator could alter it.
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "NEXT_RUFF_VERSION")]
 pub(crate) struct MethodReceiverDefault;
 
 impl Violation for MethodReceiverDefault {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Always;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         "Receiver parameter should not have a default value".to_string()
@@ -88,11 +102,24 @@ pub(crate) fn method_receiver_default(checker: &Checker, scope: &Scope) {
     };
 
     // Check if the receiver parameter has a default value
-    if let Some(default_expr) = &first_param.default {
-        let diagnostic = MethodReceiverDefault;
+    let Some(default_expr) = &first_param.default else {
+        return;
+    };
 
-        checker.report_diagnostic(diagnostic, default_expr.range());
-    }
+    // Account for a parenthesized default (e.g. `self=(None)`) so the fix removes the
+    // parentheses along with the default value.
+    let default_range = parenthesized_range(
+        default_expr.as_ref().into(),
+        first_param.into(),
+        checker.tokens(),
+    )
+    .unwrap_or(default_expr.range());
+
+    let edit = Edit::deletion(first_param.parameter.end(), default_range.end());
+
+    checker
+        .report_diagnostic(MethodReceiverDefault, default_expr.range())
+        .set_fix(Fix::unsafe_edit(edit));
 }
 
 /// Determine whether a function has a bound receiver parameter.
@@ -114,11 +141,12 @@ fn has_receiver_parameter(
     );
 
     match function_kind {
-        // Trust the classification unconditionally for an implicit classmethod (e.g.
-        // `__init_subclass__`), but only for an explicitly decorated one if it has exactly one
-        // decorator, and that decorator is the one that makes it a classmethod. Otherwise, an
+        // Trust the classification when there are no decorators at all (this is how an implicit
+        // classmethod like `__init_subclass__` is classified) or when there is exactly one
+        // decorator and it's the one that makes the function a classmethod. Otherwise, an
         // unrelated decorator (`@some_decorator`) or a stacked one alongside `@classmethod` could
-        // change how the receiver is bound, so we bail out rather than risk a false positive.
+        // change how the receiver is bound, so we bail out rather than risk a false positive —
+        // even for an implicit classmethod with an unrelated decorator attached.
         FunctionType::ClassMethod => match decorator_list {
             [] => true,
             [decorator]

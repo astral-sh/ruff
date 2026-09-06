@@ -33,6 +33,57 @@ error[RUF077]: Receiver parameter should not have a default value
 2 |     def method(self=None): ...  # snapshot: method-receiver-default
   |                     ^^^^
 help: Remove default value from receiver parameter
+  |
+1 | class InstanceReceiverDefault:
+  -     def method(self=None): ...  # snapshot: method-receiver-default
+2 +     def method(self): ...  # snapshot: method-receiver-default
+3 |
+  |
+note: This is an unsafe fix and may change runtime behavior
+```
+
+## Fix
+
+The fix deletes the default value along with any parentheses around it, and leaves an annotation
+on the receiver parameter untouched.
+
+```py
+class ParenthesizedDefaultReceiver:
+    def method(self=(None)): ...  # snapshot: method-receiver-default
+
+
+class AnnotatedReceiverDefault:
+    def method(self: "AnnotatedReceiverDefault" = None): ...  # snapshot: method-receiver-default
+```
+
+```snapshot
+error[RUF077]: Receiver parameter should not have a default value
+ --> src/mdtest_snippet.py:2:22
+  |
+2 |     def method(self=(None)): ...  # snapshot: method-receiver-default
+  |                      ^^^^
+help: Remove default value from receiver parameter
+  |
+1 | class ParenthesizedDefaultReceiver:
+  -     def method(self=(None)): ...  # snapshot: method-receiver-default
+2 +     def method(self): ...  # snapshot: method-receiver-default
+3 |
+  |
+note: This is an unsafe fix and may change runtime behavior
+
+
+error[RUF077]: Receiver parameter should not have a default value
+ --> src/mdtest_snippet.py:6:51
+  |
+6 |     def method(self: "AnnotatedReceiverDefault" = None): ...  # snapshot: method-receiver-default
+  |                                                   ^^^^
+help: Remove default value from receiver parameter
+  |
+5 | class AnnotatedReceiverDefault:
+  -     def method(self: "AnnotatedReceiverDefault" = None): ...  # snapshot: method-receiver-default
+6 +     def method(self: "AnnotatedReceiverDefault"): ...  # snapshot: method-receiver-default
+  |
+note: This is an unsafe fix and may change runtime behavior
 ```
 
 ## Implicit classmethods
@@ -66,6 +117,12 @@ error[RUF077]: Receiver parameter should not have a default value
 2 |     def method(cls=None): ...  # snapshot: method-receiver-default
   |                    ^^^^
 help: Remove default value from receiver parameter
+  |
+1 | class Meta(type):
+  -     def method(cls=None): ...  # snapshot: method-receiver-default
+2 +     def method(cls): ...  # snapshot: method-receiver-default
+  |
+note: This is an unsafe fix and may change runtime behavior
 ```
 
 ## Nested classes
