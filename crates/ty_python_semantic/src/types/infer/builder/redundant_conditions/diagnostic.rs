@@ -885,6 +885,79 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         )
     }
 
+    pub(super) fn annotate_redundant_while(
+        &self,
+        condition: &RedundantCondition<'_, 'db>,
+        diagnostic: &mut Diagnostic,
+        suite_if_true: &[ast::Stmt],
+        following_suite: &[ast::Stmt],
+    ) {
+        if condition.is_truthy {
+            if !suite_ends_with_exit(self, following_suite, SuiteExitKind::Defensive)
+                && let Some(stmt) = first_nontrivial_statement(following_suite)
+                && self.is_unreachable(stmt)
+            {
+                diagnostic.annotate(
+                    self.context
+                        .secondary(self.branch_range_until_first_newline(stmt.start(), stmt))
+                        .message("This following statement is unreachable"),
+                );
+            }
+        } else {
+            if let Some(stmt) = first_nontrivial_statement(suite_if_true)
+                && self.is_unreachable(stmt)
+            {
+                diagnostic.annotate(
+                    self.context
+                        .secondary(self.branch_range_until_first_newline(stmt.start(), stmt))
+                        .message("This statement is unreachable"),
+                );
+            }
+        }
+    }
+
+    pub(super) fn annotate_redundant_assert(
+        &self,
+        condition: &RedundantCondition<'_, 'db>,
+        diagnostic: &mut Diagnostic,
+        following_suite: &[ast::Stmt],
+    ) {
+        if condition.is_truthy {
+            return;
+        }
+
+        if let Some(stmt) = first_nontrivial_statement(following_suite)
+            && self.is_unreachable(stmt)
+        {
+            diagnostic.annotate(
+                self.context
+                    .secondary(self.branch_range_until_first_newline(stmt.start(), stmt))
+                    .message("This following statement is unreachable"),
+            );
+        }
+    }
+
+    pub(super) fn annotate_redundant_match(
+        &self,
+        condition: &RedundantCondition<'_, 'db>,
+        diagnostic: &mut Diagnostic,
+        suite_if_true: &[ast::Stmt],
+    ) {
+        if condition.is_truthy {
+            return;
+        }
+
+        if let Some(stmt) = first_nontrivial_statement(suite_if_true)
+            && self.is_unreachable(stmt)
+        {
+            diagnostic.annotate(
+                self.context
+                    .secondary(self.branch_range_until_first_newline(stmt.start(), stmt))
+                    .message("This statement is unreachable"),
+            );
+        }
+    }
+
     pub(super) fn annotate_redundant_if_or_elif(
         &self,
         condition: &RedundantCondition<'_, 'db>,
