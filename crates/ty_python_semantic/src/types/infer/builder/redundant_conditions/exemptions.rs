@@ -672,7 +672,9 @@ fn reachability_contains_special_cased_condition<'db>(
     let predicate = use_def.predicates()[node.atom()];
     if matches!(
         predicate.node,
-        PredicateNode::IsNonTerminalCall(_) | PredicateNode::ExpressionCanComplete { .. }
+        PredicateNode::IsNonTerminalCall(_)
+            | PredicateNode::ExpressionCanComplete { .. }
+            | PredicateNode::CallCanComplete(_)
     ) {
         // Termination does not give later values an environment-dependent origin.
         // Assume calls and boolean tests complete before collecting their guards;
@@ -719,6 +721,7 @@ fn predicate_contains_special_cased_condition<'db>(
         // definition environment-dependent merely because it is reached after that call returns.
         PredicateNode::IsNonTerminalCall(_)
         | PredicateNode::ExpressionCanComplete { .. }
+        | PredicateNode::CallCanComplete(_)
         | PredicateNode::ContextManagerSuppresses { .. }
         | PredicateNode::FinallyNormalPathImpossible { .. }
         | PredicateNode::OrPatternAlternative(_)

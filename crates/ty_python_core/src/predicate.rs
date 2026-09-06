@@ -168,6 +168,10 @@ pub enum PredicateNode<'db> {
         expression: Expression<'db>,
         context: ExpressionContext,
     },
+    /// Whether a call used as a boolean test can produce a result. Callable signatures can
+    /// often determine completion without inferring the arguments or selecting an overload.
+    /// Unsupported callable forms are inferred in full to detect uninhabited results.
+    CallCanComplete(CallableAndCallExpr<'db>),
     /// Whether a context manager's exit return type allows an exception to be suppressed.
     ///
     /// Resolved during type inference because the context manager's type is unavailable during

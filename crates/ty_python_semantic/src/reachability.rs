@@ -553,7 +553,8 @@ fn predicate_scope<'db>(db: &'db dyn Db, predicate: &Predicate<'db>) -> ScopeId<
         | PredicateNode::ChainedComparisonCondition(expression)
         | PredicateNode::ContextManagerSuppresses { expression, .. }
         | PredicateNode::ExpressionCanComplete { expression, .. } => expression.scope(db),
-        PredicateNode::IsNonTerminalCall(CallableAndCallExpr { callable, .. }) => {
+        PredicateNode::IsNonTerminalCall(CallableAndCallExpr { callable, .. })
+        | PredicateNode::CallCanComplete(CallableAndCallExpr { callable, .. }) => {
             callable.scope(db)
         }
         PredicateNode::Pattern(pattern) => pattern.scope(db),
@@ -590,13 +591,22 @@ fn analyze_completion_prefix<'db>(
     predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
     root_predicate: ScopedPredicateId,
 ) -> bool {
+    // A complete block needs at least this many preceding predicates, even if all of them
+    // concern completion. Short scopes cannot require the cached index either.
+    if predicates.len() <= COMPLETION_PREDICATE_CHUNK_SIZE
+        || root_predicate.index() + 1 < COMPLETION_PREDICATE_CHUNK_SIZE
+    {
+        return false;
+    }
     let scope = predicate_scope(db, &predicates[root_predicate]);
     let has_many_completions = predicates
         .iter()
         .filter(|predicate| {
             matches!(
                 predicate.node,
-                PredicateNode::IsNonTerminalCall(_) | PredicateNode::ExpressionCanComplete { .. }
+                PredicateNode::IsNonTerminalCall(_)
+                    | PredicateNode::ExpressionCanComplete { .. }
+                    | PredicateNode::CallCanComplete(_)
             )
         })
         .nth(COMPLETION_PREDICATE_CHUNK_SIZE)
@@ -636,7 +646,9 @@ fn completion_predicates<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Box<[Scop
         .filter_map(|(id, predicate)| {
             matches!(
                 predicate.node,
-                PredicateNode::IsNonTerminalCall(_) | PredicateNode::ExpressionCanComplete { .. }
+                PredicateNode::IsNonTerminalCall(_)
+                    | PredicateNode::ExpressionCanComplete { .. }
+                    | PredicateNode::CallCanComplete(_)
             )
             .then_some(id)
         })
@@ -871,7 +883,9 @@ fn evaluate_reachability_checkpoint<'db>(
         .filter(|predicate| {
             matches!(
                 predicate.node,
-                PredicateNode::IsNonTerminalCall(_) | PredicateNode::ExpressionCanComplete { .. }
+                PredicateNode::IsNonTerminalCall(_)
+                    | PredicateNode::ExpressionCanComplete { .. }
+                    | PredicateNode::CallCanComplete(_)
             )
         })
         .nth(COMPLETION_PREDICATE_CHUNK_SIZE)
@@ -1417,6 +1431,7 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                             || matches!(
                                 predicate.node,
                                 PredicateNode::ExpressionCanComplete { .. }
+                                    | PredicateNode::CallCanComplete(_)
                                     | PredicateNode::ContextManagerSuppresses { .. }
                                     | PredicateNode::FinallyNormalPathImpossible { .. }
                             ))
@@ -1453,6 +1468,7 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                         predicate.node,
                         PredicateNode::IsNonTerminalCall(_)
                             | PredicateNode::ExpressionCanComplete { .. }
+                            | PredicateNode::CallCanComplete(_)
                             | PredicateNode::ContextManagerSuppresses { .. }
                             | PredicateNode::FinallyNormalPathImpossible { .. }
                     );
@@ -1825,23 +1841,29 @@ pub(crate) fn is_non_terminal_call<'db>(
     is_await: bool,
     call_type: impl FnOnce() -> Type<'db>,
 ) -> Truthiness {
+    try_is_non_terminal_call(db, env, ty, is_await, call_type).unwrap_or(Truthiness::AlwaysTrue)
+}
+
+fn try_is_non_terminal_call<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+    is_await: bool,
+    call_type: impl FnOnce() -> Type<'db>,
+) -> Option<Truthiness> {
     // Short-circuit for well-known types that are known not to return `Never` when called. Without
     // the short-circuit, we've seen that threads keep blocking each other because they all try to
     // acquire Salsa's `CallableType` lock that ensures each type is only interned once. The lock is
     // so heavily congested because there are only very few dynamic types, in which case Salsa's
     // sharding the locks by value doesn't help much. See <https://github.com/astral-sh/ty/issues/968>.
     if matches!(ty, Type::Dynamic(_)) {
-        return Truthiness::AlwaysTrue;
+        return Some(Truthiness::AlwaysTrue);
     }
 
-    let overloads_iterator = if let Some(callable) = ty
+    let callable = ty
         .try_upcast_to_callable(db, env)
-        .and_then(CallableTypes::exactly_one)
-    {
-        callable.signatures(db).overloads.iter()
-    } else {
-        return Truthiness::AlwaysTrue;
-    };
+        .and_then(CallableTypes::exactly_one)?;
+    let overloads_iterator = callable.signatures(db).overloads.iter();
 
     let mut no_overloads_return_never = true;
     let mut all_overloads_return_never = true;
@@ -1855,11 +1877,11 @@ pub(crate) fn is_non_terminal_call<'db>(
     }
 
     if no_overloads_return_never && !any_overload_is_generic && !is_await {
-        Truthiness::AlwaysTrue
+        Some(Truthiness::AlwaysTrue)
     } else if all_overloads_return_never || call_type().is_equivalent_to(db, env, Type::Never) {
-        Truthiness::AlwaysFalse
+        Some(Truthiness::AlwaysFalse)
     } else {
-        Truthiness::AlwaysTrue
+        Some(Truthiness::AlwaysTrue)
     }
 }
 
@@ -1996,6 +2018,33 @@ fn expression_value_can_complete<'db>(db: &'db dyn Db, expression: Expression<'d
     )
 }
 
+#[salsa::tracked(
+    returns(copy),
+    cycle_initial = |_, _, _, _, _| true,
+    cycle_fn = |_, cycle: &salsa::Cycle, previous: &bool, result: bool, _, _, _| {
+        if cycle.iteration() > crate::TAINTED_CYCLES {
+            *previous || result
+        } else {
+            result
+        }
+    },
+    heap_size = get_size2::GetSize::get_heap_size
+)]
+fn expression_call_can_complete<'db>(
+    db: &'db dyn Db,
+    callable: Expression<'db>,
+    expression: Expression<'db>,
+    is_await: bool,
+) -> bool {
+    let env = ProgramEnvironment::from_scope(callable.scope(db));
+    let callable_type = infer_same_file_expression_type(db, callable, TypeContext::default());
+    let call_type = || infer_same_file_expression_type(db, expression, TypeContext::default());
+    try_is_non_terminal_call(db, &env, callable_type, is_await, call_type).map_or_else(
+        || !call_type().is_equivalent_to(db, &env, Type::Never),
+        Truthiness::is_always_true,
+    )
+}
+
 fn analyze_single(db: &dyn Db, env: &ProgramEnvironment<'_>, predicate: &Predicate) -> Truthiness {
     let _span = tracing::trace_span!("analyze_single", ?predicate).entered();
 
@@ -2015,6 +2064,13 @@ fn analyze_single(db: &dyn Db, env: &ProgramEnvironment<'_>, predicate: &Predica
             ExpressionContext::Condition => analyze_condition(db, expression).is_some(),
             ExpressionContext::Value => expression_value_can_complete(db, expression),
         })
+        .negate_if(!predicate.is_positive),
+        PredicateNode::CallCanComplete(call) => Truthiness::from(expression_call_can_complete(
+            db,
+            call.callable,
+            call.call_expr,
+            call.is_await,
+        ))
         .negate_if(!predicate.is_positive),
         PredicateNode::ChainedComparisonCondition(test_expr) => {
             let inference = infer_expression_types(db, test_expr, TypeContext::default());
@@ -2172,10 +2228,9 @@ impl<'db> ReachabilityEvaluationCache<'db> {
 
     /// Evaluates `id`, reusing a cached result when possible.
     ///
-    /// Trivial constraint ids return immediately and are not stored. For interior nodes, the
-    /// predicate determines whether the constraint belongs to the primary scope. A primary-scope
-    /// constraint from the primary graph is cached by dense index; all other constraints are cached
-    /// by graph identity and id.
+    /// Trivial constraint ids return immediately and are not stored. The primary graph's identity
+    /// already determines its scope, so cache hits need no predicate or scope lookup. Other
+    /// constraints are cached by graph identity and id.
     fn evaluate(
         &self,
         db: &'db dyn Db,
@@ -2190,16 +2245,16 @@ impl<'db> ReachabilityEvaluationCache<'db> {
             _ => {}
         }
 
-        let predicate = predicates[constraints.get_interior_node(id).atom()];
         let constraints_key = std::ptr::from_ref(constraints).addr();
-        let scope = predicate_scope(db, &predicate);
 
-        if scope != self.primary_scope || constraints_key != self.primary_constraints {
+        if constraints_key != self.primary_constraints {
             let key = (constraints_key, id);
             if let Some(result) = self.other_entries.borrow().get(&key).copied() {
                 return result;
             }
 
+            let predicate = predicates[constraints.get_interior_node(id).atom()];
+            let scope = predicate_scope(db, &predicate);
             let result = evaluate_reachability_constraint(db, scope, id, None);
             self.other_entries.borrow_mut().insert(key, result);
             return result;
