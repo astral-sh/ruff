@@ -1405,6 +1405,9 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                     let index = node.atom.index();
                     let checkpoint_position =
                         index ^ (index / NARROWING_EVALUATION_CHECKPOINT_INTERVAL);
+                    // Completion gates can depend on earlier narrowed uses without narrowing
+                    // this place themselves. Checkpoints keep those inference dependencies from
+                    // being copied into every later expression in a long chain.
                     if (id != root || use_root_checkpoint)
                         && (checkpoint_position + 1)
                             .is_multiple_of(NARROWING_EVALUATION_CHECKPOINT_INTERVAL)
@@ -1413,7 +1416,8 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                             .contains(node.atom, self.place)
                             || matches!(
                                 predicate.node,
-                                PredicateNode::ContextManagerSuppresses { .. }
+                                PredicateNode::ExpressionCanComplete { .. }
+                                    | PredicateNode::ContextManagerSuppresses { .. }
                                     | PredicateNode::FinallyNormalPathImpossible { .. }
                             ))
                     {
@@ -1973,8 +1977,8 @@ fn analyze_condition<'db>(db: &'db dyn Db, expression: Expression<'db>) -> Optio
 /// Cycle recovery assumes evaluation can complete when it depends on its own constraint.
 #[salsa::tracked(
     returns(copy),
-    cycle_initial = |_, _, _, _| true,
-    cycle_fn = |_, cycle: &salsa::Cycle, previous: &bool, result: bool, _, _| {
+    cycle_initial = |_, _, _| true,
+    cycle_fn = |_, cycle: &salsa::Cycle, previous: &bool, result: bool, _| {
         if cycle.iteration() > crate::TAINTED_CYCLES {
             *previous || result
         } else {
@@ -1983,19 +1987,13 @@ fn analyze_condition<'db>(db: &'db dyn Db, expression: Expression<'db>) -> Optio
     },
     heap_size = get_size2::GetSize::get_heap_size
 )]
-fn expression_can_complete<'db>(
-    db: &'db dyn Db,
-    expression: Expression<'db>,
-    context: ExpressionContext,
-) -> bool {
-    match context {
-        ExpressionContext::Condition => analyze_condition(db, expression).is_some(),
-        ExpressionContext::Value => {
-            let env = ProgramEnvironment::from_scope(expression.scope(db));
-            !infer_same_file_expression_type(db, expression, TypeContext::default())
-                .is_equivalent_to(db, &env, Type::Never)
-        }
-    }
+fn expression_value_can_complete<'db>(db: &'db dyn Db, expression: Expression<'db>) -> bool {
+    let env = ProgramEnvironment::from_scope(expression.scope(db));
+    !infer_same_file_expression_type(db, expression, TypeContext::default()).is_equivalent_to(
+        db,
+        &env,
+        Type::Never,
+    )
 }
 
 fn analyze_single(db: &dyn Db, env: &ProgramEnvironment<'_>, predicate: &Predicate) -> Truthiness {
@@ -2013,8 +2011,11 @@ fn analyze_single(db: &dyn Db, env: &ProgramEnvironment<'_>, predicate: &Predica
         PredicateNode::ExpressionCanComplete {
             expression,
             context,
-        } => Truthiness::from(expression_can_complete(db, expression, context))
-            .negate_if(!predicate.is_positive),
+        } => Truthiness::from(match context {
+            ExpressionContext::Condition => analyze_condition(db, expression).is_some(),
+            ExpressionContext::Value => expression_value_can_complete(db, expression),
+        })
+        .negate_if(!predicate.is_positive),
         PredicateNode::ChainedComparisonCondition(test_expr) => {
             let inference = infer_expression_types(db, test_expr, TypeContext::default());
             let expression = test_expr.node_ref(db);

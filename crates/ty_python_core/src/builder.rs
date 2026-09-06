@@ -3736,6 +3736,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         if matches!(node, ast::Expr::UnaryOp(unary) if unary.op == ast::UnaryOp::Not) {
             return ScopedReachabilityConstraintId::ALWAYS_TRUE;
         }
+        // A single value completes if its type is inhabited. Compound conditions also need
+        // their short-circuit paths, which cannot always be recovered from the result type.
+        let context = match node {
+            ast::Expr::BoolOp(_) | ast::Expr::If(_) => context,
+            ast::Expr::Compare(compare) if compare.ops.len() > 1 => context,
+            _ => ExpressionContext::Value,
+        };
         let expression = self
             .expressions_by_node
             .get(&node.into())

@@ -3,10 +3,13 @@
 //! See [`crate::reachability_constraints`] for more details.
 
 use std::cmp::Ordering;
+use std::hash::BuildHasher;
 
+use hashbrown::hash_table::Entry;
 use ruff_index::{Idx, IndexVec};
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxBuildHasher, FxHashMap};
 
+use crate::constraint_cache::BinaryConstraintCache;
 use crate::narrowing_constraints::{NarrowingConstraintsBuilder, ScopedNarrowingConstraint};
 use crate::predicate::ScopedPredicateId;
 use crate::rank::{RankBitBox, RankBitBoxVec};
@@ -172,26 +175,15 @@ impl ReachabilityConstraints {
     }
 }
 
-#[derive(Debug, Default, PartialEq, Eq)]
+#[derive(Debug, Default)]
 pub struct ReachabilityConstraintsBuilder {
     interiors: IndexVec<ScopedReachabilityConstraintId, InteriorNode>,
     interior_used: RankBitBoxVec,
-    interior_cache: FxHashMap<InteriorNode, ScopedReachabilityConstraintId>,
+    // Nodes are already stored in `interiors`; keep only their IDs in the reverse table.
+    interior_cache: hashbrown::HashTable<ScopedReachabilityConstraintId>,
     not_cache: FxHashMap<ScopedReachabilityConstraintId, ScopedReachabilityConstraintId>,
-    and_cache: FxHashMap<
-        (
-            ScopedReachabilityConstraintId,
-            ScopedReachabilityConstraintId,
-        ),
-        ScopedReachabilityConstraintId,
-    >,
-    or_cache: FxHashMap<
-        (
-            ScopedReachabilityConstraintId,
-            ScopedReachabilityConstraintId,
-        ),
-        ScopedReachabilityConstraintId,
-    >,
+    and_cache: BinaryConstraintCache<ScopedReachabilityConstraintId>,
+    or_cache: BinaryConstraintCache<ScopedReachabilityConstraintId>,
 }
 
 impl ReachabilityConstraintsBuilder {
@@ -351,10 +343,20 @@ impl ReachabilityConstraintsBuilder {
             return node.if_true;
         }
 
-        *self.interior_cache.entry(node).or_insert_with(|| {
-            self.interior_used.push(false);
-            self.interiors.push(node)
-        })
+        let interiors = &mut self.interiors;
+        match self.interior_cache.entry(
+            FxBuildHasher.hash_one(node),
+            |id| interiors[*id] == node,
+            |id| FxBuildHasher.hash_one(interiors[*id]),
+        ) {
+            Entry::Occupied(entry) => *entry.get(),
+            Entry::Vacant(entry) => {
+                self.interior_used.push(false);
+                let id = interiors.push(node);
+                entry.insert(id);
+                id
+            }
+        }
     }
 
     /// Adds a new reachability constraint that checks a single [`super::predicate::Predicate`].

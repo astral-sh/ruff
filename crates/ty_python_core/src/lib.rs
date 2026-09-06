@@ -41,6 +41,7 @@ use use_def::{EnclosingSnapshotKey, ScopedEnclosingSnapshotId};
 pub mod ast_ids;
 pub mod ast_node_ref;
 mod builder;
+mod constraint_cache;
 mod db;
 pub mod definition;
 pub mod expression;
