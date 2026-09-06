@@ -1384,6 +1384,102 @@ class OnlyNonInstance:
 reveal_type(OnlyNonInstance(1.2))  # revealed: Unknown
 ```
 
+### Failed overload resolution recovers a subclass instance the same way it recovers the base
+
+If no overload matches, but every overload's return type is an instance of the class that declares
+`__new__`, we already fall back to a plain instance of that class rather than `Unknown`, since we
+know the call constructs *something* related to it, even without knowing precisely what. The same
+reasoning applies when constructing a subclass through an inherited `__new__`: an overload's return
+type naming an ancestor class still describes what that inherited constructor produces, so the
+subclass should recover to a plain instance of itself, not `Unknown`.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import overload
+
+class DisagreeingGeneric[T]:
+    @overload
+    def __new__(cls, code: int) -> "DisagreeingGeneric[int]": ...
+    @overload
+    def __new__(cls, code: str) -> "DisagreeingGeneric[str]": ...
+    def __new__(cls, code): ...
+
+class SubOfDisagreeing(DisagreeingGeneric[int]): ...
+
+# error: [no-matching-overload]
+reveal_type(DisagreeingGeneric(1.2))  # revealed: DisagreeingGeneric[T@DisagreeingGeneric]
+
+# error: [no-matching-overload]
+reveal_type(SubOfDisagreeing(1.2))  # revealed: SubOfDisagreeing
+```
+
+If every failing overload's return type instead agrees on the exact same instance, that shared
+return type is precise enough to keep, rather than widening it to a plain, unspecialized instance.
+This applies equally whether the constructed class declares the overloads or inherits them:
+
+```py
+class AgreeingGeneric[T]:
+    @overload
+    def __new__(cls, code: int) -> "AgreeingGeneric[int]": ...
+    @overload
+    def __new__(cls, code: str) -> "AgreeingGeneric[int]": ...
+    def __new__(cls, code): ...
+
+class SubOfAgreeing(AgreeingGeneric[int]): ...
+
+# error: [no-matching-overload]
+reveal_type(AgreeingGeneric(1.2))  # revealed: AgreeingGeneric[int]
+
+# error: [no-matching-overload]
+reveal_type(SubOfAgreeing(1.2))  # revealed: AgreeingGeneric[int]
+```
+
+The same holds for a non-generic class whose overloads agree on a literal return type: inheriting
+the constructor does not change what it returns, so the subclass call still reveals that same type
+rather than an instance of the subclass:
+
+```py
+class Concrete:
+    @overload
+    def __new__(cls, code: int) -> "Concrete": ...
+    @overload
+    def __new__(cls, code: str) -> "Concrete": ...
+    def __new__(cls, code): ...
+
+class SubOfConcrete(Concrete): ...
+
+# error: [no-matching-overload]
+reveal_type(Concrete(1.2))  # revealed: Concrete
+
+# error: [no-matching-overload]
+reveal_type(SubOfConcrete(1.2))  # revealed: Concrete
+```
+
+None of this applies when the overloads' return types are unrelated to the class hierarchy being
+constructed at all: that case still reveals `Unknown`, for a subclass just as for the declaring
+class itself:
+
+```py
+class A: ...
+class B: ...
+
+class Unrelated:
+    @overload
+    def __new__(cls, code: int) -> "A": ...
+    @overload
+    def __new__(cls, code: str) -> "B": ...
+    def __new__(cls, code): ...
+
+class SubOfUnrelated(Unrelated): ...
+
+# error: [no-matching-overload]
+reveal_type(SubOfUnrelated(1.2))  # revealed: Unknown
+```
+
 ### Mixed generic `__new__` overloads should still validate `__init__`
 
 For generic classes, if an instance-returning `__new__` overload matches, we still need to validate
