@@ -2071,7 +2071,7 @@ enum ExclusionComparison {
 }
 
 /// The signs of a pair of intersection elements. For `Mixed`, the first is positive.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, salsa::SalsaValue)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 enum IntersectionPolarity {
     Positive,
     Negative,
@@ -2122,11 +2122,50 @@ fn simplify_intersection_pair<'db>(
         };
     }
 
-    simplify_intersection_pair_impl(
-        db,
-        TypePair::new(db, env.program(db), first, second),
-        polarity,
-    )
+    // Separate queries encode the polarity in the query identity. Each query can use the
+    // existing TypePair as its key, avoiding another interned key for the pair and polarity.
+    #[salsa::tracked(
+        returns(copy),
+        cycle_result=|_, _, _| IntersectionSimplification::Unchanged,
+        heap_size=ruff_memory_usage::heap_size,
+    )]
+    fn simplify_positive_intersection<'db>(
+        db: &'db dyn Db,
+        types: TypePair<'db>,
+    ) -> IntersectionSimplification {
+        simplify_intersection_pair_impl(db, types, IntersectionPolarity::Positive)
+    }
+
+    #[salsa::tracked(
+        returns(copy),
+        cycle_result=|_, _, _| IntersectionSimplification::Unchanged,
+        heap_size=ruff_memory_usage::heap_size,
+    )]
+    fn simplify_negative_intersection<'db>(
+        db: &'db dyn Db,
+        types: TypePair<'db>,
+    ) -> IntersectionSimplification {
+        simplify_intersection_pair_impl(db, types, IntersectionPolarity::Negative)
+    }
+
+    #[salsa::tracked(
+        returns(copy),
+        cycle_result=|_, _, _| IntersectionSimplification::Unchanged,
+        heap_size=ruff_memory_usage::heap_size,
+    )]
+    fn simplify_mixed_intersection<'db>(
+        db: &'db dyn Db,
+        types: TypePair<'db>,
+    ) -> IntersectionSimplification {
+        simplify_intersection_pair_impl(db, types, IntersectionPolarity::Mixed)
+    }
+
+    let types = TypePair::new(db, env.program(db), first, second);
+    match polarity {
+        IntersectionPolarity::Positive => simplify_positive_intersection(db, types),
+        IntersectionPolarity::Negative => simplify_negative_intersection(db, types),
+        IntersectionPolarity::Mixed => simplify_mixed_intersection(db, types),
+    }
 }
 
 /// Simplify a pair of intersection elements using non-circular relation checks.
@@ -2144,11 +2183,6 @@ fn simplify_intersection_pair<'db>(
 ///
 /// Inferring `C.x` needs the guarded type of `self`. The guard cannot use that unfinished
 /// inference to prove that `C` already satisfies the protocol for `x` and erase the branch.
-#[salsa::tracked(
-    returns(copy),
-    cycle_result=|_, _, _, _| IntersectionSimplification::Unchanged,
-    heap_size=ruff_memory_usage::heap_size,
-)]
 fn simplify_intersection_pair_impl<'db>(
     db: &'db dyn Db,
     types: TypePair<'db>,
