@@ -1089,7 +1089,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Flake8UsePathlib, "115") => rules::flake8_use_pathlib::rules::OsReadlink,
         (Flake8UsePathlib, "116") => rules::flake8_use_pathlib::rules::OsStat,
         (Flake8UsePathlib, "117") => rules::flake8_use_pathlib::rules::OsPathIsabs,
-        (Flake8UsePathlib, "118") => rules::flake8_use_pathlib::violations::OsPathJoin,
+        (Flake8UsePathlib, "118") => rules::flake8_use_pathlib::rules::OsPathJoin,
         (Flake8UsePathlib, "119") => rules::flake8_use_pathlib::rules::OsPathBasename,
         (Flake8UsePathlib, "120") => rules::flake8_use_pathlib::rules::OsPathDirname,
         (Flake8UsePathlib, "121") => rules::flake8_use_pathlib::rules::OsPathSamefile,
