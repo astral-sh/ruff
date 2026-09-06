@@ -659,10 +659,10 @@ cannot override an inherited pure class variable.
 
 ### Direct overrides
 
-An annotation without `ClassVar` declares an instance variable, even if the declaration also has a
-class-level default value. An explicit `ClassVar` declaration is a pure class variable. Overriding
-one with the other changes the places where the attribute is valid, so it violates Liskov
-substitution:
+An annotation without `ClassVar` in the class body declares a regular attribute, reachable both on
+the class object and on instances, whether or not the declaration has a default value. An explicit
+`ClassVar` declaration cannot be assigned through an instance, so replacing a regular attribute with
+one withholds an operation the superclass allowed:
 
 ```py
 from typing import ClassVar
@@ -673,19 +673,57 @@ class Base:
     class_attr: ClassVar[int] = 1
 
 class Subclass(Base):
-    # error: [invalid-attribute-override] "class variable cannot override instance variable `Base.instance_attr`"
+    # error: [invalid-attribute-override] "class variable cannot override regular attribute `Base.instance_attr`"
     instance_attr: ClassVar[int]
 
-    # error: [invalid-attribute-override] "class variable cannot override instance variable `Base.instance_attr_with_default`"
+    # error: [invalid-attribute-override] "class variable cannot override regular attribute `Base.instance_attr_with_default`"
     instance_attr_with_default: ClassVar[int] = 1
-
-    # error: [invalid-attribute-override] "instance variable cannot override class variable `Base.class_attr`"
-    class_attr: int
 
 class ValidSubclass(Base):
     instance_attr: int
     instance_attr_with_default: int = 1
     class_attr: ClassVar[int] = 1
+```
+
+### Regular attributes overriding class variables
+
+A regular attribute is reachable through the class object as well as through an instance, so it can
+stand in everywhere the inherited `ClassVar` could. Overriding a `ClassVar` with one is therefore
+allowed, whether or not the override supplies a default:
+
+```py
+from typing import ClassVar
+
+class Base:
+    class_attr: ClassVar[int]
+
+class Sub(Base):
+    class_attr: int
+
+class SubWithDefault(Base):
+    class_attr: int = 1
+
+# Both access paths still work on the subclass.
+reveal_type(Sub.class_attr)  # revealed: int
+reveal_type(Sub().class_attr)  # revealed: int
+```
+
+An attribute that exists only on instances cannot make that substitution, because the superclass
+promised the attribute would be reachable on the class object. A property is the class-body form of
+such an attribute: reading it through the class yields the `property` object rather than an `int`.
+
+```py
+from typing import ClassVar
+
+class Base:
+    class_attr: ClassVar[int]
+
+class Sub(Base):
+    @property
+    def class_attr(  # error: [invalid-attribute-override] "instance variable cannot override class variable `Base.class_attr`"
+        self,
+    ) -> int:
+        return 1
 ```
 
 ### Regular class-body assignments
@@ -720,7 +758,7 @@ class RegularClassAttributeBase:
     attr = 1
 
 class ExplicitClassVarOverride(RegularClassAttributeBase):
-    # error: [invalid-attribute-override] "class variable cannot override instance variable `RegularClassAttributeBase.attr`"
+    # error: [invalid-attribute-override] "class variable cannot override regular attribute `RegularClassAttributeBase.attr`"
     attr: ClassVar[int] = 1
 
 class ClassDefaultBase:
@@ -775,9 +813,25 @@ class PropertySubclass(PropertyBase):
 
 ### Repeated inherited conflicts
 
-If a parent class already made an invalid change from class variable to instance variable, a child
-that keeps the parent's kind should not receive a duplicate diagnostic. The same applies in the
-other direction:
+If a parent class already made an invalid change from a regular attribute to a class variable, a
+child that keeps the parent's kind should not receive a duplicate diagnostic:
+
+```py
+from typing import ClassVar
+
+class GrandparentInstance:
+    attr: int
+
+class ParentClassVar(GrandparentInstance):
+    # error: [invalid-attribute-override] "class variable cannot override regular attribute `GrandparentInstance.attr`"
+    attr: ClassVar[int]
+
+class ChildClassVar(ParentClassVar):
+    attr: ClassVar[int]
+```
+
+Widening a class variable to a regular attribute is allowed at every level of the hierarchy, so no
+diagnostic is reported for either the parent or the child:
 
 ```py
 from typing import ClassVar
@@ -786,21 +840,10 @@ class GrandparentClassVar:
     attr: ClassVar[int]
 
 class ParentInstance(GrandparentClassVar):
-    # error: [invalid-attribute-override] "instance variable cannot override class variable `GrandparentClassVar.attr`"
     attr: int
 
 class ChildInstance(ParentInstance):
     attr: int
-
-class GrandparentInstance:
-    attr: int
-
-class ParentClassVar(GrandparentInstance):
-    # error: [invalid-attribute-override] "class variable cannot override instance variable `GrandparentInstance.attr`"
-    attr: ClassVar[int]
-
-class ChildClassVar(ParentClassVar):
-    attr: ClassVar[int]
 ```
 
 ### Descriptors
@@ -826,15 +869,15 @@ class DescriptorAnnotationBase:
     descriptor_attr: Descriptor
 
 class DescriptorAnnotationOverride(DescriptorAnnotationBase):
-    # error: [invalid-attribute-override] "class variable cannot override instance variable `DescriptorAnnotationBase.descriptor_attr`"
+    # error: [invalid-attribute-override] "class variable cannot override regular attribute `DescriptorAnnotationBase.descriptor_attr`"
     descriptor_attr: ClassVar[Descriptor]
 ```
 
 ### Multiple inheritance
 
 The subclass must satisfy every base class. It is not enough for the first base in the MRO to agree
-with the subclass: an unrelated base that declares the same member as a pure class variable still
-makes an instance-variable override invalid.
+with the subclass: an unrelated base that declares the same member as a regular attribute still
+makes a class-variable override invalid.
 
 ```py
 from typing import ClassVar
@@ -845,9 +888,9 @@ class ClassVarBase:
 class InstanceBase:
     attr: int
 
-class MultipleInheritanceSubclass(InstanceBase, ClassVarBase):
-    # error: [invalid-attribute-override] "instance variable cannot override class variable `ClassVarBase.attr`"
-    attr: int
+class MultipleInheritanceSubclass(ClassVarBase, InstanceBase):
+    # error: [invalid-attribute-override] "class variable cannot override regular attribute `InstanceBase.attr`"
+    attr: ClassVar[int]
 ```
 
 ### Dataclasses
@@ -873,6 +916,45 @@ class DC7(DC6):
     y: int
 ```
 
+The same applies when the dataclass is generic and the subclass specializes it:
+
+```py
+from dataclasses import dataclass
+from typing import ClassVar, Generic, TypeVar
+
+T = TypeVar("T")
+
+@dataclass
+class GenericDC(Generic[T]):
+    field: ClassVar[int] = 1
+
+@dataclass
+class SpecializedDC(GenericDC[int]):
+    # error: [invalid-attribute-override] "instance variable cannot override class variable `GenericDC.field`"
+    field: int
+```
+
+### Generic classes
+
+A generic class is treated no differently: a regular attribute may widen an inherited `ClassVar`,
+and specializing the base does not change that.
+
+```py
+from typing import ClassVar, Generic, TypeVar
+
+T = TypeVar("T")
+
+class GenericBase(Generic[T]):
+    class_attr: ClassVar[int]
+    instance_attr: int
+
+class Specialized(GenericBase[int]):
+    class_attr: int
+
+    # error: [invalid-attribute-override] "class variable cannot override regular attribute `GenericBase.instance_attr`"
+    instance_attr: ClassVar[int]
+```
+
 ### Protocol implementations
 
 Regular class-body assignments can implement protocol instance attributes. The `ClassVar` case below
@@ -895,6 +977,65 @@ class ProtocolImpl(ProtocolBase):
 class ProtocolWithClassVarImpl(ProtocolBase):
     class_attr = 0
     instance_attr = 0
+```
+
+An implementation may also declare the `ClassVar` member as a regular annotated attribute:
+
+```py
+from typing import ClassVar, Protocol
+
+class ConfigProtocol(Protocol):
+    name: ClassVar[str]
+
+class Config(ConfigProtocol):
+    name: str
+```
+
+### Instance-only attributes
+
+An attribute assigned only through `self` never reaches the class object, so it is neither a class
+variable nor a regular attribute. Redeclaring one in a subclass class body is allowed, because a
+regular attribute is reachable through an instance too:
+
+```py
+from typing import ClassVar
+
+class InstanceOnlyBase:
+    def __init__(self) -> None:
+        self.attr = 1
+
+class WidenedToRegular(InstanceOnlyBase):
+    attr: int
+```
+
+This rule only considers superclass members that the superclass declares in its class body, so it
+does not currently report a `ClassVar` that overrides an attribute the superclass only ever assigned
+through `self`:
+
+```py
+from typing import ClassVar
+
+class InstanceOnlyBase:
+    def __init__(self) -> None:
+        self.attr = 1
+
+class NarrowedToClassVar(InstanceOnlyBase):
+    attr: ClassVar[int]
+```
+
+Going the other way, a subclass that only assigns through `self` cannot stand in for an inherited
+`ClassVar`. That case is reported by `invalid-attribute-access` at the assignment itself:
+
+```py
+from typing import ClassVar
+
+class ClassVarBase:
+    attr: ClassVar[int]
+
+class InstanceOnlySub(ClassVarBase):
+    def __init__(self) -> None:
+        # error: [invalid-attribute-access]
+        self.attr = 1
 ```
 
 ## Inherited method conflicts in multiple inheritance
