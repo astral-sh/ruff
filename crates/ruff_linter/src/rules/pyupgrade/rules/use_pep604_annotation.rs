@@ -3,6 +3,7 @@ use ruff_python_ast::PythonVersion;
 use ruff_python_ast::helpers::{pep_604_optional, pep_604_union};
 use ruff_python_ast::{self as ast, Expr, Operator};
 use ruff_python_parser::semantic_errors::SemanticSyntaxContext;
+use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::typing::{Pep604Operator, to_pep604_operator};
 use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
@@ -43,6 +44,13 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 ///
 /// Note that this rule only checks for usages of `typing.Union`,
 /// while `UP045` checks for `typing.Optional`.
+///
+/// Unions that are only built at runtime are ignored, as they have no PEP 604
+/// equivalent:
+/// ```python
+/// def f(types: tuple[type, ...]):
+///     return Union[types]
+/// ```
 ///
 /// ## Fix safety
 /// This rule's fix is marked as unsafe on Python versions prior to 3.10 because
@@ -260,6 +268,26 @@ pub(crate) fn non_pep604_annotation(
                 return;
             }
 
+            // Outside of type definitions, `Union[...]` is an ordinary subscript, whose members
+            // may only be known at runtime (e.g., `Union[types]`, where `types` is a tuple of
+            // types). Such unions have no PEP 604 equivalent. Implicit type aliases like
+            // `IntOrStr = Union[int, str]` aren't type definitions either, but they are type
+            // expressions, so they're still worth rewriting.
+            // <https://github.com/astral-sh/ruff/issues/21347>
+            if !checker.semantic().in_type_definition()
+                && !in_implicit_type_alias(checker.semantic(), expr)
+            {
+                return;
+            }
+
+            // Likewise, a single call argument is expanded into the union's members at runtime
+            // (e.g., `Union[tuple(types)]`), so the `Union[...]` can't be replaced by its
+            // argument.
+            // <https://github.com/astral-sh/ruff/issues/27238>
+            if slice.is_call_expr() {
+                return;
+            }
+
             let mut diagnostic = checker.report_diagnostic(NonPEP604AnnotationUnion, expr.range());
             if fixable {
                 match slice {
@@ -342,6 +370,30 @@ fn is_allowed_value(expr: &Expr) -> bool {
         | Expr::Slice(_)
         | Expr::IpyEscapeCommand(_) => false,
     }
+}
+
+/// Return `true` if the expression is (part of) the value of an implicit type alias, as in
+/// `IntOrStr = Union[int, str]` or `Ints = list[Union[int, bool]]`.
+fn in_implicit_type_alias(semantic: &SemanticModel, expr: &Expr) -> bool {
+    let ast::Stmt::Assign(ast::StmtAssign { value, .. }) = semantic.current_statement() else {
+        return false;
+    };
+
+    // Walk out of any enclosing type expression, so that a nested `Union` still counts as part of
+    // the alias, while a `Union` nested in some other expression (e.g., `x = f(Union[types])`)
+    // does not.
+    let outermost = semantic
+        .current_expressions()
+        .take_while(|enclosing| {
+            matches!(
+                enclosing,
+                Expr::Subscript(_) | Expr::Tuple(_) | Expr::BinOp(_)
+            )
+        })
+        .last()
+        .unwrap_or(expr);
+
+    outermost.range() == value.range()
 }
 
 /// Return `true` if this is an `Optional[typing.NamedTuple]` annotation.
