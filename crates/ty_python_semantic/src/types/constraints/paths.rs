@@ -46,6 +46,11 @@ use crate::{Db, FxIndexMap, ProgramEnvironment};
 pub(crate) struct PathAssignments {
     /// All of the rules that we know for inferring derived constraints on the current path.
     sequents: Vec<Sequent>,
+    /// Cached consequences of the first `checked_sequents` rules on this path. A rule only
+    /// needs reevaluation when one of its antecedents changes. Consequences are still replayed
+    /// in rule order, including redundant ones, to preserve the order of derived assignments.
+    sequent_fuels: Vec<Option<AssignmentFuel>>,
+    checked_sequents: usize,
     /// Each assignment's source constraint and the first per-path fuel value with which it was
     /// derived.
     pub(super) assignments: FxIndexMap<ConstraintAssignment, (ConstraintId, u16)>,
@@ -199,6 +204,8 @@ impl PathAssignments {
             .collect();
         Self {
             sequents: Vec::default(),
+            sequent_fuels: Vec::default(),
+            checked_sequents: 0,
             assignments: FxIndexMap::default(),
             additional_fuels: Vec::default(),
             discovered,
@@ -454,6 +461,9 @@ impl PathAssignments {
         self.assignments.truncate(start);
         self.additional_fuels.truncate(additional_fuels_start);
         self.remaining_overall_fuel = previous_remaining_overall_fuel;
+        // Child paths can overwrite cached results and discover rules that remain available
+        // to their siblings. Reevaluate all rules against the restored assignments next time.
+        self.checked_sequents = 0;
         result
     }
 
@@ -519,20 +529,22 @@ impl PathAssignments {
                 continue;
             }
 
-            let existing_support = storage.constraint_support(*existing);
-            let constraint_support = storage.constraint_support(constraint);
+            if !self.independent_typevars.is_empty() {
+                let existing_support = storage.constraint_support(*existing);
+                let constraint_support = storage.constraint_support(constraint);
 
-            // Independent typevars must be checked for disjoint or invalid constraints, but are
-            // otherwise already constrained and do not participate in sequent discovery.
-            if !existing_support.overlaps_with(constraint_support)
-                && existing_support
-                    .iter()
-                    .chain(constraint_support.iter())
-                    .any(|typevar| self.independent_typevars.contains(&typevar))
-                && existing_support.is_complete()
-                && constraint_support.is_complete()
-            {
-                continue;
+                // Independent typevars must be checked for disjoint or invalid constraints, but are
+                // otherwise already constrained and do not participate in sequent discovery.
+                if !existing_support.overlaps_with(constraint_support)
+                    && existing_support
+                        .iter()
+                        .chain(constraint_support.iter())
+                        .any(|typevar| self.independent_typevars.contains(&typevar))
+                    && existing_support.is_complete()
+                    && constraint_support.is_complete()
+                {
+                    continue;
+                }
             }
 
             if SequentMap::pair_cannot_produce_sequents(db, env, storage, *existing, constraint) {
@@ -665,23 +677,51 @@ impl PathAssignments {
         }
 
         // Then use our sequents to add additional facts that we know to be true.
-        //
-        // TODO: This is very naive at the moment, partly for expediency, and partly because we
-        // don't anticipate the sequent maps to be very large. We might consider avoiding the
-        // brute-force search.
-
         self.new_assignments.clear();
         self.discover_constraint(db, env, storage, assignment.constraint());
-
-        for i in 0..self.sequents.len() {
-            let sequent = self.sequents[i];
-            self.check_sequent(db, env, storage, sequent)?;
-        }
+        self.check_sequents(db, env, storage, assignment)?;
 
         // If we were able to derive any new assignments from this one, add them to the processing
         // queue.
         self.assignment_queue.extend(self.new_assignments.drain(..));
 
+        Ok(())
+    }
+
+    /// Replays rule consequences in their original order, recomputing only rules whose
+    /// antecedents changed or whose result has not been checked on this path.
+    fn check_sequents<'db>(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
+        assignment: ConstraintAssignment,
+    ) -> Result<(), PathAssignmentConflict> {
+        self.sequent_fuels.resize(self.sequents.len(), None);
+        let previously_checked = self.checked_sequents;
+        // A conflict can interrupt this scan after some results have changed.
+        self.checked_sequents = 0;
+        for i in 0..self.sequents.len() {
+            let sequent = self.sequents[i];
+            let affected = match sequent {
+                Sequent::SingleTautology { ante } => assignment == ante.when_false(),
+                Sequent::SingleImplication { ante, .. } => assignment == ante.when_true(),
+                Sequent::PairImpossibility { ante1, ante2 }
+                | Sequent::PairImplication { ante1, ante2, .. } => {
+                    assignment == ante1.when_true() || assignment == ante2.when_true()
+                }
+            };
+            if i >= previously_checked || affected {
+                self.sequent_fuels[i] = self.check_sequent(db, env, storage, sequent)?;
+            }
+            if let Some(fuel) = self.sequent_fuels[i]
+                && let Sequent::SingleImplication { post, .. }
+                | Sequent::PairImplication { post, .. } = sequent
+            {
+                self.enqueue_assignment(post.when_true(), fuel);
+            }
+        }
+        self.checked_sequents = self.sequents.len();
         Ok(())
     }
 
@@ -700,21 +740,19 @@ impl PathAssignments {
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         sequent: Sequent,
-    ) -> Result<(), PathAssignmentConflict> {
+    ) -> Result<Option<AssignmentFuel>, PathAssignmentConflict> {
         match sequent {
-            Sequent::SingleTautology { ante } => {
-                self.check_single_tautology(db, env, storage, ante)
-            }
-            Sequent::PairImpossibility { ante1, ante2 } => {
-                self.check_pair_impossibility(db, env, storage, ante1, ante2)
-            }
+            Sequent::SingleTautology { ante } => self
+                .check_single_tautology(db, env, storage, ante)
+                .map(|()| None),
+            Sequent::PairImpossibility { ante1, ante2 } => self
+                .check_pair_impossibility(db, env, storage, ante1, ante2)
+                .map(|()| None),
             Sequent::PairImplication { ante1, ante2, post } => {
-                self.check_pair_implication(db, env, storage, ante1, ante2, post);
-                Ok(())
+                Ok(self.check_pair_implication(db, env, storage, ante1, ante2, post))
             }
             Sequent::SingleImplication { ante, post } => {
-                self.check_single_implication(db, env, storage, ante, post);
-                Ok(())
+                Ok(self.check_single_implication(db, env, storage, ante, post))
             }
         }
     }
@@ -783,24 +821,16 @@ impl PathAssignments {
         ante1: ConstraintId,
         ante2: ConstraintId,
         post: ConstraintId,
-    ) {
-        let Some(ante1_fuel) = self.max_remaining_fuel_for(ante1.when_true()) else {
-            return;
-        };
-        let Some(ante2_fuel) = self.max_remaining_fuel_for(ante2.when_true()) else {
-            return;
-        };
+    ) -> Option<AssignmentFuel> {
+        let ante1_fuel = self.max_remaining_fuel_for(ante1.when_true())?;
+        let ante2_fuel = self.max_remaining_fuel_for(ante2.when_true())?;
         let available_fuel = ante1_fuel.min(ante2_fuel);
         let (ante1_constructor_depth, _) = storage.cached_constraint_bound_depth(db, env, ante1);
         let (ante2_constructor_depth, _) = storage.cached_constraint_bound_depth(db, env, ante2);
         let antecedent_constructor_depth = ante1_constructor_depth.max(ante2_constructor_depth);
         let fuel_cost = storage.sequent_fuel_cost(db, env, post, antecedent_constructor_depth);
-        if let Some(post_fuel) = available_fuel.checked_sub(fuel_cost) {
-            self.enqueue_assignment(
-                post.when_true(),
-                AssignmentFuel::derived(fuel_cost, post_fuel),
-            );
-        }
+        let post_fuel = available_fuel.checked_sub(fuel_cost)?;
+        Some(AssignmentFuel::derived(fuel_cost, post_fuel))
     }
 
     fn check_single_implication<'db>(
@@ -810,10 +840,8 @@ impl PathAssignments {
         storage: &mut ConstraintSetStorage<'db>,
         ante: ConstraintId,
         post: ConstraintId,
-    ) {
-        let Some(available_fuel) = self.max_remaining_fuel_for(ante.when_true()) else {
-            return;
-        };
+    ) -> Option<AssignmentFuel> {
+        let available_fuel = self.max_remaining_fuel_for(ante.when_true())?;
         let ante_data = storage.constraint_data(ante);
         let (antecedent_constructor_depth, _) =
             storage.cached_constraint_bound_depth(db, env, ante);
@@ -823,12 +851,8 @@ impl PathAssignments {
         } else {
             storage.sequent_fuel_cost(db, env, post, antecedent_constructor_depth)
         };
-        if let Some(post_fuel) = available_fuel.checked_sub(fuel_cost) {
-            self.enqueue_assignment(
-                post.when_true(),
-                AssignmentFuel::derived(fuel_cost, post_fuel),
-            );
-        }
+        let post_fuel = available_fuel.checked_sub(fuel_cost)?;
+        Some(AssignmentFuel::derived(fuel_cost, post_fuel))
     }
 }
 
@@ -839,6 +863,7 @@ struct PathAssignmentConflict;
 mod tests {
     use super::super::solutions::SolutionWalker;
     use super::super::*;
+    use super::{AssignmentFuel, PATH_FUEL_BUDGET, PathAssignments, Sequent};
 
     use crate::db::tests::{TestDb, setup_db};
     use crate::types::{BoundTypeVarInstance, KnownClass, TypeVarVariance};
@@ -862,6 +887,147 @@ mod tests {
         let env = db.program_environment();
         let ty = bound.to_instance(db, &env);
         ConstraintSet::constrain_typevar(db, &env, builder, bound_typevar, ty, ty)
+    }
+
+    fn create_path_constraint<'db>(
+        db: &'db TestDb,
+        storage: &mut ConstraintSetStorage<'db>,
+        name: &'static str,
+    ) -> ConstraintId {
+        let env = db.program_environment();
+        storage.intern_constraint(
+            db,
+            &env,
+            Constraint::from_evidence(
+                create_typevar(db, name),
+                None,
+                Some(KnownClass::Int.to_instance(db, &env)),
+            ),
+        )
+    }
+
+    #[test]
+    fn cached_sequents_preserve_consequent_order_when_fuel_increases() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let builder = ConstraintSetBuilder::new();
+        let mut storage = builder.storage.borrow_mut();
+        let [a, c, p, q] =
+            ["A", "C", "P", "Q"].map(|name| create_path_constraint(db, &mut storage, name));
+        let mut path = PathAssignments::new([], FxHashSet::default());
+        path.sequents.extend([
+            Sequent::SingleImplication { ante: a, post: p },
+            Sequent::SingleImplication { ante: c, post: q },
+            Sequent::SingleImplication { ante: c, post: p },
+        ]);
+        path.assignments.insert(a.when_true(), (a, 6));
+        path.assignments.insert(p.when_true(), (a, 5));
+        assert!(
+            path.check_sequents(db, &env, &mut storage, a.when_true())
+                .is_ok()
+        );
+        path.new_assignments.clear();
+
+        // The cached A -> P derivation is redundant, but it establishes P's queue position.
+        // C then gives Q and P more fuel without changing the first-occurrence order.
+        path.assignments.insert(c.when_true(), (c, 7));
+        assert!(
+            path.check_sequents(db, &env, &mut storage, c.when_true())
+                .is_ok()
+        );
+        assert_eq!(
+            path.new_assignments.keys().copied().collect::<Vec<_>>(),
+            [p.when_true(), q.when_true()],
+        );
+        assert_eq!(
+            path.new_assignments[&p.when_true()],
+            AssignmentFuel::derived(1, 6)
+        );
+        assert_eq!(
+            path.new_assignments[&q.when_true()],
+            AssignmentFuel::derived(1, 6)
+        );
+    }
+
+    #[test]
+    fn cached_sequents_are_rechecked_after_branch_rollback() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let builder = ConstraintSetBuilder::new();
+        let mut storage = builder.storage.borrow_mut();
+        let [
+            antecedent,
+            left_branch,
+            right_branch,
+            first_post,
+            second_post,
+        ] = ["A", "B", "C", "P", "Q"].map(|name| create_path_constraint(db, &mut storage, name));
+        let mut path = PathAssignments::new(
+            [
+                antecedent,
+                left_branch,
+                right_branch,
+                first_post,
+                second_post,
+            ],
+            FxHashSet::default(),
+        );
+        // Supply explicit rules so the test isolates replay from rule discovery.
+        path.discovered
+            .values_mut()
+            .for_each(|processed| *processed = true);
+        path.assignments
+            .insert(antecedent.when_true(), (antecedent, PATH_FUEL_BUDGET));
+
+        path.walk_edge(
+            db,
+            &env,
+            &mut storage,
+            left_branch.when_true(),
+            |storage, path, _, conflict| {
+                assert!(!conflict);
+                path.sequents.extend([
+                    Sequent::SingleImplication {
+                        ante: antecedent,
+                        post: first_post,
+                    },
+                    Sequent::SingleImplication {
+                        ante: left_branch,
+                        post: second_post,
+                    },
+                ]);
+                path.new_assignments.clear();
+                assert!(
+                    path.check_sequents(db, &env, storage, left_branch.when_true())
+                        .is_ok()
+                );
+                path.assignment_queue.extend(path.new_assignments.drain(..));
+                assert!(
+                    path.drain_assignment_queue(db, &env, storage, left_branch)
+                        .is_ok()
+                );
+                assert!(path.assignment_holds(first_post.when_true()));
+                assert!(path.assignment_holds(second_post.when_true()));
+            },
+        );
+        assert!(!path.assignment_holds(first_post.when_true()));
+        assert!(!path.assignment_holds(second_post.when_true()));
+
+        // Rules learned in the left branch remain available. The shared antecedent still
+        // holds in the right branch, so only its consequence can be derived again.
+        path.walk_edge(
+            db,
+            &env,
+            &mut storage,
+            right_branch.when_true(),
+            |_, path, _, conflict| {
+                assert!(!conflict);
+                assert!(path.assignment_holds(first_post.when_true()));
+                assert!(!path.assignment_holds(second_post.when_true()));
+            },
+        );
     }
 
     #[test]

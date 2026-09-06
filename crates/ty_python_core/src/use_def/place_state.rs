@@ -181,6 +181,17 @@ impl Declarations {
     }
 
     fn merge(&mut self, b: Self, reachability_constraints: &mut ReachabilityConstraintsBuilder) {
+        // A branch can change a declaration's reachability without adding another declaration.
+        if let ([a], [b]) = (
+            self.live_declarations.as_mut_slice(),
+            b.live_declarations.as_slice(),
+        ) && a.declaration == b.declaration
+        {
+            a.reachability_constraint = reachability_constraints
+                .add_or_constraint(a.reachability_constraint, b.reachability_constraint);
+            return;
+        }
+
         let a = std::mem::take(self);
 
         // Invariant: merge_join_by consumes the two iterators in sorted order, which ensures that
@@ -425,6 +436,24 @@ impl Bindings {
         narrowing_constraints: &mut NarrowingConstraintsBuilder,
         reachability_constraints: &mut ReachabilityConstraintsBuilder,
     ) {
+        // Merge changed constraints directly when both paths retain one definition.
+        if let ([a], [b_binding]) = (
+            self.live_bindings.as_mut_slice(),
+            b.live_bindings.as_slice(),
+        ) && a.binding() == b_binding.binding()
+        {
+            self.unbound_narrowing_constraint = self
+                .unbound_narrowing_constraint
+                .zip(b.unbound_narrowing_constraint)
+                .map(|(a, b)| narrowing_constraints.add_or_constraint(a, b));
+            a.narrowing_constraint = narrowing_constraints
+                .add_or_constraint(a.narrowing_constraint, b_binding.narrowing_constraint);
+            a.reachability_constraint = reachability_constraints
+                .add_or_constraint(a.reachability_constraint, b_binding.reachability_constraint);
+            debug_assert_eq!(a.can_be_shadowed(), b_binding.can_be_shadowed());
+            return;
+        }
+
         let a = std::mem::take(self);
 
         if let Some((a, b)) = a
