@@ -13,9 +13,9 @@ use crate::types::equality::{
 };
 use crate::types::tuple::{Tuple, TupleSpec};
 use crate::types::{
-    DynamicType, IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType,
-    LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy, Type, TypeContext, TypeTransformer,
-    TypeVarBoundOrConstraints, UnionBuilder,
+    DynamicType, FunctionType, IntersectionBuilder, IntersectionType, KnownClass,
+    KnownInstanceType, LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy, Type,
+    TypeContext, TypeTransformer, TypeVarBoundOrConstraints, UnionBuilder,
 };
 use ty_python_core::Truthiness;
 
@@ -29,10 +29,14 @@ impl<'db> Type<'db> {
     /// commitments such as `list[int]` and `list[str]` without some other code already being
     /// unsound.
     ///
+    /// Function signature substitutions can likewise differ between views of the same function
+    /// object. Use the underlying function literal without substituted signatures for identity.
+    ///
     /// Preserve negations that constrain the object itself, such as `~None`, `~SomeClass`, and
-    /// `~Literal[1]`. A `NewType` tag, type-variable selection, type-guard proof, or literal-string
-    /// origin can differ between views. A negated string literal excludes its runtime value only
-    /// when another constraint already establishes that the string has literal origin.
+    /// `~Literal[1]`. A `NewType` tag, function signature, type-variable selection, type-guard proof,
+    /// or literal-string origin can differ between views. A negated string literal excludes its
+    /// runtime value only when another constraint already establishes that the string has literal
+    /// origin.
     ///
     /// A type variable can also hide a `NewType` tag: even a variable bounded by `int` can be
     /// instantiated as an integer `NewType`. Expand variables to their upcast bounds or constraints
@@ -40,8 +44,8 @@ impl<'db> Type<'db> {
     /// `object`.
     ///
     /// Use this upcast both to decide whether identity is possible and to narrow the other
-    /// operand when it succeeds. Each operand retains its own existing tags and type-variable
-    /// relationships when the resulting constraint is applied.
+    /// operand when it succeeds. Each operand retains its own existing tags, substituted
+    /// signatures, and type-variable relationships when the resulting constraint is applied.
     pub(crate) fn identity_comparison_type(
         self,
         db: &'db dyn Db,
@@ -61,6 +65,9 @@ impl<'db> Type<'db> {
                 }
                 Type::NewTypeInstance(newtype) => {
                     upcast(db, env, newtype.concrete_base_type(db), visitor)
+                }
+                Type::FunctionLiteral(function) => {
+                    Type::FunctionLiteral(FunctionType::new(db, function.literal(db), None))
                 }
                 Type::TypeVar(typevar) => visitor.visit_type(db, ty, || {
                     match typevar.typevar(db).bound_or_constraints(db, env) {
@@ -83,11 +90,13 @@ impl<'db> Type<'db> {
                         builder = builder.add_positive(upcast(db, env, *element, visitor));
                     }
                     for element in intersection.negative(db) {
-                        // Static tags, predicate proofs, and literal-string origin can differ
-                        // between views. Once literal origin is known, an excluded string literal
-                        // also excludes its runtime value and must be preserved.
+                        // Static tags, function signatures, predicate proofs, and literal-string
+                        // origin can differ between views. Once literal origin is known, an
+                        // excluded string literal also excludes its runtime value and must be
+                        // preserved.
                         match element.resolve_type_alias(db) {
                             Type::NewTypeInstance(_)
+                            | Type::FunctionLiteral(_)
                             | Type::TypeVar(_)
                             | Type::TypeIs(_)
                             | Type::TypeGuard(_) => continue,
@@ -145,8 +154,8 @@ impl<'db> Type<'db> {
             return Truthiness::AlwaysTrue;
         }
 
-        // `NewType` instances are identity functions at runtime, so distinct static types can still
-        // identify the same object. Compare the types of their possible runtime objects instead.
+        // Distinct static types can still identify the same object, as with `NewType` tags and
+        // function signature substitutions. Compare the types of their possible runtime objects.
         let left_identity = self.identity_comparison_type(db, env);
         let right_identity = other.identity_comparison_type(db, env);
 

@@ -56,6 +56,54 @@ reveal_type(list[int] is list[int])  # revealed: bool
 reveal_type(list[int] is not list[int])  # revealed: bool
 ```
 
+## Function identity after generic substitution
+
+Passing a function through a generic identity function preserves the function object, so
+`identity(f) is f` is correctly inferred as `Literal[True]` in the examples below:
+
+```py
+from typing import TypeVar
+
+F = TypeVar("F")
+
+def identity(value: F) -> F:
+    return value
+
+def f():
+    pass
+
+def g():
+    pass
+
+reveal_type(identity(f) is f)  # revealed: Literal[True]
+reveal_type(f is identity(f))  # revealed: Literal[True]
+reveal_type(identity(f) is not f)  # revealed: Literal[False]
+reveal_type(identity(f) is g)  # revealed: Literal[False]
+```
+
+## Identity comparisons between function specializations
+
+Different specializations of a method have disjoint static types but can refer to the same function
+object at runtime if the method is unbound:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+class C[T]:
+    def method(self, value: T) -> T:
+        return value
+
+int_method = C[int].method
+str_method = C[str].method
+reveal_type(int_method is str_method)  # revealed: Literal[True]
+reveal_type(int_method is not str_method)  # revealed: Literal[False]
+reveal_type(C[int]().method is C[int]().method)  # revealed: bool
+reveal_type(C[int]().method is C[str]().method)  # revealed: Literal[False]
+```
+
 ## Identity comparisons with NewTypes
 
 Two variables cannot share the same memory address if they have disjoint nominal-instance backing
