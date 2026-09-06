@@ -153,9 +153,8 @@ pub(crate) fn negation_with_equal_op(checker: &Checker, expr: &Expr, op: UnaryOp
         return;
     }
     let Expr::Compare(ast::ExprCompare {
-        left,
         ops,
-        comparators,
+        operands,
         range: _,
         node_index: _,
     }) = operand
@@ -180,15 +179,14 @@ pub(crate) fn negation_with_equal_op(checker: &Checker, expr: &Expr, op: UnaryOp
 
     let mut diagnostic = checker.report_diagnostic(
         NegateEqualOp {
-            left: checker.generator().expr(left),
-            right: checker.generator().expr(&comparators[0]),
+            left: checker.generator().expr(&operands[0]),
+            right: checker.generator().expr(&operands[1]),
         },
         expr.range(),
     );
     let node = ast::ExprCompare {
-        left: left.clone(),
-        ops: Box::from([CmpOp::NotEq]),
-        comparators: comparators.clone(),
+        ops: [CmpOp::NotEq].into(),
+        operands: operands.clone(),
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
@@ -209,9 +207,8 @@ pub(crate) fn negation_with_not_equal_op(
         return;
     }
     let Expr::Compare(ast::ExprCompare {
-        left,
         ops,
-        comparators,
+        operands,
         range: _,
         node_index: _,
     }) = operand
@@ -236,15 +233,14 @@ pub(crate) fn negation_with_not_equal_op(
 
     let mut diagnostic = checker.report_diagnostic(
         NegateNotEqualOp {
-            left: checker.generator().expr(left),
-            right: checker.generator().expr(&comparators[0]),
+            left: checker.generator().expr(&operands[0]),
+            right: checker.generator().expr(&operands[1]),
         },
         expr.range(),
     );
     let node = ast::ExprCompare {
-        left: left.clone(),
-        ops: Box::from([CmpOp::Eq]),
-        comparators: comparators.clone(),
+        ops: [CmpOp::Eq].into(),
+        operands: operands.clone(),
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
@@ -293,7 +289,7 @@ pub(crate) fn double_negation(checker: &Checker, expr: &Expr, op: UnaryOp, opera
         let node1 = ast::ExprCall {
             func: Box::new(node.into()),
             arguments: Arguments {
-                args: Box::from([*operand.clone()]),
+                args: [*operand.clone()].into(),
                 keywords: std::iter::empty().collect(),
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,

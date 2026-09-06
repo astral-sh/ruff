@@ -6987,10 +6987,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // Make sure we iter through every parts to infer all sub-expressions. The `collector`
             // struct ensures we don't allocate unnecessary strings.
             match part {
-                ast::FStringPart::Literal(literal) => {
+                ast::FStringPartRef::Literal(literal) => {
                     collector.push_str(&literal.value);
                 }
-                ast::FStringPart::FString(fstring) => {
+                ast::FStringPartRef::FString(fstring) => {
                     for element in &fstring.elements {
                         match element {
                             ast::InterpolatedStringElement::Interpolation(expression) => {
@@ -11567,12 +11567,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let ast::ExprCompare {
             range: _,
             node_index: _,
-            left,
             ops,
-            comparators,
+            operands,
         } = compare;
 
-        self.infer_expression(left, TypeContext::default());
+        if let Some(left) = operands.first() {
+            self.infer_expression(left, TypeContext::default());
+        }
         let mut last_comparison_ty = Type::unknown();
 
         // https://docs.python.org/3/reference/expressions.html#comparisons
@@ -11588,10 +11589,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = self.infer_chained_boolean_types(
             ast::BoolOp::And,
             false,
-            std::iter::once(&**left)
-                .chain(comparators)
-                .tuple_windows::<(_, _)>()
-                .zip(ops),
+            operands.iter().tuple_windows::<(_, _)>().zip(ops),
             |_| false,
             |builder, ((left, right), op), _peer_ty| {
                 let left_ty = builder.expression_type(left);

@@ -150,14 +150,13 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &Checker, stmt: &Stmt) {
                 {
                     *operand.clone()
                 } else if let Expr::Compare(ast::ExprCompare {
-                    left,
                     ops,
-                    comparators,
+                    operands,
                     range: _,
                     node_index: _,
                 }) = &loop_.test
                 {
-                    if let ([op], [comparator]) = (&**ops, &**comparators) {
+                    if let ([op], [_, _]) = (&**ops, &**operands) {
                         let op = match op {
                             CmpOp::Eq => CmpOp::NotEq,
                             CmpOp::NotEq => CmpOp::Eq,
@@ -171,9 +170,8 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &Checker, stmt: &Stmt) {
                             CmpOp::NotIn => CmpOp::In,
                         };
                         let node = ast::ExprCompare {
-                            left: left.clone(),
-                            ops: Box::from([op]),
-                            comparators: Box::from([comparator.clone()]),
+                            ops: [op].into(),
+                            operands: operands.clone(),
                             range: TextRange::default(),
                             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                         };
@@ -431,7 +429,7 @@ fn return_stmt(id: Name, test: &Expr, target: &Expr, iter: &Expr, generator: Gen
     let node2 = ast::ExprCall {
         func: Box::new(node1.into()),
         arguments: Arguments {
-            args: Box::from([node.into()]),
+            args: [node.into()].into(),
             keywords: std::iter::empty().collect(),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,

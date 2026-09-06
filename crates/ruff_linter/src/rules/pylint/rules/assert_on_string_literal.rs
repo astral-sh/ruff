@@ -76,8 +76,8 @@ pub(crate) fn assert_on_string_literal(checker: &Checker, test: &Expr) {
         }
         Expr::FString(ast::ExprFString { value, .. }) => {
             let kind = if value.iter().all(|f_string_part| match f_string_part {
-                ast::FStringPart::Literal(literal) => literal.is_empty(),
-                ast::FStringPart::FString(f_string) => {
+                ast::FStringPartRef::Literal(literal) => literal.is_empty(),
+                ast::FStringPartRef::FString(f_string) => {
                     f_string.elements.iter().all(|element| match element {
                         ast::InterpolatedStringElement::Literal(
                             ast::InterpolatedStringLiteralElement { value, .. },
@@ -88,8 +88,8 @@ pub(crate) fn assert_on_string_literal(checker: &Checker, test: &Expr) {
             }) {
                 Kind::Empty
             } else if value.iter().any(|f_string_part| match f_string_part {
-                ast::FStringPart::Literal(literal) => !literal.is_empty(),
-                ast::FStringPart::FString(f_string) => {
+                ast::FStringPartRef::Literal(literal) => !literal.is_empty(),
+                ast::FStringPartRef::FString(f_string) => {
                     f_string.elements.iter().any(|element| match element {
                         ast::InterpolatedStringElement::Literal(
                             ast::InterpolatedStringLiteralElement { value, .. },

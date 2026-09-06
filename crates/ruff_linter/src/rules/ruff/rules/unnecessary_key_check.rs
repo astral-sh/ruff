@@ -69,13 +69,7 @@ pub(crate) fn unnecessary_key_check(checker: &Checker, expr: &Expr) {
     };
 
     // Left should be, e.g., `key in dct`.
-    let Expr::Compare(ast::ExprCompare {
-        left: key_left,
-        ops,
-        comparators,
-        ..
-    }) = left
-    else {
+    let Expr::Compare(ast::ExprCompare { ops, operands, .. }) = left else {
         return;
     };
 
@@ -83,7 +77,7 @@ pub(crate) fn unnecessary_key_check(checker: &Checker, expr: &Expr) {
         return;
     }
 
-    let [obj_left] = &**comparators else {
+    let [key_left, obj_left] = &**operands else {
         return;
     };
 

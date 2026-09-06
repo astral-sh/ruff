@@ -1646,13 +1646,15 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
         }
         Expr::Compare(
             compare @ ast::ExprCompare {
-                left,
                 ops,
-                comparators,
+                operands,
                 range: _,
                 node_index: _,
             },
         ) => {
+            let Some((left, comparators)) = operands.split_first() else {
+                return;
+            };
             if checker.any_rule_enabled(&[Rule::NoneComparison, Rule::TrueFalseComparison]) {
                 pycodestyle::rules::literal_comparisons(checker, compare);
             }
