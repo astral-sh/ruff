@@ -1269,7 +1269,13 @@ impl<'db> FunctionType<'db> {
         ) {
             (
                 self.updated_signature(db).map(|signature| {
-                    signature.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                    signature.apply_type_mapping_impl(
+                        db,
+                        type_mapping,
+                        tcx,
+                        visitor,
+                        /* skip_return_type */ false,
+                    )
                 }),
                 self.updated_implementation_callables(db).map(|callables| {
                     callables
@@ -1282,10 +1288,13 @@ impl<'db> FunctionType<'db> {
             )
         } else {
             (
-                Some(
-                    self.signature(db)
-                        .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-                ),
+                Some(self.signature(db).apply_type_mapping_impl(
+                    db,
+                    type_mapping,
+                    tcx,
+                    visitor,
+                    /* skip_return_type */ false,
+                )),
                 literal.has_separate_implementation(db).then(|| {
                     self.implementation_callables(db)
                         .iter()

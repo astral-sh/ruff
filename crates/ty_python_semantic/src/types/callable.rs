@@ -903,8 +903,13 @@ impl<'db> CallableType<'db> {
 
         self.with_signatures(
             db,
-            self.signatures(db)
-                .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+            self.signatures(db).apply_type_mapping_impl(
+                db,
+                type_mapping,
+                tcx,
+                visitor,
+                self.is_paramspec_value(db),
+            ),
         )
     }
 
@@ -1042,5 +1047,29 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source.iter().when_all(db, self.constraints, |element| {
             self.check_callable_pair(db, *element, target)
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use crate::db::tests::setup_db;
+    use crate::types::{Parameter, Type};
+
+    #[test]
+    fn paramspec_value_materialization_do_not_add_return_type() {
+        let db = setup_db();
+        let env = db.program_environment();
+        let paramspec_value = Type::paramspec_value_callable(
+            &db,
+            Parameters::standard([
+                Parameter::positional_only(None).with_annotated_type(Type::object())
+            ]),
+        );
+        let bottom = paramspec_value.bottom_materialization(&db, &env);
+        assert_eq!(paramspec_value, bottom);
+        let top = paramspec_value.top_materialization(&db, &env);
+        assert_eq!(paramspec_value, top);
     }
 }

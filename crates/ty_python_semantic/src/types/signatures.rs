@@ -318,7 +318,9 @@ impl<'db> CallableSignature<'db> {
         type_mapping: &TypeMapping<'a, 'db>,
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+        skip_return_type: bool,
     ) -> Self {
+        #[expect(clippy::too_many_arguments)]
         fn try_apply_type_mapping_for_paramspec<'db>(
             db: &'db dyn Db,
             self_signature: &Signature<'db>,
@@ -327,6 +329,7 @@ impl<'db> CallableSignature<'db> {
             type_mapping: &TypeMapping<'_, 'db>,
             tcx: TypeContext<'db>,
             visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+            skip_return_type: bool,
         ) -> Option<CallableSignature<'db>> {
             match paramspec_value {
                 Type::TypeVar(typevar) if typevar.is_paramspec(db) => {
@@ -358,12 +361,16 @@ impl<'db> CallableSignature<'db> {
                             visitor,
                         ),
                         parameters,
-                        return_ty: self_signature.return_ty.apply_type_mapping_impl(
-                            db,
-                            type_mapping,
-                            tcx,
-                            visitor,
-                        ),
+                        return_ty: if skip_return_type {
+                            self_signature.return_ty
+                        } else {
+                            self_signature.return_ty.apply_type_mapping_impl(
+                                db,
+                                type_mapping,
+                                tcx,
+                                visitor,
+                            )
+                        },
                     }))
                 }
                 Type::Callable(callable)
@@ -402,12 +409,16 @@ impl<'db> CallableSignature<'db> {
                                     param.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
                                 }),
                             ),
-                            return_ty: self_signature.return_ty.apply_type_mapping_impl(
-                                db,
-                                type_mapping,
-                                tcx,
-                                visitor,
-                            ),
+                            return_ty: if skip_return_type {
+                                self_signature.return_ty
+                            } else {
+                                self_signature.return_ty.apply_type_mapping_impl(
+                                    db,
+                                    type_mapping,
+                                    tcx,
+                                    visitor,
+                                )
+                            },
                         }),
                     ))
                 }
@@ -430,6 +441,7 @@ impl<'db> CallableSignature<'db> {
                         type_mapping,
                         tcx,
                         visitor,
+                        skip_return_type,
                     )
                 {
                     result.overloads
@@ -438,16 +450,15 @@ impl<'db> CallableSignature<'db> {
                         db,
                         type_mapping,
                         tcx,
-                        visitor
+                        visitor,
+                        skip_return_type,
                     )]
                 }
             }))
         } else {
-            Self::from_overloads(
-                self.overloads.iter().map(|signature| {
-                    signature.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
-                }),
-            )
+            Self::from_overloads(self.overloads.iter().map(|signature| {
+                signature.apply_type_mapping_impl(db, type_mapping, tcx, visitor, skip_return_type)
+            }))
         }
     }
 
@@ -994,6 +1005,7 @@ impl<'db> Signature<'db> {
         type_mapping: &TypeMapping<'a, 'db>,
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+        skip_return_type: bool,
     ) -> Self {
         let env = visitor.env;
         Self {
@@ -1006,9 +1018,12 @@ impl<'db> Signature<'db> {
             parameters: self
                 .parameters
                 .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-            return_ty: self
-                .return_ty
-                .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+            return_ty: if skip_return_type {
+                self.return_ty
+            } else {
+                self.return_ty
+                    .apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+            },
         }
     }
 
@@ -1030,6 +1045,7 @@ impl<'db> Signature<'db> {
             },
             TypeContext::default(),
             &ApplyTypeMappingVisitor::new(env),
+            /* skip_return_type */ false,
         )
     }
 
@@ -1370,6 +1386,7 @@ impl<'db> Signature<'db> {
             &type_mapping,
             TypeContext::default(),
             &ApplyTypeMappingVisitor::new(env),
+            /* skip_return_type */ false,
         );
 
         // The captured `ParamSpec` can carry overload indices from another callable. Keep
@@ -1671,6 +1688,7 @@ impl<'db> Signature<'db> {
             &type_mapping,
             TypeContext::default(),
             &ApplyTypeMappingVisitor::new(env),
+            /* skip_return_type */ false,
         )
     }
 
