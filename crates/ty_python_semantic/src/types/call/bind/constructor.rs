@@ -33,6 +33,8 @@ pub(super) struct ConstructorBinding<'db> {
     /// The next downstream constructor method, if any, to be (conditionally) checked after this
     /// one.
     pub(super) downstream_constructor: Option<Box<Bindings<'db>>>,
+    /// The expected type of the constructor call, retained independently of overload resolution.
+    call_expression_tcx: TypeContext<'db>,
 }
 
 impl<'db> ConstructorBinding<'db> {
@@ -44,6 +46,7 @@ impl<'db> ConstructorBinding<'db> {
             entry,
             constructor_context,
             downstream_constructor: None,
+            call_expression_tcx: TypeContext::default(),
         }
     }
 
@@ -182,6 +185,7 @@ impl<'db> ConstructorBinding<'db> {
         call_expression_tcx: TypeContext<'db>,
         mode: CheckTypesMode,
     ) {
+        self.call_expression_tcx = call_expression_tcx;
         self.entry
             .check_types(db, env, constraints, argument_types, call_expression_tcx);
 
@@ -304,6 +308,7 @@ impl<'db> ConstructorBinding<'db> {
             entry: f(self.entry),
             constructor_context: self.constructor_context,
             downstream_constructor: None,
+            call_expression_tcx: self.call_expression_tcx,
         }
     }
 
@@ -460,6 +465,39 @@ impl<'db> ConstructorBinding<'db> {
             {
                 combine_binding_specialization(downstream_binding);
             }
+        }
+
+        if self.callable().has_binding_errors() {
+            // The expected specialization does not depend on which constructor overload matched.
+            // For example, `consumer: Consumer[Animal] = Consumer(accepts_dog)` still establishes
+            // `T = Animal` even when every `Consumer.__init__` overload rejects the callback.
+            if let Some(contextual_specialization) =
+                static_class_literal.and_then(|class_literal| {
+                    self.call_expression_tcx
+                        .annotation?
+                        .specialization_of(db, env, class_literal)
+                })
+            {
+                return Some(
+                    contextual_specialization
+                        .apply_optional_specialization(db, Some(class_specialization)),
+                );
+            }
+
+            // Failed inference must not expose the constructed class's own type variables. Keep
+            // inferred or explicit arguments, but replace unresolved variables with their declared
+            // defaults (or `Unknown` when no default exists).
+            let default_specialization = class_context.default_specialization(
+                db,
+                self.constructed_class_literal(db, env)
+                    .and_then(|class_literal| class_literal.known(db)),
+            );
+            return Some(
+                combined
+                    .unwrap_or(default_specialization)
+                    .apply_optional_specialization(db, Some(class_specialization))
+                    .apply_optional_specialization(db, Some(default_specialization)),
+            );
         }
 
         combined.map(|specialization| {
