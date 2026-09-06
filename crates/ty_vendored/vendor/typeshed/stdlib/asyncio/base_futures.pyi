@@ -3,7 +3,6 @@ from collections.abc import Callable, Sequence
 from contextvars import Context
 from typing import Any, Final
 from typing_extensions import TypeIs
-from ty_extensions import Top
 
 from . import futures
 
@@ -13,7 +12,7 @@ _PENDING: Final = "PENDING"  # undocumented
 _CANCELLED: Final = "CANCELLED"  # undocumented
 _FINISHED: Final = "FINISHED"  # undocumented
 
-def isfuture(obj: object) -> TypeIs[Top[Future[Any]]]:
+def isfuture(obj: object) -> TypeIs[Future[Any]]:
     """Check for a Future.
 
     This returns True when obj is a Future instance or is advertising

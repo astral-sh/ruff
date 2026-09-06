@@ -497,11 +497,11 @@ impl ClassInfoConstraintFunction {
                 }
             };
 
-            if is_positive {
+            if use_generic_filtering {
                 constraint
             } else {
-                // A negative result excludes every specialization of the class. Materialize the
-                // whole type so that this also covers gradual protocol members.
+                // Strict positive narrowing and negative narrowing both cover every
+                // materialization. Materialize the whole type, including gradual protocol members.
                 constraint.top_materialization(db, env)
             }
         };
@@ -538,7 +538,12 @@ impl ClassInfoConstraintFunction {
                     //   protocol-conforming objects even if its nominal instances do not conform.
                     SubclassOfInner::Protocol(protocol) => match self {
                         ClassInfoConstraintFunction::IsInstance => {
-                            Some(Type::ProtocolInstance(protocol))
+                            let constraint = Type::ProtocolInstance(protocol);
+                            Some(if use_generic_filtering {
+                                constraint
+                            } else {
+                                constraint.top_materialization(db, env)
+                            })
                         }
                         ClassInfoConstraintFunction::IsSubclass => Some(classinfo),
                     },
@@ -816,32 +821,55 @@ fn filter_generic_narrowing_constraint<'db>(
         (subject, Type::Union(union)) => union.map(db, env, |element| {
             filter_generic_narrowing_constraint(db, env, subject, *element)
         }),
-        (subject @ Type::Callable(_), Type::Callable(_)) => subject,
+        // Dynamic types are assignable to every protocol. Including them here would create `Any`
+        // instead of `Any & Awaitable[Any]` when narrowing from `Any` via `isawaitable`. The latter
+        // is more useful in LSP use cases, so exclude dynamic types here.
+        (subject, target @ Type::ProtocolInstance(_))
+            if !subject.is_dynamic() && subject.is_assignable_to(db, env, target) =>
+        {
+            subject
+        }
+        (subject, target @ Type::Callable(_))
+            if subject.is_subtype_of(db, env, target.top_materialization(db, env)) =>
+        {
+            subject
+        }
         (subject, target)
             if is_typed_dict_runtime_domain(db, env, subject)
                 && target.nominal_class(db, env).is_some_and(|class| {
                     !class.is_protocol(db)
                         && typed_dict_matches_class_pattern(db, env, class.class_literal(db))
+                        && target.is_equivalent_to(
+                            db,
+                            env,
+                            Type::instance(
+                                db,
+                                env,
+                                class.class_literal(db).unknown_specialization(db),
+                            ),
+                        )
                 }) =>
         {
             // A TypedDict is a dictionary at runtime, but intersecting it with the target would
             // expose dict's unrestricted mutations and discard its required-key guarantees.
             subject
         }
-        (Type::Intersection(intersection), target) => {
-            let specialized_target =
-                specialize_narrowing_target_from_intersection(db, env, intersection, target)
-                    .or_else(|| {
-                        intersection.positive(db).iter().find_map(|element| {
-                            specialize_narrowing_target(db, env, *element, target)
-                        })
-                    })
-                    .unwrap_or(target);
-            IntersectionType::from_two_elements(db, env, subject, specialized_target)
-        }
         (subject, target) => {
-            let specialized_target =
-                specialize_narrowing_target(db, env, subject, target).unwrap_or(target);
+            let specialized_target = match subject {
+                Type::Intersection(intersection) => {
+                    specialize_narrowing_target_from_intersection(db, env, intersection, target)
+                        .or_else(|| {
+                            intersection.positive(db).iter().find_map(|element| {
+                                specialize_narrowing_target(db, env, *element, target)
+                            })
+                        })
+                }
+                _ => specialize_narrowing_target(db, env, subject, target),
+            }
+            .filter(|specialized| {
+                specialized.is_subtype_of(db, env, target.top_materialization(db, env))
+            })
+            .unwrap_or(target);
             IntersectionType::from_two_elements(db, env, subject, specialized_target)
         }
     }
@@ -4490,13 +4518,24 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         let place_and_constraint = match return_ty {
             Type::TypeIs(type_is) => {
                 let (_, place) = type_is.place_info(db)?;
+                let target = type_is.return_type(db);
+                let use_generic_filtering = is_positive
+                    && !db
+                        .analysis_settings(self.scope().file(db))
+                        .strict_generic_narrowing;
                 Some((
                     place,
-                    NarrowingConstraint::intersection(type_is.return_type(db).negate_if(
-                        db,
-                        &self.env,
-                        !is_positive,
-                    )),
+                    if use_generic_filtering {
+                        NarrowingConstraint::generic_filtering(target)
+                    } else {
+                        NarrowingConstraint::intersection(
+                            target.top_materialization(db, &self.env).negate_if(
+                                db,
+                                &self.env,
+                                !is_positive,
+                            ),
+                        )
+                    },
                 ))
             }
             // TypeGuard only narrows in the positive case
