@@ -97,9 +97,15 @@ impl<'db> BoundMethodType<'db> {
         heap_size=ruff_memory_usage::heap_size
     )]
     pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> CallableType<'db> {
+        let function = self.function(db);
+        let env =
+            ProgramEnvironment::from_scope(function.literal(db).last_definition.body_scope(db));
+        let typing_self_type = self.typing_self_type(db);
+        let receiver_type = self.signature_receiver(db);
+
         CallableType::new(
             db,
-            self.bound_signatures(db),
+            self.bound_signatures_with_receiver(db, &env, receiver_type, typing_self_type),
             CallableTypeKind::FunctionLike,
         )
     }
@@ -119,15 +125,9 @@ impl<'db> BoundMethodType<'db> {
         )
     }
 
-    #[salsa::tracked(returns(ref), cycle_initial=|_, _, _| CallableSignature::bottom(), heap_size=ruff_memory_usage::heap_size)]
-    pub(crate) fn bound_signatures(self, db: &'db dyn Db) -> CallableSignature<'db> {
-        let function = self.function(db);
-        let env =
-            ProgramEnvironment::from_scope(function.literal(db).last_definition.body_scope(db));
-        let typing_self_type = self.typing_self_type(db);
-        let receiver_type = self.signature_receiver(db);
-
-        self.bound_signatures_with_receiver(db, &env, receiver_type, typing_self_type)
+    /// Shares the signatures retained in the method's interned callable.
+    pub(crate) fn bound_signatures(self, db: &'db dyn Db) -> &'db CallableSignature<'db> {
+        self.into_callable_type(db).signatures(db)
     }
 
     fn bound_signatures_with_receiver(
