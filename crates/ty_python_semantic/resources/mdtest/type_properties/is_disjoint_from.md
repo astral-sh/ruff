@@ -728,6 +728,32 @@ static_assert(is_disjoint_from(str, TypeGuard[str]))
 static_assert(is_disjoint_from(str, TypeIs[str]))
 ```
 
+Either kind of type guard can return `True` or `False`, so both overlap with each boolean literal.
+
+```py
+from typing import Literal
+
+static_assert(not is_disjoint_from(TypeGuard[str], Literal[True]))
+static_assert(not is_disjoint_from(TypeGuard[str], Literal[False]))
+static_assert(not is_disjoint_from(TypeIs[str], Literal[True]))
+static_assert(not is_disjoint_from(TypeIs[str], Literal[False]))
+
+static_assert(not is_disjoint_from(Literal[True], TypeGuard[str]))
+static_assert(not is_disjoint_from(Literal[False], TypeGuard[str]))
+static_assert(not is_disjoint_from(Literal[True], TypeIs[str]))
+static_assert(not is_disjoint_from(Literal[False], TypeIs[str]))
+```
+
+The integer literals `0` and `1` are distinct from boolean literals, so they remain disjoint from
+type guard return types.
+
+```py
+static_assert(is_disjoint_from(TypeGuard[str], Literal[0]))
+static_assert(is_disjoint_from(TypeIs[str], Literal[1]))
+static_assert(is_disjoint_from(Literal[1], TypeGuard[str]))
+static_assert(is_disjoint_from(Literal[0], TypeIs[str]))
+```
+
 ### `Protocol`
 
 A protocol is disjoint from another type if any of the protocol's members are available as an
