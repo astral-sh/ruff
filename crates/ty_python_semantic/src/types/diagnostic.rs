@@ -11,7 +11,7 @@ use super::{
 };
 use crate::dependency::is_direct_dependency;
 use crate::diagnostic::{did_you_mean, format_enumeration};
-use crate::importer::{ImportRequest, MembersInScope};
+use crate::importer::{ImportAction, ImportRequest, MembersInScope};
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
 use crate::place::{DefinedPlace, Place, imported_symbol, place_from_bindings};
 use crate::suppression::FileSuppressionId;
@@ -52,7 +52,7 @@ use ruff_python_ast::name::Name;
 use ruff_python_ast::token::parentheses_iterator;
 use ruff_python_ast::{self as ast, AnyNodeRef, HasNodeIndex, PythonVersion, StringFlags};
 use ruff_source_file::LineRanges;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::fmt::{self, Formatter};
 use ty_module_resolver::{
@@ -3101,6 +3101,37 @@ pub(super) fn typing_module_for_fix(
         }
     }
     Some(module)
+}
+
+pub(super) fn import_literal_for_fix(context: &InferContext, at: TextSize) -> Option<ImportAction> {
+    let module = typing_module_for_fix(context, "Literal", PythonVersion::PY38)?;
+    context.importer().import_for_diagnostic(
+        ImportRequest::import_from(module.as_str(), "Literal"),
+        context.scope().file_scope_id(context.db()),
+        at,
+    )
+}
+
+/// Wraps a literal in `Literal[...]`, preserving its spelling, quotes, and escapes.
+/// String annotations retain their original source offsets: `parse_string_annotation` rejects
+/// contents that require unescaping, and parses accepted strings directly from the source file.
+pub(super) fn autofix_with_literal(
+    context: &InferContext,
+    diagnostic: &mut Diagnostic,
+    node: impl Ranged,
+) {
+    let Some(action) = import_literal_for_fix(context, node.start()) else {
+        return;
+    };
+    let source = source_text(context.db(), context.file());
+    diagnostic.help("Wrap in `Literal[...]`");
+    diagnostic.set_fix(Fix::unsafe_edits(
+        Edit::range_replacement(
+            format!("{}[{}]", action.symbol_text(), &source[node.range()]),
+            node.range(),
+        ),
+        action.import().cloned(),
+    ));
 }
 
 pub(super) fn report_undefined_reveal(context: &InferContext, name: &ast::ExprName) {
