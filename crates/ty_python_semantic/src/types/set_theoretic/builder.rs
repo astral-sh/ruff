@@ -1406,6 +1406,60 @@ enum IntersectionSimplification {
     Disjoint,
 }
 
+fn simplify_intersection_pair<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    first: Type<'db>,
+    second: Type<'db>,
+    polarity: IntersectionPolarity,
+) -> IntersectionSimplification {
+    // Built-in literal values have no inference dependencies, so these simplifications cannot
+    // participate in a cycle and do not need an interned pair or a tracked relation query.
+    if let (Type::LiteralValue(first), Type::LiteralValue(second)) = (first, second)
+        && matches!(
+            first.kind(),
+            LiteralValueTypeKind::Int(_)
+                | LiteralValueTypeKind::Bool(_)
+                | LiteralValueTypeKind::String(_)
+                | LiteralValueTypeKind::Bytes(_)
+        )
+        && matches!(
+            second.kind(),
+            LiteralValueTypeKind::Int(_)
+                | LiteralValueTypeKind::Bool(_)
+                | LiteralValueTypeKind::String(_)
+                | LiteralValueTypeKind::Bytes(_)
+        )
+    {
+        return match (polarity, first.kind() == second.kind()) {
+            (IntersectionPolarity::Positive, true) => {
+                // Redundancy depends on promotability and full literal identity, including
+                // the recursive-definition flag. Subtyping only compares the literal values.
+                if first == second || first.is_promotable() {
+                    IntersectionSimplification::SecondRedundant
+                } else if second.is_promotable() {
+                    IntersectionSimplification::FirstRedundant
+                } else {
+                    IntersectionSimplification::Unchanged
+                }
+            }
+            (IntersectionPolarity::Positive, false) | (IntersectionPolarity::Mixed, true) => {
+                IntersectionSimplification::Disjoint
+            }
+            (IntersectionPolarity::Negative, true) | (IntersectionPolarity::Mixed, false) => {
+                IntersectionSimplification::SecondRedundant
+            }
+            (IntersectionPolarity::Negative, false) => IntersectionSimplification::Unchanged,
+        };
+    }
+
+    simplify_intersection_pair_impl(
+        db,
+        TypePair::new(db, env.program(db), first, second),
+        polarity,
+    )
+}
+
 /// Simplify a pair of intersection elements using non-circular relation checks.
 ///
 /// If this simplification participates in an inference cycle, retain both signed
@@ -1426,7 +1480,7 @@ enum IntersectionSimplification {
     cycle_result=|_, _, _, _| IntersectionSimplification::Unchanged,
     heap_size=ruff_memory_usage::heap_size,
 )]
-fn simplify_intersection_pair<'db>(
+fn simplify_intersection_pair_impl<'db>(
     db: &'db dyn Db,
     types: TypePair<'db>,
     polarity: IntersectionPolarity,
@@ -1738,7 +1792,9 @@ impl<'db> InnerIntersectionBuilder<'db> {
                     }
                     match simplify_intersection_pair(
                         db,
-                        TypePair::new(db, env.program(db), *existing_positive, new_positive),
+                        env,
+                        *existing_positive,
+                        new_positive,
                         IntersectionPolarity::Positive,
                     ) {
                         IntersectionSimplification::Unchanged => {}
@@ -1764,7 +1820,9 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 for (index, existing_negative) in self.negative.iter().enumerate() {
                     match simplify_intersection_pair(
                         db,
-                        TypePair::new(db, env.program(db), new_positive, *existing_negative),
+                        env,
+                        new_positive,
+                        *existing_negative,
                         IntersectionPolarity::Mixed,
                     ) {
                         IntersectionSimplification::Unchanged => {}
@@ -1884,7 +1942,9 @@ impl<'db> InnerIntersectionBuilder<'db> {
 
                     match simplify_intersection_pair(
                         db,
-                        TypePair::new(db, env.program(db), *existing_negative, new_negative),
+                        env,
+                        *existing_negative,
+                        new_negative,
                         IntersectionPolarity::Negative,
                     ) {
                         IntersectionSimplification::Unchanged => {}
@@ -1926,7 +1986,9 @@ impl<'db> InnerIntersectionBuilder<'db> {
 
                     match simplify_intersection_pair(
                         db,
-                        TypePair::new(db, env.program(db), *existing_positive, new_negative),
+                        env,
+                        *existing_positive,
+                        new_negative,
                         IntersectionPolarity::Mixed,
                     ) {
                         IntersectionSimplification::Unchanged => {}
@@ -2069,15 +2131,19 @@ impl<'db> InnerIntersectionBuilder<'db> {
 #[cfg(test)]
 mod tests {
     use super::{
-        IntersectionBuilder, MAX_NON_RECURSIVE_UNION_LITERALS, MAX_RECURSIVE_UNION_LITERALS,
-        RecursivelyDefined, Type, UnionBuilder, UnionType,
+        IntersectionBuilder, IntersectionPolarity, MAX_NON_RECURSIVE_UNION_LITERALS,
+        MAX_RECURSIVE_UNION_LITERALS, RecursivelyDefined, Type, UnionBuilder, UnionType,
+        simplify_intersection_pair, simplify_intersection_pair_impl,
     };
 
     use crate::db::tests::{TestDb, setup_db};
     use crate::place::{global_symbol, known_module_symbol};
     use crate::types::enums::enum_member_literals;
     use crate::types::type_alias::TypeAliasType;
-    use crate::types::{KnownClass, KnownInstanceType, Truthiness};
+    use crate::types::{
+        BytesLiteralType, KnownClass, KnownInstanceType, LiteralValueType, LiteralValueTypeKind,
+        StringLiteralType, Truthiness, TypePair,
+    };
 
     use ruff_db::system::DbWithWritableSystem as _;
     use ty_module_resolver::KnownModule;
@@ -2308,6 +2374,58 @@ mod tests {
 
         let intersection = IntersectionBuilder::new(db, &env).build();
         assert_eq!(intersection, Type::object());
+    }
+
+    #[test]
+    fn literal_intersection_simplification_matches_relations() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+
+        let literals: Vec<_> = [
+            LiteralValueTypeKind::from(0),
+            LiteralValueTypeKind::from(1),
+            LiteralValueTypeKind::Bool(false),
+            LiteralValueTypeKind::Bool(true),
+            LiteralValueTypeKind::String(StringLiteralType::new(db, "a")),
+            LiteralValueTypeKind::String(StringLiteralType::new(db, "b")),
+            LiteralValueTypeKind::Bytes(BytesLiteralType::new(db, b"a".as_slice())),
+            LiteralValueTypeKind::Bytes(BytesLiteralType::new(db, b"b".as_slice())),
+        ]
+        .into_iter()
+        .flat_map(|kind| {
+            [false, true].into_iter().flat_map(move |promotable| {
+                [RecursivelyDefined::No, RecursivelyDefined::Yes]
+                    .into_iter()
+                    .map(move |recursive| {
+                        Type::LiteralValue(
+                            LiteralValueType::new(kind, promotable)
+                                .with_recursively_defined(recursive),
+                        )
+                    })
+            })
+        })
+        .collect();
+
+        for &first in &literals {
+            for &second in &literals {
+                for polarity in [
+                    IntersectionPolarity::Positive,
+                    IntersectionPolarity::Negative,
+                    IntersectionPolarity::Mixed,
+                ] {
+                    assert_eq!(
+                        simplify_intersection_pair(db, &env, first, second, polarity),
+                        simplify_intersection_pair_impl(
+                            db,
+                            TypePair::new(db, env.program(db), first, second),
+                            polarity,
+                        ),
+                        "{first:?}, {second:?}, {polarity:?}",
+                    );
+                }
+            }
+        }
     }
 
     #[test]
