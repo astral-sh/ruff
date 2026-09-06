@@ -2491,14 +2491,44 @@ impl<'db> Type<'db> {
     /// most general form of the type that is fully static.
     #[must_use]
     fn top_materialization(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
-        (*self).cached_materialization(db, env.program(db), MaterializationKind::Top)
+        (*self).materialization(db, env, MaterializationKind::Top)
     }
 
     /// Returns the bottom materialization (or lower bound materialization) of this type, which is
     /// the most specific form of the type that is fully static.
     #[must_use]
     fn bottom_materialization(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
-        (*self).cached_materialization(db, env.program(db), MaterializationKind::Bottom)
+        (*self).materialization(db, env, MaterializationKind::Bottom)
+    }
+
+    fn materialization(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        materialization_kind: MaterializationKind,
+    ) -> Type<'db> {
+        match self {
+            Type::Dynamic(_) => match materialization_kind {
+                MaterializationKind::Top => Type::object(),
+                MaterializationKind::Bottom => Type::Never,
+            },
+            Type::Divergent(divergent) => {
+                Type::Divergent(divergent.materialized(materialization_kind))
+            }
+            Type::Never
+            | Type::AlwaysTruthy
+            | Type::AlwaysFalsy
+            | Type::ClassLiteral(_)
+            | Type::LiteralValue(_)
+            | Type::ModuleLiteral(_)
+            | Type::WrapperDescriptor(_)
+            | Type::DataclassDecorator(_)
+            | Type::DataclassTransformer(_)
+            | Type::BoundSuper(_)
+            | Type::SpecialForm(_) => self,
+            Type::NominalInstance(instance) if !instance.is_definition_generic(db) => self,
+            _ => self.cached_materialization(db, env.program(db), materialization_kind),
+        }
     }
 
     #[salsa::tracked(
