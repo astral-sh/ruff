@@ -1,12 +1,15 @@
 use ruff_formatter::{format_args, write};
 use ruff_python_ast::StmtMatch;
+use ruff_text_size::{Ranged, TextRange};
 
-use crate::comments::leading_alternate_branch_comments;
+use crate::comments::format::format_comment;
+use crate::comments::{leading_alternate_branch_comments, leading_comments, trailing_comments};
 use crate::context::{NodeLevel, WithNodeLevel};
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
 use crate::prelude::*;
 use crate::statement::clause::{ClauseHeader, clause_header};
+use crate::verbatim::{FormatVerbatimStatementRange, Indentation};
 
 #[derive(Default)]
 pub struct FormatStmtMatch;
@@ -37,30 +40,166 @@ impl FormatNodeRule<StmtMatch> for FormatStmtMatch {
         )
         .fmt(f)?;
 
-        let mut cases_iter = cases.iter();
-        let Some(first) = cases_iter.next() else {
+        if cases.is_empty() {
             return Ok(());
-        };
+        }
 
         // The new level is for the `case` nodes.
         let mut f = WithNodeLevel::new(NodeLevel::CompoundStatement, f);
 
-        write!(f, [block_indent(&first.format())])?;
-        let mut last_case = first;
+        let source = f.context().source();
+        let mut case_index = 0;
 
-        for case in cases_iter {
-            let last_suite_in_statement = Some(case) == cases.last();
+        while let Some(case) = cases.get(case_index) {
+            let leading_case_comments = comments.leading(case);
+            let Some(format_off_index) = leading_case_comments.iter().position(|comment| {
+                comment.line_position().is_own_line() && comment.is_suppression_off_comment(source)
+            }) else {
+                let last_suite_in_statement = Some(case) == cases.last();
+                if case_index == 0 {
+                    write!(
+                        f,
+                        [block_indent(
+                            &case.format().with_options(last_suite_in_statement)
+                        )]
+                    )?;
+                } else {
+                    let last_case = &cases[case_index - 1];
+                    write!(
+                        f,
+                        [block_indent(&format_args!(
+                            leading_alternate_branch_comments(
+                                leading_case_comments,
+                                last_case.body.last(),
+                            ),
+                            case.format().with_options(last_suite_in_statement)
+                        ))]
+                    )?;
+                }
+                case_index += 1;
+                continue;
+            };
+
+            let format_off_comment = &leading_case_comments[format_off_index];
+            let mut format_on = None;
+
+            for (index, suppressed_case) in cases.iter().enumerate().skip(case_index) {
+                let leading_comments = comments.leading(suppressed_case);
+                let leading_start = if index == case_index {
+                    format_off_index + 1
+                } else {
+                    0
+                };
+
+                if let Some(comment_index) = leading_comments
+                    .iter()
+                    .enumerate()
+                    .skip(leading_start)
+                    .find_map(|(index, comment)| {
+                        (comment.line_position().is_own_line()
+                            && comment.is_suppression_on_comment(source))
+                        .then_some(index)
+                    })
+                {
+                    format_on = Some((index, false, comment_index));
+                    break;
+                }
+
+                if let Some(comment_index) =
+                    comments
+                        .trailing(suppressed_case)
+                        .iter()
+                        .position(|comment| {
+                            comment.line_position().is_own_line()
+                                && comment.is_suppression_on_comment(source)
+                        })
+                {
+                    format_on = Some((index, true, comment_index));
+                    break;
+                }
+            }
+
+            let (verbatim_end, next_case_index) =
+                if let Some((on_case_index, is_trailing, on_index)) = format_on {
+                    let on_comments = if is_trailing {
+                        comments.trailing(&cases[on_case_index])
+                    } else {
+                        comments.leading(&cases[on_case_index])
+                    };
+                    let format_on_comment = &on_comments[on_index];
+                    let last_suppressed_case = on_case_index - usize::from(!is_trailing);
+
+                    for suppressed_case in &cases[case_index..=last_suppressed_case] {
+                        comments.mark_verbatim_node_comments_formatted(suppressed_case.into());
+                    }
+
+                    if is_trailing {
+                        for comment in &on_comments[on_index..] {
+                            comment.mark_unformatted();
+                        }
+                    } else {
+                        for comment in &on_comments[..on_index] {
+                            comment.mark_formatted();
+                        }
+                    }
+
+                    (
+                        format_on_comment.start(),
+                        if is_trailing {
+                            on_case_index + 1
+                        } else {
+                            on_case_index
+                        },
+                    )
+                } else {
+                    for suppressed_case in &cases[case_index..] {
+                        comments.mark_verbatim_node_comments_formatted(suppressed_case.into());
+                    }
+
+                    (item.end(), cases.len())
+                };
+
+            format_off_comment.mark_formatted();
+            let indentation = Indentation::from_range(case, source);
             write!(
                 f,
-                [block_indent(&format_args!(
-                    leading_alternate_branch_comments(
-                        comments.leading(case),
-                        last_case.body.last(),
-                    ),
-                    case.format().with_options(last_suite_in_statement)
-                ))]
+                [block_indent(&format_with(|f| {
+                    if case_index == 0 {
+                        leading_comments(&leading_case_comments[..format_off_index]).fmt(f)?;
+                    } else {
+                        leading_alternate_branch_comments(
+                            &leading_case_comments[..format_off_index],
+                            cases[case_index - 1].body.last(),
+                        )
+                        .fmt(f)?;
+                    }
+
+                    format_comment(format_off_comment).fmt(f)?;
+                    FormatVerbatimStatementRange {
+                        verbatim_range: TextRange::new(format_off_comment.end(), verbatim_end),
+                        indentation,
+                    }
+                    .fmt(f)?;
+
+                    if let Some((on_case_index, is_trailing, on_index)) = format_on {
+                        let on_comments = if is_trailing {
+                            comments.trailing(&cases[on_case_index])
+                        } else {
+                            comments.leading(&cases[on_case_index])
+                        };
+
+                        if is_trailing {
+                            trailing_comments(&on_comments[on_index..]).fmt(f)?;
+                        } else {
+                            leading_comments(&on_comments[on_index..]).fmt(f)?;
+                        }
+                    }
+
+                    Ok(())
+                }))]
             )?;
-            last_case = case;
+
+            case_index = next_case_index;
         }
 
         Ok(())
