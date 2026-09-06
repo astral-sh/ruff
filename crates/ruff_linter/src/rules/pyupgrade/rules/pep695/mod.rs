@@ -93,6 +93,16 @@ impl TypeVar<'_> {
             source,
         }
     }
+
+    /// Returns `true` for a starred constraint like `TypeVar("T", *constraints)`, which has no
+    /// equivalent in PEP 695 syntax.
+    pub(crate) fn has_starred_constraint(&self) -> bool {
+        matches!(
+            &self.restriction,
+            Some(TypeVarRestriction::Constraint(constraints))
+                if constraints.iter().any(|constraint| constraint.is_starred_expr())
+        )
+    }
 }
 
 impl Display for DisplayTypeVar<'_> {
@@ -399,7 +409,7 @@ fn check_type_vars<'a>(vars: Vec<TypeVar<'a>>, checker: &Checker) -> Option<Vec<
         return None;
     }
 
-    if non_default_follows_default(&vars) {
+    if non_default_follows_default(&vars) || vars.iter().any(TypeVar::has_starred_constraint) {
         return None;
     }
 

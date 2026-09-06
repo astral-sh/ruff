@@ -231,6 +231,7 @@ fn generic_arguments_to_type_vars<'a>(
 ///
 /// * If `type_var` is a `TypeVar`:
 ///     * It must not be unpacked
+///     * It must not have a starred constraint
 /// * If `type_var` is a `TypeVarTuple`:
 ///     * It must be unpacked
 ///     * It must not have any restrictions
@@ -245,6 +246,10 @@ fn type_var_is_valid(type_var: &TypeVar, unpacked: bool) -> bool {
     }
 
     if !matches!(&type_var.kind, TypeParamKind::TypeVar) && type_var.restriction.is_some() {
+        return false;
+    }
+
+    if type_var.has_starred_constraint() {
         return false;
     }
 

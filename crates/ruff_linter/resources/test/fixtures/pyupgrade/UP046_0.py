@@ -142,3 +142,12 @@ class DefaultOnlyTypeVar(Generic[W]):  # -> [W = int]
 class Outer:
     class Inner(Generic[T]):
         var: T
+
+
+# TypeVar with starred constraints has no PEP 695 equivalent
+constraints = (int, str)
+U = TypeVar("U", *constraints)
+
+
+class StarredConstraints(Generic[U]):
+    var: U

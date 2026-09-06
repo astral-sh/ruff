@@ -132,3 +132,8 @@ T: TypeAlias = ( # comment0
 # Test case for TypeVar with default - should be converted when preview mode is enabled
 T_default = TypeVar("T_default", default=int)
 DefaultList: TypeAlias = list[T_default]
+
+# TypeVar with starred constraints has no PEP 695 equivalent
+constraints = (int, str)
+T_starred = TypeVar("T_starred", *constraints)
+StarredList: TypeAlias = list[T_starred]

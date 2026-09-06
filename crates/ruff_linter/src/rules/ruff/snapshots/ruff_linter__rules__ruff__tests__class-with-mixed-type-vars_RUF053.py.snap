@@ -449,3 +449,12 @@ help: Remove `Generic` base class
 97 |
    |
 note: This is an unsafe fix and may change runtime behavior
+
+RUF053 Class with type parameter list inherits from `Generic`
+   --> RUF053.py:107:12
+    |
+105 | constraints = (str, bytes)
+106 | _H = TypeVar('_H', *constraints)
+107 | class C[T](Generic[_H]): ...
+    |            ^^^^^^^^^^^
+help: Remove `Generic` base class
