@@ -11,11 +11,11 @@ use ruff_diagnostics::{Applicability, Edit, Fix};
 use ruff_python_ast::{
     self as ast, PythonVersion,
     helpers::any_over_expr,
-    token::{TokenKind, Tokens},
+    token::{TokenKind, Tokens, parenthesized_range},
 };
 use ruff_python_trivia::indentation_at_offset;
 use ruff_source_file::{LineRanges, UniversalNewlineIterator, find_newline};
-use ruff_text_size::{Ranged, TextSize};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 use ty_module_resolver::{SearchPath, file_to_module};
 use ty_python_core::{
     Truthiness,
@@ -877,10 +877,19 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             && let Some(clause) = if_stmt.elif_else_clauses.last()
             && clause.test.as_ref() == Some(test)
             && !diagnostic.has_applicable_fix(Applicability::DisplayOnly)
-            && let Some(fix) = self.add_assert_never_else(clause, test)
         {
-            diagnostic.help("Add an `else` branch that calls `assert_never`");
-            diagnostic.set_fix(fix);
+            if let Some(fix) = self.add_assert_never_else(clause, test) {
+                diagnostic.help("Add an `else` branch that calls `assert_never`");
+                diagnostic.set_fix(fix);
+            } else {
+                diagnostic.help(
+                    "Replace this `elif` with an `else` branch \
+                that asserts the condition to be `True`",
+                );
+                if let Some(fix) = self.replace_redundant_elif_with_assertion(clause, test) {
+                    diagnostic.set_fix(fix);
+                }
+            }
         }
     }
 
@@ -1024,6 +1033,77 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
         }
         place.place.ignore_possibly_undefined()
+    }
+
+    /// Replaces an always-true final `elif` with an `else` branch and a defensive assertion.
+    ///
+    /// Preserves the original condition, comments, branch indentation, and file-wide line-ending
+    /// style. Bare assignment expressions are parenthesized so they remain valid assertion tests.
+    /// Returns `None` when the branch has no body, its first statement cannot accommodate a new
+    /// indented assertion, or rewriting the header would discard a comment.
+    ///
+    /// The fix is unsafe because an incorrect static assumption can cause the new assertion to
+    /// fail at runtime, and optimized Python execution may remove the assertion entirely.
+    fn replace_redundant_elif_with_assertion(
+        &self,
+        clause: &ast::ElifElseClause,
+        test: &ast::Expr,
+    ) -> Option<Fix> {
+        let first_statement = clause.body.first()?;
+        let source = source_text(self.db(), self.file());
+        let tokens = self.module().tokens();
+        let first_statement_line_start = source.line_start(first_statement.start());
+
+        if first_statement_line_start < logical_line_end(&source, tokens, clause.start()) {
+            return None;
+        }
+
+        // An indent token can span backslash continuations. In that case, the first statement's
+        // physical indentation may differ from the indentation that determines the body's scope.
+        if let Some(token) = tokens.before(first_statement.start()).last()
+            && token.kind() == TokenKind::Indent
+            && token.start() < first_statement_line_start
+        {
+            return None;
+        }
+
+        let indentation = indentation_at_offset(first_statement.start(), &source)?;
+        let parenthesized_test_range = parenthesized_range(test.into(), clause.into(), tokens);
+        let test_range = parenthesized_test_range.unwrap_or(test.range());
+        let header_prefix_range = TextRange::new(clause.start(), test_range.start());
+
+        // Ruff caches `CommentRanges` in its indexer, but ty does not. Constructing
+        // `CommentRanges` here would scan and index every comment in the file just to check
+        // this small range, so inspect the existing tokens directly instead.
+        if tokens
+            .in_range(header_prefix_range)
+            .iter()
+            .any(|token| token.kind().is_comment())
+        {
+            return None;
+        }
+
+        let condition = &source[test_range];
+        let assertion_condition = if test.is_named_expr() && parenthesized_test_range.is_none() {
+            format!("({condition})")
+        } else {
+            condition.to_string()
+        };
+        let line_ending = find_newline(&source)
+            .map(|(_, ending)| ending)
+            .unwrap_or_default()
+            .as_str();
+
+        Some(Fix::unsafe_edits(
+            Edit::range_replacement(
+                "else".to_string(),
+                TextRange::new(clause.start(), test_range.end()),
+            ),
+            [Edit::insertion(
+                format!("assert {assertion_condition}{line_ending}{indentation}"),
+                first_statement.start(),
+            )],
+        ))
     }
 }
 
