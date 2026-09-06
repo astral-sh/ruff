@@ -3917,8 +3917,10 @@ assert None  # no diagnostic
 
 Assertion tests and their subexpressions are exempt from both rules when their inferred value type
 is a subtype of `bool` or `int`, or when their truthiness is fixed only by short-circuit evaluation.
-Other always-truthy or always-falsy values remain eligible for the ordinary rule, or the strict rule
-if they contain a walrus expression. These exemptions avoid false positives on defensive assertions
+The exception is an assertion whose complete test has an always-falsy type and is followed by a
+nontrivial suite without a defensive exit; these cases are covered in the next section. Other
+always-truthy or always-falsy values remain eligible for the ordinary rule, or the strict rule if
+they contain a walrus expression. These exemptions avoid false positives on defensive assertions
 such as the following, which are common in well written Python code:
 
 ```py
@@ -3953,15 +3955,18 @@ def accepts(value: bool) -> bool:
 
 def ambiguous_boolean_and(value: int, flag: bool):
     assert flag and value is not None  # no diagnostic
+    print(value)
 
 def ambiguous_boolean_or(value: int, flag: bool):
     assert flag or value is None  # no diagnostic
+    print(value)
 
 def ambiguous_short_circuit(other: object, flag: bool):
     assert flag and (other or True)  # no diagnostic
 
 def nested_boolean_assertion(value: int, flag: bool):
     assert flag and accepts(not (value is None))  # no diagnostic
+    print(value)
 ```
 
 Short-circuit conditions remain exempt when they are the complete assertion, whether they always
@@ -3971,6 +3976,7 @@ succeed or always fail:
 def short_circuit_assertion(value: object):
     assert value or True  # no diagnostic
     assert value and False  # no diagnostic
+    print(value)
 ```
 
 The strict rule can still fire in assertion tests that use a walrus expression when their inferred
@@ -3988,6 +3994,135 @@ Always falsy variables that are not AST literals are still reported as redundant
 def failing_assertion(value: None):
     # error: [redundant-condition] "`None` is always falsy"
     assert value
+```
+
+## Failing assertions before further statements
+
+The strict rule reports boolean and integer assertion tests that always fail when nontrivial code
+follows in the same suite without a defensive exit. The following code is unreachable, which
+suggests that the assertion is a mistake:
+
+```py
+from typing import Literal
+
+def false_boolean(value: Literal[False]):
+    assert value  # error: [redundant-condition-strict]
+    print("unreachable")
+
+def zero_integer(value: Literal[0]):
+    assert value  # error: [redundant-condition-strict]
+    pass
+    ...
+    print("unreachable")
+
+def false_comparison(value: int):
+    assert value is None  # error: [redundant-condition-strict] "always false"
+    print("unreachable")
+
+def negated_comparison(value: int):
+    assert not isinstance(value, int)  # error: [redundant-condition-strict]
+    print("unreachable")
+```
+
+A failing assertion at the end of a suite can deliberately mark an unreachable path. Trailing
+`pass`, ellipses, and string literals do not affect this exemption:
+
+```py
+def terminal_assertion(value: Literal[False]):
+    print("before the assertion")
+    assert value  # no diagnostic
+
+def trivial_following_statements(value: Literal[0]):
+    assert value  # no diagnostic
+    pass
+    ...
+    "unreachable"
+
+def terminal_branch(value: int, flag: bool):
+    if flag:
+        assert value is None  # no diagnostic
+    print("outside the assertion's suite")
+```
+
+Boolean tests nested in call arguments remain exempt even when the call's return type makes the
+complete assertion always fail. Only the complete assertion makes the following statement
+unreachable:
+
+```py
+def rejects(value: bool) -> Literal[False]:
+    return False
+
+def nested_test(value: int):
+    assert rejects(not (value is None))  # error: [redundant-condition-strict]
+    print("unreachable")
+```
+
+Literal assertion tests and environment checks retain their own exemptions even when nontrivial
+statements follow:
+
+```py
+import sys
+
+def literal_assertion():
+    assert False  # no diagnostic
+    print("unreachable")
+
+def environment_assertion():
+    assert sys.platform != "linux"  # no diagnostic
+    print("platform-specific code")
+```
+
+## Failing assertions before defensive exits
+
+A failing assertion followed by code that ends in a defensive exit can deliberately reject an
+unsupported value. We apply the same exit heuristics used for defensive `if` branches, including
+`raise`, a potentially failing assertion, calls returning `Never`, and `return NotImplemented`:
+
+```py
+from typing import Literal, Never, assert_never
+
+def raises(value: int):
+    assert value is None  # no diagnostic
+    raise TypeError("unsupported value")
+    pass
+
+def exhaustive(value: int):
+    assert not isinstance(value, int)  # no diagnostic
+    assert_never(value)
+
+def another_assertion(value: Literal[False], valid: bool):
+    assert value  # no diagnostic
+    assert valid
+
+def unsupported(value: Literal[False]):
+    assert value  # no diagnostic
+    return NotImplemented
+
+def branching_exit(value: int, flag: bool):
+    assert value is None  # no diagnostic
+    if flag:
+        raise ValueError
+    else:
+        assert_never(value)
+
+async def stop() -> Never:
+    raise ValueError
+
+async def awaited_exit(value: int):
+    assert value is None  # no diagnostic
+    await stop()
+```
+
+An ordinary return or an assertion that always succeeds does not establish a defensive exit:
+
+```py
+def returns_value(value: int):
+    assert value is None  # error: [redundant-condition-strict]
+    return 1
+
+def successful_assertion(value: int):
+    assert value is None  # error: [redundant-condition-strict]
+    assert True
 ```
 
 ## `sys.version_info` checks, `sys.platform` checks, `os.name` checks, `if TYPE_CHECKING` checks
@@ -4960,6 +5095,57 @@ class Foo:
         if not isinstance(other, Foo):
             return NotImplemented
         return self
+```
+
+Comparison methods are commonly annotated as returning `bool` while returning `NotImplemented` for
+unsupported operands. ty permits this special return value despite the annotation. Callers still
+need to check for it: an implementation of `__ne__` that delegates to `__eq__` must preserve
+`NotImplemented` instead of negating it. These checks are exempt even though the inferred `bool`
+return type makes them appear redundant:
+
+```py
+class Value:
+    def __init__(self, value: int):
+        self.value = value
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Value):
+            return NotImplemented
+        return self.value == other.value
+
+    def __ne__(self, other: object) -> bool:
+        equal = self.__eq__(other)
+        if equal is NotImplemented:  # no diagnostic
+            return equal
+        return not equal
+```
+
+Tests can check that these methods return `NotImplemented` for unsupported operands, even though ty
+infers `bool` for the calls:
+
+```py
+value = Value(1)
+reveal_type(value.__eq__("1"))  # revealed: bool
+assert value.__eq__("1") is NotImplemented  # no diagnostic
+assert value.__ne__("1") is NotImplemented  # no diagnostic
+```
+
+The same exemption applies when callers handle unsupported operands in a conditional expression, a
+compound condition, or a comprehension filter:
+
+```py
+def equal_or_false(left: Value, right: object) -> bool:
+    result = left.__eq__(right)
+    return False if result is NotImplemented else result  # no diagnostic
+
+def unequal_or_unsupported(left: Value, right: object) -> bool:
+    result = left.__eq__(right)
+    if result is NotImplemented or not result:  # no diagnostic
+        return True
+    return False
+
+def comparable_values(left: Value, others: list[object]) -> list[object]:
+    return [right for right in others if left.__eq__(right) is not NotImplemented]  # no diagnostic
 ```
 
 ## Tests that include walrus expressions

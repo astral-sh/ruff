@@ -4779,6 +4779,9 @@ positives, it excludes conditions that meet any of these criteria:
     rather than the inferred type of the boolean test.
 - The condition uses a walrus operator (`:=`). The assignment's side effect may be intentional, even
     when its result has fixed truthiness.
+- Any subexpression of the test has type `types.NotImplementedType`. Operator annotations often omit
+    `NotImplemented` even when the implementation can return it, so checks involving this sentinel
+    can still be useful at runtime.
 
 **Why is this bad?**
 
@@ -5093,14 +5096,35 @@ This kind of defensive behaviour is often reasonable, since the author of a libr
 that end users of the library will run a type checker on code calling into the library, meaning that
 it's entirely possible at runtime for an object passed into the `x`a parameter above to be a `str`
 (for example) even though the parameter annotation states that only `int`s can ever be passed in.
-This rule therefore also exempts all assertion tests or subexpressions that evaluate to a subtype of
-`int` or `bool`:
+This rule therefore exempts assertion tests or subexpressions that evaluate to a subtype of `int` or
+`bool`, unless the complete assertion test has an always-falsy type and a nontrivial statement
+follows it in the same suite without a defensive exit. In that case, the assertion makes the
+following code unreachable, which suggests a mistake:
 
-[`redundant-condition-strict`](#redundant-condition-strict) can still trigger on `assert` statements in some contexts, however. For
-example, [`redundant-condition-strict`](#redundant-condition-strict) will be emitted on the below example, where the left-hand side
-of the `and` expression is always true and not a subtype of `bool` or `int`, but where the condition
-is nonetheless excluded from the enabled-by-default [`redundant-condition`](#redundant-condition) rule due to the use of the
-walrus operator:
+```py
+def process(value: int) -> None:
+    assert value is None  # error: [redundant-condition-strict]
+    print(value)
+```
+
+Trailing `pass` statements, ellipses, and string literals do not count as nontrivial statements. A
+failing assertion followed only by these statements, or by no statements, remains exempt because it
+can deliberately mark an unreachable path. The assertion also remains exempt if the following suite
+ends in a defensive exit, using the same heuristics as defensive `if` branches below. For example,
+`assert not isinstance(value, int)` followed by `assert_never(value)` can deliberately reject an
+unsupported variant while checking exhaustiveness. Literal tests such as `assert False` and
+environment checks such as `assert sys.platform == "win32"` retain their exemptions even when more
+code follows.
+
+Both redundant-condition rules also exempt any test containing a subexpression inferred as
+`types.NotImplementedType`. Operator annotations commonly omit `NotImplemented` even when it can be
+returned, so comparisons with the sentinel can be meaningful despite those annotations. This
+exemption applies to all boolean tests, including `if`, `while`, and conditional expressions.
+
+[`redundant-condition-strict`](#redundant-condition-strict) also reports some assertions involving walrus operators. For example,
+it reports the assertion below, where the left-hand side of the `and` expression is always true and
+not a subtype of `bool` or `int`, but where the condition is nonetheless excluded from the
+enabled-by-default [`redundant-condition`](#redundant-condition) rule due to the use of the walrus operator:
 
 ```py
 def func() -> bool:
