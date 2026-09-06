@@ -268,7 +268,9 @@ fn create_diagnostic(
         return;
     }
 
-    if non_default_follows_default(type_vars) {
+    if non_default_follows_default(type_vars)
+        || type_vars.iter().any(TypeVar::has_starred_constraint)
+    {
         return;
     }
 

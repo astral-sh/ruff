@@ -101,6 +101,12 @@ class C[T: [a]](Generic[_A]): ...
 # class C[T: (*a,)](Generic[_A]): ...        # TODO: Uncomment this
 
 
+# TypeVar with starred constraints has no PEP 695 equivalent
+constraints = (str, bytes)
+_H = TypeVar('_H', *constraints)
+class C[T](Generic[_H]): ...
+
+
 ### No errors
 
 class C(Generic[_A]): ...

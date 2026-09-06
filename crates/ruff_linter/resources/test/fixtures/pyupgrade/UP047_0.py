@@ -63,3 +63,11 @@ def multi_param(t: list[T], c: Callable[[T], None]) -> T:
 def outer():
     def inner(t: T) -> T:
         return t
+
+
+constraints = (int, str)
+U = TypeVar("U", *constraints)
+
+
+def starred_constraints(var: U) -> U:
+    return var
