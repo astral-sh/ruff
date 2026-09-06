@@ -1182,6 +1182,7 @@ mod tests {
             DefinitionKind, LambdaParameterDefinitionNodeKind, ParameterDefinitionNodeKind,
         },
         program::Program,
+        reachability_constraints::ScopedReachabilityConstraintId,
     };
 
     impl UseDefMap<'_> {
@@ -1511,6 +1512,117 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
             kwargs_binding.kind(&db),
             DefinitionKind::Parameter(ParameterDefinitionNodeKind::VariadicKeywordParameter(_))
         );
+    }
+
+    #[test]
+    fn unused_parameter_states() {
+        let TestCase { db, file } = test_case("def f(untyped, typed: int): ...");
+        let index = semantic_index(&db, program_file(&db, file));
+        let [(scope, _)] = index
+            .child_scopes(FileScopeId::global())
+            .collect::<Vec<_>>()[..]
+        else {
+            panic!("expected one function scope")
+        };
+        let table = index.place_table(scope);
+        let use_def = index.use_def_map(scope);
+        let bindings = |iter: BindingWithConstraintsIterator<'_, '_>, assume_bound: bool| {
+            assert_matches!(
+                (iter.boundness_analysis(), assume_bound),
+                (BoundnessAnalysis::AssumeBound, true)
+                    | (BoundnessAnalysis::BasedOnUnboundVisibility, false)
+            );
+            iter.map(|binding| {
+                assert_eq!(
+                    binding.narrowing_constraint.constraint(),
+                    ScopedNarrowingConstraint::ALWAYS_TRUE
+                );
+                assert_eq!(
+                    binding.reachability_constraint,
+                    ScopedReachabilityConstraintId::ALWAYS_TRUE
+                );
+                (
+                    binding.binding_order.as_u32(),
+                    binding.binding.definition().is_some(),
+                )
+            })
+            .collect::<Vec<_>>()
+        };
+        let declarations = |iter: DeclarationsIterator<'_, '_>, assume_bound: bool| {
+            assert_matches!(
+                (iter.boundness_analysis(), assume_bound),
+                (BoundnessAnalysis::AssumeBound, true)
+                    | (BoundnessAnalysis::BasedOnUnboundVisibility, false)
+            );
+            iter.map(|declaration| {
+                assert_eq!(
+                    declaration.reachability_constraint,
+                    ScopedReachabilityConstraintId::ALWAYS_TRUE
+                );
+                (
+                    declaration.declaration_order.as_u32(),
+                    declaration.declaration.definition().is_some(),
+                )
+            })
+            .collect::<Vec<_>>()
+        };
+
+        assert_eq!(
+            use_def.end_of_scope_reachability(),
+            ScopedReachabilityConstraintId::ALWAYS_TRUE
+        );
+        assert_eq!(use_def.range_reachability().count(), 0);
+        assert!(use_def.predicates().is_empty());
+        assert_eq!(
+            use_def
+                .definitions_with_usage()
+                .map(|(id, _, used)| (id.as_u32(), used))
+                .collect::<Vec<_>>(),
+            vec![(1, false), (2, false)]
+        );
+
+        for (name, order, declared) in [("untyped", 1, false), ("typed", 2, true)] {
+            let symbol = table.symbol_id(name).unwrap();
+            let definition = use_def.first_public_binding(symbol).unwrap();
+            assert_eq!(
+                bindings(use_def.end_of_scope_symbol_bindings(symbol), false),
+                vec![(order, true)]
+            );
+            assert_eq!(
+                bindings(use_def.reachable_symbol_bindings(symbol), true),
+                vec![(0, false), (order, true)]
+            );
+            assert_eq!(
+                bindings(use_def.bindings_at_definition(definition), false),
+                vec![(0, false)]
+            );
+            assert_eq!(
+                declarations(use_def.declarations_at_binding(definition), false),
+                vec![(0, false)]
+            );
+
+            let (end, reachable) = if declared {
+                (vec![(order, true)], vec![(0, false), (order, true)])
+            } else {
+                (vec![(0, false)], vec![(0, false)])
+            };
+            assert_eq!(
+                declarations(use_def.end_of_scope_symbol_declarations(symbol), false),
+                end
+            );
+            assert_eq!(
+                declarations(use_def.reachable_symbol_declarations(symbol), true),
+                reachable
+            );
+        }
+
+        assert_eq!(use_def.all_end_of_scope_symbol_bindings().count(), 2);
+        assert_eq!(use_def.all_end_of_scope_symbol_declarations().count(), 2);
+        let states = use_def
+            .all_reachable_symbols()
+            .map(|(_, declarations, bindings)| (declarations.count(), bindings.count()))
+            .collect::<Vec<_>>();
+        assert_eq!(states, vec![(1, 2), (2, 2)]);
     }
 
     #[test]
