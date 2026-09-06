@@ -678,14 +678,18 @@ impl Format<PyFormatContext<'_>> for TrailingFormatOffComment<'_> {
 ///   This implementation makes use of this fact and assumes a tab size of 1.
 /// * The source document is correctly indented because it is valid Python code (or the formatter would have failed parsing the code).
 #[derive(Copy, Clone)]
-struct Indentation(u32);
+pub(crate) struct Indentation(u32);
 
 impl Indentation {
     fn from_stmt(stmt: &Stmt, source: &str) -> Indentation {
-        let line_start = source.line_start(stmt.start());
+        Self::from_range(stmt, source)
+    }
+
+    pub(crate) fn from_range(ranged: impl Ranged, source: &str) -> Indentation {
+        let line_start = source.line_start(ranged.start());
 
         let mut indentation = 0u32;
-        for c in source[TextRange::new(line_start, stmt.start())].chars() {
+        for c in source[TextRange::new(line_start, ranged.start())].chars() {
             if is_indent_whitespace(c) {
                 indentation += 1;
             } else {
@@ -752,9 +756,9 @@ const fn is_indent_whitespace(c: char) -> bool {
 /// but the indentation of the expression remains unchanged. It changes the indentation to:
 /// * Prevent syntax errors because of different indentation levels between formatted and suppressed statements.
 /// * Align with the `fmt: skip` where statements are indented as well, but inner expressions are formatted as is.
-struct FormatVerbatimStatementRange {
-    verbatim_range: TextRange,
-    indentation: Indentation,
+pub(crate) struct FormatVerbatimStatementRange {
+    pub(crate) verbatim_range: TextRange,
+    pub(crate) indentation: Indentation,
 }
 
 impl Format<PyFormatContext<'_>> for FormatVerbatimStatementRange {

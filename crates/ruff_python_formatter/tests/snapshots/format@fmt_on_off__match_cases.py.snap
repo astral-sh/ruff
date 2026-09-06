@@ -1,0 +1,143 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/fmt_on_off/match_cases.py
+---
+## Input
+```python
+match left, right:
+    # fmt: off
+    case None, None: pass
+    case None, y   : pass
+    case x,    None: pass
+    case x,    y   : pass
+    # fmt: on
+
+
+match same_case:
+    # fmt: off
+    # fmt: on
+    case value   : pass
+
+
+match next_case:
+    # fmt: off
+    case value   : pass
+    # fmt: on
+    case other   : pass
+
+
+match outer:
+    case value:
+        match left, right:
+            # fmt: off
+            case None, y   : pass
+            # fmt: on
+
+
+match unclosed:
+    # fmt: off
+    case 1: f()  # type: ignore
+    # keep this own-line comment
+
+
+match prefix:
+    # keep me
+    # fmt: off
+    # fmt: on
+    case 1: pass
+    case 2   : pass
+
+
+match suppressed_comments:
+    # fmt: off
+    # keep me
+    case 1   : pass
+    # between cases
+    case 2   : pass
+    # before on
+    # fmt: on
+    case 3   : pass
+
+
+match repeated:
+    # fmt: off
+    case 1   : pass
+    # fmt: on
+    # fmt: off
+    case 2   : pass
+    # fmt: on
+    case 3   : pass
+```
+
+## Output
+```python
+match left, right:
+    # fmt: off
+    case None, None: pass
+    case None, y   : pass
+    case x,    None: pass
+    case x,    y   : pass
+    # fmt: on
+
+
+match same_case:
+    # fmt: off
+    # fmt: on
+    case value:
+        pass
+
+
+match next_case:
+    # fmt: off
+    case value   : pass
+    # fmt: on
+    case other:
+        pass
+
+
+match outer:
+    case value:
+        match left, right:
+            # fmt: off
+            case None, y   : pass
+            # fmt: on
+
+
+match unclosed:
+    # fmt: off
+    case 1: f()  # type: ignore
+    # keep this own-line comment
+
+
+match prefix:
+    # keep me
+    # fmt: off
+    # fmt: on
+    case 1:
+        pass
+    case 2:
+        pass
+
+
+match suppressed_comments:
+    # fmt: off
+    # keep me
+    case 1   : pass
+    # between cases
+    case 2   : pass
+    # before on
+    # fmt: on
+    case 3:
+        pass
+
+
+match repeated:
+    # fmt: off
+    case 1   : pass
+    # fmt: on
+    # fmt: off
+    case 2   : pass
+    # fmt: on
+    case 3:
+        pass
+```
