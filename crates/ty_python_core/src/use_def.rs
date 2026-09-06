@@ -2992,23 +2992,13 @@ impl<'db> UseDefMapBuilder<'db> {
                 .map(|(use_id, bindings)| (use_id, place_state_interner.intern_bindings(&bindings)))
                 .collect(),
         );
-        let symbol_states = self
-            .symbol_states
-            .into_iter()
-            .map(|state| Rc::unwrap_or_clone(state.state))
-            .collect();
-        let member_states = self
-            .member_states
-            .into_iter()
-            .map(|state| Rc::unwrap_or_clone(state.state))
-            .collect();
         let end_of_scope_symbols = Self::intern_place_states(
-            symbol_states,
-            PlaceState::into_parts,
+            self.symbol_states,
+            |state| Rc::unwrap_or_clone(state.state).into_parts(),
             &mut place_state_interner,
         );
         let end_of_scope_members =
-            Self::intern_end_of_scope_members(member_states, &mut place_state_interner);
+            Self::intern_end_of_scope_members(self.member_states, &mut place_state_interner);
         let reachable_definitions_by_symbol = Self::intern_place_states(
             self.reachable_symbol_definitions,
             |definitions| (definitions.bindings, definitions.declarations),
@@ -3210,7 +3200,7 @@ impl<'db> UseDefMapBuilder<'db> {
     }
 
     fn intern_end_of_scope_members(
-        end_of_scope_members: IndexVec<ScopedMemberId, PlaceState>,
+        end_of_scope_members: IndexVec<ScopedMemberId, PendingPlaceState>,
         place_state_interner: &mut PlaceStateInterner,
     ) -> IndexVec<ScopedMemberId, InternedPlaceStateId> {
         let mut interned_ids_by_member = IndexVec::with_capacity(end_of_scope_members.len());
@@ -3218,6 +3208,7 @@ impl<'db> UseDefMapBuilder<'db> {
             FxHashMap::with_capacity_and_hasher(end_of_scope_members.len(), FxBuildHasher);
 
         for place_state in end_of_scope_members {
+            let place_state = Rc::unwrap_or_clone(place_state.state);
             let interned_id = match interned_ids_by_place_state.entry(place_state) {
                 Entry::Occupied(entry) => *entry.get(),
                 Entry::Vacant(entry) => {
