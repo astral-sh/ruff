@@ -1,5 +1,5 @@
 use ruff_formatter::{format_args, write};
-use ruff_python_ast::StmtMatch;
+use ruff_python_ast::{AnyNodeRef, StmtMatch};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::comments::format::format_comment;
@@ -130,8 +130,27 @@ impl FormatNodeRule<StmtMatch> for FormatStmtMatch {
                         .filter(|index| *index >= case_index);
 
                     if let Some(last_suppressed_case) = last_suppressed_case {
-                        for suppressed_case in &cases[case_index..=last_suppressed_case] {
+                        for (index, suppressed_case) in
+                            cases[case_index..=last_suppressed_case].iter().enumerate()
+                        {
                             comments.mark_verbatim_node_comments_formatted(suppressed_case.into());
+
+                            let leading_comments = comments.leading(suppressed_case);
+                            let leading_start = if index == 0 { format_off_index + 1 } else { 0 };
+                            for comment in &leading_comments[leading_start..] {
+                                comment.mark_formatted();
+                            }
+
+                            let trailing_comments = comments.trailing(suppressed_case);
+                            let trailing_end = if is_trailing && case_index + index == on_case_index
+                            {
+                                on_index
+                            } else {
+                                trailing_comments.len()
+                            };
+                            for comment in &trailing_comments[..trailing_end] {
+                                comment.mark_formatted();
+                            }
                         }
                     }
 
@@ -140,7 +159,12 @@ impl FormatNodeRule<StmtMatch> for FormatStmtMatch {
                             comment.mark_unformatted();
                         }
                     } else {
-                        for comment in &on_comments[..on_index] {
+                        let leading_start = if on_case_index == case_index {
+                            format_off_index + 1
+                        } else {
+                            0
+                        };
+                        for comment in &on_comments[leading_start..on_index] {
                             comment.mark_formatted();
                         }
                     }
@@ -154,11 +178,32 @@ impl FormatNodeRule<StmtMatch> for FormatStmtMatch {
                         },
                     )
                 } else {
-                    for suppressed_case in &cases[case_index..] {
+                    for (index, suppressed_case) in cases[case_index..].iter().enumerate() {
                         comments.mark_verbatim_node_comments_formatted(suppressed_case.into());
+
+                        let leading_comments = comments.leading(suppressed_case);
+                        let leading_start = if index == 0 { format_off_index + 1 } else { 0 };
+                        for comment in &leading_comments[leading_start..] {
+                            comment.mark_formatted();
+                        }
+
+                        for comment in comments.trailing(suppressed_case) {
+                            comment.mark_formatted();
+                        }
                     }
 
-                    (item.end(), cases.len())
+                    let mut current = AnyNodeRef::from(cases.last().unwrap());
+                    let end = loop {
+                        if let Some(comment) = comments.trailing(current).last() {
+                            break comment.end();
+                        } else if let Some(child) = current.last_child_in_body() {
+                            current = child;
+                        } else {
+                            break current.end();
+                        }
+                    };
+
+                    (end, cases.len())
                 };
 
             format_off_comment.mark_formatted();
@@ -189,11 +234,20 @@ impl FormatNodeRule<StmtMatch> for FormatStmtMatch {
                         } else {
                             comments.leading(&cases[on_case_index])
                         };
+                        let following_format_off = on_comments[on_index + 1..]
+                            .iter()
+                            .position(|comment| {
+                                comment.line_position().is_own_line()
+                                    && comment.is_suppression_off_comment(source)
+                            })
+                            .map_or(on_comments.len(), |index| on_index + 1 + index);
 
                         if is_trailing {
-                            trailing_comments(&on_comments[on_index..]).fmt(f)?;
+                            trailing_comments(&on_comments[on_index..following_format_off])
+                                .fmt(f)?;
                         } else {
-                            leading_comments(&on_comments[on_index..]).fmt(f)?;
+                            leading_comments(&on_comments[on_index..following_format_off])
+                                .fmt(f)?;
                         }
                     }
 

@@ -32,6 +32,41 @@ match outer:
             # fmt: off
             case None, y   : pass
             # fmt: on
+
+
+match unclosed:
+    # fmt: off
+    case 1: f()  # type: ignore
+    # keep this own-line comment
+
+
+match prefix:
+    # keep me
+    # fmt: off
+    # fmt: on
+    case 1: pass
+    case 2   : pass
+
+
+match suppressed_comments:
+    # fmt: off
+    # keep me
+    case 1   : pass
+    # between cases
+    case 2   : pass
+    # before on
+    # fmt: on
+    case 3   : pass
+
+
+match repeated:
+    # fmt: off
+    case 1   : pass
+    # fmt: on
+    # fmt: off
+    case 2   : pass
+    # fmt: on
+    case 3   : pass
 ```
 
 ## Output
@@ -66,4 +101,43 @@ match outer:
             # fmt: off
             case None, y   : pass
             # fmt: on
+
+
+match unclosed:
+    # fmt: off
+    case 1: f()  # type: ignore
+    # keep this own-line comment
+
+
+match prefix:
+    # keep me
+    # fmt: off
+    # fmt: on
+    case 1:
+        pass
+    case 2:
+        pass
+
+
+match suppressed_comments:
+    # fmt: off
+    # keep me
+    case 1   : pass
+    # between cases
+    case 2   : pass
+    # before on
+    # fmt: on
+    case 3:
+        pass
+
+
+match repeated:
+    # fmt: off
+    case 1   : pass
+    # fmt: on
+    # fmt: off
+    case 2   : pass
+    # fmt: on
+    case 3:
+        pass
 ```
