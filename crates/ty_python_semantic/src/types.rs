@@ -466,6 +466,10 @@ pub(crate) struct ApplyTypeMappingVisitor<'env, 'db> {
     promotion: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
     skip_promotion: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
     materialization_equivalence: OnceCell<MaterializationEquivalenceVisitor<'db>>,
+    /// Whether the specialization can require union-valued `ParamSpec` expansion.
+    /// The substitution values stay fixed for this visitor, including when materialization
+    /// polarity flips. Each `ParamSpec` expansion starts a new visitor for its bindings.
+    specialization_may_map_to_union: OnceCell<bool>,
 }
 
 impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
@@ -482,6 +486,7 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
             promotion: OnceCell::default(),
             skip_promotion: OnceCell::default(),
             materialization_equivalence: OnceCell::default(),
+            specialization_may_map_to_union: OnceCell::default(),
         }
     }
 
@@ -2491,14 +2496,44 @@ impl<'db> Type<'db> {
     /// most general form of the type that is fully static.
     #[must_use]
     fn top_materialization(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
-        (*self).cached_materialization(db, env.program(db), MaterializationKind::Top)
+        (*self).materialization(db, env, MaterializationKind::Top)
     }
 
     /// Returns the bottom materialization (or lower bound materialization) of this type, which is
     /// the most specific form of the type that is fully static.
     #[must_use]
     fn bottom_materialization(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
-        (*self).cached_materialization(db, env.program(db), MaterializationKind::Bottom)
+        (*self).materialization(db, env, MaterializationKind::Bottom)
+    }
+
+    fn materialization(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        materialization_kind: MaterializationKind,
+    ) -> Type<'db> {
+        match self {
+            Type::Dynamic(_) => match materialization_kind {
+                MaterializationKind::Top => Type::object(),
+                MaterializationKind::Bottom => Type::Never,
+            },
+            Type::Divergent(divergent) => {
+                Type::Divergent(divergent.materialized(materialization_kind))
+            }
+            Type::Never
+            | Type::AlwaysTruthy
+            | Type::AlwaysFalsy
+            | Type::ClassLiteral(_)
+            | Type::LiteralValue(_)
+            | Type::ModuleLiteral(_)
+            | Type::WrapperDescriptor(_)
+            | Type::DataclassDecorator(_)
+            | Type::DataclassTransformer(_)
+            | Type::BoundSuper(_)
+            | Type::SpecialForm(_) => self,
+            Type::NominalInstance(instance) if !instance.is_definition_generic(db) => self,
+            _ => self.cached_materialization(db, env.program(db), materialization_kind),
+        }
     }
 
     #[salsa::tracked(
@@ -8722,6 +8757,13 @@ impl<'db> Type<'db> {
         if let TypeMapping::ApplySpecialization(specialization)
         | TypeMapping::ApplySpecializationWithMaterialization { specialization, .. } =
             type_mapping
+            && matches!(
+                self,
+                Type::FunctionLiteral(_) | Type::BoundMethod(_) | Type::Callable(_)
+            )
+            && *visitor
+                .specialization_may_map_to_union
+                .get_or_init(|| specialization.may_map_to_union(db))
         {
             let function_signatures = |function: FunctionType<'db>| {
                 if specialization.preserves_lazy_signatures() {

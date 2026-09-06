@@ -1068,46 +1068,39 @@ impl<'db> GenericContext<'db> {
         // class C[T, U = T]: ...
         // ```
         //
-        // If there is a mapping for `T`, we want to map `U` to that type, not to `T`. To handle
-        // this, we repeatedly apply the specialization to itself, until we reach a fixed point.
+        // If there is a mapping for `T`, we want to map `U` to that type, not to `T`.
+        // Fill each argument in order so defaults can use the preceding arguments.
         let mut expanded = Vec::with_capacity(types.len());
-        for typevar in variables.clone() {
-            expanded.push(match typevar.kind(db) {
-                TypeVarKind::LegacyTypeVarTuple | TypeVarKind::Pep695TypeVarTuple => {
-                    Type::homogeneous_tuple(db, &env, Type::unknown())
+        for (ty, typevar) in types.zip(variables) {
+            let ty = if let Some(ty) = ty {
+                ty
+            } else if let Some(default) = typevar.default_type(db) {
+                // Typevars are only allowed to refer to earlier typevars in their defaults.
+                // This is statically enforced for PEP 695 contexts, and explicitly required
+                // for legacy contexts.
+                let specialization = ApplySpecialization::Partial {
+                    generic_context: self,
+                    types: &expanded,
+                    skip: None,
+                };
+                default.apply_type_mapping(
+                    db,
+                    &env,
+                    &TypeMapping::ApplySpecialization(specialization),
+                    TypeContext::default(),
+                )
+            } else {
+                match typevar.kind(db) {
+                    TypeVarKind::LegacyTypeVarTuple | TypeVarKind::Pep695TypeVarTuple => {
+                        Type::homogeneous_tuple(db, &env, Type::unknown())
+                    }
+                    TypeVarKind::LegacyParamSpec | TypeVarKind::Pep695ParamSpec => {
+                        Type::paramspec_value_callable(db, Parameters::unknown())
+                    }
+                    _ => Type::unknown(),
                 }
-                TypeVarKind::LegacyParamSpec | TypeVarKind::Pep695ParamSpec => {
-                    Type::paramspec_value_callable(db, Parameters::unknown())
-                }
-                _ => Type::unknown(),
-            });
-        }
-
-        for (idx, (ty, typevar)) in types.zip(variables).enumerate() {
-            if let Some(ty) = ty {
-                expanded[idx] = ty;
-                continue;
-            }
-
-            let Some(default) = typevar.default_type(db) else {
-                continue;
             };
-
-            // Typevars are only allowed to refer to _earlier_ typevars in their defaults. (This is
-            // statically enforced for PEP-695 contexts, and is explicitly called out as a
-            // requirement for legacy contexts.)
-            let specialization = ApplySpecialization::Partial {
-                generic_context: self,
-                types: &expanded[0..idx],
-                skip: None,
-            };
-            let default = default.apply_type_mapping(
-                db,
-                &env,
-                &TypeMapping::ApplySpecialization(specialization),
-                TypeContext::default(),
-            );
-            expanded[idx] = default;
+            expanded.push(ty);
         }
 
         expanded.into_boxed_slice()
@@ -2301,6 +2294,29 @@ impl<'db> ApplySpecialization<'_, 'db> {
         }
     }
 
+    /// Returns whether any type variable might map to a union.
+    ///
+    /// If no substitution is a union, callable specialization cannot need `ParamSpec`
+    /// expansion. Checking the substitution values avoids reading function signatures
+    /// merely to rule out that expansion. Overrides conservatively include the underlying
+    /// mapping, even if they replace its last union-valued substitution.
+    pub(super) fn may_map_to_union(self, db: &'db dyn Db) -> bool {
+        match self {
+            Self::Specialization { specialization, .. } | Self::TypeAlias(specialization) => {
+                specialization.types(db).iter().any(|ty| ty.is_union())
+            }
+            Self::Partial { types, .. } => types.iter().any(|ty| ty.is_union()),
+            Self::ReturnCallables(_) => false,
+            Self::Single(_, ty) => ty.is_union(),
+            Self::WithBindings {
+                specialization,
+                bindings,
+            } => {
+                bindings.iter().any(|(_, ty)| ty.is_union()) || specialization.may_map_to_union(db)
+            }
+        }
+    }
+
     /// Returns the type that a typevar is mapped to, or None if the typevar isn't part of this
     /// mapping.
     pub(crate) fn get(
@@ -3101,6 +3117,11 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         identity: BoundTypeVarIdentity<'db>,
         ty: Type<'db>,
     ) -> bool {
+        // Self references are not followed, so a cycle needs at least two pending mappings.
+        if types.len() <= 1 {
+            return false;
+        }
+
         let db = self.db;
         match ty {
             // A bare `T = U` edge only replaces one typevar with another; it does not wrap the
