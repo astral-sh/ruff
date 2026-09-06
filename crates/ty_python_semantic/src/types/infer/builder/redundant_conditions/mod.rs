@@ -372,9 +372,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// Sweep over an entire suite of statements to examine if any direct `if`-statement conditions,
     /// `elif`-statement conditions or `assert`-statement conditionsin that suite are redundant.
     ///
-    /// We suppress conditions in [`ConditionKind::Boolean`] when
-    /// the code they make unreachable is a "defensive exit". See the doc-comment for
-    /// [`RedundantConditionContext::DefensiveExit`] for more details.
+    /// We suppress conditions in [`ConditionKind::Boolean`] and conditions whose truthiness is fixed
+    /// only by short-circuit evaluation when the code they make unreachable is a "defensive exit".
+    /// See the doc-comment for [`RedundantConditionContext::DefensiveExit`] for more details.
     ///
     /// All types in the suite must already be inferred before this method is called. This is so we
     /// can recognize terminal statements from their types, including calls returning `Never` and
@@ -382,8 +382,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ///
     /// ## Assertions
     ///
-    /// Assertions commonly check runtime invariants, so tests classified as
-    /// [`ConditionKind::Boolean`] are exempt. This applies to
+    /// Assertions commonly check runtime invariants, so tests classified as [`ConditionKind::Boolean`]
+    /// and tests whose truthiness is fixed only by short-circuit evaluation are exempt. This applies to
     /// both complete assertion tests and their subexpressions:
     ///
     /// ```python

@@ -856,12 +856,13 @@ def walrus_condition(value: Comparable):
         pass
 ```
 
-The comparison chain is reported even when its body raises an exception. The literal comparison
-`1 < 0` prevents this branch from ever being taken, so it cannot serve as a defensive check.
+An always-false condition is exempt when its body raises an exception, since this can be a
+deliberate defensive check. This exemption also applies when the condition is always false because
+of short-circuit evaluation.
 
 ```py
 def defensive_condition(value: Comparable):
-    if value < 1 < 0:  # error: [redundant-condition]
+    if value < 1 < 0:  # no diagnostic
         raise ValueError
 ```
 
@@ -2435,7 +2436,6 @@ condition's truthiness:
 def short_circuit_assignment(value: object):
     if (saved := value) and False:  # error: [redundant-condition-strict]
         pass
-    assert (saved := value) or True  # error: [redundant-condition-strict]
 ```
 
 ## Boolean tests inside value expressions
@@ -3589,10 +3589,10 @@ assert None  # no diagnostic
 ## Defensive assertions
 
 Assertion tests and their subexpressions are exempt from both rules when their inferred value type
-is a subtype of `bool` or `int`. Other always-truthy or always-falsy values remain eligible for the
-ordinary rule, or the strict rule if they contain a walrus expression. These exemptions avoid false
-positives on defensive assertions such as the following, which are common in well written Python
-code:
+is a subtype of `bool` or `int`, or when their truthiness is fixed only by short-circuit evaluation.
+Other always-truthy or always-falsy values remain eligible for the ordinary rule, or the strict rule
+if they contain a walrus expression. These exemptions avoid false positives on defensive assertions
+such as the following, which are common in well written Python code:
 
 ```py
 def f(x: str, y: str | int, z: str | int | bytes):
@@ -3617,8 +3617,8 @@ def assertion_boundaries(x: str, flag: bool):
     assert flag, isinstance(x, str) and flag
 ```
 
-Boolean operands within assertions remain exempt when the complete assertion has unknown truthiness.
-This includes boolean tests nested inside call arguments:
+Boolean and short-circuit operands within assertions remain exempt when the complete assertion has
+unknown truthiness. This includes boolean tests nested inside call arguments:
 
 ```py
 def accepts(value: bool) -> bool:
@@ -3630,21 +3630,23 @@ def ambiguous_boolean_and(value: int, flag: bool):
 def ambiguous_boolean_or(value: int, flag: bool):
     assert flag or value is None  # no diagnostic
 
+def ambiguous_short_circuit(other: object, flag: bool):
+    assert flag and (other or True)  # no diagnostic
+
 def nested_boolean_assertion(value: int, flag: bool):
     assert flag and accepts(not (value is None))  # no diagnostic
 ```
 
-Short-circuit evaluation can make an assertion or one of its operands redundant even when its
-inferred value type has ambiguous truthiness. These conditions are reported by the ordinary rule,
-whether they always succeed or always fail:
+Short-circuit conditions remain exempt when they are the complete assertion, whether they always
+succeed or always fail. A walrus assignment does not prevent this exemption:
 
 ```py
-def ambiguous_short_circuit(other: object, flag: bool):
-    assert flag and (other or True)  # error: [redundant-condition]
-
 def short_circuit_assertion(value: object):
-    assert value or True  # error: [redundant-condition]
-    assert value and False  # error: [redundant-condition]
+    assert value or True  # no diagnostic
+    assert value and False  # no diagnostic
+
+def short_circuit_assignment(value: object):
+    assert (saved := value) or True  # no diagnostic
 ```
 
 The strict rule can still fire in assertion tests that use a walrus expression when their inferred
@@ -4428,6 +4430,38 @@ def uncalled_function(flag: bool):
         pass
     else:
         raise AssertionError
+```
+
+## Defensive short-circuit conditions
+
+A conjunction can be always false according to the annotations while still rejecting invalid runtime
+inputs. Its raising branch exempts it even when the conjunction's value type includes a falsy
+non-boolean operand. A walrus assignment does not prevent this exemption:
+
+```py
+def validate(value: str):
+    if value and not isinstance(value, str):  # no diagnostic
+        raise TypeError
+
+def validate_assignment(value: str):
+    if (saved := value) and not isinstance(saved, str):  # no diagnostic
+        raise TypeError
+```
+
+Negation can instead make the complete condition always true, leaving a defensive `else` branch
+unreachable. Short-circuit operands also inherit the exemption when the complete condition has
+unknown truthiness:
+
+```py
+def validate_else(value: str):
+    if not (value and not isinstance(value, str)):  # no diagnostic
+        return value
+    else:
+        raise TypeError
+
+def validate_operand(value: str, enabled: bool):
+    if enabled or (value and not isinstance(value, str)):  # no diagnostic
+        raise TypeError
 ```
 
 ## Defensive operands in ambiguous conditions

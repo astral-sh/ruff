@@ -4893,6 +4893,10 @@ def check_saved(value: Comparable):
         pass
 ```
 
+Conditions whose truthiness is fixed only by short-circuit evaluation are exempt in assertions and
+when their fixed outcome rules out a branch that ends in a defensive exit, such as `raise`. These
+checks can deliberately reject invalid runtime inputs that the annotations exclude.
+
 **Boolean operators used to compute values**
 
 

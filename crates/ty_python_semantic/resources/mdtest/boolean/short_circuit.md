@@ -227,27 +227,22 @@ distinction:
 
 ```py
 def conditions(value: object):
-    # error: [redundant-condition]
     if value and False:
         # This branch is not reachable; `value.__bool__` is only tested once. If it's false, this
         # branch is skipped immediately, if it's true, `False` is always false and this branch is
         # still skipped.
         reveal_type(value)  # revealed: Never
 
-    # error: [redundant-condition]
     if value or True:
         pass
     else:
         reveal_type(value)  # revealed: Never
 
-    # error: [redundant-condition]
     if not (value and False):
         pass
     else:
         reveal_type(value)  # revealed: Never
 
-    # error: [redundant-condition] "Condition `value and False` is always false"
-    # error: [redundant-condition] "Condition `value or True` is always true"
     if (value and False) or not (value or True):
         reveal_type(value)  # revealed: Never
 ```
@@ -279,7 +274,6 @@ def other_conditions(value: object):
     while value and False:
         reveal_type(value)  # revealed: Never
 
-    # error: [redundant-condition]
     assert value or True, reveal_type(value)  # revealed: Never
 
     # error: [redundant-condition]
@@ -293,7 +287,6 @@ def other_conditions(value: object):
         case _ if value and False:
             reveal_type(value)  # revealed: Never
 
-    # error: [redundant-condition]
     assert value and False
     reveal_type(value)  # revealed: Never
 ```
@@ -324,11 +317,9 @@ truthiness.
 
 ```py
 def nested_impossible_operands(other: object, value: bool, marker: int):
-    # error: [redundant-condition]
     if other and (isinstance(value, str) and value):
         reveal_type(marker)  # revealed: Never
 
-    # error: [redundant-condition]
     if other or (not isinstance(value, str) or value):
         pass
     else:
@@ -385,11 +376,9 @@ truthy.
 
 ```py
 def conditional_expressions(value: object, flag: bool):
-    # error: [redundant-condition]
     if (value and False) if flag else False:
         reveal_type(value)  # revealed: Never
 
-    # error: [redundant-condition]
     if True if flag else (value or True):
         pass
     else:
@@ -425,11 +414,9 @@ class Comparable:
         return object()
 
 def comparisons(value: Comparable):
-    # error: [redundant-condition]
     if value < 1 < 0:
         reveal_type(value)  # revealed: Never
 
-    # error: [redundant-condition]
     if value < 1 < 0 < 1:
         reveal_type(value)  # revealed: Never
 
@@ -437,7 +424,6 @@ def comparisons(value: Comparable):
     if (value < 1 < 0) and reveal_type(value):  # revealed: Never
         pass
 
-    # error: [redundant-condition]
     if not (value < 1 < 0):
         pass
     else:
