@@ -142,3 +142,20 @@ class DefaultOnlyTypeVar(Generic[W]):  # -> [W = int]
 class Outer:
     class Inner(Generic[T]):
         var: T
+
+
+# A sole starred constraint needs a trailing comma in the PEP 695 constraint tuple.
+constraints = (int, str)
+U = TypeVar("U", *constraints)
+
+
+class StarredConstraints(Generic[U]):
+    var: U
+
+
+# Mixed constraints retain both the explicit and unpacked types.
+V = TypeVar("V", bool, *constraints)
+
+
+class MixedConstraints(Generic[V]):
+    var: V
