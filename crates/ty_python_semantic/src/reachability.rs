@@ -199,14 +199,19 @@ use std::cell::RefCell;
 use crate::{
     Db,
     dunder_all::dunder_all_names,
-    place::{DefinedPlace, Definedness, Place, RequiresExplicitReExport, imported_symbol},
+    place::{
+        DefinedPlace, Definedness, Place, RequiresExplicitReExport, implicit_builtins_symbol,
+        imported_symbol,
+    },
+    place_load::definitely_has_builtin_binding,
     types::{
-        CallableTypes, ComparisonSoundnessPolicy, EnumClassLiteral, KnownClass, KnownInstanceType,
-        NarrowingConstraint, SpecialFormType, Type, TypeContext, UnionType, callable_pattern_type,
-        definite_match_pattern_type, definite_match_pattern_type_for_subject, equality_truthiness,
-        expand_type, infer_expression_types, infer_narrowing_constraints,
-        infer_same_file_expression_type, mapping_pattern_type, pattern_binding_fallthrough_type,
-        sequence_pattern_type_builder, singleton_pattern_type,
+        CallableTypes, ComparisonSoundnessPolicy, EnumClassLiteral, KnownClass, KnownFunction,
+        KnownInstanceType, NarrowingConstraint, SpecialFormType, Type, TypeContext, UnionType,
+        callable_pattern_type, definite_match_pattern_type,
+        definite_match_pattern_type_for_subject, equality_truthiness, expand_type,
+        infer_expression_types, infer_narrowing_constraints, infer_same_file_expression_type,
+        mapping_pattern_type, pattern_binding_fallthrough_type, sequence_pattern_type_builder,
+        singleton_pattern_type,
     },
 };
 use ruff_db::parsed::parsed_module;
@@ -226,12 +231,12 @@ use ty_python_core::{
     place::ScopedPlaceId,
     place_table,
     predicate::{
-        CallableAndCallExpr, PatternPredicate, PatternPredicateKind, Predicate, PredicateNode,
-        ScopedPredicateId,
+        BuiltinCallKind, CallableAndCallExpr, PatternPredicate, PatternPredicateKind, Predicate,
+        PredicateNode, ScopedPredicateId,
     },
     reachability_constraints::{ReachabilityConstraints, ScopedReachabilityConstraintId},
     scope::ScopeId,
-    use_def_map,
+    semantic_index, use_def_map,
 };
 
 /// Narrow `subject_ty` by all preceding unguarded match patterns.
@@ -553,10 +558,9 @@ fn predicate_scope<'db>(db: &'db dyn Db, predicate: &Predicate<'db>) -> ScopeId<
         | PredicateNode::Condition(expression)
         | PredicateNode::ChainedComparisonCondition(expression)
         | PredicateNode::ContextManagerSuppresses { expression, .. }
+        | PredicateNode::BuiltinCallCanComplete { expression, .. }
         | PredicateNode::ExpressionCanComplete { expression, .. } => expression.scope(db),
-        PredicateNode::IsNonTerminalCall(call) | PredicateNode::BoolCallCanComplete(call) => {
-            call.callable(db).scope(db)
-        }
+        PredicateNode::IsNonTerminalCall(call) => call.callable(db).scope(db),
         PredicateNode::Pattern(pattern) => pattern.scope(db),
         PredicateNode::FinallyNormalPathImpossible { scope, .. } => scope,
         PredicateNode::OrPatternAlternative(scope) => scope,
@@ -634,7 +638,7 @@ fn completion_predicates<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Box<[Scop
                 predicate.node,
                 PredicateNode::IsNonTerminalCall(_)
                     | PredicateNode::ExpressionCanComplete { .. }
-                    | PredicateNode::BoolCallCanComplete(_)
+                    | PredicateNode::BuiltinCallCanComplete { .. }
             )
             .then_some(id)
         })
@@ -1437,7 +1441,7 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                             || matches!(
                                 predicate.node,
                                 PredicateNode::ExpressionCanComplete { .. }
-                                    | PredicateNode::BoolCallCanComplete(_)
+                                    | PredicateNode::BuiltinCallCanComplete { .. }
                                     | PredicateNode::ContextManagerSuppresses { .. }
                                     | PredicateNode::FinallyNormalPathImpossible { .. }
                             ))
@@ -1474,7 +1478,7 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                         predicate.node,
                         PredicateNode::IsNonTerminalCall(_)
                             | PredicateNode::ExpressionCanComplete { .. }
-                            | PredicateNode::BoolCallCanComplete(_)
+                            | PredicateNode::BuiltinCallCanComplete { .. }
                             | PredicateNode::ContextManagerSuppresses { .. }
                             | PredicateNode::FinallyNormalPathImpossible { .. }
                     );
@@ -2043,6 +2047,65 @@ fn inferred_expression_can_complete<'db>(db: &'db dyn Db, expression: Expression
     }
 }
 
+/// Resolves a builtin once per scope when no visible binding or predicate can change its type.
+/// This keeps repeated calls from adding separate callee-inference dependencies to reachability.
+#[salsa::tracked(returns(copy), cycle_initial = |_, _, _, _| false, heap_size = get_size2::GetSize::get_heap_size)]
+fn builtin_call_has_inhabited_result<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    builtin: BuiltinCallKind,
+) -> bool {
+    let name = builtin.name();
+    if !definitely_has_builtin_binding(db, scope, name) {
+        return false;
+    }
+    let index = semantic_index(db, scope.program_file(db));
+    if index
+        .visible_ancestor_scopes(scope.file_scope_id(db))
+        .any(|(scope, _)| {
+            index
+                .place_table(scope)
+                .symbol_id(name)
+                .is_some_and(|symbol| {
+                    index
+                        .use_def_map(scope)
+                        .predicate_narrowing_targets()
+                        .contains_place(symbol.into())
+                })
+        })
+    {
+        return false;
+    }
+    let env = ProgramEnvironment::from_scope(scope);
+    let callable = implicit_builtins_symbol(db, &env, name)
+        .place
+        .ignore_possibly_undefined();
+    // These builtins keep an inhabited return type when argument inference refines it.
+    // Check annotations as well so replacement stubs retain their semantics.
+    match callable {
+        Some(Type::ClassLiteral(class)) => class.is_known(db, KnownClass::Bool),
+        Some(Type::FunctionLiteral(function))
+            if matches!(
+                function.known(db),
+                Some(
+                    KnownFunction::Len
+                        | KnownFunction::IsInstance
+                        | KnownFunction::IsSubclass
+                        | KnownFunction::HasAttr
+                )
+            ) =>
+        {
+            let overloads = &function.signature(db).overloads;
+            !overloads.is_empty()
+                && overloads.iter().all(|overload| {
+                    !overload.return_ty.is_equivalent_to(db, &env, Type::Never)
+                        && !overload.return_ty.has_typevar(db, &env)
+                })
+        }
+        _ => false,
+    }
+}
+
 fn analyze_single(db: &dyn Db, env: &ProgramEnvironment<'_>, predicate: &Predicate) -> Truthiness {
     let _span = tracing::trace_span!("analyze_single", ?predicate).entered();
 
@@ -2063,18 +2126,14 @@ fn analyze_single(db: &dyn Db, env: &ProgramEnvironment<'_>, predicate: &Predica
             ExpressionContext::Value => inferred_expression_can_complete(db, expression),
         })
         .negate_if(!predicate.is_positive),
-        PredicateNode::BoolCallCanComplete(call) => {
-            let callable_type =
-                infer_same_file_expression_type(db, call.callable(db), TypeContext::default());
-            // `bool` has an inhabited return type regardless of its argument's type. Avoid
-            // pulling argument inference into reachability when the callee confirms this case.
-            Truthiness::from(
-                matches!(callable_type, Type::ClassLiteral(class)
-                    if class.is_known(db, KnownClass::Bool))
-                    || inferred_expression_can_complete(db, call.call_expr(db)),
-            )
-            .negate_if(!predicate.is_positive)
-        }
+        PredicateNode::BuiltinCallCanComplete {
+            expression,
+            builtin,
+        } => Truthiness::from(
+            builtin_call_has_inhabited_result(db, expression.scope(db), builtin)
+                || inferred_expression_can_complete(db, expression),
+        )
+        .negate_if(!predicate.is_positive),
         PredicateNode::ChainedComparisonCondition(test_expr) => {
             let inference = infer_expression_types(db, test_expr, TypeContext::default());
             let expression = test_expr.node_ref(db);

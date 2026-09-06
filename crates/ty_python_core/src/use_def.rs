@@ -985,6 +985,10 @@ impl<'db> UseDefMap<'db> {
         &self.constraint_tables().predicates
     }
 
+    pub fn predicate_narrowing_targets(&self) -> &PredicateNarrowingTargets {
+        &self.constraint_tables().predicate_narrowing_targets
+    }
+
     pub fn range_reachability(
         &self,
     ) -> impl Iterator<Item = (TextRange, ScopedReachabilityConstraintId)> + '_ {

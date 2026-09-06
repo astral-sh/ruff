@@ -111,7 +111,7 @@ pub(crate) fn infer_narrowing_constraints<'db>(
         }
         PredicateNode::ContextManagerSuppresses { .. }
         | PredicateNode::ExpressionCanComplete { .. }
-        | PredicateNode::BoolCallCanComplete(_)
+        | PredicateNode::BuiltinCallCanComplete { .. }
         | PredicateNode::FinallyNormalPathImpossible { .. }
         | PredicateNode::IsNonTerminalCall(_)
         | PredicateNode::IsNonEmptyIterable(_)
@@ -1591,7 +1591,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             }
             PredicateNode::ContextManagerSuppresses { .. }
             | PredicateNode::ExpressionCanComplete { .. }
-            | PredicateNode::BoolCallCanComplete(_)
+            | PredicateNode::BuiltinCallCanComplete { .. }
             | PredicateNode::FinallyNormalPathImpossible { .. }
             | PredicateNode::IsNonTerminalCall(_) => return None,
             PredicateNode::IsNonEmptyIterable(_) => return None,
@@ -3310,6 +3310,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             | PredicateNode::Condition(expression)
             | PredicateNode::ChainedComparisonCondition(expression)
             | PredicateNode::ContextManagerSuppresses { expression, .. }
+            | PredicateNode::BuiltinCallCanComplete { expression, .. }
             | PredicateNode::ExpressionCanComplete { expression, .. } => expression.scope(db),
             PredicateNode::Pattern(pattern) => pattern.scope(db),
             PredicateNode::FinallyNormalPathImpossible { scope, .. } => scope,
@@ -3317,9 +3318,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             PredicateNode::SubjectElementPattern(subject_element) => {
                 subject_element.pattern.scope(db)
             }
-            PredicateNode::IsNonTerminalCall(call) | PredicateNode::BoolCallCanComplete(call) => {
-                call.callable(db).scope(db)
-            }
+            PredicateNode::IsNonTerminalCall(call) => call.callable(db).scope(db),
             PredicateNode::IsNonEmptyIterable(expression) => expression.scope(db),
             PredicateNode::StarImportPlaceholder(definition) => definition.scope(db),
         }

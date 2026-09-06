@@ -48,10 +48,10 @@ use crate::place::{
     match_subject_place_expressions,
 };
 use crate::predicate::{
-    CallableAndCallExpr, ClassPatternKeywordPredicateKind, ClassPatternPredicateKind,
-    MappingPatternEntryPredicateKind, MappingPatternPredicateKind, PatternPredicate,
-    PatternPredicateKind, Predicate, PredicateNode, PredicateOrLiteral, ScopedPredicateId,
-    SequencePatternPredicateKind, StarImportPlaceholderPredicate, StatementCall,
+    BuiltinCallKind, CallableAndCallExpr, ClassPatternKeywordPredicateKind,
+    ClassPatternPredicateKind, MappingPatternEntryPredicateKind, MappingPatternPredicateKind,
+    PatternPredicate, PatternPredicateKind, Predicate, PredicateNode, PredicateOrLiteral,
+    ScopedPredicateId, SequencePatternPredicateKind, StarImportPlaceholderPredicate, StatementCall,
     SubjectElementPatternPredicate,
 };
 use crate::re_exports::exported_names;
@@ -2412,7 +2412,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     }
                     PredicateNode::SubjectElementPattern(_)
                     | PredicateNode::ExpressionCanComplete { .. }
-                    | PredicateNode::BoolCallCanComplete(_)
+                    | PredicateNode::BuiltinCallCanComplete { .. }
                     | PredicateNode::IsNonTerminalCall(_)
                     | PredicateNode::ContextManagerSuppresses { .. }
                     | PredicateNode::FinallyNormalPathImpossible { .. }
@@ -3772,16 +3772,15 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             .copied()
             .unwrap_or_else(|| self.add_standalone_expression_impl(node, kind, None));
         let node = if let ast::Expr::Call(call) = node
-            && call
+            && let Some(builtin) = call
                 .func
                 .as_name_expr()
-                .is_some_and(|name| name.id == "bool")
+                .and_then(|name| BuiltinCallKind::from_name(name.id.as_str()))
         {
-            let callable =
-                self.add_standalone_expression_impl(&call.func, ExpressionKind::Callee, None);
-            PredicateNode::BoolCallCanComplete(CallableAndCallExpr::new(
-                self.db, callable, expression, false,
-            ))
+            PredicateNode::BuiltinCallCanComplete {
+                expression,
+                builtin,
+            }
         } else {
             PredicateNode::ExpressionCanComplete {
                 expression,

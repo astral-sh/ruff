@@ -16,7 +16,7 @@ use ty_module_resolver::{
 
 use crate::Db;
 use crate::place::implicit_globals::all_implicit_module_globals;
-use crate::place::{builtins_module_scope, implicit_builtins_symbol_scope};
+use crate::place_load::definitely_has_builtin_binding;
 use crate::types::ide_support::{ImportAliasResolution, definition_for_name};
 use crate::types::list_members::{all_members, all_reachable_members};
 use crate::types::{
@@ -104,23 +104,14 @@ impl<'db> SemanticModel<'db> {
         name: &str,
         node: ast::AnyNodeRef<'_>,
     ) -> bool {
-        let index = semantic_index(self.db, self.program_file());
         let Some(scope) = self.scope(node) else {
             return false;
         };
-
-        if index.visible_ancestor_scopes(scope).any(|(scope, _)| {
-            index
-                .place_table(scope)
-                .symbol_by_name(name)
-                .is_some_and(|symbol| symbol.is_bound() || symbol.is_declared())
-        }) {
-            return false;
-        }
-
-        let env = self.program_environment();
-        implicit_builtins_symbol_scope(self.db, &env, name)
-            .is_some_and(|scope| Some(scope) == builtins_module_scope(self.db, &env))
+        definitely_has_builtin_binding(
+            self.db,
+            scope.to_scope_id(self.db, self.program_file()),
+            name,
+        )
     }
 
     /// Returns a map from symbol name to that symbol's

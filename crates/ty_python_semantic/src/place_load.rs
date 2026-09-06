@@ -91,10 +91,34 @@ use ty_python_core::scope::{NodeWithScopeKind, ScopeId, ScopeKind};
 use ty_python_core::symbol::{ScopedSymbolId, Symbol};
 use ty_python_core::{
     AncestorsIter, BindingWithConstraintsIterator, BindingsSnapshotId, EnclosingSnapshotResult,
-    FileScopeId, ProgramFile, SemanticIndex,
+    FileScopeId, ProgramFile, SemanticIndex, semantic_index,
 };
 
-use crate::Db;
+use crate::place::{builtins_module_scope, implicit_builtins_symbol_scope};
+use crate::{Db, ProgramEnvironment};
+
+/// Returns whether a name is supplied by standard builtins without resolving individual uses.
+/// Any visible binding or declaration, including project-level builtins, prevents this shortcut.
+pub(crate) fn definitely_has_builtin_binding(db: &dyn Db, scope: ScopeId<'_>, name: &str) -> bool {
+    let index = semantic_index(db, scope.program_file(db));
+    if index
+        .visible_ancestor_scopes(scope.file_scope_id(db))
+        .any(|(scope, _)| {
+            index
+                .place_table(scope)
+                .symbol_id(name)
+                .is_some_and(|symbol| {
+                    let symbol = index.place_table(scope).symbol(symbol);
+                    symbol.is_bound() || symbol.is_declared()
+                })
+        })
+    {
+        return false;
+    }
+    let env = ProgramEnvironment::from_scope(scope);
+    implicit_builtins_symbol_scope(db, &env, name)
+        .is_some_and(|scope| Some(scope) == builtins_module_scope(db, &env))
+}
 
 /// Returns an iterator over the steps that resolve a value for a place load.
 pub(crate) fn resolve_place_load<'db, 'ast>(

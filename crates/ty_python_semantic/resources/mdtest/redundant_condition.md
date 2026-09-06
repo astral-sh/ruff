@@ -2810,8 +2810,8 @@ def nested_conditional():
 ```
 
 A statement condition that never returns reaches neither outcome, including when the callable
-shadows the builtin `bool`. Tests in the body, the `else` branch, and subsequent statements are
-unreachable.
+shadows a builtin such as `bool` or `len`. Tests in the body, the `else` branch, and subsequent
+statements are unreachable.
 
 ```py
 def statement_condition(bool: Callable[[], Never]):
@@ -2834,8 +2834,8 @@ def elif_condition(flag: bool):
         if "yes":  # no diagnostic
             pass
 
-def while_condition():
-    while die():
+def while_condition(len: Callable[[], Never]):
+    while len():
         if "yes":  # no diagnostic
             pass
     else:

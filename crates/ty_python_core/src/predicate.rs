@@ -102,6 +102,39 @@ impl PredicateOrLiteral<'_> {
     }
 }
 
+/// Builtins whose call result can be established without inferring their arguments.
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+pub enum BuiltinCallKind {
+    Bool,
+    Len,
+    IsInstance,
+    IsSubclass,
+    HasAttr,
+}
+
+impl BuiltinCallKind {
+    pub(crate) fn from_name(name: &str) -> Option<Self> {
+        match name {
+            "bool" => Some(Self::Bool),
+            "len" => Some(Self::Len),
+            "isinstance" => Some(Self::IsInstance),
+            "issubclass" => Some(Self::IsSubclass),
+            "hasattr" => Some(Self::HasAttr),
+            _ => None,
+        }
+    }
+
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::Bool => "bool",
+            Self::Len => "len",
+            Self::IsInstance => "isinstance",
+            Self::IsSubclass => "issubclass",
+            Self::HasAttr => "hasattr",
+        }
+    }
+}
+
 /// A stable key for call-completion queries. Creating it while building predicates lets cached
 /// queries use its ID directly, without looking up its components in Salsa's intern table again.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
@@ -176,10 +209,12 @@ pub enum PredicateNode<'db> {
         expression: Expression<'db>,
         context: ExpressionContext,
     },
-    /// Whether a direct `bool(...)` call can produce a result. Resolving its callee can establish
-    /// an inhabited result without inferring argument types; shadowed names require full inference.
-    /// The interned call descriptor keeps `PredicateNode` compact.
-    BoolCallCanComplete(CallableAndCallExpr<'db>),
+    /// Whether a call to a builtin with an inhabited result type can produce a result. Resolving
+    /// its callee can avoid inferring argument types; shadowed names require full inference.
+    BuiltinCallCanComplete {
+        expression: Expression<'db>,
+        builtin: BuiltinCallKind,
+    },
     /// Whether a context manager's exit return type allows an exception to be suppressed.
     ///
     /// Resolved during type inference because the context manager's type is unavailable during
