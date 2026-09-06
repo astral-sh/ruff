@@ -1179,7 +1179,8 @@ mod tests {
         ast_ids::{HasScopedUseId, ScopedUseId},
         db::tests::{TestDb, TestDbBuilder},
         definition::{
-            DefinitionKind, LambdaParameterDefinitionNodeKind, ParameterDefinitionNodeKind,
+            DefinitionKind, DefinitionState, LambdaParameterDefinitionNodeKind,
+            ParameterDefinitionNodeKind,
         },
         program::Program,
     };
@@ -1295,6 +1296,89 @@ mod tests {
             declaration.kind(&db),
             DefinitionKind::AnnotatedAssignment(_)
         );
+    }
+
+    #[test]
+    fn reachable_definitions_include_initial_state() {
+        let TestCase { db, file } = test_case("if flag:\n    x: int = 1\n");
+        let scope = global_scope(&db, program_file(&db, file));
+        let table = place_table(&db, scope);
+        let symbol = table.symbol_id("x").unwrap();
+        let use_def = use_def_map(&db, scope);
+
+        let bindings = use_def
+            .reachable_symbol_bindings(symbol)
+            .collect::<Vec<_>>();
+        let declarations = use_def
+            .reachable_symbol_declarations(symbol)
+            .collect::<Vec<_>>();
+        assert_eq!(bindings.len(), 2);
+        assert_eq!(declarations.len(), 2);
+        assert_matches!(bindings[0].binding, DefinitionState::Undefined);
+        assert_matches!(declarations[0].declaration, DefinitionState::Undefined);
+        assert!(bindings[0].binding_order.is_unbound());
+        assert!(declarations[0].declaration_order.is_unbound());
+        assert_eq!(
+            bindings[0].narrowing_constraint.constraint(),
+            ScopedNarrowingConstraint::ALWAYS_TRUE,
+        );
+        let initial_reachability = bindings[0].reachability_constraint;
+        assert!(!initial_reachability.is_terminal());
+        assert_eq!(initial_reachability, bindings[1].reachability_constraint);
+        assert_eq!(
+            initial_reachability,
+            declarations[0].reachability_constraint
+        );
+        assert_eq!(
+            initial_reachability,
+            declarations[1].reachability_constraint
+        );
+
+        let (_, all_declarations, all_bindings) = use_def
+            .all_reachable_symbols()
+            .find(|(id, _, _)| *id == symbol)
+            .unwrap();
+        assert_eq!(
+            all_bindings
+                .map(|binding| binding.binding_order)
+                .collect::<Vec<_>>(),
+            bindings
+                .iter()
+                .map(|binding| binding.binding_order)
+                .collect::<Vec<_>>(),
+        );
+        assert_eq!(
+            all_declarations
+                .map(|declaration| declaration.declaration_order)
+                .collect::<Vec<_>>(),
+            declarations
+                .iter()
+                .map(|declaration| declaration.declaration_order)
+                .collect::<Vec<_>>(),
+        );
+    }
+
+    #[test]
+    fn reachable_initial_state_without_definitions() {
+        let TestCase { db, file } = test_case("if flag:\n    missing\n");
+        let scope = global_scope(&db, program_file(&db, file));
+        let table = place_table(&db, scope);
+        let symbol = table.symbol_id("missing").unwrap();
+        let use_def = use_def_map(&db, scope);
+
+        let mut bindings = use_def.reachable_symbol_bindings(symbol);
+        let mut declarations = use_def.reachable_symbol_declarations(symbol);
+        let binding = bindings.next().unwrap();
+        let declaration = declarations.next().unwrap();
+        assert_matches!(binding.binding, DefinitionState::Undefined);
+        assert_matches!(declaration.declaration, DefinitionState::Undefined);
+        assert!(!binding.reachability_constraint.is_terminal());
+        assert_eq!(
+            binding.reachability_constraint,
+            declaration.reachability_constraint
+        );
+        assert!(bindings.next().is_none());
+        assert!(declarations.next().is_none());
     }
 
     #[test]
