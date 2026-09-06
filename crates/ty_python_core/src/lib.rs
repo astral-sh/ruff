@@ -1306,12 +1306,12 @@ mod tests {
         let symbol = table.symbol_id("x").unwrap();
         let use_def = use_def_map(&db, scope);
 
-        let bindings = use_def
-            .reachable_symbol_bindings(symbol)
-            .collect::<Vec<_>>();
-        let declarations = use_def
-            .reachable_symbol_declarations(symbol)
-            .collect::<Vec<_>>();
+        let (_, declarations, bindings) = use_def
+            .all_reachable_symbols()
+            .find(|(id, _, _)| *id == symbol)
+            .unwrap();
+        let bindings = bindings.collect::<Vec<_>>();
+        let declarations = declarations.collect::<Vec<_>>();
         assert_eq!(bindings.len(), 2);
         assert_eq!(declarations.len(), 2);
         assert_matches!(bindings[0].binding, DefinitionState::Undefined);
@@ -1332,29 +1332,6 @@ mod tests {
         assert_eq!(
             initial_reachability,
             declarations[1].reachability_constraint
-        );
-
-        let (_, all_declarations, all_bindings) = use_def
-            .all_reachable_symbols()
-            .find(|(id, _, _)| *id == symbol)
-            .unwrap();
-        assert_eq!(
-            all_bindings
-                .map(|binding| binding.binding_order)
-                .collect::<Vec<_>>(),
-            bindings
-                .iter()
-                .map(|binding| binding.binding_order)
-                .collect::<Vec<_>>(),
-        );
-        assert_eq!(
-            all_declarations
-                .map(|declaration| declaration.declaration_order)
-                .collect::<Vec<_>>(),
-            declarations
-                .iter()
-                .map(|declaration| declaration.declaration_order)
-                .collect::<Vec<_>>(),
         );
     }
 

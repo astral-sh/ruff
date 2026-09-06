@@ -597,10 +597,10 @@ impl Index<InternedDeclarationsId> for RetainedDeclarations {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, get_size2::GetSize)]
-struct RetainedPlaceStates<T> {
-    end_of_scope: T,
+struct RetainedPlaceStates {
+    end_of_scope: InternedPlaceStateId,
     /// The reachable histories exclude their implicit initial unbound/undeclared entries.
-    reachable: T,
+    reachable: InternedPlaceStateId,
     /// Both initial entries have this reachability constraint and are reconstructed by iterators.
     initial_reachability: ScopedReachabilityConstraintId,
 }
@@ -678,7 +678,7 @@ struct UseDefMapExtra {
     multi_bindings_by_use: MultiBindingsByUse,
 
     /// Retained [`PlaceState`] values for each member.
-    member_states: FrozenIndexVec<ScopedMemberId, RetainedPlaceStates<InternedPlaceStateId>>,
+    member_states: FrozenIndexVec<ScopedMemberId, RetainedPlaceStates>,
 
     /// Snapshots of bindings used to resolve references from nested scopes.
     enclosing_snapshots: FrozenIndexVec<ScopedEnclosingSnapshotId, InternedEnclosingSnapshotId>,
@@ -821,7 +821,7 @@ pub struct UseDefMap<'db> {
     >,
 
     /// Retained [`PlaceState`] values for each symbol.
-    symbol_states: FrozenIndexVec<ScopedSymbolId, RetainedPlaceStates<InternedPlaceStateId>>,
+    symbol_states: FrozenIndexVec<ScopedSymbolId, RetainedPlaceStates>,
 
     /// Collection fields omitted when they would all be empty.
     extra: Option<Box<UseDefMapExtra>>,
@@ -1129,9 +1129,14 @@ impl<'db> UseDefMap<'db> {
         &self,
         place: ScopedPlaceId,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
-        match place {
-            ScopedPlaceId::Symbol(symbol) => self.reachable_symbol_bindings(symbol),
-            ScopedPlaceId::Member(member) => self.reachable_member_bindings(member),
+        let state = match place {
+            ScopedPlaceId::Symbol(symbol) => &self.symbol_states[symbol],
+            ScopedPlaceId::Member(member) => &self.extra().member_states[member],
+        };
+        let bindings = &self.interned_bindings[state.reachable.bindings_id()];
+        BindingWithConstraintsIterator {
+            initial_unbound: Some(state.initial_reachability),
+            ..self.bindings_iterator(bindings, BoundnessAnalysis::AssumeBound)
         }
     }
 
@@ -1139,24 +1144,14 @@ impl<'db> UseDefMap<'db> {
         &self,
         symbol: ScopedSymbolId,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
-        let state = &self.symbol_states[symbol];
-        let bindings = &self.interned_bindings[state.reachable.bindings_id()];
-        BindingWithConstraintsIterator {
-            initial_unbound: Some(state.initial_reachability),
-            ..self.bindings_iterator(bindings, BoundnessAnalysis::AssumeBound)
-        }
+        self.reachable_bindings(symbol.into())
     }
 
     pub fn reachable_member_bindings(
         &self,
         member: ScopedMemberId,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
-        let state = &self.extra().member_states[member];
-        let bindings = &self.interned_bindings[state.reachable.bindings_id()];
-        BindingWithConstraintsIterator {
-            initial_unbound: Some(state.initial_reachability),
-            ..self.bindings_iterator(bindings, BoundnessAnalysis::AssumeBound)
-        }
+        self.reachable_bindings(member.into())
     }
 
     pub(crate) fn enclosing_snapshot(
@@ -1249,30 +1244,25 @@ impl<'db> UseDefMap<'db> {
         &self,
         symbol: ScopedSymbolId,
     ) -> DeclarationsIterator<'_, 'db> {
-        let state = &self.symbol_states[symbol];
-        let declarations = &self.interned_declarations[state.reachable.declarations_id()];
-        DeclarationsIterator {
-            initial_undeclared: Some(state.initial_reachability),
-            ..self.declarations_iterator(declarations, BoundnessAnalysis::AssumeBound)
-        }
+        self.reachable_declarations(symbol.into())
     }
 
     pub fn reachable_member_declarations(
         &self,
         member: ScopedMemberId,
     ) -> DeclarationsIterator<'_, 'db> {
-        let state = &self.extra().member_states[member];
+        self.reachable_declarations(member.into())
+    }
+
+    pub fn reachable_declarations(&self, place: ScopedPlaceId) -> DeclarationsIterator<'_, 'db> {
+        let state = match place {
+            ScopedPlaceId::Symbol(symbol) => &self.symbol_states[symbol],
+            ScopedPlaceId::Member(member) => &self.extra().member_states[member],
+        };
         let declarations = &self.interned_declarations[state.reachable.declarations_id()];
         DeclarationsIterator {
             initial_undeclared: Some(state.initial_reachability),
             ..self.declarations_iterator(declarations, BoundnessAnalysis::AssumeBound)
-        }
-    }
-
-    pub fn reachable_declarations(&self, place: ScopedPlaceId) -> DeclarationsIterator<'_, 'db> {
-        match place {
-            ScopedPlaceId::Symbol(symbol) => self.reachable_symbol_declarations(symbol),
-            ScopedPlaceId::Member(member) => self.reachable_member_declarations(member),
         }
     }
 
@@ -3167,7 +3157,7 @@ impl<'db> UseDefMapBuilder<'db> {
         reachable: IndexVec<I, ReachableDefinitions>,
         place_state_interner: &mut PlaceStateInterner,
         reachability_constraints: &mut ReachabilityConstraintsBuilder,
-    ) -> FrozenIndexVec<I, RetainedPlaceStates<InternedPlaceStateId>> {
+    ) -> FrozenIndexVec<I, RetainedPlaceStates> {
         assert_eq!(end_of_scope.len(), reachable.len());
 
         end_of_scope
