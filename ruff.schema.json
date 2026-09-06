@@ -1528,6 +1528,7 @@
             "array",
             "null"
           ],
+          "deprecated": true,
           "items": {
             "type": "string"
           }
@@ -1538,6 +1539,7 @@
             "array",
             "null"
           ],
+          "deprecated": true,
           "items": {
             "type": "string"
           }
@@ -2602,6 +2604,17 @@
           "anyOf": [
             {
               "$ref": "#/definitions/RuffOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "runtime-evaluated-annotations": {
+          "description": "Targets the annotation for a set of specified objects and treats\nthem as either runtime-required or runtime-ambiguous.\n\nA common example for a runtime-required base class is Pydantic's\n`pydantic.BaseModel`, where all of the annotations need to be evaluated\nat runtime by pydantic. This prevents relevant imports from being\nmoved into type checking blocks and helps detect imports that need\nto be moved out of type checking blocks.\n\nA common example for a runtime-ambiguous base class is SQLAlchemy's\n`sqlalchemy.orm.DeclarativeBase`, where it requires `Mapped` and most\ntypes to be available at runtime, but models may be referenced via\ntheir name as a forward-reference. So some annotations are runtime-required\nbut others are not, hence runtime-ambiguous. This prevents relevant\nimports from being moved at all, it will be assumed they are already\ncorrect, the way they are.\n\n`base-classes` directly targets a specific base class and its direct\ndescendants, whereas `decorators` targets any classes or functions\ndecorated with one of the decorators.\n\n`decorators` also supports framework decorators like FastAPI's `fastapi.FastAPI.get`\nwhich will work across assignments in the same module.\n\nFor example:\n```python\nfrom fastapi import FastAPI\n\napp = FastAPI(\"app\")\n\n@app.get(\"/home\")\ndef home() -> str: ...\n```\n\nHere `app.get` will correctly be identified as `fastapi.FastAPI.get`.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/RuntimeEvaluatedAnnotationLocations"
             },
             {
               "type": "null"
@@ -5537,6 +5550,54 @@
         "zip-instead-of-pairwise",
         "zip-without-explicit-strict"
       ]
+    },
+    "RuntimeEvaluatedAnnotationLocation": {
+      "type": "object",
+      "properties": {
+        "ambiguous": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "required": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "RuntimeEvaluatedAnnotationLocations": {
+      "type": "object",
+      "properties": {
+        "base-classes": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/RuntimeEvaluatedAnnotationLocation"
+            }
+          ],
+          "default": {
+            "ambiguous": [],
+            "required": []
+          }
+        },
+        "decorators": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/RuntimeEvaluatedAnnotationLocation"
+            }
+          ],
+          "default": {
+            "ambiguous": [],
+            "required": []
+          }
+        }
+      },
+      "additionalProperties": false
     },
     "Strictness": {
       "oneOf": [
