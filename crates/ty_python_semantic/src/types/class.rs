@@ -528,21 +528,21 @@ impl<'db> GenericAlias<'db> {
         cycle_initial=|db, _, alias: GenericAlias<'db>| {
             let origin = alias.origin(db);
             let env = ProgramEnvironment::from_scope(origin.body_scope(db));
-            Err(StaticMroError::cycle(
+            Err(Box::new(StaticMroError::cycle(
                 db,
                 &env,
                 origin.apply_optional_specialization(db, Some(alias.specialization(db))),
-            ))
+            )))
         },
         heap_size=ruff_memory_usage::heap_size
     )]
     pub(in crate::types) fn try_mro(
         self,
         db: &'db dyn Db,
-    ) -> Result<Mro<'db>, StaticMroError<'db>> {
+    ) -> Result<Mro<'db>, Box<StaticMroError<'db>>> {
         let origin = self.origin(db);
         tracing::trace!("GenericAlias::try_mro: {}", origin.name(db));
-        Mro::of_static_class(db, origin, Some(self.specialization(db)))
+        Mro::of_static_class(db, origin, Some(self.specialization(db))).map_err(Box::new)
     }
 
     /// Compose each type argument's variance with its formal parameter's variance. Inferred
