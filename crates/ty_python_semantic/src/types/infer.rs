@@ -66,7 +66,7 @@ use crate::{Db, FxIndexSet};
 use builder::TypeInferenceBuilder;
 pub(super) use comparisons::UnsupportedComparisonError;
 use ty_python_core::definition::{Definition, DefinitionKind};
-use ty_python_core::expression::Expression;
+use ty_python_core::expression::{Expression, ExpressionKind};
 use ty_python_core::scope::ScopeId;
 use ty_python_core::statement::StatementInner;
 use ty_python_core::unpack::Unpack;
@@ -454,7 +454,7 @@ pub(crate) fn infer_expression_types<'db>(
     cycle_fn=|db, cycle, previous: &ExpressionInference<'db>, inference: ExpressionInference<'db>, input: InferExpression<'db>| {
         let (expression, _) = input.into_inner(db);
         let env = ProgramEnvironment::from_scope(expression.scope(db));
-        inference.cycle_normalized(db, &env, previous, cycle)
+        inference.cycle_normalized(db, &env, expression, previous, cycle)
     },
     heap_size=ruff_memory_usage::heap_size
 )]
@@ -479,7 +479,7 @@ pub(super) fn infer_expression_types_impl<'db>(
 
     let env = ProgramEnvironment::from_file(program_file);
 
-    TypeInferenceBuilder::new(
+    let mut inference = TypeInferenceBuilder::new(
         db,
         &env,
         InferenceRegion::Expression(expression, tcx),
@@ -488,7 +488,15 @@ pub(super) fn infer_expression_types_impl<'db>(
         index,
         &module,
     )
-    .finish_expression()
+    .finish_expression();
+    if expression.kind(db) == ExpressionKind::BooleanTest {
+        inference.boolean_test_completion = Some(
+            !inference
+                .expression_type(expression.node_ref(db))
+                .is_equivalent_to(db, &env, Type::Never),
+        );
+    }
+    inference
 }
 
 fn expression_cycle_initial<'db>(
@@ -1796,6 +1804,9 @@ pub(crate) struct ExpressionInference<'db> {
     /// The types of every expression in this region.
     expressions: FrozenMap<ExpressionNodeKey, Type<'db>>,
 
+    /// Whether a boolean test can produce a value. Other expression regions leave this unset.
+    boolean_test_completion: Option<bool>,
+
     extra: Option<Box<ExpressionInferenceExtra<'db>>>,
 
     /// The scope this region is part of.
@@ -1864,6 +1875,7 @@ impl<'db> ExpressionInference<'db> {
     fn cycle_initial(scope: ScopeId<'db>, cycle_recovery: Type<'db>) -> Self {
         let _ = scope;
         Self {
+            boolean_test_completion: Some(true),
             extra: Some(Box::new(ExpressionInferenceExtra {
                 cycle_recovery: Some(cycle_recovery),
                 ..ExpressionInferenceExtra::default()
@@ -1878,6 +1890,7 @@ impl<'db> ExpressionInference<'db> {
         mut self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        expression: Expression<'db>,
         previous: &ExpressionInference<'db>,
         cycle: &salsa::Cycle,
     ) -> ExpressionInference<'db> {
@@ -1903,6 +1916,17 @@ impl<'db> ExpressionInference<'db> {
         for (expr, ty) in &mut self.expressions {
             let previous_ty = previous.expression_type(*expr);
             *ty = ty.cycle_normalized(db, env, previous_ty, cycle);
+        }
+
+        if self.boolean_test_completion.is_some() {
+            let can_complete = !self
+                .expression_type(expression.node_ref(db))
+                .is_equivalent_to(db, env, Type::Never);
+            self.boolean_test_completion = Some(
+                can_complete
+                    || (cycle.iteration() > crate::TAINTED_CYCLES
+                        && previous.boolean_test_completion == Some(true)),
+            );
         }
 
         if cycle.iteration() > crate::TAINTED_CYCLES
@@ -1962,6 +1986,10 @@ impl<'db> ExpressionInference<'db> {
             .comparison_truthiness
             .get(&expression.into())
             .copied()
+    }
+
+    pub(crate) fn boolean_test_completion(&self) -> Option<bool> {
+        self.boolean_test_completion
     }
 
     fn collection_use_constraints(

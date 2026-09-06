@@ -1495,7 +1495,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.context.inference_flags |= InferenceFlags::CHECK_UNBOUND_TYPEVARS;
                 self.infer_expression_impl(expression.node_ref(self.db()).node(self.module()), tcx);
             }
-            ExpressionKind::Normal => {
+            ExpressionKind::Normal | ExpressionKind::BooleanTest => {
                 self.infer_expression_impl(expression.node_ref(self.db()).node(self.module()), tcx);
             }
             ExpressionKind::TypeExpression => {
@@ -12453,6 +12453,7 @@ impl<'db> FullExpressionCacheEntry<'db> {
 
         ExpressionInference {
             expressions: FrozenMap::from(self.expressions),
+            boolean_test_completion: None,
             extra,
             #[cfg(debug_assertions)]
             scope: self.scope,

@@ -556,6 +556,7 @@ fn comparison_truthiness_widens_across_sparse_cycle_results() -> anyhow::Result<
         (
             ExpressionInference {
                 expressions: [(expression, ty)].into_iter().collect(),
+                boolean_test_completion: None,
                 extra: truthiness.map(|truthiness| {
                     Box::new(ExpressionInferenceExtra {
                         comparison_truthiness: [(expression, truthiness)].into_iter().collect(),

@@ -221,7 +221,7 @@ use ty_python_core::{
     FileScopeId, NarrowingEvaluator, PredicateNarrowingTargets, ScopedDefinitionId, SemanticIndex,
     Truthiness, UseDefMap,
     definition::DefinitionState,
-    expression::{Expression, ExpressionContext},
+    expression::{Expression, ExpressionContext, ExpressionKind},
     narrowing_constraints::{NarrowingConstraints, ScopedNarrowingConstraint},
     place::ScopedPlaceId,
     place_table,
@@ -695,6 +695,8 @@ fn analyze_completion_range<'db>(db: &'db dyn Db, scope: ScopeId<'db>, level: u3
 fn evaluate_reachability_constraint<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
+    constraints: &ReachabilityConstraints,
+    predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
     id: ScopedReachabilityConstraintId,
     cache: Option<&ReachabilityCacheEntries>,
 ) -> Truthiness {
@@ -702,9 +704,6 @@ fn evaluate_reachability_constraint<'db>(
         return reachability;
     }
 
-    let use_def = use_def_map(db, scope);
-    let constraints = use_def.reachability_constraints();
-    let predicates = use_def.predicates();
     let root_predicate = constraints.get_interior_node(id).atom();
     let has_many_completions = analyze_completion_prefix(db, predicates, root_predicate);
     let completion_predicates = has_many_completions.then(|| completion_predicates(db, scope));
@@ -739,7 +738,15 @@ fn evaluate_finally_continuation<'db>(
     scope: ScopeId<'db>,
     continuation: ScopedReachabilityConstraintId,
 ) -> Truthiness {
-    evaluate_reachability_constraint(db, scope, continuation, None)
+    let use_def = use_def_map(db, scope);
+    evaluate_reachability_constraint(
+        db,
+        scope,
+        use_def.reachability_constraints(),
+        use_def.predicates(),
+        continuation,
+        None,
+    )
 }
 
 fn terminal_reachability(id: ScopedReachabilityConstraintId) -> Option<Truthiness> {
@@ -2021,6 +2028,11 @@ fn analyze_single(db: &dyn Db, env: &ProgramEnvironment<'_>, predicate: &Predica
             context,
         } => Truthiness::from(match context {
             ExpressionContext::Condition => analyze_condition(db, expression).is_some(),
+            ExpressionContext::Value if expression.kind(db) == ExpressionKind::BooleanTest => {
+                infer_expression_types(db, expression, TypeContext::default())
+                    .boolean_test_completion()
+                    .unwrap_or(true)
+            }
             ExpressionContext::Value => expression_value_can_complete(db, expression),
         })
         .negate_if(!predicate.is_positive),
@@ -2181,10 +2193,8 @@ impl<'db> ReachabilityEvaluationCache<'db> {
 
     /// Evaluates `id`, reusing a cached result when possible.
     ///
-    /// Trivial constraint ids return immediately and are not stored. For interior nodes, the
-    /// predicate determines whether the constraint belongs to the primary scope. A primary-scope
-    /// constraint from the primary graph is cached by dense index; all other constraints are cached
-    /// by graph identity and id.
+    /// Trivial constraint ids return immediately and are not stored. Constraints from the primary
+    /// graph are cached by dense index; all other constraints are cached by graph identity and id.
     fn evaluate(
         &self,
         db: &'db dyn Db,
@@ -2199,27 +2209,38 @@ impl<'db> ReachabilityEvaluationCache<'db> {
             _ => {}
         }
 
-        let predicate = predicates[constraints.get_interior_node(id).atom()];
         let constraints_key = std::ptr::from_ref(constraints).addr();
-        let scope = predicate_scope(db, &predicate);
-
-        if scope != self.primary_scope || constraints_key != self.primary_constraints {
-            let key = (constraints_key, id);
-            if let Some(result) = self.other_entries.borrow().get(&key).copied() {
+        if constraints_key == self.primary_constraints {
+            if let Some(result) = self
+                .primary_entries
+                .borrow()
+                .get(id.index())
+                .copied()
+                .flatten()
+            {
                 return result;
             }
 
-            let result = evaluate_reachability_constraint(db, scope, id, None);
-            self.other_entries.borrow_mut().insert(key, result);
+            return evaluate_reachability_constraint(
+                db,
+                self.primary_scope,
+                constraints,
+                predicates,
+                id,
+                Some(&self.primary_entries),
+            );
+        }
+
+        let key = (constraints_key, id);
+        if let Some(result) = self.other_entries.borrow().get(&key).copied() {
             return result;
         }
 
-        let index = id.index();
-        if let Some(result) = self.primary_entries.borrow().get(index).copied().flatten() {
-            return result;
-        }
-
-        evaluate_reachability_constraint(db, self.primary_scope, id, Some(&self.primary_entries))
+        let predicate = predicates[constraints.get_interior_node(id).atom()];
+        let scope = predicate_scope(db, &predicate);
+        let result = evaluate_reachability_constraint(db, scope, constraints, predicates, id, None);
+        self.other_entries.borrow_mut().insert(key, result);
+        result
     }
 }
 
@@ -2406,6 +2427,8 @@ class TargetB:
                     evaluate_reachability_constraint(
                         &db,
                         scope,
+                        use_def.reachability_constraints(),
+                        use_def.predicates(),
                         use_def.end_of_scope_reachability(),
                         None,
                     )
@@ -2425,6 +2448,8 @@ class TargetB:
                 evaluate_reachability_constraint(
                     &db,
                     scope,
+                    use_def.reachability_constraints(),
+                    use_def.predicates(),
                     use_def.end_of_scope_reachability(),
                     None
                 )

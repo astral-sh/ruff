@@ -3743,11 +3743,15 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             ast::Expr::Compare(compare) if compare.ops.len() > 1 => context,
             _ => ExpressionContext::Value,
         };
+        let kind = match context {
+            ExpressionContext::Value => ExpressionKind::BooleanTest,
+            ExpressionContext::Condition => ExpressionKind::Normal,
+        };
         let expression = self
             .expressions_by_node
             .get(&node.into())
             .copied()
-            .unwrap_or_else(|| self.add_standalone_expression(node));
+            .unwrap_or_else(|| self.add_standalone_expression_impl(node, kind, None));
         let predicate = self.add_predicate(PredicateOrLiteral::Predicate(Predicate {
             node: PredicateNode::ExpressionCanComplete {
                 expression,
