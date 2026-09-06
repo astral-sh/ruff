@@ -1,6 +1,7 @@
 use ruff_python_ast::helpers::map_callable;
 use ruff_python_ast::{self as ast, ExceptHandler, Stmt};
 
+use crate::analyze::context_manager::may_suppress_exceptions;
 use crate::model::SemanticModel;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -149,8 +150,21 @@ impl Terminal {
                         );
                     }
                 }
-                Stmt::With(ast::StmtWith { body, .. }) => {
-                    terminal = terminal.and_then(Self::from_body(body, semantic));
+                Stmt::With(with_stmt) => {
+                    let body_terminal = Self::from_body(&with_stmt.body, semantic);
+
+                    if may_suppress_exceptions(with_stmt, semantic) {
+                        // Execution resumes after the `with` statement once the exception is
+                        // swallowed, so the body never proves that the function always raises.
+                        // A `return` in the body proves only that the function *can* return:
+                        // `with suppress(ValueError): return int(value)` falls through to an
+                        // implicit `return None` whenever `int(value)` raises.
+                        if body_terminal.has_any_return() {
+                            terminal = terminal.and_then(Terminal::ConditionalReturn);
+                        }
+                    } else {
+                        terminal = terminal.and_then(body_terminal);
+                    }
                 }
                 Stmt::Return(_) => {
                     terminal = terminal.and_then(Terminal::RaiseOrReturn);
@@ -353,7 +367,8 @@ fn sometimes_breaks(stmts: &[Stmt], semantic: &SemanticModel) -> bool {
     false
 }
 
-/// Returns `true` if the body may break via a `break` statement.
+/// Returns `true` if the body always breaks via a `break` statement, i.e., if it reaches a
+/// top-level `break` before any `return` or `raise`.
 fn always_breaks(stmts: &[Stmt]) -> bool {
     for stmt in stmts {
         match stmt {
