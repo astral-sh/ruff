@@ -1551,14 +1551,13 @@ impl<'db> FunctionType<'db> {
     ///
     /// This is the signature as seen by external callers, possibly modified by decorators and/or
     /// overloaded.
-    ///
-    /// ## Why is this a salsa query?
-    ///
-    /// This is a salsa query to short-circuit the invalidation
-    /// when the function's AST node changes.
-    ///
-    /// Were this not a salsa query, then the calling query
-    /// would depend on the function's AST and rerun for every change in that file.
+    pub(crate) fn signature(self, db: &'db dyn Db) -> &'db CallableSignature<'db> {
+        self.updated_signature(db)
+            .unwrap_or_else(|| self.literal_signature(db))
+    }
+
+    /// This query isolates the function's AST dependency, so callers only invalidate when the
+    /// computed signature changes. Updated signatures are already stored on the interned function.
     #[salsa::tracked(
         returns(ref),
         cycle_initial=|db, id, function: FunctionType<'db>| {
@@ -1575,10 +1574,8 @@ impl<'db> FunctionType<'db> {
         },
         heap_size=ruff_memory_usage::heap_size,
     )]
-    pub(crate) fn signature(self, db: &'db dyn Db) -> CallableSignature<'db> {
-        self.updated_signature(db)
-            .cloned()
-            .unwrap_or_else(|| self.literal(db).signature(db))
+    fn literal_signature(self, db: &'db dyn Db) -> CallableSignature<'db> {
+        self.literal(db).signature(db)
     }
 
     /// Refer to this signature's equation, including recursive `TypeOf` references to itself.
