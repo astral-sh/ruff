@@ -72,7 +72,7 @@ fn property_deprecations_do_not_infer_accessor_signatures() -> anyhow::Result<()
     for accessor in accessor_ids {
         assert_function_query_was_not_run_by_name(
             &db,
-            "FunctionType < 'db >::signature_",
+            "FunctionType < 'db >::literal_signature_",
             Some(accessor),
             &events,
         );
