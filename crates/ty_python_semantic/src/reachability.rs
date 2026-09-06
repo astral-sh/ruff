@@ -194,7 +194,7 @@
 //! [bdd]: https://en.wikipedia.org/wiki/Binary_decision_diagram
 
 use crate::ProgramEnvironment;
-use std::cell::RefCell;
+use std::cell::{OnceCell, RefCell};
 
 use crate::{
     Db,
@@ -547,6 +547,7 @@ const CONTROL_FLOW_REACHABILITY_CHECKPOINT_INTERVAL: usize = 16;
 const NARROWING_EVALUATION_CHECKPOINT_INTERVAL: usize = 8;
 
 type ReachabilityCacheEntries = RefCell<Vec<Option<Truthiness>>>;
+type PredicateCacheEntries = RefCell<FxHashMap<(usize, ScopedPredicateId), Truthiness>>;
 fn predicate_scope<'db>(db: &'db dyn Db, predicate: &Predicate<'db>) -> ScopeId<'db> {
     match predicate.node {
         PredicateNode::Expression(expression)
@@ -2185,7 +2186,8 @@ pub(crate) struct ReachabilityEvaluationCache<'db> {
     primary_constraints: usize,
     primary_entries: ReachabilityCacheEntries,
     other_entries: RefCell<FxHashMap<(usize, ScopedReachabilityConstraintId), Truthiness>>,
-    predicate_entries: RefCell<FxHashMap<(usize, ScopedPredicateId), Truthiness>>,
+    // Allocate this separately so regions that never evaluate a predicate keep a small cache object.
+    predicate_entries: OnceCell<Box<PredicateCacheEntries>>,
 }
 
 impl<'db> ReachabilityEvaluationCache<'db> {
@@ -2203,7 +2205,7 @@ impl<'db> ReachabilityEvaluationCache<'db> {
             primary_constraints: std::ptr::from_ref(primary_constraints).addr(),
             primary_entries: RefCell::new(Vec::new()),
             other_entries: RefCell::new(FxHashMap::default()),
-            predicate_entries: RefCell::new(FxHashMap::default()),
+            predicate_entries: OnceCell::new(),
         }
     }
 
@@ -2218,11 +2220,14 @@ impl<'db> ReachabilityEvaluationCache<'db> {
     ) -> Truthiness {
         debug_assert_eq!(env.program(db), self.primary_scope.program(db));
         let key = (predicates.raw.as_ptr().addr(), id);
-        if let Some(result) = self.predicate_entries.borrow().get(&key).copied() {
+        let entries = self
+            .predicate_entries
+            .get_or_init(|| Box::new(RefCell::new(FxHashMap::default())));
+        if let Some(result) = entries.borrow().get(&key).copied() {
             return result;
         }
         let result = analyze_single(db, env, &predicates[id]);
-        self.predicate_entries.borrow_mut().insert(key, result);
+        entries.borrow_mut().insert(key, result);
         result
     }
 
