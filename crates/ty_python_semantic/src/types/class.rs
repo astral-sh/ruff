@@ -36,6 +36,7 @@ use crate::types::generics::{GenericContext, Specialization, walk_specialization
 use crate::types::infer::infer_definition_types;
 use crate::types::known_instance::DeprecatedInstance;
 use crate::types::member::Member;
+use crate::types::mro::{Mro, StaticMroError};
 use crate::types::relation::{
     DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
 };
@@ -521,6 +522,29 @@ impl<'db> VarianceInferable<'db> for GenericAlias<'db> {
 
 #[salsa::tracked]
 impl<'db> GenericAlias<'db> {
+    /// Resolve the MRO with this alias's type arguments applied to its base classes.
+    #[salsa::tracked(
+        returns(as_ref),
+        cycle_initial=|db, _, alias: GenericAlias<'db>| {
+            let origin = alias.origin(db);
+            let env = ProgramEnvironment::from_scope(origin.body_scope(db));
+            Err(StaticMroError::cycle(
+                db,
+                &env,
+                origin.apply_optional_specialization(db, Some(alias.specialization(db))),
+            ))
+        },
+        heap_size=ruff_memory_usage::heap_size
+    )]
+    pub(in crate::types) fn try_mro(
+        self,
+        db: &'db dyn Db,
+    ) -> Result<Mro<'db>, StaticMroError<'db>> {
+        let origin = self.origin(db);
+        tracing::trace!("GenericAlias::try_mro: {}", origin.name(db));
+        Mro::of_static_class(db, origin, Some(self.specialization(db)))
+    }
+
     /// Compose each type argument's variance with its formal parameter's variance. Inferred
     /// parameters refer to the unspecialized class equation, keeping references such as
     /// `P[list[T]]` finite without expanding specialized class bodies.
