@@ -5550,6 +5550,17 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         }
                     }
 
+                    // An augmented single-element assignment on the collection object. Slices
+                    // produce another collection and require a separate constraint model.
+                    ruff_python_ast::Stmt::AugAssign(ast::StmtAugAssign { target, .. }) => {
+                        matches!(
+                            target.as_ref(),
+                            ast::Expr::Subscript(ast::ExprSubscript { value, slice, .. })
+                                if !matches!(slice.as_ref(), ast::Expr::Slice(_))
+                                    && ExpressionNodeKey::from(value) == *use_expression
+                        )
+                    }
+
                     // An annotated assignment assigning the collection object to a new binding.
                     ruff_python_ast::Stmt::AnnAssign(_) => true,
 
