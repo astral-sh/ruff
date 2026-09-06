@@ -30,9 +30,8 @@ use ty_python_core::expression::Expression;
 use ty_python_core::frozen::FrozenMap;
 use ty_python_core::place::{PlaceExpr, PlaceTable, ScopedPlaceId};
 use ty_python_core::predicate::{
-    CallableAndCallExpr, ClassPatternPredicateKind, MappingPatternPredicateKind, PatternPredicate,
-    PatternPredicateKind, Predicate, PredicateNode, SequencePatternPredicateKind,
-    SubjectElementPatternPredicate,
+    ClassPatternPredicateKind, MappingPatternPredicateKind, PatternPredicate, PatternPredicateKind,
+    Predicate, PredicateNode, SequencePatternPredicateKind, SubjectElementPatternPredicate,
 };
 use ty_python_core::scope::ScopeId;
 use ty_python_core::symbol::Symbol;
@@ -3411,9 +3410,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             PredicateNode::SubjectElementPattern(subject_element) => {
                 subject_element.pattern.scope(db)
             }
-            PredicateNode::IsNonTerminalCall(CallableAndCallExpr { callable, .. }) => {
-                callable.scope(db)
-            }
+            PredicateNode::IsNonTerminalCall(call) => call.callable(db).scope(db),
             PredicateNode::IsNonEmptyIterable(expression) => expression.scope(db),
             PredicateNode::StarImportPlaceholder(definition) => definition.scope(db),
         }
