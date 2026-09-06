@@ -2501,6 +2501,25 @@ impl<'db> UseDefMapBuilder<'db> {
         self.record_reachability_constraint_impl(reachability_constraint, narrowing_constraint);
     }
 
+    /// Like a statement call, evaluating a test can terminate execution without changing any
+    /// bindings. Its completion gate does not expose additional bindings to an exception handler
+    /// until control flow restores or merges another path.
+    pub(super) fn record_expression_completion_constraint(
+        &mut self,
+        reachability_constraint: ScopedReachabilityConstraintId,
+    ) {
+        if reachability_constraint == ScopedReachabilityConstraintId::ALWAYS_TRUE {
+            return;
+        }
+        let narrowing_constraint = if self.reachability_narrowing_enabled {
+            self.reachability_constraints
+                .narrowing_gate(reachability_constraint, &mut self.narrowing_constraints)
+        } else {
+            ScopedNarrowingConstraint::ALWAYS_TRUE
+        };
+        self.record_non_terminal_call_constraints(reachability_constraint, narrowing_constraint);
+    }
+
     fn record_reachability_constraint_impl(
         &mut self,
         reachability_constraint: ScopedReachabilityConstraintId,

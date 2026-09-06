@@ -1368,17 +1368,17 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 let merged = self.flow_snapshot();
                 self.flow_restore(snapshots.truthy);
                 self.current_use_def_map_mut()
-                    .record_reachability_constraint(completion);
+                    .record_expression_completion_constraint(completion);
                 let truthy = self.flow_snapshot();
                 self.flow_restore(snapshots.falsy);
                 self.current_use_def_map_mut()
-                    .record_reachability_constraint(completion);
+                    .record_expression_completion_constraint(completion);
                 let falsy = self.flow_snapshot();
                 self.flow_restore(merged);
                 ConditionFlowSnapshots { truthy, falsy }
             });
         self.current_use_def_map_mut()
-            .record_reachability_constraint(completion);
+            .record_expression_completion_constraint(completion);
         if let Some(snapshots) = snapshots {
             ConditionFlowSnapshot::Branches(snapshots)
         } else {
