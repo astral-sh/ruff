@@ -1314,7 +1314,7 @@ impl<'db> Signature<'db> {
 
         match when.solutions(db, env, inferable) {
             Ok(Solutions::Unsatisfiable) => return None,
-            Ok(Solutions::Unconstrained) | Err(_) => {
+            Ok(Solutions::Unconstrained | Solutions::Unsupported) | Err(_) => {
                 return Some(CallableSignature::single(self.clone()));
             }
             // Each receiver path can leave a different type variable unconstrained. Preserve the
