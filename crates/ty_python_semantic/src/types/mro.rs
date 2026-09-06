@@ -719,10 +719,7 @@ impl DoubleEndedIterator for MroIterator<'_> {
 }
 
 #[derive(Debug, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
-pub(super) struct StaticMroError<'db> {
-    kind: StaticMroErrorKind<'db>,
-    fallback_mro: Mro<'db>,
-}
+pub(super) struct StaticMroError<'db>(Box<StaticMroErrorInner<'db>>);
 
 impl<'db> StaticMroError<'db> {
     /// Construct an MRO error of kind `InheritanceCycle`.
@@ -735,19 +732,26 @@ impl<'db> StaticMroError<'db> {
     }
 
     pub(super) fn is_cycle(&self) -> bool {
-        matches!(self.kind, StaticMroErrorKind::InheritanceCycle)
+        matches!(self.0.kind, StaticMroErrorKind::InheritanceCycle)
     }
 
     /// Return an [`StaticMroErrorKind`] variant describing why we could not resolve the MRO for this class.
     pub(super) fn reason(&self) -> &StaticMroErrorKind<'db> {
-        &self.kind
+        &self.0.kind
     }
 
     /// Return the fallback MRO we should infer for this class during type inference
     /// (since accurate resolution of its "true" MRO was impossible)
     fn fallback_mro(&self) -> &Mro<'db> {
-        &self.fallback_mro
+        &self.0.fallback_mro
     }
+}
+
+/// Failure details are boxed so successful cached MROs do not reserve space for them.
+#[derive(Debug, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+struct StaticMroErrorInner<'db> {
+    kind: StaticMroErrorKind<'db>,
+    fallback_mro: Mro<'db>,
 }
 
 /// Possible ways in which attempting to resolve the MRO of a statically-defined class might fail.
@@ -796,10 +800,10 @@ impl<'db> StaticMroErrorKind<'db> {
         env: &ProgramEnvironment<'db>,
         class: ClassType<'db>,
     ) -> StaticMroError<'db> {
-        StaticMroError {
+        StaticMroError(Box::new(StaticMroErrorInner {
             kind: self,
             fallback_mro: Mro::from_error(db, env, class),
-        }
+        }))
     }
 }
 
