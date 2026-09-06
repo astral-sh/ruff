@@ -89,6 +89,13 @@ struct Loop {
     continue_states: Vec<FlowSnapshot>,
 }
 
+/// A symbol snapshot that can gain bindings when an enclosing scope reassigns the symbol.
+struct LazySymbolSnapshot {
+    enclosing_scope: FileScopeId,
+    enclosing_symbol: ScopedSymbolId,
+    snapshot_id: ScopedEnclosingSnapshotId,
+}
+
 /// A narrowing alias: a variable whose RHS is a narrowing expression
 /// (e.g., `is_none = x is None`).
 #[derive(Clone, Debug)]
@@ -304,6 +311,11 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     annotations: Vec<NodeIndex>,
     /// Snapshots of enclosing-scope place states visible from nested scopes.
     enclosing_snapshots: FxHashMap<EnclosingSnapshotKey, ScopedEnclosingSnapshotId>,
+    /// Lazy snapshots grouped by the name whose reassignments can update them.
+    lazy_symbol_snapshots: FxHashMap<Name, SmallVec<[LazySymbolSnapshot; 1]>>,
+    /// Highest scope ID with a bound `nonlocal` declaration for each name. The final snapshot
+    /// sweep only needs to know whether such a scope exists at or after an enclosing scope.
+    last_nonlocal_binding_scopes: FxHashMap<Name, FileScopeId>,
     /// Errors collected by the `semantic_checker`.
     semantic_syntax_errors: RefCell<Vec<SemanticSyntaxError>>,
 
@@ -361,6 +373,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             annotations: Vec::new(),
 
             enclosing_snapshots: FxHashMap::default(),
+            lazy_symbol_snapshots: FxHashMap::default(),
+            last_nonlocal_binding_scopes: FxHashMap::default(),
 
             resolver_environment: file.resolver_environment(db),
             python_version: file.python_version(db),
@@ -788,6 +802,14 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     false,
                 );
                 self.enclosing_snapshots.insert(key, lazy_snapshot);
+                self.lazy_symbol_snapshots
+                    .entry(nested_symbol.name().clone())
+                    .or_default()
+                    .push(LazySymbolSnapshot {
+                        enclosing_scope: enclosing_scope_id,
+                        enclosing_symbol: enclosed_symbol_id,
+                        snapshot_id: lazy_snapshot,
+                    });
             }
         }
     }
@@ -826,69 +848,47 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         if !symbol.is_reassigned() {
             return;
         }
-        #[expect(
-            clippy::iter_over_hash_type,
-            reason = "each matching snapshot is updated independently"
-        )]
-        for (key, snapshot_id) in &self.enclosing_snapshots {
-            if let Some(enclosing_symbol) = key.enclosing_place.as_symbol() {
-                let name = self.place_tables[key.enclosing_scope]
-                    .symbol(enclosing_symbol)
-                    .name();
-                let is_reassignment_of_snapshotted_symbol = || {
-                    for (ancestor, _) in self.visible_ancestor_scopes(key.enclosing_scope) {
-                        if ancestor == current_scope {
-                            return true;
-                        }
-                        let ancestor_table = &self.place_tables[ancestor];
-                        // If there is a symbol binding in an ancestor scope,
-                        // then a reassignment in the current scope is not relevant to the snapshot.
-                        if ancestor_table
-                            .symbol_id(name)
-                            .is_some_and(|id| ancestor_table.symbol(id).is_bound())
-                        {
-                            return false;
-                        }
+        let Some(snapshots) = self.lazy_symbol_snapshots.get(symbol.name()) else {
+            return;
+        };
+        for snapshot in snapshots {
+            let is_reassignment_of_snapshotted_symbol = || {
+                for (ancestor, _) in self.visible_ancestor_scopes(snapshot.enclosing_scope) {
+                    if ancestor == current_scope {
+                        return true;
                     }
-                    false
-                };
-
-                if key.nested_laziness.is_lazy()
-                    && symbol.name() == name
-                    && is_reassignment_of_snapshotted_symbol()
-                {
-                    self.use_def_maps[key.enclosing_scope]
-                        .update_enclosing_snapshot(*snapshot_id, enclosing_symbol);
+                    let ancestor_table = &self.place_tables[ancestor];
+                    // If there is a symbol binding in an ancestor scope,
+                    // then a reassignment in the current scope is not relevant to the snapshot.
+                    if ancestor_table
+                        .symbol_id(symbol.name())
+                        .is_some_and(|id| ancestor_table.symbol(id).is_bound())
+                    {
+                        return false;
+                    }
                 }
+                false
+            };
+
+            if is_reassignment_of_snapshotted_symbol() {
+                self.use_def_maps[snapshot.enclosing_scope]
+                    .update_enclosing_snapshot(snapshot.snapshot_id, snapshot.enclosing_symbol);
             }
         }
     }
 
     fn sweep_nonlocal_lazy_snapshots(&mut self) {
         self.enclosing_snapshots.retain(|key, _| {
-            let place_table = &self.place_tables[key.enclosing_scope];
-
-            let is_bound_and_non_local = || -> bool {
-                let ScopedPlaceId::Symbol(symbol_id) = key.enclosing_place else {
-                    return false;
-                };
-
-                let symbol = place_table.symbol(symbol_id);
-                self.scopes
-                    .iter_enumerated()
-                    .skip_while(|(scope_id, _)| *scope_id != key.enclosing_scope)
-                    .any(|(scope_id, _)| {
-                        let other_scope_place_table = &self.place_tables[scope_id];
-                        let Some(symbol_id) = other_scope_place_table.symbol_id(symbol.name())
-                        else {
-                            return false;
-                        };
-                        let symbol = other_scope_place_table.symbol(symbol_id);
-                        symbol.is_nonlocal() && symbol.is_bound()
-                    })
+            if key.nested_laziness.is_eager() {
+                return true;
+            }
+            let ScopedPlaceId::Symbol(symbol_id) = key.enclosing_place else {
+                return true;
             };
-
-            key.nested_laziness.is_eager() || !is_bound_and_non_local()
+            let symbol = self.place_tables[key.enclosing_scope].symbol(symbol_id);
+            self.last_nonlocal_binding_scopes
+                .get(symbol.name())
+                .is_none_or(|scope| *scope < key.enclosing_scope)
         });
     }
 
@@ -1019,6 +1019,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
             // Add in any `global` and `nonlocal` declarations from this (non-module) scope.
             if symbol.is_global() || symbol.is_nonlocal() {
+                if symbol.is_nonlocal() && symbol.is_bound() {
+                    self.last_nonlocal_binding_scopes
+                        .entry(symbol.name().clone())
+                        .and_modify(|scope| *scope = (*scope).max(popped_scope_id))
+                        .or_insert(popped_scope_id);
+                }
                 let kind = if symbol.is_global() {
                     GlobalOrNonlocal::Global
                 } else {

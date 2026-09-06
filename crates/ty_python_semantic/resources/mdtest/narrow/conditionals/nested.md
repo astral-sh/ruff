@@ -399,6 +399,27 @@ def f():
         [reveal_type(l[0]) for _ in range(1)]  # revealed: str
 ```
 
+### Nonlocal writes in multiple enclosing scopes
+
+A `nonlocal` write invalidates narrowing for nested functions that read the variable. A separate
+`nonlocal` write to the same name in an outer function does not hide the inner write.
+
+```py
+def outer(x: str | None):
+    def middle():
+        nonlocal x
+        x = None
+
+        def inner(x: str | None):
+            def write():
+                nonlocal x
+                x = None
+
+            if x is not None:
+                def read():
+                    reveal_type(x)  # revealed: str | None
+```
+
 ### Narrowing constraints introduced in multiple scopes
 
 ```py
