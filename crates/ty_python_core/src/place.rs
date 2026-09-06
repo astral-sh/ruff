@@ -10,7 +10,7 @@ use ruff_db::parsed::ParsedModuleRef;
 use ruff_index::IndexVec;
 use ruff_python_ast as ast;
 use smallvec::SmallVec;
-use std::hash::Hash;
+use std::hash::{Hash, Hasher};
 use std::iter::FusedIterator;
 
 /// Return the expressions whose existing bindings a match pattern can narrow.
@@ -187,6 +187,30 @@ pub enum ScopedPlaceId {
 pub struct PlaceTable {
     symbols: SymbolTable,
     members: MemberTable,
+}
+
+impl Hash for PlaceTable {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        // The reverse-lookup indexes are also ignored by equality.
+        self.symbols.iter().len().hash(state);
+        for symbol in self.symbols.iter() {
+            symbol.name().hash(state);
+            symbol.is_used().hash(state);
+            symbol.is_bound().hash(state);
+            symbol.is_declared().hash(state);
+            symbol.is_global().hash(state);
+            symbol.is_nonlocal().hash(state);
+            symbol.is_reassigned().hash(state);
+            symbol.is_parameter().hash(state);
+        }
+        self.members.iter().len().hash(state);
+        for member in self.members.iter() {
+            member.expression().as_ref().hash(state);
+            member.is_bound().hash(state);
+            member.is_declared().hash(state);
+            member.is_instance_attribute().hash(state);
+        }
+    }
 }
 
 impl PlaceTable {
