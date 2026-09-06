@@ -3,14 +3,13 @@
 A common error in Python is to accidentally test truthiness of the wrong object: for example
 `if func:` (which is always true) where `if func():` was intended, or `if coroutine():` where
 `if await coroutine():` was intended. By default, ty alerts the user to these errors with the error
-code `redundant-condition`, but only if the inferred type of the object is not assignable to `int`
-and has fixed truthiness. This heuristic catches the `if func` and `if coroutine()` cases, while
-avoiding false positives on cases such as `if DEBUG:` where `DEBUG = 0` or `DEBUG = False` is a
-constant.
+code `redundant-condition`, but only if the inferred type of the object is not assignable to `int`.
+The condition's truthiness can be fixed by its inferred type or by short-circuit evaluation. This
+heuristic catches the `if func` and `if coroutine()` cases, while avoiding false positives on cases
+such as `if DEBUG:` where `DEBUG = 0` or `DEBUG = False` is a constant.
 
-The remaining cases -- where the inferred type is assignable to `int`, or only short-circuit
-evaluation makes the condition's truthiness fixed -- are covered by a separate, stricter rule
-(`redundant-condition-strict`).
+The remaining cases -- where the inferred type is assignable to `int`, or the condition contains a
+walrus expression -- are covered by a separate, stricter rule (`redundant-condition-strict`).
 
 ```toml
 [environment]
@@ -802,6 +801,11 @@ note: This is an unsafe fix and may change runtime behavior
 
 ## Chained comparison conditions
 
+```toml
+[rules]
+redundant-condition-strict = "ignore"
+```
+
 A comparison chain used directly as a condition is always false if any comparison is always false,
 even when an earlier comparison returns an object with mutable truthiness. The condition below
 always fails because `1 < 0` is false.
@@ -815,7 +819,7 @@ def direct_condition(value: Comparable):
     reveal_type(bool(value < 1 < 0))  # revealed: bool
 
     # Short-circuiting makes the direct condition always false, despite the standalone types above.
-    if value < 1 < 0:  # error: [redundant-condition-strict]
+    if value < 1 < 0:  # error: [redundant-condition]
         pass
 
 def negated_condition(value: Comparable):
@@ -823,7 +827,7 @@ def negated_condition(value: Comparable):
     reveal_type(bool(not (value < 1 < 0)))  # revealed: bool
 
     # Short-circuiting makes the direct condition always true, despite the standalone types above.
-    if not (value < 1 < 0):  # error: [redundant-condition-strict]
+    if not (value < 1 < 0):  # error: [redundant-condition] "Condition `value < 1 < 0` is always false"
         pass
 ```
 
@@ -833,9 +837,9 @@ be inferred separately from the surrounding suite.
 
 ```py
 def lambda_conditions(value: Comparable):
-    if (lambda: value)() < 1 < 0:  # error: [redundant-condition-strict] "is always false"
+    if (lambda: value)() < 1 < 0:  # error: [redundant-condition] "is always false"
         pass
-    while (lambda: value)() < 1 < 0:  # error: [redundant-condition-strict] "is always false"
+    while (lambda: value)() < 1 < 0:  # error: [redundant-condition] "is always false"
         pass
 ```
 
@@ -847,18 +851,17 @@ def consume(value: bool) -> bool:
     return value
 
 def walrus_condition(value: Comparable):
-    # error: [redundant-condition-strict] "Condition `value < 1 < 0` is always false"
+    # error: [redundant-condition] "Condition `value < 1 < 0` is always false"
     if consume(saved := True if value < 1 < 0 else False):
         pass
 ```
 
-An always-false condition is exempt when its body raises an exception, since this can be a
-deliberate defensive check. This exemption also applies when the condition is always false because
-of short-circuit evaluation.
+The comparison chain is reported even when its body raises an exception. The literal comparison
+`1 < 0` prevents this branch from ever being taken, so it cannot serve as a defensive check.
 
 ```py
 def defensive_condition(value: Comparable):
-    if value < 1 < 0:  # no diagnostic
+    if value < 1 < 0:  # error: [redundant-condition]
         raise ValueError
 ```
 
@@ -935,7 +938,7 @@ if `value` has mutable truthiness, `value or True` short-circuits directly to th
 
 ```py
 def conditional_expression(value: object, flag: bool):
-    # error: [redundant-condition-strict]
+    # error: [redundant-condition] "Condition `value or True` is always true"
     while True if flag else (value or True):
         break
 ```
@@ -2292,9 +2295,8 @@ def negated_integer_return(value: Literal[1, 2]) -> bool:
     return not value  # error: [redundant-condition-strict] "Object of type `Literal[1, 2]` is always truthy"
 ```
 
-When the strict rule is needed because of a test's type or short-circuit behavior, we report the
-complete compound condition instead of its operands. Only a single diagnostic is emitted on each of
-these:
+When the strict rule is needed because of a test's boolean or integer type, we report the complete
+compound condition instead of its operands. Only a single diagnostic is emitted on each of these:
 
 ```py
 def compound_truthy(x: str):
@@ -2380,9 +2382,9 @@ not guarantee that truthiness:
 
 ```py
 def short_circuit_operands(value: object, enabled: bool):
-    if enabled and (value or True):  # error: [redundant-condition-strict] "Condition `value or True` is always true"
+    if enabled and (value or True):  # error: [redundant-condition] "Condition `value or True` is always true"
         pass
-    if enabled or (value and False):  # error: [redundant-condition-strict] "Condition `value and False` is always false"
+    if enabled or (value and False):  # error: [redundant-condition] "Condition `value and False` is always false"
         pass
 ```
 
@@ -2413,7 +2415,7 @@ def mixed_operands(value: object):
         pass
 ```
 
-When neither operand is reported, the strict rule can report a fixed outcome established by
+When neither operand is reported, the ordinary rule can report a fixed outcome established by
 short-circuit evaluation, even if the expression's value type has ambiguous truthiness.
 
 ```py
@@ -2422,8 +2424,18 @@ def short_circuit(value: object):
     reveal_type(bool(value and False))  # revealed: bool
 
     # Short-circuiting means this body is never reached, despite the standalone types above.
-    if value and False:  # error: [redundant-condition-strict] "Condition `value and False` is always false"
+    if value and False:  # error: [redundant-condition] "Condition `value and False` is always false"
         pass
+```
+
+A walrus expression still selects the strict rule, even when short-circuit evaluation fixes the
+condition's truthiness:
+
+```py
+def short_circuit_assignment(value: object):
+    if (saved := value) and False:  # error: [redundant-condition-strict]
+        pass
+    assert (saved := value) or True  # error: [redundant-condition-strict]
 ```
 
 ## Boolean tests inside value expressions
@@ -3577,10 +3589,10 @@ assert None  # no diagnostic
 ## Defensive assertions
 
 Assertion tests and their subexpressions are exempt from both rules when their inferred value type
-is a subtype of `bool` or `int`, or when their truthiness is fixed only by short-circuit evaluation.
-Other always-truthy or always-falsy values remain eligible for the ordinary rule, or the strict rule
-if they contain a walrus expression. These exemptions avoid false positives on defensive assertions
-such as the following, which are common in well written Python code:
+is a subtype of `bool` or `int`. Other always-truthy or always-falsy values remain eligible for the
+ordinary rule, or the strict rule if they contain a walrus expression. These exemptions avoid false
+positives on defensive assertions such as the following, which are common in well written Python
+code:
 
 ```py
 def f(x: str, y: str | int, z: str | int | bytes):
@@ -3605,8 +3617,8 @@ def assertion_boundaries(x: str, flag: bool):
     assert flag, isinstance(x, str) and flag
 ```
 
-Boolean and short-circuit operands within assertions remain exempt when the complete assertion has
-unknown truthiness. This includes boolean tests nested inside call arguments:
+Boolean operands within assertions remain exempt when the complete assertion has unknown truthiness.
+This includes boolean tests nested inside call arguments:
 
 ```py
 def accepts(value: bool) -> bool:
@@ -3618,20 +3630,21 @@ def ambiguous_boolean_and(value: int, flag: bool):
 def ambiguous_boolean_or(value: int, flag: bool):
     assert flag or value is None  # no diagnostic
 
-def ambiguous_short_circuit(other: object, flag: bool):
-    assert flag and (other or True)  # no diagnostic
-
 def nested_boolean_assertion(value: int, flag: bool):
     assert flag and accepts(not (value is None))  # no diagnostic
 ```
 
-Short-circuit conditions remain exempt when they are the complete assertion, whether they always
-succeed or always fail:
+Short-circuit evaluation can make an assertion or one of its operands redundant even when its
+inferred value type has ambiguous truthiness. These conditions are reported by the ordinary rule,
+whether they always succeed or always fail:
 
 ```py
+def ambiguous_short_circuit(other: object, flag: bool):
+    assert flag and (other or True)  # error: [redundant-condition]
+
 def short_circuit_assertion(value: object):
-    assert value or True  # no diagnostic
-    assert value and False  # no diagnostic
+    assert value or True  # error: [redundant-condition]
+    assert value and False  # error: [redundant-condition]
 ```
 
 The strict rule can still fire in assertion tests that use a walrus expression when their inferred

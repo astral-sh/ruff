@@ -11,9 +11,6 @@ This rule reports redundant conditions that meet any of these criteria:
 
 - The boolean test is inferred as evaluating to `True` itself, `False` itself, or an exact integer
     such as `1` or `0`.
-- Short-circuit evaluation means the condition can be guaranteed to be always truthy or always falsy
-    despite fixed truthiness not being guaranteed by the inferred type of the expression's value
-    (see "Short-circuiting boolean conditions" below for an example).
 - The condition uses a walrus operator (`:=`). The assignment's side effect may be intentional, even
     when its result has fixed truthiness.
 
@@ -47,54 +44,6 @@ Comparing one of those values with a string will therefore always evaluate to `F
 def trace(**kwargs: dict[str, str]) -> None:
     if kwargs.get("operation") == "task":  # error: [redundant-condition-strict]
         print("Tracing task")
-```
-
-## Short-circuiting boolean conditions
-
-In some situations, ty can know that a condition will always be true, or it can know that a
-condition will always be false, even when this is not guaranteed by the inferred type of that
-condition. This is because of the way that Python short-circuits evaluation of conditions in the
-context of `if` tests, `while` tests and `assert` statements.
-
-Consider a class whose comparison method has an `object` return type:
-
-```py
-from typing_extensions import reveal_type
-
-
-class Comparable:
-    def __lt__(self, other: int) -> object: ...
-
-
-def check(value: Comparable):
-    reveal_type(value < 1 < 0)  # revealed: ~AlwaysTruthy
-
-    if value < 1 < 0:  # error: [redundant-condition-strict] "always false"
-        pass
-```
-
-Outside the context of an `if` test, the revealed type of the condition here is `~AlwaysTruthy`: in
-other words, ty knows that this expression is not *always true*, but cannot guarantee that it is
-definitely *always false*. It could be an object that is sometimes true and sometimes false -- for
-example, a `list` (which is falsy when it is empty, and truthy otherwise).
-
-Nonetheless, when `value < 1 < 0` is used directly as a condition, ty knows that the condition will
-always be falsy and the `if` branch will never be taken. Python tests the truthiness of the object
-returned by `Comparable.__lt__` once: if it is falsy, the condition fails immediately. If it is
-truthy, Python evaluates `1 < 0`, which is false. There is no second truthiness test of the object
-returned by `__lt__`.
-
-If the chained comparison is saved as a variable first, its value can be the object returned by
-`__lt__`, if that object was falsy when first tested. The `if result` statement then tests that
-object's truthiness again. A user-defined `__bool__` method can return a different result on that
-second call, so ty cannot guarantee that the saved value is still falsy, and no diagnostic is
-emitted:
-
-```py
-def check_saved(value: Comparable):
-    result = value < 1 < 0
-    if result:  # no diagnostic
-        pass
 ```
 
 ## Exemptions

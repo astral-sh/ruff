@@ -65,15 +65,14 @@ pub(super) enum RedundantConditionContext {
 
     /// A test within an assertion, including the complete assertion and tests in call arguments.
     ///
-    /// Tests classified as [`ConditionKind::Boolean`] or [`ConditionKind::ShortCircuit`] are exempt.
+    /// Tests classified as [`ConditionKind::Boolean`] are exempt.
     /// Other always-truthy or always-falsy values remain eligible for `redundant-condition`, or
     /// `redundant-condition-strict` if classified as [`ConditionKind::ContainsWalrus`].
     ///
     /// ```python
-    /// def check(value: int, other: object, flag: bool):
+    /// def check(value: int, flag: bool):
     ///     assert isinstance(value, int)  # Defensive runtime check; exempt.
-    ///     assert flag and (other or True)  # No diagnostic on `other or True`.
-    ///     assert other or True  # Short-circuit assertion; exempt.
+    ///     assert flag and value is not None  # No diagnostic on `value is not None`.
     /// ```
     ///
     /// An uncalled function in `assert not ready` is still reported: the function itself is an
@@ -86,7 +85,7 @@ pub(super) enum RedundantConditionContext {
     /// We call that rejection a "defensive exit". For example, a function might raise `TypeError`
     /// if its argument has the wrong type. Type annotations do not enforce this at runtime, so
     /// the check can still be useful when the function is called from untyped code. We therefore
-    /// exempt conditions in [`ConditionKind::Boolean`] and [`ConditionKind::ShortCircuit`] when
+    /// exempt conditions in [`ConditionKind::Boolean`] when
     /// their fixed truthiness rules out taking a defensive branch.
     ///
     /// ```python
@@ -176,20 +175,12 @@ impl RedundantConditionContext {
         condition: &RedundantCondition<'_, '_>,
     ) -> bool {
         let defensive = match self {
-            Self::Assertion => matches!(
-                &condition.kind,
-                ConditionKind::Boolean | ConditionKind::ShortCircuit
-            ),
+            Self::Assertion => condition.kind == ConditionKind::Boolean,
             Self::DefensiveExit {
                 truthy_branch,
                 falsy_branch,
             } => {
-                let is_boolean_or_short_circuit = matches!(
-                    &condition.kind,
-                    ConditionKind::Boolean | ConditionKind::ShortCircuit
-                );
-
-                is_boolean_or_short_circuit
+                condition.kind == ConditionKind::Boolean
                     && if condition.is_truthy {
                         falsy_branch
                     } else {
