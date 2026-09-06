@@ -1824,6 +1824,40 @@ fn analyze_non_empty_iterable(db: &dyn Db, iterable: Expression) -> Truthiness {
     }
 }
 
+/// Cache the whole predicate so repeated reachability walks can reuse one query result
+/// instead of looking up the expression's type and suppression behavior separately.
+/// Separate sync and async queries use the expression directly as their Salsa key.
+#[salsa::tracked(
+    returns(copy),
+    cycle_initial = |_, _, _| false,
+    heap_size = get_size2::GetSize::get_heap_size
+)]
+fn sync_context_manager_suppresses<'db>(db: &'db dyn Db, expression: Expression<'db>) -> bool {
+    context_manager_suppresses(db, expression, false)
+}
+
+#[salsa::tracked(
+    returns(copy),
+    cycle_initial = |_, _, _| false,
+    heap_size = get_size2::GetSize::get_heap_size
+)]
+fn async_context_manager_suppresses<'db>(db: &'db dyn Db, expression: Expression<'db>) -> bool {
+    context_manager_suppresses(db, expression, true)
+}
+
+fn context_manager_suppresses<'db>(
+    db: &'db dyn Db,
+    expression: Expression<'db>,
+    is_async: bool,
+) -> bool {
+    let env = ProgramEnvironment::from_scope(expression.scope(db));
+    infer_same_file_expression_type(db, expression, TypeContext::default()).can_suppress_exceptions(
+        db,
+        &env,
+        EvaluationMode::from_is_async(is_async),
+    )
+}
+
 /// Evaluate a condition without re-testing intermediate short-circuit results.
 ///
 /// `None` means evaluation cannot produce a result, as for an operand narrowed to `Never`.
@@ -1930,10 +1964,11 @@ fn analyze_single(db: &dyn Db, env: &ProgramEnvironment<'_>, predicate: &Predica
         PredicateNode::ContextManagerSuppresses {
             expression,
             is_async,
-        } => Truthiness::from(
-            infer_same_file_expression_type(db, expression, TypeContext::default())
-                .can_suppress_exceptions(db, env, EvaluationMode::from_is_async(is_async)),
-        )
+        } => Truthiness::from(if is_async {
+            async_context_manager_suppresses(db, expression)
+        } else {
+            sync_context_manager_suppresses(db, expression)
+        })
         .negate_if(!predicate.is_positive),
         PredicateNode::FinallyNormalPathImpossible {
             scope,
