@@ -2080,8 +2080,9 @@ fn builtin_call_has_inhabited_result<'db>(
     let callable = implicit_builtins_symbol(db, &env, name)
         .place
         .ignore_possibly_undefined();
-    // These builtins keep an inhabited return type when argument inference refines it.
-    // Check annotations as well so replacement stubs retain their semantics.
+    // Inference can specialize these known functions without making their return types
+    // uninhabited. Other recognized builtins use their signatures directly. Check annotations
+    // as well so replacement stubs retain their semantics.
     match callable {
         Some(Type::ClassLiteral(class)) => class.is_known(db, KnownClass::Bool),
         Some(Type::FunctionLiteral(function))
@@ -2093,7 +2094,11 @@ fn builtin_call_has_inhabited_result<'db>(
                         | KnownFunction::IsSubclass
                         | KnownFunction::HasAttr
                 )
-            ) =>
+            ) || (matches!(
+                builtin,
+                BuiltinCallKind::Any | BuiltinCallKind::All | BuiltinCallKind::Callable
+            ) && function.known(db).is_none()
+                && function.name(db).as_str() == name) =>
         {
             let overloads = &function.signature(db).overloads;
             !overloads.is_empty()

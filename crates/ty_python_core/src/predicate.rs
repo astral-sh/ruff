@@ -110,6 +110,9 @@ pub enum BuiltinCallKind {
     IsInstance,
     IsSubclass,
     HasAttr,
+    Any,
+    All,
+    Callable,
 }
 
 impl BuiltinCallKind {
@@ -120,6 +123,9 @@ impl BuiltinCallKind {
             "isinstance" => Some(Self::IsInstance),
             "issubclass" => Some(Self::IsSubclass),
             "hasattr" => Some(Self::HasAttr),
+            "any" => Some(Self::Any),
+            "all" => Some(Self::All),
+            "callable" => Some(Self::Callable),
             _ => None,
         }
     }
@@ -131,6 +137,9 @@ impl BuiltinCallKind {
             Self::IsInstance => "isinstance",
             Self::IsSubclass => "issubclass",
             Self::HasAttr => "hasattr",
+            Self::Any => "any",
+            Self::All => "all",
+            Self::Callable => "callable",
         }
     }
 }
