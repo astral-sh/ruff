@@ -124,6 +124,19 @@ def do_something(coinflip: bool):
 Unlike `and` and `or`, however, `not` explicitly converts its operand to a boolean, so the rule
 checks `not` expressions in every context.
 
+Both redundant-condition rules exempt calls returning `None` in conditional expressions,
+comprehension filters, and standalone `not` expressions, provided these expressions are not nested
+inside an outer boolean test. Such calls are often used for their side effects. This includes calls
+containing walrus arguments that would otherwise be reported by this rule:
+
+```py
+def record(value: int) -> None: ...
+
+
+selected = 1 if record(value := 1) else 2
+negated = not record(value := 2)
+```
+
 Another exemption applied by this rule concerns `assert`-statement tests. A common pattern in Python
 code is to use defensive `assert`s to enforce behaviour at runtime, even when the asserted condition
 can be inferred statically to be always true. For example:

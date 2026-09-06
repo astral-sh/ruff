@@ -1,4 +1,4 @@
-//! Redundant-condition exemptions for assertions, environment guards, and defensive exits.
+//! Redundant-condition exemptions for assertions, calls, environment guards, and defensive exits.
 //!
 //! "Environment guards" select code for a particular Python version, platform, or type-checking
 //! context. For example, `if sys.version_info >= (3, 14)`, `if sys.platform == "win32"`,
@@ -48,7 +48,7 @@ use super::{ConditionKind, RedundantCondition};
 /// [`ConditionKind`] determines the rule that will be applied if the condition is not exempted.
 /// This context determines whether the test serves a purpose that makes reporting it undesirable.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(super) enum RedundantConditionContext {
+pub(in crate::types::infer::builder) enum RedundantConditionContext {
     /// A boolean test checked without the additional exemptions represented by the other variants.
     ///
     /// This includes ordinary `if` conditions. For example:
@@ -62,6 +62,19 @@ pub(super) enum RedundantConditionContext {
     /// The special cases for assertions and checks that reject unexpected input are described
     /// by [`Self::Assertion`] and [`Self::DefensiveExit`].
     Standalone,
+
+    /// A conditional expression, comprehension filter, or standalone `not` expression.
+    ///
+    /// Calls returning `None` can be used for their side effects in these contexts. For example,
+    /// `item in seen or seen.add(item)` in a comprehension filter records new items while
+    /// excluding them from the result. We exempt such calls from both rules, including calls
+    /// with walrus arguments that would otherwise be classified as [`ConditionKind::ContainsWalrus`].
+    ///
+    /// Boolean operands inherit this exemption. Tests nested inside another boolean test,
+    /// such as `record()` in `if flag if record() else other_flag:`, do not.
+    /// This also applies across scope boundaries: a comprehension filter is checked in its own
+    /// scope, but the comprehension can still be nested in an outer boolean test.
+    Expression,
 
     /// A test within an assertion, including the complete assertion and tests in call arguments.
     ///
@@ -175,7 +188,15 @@ impl RedundantConditionContext {
         builder: &TypeInferenceBuilder<'_, '_>,
         condition: &RedundantCondition<'_, '_>,
     ) -> bool {
-        let defensive = match self {
+        let exempt = match self {
+            Self::Expression => {
+                condition.expression.is_call_expr()
+                    && condition.value_type.is_none(builder.db())
+                    && !builder
+                        .index
+                        .scope(builder.scope().file_scope_id(builder.db()))
+                        .is_in_boolean_test()
+            }
             Self::Assertion => matches!(
                 &condition.kind,
                 ConditionKind::Boolean | ConditionKind::ShortCircuit
@@ -199,7 +220,7 @@ impl RedundantConditionContext {
             Self::Standalone => false,
         };
 
-        if defensive {
+        if exempt {
             return true;
         }
 
@@ -305,7 +326,7 @@ impl RedundantConditionContext {
         match self {
             // Assertions also exempt boolean tests embedded in calls or other value expressions.
             Self::Assertion => self,
-            Self::Standalone | Self::DefensiveExit { .. } => Self::Standalone,
+            Self::Standalone | Self::Expression | Self::DefensiveExit { .. } => Self::Standalone,
         }
     }
 }
