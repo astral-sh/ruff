@@ -47,9 +47,7 @@ match {0 for _ in [0] if value} and (lambda: value) and [lambda: value for _ in 
     case captured:
         match captured:
             case []:
-                def value() -> captured:
-                    pass
-
+                value: captured = None
 ```
 
 ## Function signature

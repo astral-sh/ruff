@@ -3742,6 +3742,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     | ast::Expr::SetComp(_)
                     | ast::Expr::DictComp(_)
             )
+            // Identity comparisons always produce a boolean, including within comparison chains.
+            || matches!(node, ast::Expr::Compare(compare)
+                if compare.ops.iter().all(|op| matches!(op, ast::CmpOp::Is | ast::CmpOp::IsNot)))
         {
             return ScopedReachabilityConstraintId::ALWAYS_TRUE;
         }
