@@ -1437,14 +1437,16 @@ mod uv_metadata {
     use std::{fs, process::Command};
 
     use insta_cmd::assert_cmd_snapshot;
+    use ruff_db::system::test_env_vars;
     use ty_static::EnvVars;
 
     use crate::CliTest;
     use crate::uv_workspace::{uv_sync_command, write_dependency_wheel};
 
     fn command_with_script_uv(case: &CliTest) -> Command {
-        let mut command = case.command_inheriting_environment();
+        let mut command = case.command();
         command
+            .envs(test_env_vars())
             .env(EnvVars::TY_UV, "1")
             .env(EnvVars::UV, "uv")
             .env("UV_CACHE_DIR", case.root().join("cache"));
@@ -1453,6 +1455,8 @@ mod uv_metadata {
 
     fn assert_uv_supports_script_metadata() -> anyhow::Result<()> {
         let output = Command::new("uv")
+            .env_clear()
+            .envs(test_env_vars())
             .args(["workspace", "metadata", "--help"])
             .output()?;
 
@@ -1809,6 +1813,8 @@ mod uv_metadata {
         // come from the separate environment that uv creates for the script.
         let environment = case.root().join(".venv");
         let output = Command::new("uv")
+            .env_clear()
+            .envs(test_env_vars())
             .args(["venv", "--no-project", "--python", "3.12"])
             .arg(&environment)
             .env("UV_CACHE_DIR", case.root().join("cache"))

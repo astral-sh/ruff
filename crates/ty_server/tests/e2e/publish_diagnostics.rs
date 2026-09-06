@@ -1008,6 +1008,8 @@ package = "invalid"
 
         server.write_file("src/pyproject.toml", manifest)?;
         let output = Command::new("uv")
+            .env_clear()
+            .envs(ruff_db::system::test_env_vars())
             .current_dir(server.file_path("src"))
             .args(["sync", "--offline"])
             .output()?;

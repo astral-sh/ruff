@@ -1248,6 +1248,8 @@ mod tests {
 
             fn sync_workspace(&self) -> anyhow::Result<()> {
                 let output = Command::new(self.db.test_system().env_var(EnvVars::UV)?)
+                    .env_clear()
+                    .envs(ruff_db::system::test_env_vars())
                     .current_dir(self.db.project().root(&self.db))
                     .args(["sync", "--offline"])
                     .output()?;
@@ -1277,6 +1279,8 @@ mod tests {
                     root.join("bin/python")
                 };
                 let output = Command::new(python.as_std_path())
+                    .env_clear()
+                    .envs(ruff_db::system::test_env_vars())
                     .args(["-c", &format!("import {module}")])
                     .output()?;
 

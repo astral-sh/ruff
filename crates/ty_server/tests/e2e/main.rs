@@ -1300,8 +1300,11 @@ impl TestServerBuilder {
 
     /// Enable uv integration using the uv executable on the test process's PATH.
     #[cfg(feature = "test-uv")]
-    pub(crate) fn with_real_uv(self, use_uv: UseUv) -> Result<Self> {
+    pub(crate) fn with_real_uv(mut self, use_uv: UseUv) -> Result<Self> {
         let uv = OsSystem::default().which("uv")?;
+        // uv searches HOME for managed installations and PATH for system interpreters.
+        self.env_vars
+            .retain(|(name, value)| value.is_some() || !matches!(name.as_str(), "HOME" | "PATH"));
         Ok(self.with_use_uv(use_uv).with_env_var("UV", uv.as_str()))
     }
 

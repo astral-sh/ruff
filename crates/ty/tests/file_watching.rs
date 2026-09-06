@@ -2893,6 +2893,8 @@ mod uv_metadata {
                 }
                 if use_uv == UseUv::On {
                     let output = Command::new(uv.as_std_path())
+                        .env_clear()
+                        .envs(ruff_db::system::test_env_vars())
                         .current_dir(context.project_path())
                         .args(["sync", "--offline"])
                         .output()?;

@@ -1,17 +1,41 @@
 use ruff_notebook::{Notebook, NotebookError};
 use rustc_hash::FxHashMap;
+use std::ffi::OsString;
 use std::panic::RefUnwindSafe;
+use std::process::Output;
 use std::sync::{Arc, Mutex};
 
 use crate::Db;
 use crate::files::File;
 use crate::system::{
-    CommandExecutor, DirectoryEntry, MemoryFileSystem, Metadata, Result, System, SystemPath,
-    SystemPathBuf, SystemVirtualPath, WhichError, WhichResult,
+    Command, CommandExecutor, DirectoryEntry, MemoryFileSystem, Metadata, Result, System,
+    SystemPath, SystemPathBuf, SystemVirtualPath, WhichError, WhichResult,
 };
 
 use super::WritableSystem;
 use super::walk_directory::WalkDirectoryBuilder;
+
+/// Host environment variables needed to locate executables, Python installations, and caches.
+///
+/// Use with [`std::process::Command::env_clear`] to keep settings such as `UV_LOCKED` and
+/// `PYTHONPATH` from affecting test subprocesses.
+pub fn test_env_vars() -> impl Iterator<Item = (&'static str, OsString)> {
+    [
+        "PATH",
+        "PATHEXT",
+        "SYSTEMROOT",
+        "HOME",
+        "USERPROFILE",
+        "XDG_DATA_HOME",
+        "TMPDIR",
+        "TEMP",
+        "TMP",
+        "UV_CACHE_DIR",
+        "UV_PYTHON_INSTALL_DIR",
+    ]
+    .into_iter()
+    .filter_map(|name| std::env::var_os(name).map(|value| (name, value)))
+}
 
 /// System implementation intended for testing.
 ///
@@ -141,7 +165,9 @@ impl System for TestSystem {
     }
 
     fn command_executor(&self) -> Option<&dyn CommandExecutor> {
-        self.system().command_executor()
+        self.system()
+            .command_executor()
+            .map(|_| self as &dyn CommandExecutor)
     }
 
     fn read_directory<'a>(
@@ -180,6 +206,30 @@ impl System for TestSystem {
     }
 
     fn dyn_clone(&self) -> Box<dyn System> {
+        Box::new(self.clone())
+    }
+}
+
+impl CommandExecutor for TestSystem {
+    fn execute(&self, mut command: Command) -> Result<Output> {
+        let mut environment: FxHashMap<OsString, OsString> = test_env_vars()
+            .map(|(name, value)| (name.into(), value))
+            .collect();
+        for (name, value) in self.env_overrides.lock().unwrap().iter() {
+            match value {
+                Some(value) => {
+                    environment.insert(name.into(), value.into());
+                }
+                None => {
+                    environment.remove(&OsString::from(name));
+                }
+            }
+        }
+        command.environment = Some(environment);
+        self.system().run_command(command)
+    }
+
+    fn dyn_clone(&self) -> Box<dyn CommandExecutor> {
         Box::new(self.clone())
     }
 }
