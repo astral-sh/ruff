@@ -33,9 +33,11 @@
 //! `A OR (NOT A AND B)` simplifies to `A OR B`.
 
 use std::cmp::Ordering;
+use std::hash::BuildHasher;
 
+use hashbrown::hash_table::Entry;
 use ruff_index::{Idx, IndexVec};
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxBuildHasher, FxHashMap};
 
 use crate::ast_ids::ScopedUseId;
 use crate::predicate::ScopedPredicateId;
@@ -128,11 +130,12 @@ impl NarrowingConstraints {
     }
 }
 
-#[derive(Debug, Default, PartialEq, Eq)]
+#[derive(Debug, Default)]
 pub struct NarrowingConstraintsBuilder {
     interiors: IndexVec<ScopedNarrowingConstraint, InteriorNode>,
     interior_used: RankBitBoxVec,
-    interior_cache: FxHashMap<InteriorNode, ScopedNarrowingConstraint>,
+    // Nodes are already stored in `interiors`; keep only their IDs in the reverse table.
+    interior_cache: hashbrown::HashTable<ScopedNarrowingConstraint>,
     and_cache: FxHashMap<
         (ScopedNarrowingConstraint, ScopedNarrowingConstraint),
         ScopedNarrowingConstraint,
@@ -228,10 +231,20 @@ impl NarrowingConstraintsBuilder {
             });
         }
 
-        *self.interior_cache.entry(node).or_insert_with(|| {
-            self.interior_used.push(false);
-            self.interiors.push(node)
-        })
+        let interiors = &mut self.interiors;
+        match self.interior_cache.entry(
+            FxBuildHasher.hash_one(node),
+            |id| interiors[*id] == node,
+            |id| FxBuildHasher.hash_one(interiors[*id]),
+        ) {
+            Entry::Occupied(entry) => *entry.get(),
+            Entry::Vacant(entry) => {
+                self.interior_used.push(false);
+                let id = interiors.push(node);
+                entry.insert(id);
+                id
+            }
+        }
     }
 
     pub(crate) fn add_atom(&mut self, predicate: ScopedPredicateId) -> ScopedNarrowingConstraint {
@@ -280,7 +293,12 @@ impl NarrowingConstraintsBuilder {
             if_uncertain: ALWAYS_FALSE,
             if_false,
         };
-        if let Some(cached) = self.interior_cache.get(&node) {
+        if let Some(cached) = self
+            .interior_cache
+            .find(FxBuildHasher.hash_one(node), |id| {
+                self.interiors[*id] == node
+            })
+        {
             return *cached;
         }
         if self.interiors.len() >= MAX_INTERIOR_NODES {
