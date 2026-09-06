@@ -545,6 +545,8 @@ const COMPLETION_PREDICATE_PREFIX_THRESHOLD: usize = 256;
 const REACHABILITY_EVALUATION_CHUNK_SIZE: usize = 256;
 const CONTROL_FLOW_REACHABILITY_CHECKPOINT_INTERVAL: usize = 16;
 const NARROWING_EVALUATION_CHECKPOINT_INTERVAL: usize = 8;
+const SMALL_SCOPE_NARROWING_CHECKPOINT_INTERVAL: usize = 16;
+const SMALL_SCOPE_NARROWING_PREDICATE_THRESHOLD: usize = 256;
 
 type ReachabilityCacheEntries = RefCell<Vec<Option<Truthiness>>>;
 fn predicate_scope<'db>(db: &'db dyn Db, predicate: &Predicate<'db>) -> ScopeId<'db> {
@@ -1393,6 +1395,9 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
             FinishPredicate(Id),
         }
         let db = self.db;
+        // Smaller scopes need fewer checkpoints to bound repeated work. Avoid allocating
+        // a Salsa query for every short suffix while retaining denser reuse in large scopes.
+        let small_scope = self.predicates.len() <= SMALL_SCOPE_NARROWING_PREDICATE_THRESHOLD;
 
         let mut actions = SmallVec::<[Action; 8]>::new();
         actions.push(Action::Visit(root));
@@ -1407,14 +1412,18 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                     let node = self.constraints.get_interior_node(id);
                     let predicate = self.predicates[node.atom];
                     let index = node.atom.index();
-                    let checkpoint_position =
-                        index ^ (index / NARROWING_EVALUATION_CHECKPOINT_INTERVAL);
+                    let at_checkpoint = if small_scope {
+                        let position = index ^ (index / SMALL_SCOPE_NARROWING_CHECKPOINT_INTERVAL);
+                        (position + 1).is_multiple_of(SMALL_SCOPE_NARROWING_CHECKPOINT_INTERVAL)
+                    } else {
+                        let position = index ^ (index / NARROWING_EVALUATION_CHECKPOINT_INTERVAL);
+                        (position + 1).is_multiple_of(NARROWING_EVALUATION_CHECKPOINT_INTERVAL)
+                    };
                     // Completion gates can depend on earlier narrowed uses without narrowing
                     // this place themselves. Checkpoints keep those inference dependencies from
                     // being copied into every later expression in a long chain.
                     if (id != root || use_root_checkpoint)
-                        && (checkpoint_position + 1)
-                            .is_multiple_of(NARROWING_EVALUATION_CHECKPOINT_INTERVAL)
+                        && at_checkpoint
                         && (self
                             .predicate_narrowing_targets
                             .contains(node.atom, self.place)
@@ -2324,6 +2333,7 @@ impl<'db> DeclarationsIteratorExtension<'db> for DeclarationsIterator<'_, 'db> {
 mod tests {
     use super::*;
     use crate::db::tests::setup_db;
+    use crate::types::infer_scope_types;
     use ruff_db::files::system_path_to_file;
     use ruff_db::system::DbWithWritableSystem as _;
     use ty_python_core::ProgramFile;
@@ -2331,20 +2341,40 @@ mod tests {
     use ty_python_core::predicate::Predicates;
     use ty_python_core::semantic_index;
 
-    /// A cached completion range returns without panicking when each class's `target` attribute
-    /// depends on the other class's `setup` method. This forces a Salsa cycle across files while
-    /// the range query itself is active, exercising that query's cycle recovery.
+    /// Each class's `target` attribute depends on the other class's `setup` method. Completion
+    /// analysis handles this cross-file cycle both at the limit for on-demand evaluation and
+    /// after prefix warming starts, using the stack size of production workers. Entering a range
+    /// directly also exercises recovery when that range query becomes the cycle head.
     #[test]
     fn completion_range_recovers_cross_file_cycle() -> anyhow::Result<()> {
-        let mut db = setup_db();
-        let calls = concat!(
-            "        other.target.ping()\n",
-            "        other.target.ping() and None\n",
-            "        None if other.target.ping() else None\n",
-        )
-        .repeat(COMPLETION_PREDICATE_PREFIX_THRESHOLD + 1);
-        let a = format!(
-            r#"from b import B
+        let handle = std::thread::Builder::new()
+            .name("completion-cycle-stack-test".into())
+            .stack_size(ruff_db::STACK_SIZE)
+            .spawn(|| -> anyhow::Result<()> {
+                for (calls, enter_range) in [
+                    (
+                        concat!(
+                            "        other.target.ping()\n",
+                            "        other.target.ping() and None\n",
+                            "        None if other.target.ping() else None\n",
+                        )
+                        .repeat(COMPLETION_PREDICATE_PREFIX_THRESHOLD + 1),
+                        true,
+                    ),
+                    (
+                        "        other.target.ping()\n"
+                            .repeat(COMPLETION_PREDICATE_PREFIX_THRESHOLD),
+                        false,
+                    ),
+                    (
+                        "        other.target.ping()\n"
+                            .repeat(COMPLETION_PREDICATE_PREFIX_THRESHOLD + 1),
+                        false,
+                    ),
+                ] {
+                    let mut db = setup_db();
+                    let a = format!(
+                        r#"from b import B
 
 class A:
     def setup(self, other: B) -> None:
@@ -2353,9 +2383,9 @@ class A:
 class TargetA:
     def ping(self) -> None: ...
 "#
-        );
-        let b = format!(
-            r#"from a import A
+                    );
+                    let b = format!(
+                        r#"from a import A
 
 class B:
     def setup(self, other: A) -> None:
@@ -2364,28 +2394,39 @@ class B:
 class TargetB:
     def ping(self) -> None: ...
 "#
-        );
-        db.write_files([("/src/a.py", a.as_str()), ("/src/b.py", b.as_str())])?;
+                    );
+                    db.write_files([("/src/a.py", a.as_str()), ("/src/b.py", b.as_str())])?;
 
-        let file = system_path_to_file(&db, "/src/a.py").unwrap();
-        let program_file = ProgramFile::new(&db, file, db.program_environment().program(&db));
-        let index = semantic_index(&db, program_file);
-        let class_scope = index
-            .child_scopes(FileScopeId::global())
-            .find(|(_, scope)| scope.node().as_class().is_some())
-            .unwrap()
-            .0;
-        let setup_scope = index
-            .child_scopes(class_scope)
-            .find(|(_, scope)| scope.node().as_function().is_some())
-            .unwrap()
-            .0
-            .to_scope_id(&db, program_file);
+                    let file = system_path_to_file(&db, "/src/a.py").unwrap();
+                    let program_file =
+                        ProgramFile::new(&db, file, db.program_environment().program(&db));
+                    let index = semantic_index(&db, program_file);
+                    let class_scope = index
+                        .child_scopes(FileScopeId::global())
+                        .find(|(_, scope)| scope.node().as_class().is_some())
+                        .unwrap()
+                        .0;
+                    let setup_scope = index
+                        .child_scopes(class_scope)
+                        .find(|(_, scope)| scope.node().as_function().is_some())
+                        .unwrap()
+                        .0
+                        .to_scope_id(&db, program_file);
 
-        // Enter the range directly so it becomes the cycle head when inferring `other.target`
-        // reaches the other module and then re-enters this scope.
-        analyze_completion_range(&db, setup_scope, 0, 0);
-        Ok(())
+                    if enter_range {
+                        // Enter the range directly so it becomes the cycle head when inferring `other.target`
+                        // reaches the other module and then re-enters this scope.
+                        analyze_completion_range(&db, setup_scope, 0, 0);
+                    } else {
+                        infer_scope_types(&db, setup_scope, TypeContext::default());
+                    }
+                }
+                Ok(())
+            })?;
+
+        handle
+            .join()
+            .map_err(|_| anyhow::anyhow!("completion analysis thread panicked"))?
     }
 
     /// Changing an imported callable's return type from `None` to `NoReturn` invalidates cached
