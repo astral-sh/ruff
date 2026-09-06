@@ -519,20 +519,22 @@ impl PathAssignments {
                 continue;
             }
 
-            let existing_support = storage.constraint_support(*existing);
-            let constraint_support = storage.constraint_support(constraint);
+            if !self.independent_typevars.is_empty() {
+                let existing_support = storage.constraint_support(*existing);
+                let constraint_support = storage.constraint_support(constraint);
 
-            // Independent typevars must be checked for disjoint or invalid constraints, but are
-            // otherwise already constrained and do not participate in sequent discovery.
-            if !existing_support.overlaps_with(constraint_support)
-                && existing_support
-                    .iter()
-                    .chain(constraint_support.iter())
-                    .any(|typevar| self.independent_typevars.contains(&typevar))
-                && existing_support.is_complete()
-                && constraint_support.is_complete()
-            {
-                continue;
+                // Independent typevars must be checked for disjoint or invalid constraints, but are
+                // otherwise already constrained and do not participate in sequent discovery.
+                if !existing_support.overlaps_with(constraint_support)
+                    && existing_support
+                        .iter()
+                        .chain(constraint_support.iter())
+                        .any(|typevar| self.independent_typevars.contains(&typevar))
+                    && existing_support.is_complete()
+                    && constraint_support.is_complete()
+                {
+                    continue;
+                }
             }
 
             if SequentMap::pair_cannot_produce_sequents(db, env, storage, *existing, constraint) {

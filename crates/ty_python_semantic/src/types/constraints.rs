@@ -1412,12 +1412,23 @@ impl<'db> ConstraintSetStorage<'db> {
         env: &ProgramEnvironment<'db>,
         data: Constraint<'db>,
     ) -> ConstraintId {
-        let support = self.intern_constraint_typevars(db, env, data);
+        self.intern_constraint_with_support(data, |storage| {
+            storage.intern_constraint_typevars(db, env, data)
+        })
+    }
 
+    /// Reuses an existing constraint without recomputing its support. Callers that already
+    /// registered the constraint's typevars can provide the support from that traversal.
+    fn intern_constraint_with_support(
+        &mut self,
+        data: Constraint<'db>,
+        support: impl FnOnce(&mut Self) -> Support,
+    ) -> ConstraintId {
         self.ensure_overlay_identity_caches();
         if let Some(id) = self.constraint_cache.get(&data) {
             return *id;
         }
+        let support = support(self);
         let support_id = self.intern_support(support);
         let id = self.constraints.push(data);
         self.constraint_supports.push(support_id);
@@ -2558,7 +2569,7 @@ impl<'db> Constraint<'db> {
         }
 
         let constraint = Constraint::new(typevar, lower, upper);
-        storage.intern_constraint_typevars(db, env, constraint);
+        let support = storage.intern_constraint_typevars(db, env, constraint);
 
         // If `lower ≰ upper` for every possible assignment of typevars, then the constraint cannot
         // be satisfied, since there is no type that is both greater than `lower`, and less than
@@ -2680,8 +2691,7 @@ impl<'db> Constraint<'db> {
             }
 
             _ => {
-                let constraint =
-                    ConstraintId::new_with_bounds(db, env, storage, typevar, lower, upper);
+                let constraint = storage.intern_constraint_with_support(constraint, |_| support);
                 Node::new_constraint(storage, constraint)
             }
         }
