@@ -765,6 +765,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             return ConditionCheckResult::CheckEnclosingCondition;
         }
 
+        // An unreachable operand can retain a literal type, as in `False and "yes"`.
+        // Its diagnostic would be discarded, so it must not suppress the enclosing condition.
+        if !self
+            .context
+            .is_range_reachable(condition.expression.range())
+        {
+            return ConditionCheckResult::CheckEnclosingCondition;
+        }
+
         let rule = condition.kind.rule();
 
         if self.context.is_lint_enabled(rule) && !condition_context.exempts(self, &condition) {
