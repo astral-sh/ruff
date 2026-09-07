@@ -163,19 +163,19 @@ class RuntimeClass:
 
 
 def typing_only_local():
-    from typing import Sequence as LocalTypingOnlySequence
-
     if TYPE_CHECKING:
+        from typing import Sequence as LocalTypingOnlySequence
+
         local_typing_only_value: LocalTypingOnlySequence
 
 
-def typing_only_local_with_locals():
-    from typing import Sequence as LocalWithLocalsSequence
+def typing_only_local_with_vars():
+    from typing import Sequence as LocalWithVarsSequence
 
     if TYPE_CHECKING:
-        local_with_locals_value: LocalWithLocalsSequence
+        local_with_vars_value: LocalWithVarsSequence
 
-    locals()
+    vars()
 
 
 from typing import Sequence as ShadowedSequence

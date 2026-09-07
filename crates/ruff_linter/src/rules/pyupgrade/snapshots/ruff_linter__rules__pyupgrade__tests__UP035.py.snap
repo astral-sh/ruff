@@ -1264,36 +1264,37 @@ help: Import from `collections.abc`
 note: This is an unsafe fix and may change runtime behavior
 
 UP035 [*] Import from `collections.abc` instead: `Sequence`
-   --> UP035.py:166:5
+   --> UP035.py:167:9
     |
 165 | def typing_only_local():
-166 |     from typing import Sequence as LocalTypingOnlySequence
-    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-167 |
-168 |     if TYPE_CHECKING:
+166 |     if TYPE_CHECKING:
+167 |         from typing import Sequence as LocalTypingOnlySequence
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+168 |
+169 |         local_typing_only_value: LocalTypingOnlySequence
     |
 help: Import from `collections.abc`
     |
-165 | def typing_only_local():
-    -     from typing import Sequence as LocalTypingOnlySequence
-166 +     from collections.abc import Sequence as LocalTypingOnlySequence
-167 |
+166 |     if TYPE_CHECKING:
+    -         from typing import Sequence as LocalTypingOnlySequence
+167 +         from collections.abc import Sequence as LocalTypingOnlySequence
+168 |
     |
 
 UP035 [*] Import from `collections.abc` instead: `Sequence`
    --> UP035.py:173:5
     |
-172 | def typing_only_local_with_locals():
-173 |     from typing import Sequence as LocalWithLocalsSequence
-    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+172 | def typing_only_local_with_vars():
+173 |     from typing import Sequence as LocalWithVarsSequence
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 174 |
 175 |     if TYPE_CHECKING:
     |
 help: Import from `collections.abc`
     |
-172 | def typing_only_local_with_locals():
-    -     from typing import Sequence as LocalWithLocalsSequence
-173 +     from collections.abc import Sequence as LocalWithLocalsSequence
+172 | def typing_only_local_with_vars():
+    -     from typing import Sequence as LocalWithVarsSequence
+173 +     from collections.abc import Sequence as LocalWithVarsSequence
 174 |
     |
 note: This is an unsafe fix and may change runtime behavior

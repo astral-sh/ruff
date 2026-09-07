@@ -1,11 +1,12 @@
 use itertools::Itertools;
+use rustc_hash::FxHashMap;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::token::Tokens;
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_ast::{self as ast, Alias, StmtImportFrom, StmtRef};
 use ruff_python_codegen::Stylist;
-use ruff_python_semantic::{AnyImport, Imported, NodeId, Scope};
+use ruff_python_semantic::{AnyImport, BindingId, Imported, NodeId, Scope};
 use ruff_text_size::Ranged;
 
 use crate::Locator;
@@ -53,10 +54,10 @@ enum Deprecation {
 /// ## Fix safety
 /// Fixes that replace deprecated aliases from `typing` or `typing.re` with
 /// runtime implementations can change the value of the imported object.
-/// Ruff marks these fixes as safe only for function-local imports when the
-/// function does not inspect its locals, every affected binding has at least
-/// one reference, every reference is in a typing-only context, and the import
-/// is not re-exported. Otherwise, the fix is marked unsafe.
+/// Ruff marks these fixes as safe only when every affected import binding is
+/// itself in a typing-only context, has at least one reference, every reference
+/// is in a typing-only context, and the import is not re-exported. Otherwise,
+/// the fix is marked unsafe.
 ///
 /// Note that, in some cases, it may be preferable to continue importing
 /// members from `typing_extensions` even after they're added to the Python
@@ -757,22 +758,13 @@ impl<'a> ImportReplacer<'a> {
 
 fn runtime_sensitive_applicability(
     checker: &Checker,
-    scope: &Scope,
-    node_id: NodeId,
+    binding_ids: &[BindingId],
     operation: &WithoutRename,
 ) -> Applicability {
-    if !scope.kind.is_function() || scope.uses_locals() {
-        return Applicability::Unsafe;
-    }
-
     let mut matched_binding = false;
 
-    for (_, binding_id) in scope.all_bindings() {
+    for &binding_id in binding_ids {
         let binding = checker.semantic().binding(binding_id);
-
-        if binding.source != Some(node_id) {
-            continue;
-        }
 
         let Some(AnyImport::FromImport(import)) = binding.as_any_import() else {
             continue;
@@ -788,7 +780,9 @@ fn runtime_sensitive_applicability(
 
         matched_binding = true;
 
-        if binding.is_explicit_export() {
+        // A runtime import remains observable through namespace inspection,
+        // even when all ordinary references are typing-only.
+        if !binding.context.is_typing() || binding.is_explicit_export() {
             return Applicability::Unsafe;
         }
 
@@ -827,25 +821,32 @@ pub(crate) fn deprecated_import(checker: &Checker, import_from_stmt: &StmtImport
 
 /// Report runtime-sensitive UP035 fixes after semantic traversal.
 pub(crate) fn deprecated_import_runtime_sensitive(checker: &Checker, scope: &Scope) {
-    let mut statements = scope
-        .all_bindings()
-        .filter_map(|(_, binding_id)| {
-            let binding = checker.semantic().binding(binding_id);
+    let mut bindings_by_statement: FxHashMap<NodeId, Vec<BindingId>> = FxHashMap::default();
 
-            let AnyImport::FromImport(import) = binding.as_any_import()? else {
-                return None;
-            };
+    for (_, binding_id) in scope.all_bindings() {
+        let binding = checker.semantic().binding(binding_id);
 
-            let module = import.source_name().join(".");
+        let Some(AnyImport::FromImport(import)) = binding.as_any_import() else {
+            continue;
+        };
 
-            if !matches!(module.as_str(), "typing" | "typing.re") {
-                return None;
-            }
+        let module = import.source_name().join(".");
 
-            binding.source
-        })
-        .unique()
-        .collect_vec();
+        if !matches!(module.as_str(), "typing" | "typing.re") {
+            continue;
+        }
+
+        let Some(node_id) = binding.source else {
+            continue;
+        };
+
+        bindings_by_statement
+            .entry(node_id)
+            .or_default()
+            .push(binding_id);
+    }
+
+    let mut statements = bindings_by_statement.keys().copied().collect_vec();
 
     statements.sort_unstable_by_key(|node_id| checker.semantic().statement(*node_id).start());
 
@@ -854,11 +855,15 @@ pub(crate) fn deprecated_import_runtime_sensitive(checker: &Checker, scope: &Sco
             continue;
         };
 
+        let binding_ids = bindings_by_statement
+            .get(&node_id)
+            .expect("statement was collected from this map");
+
         report_deprecated_import(
             checker,
             import_from_stmt,
             |module, operation| is_runtime_sensitive_migration(module, &operation.target),
-            |operation| runtime_sensitive_applicability(checker, scope, node_id, operation),
+            |operation| runtime_sensitive_applicability(checker, binding_ids, operation),
             false,
         );
     }
