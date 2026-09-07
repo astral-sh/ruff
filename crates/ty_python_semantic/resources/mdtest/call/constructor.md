@@ -1751,6 +1751,27 @@ Invariant[Never]()  # error: [invalid-argument-type]
 Invariant[object]()  # error: [invalid-argument-type]
 ```
 
+## Constrained type variables in a union `self` annotation
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+class C[T: (str | None, int | None)]:
+    def __init__[U: (str, int)](self: C[U | None], value: U) -> None: ...
+    def get(self) -> T:
+        raise NotImplementedError
+
+reveal_type(C("a"))  # revealed: C[str | None]
+
+# TODO: Resolve `U` before selecting a constraint for `T`. This should infer
+# `C[int | None]` without an error.
+# error: [invalid-argument-type]
+reveal_type(C(1))  # revealed: C[str | None]
+```
+
 ## `__init__` can remap constructor generic arguments via `self` annotation
 
 ```py
