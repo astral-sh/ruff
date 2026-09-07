@@ -193,18 +193,20 @@ impl Format<PyFormatContext<'_>> for FormatInterpolatedElement<'_> {
                 }));
 
             let item = format_with(|f: &mut PyFormatter| {
-                // Update the context for this f-string expression element.
-                // An interpolated element in a format spec belongs to the same f-string as
-                // its enclosing element, such as `{width}` in `f"{value:{width}}"`.
-                // Increasing the depth here would preserve inner quotes before Python 3.12
-                // and could reuse the outer quote character, producing invalid syntax.
                 let state = match f.context().interpolated_string_state() {
+                    InterpolatedStringState::Outside => {
+                        InterpolatedStringState::InsideInterpolatedElement(context)
+                    }
+                    // Formatting an interpolated element does not enter another f/t-string:
+                    // `{width}` in `f"{value:{width}}"` still belongs to the outer f-string.
+                    // Increasing the depth for that element would preserve its expression's
+                    // quotes before Python 3.12 and could reuse the outer quote character,
+                    // producing invalid syntax.
+                    InterpolatedStringState::InsideInterpolatedElement(_) => {
+                        InterpolatedStringState::InsideInterpolatedElement(context)
+                    }
                     InterpolatedStringState::NestedInterpolatedElement(_) => {
                         InterpolatedStringState::NestedInterpolatedElement(context)
-                    }
-                    InterpolatedStringState::InsideInterpolatedElement(_)
-                    | InterpolatedStringState::Outside => {
-                        InterpolatedStringState::InsideInterpolatedElement(context)
                     }
                 };
                 let f = &mut WithInterpolatedStringState::new(state, f);
