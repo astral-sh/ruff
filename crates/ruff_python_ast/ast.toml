@@ -413,14 +413,15 @@ fields = [{ name = "value", type = "Expr" }]
 [Expr.nodes.ExprCompare]
 doc = """A comparison or chain of comparisons.
 
-`operands` contains all operands in source order, including the leftmost operand.
-For example, `a < b <= c` has operands `[a, b, c]` and operators `[Lt, LtE]`.
-There is at least one operator, and `operands.len() == ops.len() + 1`.
+`left` is the initial operand, and `comparisons` pairs each operator with its right operand.
+For example, `a < b <= c` has `left = a` and comparisons `[(Lt, b), (LtE, c)]`.
+The parser always produces at least one comparison, synthesizing an invalid name expression
+for a missing operand during error recovery.
 
 See also [Compare](https://docs.python.org/3/library/ast.html#ast.Compare)."""
 fields = [
-  { name = "ops", type = "Box<[CmpOp]>" },
-  { name = "operands", type = "Box<[Expr]>" },
+  { name = "left", type = "Expr" },
+  { name = "comparisons", type = "Box<[(crate::CmpOp, Expr)]>" },
 ]
 # The fields must be visited simultaneously
 custom_source_order = true

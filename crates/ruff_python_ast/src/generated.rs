@@ -9769,9 +9769,10 @@ pub struct ExprYieldFrom {
 
 /// A comparison or chain of comparisons.
 ///
-/// `operands` contains all operands in source order, including the leftmost operand.
-/// For example, `a < b <= c` has operands `[a, b, c]` and operators `[Lt, LtE]`.
-/// There is at least one operator, and `operands.len() == ops.len() + 1`.
+/// `left` is the initial operand, and `comparisons` pairs each operator with its right operand.
+/// For example, `a < b <= c` has `left = a` and comparisons `[(Lt, b), (LtE, c)]`.
+/// The parser always produces at least one comparison, synthesizing an invalid name expression
+/// for a missing operand during error recovery.
 ///
 /// See also [Compare](https://docs.python.org/3/library/ast.html#ast.Compare).
 #[derive(Clone, Debug, PartialEq)]
@@ -9779,8 +9780,8 @@ pub struct ExprYieldFrom {
 pub struct ExprCompare {
     pub node_index: crate::AtomicNodeIndex,
     pub range: ruff_text_size::TextRange,
-    pub ops: Box<[crate::CmpOp]>,
-    pub operands: Box<[Expr]>,
+    pub left: Box<Expr>,
+    pub comparisons: Box<[(crate::CmpOp, Expr)]>,
 }
 
 /// A call expression whose end offset is derived from its arguments.

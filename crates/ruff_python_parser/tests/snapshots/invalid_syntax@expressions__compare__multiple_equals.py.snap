@@ -19,25 +19,25 @@ Module(
                             ExprCompare {
                                 node_index: NodeIndex(None),
                                 range: 25..29,
-                                ops: [
-                                    Eq,
-                                ],
-                                operands: [
-                                    Name(
-                                        ExprName {
-                                            node_index: NodeIndex(None),
-                                            range: 25..26,
-                                            id: Name("x"),
-                                            ctx: Load,
-                                        },
-                                    ),
-                                    Name(
-                                        ExprName {
-                                            node_index: NodeIndex(None),
-                                            range: 29..29,
-                                            id: Name(""),
-                                            ctx: Invalid,
-                                        },
+                                left: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 25..26,
+                                        id: Name("x"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                comparisons: [
+                                    (
+                                        Eq,
+                                        Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 29..29,
+                                                id: Name(""),
+                                                ctx: Invalid,
+                                            },
+                                        ),
                                     ),
                                 ],
                             },
@@ -62,25 +62,25 @@ Module(
                             ExprCompare {
                                 node_index: NodeIndex(None),
                                 range: 33..37,
-                                ops: [
-                                    NotEq,
-                                ],
-                                operands: [
-                                    Name(
-                                        ExprName {
-                                            node_index: NodeIndex(None),
-                                            range: 33..34,
-                                            id: Name("x"),
-                                            ctx: Load,
-                                        },
-                                    ),
-                                    Name(
-                                        ExprName {
-                                            node_index: NodeIndex(None),
-                                            range: 37..37,
-                                            id: Name(""),
-                                            ctx: Invalid,
-                                        },
+                                left: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 33..34,
+                                        id: Name("x"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                comparisons: [
+                                    (
+                                        NotEq,
+                                        Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 37..37,
+                                                id: Name(""),
+                                                ctx: Invalid,
+                                            },
+                                        ),
                                     ),
                                 ],
                             },

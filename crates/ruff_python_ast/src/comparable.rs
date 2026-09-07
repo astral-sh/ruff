@@ -941,8 +941,8 @@ pub struct ExprYieldFrom<'a> {
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ExprCompare<'a> {
-    ops: Vec<ComparableCmpOp>,
-    operands: Vec<ComparableExpr<'a>>,
+    left: Box<ComparableExpr<'a>>,
+    comparisons: Vec<(ComparableCmpOp, ComparableExpr<'a>)>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -1221,13 +1221,16 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
                 value: value.into(),
             }),
             ast::Expr::Compare(ast::ExprCompare {
-                ops,
-                operands,
+                left,
+                comparisons,
                 range: _,
                 node_index: _,
             }) => Self::Compare(ExprCompare {
-                ops: ops.iter().copied().map(Into::into).collect(),
-                operands: operands.iter().map(Into::into).collect(),
+                left: left.into(),
+                comparisons: comparisons
+                    .iter()
+                    .map(|(op, right)| ((*op).into(), right.into()))
+                    .collect(),
             }),
             ast::Expr::Call(ast::ExprCall {
                 func,

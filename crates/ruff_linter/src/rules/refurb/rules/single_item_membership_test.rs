@@ -70,10 +70,9 @@ pub(crate) fn single_item_membership_test(
     checker: &Checker,
     expr: &Expr,
     left: &Expr,
-    ops: &[CmpOp],
-    comparators: &[Expr],
+    comparisons: &[(CmpOp, Expr)],
 ) {
-    let ([op], [right]) = (ops, comparators) else {
+    let [(op, right)] = comparisons else {
         return;
     };
 
@@ -93,8 +92,7 @@ pub(crate) fn single_item_membership_test(
         pad(
             generate_comparison(
                 left,
-                &[membership_test.replacement_op()],
-                std::slice::from_ref(item),
+                std::iter::once((membership_test.replacement_op(), item)),
                 expr.into(),
                 checker.tokens(),
                 checker.source(),

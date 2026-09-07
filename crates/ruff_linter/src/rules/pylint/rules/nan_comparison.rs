@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{self as ast, Expr, ExprCompare};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
@@ -50,8 +50,8 @@ impl Violation for NanComparison {
 }
 
 /// PLW0177
-pub(crate) fn nan_comparison(checker: &Checker, left: &Expr, comparators: &[Expr]) {
-    nan_comparison_impl(checker, std::iter::once(left).chain(comparators));
+pub(crate) fn nan_comparison(checker: &Checker, compare: &ExprCompare) {
+    nan_comparison_impl(checker, compare.operands());
 }
 
 /// PLW0177

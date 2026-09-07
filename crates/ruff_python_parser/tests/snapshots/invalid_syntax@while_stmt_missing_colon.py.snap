@@ -18,26 +18,26 @@ Module(
                         ExprCompare {
                             node_index: NodeIndex(None),
                             range: 12..18,
-                            ops: [
-                                Lt,
-                            ],
-                            operands: [
-                                Name(
-                                    ExprName {
-                                        node_index: NodeIndex(None),
-                                        range: 12..13,
-                                        id: Name("a"),
-                                        ctx: Load,
-                                    },
-                                ),
-                                NumberLiteral(
-                                    ExprNumberLiteral {
-                                        node_index: NodeIndex(None),
-                                        range: 16..18,
-                                        value: Int(
-                                            30,
-                                        ),
-                                    },
+                            left: Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 12..13,
+                                    id: Name("a"),
+                                    ctx: Load,
+                                },
+                            ),
+                            comparisons: [
+                                (
+                                    Lt,
+                                    NumberLiteral(
+                                        ExprNumberLiteral {
+                                            node_index: NodeIndex(None),
+                                            range: 16..18,
+                                            value: Int(
+                                                30,
+                                            ),
+                                        },
+                                    ),
                                 ),
                             ],
                         },

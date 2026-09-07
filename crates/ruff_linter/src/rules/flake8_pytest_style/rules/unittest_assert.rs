@@ -172,8 +172,8 @@ fn assert(expr: &Expr, msg: Option<&Expr>) -> Stmt {
 
 fn compare(left: &Expr, cmp_op: CmpOp, right: &Expr) -> Expr {
     Expr::Compare(ast::ExprCompare {
-        ops: [cmp_op].into(),
-        operands: Box::from([left.clone(), right.clone()]),
+        left: Box::new(left.clone()),
+        comparisons: [(cmp_op, right.clone())].into(),
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     })

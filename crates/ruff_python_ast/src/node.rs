@@ -70,23 +70,35 @@ impl ast::ExprBoolOp {
 }
 
 impl ast::ExprCompare {
+    /// Iterate over all operands in source order, including the initial left operand.
+    pub fn operands(&self) -> impl DoubleEndedIterator<Item = &ast::Expr> + Clone {
+        std::iter::once(self.left.as_ref()).chain(self.comparisons.iter().map(|(_, right)| right))
+    }
+
+    /// Iterate over the left operand, operator, and right operand of each comparison.
+    ///
+    /// For `a < b <= c`, this yields `(a, Lt, b)` followed by `(b, LtE, c)`.
+    pub fn iter(&self) -> impl Iterator<Item = (&ast::Expr, &ast::CmpOp, &ast::Expr)> + Clone {
+        self.operands()
+            .zip(self.comparisons.iter())
+            .map(|(left, (op, right))| (left, op, right))
+    }
+
     pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
         let ast::ExprCompare {
-            ops,
-            operands,
+            left,
+            comparisons,
             range: _,
             node_index: _,
         } = self;
 
-        if let Some((left, comparators)) = operands.split_first() {
-            visitor.visit_expr(left);
-            for (op, comparator) in ops.iter().zip(comparators) {
-                visitor.visit_cmp_op(op);
-                visitor.visit_expr(comparator);
-            }
+        visitor.visit_expr(left);
+        for (op, comparator) in comparisons {
+            visitor.visit_cmp_op(op);
+            visitor.visit_expr(comparator);
         }
     }
 }

@@ -66,8 +66,8 @@ pub(super) fn replace_with_identity_check(
     };
 
     let new_expr = Expr::Compare(ast::ExprCompare {
-        ops: [op].into(),
-        operands: [left.clone(), ast::ExprNoneLiteral::default().into()].into(),
+        left: Box::new(left.clone()),
+        comparisons: [(op, ast::ExprNoneLiteral::default().into())].into(),
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     });

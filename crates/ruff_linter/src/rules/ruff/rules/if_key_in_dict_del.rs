@@ -84,15 +84,11 @@ fn extract_dict_and_key_from_test(test: &Expr) -> Option<(&Dict, &Key)> {
         return None;
     };
 
-    let [key, Expr::Name(dict)] = comp.operands.as_ref() else {
+    let [(CmpOp::In, Expr::Name(dict))] = comp.comparisons.as_ref() else {
         return None;
     };
 
-    if !matches!(comp.ops.as_ref(), [CmpOp::In]) {
-        return None;
-    }
-
-    Some((dict, key))
+    Some((dict, &comp.left))
 }
 
 fn extract_dict_and_key_from_del(targets: &[Expr]) -> Option<(&Dict, &Key)> {

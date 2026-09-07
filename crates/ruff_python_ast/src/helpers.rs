@@ -389,9 +389,9 @@ where
             }) => value
                 .as_ref()
                 .is_some_and(|value| any_over_expr(value, func)),
-            Expr::Compare(ast::ExprCompare { operands, .. }) => {
-                operands.iter().any(|expr| any_over_expr(expr, &mut *func))
-            }
+            Expr::Compare(compare) => compare
+                .operands()
+                .any(|expr| any_over_expr(expr, &mut *func)),
             Expr::Call(ast::ExprCall {
                 func: call_func,
                 arguments,
@@ -1655,16 +1655,18 @@ pub fn is_empty_f_string(expr: &ast::ExprFString) -> bool {
     })
 }
 
-pub fn generate_comparison(
+pub fn generate_comparison<'a>(
     left: &Expr,
-    ops: &[CmpOp],
-    comparators: &[Expr],
+    comparisons: impl DoubleEndedIterator<Item = (CmpOp, &'a Expr)> + Clone,
     parent: AnyNodeRef,
     tokens: &Tokens,
     source: &str,
 ) -> String {
     let start = left.start();
-    let end = comparators.last().map_or_else(|| left.end(), Ranged::end);
+    let end = comparisons
+        .clone()
+        .next_back()
+        .map_or_else(|| left.end(), |(_, right)| right.end());
     let mut contents = String::with_capacity(usize::from(end - start));
 
     // Add the left side of the comparison.
@@ -1672,7 +1674,7 @@ pub fn generate_comparison(
         &source[parenthesized_range(left.into(), parent, tokens).unwrap_or(left.range())],
     );
 
-    for (op, comparator) in ops.iter().zip(comparators) {
+    for (op, comparator) in comparisons {
         // Add the operator.
         contents.push_str(match op {
             CmpOp::Eq => " == ",

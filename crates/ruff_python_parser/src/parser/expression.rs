@@ -1240,9 +1240,8 @@ impl<'src> Parser<'src> {
     ) -> ast::ExprCompare {
         self.bump_cmp_op(op);
 
-        let operands_snapshot = self.expr_scratch.snapshot();
-        self.expr_scratch.push(lhs);
-        let mut operators = vec![op];
+        let comparisons_snapshot = self.comparison_scratch.snapshot();
+        let mut op = op;
 
         let mut progress = ParserProgress::default();
 
@@ -1255,7 +1254,7 @@ impl<'src> Parser<'src> {
                     context,
                 )
                 .expr;
-            self.expr_scratch.push(comparator);
+            self.comparison_scratch.push((op, comparator));
 
             let next_token = self.current_token_kind();
             if matches!(next_token, TokenKind::In) && context.is_in_excluded() {
@@ -1269,12 +1268,12 @@ impl<'src> Parser<'src> {
             };
 
             self.bump_cmp_op(next_op);
-            operators.push(next_op);
+            op = next_op;
         }
 
         ast::ExprCompare {
-            ops: operators.into_boxed_slice(),
-            operands: self.expr_scratch.take(operands_snapshot),
+            left: Box::new(lhs),
+            comparisons: self.comparison_scratch.take(comparisons_snapshot),
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
         }

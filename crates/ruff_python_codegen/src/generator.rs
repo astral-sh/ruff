@@ -1167,15 +1167,15 @@ impl<'a> Generator<'a> {
                 });
             }
             Expr::Compare(ast::ExprCompare {
-                ops,
-                operands,
+                left,
+                comparisons,
                 range: _,
                 node_index: _,
             }) => {
                 group_if!(precedence::CMP, {
                     let new_lvl = precedence::CMP + 1;
-                    self.unparse_expr(&operands[0], new_lvl);
-                    for (op, cmp) in ops.iter().zip(&operands[1..]) {
+                    self.unparse_expr(left, new_lvl);
+                    for (op, cmp) in comparisons {
                         let op = match op {
                             CmpOp::Eq => " == ",
                             CmpOp::NotEq => " != ",

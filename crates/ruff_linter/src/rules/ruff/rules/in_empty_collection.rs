@@ -38,17 +38,13 @@ impl Violation for InEmptyCollection {
 
 /// RUF060
 pub(crate) fn in_empty_collection(checker: &Checker, compare: &ast::ExprCompare) {
-    let [op] = &*compare.ops else {
+    let [(op, right)] = &*compare.comparisons else {
         return;
     };
 
     if !matches!(op, CmpOp::In | CmpOp::NotIn) {
         return;
     }
-
-    let [_, right] = &*compare.operands else {
-        return;
-    };
 
     let semantic = checker.semantic();
 

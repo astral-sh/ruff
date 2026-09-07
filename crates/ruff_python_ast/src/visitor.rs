@@ -513,19 +513,17 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
             node_index: _,
         }) => visitor.visit_expr(value),
         Expr::Compare(ast::ExprCompare {
-            ops,
-            operands,
+            left,
+            comparisons,
             range: _,
             node_index: _,
         }) => {
-            if let Some((left, comparators)) = operands.split_first() {
-                visitor.visit_expr(left);
-                for cmp_op in ops {
-                    visitor.visit_cmp_op(cmp_op);
-                }
-                for expr in comparators {
-                    visitor.visit_expr(expr);
-                }
+            visitor.visit_expr(left);
+            for (cmp_op, _) in comparisons {
+                visitor.visit_cmp_op(cmp_op);
+            }
+            for (_, expr) in comparisons {
+                visitor.visit_expr(expr);
             }
         }
         Expr::Call(ast::ExprCall {

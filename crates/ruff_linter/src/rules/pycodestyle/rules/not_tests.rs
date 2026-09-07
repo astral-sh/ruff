@@ -87,8 +87,8 @@ pub(crate) fn not_tests(checker: &Checker, unary_op: &ast::ExprUnaryOp) {
     }
 
     let Expr::Compare(ast::ExprCompare {
-        ops,
-        operands,
+        left,
+        comparisons,
         range: _,
         node_index: _,
     }) = unary_op.operand.as_ref()
@@ -96,19 +96,14 @@ pub(crate) fn not_tests(checker: &Checker, unary_op: &ast::ExprUnaryOp) {
         return;
     };
 
-    let Some((left, comparators)) = operands.split_first() else {
-        return;
-    };
-
-    match &**ops {
-        [CmpOp::In] if checker.is_rule_enabled(Rule::NotInTest) => {
+    match &**comparisons {
+        [(CmpOp::In, right)] if checker.is_rule_enabled(Rule::NotInTest) => {
             let mut diagnostic = checker.report_diagnostic(NotInTest, unary_op.operand.range());
             diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                 pad(
                     generate_comparison(
                         left,
-                        &[CmpOp::NotIn],
-                        comparators,
+                        std::iter::once((CmpOp::NotIn, right)),
                         unary_op.into(),
                         checker.tokens(),
                         checker.source(),
@@ -119,14 +114,13 @@ pub(crate) fn not_tests(checker: &Checker, unary_op: &ast::ExprUnaryOp) {
                 unary_op.range(),
             )));
         }
-        [CmpOp::Is] if checker.is_rule_enabled(Rule::NotIsTest) => {
+        [(CmpOp::Is, right)] if checker.is_rule_enabled(Rule::NotIsTest) => {
             let mut diagnostic = checker.report_diagnostic(NotIsTest, unary_op.operand.range());
             diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                 pad(
                     generate_comparison(
                         left,
-                        &[CmpOp::IsNot],
-                        comparators,
+                        std::iter::once((CmpOp::IsNot, right)),
                         unary_op.into(),
                         checker.tokens(),
                         checker.source(),

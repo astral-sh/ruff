@@ -332,8 +332,8 @@ impl<'a> ReFunc<'a> {
     /// Return a new compare expr of the form `left op right`
     fn compare_expr(left: &Expr, op: CmpOp, right: &Expr) -> Expr {
         Expr::Compare(ExprCompare {
-            ops: [op].into(),
-            operands: Box::new([left.clone(), right.clone()]),
+            left: Box::new(left.clone()),
+            comparisons: [(op, right.clone())].into(),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         })
@@ -441,22 +441,15 @@ fn get_comparison_to_none(semantic: &SemanticModel) -> Option<(ComparisonToNone,
     let parent_expr = semantic.current_expression_parent()?;
 
     let Expr::Compare(ExprCompare {
-        ops,
-        operands,
-        range,
-        ..
+        comparisons, range, ..
     }) = parent_expr
     else {
         return None;
     };
 
-    let Some(Expr::NoneLiteral(_)) = operands.get(1) else {
-        return None;
-    };
-
-    match ops.as_ref() {
-        [CmpOp::Is] => Some((ComparisonToNone::Is, *range)),
-        [CmpOp::IsNot] => Some((ComparisonToNone::IsNot, *range)),
+    match comparisons.as_ref() {
+        [(CmpOp::Is, Expr::NoneLiteral(_))] => Some((ComparisonToNone::Is, *range)),
+        [(CmpOp::IsNot, Expr::NoneLiteral(_))] => Some((ComparisonToNone::IsNot, *range)),
         _ => None,
     }
 }

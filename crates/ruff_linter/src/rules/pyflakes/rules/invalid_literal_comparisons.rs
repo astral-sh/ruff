@@ -79,13 +79,12 @@ impl AlwaysFixableViolation for IsLiteral {
 pub(crate) fn invalid_literal_comparison(
     checker: &Checker,
     left: &Expr,
-    ops: &[CmpOp],
-    comparators: &[Expr],
+    comparisons: &[(CmpOp, Expr)],
     expr: &Expr,
 ) {
     let mut lazy_located = None;
     let mut left = left;
-    for (index, (op, right)) in ops.iter().zip(comparators).enumerate() {
+    for (index, (op, right)) in comparisons.iter().enumerate() {
         if matches!(op, CmpOp::Is | CmpOp::IsNot)
             && (helpers::is_constant_non_singleton(left)
                 || helpers::is_constant_non_singleton(right)

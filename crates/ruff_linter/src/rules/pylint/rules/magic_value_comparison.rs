@@ -1,6 +1,6 @@
 use itertools::Itertools;
 use ruff_python_ast::helpers::map_subscript;
-use ruff_python_ast::{self as ast, Expr, Int, LiteralExpressionRef, UnaryOp};
+use ruff_python_ast::{self as ast, Expr, ExprCompare, Int, LiteralExpressionRef, UnaryOp};
 use ruff_python_semantic::SemanticModel;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -120,8 +120,8 @@ fn is_sys_version_comparand(expr: &Expr, semantic: &SemanticModel) -> bool {
 }
 
 /// PLR2004
-pub(crate) fn magic_value_comparison(checker: &Checker, left: &Expr, comparators: &[Expr]) {
-    for (left, right) in std::iter::once(left).chain(comparators).tuple_windows() {
+pub(crate) fn magic_value_comparison(checker: &Checker, compare: &ExprCompare) {
+    for (left, right) in compare.operands().tuple_windows() {
         // If both of the comparators are literals, skip rule for the whole expression.
         // R0133: comparison-of-constants
         if as_literal(left).is_some() && as_literal(right).is_some() {
@@ -130,7 +130,7 @@ pub(crate) fn magic_value_comparison(checker: &Checker, left: &Expr, comparators
     }
 
     let mut previous = None;
-    let mut operands = std::iter::once(left).chain(comparators).peekable();
+    let mut operands = compare.operands().peekable();
     while let Some(comparison_expr) = operands.next() {
         if let Some(value) = as_literal(comparison_expr)
             && is_magic_value(value, &checker.settings().pylint.allow_magic_value_types)

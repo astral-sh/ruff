@@ -2232,7 +2232,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         }),
                     ) => PredicateNode::Condition(expression),
                     (ExpressionContext::Condition, ast::Expr::Compare(compare))
-                        if compare.ops.len() > 1 =>
+                        if compare.comparisons.len() > 1 =>
                     {
                         PredicateNode::ChainedComparisonCondition(expression)
                     }
@@ -2537,11 +2537,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 operand,
                 ..
             }) => Self::condition_evaluation_is_known_safe(operand),
-            ast::Expr::Compare(ast::ExprCompare { ops, operands, .. }) => {
-                ops.iter()
-                    .all(|op| matches!(op, ast::CmpOp::Is | ast::CmpOp::IsNot))
-                    && operands
-                        .iter()
+            ast::Expr::Compare(compare) => {
+                compare
+                    .comparisons
+                    .iter()
+                    .all(|(op, _)| matches!(op, ast::CmpOp::Is | ast::CmpOp::IsNot))
+                    && compare
+                        .operands()
                         .all(Self::expression_evaluation_is_known_safe)
             }
             _ => false,
@@ -3633,16 +3635,16 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         || !Self::condition_evaluation_is_known_safe(&unary.operand),
                 );
             }
-            ast::Expr::Compare(ast::ExprCompare { ops, operands, .. }) => {
-                if let Some((left, comparators)) = operands.split_first() {
-                    self.visit_expr(left);
-                    for (op, comparator) in ops.iter().zip(comparators) {
-                        self.visit_expr(comparator);
-                        self.record_exception_checkpoint_if(!matches!(
-                            op,
-                            ast::CmpOp::Is | ast::CmpOp::IsNot
-                        ));
-                    }
+            ast::Expr::Compare(ast::ExprCompare {
+                left, comparisons, ..
+            }) => {
+                self.visit_expr(left);
+                for (op, comparator) in comparisons {
+                    self.visit_expr(comparator);
+                    self.record_exception_checkpoint_if(!matches!(
+                        op,
+                        ast::CmpOp::Is | ast::CmpOp::IsNot
+                    ));
                 }
             }
             ast::Expr::BoolOp(node) => self.visit_bool_expression(node, context),

@@ -67,14 +67,13 @@ pub(crate) fn nunique_constant_series_check(
     checker: &Checker,
     expr: &Expr,
     left: &Expr,
-    ops: &[CmpOp],
-    comparators: &[Expr],
+    comparisons: &[(CmpOp, Expr)],
 ) {
     if !checker.semantic().seen_module(Modules::PANDAS) {
         return;
     }
 
-    let ([op], [right]) = (ops, comparators) else {
+    let [(op, right)] = comparisons else {
         return;
     };
 

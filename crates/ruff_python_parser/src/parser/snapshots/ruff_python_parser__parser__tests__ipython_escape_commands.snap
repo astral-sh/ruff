@@ -172,25 +172,25 @@ Module(
                                         ExprCompare {
                                             node_index: NodeIndex(None),
                                             range: 598..620,
-                                            ops: [
-                                                NotEq,
-                                            ],
-                                            operands: [
-                                                Name(
-                                                    ExprName {
-                                                        node_index: NodeIndex(None),
-                                                        range: 598..599,
-                                                        id: Name("a"),
-                                                        ctx: Load,
-                                                    },
-                                                ),
-                                                Name(
-                                                    ExprName {
-                                                        node_index: NodeIndex(None),
-                                                        range: 619..620,
-                                                        id: Name("b"),
-                                                        ctx: Load,
-                                                    },
+                                            left: Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 598..599,
+                                                    id: Name("a"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            comparisons: [
+                                                (
+                                                    NotEq,
+                                                    Name(
+                                                        ExprName {
+                                                            node_index: NodeIndex(None),
+                                                            range: 619..620,
+                                                            id: Name("b"),
+                                                            ctx: Load,
+                                                        },
+                                                    ),
                                                 ),
                                             ],
                                         },

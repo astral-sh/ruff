@@ -238,7 +238,7 @@ impl Violation for SysVersionCmpStr10 {
 }
 
 /// YTT103, YTT201, YTT203, YTT204, YTT302
-pub(crate) fn compare(checker: &Checker, left: &Expr, ops: &[CmpOp], comparators: &[Expr]) {
+pub(crate) fn compare(checker: &Checker, left: &Expr, comparisons: &[(CmpOp, Expr)]) {
     match left {
         Expr::Subscript(ast::ExprSubscript { value, slice, .. })
             if is_sys(value, "version_info", checker.semantic()) =>
@@ -249,15 +249,15 @@ pub(crate) fn compare(checker: &Checker, left: &Expr, ops: &[CmpOp], comparators
             }) = slice.as_ref()
             {
                 if *i == 0 {
-                    if let (
-                        [operator @ (CmpOp::Eq | CmpOp::NotEq)],
-                        [
+                    if let [
+                        (
+                            operator @ (CmpOp::Eq | CmpOp::NotEq),
                             Expr::NumberLiteral(ast::ExprNumberLiteral {
                                 value: ast::Number::Int(n),
                                 ..
                             }),
-                        ],
-                    ) = (ops, comparators)
+                        ),
+                    ] = comparisons
                     {
                         if *n == 3 && checker.is_rule_enabled(Rule::SysVersionInfo0Eq3) {
                             checker.report_diagnostic(
@@ -269,15 +269,15 @@ pub(crate) fn compare(checker: &Checker, left: &Expr, ops: &[CmpOp], comparators
                         }
                     }
                 } else if *i == 1 {
-                    if let (
-                        [CmpOp::Lt | CmpOp::LtE | CmpOp::Gt | CmpOp::GtE],
-                        [
+                    if let [
+                        (
+                            CmpOp::Lt | CmpOp::LtE | CmpOp::Gt | CmpOp::GtE,
                             Expr::NumberLiteral(ast::ExprNumberLiteral {
                                 value: ast::Number::Int(_),
                                 ..
                             }),
-                        ],
-                    ) = (ops, comparators)
+                        ),
+                    ] = comparisons
                     {
                         checker.report_diagnostic_if_enabled(SysVersionInfo1CmpInt, left.range());
                     }
@@ -288,15 +288,15 @@ pub(crate) fn compare(checker: &Checker, left: &Expr, ops: &[CmpOp], comparators
         Expr::Attribute(ast::ExprAttribute { value, attr, .. })
             if is_sys(value, "version_info", checker.semantic()) && attr == "minor" =>
         {
-            if let (
-                [CmpOp::Lt | CmpOp::LtE | CmpOp::Gt | CmpOp::GtE],
-                [
+            if let [
+                (
+                    CmpOp::Lt | CmpOp::LtE | CmpOp::Gt | CmpOp::GtE,
                     Expr::NumberLiteral(ast::ExprNumberLiteral {
                         value: ast::Number::Int(_),
                         ..
                     }),
-                ],
-            ) = (ops, comparators)
+                ),
+            ] = comparisons
             {
                 checker.report_diagnostic_if_enabled(SysVersionInfoMinorCmpInt, left.range());
             }
@@ -306,10 +306,12 @@ pub(crate) fn compare(checker: &Checker, left: &Expr, ops: &[CmpOp], comparators
     }
 
     if is_sys(left, "version", checker.semantic()) {
-        if let (
-            [CmpOp::Lt | CmpOp::LtE | CmpOp::Gt | CmpOp::GtE],
-            [Expr::StringLiteral(ast::ExprStringLiteral { value, .. })],
-        ) = (ops, comparators)
+        if let [
+            (
+                CmpOp::Lt | CmpOp::LtE | CmpOp::Gt | CmpOp::GtE,
+                Expr::StringLiteral(ast::ExprStringLiteral { value, .. }),
+            ),
+        ] = comparisons
         {
             if value.len() == 1 {
                 checker.report_diagnostic_if_enabled(SysVersionCmpStr10, left.range());

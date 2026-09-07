@@ -122,9 +122,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 ));
             }
 
-            if let ast::Expr::Compare(ast::ExprCompare { ops, operands, .. }) = test
-                && ops.len() == 1
-                && let [left, single_comparator] = &**operands
+            if let ast::Expr::Compare(ast::ExprCompare {
+                left, comparisons, ..
+            }) = test
+                && let [(_, single_comparator)] = &**comparisons
             {
                 if let (Type::LiteralValue(left_type), Type::LiteralValue(right_type)) = (
                     self.expression_type(left),
@@ -135,7 +136,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     // For the specific case of a string-literal type compared with a bytes-literal type,
                     // cite their nominal-instance supertypes rather than their `Literal` types,
                     // since their `Literal` types look quite similar in their display representations.
-                    for node in [left, single_comparator] {
+                    for node in [left.as_ref(), single_comparator] {
                         if let Some(class) = self.expression_type(node).nominal_class(db, env) {
                             diagnostic.annotate(
                                 self.context
@@ -145,7 +146,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         }
                     }
                 } else {
-                    for node in [left, single_comparator] {
+                    for node in [left.as_ref(), single_comparator] {
                         match node {
                             ast::Expr::NoneLiteral(_)
                             | ast::Expr::BooleanLiteral(_)
@@ -619,11 +620,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let db = self.db();
         let env = self.program_environment();
 
-        if let ast::Expr::Compare(ast::ExprCompare { ops, operands, .. }) = test
-            && let [single_op] = &**ops
-            && let [left, single_comparator] = &**operands
+        if let ast::Expr::Compare(ast::ExprCompare {
+            left, comparisons, ..
+        }) = test
+            && let [(single_op, single_comparator)] = &**comparisons
             && let (ast::Expr::Call(call), other) | (other, ast::Expr::Call(call)) =
-                (left, single_comparator)
+                (left.as_ref(), single_comparator)
             && matches!(single_op, ast::CmpOp::Eq | ast::CmpOp::NotEq)
             && let ast::Arguments { args, keywords, .. } = &call.arguments
             && keywords.is_empty()
@@ -978,8 +980,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         let candidates = match operand {
             ast::Expr::Name(_) => [Some(operand), None],
-            ast::Expr::Compare(compare) if compare.ops.len() == 1 => {
-                [compare.operands.first(), compare.operands.get(1)]
+            ast::Expr::Compare(compare) if let [(_, right)] = &*compare.comparisons => {
+                [Some(compare.left.as_ref()), Some(right)]
             }
             ast::Expr::Call(call) => [call.arguments.args.first(), None],
             _ => return None,

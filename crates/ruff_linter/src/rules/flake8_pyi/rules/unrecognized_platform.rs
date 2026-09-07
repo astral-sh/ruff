@@ -101,11 +101,14 @@ impl Violation for UnrecognizedPlatformName {
 
 /// PYI007, PYI008
 pub(crate) fn unrecognized_platform(checker: &Checker, test: &Expr) {
-    let Expr::Compare(ast::ExprCompare { ops, operands, .. }) = test else {
+    let Expr::Compare(ast::ExprCompare {
+        left, comparisons, ..
+    }) = test
+    else {
         return;
     };
 
-    let ([op], [left, right]) = (&**ops, &**operands) else {
+    let [(op, right)] = &**comparisons else {
         return;
     };
 

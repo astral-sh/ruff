@@ -234,19 +234,23 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
                     ..
                 }) => Some((**operand).clone()),
 
-                Expr::Compare(ast::ExprCompare { ops, operands, .. })
-                    if let [
+                Expr::Compare(ast::ExprCompare {
+                    left, comparisons, ..
+                }) if let [
+                    (
                         op @ (ast::CmpOp::Eq
                         | ast::CmpOp::NotEq
                         | ast::CmpOp::In
                         | ast::CmpOp::NotIn
                         | ast::CmpOp::Is
                         | ast::CmpOp::IsNot),
-                    ] = ops.as_ref() =>
+                        right,
+                    ),
+                ] = comparisons.as_ref() =>
                 {
                     Some(Expr::Compare(ast::ExprCompare {
-                        ops: [op.negate()].into(),
-                        operands: operands.clone(),
+                        left: left.clone(),
+                        comparisons: [(op.negate(), right.clone())].into(),
                         range: TextRange::default(),
                         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                     }))

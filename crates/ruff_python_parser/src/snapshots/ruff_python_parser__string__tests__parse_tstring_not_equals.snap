@@ -25,27 +25,27 @@ expression: suite
                                                 ExprCompare {
                                                     node_index: NodeIndex(None),
                                                     range: 3..9,
-                                                    ops: [
-                                                        NotEq,
-                                                    ],
-                                                    operands: [
-                                                        NumberLiteral(
-                                                            ExprNumberLiteral {
-                                                                node_index: NodeIndex(None),
-                                                                range: 3..4,
-                                                                value: Int(
-                                                                    1,
-                                                                ),
-                                                            },
-                                                        ),
-                                                        NumberLiteral(
-                                                            ExprNumberLiteral {
-                                                                node_index: NodeIndex(None),
-                                                                range: 8..9,
-                                                                value: Int(
-                                                                    2,
-                                                                ),
-                                                            },
+                                                    left: NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            node_index: NodeIndex(None),
+                                                            range: 3..4,
+                                                            value: Int(
+                                                                1,
+                                                            ),
+                                                        },
+                                                    ),
+                                                    comparisons: [
+                                                        (
+                                                            NotEq,
+                                                            NumberLiteral(
+                                                                ExprNumberLiteral {
+                                                                    node_index: NodeIndex(None),
+                                                                    range: 8..9,
+                                                                    value: Int(
+                                                                        2,
+                                                                    ),
+                                                                },
+                                                            ),
                                                         ),
                                                     ],
                                                 },

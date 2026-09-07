@@ -274,11 +274,11 @@ fn find_last_nested_if(body: &[Stmt]) -> Option<&Expr> {
 
 /// Returns `true` if an expression is an `if __name__ == "__main__":` check.
 fn is_main_check(expr: &Expr) -> bool {
-    if let Expr::Compare(ast::ExprCompare { operands, .. }) = expr
-        && let [
-            Expr::Name(ast::ExprName { id, .. }),
-            Expr::StringLiteral(ast::ExprStringLiteral { value, .. }),
-        ] = &**operands
+    if let Expr::Compare(ast::ExprCompare {
+        left, comparisons, ..
+    }) = expr
+        && let Expr::Name(ast::ExprName { id, .. }) = left.as_ref()
+        && let [(_, Expr::StringLiteral(ast::ExprStringLiteral { value, .. }))] = &**comparisons
     {
         id == "__name__" && value == "__main__"
     } else {

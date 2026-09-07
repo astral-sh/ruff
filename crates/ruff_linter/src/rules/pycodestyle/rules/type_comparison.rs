@@ -1,4 +1,3 @@
-use itertools::Itertools;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use ruff_python_ast::{self as ast, CmpOp, Expr};
@@ -64,12 +63,9 @@ impl Violation for TypeComparison {
 /// E721
 pub(crate) fn type_comparison(checker: &Checker, compare: &ast::ExprCompare) {
     for (left, right) in compare
-        .operands
         .iter()
-        .tuple_windows()
-        .zip(&compare.ops)
-        .filter(|(_, op)| matches!(op, CmpOp::Eq | CmpOp::NotEq))
-        .map(|((left, right), _)| (left, right))
+        .filter(|(_, op, _)| matches!(op, CmpOp::Eq | CmpOp::NotEq))
+        .map(|(left, _, right)| (left, right))
     {
         // If either expression is a type...
         if is_type(left, checker.semantic()) || is_type(right, checker.semantic()) {

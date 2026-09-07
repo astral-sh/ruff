@@ -699,12 +699,12 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
             Expr::Compare(ast::ExprCompare {
                 range: _,
                 node_index: _,
-                ops,
-                operands: _,
+                comparisons,
+                left: _,
             }) => {
                 self.update_max_precedence_with_count(
                     OperatorPrecedence::Comparator,
-                    ops.len() as u32,
+                    comparisons.len() as u32,
                 );
             }
             Expr::Call(ast::ExprCall {
@@ -1433,10 +1433,10 @@ pub(crate) fn left_most<'expr>(expression: &'expr Expr, trivia: &TriviaRanges) -
             | Expr::If(ast::ExprIf { body: left, .. })
             | Expr::Call(ast::ExprCall { func: left, .. })
             | Expr::Attribute(ast::ExprAttribute { value: left, .. })
-            | Expr::Subscript(ast::ExprSubscript { value: left, .. }) => Some(&**left),
+            | Expr::Subscript(ast::ExprSubscript { value: left, .. })
+            | Expr::Compare(ast::ExprCompare { left, .. }) => Some(&**left),
 
             Expr::BoolOp(expr_bool_op) => expr_bool_op.values.first(),
-            Expr::Compare(compare) => compare.operands.first(),
 
             Expr::Generator(generator) if !generator.parenthesized => Some(&*generator.elt),
 

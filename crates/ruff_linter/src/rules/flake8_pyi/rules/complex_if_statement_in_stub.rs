@@ -46,12 +46,15 @@ impl Violation for ComplexIfStatementInStub {
 
 /// PYI002
 pub(crate) fn complex_if_statement_in_stub(checker: &Checker, test: &Expr) {
-    let Expr::Compare(ast::ExprCompare { operands, .. }) = test else {
+    let Expr::Compare(ast::ExprCompare {
+        left, comparisons, ..
+    }) = test
+    else {
         checker.report_diagnostic(ComplexIfStatementInStub, test.range());
         return;
     };
 
-    let [left, _] = &**operands else {
+    let [_] = &**comparisons else {
         checker.report_diagnostic(ComplexIfStatementInStub, test.range());
         return;
     };

@@ -51,11 +51,8 @@ impl AlwaysFixableViolation for LiteralMembership {
 
 /// PLR6201
 pub(crate) fn literal_membership(checker: &Checker, compare: &ast::ExprCompare) {
-    if !matches!(&*compare.ops, [CmpOp::In | CmpOp::NotIn]) {
-        return;
-    }
-
-    let [left, right] = &*compare.operands else {
+    let left = compare.left.as_ref();
+    let [(CmpOp::In | CmpOp::NotIn, right)] = &*compare.comparisons else {
         return;
     };
 

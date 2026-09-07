@@ -799,34 +799,36 @@ Module(
                             ExprCompare {
                                 node_index: NodeIndex(None),
                                 range: 549..558,
-                                ops: [
-                                    Lt,
-                                    Lt,
-                                ],
-                                operands: [
-                                    Name(
-                                        ExprName {
-                                            node_index: NodeIndex(None),
-                                            range: 549..550,
-                                            id: Name("a"),
-                                            ctx: Load,
-                                        },
+                                left: Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 549..550,
+                                        id: Name("a"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                comparisons: [
+                                    (
+                                        Lt,
+                                        Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 553..554,
+                                                id: Name("b"),
+                                                ctx: Load,
+                                            },
+                                        ),
                                     ),
-                                    Name(
-                                        ExprName {
-                                            node_index: NodeIndex(None),
-                                            range: 553..554,
-                                            id: Name("b"),
-                                            ctx: Load,
-                                        },
-                                    ),
-                                    Name(
-                                        ExprName {
-                                            node_index: NodeIndex(None),
-                                            range: 557..558,
-                                            id: Name("c"),
-                                            ctx: Load,
-                                        },
+                                    (
+                                        Lt,
+                                        Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 557..558,
+                                                id: Name("c"),
+                                                ctx: Load,
+                                            },
+                                        ),
                                     ),
                                 ],
                             },

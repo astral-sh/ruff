@@ -326,27 +326,27 @@ Module(
                                                         ExprCompare {
                                                             node_index: NodeIndex(None),
                                                             range: 79..83,
-                                                            ops: [
-                                                                NotEq,
-                                                            ],
-                                                            operands: [
-                                                                NumberLiteral(
-                                                                    ExprNumberLiteral {
-                                                                        node_index: NodeIndex(None),
-                                                                        range: 79..80,
-                                                                        value: Int(
-                                                                            3,
-                                                                        ),
-                                                                    },
-                                                                ),
-                                                                NumberLiteral(
-                                                                    ExprNumberLiteral {
-                                                                        node_index: NodeIndex(None),
-                                                                        range: 82..83,
-                                                                        value: Int(
-                                                                            4,
-                                                                        ),
-                                                                    },
+                                                            left: NumberLiteral(
+                                                                ExprNumberLiteral {
+                                                                    node_index: NodeIndex(None),
+                                                                    range: 79..80,
+                                                                    value: Int(
+                                                                        3,
+                                                                    ),
+                                                                },
+                                                            ),
+                                                            comparisons: [
+                                                                (
+                                                                    NotEq,
+                                                                    NumberLiteral(
+                                                                        ExprNumberLiteral {
+                                                                            node_index: NodeIndex(None),
+                                                                            range: 82..83,
+                                                                            value: Int(
+                                                                                4,
+                                                                            ),
+                                                                        },
+                                                                    ),
                                                                 ),
                                                             ],
                                                         },

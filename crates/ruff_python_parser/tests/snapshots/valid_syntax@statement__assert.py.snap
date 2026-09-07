@@ -18,27 +18,27 @@ Module(
                         ExprCompare {
                             node_index: NodeIndex(None),
                             range: 7..12,
-                            ops: [
-                                Lt,
-                            ],
-                            operands: [
-                                NumberLiteral(
-                                    ExprNumberLiteral {
-                                        node_index: NodeIndex(None),
-                                        range: 7..8,
-                                        value: Int(
-                                            1,
-                                        ),
-                                    },
-                                ),
-                                NumberLiteral(
-                                    ExprNumberLiteral {
-                                        node_index: NodeIndex(None),
-                                        range: 11..12,
-                                        value: Int(
-                                            2,
-                                        ),
-                                    },
+                            left: NumberLiteral(
+                                ExprNumberLiteral {
+                                    node_index: NodeIndex(None),
+                                    range: 7..8,
+                                    value: Int(
+                                        1,
+                                    ),
+                                },
+                            ),
+                            comparisons: [
+                                (
+                                    Lt,
+                                    NumberLiteral(
+                                        ExprNumberLiteral {
+                                            node_index: NodeIndex(None),
+                                            range: 11..12,
+                                            value: Int(
+                                                2,
+                                            ),
+                                        },
+                                    ),
                                 ),
                             ],
                         },

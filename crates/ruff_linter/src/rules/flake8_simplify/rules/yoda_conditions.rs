@@ -209,10 +209,9 @@ pub(crate) fn yoda_conditions(
     checker: &Checker,
     expr: &Expr,
     left: &Expr,
-    ops: &[CmpOp],
-    comparators: &[Expr],
+    comparisons: &[(CmpOp, Expr)],
 ) {
-    let ([op], [right]) = (ops, comparators) else {
+    let [(op, right)] = comparisons else {
         return;
     };
 

@@ -110,17 +110,18 @@ pub(crate) fn if_stmt_min_max(checker: &Checker, stmt_if: &ast::StmtIf) {
         return;
     };
 
-    let Some(ast::ExprCompare { ops, operands, .. }) = test.as_compare_expr() else {
+    let Some(ast::ExprCompare {
+        left, comparisons, ..
+    }) = test.as_compare_expr()
+    else {
         return;
     };
 
     // Ignore, e.g., `foo < bar < baz`.
-    let [op] = &**ops else {
+    let [(op, right)] = &**comparisons else {
         return;
     };
-    let [left, right] = &**operands else {
-        return;
-    };
+    let left = left.as_ref();
 
     // extract helpful info from expression of the form
     // `if cmp_left op cmp_right: target = assignment_value`

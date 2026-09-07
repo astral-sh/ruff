@@ -671,17 +671,20 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
     fn expr_compare(&self, expr_compare: &ast::ExprCompare) -> PossiblyNarrowedPlaces {
         let mut places = PossiblyNarrowedPlaces::default();
 
-        for operand in &expr_compare.operands {
+        for operand in expr_compare.operands() {
             self.add_narrowing_target(operand, &mut places);
         }
 
         let can_narrow_tagged_union_base = matches!(
-            &*expr_compare.ops,
-            [ast::CmpOp::Eq | ast::CmpOp::NotEq | ast::CmpOp::Is | ast::CmpOp::IsNot]
+            &*expr_compare.comparisons,
+            [(
+                ast::CmpOp::Eq | ast::CmpOp::NotEq | ast::CmpOp::Is | ast::CmpOp::IsNot,
+                _
+            )]
         );
 
         // Tagged-union checks can also narrow the base of a subscript or attribute on either side.
-        for expr in &expr_compare.operands {
+        for expr in expr_compare.operands() {
             if can_narrow_tagged_union_base
                 && let ast::Expr::Subscript(subscript) = expr.expression_value()
                 && let Some(place_expr) = PlaceExpr::try_from_expr(&subscript.value)

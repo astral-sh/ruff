@@ -3278,41 +3278,41 @@ Module(
                                     ExprCompare {
                                         node_index: NodeIndex(None),
                                         range: 2282..2292,
-                                        ops: [
-                                            Eq,
-                                        ],
-                                        operands: [
-                                            Name(
-                                                ExprName {
-                                                    node_index: NodeIndex(None),
-                                                    range: 2282..2283,
-                                                    id: Name("z"),
-                                                    ctx: Load,
-                                                },
-                                            ),
-                                            BinOp(
-                                                ExprBinOp {
-                                                    node_index: NodeIndex(None),
-                                                    range: 2287..2292,
-                                                    left: Name(
-                                                        ExprName {
-                                                            node_index: NodeIndex(None),
-                                                            range: 2287..2288,
-                                                            id: Name("x"),
-                                                            ctx: Load,
-                                                        },
-                                                    ),
-                                                    op: Mod,
-                                                    right: NumberLiteral(
-                                                        ExprNumberLiteral {
-                                                            node_index: NodeIndex(None),
-                                                            range: 2291..2292,
-                                                            value: Int(
-                                                                2,
-                                                            ),
-                                                        },
-                                                    ),
-                                                },
+                                        left: Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 2282..2283,
+                                                id: Name("z"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        comparisons: [
+                                            (
+                                                Eq,
+                                                BinOp(
+                                                    ExprBinOp {
+                                                        node_index: NodeIndex(None),
+                                                        range: 2287..2292,
+                                                        left: Name(
+                                                            ExprName {
+                                                                node_index: NodeIndex(None),
+                                                                range: 2287..2288,
+                                                                id: Name("x"),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                        op: Mod,
+                                                        right: NumberLiteral(
+                                                            ExprNumberLiteral {
+                                                                node_index: NodeIndex(None),
+                                                                range: 2291..2292,
+                                                                value: Int(
+                                                                    2,
+                                                                ),
+                                                            },
+                                                        ),
+                                                    },
+                                                ),
                                             ),
                                         ],
                                     },
@@ -7945,27 +7945,27 @@ Module(
                                     ExprCompare {
                                         node_index: NodeIndex(None),
                                         range: 5096..5101,
-                                        ops: [
-                                            Lt,
-                                        ],
-                                        operands: [
-                                            NumberLiteral(
-                                                ExprNumberLiteral {
-                                                    node_index: NodeIndex(None),
-                                                    range: 5096..5097,
-                                                    value: Int(
-                                                        1,
-                                                    ),
-                                                },
-                                            ),
-                                            NumberLiteral(
-                                                ExprNumberLiteral {
-                                                    node_index: NodeIndex(None),
-                                                    range: 5100..5101,
-                                                    value: Int(
-                                                        2,
-                                                    ),
-                                                },
+                                        left: NumberLiteral(
+                                            ExprNumberLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 5096..5097,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
+                                        comparisons: [
+                                            (
+                                                Lt,
+                                                NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        node_index: NodeIndex(None),
+                                                        range: 5100..5101,
+                                                        value: Int(
+                                                            2,
+                                                        ),
+                                                    },
+                                                ),
                                             ),
                                         ],
                                     },
@@ -8864,25 +8864,25 @@ Module(
                                 ExprCompare {
                                     node_index: NodeIndex(None),
                                     range: 5738..5752,
-                                    ops: [
-                                        Eq,
-                                    ],
-                                    operands: [
-                                        Name(
-                                            ExprName {
-                                                node_index: NodeIndex(None),
-                                                range: 5738..5743,
-                                                id: Name("query"),
-                                                ctx: Load,
-                                            },
-                                        ),
-                                        Name(
-                                            ExprName {
-                                                node_index: NodeIndex(None),
-                                                range: 5747..5752,
-                                                id: Name("event"),
-                                                ctx: Load,
-                                            },
+                                    left: Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 5738..5743,
+                                            id: Name("query"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    comparisons: [
+                                        (
+                                            Eq,
+                                            Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 5747..5752,
+                                                    id: Name("event"),
+                                                    ctx: Load,
+                                                },
+                                            ),
                                         ),
                                     ],
                                 },

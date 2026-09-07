@@ -28,3 +28,6 @@ x is not await y
 
 # All operators have the same precedence
 a < b == c > d is e not in f is not g <= h >= i != j
+
+# Nested comparisons preserve the surrounding operands and operators.
+a < b < (c <= d < e) < f

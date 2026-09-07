@@ -1646,20 +1646,17 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
         }
         Expr::Compare(
             compare @ ast::ExprCompare {
-                ops,
-                operands,
+                left,
+                comparisons,
                 range: _,
                 node_index: _,
             },
         ) => {
-            let Some((left, comparators)) = operands.split_first() else {
-                return;
-            };
             if checker.any_rule_enabled(&[Rule::NoneComparison, Rule::TrueFalseComparison]) {
                 pycodestyle::rules::literal_comparisons(checker, compare);
             }
             if checker.is_rule_enabled(Rule::IsLiteral) {
-                pyflakes::rules::invalid_literal_comparison(checker, left, ops, comparators, expr);
+                pyflakes::rules::invalid_literal_comparison(checker, left, comparisons, expr);
             }
             if checker.is_rule_enabled(Rule::TypeComparison) {
                 pycodestyle::rules::type_comparison(checker, compare);
@@ -1671,32 +1668,28 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 Rule::SysVersionInfoMinorCmpInt,
                 Rule::SysVersionCmpStr10,
             ]) {
-                flake8_2020::rules::compare(checker, left, ops, comparators);
+                flake8_2020::rules::compare(checker, left, comparisons);
             }
             if checker.is_rule_enabled(Rule::HardcodedPasswordString) {
-                flake8_bandit::rules::compare_to_hardcoded_password_string(
-                    checker,
-                    left,
-                    comparators,
-                );
+                flake8_bandit::rules::compare_to_hardcoded_password_string(checker, compare);
             }
             if checker.is_rule_enabled(Rule::ComparisonWithItself) {
-                pylint::rules::comparison_with_itself(checker, left, ops, comparators);
+                pylint::rules::comparison_with_itself(checker, compare);
             }
             if checker.is_rule_enabled(Rule::LiteralMembership) {
                 pylint::rules::literal_membership(checker, compare);
             }
             if checker.is_rule_enabled(Rule::ComparisonOfConstant) {
-                pylint::rules::comparison_of_constant(checker, left, ops, comparators);
+                pylint::rules::comparison_of_constant(checker, compare);
             }
             if checker.is_rule_enabled(Rule::CompareToEmptyString) {
-                pylint::rules::compare_to_empty_string(checker, left, ops, comparators);
+                pylint::rules::compare_to_empty_string(checker, compare);
             }
             if checker.is_rule_enabled(Rule::MagicValueComparison) {
-                pylint::rules::magic_value_comparison(checker, left, comparators);
+                pylint::rules::magic_value_comparison(checker, compare);
             }
             if checker.is_rule_enabled(Rule::NanComparison) {
-                pylint::rules::nan_comparison(checker, left, comparators);
+                pylint::rules::nan_comparison(checker, compare);
             }
             if checker.is_rule_enabled(Rule::InEmptyCollection) {
                 ruff::rules::in_empty_collection(checker, compare);
@@ -1705,25 +1698,19 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 flake8_simplify::rules::key_in_dict_compare(checker, compare);
             }
             if checker.is_rule_enabled(Rule::YodaConditions) {
-                flake8_simplify::rules::yoda_conditions(checker, expr, left, ops, comparators);
+                flake8_simplify::rules::yoda_conditions(checker, expr, left, comparisons);
             }
             if checker.is_rule_enabled(Rule::FloatEqualityComparison) {
                 ruff::rules::float_equality_comparison(checker, compare);
             }
             if checker.is_rule_enabled(Rule::PandasNuniqueConstantSeriesCheck) {
-                pandas_vet::rules::nunique_constant_series_check(
-                    checker,
-                    expr,
-                    left,
-                    ops,
-                    comparators,
-                );
+                pandas_vet::rules::nunique_constant_series_check(checker, expr, left, comparisons);
             }
             if checker.is_rule_enabled(Rule::TypeNoneComparison) {
                 refurb::rules::type_none_comparison(checker, compare);
             }
             if checker.is_rule_enabled(Rule::SingleItemMembershipTest) {
-                refurb::rules::single_item_membership_test(checker, expr, left, ops, comparators);
+                refurb::rules::single_item_membership_test(checker, expr, left, comparisons);
             }
         }
         Expr::NumberLiteral(number_literal @ ast::ExprNumberLiteral { .. }) => {

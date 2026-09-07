@@ -430,12 +430,10 @@ fn cmp_op(expr: &ast::ExprCompare, params: &Parameters) -> Option<&'static str> 
     let [arg1, arg2] = params.args.as_slice() else {
         return None;
     };
-    let [op] = &*expr.ops else {
+    let [(op, right)] = &*expr.comparisons else {
         return None;
     };
-    let [left, right] = &*expr.operands else {
-        return None;
-    };
+    let left = expr.left.as_ref();
 
     match op {
         ast::CmpOp::Eq => match_arguments(arg1, arg2, left, right).then_some("eq"),

@@ -78,11 +78,11 @@ pub(crate) fn boolean_chained_comparison(checker: &Checker, expr_bool_op: &ExprB
                 are_compare_expr_simplifiable(left_compare, right_compare)
             })
     {
-        let Some(Expr::Name(left_compare_right)) = left_compare.operands.last() else {
+        let Some((_, Expr::Name(left_compare_right))) = left_compare.comparisons.last() else {
             continue;
         };
 
-        let Some(Expr::Name(right_compare_left)) = right_compare.operands.first() else {
+        let Expr::Name(right_compare_left) = right_compare.left.as_ref() else {
             continue;
         };
 
@@ -144,9 +144,10 @@ pub(crate) fn boolean_chained_comparison(checker: &Checker, expr_bool_op: &ExprB
 
 /// Checks whether two compare expressions are simplifiable
 fn are_compare_expr_simplifiable(left: &ExprCompare, right: &ExprCompare) -> bool {
-    left.ops
+    left.comparisons
         .iter()
-        .chain(right.ops.iter())
+        .chain(right.comparisons.iter())
+        .map(|(op, _)| op)
         .tuple_windows::<(_, _)>()
         .all(|(left_operator, right_operator)| {
             matches!(

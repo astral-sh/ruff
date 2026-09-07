@@ -459,18 +459,18 @@ pub(crate) fn duplicate_isinstance_call(checker: &Checker, expr: &Expr) {
 
 fn match_eq_target(expr: &Expr) -> Option<(&Name, &Expr)> {
     let Expr::Compare(ast::ExprCompare {
-        ops,
-        operands,
+        left,
+        comparisons,
         range: _,
         node_index: _,
     }) = expr
     else {
         return None;
     };
-    if **ops != [CmpOp::Eq] {
+    let [(CmpOp::Eq, comparator)] = &**comparisons else {
         return None;
-    }
-    let [Expr::Name(ast::ExprName { id, .. }), comparator] = &**operands else {
+    };
+    let Expr::Name(ast::ExprName { id, .. }) = left.as_ref() else {
         return None;
     };
     if !comparator.is_name_expr() {
@@ -541,8 +541,8 @@ pub(crate) fn compare_with_tuple(checker: &Checker, expr: &Expr) {
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         };
         let node2 = ast::ExprCompare {
-            ops: [CmpOp::In].into(),
-            operands: Box::from([node1.into(), node.into()]),
+            left: Box::new(node1.into()),
+            comparisons: [(CmpOp::In, node.into())].into(),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         };

@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{self as ast, Expr, ExprCompare};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -73,16 +73,12 @@ fn password_target(target: &Expr) -> Option<&str> {
 }
 
 /// S105
-pub(crate) fn compare_to_hardcoded_password_string(
-    checker: &Checker,
-    left: &Expr,
-    comparators: &[Expr],
-) {
-    for comp in comparators {
+pub(crate) fn compare_to_hardcoded_password_string(checker: &Checker, compare: &ExprCompare) {
+    for (_, comp) in &compare.comparisons {
         if string_literal(comp).is_none_or(str::is_empty) {
             continue;
         }
-        let Some(name) = password_target(left) else {
+        let Some(name) = password_target(&compare.left) else {
             continue;
         };
         checker.report_diagnostic(

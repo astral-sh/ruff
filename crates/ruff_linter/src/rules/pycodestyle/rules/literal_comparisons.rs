@@ -213,14 +213,9 @@ pub(crate) fn literal_comparisons(checker: &Checker, compare: &ast::ExprCompare)
     let mut diagnostics = vec![];
 
     // Check `left`.
-    let Some((left, comparators)) = compare.operands.split_first() else {
-        return;
-    };
+    let left = compare.left.as_ref();
     let mut comparator = left;
-    let [op, ..] = &*compare.ops else {
-        return;
-    };
-    let [next, ..] = comparators else {
+    let [(op, next), ..] = &*compare.comparisons else {
         return;
     };
 
@@ -247,7 +242,7 @@ pub(crate) fn literal_comparisons(checker: &Checker, compare: &ast::ExprCompare)
                 if let Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. }) = comparator {
                     match op {
                         EqCmpOp::Eq => {
-                            let cond = if compare.ops.len() == 1 {
+                            let cond = if compare.comparisons.len() == 1 {
                                 Some(SourceCodeSnippet::from_str(checker.locator().slice(next)))
                             } else {
                                 None
@@ -264,7 +259,7 @@ pub(crate) fn literal_comparisons(checker: &Checker, compare: &ast::ExprCompare)
                             diagnostics.push(diagnostic);
                         }
                         EqCmpOp::NotEq => {
-                            let cond = if compare.ops.len() == 1 {
+                            let cond = if compare.comparisons.len() == 1 {
                                 Some(SourceCodeSnippet::from_str(checker.locator().slice(next)))
                             } else {
                                 None
@@ -287,7 +282,7 @@ pub(crate) fn literal_comparisons(checker: &Checker, compare: &ast::ExprCompare)
     }
 
     // Check each comparator in order.
-    for (index, (op, next)) in compare.ops.iter().zip(comparators).enumerate() {
+    for (index, (op, next)) in compare.comparisons.iter().enumerate() {
         if helpers::is_constant_non_singleton(comparator) {
             comparator = next;
             continue;
@@ -325,7 +320,7 @@ pub(crate) fn literal_comparisons(checker: &Checker, compare: &ast::ExprCompare)
                                 }
                             }
 
-                            let cond = if compare.ops.len() == 1 {
+                            let cond = if compare.comparisons.len() == 1 {
                                 Some(SourceCodeSnippet::from_str(
                                     checker.locator().slice(comparator),
                                 ))
@@ -344,7 +339,7 @@ pub(crate) fn literal_comparisons(checker: &Checker, compare: &ast::ExprCompare)
                             diagnostics.push(diagnostic);
                         }
                         EqCmpOp::NotEq => {
-                            let cond = if compare.ops.len() == 1 {
+                            let cond = if compare.comparisons.len() == 1 {
                                 Some(SourceCodeSnippet::from_str(
                                     checker.locator().slice(comparator),
                                 ))
@@ -373,19 +368,17 @@ pub(crate) fn literal_comparisons(checker: &Checker, compare: &ast::ExprCompare)
     // TODO(charlie): Respect `noqa` directives. If one of the operators has a
     // `noqa`, but another doesn't, both will be removed here.
     if !bad_ops.is_empty() {
-        let ops = compare
-            .ops
+        let comparisons = compare
+            .comparisons
             .iter()
             .enumerate()
-            .map(|(idx, op)| bad_ops.get(&idx).unwrap_or(op))
-            .copied()
-            .collect::<Vec<_>>();
+            .map(|(idx, (op, right))| (*bad_ops.get(&idx).unwrap_or(op), right));
 
         let tokens = checker.tokens();
         let source = checker.source();
 
-        let content = match (&*compare.ops, comparators) {
-            ([op], [comparator]) => {
+        let content = match &*compare.comparisons {
+            [(op, comparator)] => {
                 if let Some(kind) = is_redundant_boolean_comparison(*op, left) {
                     let needs_wrap = left.range().start() != compare.range().start();
                     generate_redundant_comparison(
@@ -395,10 +388,10 @@ pub(crate) fn literal_comparisons(checker: &Checker, compare: &ast::ExprCompare)
                     let needs_wrap = comparator.range().end() != compare.range().end();
                     generate_redundant_comparison(compare, tokens, source, left, kind, needs_wrap)
                 } else {
-                    generate_comparison(left, &ops, comparators, compare.into(), tokens, source)
+                    generate_comparison(left, comparisons, compare.into(), tokens, source)
                 }
             }
-            _ => generate_comparison(left, &ops, comparators, compare.into(), tokens, source),
+            _ => generate_comparison(left, comparisons, compare.into(), tokens, source),
         };
 
         for diagnostic in &mut diagnostics {

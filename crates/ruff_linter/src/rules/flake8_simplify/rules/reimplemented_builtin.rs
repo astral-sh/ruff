@@ -150,13 +150,13 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &Checker, stmt: &Stmt) {
                 {
                     *operand.clone()
                 } else if let Expr::Compare(ast::ExprCompare {
-                    ops,
-                    operands,
+                    left,
+                    comparisons,
                     range: _,
                     node_index: _,
                 }) = &loop_.test
                 {
-                    if let ([op], [_, _]) = (&**ops, &**operands) {
+                    if let [(op, right)] = &**comparisons {
                         let op = match op {
                             CmpOp::Eq => CmpOp::NotEq,
                             CmpOp::NotEq => CmpOp::Eq,
@@ -170,8 +170,8 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &Checker, stmt: &Stmt) {
                             CmpOp::NotIn => CmpOp::In,
                         };
                         let node = ast::ExprCompare {
-                            ops: [op].into(),
-                            operands: operands.clone(),
+                            left: left.clone(),
+                            comparisons: [(op, right.clone())].into(),
                             range: TextRange::default(),
                             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                         };

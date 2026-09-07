@@ -1,5 +1,4 @@
-use itertools::Itertools;
-use ruff_python_ast::{CmpOp, Expr};
+use ruff_python_ast::{CmpOp, ExprCompare};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
@@ -52,17 +51,8 @@ impl Violation for ComparisonOfConstant {
 }
 
 /// PLR0133
-pub(crate) fn comparison_of_constant(
-    checker: &Checker,
-    left: &Expr,
-    ops: &[CmpOp],
-    comparators: &[Expr],
-) {
-    for ((left, right), op) in std::iter::once(left)
-        .chain(comparators)
-        .tuple_windows()
-        .zip(ops)
-    {
+pub(crate) fn comparison_of_constant(checker: &Checker, compare: &ExprCompare) {
+    for (left, op, right) in compare.iter() {
         if left.is_literal_expr() && right.is_literal_expr() {
             checker.report_diagnostic(
                 ComparisonOfConstant {
