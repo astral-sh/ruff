@@ -62,7 +62,7 @@ impl ScopedDefinitionId {
     /// unbound or undeclared at a given usage site.
     /// When creating a use-def-map builder, we always add an empty `DefinitionState::Undefined` definition
     /// at index 0, so this ID is always present.
-    const UNBOUND: ScopedDefinitionId = ScopedDefinitionId::from_u32(0);
+    pub(super) const UNBOUND: ScopedDefinitionId = ScopedDefinitionId::from_u32(0);
 
     pub(crate) fn is_unbound(self) -> bool {
         self == Self::UNBOUND
@@ -369,8 +369,12 @@ impl Bindings {
     ) {
         // If we are in a class scope, and the unbound name binding was previously visible, but we will
         // now replace it, record the narrowing constraints on it:
-        if is_class_scope && is_place_name && self.live_bindings[0].binding().is_unbound() {
-            self.unbound_narrowing_constraint = Some(self.live_bindings[0].narrowing_constraint);
+        if is_class_scope
+            && is_place_name
+            && let Some(binding) = self.live_bindings.first()
+            && binding.binding().is_unbound()
+        {
+            self.unbound_narrowing_constraint = Some(binding.narrowing_constraint);
         }
         // If the new binding is a shadowing type, it replaces previous live bindings in this path
         // (unless they're marked as not shadowable), and has no constraints.
