@@ -338,6 +338,31 @@ fn benchmark_tuple_implicit_instance_attributes(criterion: &mut Criterion) {
     });
 }
 
+/// Regression benchmark for <https://github.com/astral-sh/ty/issues/4466>.
+///
+/// Uses of empty dictionaries in a nested conditional constrain their initializers. Without
+/// normalization, these constraints gain another layer of dictionary types on each cycle iteration.
+fn benchmark_recursive_collection_use_constraints(criterion: &mut Criterion) {
+    setup_rayon();
+
+    criterion.bench_function("ty_micro[recursive_collection_use_constraints]", |b| {
+        b.iter_batched_ref(
+            || {
+                setup_micro_case(
+                    r#"
+                    def f(flag: bool):
+                        x = {}
+                        y = {}
+                        return {"a": x, "b": {"c": y} if flag else {"d": {"e": y}}}
+                    "#,
+                )
+            },
+            |case| assert_eq!(case.db.check().len(), 0),
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 fn benchmark_complex_constrained_attributes_1(criterion: &mut Criterion) {
     setup_rayon();
 
@@ -1871,6 +1896,7 @@ criterion_group!(
     benchmark_many_string_assignments,
     benchmark_many_tuple_assignments,
     benchmark_tuple_implicit_instance_attributes,
+    benchmark_recursive_collection_use_constraints,
     benchmark_complex_constrained_attributes_1,
     benchmark_complex_constrained_attributes_2,
     benchmark_complex_constrained_attributes_3,
