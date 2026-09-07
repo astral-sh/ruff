@@ -9,8 +9,8 @@
 strict-generic-narrowing = false
 ```
 
-Narrowing with `callable(x)` or `isinstance(x, Callable)` narrow a union to just the callable types,
-while preserving their signatures:
+Narrowing with `callable(x)` or `isinstance(x, Callable)` narrows a union to just the callable
+types, while preserving their signatures:
 
 ```py
 from typing import Any, Callable
@@ -57,8 +57,8 @@ def f(f: object):
 strict-generic-narrowing = true
 ```
 
-Narrowing with `callable(x)` or `isinstance(x, Callable)` narrow a union to just the callable types,
-while preserving their signatures. Exactly the same as in non-strict mode.
+Narrowing with `callable(x)` or `isinstance(x, Callable)` narrows a union to just the callable
+types, while preserving their signatures. Exactly the same as in non-strict mode.
 
 ```py
 from typing import Any, Callable
