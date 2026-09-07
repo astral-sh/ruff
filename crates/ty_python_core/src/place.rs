@@ -6,9 +6,11 @@ use crate::member::{
 use crate::predicate::PatternPredicate;
 use crate::symbol::{ScopedSymbolId, Symbol, SymbolTable, SymbolTableBuilder};
 use crate::{Db, PossiblyNarrowedPlaces};
+use char_str::CharString;
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_index::IndexVec;
 use ruff_python_ast as ast;
+use ruff_python_ast::name::Name;
 use smallvec::SmallVec;
 use std::hash::Hash;
 use std::iter::FusedIterator;
@@ -342,7 +344,15 @@ impl PlaceTableBuilder {
 
     pub(crate) fn add_symbol(&mut self, symbol: Symbol) -> (ScopedSymbolId, bool) {
         let (id, is_new) = self.symbols.add(symbol);
+        self.register_symbol(id, is_new)
+    }
 
+    pub(crate) fn add_symbol_name(&mut self, name: &Name) -> (ScopedSymbolId, bool) {
+        let (id, is_new) = self.symbols.add_name(name);
+        self.register_symbol(id, is_new)
+    }
+
+    fn register_symbol(&mut self, id: ScopedSymbolId, is_new: bool) -> (ScopedSymbolId, bool) {
         if is_new {
             let new_id = self.associated_symbol_members.push(SmallVec::new_const());
             debug_assert_eq!(new_id, id);
@@ -353,7 +363,10 @@ impl PlaceTableBuilder {
 
     fn add_member(&mut self, member: Member) -> (ScopedMemberId, bool) {
         let (id, is_new) = self.member.add(member);
+        self.register_member(id, is_new)
+    }
 
+    fn register_member(&mut self, id: ScopedMemberId, is_new: bool) -> (ScopedMemberId, bool) {
         if is_new {
             let new_id = self.associated_sub_members.push(SmallVec::new_const());
             debug_assert_eq!(new_id, id);
@@ -376,6 +389,25 @@ impl PlaceTableBuilder {
         }
 
         (id, is_new)
+    }
+
+    /// Inserts an AST place without creating owned strings for existing entries.
+    pub(crate) fn add_expr(
+        &mut self,
+        expr: &ast::Expr,
+        is_instance_attribute: bool,
+        path_buffer: &mut CharString,
+    ) -> Option<(ScopedPlaceId, bool)> {
+        if let ast::Expr::Name(name) = expr {
+            let (id, is_new) = self.add_symbol_name(&name.id);
+            Some((id.into(), is_new))
+        } else {
+            let (id, is_new) =
+                self.member
+                    .add_expr(expr.into(), is_instance_attribute, path_buffer)?;
+            let (id, is_new) = self.register_member(id, is_new);
+            Some((id.into(), is_new))
+        }
     }
 
     pub(crate) fn add_place(&mut self, place: PlaceExpr) -> (ScopedPlaceId, bool) {

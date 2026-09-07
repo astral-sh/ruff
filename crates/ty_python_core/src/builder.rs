@@ -1,6 +1,7 @@
 use std::cell::{OnceCell, RefCell};
 use std::sync::Arc;
 
+use char_str::CharString;
 use except_handlers::{ExceptionContextStackManager, ExceptionHandlers};
 use itertools::Itertools;
 use ruff_python_ast::helpers::{Truthiness, any_over_expr, is_dotted_name};
@@ -276,6 +277,8 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     scopes: IndexVec<FileScopeId, Scope>,
     scope_ids_by_scope: IndexVec<FileScopeId, ScopeId<'db>>,
     place_tables: IndexVec<FileScopeId, PlaceTableBuilder>,
+    /// Reused across scopes when looking up concatenated member paths.
+    member_path_buffer: CharString,
     ast_ids: IndexVec<FileScopeId, AstIdsBuilder>,
     // Box to avoid copying large builders when this index grows.
     use_def_maps: IndexVec<FileScopeId, Box<UseDefMapBuilder<'db>>>,
@@ -339,6 +342,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
             scopes: IndexVec::new(),
             place_tables: IndexVec::new(),
+            member_path_buffer: CharString::new(),
             ast_ids: IndexVec::new(),
             scope_ids_by_scope: IndexVec::new(),
             use_def_maps: IndexVec::new(),
@@ -1380,8 +1384,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
     /// Add a symbol to the place table and the use-def map.
     /// Return the [`ScopedPlaceId`] that uniquely identifies the symbol in both.
-    fn add_symbol(&mut self, name: Name) -> ScopedSymbolId {
-        let (symbol_id, added) = self.current_place_table_mut().add_symbol(Symbol::new(name));
+    fn add_symbol(&mut self, name: &Name) -> ScopedSymbolId {
+        let (symbol_id, added) = self.current_place_table_mut().add_symbol_name(name);
         if added {
             self.current_use_def_map_mut().add_place(symbol_id.into());
         }
@@ -1671,7 +1675,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         };
         node.value.as_ref()?;
 
-        let place = self.add_symbol(name.id.clone()).into();
+        let place = self.add_symbol(&name.id).into();
         let definition =
             self.create_definition(place, AnnotatedAssignmentDefinitionNodeRef { node });
         self.mark_place_declared(place);
@@ -1923,7 +1927,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 continue;
             }
 
-            let place: ScopedPlaceId = self.add_symbol(name.clone()).into();
+            let place: ScopedPlaceId = self.add_symbol(&name).into();
             let definition = Definition::new(
                 self.db,
                 self.current_scope_id(),
@@ -1999,7 +2003,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
             let binding_status = self.comprehension_binding_status(&name, &declarations);
 
-            let symbol = self.add_symbol(name.clone());
+            let symbol = self.add_symbol(&name);
             debug_assert!(
                 declarations
                     .iter()
@@ -2998,7 +3002,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 };
                 self.scopes_by_expression
                     .record_expression(name, self.current_scope());
-                let symbol = self.add_symbol(name.id.clone());
+                let symbol = self.add_symbol(&name.id);
                 // TODO create Definition for PEP 695 typevars
                 // note that the "bound" on the typevar is a totally different thing than whether
                 // or not a name is "bound" by a typevar declaration; the latter is always true.
@@ -3159,7 +3163,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             self.declare_parameter(parameter);
         }
         if let Some(vararg) = parameters.vararg.as_ref() {
-            let symbol = self.add_symbol(vararg.name.id().clone());
+            let symbol = self.add_symbol(vararg.name.id());
             self.current_place_table_mut()
                 .symbol_mut(symbol)
                 .mark_parameter();
@@ -3169,7 +3173,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             );
         }
         if let Some(kwarg) = parameters.kwarg.as_ref() {
-            let symbol = self.add_symbol(kwarg.name.id().clone());
+            let symbol = self.add_symbol(kwarg.name.id());
             self.current_place_table_mut()
                 .symbol_mut(symbol)
                 .mark_parameter();
@@ -3181,7 +3185,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     }
 
     fn declare_parameter(&mut self, parameter: &'ast ast::ParameterWithDefault) {
-        let symbol = self.add_symbol(parameter.name().id().clone());
+        let symbol = self.add_symbol(parameter.name().id());
 
         self.add_definition(
             symbol.into(),
@@ -3208,7 +3212,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             index += 1;
         }
         if let Some(vararg) = parameters.vararg.as_ref() {
-            let symbol = self.add_symbol(vararg.name.id().clone());
+            let symbol = self.add_symbol(vararg.name.id());
             self.current_place_table_mut()
                 .symbol_mut(symbol)
                 .mark_parameter();
@@ -3227,7 +3231,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             index += 1;
         }
         if let Some(kwarg) = parameters.kwarg.as_ref() {
-            let symbol = self.add_symbol(kwarg.name.id().clone());
+            let symbol = self.add_symbol(kwarg.name.id());
             self.current_place_table_mut()
                 .symbol_mut(symbol)
                 .mark_parameter();
@@ -3248,7 +3252,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         parameter: &'ast ast::ParameterWithDefault,
         lambda: &'ast ast::ExprLambda,
     ) {
-        let symbol = self.add_symbol(parameter.name().id().clone());
+        let symbol = self.add_symbol(parameter.name().id());
 
         self.add_definition(
             symbol.into(),
@@ -3416,60 +3420,57 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // equivalent because `walk_expr` is a no-op; for attribute/subscript places,
                 // child evaluation can introduce bindings (for example via walrus operators),
                 // and those bindings need to exist before we register parent/member associations.
-                let mut deferred_effects = None;
-                if let Some(mut place_expr) = PlaceExpr::try_from_expr(expr) {
-                    if let Some(method_scope_id) = self.is_method_or_eagerly_executed_in_method()
-                        && let PlaceExpr::Member(member) = &mut place_expr
-                        && member.is_instance_attribute_candidate()
-                        && let Some(attribute) = expr.as_attribute_expr()
-                    {
-                        // We specifically mark direct attribute assignments to the first
-                        // parameter of a method, i.e. typically `self` or `cls`.
-                        // However, we must check that the symbol hasn't been shadowed by an
-                        // intermediate scope (e.g., a comprehension variable: `for self in [...]`)
-                        // and that the AST base is still the original name rather than a
-                        // rebinding expression such as `(self := other).x`.
-                        let accessed_object_refers_to_first_parameter =
-                            self.current_first_parameter_name.is_some_and(|first| {
-                                attribute
-                                    .value
-                                    .as_name_expr()
-                                    .is_some_and(|name| name.id == first)
-                                    && !self.is_symbol_bound_in_intermediate_eager_scopes(
-                                        first,
-                                        method_scope_id,
-                                    )
-                            });
+                // We specifically mark direct attribute assignments to the first
+                // parameter of a method, i.e. typically `self` or `cls`.
+                // However, we must check that the symbol hasn't been shadowed by an
+                // intermediate scope (e.g., a comprehension variable: `for self in [...]`)
+                // and that the AST base is still the original name rather than a
+                // rebinding expression such as `(self := other).x`.
+                // Resolve shadowing before walking, while the original scope state is available.
+                let is_instance_attribute = if let Some(method_scope_id) =
+                    self.is_method_or_eagerly_executed_in_method()
+                    && let Some(attribute) = expr.as_attribute_expr()
+                {
+                    self.current_first_parameter_name.is_some_and(|first| {
+                        attribute
+                            .value
+                            .as_name_expr()
+                            .is_some_and(|name| name.id == first)
+                            && !self.is_symbol_bound_in_intermediate_eager_scopes(
+                                first,
+                                method_scope_id,
+                            )
+                    })
+                } else {
+                    false
+                };
 
-                        if accessed_object_refers_to_first_parameter {
-                            member.mark_instance_attribute();
-                        }
+                let (is_use, is_definition) = match (ctx, self.current_assignment()) {
+                    (ast::ExprContext::Store, Some(CurrentAssignment::AugAssign(_))) => {
+                        // Record the target load now; the definition is recorded separately
+                        // after visiting the right-hand side.
+                        (true, false)
                     }
-
-                    let (is_use, is_definition) = match (ctx, self.current_assignment()) {
-                        (ast::ExprContext::Store, Some(CurrentAssignment::AugAssign(_))) => {
-                            // Record the target load now; the definition is recorded separately
-                            // after visiting the right-hand side.
-                            (true, false)
-                        }
-                        (ast::ExprContext::Load, _) => (true, false),
-                        (ast::ExprContext::Store, _) => (false, true),
-                        (ast::ExprContext::Del, _) => (true, true),
-                        (ast::ExprContext::Invalid, _) => (false, false),
-                    };
-                    deferred_effects = Some((place_expr, is_use, is_definition));
-                }
+                    (ast::ExprContext::Load, _) => (true, false),
+                    (ast::ExprContext::Store, _) => (false, true),
+                    (ast::ExprContext::Del, _) => (true, true),
+                    (ast::ExprContext::Invalid, _) => (false, false),
+                };
 
                 walk_expr(self, expr);
 
-                let is_use = deferred_effects
-                    .as_ref()
-                    .is_some_and(|(_, is_use, _)| *is_use);
                 let can_raise = self.place_access_can_raise(expr, is_use);
                 self.record_exception_checkpoint_if(can_raise);
 
-                if let Some((place_expr, is_use, is_definition)) = deferred_effects {
-                    let place_id = self.add_place(place_expr);
+                let scope_id = self.current_scope();
+                if let Some((place_id, added)) = self.place_tables[scope_id].add_expr(
+                    expr,
+                    is_instance_attribute,
+                    &mut self.member_path_buffer,
+                ) {
+                    if added {
+                        self.current_use_def_map_mut().add_place(place_id);
+                    }
 
                     if is_use {
                         self.record_place_use(place_id, expr);
@@ -3904,7 +3905,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // The symbol for the function name itself has to be evaluated
                 // at the end to match the runtime evaluation of parameter defaults
                 // and return-type annotations.
-                let symbol = self.add_symbol(name.id.clone());
+                let symbol = self.add_symbol(&name.id);
 
                 // Record a use of the function name in the scope that it is defined in, so that it
                 // can be used to find previously defined functions with the same name. This is
@@ -3949,7 +3950,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 self.record_exception_checkpoint();
 
                 // In Python runtime semantics, a class is registered after its scope is evaluated.
-                let symbol = self.add_symbol(class.name.id.clone());
+                let symbol = self.add_symbol(&class.name.id);
                 self.add_definition(symbol.into(), class);
             }
             ast::Stmt::TypeAlias(type_alias) => {
@@ -3957,8 +3958,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     type_alias
                         .name
                         .as_name_expr()
-                        .map(|name| name.id.clone())
-                        .unwrap_or("<unknown>".into()),
+                        .map(|name| &name.id)
+                        .unwrap_or(&Name::new_static("<unknown>")),
                 );
                 self.add_definition(symbol.into(), type_alias);
                 self.visit_expr(&type_alias.name);
@@ -3991,7 +3992,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         (Name::new(alias.name.id.split('.').next().unwrap()), false)
                     };
 
-                    let symbol = self.add_symbol(symbol_name);
+                    let symbol = self.add_symbol(&symbol_name);
                     self.add_definition(
                         symbol.into(),
                         ImportDefinitionNodeRef {
@@ -4059,7 +4060,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                         if !is_immediately_shadowed {
                             let direct_submodule_name = Name::new(direct_submodule);
-                            let symbol = self.add_symbol(direct_submodule_name);
+                            let symbol = self.add_symbol(&direct_submodule_name);
 
                             let module_index = if node.level == 0 {
                                 // "whatever.thispackage.x.y" we want `x`
@@ -4139,7 +4140,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         //
                         // For more details, see the doc-comment on `StarImportPlaceholderPredicate`.
                         for export in exported_names(self.db, referenced_program_file) {
-                            let symbol_id = self.add_symbol(export.clone());
+                            let symbol_id = self.add_symbol(export);
                             let node_ref = StarImportDefinitionNodeRef { node, symbol_id };
                             let star_import = StarImportPlaceholderPredicate::new(
                                 self.db,
@@ -4210,7 +4211,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         && alias.name.id == "annotations"
                         && node.module.as_deref() == Some("__future__");
 
-                    let symbol = self.add_symbol(symbol_name.clone());
+                    let symbol = self.add_symbol(symbol_name);
 
                     self.add_definition(
                         symbol.into(),
@@ -4332,7 +4333,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 }
 
                 if let ast::Expr::Name(name) = &*node.target {
-                    let symbol_id = self.add_symbol(name.id.clone());
+                    let symbol_id = self.add_symbol(&name.id);
                     let symbol = self.current_place_table().symbol(symbol_id);
                     // Check whether the variable has been declared global.
                     if symbol.is_global() {
@@ -5083,7 +5084,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         // which is invalid syntax. However, it's still pretty obvious here that the user
                         // *wanted* `e` to be bound, so we should still create a definition here nonetheless.
                         let symbol = if let Some(symbol_name) = symbol_name {
-                            let symbol = self.add_symbol(symbol_name.id.clone());
+                            let symbol = self.add_symbol(&symbol_name.id);
 
                             self.add_definition(
                                 symbol.into(),
@@ -5300,7 +5301,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 for name in names {
                     self.scopes_by_expression
                         .record_expression(name, self.current_scope());
-                    let symbol_id = self.add_symbol(name.id.clone());
+                    let symbol_id = self.add_symbol(&name.id);
                     let symbol = self.current_place_table().symbol(symbol_id);
                     // Check whether the variable has already been accessed in this scope.
                     if (symbol.is_bound() || symbol.is_declared() || symbol.is_used())
@@ -5355,7 +5356,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 for name in names {
                     self.scopes_by_expression
                         .record_expression(name, self.current_scope());
-                    let symbol_id = self.add_symbol(name.id.clone());
+                    let symbol_id = self.add_symbol(&name.id);
                     let symbol = self.current_place_table().symbol(symbol_id);
                     // Check whether the variable has already been accessed in this scope.
                     if (symbol.is_bound() || symbol.is_declared() || symbol.is_used())
@@ -5706,7 +5707,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
             node_index: _,
         }) = pattern
         {
-            let symbol = self.add_symbol(name.id().clone());
+            let symbol = self.add_symbol(name.id());
             let state = self.current_match_case.as_ref().unwrap();
             self.add_definition(
                 symbol.into(),
@@ -5727,7 +5728,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
             rest: Some(name), ..
         }) = pattern
         {
-            let symbol = self.add_symbol(name.id().clone());
+            let symbol = self.add_symbol(name.id());
             let state = self.current_match_case.as_ref().unwrap();
             self.add_definition(
                 symbol.into(),

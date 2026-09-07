@@ -511,12 +511,11 @@ impl MemberReverseTable {
     fn entry<'a>(
         &'a mut self,
         members: &IndexVec<ScopedMemberId, Member>,
-        member: &Member,
+        member: &MemberExprRef<'_>,
     ) -> Entry<'a, ScopedMemberId> {
-        let member = member.expression.as_ref();
         self.0.entry(
-            hash_single(&member),
-            |id| members[*id].expression.as_ref() == member,
+            hash_single(member),
+            |id| members[*id].expression.as_ref() == *member,
             |id| hash_single(&members[*id].expression.as_ref()),
         )
     }
@@ -620,7 +619,9 @@ impl MemberTableBuilder {
     ///
     /// Members are identified by their expression, which is hashed to find the entry in the table.
     pub(super) fn add(&mut self, member: Member) -> (ScopedMemberId, bool) {
-        let entry = self.reverse.entry(&self.table.members, &member);
+        let entry = self
+            .reverse
+            .entry(&self.table.members, &member.expression.as_ref());
 
         match entry {
             Entry::Occupied(entry) => {
@@ -638,6 +639,48 @@ impl MemberTableBuilder {
                 (id, true)
             }
         }
+    }
+
+    /// Adds an AST member, allocating its retained path and segments only on a miss.
+    pub(super) fn add_expr(
+        &mut self,
+        expr: ast::ExprRef<'_>,
+        is_instance_attribute: bool,
+        path_buffer: &mut CharString,
+    ) -> Option<(ScopedMemberId, bool)> {
+        let mut parts = SmallVec::new_const();
+        let mut segments = SmallVec::new_const();
+        let mut path_len = TextSize::new(0);
+        MemberExprBuilder::collect_expr(expr, &mut parts, &mut segments, &mut path_len)?;
+        if segments.is_empty() {
+            return None;
+        }
+
+        path_buffer.clear();
+        path_buffer.reserve(path_len.to_usize());
+        for part in &parts {
+            path_buffer.push_str(part.as_ref());
+        }
+        let expression = MemberExprRef {
+            path: path_buffer.as_str(),
+            segments: SegmentsRef::Heap(&segments),
+        };
+
+        let (id, is_new) = match self.reverse.entry(&self.table.members, &expression) {
+            Entry::Occupied(entry) => (*entry.get(), false),
+            Entry::Vacant(entry) => {
+                let id = self.table.members.push(Member::new(MemberExpr {
+                    path: CharStr::from(path_buffer.as_str()),
+                    segments: Segments::from_vec(segments),
+                }));
+                entry.insert(id);
+                (id, true)
+            }
+        };
+        if is_instance_attribute {
+            self.table.members[id].mark_instance_attribute();
+        }
+        Some((id, is_new))
     }
 
     pub(super) fn build(self) -> MemberTable {
@@ -1036,7 +1079,63 @@ fn hash_single<T: Hash>(value: &T) -> u64 {
 mod tests {
     use std::assert_matches;
 
+    use ruff_python_parser::parse_expression;
+
     use super::*;
+
+    #[test]
+    fn ast_insertion_reuses_members_and_preserves_segment_boundaries() {
+        let first = parse_expression("long_object_name.attribute['value']").unwrap();
+        let second = parse_expression("long_object_name.attributevalue['']").unwrap();
+        let mut table = MemberTableBuilder::default();
+        let mut path_buffer = CharString::new();
+
+        let (first_id, is_new) = table
+            .add_expr(first.expr().into(), false, &mut path_buffer)
+            .unwrap();
+        assert!(is_new);
+        table.member_mut(first_id).mark_bound();
+
+        // These expressions have identical concatenated paths, but different segment boundaries.
+        let (second_id, is_new) = table
+            .add_expr(second.expr().into(), false, &mut path_buffer)
+            .unwrap();
+        assert!(is_new);
+        assert_ne!(first_id, second_id);
+        assert_eq!(
+            table.member(first_id).expression.path,
+            table.member(second_id).expression.path
+        );
+
+        assert_eq!(
+            table.add_expr(first.expr().into(), false, &mut path_buffer),
+            Some((first_id, false)),
+        );
+        assert!(table.member(first_id).is_bound());
+
+        // The existing owned insertion and borrowed lookup must use the same hash and equality.
+        let owned = MemberExpr::try_from_expr(second.expr().into()).unwrap();
+        assert_eq!(table.add(Member::new(owned.clone())), (second_id, false));
+        assert_eq!(table.build().member_id(&owned), Some(second_id));
+    }
+
+    #[test]
+    fn ast_insertion_updates_instance_attribute_flags() {
+        let parsed = parse_expression("self.long_attribute_name").unwrap();
+        let mut table = MemberTableBuilder::default();
+        let mut path_buffer = CharString::new();
+        let (id, _) = table
+            .add_expr(parsed.expr().into(), false, &mut path_buffer)
+            .unwrap();
+        table.member_mut(id).mark_declared();
+        assert!(!table.member(id).is_instance_attribute());
+        assert_eq!(
+            table.add_expr(parsed.expr().into(), true, &mut path_buffer),
+            Some((id, false)),
+        );
+        assert!(table.member(id).is_instance_attribute());
+        assert!(table.member(id).is_declared());
+    }
 
     #[test]
     fn test_member_expr_ref_hash_and_eq_small_heap() {

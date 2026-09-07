@@ -179,11 +179,11 @@ impl SymbolReverseTable {
     fn entry<'a>(
         &'a mut self,
         symbols: &IndexVec<ScopedSymbolId, Symbol>,
-        symbol: &Symbol,
+        name: &Name,
     ) -> Entry<'a, ScopedSymbolId> {
         self.0.entry(
-            Self::hash_name(symbol.name()),
-            |id| &symbols[*id].name == symbol.name(),
+            Self::hash_name(name),
+            |id| &symbols[*id].name == name,
             |id| Self::hash_name(&symbols[*id].name),
         )
     }
@@ -274,7 +274,7 @@ impl SymbolTableBuilder {
 
     /// Add a new symbol to this scope or update the flags if a symbol with the same name already exists.
     pub(super) fn add(&mut self, symbol: Symbol) -> (ScopedSymbolId, bool) {
-        let entry = self.reverse.entry(&self.table.symbols, &symbol);
+        let entry = self.reverse.entry(&self.table.symbols, symbol.name());
 
         match entry {
             Entry::Occupied(entry) => {
@@ -288,6 +288,18 @@ impl SymbolTableBuilder {
             }
             Entry::Vacant(entry) => {
                 let id = self.table.symbols.push(symbol);
+                entry.insert(id);
+                (id, true)
+            }
+        }
+    }
+
+    /// Adds a name, cloning its storage only when the symbol is new to this scope.
+    pub(super) fn add_name(&mut self, name: &Name) -> (ScopedSymbolId, bool) {
+        match self.reverse.entry(&self.table.symbols, name) {
+            Entry::Occupied(entry) => (*entry.get(), false),
+            Entry::Vacant(entry) => {
+                let id = self.table.symbols.push(Symbol::new(name.clone()));
                 entry.insert(id);
                 (id, true)
             }
