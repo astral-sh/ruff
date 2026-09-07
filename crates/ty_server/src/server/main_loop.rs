@@ -248,33 +248,33 @@ impl std::fmt::Debug for SendRequest {
 struct UvSyncWakeups(Vec<(SystemPathBuf, crossbeam::channel::Receiver<()>)>);
 
 impl UvSyncWakeups {
-    /// Waits for a project wakeup, main-loop action, or client message, in that order.
-    /// If incoming requests keep winning, the main loop can block submitting jobs while
-    /// workers block sending responses to its bounded action channel.
+    /// Waits for a main-loop action, project wakeup, or client message, in that order.
+    /// Polling uv can wait for worker database snapshots, so drain the bounded action
+    /// channel before applying uv results. Handle both before accepting new requests.
     fn select(
         &self,
         connection: &crossbeam::channel::Receiver<Message>,
         main_loop: &MainLoopReceiver,
     ) -> Result<Option<Event>, crossbeam::channel::RecvError> {
         let mut select = crossbeam::channel::Select::new_biased();
+        let main_loop_index = select.recv(main_loop);
         for (_, receiver) in &self.0 {
             select.recv(receiver);
         }
-        let main_loop_index = select.recv(main_loop);
         let connection_index = select.recv(connection);
         let operation = select.select();
         let index = operation.index();
 
-        if let Some((project_root, receiver)) = self.0.get(index) {
+        if index == main_loop_index {
+            return operation.recv(main_loop).map(Some);
+        }
+
+        if let Some((project_root, receiver)) = index.checked_sub(1).and_then(|i| self.0.get(i)) {
             return operation.recv(receiver).map(|()| {
                 Some(Event::PollUvEnvironments {
                     project_root: project_root.clone(),
                 })
             });
-        }
-
-        if index == main_loop_index {
-            return operation.recv(main_loop).map(Some);
         }
 
         debug_assert_eq!(index, connection_index);
