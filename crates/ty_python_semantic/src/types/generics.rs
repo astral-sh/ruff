@@ -3874,13 +3874,14 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         // `list[T]` must survive a comparison with `list[object]` even if `T: str`, so that
         // inference can report the bound violation. It can still be discarded when the
         // argument is `str | None`, since no specialization of `list[T]` can match it.
-        let disjoint_constraints = ConstraintSetBuilder::new();
-        let formal = formal.filter_union(db, self.env, |element| {
-            !element
-                .apply_specialization(db, self.generic_context.unknown_specialization(db, None))
-                .when_disjoint_from(db, self.env, actual, &disjoint_constraints, self.inferable)
-                .is_always_satisfied(db, self.env)
-        });
+        let formal = filter_formal_union_for_inference(
+            db,
+            self.env,
+            self.generic_context,
+            formal,
+            actual,
+            self.inferable,
+        );
 
         // ParamSpecs and TypeVarTuples still use the forward-only legacy mapping table. Keep
         // their entire inference context on the existing signature path, and use forward
@@ -4595,6 +4596,82 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     }
 }
 
+/// Removes formal union members that cannot overlap the actual type under any specialization.
+///
+/// This depends on the generic context and the compared types, independently of the mappings
+/// accumulated while inferring other arguments. Share it across contextual inference attempts.
+#[expect(
+    clippy::unnecessary_wraps,
+    reason = "Salsa cycle recovery returns None"
+)]
+fn filter_formal_union_for_inference<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    generic_context: GenericContext<'db>,
+    formal: Type<'db>,
+    actual: Type<'db>,
+    inferable: TypeVarSet<'db>,
+) -> Type<'db> {
+    fn filter_uncached<'db>(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        generic_context: GenericContext<'db>,
+        formal: Type<'db>,
+        actual: Type<'db>,
+        inferable: TypeVarSet<'db>,
+    ) -> Type<'db> {
+        let disjoint_constraints = ConstraintSetBuilder::new();
+        formal.filter_union(db, env, |element| {
+            !element
+                .apply_specialization(db, generic_context.unknown_specialization(db, None))
+                .when_disjoint_from(db, env, actual, &disjoint_constraints, inferable)
+                .is_always_satisfied(db, env)
+        })
+    }
+
+    #[salsa::tracked(
+        returns(copy),
+        cycle_result=|_, _, _, _, _, _, _| None,
+        heap_size=ruff_memory_usage::heap_size,
+    )]
+    fn filter_formal_union_impl<'db>(
+        db: &'db dyn Db,
+        program: Program<'db>,
+        generic_context: GenericContext<'db>,
+        formal: Type<'db>,
+        actual: Type<'db>,
+        inferable: TypeVarSet<'db>,
+    ) -> Option<Type<'db>> {
+        let env = ProgramEnvironment::from_program(program);
+        Some(filter_uncached(
+            db,
+            &env,
+            generic_context,
+            formal,
+            actual,
+            inferable,
+        ))
+    }
+
+    if !formal.resolve_type_alias(db).is_union() {
+        return formal;
+    }
+
+    filter_formal_union_impl(
+        db,
+        env.program(db),
+        generic_context,
+        formal,
+        actual,
+        inferable,
+    )
+    .unwrap_or_else(|| {
+        // Keeping all members during a cycle could change inferred mappings. Perform the
+        // original filtering outside the query's recovery callback instead.
+        filter_uncached(db, env, generic_context, formal, actual, inferable)
+    })
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum SpecializationError<'db> {
     MismatchedBound {
@@ -4629,6 +4706,7 @@ mod tests {
 
     use ruff_db::files::system_path_to_file;
     use ruff_db::system::DbWithWritableSystem;
+    use ruff_db::testing::find_will_execute_event_by_name;
     use ruff_python_ast::name::Name;
     use ty_python_core::ProgramFile;
 
@@ -4665,6 +4743,54 @@ mod tests {
                     ConstraintSet::constrain_typevar(db, &env, constraints, typevar, ty, ty)
                 })
         })
+    }
+
+    #[test]
+    fn formal_union_filter_reuses_matching_arguments() {
+        let mut db = setup_db();
+        db.clear_salsa_events();
+        for (list_argument, query_runs) in [
+            (true, true),
+            (true, false),
+            (false, true),
+            (false, false),
+            (true, false),
+        ] {
+            {
+                let env = db.program_environment();
+                let [t] = create_typevars(&db, ["T"]);
+                let context = GenericContext::from_typevar_instances(&db, &env, [t]);
+                let formal_list =
+                    KnownClass::List.to_specialized_instance(&db, &env, &[Type::TypeVar(t)]);
+                let none = Type::none(&db, &env);
+                let formal = UnionType::from_two_elements(&db, &env, formal_list, none);
+                let int = KnownClass::Int.to_instance(&db, &env);
+                let actual = if list_argument {
+                    KnownClass::List.to_specialized_instance(&db, &env, &[int])
+                } else {
+                    none
+                };
+
+                assert_eq!(
+                    filter_formal_union_for_inference(
+                        &db,
+                        &env,
+                        context,
+                        formal,
+                        actual,
+                        context.inferable_typevars(&db),
+                    ),
+                    if list_argument { formal_list } else { none }
+                );
+            }
+
+            let events = db.take_salsa_events();
+            assert_eq!(
+                find_will_execute_event_by_name(&db, "filter_formal_union_impl", None, &events)
+                    .is_some(),
+                query_runs,
+            );
+        }
     }
 
     #[test]
