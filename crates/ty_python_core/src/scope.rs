@@ -1,5 +1,6 @@
 use std::ops::Range;
 
+use bitflags::bitflags;
 use ruff_db::{PythonFile, files::File, parsed::ParsedModuleRef};
 use ruff_index::newtype_index;
 use ruff_python_ast::{self as ast, NodeIndex};
@@ -115,13 +116,66 @@ impl FileScopeId {
     }
 
     pub fn is_generator_function(self, index: &SemanticIndex) -> bool {
-        index.generator_functions.contains(&self)
+        self.flags(index)
+            .contains(ScopeFlags::IS_GENERATOR_FUNCTION)
     }
 
     pub fn is_async_comprehension(self, index: &SemanticIndex) -> bool {
-        index.async_comprehensions.contains(&self)
+        self.flags(index)
+            .contains(ScopeFlags::IS_ASYNC_COMPREHENSION)
+    }
+
+    /// Whether this scope occurs within an enclosing expression that Python tests for truthiness.
+    /// For example, the comprehension scope in `if any(x for x in items if predicate(x)):` does.
+    pub fn is_in_boolean_test(self, index: &SemanticIndex) -> bool {
+        self.flags(index).contains(ScopeFlags::IN_BOOLEAN_TEST)
+    }
+
+    fn flags(self, index: &SemanticIndex) -> ScopeFlags {
+        index.scope_flags.get(&self).copied().unwrap_or_default()
     }
 }
+
+bitflags! {
+    /// Properties stored only for scopes with at least one of these flags.
+    #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+    pub(super) struct ScopeFlags: u8 {
+        /// The scope belongs to a [generator function]. Here, `values` is a generator function
+        /// because its body contains `yield`:
+        ///
+        /// ```python
+        /// def values():
+        ///     yield 1
+        /// ```
+        ///
+        /// [generator function]: https://docs.python.org/3/glossary.html#term-generator
+        const IS_GENERATOR_FUNCTION = 1 << 0;
+
+        /// The scope belongs to an asynchronous comprehension. The list comprehension in
+        /// `collect` iterates asynchronously:
+        ///
+        /// ```python
+        /// async def values():
+        ///     yield 1
+        ///
+        /// async def collect():
+        ///     return [value async for value in values()]
+        /// ```
+        const IS_ASYNC_COMPREHENSION = 1 << 1;
+
+        /// The expression defining the scope is nested in a boolean test. Here, the generator
+        /// expression is part of the outer `if` condition:
+        ///
+        /// ```python
+        /// def check(items: list[int]):
+        ///     if any(item > 0 for item in items):
+        ///         print("Found a positive item")
+        /// ```
+        const IN_BOOLEAN_TEST = 1 << 2;
+    }
+}
+
+impl get_size2::GetSize for ScopeFlags {}
 
 #[derive(Debug, get_size2::GetSize)]
 pub struct Scope {
@@ -133,9 +187,6 @@ pub struct Scope {
 
     /// The range of [`FileScopeId`]s that are descendants of this scope.
     descendants: Range<FileScopeId>,
-
-    /// Whether this scope's defining expression is nested in a boolean test.
-    in_boolean_test: bool,
 }
 
 impl Scope {
@@ -143,24 +194,16 @@ impl Scope {
         parent: Option<FileScopeId>,
         node: NodeWithScopeKind,
         descendants: Range<FileScopeId>,
-        in_boolean_test: bool,
     ) -> Self {
         Scope {
             parent,
             node,
             descendants,
-            in_boolean_test,
         }
     }
 
     pub fn parent(&self) -> Option<FileScopeId> {
         self.parent
-    }
-
-    /// Whether this scope occurs within an enclosing expression that Python tests for truthiness.
-    /// For example, the comprehension scope in `if any(x for x in items if predicate(x)):` does.
-    pub fn is_in_boolean_test(&self) -> bool {
-        self.in_boolean_test
     }
 
     pub fn node(&self) -> &NodeWithScopeKind {

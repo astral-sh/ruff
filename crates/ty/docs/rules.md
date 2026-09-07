@@ -4847,6 +4847,9 @@ def test_my_data(data: list[int]):
     assert (item for item in data if item > 42)  # error: [redundant-condition]
 ```
 
+**Exemptions**
+
+
 **Boolean operators used to compute values**
 
 
@@ -4871,27 +4874,6 @@ def test(coinflip: bool):
     func()
 ```
 
-This also allows calls that are deliberately always falsy but are used for their side effects:
-
-```py
-from unittest.mock import patch
-
-
-def ask_to_continue() -> bool:
-    return input("Continue? ") == "yes"
-
-
-def test_ask_to_continue():
-    prompts = []
-    with patch(
-        "builtins.input",
-        side_effect=lambda prompt: prompts.append(prompt) or "yes",
-    ):
-        assert ask_to_continue()
-
-    assert prompts == ["Continue? "]
-```
-
 By contrast, `not` always produces a boolean, so we will still emit a diagnostic on the following
 example -- negating the truthiness of a function object is pointless, since a function object is
 always truthy:
@@ -4906,13 +4888,15 @@ value = not f  # error: [redundant-condition]
 **Calls returning `None`**
 
 
-Calls returning `None` are often used for their side effects in conditional expressions,
-comprehension filters, and standalone `not` expressions. Both redundant-condition rules exempt these
-calls, including calls used as operands of `and`, `or`, and `not` in these contexts:
+Calls returning `None` are often used for their side effects in conditional expressions and
+comprehension filters. [`redundant-condition`](#redundant-condition) and [`redundant-condition-strict`](#redundant-condition-strict) both therefore exempt
+calls returning `None` in these contexts. This includes calls appearing as subexpressions of `and`,
+`or` or `not` expressions:
 
 ```py
 def find_duplicate_coordinates(coordinates: list[tuple[int, int]]):
     seen: set[tuple[int, int]] = set()
+    # No diagnostic here, even though `seen.add(coord)` returns `None`, which is always falsy
     duplicates = {coord for coord in coordinates if coord in seen or seen.add(coord)}
     print(f"Duplicates are {duplicates}")
 ```
@@ -4920,8 +4904,8 @@ def find_duplicate_coordinates(coordinates: list[tuple[int, int]]):
 Here, `seen.add(coord)` records each new coordinate while its `None` result excludes that coordinate
 from the set of duplicates.
 
-The exemption does not apply when these expressions are nested inside an outer boolean test, or when
-the call itself is a statement condition:
+The exemption does not apply when a call returning `None` is nested inside an outer boolean test, or
+when the call itself is a statement condition:
 
 ```py
 def record() -> None: ...
@@ -4930,8 +4914,10 @@ def record() -> None: ...
 def check(flag: bool, other_flag: bool):
     if record():  # error: [redundant-condition]
         pass
+
     if not record():  # error: [redundant-condition]
         pass
+
     if flag if record() else other_flag:  # error: [redundant-condition]
         pass
 ```
@@ -5052,6 +5038,9 @@ def check_saved(value: Comparable):
 **Exemptions**
 
 
+**Boolean operators used to compute values**
+
+
 Like [`redundant-condition`](#redundant-condition), this rule checks subexpressions of an `and` or `or` expression only when
 the outer expression is used as a condition. This is to avoid emitting false-positive diagnostics on
 code like the following, where the `and` expression is clearly not redundant despite the fact that
@@ -5077,18 +5066,8 @@ def do_something(coinflip: bool):
 Unlike `and` and `or`, however, `not` explicitly converts its operand to a boolean, so the rule
 checks `not` expressions in every context.
 
-Both redundant-condition rules exempt calls returning `None` in conditional expressions,
-comprehension filters, and standalone `not` expressions, provided these expressions are not nested
-inside an outer boolean test. Such calls are often used for their side effects. This includes calls
-containing walrus arguments that would otherwise be reported by this rule:
+**`assert`s where the test is an `int` or `bool`**
 
-```py
-def record(value: int) -> None: ...
-
-
-selected = 1 if record(value := 1) else 2
-negated = not record(value := 2)
-```
 
 Another exemption applied by this rule concerns `assert`-statement tests. A common pattern in Python
 code is to use defensive `assert`s to enforce behaviour at runtime, even when the asserted condition
@@ -5105,7 +5084,7 @@ that end users of the library will run a type checker on code calling into the l
 it's entirely possible at runtime for an object passed into the `x`a parameter above to be a `str`
 (for example) even though the parameter annotation states that only `int`s can ever be passed in.
 This rule therefore also exempts all assertion tests or subexpressions that evaluate to a subtype of
-`int` or `bool`:
+`int` or `bool`.
 
 [`redundant-condition-strict`](#redundant-condition-strict) can still trigger on `assert` statements in some contexts, however. For
 example, [`redundant-condition-strict`](#redundant-condition-strict) will be emitted on the below example, where the left-hand side
@@ -5121,6 +5100,9 @@ def func() -> bool:
 def test_func():
     assert (result := func) and result != func()  # error: [redundant-condition-strict]
 ```
+
+**Fixed-truthiness `if`s or `elif`s followed by defensive exits**
+
 
 For similar reasons to the `assert` exemptions, this rule also exempts always-false `if` or `elif`
 conditions when their bodies end in a defensive check: a `raise`, an assertion that could fail, a
@@ -5191,6 +5173,9 @@ def parse_data_early_return(data: int | str):
     raise AssertionError("unexpected data")
 ```
 
+**`sys.version_info`, `sys.platform`, `os.name`, `typing.TYPE_CHECKING`**
+
+
 Any conditions defined in relation to `sys.version_info`, `sys.platform`, `os.name` or
 `typing.TYPE_CHECKING` are also exempted. The rule recursively follows the definitions of names and
 attributes across module boundaries to determine if a name or attribute was indirectly defined in
@@ -5231,6 +5216,9 @@ system might very well be always false on another operating system (for example)
 conditions as being always true or always false would only add noise: the aim of the rule is to flag
 conditions that are *unintentionally* always true or always false.
 
+**AST-literal bool or ints**
+
+
 Lastly, some conditions involving literal integers and booleans in the AST are also exempted:
 there's no reason why you'd use a condition like this unless it was intentional.
 
@@ -5240,6 +5228,13 @@ if True:  # inferred as always true (obviously), but no diagnostic
 
 if 0:
     pass  # inferred as always false, but no diagnostic
+```
+
+And this also ensures that common patterns for creating infinite `while` loops are allowed:
+
+```py
+while True:  # no diagnostic
+    ...
 ```
 
 **Known issues and workarounds**

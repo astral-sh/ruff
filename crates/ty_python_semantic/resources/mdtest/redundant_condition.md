@@ -3919,41 +3919,126 @@ Calls returning `None` are often used for their side effects in conditional expr
 comprehension filters, and standalone `not` expressions. We exempt these calls from both rules,
 including when they are operands of `and`, `or`, or `not` in these contexts.
 
+### Deduplicating items
+
+To keep the first occurrence of each item, a comprehension can check a `seen` set and add each new
+item to it. `seen.add(item)` returns `None`, so `not seen.add(item)` lets the new item through after
+recording it. Removing that call would let duplicates through as well.
+
 ```py
-def record(value: object) -> None: ...
-def expression_tests(flag: bool):
-    selected = 1 if record(flag) else 2
-    selected = 1 if flag and record(flag) else 2
-    selected = 1 if flag or record(flag) else 2
-    selected = 1 if not record(flag) else 2
-    negated = not record(flag)
-    negated = not (flag or record(flag))
-    negated = not not record(flag)
+items = ["red", "blue", "red", "green", "blue"]
+seen: set[str] = set()
+
+unique = [item for item in items if item not in seen and not seen.add(item)]  # no diagnostic
+assert unique == ["red", "blue", "green"]
 ```
 
-The same exemption applies to every kind of comprehension and to generator expressions. For example,
-`seen.add(item)` below records each new item while its `None` result excludes that item from the set
-of duplicates.
+The same filter can deduplicate items lazily in a generator expression:
 
 ```py
-def comprehension_tests(items: list[int]):
-    recorded = [item for item in items if record(item)]
-    recorded_set = {item for item in items if not record(item)}
-    recorded_dict = {item: item for item in items if record(item)}
-    recorded_generator = (item for item in items if not record(item))
-
-    seen: set[int] = set()
-    duplicates = {item for item in items if item in seen or seen.add(item)}
+seen.clear()
+unique_iter = (item for item in items if item not in seen and not seen.add(item))  # no diagnostic
+assert list(unique_iter) == ["red", "blue", "green"]
 ```
 
-A call containing a walrus expression would normally fall under `redundant-condition-strict`. It is
-also exempt if it returns `None` in one of these contexts.
+To collect only duplicates, the filter instead accepts items already in `seen`. For a new item,
+`seen.add(item)` records it while its falsy return value excludes it from the result:
 
 ```py
-def calls_with_walruses(items: list[int]):
-    selected = 1 if record(value := 1) else 2
-    negated = not record(value := 2)
-    recorded = [item for item in items if record(value := item)]
+seen.clear()
+duplicates = {item for item in items if item in seen or seen.add(item)}  # no diagnostic
+assert duplicates == {"red", "blue"}
+```
+
+A dictionary comprehension can use the first-occurrence filter to record each item's earliest
+position. Without the filter, later occurrences would overwrite those positions.
+
+```py
+seen.clear()
+first_positions = {
+    item: position
+    for position, item in enumerate(items)
+    if item not in seen and not seen.add(item)  # no diagnostic
+}
+assert first_positions == {"red": 0, "blue": 1, "green": 3}
+```
+
+To label every occurrence as new or repeated, a conditional expression can perform the same check
+and update:
+
+```py
+seen.clear()
+labels = [
+    "repeat" if item in seen or seen.add(item) else "new"  # no diagnostic
+    for item in items
+]
+assert labels == ["new", "new", "repeat", "new", "repeat"]
+```
+
+A predicate passed to `filter` can also keep first occurrences. Here, `not` returns `False` for an
+item already in `seen` and `True` for a new item, after `seen.add(item)` records it:
+
+```py
+seen.clear()
+unique = list(filter(lambda item: not (item in seen or seen.add(item)), items))  # no diagnostic
+assert unique == ["red", "blue", "green"]
+```
+
+### Mock callbacks
+
+A mock callback can record each prompt before returning a canned response. Here, `append` always
+selects the `else` branch, but its side effect lets the test verify the prompt shown to the user.
+
+```py
+from unittest.mock import patch
+
+def ask_to_continue() -> bool:
+    return input("Continue? ") == "yes"
+
+prompts: list[str] = []
+with patch(
+    "builtins.input",
+    side_effect=lambda prompt: "no" if prompts.append(prompt) else "yes",  # no diagnostic
+):
+    assert ask_to_continue()
+
+assert prompts == ["Continue? "]
+```
+
+A callback can normalize a prompt once, record it, and use it to look up a response. The walrus
+argument would normally put the call under `redundant-condition-strict`, but the call still serves a
+purpose and is exempt.
+
+```py
+prompts.clear()
+responses = {"Continue?": "yes"}
+with patch(
+    "builtins.input",
+    side_effect=lambda prompt: (
+        "no" if prompts.append(key := prompt.strip()) else responses[key]  # no diagnostic
+    ),
+):
+    assert ask_to_continue()
+
+assert prompts == ["Continue?"]
+```
+
+### Logging filters
+
+A logging filter must return a truthy value for a message to reach the logger's handlers. This
+filter collects messages for inspection and returns `True` by negating the `None` returned by
+`append`, so it does not suppress the messages it records.
+
+```py
+from logging import Logger, NullHandler
+
+messages: list[str] = []
+logger = Logger("capture")
+logger.addHandler(NullHandler())
+logger.addFilter(lambda record: not messages.append(record.getMessage()))  # no diagnostic
+
+logger.warning("Saved report")
+assert messages == ["Saved report"]
 ```
 
 ## Calls returning `None` in statement conditions
@@ -3962,18 +4047,23 @@ Calls returning `None` are still reported in statement conditions. In these cont
 call's falsy result is more likely to be a mistake.
 
 ```py
-def record(value: object = None) -> None: ...
+def foo(value: object = None) -> None:
+    pass
+
 def statement_tests(flag: bool):
-    if record():  # error: [redundant-condition]
+    if foo():  # error: [redundant-condition]
         pass
-    elif record(value := 1):  # error: [redundant-condition-strict]
+    elif foo(value := 1):  # error: [redundant-condition-strict]
         pass
-    while record():  # error: [redundant-condition]
+
+    while foo():  # error: [redundant-condition]
         pass
+
     match flag:
-        case _ if record():  # error: [redundant-condition]
+        case _ if foo():  # error: [redundant-condition]
             pass
-    assert record()  # error: [redundant-condition]
+
+    assert foo()  # error: [redundant-condition]
 ```
 
 Conditional and `not` expressions nested in an outer boolean test do not receive the exemption. This
@@ -3985,38 +4075,48 @@ def accepts(value: object) -> bool:
     return bool(value)
 
 def nested_tests(flag: bool, other_flag: bool):
-    if not record():  # error: [redundant-condition]
+    if not foo():  # error: [redundant-condition]
         pass
-    if flag if record() else other_flag:  # error: [redundant-condition]
+
+    if flag if foo() else other_flag:  # error: [redundant-condition]
         pass
-    if accepts(not record()):  # error: [redundant-condition]
+
+    if accepts(not foo()):  # error: [redundant-condition]
         pass
-    if accepts(1 if record(value := 1) else 2):  # error: [redundant-condition-strict]
+
+    if accepts(1 if foo(value := 1) else 2):  # error: [redundant-condition-strict]
         pass
-    selected = 1 if accepts(not record()) else 2  # error: [redundant-condition]
+
+    selected = 1 if accepts(not foo()) else 2  # error: [redundant-condition]
 ```
 
 Comprehensions, generators, and lambdas have their own scopes, but tests within them can still be
-nested in an outer boolean condition. These tests are also reported. The final two expressions are
-outside those conditions, so the exemption applies again.
+nested in an outer boolean condition. These tests are also reported. The final comprehension and
+predicate deduplicate items outside those conditions, so the exemption applies again.
 
 ```py
 def nested_scopes(items: list[int]):
-    if [item for item in items if record(item)]:  # error: [redundant-condition]
-        pass
-    if {item for item in items if not record(item)}:  # error: [redundant-condition]
-        pass
-    if {item: item for item in items if record(item)}:  # error: [redundant-condition]
-        pass
-    if any(item for item in items if not record(item)):  # error: [redundant-condition]
-        pass
-    if accepts(lambda: not record()):  # error: [redundant-condition]
-        pass
-    if accepts(lambda: 1 if record() else 2):  # error: [redundant-condition]
+    if [item for item in items if foo(item)]:  # error: [redundant-condition]
         pass
 
-    recorded = [item for item in items if record(item)]
-    negate = lambda: not record()
+    if {item for item in items if not foo(item)}:  # error: [redundant-condition]
+        pass
+
+    if {item: item for item in items if foo(item)}:  # error: [redundant-condition]
+        pass
+
+    if any(item for item in items if not foo(item)):  # error: [redundant-condition]
+        pass
+
+    if accepts(lambda: not foo()):  # error: [redundant-condition]
+        pass
+
+    if accepts(lambda: 1 if foo() else 2):  # error: [redundant-condition]
+        pass
+
+    seen: set[int] = set()
+    unique = [item for item in items if item not in seen and not seen.add(item)]  # no diagnostic
+    is_new = lambda item: not (item in seen or seen.add(item))  # no diagnostic
 ```
 
 ## Other always-falsy expression tests

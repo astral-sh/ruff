@@ -37,115 +37,7 @@ use crate::{
     },
 };
 
-use super::{ConditionKind, RedundantCondition};
-
-/// The context in which a boolean test occurs.
-///
-/// This is used to help determine whether a test should be exempt from one or both
-/// redundant-condition rules. For example, the same always-true comparison can be reported in
-/// an `if` condition but exempt in an assertion.
-///
-/// [`ConditionKind`] determines the rule that will be applied if the condition is not exempted.
-/// This context determines whether the test serves a purpose that makes reporting it undesirable.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(in crate::types::infer::builder) enum RedundantConditionContext {
-    /// A boolean test checked without the additional exemptions represented by the other variants.
-    ///
-    /// This includes ordinary `if` conditions. For example:
-    ///
-    /// ```python
-    /// def check(value: str):
-    ///     if isinstance(value, str):  # Always true; flagged by `redundant-condition-strict`.
-    ///         print(value)
-    /// ```
-    ///
-    /// The special cases for assertions and checks that reject unexpected input are described
-    /// by [`Self::Assertion`] and [`Self::DefensiveExit`].
-    Standalone,
-
-    /// A conditional expression, comprehension filter, or standalone `not` expression.
-    ///
-    /// Calls returning `None` can be used for their side effects in these contexts. For example,
-    /// `item in seen or seen.add(item)` in a comprehension filter records new items while
-    /// excluding them from the result. We exempt such calls from both rules, including calls
-    /// with walrus arguments that would otherwise be classified as [`ConditionKind::ContainsWalrus`].
-    ///
-    /// Boolean operands inherit this exemption. Tests nested inside another boolean test,
-    /// such as `record()` in `if flag if record() else other_flag:`, do not.
-    /// This also applies across scope boundaries: a comprehension filter is checked in its own
-    /// scope, but the comprehension can still be nested in an outer boolean test.
-    Expression,
-
-    /// A test within an assertion, including the complete assertion and tests in call arguments.
-    ///
-    /// Tests classified as [`ConditionKind::Boolean`] or [`ConditionKind::ShortCircuit`] are exempt.
-    /// Other always-truthy or always-falsy values remain eligible for `redundant-condition`, or
-    /// `redundant-condition-strict` if classified as [`ConditionKind::ContainsWalrus`].
-    ///
-    /// ```python
-    /// def check(value: int, other: object, flag: bool):
-    ///     assert isinstance(value, int)  # Defensive runtime check; exempt.
-    ///     assert flag and (other or True)  # No diagnostic on `other or True`.
-    ///     assert other or True  # Short-circuit assertion; exempt.
-    /// ```
-    ///
-    /// An uncalled function in `assert not ready` is still reported: the function itself is an
-    /// always-truthy value even though the complete assertion always fails.
-    Assertion,
-
-    /// Whether the branches of an `if` or `elif` test reject unexpected input or an
-    /// unsupported operation.
-    ///
-    /// We call that rejection a "defensive exit". For example, a function might raise `TypeError`
-    /// if its argument has the wrong type. Type annotations do not enforce this at runtime, so
-    /// the check can still be useful when the function is called from untyped code. We therefore
-    /// exempt conditions in [`ConditionKind::Boolean`] and [`ConditionKind::ShortCircuit`] when
-    /// their fixed truthiness rules out taking a defensive branch.
-    ///
-    /// ```python
-    /// def check(value: int):
-    ///     # Always false according to the annotation,
-    ///     # but exempted from diagnostics due to the defensive exit in the branch body:
-    ///     if not isinstance(value, int):  
-    ///         raise TypeError("expected an integer")
-    /// ```
-    ///
-    /// The code that rejects the input can also be in an `else` branch:
-    ///
-    /// ```python
-    /// def check(value: int):
-    ///     # Always true according to the annotation,
-    ///     # but exempted from diagnostics due to the defensive exit in the `else`-branch body:
-    ///     if isinstance(value, int):  
-    ///         ...
-    ///     else:
-    ///         raise TypeError("expected an integer")
-    /// ```
-    ///
-    /// Or after an always-true final `if` or `elif` whose body ends in a recognized exit:
-    ///
-    /// ```python
-    /// def check(value: int):
-    ///     # Always true according to the annotation,
-    ///     # but exempted from diagnostics due to the defensive exit in the body
-    ///     # of the "implicit `else`" after the final `if`:
-    ///     if isinstance(value, int):  # Always true according to the annotation; exempt.
-    ///         return value
-    ///     raise TypeError("expected an integer")
-    /// ```
-    ///
-    /// [`suite_ends_with_exit`] describes the forms of rejection we recognize
-    /// with [`SuiteExitKind::Defensive`].
-    ///
-    /// Boolean operands inherit these exemptions even when the complete condition has unknown
-    /// truthiness. Negation reverses which branch their truthiness selects. Independent tests in
-    /// call arguments do not inherit the exemptions, and mistakes such as testing an uncalled
-    /// function can still be reported. Each field records whether that branch ends in a defensive exit.
-    DefensiveExit {
-        truthy_branch: bool,
-        falsy_branch: bool,
-    },
-}
+use super::{ConditionKind, RedundantCondition, RedundantConditionContext};
 
 impl RedundantConditionContext {
     /// Identify the defensive branches of an `if` or `elif` once for the complete condition.
@@ -193,9 +85,9 @@ impl RedundantConditionContext {
                 condition.expression.is_call_expr()
                     && condition.value_type.is_none(builder.db())
                     && !builder
-                        .index
-                        .scope(builder.scope().file_scope_id(builder.db()))
-                        .is_in_boolean_test()
+                        .scope()
+                        .file_scope_id(builder.db())
+                        .is_in_boolean_test(builder.index)
             }
             Self::Assertion => matches!(
                 &condition.kind,
