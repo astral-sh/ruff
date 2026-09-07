@@ -44,6 +44,7 @@ use std::hint::cold_path;
 use super::RecursivelyDefined;
 use super::generic_gradual_intersections::{GenericIntersection, generic_gradual_intersection};
 use crate::types::enums::EnumComplement;
+use crate::types::relation::UnionRedundancy;
 use crate::types::set_theoretic::expand_intersection_typevars_and_newtypes;
 use crate::types::visitor::any_over_type;
 use crate::types::{
@@ -1086,13 +1087,13 @@ impl<'db> UnionBuilder<'db> {
                 {
                     continue;
                 }
-                if ty.is_redundant_with(db, &self.env, element_type) {
-                    return;
-                }
-
-                if element_type.is_redundant_with(db, &self.env, ty) {
-                    to_remove.push(i);
-                    continue;
+                match ty.union_redundancy(db, &self.env, element_type) {
+                    UnionRedundancy::First => return,
+                    UnionRedundancy::Second => {
+                        to_remove.push(i);
+                        continue;
+                    }
+                    UnionRedundancy::Neither => {}
                 }
 
                 if ty.negation_is_subtype_of_cached(db, &self.env, element_type, &mut ty_negated) {
@@ -2076,12 +2077,127 @@ mod tests {
     use crate::db::tests::{TestDb, setup_db};
     use crate::place::{global_symbol, known_module_symbol};
     use crate::types::enums::enum_member_literals;
+    use crate::types::relation::UnionRedundancy;
     use crate::types::type_alias::TypeAliasType;
     use crate::types::{KnownClass, KnownInstanceType, Truthiness};
 
     use ruff_db::system::DbWithWritableSystem as _;
     use ty_module_resolver::KnownModule;
     use ty_python_core::ProgramFile;
+
+    #[test]
+    fn paired_redundancy_preserves_order() {
+        let db = setup_db();
+        let env = db.program_environment();
+        let int = KnownClass::Int.to_instance(&db, &env);
+        let str = KnownClass::Str.to_instance(&db, &env);
+        let literal = Type::int_literal(1);
+
+        assert_eq!(int.union_redundancy(&db, &env, int), UnionRedundancy::First);
+        assert_eq!(
+            literal.union_redundancy(&db, &env, int),
+            UnionRedundancy::First
+        );
+        assert_eq!(
+            int.union_redundancy(&db, &env, literal),
+            UnionRedundancy::Second
+        );
+        assert_eq!(
+            int.union_redundancy(&db, &env, str),
+            UnionRedundancy::Neither
+        );
+    }
+
+    #[test]
+    fn paired_redundancy_matches_directed_checks_for_recursive_types() -> anyhow::Result<()> {
+        fn check_pair(first: &str, second: &str, paired: bool) -> anyhow::Result<UnionRedundancy> {
+            let mut db = setup_db();
+            db.write_dedented(
+                "/src/recursive.py",
+                r#"
+                from typing import Protocol
+
+                class RecursiveInt(Protocol):
+                    @property
+                    def value(self) -> int: ...
+                    @property
+                    def child(self) -> RecursiveInt: ...
+
+                class EquivalentInt(Protocol):
+                    @property
+                    def value(self) -> int: ...
+                    @property
+                    def child(self) -> EquivalentInt: ...
+
+                class RecursiveObject(Protocol):
+                    @property
+                    def value(self) -> object: ...
+                    @property
+                    def child(self) -> RecursiveObject: ...
+
+                class RecursiveStr(Protocol):
+                    @property
+                    def value(self) -> str: ...
+                    @property
+                    def child(self) -> RecursiveStr: ...
+
+                type IntTree = int | list[IntTree]
+                type OtherIntTree = int | list[OtherIntTree]
+                type StrTree = str | list[StrTree]
+
+                recursive_int: RecursiveInt
+                equivalent_int: EquivalentInt
+                recursive_object: RecursiveObject
+                recursive_str: RecursiveStr
+                int_tree: IntTree
+                other_int_tree: OtherIntTree
+                str_tree: StrTree
+                "#,
+            )?;
+            let env = db.program_environment();
+            let file = ruff_db::files::system_path_to_file(&db, "/src/recursive.py")?;
+            let module = ProgramFile::new(&db, file, env.program(&db));
+            let first_ty = global_symbol(&db, module, first).place.expect_type();
+            let second_ty = global_symbol(&db, module, second).place.expect_type();
+            Ok(if paired {
+                first_ty.union_redundancy(&db, &env, second_ty)
+            } else if first_ty.is_redundant_with(&db, &env, second_ty) {
+                UnionRedundancy::First
+            } else if second_ty.is_redundant_with(&db, &env, first_ty) {
+                UnionRedundancy::Second
+            } else {
+                UnionRedundancy::Neither
+            })
+        }
+
+        // Each call starts with a separate database, so the paired query cannot populate the
+        // directed query's cache before it is checked. Equivalent types prefer the first
+        // direction; strictly narrower types are redundant only with their supertypes.
+        for (first, second, expected) in [
+            ("recursive_int", "equivalent_int", UnionRedundancy::First),
+            ("equivalent_int", "recursive_int", UnionRedundancy::First),
+            ("recursive_int", "recursive_object", UnionRedundancy::First),
+            ("recursive_object", "recursive_int", UnionRedundancy::Second),
+            ("recursive_int", "recursive_str", UnionRedundancy::Neither),
+            ("recursive_str", "recursive_int", UnionRedundancy::Neither),
+            ("int_tree", "other_int_tree", UnionRedundancy::First),
+            ("other_int_tree", "int_tree", UnionRedundancy::First),
+            ("int_tree", "str_tree", UnionRedundancy::Neither),
+            ("str_tree", "int_tree", UnionRedundancy::Neither),
+        ] {
+            assert_eq!(
+                check_pair(first, second, false)?,
+                expected,
+                "{first} | {second}, directed queries"
+            );
+            assert_eq!(
+                check_pair(first, second, true)?,
+                expected,
+                "{first} | {second}, paired query"
+            );
+        }
+        Ok(())
+    }
 
     #[test]
     fn build_union_no_elements() {

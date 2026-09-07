@@ -31,6 +31,16 @@ use crate::{
     },
 };
 
+/// Which type can be omitted when combining an ordered pair into a union.
+///
+/// If both types are redundant with each other, prefer omitting the first one.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, salsa::SalsaValue, get_size2::GetSize)]
+pub(super) enum UnionRedundancy {
+    First,
+    Second,
+    Neither,
+}
+
 /// A non-exhaustive enumeration of relations that can exist between types.
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
 pub(crate) enum TypeRelation {
@@ -654,6 +664,60 @@ impl<'db> Type<'db> {
 
         let program = env.program(db);
         is_redundant_with_impl(db, TypePair::new(db, program, self, other))
+    }
+
+    /// Compare both directions of union redundancy, preferring to omit `self`.
+    ///
+    /// Cache the ordered decision while retaining each directed query's independent cycle
+    /// state. If this decision participates in a cycle, leave it to the directed queries.
+    #[expect(
+        clippy::unnecessary_wraps,
+        reason = "Salsa cycle recovery returns None"
+    )]
+    pub(super) fn union_redundancy(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        other: Type<'db>,
+    ) -> UnionRedundancy {
+        #[salsa::tracked(
+            returns(copy),
+            cycle_result=|_, _, _| None,
+            heap_size=ruff_memory_usage::heap_size,
+        )]
+        fn union_redundancy_impl<'db>(
+            db: &'db dyn Db,
+            types: TypePair<'db>,
+        ) -> Option<UnionRedundancy> {
+            let env = ProgramEnvironment::from_program(types.program(db));
+            let first = types.first(db);
+            let second = types.second(db);
+            Some(if first.is_redundant_with(db, &env, second) {
+                UnionRedundancy::First
+            } else if second.is_redundant_with(db, &env, first) {
+                UnionRedundancy::Second
+            } else {
+                UnionRedundancy::Neither
+            })
+        }
+
+        if self == other {
+            return UnionRedundancy::First;
+        }
+
+        let program = env.program(db);
+        if let Some(result) = union_redundancy_impl(db, TypePair::new(db, program, self, other)) {
+            return result;
+        }
+
+        // This runs after the query returns, never inside a cycle-recovery callback.
+        if self.is_redundant_with(db, env, other) {
+            UnionRedundancy::First
+        } else if other.is_redundant_with(db, env, self) {
+            UnionRedundancy::Second
+        } else {
+            UnionRedundancy::Neither
+        }
     }
 
     /// Return `true` if `self` is redundant with `other` under the pure redundancy relation.
