@@ -81,8 +81,11 @@ impl RedundantConditionContext {
         condition: &RedundantCondition<'_, '_>,
     ) -> bool {
         let exempt = match self {
-            Self::Expression => {
-                condition.expression.is_call_expr()
+            Self::Expression {
+                allow_none_returning_calls,
+            } => {
+                allow_none_returning_calls
+                    && condition.expression.is_call_expr()
                     && condition.value_type.is_none(builder.db())
                     && !builder
                         .scope()
@@ -218,7 +221,9 @@ impl RedundantConditionContext {
         match self {
             // Assertions also exempt boolean tests embedded in calls or other value expressions.
             Self::Assertion => self,
-            Self::Standalone | Self::Expression | Self::DefensiveExit { .. } => Self::Standalone,
+            Self::Standalone | Self::Expression { .. } | Self::DefensiveExit { .. } => {
+                Self::Standalone
+            }
         }
     }
 }

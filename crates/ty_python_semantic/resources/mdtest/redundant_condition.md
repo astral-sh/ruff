@@ -3916,8 +3916,9 @@ assert None  # no diagnostic
 ## Calls returning `None` in expression tests
 
 Calls returning `None` are often used for their side effects in conditional expressions,
-comprehension filters, and standalone `not` expressions. We exempt these calls from both rules,
-including when they are operands of `and`, `or`, or `not` in these contexts.
+comprehension filters, and standalone `not` expressions. In conditional tests and comprehension
+filters, we exempt these calls from both rules when they contribute to an `and` or `or` expression,
+including through `not`. Standalone `not` expressions also receive the exemption.
 
 ### Deduplicating items
 
@@ -3984,41 +3985,56 @@ unique = list(filter(lambda item: not (item in seen or seen.add(item)), items)) 
 assert unique == ["red", "blue", "green"]
 ```
 
+### Calls used as entire tests
+
+Without `and` or `or`, calls returning `None` are still reported in conditional tests and
+comprehension filters. `set.add` does not indicate whether an item was already present, so this
+attempt to label first occurrences always selects `"repeat"`:
+
+```py
+items = ["red", "blue", "red"]
+seen: set[str] = set()
+
+labels = ["new" if seen.add(item) else "repeat" for item in items]  # error: [redundant-condition]
+assert labels == ["repeat", "repeat", "repeat"]
+```
+
+Using the call as the entire comprehension filter rejects every item:
+
+```py
+seen.clear()
+duplicates = [item for item in items if seen.add(item)]  # error: [redundant-condition]
+assert duplicates == []
+```
+
+Negating the call admits every item, including duplicates. The filter still has no effect on which
+items are included, so this call is also reported:
+
+```py
+seen.clear()
+unique = [item for item in items if not seen.add(item)]  # error: [redundant-condition]
+assert unique == items
+```
+
 ### Mock callbacks
 
-A mock callback can record each prompt before returning a canned response. Here, `append` always
-selects the `else` branch, but its side effect lets the test verify the prompt shown to the user.
+A mock callback can answer one prompt directly and record the normalized forms of other prompts
+before looking up their responses. Here, the call is an `or` operand, so it is exempt despite its
+walrus argument:
 
 ```py
 from unittest.mock import patch
 
-def ask_to_continue() -> bool:
-    return input("Continue? ") == "yes"
-
 prompts: list[str] = []
-with patch(
-    "builtins.input",
-    side_effect=lambda prompt: "no" if prompts.append(prompt) else "yes",  # no diagnostic
-):
-    assert ask_to_continue()
-
-assert prompts == ["Continue? "]
-```
-
-A callback can normalize a prompt once, record it, and use it to look up a response. The walrus
-argument would normally put the call under `redundant-condition-strict`, but the call still serves a
-purpose and is exempt.
-
-```py
-prompts.clear()
 responses = {"Continue?": "yes"}
 with patch(
     "builtins.input",
     side_effect=lambda prompt: (
-        "no" if prompts.append(key := prompt.strip()) else responses[key]  # no diagnostic
+        "no" if prompt == "Cancel?" or prompts.append(key := prompt.strip()) else responses[key]  # no diagnostic
     ),
 ):
-    assert ask_to_continue()
+    assert input("Cancel?") == "no"
+    assert input("Continue? ") == "yes"
 
 assert prompts == ["Continue?"]
 ```
@@ -4043,27 +4059,30 @@ assert messages == ["Saved report"]
 
 ## Calls returning `None` in statement conditions
 
-Calls returning `None` are still reported in statement conditions. In these contexts, relying on the
-call's falsy result is more likely to be a mistake.
+The `and`/`or` exemption does not apply to statement conditions. These calls are still reported even
+though they are operands of `or`:
 
 ```py
 def foo(value: object = None) -> None:
     pass
 
-def statement_tests(flag: bool):
-    if foo():  # error: [redundant-condition]
+def if_tests(flag: bool, other_flag: bool):
+    if flag or foo():  # error: [redundant-condition]
         pass
-    elif foo(value := 1):  # error: [redundant-condition-strict]
-        pass
-
-    while foo():  # error: [redundant-condition]
+    elif other_flag or foo(value := 1):  # error: [redundant-condition-strict]
         pass
 
+def while_test(flag: bool):
+    while flag or foo():  # error: [redundant-condition]
+        pass
+
+def match_test(flag: bool):
     match flag:
-        case _ if foo():  # error: [redundant-condition]
+        case _ if flag or foo():  # error: [redundant-condition]
             pass
 
-    assert foo()  # error: [redundant-condition]
+def assertion_test(flag: bool):
+    assert flag or foo()  # error: [redundant-condition]
 ```
 
 Conditional and `not` expressions nested in an outer boolean test do not receive the exemption. This
@@ -4074,20 +4093,20 @@ call's truthiness.
 def accepts(value: object) -> bool:
     return bool(value)
 
-def nested_tests(flag: bool, other_flag: bool):
+def nested_tests(flag: bool, other_flag: bool, condition: bool):
     if not foo():  # error: [redundant-condition]
         pass
 
-    if flag if foo() else other_flag:  # error: [redundant-condition]
+    if flag if condition or foo() else other_flag:  # error: [redundant-condition]
         pass
 
     if accepts(not foo()):  # error: [redundant-condition]
         pass
 
-    if accepts(1 if foo(value := 1) else 2):  # error: [redundant-condition-strict]
+    if accepts(1 if condition or foo(value := 1) else 2):  # error: [redundant-condition-strict]
         pass
 
-    selected = 1 if accepts(not foo()) else 2  # error: [redundant-condition]
+    selected = 1 if flag and accepts(not foo()) else 2  # error: [redundant-condition]
 ```
 
 Comprehensions, generators, and lambdas have their own scopes, but tests within them can still be
@@ -4096,22 +4115,16 @@ predicate deduplicate items outside those conditions, so the exemption applies a
 
 ```py
 def nested_scopes(items: list[int]):
-    if [item for item in items if foo(item)]:  # error: [redundant-condition]
+    if [item for item in items if item > 0 and not foo(item)]:  # error: [redundant-condition]
         pass
 
-    if {item for item in items if not foo(item)}:  # error: [redundant-condition]
-        pass
-
-    if {item: item for item in items if foo(item)}:  # error: [redundant-condition]
-        pass
-
-    if any(item for item in items if not foo(item)):  # error: [redundant-condition]
+    if any(item for item in items if item > 0 and not foo(item)):  # error: [redundant-condition]
         pass
 
     if accepts(lambda: not foo()):  # error: [redundant-condition]
         pass
 
-    if accepts(lambda: 1 if foo() else 2):  # error: [redundant-condition]
+    if accepts(lambda: 1 if items or foo() else 2):  # error: [redundant-condition]
         pass
 
     seen: set[int] = set()
@@ -4122,7 +4135,8 @@ def nested_scopes(items: list[int]):
 ## Other always-falsy expression tests
 
 The exemption requires a call whose inferred return type is `None`. We still report other
-always-falsy return types, saved `None` values, and calls wrapped in a walrus expression.
+always-falsy return types, saved `None` values, and calls wrapped in a walrus expression, even in
+`and`/`or` operands or standalone `not` expressions.
 
 ```py
 from typing import Literal
@@ -4134,19 +4148,14 @@ def false() -> Literal[False]:
     return False
 
 def record() -> None: ...
-def other_tests(value: None):
-    selected = 1 if empty() else 2  # error: [redundant-condition]
-    negated = not empty()  # error: [redundant-condition]
-    filtered = [item for item in range(3) if empty()]  # error: [redundant-condition]
+def other_tests(value: None, flag: bool):
+    selected = 1 if flag or empty() else 2  # error: [redundant-condition]
     negated = not false()  # error: [redundant-condition-strict]
 
-    selected = 1 if value else 2  # error: [redundant-condition]
-    negated = not value  # error: [redundant-condition]
-    filtered = [item for item in range(3) if value]  # error: [redundant-condition]
+    filtered = [item for item in range(3) if item > 0 and value]  # error: [redundant-condition]
 
-    selected = 1 if (saved := record()) else 2  # error: [redundant-condition-strict]
+    selected = 1 if flag or (saved := record()) else 2  # error: [redundant-condition-strict]
     negated = not (saved := record())  # error: [redundant-condition-strict]
-    filtered = [item for item in range(3) if (saved := record())]  # error: [redundant-condition-strict]
 ```
 
 An awaited call is an `await` expression, so it does not receive the call exemption.

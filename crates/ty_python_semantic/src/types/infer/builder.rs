@@ -8422,7 +8422,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 err.report_diagnostic(&self.context, expr);
             }
 
-            self.check_condition_redundancy(expr, test_ty, RedundantConditionContext::Expression);
+            self.check_condition_redundancy(
+                expr,
+                test_ty,
+                RedundantConditionContext::Expression {
+                    allow_none_returning_calls: false,
+                },
+            );
         }
     }
 
@@ -8581,7 +8587,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         };
 
-        self.check_condition_redundancy(test, test_ty, RedundantConditionContext::Expression);
+        self.check_condition_redundancy(
+            test,
+            test_ty,
+            RedundantConditionContext::Expression {
+                allow_none_returning_calls: false,
+            },
+        );
 
         match test_truthiness {
             Truthiness::AlwaysTrue => body_ty,

@@ -4890,8 +4890,8 @@ value = not f  # error: [redundant-condition]
 
 Calls returning `None` are often used for their side effects in conditional expressions and
 comprehension filters. [`redundant-condition`](#redundant-condition) and [`redundant-condition-strict`](#redundant-condition-strict) both therefore exempt
-calls returning `None` in these contexts. This includes calls appearing as subexpressions of `and`,
-`or` or `not` expressions:
+these calls when they contribute to an `and` or `or` expression in the test. This includes negated
+calls, such as `item not in seen and not seen.add(item)`:
 
 ```py
 def find_duplicate_coordinates(coordinates: list[tuple[int, int]]):
@@ -4903,6 +4903,62 @@ def find_duplicate_coordinates(coordinates: list[tuple[int, int]]):
 
 Here, `seen.add(coord)` records each new coordinate while its `None` result excludes that coordinate
 from the set of duplicates.
+
+Calls used as the entire test are still reported. For example, this function attempts to label each
+item as new or repeated. But `set.add` returns `None` regardless of whether the item was already in
+the set, so the conditional expression always selects `"repeat"`:
+
+```py
+def label_items(items: list[str]) -> list[str]:
+    seen: set[str] = set()
+    return [
+        "new" if seen.add(item) else "repeat"  # error: [redundant-condition]
+        for item in items
+    ]
+
+
+assert label_items(["red", "blue", "red"]) == ["repeat", "repeat", "repeat"]
+```
+
+Using `set.add` as the entire comprehension filter cannot remove duplicates either. Its falsy return
+value rejects every item, leaving an empty list:
+
+```py
+items = ["red", "blue", "red"]
+seen: set[str] = set()
+
+unique = [item for item in items if seen.add(item)]  # error: [redundant-condition]
+assert unique == []
+```
+
+Negating the call instead admits every item, including duplicates. We report this filter too,
+because it still has no effect on which items are included:
+
+```py
+items = ["red", "blue", "red"]
+seen: set[str] = set()
+
+unique = [item for item in items if not seen.add(item)]  # error: [redundant-condition]
+assert unique == ["red", "blue", "red"]
+```
+
+A standalone `not` expression is exempt. For example, a logging filter can save each message for
+inspection while allowing it to reach the logger's handlers. Returning `True` lets the message
+through; `not` converts the `None` returned by `append` to that result:
+
+```py
+from logging import Logger, StreamHandler
+
+messages: list[str] = []
+logger = Logger("capture")
+logger.addHandler(StreamHandler())
+logger.addFilter(
+    lambda record: not messages.append(record.getMessage())
+)  # no diagnostic
+
+logger.warning("Saved report")  # Emits "Saved report".
+assert messages == ["Saved report"]
+```
 
 The exemption does not apply when a call returning `None` is nested inside an outer boolean test, or
 when the call itself is a statement condition:

@@ -95,7 +95,8 @@ pub(super) enum RedundantConditionContext {
     /// A ternary `<EXPR1> if <COND> else <EXPR2>` expression, a comprehension filter, or a
     /// standalone `not` expression.
     ///
-    /// Calls returning `None` can be used for their side effects in these contexts. For example,
+    /// Calls returning `None` can be used for their side effects in `and`/`or` operands within
+    /// ternary tests and comprehension filters, or as the operand of a standalone `not`. For example,
     /// the following is a common pattern found in the ecosystem that is used to deduplicate items
     /// in a concise way:
     ///
@@ -123,13 +124,13 @@ pub(super) enum RedundantConditionContext {
     /// ```
     ///
     /// The exemption does not apply when the expression is itself nested in another boolean test.
-    /// Here, `print(...)` selects a ternary branch, whose value is then tested by `if`. We report
-    /// the call because it always returns `None`: the ternary always selects `backup_ready`, so
-    /// `primary_ready` has no effect on whether `"Ready"` is printed.
+    /// Here, the ternary selects which readiness flag to check, and the enclosing `if` tests that
+    /// flag. The `print` call logs the choice of the backup. Although it is an `or` operand, it is
+    /// also part of the enclosing `if` condition, so we report its always-falsy return value.
     ///
     /// ```python
-    /// def report_readiness(primary_ready: bool, backup_ready: bool) -> None:
-    ///     if primary_ready if print("Checking readiness") else backup_ready:  # error: [redundant-condition]
+    /// def report_readiness(prefer_primary: bool, primary_ready: bool, backup_ready: bool) -> None:
+    ///     if primary_ready if prefer_primary or print("Using backup") else backup_ready:  # error: [redundant-condition]
     ///         print("Ready")
     /// ```
     ///
@@ -144,7 +145,11 @@ pub(super) enum RedundantConditionContext {
     ///     if {coord for coord in coordinates if coord in seen or seen.add(coord)}:  # error: [redundant-condition]
     ///         print("Duplicate coordinates found")
     /// ```
-    Expression,
+    Expression {
+        /// Set for standalone `not` operands and when entering an `and`/`or` expression.
+        /// Negation preserves this exemption; independent nested tests do not inherit it.
+        allow_none_returning_calls: bool,
+    },
 
     /// A test within an assertion, including the complete assertion and tests in call arguments.
     ///
@@ -529,7 +534,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 truthiness: operand_truthiness,
                 evaluation: ExpressionContext::Value,
             },
-            RedundantConditionContext::Expression,
+            RedundantConditionContext::Expression {
+                allow_none_returning_calls: true,
+            },
         ) {
             self.report_redundant_condition(&condition);
         }
@@ -853,9 +860,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         match test.expression {
             ast::Expr::BoolOp(ast::ExprBoolOp { values, .. }) => {
+                let context = match condition_context {
+                    RedundantConditionContext::Expression { .. } => {
+                        RedundantConditionContext::Expression {
+                            allow_none_returning_calls: true,
+                        }
+                    }
+                    context => context,
+                };
                 // Include the final operand: `if flag and func` tests `func` when `flag` is true.
                 for value in values {
-                    check_operand(value, condition_context, conditions);
+                    check_operand(value, context, conditions);
                 }
             }
 
