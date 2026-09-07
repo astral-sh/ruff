@@ -486,8 +486,8 @@ impl Violation for MissingReturnTypeClassMethod {
 }
 
 /// ## What it does
-/// Checks that function arguments are annotated with a more specific type than
-/// `Any`.
+/// Checks that function arguments and return values are annotated with a more
+/// specific type than `Any`.
 ///
 /// ## Why is this bad?
 /// `Any` is a special type indicating an unconstrained type. When an
