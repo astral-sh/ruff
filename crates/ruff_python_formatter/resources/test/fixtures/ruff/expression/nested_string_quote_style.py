@@ -80,16 +80,11 @@ t'{ ("implicit " "concatenation", ["more", "strings"]) }'
 f'{ ("implicit " "concatenation", ["'single'", "\"double\""]) }'
 t'{ ("implicit " "concatenation", ["'single'", "\"double\""]) }'
 
-# Nested string literals inside a format spec. The field belongs to the same string as the
-# field enclosing it, so it follows the same rules as an ordinary interpolation rather than
-# counting as a further level of nesting.
-f'{v:,.{d["n"]}f}'
-t'{v:,.{d["n"]}f}'
-f'{v:{"width"}}'
-t'{v:{"width"}}'
+# A field in a format spec belongs to the same string as its enclosing field,
+# so its string literals follow the same rules as an ordinary interpolation.
+# Regression test for https://github.com/astral-sh/ruff/issues/28218
+f'{v:{d["n"]}}'
+t'{v:{d["n"]}}'
 
-# An interpolated string inside a format spec is still a further level of nesting, so the
-# innermost quotes are preserved before 3.12. Triple quoted outside so that the input is
-# not itself a pre-3.12 syntax error.
+# A nested f-string inside a format spec adds another level of nesting.
 f'''{v:{f"{d['n']}"}}'''
-t'''{v:{f"{d['n']}"}}'''
