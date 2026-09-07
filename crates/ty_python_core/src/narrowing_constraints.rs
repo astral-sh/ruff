@@ -33,13 +33,12 @@
 //! `A OR (NOT A AND B)` simplifies to `A OR B`.
 
 use std::cmp::Ordering;
-use std::hash::BuildHasher;
 
-use hashbrown::hash_table::Entry;
-use ruff_index::{Idx, IndexVec};
-use rustc_hash::{FxBuildHasher, FxHashMap};
+use ruff_index::Idx;
+use rustc_hash::FxHashMap;
 
 use crate::ast_ids::ScopedUseId;
+use crate::interned_nodes::InternedNodes;
 use crate::predicate::ScopedPredicateId;
 use crate::rank::{RankBitBox, RankBitBoxVec};
 use crate::scope::FileScopeId;
@@ -132,10 +131,8 @@ impl NarrowingConstraints {
 
 #[derive(Debug, Default)]
 pub struct NarrowingConstraintsBuilder {
-    interiors: IndexVec<ScopedNarrowingConstraint, InteriorNode>,
+    interiors: InternedNodes<ScopedNarrowingConstraint, InteriorNode>,
     interior_used: RankBitBoxVec,
-    // Nodes are already stored in `interiors`; keep only their IDs in the reverse table.
-    interior_cache: hashbrown::HashTable<ScopedNarrowingConstraint>,
     and_cache: FxHashMap<
         (ScopedNarrowingConstraint, ScopedNarrowingConstraint),
         ScopedNarrowingConstraint,
@@ -150,13 +147,13 @@ impl NarrowingConstraintsBuilder {
     pub(crate) fn build(self) -> NarrowingConstraints {
         if self.interior_used.first_zero().is_none() {
             NarrowingConstraints {
-                used_interiors: self.interiors.raw.into_boxed_slice(),
+                used_interiors: self.interiors.into_nodes_boxed_slice(),
                 used_indices: None,
             }
         } else {
             let used_interiors = self
                 .interiors
-                .into_iter()
+                .into_node_iterator()
                 .zip(&self.interior_used)
                 .filter_map(|(interior, used)| used.then_some(interior))
                 .collect();
@@ -231,20 +228,11 @@ impl NarrowingConstraintsBuilder {
             });
         }
 
-        let interiors = &mut self.interiors;
-        match self.interior_cache.entry(
-            FxBuildHasher.hash_one(node),
-            |id| interiors[*id] == node,
-            |id| FxBuildHasher.hash_one(interiors[*id]),
-        ) {
-            Entry::Occupied(entry) => *entry.get(),
-            Entry::Vacant(entry) => {
-                self.interior_used.push(false);
-                let id = interiors.push(node);
-                entry.insert(id);
-                id
-            }
+        let (id, inserted) = self.interiors.intern(node);
+        if inserted {
+            self.interior_used.push(false);
         }
+        id
     }
 
     pub(crate) fn add_atom(&mut self, predicate: ScopedPredicateId) -> ScopedNarrowingConstraint {
@@ -293,13 +281,8 @@ impl NarrowingConstraintsBuilder {
             if_uncertain: ALWAYS_FALSE,
             if_false,
         };
-        if let Some(cached) = self
-            .interior_cache
-            .find(FxBuildHasher.hash_one(node), |id| {
-                self.interiors[*id] == node
-            })
-        {
-            return *cached;
+        if let Some(cached) = self.interiors.find(&node) {
+            return cached;
         }
         if self.interiors.len() >= MAX_INTERIOR_NODES {
             return ALWAYS_TRUE;
