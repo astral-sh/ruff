@@ -14,6 +14,7 @@ use std::slice::{Iter, IterMut};
 use std::sync::OnceLock;
 
 use bitflags::bitflags;
+use char_str::CharStr;
 use thin_vec::ThinVec;
 
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
@@ -354,7 +355,7 @@ pub struct InterpolatedElement {
 pub struct InterpolatedStringLiteralElement {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
-    pub value: Box<str>,
+    pub value: CharStr,
 }
 
 impl InterpolatedStringLiteralElement {
@@ -1465,8 +1466,8 @@ impl StringLiteralValue {
 
     /// Returns the concatenated string value as a [`str`].
     ///
-    /// Note that this will perform an allocation on the first invocation if the
-    /// string value is implicitly concatenated.
+    /// This may allocate on the first invocation if the string value is implicitly
+    /// concatenated and does not fit inline.
     pub fn to_str(&self) -> &str {
         match &self.inner {
             StringLiteralValueInner::Single(value) => value.as_str(),
@@ -1722,7 +1723,7 @@ impl fmt::Debug for StringLiteralFlags {
 pub struct StringLiteral {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
-    pub value: Box<str>,
+    pub value: CharStr,
     pub flags: StringLiteralFlags,
 }
 
@@ -1731,6 +1732,12 @@ impl Deref for StringLiteral {
 
     fn deref(&self) -> &Self::Target {
         &self.value
+    }
+}
+
+impl AsRef<str> for StringLiteral {
+    fn as_ref(&self) -> &str {
+        self.as_str()
     }
 }
 
@@ -1780,16 +1787,13 @@ struct ConcatenatedStringLiteral {
     /// The individual [`StringLiteral`] parts that make up the concatenated string.
     strings: Vec<StringLiteral>,
     /// The concatenated string value.
-    value: OnceLock<Box<str>>,
+    value: OnceLock<CharStr>,
 }
 
 impl ConcatenatedStringLiteral {
     /// Extracts a string slice containing the entire concatenated string.
     fn to_str(&self) -> &str {
-        self.value.get_or_init(|| {
-            let concatenated: String = self.strings.iter().map(StringLiteral::as_str).collect();
-            concatenated.into_boxed_str()
-        })
+        self.value.get_or_init(|| CharStr::concat(&self.strings))
     }
 }
 
