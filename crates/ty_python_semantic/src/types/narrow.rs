@@ -16,9 +16,9 @@ use crate::types::unpacker::collected_list_type;
 use crate::types::{
     CallableType, ClassBase, ClassLiteral, ClassPatternPositionalSource, ClassType,
     IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
-    Parameter, Parameters, Signature, SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness,
-    Type, TypeContext, TypeVarBoundOrConstraints, UnionBuilder, binding_type,
-    callable_pattern_type, class_pattern_positional_sources,
+    Parameter, Parameters, Signature, SpecialFormType, StringLiteralType, SubclassOfInner,
+    SubclassOfType, Truthiness, Type, TypeContext, TypeVarBoundOrConstraints, UnionBuilder,
+    binding_type, callable_pattern_type, class_pattern_positional_sources,
     definite_match_pattern_type_for_subject, exact_sequence_pattern_type, infer_expression_types,
     mapping_pattern_type, pattern_binding_fallthrough_type, sequence_pattern_type_builder,
     singleton_pattern_type, starred_sequence_pattern_type, typed_dict_matches_class_pattern,
@@ -35,7 +35,7 @@ use ty_python_core::predicate::{
 };
 use ty_python_core::scope::ScopeId;
 use ty_python_core::symbol::Symbol;
-use ty_python_core::{ExpressionNodeKey, NarrowingEvaluator, place_table, semantic_index};
+use ty_python_core::{ExpressionNodeKey, NarrowingEvaluator, Program, place_table, semantic_index};
 
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast::name::Name;
@@ -5037,31 +5037,53 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
     // `NarrowingConstraint::intersection` at the call site instead of constructing a replacement
     // type here.
     fn narrow_with_present_key(&self, ty: Type<'db>, key: &str) -> Type<'db> {
-        let db = self.db;
-        let constrain = |ty, key_presence_constraint| {
-            IntersectionType::from_two_elements(db, &self.env, ty, key_presence_constraint)
-        };
+        #[salsa::tracked(
+            returns(copy),
+            cycle_initial=|_, _, _, ty, _| ty,
+            heap_size=ruff_memory_usage::heap_size
+        )]
+        fn narrow_with_present_key_impl<'db>(
+            db: &'db dyn Db,
+            program: Program<'db>,
+            ty: Type<'db>,
+            key: StringLiteralType<'db>,
+        ) -> Type<'db> {
+            let env = ProgramEnvironment::from_program(program);
+            let constrain = |ty, key_presence_constraint| {
+                IntersectionType::from_two_elements(db, &env, ty, key_presence_constraint)
+            };
 
-        match ty.resolve_type_alias(db) {
-            Type::Union(union) => union.map(db, &self.env, |element| {
-                self.narrow_with_present_key(*element, key)
-            }),
-            Type::TypedDict(typed_dict)
-                if typed_dict
-                    .key_membership_truthiness(db, key)
-                    .is_always_false() =>
-            {
-                Type::Never
+            match ty.resolve_type_alias(db) {
+                Type::Union(union) => union.map(db, &env, |element| {
+                    narrow_with_present_key_impl(db, program, *element, key)
+                }),
+                Type::TypedDict(typed_dict)
+                    if typed_dict
+                        .key_membership_truthiness(db, key.value(db))
+                        .is_always_false() =>
+                {
+                    Type::Never
+                }
+                resolved if typeddict_declares_key(db, resolved, key.value(db)) => resolved,
+                // TODO: Extend this to subtypes of `Mapping[str, object]` whose membership and
+                // subscript operations obey the `Mapping` contract.
+                resolved if is_or_contains_typeddict(db, resolved) => constrain(
+                    ty,
+                    Type::TypedDict(required_typeddict_key(db, key.value(db), Type::object())),
+                ),
+                _ => constrain(
+                    ty,
+                    key_membership_contains_protocol(db, &env, key.value(db)),
+                ),
             }
-            resolved if typeddict_declares_key(db, resolved, key) => resolved,
-            // TODO: Extend this to subtypes of `Mapping[str, object]` whose membership and
-            // subscript operations obey the `Mapping` contract.
-            resolved if is_or_contains_typeddict(db, resolved) => constrain(
-                ty,
-                Type::TypedDict(required_typeddict_key(db, key, Type::object())),
-            ),
-            _ => constrain(ty, key_membership_contains_protocol(db, &self.env, key)),
         }
+
+        narrow_with_present_key_impl(
+            self.db,
+            self.env.program(self.db),
+            ty,
+            StringLiteralType::new(self.db, key),
+        )
     }
 
     /// Narrow tagged unions of tuples with `Literal` elements.
@@ -5526,5 +5548,78 @@ impl<'db> NarrowingEvaluatorExtension<'db> for NarrowingEvaluator<'_, 'db> {
         place: ScopedPlaceId,
     ) -> Type<'db> {
         narrow_type_by_constraint(db, env, self, base_type, place)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use ruff_db::files::system_path_to_file;
+    use ruff_db::system::DbWithWritableSystem as _;
+    use ruff_db::testing::{
+        assert_function_query_was_not_run_by_name, find_will_execute_event_by_name,
+    };
+    use ty_python_core::ProgramFile;
+
+    use crate::db::tests::setup_db;
+    use crate::types::check_types;
+
+    #[test]
+    fn present_key_narrowing_is_shared_between_modules() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/common.py",
+            r#"
+            from typing import Literal, TypedDict
+
+            class First(TypedDict):
+                tag: Literal["first"]
+
+            class Second(TypedDict):
+                tag: Literal["second"]
+
+            type Item = First | Second
+            "#,
+        )?;
+        for path in ["/src/first.py", "/src/second.py"] {
+            db.write_dedented(
+                path,
+                r#"
+                from common import Item
+
+                def read_field(item: Item) -> object:
+                    if "field" in item:
+                        return item["field"]
+                    return None
+                "#,
+            )?;
+        }
+
+        db.clear_salsa_events();
+        for (path, cached) in [("/src/first.py", false), ("/src/second.py", true)] {
+            let env = db.program_environment();
+            let file = system_path_to_file(&db, path)?;
+            let file = ProgramFile::new(&db, file, env.program(&db));
+            assert!(check_types(&db, file).is_empty());
+            let events = db.take_salsa_events();
+            if cached {
+                assert_function_query_was_not_run_by_name(
+                    &db,
+                    "narrow_with_present_key_impl",
+                    None,
+                    &events,
+                );
+            } else {
+                assert!(
+                    find_will_execute_event_by_name(
+                        &db,
+                        "narrow_with_present_key_impl",
+                        None,
+                        &events,
+                    )
+                    .is_some()
+                );
+            }
+        }
+        Ok(())
     }
 }
