@@ -4023,10 +4023,10 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                             self.add_type_mapping(actual_typevar, formal, polarity);
                             return Ok(());
                         }
+                    } else {
+                        let when = self.constraint_for_relation(formal, actual, relation_polarity);
+                        return self.infer_from_constraint_set(when);
                     }
-
-                    let when = self.constraint_for_relation(formal, actual, relation_polarity);
-                    return self.infer_from_constraint_set(when);
                 }
 
                 // Second, if the formal is a union, and the actual type is assignable to precisely

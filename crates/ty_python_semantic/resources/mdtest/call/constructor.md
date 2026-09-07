@@ -1772,6 +1772,35 @@ reveal_type(C("a"))  # revealed: C[str | None]
 reveal_type(C(1))  # revealed: C[str | None]
 ```
 
+## Union `self` annotations with variadic constructor parameters
+
+The `object` argument selects the `Any` constraint, even when the constructor also infers a
+`ParamSpec` or `TypeVarTuple`.
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from collections.abc import Callable
+from typing import Any
+
+class WithParamSpec[T: (str | None, Any)]:
+    def __init__[**P](self: WithParamSpec[str | None], value: T, callback: Callable[P, None]) -> None: ...
+    def push(self, value: T) -> None: ...
+
+def callback() -> None: ...
+
+reveal_type(WithParamSpec(object(), callback))  # revealed: WithParamSpec[Any]
+
+class WithTypeVarTuple[T: (str | None, Any)]:
+    def __init__[*Ts](self: WithTypeVarTuple[str | None], value: T, rest: tuple[*Ts]) -> None: ...
+    def push(self, value: T) -> None: ...
+
+reveal_type(WithTypeVarTuple(object(), (1,)))  # revealed: WithTypeVarTuple[Any]
+```
+
 ## `__init__` can remap constructor generic arguments via `self` annotation
 
 ```py
