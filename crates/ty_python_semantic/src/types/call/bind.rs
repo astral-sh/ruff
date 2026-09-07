@@ -7777,8 +7777,10 @@ impl<'db> Binding<'db> {
             .ok()
     }
 
-    /// Returns the type context to use for bidirectional inference of a source call argument,
-    /// using the provided argument specialization.
+    /// Returns the type context to use for bidirectional inference of a source call argument.
+    ///
+    /// Request the shared argument specialization only when this parameter needs it. Unmatched
+    /// arguments and parameters that use their type variable's upper bound do not need one.
     ///
     /// This method also handles `ParamSpec` forwarding, where a wrapper argument receives context
     /// from the wrapped callable's parameter.
@@ -7798,7 +7800,7 @@ impl<'db> Binding<'db> {
         arguments_types: &CallArguments<'_, 'db>,
         argument_index: usize,
         call_expression_tcx: TypeContext<'db>,
-        specialization: Option<Specialization<'db>>,
+        specialization: impl Fn() -> Option<Specialization<'db>>,
     ) -> Option<ArgumentTypeContext<'db>> {
         let argument_matches = self.matched_argument_for_call_argument(binding, argument_index)?;
         let [matched_parameter] = argument_matches.parameters.as_slice() else {
@@ -7815,7 +7817,7 @@ impl<'db> Binding<'db> {
                 .merged_specialization(db)
                 .and_then(|specialization| specialization.get(db, paramspec))
                 .or_else(|| {
-                    specialization.and_then(|specialization| specialization.get(db, paramspec))
+                    specialization().and_then(|specialization| specialization.get(db, paramspec))
                 })?
             else {
                 return None;
@@ -7872,7 +7874,7 @@ impl<'db> Binding<'db> {
                 ));
             }
 
-            parameter_type = parameter_type.apply_optional_specialization(db, specialization);
+            parameter_type = parameter_type.apply_optional_specialization(db, specialization());
             if let Some(expected_return_ty) = call_expression_tcx.annotation
                 && let Some(expected) = self.typevartuple_argument_context(
                     db,
