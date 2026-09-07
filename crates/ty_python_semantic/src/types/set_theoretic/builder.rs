@@ -49,7 +49,8 @@ use crate::types::visitor::any_over_type;
 use crate::types::{
     BytesLiteralType, ClassLiteral, EnumLiteralType, IntersectionType, KnownClass,
     KnownInstanceType, LiteralValueType, LiteralValueTypeKind, NegativeIntersectionElements,
-    StringLiteralType, SubclassOfType, Type, TypePair, TypeVarBoundOrConstraints, UnionType,
+    StringLiteralType, SubclassOfType, Type, TypePair, TypeVarBoundOrConstraints, TypedDictType,
+    UnionType,
 };
 use crate::{Db, FxOrderMap, FxOrderSet, ProgramEnvironment};
 use rustc_hash::FxHashSet;
@@ -505,6 +506,10 @@ const MAX_RECURSIVE_UNION_LITERALS: usize = 5;
 const MAX_NON_RECURSIVE_UNION_LITERALS: usize = 8192;
 pub(crate) struct UnionBuilder<'db> {
     elements: Vec<UnionElement<'db>>,
+    /// A pure `TypedDict` union only deduplicates by identity. The vector retains insertion order;
+    /// this index avoids comparing each new dictionary against all preceding dictionaries.
+    /// Allocate it only after encountering two distinct dictionaries.
+    typed_dicts: Option<Box<FxHashSet<TypedDictType<'db>>>>,
     db: &'db dyn Db,
     env: ProgramEnvironment<'db>,
     unpack_aliases: bool,
@@ -583,6 +588,7 @@ impl<'db> UnionBuilder<'db> {
             db,
             env: env.clone(),
             elements: vec![],
+            typed_dicts: None,
             unpack_aliases: true,
             cycle_recovery: false,
             recursively_defined: RecursivelyDefined::No,
@@ -613,6 +619,7 @@ impl<'db> UnionBuilder<'db> {
 
     /// Collapse the union to a single type: `object`.
     fn collapse_to_object(&mut self) {
+        self.typed_dicts = None;
         self.elements.clear();
         self.elements.push(UnionElement::Type(Type::object()));
     }
@@ -655,6 +662,32 @@ impl<'db> UnionBuilder<'db> {
     }
 
     fn add_in_place_impl(&mut self, ty: Type<'db>, seen_aliases: &mut Vec<Type<'db>>) {
+        match ty {
+            Type::TypedDict(typed_dict) => {
+                if let Some(typed_dicts) = &mut self.typed_dicts {
+                    if typed_dicts.insert(typed_dict) {
+                        self.elements.push(UnionElement::Type(ty));
+                    }
+                    return;
+                }
+
+                if let [UnionElement::Type(Type::TypedDict(existing))] = self.elements.as_slice() {
+                    if *existing != typed_dict {
+                        self.typed_dicts =
+                            Some(Box::new(FxHashSet::from_iter([*existing, typed_dict])));
+                        self.elements.push(UnionElement::Type(ty));
+                    }
+                    return;
+                }
+            }
+            // These wrappers do not themselves add a concrete member. Their expanded members
+            // determine whether the union still contains only `TypedDict`s.
+            Type::Union(_) | Type::Never => {}
+            Type::TypeAlias(_) if self.unpack_aliases => {}
+            // Literal groups also bypass `push_type`, so invalidate the index before dispatch.
+            _ => self.typed_dicts = None,
+        }
+
         let db = self.db;
         let cycle_recovery = self.cycle_recovery;
         let should_widen = |literals, recursively_defined: RecursivelyDefined| {
@@ -2082,6 +2115,125 @@ mod tests {
     use ruff_db::system::DbWithWritableSystem as _;
     use ty_module_resolver::KnownModule;
     use ty_python_core::ProgramFile;
+
+    #[test]
+    fn typed_dict_union_identity_and_mixed_members() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/dictionaries.py",
+            r#"
+            from typing import TypedDict
+
+            class First(TypedDict):
+                value: int
+
+            class Second(TypedDict):
+                value: int
+
+            class Third(TypedDict):
+                value: str
+
+            first: First
+            second: Second
+            third: Third
+            type Alias = First
+            "#,
+        )?;
+        let env = db.program_environment();
+        let file = ruff_db::files::system_path_to_file(&db, "/src/dictionaries.py")?;
+        let module = ProgramFile::new(&db, file, env.program(&db));
+        let [first, second, third] = ["first", "second", "third"]
+            .map(|name| global_symbol(&db, module, name).place.expect_type());
+        let Type::KnownInstance(KnownInstanceType::TypeAliasType(alias)) =
+            global_symbol(&db, module, "Alias").place.expect_type()
+        else {
+            anyhow::bail!("Expected a type alias");
+        };
+        let alias = Type::TypeAlias(alias);
+
+        // Structurally equivalent but distinct dictionaries remain separate. Duplicates reached
+        // through flattened unions retain the first occurrence's position and recursion metadata.
+        let nested = Type::Union(UnionType::new(
+            &db,
+            vec![third, first].into_boxed_slice(),
+            RecursivelyDefined::Yes,
+        ));
+        let result = UnionBuilder::new(&db, &env)
+            .add(first)
+            .add(second)
+            .add(first)
+            .add(Type::Never)
+            .add(alias)
+            .add(nested)
+            .add(second)
+            .build();
+        assert_eq!(
+            result,
+            Type::Union(UnionType::new(
+                &db,
+                vec![first, second, third].into_boxed_slice(),
+                RecursivelyDefined::Yes,
+            ))
+        );
+
+        // Adding a literal must preserve the ordinary mixed-union order and deduplication.
+        for literal in [
+            Type::int_literal(1),
+            Type::string_literal(&db, "x"),
+            Type::bytes_literal(&db, b"x"),
+            Type::bool_literal(true),
+        ] {
+            let result = UnionBuilder::new(&db, &env)
+                .add(first)
+                .add(second)
+                .add(literal)
+                .add(first)
+                .add(third)
+                .add(literal)
+                .build();
+            assert_eq!(
+                result,
+                Type::Union(UnionType::new(
+                    &db,
+                    vec![first, second, literal, third].into_boxed_slice(),
+                    RecursivelyDefined::No,
+                ))
+            );
+        }
+
+        // A non-dictionary supertype can remove every indexed member. Later duplicates must
+        // still be compared with the remaining supertype rather than added unconditionally.
+        assert_eq!(
+            UnionBuilder::new(&db, &env)
+                .add(first)
+                .add(second)
+                .add(Type::object())
+                .add(first)
+                .add(third)
+                .build(),
+            Type::object(),
+        );
+
+        // An unexpanded alias is an ordinary mixed member, including during cycle recovery.
+        for cycle_recovery in [false, true] {
+            assert_eq!(
+                UnionBuilder::new(&db, &env)
+                    .unpack_aliases(false)
+                    .cycle_recovery(cycle_recovery)
+                    .add(first)
+                    .add(second)
+                    .add(alias)
+                    .add(first)
+                    .build(),
+                Type::Union(UnionType::new(
+                    &db,
+                    vec![first, second, alias].into_boxed_slice(),
+                    RecursivelyDefined::No,
+                ))
+            );
+        }
+        Ok(())
+    }
 
     #[test]
     fn build_union_no_elements() {
