@@ -2059,6 +2059,13 @@ impl<'db> VarianceInferable<'db> for &Signature<'db> {
     }
 }
 
+/// Selects when to compare return types while relating two signatures.
+#[derive(Clone, Copy)]
+enum SignatureReturnCheck {
+    Eager,
+    Deferred,
+}
+
 impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     /// Fast path for unary callable assignability: compare overload sets by aggregating
     /// overlapping parameter domains and return types.
@@ -2495,6 +2502,36 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source: &Signature<'db>,
         target: &Signature<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        if self.is_context_collection_enabled()
+            || !source.parameters.is_standard()
+            || !target.parameters.is_standard()
+        {
+            return self.check_signature_pair_impl(db, source, target, SignatureReturnCheck::Eager);
+        }
+
+        // Overload return types can contain large recursive structures. An incompatible parameter
+        // list already rejects the signature, so compare it before exploring those return types.
+        // Keep the original order for diagnostics and ParamSpec binding, which can depend on the
+        // return-type constraints even when the signatures are incompatible.
+        let parameter_constraints =
+            self.check_signature_pair_impl(db, source, target, SignatureReturnCheck::Deferred);
+        if parameter_constraints.is_never_satisfied(db, self.env) {
+            return parameter_constraints;
+        }
+
+        // Preserve the original source order of constraints even though they were evaluated in
+        // the opposite order. This keeps return-type evidence first when selecting a solution.
+        self.check_type_pair(db, source.return_ty, target.return_ty)
+            .and(db, self.constraints, || parameter_constraints)
+    }
+
+    fn check_signature_pair_impl(
+        &self,
+        db: &'db dyn Db,
+        source: &Signature<'db>,
+        target: &Signature<'db>,
+        return_check: SignatureReturnCheck,
+    ) -> ConstraintSet<'db, 'c> {
         /// A helper struct to zip two slices of parameters together that provides control over the
         /// two iterators individually. It also keeps track of the current parameter in each
         /// iterator.
@@ -2724,10 +2761,16 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // Avoid returning early after checking the return types in case there is a `ParamSpec` type
         // variable in either signature to ensure that the `ParamSpec` binding is still applied even
         // if the return types are incompatible.
-        let return_type_constraints = if target_parameters.as_paramspec_with_prefix().is_some() {
-            self.check_paramspec_return_pair(db, source, target.return_ty)
-        } else {
-            self.check_type_pair(db, source.return_ty, target.return_ty)
+        let return_type_constraints = match return_check {
+            SignatureReturnCheck::Deferred => self.always(),
+            SignatureReturnCheck::Eager
+                if target_parameters.as_paramspec_with_prefix().is_some() =>
+            {
+                self.check_paramspec_return_pair(db, source, target.return_ty)
+            }
+            SignatureReturnCheck::Eager => {
+                self.check_type_pair(db, source.return_ty, target.return_ty)
+            }
         };
         let return_type_checks = !result
             .intersect(db, self.constraints, return_type_constraints)
