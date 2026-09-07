@@ -572,11 +572,14 @@ impl<'db> HasIdentity<'db> for (Type<'db>, TypeVarVariance) {
     type Id = (TypeIdentity<'db>, TypeVarVariance);
 
     fn may_share_identity(&self, db: &'db dyn Db, other: &Self) -> bool {
-        self.1 == other.1 && self.0.may_share_type_identity(db, other.0)
+        let (self_ty, self_variance) = self;
+        let (other_ty, other_variance) = other;
+        self_variance == other_variance && self_ty.may_share_type_identity(db, *other_ty)
     }
 
     fn to_identity(&self, db: &'db dyn Db) -> Self::Id {
-        (self.0.to_type_identity(db), self.1)
+        let (ty, variance) = self;
+        (ty.to_type_identity(db), *variance)
     }
 }
 
