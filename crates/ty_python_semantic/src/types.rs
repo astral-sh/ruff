@@ -28,7 +28,7 @@ pub(crate) use self::callable::UpcastPolicy;
 use self::class::ClassInstanceFlags;
 pub use self::cyclic::CycleDetector;
 pub(crate) use self::cyclic::TypeTransformer;
-use self::cyclic::{ActiveRecursionDetector, TypeIdentity};
+use self::cyclic::{ActiveRecursionDetector, HasIdentity, TypeIdentity};
 pub use self::dedicated::pytest::{
     FixtureBinding, FixtureExposure, FixtureNameSource, fixture_bindings_for_parameter,
     fixture_exposures_for_definition, pytest_global_plugin_files,
@@ -564,8 +564,21 @@ pub(crate) type FindLegacyTypeVarsVisitor<'db> =
 pub(crate) struct FindLegacyTypeVars;
 
 /// A [`CycleDetector`] that is used in `visit_specialization` methods.
-type SpecializationVisitor<'db> = CycleDetector<'db, VisitSpecialization, Type<'db>, (), 3>;
+type SpecializationVisitor<'db> =
+    CycleDetector<'db, VisitSpecialization, (Type<'db>, TypeVarVariance), (), 3>;
 struct VisitSpecialization;
+
+impl<'db> HasIdentity<'db> for (Type<'db>, TypeVarVariance) {
+    type Id = (TypeIdentity<'db>, TypeVarVariance);
+
+    fn may_share_identity(&self, db: &'db dyn Db, other: &Self) -> bool {
+        self.1 == other.1 && self.0.may_share_type_identity(db, other.0)
+    }
+
+    fn to_identity(&self, db: &'db dyn Db) -> Self::Id {
+        (self.0.to_type_identity(db), self.1)
+    }
+}
 
 /// The standard-library `typing` module or its `typing_extensions` backport.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
@@ -3448,10 +3461,11 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Recursively visit the specialization of a generic class instance.
+    /// Recursively visit a type and its specializations.
     ///
-    /// The provided closure will be called on any nested types, along with their variance with
-    /// respect to the outermost type.
+    /// The provided closure will be called on the type itself and its nested types, along with
+    /// their variance with respect to the outermost type. Repeated types with the same variance
+    /// may be skipped.
     fn visit_specialization<F>(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>, mut f: F)
     where
         F: FnMut(Type<'db>, TypeVarVariance),
@@ -3473,62 +3487,58 @@ impl<'db> Type<'db> {
         f: &mut dyn FnMut(Type<'db>, TypeVarVariance),
         visitor: &SpecializationVisitor<'db>,
     ) {
-        let Some((_, specialization)) = self.class_specialization(db, env) else {
-            match self {
-                Type::Union(union) => {
-                    for element in union.elements(db) {
-                        element.visit_specialization_impl(db, env, polarity, f, visitor);
-                    }
-                }
-                Type::Intersection(intersection) => {
-                    for element in intersection.positive(db) {
-                        element.visit_specialization_impl(db, env, polarity, f, visitor);
-                    }
-                }
-                Type::TypeAlias(alias) => visitor.visit(db, self, || {
-                    alias
-                        .value_type(db)
-                        .visit_specialization_impl(db, env, polarity, f, visitor);
-                }),
-                Type::Callable(callable) => {
-                    for signature in callable.signatures(db) {
-                        for parameter in signature.parameters() {
-                            let variance = TypeVarVariance::Contravariant.compose(polarity);
+        f(self, polarity);
 
-                            f(parameter.annotated_type(), variance);
-
-                            visitor.visit(db, parameter.annotated_type(), || {
-                                parameter
-                                    .annotated_type()
-                                    .visit_specialization_impl(db, env, variance, f, visitor);
-                            });
+        visitor.visit(db, (self, polarity), || {
+            let Some((_, specialization)) = self.class_specialization(db, env) else {
+                match self {
+                    Type::Union(union) => {
+                        for element in union.elements(db) {
+                            element.visit_specialization_impl(db, env, polarity, f, visitor);
                         }
+                    }
+                    Type::Intersection(intersection) => {
+                        for element in intersection.positive(db) {
+                            element.visit_specialization_impl(db, env, polarity, f, visitor);
+                        }
+                        for element in intersection.negative(db) {
+                            element.visit_specialization_impl(db, env, polarity.flip(), f, visitor);
+                        }
+                    }
+                    Type::TypeAlias(alias) => alias
+                        .value_type(db)
+                        .visit_specialization_impl(db, env, polarity, f, visitor),
+                    Type::Callable(callable) => {
+                        for signature in callable.signatures(db) {
+                            for parameter in signature.parameters() {
+                                parameter.annotated_type().visit_specialization_impl(
+                                    db,
+                                    env,
+                                    polarity.flip(),
+                                    f,
+                                    visitor,
+                                );
+                            }
 
-                        visitor.visit(db, signature.return_ty, || {
                             signature
                                 .return_ty
                                 .visit_specialization_impl(db, env, polarity, f, visitor);
-                        });
+                        }
                     }
+                    _ => {}
                 }
-                _ => {}
-            }
 
-            return;
-        };
+                return;
+            };
 
-        for (typevar, ty) in iter::zip(
-            specialization.generic_context(db).variables(db),
-            specialization.types(db),
-        ) {
-            let variance = typevar.variance_with_polarity(db, polarity);
-
-            f(*ty, variance);
-
-            visitor.visit(db, *ty, || {
+            for (typevar, ty) in iter::zip(
+                specialization.generic_context(db).variables(db),
+                specialization.types(db),
+            ) {
+                let variance = typevar.variance_with_polarity(db, polarity);
                 ty.visit_specialization_impl(db, env, variance, f, visitor);
-            });
-        }
+            }
+        });
     }
 
     /// Return true if there is just a single inhabitant for this type.

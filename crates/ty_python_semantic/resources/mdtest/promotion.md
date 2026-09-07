@@ -312,7 +312,7 @@ We promote in non-covariant position in the return type of a generic function, o
 generic class:
 
 ```py
-from typing import Callable, Literal
+from typing import Callable, Literal, Any
 
 class Bivariant[T]:
     def __init__(self, value: T): ...
@@ -367,6 +367,61 @@ reveal_type(f11(1, 1))  # revealed: tuple[Invariant[Covariant[int] | None], Cova
 
 reveal_type(f12(1))  # revealed: ((int, /) -> bool) | None
 reveal_type(f13(1))  # revealed: ((bool, /) -> Invariant[int]) | None
+```
+
+This also works if the type variable is nested inside a union:
+
+```py
+def f14[T](x: T) -> Covariant[T | None]:
+    raise NotImplementedError
+
+def f15[T](x: T) -> Contravariant[T | None]:
+    raise NotImplementedError
+
+def f16[T](x: T) -> Invariant[T | None]:
+    raise NotImplementedError
+
+reveal_type(f14(1))  # revealed: Covariant[Literal[1] | None]
+reveal_type(f15(1))  # revealed: Contravariant[int | None]
+reveal_type(f16(1))  # revealed: Invariant[int | None]
+```
+
+And similarly if the type variable is nested in an intersection (note that negation flips variance):
+
+```py
+from ty_extensions import Intersection, Not
+
+def f17[T](x: T) -> Covariant[Intersection[Any, T]]:
+    raise NotImplementedError
+
+def f18[T](x: T) -> Covariant[Intersection[Any, Not[T]]]:
+    raise NotImplementedError
+
+def f19[T](x: T) -> Invariant[Intersection[Any, T]]:
+    raise NotImplementedError
+
+reveal_type(f17(1))  # revealed: Covariant[Any & Literal[1]]
+reveal_type(f18(1))  # revealed: Covariant[Any & ~int]
+reveal_type(f19(1))  # revealed: Invariant[Any & int]
+```
+
+We also promote a callable's return type, if the whole callable is in invariant position:
+
+```py
+def f20[T](x: T) -> Invariant[Callable[[], T]]:
+    raise NotImplementedError
+
+reveal_type(f20(1))  # revealed: Invariant[() -> int]
+```
+
+When the same nested type occurs in both covariant and contravariant positions, both occurrences
+contribute to promotion:
+
+```py
+def f21[T](x: T) -> tuple[Covariant[T | None], Contravariant[T | None]]:
+    raise NotImplementedError
+
+reveal_type(f21(1))  # revealed: tuple[Covariant[int | None], Contravariant[int | None]]
 ```
 
 ## Promotion is recursive
