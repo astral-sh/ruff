@@ -4057,6 +4057,54 @@ logger.warning("Saved report")
 assert messages == ["Saved report"]
 ```
 
+### Awaited calls
+
+The same exemption applies to awaited calls that produce `None`. Here, `Queue.put` queues a message
+for each unfinished job. Negating its awaited result keeps the queued message in the returned list.
+The walrus argument records the message so the comprehension can return exactly what it queued.
+
+```py
+from asyncio import Queue
+
+async def enqueue_pending(jobs: list[str], completed: set[str], queue: Queue[str]) -> list[str]:
+    return [
+        message
+        for job in jobs
+        if job not in completed and not await queue.put(message := f"Process {job}")  # no diagnostic
+    ]
+```
+
+A conditional expression can report whether a job was skipped or queued. The completed-job check
+selects `"skipped"`; otherwise, the awaited call queues the job and its `None` result selects
+`"queued"`:
+
+```py
+async def enqueue_status(job: str, completed: set[str], queue: Queue[str]) -> str:
+    return "skipped" if job in completed or await queue.put(job) else "queued"  # no diagnostic
+```
+
+An asynchronous callback can also queue a job and return `True` to indicate acceptance:
+
+```py
+async def accept_job(job: str, queue: Queue[str]) -> bool:
+    return not await queue.put(job)  # no diagnostic
+```
+
+Awaiting the call does not relax the restrictions on where the exemption applies. A bare conditional
+test is reported, as are `or` operands in statement conditions and comprehension filters nested in
+an outer boolean test:
+
+```py
+async def nonexempt_contexts(job: str, completed: set[str], queue: Queue[str]):
+    status = "skipped" if await queue.put(job) else "queued"  # error: [redundant-condition]
+
+    if job in completed or await queue.put(job):  # error: [redundant-condition]
+        pass
+
+    if [item for item in [job] if item not in completed and not await queue.put(item)]:  # error: [redundant-condition]
+        pass
+```
+
 ## Calls returning `None` in statement conditions
 
 The `and`/`or` exemption does not apply to statement conditions. These calls are still reported even
@@ -4158,12 +4206,18 @@ def other_tests(value: None, flag: bool):
     negated = not (saved := record())  # error: [redundant-condition-strict]
 ```
 
-An awaited call is an `await` expression, so it does not receive the call exemption.
+An awaited call must produce `None` to qualify. The operand of `await` must also be a call: awaiting
+a saved awaitable does not receive the exemption, even if its result is `None`.
 
 ```py
-async def async_record() -> None: ...
-async def awaited_test():
-    negated = not await async_record()  # error: [redundant-condition]
+from collections.abc import Awaitable
+
+async def async_false() -> Literal[False]:
+    return False
+
+async def awaited_tests(saved: Awaitable[None]):
+    negated = not await async_false()  # error: [redundant-condition-strict]
+    negated = not await saved  # error: [redundant-condition]
 ```
 
 ## Defensive assertions

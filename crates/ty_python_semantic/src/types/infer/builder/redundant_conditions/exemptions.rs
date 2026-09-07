@@ -84,8 +84,13 @@ impl RedundantConditionContext {
             Self::Expression {
                 allow_none_returning_calls,
             } => {
+                // For an awaited call, `condition.value_type` describes the awaited result.
+                let expression = match condition.expression {
+                    ast::Expr::Await(await_expression) => &*await_expression.value,
+                    expression => expression,
+                };
                 allow_none_returning_calls
-                    && condition.expression.is_call_expr()
+                    && expression.is_call_expr()
                     && condition.value_type.is_none(builder.db())
                     && !builder
                         .scope()

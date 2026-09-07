@@ -4960,6 +4960,24 @@ logger.warning("Saved report")  # Emits "Saved report".
 assert messages == ["Saved report"]
 ```
 
+The same rules apply to awaited calls that produce `None`. This function queues each unfinished job
+and returns the jobs it queued. `Queue.put` produces `None` when awaited, so negating that result
+keeps each queued job in the returned list:
+
+```py
+from asyncio import Queue
+
+
+async def enqueue_pending(
+    jobs: list[str], completed: set[str], queue: Queue[str]
+) -> list[str]:
+    return [
+        job
+        for job in jobs
+        if job not in completed and not await queue.put(job)  # no diagnostic
+    ]
+```
+
 The exemption does not apply when a call returning `None` is nested inside an outer boolean test, or
 when the call itself is a statement condition:
 

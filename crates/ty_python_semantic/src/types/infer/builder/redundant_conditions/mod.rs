@@ -123,6 +123,16 @@ pub(super) enum RedundantConditionContext {
     ///     return [item for item in items if item not in seen and not seen.add(item)]  # no diagnostic
     /// ```
     ///
+    /// An awaited call is also exempt when awaiting it produces `None`. This callback queues a
+    /// job and returns `True` to indicate acceptance:
+    ///
+    /// ```python
+    /// from asyncio import Queue
+    ///
+    /// async def accept_job(job: str, queue: Queue[str]) -> bool:
+    ///     return not await queue.put(job)  # no diagnostic
+    /// ```
+    ///
     /// The exemption does not apply when the expression is itself nested in another boolean test.
     /// Here, the ternary selects which readiness flag to check, and the enclosing `if` tests that
     /// flag. The `print` call logs the choice of the backup. Although it is an `or` operand, it is
