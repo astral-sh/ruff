@@ -1910,8 +1910,7 @@ impl<'db> StaticClassLiteral<'db> {
                     add_parameter_with_name(field_name.clone(), default_ty);
                 } else {
                     // Use the alias name if provided, otherwise use the field name.
-                    let parameter_name =
-                        Name::new(alias.map(|alias| &**alias).unwrap_or(&**field_name));
+                    let parameter_name = alias.map_or_else(|| field_name.clone(), Name::new);
                     add_parameter_with_name(parameter_name, default_ty);
                 }
             }
