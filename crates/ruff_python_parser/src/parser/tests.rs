@@ -4,24 +4,6 @@ use ruff_python_ast::{Expr, InterpolatedStringElement, IpyEscapeKind, Number, St
 
 use crate::{Mode, ParseOptions, parse, parse_expression, parse_module};
 
-use super::NameInterner;
-
-#[test]
-fn name_interner_shares_long_names() {
-    let mut interner = NameInterner::default();
-    assert_eq!(interner.intern("short"), "short");
-    assert!(interner.names.is_empty());
-
-    let text = "identifier_longer_than_the_inline_capacity";
-    let first = interner.intern(text);
-    let repeated = interner.intern(text);
-    let different = interner.intern("another_identifier_longer_than_the_inline_capacity");
-    assert_eq!(first, text);
-    assert!(std::ptr::eq(first.as_ptr(), repeated.as_ptr()));
-    assert_ne!(first, different);
-    assert_eq!(interner.names.len(), 2);
-}
-
 // Keep recursive ASTs shallow enough for Windows's 1 MiB test-thread stacks.
 const RECURSIVE_AST_TEST_DEPTH: usize = 1_000;
 
