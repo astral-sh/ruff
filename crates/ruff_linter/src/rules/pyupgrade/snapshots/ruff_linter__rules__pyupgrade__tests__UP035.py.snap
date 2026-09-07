@@ -387,6 +387,25 @@ UP035 `typing.ContextManager` is deprecated, use `contextlib.AbstractContextMana
 52 | from typing_extensions import OrderedDict
    |
 
+UP035 [*] Import from `collections` instead: `OrderedDict`
+  --> UP035.py:51:1
+   |
+49 | # Bad imports from PYI027 that are now handled by PYI022 (UP035)
+50 | from typing import ContextManager
+51 | from typing import OrderedDict
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+52 | from typing_extensions import OrderedDict
+53 | from typing import Callable
+   |
+help: Import from `collections`
+   |
+50 | from typing import ContextManager
+   - from typing import OrderedDict
+51 + from collections import OrderedDict
+52 | from typing_extensions import OrderedDict
+   |
+note: This is an unsafe fix and may change runtime behavior
+
 UP035 [*] Import from `typing` instead: `OrderedDict`
   --> UP035.py:52:1
    |
@@ -404,6 +423,25 @@ help: Import from `typing`
 52 + from typing import OrderedDict
 53 | from typing import Callable
    |
+
+UP035 [*] Import from `collections.abc` instead: `Callable`
+  --> UP035.py:53:1
+   |
+51 | from typing import OrderedDict
+52 | from typing_extensions import OrderedDict
+53 | from typing import Callable
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+54 | from typing import ByteString
+55 | from typing import Container
+   |
+help: Import from `collections.abc`
+   |
+52 | from typing_extensions import OrderedDict
+   - from typing import Callable
+53 + from collections.abc import Callable
+54 | from typing import ByteString
+   |
+note: This is an unsafe fix and may change runtime behavior
 
 UP035 [*] Import from `collections.abc` instead: `ByteString`
   --> UP035.py:54:1
@@ -1148,6 +1186,7 @@ help: Import from `collections.abc`
 141 + from collections.abc import Sequence as TypingOnlySequence
 142 |
     |
+note: This is an unsafe fix and may change runtime behavior
 
 UP035 [*] Import from `collections.abc` instead: `Sequence`
    --> UP035.py:146:1
@@ -1185,6 +1224,7 @@ help: Import from `collections.abc`
 150 + from collections.abc import Sequence as RuntimeAnnotationSequence
 151 |
     |
+note: This is an unsafe fix and may change runtime behavior
 
 UP035 [*] Import from `collections.abc` instead: `Sequence`
    --> UP035.py:155:1
@@ -1220,5 +1260,74 @@ help: Import from `collections.abc`
     -     from typing import Sequence as ClassSequence
 160 +     from collections.abc import Sequence as ClassSequence
 161 |
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+UP035 [*] Import from `collections.abc` instead: `Sequence`
+   --> UP035.py:166:5
+    |
+165 | def typing_only_local():
+166 |     from typing import Sequence as LocalTypingOnlySequence
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+167 |
+168 |     if TYPE_CHECKING:
+    |
+help: Import from `collections.abc`
+    |
+165 | def typing_only_local():
+    -     from typing import Sequence as LocalTypingOnlySequence
+166 +     from collections.abc import Sequence as LocalTypingOnlySequence
+167 |
+    |
+
+UP035 [*] Import from `collections.abc` instead: `Sequence`
+   --> UP035.py:173:5
+    |
+172 | def typing_only_local_with_locals():
+173 |     from typing import Sequence as LocalWithLocalsSequence
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+174 |
+175 |     if TYPE_CHECKING:
+    |
+help: Import from `collections.abc`
+    |
+172 | def typing_only_local_with_locals():
+    -     from typing import Sequence as LocalWithLocalsSequence
+173 +     from collections.abc import Sequence as LocalWithLocalsSequence
+174 |
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+UP035 [*] Import from `collections.abc` instead: `Sequence`
+   --> UP035.py:181:1
+    |
+181 | from typing import Sequence as ShadowedSequence
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+182 |
+183 | shadowed_runtime_value = ShadowedSequence
+    |
+help: Import from `collections.abc`
+    |
+180 |
+    - from typing import Sequence as ShadowedSequence
+181 + from collections.abc import Sequence as ShadowedSequence
+182 |
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+UP035 [*] Import from `collections.abc` instead: `Callable`, `Sequence`
+   --> UP035.py:187:1
+    |
+187 | from typing import Callable as ShadowedCallable, Sequence as MultiTypingOnlySequence
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+188 |
+189 | shadowed_callable_runtime = ShadowedCallable
+    |
+help: Import from `collections.abc`
+    |
+186 |
+    - from typing import Callable as ShadowedCallable, Sequence as MultiTypingOnlySequence
+187 + from collections.abc import Callable as ShadowedCallable, Sequence as MultiTypingOnlySequence
+188 |
     |
 note: This is an unsafe fix and may change runtime behavior

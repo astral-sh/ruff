@@ -53,7 +53,8 @@ enum Deprecation {
 /// ## Fix safety
 /// Fixes that replace deprecated aliases from `typing` or `typing.re` with
 /// runtime implementations can change the value of the imported object.
-/// Ruff marks these fixes as safe only when the affected import has at least
+/// Ruff marks these fixes as safe only for function-local imports when the
+/// function does not inspect its locals, every affected binding has at least
 /// one reference, every reference is in a typing-only context, and the import
 /// is not re-exported. Otherwise, the fix is marked unsafe.
 ///
@@ -760,9 +761,13 @@ fn runtime_sensitive_applicability(
     node_id: NodeId,
     operation: &WithoutRename,
 ) -> Applicability {
+    if !scope.kind.is_function() || scope.uses_locals() {
+        return Applicability::Unsafe;
+    }
+
     let mut matched_binding = false;
 
-    for binding_id in scope.binding_ids() {
+    for (_, binding_id) in scope.all_bindings() {
         let binding = checker.semantic().binding(binding_id);
 
         if binding.source != Some(node_id) {
@@ -823,8 +828,8 @@ pub(crate) fn deprecated_import(checker: &Checker, import_from_stmt: &StmtImport
 /// Report runtime-sensitive UP035 fixes after semantic traversal.
 pub(crate) fn deprecated_import_runtime_sensitive(checker: &Checker, scope: &Scope) {
     let mut statements = scope
-        .binding_ids()
-        .filter_map(|binding_id| {
+        .all_bindings()
+        .filter_map(|(_, binding_id)| {
             let binding = checker.semantic().binding(binding_id);
 
             let AnyImport::FromImport(import) = binding.as_any_import()? else {

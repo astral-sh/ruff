@@ -160,3 +160,34 @@ class RuntimeClass:
     from typing import Sequence as ClassSequence
 
     value = ClassSequence
+
+
+def typing_only_local():
+    from typing import Sequence as LocalTypingOnlySequence
+
+    if TYPE_CHECKING:
+        local_typing_only_value: LocalTypingOnlySequence
+
+
+def typing_only_local_with_locals():
+    from typing import Sequence as LocalWithLocalsSequence
+
+    if TYPE_CHECKING:
+        local_with_locals_value: LocalWithLocalsSequence
+
+    locals()
+
+
+from typing import Sequence as ShadowedSequence
+
+shadowed_runtime_value = ShadowedSequence
+ShadowedSequence = list
+
+
+from typing import Callable as ShadowedCallable, Sequence as MultiTypingOnlySequence
+
+shadowed_callable_runtime = ShadowedCallable
+ShadowedCallable = object
+
+if TYPE_CHECKING:
+    multi_typing_only_value: MultiTypingOnlySequence
