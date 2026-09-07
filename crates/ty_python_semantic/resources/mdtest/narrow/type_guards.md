@@ -687,6 +687,33 @@ def _(obj: SpecificReader | Unrelated):
         reveal_type(obj)  # revealed: Unrelated
 ```
 
+Conversely, narrowing a gradual implementation with a fully static protocol retains the
+intersection. `GradualReader.read` can return any type, but `IntReader.read` restricts the return
+type to `int`, so the narrowed return type is `Any & int`:
+
+```py
+@runtime_checkable
+class IntReader(Protocol):
+    def read(self) -> int: ...
+
+class GradualReader:
+    def read(self) -> Any:
+        raise NotImplementedError
+
+def is_int_reader(x: object) -> TypeIs[IntReader]:
+    raise NotImplementedError
+
+def _(obj: GradualReader):
+    if is_int_reader(obj):
+        reveal_type(obj)  # revealed: GradualReader & IntReader
+        reveal_type(obj.read())  # revealed: Any & int
+
+    # For comparison, `isinstance` narrowing behaves in the same way:
+    if isinstance(obj, IntReader):
+        reveal_type(obj)  # revealed: GradualReader & IntReader
+        reveal_type(obj.read())  # revealed: Any & int
+```
+
 ### Strict mode
 
 ```toml
@@ -876,6 +903,75 @@ def _(obj: SpecificReader | Unrelated):
         reveal_type(obj.read())  # revealed: str
     else:
         reveal_type(obj)  # revealed: Unrelated
+```
+
+Narrowing a gradual implementation with a fully static protocol retains the same intersection as in
+non-strict mode, since materialization does not change the protocol:
+
+```py
+@runtime_checkable
+class IntReader(Protocol):
+    def read(self) -> int: ...
+
+class GradualReader:
+    def read(self) -> Any:
+        raise NotImplementedError
+
+def is_int_reader(x: object) -> TypeIs[IntReader]:
+    raise NotImplementedError
+
+def _(obj: GradualReader):
+    if is_int_reader(obj):
+        reveal_type(obj)  # revealed: GradualReader & IntReader
+        reveal_type(obj.read())  # revealed: Any & int
+
+    # For comparison, `isinstance` narrowing behaves in the same way:
+    if isinstance(obj, IntReader):
+        reveal_type(obj)  # revealed: GradualReader & IntReader
+        reveal_type(obj.read())  # revealed: Any & int
+```
+
+## `TypeIs` narrowing with overloaded protocol implementations
+
+An overloaded method can be assignable to a protocol member without being a subtype of it. Narrowing
+still intersects the implementation with the protocol, so calling the method combines the return
+types from both. Here, `Source.read("value")` returns `object` before narrowing and
+`object & int = int` afterwards. This also allows assigning the result to an `int` variable.
+
+Regression test for <https://github.com/astral-sh/ty/issues/4479>.
+
+```py
+from typing import Any, Literal, Protocol, overload, runtime_checkable
+from typing_extensions import TypeIs
+
+class Source:
+    @overload
+    def read(self, key: Literal["value"]) -> object: ...
+    @overload
+    def read(self, key: str) -> Any: ...
+    def read(self, key: str) -> Any:
+        raise NotImplementedError
+
+@runtime_checkable
+class IntReader(Protocol):
+    def read(self, key: str) -> int: ...
+
+def is_int_reader(x: object) -> TypeIs[IntReader]:
+    raise NotImplementedError
+
+def _(obj: Source):
+    reveal_type(obj.read("value"))  # revealed: object
+
+    if is_int_reader(obj):
+        reveal_type(obj)  # revealed: Source & IntReader
+        reveal_type(obj.read("value"))  # revealed: int
+        value: int = obj.read("value")
+
+    # For comparison, `isinstance` narrowing behaves in the same way:
+    if isinstance(obj, IntReader):
+        reveal_type(obj)  # revealed: Source & IntReader
+        reveal_type(obj.read("value"))  # revealed: int
+        value: int = obj.read("value")
 ```
 
 ## `TypeIs` narrowing of `NewType` instances
