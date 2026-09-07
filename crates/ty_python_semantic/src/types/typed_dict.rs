@@ -774,6 +774,38 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let target_items = target.items(db);
         let source_openness = source.openness(db);
         let target_openness = target.openness(db);
+
+        // Missing fields, incompatible mutability, and distinct literal tags rule out a match.
+        // Check these before comparing potentially recursive field types. When collecting
+        // diagnostics, preserve the ordinary order so the first incompatible field is reported.
+        if !self.is_context_collection_enabled()
+            && target_items.iter().any(|(name, target_field)| {
+                if let Some(source_field) = source_items.get(name) {
+                    (target_field.is_required() && !source_field.is_required())
+                        || (!target_field.is_read_only()
+                            && (source_field.is_read_only()
+                                || source_field.is_required() != target_field.is_required()))
+                        || (matches!(source_field.declared_ty, Type::LiteralValue(_))
+                            && matches!(target_field.declared_ty, Type::LiteralValue(_))
+                            && self
+                                .check_type_pair(
+                                    db,
+                                    source_field.declared_ty,
+                                    target_field.declared_ty,
+                                )
+                                .is_trivially_never_satisfied())
+                } else {
+                    target_field.is_required()
+                        || (!target_field.is_read_only()
+                            && source_openness
+                                .explicit_extra_items()
+                                .is_none_or(TypedDictExtraItems::is_read_only))
+                }
+            })
+        {
+            return self.never();
+        }
+
         // Many rules violations short-circuit with "never", but asking whether one field is
         // [relation] to/of another can produce more complicated constraints, and we collect those.
         let mut result = self.always();
@@ -1110,6 +1142,28 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
     ) -> ConstraintSet<'db, 'c> {
         let left_items = left.items(db);
         let right_items = right.items(db);
+        // Required literal tags can establish disjointness before recursive fields are
+        // compared. Keep the field order when collecting diagnostic context.
+        if self.report_context().is_none()
+            && left_items.iter().any(|(name, left_field)| {
+                left_field.is_required()
+                    && matches!(left_field.declared_ty, Type::LiteralValue(_))
+                    && right_items.get(name).is_some_and(|right_field| {
+                        right_field.is_required()
+                            && matches!(right_field.declared_ty, Type::LiteralValue(_))
+                            && self
+                                .check_type_pair(
+                                    db,
+                                    left_field.declared_ty,
+                                    right_field.declared_ty,
+                                )
+                                .is_trivially_always_satisfied()
+                    })
+            })
+        {
+            return self.always();
+        }
+
         let fields_in_common = btreemap_items_with_same_key(left_items, right_items);
         let common_fields_disjoint =
             fields_in_common.when_any(db, self.constraints, |(name, left_field, right_field)| {

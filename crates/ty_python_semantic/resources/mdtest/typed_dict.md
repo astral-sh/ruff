@@ -2360,6 +2360,46 @@ static_assert(is_assignable_to(Person1, Person2))
 static_assert(is_equivalent_to(Person1, Person2))
 ```
 
+## Literal tags on recursive `TypedDict`s
+
+Different required literal tags make recursive `TypedDict`s incompatible and disjoint, including
+when the recursive fields appear before the tags. Matching tags still allow structurally equivalent
+recursive types.
+
+```py
+from typing_extensions import Literal, LiteralString, ReadOnly, TypedDict
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to, is_disjoint_from, is_equivalent_to
+
+class Left(TypedDict):
+    children: list["Left"]
+    tag: Literal["left"]
+
+class Right(TypedDict):
+    children: list["Right"]
+    tag: Literal["right"]
+
+class SameTag(TypedDict):
+    children: list["SameTag"]
+    tag: Literal["left"]
+
+static_assert(not is_assignable_to(Left, Right))
+static_assert(is_disjoint_from(Left, Right))
+static_assert(is_equivalent_to(Left, SameTag))
+```
+
+A read-only `LiteralString` tag accepts a concrete string literal. A broad literal string type does
+not distinguish the alternatives.
+
+```py
+class BroadTag(TypedDict):
+    children: list[Left]
+    tag: ReadOnly[LiteralString]
+
+static_assert(is_assignable_to(Left, BroadTag))
+static_assert(not is_disjoint_from(Left, BroadTag))
+```
+
 ## Recursively-specialized generic `TypedDict`s
 
 ```toml
