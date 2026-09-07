@@ -587,6 +587,55 @@ def _(obj: Overlapping | Getter[int]):
         reveal_type(obj)  # revealed: Overlapping & ~Getter[object]
 ```
 
+The same also works for invariant generics:
+
+```py
+def is_list(value: object) -> TypeIs[list]:
+    return isinstance(value, list)
+
+def _(obj: object):
+    if is_list(obj):
+        reveal_type(obj)  # revealed: list[Unknown]
+    else:
+        reveal_type(obj)  # revealed: ~Top[list[Unknown]]
+
+    # For comparison, `isinstance` narrowing behaves in the same way:
+    if isinstance(obj, list):
+        reveal_type(obj)  # revealed: list[Unknown]
+    else:
+        reveal_type(obj)  # revealed: ~Top[list[Unknown]]
+
+def _(obj: Unrelated | list[int]):
+    if is_list(obj):
+        reveal_type(obj)  # revealed: list[int]
+    else:
+        reveal_type(obj)  # revealed: Unrelated
+
+    # For comparison, `isinstance` narrowing behaves in the same way:
+    if isinstance(obj, list):
+        reveal_type(obj)  # revealed: list[int]
+    else:
+        reveal_type(obj)  # revealed: Unrelated
+
+def _(obj: Overlapping | list[int]):
+    if is_list(obj):
+        reveal_type(obj)  # revealed: (Overlapping & list[Unknown]) | list[int]
+    else:
+        reveal_type(obj)  # revealed: Overlapping & ~Top[list[Unknown]]
+
+    # For comparison, `isinstance` narrowing behaves in the same way:
+    if isinstance(obj, list):
+        reveal_type(obj)  # revealed: (Overlapping & list[Unknown]) | list[int]
+    else:
+        reveal_type(obj)  # revealed: Overlapping & ~Top[list[Unknown]]
+
+# Regression test from https://github.com/astral-sh/ty/issues/4394
+def _(value: int | list) -> int:
+    if is_list(value):
+        value = 0
+    return value
+```
+
 Similarly, for gradual protocols, `TypeIs` narrowing retains the gradualness of protocol members in
 non-strict mode, when narrowing from object:
 
@@ -727,6 +776,55 @@ def _(obj: Overlapping | Getter[int]):
         reveal_type(obj.get())  # revealed: object
     else:
         reveal_type(obj)  # revealed: Overlapping & ~Getter[object]
+```
+
+The same also works for invariant generics:
+
+```py
+def is_list(value: object) -> TypeIs[list]:
+    return isinstance(value, list)
+
+def _(obj: object):
+    if is_list(obj):
+        reveal_type(obj)  # revealed: Top[list[Unknown]]
+    else:
+        reveal_type(obj)  # revealed: ~Top[list[Unknown]]
+
+    # For comparison, `isinstance` narrowing behaves in the same way:
+    if isinstance(obj, list):
+        reveal_type(obj)  # revealed: Top[list[Unknown]]
+    else:
+        reveal_type(obj)  # revealed: ~Top[list[Unknown]]
+
+def _(obj: Unrelated | list[int]):
+    if is_list(obj):
+        reveal_type(obj)  # revealed: list[int]
+    else:
+        reveal_type(obj)  # revealed: Unrelated
+
+    # For comparison, `isinstance` narrowing behaves in the same way:
+    if isinstance(obj, list):
+        reveal_type(obj)  # revealed: list[int]
+    else:
+        reveal_type(obj)  # revealed: Unrelated
+
+def _(obj: Overlapping | list[int]):
+    if is_list(obj):
+        reveal_type(obj)  # revealed: (Overlapping & Top[list[Unknown]]) | list[int]
+    else:
+        reveal_type(obj)  # revealed: Overlapping & ~Top[list[Unknown]]
+
+    # For comparison, `isinstance` narrowing behaves in the same way:
+    if isinstance(obj, list):
+        reveal_type(obj)  # revealed: (Overlapping & Top[list[Unknown]]) | list[int]
+    else:
+        reveal_type(obj)  # revealed: Overlapping & ~Top[list[Unknown]]
+
+# Regression test from https://github.com/astral-sh/ty/issues/4394
+def _(value: int | list) -> int:
+    if is_list(value):
+        value = 0
+    return value
 ```
 
 Similarly, for gradual protocols, `TypeIs` narrowing in strict mode also narrows to the
