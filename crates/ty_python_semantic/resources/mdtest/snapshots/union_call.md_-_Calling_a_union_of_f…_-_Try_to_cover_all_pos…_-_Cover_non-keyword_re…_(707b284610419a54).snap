@@ -83,7 +83,6 @@ error[call-non-callable]: Object of type `Literal[5]` is not callable
    |
 60 |     x = f(3)
    |         ^^^^
-   |
 info: Union variant `Literal[5]` is incompatible with this call site
 info: Attempted to call union type `(def f1() -> int) | (def f2(name: str) -> int) | (def f3(a: int, b: int) -> int) | ... omitted 5 union elements`
 
@@ -95,7 +94,6 @@ error[call-non-callable]: Object of type `PossiblyNotCallable` is not callable (
    |
 60 |     x = f(3)
    |         ^^^^
-   |
 info: Union variant `PossiblyNotCallable` is incompatible with this call site
 info: Attempted to call union type `(def f1() -> int) | (def f2(name: str) -> int) | (def f3(a: int, b: int) -> int) | ... omitted 5 union elements`
 
@@ -107,7 +105,6 @@ error[missing-argument]: No argument provided for required parameter `b` of func
    |
 60 |     x = f(3)
    |         ^^^^
-   |
 info: Union variant `def f3(a: int, b: int) -> int` is incompatible with this call site
 info: Attempted to call union type `(def f1() -> int) | (def f2(name: str) -> int) | (def f3(a: int, b: int) -> int) | ... omitted 5 union elements`
 
@@ -119,14 +116,12 @@ error[no-matching-overload]: No overload of function `f6` matches arguments
    |
 60 |     x = f(3)
    |         ^^^^
-   |
 info: First overload defined here
   --> src/mdtest_snippet.py:23:1
    |
 23 | / @overload
 24 | | def f6() -> None: ...
    | |_____________________^ First overload defined here
-   |
 info: Possible overloads for function `f6`:
 info:   () -> None
 info:   (x: str, y: str) -> str
@@ -135,7 +130,6 @@ info: Overload implementation defined here
    |
 27 | def f6(x: str | None = None, y: str | None = None) -> str | None:
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 info: Union variant `Overload[() -> None, (x: str, y: str) -> str]` is incompatible with this call site
 info: Attempted to call union type `(def f1() -> int) | (def f2(name: str) -> int) | (def f3(a: int, b: int) -> int) | ... omitted 5 union elements`
 
@@ -147,13 +141,11 @@ error[invalid-argument-type]: Argument to function `f2` is incorrect
    |
 60 |     x = f(3)
    |           ^ Expected `str`, found `Literal[3]`
-   |
 info: Function defined here
  --> src/mdtest_snippet.py:7:5
   |
 7 | def f2(name: str) -> int:
   |     ^^ --------- Parameter declared here
-  |
 info: Union variant `def f2(name: str) -> int` is incompatible with this call site
 info: Attempted to call union type `(def f1() -> int) | (def f2(name: str) -> int) | (def f3(a: int, b: int) -> int) | ... omitted 5 union elements`
 
@@ -165,13 +157,11 @@ error[invalid-argument-type]: Argument to function `f4` is incorrect
    |
 60 |     x = f(3)
    |           ^ Argument type `Literal[3]` does not satisfy upper bound `str` of type variable `T`
-   |
 info: Type variable defined here
   --> src/mdtest_snippet.py:13:8
    |
 13 | def f4[T: str](x: T) -> int:
    |        ^^^^^^
-   |
 info: Union variant `def f4[T](x: T) -> int` is incompatible with this call site
 info: Attempted to call union type `(def f1() -> int) | (def f2(name: str) -> int) | (def f3(a: int, b: int) -> int) | ... omitted 5 union elements`
 
@@ -183,13 +173,11 @@ error[invalid-argument-type]: Argument to function `f5` is incorrect
    |
 60 |     x = f(3)
    |           ^ Expected `str`, found `Literal[3]`
-   |
 info: Matching overload defined here
   --> src/mdtest_snippet.py:19:5
    |
 19 | def f5(x: str) -> str: ...
    |     ^^ ------ Parameter declared here
-   |
 info: Non-matching overloads for function `f5`:
 info:   () -> None
 info: Union variant `Overload[() -> None, (x: str) -> str]` is incompatible with this call site
@@ -203,7 +191,6 @@ error[too-many-positional-arguments]: Too many positional arguments to function 
    |
 60 |     x = f(3)
    |           ^
-   |
 info: Union variant `def f1() -> int` is incompatible with this call site
 info: Attempted to call union type `(def f1() -> int) | (def f2(name: str) -> int) | (def f3(a: int, b: int) -> int) | ... omitted 5 union elements`
 

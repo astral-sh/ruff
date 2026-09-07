@@ -1151,9 +1151,6 @@ class TarInfo:
         "_link_target",
     )
     name: str
-    path: str
-    """In pax headers, "name" is called "path"."""
-
     size: int
     mtime: int | float
     chksum: int
@@ -1176,10 +1173,10 @@ class TarInfo:
         """
 
     @property
-    @deprecated("Deprecated since Python 3.13; will be removed in Python 3.16.")
+    @deprecated("Deprecated; will be removed in Python 3.16.")
     def tarfile(self) -> TarFile | None: ...
     @tarfile.setter
-    @deprecated("Deprecated since Python 3.13; will be removed in Python 3.16.")
+    @deprecated("Deprecated; will be removed in Python 3.16.")
     def tarfile(self, tarfile: TarFile | None) -> None: ...
 
     @classmethod
@@ -1195,6 +1192,12 @@ class TarInfo:
         """Return the next TarInfo object from TarFile object
         tarfile.
         """
+
+    @property
+    def path(self) -> str:
+        """In pax headers, "name" is called "path"."""
+    @path.setter
+    def path(self, name: str) -> None: ...
 
     @property
     def linkpath(self) -> str:

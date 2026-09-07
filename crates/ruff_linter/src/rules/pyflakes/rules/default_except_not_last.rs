@@ -5,6 +5,7 @@ use ruff_python_ast::{self as ast, ExceptHandler};
 use crate::Locator;
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for `except` blocks that handle all exceptions, but are not the last
@@ -45,7 +46,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: `except` clause](https://docs.python.org/3/reference/compound_stmts.html#except-clause)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.28")]
+#[violation_metadata(stable_since = "v0.0.28", category = Category::Correctness)]
 pub(crate) struct DefaultExceptNotLast;
 
 impl Violation for DefaultExceptNotLast {

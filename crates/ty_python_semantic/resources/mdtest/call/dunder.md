@@ -138,6 +138,36 @@ C()()
 _: Callable[..., None] = C()
 ```
 
+The dunder-name heuristic also does not apply to a callable parameterized by a `ParamSpec`, even
+after the `ParamSpec` is specialized:
+
+```py
+from collections.abc import Callable
+from typing import Generic, ParamSpec, Protocol
+from typing_extensions import Self
+
+P = ParamSpec("P")
+
+class C(Protocol[P]):
+    __call__: Callable[P, int]
+
+def check(value: C[[str]]) -> None:
+    reveal_type(value.__call__)  # revealed: (str, /) -> int
+    reveal_type(value("value"))  # revealed: int
+
+class Base(Generic[P]):
+    __getitem__: Callable[P, Self]
+
+class Child(Base[[int]]):
+    pass
+
+def check_self(value: Child) -> None:
+    reveal_type(value.__getitem__(0))  # revealed: Child
+    reveal_type(value[0])  # revealed: Child
+
+    result: Child = value[0]
+```
+
 And of course the same is true if we have only an implicit assignment inside a method:
 
 ```py

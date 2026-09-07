@@ -39,7 +39,6 @@ error[invalid-await]: `HasBadAwait` is not awaitable
   |
 2 |     __await__ = 42
   |     --------- attribute defined here
-  |
 info: `__await__` is not callable
 
 ```

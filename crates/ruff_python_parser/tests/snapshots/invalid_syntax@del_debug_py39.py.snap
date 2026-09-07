@@ -36,4 +36,3 @@ Module(
 1 | # parse_options: {"target-version": "3.9"}
 2 | del __debug__
   |     ^^^^^^^^^ Syntax Error: cannot delete `__debug__` on Python 3.9 (syntax was removed in 3.9)
-  |

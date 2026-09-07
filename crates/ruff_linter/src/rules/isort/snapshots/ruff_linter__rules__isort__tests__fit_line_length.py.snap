@@ -14,7 +14,6 @@ I001 [*] Import block is un-sorted or un-formatted
 13 | |         aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
 14 | |     )
    | |_____^
-   |
 help: Organize imports
    |
 7  |     from line_with_88 import aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa

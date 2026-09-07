@@ -8,7 +8,6 @@ diagnostic range.
 
 ```toml
 [lint]
-preview = true
 select = ["RUF015"]
 ```
 
@@ -29,7 +28,6 @@ entire class definition.
 
 ```toml
 [lint]
-preview = true
 select = ["B903"]
 ```
 
@@ -46,7 +44,6 @@ Diagnostics with empty ranges should also be suppressible, as with `noqa`.
 
 ```toml
 [lint]
-preview = true
 select = ["W292"]
 ```
 
@@ -61,7 +58,6 @@ after the matching `ruff:enable` comment:
 
 ```toml
 [lint]
-preview = true
 select = ["RUF015"]
 ```
 
@@ -91,7 +87,6 @@ not_suppressed = [
 
 ```toml
 [lint]
-preview = true
 select = ["RUF015"]
 ```
 
@@ -153,7 +148,6 @@ x = (
 
 ```toml
 [lint]
-preview = true
 select = [ "F" ]
 ```
 
@@ -174,7 +168,6 @@ from foo import (  # ruff:ignore[F401]
 
 ```toml
 [lint]
-preview = true
 select = [ "F401", "RUF100" ]
 ```
 
@@ -201,7 +194,6 @@ from sys import ( # ruff:ignore[F401]
 
 ```toml
 [lint]
-preview = true
 select = [ "W291" ]
 ```
 
@@ -226,7 +218,7 @@ values = [
 ```toml
 [lint]
 preview = true
-select = ["E501", "F401", "RUF10"]
+select = ["E501", "F401", "RUF100", "RUF103", "RUF104"]
 ```
 
 An intervening `ruff:ignore` directive shouldn't cause a `disable`/`enable` pair to be reported as
@@ -269,7 +261,6 @@ error[RUF100]: Unused suppression (unused: `F401`)
    |
 21 | import sys  # start # ruff:ignore[F401] # end
    |                     ^^^^^^^^^^^^^^^^^^^^
-   |
 help: Remove unused suppression
    |
 20 | # snapshot: unused-noqa
@@ -303,8 +294,7 @@ def f():
 
 ```toml
 [lint]
-preview = true
-select = ["F401", "RUF10"]
+select = ["F401", "RUF100", "RUF104"]
 ```
 
 A `file-ignore` within a range suppression takes precedence and marks the `disable` as unused:
@@ -346,7 +336,6 @@ error[RUF102]: Invalid rule code in suppression: unused-import
 4 | import math
 5 | # ruff:enable[unused-import]
   |               -------------
-  |
 help: Enable `lint.preview` to use rule names
 help: Remove the suppression comment
   |
@@ -379,8 +368,6 @@ error[RUF102]: Invalid rule code in suppression: unknown-rule, unused-import
  9 | import sys
 10 | # ruff:enable[unused-import, unknown-rule]
    | ------------------------------------------
-   |
-help: Add non-Ruff rule codes to the `lint.external` configuration option
 help: Enable `lint.preview` to use rule names
 help: Remove the suppression comment
   |
@@ -454,7 +441,6 @@ error[RUF103]: Invalid suppression comment: no matching 'disable' comment
    |
 12 | # ruff:enable[F401]
    | ^^^^^^^^^^^^^^^^^^^
-   |
 help: Remove suppression comment
    |
 11 | # snapshot: invalid-suppression-comment
@@ -494,8 +480,6 @@ error[RUF102]: Invalid rule code in suppression: not-a-rule
   |
 2 | # ruff:ignore[unused-import, not-a-rule]
   |                              ^^^^^^^^^^
-  |
-help: Add non-Ruff rule codes to the `lint.external` configuration option
 help: Remove the rule code `not-a-rule`
   |
 1 | # snapshot: invalid-rule-code
@@ -528,7 +512,6 @@ error[RUF100]: Unused suppression (unused: `unused-import`)
   |
 8 | import math  # ruff:ignore[unused-import]
   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  |
 help: Remove unused suppression
   |
 7 | # snapshot: unused-noqa
@@ -553,7 +536,6 @@ error[RUF100]: Unused suppression (unused: `unused-import`)
    |
 12 | # ruff:ignore[F401, unused-import]
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Remove unused suppression
    |
 11 | # snapshot: unused-noqa
@@ -567,8 +549,7 @@ help: Remove unused suppression
 
 ```toml
 [lint]
-preview = true
-select = ["F401", "RUF10"]
+select = ["F401", "RUF103", "RUF104"]
 ```
 
 `ruff:ignore` comments nested within other comments should still work:
@@ -591,7 +572,6 @@ error[RUF103]: Invalid suppression comment: missing suppression codes like `[E50
   |
 4 | import sys  # explanation # ruff:ignore # another
   |                           ^^^^^^^^^^^^^^
-  |
 help: Remove suppression comment
   |
 3 | # error: [unused-import]
@@ -617,8 +597,7 @@ import foo
 
 ```toml
 [lint]
-preview = true
-select = ["F401", "RUF10"]
+select = ["F401", "RUF103", "RUF104"]
 ```
 
 Nested `disable` and `file-ignore` comments are also invalid and don't suppress diagnostics on the
@@ -642,7 +621,6 @@ error[RUF103]: Invalid suppression comment: trailing comments are only supported
   |
 2 | # explanation # ruff:disable[F401]
   |               ^^^^^^^^^^^^^^^^^^^^
-  |
 help: Remove suppression comment
   |
 1 | # snapshot: invalid-suppression-comment
@@ -667,8 +645,7 @@ import foo
 
 ```toml
 [lint]
-preview = true
-select = ["F401", "RUF10", "FIX002"]
+select = ["F401", "RUF100", "FIX002"]
 ```
 
 Nested suppression comments on a comment-only line are treated as trailing on the comment itself and
@@ -699,8 +676,7 @@ a = 10
 
 ```toml
 [lint]
-preview = true
-select = ["E501", "F821", "RUF10"]
+select = ["E501", "F821", "RUF100", "RUF103"]
 ```
 
 `RUF100` should have an unsafe fix when deleting a leading suppression would change the placement
@@ -721,7 +697,6 @@ error[RUF100]: Unused suppression (unused: `E501`)
   |
 3 | # ruff:ignore[E501] # ruff:file-ignore[F821]
   | ^^^^^^^^^^^^^^^^^^^^
-  |
 help: Remove unused suppression
   |
 2 | # error: [invalid-suppression-comment]
@@ -756,7 +731,6 @@ error[RUF100]: Unused suppression (unused: `E501`)
 10 | undefined_name
 11 | # ruff:enable[E501]
    | -------------------
-   |
 help: Remove unused suppression
    |
 7  | # error: [unused-noqa] "F821"
@@ -773,8 +747,7 @@ note: This is an unsafe fix and may change runtime behavior
 
 ```toml
 [lint]
-preview = true
-select = ["E501", "RUF10", "FIX002"]
+select = ["E501", "RUF100", "FIX002"]
 ```
 
 Deleting either half of a `disable`/`enable` pair should make the fix unsafe if in a nested context:
@@ -795,7 +768,6 @@ error[RUF100]: Unused suppression (unused: `E501`)
 3 | value = 1
 4 | # ruff:enable[E501] # TODO # ruff:ignore[FIX002]
   | --------------------
-  |
 help: Remove unused suppression
   |
 1 | # snapshot: unused-noqa
@@ -811,8 +783,7 @@ note: This is an unsafe fix and may change runtime behavior
 
 ```toml
 [lint]
-preview = true
-select = ["E501", "F401", "F821", "RUF10"]
+select = ["E501", "F401", "F821", "RUF100", "RUF103"]
 ```
 
 Removing a code from a multi-code suppression doesn't promote the later suppression, so the fix is
@@ -831,7 +802,6 @@ error[RUF100]: Unused suppression (unused: `E501`)
   |
 3 | # ruff:ignore[E501, F821] # ruff:file-ignore[F401]
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^
-  |
 help: Remove unused suppression
   |
 2 | # error: [invalid-suppression-comment]
@@ -845,8 +815,7 @@ help: Remove unused suppression
 
 ```toml
 [lint]
-preview = true
-select = ["F821", "RUF10"]
+select = ["F821", "RUF102", "RUF103"]
 ```
 
 The `RUF102` fix should also be unsafe when it would promote a later suppression:
@@ -865,8 +834,6 @@ error[RUF102]: Invalid rule code in suppression: XYZ
   |
 3 | # ruff:ignore[XYZ] # ruff:file-ignore[F821]
   |               ^^^
-  |
-help: Add non-Ruff rule codes to the `lint.external` configuration option
 help: Remove the suppression comment
   |
 2 | # error: [invalid-suppression-comment]
@@ -881,8 +848,7 @@ note: This is an unsafe fix and may change runtime behavior
 
 ```toml
 [lint]
-preview = true
-select = ["F401", "F821", "RUF10"]
+select = ["F401", "F821", "RUF100", "RUF103"]
 ```
 
 The same applies to fixes for invalid suppression placement:
@@ -902,7 +868,6 @@ error[RUF103]: Invalid suppression comment: trailing comments are only supported
   |
 4 |     # explanation # ruff:file-ignore[F401] # ruff:ignore[F401]
   |                   ^^^^^^^^^^^^^^^^^^^^^^^^^
-  |
 help: Remove suppression comment
   |
 3 |     # error: [unused-noqa]
@@ -929,7 +894,6 @@ error[RUF103]: Invalid suppression comment: missing suppression codes like `[E50
   |
 9 | # explanation # ruff:ignore # ruff:ignore[F821]
   |               ^^^^^^^^^^^^^^
-  |
 help: Remove suppression comment
    |
 8  | # error: [unused-noqa]
@@ -944,7 +908,6 @@ note: This is an unsafe fix and may change runtime behavior
 
 ```toml
 [lint]
-preview = true
 select = ["RUF103"]
 ```
 
@@ -963,7 +926,6 @@ error[RUF103]: Invalid suppression comment: unknown ruff directive
   |
 2 | import os  # explanation # ruff:unknown[F401] # another
   |                          ^^^^^^^^^^^^^^^^^^^^^
-  |
 help: Remove suppression comment
   |
 1 | # snapshot: invalid-suppression-comment
@@ -979,7 +941,6 @@ error[RUF103]: Invalid suppression comment: missing comma between codes
   |
 4 | import sys  # explanation # ruff:ignore[F401 F841] # another
   |                           ^^^^^^^^^^^^^^^^^^^^^^^^^
-  |
 help: Remove suppression comment
   |
 3 | # snapshot: invalid-suppression-comment
@@ -993,7 +954,6 @@ note: This is an unsafe fix and may change runtime behavior
 
 ```toml
 [lint]
-preview = true
 select = ["F401", "RUF103"]
 ```
 
@@ -1008,7 +968,6 @@ import os  # before # ruff:ignore # ruff:ignore[F401] # after
 
 ```toml
 [lint]
-preview = true
 select = ["RUF100"]
 ```
 
@@ -1028,7 +987,6 @@ error[RUF100]: Unused suppression (non-enabled: `F401`)
   |
 2 | value = 1  # before # ruff:ignore[F401] # after
   |                     ^^^^^^^^^^^^^^^^^^^^
-  |
 help: Remove unused suppression
   |
 1 | # snapshot: unused-noqa
@@ -1044,7 +1002,6 @@ error[RUF100]: Unused suppression (non-enabled: `F401`)
   |
 5 | value = 1  # before # ruff:ignore[F401]
   |                     ^^^^^^^^^^^^^^^^^^^
-  |
 help: Remove unused suppression
   |
 4 | # snapshot: unused-noqa
@@ -1061,7 +1018,6 @@ at offset zero, as with `noqa`.
 
 ```toml
 [lint]
-preview = true
 select = ["D100"]
 ```
 

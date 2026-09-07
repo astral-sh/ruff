@@ -5,11 +5,10 @@ use std::time::{Duration, Instant};
 use lsp_server::RequestId;
 use lsp_types::WorkspaceDiagnosticRequest;
 use lsp_types::{
-    FullDocumentDiagnosticReport, PreviousResultId, ProgressNotification, ProgressParams,
-    ProgressToken, UnchangedDocumentDiagnosticReport, Uri, WorkspaceDiagnosticParams,
-    WorkspaceDiagnosticReport, WorkspaceDiagnosticReportPartialResult,
-    WorkspaceDocumentDiagnosticReport, WorkspaceFullDocumentDiagnosticReport,
-    WorkspaceUnchangedDocumentDiagnosticReport,
+    FullDocumentDiagnosticReport, PreviousResultId, ProgressToken,
+    UnchangedDocumentDiagnosticReport, Uri, WorkspaceDiagnosticParams, WorkspaceDiagnosticReport,
+    WorkspaceDiagnosticReportPartialResult, WorkspaceDocumentDiagnosticReport,
+    WorkspaceFullDocumentDiagnosticReport, WorkspaceUnchangedDocumentDiagnosticReport,
 };
 use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::File;
@@ -18,7 +17,7 @@ use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use ty_ide::{Hint, hints};
-use ty_project::{ProgressReporter, ProjectDatabase};
+use ty_project::{Db as _, ProgressReporter, ProjectDatabase};
 
 use crate::PositionEncoding;
 use crate::capabilities::ResolvedClientCapabilities;
@@ -99,6 +98,10 @@ use crate::system::file_to_uri;
 /// suspended workspace diagnostic request (if any) after every notification if the notification
 /// changed the [`Session`]'s state.
 ///
+/// Workspace diagnostics also wait while a script's initial environment is unavailable.
+/// Refreshing an available project or script environment does not block diagnostics.
+/// The same long-polling mechanism resumes the request after the host applies the uv results.
+///
 /// [workspace-diagnostics](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_diagnostic)
 pub(crate) struct WorkspaceDiagnosticRequestHandler;
 
@@ -114,6 +117,20 @@ impl BackgroundRequestHandler for WorkspaceDiagnosticRequestHandler {
     ) -> Result<WorkspaceDiagnosticReport> {
         if !snapshot.global_settings().diagnostic_mode().is_workspace() {
             tracing::debug!("Workspace diagnostics is disabled; returning empty report");
+            return Ok(WorkspaceDiagnosticReport { items: vec![] });
+        }
+
+        if snapshot
+            .projects()
+            .iter()
+            .any(|db| db.uv_environments().has_pending_initializations())
+        {
+            tracing::debug!(
+                "Deferring workspace diagnostics until script initialization completes"
+            );
+            // Returning an empty workspace report makes `handle_request` suspend the request.
+            // Skip the response writer: it would clear diagnostics for previous result IDs
+            // that we have not checked yet. Suspension retains the request, not this snapshot.
             return Ok(WorkspaceDiagnosticReport { items: vec![] });
         }
 
@@ -280,7 +297,7 @@ impl ProgressReporter for WorkspaceDiagnosticsProgressReporter<'_> {
             } else {
                 tracing::debug!(
                     "Ignoring diagnostic without a file: {diagnostic}",
-                    diagnostic = diagnostic.primary_message()
+                    diagnostic = diagnostic.headline_message()
                 );
             }
         }
@@ -624,12 +641,17 @@ impl Streaming {
             .map(WorkspaceDocumentDiagnosticReport::WorkspaceFullDocumentDiagnosticReport)
             .collect();
 
-        let report = self.create_result(items);
+        let partial_result = match self.create_result(items) {
+            WorkspaceDiagnosticReportResult::PartialReport(partial_report) => partial_report,
+            WorkspaceDiagnosticReportResult::Report(WorkspaceDiagnosticReport { items }) => {
+                // WorkspaceDiagnosticReport and WorkspaceDiagnosticReportPartialResult have the
+                // same serialization in the LSP.
+                // https://github.com/microsoft/language-server-protocol/issues/2281
+                WorkspaceDiagnosticReportPartialResult { items }
+            }
+        };
         self.client
-            .send_notification::<ProgressNotification>(ProgressParams {
-                token: self.token.clone(),
-                value: json!(report),
-            });
+            .send_partial_result::<WorkspaceDiagnosticRequest>(self.token.clone(), partial_result);
         self.last_flush = Instant::now();
     }
 

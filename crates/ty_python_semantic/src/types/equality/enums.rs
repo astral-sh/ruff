@@ -9,36 +9,258 @@ use crate::types::{
     EnumClassLiteral, EnumComplementType, EnumLiteralType, IntersectionBuilder, IntersectionType,
     LiteralValueType, LiteralValueTypeKind, Type, UnionBuilder,
 };
-use crate::{Db, FxOrderMap, FxOrderSet};
+use crate::{Db, FxOrderMap, FxOrderSet, ProgramEnvironment};
 
 use super::{
-    ComparisonBranch, ComparisonOperator, ComparisonResult, KnownComparisonSemantics,
-    enum_literal_value,
+    ComparisonBranch, ComparisonEvaluator, ComparisonGoal, ComparisonOperator, ComparisonResult,
+    KnownComparisonSemantics, combine_definite_truthiness, enum_literal_value,
+    evaluate_against_results, evaluate_target_union,
 };
 
-/// Compare two enum value domains without comparing every pair of members.
+/// Compare enum values without checking every pair of members.
 ///
-/// Any narrowing constraint produced here contains only enum-membership facts. In particular,
-/// equality never transfers gradual or nominal intersection state from one operand to the other.
-/// Same-class domains compare compact member sets directly, while comparisons spanning multiple
-/// classes project their members onto runtime comparison keys.
-pub(super) fn evaluate_enum_domains<'db>(
-    db: &'db dyn Db,
+/// If either side also contains other values, compare those values normally.
+///
+/// Return `None` when the enum comparison does not apply.
+pub(super) fn evaluate_enum_comparison<'db>(
+    evaluator: &mut ComparisonEvaluator<'db>,
     target: Type<'db>,
     other: Type<'db>,
     branch: ComparisonBranch,
     operator: ComparisonOperator,
 ) -> Option<ComparisonResult<'db>> {
-    let target = EnumDomainSet::from_type(db, target)?;
-    let other = EnumDomainSet::from_type(db, other)?;
+    let db = evaluator.db;
+    let env = evaluator.env.clone();
+    evaluate_enum_domains(db, &env, target, other, branch, operator).or_else(|| {
+        PartitionedEnumComparison::new(db, &env, target, other, branch, operator).map(
+            |comparison| match comparison.evaluate(evaluator, branch, operator) {
+                ComparisonResult::CanNarrow(narrowed)
+                    if narrowed == target.resolve_type_alias(db) =>
+                {
+                    ComparisonResult::Ambiguous
+                }
+                result => result,
+            },
+        )
+    })
+}
+
+/// Compare values that are all enum members.
+///
+/// Describe the result using enum members only. Do not copy other restrictions from one side to
+/// the other.
+fn evaluate_enum_domains<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    target: Type<'db>,
+    other: Type<'db>,
+    branch: ComparisonBranch,
+    operator: ComparisonOperator,
+) -> Option<ComparisonResult<'db>> {
+    let target = EnumDomainSet::from_type(db, env, target)?;
+    let other = EnumDomainSet::from_type(db, env, other)?;
     if let (Some(target), Some(other)) = (target.single(), other.single())
         && target.enum_class == other.enum_class
     {
         return SameEnumComparison::new(db, target.clone(), other.clone(), operator)
-            .evaluate(db, branch, operator);
+            .evaluate(db, env, branch, operator);
     }
 
-    ProjectedEnumComparison::new(db, target, &other, operator)?.evaluate(db, branch, operator)
+    ProjectedEnumComparison::new(db, target, &other, operator)?.evaluate(db, env, branch, operator)
+}
+
+/// Compare unions that contain enums and other values.
+///
+/// Compare enum members together and compare other values normally. Values such as `None`,
+/// `Any`, or a matching string can also affect which values match.
+///
+/// Compare the enum members only once.
+///
+/// ```python
+/// from enum import StrEnum
+///
+/// class Left(StrEnum):
+///     SHARED = "shared"
+///     LEFT = "left"
+///
+/// class Right(StrEnum):
+///     SHARED = "shared"
+///     RIGHT = "right"
+///
+/// def compare(left: Left | None, right: Right | None):
+///     if left == right:
+///         reveal_type(left)   # Literal[Left.SHARED] | None
+///         reveal_type(right)  # Literal[Right.SHARED] | None
+/// ```
+struct PartitionedEnumComparison<'db> {
+    target: EnumDomainPartition<'db>,
+    other: EnumDomainPartition<'db>,
+    other_type: Type<'db>,
+    enum_result: ComparisonResult<'db>,
+}
+
+impl<'db> PartitionedEnumComparison<'db> {
+    /// Prepare a comparison when both sides contain enums and at least one side also contains
+    /// another value.
+    ///
+    /// Return `None` if either enum has unsupported comparison behavior.
+    fn new(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        target: Type<'db>,
+        other: Type<'db>,
+        branch: ComparisonBranch,
+        operator: ComparisonOperator,
+    ) -> Option<Self> {
+        if !matches!(target.resolve_type_alias(db), Type::Union(_))
+            && !matches!(other.resolve_type_alias(db), Type::Union(_))
+        {
+            return None;
+        }
+
+        let target = EnumDomainPartition::from_type(db, env, target)?;
+        let other_type = other;
+        let other = EnumDomainPartition::from_type(db, env, other)?;
+
+        if !target.has_other_values() && !other.has_other_values() {
+            return None;
+        }
+
+        let enum_result =
+            evaluate_enum_domains(db, env, target.enum_type, other.enum_type, branch, operator)?;
+
+        Some(Self {
+            target,
+            other,
+            other_type,
+            enum_result,
+        })
+    }
+
+    /// Reuse the saved enum result and compare all other values normally.
+    fn evaluate_pair(
+        &self,
+        evaluator: &mut ComparisonEvaluator<'db>,
+        target: Type<'db>,
+        other: Type<'db>,
+        branch: ComparisonBranch,
+        operator: ComparisonOperator,
+    ) -> ComparisonResult<'db> {
+        if target == self.target.enum_type && other == self.other.enum_type {
+            self.enum_result
+        } else {
+            evaluator.evaluate(target, other, branch, operator)
+        }
+    }
+
+    /// Compare one possible value with the other side.
+    ///
+    /// Compare `Any` and `Unknown` with the whole union so neither is narrowed by separate values.
+    ///
+    /// Return whether the result is certain or which values can still match.
+    fn evaluate_against_other(
+        &self,
+        evaluator: &mut ComparisonEvaluator<'db>,
+        target: Type<'db>,
+        branch: ComparisonBranch,
+        operator: ComparisonOperator,
+    ) -> ComparisonResult<'db> {
+        let db = evaluator.db;
+        if let [other] = self.other.alternatives.as_slice() {
+            return self.evaluate_pair(evaluator, target, *other, branch, operator);
+        }
+
+        if evaluator.goal == ComparisonGoal::Truthiness {
+            return combine_definite_truthiness(
+                self.other
+                    .alternatives
+                    .iter()
+                    .map(|other| self.evaluate_pair(evaluator, target, *other, branch, operator)),
+            );
+        }
+
+        let env = evaluator.env.clone();
+        if matches!(target.resolve_type_alias(db), Type::Dynamic(_)) {
+            return evaluator.evaluate(target, self.other_type, branch, operator);
+        }
+
+        evaluate_against_results(
+            db,
+            &env,
+            target,
+            branch,
+            self.other
+                .alternatives
+                .iter()
+                .map(|other| self.evaluate_pair(evaluator, target, *other, branch, operator)),
+        )
+    }
+
+    /// Compare all possible values.
+    ///
+    /// If no member of an enum can match, exclude it from the other possible values.
+    ///
+    /// Return whether the result is certain or which values can still match.
+    fn evaluate(
+        &self,
+        evaluator: &mut ComparisonEvaluator<'db>,
+        branch: ComparisonBranch,
+        operator: ComparisonOperator,
+    ) -> ComparisonResult<'db> {
+        let db = evaluator.db;
+        if let [target] = self.target.alternatives.as_slice() {
+            return self.evaluate_against_other(evaluator, *target, branch, operator);
+        }
+
+        if evaluator.goal == ComparisonGoal::Truthiness {
+            return combine_definite_truthiness(
+                self.target.alternatives.iter().map(|target| {
+                    self.evaluate_against_other(evaluator, *target, branch, operator)
+                }),
+            );
+        }
+
+        let env = evaluator.env.clone();
+        let mut narrowed_enum = None;
+        let result = evaluate_target_union(db, &env, &self.target.alternatives, branch, |target| {
+            let result = self.evaluate_against_other(evaluator, target, branch, operator);
+            if target == self.target.enum_type
+                && let ComparisonResult::CanNarrow(narrowed) = result
+                && narrowed != target
+            {
+                narrowed_enum = Some(narrowed);
+            }
+            result
+        });
+
+        if let ComparisonResult::CanNarrow(narrowed) = result
+            && let Some(narrowed_enum) = narrowed_enum
+            && let Some(domains) = EnumDomainSet::from_type(db, &env, self.target.enum_type)
+        {
+            let excluded = domains
+                .domains
+                .iter()
+                .fold(UnionBuilder::new(db, &env), |builder, domain| {
+                    let domain_type = domain.restriction_type(db, &env);
+                    if domain_type.is_disjoint_from(db, &env, narrowed_enum) {
+                        builder.add(domain_type)
+                    } else {
+                        builder
+                    }
+                })
+                .build();
+            if !excluded.is_never() {
+                return ComparisonResult::CanNarrow(
+                    IntersectionBuilder::new(db, &env)
+                        .add_positive(narrowed)
+                        .add_negative(excluded)
+                        .build(),
+                );
+            }
+        }
+
+        result
+    }
 }
 
 /// Two non-empty value domains from the same enum and the semantics used to compare them.
@@ -94,6 +316,7 @@ impl<'db> SameEnumComparison<'db> {
     fn evaluate(
         &self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         branch: ComparisonBranch,
         operator: ComparisonOperator,
     ) -> Option<ComparisonResult<'db>> {
@@ -103,15 +326,15 @@ impl<'db> SameEnumComparison<'db> {
             Truthiness::Ambiguous if !self.supports_domain_narrowing() => {
                 Some(ComparisonResult::Ambiguous)
             }
-            Truthiness::Ambiguous if operator.condition_expects_equality(branch) => {
-                Some(ComparisonResult::CanNarrow(self.right.restriction_type(db)))
-            }
+            Truthiness::Ambiguous if operator.condition_expects_equality(branch) => Some(
+                ComparisonResult::CanNarrow(self.right.restriction_type(db, env)),
+            ),
             Truthiness::Ambiguous => Some(self.right.singleton_type(db).map_or(
                 ComparisonResult::Ambiguous,
                 |singleton| {
                     ComparisonResult::CanNarrow(
-                        IntersectionBuilder::new(db)
-                            .add_positive(self.left.restriction_type(db))
+                        IntersectionBuilder::new(db, env)
+                            .add_positive(self.left.restriction_type(db, env))
                             .add_negative(singleton)
                             .build(),
                     )
@@ -161,15 +384,17 @@ enum EnumValueSetMembers<'db> {
 impl<'db> EnumValueSet<'db> {
     /// Extract only structural enum membership facts from `ty`.
     ///
-    /// This deliberately does not use subtyping: a `NewType` over an enum is a subtype of the
-    /// enum but remains disjoint from the enum's literal members.
+    /// This deliberately does not use subtyping: extra nominal restrictions must not be
+    /// transferred to the other comparison operand.
     fn from_type(
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         ty: Type<'db>,
         active_types: &mut FxHashSet<Type<'db>>,
     ) -> Option<Self> {
         fn from_type_inner<'db>(
             db: &'db dyn Db,
+            env: &ProgramEnvironment<'db>,
             ty: Type<'db>,
             active_types: &mut FxHashSet<Type<'db>>,
         ) -> Option<EnumValueSet<'db>> {
@@ -189,18 +414,21 @@ impl<'db> EnumValueSet<'db> {
                     }
                 }
                 Type::NominalInstance(instance) => EnumValueSet {
-                    enum_class: instance.class_literal(db).into_enum_class(db)?,
+                    enum_class: instance.class_literal(db, env).into_enum_class(db)?,
                     members: EnumValueSetMembers::All,
                 },
+                Type::NewTypeInstance(newtype) => {
+                    EnumValueSet::from_type(db, env, newtype.concrete_base_type(db), active_types)?
+                }
                 Type::EnumComplement(complement) => EnumValueSet {
                     enum_class: complement.enum_class_literal(db),
                     members: EnumValueSetMembers::AllExcept(complement),
                 },
                 Type::Union(union) => {
-                    EnumValueSet::from_union(db, union.elements(db), active_types)?
+                    EnumValueSet::from_union(db, env, union.elements(db), active_types)?
                 }
                 Type::Intersection(intersection) => {
-                    EnumValueSet::from_intersection(db, intersection, active_types)?
+                    EnumValueSet::from_intersection(db, env, intersection, active_types)?
                 }
                 _ => return None,
             };
@@ -211,7 +439,7 @@ impl<'db> EnumValueSet<'db> {
         if !active_types.insert(ty) {
             return None;
         }
-        let value_set = from_type_inner(db, ty, active_types);
+        let value_set = from_type_inner(db, env, ty, active_types);
         active_types.remove(&ty);
         value_set
     }
@@ -221,13 +449,14 @@ impl<'db> EnumValueSet<'db> {
     /// Whole-domain and complement arms are rejected because they are not exact included sets.
     fn from_union(
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         elements: &[Type<'db>],
         active_types: &mut FxHashSet<Type<'db>>,
     ) -> Option<Self> {
         let mut enum_class = None;
         let mut included = FxOrderMap::default();
         for element in elements {
-            let value_set = Self::from_type(db, *element, active_types)?;
+            let value_set = Self::from_type(db, env, *element, active_types)?;
             if let Some(enum_class) = enum_class
                 && enum_class != value_set.enum_class
             {
@@ -288,11 +517,22 @@ impl<'db> EnumValueSet<'db> {
     /// Extract the enum restriction while discarding unrelated positive intersection state.
     fn from_intersection(
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         intersection: IntersectionType<'db>,
         active_types: &mut FxHashSet<Type<'db>>,
     ) -> Option<Self> {
-        if let Some(complement) = intersection.enum_complement(db) {
-            return Self::from_type(db, Type::EnumComplement(complement), active_types);
+        if let Some(complement) = intersection.enum_complement(db, env) {
+            return Self::from_type(db, env, Type::EnumComplement(complement), active_types);
+        }
+
+        if intersection
+            .positive(db)
+            .iter()
+            .any(|positive| matches!(positive.resolve_type_alias(db), Type::NewTypeInstance(_)))
+            && let expanded = intersection.with_expanded_typevars_and_newtypes(db, env)
+            && let Some(value_set) = Self::from_type(db, env, expanded, active_types)
+        {
+            return Some(value_set);
         }
 
         // Other intersection components can only reduce the represented enum values. Ignoring
@@ -300,7 +540,7 @@ impl<'db> EnumValueSet<'db> {
         let mut value_sets = intersection
             .positive(db)
             .iter()
-            .filter_map(|positive| Self::from_type(db, *positive, active_types));
+            .filter_map(|positive| Self::from_type(db, env, *positive, active_types));
         let value_set = value_sets.next()?;
         value_sets
             .all(|other| other.enum_class == value_set.enum_class)
@@ -389,18 +629,18 @@ impl<'db> EnumValueSet<'db> {
     }
 
     /// Reconstruct a constraint containing only this enum value restriction.
-    fn restriction_type(&self, db: &'db dyn Db) -> Type<'db> {
+    fn restriction_type(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
         match &self.members {
             EnumValueSetMembers::All => self
                 .enum_class
                 .class_literal(db)
-                .to_non_generic_instance(db),
+                .to_non_generic_instance(db, env),
             EnumValueSetMembers::One { name, promotable } => {
                 self.member_type(db, name, *promotable)
             }
             EnumValueSetMembers::Included(members) => members
                 .iter()
-                .fold(UnionBuilder::new(db), |builder, (name, promotable)| {
+                .fold(UnionBuilder::new(db, env), |builder, (name, promotable)| {
                     builder.add(self.member_type(db, name, *promotable))
                 })
                 .build(),
@@ -411,7 +651,7 @@ impl<'db> EnumValueSet<'db> {
                     Type::EnumComplement(EnumComplementType::new(
                         db,
                         self.enum_class,
-                        complement.excluded_names(db).clone(),
+                        complement.excluded_names(db),
                         FxOrderSet::default(),
                     ))
                 }
@@ -445,11 +685,90 @@ impl<'db> EnumValueSet<'db> {
     }
 
     fn member_type(&self, db: &'db dyn Db, name: &Name, promotable: bool) -> Type<'db> {
-        LiteralValueType::new(
-            EnumLiteralType::new(db, self.enum_class, name.clone()),
-            promotable,
-        )
-        .into()
+        LiteralValueType::new(EnumLiteralType::new(db, self.enum_class, name), promotable).into()
+    }
+}
+
+/// The enum members and other values on one side of a comparison.
+///
+/// Place enum members at the first enum's position and keep other values in their original order.
+struct EnumDomainPartition<'db> {
+    enum_type: Type<'db>,
+    alternatives: Vec<Type<'db>>,
+}
+
+impl<'db> EnumDomainPartition<'db> {
+    /// Combine enum values while keeping other values in their original order.
+    ///
+    /// Return `None` when there is no enum or a type alias refers to itself.
+    fn from_type(db: &'db dyn Db, env: &ProgramEnvironment<'db>, ty: Type<'db>) -> Option<Self> {
+        fn collect<'db>(
+            db: &'db dyn Db,
+            env: &ProgramEnvironment<'db>,
+            ty: Type<'db>,
+            enum_types: &mut Vec<Type<'db>>,
+            alternatives: &mut Vec<Type<'db>>,
+            enum_position: &mut Option<usize>,
+            active_types: &mut FxHashSet<Type<'db>>,
+        ) -> Option<()> {
+            if EnumValueSet::from_type(db, env, ty, active_types).is_some() {
+                enum_position.get_or_insert(alternatives.len());
+                enum_types.push(ty);
+                return Some(());
+            }
+
+            let Type::Union(union) = ty.resolve_type_alias(db) else {
+                alternatives.push(ty);
+                return Some(());
+            };
+
+            if !active_types.insert(ty) {
+                return None;
+            }
+
+            let result = union.elements(db).iter().try_for_each(|element| {
+                collect(
+                    db,
+                    env,
+                    *element,
+                    enum_types,
+                    alternatives,
+                    enum_position,
+                    active_types,
+                )
+            });
+            active_types.remove(&ty);
+            result
+        }
+
+        let mut enum_types = Vec::new();
+        let mut alternatives = Vec::new();
+        let mut enum_position = None;
+        let mut active_types = FxHashSet::default();
+        collect(
+            db,
+            env,
+            ty,
+            &mut enum_types,
+            &mut alternatives,
+            &mut enum_position,
+            &mut active_types,
+        )?;
+        let enum_position = enum_position?;
+        let enum_type = enum_types
+            .into_iter()
+            .fold(UnionBuilder::new(db, env), UnionBuilder::add)
+            .build();
+        alternatives.insert(enum_position, enum_type);
+
+        Some(Self {
+            enum_type,
+            alternatives,
+        })
+    }
+
+    fn has_other_values(&self) -> bool {
+        self.alternatives.len() > 1
     }
 }
 
@@ -459,14 +778,15 @@ struct EnumDomainSet<'db> {
 }
 
 impl<'db> EnumDomainSet<'db> {
-    fn from_type(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
+    fn from_type(db: &'db dyn Db, env: &ProgramEnvironment<'db>, ty: Type<'db>) -> Option<Self> {
         fn collect<'db>(
             db: &'db dyn Db,
+            env: &ProgramEnvironment<'db>,
             ty: Type<'db>,
             domains: &mut Vec<EnumValueSet<'db>>,
             active_types: &mut FxHashSet<Type<'db>>,
         ) -> Option<()> {
-            if let Some(domain) = EnumValueSet::from_type(db, ty, active_types) {
+            if let Some(domain) = EnumValueSet::from_type(db, env, ty, active_types) {
                 domains.push(domain);
                 return Some(());
             }
@@ -474,13 +794,14 @@ impl<'db> EnumDomainSet<'db> {
             if !active_types.insert(ty) {
                 return None;
             }
-            let result = collect_union(db, ty, domains, active_types);
+            let result = collect_union(db, env, ty, domains, active_types);
             active_types.remove(&ty);
             result
         }
 
         fn collect_union<'db>(
             db: &'db dyn Db,
+            env: &ProgramEnvironment<'db>,
             ty: Type<'db>,
             domains: &mut Vec<EnumValueSet<'db>>,
             active_types: &mut FxHashSet<Type<'db>>,
@@ -489,14 +810,14 @@ impl<'db> EnumDomainSet<'db> {
                 return None;
             };
             for element in union.elements(db) {
-                collect(db, *element, domains, active_types)?;
+                collect(db, env, *element, domains, active_types)?;
             }
             Some(())
         }
 
         let mut domains = Vec::new();
         let mut active_types = FxHashSet::default();
-        collect(db, ty, &mut domains, &mut active_types)?;
+        collect(db, env, ty, &mut domains, &mut active_types)?;
         (!domains.is_empty()).then_some(Self { domains })
     }
 
@@ -519,11 +840,11 @@ impl<'db> EnumDomainSet<'db> {
         Some(projection)
     }
 
-    fn restriction_type(&self, db: &'db dyn Db) -> Type<'db> {
+    fn restriction_type(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
         self.domains
             .iter()
-            .fold(UnionBuilder::new(db), |builder, domain| {
-                builder.add(domain.restriction_type(db))
+            .fold(UnionBuilder::new(db, env), |builder, domain| {
+                builder.add(domain.restriction_type(db, env))
             })
             .build()
     }
@@ -531,17 +852,18 @@ impl<'db> EnumDomainSet<'db> {
     fn restrict_for_equality(
         &self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         operator: ComparisonOperator,
         other: &EnumKeyProjection<'db>,
     ) -> Option<Type<'db>> {
-        let mut builder = UnionBuilder::new(db);
+        let mut builder = UnionBuilder::new(db, env);
         for domain in &self.domains {
             let mut projection = EnumKeyProjection::default();
             domain.add_keys_to_projection(db, operator, &mut projection)?;
             if projection.unknowns_may_overlap(other) {
-                builder = builder.add(domain.restriction_type(db));
+                builder = builder.add(domain.restriction_type(db, env));
             } else if let Some(retained) = domain.retain_keys(db, operator, &other.keys).ok()? {
-                builder = builder.add(retained.restriction_type(db));
+                builder = builder.add(retained.restriction_type(db, env));
             }
         }
         Some(builder.build())
@@ -551,10 +873,11 @@ impl<'db> EnumDomainSet<'db> {
     fn known_equal_type(
         &self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         operator: ComparisonOperator,
         other: &EnumKeyProjection<'db>,
     ) -> Option<Type<'db>> {
-        let mut builder = UnionBuilder::new(db);
+        let mut builder = UnionBuilder::new(db, env);
         for domain in &self.domains {
             let mut projection = EnumKeyProjection::default();
             domain.add_keys_to_projection(db, operator, &mut projection)?;
@@ -562,7 +885,7 @@ impl<'db> EnumDomainSet<'db> {
                 continue;
             }
             if let Some(retained) = domain.retain_keys(db, operator, &other.keys).ok()? {
-                builder = builder.add(retained.restriction_type(db));
+                builder = builder.add(retained.restriction_type(db, env));
             }
         }
         Some(builder.build())
@@ -610,6 +933,7 @@ impl<'db> ProjectedEnumComparison<'db> {
     fn evaluate(
         &self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         branch: ComparisonBranch,
         operator: ComparisonOperator,
     ) -> Option<ComparisonResult<'db>> {
@@ -619,16 +943,16 @@ impl<'db> ProjectedEnumComparison<'db> {
             Truthiness::Ambiguous if operator.condition_expects_equality(branch) => {
                 Some(ComparisonResult::CanNarrow(
                     self.left
-                        .restrict_for_equality(db, operator, &self.right_projection)?,
+                        .restrict_for_equality(db, env, operator, &self.right_projection)?,
                 ))
             }
             Truthiness::Ambiguous if self.right_projection.single_key().is_some() => {
                 let equal_left =
                     self.left
-                        .known_equal_type(db, operator, &self.right_projection)?;
+                        .known_equal_type(db, env, operator, &self.right_projection)?;
                 Some(ComparisonResult::CanNarrow(
-                    IntersectionBuilder::new(db)
-                        .add_positive(self.left.restriction_type(db))
+                    IntersectionBuilder::new(db, env)
+                        .add_positive(self.left.restriction_type(db, env))
                         .add_negative(equal_left)
                         .build(),
                 ))
@@ -783,7 +1107,7 @@ impl<'db> EnumValueSet<'db> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 struct EnumClassKeyProfile<'db> {
     members_are_exhaustive: bool,
     semantics: Option<KnownComparisonSemantics>,
@@ -797,9 +1121,13 @@ fn enum_class_key_profile<'db>(
     enum_class: EnumClassLiteral<'db>,
     operator: ComparisonOperator,
 ) -> EnumClassKeyProfile<'db> {
+    let env = ProgramEnvironment::from_file(enum_class.class_literal(db).program_file(db));
     let semantics = KnownComparisonSemantics::of_instance(
         db,
-        enum_class.class_literal(db).to_non_generic_instance(db),
+        &env,
+        enum_class
+            .class_literal(db)
+            .to_non_generic_instance(db, &env),
         operator,
     );
     let members: Box<[(Name, Option<LiteralValueTypeKind<'db>>)]> = enum_class
@@ -809,7 +1137,7 @@ fn enum_class_key_profile<'db>(
             (
                 name.clone(),
                 semantics.and_then(|semantics| {
-                    enum_literal_value(db, EnumLiteralType::new(db, enum_class, name.clone()))
+                    enum_literal_value(db, &env, EnumLiteralType::new(db, enum_class, name))
                         .and_then(|value| enum_comparison_key(semantics, value))
                 }),
             )
@@ -823,7 +1151,7 @@ fn enum_class_key_profile<'db>(
 }
 
 /// Whether distinct declared members are known to have distinct runtime comparison keys.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, get_size2::GetSize)]
 enum SameEnumComparisonKeys {
     /// Different member names cannot compare equal.
     Distinct,
@@ -832,14 +1160,14 @@ enum SameEnumComparisonKeys {
 }
 
 /// Same-class facts that are unnecessary when projecting keys across different classes.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, get_size2::GetSize)]
 struct SameEnumComparisonProfile {
     members_are_exhaustive: bool,
     members_compare_by_identity: bool,
     comparison_keys: Option<SameEnumComparisonKeys>,
 }
 
-#[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
 fn same_enum_comparison_profile<'db>(
     db: &'db dyn Db,
     enum_class: EnumClassLiteral<'db>,

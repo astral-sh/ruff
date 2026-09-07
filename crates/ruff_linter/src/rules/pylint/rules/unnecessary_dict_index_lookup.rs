@@ -4,6 +4,7 @@ use ruff_python_ast::{self as ast, Expr, StmtFor};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::pylint::helpers::SequenceIndexVisitor;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
@@ -31,7 +32,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///     print(fruit_count)
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.12.0")]
+#[violation_metadata(stable_since = "0.12.0", category = Category::Complexity)]
 pub(crate) struct UnnecessaryDictIndexLookup;
 
 impl AlwaysFixableViolation for UnnecessaryDictIndexLookup {

@@ -1,5 +1,6 @@
 use ruff_python_ast::{self as ast, Arguments, Expr};
 
+use crate::codes::Category;
 use crate::{Edit, Fix, FixAvailability, Violation};
 use crate::{
     checkers::ast::Checker, preview::is_fix_manual_list_comprehension_enabled,
@@ -49,7 +50,7 @@ use ruff_text_size::{Ranged, TextRange};
 /// filtered.extend(x for x in original if x % 2)
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.276")]
+#[violation_metadata(stable_since = "v0.0.276", category = Category::Pedantic)]
 pub(crate) struct ManualListComprehension {
     is_async: bool,
     comprehension_type: Option<ComprehensionType>,
@@ -146,12 +147,13 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
                 range: _,
                 node_index: _,
             },
-        range,
+        range_start: _,
         node_index: _,
     }) = value.as_ref()
     else {
         return;
     };
+    let call_range = value.range();
 
     if !keywords.is_empty() {
         return;
@@ -339,7 +341,7 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
             is_async: for_stmt.is_async,
             comprehension_type: Some(comprehension_type),
         },
-        *range,
+        call_range,
     );
 
     // TODO: once this fix is stabilized, change the rule to always fixable

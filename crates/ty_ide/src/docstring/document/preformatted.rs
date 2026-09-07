@@ -1,6 +1,8 @@
 use ruff_python_trivia::leading_indentation;
 use ruff_text_size::TextSize;
 
+use super::syntax::indentation as visual_indentation;
+
 /// Represents a fenced Markdown code block.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(in crate::docstring) struct MarkdownFence<'a> {
@@ -30,14 +32,24 @@ impl<'a> MarkdownFence<'a> {
         let fence_len = line.len() - without_leading_fence.len();
         let fence = &line[..fence_len];
 
-        // We *don't* want to consider ```hello``` as a codefence; that's inline code!
-        (!without_leading_fence.contains(fence)).then_some(Self { marker: fence })
+        // Backticks are not allowed in a backtick fence's info string.
+        // This also keeps code spans such as ```hello``` from being mistaken for fenced blocks.
+        //
+        // <https://spec.commonmark.org/0.31.2/#fenced-code-blocks>
+        (!has_tick_fence || !without_leading_fence.contains('`')).then_some(Self { marker: fence })
     }
 
     /// Returns whether `line` closes this fenced code block.
     pub(in crate::docstring) fn is_closed_by(&self, line: &str) -> bool {
         line.trim_start_matches(' ').starts_with(self.marker)
     }
+}
+
+/// Returns whether `line` starts a recognized preformatted block.
+pub(super) fn starts_preformatted_block(line: &str) -> bool {
+    PreformattedBlockScanner::line_starts_doctest(line)
+        || MarkdownFence::find(line).is_some()
+        || RestLiteralBlockScanner::line_starts_literal_block(line.trim_start())
 }
 
 /// Recognizes preformatted blocks that may occur within a docstring.
@@ -54,6 +66,16 @@ pub(super) struct PreformattedBlockScanner<'a> {
 const QUOTED_LITERAL_BLOCK_QUOTE_CHARACTERS: &str = r##"!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~"##;
 
 impl<'a> PreformattedBlockScanner<'a> {
+    /// Returns whether the scanner is currently inside an accepted preformatted block.
+    pub(super) fn is_active(&self) -> bool {
+        self.active_markdown_fence.is_some()
+            || self.active_doctest_indent.is_some()
+            || matches!(
+                self.rest_literal_blocks.state,
+                RestLiteralBlockState::Active(_)
+            )
+    }
+
     /// Updates internal state to reflect the given line and returns whether or
     /// not the given line is contained within a preformatted block.
     pub(super) fn consume_preformatted_line(&mut self, line: &'a str) -> bool {
@@ -69,10 +91,10 @@ impl<'a> PreformattedBlockScanner<'a> {
         }
 
         if let Some(doctest_indent) = self.active_doctest_indent {
-            if line.trim_start_matches(' ').is_empty() {
+            if line.bytes().all(|byte| matches!(byte, b' ' | b'\t')) {
                 self.active_doctest_indent = None;
                 return true;
-            } else if indentation(line) < doctest_indent {
+            } else if visual_indentation(line) < doctest_indent {
                 self.active_doctest_indent = None;
             } else {
                 return true;
@@ -80,7 +102,7 @@ impl<'a> PreformattedBlockScanner<'a> {
         }
 
         if Self::line_starts_doctest(line) {
-            self.active_doctest_indent = Some(indentation(line));
+            self.active_doctest_indent = Some(visual_indentation(line));
             return true;
         }
 
@@ -111,13 +133,13 @@ pub(super) struct RestLiteralBlockScanner {
 
 impl RestLiteralBlockScanner {
     /// Updates internal state for a possible reST literal block marker.
-    pub(super) fn observe_marker_in_line(&mut self, line: &str) {
+    fn observe_marker_in_line(&mut self, line: &str) {
         self.observe_marker(line, indentation(line));
     }
 
     /// Updates internal state for a possible reST literal block marker whose text has already
     /// been split out from its source line.
-    pub(super) fn observe_marker(&mut self, line: &str, marker_indent: TextSize) {
+    fn observe_marker(&mut self, line: &str, marker_indent: TextSize) {
         let line = line.trim_start();
         if matches!(self.state, RestLiteralBlockState::Inactive)
             && Self::line_starts_literal_block(line)
@@ -130,7 +152,7 @@ impl RestLiteralBlockScanner {
     }
 
     /// Consumes a line if it is inside a reST literal block already observed by `observe_marker`.
-    pub(super) fn consume_line(&mut self, line: &str) -> bool {
+    fn consume_line(&mut self, line: &str) -> bool {
         let current_indent = indentation(line);
         let line_is_empty = line.trim_start().is_empty();
 
@@ -165,6 +187,11 @@ impl RestLiteralBlockScanner {
                         marker_indent,
                     });
                     true
+                } else if MarkdownFence::find(line).is_some() {
+                    // Without indentation to start a reST literal, let the outer scanner handle
+                    // the Markdown fence.
+                    self.state = RestLiteralBlockState::Inactive;
+                    false
                 } else if allows_quoted_literal_block
                     && let Some(quote) = Self::quote_character(line, marker_indent)
                 {

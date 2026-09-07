@@ -13,10 +13,11 @@ use ruff_source_file::{LineColumn, OneIndexed};
 use crate::fs::relativize_path;
 use crate::message::{Emitter, EmitterContext};
 
-pub struct GroupedEmitter {
+pub(crate) struct GroupedEmitter {
     show_fix_status: bool,
     applicability: Applicability,
     preview: bool,
+    prefer_rule_codes: bool,
 }
 
 impl Default for GroupedEmitter {
@@ -25,26 +26,33 @@ impl Default for GroupedEmitter {
             show_fix_status: false,
             applicability: Applicability::Safe,
             preview: false,
+            prefer_rule_codes: false,
         }
     }
 }
 
 impl GroupedEmitter {
     #[must_use]
-    pub fn with_show_fix_status(mut self, show_fix_status: bool) -> Self {
+    pub(crate) fn with_show_fix_status(mut self, show_fix_status: bool) -> Self {
         self.show_fix_status = show_fix_status;
         self
     }
 
     #[must_use]
-    pub fn with_applicability(mut self, applicability: Applicability) -> Self {
+    pub(crate) fn with_applicability(mut self, applicability: Applicability) -> Self {
         self.applicability = applicability;
         self
     }
 
     #[must_use]
-    pub fn with_preview(mut self, preview: bool) -> Self {
+    pub(crate) fn with_preview(mut self, preview: bool) -> Self {
         self.preview = preview;
+        self
+    }
+
+    #[must_use]
+    pub(crate) fn with_prefer_rule_codes(mut self, prefer_rule_codes: bool) -> Self {
+        self.prefer_rule_codes = prefer_rule_codes;
         self
     }
 }
@@ -87,6 +95,7 @@ impl Emitter for GroupedEmitter {
                         row_length,
                         column_length,
                         preview: self.preview,
+                        prefer_rule_codes: self.prefer_rule_codes,
                     }
                 )?;
             }
@@ -136,6 +145,7 @@ struct DisplayGroupedMessage<'a> {
     column_length: NonZeroUsize,
     notebook_index: Option<&'a NotebookIndex>,
     preview: bool,
+    prefer_rule_codes: bool,
 }
 
 impl Display for DisplayGroupedMessage<'_> {
@@ -182,6 +192,7 @@ impl Display for DisplayGroupedMessage<'_> {
                 show_fix_status: self.show_fix_status,
                 applicability: self.applicability,
                 preview: self.preview,
+                prefer_rule_codes: self.prefer_rule_codes,
             },
         )?;
 
@@ -190,19 +201,21 @@ impl Display for DisplayGroupedMessage<'_> {
 }
 
 pub(super) struct RuleCodeAndBody<'a> {
-    pub(crate) message: &'a Diagnostic,
-    pub(crate) show_fix_status: bool,
-    pub(crate) applicability: Applicability,
-    pub(crate) preview: bool,
+    message: &'a Diagnostic,
+    show_fix_status: bool,
+    applicability: Applicability,
+    preview: bool,
+    prefer_rule_codes: bool,
 }
 
 impl Display for RuleCodeAndBody<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let use_name = self.preview && !self.prefer_rule_codes;
         if self.show_fix_status {
             if let Some(fix) = self.message.fix() {
                 // Do not display an indicator for inapplicable fixes
                 if fix.applies(self.applicability) {
-                    let code = if self.preview {
+                    let code = if use_name {
                         self.message.id().as_str()
                     } else {
                         self.message.secondary_code_or_id()
@@ -218,9 +231,7 @@ impl Display for RuleCodeAndBody<'_> {
             }
         }
 
-        if !self.preview
-            && let Some(code) = self.message.secondary_code()
-        {
+        if !use_name && let Some(code) = self.message.secondary_code() {
             write!(
                 f,
                 "{code} {body}",

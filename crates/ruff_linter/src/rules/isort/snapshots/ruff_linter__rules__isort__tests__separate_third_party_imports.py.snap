@@ -9,7 +9,6 @@ I001 [*] Import block is un-sorted or un-formatted
 3 | | import numpy as np
 4 | | import os
   | |_________^
-  |
 help: Organize imports
   |
   - import pandas as pd

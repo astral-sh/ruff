@@ -1,0 +1,132 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+PLE2510 [*] Invalid unescaped character backspace, use "\b" instead
+  --> invalid_characters.py:15:6
+   |
+13 | #        (Pylint, "C3002") => Rule::UnnecessaryDirectLambdaCall,
+14 | #foo = 'hi'
+15 | b = '␈'
+   |      ^
+16 | b = f'␈'
+   |
+help: Replace with escape sequence
+   |
+14 | #foo = 'hi'
+   - b = '␈'
+15 + b = '\b'
+16 | b = f'␈'
+   |
+
+PLE2510 [*] Invalid unescaped character backspace, use "\b" instead
+  --> invalid_characters.py:16:7
+   |
+14 | #foo = 'hi'
+15 | b = '␈'
+16 | b = f'␈'
+   |       ^
+17 |
+18 | b_ok = '\\b'
+   |
+help: Replace with escape sequence
+   |
+15 | b = '␈'
+   - b = f'␈'
+16 + b = f'\b'
+17 |
+   |
+
+PLE2510 [*] Invalid unescaped character backspace, use "\b" instead
+  --> invalid_characters.py:55:21
+   |
+53 | zwsp_after_multicharacter_grapheme_cluster = f"ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
+54 |
+55 | nested_fstrings = f'␈{f'␚{f'␛'}'}'
+   |                     ^
+56 |
+57 | # https://github.com/astral-sh/ruff/issues/7455#issuecomment-1741998106
+   |
+help: Replace with escape sequence
+   |
+54 |
+   - nested_fstrings = f'␈{f'{f'␛'}'}'
+55 + nested_fstrings = f'\b{f'{f'␛'}'}'
+56 |
+   |
+
+PLE2510 Invalid unescaped character backspace, use "\b" instead
+  --> invalid_characters.py:64:11
+   |
+63 | # https://github.com/astral-sh/ruff/issues/13294
+64 | print(r"""␈␚␛␀​
+   |           ^
+65 | """)
+66 | print(fr"""␈␚␛␀​
+   |
+help: Replace with escape sequence
+
+PLE2510 Invalid unescaped character backspace, use "\b" instead
+  --> invalid_characters.py:66:12
+   |
+64 | print(r"""␈␚␛␀​
+65 | """)
+66 | print(fr"""␈␚␛␀​
+   |            ^
+67 | """)
+68 | print(Rf"""␈␚␛␀​
+   |
+help: Replace with escape sequence
+
+PLE2510 Invalid unescaped character backspace, use "\b" instead
+  --> invalid_characters.py:68:12
+   |
+66 | print(fr"""␈␚␛␀​
+67 | """)
+68 | print(Rf"""␈␚␛␀​
+   |            ^
+69 | """)
+   |
+help: Replace with escape sequence
+
+PLE2510 Invalid unescaped character backspace, use "\b" instead
+  --> invalid_characters.py:72:7
+   |
+71 | # https://github.com/astral-sh/ruff/issues/18815
+72 | b = "\␈"
+   |       ^
+73 | sub = "\␚"
+74 | esc = "\␛"
+   |
+help: Replace with escape sequence
+
+PLE2510 [*] Invalid unescaped character backspace, use "\b" instead
+  --> invalid_characters.py:80:21
+   |
+78 | # tstrings
+79 | esc = t'esc esc ␛'
+80 | nested_tstrings = t'␈{t'␚{t'␛'}'}'
+   |                     ^
+81 | nested_ftstrings = t'␈{f'␚{t'␛'}'}'
+   |
+help: Replace with escape sequence
+   |
+79 | esc = t'esc esc ␛'
+   - nested_tstrings = t'␈{t'{t'␛'}'}'
+80 + nested_tstrings = t'\b{t'{t'␛'}'}'
+81 | nested_ftstrings = t'␈{f'{t'␛'}'}'
+   |
+
+PLE2510 [*] Invalid unescaped character backspace, use "\b" instead
+  --> invalid_characters.py:81:22
+   |
+79 | esc = t'esc esc ␛'
+80 | nested_tstrings = t'␈{t'␚{t'␛'}'}'
+81 | nested_ftstrings = t'␈{f'␚{t'␛'}'}'
+   |                      ^
+help: Replace with escape sequence
+   |
+80 | nested_tstrings = t'␈{t'{t'␛'}'}'
+   - nested_ftstrings = t'␈{f'{t'␛'}'}'
+81 + nested_ftstrings = t'\b{f'{t'␛'}'}'
+82 |
+   |

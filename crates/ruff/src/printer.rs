@@ -9,7 +9,9 @@ use itertools::{Itertools, iterate};
 use ruff_linter::linter::FixTable;
 use serde::Serialize;
 
-use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig, SecondaryCode};
+use ruff_db::diagnostic::{
+    Diagnostic, DiagnosticStylesheet, DisplayDiagnosticConfig, SecondaryCode, fmt_with_hyperlink,
+};
 use ruff_linter::fs::relativize_path;
 use ruff_linter::logging::LogLevel;
 use ruff_linter::message::{EmitterContext, render_diagnostics};
@@ -33,6 +35,10 @@ bitflags! {
 #[derive(Serialize)]
 struct ExpandedStatistics<'a> {
     code: Option<&'a SecondaryCode>,
+    /// Skipped when serializing to keep the JSON output unchanged; it only exists to hyperlink
+    /// the code in terminal output.
+    #[serde(skip)]
+    url: Option<&'a str>,
     name: &'static str,
     count: usize,
     #[serde(rename = "fixable")]
@@ -46,7 +52,7 @@ impl ExpandedStatistics<'_> {
     }
 }
 
-/// Accumulator type for grouping diagnostics by code.
+/// Accumulator type for grouping diagnostics by name.
 /// Format: (`code`, `representative_diagnostic`, `total_count`, `fixable_count`)
 type DiagnosticGroup<'a> = (Option<&'a SecondaryCode>, &'a Diagnostic, usize, usize);
 
@@ -210,6 +216,7 @@ impl Printer {
         diagnostics: &Diagnostics,
         writer: &mut dyn Write,
         preview: PreviewMode,
+        prefer_rule_codes: bool,
     ) -> Result<()> {
         if matches!(self.log_level, LogLevel::Silent) {
             return Ok(());
@@ -223,7 +230,7 @@ impl Printer {
                 if self.flags.intersects(Flags::SHOW_FIX_SUMMARY) {
                     if !diagnostics.fixed.is_empty() {
                         writeln!(writer)?;
-                        print_fix_summary(writer, &diagnostics.fixed, preview)?;
+                        print_fix_summary(writer, &diagnostics.fixed, preview, prefer_rule_codes)?;
                         writeln!(writer)?;
                     }
                 }
@@ -237,11 +244,11 @@ impl Printer {
 
         let config = DisplayDiagnosticConfig::new("ruff")
             .preview(preview.is_enabled())
+            .prefer_rule_codes(prefer_rule_codes)
             .hide_severity(true)
             .color(!cfg!(test) && colored::control::SHOULD_COLORIZE.should_colorize())
             .with_show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
-            .with_fix_applicability(self.unsafe_fixes.required_applicability())
-            .show_fix_diff(preview.is_enabled());
+            .with_fix_applicability(self.unsafe_fixes.required_applicability());
 
         render_diagnostics(writer, self.format, config, &context, &diagnostics.inner)?;
 
@@ -252,7 +259,7 @@ impl Printer {
             if self.flags.intersects(Flags::SHOW_FIX_SUMMARY) {
                 if !diagnostics.fixed.is_empty() {
                     writeln!(writer)?;
-                    print_fix_summary(writer, &diagnostics.fixed, preview)?;
+                    print_fix_summary(writer, &diagnostics.fixed, preview, prefer_rule_codes)?;
                     writeln!(writer)?;
                 }
             }
@@ -273,15 +280,15 @@ impl Printer {
         let statistics: Vec<ExpandedStatistics> = diagnostics
             .inner
             .iter()
-            .sorted_by_key(|diagnostic| diagnostic.secondary_code())
+            .sorted_by_key(|diagnostic| diagnostic.name())
             .fold(vec![], |mut acc: Vec<DiagnosticGroup>, diagnostic| {
                 let is_fixable = diagnostic
                     .fix()
                     .is_some_and(|fix| fix.applies(required_applicability));
                 let code = diagnostic.secondary_code();
 
-                if let Some((prev_code, _prev_message, count, fixable_count)) = acc.last_mut() {
-                    if *prev_code == code {
+                if let Some((_prev_code, prev_message, count, fixable_count)) = acc.last_mut() {
+                    if prev_message.name() == diagnostic.name() {
                         *count += 1;
                         if is_fixable {
                             *fixable_count += 1;
@@ -296,6 +303,7 @@ impl Printer {
             .map(
                 |&(code, message, count, fixable_count)| ExpandedStatistics {
                     code,
+                    url: message.documentation_url(),
                     name: message.name(),
                     count,
                     // Backward compatibility: `fixable` is true only when all violations are fixable.
@@ -329,22 +337,32 @@ impl Printer {
                     .unwrap();
                 let any_fixable = statistics.iter().any(ExpandedStatistics::any_fixable);
 
+                // Pick the stylesheet the same way the full and concise renderers do, so that
+                // turning colors off also turns the hyperlinks off.
+                let stylesheet = if colored::control::SHOULD_COLORIZE.should_colorize() {
+                    DiagnosticStylesheet::styled()
+                } else {
+                    DiagnosticStylesheet::plain()
+                };
+
                 let all_fixable = format!("[{}] ", "*".cyan());
                 let partially_fixable = format!("[{}] ", "-".cyan());
                 let unfixable = "[ ] ";
 
                 // By default, we mimic Flake8's `--statistics` format.
                 for statistic in &statistics {
+                    let code = statistic
+                        .code
+                        .map(SecondaryCode::as_str)
+                        .unwrap_or_default();
+                    let padding_width = code_width - code.len();
+
                     writeln!(
                         writer,
-                        "{:>count_width$}\t{:<code_width$}\t{}{}",
+                        "{:>count_width$}\t{}{:padding_width$}\t{}{}",
                         statistic.count.to_string().bold(),
-                        statistic
-                            .code
-                            .map(SecondaryCode::as_str)
-                            .unwrap_or_default()
-                            .red()
-                            .bold(),
+                        fmt_with_hyperlink(code.red().bold(), statistic.url, &stylesheet),
+                        "",
                         if any_fixable {
                             if statistic.all_fixable {
                                 &all_fixable
@@ -384,6 +402,7 @@ impl Printer {
         writer: &mut dyn Write,
         diagnostics: &Diagnostics,
         preview: PreviewMode,
+        prefer_rule_codes: bool,
     ) -> Result<()> {
         if matches!(self.log_level, LogLevel::Silent) {
             return Ok(());
@@ -411,11 +430,11 @@ impl Printer {
             let context = EmitterContext::new(&diagnostics.notebook_indexes);
             let config = DisplayDiagnosticConfig::new("ruff")
                 .preview(preview.is_enabled())
+                .prefer_rule_codes(prefer_rule_codes)
                 .hide_severity(true)
                 .color(!cfg!(test) && colored::control::SHOULD_COLORIZE.should_colorize())
                 .with_show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
-                .with_fix_applicability(self.unsafe_fixes.required_applicability())
-                .show_fix_diff(preview.is_enabled());
+                .with_fix_applicability(self.unsafe_fixes.required_applicability());
             render_diagnostics(writer, self.format, config, &context, &diagnostics.inner)?;
         }
         writer.flush()?;
@@ -447,7 +466,12 @@ fn show_fix_status(fix_mode: flags::FixMode, fixables: Option<&FixableStatistics
     (!fix_mode.is_apply()) && fixables.is_some_and(FixableStatistics::any_applicable_fixes)
 }
 
-fn print_fix_summary(writer: &mut dyn Write, fixed: &FixMap, preview: PreviewMode) -> Result<()> {
+fn print_fix_summary(
+    writer: &mut dyn Write,
+    fixed: &FixMap,
+    preview: PreviewMode,
+    prefer_rule_codes: bool,
+) -> Result<()> {
     let total = fixed
         .values()
         .map(|table| table.counts().sum::<usize>())
@@ -476,19 +500,18 @@ fn print_fix_summary(writer: &mut dyn Write, fixed: &FixMap, preview: PreviewMod
             relativize_path(filename).bold(),
             ":".cyan()
         )?;
-        for (code, name, count) in table.iter().sorted_by_key(|(.., count)| Reverse(*count)) {
-            if is_human_readable_names_enabled(preview) {
-                writeln!(
-                    writer,
-                    "    {count:>num_digits$} × {name} ({code})",
-                    name = name.to_string().red().bold(),
-                )?;
-            } else {
-                writeln!(
-                    writer,
-                    "    {count:>num_digits$} × {code} ({name})",
-                    code = code.to_string().red().bold(),
-                )?;
+        for (name, code, count) in table.iter().sorted_by_key(|(.., count)| Reverse(*count)) {
+            write!(writer, "    {count:>num_digits$} × ")?;
+            match code {
+                Some(code) if is_human_readable_names_enabled(preview) && !prefer_rule_codes => {
+                    writeln!(writer, "{name} ({code})", name = name.as_str().red().bold())?;
+                }
+                Some(code) => {
+                    writeln!(writer, "{code} ({name})", code = code.as_str().red().bold())?;
+                }
+                None => {
+                    writeln!(writer, "{name}", name = name.as_str().red().bold())?;
+                }
             }
         }
     }

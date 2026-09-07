@@ -563,4 +563,3 @@ Module(
  9 | [x]: int = 1
 10 | [x, y]: int = 1, 2
    | ^^^^^^ Syntax Error: Only single target (not list) can be annotated
-   |

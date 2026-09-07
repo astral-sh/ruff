@@ -1739,4 +1739,3 @@ Module(
 33 | [[a, b], [[42]], d] += [[1, 2], [[3]], 4]
 34 | (x, foo(), y) += (42, 42, 42)
    | ^^^^^^^^^^^^^ Syntax Error: Invalid augmented assignment target
-   |

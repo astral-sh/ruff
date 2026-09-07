@@ -250,6 +250,51 @@ def add_permission(permission: P) -> P:
     return 0 | permission
 ```
 
+## Runtime-class precedence ignores generic specializations
+
+Generic specializations do not exist at runtime, so they cannot affect whether the right operand's
+runtime class is a strict subclass of the left operand's runtime class:
+
+```py
+from typing import Generic, Literal, TypeVar
+
+T = TypeVar("T")
+
+class GenericBase(Generic[T]):
+    def __add__(self, other: object) -> Literal["left"]:
+        return "left"
+
+class GenericChild(GenericBase[T]):
+    def __radd__(self, other: object) -> Literal["right"]:
+        return "right"
+
+def add_generic(left: GenericBase[int], right: GenericChild[str]) -> Literal["left", "right"]:
+    reveal_type(left + right)  # revealed: Literal["right", "left"]
+    return left + right
+```
+
+## Class objects use their metaclasses for reflected precedence
+
+The runtime classes of class objects are their metaclasses. If the right operand's metaclass is a
+strict subclass of the left operand's metaclass, its reflected method takes precedence:
+
+```py
+from typing import Literal
+
+class LeftMeta(type):
+    def __add__(cls, other: object) -> Literal["left"]:
+        return "left"
+
+class RightMeta(LeftMeta):
+    def __radd__(cls, other: object) -> Literal["right"]:
+        return "right"
+
+class A(metaclass=LeftMeta): ...
+class B(metaclass=RightMeta): ...
+
+reveal_type(A + B)  # revealed: Literal["right"]
+```
+
 ## TypeVars and NewTypes do not have an exact runtime class
 
 The upper bound of a TypeVar is not necessarily its runtime class, so it cannot decide definitively
@@ -360,17 +405,17 @@ dunder methods. Perhaps we could have a special-case on the special-case, to exc
 return annotations from the widening, and preserve a bit more precision here?
 
 ```py
-reveal_type(3j + 3.14)  # revealed: int | float | complex
-reveal_type(4.2 + 42)  # revealed: int | float
-reveal_type(3j + 3)  # revealed: int | float | complex
-reveal_type(3.14 + 3j)  # revealed: int | float | complex
-reveal_type(42 + 4.2)  # revealed: int | float
-reveal_type(3 + 3j)  # revealed: int | float | complex
+reveal_type(3j + 3.14)  # revealed: complex
+reveal_type(4.2 + 42)  # revealed: float
+reveal_type(3j + 3)  # revealed: complex
+reveal_type(3.14 + 3j)  # revealed: complex
+reveal_type(42 + 4.2)  # revealed: float
+reveal_type(3 + 3j)  # revealed: complex
 
 def _(x: bool, y: int):
     reveal_type(x + y)  # revealed: int
-    reveal_type(4.2 + x)  # revealed: int | float
-    reveal_type(y + 4.12)  # revealed: int | float
+    reveal_type(4.2 + x)  # revealed: float
+    reveal_type(y + 4.12)  # revealed: float
 ```
 
 ## With literal types
@@ -449,7 +494,6 @@ error[unsupported-bool-conversion]: Boolean conversion is not supported for type
   |
 7 | 10 and a and True
   |        ^
-  |
 info: `__bool__` on `NotBoolable` must be callable
 ```
 

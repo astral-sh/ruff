@@ -118,7 +118,7 @@ pub(crate) struct LogicalLine<'a> {
 
 impl<'a> LogicalLine<'a> {
     /// Returns `true` if this line is positioned at the start of the file.
-    pub(crate) const fn is_start_of_file(&self) -> bool {
+    const fn is_start_of_file(&self) -> bool {
         self.line.tokens_start == 0
     }
 
@@ -128,7 +128,7 @@ impl<'a> LogicalLine<'a> {
     }
 
     /// Returns logical line's text including comments, indents, dedent and trailing new lines.
-    pub(crate) fn text(&self) -> &'a str {
+    fn text(&self) -> &'a str {
         let tokens = self.tokens();
         match (tokens.first(), tokens.last()) {
             (Some(first), Some(last)) => self
@@ -141,7 +141,7 @@ impl<'a> LogicalLine<'a> {
 
     /// Returns the text without any leading or trailing newline, comment, indent, or dedent of this line
     #[cfg(test)]
-    pub(crate) fn text_trimmed(&self) -> &'a str {
+    fn text_trimmed(&self) -> &'a str {
         let tokens = self.tokens_trimmed();
 
         match (tokens.first(), tokens.last()) {
@@ -153,7 +153,7 @@ impl<'a> LogicalLine<'a> {
         }
     }
 
-    pub(crate) fn tokens_trimmed(&self) -> &'a [LogicalLineToken] {
+    fn tokens_trimmed(&self) -> &'a [LogicalLineToken] {
         let tokens = self.tokens();
 
         let start = tokens
@@ -173,7 +173,7 @@ impl<'a> LogicalLine<'a> {
 
     /// Returns the text after `token`
     #[inline]
-    pub(crate) fn text_after(&self, token: &'a LogicalLineToken) -> &str {
+    fn text_after(&self, token: &'a LogicalLineToken) -> &str {
         // SAFETY: The line must have at least one token or `token` would not belong to this line.
         let last_token = self.tokens().last().unwrap();
         self.lines
@@ -183,7 +183,7 @@ impl<'a> LogicalLine<'a> {
 
     /// Returns the text before `token`
     #[inline]
-    pub(crate) fn text_before(&self, token: &'a LogicalLineToken) -> &str {
+    fn text_before(&self, token: &'a LogicalLineToken) -> &str {
         // SAFETY: The line must have at least one token or `token` would not belong to this line.
         let first_token = self.tokens().first().unwrap();
         self.lines
@@ -192,20 +192,17 @@ impl<'a> LogicalLine<'a> {
     }
 
     /// Returns the whitespace *after* the `token` with the byte length
-    pub(crate) fn trailing_whitespace(
-        &self,
-        token: &'a LogicalLineToken,
-    ) -> (Whitespace, TextSize) {
+    fn trailing_whitespace(&self, token: &'a LogicalLineToken) -> (Whitespace, TextSize) {
         Whitespace::leading(self.text_after(token))
     }
 
     /// Returns the whitespace and whitespace byte-length *before* the `token`
-    pub(crate) fn leading_whitespace(&self, token: &'a LogicalLineToken) -> (Whitespace, TextSize) {
+    fn leading_whitespace(&self, token: &'a LogicalLineToken) -> (Whitespace, TextSize) {
         Whitespace::trailing(self.text_before(token))
     }
 
     /// Returns all tokens of the line, including comments and trailing new lines.
-    pub(crate) fn tokens(&self) -> &'a [LogicalLineToken] {
+    fn tokens(&self) -> &'a [LogicalLineToken] {
         &self.lines.tokens[self.line.tokens_start as usize..self.line.tokens_end as usize]
     }
 

@@ -57,10 +57,7 @@ pub(crate) struct FormatFStringLiteralElement<'a> {
 }
 
 impl<'a> FormatFStringLiteralElement<'a> {
-    pub(crate) fn new(
-        element: &'a InterpolatedStringLiteralElement,
-        fstring_flags: AnyStringFlags,
-    ) -> Self {
+    fn new(element: &'a InterpolatedStringLiteralElement, fstring_flags: AnyStringFlags) -> Self {
         Self {
             element,
             fstring_flags,

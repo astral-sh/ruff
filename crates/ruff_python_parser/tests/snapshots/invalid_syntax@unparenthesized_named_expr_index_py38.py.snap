@@ -64,4 +64,3 @@ Module(
 1 | # parse_options: {"target-version": "3.8"}
 2 | lst[x:=1]
   |     ^^^^ Syntax Error: Cannot use unparenthesized assignment expression in a sequence index on Python 3.8 (syntax was added in Python 3.9)
-  |

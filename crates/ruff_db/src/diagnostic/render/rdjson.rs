@@ -86,7 +86,7 @@ fn diagnostic_to_rdjson<'a>(
         message: diagnostic.concise_message(),
         location,
         code: RdjsonCode {
-            value: if config.preview {
+            value: if config.preview && !config.prefer_rule_codes {
                 diagnostic.id().as_str()
             } else {
                 diagnostic.secondary_code_or_id()

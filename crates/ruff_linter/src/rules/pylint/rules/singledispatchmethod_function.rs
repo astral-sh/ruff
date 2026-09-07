@@ -5,6 +5,7 @@ use ruff_python_semantic::analyze::function_type;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::importer::ImportRequest;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
@@ -41,7 +42,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// This rule's fix is marked as unsafe, as migrating from `@singledispatchmethod` to
 /// `@singledispatch` may change the behavior of the code.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.6.0")]
+#[violation_metadata(stable_since = "0.6.0", category = Category::Suspicious)]
 pub(crate) struct SingledispatchmethodFunction;
 
 impl Violation for SingledispatchmethodFunction {

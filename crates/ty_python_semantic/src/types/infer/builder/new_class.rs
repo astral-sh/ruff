@@ -13,7 +13,7 @@ use crate::types::infer::builder::{
     },
 };
 use crate::types::{KnownClass, SubclassOfType, Type, TypeContext, definition_expression_type};
-use ruff_python_ast::{self as ast, HasNodeIndex, NodeIndex};
+use ruff_python_ast as ast;
 use ty_python_core::definition::Definition;
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
@@ -27,6 +27,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         call_expr: &ast::ExprCall,
         definition: Option<Definition<'db>>,
     ) -> Type<'db> {
+        let env = self.program_environment();
         let db = self.db();
 
         let ast::Arguments {
@@ -71,21 +72,21 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             .unwrap_or_else(Type::unknown);
 
         let name = if let Some(literal) = name_type.as_string_literal() {
-            ast::name::Name::new(literal.value(db))
+            literal.value(db)
         } else {
             if let Some(name_node) = name_node
-                && !name_type.is_assignable_to(db, KnownClass::Str.to_instance(db))
+                && !name_type.is_assignable_to(db, env, KnownClass::Str.to_instance(db, env))
                 && let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, name_node)
             {
                 let mut diagnostic = builder.into_diagnostic(
                     "Invalid argument to parameter 1 (`name`) of `types.new_class()`",
                 );
-                diagnostic.set_primary_message(format_args!(
+                diagnostic.set_primary_annotation_message(format_args!(
                     "Expected `str`, found `{}`",
-                    name_type.display(db)
+                    name_type.display(db, env)
                 ));
             }
-            ast::name::Name::new_static("<unknown>")
+            "<unknown>"
         };
 
         // For assigned `new_class()` calls, bases inference is deferred to handle forward
@@ -110,15 +111,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             self.deferred.insert(def);
             DynamicClassAnchor::Definition(def)
         } else {
-            let call_node_index = call_expr.node_index().load();
-            let scope_anchor = scope.node(db).node_index().unwrap_or(NodeIndex::from(0));
-            let anchor_u32 = scope_anchor
-                .as_u32()
-                .expect("scope anchor should not be NodeIndex::NONE");
-            let call_u32 = call_node_index
-                .as_u32()
-                .expect("call node should not be NodeIndex::NONE");
-
             // Use [Unknown] as fallback if bases extraction failed (e.g., not a tuple).
             let anchor_bases = explicit_bases
                 .clone()
@@ -126,7 +118,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
             DynamicClassAnchor::ScopeOffset {
                 scope,
-                offset: call_u32 - anchor_u32,
+                offset: self.dynamic_class_scope_offset(call_expr),
                 explicit_bases: anchor_bases,
             }
         };
@@ -147,7 +139,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let has_exec_body = exec_body_arg.is_some_and(|arg| !arg.is_none_literal_expr());
         let members: Box<[(ast::name::Name, Type<'db>)]> = Box::new([]);
         let dynamic_class =
-            DynamicClassLiteral::new(db, &name, anchor, members, has_exec_body, None);
+            DynamicClassLiteral::new(db, name, anchor, members, has_exec_body, None);
 
         // For dangling calls, validate bases eagerly. For assigned calls, validation is
         // deferred along with bases inference.
@@ -157,7 +149,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             let mut disjoint_bases = self.validate_dynamic_type_bases(
                 bases_arg,
                 explicit_bases,
-                &name,
+                dynamic_class.name(db),
                 DynamicClassKind::NewClass,
             );
 
@@ -189,9 +181,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     call_expr.into(),
                     dynamic_class.name(db),
                     metaclass1,
-                    base1.display(db),
+                    base1.display(db, env),
                     metaclass2,
-                    base2.display(db),
+                    base2.display(db, env),
                 );
             }
         }
@@ -215,7 +207,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         };
 
         // Get the already-inferred class type from the initial pass.
-        let inferred_type = definition_expression_type(db, definition, call_expr);
+        let inferred_type = definition_expression_type(self.db(), definition, call_expr);
         let Type::ClassLiteral(ClassLiteral::Dynamic(dynamic_class)) = inferred_type else {
             return;
         };
@@ -256,20 +248,23 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         definition: Option<Definition<'db>>,
     ) {
         let db = self.db();
+        let env = self.program_environment();
         let callable_type = self.expression_type(call_expr.func.as_ref());
-        let iterable_object = KnownClass::Iterable.to_specialized_instance(db, &[Type::object()]);
+        let iterable_object =
+            KnownClass::Iterable.to_specialized_instance(db, env, &[Type::object()]);
         let mut call_arguments = self.prepare_call_arguments(&call_expr.arguments);
 
-        let mut bindings = callable_type
-            .bindings(db)
-            .match_parameters(db, &call_arguments);
+        let mut bindings =
+            callable_type
+                .bindings(db, env)
+                .match_parameters(db, env, &call_arguments);
         let bindings_result = self.infer_and_check_argument_types(
             ArgumentsIter::from_ast(&call_expr.arguments),
             &mut call_arguments,
             &mut |builder, (_, expr, tcx)| {
                 if name_node.is_some_and(|name| std::ptr::eq(expr, name)) {
                     let _ = builder.infer_expression(expr, tcx);
-                    KnownClass::Str.to_instance(builder.db())
+                    KnownClass::Str.to_instance(db, env)
                 } else if bases_arg.is_some_and(|bases| std::ptr::eq(expr, bases)) {
                     if definition.is_none() {
                         let _ = builder.infer_expression(expr, tcx);

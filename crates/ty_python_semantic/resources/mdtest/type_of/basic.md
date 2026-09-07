@@ -271,7 +271,7 @@ def f(
 ## As a base class
 
 ```py
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 class Foo(type[int]): ...
 
@@ -316,9 +316,8 @@ python-version = "3.12"
 
 ```py
 from typing import final, Any
-from ty_extensions import is_assignable_to, is_subtype_of, is_disjoint_from, static_assert
-
-class Biv[T]: ...
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to, is_subtype_of, is_disjoint_from
 
 class Cov[T]:
     def pop(self) -> T:
@@ -332,9 +331,6 @@ class Inv[T]:
     x: T
 
 @final
-class BivSub[T](Biv[T]): ...
-
-@final
 class CovSub[T](Cov[T]): ...
 
 @final
@@ -344,9 +340,6 @@ class ContraSub[T](Contra[T]): ...
 class InvSub[T](Inv[T]): ...
 
 def _[T, U]():
-    static_assert(is_subtype_of(type[BivSub[T]], type[BivSub[U]]))
-    static_assert(not is_disjoint_from(type[BivSub[U]], type[BivSub[T]]))
-
     # `T` and `U` could specialize to the same type.
     static_assert(not is_subtype_of(type[CovSub[T]], type[CovSub[U]]))
     static_assert(not is_disjoint_from(type[CovSub[U]], type[CovSub[T]]))
@@ -358,12 +351,6 @@ def _[T, U]():
     static_assert(not is_disjoint_from(type[InvSub[U]], type[InvSub[T]]))
 
 def _():
-    static_assert(is_subtype_of(type[BivSub[bool]], type[BivSub[int]]))
-    static_assert(is_subtype_of(type[BivSub[int]], type[BivSub[bool]]))
-    static_assert(not is_disjoint_from(type[BivSub[bool]], type[BivSub[int]]))
-    # `BivSub[int]` and `BivSub[str]` are mutual subtypes.
-    static_assert(not is_disjoint_from(type[BivSub[int]], type[BivSub[str]]))
-
     static_assert(is_subtype_of(type[CovSub[bool]], type[CovSub[int]]))
     static_assert(not is_subtype_of(type[CovSub[int]], type[CovSub[bool]]))
     static_assert(not is_disjoint_from(type[CovSub[bool]], type[CovSub[int]]))
@@ -382,12 +369,6 @@ def _():
     static_assert(is_disjoint_from(type[InvSub[bool]], type[InvSub[int]]))
 
 def _[T]():
-    static_assert(is_subtype_of(type[BivSub[T]], type[BivSub[Any]]))
-    static_assert(is_subtype_of(type[BivSub[Any]], type[BivSub[T]]))
-    static_assert(is_assignable_to(type[BivSub[T]], type[BivSub[Any]]))
-    static_assert(is_assignable_to(type[BivSub[Any]], type[BivSub[T]]))
-    static_assert(not is_disjoint_from(type[BivSub[T]], type[BivSub[Any]]))
-
     static_assert(not is_subtype_of(type[CovSub[T]], type[CovSub[Any]]))
     static_assert(not is_subtype_of(type[CovSub[Any]], type[CovSub[T]]))
     static_assert(is_assignable_to(type[CovSub[T]], type[CovSub[Any]]))
@@ -407,12 +388,6 @@ def _[T]():
     static_assert(not is_disjoint_from(type[InvSub[T]], type[InvSub[Any]]))
 
 def _[T, U]():
-    static_assert(is_subtype_of(type[BivSub[T]], type[Biv[T]]))
-    static_assert(not is_subtype_of(type[Biv[T]], type[BivSub[T]]))
-    static_assert(not is_disjoint_from(type[BivSub[T]], type[Biv[T]]))
-    static_assert(not is_disjoint_from(type[BivSub[U]], type[Biv[T]]))
-    static_assert(not is_disjoint_from(type[BivSub[U]], type[Biv[U]]))
-
     static_assert(is_subtype_of(type[CovSub[T]], type[Cov[T]]))
     static_assert(not is_subtype_of(type[Cov[T]], type[CovSub[T]]))
     static_assert(not is_disjoint_from(type[CovSub[T]], type[Cov[T]]))
@@ -432,11 +407,6 @@ def _[T, U]():
     static_assert(not is_disjoint_from(type[InvSub[U]], type[Inv[U]]))
 
 def _():
-    static_assert(is_subtype_of(type[BivSub[bool]], type[Biv[int]]))
-    static_assert(is_subtype_of(type[BivSub[int]], type[Biv[bool]]))
-    static_assert(not is_disjoint_from(type[BivSub[bool]], type[Biv[int]]))
-    static_assert(not is_disjoint_from(type[BivSub[int]], type[Biv[bool]]))
-
     static_assert(is_subtype_of(type[CovSub[bool]], type[Cov[int]]))
     static_assert(not is_subtype_of(type[CovSub[int]], type[Cov[bool]]))
     static_assert(not is_disjoint_from(type[CovSub[bool]], type[Cov[int]]))
@@ -453,12 +423,6 @@ def _():
     static_assert(is_disjoint_from(type[InvSub[int]], type[Inv[bool]]))
 
 def _[T]():
-    static_assert(is_subtype_of(type[BivSub[T]], type[Biv[Any]]))
-    static_assert(is_subtype_of(type[BivSub[Any]], type[Biv[T]]))
-    static_assert(is_assignable_to(type[BivSub[T]], type[Biv[Any]]))
-    static_assert(is_assignable_to(type[BivSub[Any]], type[Biv[T]]))
-    static_assert(not is_disjoint_from(type[BivSub[T]], type[Biv[Any]]))
-
     static_assert(not is_subtype_of(type[CovSub[T]], type[Cov[Any]]))
     static_assert(not is_subtype_of(type[CovSub[Any]], type[Cov[T]]))
     static_assert(is_assignable_to(type[CovSub[T]], type[Cov[Any]]))
@@ -484,7 +448,8 @@ def _[T]():
 
 ```py
 from typing import Callable, Protocol
-from ty_extensions import is_assignable_to, is_subtype_of, static_assert, TypeOf, Top
+from ty_extensions import static_assert, Top
+from ty_extensions._internal import TypeOf, is_assignable_to, is_subtype_of
 
 class Foo:
     def __init__(self): ...

@@ -1,0 +1,11 @@
+{
+  "name": "playground-deploy",
+  "private": true,
+  "version": "0.0.0",
+  "engines": {
+    "npm": ">=11.10.0"
+  },
+  "devDependencies": {
+    "wrangler": "4.118.0"
+  }
+}

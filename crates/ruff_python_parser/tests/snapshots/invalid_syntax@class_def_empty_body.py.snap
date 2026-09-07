@@ -91,4 +91,3 @@ Module(
 2 | class Foo():
 3 | x = 42
   | ^ Syntax Error: Expected an indented block after `class` definition
-  |

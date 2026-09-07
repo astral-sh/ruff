@@ -243,7 +243,7 @@ pub(crate) fn is_dataclass_meta_annotation(annotation: &Expr, semantic: &Semanti
 /// def fun(arg, verbose=False):
 ///     ...
 /// ```
-pub(crate) fn is_singledispatch_interface(
+fn is_singledispatch_interface(
     function_def: &ast::StmtFunctionDef,
     semantic: &SemanticModel,
 ) -> bool {

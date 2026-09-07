@@ -4,6 +4,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::flake8_async::helpers::AsyncModule;
 
 /// ## What it does
@@ -47,7 +48,7 @@ use crate::rules::flake8_async::helpers::AsyncModule;
 /// - [`anyio` events](https://anyio.readthedocs.io/en/latest/api.html#anyio.Event)
 /// - [`trio` events](https://trio.readthedocs.io/en/latest/reference-core.html#trio.Event)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.5.0")]
+#[violation_metadata(stable_since = "0.5.0", category = Category::Pedantic)]
 pub(crate) struct AsyncBusyWait {
     module: AsyncModule,
 }

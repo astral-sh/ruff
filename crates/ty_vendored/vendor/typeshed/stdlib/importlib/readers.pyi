@@ -16,7 +16,7 @@ from _typeshed import StrPath
 from collections.abc import Iterable, Iterator
 from importlib._bootstrap_external import FileLoader
 from io import BufferedReader
-from typing import Literal, NoReturn, TypeVar
+from typing import Literal, TypeVar
 from typing_extensions import Never
 from zipimport import zipimporter
 
@@ -68,8 +68,8 @@ class MultiplexedPath(abc.Traversable):
 
     def __init__(self, *paths: abc.Traversable) -> None: ...
     def iterdir(self) -> Iterator[abc.Traversable]: ...
-    def read_bytes(self) -> NoReturn: ...
-    def read_text(self, *args: Never, **kwargs: Never) -> NoReturn: ...  # type: ignore[override]
+    def read_bytes(self) -> Never: ...
+    def read_text(self, *args: Never, **kwargs: Never) -> Never: ...  # type: ignore[override]
     def is_dir(self) -> Literal[True]: ...
     def is_file(self) -> Literal[False]: ...
 
@@ -83,7 +83,7 @@ class MultiplexedPath(abc.Traversable):
     if sys.version_info < (3, 12):
         __truediv__ = joinpath
 
-    def open(self, *args: Never, **kwargs: Never) -> NoReturn: ...  # type: ignore[override]
+    def open(self, *args: Never, **kwargs: Never) -> Never: ...  # type: ignore[override]
     @property
     def name(self) -> str: ...
 

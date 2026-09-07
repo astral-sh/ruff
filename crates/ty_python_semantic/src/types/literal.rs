@@ -1,3 +1,4 @@
+use crate::ProgramEnvironment;
 use bitflags::bitflags;
 use compact_str::CompactString;
 use ruff_python_ast::name::Name;
@@ -10,14 +11,14 @@ use ty_python_core::definition::Definition;
 use ty_python_core::{place_table, use_def_map};
 
 /// A literal value. See [`LiteralValueTypeKind`] for details.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub struct LiteralValueType<'db>(LiteralValueTypeInner<'db>);
 
 /// Each variant carries a [`LiteralFlags`] byte alongside its payload.
 /// Because the flags byte fits into the padding between the enum discriminant
 /// (1 byte) and the 4-byte-aligned payload, the overall size of this enum
 /// stays at 12 bytes, the same as the original flagless representation.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 enum LiteralValueTypeInner<'db> {
     Int(IntLiteralType, LiteralFlags),
     Bool(bool, LiteralFlags),
@@ -32,7 +33,7 @@ bitflags! {
     ///
     /// Stored in each [`LiteralValueTypeInner`] variant, fitting into the
     /// discriminant's padding so that the enum size is unchanged.
-    #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
+    #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
     struct LiteralFlags: u8 {
         const PROMOTABLE = 1 << 0;
         const RECURSIVELY_DEFINED = 1 << 1;
@@ -72,7 +73,7 @@ impl LiteralFlags {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) enum LiteralValueTypeKind<'db> {
     /// An integer literal
     Int(IntLiteralType),
@@ -247,15 +248,19 @@ impl<'db> LiteralValueType<'db> {
         matches!(self.kind(), LiteralValueTypeKind::Bytes(..))
     }
 
-    pub(crate) fn fallback_instance(self, db: &'db dyn Db) -> Type<'db> {
+    pub(crate) fn fallback_instance(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Type<'db> {
         match self.kind() {
             LiteralValueTypeKind::String(_) | LiteralValueTypeKind::LiteralString => {
-                KnownClass::Str.to_instance(db)
+                KnownClass::Str.to_instance(db, env)
             }
-            LiteralValueTypeKind::Bool(_) => KnownClass::Bool.to_instance(db),
-            LiteralValueTypeKind::Int(_) => KnownClass::Int.to_instance(db),
-            LiteralValueTypeKind::Bytes(_) => KnownClass::Bytes.to_instance(db),
-            LiteralValueTypeKind::Enum(literal) => literal.enum_class_instance(db),
+            LiteralValueTypeKind::Bool(_) => KnownClass::Bool.to_instance(db, env),
+            LiteralValueTypeKind::Int(_) => KnownClass::Int.to_instance(db, env),
+            LiteralValueTypeKind::Bytes(_) => KnownClass::Bytes.to_instance(db, env),
+            LiteralValueTypeKind::Enum(literal) => literal.enum_class_instance(db, env),
         }
     }
 }
@@ -298,7 +303,7 @@ impl<'db> From<LiteralValueType<'db>> for Type<'db> {
 
 // This type has the same alignment as `salsa::Id`, allowing `LiteralValueType` to use a smaller
 // discriminant.
-#[derive(Copy, Clone, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub(crate) struct IntLiteralType {
     high: u32,
     low: u32,
@@ -387,6 +392,7 @@ impl<'db> BytesLiteralType<'db> {
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct EnumLiteralType<'db> {
     /// The enum class this literal belongs to.
+    #[returns(copy)]
     pub(crate) enum_class_literal: EnumClassLiteral<'db>,
     /// The name of the enum member
     #[returns(ref)]
@@ -401,8 +407,12 @@ impl<'db> EnumLiteralType<'db> {
         self.enum_class_literal(db).class_literal(db)
     }
 
-    pub(crate) fn enum_class_instance(self, db: &'db dyn Db) -> Type<'db> {
-        self.enum_class(db).to_non_generic_instance(db)
+    pub(crate) fn enum_class_instance(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Type<'db> {
+        self.enum_class(db).to_non_generic_instance(db, env)
     }
 
     pub(crate) fn definition(self, db: &'db dyn Db) -> Option<Definition<'db>> {

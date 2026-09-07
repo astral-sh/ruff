@@ -6,7 +6,9 @@ use indexmap::IndexSet;
 use log::{debug, warn};
 use path_absolutize::CWD;
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
-use ruff_graph::{Direction, ImportMap, ModuleDb, ModuleImports};
+use ruff_graph::{
+    Direction, ImportMap, ModuleDb, ModuleImports, ResolverEnvironment, resolve_search_paths,
+};
 use ruff_linter::package::PackageRoot;
 use ruff_linter::source_kind::SourceKind;
 use ruff_linter::{warn_user, warn_user_once};
@@ -96,18 +98,14 @@ pub(crate) fn analyze_graph(
     );
 
     let system = OsSystem::default();
-    let db = ModuleDb::from_src_roots(
-        system,
+    let search_paths = resolve_search_paths(
+        &system,
         src_roots.into_iter().collect(),
-        pyproject_config
-            .settings
-            .analyze
-            .target_version
-            .as_tuple()
-            .into(),
         args.python
             .and_then(|python| SystemPathBuf::from_path_buf(python).ok()),
     )?;
+    let db = ModuleDb::new(system);
+    search_paths.try_register_static_roots(&db);
 
     let imports = {
         // Create a cache for resolved globs.
@@ -117,6 +115,7 @@ pub(crate) fn analyze_graph(
         let result = Arc::new(Mutex::new(Vec::new()));
         let inner_result = Arc::clone(&result);
         let db = db.clone();
+        let search_paths = &search_paths;
 
         rayon::scope(move |scope| {
             for resolved_file in paths {
@@ -135,6 +134,7 @@ pub(crate) fn analyze_graph(
                 let string_imports = settings.analyze.string_imports;
                 let include_dependencies = settings.analyze.include_dependencies.get(path).cloned();
                 let type_checking_imports = settings.analyze.type_checking_imports;
+                let python_version = settings.analyze.target_version;
                 let source_type = settings.analyze.extension.get_source_type(path);
 
                 // Skip excluded files.
@@ -176,13 +176,13 @@ pub(crate) fn analyze_graph(
                         }
                     };
 
-                    let source_code = source_kind.source_code();
+                    let environment = ResolverEnvironment::new(&db, python_version, search_paths);
 
                     // Identify any imports via static analysis.
                     let mut imports = ModuleImports::detect(
                         &db,
-                        source_code,
-                        source_type.expect_python(),
+                        environment,
+                        &source_kind,
                         &path,
                         package.as_deref(),
                         string_imports,

@@ -130,7 +130,6 @@ NPY001 [*] Type alias `np.float` is deprecated, replace with builtin type
 24 |
 25 | float(1)
    | ^^^^^
-   |
 help: Replace `np.float` with builtin type
    |
 23 | from numpy import float

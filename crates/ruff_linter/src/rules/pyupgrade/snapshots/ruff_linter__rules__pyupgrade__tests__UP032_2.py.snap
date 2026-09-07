@@ -426,7 +426,6 @@ UP032 [*] Use f-string instead of `format` call
 32 | "{0.real}".format(1_2)
 33 | "{a.real}".format(a=1_2)
    | ^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Convert to f-string
    |
 32 | "{0.real}".format(1_2)

@@ -1,12 +1,12 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::helpers::{contains_effect, is_empty_f_string};
+use ruff_python_ast::helpers::is_empty_f_string;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_codegen::Generator;
-use ruff_python_semantic::SemanticModel;
 use ruff_python_trivia::CommentRanges;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -33,13 +33,13 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 ///
 /// ## Fix safety
 /// This fix is marked as unsafe if it removes comments or an unused `sep` keyword argument
-/// that may have side effects. Removing such arguments may change the program's
-/// behavior by skipping the execution of those side effects.
+/// that is not known to be a valid separator. Removing such arguments may change the
+/// program's behavior by skipping their evaluation or hiding a `TypeError`.
 ///
 /// ## References
 /// - [Python documentation: `print`](https://docs.python.org/3/library/functions.html#print)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.5.0")]
+#[violation_metadata(stable_since = "0.5.0", category = Category::Complexity)]
 pub(crate) struct PrintEmptyString {
     reason: Reason,
 }
@@ -98,7 +98,6 @@ pub(crate) fn print_empty_string(checker: &Checker, call: &ast::ExprCall) {
                 EmptyStringFix::from_call(
                     call,
                     Separator::Remove,
-                    checker.semantic(),
                     checker.generator(),
                     checker.comment_ranges(),
                 )
@@ -125,7 +124,6 @@ pub(crate) fn print_empty_string(checker: &Checker, call: &ast::ExprCall) {
                     EmptyStringFix::from_call(
                         call,
                         Separator::Remove,
-                        checker.semantic(),
                         checker.generator(),
                         checker.comment_ranges(),
                     )
@@ -191,7 +189,6 @@ pub(crate) fn print_empty_string(checker: &Checker, call: &ast::ExprCall) {
                 EmptyStringFix::from_call(
                     call,
                     separator,
-                    checker.semantic(),
                     checker.generator(),
                     checker.comment_ranges(),
                 )
@@ -210,6 +207,10 @@ fn is_empty_string(expr: &Expr) -> bool {
     }
 }
 
+fn is_known_valid_separator(expr: &Expr) -> bool {
+    expr.is_string_literal_expr() || expr.is_none_literal_expr()
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Separator {
     Remove,
@@ -225,7 +226,6 @@ impl EmptyStringFix {
     fn from_call(
         call: &ast::ExprCall,
         separator: Separator,
-        semantic: &SemanticModel,
         generator: Generator,
         comment_ranges: &CommentRanges,
     ) -> Self {
@@ -262,7 +262,7 @@ impl EmptyStringFix {
                         return true;
                     }
 
-                    if contains_effect(&keyword.value, |id| semantic.has_builtin_binding(id)) {
+                    if !is_known_valid_separator(&keyword.value) {
                         applicability = Applicability::Unsafe;
                     }
 

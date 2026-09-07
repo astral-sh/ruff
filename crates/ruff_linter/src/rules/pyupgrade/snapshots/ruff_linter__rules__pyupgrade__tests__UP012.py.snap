@@ -468,7 +468,6 @@ UP012 [*] Unnecessary UTF-8 `encoding` argument to `encode`
 76 | ("unicode text©").encode("utf-8")
 77 | ("unicode text©").encode(encoding="utf-8")
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Remove unnecessary `encoding` argument
    |
 76 | ("unicode text©").encode("utf-8")
@@ -800,7 +799,6 @@ UP012 [*] Unnecessary call to `encode` as UTF-8
 119 |
 120 | '\\ u0000 '.encode()
     | ^^^^^^^^^^^^^^^^^^^^
-    |
 help: Rewrite as bytes literal
     |
 119 |

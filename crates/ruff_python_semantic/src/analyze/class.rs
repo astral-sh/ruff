@@ -157,16 +157,6 @@ pub enum ClassMemberBoundness {
     Bound,
 }
 
-impl ClassMemberBoundness {
-    pub const fn is_bound(self) -> bool {
-        matches!(self, Self::Bound)
-    }
-
-    pub const fn is_possibly_unbound(self) -> bool {
-        matches!(self, Self::PossiblyUnbound)
-    }
-}
-
 #[derive(Copy, Clone, Debug)]
 pub enum ClassMemberKind<'a> {
     Assign(&'a ast::StmtAssign),

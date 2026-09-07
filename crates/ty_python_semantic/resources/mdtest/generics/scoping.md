@@ -28,6 +28,72 @@ def f() -> None:
     x: T
 ```
 
+## Constructor calls require bound type variables
+
+A type argument in a constructor call must be bound in an enclosing generic scope. Assigning the
+result to a variable does not introduce a generic context, and nested type arguments follow the same
+rule.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+# error: [unbound-type-variable]
+list[T]()
+# error: [unbound-type-variable]
+items = list[T]()
+# error: [unbound-type-variable]
+list[list[T]]()
+
+class Box(Generic[T]): ...
+
+# error: [unbound-type-variable]
+Box[T]()
+```
+
+Generic functions and classes can use their own type variables when calling constructors.
+
+```py
+def make(value: T) -> list[T]:
+    result = list[T]([value])
+    reveal_type(result)  # revealed: list[T@make]
+    return result
+
+class Factory(Generic[T]):
+    def make(self, value: T) -> list[T]:
+        return list[T]([value])
+
+def modern[T](value: T) -> list[T]:
+    return list[T]([value])
+```
+
+An alias assignment or a class base can introduce a generic context. Calling a generic alias without
+explicit type arguments also remains valid.
+
+```py
+Alias = list[T]
+reveal_type(Alias[int]())  # revealed: list[int]
+Alias()
+
+class Derived(list[T]): ...
+```
+
+## Constructor calls in stubs
+
+Constructor calls in stubs follow the same scoping rules as calls in Python source files.
+
+```pyi
+from typing import TypeVar
+
+T = TypeVar("T")
+
+# error: [unbound-type-variable]
+list[T]()
+# error: [unbound-type-variable]
+items = list[T]()
+```
+
 ## Legacy typevar used multiple times
 
 > A type variable used in a generic function could be inferred to represent different types in the
@@ -87,6 +153,88 @@ c.m2(1)
 c.m2("string")
 ```
 
+## Passing bounded class typevars to broader parameters
+
+A class typevar is fixed by the receiver. Passing it to an `object` parameter must not infer a new
+specialization of the class typevar from that parameter's annotation.
+
+```py
+class G[T: int]:
+    def takes_object(self, value: object) -> None: ...
+    def echo(self, value: T) -> T:
+        return value
+
+    def caller(self, value: T, other: "G[int]") -> None:
+        self.takes_object(value)
+        other.takes_object(value)
+        reveal_type(self.echo(value))  # revealed: T@G
+        # error: [invalid-argument-type] "Expected `int`"
+        other.echo("bad")
+
+    def explicit_receiver(self: "G[T]", value: T) -> None:
+        self.takes_object(value)
+```
+
+The same applies to classmethods and to membership tests, which call `__contains__`.
+
+```py
+class Container[T: int]:
+    @classmethod
+    def takes_object(cls, value: object) -> None: ...
+    def __contains__(self, value: object) -> bool:
+        return False
+
+    def caller(self, value: T) -> None:
+        self.takes_object(value)
+        self.__contains__(value)
+        reveal_type(value in self)  # revealed: bool
+```
+
+## Passing class typevars to a superclass of their bound
+
+The parameter need not be `object`: any superclass of the typevar's bound accepts its values.
+
+```py
+class Base: ...
+class Child(Base): ...
+
+class G[T: Child]:
+    def takes_base(self, value: Base) -> None: ...
+    def caller(self, value: T) -> None:
+        self.takes_base(value)
+```
+
+## Passing constrained class typevars to broader parameters
+
+Every allowed specialization is assignable to `object`, without selecting one of the constraints
+again at the method call.
+
+```py
+class G[T: (int, str)]:
+    def takes_object(self, value: object) -> None: ...
+    def echo(self, value: T) -> T:
+        return value
+
+    def caller(self, value: T) -> None:
+        self.takes_object(value)
+        reveal_type(self.echo(value))  # revealed: T@G
+```
+
+## Passing legacy class typevars to broader parameters
+
+Legacy class typevars follow the same rule.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T", bound=int)
+
+class G(Generic[T]):
+    def takes_object(self, value: object) -> None: ...
+    def caller(self, value: T) -> None:
+        self.takes_object(value)
+```
+
 ## Functions on generic classes are descriptors
 
 This repeats the tests in the [Functions as descriptors](./call/methods.md) test suite, but on a
@@ -116,7 +264,7 @@ reveal_type(bound_method.__func__)  # revealed: def f(self, x: int) -> str
 reveal_type(C[int]().f(1))  # revealed: str
 reveal_type(bound_method(1))  # revealed: str
 
-# error: [invalid-argument-type] "Argument to function `C.f` is incorrect: Argument type `Literal[1]` does not satisfy upper bound `C[T@C]` of type variable `Self`"
+# error: [invalid-argument-type] "Argument to function `C.f` is incorrect: Argument type `Literal[1]` does not satisfy upper bound `C[int]` of type variable `Self`"
 C[int].f(1)  # error: [missing-argument]
 reveal_type(C[int].f(C[int](), 1))  # revealed: str
 
@@ -149,13 +297,13 @@ The class typevar in the method signature does not bind a _new_ instance of the 
 already solved and specialized when the class was specialized:
 
 ```py
-from ty_extensions import generic_context
+from ty_extensions._internal import generic_context
 
 legacy.m("string", None)  # error: [invalid-argument-type]
 reveal_type(legacy.m)  # revealed: bound method Legacy[int].m[S](x: int, y: S) -> S
-# revealed: ty_extensions.GenericContext[T@Legacy]
+# revealed: ty_extensions._internal.GenericContext[T@Legacy]
 reveal_type(generic_context(Legacy))
-# revealed: ty_extensions.GenericContext[Self@m, S@m]
+# revealed: ty_extensions._internal.GenericContext[Self@m, S@m]
 reveal_type(generic_context(legacy.m))
 ```
 
@@ -230,7 +378,7 @@ error on the following snippet, but we may change this in the future.
 
 ```py
 from typing import TypeVar, Callable
-from ty_extensions import generic_context
+from ty_extensions._internal import generic_context
 
 T = TypeVar("T")
 
@@ -287,6 +435,29 @@ def f[T](x: T, y: T) -> None:
 
     # error: [shadowed-type-variable]
     def bad[T](a: T, b: T) -> None: ...
+```
+
+### Generic TypeVarTuple within generic function
+
+```py
+def outer[*Ts](*args: *Ts) -> None:
+    def ok[*Us](*ok_args: *Us) -> None: ...
+
+    # snapshot: shadowed-type-variable
+    def bad[*Ts](*bad_args: *Ts) -> None: ...
+```
+
+```snapshot
+error[shadowed-type-variable]: Generic function `bad` uses TypeVarTuple `Ts` already bound by an enclosing scope
+ --> src/mdtest_snippet.py:5:9
+  |
+5 |     def bad[*Ts](*bad_args: *Ts) -> None: ...
+  |         ^^^ `Ts` used in function definition here
+  |
+ ::: src/mdtest_snippet.py:1:5
+  |
+1 | def outer[*Ts](*args: *Ts) -> None:
+  |     ------------------------------ TypeVarTuple `Ts` is bound in this enclosing scope
 ```
 
 ### Generic method within generic class
@@ -546,7 +717,7 @@ parameters from the enclosing class.
 ```py
 from typing import Generic, TypeVar
 
-from ty_extensions import into_regular_callable
+from ty_extensions._internal import into_regular_callable
 
 T = TypeVar("T")
 S = TypeVar("S")

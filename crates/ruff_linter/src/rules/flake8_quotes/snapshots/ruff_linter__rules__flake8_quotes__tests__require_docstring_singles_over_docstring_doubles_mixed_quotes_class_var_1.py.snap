@@ -28,5 +28,4 @@ Q002 Double quote docstring found but single quotes preferred
 8 |
 9 |     class Nested(foo()[:]): ""'Start with empty string' ' and lint docstring safely'; pass
   |                             ^^
-  |
 help: Replace double quotes docstring with single quotes

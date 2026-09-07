@@ -1,33 +1,35 @@
 use std::collections::HashMap;
 
 use crate::FxIndexSet;
-use crate::place::builtins_module_scope;
+use crate::place::implicit_builtins_symbol_scope;
 use crate::reachability::is_range_reachable;
+use crate::types::call::bind::CheckTypesMode;
 use crate::types::call::{CallArguments, CallError, MatchedArgument};
 use crate::types::class::{DynamicClassAnchor, DynamicEnumAnchor, DynamicNamedTupleAnchor};
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::signatures::{ParametersKind, Signature};
 use crate::types::{
-    CallDunderError, CallableTypes, ClassBase, ClassLiteral, ClassType, KnownClass, KnownFunction,
-    KnownUnion, Type, TypeContext,
+    CallDunderError, CallableTypes, ClassBase, ClassLiteral, KnownClass, KnownFunction, KnownUnion,
+    PropertyAccessorRole, Type, TypeContext, TypeVarBoundOrConstraints, binding_type,
 };
-use crate::{Db, DisplaySettings, HasDefinition, HasType, SemanticModel};
-use itertools::Either;
+use crate::{Db, HasDefinition, HasType, ProgramEnvironment, SemanticModel};
 use ruff_db::files::FileRange;
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::source_text;
 use ruff_python_ast::{self as ast, AnyNodeRef, name::Name};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
+use ty_module_resolver::{ImportingFile, Module, ResolverFile};
 use ty_python_core::definition::{Definition, DefinitionKind};
-use ty_python_core::{attribute_scopes, global_scope, semantic_index, use_def_map};
+use ty_python_core::{ProgramFile, attribute_scopes, semantic_index, use_def_map};
 
 mod unreachable_code;
 #[path = "ide_support/unused_bindings.rs"]
 mod unused_binding_support;
 
-pub use resolve_definition::{ImportAliasResolution, ResolvedDefinition, map_stub_definition};
-use resolve_definition::{find_symbol_in_scope, resolve_definition};
+use crate::types::definition_resolution::{self, user_visible_definitions};
+pub use crate::types::definition_resolution::{ImportAliasResolution, ResolvedDefinition};
+pub use stub_mapping::map_stub_definition;
 pub use unreachable_code::{UnreachableKind, UnreachableRange, unreachable_ranges};
 pub use unused_binding_support::{UnusedBinding, unused_bindings};
 
@@ -51,8 +53,7 @@ pub fn definition_for_name<'db>(
     None
 }
 
-/// Returns all definitions for a name. If any definitions are imports, they
-/// are resolved (recursively) to the original definitions or module files.
+/// Returns definitions for IDE navigation, expanding numeric annotations to their accepted classes.
 pub fn definitions_for_name<'db>(
     model: &SemanticModel<'db>,
     name_str: &str,
@@ -60,256 +61,387 @@ pub fn definitions_for_name<'db>(
     alias_resolution: ImportAliasResolution,
 ) -> Vec<ResolvedDefinition<'db>> {
     let db = model.db();
-    let file = model.file();
-    let index = semantic_index(db, file);
+    let env = model.program_environment();
 
     // Get the scope for this name expression
-    let Some(file_scope) = model.scope(node) else {
+    let Some(scope) = model.scope(node) else {
         return vec![];
     };
-
-    let mut all_definitions = FxIndexSet::default();
-
-    // Search through the scope hierarchy: start from the current scope and
-    // traverse up through parent scopes to find definitions
-    for (scope_id, _scope) in index.visible_ancestor_scopes(file_scope) {
-        let place_table = index.place_table(scope_id);
-
-        let Some(symbol_id) = place_table.symbol_id(name_str) else {
-            continue; // Name not found in this scope, try parent scope
-        };
-
-        // Check if this place is marked as global or nonlocal
-        let place_expr = place_table.symbol(symbol_id);
-        let is_global = place_expr.is_global();
-        let is_nonlocal = place_expr.is_nonlocal();
-
-        // TODO: The current algorithm doesn't return definitions or bindings
-        // for other scopes that are outside of this scope hierarchy that target
-        // this name using a nonlocal or global binding. The semantic analyzer
-        // doesn't appear to track these in a way that we can easily access
-        // them from here without walking all scopes in the module.
-
-        // If marked as global, skip to global scope
-        if is_global {
-            let global_scope_id = global_scope(db, file);
-            let global_place_table = ty_python_core::place_table(db, global_scope_id);
-
-            if let Some(global_symbol_id) = global_place_table.symbol_id(name_str) {
-                let global_use_def_map = ty_python_core::use_def_map(db, global_scope_id);
-                all_definitions.extend(reachable_definitions(
-                    db,
-                    global_use_def_map
-                        .reachable_symbol_bindings(global_symbol_id)
-                        .filter_map(|binding| binding.binding.definition())
-                        .chain(
-                            global_use_def_map
-                                .reachable_symbol_declarations(global_symbol_id)
-                                .filter_map(|declaration| declaration.declaration.definition()),
-                        ),
-                ));
-            }
-            break;
-        }
-
-        // If marked as nonlocal, skip current scope and search in ancestor scopes
-        if is_nonlocal {
-            // Continue searching in parent scopes, but skip the current scope
-            continue;
-        }
-
-        let use_def_map = index.use_def_map(scope_id);
-
-        // Get all definitions (both bindings and declarations) for this place
-        all_definitions.extend(reachable_definitions(
-            db,
-            use_def_map
-                .reachable_symbol_bindings(symbol_id)
-                .filter_map(|binding| binding.binding.definition())
-                .chain(
-                    use_def_map
-                        .reachable_symbol_declarations(symbol_id)
-                        .filter_map(|declaration| declaration.declaration.definition()),
-                ),
-        ));
-
-        // If we found definitions in this scope, we can stop searching
-        if !all_definitions.is_empty() {
-            break;
-        }
-    }
-
-    // Resolve import definitions to their targets
-    let mut resolved_definitions = Vec::new();
-
-    for definition in &all_definitions {
-        let resolved = resolve_definition(db, *definition, Some(name_str), alias_resolution);
-        resolved_definitions.extend(resolved);
+    let scope = scope.to_scope_id(db, model.program_file());
+    let definitions =
+        definition_resolution::scoped_definitions_for_name(db, scope, name_str, alias_resolution);
+    if !definitions.is_empty() {
+        return definitions;
     }
 
     // If we didn't find any definitions in scopes, fallback to builtins
-    if resolved_definitions.is_empty()
-        && let Some(builtins_scope) = builtins_module_scope(db)
+    let Some(builtins_scope) = implicit_builtins_symbol_scope(db, &env, name_str) else {
+        return vec![];
+    };
+    // Special cases for `float` and `complex` in type annotation positions.
+    // We don't know whether we're in a type annotation position, so we'll just ask `Name`'s type,
+    // which resolves to `int | float` or `int | float | complex` if `float` or `complex` is used in
+    // a type annotation position and `float` or `complex` otherwise.
+    //
+    // https://typing.python.org/en/latest/spec/special-types.html#special-cases-for-float-and-complex
+    //
+    // Only numeric builtins need expression inference to distinguish annotations from runtime values.
+    if matches!(name_str, "float" | "complex")
+        && let Some(expr) = node.expr_name()
+        && let Some(ty) = expr.inferred_type(model)
+        && let Some(union) = ty.as_union()
+        && matches!(
+            (name_str, union.known(db)),
+            ("float", Some(KnownUnion::Float)) | ("complex", Some(KnownUnion::Complex))
+        )
     {
-        // Special cases for `float` and `complex` in type annotation positions.
-        // We don't know whether we're in a type annotation position, so we'll just ask `Name`'s type,
-        // which resolves to `int | float` or `int | float | complex` if `float` or `complex` is used in
-        // a type annotation position and `float` or `complex` otherwise.
-        //
-        // https://typing.python.org/en/latest/spec/special-types.html#special-cases-for-float-and-complex
-        if let Some(expr) = node.expr_name()
-            && let Some(ty) = expr.inferred_type(model)
-            && let Some(union) = ty.as_union()
-            && matches!(
-                (name_str, union.known(db)),
-                ("float", Some(KnownUnion::Float)) | ("complex", Some(KnownUnion::Complex))
-            )
-        {
-            return union
-                .elements(db)
-                .iter()
-                // Use `rev` so that `complex` and `float` come first.
-                // This is required for hover to pick up the docstring of `complex` and `float`
-                // instead of `int` (hover only shows the docstring of the first definition).
-                .rev()
-                .filter_map(|ty| ty.as_nominal_instance())
-                .filter_map(|instance| {
-                    let definition = instance.class_literal(db).definition(db)?;
-                    Some(ResolvedDefinition::Definition(definition))
-                })
-                .collect();
-        }
-
-        find_symbol_in_scope(db, builtins_scope, name_str)
-            .into_iter()
-            .filter(|def| def.is_reexported(db))
-            .flat_map(|def| {
-                resolve_definition(
-                    db,
-                    def,
-                    Some(name_str),
-                    ImportAliasResolution::ResolveAliases,
-                )
+        return union
+            .elements(db)
+            .iter()
+            // Use `rev` so that `complex` and `float` come first.
+            // This is required for hover to pick up the docstring of `complex` and `float`
+            // instead of `int` (hover only shows the docstring of the first definition).
+            .rev()
+            .filter_map(|ty| ty.as_nominal_instance())
+            .filter_map(|instance| {
+                let definition = instance.class_literal(db, &env).definition(db)?;
+                Some(ResolvedDefinition::Definition(definition))
             })
-            .collect()
-    } else {
-        resolved_definitions
+            .collect();
     }
+
+    definition_resolution::definitions_for_builtin(db, builtins_scope, name_str)
 }
 
-/// Returns all resolved definitions for an attribute expression `x.y`.
-/// This function duplicates much of the functionality in the semantic
-/// analyzer, but it has somewhat different behavior so we've decided
-/// to keep it separate for now. One key difference is that this function
-/// doesn't model the descriptor protocol when accessing attributes.
-/// For "go to definition", we want to get the type of the descriptor object
-/// rather than "invoking" its `__get__` or `__set__` method.
-/// If this becomes a maintenance burden in the future, it may be worth
-/// changing the corresponding logic in the semantic analyzer to conditionally
-/// handle this case through the use of mode flags.
+/// Returns definitions for an attribute expression, inferring its receiver through the IDE model.
 pub fn definitions_for_attribute<'db>(
     model: &SemanticModel<'db>,
     attribute: &ast::ExprAttribute,
 ) -> Vec<ResolvedDefinition<'db>> {
-    let db = model.db();
-    let name_str = attribute.attr.as_str();
-
-    let mut resolved = Vec::new();
-
     // Determine the type of the LHS
     let Some(lhs_ty) = attribute.value.inferred_type(model) else {
-        return resolved;
+        return vec![];
     };
+    definition_resolution::definitions_for_attribute(
+        model.db(),
+        &model.program_environment(),
+        lhs_ty,
+        attribute.attr.as_str(),
+    )
+}
 
-    let tys = match lhs_ty {
-        Type::Union(union) => union.elements(model.db()),
-        _ => std::slice::from_ref(&lhs_ty),
-    };
+/// A prepared implementation search.
+///
+/// Preparing the finder resolves the class roots and the implementations selected for those roots.
+/// Candidate subclasses can then be scanned one file at a time.
+pub struct ImplementationsFinder<'db> {
+    /// Definitions selected directly for the goto target's roots:
+    /// - Root class definitions for a class-family search
+    /// - Definitions found through each root's MRO for a member-family search.
+    initial_definitions: Vec<ResolvedDefinition<'db>>,
 
-    // Expand intersections for each subtype into their components
-    let expanded_tys = tys
-        .iter()
-        .flat_map(|ty| match ty {
-            Type::Intersection(intersection) => Either::Left(intersection.positive(db).iter()),
-            _ => Either::Right(std::iter::once(ty)),
-        })
-        .copied();
+    /// Classes whose known subclasses should be scanned for additional implementations.
+    roots: FxHashSet<ClassLiteral<'db>>,
 
-    for ty in expanded_tys {
-        // Handle modules
-        if let Type::ModuleLiteral(module_literal) = ty {
-            if let Some(module_file) = module_literal.module(db).file(db) {
-                let module_scope = global_scope(db, module_file);
-                for def in find_symbol_in_scope(db, module_scope, name_str) {
-                    resolved.extend(resolve_definition(
-                        db,
-                        def,
-                        Some(name_str),
-                        ImportAliasResolution::ResolveAliases,
-                    ));
+    /// Whether scanning should return subclass definitions or same-named members on subclasses.
+    kind: ImplementationsFinderKind,
+}
+
+enum ImplementationsFinderKind {
+    ClassFamily,
+    MemberFamily {
+        name: Name,
+        accessor_role: Option<PropertyAccessorRole>,
+    },
+}
+
+impl<'db> ImplementationsFinder<'db> {
+    /// Creates a class-family finder from resolved class roots.
+    fn for_class_roots(db: &'db dyn Db, roots: Vec<ClassLiteral<'db>>) -> Self {
+        let mut initial_definitions = Vec::new();
+        for root in &roots {
+            if let Some(definition) = root.definition(db) {
+                let resolved = ResolvedDefinition::Definition(definition);
+                if !initial_definitions.contains(&resolved) {
+                    initial_definitions.push(resolved);
                 }
             }
-            continue;
         }
 
-        // Prevent lookup on BoundSuper proxy object
-        if matches!(ty, Type::BoundSuper(_)) {
-            continue;
-        }
-
-        let meta_type = ty.to_meta_type(db);
-
-        // Look up the attribute first on the meta-type, unless it's already a class-like type.
-        let lookup_type = match ty {
-            Type::ClassLiteral(_) | Type::SubclassOf(_) | Type::GenericAlias(_) => ty,
-            _ => meta_type,
-        };
-
-        let class_literal = match lookup_type {
-            Type::ClassLiteral(class_literal) => class_literal,
-            Type::SubclassOf(subclass) => match subclass.subclass_of().into_class(db) {
-                Some(cls) => match cls.static_class_literal(db) {
-                    Some((lit, _)) => ClassLiteral::Static(lit),
-                    None => continue,
-                },
-                None => continue,
-            },
-            _ => continue,
-        };
-
-        resolved.extend(definitions_for_attribute_in_class_hierarchy(
-            &class_literal,
-            model,
-            name_str,
-        ));
-
-        // The metaclass of a derived class must be a subclass of the metaclasses of all of
-        // its base classes. This is why we only have to look at the metaclass of the
-        // class_literal.
-        // Only look up definitions on the metaclass if the type is a class object to begin with in
-        // order to prevent looking up instance members on the class metaclass
-        if resolved.is_empty() && meta_type != lookup_type {
-            let class_literal = match meta_type {
-                Type::ClassLiteral(class_literal) => class_literal,
-                Type::SubclassOf(subclass) => match subclass.subclass_of().into_class(db) {
-                    Some(cls) => match cls.static_class_literal(db) {
-                        Some((lit, _)) => ClassLiteral::Static(lit),
-                        None => continue,
-                    },
-                    None => continue,
-                },
-                _ => continue,
-            };
-
-            resolved.extend(definitions_for_attribute_in_class_hierarchy(
-                &class_literal,
-                model,
-                name_str,
-            ));
+        Self {
+            initial_definitions,
+            roots: roots.into_iter().collect(),
+            kind: ImplementationsFinderKind::ClassFamily,
         }
     }
 
-    resolved
+    /// Creates a member-family finder for roots that resolve the member through their MRO.
+    fn for_member_roots(
+        db: &'db dyn Db,
+        roots: Vec<ClassLiteral<'db>>,
+        member_name: Name,
+        accessor_role: Option<PropertyAccessorRole>,
+    ) -> Option<Self> {
+        let mut initial_definitions = Vec::new();
+        let mut family_roots = FxHashSet::default();
+
+        for root in roots {
+            // Avoid scanning every known subclass when the member doesn't resolve on this root.
+            let Some(root_definitions) =
+                mro_member_definitions(db, root, member_name.as_str(), accessor_role)
+            else {
+                continue;
+            };
+
+            for definition in root_definitions {
+                if !initial_definitions.contains(&definition) {
+                    initial_definitions.push(definition);
+                }
+            }
+
+            family_roots.insert(root);
+        }
+
+        if family_roots.is_empty() {
+            return None;
+        }
+
+        Some(Self {
+            initial_definitions,
+            roots: family_roots,
+            kind: ImplementationsFinderKind::MemberFamily {
+                name: member_name,
+                accessor_role,
+            },
+        })
+    }
+
+    /// Returns implementations contributed by classes defined in `file`.
+    pub fn implementations_for_file<'scan>(
+        &'scan self,
+        db: &'scan dyn Db,
+        file: ProgramFile<'scan>,
+    ) -> Vec<ResolvedDefinition<'scan>>
+    where
+        'db: 'scan,
+    {
+        let roots: &FxHashSet<ClassLiteral<'scan>> = &self.roots;
+        match &self.kind {
+            ImplementationsFinderKind::ClassFamily => {
+                class_implementations_for_file(db, file, roots)
+            }
+            ImplementationsFinderKind::MemberFamily {
+                name,
+                accessor_role,
+            } => member_implementations_for_file(db, file, roots, name.as_str(), *accessor_role),
+        }
+    }
+
+    /// Returns the definitions selected directly for the finder's roots.
+    pub fn into_initial_definitions(self) -> Vec<ResolvedDefinition<'db>> {
+        self.initial_definitions
+    }
+
+    /// Creates an `ImplementationsFinder` for an attribute expression `x.y`.
+    ///
+    /// ```py
+    /// def f(animal: Animal):
+    ///     animal.sound
+    ///            ^^^^^
+    /// ```
+    ///
+    /// For a receiver of type `Animal`, this includes the member definition selected through
+    /// `Animal`'s MRO plus same-named definitions on known subclasses such as `Dog` or `Cat`. For a
+    /// receiver of type `Dog`, the root is `Dog`: inherited behavior resolves through `Dog`'s MRO,
+    /// and sibling classes such as `Cat` are not included.
+    ///
+    /// Both `def`-style methods and attribute definitions are returned, whether the attribute is
+    /// declared in the class body (`sound: str = ...`, `sound = ...`, or a bare `sound: str`) or
+    /// assigned to `self` in a method body (`self.sound = ...`).
+    pub fn for_attribute(
+        model: &SemanticModel<'db>,
+        attribute: &ast::ExprAttribute,
+    ) -> Option<Self> {
+        let db = model.db();
+        let lhs_ty = attribute.value.inferred_type(model)?;
+        let env = model.program_environment();
+        let mut roots = Vec::new();
+        let mut seen = FxHashSet::default();
+        collect_implementation_root_classes(db, &env, lhs_ty, &mut seen, &mut roots);
+
+        let accessor_role = match attribute.ctx {
+            ast::ExprContext::Load => Some(PropertyAccessorRole::Getter),
+            ast::ExprContext::Store => Some(PropertyAccessorRole::Setter),
+            ast::ExprContext::Del => Some(PropertyAccessorRole::Deleter),
+            ast::ExprContext::Invalid => None,
+        };
+
+        ImplementationsFinder::for_member_roots(db, roots, attribute.attr.id.clone(), accessor_role)
+    }
+
+    /// Creates an `ImplementationsFinder` for a method declaration.
+    ///
+    /// ```py
+    /// class Animal:
+    ///     def speak(self): ...
+    ///         ^^^^^
+    ///
+    /// class Dog(Animal):
+    ///     def speak(self): ...
+    /// ```
+    ///
+    /// The containing class is used as the root. The method's implementation, if present, is returned
+    /// along with same-named methods defined on known transitive subclasses. This does not walk to
+    /// parent classes: on `Dog.speak`, the root is `Dog`, so `Animal.speak` is not included.
+    pub fn for_method(model: &SemanticModel<'db>, function: &ast::StmtFunctionDef) -> Option<Self> {
+        let db = model.db();
+        let env = model.program_environment();
+        let function_definition = function.definition(model);
+        if !is_reachable_implementation_definition(db, function_definition) {
+            return None;
+        }
+
+        let containing_scope = function_definition.scope(db);
+        let accessor_role = function
+            .inferred_type(model)
+            .and_then(Type::as_property_instance)
+            .and_then(|property| property.accessor_role(db, function_definition));
+        let class_node = containing_scope.node(db).as_class()?;
+        let class_definition = semantic_index(db, containing_scope.program_file(db))
+            .expect_single_definition(class_node);
+        let class_ty = binding_type(db, class_definition);
+        let root = extract_class_literal(db, &env, class_ty)?;
+
+        ImplementationsFinder::for_member_roots(
+            db,
+            vec![root],
+            function.name.id.clone(),
+            accessor_role,
+        )
+    }
+
+    /// Creates an `ImplementationsFinder` for a class declaration.
+    ///
+    /// ```py
+    /// class Animal:
+    ///       ^^^^^^
+    ///     pass
+    ///
+    /// class Dog(Animal): ...
+    /// class Cat(Animal): ...
+    /// ```
+    ///
+    /// The clicked class is the root and is returned first, followed by its known transitive
+    /// subclasses such as `Dog` and `Cat`. This walks down the hierarchy only: clicking a subclass
+    /// returns that class and its own subclasses, not its parents.
+    pub fn for_class(model: &SemanticModel<'db>, class: &ast::StmtClassDef) -> Option<Self> {
+        let db = model.db();
+        let env = model.program_environment();
+        let class_definition = class.definition(model);
+        if !is_reachable_implementation_definition(db, class_definition) {
+            return None;
+        }
+        let root = extract_class_literal(db, &env, binding_type(db, class_definition))?;
+
+        Some(ImplementationsFinder::for_class_roots(db, vec![root]))
+    }
+
+    /// Creates an `ImplementationsFinder` for classes referred to by `resolved`, covering class
+    /// references such as a base class, an annotation, or a constructor call.
+    ///
+    /// ```py
+    /// class Animal: ...
+    ///
+    /// class Dog(Animal): ...
+    ///           ^^^^^^
+    /// ```
+    ///
+    /// The referenced class is the root and is returned first, followed by its known transitive
+    /// subclasses, just like clicking the class declaration.
+    ///
+    /// The resolved definitions' binding types are used rather than the reference's inferred value
+    /// type, because a class used as an annotation (`x: Animal`) infers as an instance of that class,
+    /// which is indistinguishable from an actual instance variable. The resolved definition's type is
+    /// a class object precisely when the reference refers to a class.
+    ///
+    /// Returns `None` when no binding refers to a class object or any binding refers to a non-class
+    /// object (for example an instance variable or method), so callers can fall back to member
+    /// handling.
+    pub fn for_class_reference(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        resolved_definitions: &[ResolvedDefinition<'db>],
+    ) -> Option<Self> {
+        let mut roots = Vec::new();
+        let mut seen = FxHashSet::default();
+
+        for def in resolved_definitions {
+            let ResolvedDefinition::Definition(definition) = def else {
+                return None;
+            };
+
+            if !is_reachable_implementation_definition(db, *definition) {
+                continue;
+            }
+
+            // Declaration-only definitions such as a bare `sound: str` annotation have no binding
+            // type and cannot refer to a class object.
+            if !def.category(db).is_binding() {
+                continue;
+            }
+
+            // Only references that resolve to a class object (a base class, annotation, `Animal()`, or
+            // a name bound to a class) are class implementation requests; instances resolve to their
+            // own definitions, whose type is the instance rather than the class object.
+            let ty = binding_type(db, *definition);
+
+            let root = match ty {
+                Type::ClassLiteral(_) | Type::SubclassOf(_) | Type::GenericAlias(_) => {
+                    extract_class_literal(db, env, ty)
+                }
+                _ => None,
+            };
+
+            let root = root?;
+
+            if seen.insert(root) {
+                roots.push(root);
+            }
+        }
+
+        if roots.is_empty() {
+            return None;
+        }
+
+        Some(ImplementationsFinder::for_class_roots(db, roots))
+    }
+}
+
+/// Finds subclasses of `roots` defined in `file`.
+fn class_implementations_for_file<'db>(
+    db: &'db dyn Db,
+    file: ProgramFile<'db>,
+    roots: &FxHashSet<ClassLiteral<'db>>,
+) -> Vec<ResolvedDefinition<'db>> {
+    if !contains_identifier(&source_text(db, file.file(db)), "class") {
+        return Vec::new();
+    }
+
+    let mut definitions = Vec::new();
+
+    for candidate in reachable_class_literals_in_file(db, file) {
+        if roots.contains(&candidate) || !class_mro_intersects(db, candidate, roots) {
+            continue;
+        }
+        if let Some(definition) = candidate.definition(db) {
+            let resolved = ResolvedDefinition::Definition(definition);
+            if !definitions.contains(&resolved) {
+                definitions.push(resolved);
+            }
+        }
+    }
+
+    definitions
 }
 
 /// Returns the descriptor object type for an attribute expression `x.y`, without invoking the
@@ -318,107 +450,369 @@ pub fn static_member_type_for_attribute<'db>(
     model: &SemanticModel<'db>,
     attribute: &ast::ExprAttribute,
 ) -> Option<Type<'db>> {
+    let db = model.db();
     let lhs_ty = attribute.value.inferred_type(model)?;
     lhs_ty
-        .static_member(model.db(), attribute.attr.as_str())
+        .static_member(db, &model.program_environment(), attribute.attr.as_str())
         .ignore_possibly_undefined()
 }
 
-fn definitions_for_attribute_in_class_hierarchy<'db>(
-    class_literal: &ClassLiteral<'db>,
-    model: &SemanticModel<'db>,
-    attribute_name: &str,
+/// Finds member implementations contributed by subclasses of `roots` defined in `file`.
+fn member_implementations_for_file<'db>(
+    db: &'db dyn Db,
+    file: ProgramFile<'db>,
+    roots: &FxHashSet<ClassLiteral<'db>>,
+    member_name: &str,
+    accessor_role: Option<PropertyAccessorRole>,
 ) -> Vec<ResolvedDefinition<'db>> {
-    let db = model.db();
-    let mut resolved = Vec::new();
-    'scopes: for ancestor in class_literal
-        .iter_mro(db)
-        .filter_map(ClassBase::into_class)
-        .filter_map(|cls: ClassType<'db>| cls.static_class_literal(db).map(|(lit, _)| lit))
-    {
-        let class_scope = ancestor.body_scope(db);
-        let class_place_table = ty_python_core::place_table(db, class_scope);
+    let mut definitions = Vec::new();
 
-        // Look for class-level declarations and bindings
-        if let Some(place_id) = class_place_table.symbol_id(attribute_name) {
-            let use_def = use_def_map(db, class_scope);
-            let resolved_in_scope = resolve_reachable_definitions(
-                db,
-                attribute_name,
-                use_def
-                    .reachable_symbol_declarations(place_id)
-                    .filter_map(|declaration| declaration.declaration.definition())
-                    .chain(
-                        use_def
-                            .reachable_symbol_bindings(place_id)
-                            .filter_map(|binding| binding.binding.definition()),
-                    ),
-            );
-            if !resolved_in_scope.is_empty() {
-                resolved.extend(resolved_in_scope);
-                break 'scopes;
-            }
+    // A file can only contribute an override if it contains a class and spells the member name,
+    // whether as a method name, a class-body target, or a `self.member` assignment.
+    let source = source_text(db, file.file(db));
+    if !contains_identifier(&source, "class") || !contains_identifier(&source, member_name) {
+        return definitions;
+    }
+
+    for candidate in reachable_class_literals_in_file(db, file) {
+        // The implementations selected for the roots were collected during finder preparation.
+        if roots.contains(&candidate) {
+            continue;
         }
 
-        // Look for instance attributes in method scopes (e.g., self.x = 1)
-        let file = class_scope.file(db);
-        let index = semantic_index(db, file);
+        if !class_mro_intersects(db, candidate, roots) {
+            continue;
+        }
 
-        for function_scope_id in attribute_scopes(db, class_scope) {
-            if let Some(place_id) = index
-                .place_table(function_scope_id)
-                .member_id_by_instance_attribute_name(attribute_name)
-            {
-                let use_def = index.use_def_map(function_scope_id);
-                let resolved_in_scope = resolve_reachable_definitions(
-                    db,
-                    attribute_name,
-                    use_def
-                        .reachable_member_declarations(place_id)
-                        .filter_map(|declaration| declaration.declaration.definition())
-                        .chain(
-                            use_def
-                                .reachable_member_bindings(place_id)
-                                .filter_map(|binding| binding.binding.definition()),
-                        ),
-                );
-                if !resolved_in_scope.is_empty() {
-                    resolved.extend(resolved_in_scope);
-                    break 'scopes;
-                }
+        for definition in
+            own_member_definitions(db, candidate, member_name, accessor_role).unwrap_or_default()
+        {
+            if !definitions.contains(&definition) {
+                definitions.push(definition);
             }
         }
     }
 
-    resolved
+    definitions
 }
 
-fn reachable_definitions<'db>(
+/// Returns whether any class in `class`'s MRO is one of `roots`.
+fn class_mro_intersects<'db>(
+    db: &'db dyn Db,
+    class: ClassLiteral<'db>,
+    roots: &FxHashSet<ClassLiteral<'db>>,
+) -> bool {
+    class
+        .iter_mro(db)
+        .filter_map(ClassBase::into_class)
+        .any(|ancestor| roots.contains(&ancestor.class_literal(db)))
+}
+
+/// Finds the member definitions selected by normal Python MRO lookup for `class`.
+///
+/// This intentionally stops at the first class in the MRO that defines `member_name`; inherited
+/// members should navigate to the definition that actually provides the behavior for the receiver.
+/// The returned vector can be empty when the selected member has no implementation definition,
+/// such as an overload-only method.
+fn mro_member_definitions<'db>(
+    db: &'db dyn Db,
+    class: ClassLiteral<'db>,
+    member_name: &str,
+    accessor_role: Option<PropertyAccessorRole>,
+) -> Option<Vec<ResolvedDefinition<'db>>> {
+    class
+        .iter_mro(db)
+        .filter_map(ClassBase::into_class)
+        .find_map(|class| {
+            own_member_definitions(db, class.class_literal(db), member_name, accessor_role)
+        })
+}
+
+/// Returns member definitions for `member_name` that are declared directly in `class`.
+///
+/// ```py
+/// class Animal:
+///     def speak(self): ...
+///
+/// class Dog(Animal):
+///     pass
+///
+/// class Cat(Animal):
+///     def speak(self): ...
+/// ```
+///
+/// For member `speak`, this returns nothing for `Dog` because it only inherits the member, but it
+/// returns `Cat.speak` for `Cat` because it is defined directly in `Cat`.
+///
+/// A class-body definition (method or attribute) takes priority and determines this class's
+/// contribution when present, mirroring the goto-definition lookup in
+/// [`definition_resolution::definitions_for_attribute`]. Otherwise, instance attributes assigned in the
+/// class's own method bodies (`self.member = ...`) are used.
+///
+/// Subclasses that only inherit the member do not add a new implementation target. The inherited
+/// definition is already represented by the ancestor that defines it; this only finds subclasses
+/// that define a new method body or attribute.
+///
+/// Returns `None` if `class` has no reachable user-visible definitions for `member_name`. Returns
+/// `Some` with an empty vector if the class defines the symbol but none of its reachable definitions
+/// produce a navigable implementation matching `accessor_role`.
+fn own_member_definitions<'db>(
+    db: &'db dyn Db,
+    class: ClassLiteral<'db>,
+    member_name: &str,
+    accessor_role: Option<PropertyAccessorRole>,
+) -> Option<Vec<ResolvedDefinition<'db>>> {
+    let class = class.as_static()?;
+    let class_scope = class.body_scope(db);
+
+    let class_place_table = ty_python_core::place_table(db, class_scope);
+    if let Some(place_id) = class_place_table.symbol_id(member_name) {
+        let use_def = use_def_map(db, class_scope);
+        let definitions = reachable_implementation_definitions(
+            db,
+            use_def
+                .reachable_symbol_declarations(place_id)
+                .filter_map(|declaration| declaration.declaration.definition())
+                .chain(
+                    use_def
+                        .reachable_symbol_bindings(place_id)
+                        .filter_map(|binding| binding.binding.definition()),
+                ),
+        );
+        if !definitions.is_empty() {
+            return Some(
+                definitions
+                    .into_iter()
+                    .filter(|definition| {
+                        property_accessor_role_matches(db, *definition, accessor_role)
+                    })
+                    .filter_map(|definition| member_implementation_definition(db, definition))
+                    .collect(),
+            );
+        }
+    }
+
+    let file = class_scope.program_file(db);
+    let index = semantic_index(db, file);
+    let mut instance_definitions = Vec::new();
+    for function_scope_id in attribute_scopes(db, class_scope) {
+        let Some(place_id) = index
+            .place_table(function_scope_id)
+            .member_id_by_instance_attribute_name(member_name)
+        else {
+            continue;
+        };
+        let use_def = index.use_def_map(function_scope_id);
+        instance_definitions.extend(
+            use_def
+                .reachable_member_declarations(place_id)
+                .filter_map(|declaration| declaration.declaration.definition())
+                .chain(
+                    use_def
+                        .reachable_member_bindings(place_id)
+                        .filter_map(|binding| binding.binding.definition()),
+                ),
+        );
+    }
+
+    let instance_definitions = reachable_implementation_definitions(db, instance_definitions);
+    if instance_definitions.is_empty() {
+        return None;
+    }
+    Some(
+        instance_definitions
+            .into_iter()
+            .filter_map(|definition| member_implementation_definition(db, definition))
+            .collect(),
+    )
+}
+
+/// Returns whether `definition` is either not a property accessor or has the requested role.
+fn property_accessor_role_matches<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+    requested_role: Option<PropertyAccessorRole>,
+) -> bool {
+    if !matches!(definition.kind(db), DefinitionKind::Function(_)) {
+        return true;
+    }
+
+    requested_role.is_none_or(|requested_role| {
+        binding_type(db, definition)
+            .as_property_instance()
+            .and_then(|property| property.accessor_role(db, definition))
+            .is_none_or(|definition_role| definition_role == requested_role)
+    })
+}
+
+/// Normalize a member definition to the implementation target that should be navigated to.
+fn member_implementation_definition<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> Option<ResolvedDefinition<'db>> {
+    match definition.kind(db) {
+        // `def` statements collapse overload declarations to their concrete implementation below.
+        DefinitionKind::Function(_) => {}
+        // Attribute definitions (`sound: str = ...`, `sound = ...`, a bare `sound: str`
+        // declaration, or `self.sound = ...`) are implementation targets as-is.
+        DefinitionKind::Assignment(_) | DefinitionKind::AnnotatedAssignment(_) => {
+            return Some(ResolvedDefinition::Definition(definition));
+        }
+        // Other kinds (imports, comprehension targets, ...) can stop MRO lookup, but should not
+        // themselves become implementation targets.
+        _ => return None,
+    }
+
+    // Use the inferred function type to collapse overload declarations to their concrete
+    // implementation. If inference cannot produce a function literal, keep the original `def` as a
+    // conservative fallback.
+    let Some(function) = binding_type(db, definition).as_function_literal() else {
+        return Some(ResolvedDefinition::Definition(definition));
+    };
+
+    let (_, implementation) = function.overloads_and_implementation(db);
+    if implementation.is_some() {
+        return Some(ResolvedDefinition::Definition(function.last_definition(db)));
+    }
+
+    // Stub overload declarations can still map to a real source implementation later.
+    if definition.file(db).is_stub(db) {
+        return Some(ResolvedDefinition::Definition(definition));
+    }
+
+    // Non-stub overload-only groups have no runtime implementation to navigate to.
+    None
+}
+
+/// Normalizes a receiver type into the class roots used for implementation lookup.
+fn collect_implementation_root_classes<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+    seen: &mut FxHashSet<ClassLiteral<'db>>,
+    roots: &mut Vec<ClassLiteral<'db>>,
+) {
+    match ty.resolve_type_alias(db) {
+        Type::Union(union) => {
+            // `pet: Dog | Cat` can dispatch through either `Dog` or `Cat`.
+            for element in union.elements(db) {
+                collect_implementation_root_classes(db, env, *element, seen, roots);
+            }
+        }
+        Type::Intersection(intersection) => {
+            // Finite intersections can stand for alternatives like `Dog` or `Cat`.
+            if let Some(alternatives) = intersection.finite_alternatives(db, env) {
+                for alternative in alternatives {
+                    collect_implementation_root_classes(db, env, alternative, seen, roots);
+                }
+            }
+        }
+        Type::TypeVar(typevar) => match typevar.typevar(db).bound_or_constraints(db, env) {
+            // `T: Animal` can dispatch through the `Animal` bound.
+            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                collect_implementation_root_classes(db, env, bound, seen, roots);
+            }
+            // `T: (Dog, Cat)` can dispatch through either constraint.
+            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                collect_implementation_root_classes(
+                    db,
+                    env,
+                    constraints.as_type(db, env),
+                    seen,
+                    roots,
+                );
+            }
+            None => {}
+        },
+        Type::SubclassOf(subclass_of) if subclass_of.is_type_var() => {
+            // Both `type[T]` and the implicit `cls` parameter of a classmethod are represented as
+            // `SubclassOf(TypeVar)`. Normalize them through the existing TypeVar handling above.
+            collect_implementation_root_classes(
+                db,
+                env,
+                subclass_of.to_instance(db, env),
+                seen,
+                roots,
+            );
+        }
+        ty => {
+            // `dog: Dog` maps directly to the `Dog` class root.
+            let root = match ty {
+                Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_) => {
+                    extract_class_literal(db, env, ty)
+                }
+                Type::NominalInstance(_)
+                | Type::ProtocolInstance(_)
+                | Type::KnownInstance(_)
+                | Type::LiteralValue(_)
+                | Type::TypedDict(_)
+                | Type::NewTypeInstance(_) => extract_class_literal(db, env, ty)
+                    .or_else(|| extract_class_literal(db, env, ty.to_meta_type(db, env))),
+                _ => None,
+            };
+
+            if let Some(root) = root
+                && seen.insert(root)
+            {
+                roots.push(root);
+            }
+        }
+    }
+}
+
+fn reachable_implementation_definitions<'db>(
     db: &'db dyn Db,
     definitions: impl IntoIterator<Item = Definition<'db>>,
 ) -> FxIndexSet<Definition<'db>> {
     definitions
         .into_iter()
         .filter(|definition| definition.kind(db).is_user_visible())
+        .filter(|definition| is_reachable_implementation_definition(db, *definition))
         .collect()
 }
 
-fn resolve_reachable_definitions<'db>(
+fn is_reachable_implementation_definition<'db>(
     db: &'db dyn Db,
-    symbol_name: &str,
-    definitions: impl IntoIterator<Item = Definition<'db>>,
-) -> Vec<ResolvedDefinition<'db>> {
-    reachable_definitions(db, definitions)
-        .into_iter()
-        .flat_map(|definition| {
-            resolve_definition(
-                db,
-                definition,
-                Some(symbol_name),
-                ImportAliasResolution::ResolveAliases,
-            )
-        })
-        .collect()
+    definition: Definition<'db>,
+) -> bool {
+    let file = definition.program_file(db);
+    let parsed = parsed_module(db, file.python_file(db)).load(db);
+    is_range_reachable(
+        db,
+        semantic_index(db, file),
+        definition.file_scope(db),
+        definition.full_range(db, &parsed).range(),
+    )
+}
+
+/// Cheap text prefilter for identifier references before AST/semantic validation.
+///
+/// Heuristically matches an ASCII approximation of `\b{name}\b`.
+pub fn contains_identifier(source: &str, name: &str) -> bool {
+    if name.is_empty() {
+        return false;
+    }
+
+    let bytes = source.as_bytes();
+    let needle = name.as_bytes();
+
+    memchr::memmem::find_iter(bytes, needle).any(move |pos| {
+        let after = pos + needle.len();
+
+        // Skip this entry if it is within an identifier. E.g. skip
+        // this entry when searching for `x` and this is a match
+        // within `exclude = 10`.
+        let boundary_before = pos == 0 || !is_ascii_identifier_continue(bytes[pos - 1]);
+        let boundary_after = bytes
+            .get(after)
+            .is_none_or(|byte| !is_ascii_identifier_continue(*byte));
+
+        boundary_before && boundary_after
+    })
+}
+
+fn is_ascii_identifier_continue(byte: u8) -> bool {
+    byte.is_ascii_alphanumeric() || byte == b'_'
 }
 
 pub struct TypedDictKeyHover<'db> {
@@ -444,13 +838,16 @@ pub fn typed_dict_key_hover<'db>(
     model: &SemanticModel<'db>,
     subscript: &ast::ExprSubscript,
 ) -> Option<TypedDictKeyHover<'db>> {
+    let db = model.db();
     let key = subscript
         .slice
         .as_string_literal_expr()
         .map(|literal| literal.value.to_str())?;
     let value_ty = subscript.value.inferred_type(model)?;
     let typed_dict = value_ty.as_typed_dict()?;
-    let owner = value_ty.display(model.db()).to_string();
+    let owner = value_ty
+        .display(db, &model.program_environment())
+        .to_string();
     let field = typed_dict.items(model.db()).get(key)?;
     let docstring = field
         .first_declaration()
@@ -482,9 +879,10 @@ pub fn definitions_for_keyword_argument<'db>(
     let keyword_name_str = keyword_name.as_str();
 
     let mut resolved_definitions = Vec::new();
+    let env = &model.program_environment();
 
     if let Some(callable_type) = func_type
-        .try_upcast_to_callable(db)
+        .try_upcast_to_callable(db, env)
         .and_then(CallableTypes::exactly_one)
     {
         let signatures = callable_type.signatures(db);
@@ -516,9 +914,11 @@ pub fn definitions_for_imported_symbol<'db>(
     alias_resolution: ImportAliasResolution,
 ) -> Vec<ResolvedDefinition<'db>> {
     let mut visited = FxHashSet::default();
-    resolve_definition::resolve_from_import_definitions(
+    let env = model.program_environment();
+    definition_resolution::resolve_from_import_definitions(
         model.db(),
-        model.file(),
+        &env,
+        ImportingFile::File(model.file(), env.resolver_environment(model.db())),
         import_node,
         symbol_name,
         &mut visited,
@@ -534,13 +934,14 @@ pub fn definitions_and_overloads_for_function<'db>(
     model: &SemanticModel<'db>,
     function: &ast::StmtFunctionDef,
 ) -> Vec<ResolvedDefinition<'db>> {
+    let db = model.db();
     if let Some(function_type) = function
         .inferred_type(model)
         .and_then(Type::as_function_literal)
     {
         function_type
-            .iter_overloads_and_implementation(model.db())
-            .filter_map(|overload| overload.signature(model.db()).definition())
+            .iter_overloads_and_implementation(db)
+            .filter_map(|overload| overload.signature(db).definition())
             .map(ResolvedDefinition::Definition)
             .collect()
     } else {
@@ -596,11 +997,15 @@ pub struct CallSignatureParameter<'db> {
 }
 
 impl<'db> CallSignatureDetails<'db> {
-    fn from_binding(db: &'db dyn Db, binding: &crate::types::call::Binding<'db>) -> Self {
+    fn from_binding(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        binding: &crate::types::call::Binding<'db>,
+    ) -> Self {
         let argument_to_parameter_mapping = binding.argument_matches().to_vec();
-        let specialization = binding.specialization();
+        let specialization = binding.merged_specialization(db);
         let signature = binding.signature.clone();
-        let display_details = signature.display(db).to_string_parts();
+        let display_details = signature.display(db, env).to_string_parts();
         let (parameters, parameter_to_displayed_parameter_mapping) =
             displayed_parameters_for_signature(db, &signature, &display_details, specialization);
         let argument_to_displayed_parameter_mapping = argument_to_parameter_mapping
@@ -733,16 +1138,16 @@ pub fn call_signature_details<'db>(
     model: &SemanticModel<'db>,
     call_expr: &ast::ExprCall,
 ) -> Vec<CallSignatureDetails<'db>> {
+    let db = model.db();
     let Some(func_type) = call_expr.func.inferred_type(model) else {
         return Vec::new();
     };
 
-    let db = model.db();
-
     // Use into_callable to handle all the complex type conversions
+    let env = &model.program_environment();
     if let Some(callable_type) = func_type
-        .try_upcast_to_callable(db)
-        .map(|callables| callables.into_type(db))
+        .try_upcast_to_callable(db, env)
+        .map(|callables| callables.into_type(db, env))
     {
         // Use from_arguments_typed so that check_types can infer TypeVar
         // specializations from the actual argument types at this call site.
@@ -752,9 +1157,10 @@ pub fn call_signature_details<'db>(
                     .inferred_type(model)
                     .unwrap_or(Type::unknown())
             });
-        let mut bindings = callable_type
-            .bindings(db)
-            .match_parameters(db, &call_arguments);
+        let mut bindings =
+            callable_type
+                .bindings(db, env)
+                .match_parameters(db, env, &call_arguments);
 
         // Run type checking to resolve TypeVar bindings from argument types.
         // For example, calling `dict[str, int].get("a")` resolves the `_KT`
@@ -763,17 +1169,19 @@ pub fn call_signature_details<'db>(
         let constraints = ConstraintSetBuilder::new();
         let _ = bindings.check_types_impl(
             db,
+            env,
             &constraints,
             &call_arguments,
             TypeContext::default(),
             &[],
+            CheckTypesMode::Finalize,
         );
 
         // Extract signature details from all callable bindings
         bindings
             .iter_flat()
             .flatten()
-            .map(|binding| CallSignatureDetails::from_binding(db, binding))
+            .map(|binding| CallSignatureDetails::from_binding(db, env, binding))
             .collect()
     } else {
         // Type is not callable, return empty signatures
@@ -789,7 +1197,8 @@ fn resolve_single_overload<'db>(
     call_expr: &ast::ExprCall,
 ) -> Option<Signature<'db>> {
     let db = model.db();
-    let bindings = callable_type.bindings(db);
+    let env = &model.program_environment();
+    let bindings = callable_type.bindings(db, env);
 
     let args = CallArguments::from_arguments_typed(&call_expr.arguments, |splatted_value| {
         splatted_value
@@ -799,8 +1208,8 @@ fn resolve_single_overload<'db>(
 
     let constraints = ConstraintSetBuilder::new();
     let mut resolved: Vec<_> = bindings
-        .match_parameters(db, &args)
-        .check_types(db, &constraints, &args, TypeContext::default(), &[])
+        .match_parameters(db, env, &args)
+        .check_types(db, env, &constraints, &args, TypeContext::default(), &[])
         .iter()
         .flat_map(super::call::bind::Bindings::iter_flat)
         .flat_map(|binding| {
@@ -836,6 +1245,7 @@ fn full_type_bindings_for_call<'db>(
     call_expr: &ast::ExprCall,
 ) -> crate::types::call::Bindings<'db> {
     let db = model.db();
+    let env = &model.program_environment();
     let call_arguments =
         CallArguments::from_arguments_typed(&call_expr.arguments, |splatted_value| {
             splatted_value
@@ -845,10 +1255,11 @@ fn full_type_bindings_for_call<'db>(
     let constraints = ConstraintSetBuilder::new();
 
     func_type
-        .bindings(db)
-        .match_parameters(db, &call_arguments)
+        .bindings(db, env)
+        .match_parameters(db, env, &call_arguments)
         .check_types(
             db,
+            env,
             &constraints,
             &call_arguments,
             TypeContext::default(),
@@ -869,7 +1280,14 @@ fn known_type_form_parameter_index(db: &dyn Db, callable_type: Type<'_>) -> Opti
             Some(KnownFunction::AssertType) => Some(1),
             _ => None,
         },
-        Type::ClassLiteral(class) if class.is_known(db, KnownClass::TypeAliasType) => Some(1),
+        Type::ClassLiteral(class)
+            if matches!(
+                class.known(db),
+                Some(KnownClass::TypeAliasType | KnownClass::ExtensionsTypeAliasType)
+            ) =>
+        {
+            Some(1)
+        }
         _ => None,
     }
 }
@@ -914,7 +1332,7 @@ pub fn call_argument_forms(
 
     // Ordinary callables have only value-form arguments for IDE purposes, so skip full binding.
     if !func_type
-        .bindings(db)
+        .bindings(db, &model.program_environment())
         .iter_flat()
         .any(|binding| known_type_form_parameter_index(db, binding.callable_type).is_some())
     {
@@ -986,21 +1404,20 @@ pub fn call_type_simplified_by_overloads(
     let db = model.db();
     let func_type = call_expr.func.inferred_type(model)?;
 
-    let callable_type = func_type.try_upcast_to_callable(db)?.into_type(db);
+    let env = &model.program_environment();
+    let callable_type = func_type
+        .try_upcast_to_callable(db, env)?
+        .into_type(db, env);
 
     // If the callable is trivial this analysis is useless, bail out
-    if let Some(binding) = callable_type.bindings(db).single_element()
+    if let Some(binding) = callable_type.bindings(db, env).single_element()
         && binding.overloads().len() < 2
     {
         return None;
     }
 
     let signature = resolve_single_overload(model, callable_type, call_expr)?;
-    Some(
-        signature
-            .display_with(db, DisplaySettings::default().multiline())
-            .to_string(),
-    )
+    Some(signature.display(db, env).multiline().to_string())
 }
 
 /// Returns the definitions of the binary operation along with its callable type.
@@ -1008,14 +1425,15 @@ pub fn definitions_for_bin_op<'db>(
     model: &SemanticModel<'db>,
     binary_op: &ast::ExprBinOp,
 ) -> Option<(Vec<ResolvedDefinition<'db>>, Type<'db>)> {
+    let db = model.db();
     let left_ty = binary_op.left.inferred_type(model)?;
     let right_ty = binary_op.right.inferred_type(model)?;
-
-    let Ok(bindings) = Type::try_call_bin_op(model.db(), left_ty, binary_op.op, right_ty) else {
+    let env = &model.program_environment();
+    let Ok(bindings) = Type::try_call_bin_op(db, env, left_ty, binary_op.op, right_ty) else {
         return None;
     };
 
-    let callable_type = promote_for_self(model.db(), bindings.callable_type());
+    let callable_type = promote_for_self(db, env, bindings.callable_type());
 
     let definitions: Vec<_> = bindings
         .iter_flat()
@@ -1035,6 +1453,7 @@ pub fn definitions_for_unary_op<'db>(
     model: &SemanticModel<'db>,
     unary_op: &ast::ExprUnaryOp,
 ) -> Option<(Vec<ResolvedDefinition<'db>>, Type<'db>)> {
+    let db = model.db();
     let operand_ty = unary_op.operand.inferred_type(model)?;
 
     let unary_dunder_method = match unary_op.op {
@@ -1044,8 +1463,10 @@ pub fn definitions_for_unary_op<'db>(
         ast::UnaryOp::Not => "__bool__",
     };
 
+    let env = &model.program_environment();
     let bindings = match operand_ty.try_call_dunder(
-        model.db(),
+        db,
+        env,
         unary_dunder_method,
         CallArguments::none(),
         TypeContext::default(),
@@ -1054,7 +1475,8 @@ pub fn definitions_for_unary_op<'db>(
         Err(CallDunderError::MethodNotAvailable) if unary_op.op == ast::UnaryOp::Not => {
             // The runtime falls back to `__len__` for `not` if `__bool__` is not defined.
             match operand_ty.try_call_dunder(
-                model.db(),
+                db,
+                env,
                 "__len__",
                 CallArguments::none(),
                 TypeContext::default(),
@@ -1074,7 +1496,7 @@ pub fn definitions_for_unary_op<'db>(
         ) => *bindings,
     };
 
-    let callable_type = promote_for_self(model.db(), bindings.callable_type());
+    let callable_type = promote_for_self(db, env, bindings.callable_type());
 
     let definitions = bindings
         .iter_flat()
@@ -1092,14 +1514,22 @@ pub fn definitions_for_unary_op<'db>(
 /// Promotes types in `self` positions.
 ///
 /// This is so that we show e.g. `int.__add__` instead of `Literal[4].__add__`.
-fn promote_for_self<'db>(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
+fn promote_for_self<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+) -> Type<'db> {
     match ty {
         Type::BoundMethod(method) => Type::BoundMethod(method.map_self_type(db, |self_ty| {
-            self_ty.literal_fallback_instance(db).unwrap_or(self_ty)
+            self_ty
+                .literal_fallback_instance(db, env)
+                .unwrap_or(self_ty)
         })),
-        Type::Union(elements) => elements.map(db, |ty| match ty {
+        Type::Union(elements) => elements.map(db, env, |ty| match ty {
             Type::BoundMethod(method) => Type::BoundMethod(method.map_self_type(db, |self_ty| {
-                self_ty.literal_fallback_instance(db).unwrap_or(self_ty)
+                self_ty
+                    .literal_fallback_instance(db, env)
+                    .unwrap_or(self_ty)
             })),
             _ => *ty,
         }),
@@ -1158,7 +1588,10 @@ pub fn resolved_call_signature<'db>(
 ) -> Option<CallSignatureDetails<'db>> {
     let db = model.db();
     let func_type = call_expr.func.inferred_type(model)?;
-    let callable_type = func_type.try_upcast_to_callable(db)?.into_type(db);
+    let env = &model.program_environment();
+    let callable_type = func_type
+        .try_upcast_to_callable(db, env)?
+        .into_type(db, env);
 
     let args = CallArguments::from_arguments_typed(&call_expr.arguments, |splatted_value| {
         splatted_value
@@ -1169,16 +1602,16 @@ pub fn resolved_call_signature<'db>(
     // Extract the `Bindings` regardless of whether type checking succeeded or failed.
     let constraints = ConstraintSetBuilder::new();
     let bindings = callable_type
-        .bindings(db)
-        .match_parameters(db, &args)
-        .check_types(db, &constraints, &args, TypeContext::default(), &[])
+        .bindings(db, env)
+        .match_parameters(db, env, &args)
+        .check_types(db, env, &constraints, &args, TypeContext::default(), &[])
         .unwrap_or_else(|CallError(_, bindings)| *bindings);
 
     // First, try to find the matching overload after full type checking.
     let type_checked_details: Vec<_> = bindings
         .iter_flat()
         .flat_map(|binding| binding.matching_overloads().map(|(_, overload)| overload))
-        .map(|binding| CallSignatureDetails::from_binding(db, binding))
+        .map(|binding| CallSignatureDetails::from_binding(db, env, binding))
         .collect();
 
     if !type_checked_details.is_empty() {
@@ -1192,7 +1625,7 @@ pub fn resolved_call_signature<'db>(
     let all_details: Vec<_> = bindings
         .iter_flat()
         .flatten()
-        .map(|binding| CallSignatureDetails::from_binding(db, binding))
+        .map(|binding| CallSignatureDetails::from_binding(db, env, binding))
         .collect();
 
     if all_details.is_empty() {
@@ -1244,8 +1677,7 @@ pub fn inlay_hint_call_argument_details<'db>(
         };
 
         let parameter_label_offset = param.definition().map(|definition| {
-            let param_file = definition.file(db);
-            let module = parsed_module(db, param_file).load(db);
+            let module = parsed_module(db, definition.python_file(db)).load(db);
             definition.focus_range(db, &module)
         });
 
@@ -1261,401 +1693,21 @@ pub fn inlay_hint_call_argument_details<'db>(
     Some(InlayHintCallArgumentDetails { argument_names })
 }
 
-mod resolve_definition {
-    //! Resolves an Import, `ImportFrom` or `StarImport` definition to one or more
-    //! "resolved definitions". This is done recursively to find the original
-    //! definition targeted by the import.
-
-    /// Controls whether local import aliases should be resolved to their targets or returned as-is.
-    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-    pub enum ImportAliasResolution {
-        /// Resolve import aliases to their original definitions
-        ResolveAliases,
-        /// Keep import aliases as-is, don't resolve to original definitions
-        PreserveAliases,
-    }
-
-    use indexmap::IndexSet;
-    use ruff_db::files::{File, FileRange, vendored_path_to_file};
-    use ruff_db::parsed::{ParsedModuleRef, parsed_module};
+mod stub_mapping {
+    use crate::lexical_name_path::{
+        lexical_name_path_component_for_node, lexical_name_path_for_definition,
+    };
+    use crate::types::definition_resolution::{
+        ImportAliasResolution, ResolvedDefinition, find_symbol_in_scope, resolve_definition,
+    };
+    use crate::{Db, ProgramEnvironment};
+    use ruff_db::files::vendored_path_to_file;
+    use ruff_db::parsed::parsed_module;
     use ruff_db::system::SystemPath;
     use ruff_db::vendored::VendoredPathBuf;
-    use ruff_python_ast as ast;
-    use ruff_python_stdlib::sys::is_builtin_module;
-    use ruff_text_size::TextRange;
-    use rustc_hash::FxHashSet;
     use tracing::trace;
-    use ty_module_resolver::{ModuleName, file_to_module, resolve_module, resolve_real_module};
-
-    use crate::Db;
-    use crate::module_docstring;
-    use crate::types::binding_type;
-    use ty_python_core::definition::{Definition, DefinitionCategory, DefinitionKind};
-    use ty_python_core::scope::{NodeWithScopeKind, ScopeId};
-    use ty_python_core::{global_scope, place_table, semantic_index, use_def_map};
-
-    /// Represents the result of resolving an import to either a specific definition or
-    /// a specific range within a file.
-    /// This enum helps distinguish between cases where an import resolves to:
-    /// - A specific definition within a module (e.g., `from os import path` -> definition of `path`)
-    /// - A specific range within a file, sometimes an empty range at the top of the file
-    #[derive(Debug, Clone, PartialEq, Eq)]
-    pub enum ResolvedDefinition<'db> {
-        /// The import resolved to a specific definition within a module
-        Definition(Definition<'db>),
-        /// The import resolved to an entire module
-        Module(File),
-        /// The import resolved to a file with a specific range
-        FileWithRange(FileRange),
-    }
-
-    impl<'db> ResolvedDefinition<'db> {
-        pub fn focus_range(&self, db: &dyn Db) -> FileRange {
-            match self {
-                ResolvedDefinition::Definition(definition) => {
-                    let parsed = parsed_module(db, definition.file(db)).load(db);
-                    definition.focus_range(db, &parsed)
-                }
-                // For modules, navigate to the start of the file
-                ResolvedDefinition::Module(module) => FileRange::new(*module, TextRange::default()),
-                ResolvedDefinition::FileWithRange(file_range) => *file_range,
-            }
-        }
-
-        pub fn category(&self, db: &dyn Db) -> DefinitionCategory {
-            match self {
-                ResolvedDefinition::Definition(definition) => {
-                    let file = definition.file(db);
-                    let parsed = parsed_module(db, file).load(db);
-                    definition.kind(db).category(file.is_stub(db), &parsed)
-                }
-                ResolvedDefinition::Module(_) | ResolvedDefinition::FileWithRange(_) => {
-                    DefinitionCategory::DeclarationAndBinding
-                }
-            }
-        }
-
-        pub fn definition(&self) -> Option<Definition<'db>> {
-            match self {
-                ResolvedDefinition::Definition(definition) => Some(*definition),
-                ResolvedDefinition::Module(_) => None,
-                ResolvedDefinition::FileWithRange(_) => None,
-            }
-        }
-
-        fn file(&self, db: &'db dyn Db) -> File {
-            match self {
-                ResolvedDefinition::Definition(definition) => definition.file(db),
-                ResolvedDefinition::Module(file) => *file,
-                ResolvedDefinition::FileWithRange(file_range) => file_range.file(),
-            }
-        }
-
-        pub fn docstring(&self, db: &'db dyn Db) -> Option<String> {
-            match self {
-                ResolvedDefinition::Definition(definition) => definition.docstring(db),
-                ResolvedDefinition::Module(file) => module_docstring(db, *file),
-                ResolvedDefinition::FileWithRange(_) => None,
-            }
-        }
-
-        pub fn implementation_docstring(&self, db: &'db dyn Db) -> Option<String> {
-            match self {
-                ResolvedDefinition::Definition(definition) => {
-                    implementation_docstring(db, *definition)
-                }
-                ResolvedDefinition::Module(_) | ResolvedDefinition::FileWithRange(_) => None,
-            }
-        }
-    }
-
-    // Overload declarations often omit docstrings, while the runtime
-    // implementation appears as the last sibling binding for the same symbol.
-    // Fall back to that binding's docstring when the resolved overload has none.
-    //
-    // Uses type-aware matching: resolves each end-of-scope binding's type to a
-    // function literal, then checks whether that function's overloads contain the
-    // current definition. This correctly handles version-conditional branches and
-    // avoids picking up unrelated reassignments of the same name.
-    fn implementation_docstring<'db>(
-        db: &'db dyn Db,
-        definition: Definition<'db>,
-    ) -> Option<String> {
-        let DefinitionKind::Function(_) = definition.kind(db) else {
-            return None;
-        };
-
-        let name = definition.name(db)?;
-        let scope = definition.scope(db);
-        let symbol_id = place_table(db, scope).symbol_id(&name)?;
-        let use_def = use_def_map(db, scope);
-
-        let current_overload = binding_type(db, definition)
-            .as_function_literal()?
-            .literal(db)
-            .last_definition;
-
-        // Find the last end-of-scope binding whose function type contains this overload.
-        let implementation = use_def
-            .end_of_scope_symbol_bindings(symbol_id)
-            .filter_map(|binding| {
-                let ty = binding_type(db, binding.binding.definition()?).as_function_literal()?;
-                ty.iter_overloads_and_implementation(db)
-                    .any(|overload| overload == current_overload)
-                    .then_some(ty)
-            })
-            .last()?;
-
-        implementation.definition(db).docstring(db)
-    }
-
-    /// Resolve import definitions to their targets.
-    /// Returns resolved definitions which can be either specific definitions or module files.
-    /// For non-import definitions, returns the definition wrapped in `ResolvedDefinition::Definition`.
-    /// Always returns at least the original definition as a fallback if resolution fails.
-    pub(crate) fn resolve_definition<'db>(
-        db: &'db dyn Db,
-        definition: Definition<'db>,
-        symbol_name: Option<&str>,
-        alias_resolution: ImportAliasResolution,
-    ) -> Vec<ResolvedDefinition<'db>> {
-        let mut visited = FxHashSet::default();
-        let resolved = resolve_definition_recursive(
-            db,
-            definition,
-            &mut visited,
-            symbol_name,
-            alias_resolution,
-        );
-
-        // If resolution failed, return the original definition as fallback
-        if resolved.is_empty() {
-            vec![ResolvedDefinition::Definition(definition)]
-        } else {
-            resolved
-        }
-    }
-
-    /// Helper function to resolve import definitions recursively.
-    fn resolve_definition_recursive<'db>(
-        db: &'db dyn Db,
-        definition: Definition<'db>,
-        visited: &mut FxHashSet<Definition<'db>>,
-        symbol_name: Option<&str>,
-        alias_resolution: ImportAliasResolution,
-    ) -> Vec<ResolvedDefinition<'db>> {
-        // Prevent infinite recursion if there are circular imports
-        if visited.contains(&definition) {
-            return Vec::new(); // Return empty list for circular imports
-        }
-        visited.insert(definition);
-
-        let kind = definition.kind(db);
-
-        match kind {
-            DefinitionKind::Import(import_def) => {
-                let file = definition.file(db);
-                let module = parsed_module(db, file).load(db);
-                let alias = import_def.alias(&module);
-
-                if alias.asname.is_some()
-                    && alias_resolution == ImportAliasResolution::PreserveAliases
-                {
-                    return vec![ResolvedDefinition::Definition(definition)];
-                }
-
-                // Get the full module name being imported
-                let Some(module_name) = ModuleName::new(&alias.name) else {
-                    return Vec::new(); // Invalid module name, return empty list
-                };
-
-                // Resolve the module to its file
-                let Some(resolved_module) = resolve_module(db, file, &module_name) else {
-                    return Vec::new(); // Module not found, return empty list
-                };
-
-                let Some(module_file) = resolved_module.file(db) else {
-                    return Vec::new(); // No file for module, return empty list
-                };
-
-                // For simple imports like "import os", we want to navigate to the module itself.
-                // Return the module file directly instead of trying to find definitions within it.
-                vec![ResolvedDefinition::Module(module_file)]
-            }
-
-            DefinitionKind::ImportFrom(import_from_def) => {
-                let file = definition.file(db);
-                let module = parsed_module(db, file).load(db);
-                let import_node = import_from_def.import(&module);
-                let alias = import_from_def.alias(&module);
-
-                if alias.asname.is_some()
-                    && alias_resolution == ImportAliasResolution::PreserveAliases
-                {
-                    return vec![ResolvedDefinition::Definition(definition)];
-                }
-
-                // For `ImportFrom`, we need to resolve the original imported symbol name
-                // (alias.name), not the local alias (symbol_name)
-                resolve_from_import_definitions(
-                    db,
-                    file,
-                    import_node,
-                    &alias.name,
-                    visited,
-                    alias_resolution,
-                )
-            }
-
-            // For star imports, try to resolve to the specific symbol being accessed
-            DefinitionKind::StarImport(star_import_def) => {
-                let file = definition.file(db);
-                let module = parsed_module(db, file).load(db);
-                let import_node = star_import_def.import(&module);
-
-                // If we have a symbol name, use the helper to resolve it in the target module
-                if let Some(symbol_name) = symbol_name {
-                    resolve_from_import_definitions(
-                        db,
-                        file,
-                        import_node,
-                        symbol_name,
-                        visited,
-                        alias_resolution,
-                    )
-                } else {
-                    // No symbol context provided, can't resolve star import
-                    Vec::new()
-                }
-            }
-
-            // For non-import definitions, return the definition as is
-            _ => vec![ResolvedDefinition::Definition(definition)],
-        }
-    }
-
-    /// Helper function to resolve import definitions for `ImportFrom` and `StarImport` cases.
-    pub(crate) fn resolve_from_import_definitions<'db>(
-        db: &'db dyn Db,
-        file: File,
-        import_node: &ast::StmtImportFrom,
-        symbol_name: &str,
-        visited: &mut FxHashSet<Definition<'db>>,
-        alias_resolution: ImportAliasResolution,
-    ) -> Vec<ResolvedDefinition<'db>> {
-        if alias_resolution == ImportAliasResolution::PreserveAliases {
-            for alias in &import_node.names {
-                if let Some(asname) = &alias.asname {
-                    if asname.as_str() == symbol_name {
-                        return vec![ResolvedDefinition::FileWithRange(FileRange::new(
-                            file,
-                            asname.range,
-                        ))];
-                    }
-                }
-            }
-        }
-
-        // Resolve the module being imported from (handles both relative and absolute imports)
-        let Some(module_name) = ModuleName::from_import_statement(db, file, import_node).ok()
-        else {
-            return Vec::new();
-        };
-        let Some(resolved_module) = resolve_module(db, file, &module_name) else {
-            return Vec::new();
-        };
-
-        // Resolve the target module file
-        let module_file = resolved_module.file(db);
-
-        let Some(module_file) = module_file else {
-            // No file means this is a namespace package, try to import the submodule
-            return Vec::from_iter(resolve_from_import_submodule_definitions(
-                db,
-                file,
-                symbol_name,
-                module_name,
-            ));
-        };
-
-        // Find the definition of this symbol in the imported module's global scope
-        let global_scope = global_scope(db, module_file);
-        let definitions_in_module = find_symbol_in_scope(db, global_scope, symbol_name);
-
-        // Recursively resolve any import definitions found in the target module
-        let mut resolved_definitions = Vec::new();
-        for def in definitions_in_module {
-            let resolved =
-                resolve_definition_recursive(db, def, visited, Some(symbol_name), alias_resolution);
-            resolved_definitions.extend(resolved);
-        }
-
-        if resolved_definitions.is_empty() {
-            // In `pkg/__init__.py`, `from . import child` resolves `.` to
-            // `pkg/__init__.py`. Looking up `child` there can find an import definition
-            // that recursively resolves back here (possibly through `from . import *`),
-            // so recursive resolution bottoms out before reaching the `pkg.child`
-            // submodule target. Fall back to the same submodule candidate we use when
-            // `child` has no binding in `pkg/__init__.py`.
-            Vec::from_iter(resolve_from_import_submodule_definitions(
-                db,
-                file,
-                symbol_name,
-                module_name,
-            ))
-        } else {
-            resolved_definitions
-        }
-    }
-
-    // Helper to resolve `from x.y import z` assuming `x.y.z` is a module.
-    fn resolve_from_import_submodule_definitions<'db>(
-        db: &'db dyn Db,
-        file: File,
-        symbol_name: &str,
-        module_name: ModuleName,
-    ) -> Option<ResolvedDefinition<'db>> {
-        let submodule_name = ModuleName::new(symbol_name)?;
-        let mut full_submodule_name = module_name;
-        full_submodule_name.extend(&submodule_name);
-        let module = resolve_module(db, file, &full_submodule_name)?;
-        let file = module.file(db)?;
-
-        Some(ResolvedDefinition::Module(file))
-    }
-
-    /// Find definitions for a symbol name in a specific scope.
-    pub(crate) fn find_symbol_in_scope<'db>(
-        db: &'db dyn Db,
-        scope: ScopeId<'db>,
-        symbol_name: &str,
-    ) -> IndexSet<Definition<'db>> {
-        let place_table = place_table(db, scope);
-        let Some(symbol_id) = place_table.symbol_id(symbol_name) else {
-            return IndexSet::new();
-        };
-
-        let use_def_map = use_def_map(db, scope);
-        let mut definitions = IndexSet::new();
-
-        // Get all definitions (both bindings and declarations) for this place
-        let bindings = use_def_map.reachable_symbol_bindings(symbol_id);
-        let declarations = use_def_map.reachable_symbol_declarations(symbol_id);
-
-        for binding in bindings {
-            if let Some(def) = binding.binding.definition() {
-                definitions.insert(def);
-            }
-        }
-
-        for declaration in declarations {
-            if let Some(def) = declaration.declaration.definition() {
-                definitions.insert(def);
-            }
-        }
-
-        definitions
-    }
+    use ty_module_resolver::stub_file_to_real_module;
+    use ty_python_core::{ProgramFile, global_scope, semantic_index};
 
     /// Given a definition that may be in a stub file, find the "real" definition in a non-stub.
     #[tracing::instrument(skip_all)]
@@ -1664,8 +1716,14 @@ mod resolve_definition {
         def: &ResolvedDefinition<'db>,
         cached_vendored_typeshed: Option<&SystemPath>,
     ) -> Option<Vec<ResolvedDefinition<'db>>> {
+        let Some(stub_program_file) = def.program_file(db) else {
+            trace!("Found arbitrary FileWithRange while stub mapping, giving up");
+            return None;
+        };
+        let env = ProgramEnvironment::from_file(stub_program_file);
+
         // If the file isn't a stub, this is presumably the real definition
-        let stub_file = def.file(db);
+        let stub_file = stub_program_file.file(db);
         trace!("Stub mapping definition in: {}", stub_file.path(db));
         if !stub_file.is_stub(db) {
             trace!("File isn't a stub, no stub mapping to do");
@@ -1682,7 +1740,7 @@ mod resolve_definition {
         // we're in typeshed to successfully stub-map to the Real Stdlib. So here we attempt
         // to do just that. The resulting file must not be used for anything other than
         // this module lookup, as the `ResolvedDefinition` we're handling isn't for that file.
-        let mut stub_file_for_module_lookup = stub_file;
+        let mut stub_file_for_module_lookup = stub_program_file;
         if let Some(vendored_typeshed) = cached_vendored_typeshed
             && let Some(stub_path) = stub_file.path(db).as_system_path()
             && let Ok(rel_path) = stub_path.strip_prefix(vendored_typeshed)
@@ -1693,73 +1751,33 @@ mod resolve_definition {
                 "Stub is cached vendored typeshed: {}",
                 typeshed_file.path(db)
             );
-            stub_file_for_module_lookup = typeshed_file;
+            stub_file_for_module_lookup = ProgramFile::new(db, typeshed_file, env.program(db));
         }
 
         // It's definitely a stub, so now rerun module resolution but with stubs disabled.
-        let stub_module = file_to_module(db, stub_file_for_module_lookup)?;
-        trace!("Found stub module: {}", stub_module.name(db));
-        // We need to pass an importing file to `resolve_real_module` which is a bit odd
-        // here because there isn't really an importing file. However this `resolve_real_module`
-        // can be understood as essentially `import .`, which is also what `file_to_module` is,
-        // so this is in fact exactly the file we want to consider the importer.
-        //
-        // ... unless we have a builtin module. i.e., A module embedded
-        // into the interpreter. In which case, all we have are stubs.
-        // `resolve_real_module` will always return `None` for this case, but
-        // it will emit false positive logs. And this saves us some work.
-        if is_builtin_module(db.python_version().minor, stub_module.name(db)) {
-            return None;
-        }
-        let real_module =
-            resolve_real_module(db, stub_file_for_module_lookup, stub_module.name(db))?;
+        let resolver_file = stub_file_for_module_lookup.resolver_file(db);
+        let real_module = stub_file_to_real_module(db, resolver_file)?;
         trace!("Found real module: {}", real_module.name(db));
-        let real_file = real_module.file(db)?;
+        let real_parse_file = ProgramFile::new(db, real_module.file(db)?, env.program(db));
+        let real_file = real_parse_file.file(db);
         trace!("Found real file: {}", real_file.path(db));
 
-        // A definition has a "Definition Path" in a file made of nested definitions (~scopes):
+        // A definition's lexical name path describes its nesting within a module:
         //
         // ```
-        // class myclass:  # ./myclass
-        //     def some_func(args: bool):  # ./myclass/some_func
-        //                 # ^~~~ ./myclass/other_func/args/
+        // class Outer:          # [Outer]
+        //     def method(): ... # [Outer, method]
         // ```
         //
-        // So our heuristic goal here is to compute a Definition Path in the stub file
-        // and then resolve the same Definition Path in the real file.
+        // Compute the path in the stub file, then resolve the same path in the real file.
         //
-        // NOTE: currently a path component is just a str, but in the future additional
+        // NOTE: currently a path component is just a name, but in the future additional
         // disambiguators (like "is a class def") could be added if needed.
-        let mut path = Vec::new();
-        let stub_parsed;
-        let stub_ref;
-        match *def {
+        let path = match *def {
             ResolvedDefinition::Definition(definition) => {
-                stub_parsed = parsed_module(db, stub_file);
-                stub_ref = stub_parsed.load(db);
-
-                // Get the leaf of the path (the definition itself)
-                let leaf = definition_path_component_for_leaf(db, &stub_ref, definition)
-                    .map_err(|()| {
-                        trace!("Found unsupported DefinitionKind while stub mapping, giving up");
-                    })
-                    .ok()?;
-                path.push(leaf);
-
-                // Get the ancestors of the path (all the definitions we're nested under)
-                let index = semantic_index(db, stub_file);
-                for (_scope_id, scope) in index.ancestor_scopes(definition.file_scope(db)) {
-                    let node = scope.node();
-                    let component = definition_path_component_for_node(&stub_ref, node)
-                        .map_err(|()| {
-                            trace!("Found unsupported NodeScopeKind while stub mapping, giving up");
-                        })
-                        .ok()?;
-                    if let Some(component) = component {
-                        path.push(component);
-                    }
-                }
-                trace!("Built Definition Path: {path:?}");
+                let path = lexical_name_path_for_definition(db, definition)?;
+                trace!("Built lexical name path: {path:?}");
+                path
             }
             ResolvedDefinition::Module(_) => {
                 trace!(
@@ -1767,40 +1785,43 @@ mod resolve_definition {
                     stub_file.path(db),
                     real_file.path(db)
                 );
-                return Some(vec![ResolvedDefinition::Module(real_file)]);
+                return Some(vec![ResolvedDefinition::Module(real_parse_file)]);
             }
             ResolvedDefinition::FileWithRange(_) => {
                 // Not yet implemented -- in this case we want to recover something like a Definition
-                // and build a Definition Path, but this input is a bit too abstract for now.
+                // and build a lexical name path, but this input is a bit too abstract for now.
                 trace!("Found arbitrary FileWithRange while stub mapping, giving up");
                 return None;
             }
-        }
+        };
 
-        // Walk down the Definition Path in the real file
+        // Walk down the lexical name path in the real file.
         let mut definitions = Vec::new();
-        let index = semantic_index(db, real_file);
-        let real_parsed = parsed_module(db, real_file);
+        let index = semantic_index(db, real_parse_file);
+        let global_scope = global_scope(db, real_parse_file);
+        let real_parsed = parsed_module(db, global_scope.python_file(db));
         let real_ref = real_parsed.load(db);
         // Start our search in the module (global) scope
-        let mut scopes = vec![global_scope(db, real_file)];
-        while let Some(component) = path.pop() {
-            trace!("Traversing definition path component: {}", component);
+        let mut scopes = vec![global_scope];
+        let mut path = path.iter().peekable();
+        while let Some(component) = path.next() {
+            trace!("Traversing lexical name path component: {}", component);
             // We're doing essentially a breadth-first traversal of the definitions.
             // If ever we find multiple matching scopes for a component, we need to continue
             // walking down each of them to try to resolve the path. Here we loop over
             // all the scopes at the current level of search.
             for scope in std::mem::take(&mut scopes) {
-                if path.is_empty() {
+                if path.peek().is_none() {
                     // We're at the end of the path, everything we find here is the final result
                     definitions.extend(
-                        find_symbol_in_scope(db, scope, component)
+                        find_symbol_in_scope(db, scope, component.as_str())
                             .into_iter()
                             .flat_map(|definition| {
                                 resolve_definition(
                                     db,
+                                    &env,
                                     definition,
-                                    Some(component),
+                                    Some(component.as_str()),
                                     ImportAliasResolution::ResolveAliases,
                                 )
                             }),
@@ -1811,11 +1832,10 @@ mod resolve_definition {
                     {
                         let scope_node = child_scope.node();
                         if let Ok(Some(real_component)) =
-                            definition_path_component_for_node(&real_ref, scope_node)
+                            lexical_name_path_component_for_node(&real_ref, scope_node)
+                            && real_component == *component
                         {
-                            if real_component == component {
-                                scopes.push(child_scope_id.to_scope_id(db, real_file));
-                            }
+                            scopes.push(child_scope_id.to_scope_id(db, real_parse_file));
                         }
                         scope.node(db);
                     }
@@ -1835,86 +1855,15 @@ mod resolve_definition {
             Some(definitions)
         }
     }
-
-    /// Computes a "Definition Path" component for an internal node of the definition path.
-    ///
-    /// See [`map_stub_definition`][] for details.
-    fn definition_path_component_for_node<'parse>(
-        parsed: &'parse ParsedModuleRef,
-        node: &NodeWithScopeKind,
-    ) -> Result<Option<&'parse str>, ()> {
-        let component = match node {
-            NodeWithScopeKind::Module => {
-                // This is just implicit, so has no component
-                return Ok(None);
-            }
-            NodeWithScopeKind::Class(class) => class.node(parsed).name.as_str(),
-            NodeWithScopeKind::Function(func) => func.node(parsed).name.as_str(),
-            NodeWithScopeKind::TypeAlias(_)
-            | NodeWithScopeKind::ClassTypeParameters(_)
-            | NodeWithScopeKind::FunctionTypeParameters(_)
-            | NodeWithScopeKind::TypeAliasTypeParameters(_)
-            | NodeWithScopeKind::Lambda(_)
-            | NodeWithScopeKind::ListComprehension(_)
-            | NodeWithScopeKind::SetComprehension(_)
-            | NodeWithScopeKind::DictComprehension(_)
-            | NodeWithScopeKind::GeneratorExpression(_) => {
-                // Not yet implemented
-                return Err(());
-            }
-        };
-        Ok(Some(component))
-    }
-
-    /// Computes a "Definition Path" component for a leaf node of the definition path.
-    ///
-    /// See [`map_stub_definition`][] for details.
-    fn definition_path_component_for_leaf<'parse>(
-        db: &dyn Db,
-        parsed: &'parse ParsedModuleRef,
-        definition: Definition,
-    ) -> Result<&'parse str, ()> {
-        let component = match definition.kind(db) {
-            DefinitionKind::Function(func) => func.node(parsed).name.as_str(),
-            DefinitionKind::Class(class) => class.node(parsed).name.as_str(),
-            DefinitionKind::TypeAlias(_)
-            | DefinitionKind::Import(_)
-            | DefinitionKind::ImportFrom(_)
-            | DefinitionKind::ImportFromSubmodule(_)
-            | DefinitionKind::StarImport(_)
-            | DefinitionKind::NamedExpression(_)
-            | DefinitionKind::Assignment(_)
-            | DefinitionKind::AnnotatedAssignment(_)
-            | DefinitionKind::AugmentedAssignment(_)
-            | DefinitionKind::DictKeyAssignment(_)
-            | DefinitionKind::For(_)
-            | DefinitionKind::Comprehension(_)
-            | DefinitionKind::Parameter(_)
-            | DefinitionKind::LambdaParameter { .. }
-            | DefinitionKind::WithItem(_)
-            | DefinitionKind::MatchPattern(_)
-            | DefinitionKind::ExceptHandler(_)
-            | DefinitionKind::TypeVar(_)
-            | DefinitionKind::ParamSpec(_)
-            | DefinitionKind::TypeVarTuple(_)
-            | DefinitionKind::LoopHeader(_)
-            | DefinitionKind::NestedBindings(_) => {
-                // Not yet implemented
-                return Err(());
-            }
-        };
-
-        Ok(component)
-    }
 }
 
 /// Information about a class in the type hierarchy.
 #[derive(Debug, Clone)]
-pub struct TypeHierarchyClass {
+pub struct TypeHierarchyClass<'db> {
     /// The name of the class.
     pub name: Name,
     /// The file containing the class definition.
-    pub file: ruff_db::files::File,
+    pub file: ResolverFile<'db>,
     /// The range covering the full class definition header.
     pub full_range: TextRange,
     /// The range of the class name (for selection/focus).
@@ -1929,8 +1878,12 @@ pub struct TypeHierarchyClass {
 /// This is meant to be used to "prepare" for a subtype or supertype request.
 /// That is, this effectively validates whether the given type can be used in
 /// subsequent requests for supertypes or subtypes.
-pub fn type_hierarchy_prepare(db: &dyn Db, ty: Type<'_>) -> Option<TypeHierarchyClass> {
-    let class_literal = extract_class_literal(db, ty)?;
+pub fn type_hierarchy_prepare<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+) -> Option<TypeHierarchyClass<'db>> {
+    let class_literal = extract_class_literal(db, env, ty)?;
     Some(class_literal_to_hierarchy_info(db, class_literal))
 }
 
@@ -1940,18 +1893,22 @@ pub fn type_hierarchy_prepare(db: &dyn Db, ty: Type<'_>) -> Option<TypeHierarchy
 /// returns an empty sequence.
 ///
 /// This includes `object` when the given class has no direct base classes.
-pub fn type_hierarchy_supertypes(db: &dyn Db, ty: Type<'_>) -> Vec<TypeHierarchyClass> {
-    let Some(class_literal) = extract_class_literal(db, ty) else {
+pub fn type_hierarchy_supertypes<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+) -> Vec<TypeHierarchyClass<'db>> {
+    let Some(class_literal) = extract_class_literal(db, env, ty) else {
         return vec![];
     };
     if class_literal.is_known(db, KnownClass::Object) {
         return vec![];
     }
 
-    let mut supertypes: Vec<TypeHierarchyClass> = class_literal
+    let mut supertypes: Vec<TypeHierarchyClass<'db>> = class_literal
         .explicit_bases(db)
         .into_iter()
-        .filter_map(|base| extract_class_literal(db, base))
+        .filter_map(|base| extract_class_literal(db, env, base))
         .map(|class_literal| class_literal_to_hierarchy_info(db, class_literal))
         .collect();
     // Every class implicitly inherits from `object` when no explicit
@@ -1959,30 +1916,51 @@ pub fn type_hierarchy_supertypes(db: &dyn Db, ty: Type<'_>) -> Vec<TypeHierarchy
     if supertypes.is_empty() {
         supertypes.push(class_literal_to_hierarchy_info(
             db,
-            ClassLiteral::object(db),
+            ClassLiteral::object(db, env),
         ));
     }
     supertypes
 }
 
-/// Get the direct subtypes of the class given.
+/// Get the direct subtypes of the class given in `modules`.
 ///
 /// When the type given doesn't correspond to a class literal, then this always
 /// returns an empty sequence.
-///
-/// Note that this scans all modules in `db` to find classes that directly
-/// inherit from the given class. This could be quite expensive in large
-/// projects.
-pub fn type_hierarchy_subtypes(db: &dyn Db, ty: Type<'_>) -> Vec<TypeHierarchyClass> {
-    let Some(target_class) = extract_class_literal(db, ty) else {
+pub fn type_hierarchy_subtypes<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+    modules: &[Module<'db>],
+) -> Vec<TypeHierarchyClass<'db>> {
+    let Some(target_class) = extract_class_literal(db, env, ty) else {
         return vec![];
     };
+    direct_subtypes(db, env, target_class, modules)
+        .into_iter()
+        .map(|class_literal| class_literal_to_hierarchy_info(db, class_literal))
+        .collect()
+}
+
+/// Finds classes that directly inherit from `target_class`.
+///
+/// ```py
+/// class Animal: ...
+/// class Dog(Animal): ...
+/// class LoudDog(Dog): ...
+/// ```
+///
+/// For `Animal`, this returns `Dog`, but not `LoudDog`.
+fn direct_subtypes<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    target_class: ClassLiteral<'db>,
+    modules: &[Module<'db>],
+) -> Vec<ClassLiteral<'db>> {
     let target_name = target_class.name(db);
     let target_is_object = target_class.is_known(db, KnownClass::Object);
     let mut subtypes = vec![];
 
-    // Scan all modules in the workspace
-    for module in ty_module_resolver::all_modules(db) {
+    for &module in modules {
         let Some(file) = module.file(db) else {
             continue;
         };
@@ -1999,37 +1977,25 @@ pub fn type_hierarchy_subtypes(db: &dyn Db, ty: Type<'_>) -> Vec<TypeHierarchyCl
             continue;
         }
 
-        // Skip files that don't contain the class name. This avoids expensive
-        // semantic analysis for files that can't possibly contain a subclass
-        // of the target. We can't do this when looking for subtypes of
-        // `object` since `object` can be implicit.
-        if !target_is_object && !source_text(db, file).contains(target_name.as_str()) {
+        let source = source_text(db, file);
+        if !contains_identifier(&source, "class") {
             continue;
         }
 
-        let index = semantic_index(db, file);
-        for scope_id in index.scope_ids() {
-            let scope = scope_id.node(db);
-            let Some(class_node) = scope.as_class() else {
-                continue;
-            };
+        // Keep the cheap name-based prefilter for non-first-party modules, which includes the
+        // vendored stdlib. First-party modules may inherit through local import aliases, e.g.
+        // `from a import Base as B; class Child(B): ...`, so they need semantic analysis even
+        // when they do not mention the target class's original name.
+        if is_non_first_party
+            && !target_is_object
+            && !contains_identifier(&source, target_name.as_str())
+        {
+            continue;
+        }
 
-            let def = index.expect_single_definition(class_node);
-            if !matches!(def.kind(db), DefinitionKind::Class(_)) {
-                continue;
-            }
-
-            let file_scope_id = scope_id.file_scope_id(db);
-            let parsed = parsed_module(db, file).load(db);
-            if !is_range_reachable(db, index, file_scope_id, class_node.node(&parsed).range()) {
-                continue;
-            }
-
-            let ty = crate::types::binding_type(db, def);
-            let Some(class_ty) = extract_class_literal(db, ty) else {
-                continue;
-            };
-
+        let program_file = ProgramFile::new(db, file, env.program(db));
+        let file_env = ProgramEnvironment::from_file(program_file);
+        for class_ty in reachable_class_literals_in_file(db, program_file) {
             let bases = class_ty.explicit_bases(db);
             let is_subtype = if target_is_object
                 && bases.is_empty()
@@ -2038,20 +2004,61 @@ pub fn type_hierarchy_subtypes(db: &dyn Db, ty: Type<'_>) -> Vec<TypeHierarchyCl
                 true
             } else {
                 bases.iter().any(|base| {
-                    extract_class_literal(db, *base)
+                    extract_class_literal(db, &file_env, *base)
                         .is_some_and(|base_literal| base_literal == target_class)
                 })
             };
             if is_subtype {
-                subtypes.push(class_literal_to_hierarchy_info(db, class_ty));
+                subtypes.push(class_ty);
             }
         }
     }
     subtypes
 }
 
+/// Enumerates the reachable class definitions in `file`.
+fn reachable_class_literals_in_file<'db>(
+    db: &'db dyn Db,
+    file: ProgramFile<'db>,
+) -> Vec<ClassLiteral<'db>> {
+    let env = ProgramEnvironment::from_file(file);
+    let index = semantic_index(db, file);
+    let parsed = parsed_module(db, file.python_file(db)).load(db);
+    let mut classes = Vec::new();
+
+    for scope_id in index.scope_ids() {
+        let scope = scope_id.node(db);
+        let Some(class_node) = scope.as_class() else {
+            continue;
+        };
+
+        // Map AST class node to its definition in the semantic index.
+        let definition = index.expect_single_definition(class_node);
+        if !matches!(definition.kind(db), DefinitionKind::Class(_)) {
+            continue;
+        }
+
+        // Drop classes in dead code — e.g. a class under if sys.version_info < (3, 9): on a newer Python.
+        let file_scope_id = scope_id.file_scope_id(db);
+        if !is_range_reachable(db, index, file_scope_id, class_node.node(&parsed).range()) {
+            continue;
+        }
+
+        // Convert the definition's type into a ClassLiteral, dropping anything that doesn't produce a usable class object.
+        if let Some(class) = extract_class_literal(db, &env, binding_type(db, definition)) {
+            classes.push(class);
+        }
+    }
+
+    classes
+}
+
 /// Extract a `ClassLiteral` from a `Type`, handling various type forms.
-fn extract_class_literal<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<ClassLiteral<'db>> {
+fn extract_class_literal<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+) -> Option<ClassLiteral<'db>> {
     match ty {
         Type::ClassLiteral(class_literal) => Some(class_literal),
         Type::SubclassOf(subclass_of) => {
@@ -2061,15 +2068,16 @@ fn extract_class_literal<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<ClassLit
                     Some(class_type.class_literal(db))
                 }
                 crate::types::SubclassOfInner::Dynamic(_)
+                | crate::types::SubclassOfInner::Protocol(_)
                 | crate::types::SubclassOfInner::TypeVar(_) => None,
             }
         }
         Type::GenericAlias(generic_alias) => Some(ClassLiteral::Static(generic_alias.origin(db))),
-        Type::NominalInstance(instance) => Some(instance.class(db).class_literal(db)),
+        Type::NominalInstance(instance) => Some(instance.class(db, env).class_literal(db)),
         Type::Union(union) => union
             .elements(db)
             .iter()
-            .find_map(|elem| extract_class_literal(db, *elem)),
+            .find_map(|elem| extract_class_literal(db, env, *elem)),
 
         _ => None,
     }
@@ -2079,16 +2087,16 @@ fn extract_class_literal<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<ClassLit
 ///
 /// For the most part, this is about extracting the right
 /// text ranges.
-fn class_literal_to_hierarchy_info(
-    db: &dyn Db,
-    class_literal: ClassLiteral<'_>,
-) -> TypeHierarchyClass {
+fn class_literal_to_hierarchy_info<'db>(
+    db: &'db dyn Db,
+    class_literal: ClassLiteral<'db>,
+) -> TypeHierarchyClass<'db> {
     let name = class_literal.name(db).clone();
-    let file = class_literal.file(db);
+    let file = class_literal.program_file(db).resolver_file(db);
 
     let (full_range, selection_range) = match class_literal {
         ClassLiteral::Static(static_class) => {
-            let parsed = parsed_module(db, file).load(db);
+            let parsed = parsed_module(db, static_class.python_file(db)).load(db);
             let header_range = static_class.header_range(db);
             let body_scope = static_class.body_scope(db);
 
@@ -2116,7 +2124,7 @@ fn class_literal_to_hierarchy_info(
         // (likely incorrectly) return the type hierarchy for `type` itself.
         ClassLiteral::Dynamic(dynamic_class) => {
             if let DynamicClassAnchor::Definition(definition) = dynamic_class.anchor(db) {
-                let parsed = parsed_module(db, file).load(db);
+                let parsed = parsed_module(db, definition.python_file(db)).load(db);
                 let kind = definition.kind(db);
                 (kind.full_range(&parsed), kind.target_range(&parsed))
             } else {
@@ -2128,7 +2136,7 @@ fn class_literal_to_hierarchy_info(
             if let DynamicNamedTupleAnchor::CollectionsDefinition { definition, .. }
             | DynamicNamedTupleAnchor::TypingDefinition(definition) = namedtuple.anchor(db)
             {
-                let parsed = parsed_module(db, file).load(db);
+                let parsed = parsed_module(db, definition.python_file(db)).load(db);
                 let kind = definition.kind(db);
                 (kind.full_range(&parsed), kind.target_range(&parsed))
             } else {
@@ -2142,7 +2150,7 @@ fn class_literal_to_hierarchy_info(
         }
         ClassLiteral::DynamicEnum(dynamic_enum) => {
             if let DynamicEnumAnchor::Definition { definition, .. } = dynamic_enum.anchor(db) {
-                let parsed = parsed_module(db, file).load(db);
+                let parsed = parsed_module(db, definition.python_file(db)).load(db);
                 let kind = definition.kind(db);
                 (kind.full_range(&parsed), kind.target_range(&parsed))
             } else {
@@ -2164,21 +2172,21 @@ pub fn constructor_signature(model: &SemanticModel, call_expr: &ast::ExprCall) -
     let function_ty = call_expr.func.inferred_type(model)?;
     let db = model.db();
     let class_name = function_ty.as_class_literal()?.name(db);
+    let env = &model.program_environment();
     let display_sig = |signature: &Signature| {
         let params = signature
-            .display_with(
-                db,
-                DisplaySettings::default()
-                    .multiline()
-                    .disallow_signature_name()
-                    .hide_return_type(),
-            )
+            .display(db, env)
+            .multiline()
+            .disallow_name()
+            .hide_return_type()
             .to_string();
 
         format!("class {class_name}{params}")
     };
-    let callable_type = function_ty.try_upcast_to_callable(db)?.into_type(db);
-    let bindings = callable_type.bindings(db);
+    let callable_type = function_ty
+        .try_upcast_to_callable(db, env)?
+        .into_type(db, env);
+    let bindings = callable_type.bindings(db, env);
 
     if let Some(binding) = bindings.single_element()
         && binding.overloads().len() == 1
@@ -2208,11 +2216,58 @@ pub fn constructor_signature(model: &SemanticModel, call_expr: &ast::ExprCall) -
 
 #[cfg(test)]
 mod tests {
-    use super::{CallArgumentForm, call_argument_forms};
+    use super::{
+        CallArgumentForm, ImportAliasResolution, call_argument_forms, contains_identifier,
+        definitions_for_name,
+    };
     use crate::SemanticModel;
     use crate::db::tests::TestDbBuilder;
+    use anyhow::Context;
     use ruff_db::files::system_path_to_file;
     use ruff_db::parsed::parsed_module;
+    use ruff_db::testing::assert_function_query_was_not_run_by_name;
+    use ruff_python_ast as ast;
+    use ty_python_core::ProgramFile;
+
+    #[test]
+    fn builtin_definition_lookup_does_not_infer_scope() -> anyhow::Result<()> {
+        let mut db = TestDbBuilder::new()
+            .with_file("/src/foo.py", "isinstance")
+            .build()?;
+        let file = system_path_to_file(&db, "/src/foo.py")?;
+        let file = ProgramFile::new(&db, file, db.program_environment().program(&db));
+        let parsed = parsed_module(&db, file.python_file(&db)).load(&db);
+        let expression = &parsed
+            .suite()
+            .first()
+            .and_then(ast::Stmt::as_expr_stmt)
+            .context("expected an expression statement")?
+            .value;
+        let model = SemanticModel::new(&db, file);
+
+        let definitions = definitions_for_name(
+            &model,
+            "isinstance",
+            expression.as_ref().into(),
+            ImportAliasResolution::ResolveAliases,
+        );
+        assert_eq!(definitions.len(), 1);
+
+        let events = db.take_salsa_events();
+        assert_function_query_was_not_run_by_name(&db, "infer_scope_types_impl", None, &events);
+        Ok(())
+    }
+
+    #[test]
+    fn source_candidate_prefilters_use_identifier_boundaries() {
+        for (source, name) in [("x = 1", "x"), ("obj.x", "x"), ("x()", "x")] {
+            assert!(contains_identifier(source, name));
+        }
+
+        for (source, name) in [("exclude = 10", "x"), ("Database", "Base"), ("", "x")] {
+            assert!(!contains_identifier(source, name));
+        }
+    }
 
     #[test]
     fn keyword_call_argument_forms_follow_source_order() -> anyhow::Result<()> {
@@ -2228,7 +2283,8 @@ cast(val="", typ=int)
             .build()?;
 
         let file = system_path_to_file(&db, "/src/foo.py").unwrap();
-        let parsed = parsed_module(&db, file).load(&db);
+        let file = ProgramFile::new(&db, file, db.program_environment().program(&db));
+        let parsed = parsed_module(&db, file.python_file(&db)).load(&db);
         let call = parsed
             .suite()
             .last()
@@ -2268,7 +2324,8 @@ f(y="", x=1)
             .build()?;
 
         let file = system_path_to_file(&db, "/src/foo.py").unwrap();
-        let parsed = parsed_module(&db, file).load(&db);
+        let file = ProgramFile::new(&db, file, db.program_environment().program(&db));
+        let parsed = parsed_module(&db, file.python_file(&db)).load(&db);
         let call = parsed
             .suite()
             .last()
@@ -2304,7 +2361,8 @@ f(val="", typ=int)
             .build()?;
 
         let file = system_path_to_file(&db, "/src/foo.py").unwrap();
-        let parsed = parsed_module(&db, file).load(&db);
+        let file = ProgramFile::new(&db, file, db.program_environment().program(&db));
+        let parsed = parsed_module(&db, file.python_file(&db)).load(&db);
         let call = parsed
             .suite()
             .last()
@@ -2341,7 +2399,8 @@ f("", int)
             .build()?;
 
         let file = system_path_to_file(&db, "/src/foo.py").unwrap();
-        let parsed = parsed_module(&db, file).load(&db);
+        let file = ProgramFile::new(&db, file, db.program_environment().program(&db));
+        let parsed = parsed_module(&db, file.python_file(&db)).load(&db);
         let call = parsed
             .suite()
             .last()
@@ -2381,7 +2440,8 @@ f(int, x)
             .build()?;
 
         let file = system_path_to_file(&db, "/src/foo.py").unwrap();
-        let parsed = parsed_module(&db, file).load(&db);
+        let file = ProgramFile::new(&db, file, db.program_environment().program(&db));
+        let parsed = parsed_module(&db, file.python_file(&db)).load(&db);
         let call = parsed
             .suite()
             .last()
@@ -2425,7 +2485,8 @@ TypeAliasType("Alias", int)
             .build()?;
 
         let file = system_path_to_file(&db, "/src/foo.py").unwrap();
-        let parsed = parsed_module(&db, file).load(&db);
+        let file = ProgramFile::new(&db, file, db.program_environment().program(&db));
+        let parsed = parsed_module(&db, file.python_file(&db)).load(&db);
         let calls: Vec<_> = parsed
             .suite()
             .iter()
@@ -2470,7 +2531,8 @@ cast(*args)
             .build()?;
 
         let file = system_path_to_file(&db, "/src/foo.py").unwrap();
-        let parsed = parsed_module(&db, file).load(&db);
+        let file = ProgramFile::new(&db, file, db.program_environment().program(&db));
+        let parsed = parsed_module(&db, file.python_file(&db)).load(&db);
         let call = parsed
             .suite()
             .last()

@@ -160,14 +160,14 @@ pub(crate) struct IdentifierTokenizer<'a> {
 }
 
 impl<'a> IdentifierTokenizer<'a> {
-    pub(crate) fn new(source: &'a str, range: TextRange) -> Self {
+    fn new(source: &'a str, range: TextRange) -> Self {
         Self {
             cursor: Cursor::new(&source[range]),
             offset: range.start(),
         }
     }
 
-    pub(crate) fn starts_at(offset: TextSize, source: &'a str) -> Self {
+    fn starts_at(offset: TextSize, source: &'a str) -> Self {
         let range = TextRange::new(offset, source.text_len());
         Self::new(source, range)
     }

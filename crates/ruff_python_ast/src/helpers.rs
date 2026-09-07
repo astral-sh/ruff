@@ -9,8 +9,7 @@ use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::name::{Name, QualifiedName, QualifiedNameBuilder};
 use crate::statement_visitor::StatementVisitor;
-use crate::token::Tokens;
-use crate::token::parenthesized_range;
+use crate::token::{Tokens, parenthesized_range};
 use crate::visitor::Visitor;
 use crate::{
     self as ast, Arguments, AtomicNodeIndex, CmpOp, DictItem, ExceptHandler, Expr, ExprNoneLiteral,
@@ -283,7 +282,16 @@ where
                 any_over_expr(left, &mut *func) || any_over_expr(right, &mut *func)
             }
             Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) => any_over_expr(operand, func),
-            Expr::Lambda(ast::ExprLambda { body, .. }) => any_over_expr(body, func),
+            Expr::Lambda(ast::ExprLambda {
+                body, parameters, ..
+            }) => {
+                parameters
+                    .iter()
+                    .flat_map(|parameters| parameters.iter_non_variadic_params())
+                    .filter_map(|parameter| parameter.default.as_deref())
+                    .any(|default| any_over_expr(default, &mut *func))
+                    || any_over_expr(body, func)
+            }
             Expr::If(ast::ExprIf {
                 test,
                 body,
@@ -310,18 +318,10 @@ where
                 range: _,
                 node_index: _,
             })
-            | Expr::List(ast::ExprList {
-                elts,
-                range: _,
-                node_index: _,
-                ..
-            })
-            | Expr::Tuple(ast::ExprTuple {
-                elts,
-                range: _,
-                node_index: _,
-                ..
-            }) => elts.iter().any(|expr| any_over_expr(expr, &mut *func)),
+            | Expr::List(ast::ExprList { elts, .. })
+            | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+                elts.iter().any(|expr| any_over_expr(expr, &mut *func))
+            }
             Expr::ListComp(ast::ExprListComp {
                 elt,
                 generators,
@@ -380,18 +380,8 @@ where
                 range: _,
                 node_index: _,
             })
-            | Expr::Attribute(ast::ExprAttribute {
-                value,
-                range: _,
-                node_index: _,
-                ..
-            })
-            | Expr::Starred(ast::ExprStarred {
-                value,
-                range: _,
-                node_index: _,
-                ..
-            }) => any_over_expr(value, func),
+            | Expr::Attribute(ast::ExprAttribute { value, .. })
+            | Expr::Starred(ast::ExprStarred { value, .. }) => any_over_expr(value, func),
             Expr::Yield(ast::ExprYield {
                 value,
                 range: _,
@@ -410,14 +400,18 @@ where
             Expr::Call(ast::ExprCall {
                 func: call_func,
                 arguments,
-                range: _,
+                range_start: _,
                 node_index: _,
             }) => {
+                // Note that this is the evaluation order but not necessarily the declaration order
+                // (e.g. for `f(*args, a=2, *args2, **kwargs)` it's not)
                 any_over_expr(call_func, &mut *func)
-                    // Note that this is the evaluation order but not necessarily the declaration order
-                    // (e.g. for `f(*args, a=2, *args2, **kwargs)` it's not)
-                    || arguments.args.iter().any(|expr| any_over_expr(expr, &mut *func))
-                    || arguments.keywords
+                    || arguments
+                        .args
+                        .iter()
+                        .any(|expr| any_over_expr(expr, &mut *func))
+                    || arguments
+                        .keywords
                         .iter()
                         .any(|keyword| any_over_expr(&keyword.value, &mut *func))
             }
@@ -824,7 +818,7 @@ pub fn is_assignment_to_a_dunder(stmt: &Stmt) -> bool {
 
 /// Return `true` if the [`Expr`] is a singleton (`None`, `True`, `False`, or
 /// `...`).
-pub const fn is_singleton(expr: &Expr) -> bool {
+const fn is_singleton(expr: &Expr) -> bool {
     matches!(
         expr,
         Expr::NoneLiteral(_) | Expr::BooleanLiteral(_) | Expr::EllipsisLiteral(_)

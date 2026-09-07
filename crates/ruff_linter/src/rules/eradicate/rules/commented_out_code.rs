@@ -5,6 +5,7 @@ use ruff_text_size::TextRange;
 
 use crate::Locator;
 use crate::checkers::ast::LintContext;
+use crate::codes::Category;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 use crate::rules::eradicate::detection::comment_contains_code;
@@ -30,7 +31,7 @@ use crate::rules::eradicate::detection::comment_contains_code;
 ///
 /// [#4845]: https://github.com/astral-sh/ruff/issues/4845
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.145")]
+#[violation_metadata(stable_since = "v0.0.145", category = Category::Pedantic)]
 pub(crate) struct CommentedOutCode;
 
 impl Violation for CommentedOutCode {

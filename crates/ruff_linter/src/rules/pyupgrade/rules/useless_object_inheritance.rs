@@ -4,6 +4,7 @@ use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::{Parentheses, remove_argument};
 use crate::{AlwaysFixableViolation, Fix};
 
@@ -32,7 +33,7 @@ use crate::{AlwaysFixableViolation, Fix};
 /// ## References
 /// - [PEP 3115 – Metaclasses in Python 3000](https://peps.python.org/pep-3115/)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.155")]
+#[violation_metadata(stable_since = "v0.0.155", category = Category::Complexity)]
 pub(crate) struct UselessObjectInheritance {
     name: String,
 }

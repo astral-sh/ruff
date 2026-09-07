@@ -1403,7 +1403,6 @@ Module(
  9 | (*lambda x: x, z, *lambda x: x)
 10 | (*x := 2, z, *x := 2)
    |  ^^ Syntax Error: Assignment expression target must be an identifier
-   |
 
 
    |
@@ -1411,7 +1410,6 @@ Module(
  9 | (*lambda x: x, z, *lambda x: x)
 10 | (*x := 2, z, *x := 2)
    |              ^^ Syntax Error: Assignment expression target must be an identifier
-   |
 
 
    |
@@ -1535,7 +1533,6 @@ Module(
 19 | *lambda x: x, z, *lambda x: x
 20 | *x := 2, z, *x := 2
    |    ^^ Syntax Error: Expected a statement
-   |
 
 
    |
@@ -1543,4 +1540,3 @@ Module(
 19 | *lambda x: x, z, *lambda x: x
 20 | *x := 2, z, *x := 2
    |                ^^ Syntax Error: Expected `,`, found `:=`
-   |

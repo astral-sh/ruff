@@ -47,13 +47,11 @@ error[unknown-argument]: Argument `d` does not match any known parameter of func
   |
 3 | f(a=1, b=2, c=3, d=42)  # error: [unknown-argument]
   |                  ^^^^
-  |
 info: Function signature here
  --> src/module.py:1:5
   |
 1 | def f(a, b, c=42): ...
   |     ^^^^^^^^^^^^^
-  |
 
 ```
 
@@ -63,7 +61,6 @@ error[unknown-argument]: Argument `d` does not match any known parameter of func
    |
 12 | h(a=1, b=2, d=42)
    |             ^^^^
-   |
 info: Union variant `def f(a, b, c=42) -> Unknown` is incompatible with this call site
 info: Attempted to call union type `(def f(a, b, c=42) -> Unknown) | (def g(a, b) -> Unknown)`
 
@@ -75,7 +72,6 @@ error[unknown-argument]: Argument `d` does not match any known parameter of func
    |
 12 | h(a=1, b=2, d=42)
    |             ^^^^
-   |
 info: Union variant `def g(a, b) -> Unknown` is incompatible with this call site
 info: Attempted to call union type `(def f(a, b, c=42) -> Unknown) | (def g(a, b) -> Unknown)`
 
@@ -87,12 +83,10 @@ error[unknown-argument]: Argument `c` does not match any known parameter of boun
    |
 14 | Foo().method(a=1, b=2, c=3)  # error: [unknown-argument]
    |                        ^^^
-   |
 info: Method signature here
  --> src/module.py:5:9
   |
 5 |     def method(self, a, b): ...
   |         ^^^^^^^^^^^^^^^^^^
-  |
 
 ```

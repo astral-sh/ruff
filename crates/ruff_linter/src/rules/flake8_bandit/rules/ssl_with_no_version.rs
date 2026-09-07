@@ -4,6 +4,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for calls to `ssl.wrap_socket()` without an `ssl_version`.
@@ -26,7 +27,7 @@ use crate::checkers::ast::Checker;
 /// ssl.wrap_socket(ssl_version=ssl.PROTOCOL_TLSv1_2)
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.2.0")]
+#[violation_metadata(stable_since = "v0.2.0", category = Category::Security)]
 pub(crate) struct SslWithNoVersion;
 
 impl Violation for SslWithNoVersion {

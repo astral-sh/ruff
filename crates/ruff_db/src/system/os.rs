@@ -1,17 +1,21 @@
 #![allow(clippy::disallowed_methods)]
 
+mod ignore;
+
+use self::ignore::IgnoreFiles;
 use super::walk_directory::{
-    self, DirectoryWalker, WalkDirectoryBuilder, WalkDirectoryConfiguration,
+    self, DirectoryWalker, IgnoreIncremental, WalkDirectoryBuilder, WalkDirectoryConfiguration,
     WalkDirectoryVisitorBuilder, WalkState,
 };
 use crate::max_parallelism;
 use crate::system::{
-    DirectoryEntry, FileType, Metadata, Result, System, SystemPath, SystemPathBuf,
-    SystemVirtualPath, WhichError, WhichResult, WritableSystem,
+    Command, CommandExecutor, DirectoryEntry, FileType, Metadata, Result, System, SystemPath,
+    SystemPathBuf, SystemVirtualPath, WhichError, WhichResult, WritableSystem,
 };
 use filetime::FileTime;
 use ruff_notebook::{Notebook, NotebookError};
 use std::num::NonZeroUsize;
+use std::process::Output;
 use std::sync::Arc;
 use std::{any::Any, path::PathBuf};
 
@@ -126,6 +130,10 @@ impl System for OsSystem {
         }
     }
 
+    fn command_executor(&self) -> Option<&dyn CommandExecutor> {
+        Some(self)
+    }
+
     fn current_directory(&self) -> &SystemPath {
         &self.inner.cwd
     }
@@ -173,7 +181,7 @@ impl System for OsSystem {
 
     /// Creates a builder to recursively walk `path`.
     ///
-    /// The walker ignores files according to [`ignore::WalkBuilder::standard_filters`]
+    /// The walker ignores files according to [`::ignore::WalkBuilder::standard_filters`]
     /// when setting [`WalkDirectoryBuilder::standard_filters`] to true.
     fn walk_directory(&self, path: &SystemPath) -> WalkDirectoryBuilder {
         WalkDirectoryBuilder::new(
@@ -216,6 +224,23 @@ impl System for OsSystem {
     }
 
     fn dyn_clone(&self) -> Box<dyn System> {
+        Box::new(self.clone())
+    }
+}
+
+impl CommandExecutor for OsSystem {
+    fn execute(&self, command: Command) -> Result<Output> {
+        let directory = command
+            .get_current_dir()
+            .unwrap_or_else(|| self.current_directory());
+
+        std::process::Command::new(command.get_executable())
+            .args(command.get_args())
+            .current_dir(directory.as_std_path())
+            .output()
+    }
+
+    fn dyn_clone(&self) -> Box<dyn CommandExecutor> {
         Box::new(self.clone())
     }
 }
@@ -268,7 +293,7 @@ impl DirectoryWalker for OsDirectoryWalker {
             return;
         };
 
-        let mut builder = ignore::WalkBuilder::new(first.as_std_path());
+        let mut builder = ::ignore::WalkBuilder::new(first.as_std_path());
         builder.current_dir(self.cwd.as_std_path());
 
         builder.standard_filters(standard_filters);
@@ -315,7 +340,7 @@ impl DirectoryWalker for OsDirectoryWalker {
                                 }));
 
                                 // Skip the entire directory because all the paths won't be UTF-8 paths.
-                                ignore::WalkState::Skip
+                                ::ignore::WalkState::Skip
                             }
                         }
                     }
@@ -326,22 +351,40 @@ impl DirectoryWalker for OsDirectoryWalker {
                             // (which, should not be reported here but the `ignore` crate doesn't distinguish between ignore and IO errors).
                             // Let's log the error to at least make it visible.
                             tracing::warn!("Failed to traverse directory: {error}.");
-                            ignore::WalkState::Continue
+                            ::ignore::WalkState::Continue
                         }
                     },
                 }
             })
         });
     }
+
+    fn incremental_matcher(
+        &self,
+        configuration: WalkDirectoryConfiguration,
+    ) -> Box<dyn IgnoreIncremental> {
+        let WalkDirectoryConfiguration {
+            paths,
+            ignore_hidden: hidden,
+            standard_filters,
+        } = configuration;
+
+        let mut builder = ::ignore::WalkBuilder::from_iter(paths.iter().map(|p| p.as_std_path()));
+        builder.current_dir(self.cwd.as_std_path());
+        builder.standard_filters(standard_filters);
+        builder.hidden(hidden);
+        let root_matchers = builder.build_matchers();
+        Box::new(IgnoreFiles { root_matchers })
+    }
 }
 
 #[cold]
 fn ignore_to_walk_directory_error(
-    error: ignore::Error,
+    error: ::ignore::Error,
     path: Option<PathBuf>,
     depth: Option<usize>,
-) -> std::result::Result<walk_directory::Error, ignore::Error> {
-    use ignore::Error;
+) -> std::result::Result<walk_directory::Error, ::ignore::Error> {
+    use ::ignore::Error;
 
     match error {
         Error::WithPath { path, err } => ignore_to_walk_directory_error(*err, Some(path), depth),
@@ -399,12 +442,12 @@ impl From<std::fs::FileType> for FileType {
     }
 }
 
-impl From<WalkState> for ignore::WalkState {
+impl From<WalkState> for ::ignore::WalkState {
     fn from(value: WalkState) -> Self {
         match value {
-            WalkState::Continue => ignore::WalkState::Continue,
-            WalkState::Skip => ignore::WalkState::Skip,
-            WalkState::Quit => ignore::WalkState::Quit,
+            WalkState::Continue => ::ignore::WalkState::Continue,
+            WalkState::Skip => ::ignore::WalkState::Skip,
+            WalkState::Quit => ::ignore::WalkState::Quit,
         }
     }
 }

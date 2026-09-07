@@ -514,4 +514,3 @@ Module(
  9 | {*lambda x: x, z}
 10 | {*x := 2, z}
    |  ^^ Syntax Error: Assignment expression target must be an identifier
-   |

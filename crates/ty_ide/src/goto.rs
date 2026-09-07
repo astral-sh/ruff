@@ -2,6 +2,7 @@ use crate::docstring::Docstring;
 pub use crate::goto_declaration::goto_declaration;
 pub use crate::goto_definition::goto_definition;
 pub use crate::goto_type_definition::goto_type_definition;
+use ty_python_semantic::Db;
 
 use std::borrow::Cow;
 
@@ -13,17 +14,19 @@ use ruff_python_ast::token::{Token, TokenAt, TokenKind, Tokens};
 use ruff_python_ast::{self as ast, AnyNodeRef, ExprRef};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
+use ty_python_core::ProgramFile;
 use ty_python_core::definition::{Definition, DefinitionKind};
-use ty_python_semantic::ResolvedDefinition;
 use ty_python_semantic::types::Type;
 use ty_python_semantic::types::ide_support::{
     call_signature_details, call_type_simplified_by_overloads, constructor_signature,
     definitions_and_overloads_for_function, definitions_for_keyword_argument,
     typed_dict_key_definition,
 };
+use ty_python_semantic::{Db as SemanticDb, ResolvedDefinition};
 use ty_python_semantic::{
-    HasDefinition, HasType, ImportAliasResolution, SemanticModel, TypeQualifiers,
-    definitions_for_imported_symbol, definitions_for_name,
+    HasDefinition, HasType, ImportAliasResolution, ProgramEnvironment, SemanticModel,
+    TypeQualifiers, definitions_for_imported_symbol, definitions_for_name,
+    fixture_bindings_for_parameter,
 };
 
 #[derive(Clone, Debug)]
@@ -246,7 +249,7 @@ pub(crate) enum GotoTarget<'a> {
 pub(crate) struct Definitions<'db>(Vec<ResolvedDefinition<'db>>);
 
 impl<'db> Definitions<'db> {
-    fn new(mut resolved: Vec<ResolvedDefinition<'db>>) -> Self {
+    pub(crate) fn new(mut resolved: Vec<ResolvedDefinition<'db>>) -> Self {
         for index in (1..resolved.len()).rev() {
             if resolved[..index].contains(&resolved[index]) {
                 resolved.remove(index);
@@ -256,11 +259,15 @@ impl<'db> Definitions<'db> {
         Self(resolved)
     }
 
-    pub(crate) fn from_ty(db: &'db dyn crate::Db, ty: Type<'db>) -> Option<Self> {
-        let ty_def = ty.definition(db)?;
+    pub(crate) fn from_ty(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+    ) -> Option<Self> {
+        let ty_def = ty.definition(db, env)?;
         let resolved = match ty_def {
             ty_python_semantic::types::TypeDefinition::Module(module) => {
-                ResolvedDefinition::Module(module.file(db)?)
+                ResolvedDefinition::Module(ProgramFile::new(db, module.file(db)?, env.program(db)))
             }
             ty_python_semantic::types::TypeDefinition::StaticClass(definition)
             | ty_python_semantic::types::TypeDefinition::DynamicClass(definition)
@@ -338,9 +345,63 @@ impl<'db> Definitions<'db> {
         model: &SemanticModel<'db>,
         goto_target: &GotoTarget<'_>,
     ) -> Option<Definitions<'db>> {
-        let definitions = self.goto_declaration(model, goto_target)?;
-        let resolved = StubMapper::new(model.db()).map_definitions(definitions.0);
-        Some(Self::new(resolved))
+        let mut definitions = self;
+
+        if let GotoTarget::Parameter(parameter) = goto_target {
+            let fixture_bindings =
+                fixture_bindings_for_parameter(model.db(), parameter.definition(model));
+
+            if !fixture_bindings.is_empty() {
+                definitions = Self::new(
+                    fixture_bindings
+                        .iter()
+                        .map(|binding| ResolvedDefinition::Definition(binding.fixture()))
+                        .collect(),
+                );
+            }
+        }
+
+        Some(
+            definitions
+                .goto_declaration(model, goto_target)?
+                .map_stubs(model.db()),
+        )
+    }
+
+    /// Map definitions from stub files to corresponding source implementations.
+    fn map_stubs(self, db: &'db dyn ty_python_semantic::Db) -> Definitions<'db> {
+        let resolved = StubMapper::new(db).map_definitions(self.0);
+        Self::new(resolved)
+    }
+
+    /// Map stub definitions to corresponding source implementations for implementation lookup.
+    ///
+    /// Stub definitions without source mappings are discarded. Returns `None` if no definitions
+    /// remain.
+    pub(crate) fn map_stubs_for_implementation(
+        self,
+        db: &'db dyn ty_python_semantic::Db,
+    ) -> Option<Definitions<'db>> {
+        let stub_mapper = StubMapper::new(db);
+        let resolved: Vec<_> = self
+            .0
+            .into_iter()
+            .flat_map(|definition| {
+                if definition.focus_range(db).file().is_stub(db) {
+                    stub_mapper
+                        .map_definition_to_source(&definition)
+                        .unwrap_or_default()
+                } else {
+                    vec![definition]
+                }
+            })
+            .collect();
+
+        if resolved.is_empty() {
+            None
+        } else {
+            Some(Self::new(resolved))
+        }
     }
 
     /// Convert these semantic definitions to editor-facing navigation targets.
@@ -352,8 +413,8 @@ impl<'db> Definitions<'db> {
             .into_iter()
             .map(|definition| match definition {
                 ResolvedDefinition::Definition(definition) => {
-                    let file = definition.file(db);
-                    let module = ruff_db::parsed::parsed_module(db, file).load(db);
+                    let module =
+                        ruff_db::parsed::parsed_module(db, definition.python_file(db)).load(db);
 
                     let focus_range = definition.focus_range(db, &module);
                     let full_range = definition.full_range(db, &module);
@@ -365,7 +426,7 @@ impl<'db> Definitions<'db> {
                     }
                 }
                 ResolvedDefinition::Module(file) => {
-                    NavigationTarget::new(file, TextRange::default())
+                    NavigationTarget::new(file.file(db), TextRange::default())
                 }
                 ResolvedDefinition::FileWithRange(file_range) => NavigationTarget::from(file_range),
             })
@@ -377,7 +438,7 @@ impl<'db> Definitions<'db> {
     /// Typically documentation only appears on implementations and not stubs,
     /// so this will check both the goto-declarations and goto-definitions (in that order)
     /// and return the first one found.
-    pub(crate) fn docstring(self, db: &'db dyn crate::Db) -> Option<Docstring> {
+    pub(crate) fn docstring(self, db: &'db dyn SemanticDb) -> Option<Docstring> {
         for definition in &self {
             // If we got a docstring from the original definition, use it
             if let Some(docstring) = definition.docstring(db) {
@@ -435,7 +496,7 @@ impl<'a, 'db> IntoIterator for &'a Definitions<'db> {
 /// Shared by hover and signature help so both surfaces render the same
 /// docstring for a given call site.
 pub(crate) fn docstring_for_call_definition<'db>(
-    db: &'db dyn crate::Db,
+    db: &'db dyn Db,
     definition: Definition<'db>,
 ) -> Option<Docstring> {
     let resolved = ResolvedDefinition::Definition(definition);
@@ -460,6 +521,7 @@ impl GotoTarget<'_> {
             // (i.e. the type of `MyClass` in `MyClass()` is `<class MyClass>` and not `() -> MyClass`)
             GotoTarget::Call { callable, .. } => callable.inferred_type(model),
             GotoTarget::TypeParamTypeVarName(typevar) => typevar.inferred_type(model),
+            GotoTarget::TypeParamParamSpecName(typevar) => typevar.inferred_type(model),
             GotoTarget::ImportModuleComponent {
                 module_name,
                 component_index,
@@ -521,7 +583,6 @@ impl GotoTarget<'_> {
             | GotoTarget::PatternKeywordArgument(_)
             | GotoTarget::PatternMatchStarName(_)
             | GotoTarget::PatternMatchAsName(_)
-            | GotoTarget::TypeParamParamSpecName(_)
             | GotoTarget::TypeParamTypeVarTupleName(_)
             | GotoTarget::NonLocal { .. }
             | GotoTarget::Globals { .. } => None,
@@ -544,6 +605,24 @@ impl GotoTarget<'_> {
         } else {
             None
         }
+    }
+
+    /// Gets definitions for the underlying expression, excluding call dispatch targets.
+    pub(crate) fn expression_definitions<'db>(
+        &self,
+        model: &SemanticModel<'db>,
+        alias_resolution: ImportAliasResolution,
+    ) -> Option<Definitions<'db>> {
+        let expression = match self {
+            GotoTarget::Expression(expression)
+            | GotoTarget::Call {
+                callable: expression,
+                ..
+            } => *expression,
+            _ => return None,
+        };
+
+        definitions_for_expression(model, expression, alias_resolution).map(Definitions::new)
     }
 
     /// Gets the definitions for this goto target.
@@ -1344,7 +1423,7 @@ pub(crate) fn find_goto_target<'a>(
     find_goto_target_impl(model, parsed.tokens(), parsed.syntax().into(), offset)
 }
 
-pub(crate) fn find_goto_target_impl<'a>(
+fn find_goto_target_impl<'a>(
     model: &'a SemanticModel,
     tokens: &'a Tokens,
     syntax: AnyNodeRef<'a>,
@@ -1393,7 +1472,7 @@ fn definitions_for_module<'db>(
     level: u32,
 ) -> Option<Vec<ResolvedDefinition<'db>>> {
     let module = model.resolve_module(module, level)?;
-    let file = module.file(model.db())?;
+    let file = ProgramFile::new(model.db(), module.file(model.db())?, model.program());
     Some(vec![ResolvedDefinition::Module(file)])
 }
 

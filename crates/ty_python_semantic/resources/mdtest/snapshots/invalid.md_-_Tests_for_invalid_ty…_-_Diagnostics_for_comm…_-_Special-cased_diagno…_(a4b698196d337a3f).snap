@@ -27,7 +27,6 @@ error[invalid-type-form]: Function `callable` is not valid in a parameter annota
   |
 3 | def decorator(fn: callable) -> callable:
   |                   ^^^^^^^^ Did you mean `collections.abc.Callable`?
-  |
 
 ```
 
@@ -37,6 +36,5 @@ error[invalid-type-form]: Function `callable` is not valid in a return type anno
   |
 3 | def decorator(fn: callable) -> callable:
   |                                ^^^^^^^^ Did you mean `collections.abc.Callable`?
-  |
 
 ```

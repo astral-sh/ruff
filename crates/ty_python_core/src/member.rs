@@ -1,13 +1,13 @@
 use ruff_index::{IndexVec, newtype_index};
-use ruff_python_ast::{self as ast, name::Name};
+use ruff_python_ast as ast;
 use ruff_text_size::{TextLen as _, TextRange, TextSize};
 
 use bitflags::bitflags;
+use char_str::{CharStr, CharString, format_char};
 use hashbrown::hash_table::Entry;
 use rustc_hash::FxHasher;
 use smallvec::SmallVec;
 
-use std::fmt::Write as _;
 use std::hash::{Hash, Hasher as _};
 use std::ops::{Deref, DerefMut};
 
@@ -80,7 +80,7 @@ impl Member {
     /// a method context, or whether the `<NAME>` actually refers to the first
     /// parameter of the method (i.e. `self`). To answer those questions,
     /// use [`Self::as_instance_attribute`].
-    pub(super) fn as_instance_attribute_candidate(&self) -> Option<&str> {
+    fn as_instance_attribute_candidate(&self) -> Option<&str> {
         let mut segments = self.expression().segments();
         let first_segment = segments.next()?;
 
@@ -105,7 +105,7 @@ impl Member {
     }
 
     /// Does the place expression have the form `self.{name}` (`self` is the first parameter of the method)?
-    pub(super) fn is_instance_attribute_named(&self, name: &str) -> bool {
+    fn is_instance_attribute_named(&self, name: &str) -> bool {
         self.as_instance_attribute() == Some(name)
     }
 
@@ -156,15 +156,15 @@ impl get_size2::GetSize for MemberFlags {}
 /// The symbol name can be extracted from the path by taking the text up to the first segment's start offset.
 #[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
 pub(crate) struct MemberExpr {
-    /// The entire path as a single Name
-    path: Name,
+    /// The entire path as a single immutable string.
+    path: CharStr,
     /// Metadata for each segment (in forward order)
     segments: Segments,
 }
 
 impl MemberExpr {
     #[cfg(test)]
-    pub(super) fn try_from_expr(expression: ast::ExprRef<'_>) -> Option<Self> {
+    fn try_from_expr(expression: ast::ExprRef<'_>) -> Option<Self> {
         MemberExprBuilder::visit_expr(expression).and_then(Self::try_from_builder)
     }
 
@@ -187,14 +187,10 @@ impl MemberExpr {
         SegmentsIterator::new(self.path.as_str(), self.segment_infos())
     }
 
-    fn shrink_to_fit(&mut self) {
-        self.path.shrink_to_fit();
-    }
-
     /// Returns the left most part of the member expression, e.g. `x` in `x.y.z`.
     ///
     /// This is the symbol on which the member access is performed.
-    pub(crate) fn symbol_name(&self) -> &str {
+    fn symbol_name(&self) -> &str {
         self.as_ref().symbol_name()
     }
 
@@ -211,64 +207,118 @@ impl MemberExpr {
 }
 
 /// A builder for a [`MemberExpr`].
-#[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) struct MemberExprBuilder {
-    path: Name,
+    path: CharStr,
     segments: SmallVec<[SegmentInfo; 8]>,
 }
 
 impl MemberExprBuilder {
     pub(super) fn visit_expr(expr: ast::ExprRef) -> Option<MemberExprBuilder> {
         match expr {
-            ast::ExprRef::Name(name) => Some(MemberExprBuilder {
-                path: name.id.clone(),
-                segments: smallvec::SmallVec::new_const(),
-            }),
-            ast::ExprRef::Named(named) if named.target.is_name_expr() => {
-                MemberExprBuilder::visit_expr(ast::ExprRef::from(named.target.as_ref()))
+            ast::ExprRef::Name(name) => {
+                return Some(MemberExprBuilder {
+                    path: CharStr::from(name.id.clone()),
+                    segments: SmallVec::new_const(),
+                });
             }
+            ast::ExprRef::Named(named) if named.target.is_name_expr() => {
+                return Self::visit_expr(ast::ExprRef::from(named.target.as_ref()));
+            }
+            _ => {}
+        }
+
+        let mut parts = SmallVec::new_const();
+        let mut segments = SmallVec::new_const();
+        let mut path_len = TextSize::new(0);
+        Self::collect_expr(expr, &mut parts, &mut segments, &mut path_len)?;
+
+        Some(MemberExprBuilder {
+            path: CharStr::concat(&parts),
+            segments,
+        })
+    }
+
+    fn collect_expr<'a>(
+        expr: ast::ExprRef<'a>,
+        parts: &mut SmallVec<[MemberPathPart<'a>; 8]>,
+        segments: &mut SmallVec<[SegmentInfo; 8]>,
+        path_len: &mut TextSize,
+    ) -> Option<()> {
+        match expr {
+            ast::ExprRef::Name(name) => {
+                let text = name.id.as_str();
+                *path_len += text.text_len();
+                parts.push(MemberPathPart::Borrowed(text));
+                Some(())
+            }
+            ast::ExprRef::Named(named) if named.target.is_name_expr() => Self::collect_expr(
+                ast::ExprRef::from(named.target.as_ref()),
+                parts,
+                segments,
+                path_len,
+            ),
             ast::ExprRef::Named(_) => None,
 
             ast::ExprRef::Attribute(attribute) => {
-                let mut builder =
-                    MemberExprBuilder::visit_expr(ast::ExprRef::from(&attribute.value))?;
+                Self::collect_expr(
+                    ast::ExprRef::from(&attribute.value),
+                    parts,
+                    segments,
+                    path_len,
+                )?;
 
-                let start_offset = builder.path.text_len();
-                let _ = write!(builder.path, "{}", attribute.attr.id);
-                builder
-                    .segments
-                    .push(SegmentInfo::new(SegmentKind::Attribute, start_offset));
+                let start_offset = *path_len;
+                let text = attribute.attr.id.as_str();
+                *path_len += text.text_len();
+                parts.push(MemberPathPart::Borrowed(text));
+                segments.push(SegmentInfo::new(SegmentKind::Attribute, start_offset));
 
-                Some(builder)
+                Some(())
             }
             ast::ExprRef::Subscript(subscript) => {
-                let subscript_value =
-                    MemberExprBuilder::visit_expr(ast::ExprRef::from(&subscript.value))?;
-                MemberExprBuilder::visit_subscript_expr(subscript_value, &subscript.slice)
+                Self::collect_expr(
+                    ast::ExprRef::from(&subscript.value),
+                    parts,
+                    segments,
+                    path_len,
+                )?;
+
+                let start_offset = *path_len;
+                let (kind, part) = Self::subscript_part(&subscript.slice)?;
+                *path_len += part.as_ref().text_len();
+                parts.push(part);
+                segments.push(SegmentInfo::new(kind, start_offset));
+
+                Some(())
             }
             _ => None,
         }
     }
 
     pub(super) fn visit_subscript_expr(
-        subscript_value: MemberExprBuilder,
+        subscript_value: &MemberExprBuilder,
         subscript_slice: &ast::Expr,
     ) -> Option<MemberExprBuilder> {
-        let MemberExprBuilder {
-            mut path,
-            mut segments,
-        } = subscript_value;
-        let start_offset = path.text_len();
+        let start_offset = subscript_value.path.text_len();
+        let (kind, part) = Self::subscript_part(subscript_slice)?;
+        let path = CharStr::concat(&[subscript_value.path.as_str(), part.as_ref()]);
+        let mut segments = subscript_value.segments.clone();
+        segments.push(SegmentInfo::new(kind, start_offset));
 
+        Some(MemberExprBuilder { path, segments })
+    }
+
+    fn subscript_part(subscript_slice: &ast::Expr) -> Option<(SegmentKind, MemberPathPart<'_>)> {
         match subscript_slice {
             // Handle integer subscripts, like `x[0]`.
             ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
                 value: ast::Number::Int(index),
                 ..
-            }) => {
-                let _ = write!(path, "{index}");
-                segments.push(SegmentInfo::new(SegmentKind::IntSubscript, start_offset));
-            }
+            }) => Some((
+                SegmentKind::IntSubscript,
+                MemberPathPart::Owned(format_char!("{index}")),
+            )),
             // Handle negative integer subscripts, like `x[-1]`.
             ast::Expr::UnaryOp(ast::ExprUnaryOp {
                 op: ast::UnaryOp::USub,
@@ -278,11 +328,11 @@ impl MemberExprBuilder {
                 ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
                     value: ast::Number::Int(index),
                     ..
-                }) => {
-                    let _ = write!(path, "-{index}");
-                    segments.push(SegmentInfo::new(SegmentKind::IntSubscript, start_offset));
-                }
-                _ => return None,
+                }) => Some((
+                    SegmentKind::IntSubscript,
+                    MemberPathPart::Owned(format_char!("-{index}")),
+                )),
+                _ => None,
             },
             // Handle positive integer subscripts with explicit plus, like `x[+1]`.
             ast::Expr::UnaryOp(ast::ExprUnaryOp {
@@ -293,34 +343,51 @@ impl MemberExprBuilder {
                 ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
                     value: ast::Number::Int(index),
                     ..
-                }) => {
-                    let _ = write!(path, "{index}");
-                    segments.push(SegmentInfo::new(SegmentKind::IntSubscript, start_offset));
-                }
-                _ => return None,
+                }) => Some((
+                    SegmentKind::IntSubscript,
+                    MemberPathPart::Owned(format_char!("{index}")),
+                )),
+                _ => None,
             },
             // Handle boolean subscripts, like `x[True]` or `x[False]`.
             // In Python, `True` and `False` are equivalent to `1` and `0` for indexing.
-            ast::Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. }) => {
-                let _ = write!(path, "{}", u8::from(*value));
-                segments.push(SegmentInfo::new(SegmentKind::IntSubscript, start_offset));
-            }
-            ast::Expr::StringLiteral(string) => {
-                let _ = write!(path, "{}", string.value);
-                segments.push(SegmentInfo::new(SegmentKind::StringSubscript, start_offset));
-            }
+            ast::Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. }) => Some((
+                SegmentKind::IntSubscript,
+                MemberPathPart::Borrowed(if *value { "1" } else { "0" }),
+            )),
+            ast::Expr::StringLiteral(string) => Some((
+                SegmentKind::StringSubscript,
+                MemberPathPart::Borrowed(string.value.to_str()),
+            )),
             // Handle bytes literal subscripts, like `x[b"key"]`.
             ast::Expr::BytesLiteral(bytes) => {
                 let bytes_vec: Vec<u8> = bytes.value.bytes().collect();
-                let _ = write!(path, "{}", String::from_utf8_lossy(&bytes_vec));
-                segments.push(SegmentInfo::new(SegmentKind::BytesSubscript, start_offset));
+                let text = String::from_utf8_lossy(&bytes_vec);
+                Some((
+                    SegmentKind::BytesSubscript,
+                    MemberPathPart::Owned(CharString::from(text.as_ref())),
+                ))
             }
-            _ => {
-                return None;
-            }
+            _ => None,
         }
+    }
+}
 
-        Some(MemberExprBuilder { path, segments })
+/// A borrowed or owned fragment collected while building an immutable member path.
+///
+/// AST-backed text is borrowed directly, while formatted subscripts use a temporary [`CharString`].
+/// The complete set of fragments is concatenated once into the builder's [`CharStr`].
+enum MemberPathPart<'a> {
+    Borrowed(&'a str),
+    Owned(CharString),
+}
+
+impl AsRef<str> for MemberPathPart<'_> {
+    fn as_ref(&self) -> &str {
+        match self {
+            MemberPathPart::Borrowed(text) => text,
+            MemberPathPart::Owned(text) => text.as_str(),
+        }
     }
 }
 
@@ -421,7 +488,7 @@ impl Hash for MemberExprRef<'_> {
 
 /// Uniquely identifies a member in a scope.
 #[newtype_index]
-#[derive(Ord, PartialOrd, get_size2::GetSize, salsa::Update)]
+#[derive(Ord, PartialOrd, get_size2::GetSize)]
 pub struct ScopedMemberId;
 
 /// Map from member path to its ID.
@@ -552,7 +619,7 @@ impl MemberTableBuilder {
     /// Adds a member to the table or updates the flags of an existing member if it already exists.
     ///
     /// Members are identified by their expression, which is hashed to find the entry in the table.
-    pub(super) fn add(&mut self, mut member: Member) -> (ScopedMemberId, bool) {
+    pub(super) fn add(&mut self, member: Member) -> (ScopedMemberId, bool) {
         let entry = self.reverse.entry(&self.table.members, &member);
 
         match entry {
@@ -566,8 +633,6 @@ impl MemberTableBuilder {
                 (id, false)
             }
             Entry::Vacant(entry) => {
-                member.expression.shrink_to_fit();
-
                 let id = self.table.members.push(member);
                 entry.insert(id);
                 (id, true)
@@ -969,6 +1034,8 @@ fn hash_single<T: Hash>(value: &T) -> u64 {
 
 #[cfg(test)]
 mod tests {
+    use std::assert_matches;
+
     use super::*;
 
     #[test]
@@ -1105,7 +1172,7 @@ mod tests {
             MemberExpr::try_from_expr(ast::ExprRef::from(small_expr.expr())).unwrap();
 
         // Should use Small allocation
-        assert!(matches!(small_member.segments, Segments::Small(_)));
+        assert_matches!(small_member.segments, Segments::Small(_));
         assert_eq!(small_member.num_segments(), 7);
 
         // Test Heap allocation: 8 segments (exceeds inline capacity)
@@ -1114,7 +1181,7 @@ mod tests {
         let heap_member = MemberExpr::try_from_expr(ast::ExprRef::from(heap_expr.expr())).unwrap();
 
         // Should use Heap allocation
-        assert!(matches!(heap_member.segments, Segments::Heap(_)));
+        assert_matches!(heap_member.segments, Segments::Heap(_));
         assert_eq!(heap_member.num_segments(), 8);
 
         // Test Small allocation with relative offset limit
@@ -1124,7 +1191,7 @@ mod tests {
             MemberExpr::try_from_expr(ast::ExprRef::from(small_offset_expr.expr())).unwrap();
 
         // Should use Small allocation (3 segments, small offsets)
-        assert!(matches!(small_offset_member.segments, Segments::Small(_)));
+        assert_matches!(small_offset_member.segments, Segments::Small(_));
         assert_eq!(small_offset_member.num_segments(), 3);
 
         // Test Small allocation with maximum 63-byte relative offset limit
@@ -1135,7 +1202,7 @@ mod tests {
         let max_offset_member =
             MemberExpr::try_from_expr(ast::ExprRef::from(max_offset_expr.expr())).unwrap();
         // Should still use Small allocation (exactly at the limit)
-        assert!(matches!(max_offset_member.segments, Segments::Small(_)));
+        assert_matches!(max_offset_member.segments, Segments::Small(_));
         assert_eq!(max_offset_member.num_segments(), 2);
 
         // Test that heap allocation works for segment content that would exceed relative offset limits
@@ -1146,7 +1213,7 @@ mod tests {
         let long_expr = parse_expression(&long_expr_code).unwrap();
         let long_member = MemberExpr::try_from_expr(ast::ExprRef::from(long_expr.expr())).unwrap();
         // Should use Heap allocation due to large relative offset
-        assert!(matches!(long_member.segments, Segments::Heap(_)));
+        assert_matches!(long_member.segments, Segments::Heap(_));
         assert_eq!(long_member.num_segments(), 2);
     }
 }

@@ -28,8 +28,8 @@
 
 use crate::Db;
 use bitflags::bitflags;
-use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
+use ruff_python_ast::script::ScriptTag;
 use ruff_python_ast::visitor::source_order::{
     SourceOrderVisitor, TraversalSignal, walk_arguments, walk_expr,
     walk_interpolated_string_element, walk_stmt,
@@ -40,6 +40,10 @@ use ruff_python_ast::{
 };
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use std::ops::Deref;
+use toml_parser::decoder::ScalarKind;
+use toml_parser::parser::{Event, EventKind};
+use ty_project::script_tag;
+use ty_python_core::ProgramFile;
 use ty_python_core::definition::{Definition, DefinitionKind, ParameterDefinitionNodeKind};
 use ty_python_semantic::{
     HasType, ImportAliasResolution, ResolvedDefinition, SemanticModel, definitions_for_attribute,
@@ -70,11 +74,13 @@ pub enum SemanticTokenType {
     Decorator,
     BuiltinConstant,
     TypeParameter,
+    Operator,
+    Regexp,
 }
 
 impl SemanticTokenType {
     /// Returns all supported semantic token types as enum variants.
-    pub const fn all() -> [SemanticTokenType; 15] {
+    pub const fn all() -> [SemanticTokenType; 17] {
         [
             SemanticTokenType::Namespace,
             SemanticTokenType::Class,
@@ -91,6 +97,8 @@ impl SemanticTokenType {
             SemanticTokenType::Decorator,
             SemanticTokenType::BuiltinConstant,
             SemanticTokenType::TypeParameter,
+            SemanticTokenType::Operator,
+            SemanticTokenType::Regexp,
         ]
     }
 
@@ -118,6 +126,8 @@ impl SemanticTokenType {
             SemanticTokenType::Decorator => "decorator",
             SemanticTokenType::BuiltinConstant => "builtinConstant",
             SemanticTokenType::TypeParameter => "typeParameter",
+            SemanticTokenType::Operator => "operator",
+            SemanticTokenType::Regexp => "regexp",
         }
     }
 }
@@ -168,7 +178,7 @@ pub struct SemanticTokens {
 
 impl SemanticTokens {
     /// Create a new `SemanticTokens` instance.
-    pub fn new(tokens: Vec<SemanticToken>) -> Self {
+    fn new(tokens: Vec<SemanticToken>) -> Self {
         Self { tokens }
     }
 }
@@ -183,15 +193,114 @@ impl Deref for SemanticTokens {
 
 /// Generates semantic tokens for a Python file within the specified range.
 /// Pass None to get tokens for the entire file.
-pub fn semantic_tokens(db: &dyn Db, file: File, range: Option<TextRange>) -> SemanticTokens {
-    let parsed = parsed_module(db, file).load(db);
+pub fn semantic_tokens(
+    db: &dyn Db,
+    file: ProgramFile<'_>,
+    range: Option<TextRange>,
+) -> SemanticTokens {
+    let parsed = parsed_module(db, file.python_file(db)).load(db);
     let model = SemanticModel::new(db, file);
 
     let mut visitor = SemanticTokenVisitor::new(&model, range);
     visitor.expecting_docstring = true;
     visitor.visit_body(parsed.suite());
 
+    if let Some(tag) = script_tag(db, file.file(db)) {
+        let insertion = visitor
+            .tokens
+            .partition_point(|token| token.start() < tag.start());
+        visitor
+            .tokens
+            .splice(insertion..insertion, script_metadata_tokens(tag, range));
+    }
+
     SemanticTokens::new(visitor.tokens)
+}
+
+/// Highlights embedded TOML without treating its Python comment prefixes as TOML content.
+fn script_metadata_tokens(tag: &ScriptTag, range: Option<TextRange>) -> Vec<SemanticToken> {
+    let metadata = tag.metadata();
+    let tokens = toml_parser::Source::new(metadata).lex().collect::<Vec<_>>();
+    let mut semantic_tokens = Vec::new();
+    let mut in_table_header = false;
+
+    toml_parser::parser::parse_document(
+        &tokens,
+        &mut |event: Event| {
+            let span = event.span();
+            let Some(text) = metadata.get(span.start()..span.end()) else {
+                return;
+            };
+
+            let token_type = match event.kind() {
+                EventKind::StdTableOpen | EventKind::ArrayTableOpen => {
+                    in_table_header = true;
+                    SemanticTokenType::Operator
+                }
+                EventKind::StdTableClose | EventKind::ArrayTableClose => {
+                    in_table_header = false;
+                    SemanticTokenType::Operator
+                }
+                EventKind::InlineTableOpen
+                | EventKind::InlineTableClose
+                | EventKind::ArrayOpen
+                | EventKind::ArrayClose
+                | EventKind::KeySep
+                | EventKind::KeyValSep
+                | EventKind::ValueSep => SemanticTokenType::Operator,
+                EventKind::SimpleKey if in_table_header => SemanticTokenType::Namespace,
+                EventKind::SimpleKey => SemanticTokenType::Variable,
+                EventKind::Scalar => {
+                    let scalar = toml_parser::Raw::new_unchecked(text, event.encoding(), span);
+
+                    match scalar.decode_scalar(&mut (), &mut ()) {
+                        ScalarKind::String => SemanticTokenType::String,
+                        ScalarKind::Boolean(_) => SemanticTokenType::BuiltinConstant,
+                        ScalarKind::DateTime => SemanticTokenType::Regexp,
+                        ScalarKind::Float | ScalarKind::Integer(_) => SemanticTokenType::Number,
+                    }
+                }
+                EventKind::Newline => {
+                    in_table_header = false;
+                    return;
+                }
+                _ => return,
+            };
+
+            let Ok(mut offset) = TextSize::try_from(span.start()) else {
+                return;
+            };
+
+            // Multiline TOML values are interrupted by Python comment prefixes in the source.
+            // Highlight each metadata line separately so those prefixes remain comments.
+            for line in text.split_inclusive('\n') {
+                let content = line.strip_suffix('\n').unwrap_or(line);
+                let token_range = tag
+                    .source_map()
+                    .map_range(TextRange::at(offset, content.text_len()));
+                offset += line.text_len();
+
+                if token_range.is_empty()
+                    || range.is_some_and(|requested| {
+                        token_range
+                            .intersect(requested)
+                            .is_none_or(TextRange::is_empty)
+                    })
+                {
+                    continue;
+                }
+
+                semantic_tokens.push(SemanticToken {
+                    range: token_range,
+                    token_type,
+                    modifiers: SemanticTokenModifier::empty(),
+                });
+            }
+        },
+        &mut (),
+    );
+
+    semantic_tokens
 }
 
 /// AST visitor that collects semantic tokens.
@@ -299,7 +408,7 @@ impl<'db> SemanticTokenVisitor<'db> {
     ) -> Option<(SemanticTokenType, SemanticTokenModifier)> {
         let mut modifiers = SemanticTokenModifier::empty();
         let db = self.model.db();
-        let model = SemanticModel::new(db, definition.file(db));
+        let model = SemanticModel::new(db, definition.program_file(db));
 
         if model.is_type_alias_definition(definition) {
             return Some((SemanticTokenType::Class, modifiers));
@@ -319,7 +428,7 @@ impl<'db> SemanticTokenVisitor<'db> {
                 Some((SemanticTokenType::TypeParameter, modifiers))
             }
             DefinitionKind::Parameter(ParameterDefinitionNodeKind::Parameter(parameter)) => {
-                let parsed = parsed_module(db, definition.file(db));
+                let parsed = parsed_module(db, definition.python_file(db));
                 let ty = parameter.node(&parsed.load(db)).inferred_type(&model);
 
                 if let Some(ty) = ty {
@@ -355,22 +464,21 @@ impl<'db> SemanticTokenVisitor<'db> {
                 // (e.g., imported classes as Class, imported functions as Function, etc.)
                 None
             }
-            _ => {
+            kind => {
                 // For other definition kinds (assignments, etc.), apply constant naming convention
                 if Self::is_constant_name(name_str) {
                     modifiers |= SemanticTokenModifier::READONLY;
                 }
 
-                let parsed = parsed_module(db, definition.file(db));
-                let parsed = parsed.load(db);
-                let value = match definition.kind(db) {
-                    DefinitionKind::Assignment(assignment) => Some(assignment.value(&parsed)),
+                let value_ty = match kind {
+                    DefinitionKind::Assignment(assignment) => {
+                        let parsed = parsed_module(db, definition.python_file(db)).load(db);
+                        assignment.value(&parsed).inferred_type(&model)
+                    }
                     _ => None,
                 };
 
-                if let Some(value) = value
-                    && let Some(value_ty) = value.inferred_type(&model)
-                {
+                if let Some(value_ty) = value_ty {
                     if matches!(value_ty, Type::KnownInstance(KnownInstanceType::TypeVar(_))) {
                         modifiers.remove(SemanticTokenModifier::READONLY);
                         return Some((SemanticTokenType::TypeParameter, modifiers));
@@ -1284,7 +1392,7 @@ mod tests {
 
     use insta::assert_snapshot;
     use ruff_db::{
-        files::system_path_to_file,
+        files::{File, system_path_to_file},
         system::{DbWithWritableSystem, SystemPath, SystemPathBuf},
     };
     use ty_project::ProjectMetadata;
@@ -1296,6 +1404,209 @@ mod tests {
         let tokens = test.highlight_file();
 
         assert_snapshot!(test.to_snapshot(&tokens), @r#""foo" @ 4..7: Function [definition]"#);
+    }
+
+    #[test]
+    fn script_metadata_highlights_toml_in_source_order() {
+        let source = r#"before = 1
+# /// script
+# requires-python = ">=3.12"
+# dependencies = ["httpx", "attrs"]
+# [tool.uv]
+# enabled = true
+# disabled = false
+# retries = 2
+# "quoted-key" = { nested = "value" }
+# [[tool.packages]]
+# name = "example"
+# ///
+after = 2
+"#;
+        let test = SemanticTokenTest::new(source);
+        let tokens = test.highlight_file();
+        let source = ruff_db::source::source_text(&test.db, test.file);
+        let highlighted: Vec<_> = tokens
+            .iter()
+            .map(|token| (&source[token.range()], token.token_type))
+            .collect();
+
+        assert_eq!(
+            highlighted,
+            vec![
+                ("before", SemanticTokenType::Variable),
+                ("1", SemanticTokenType::Number),
+                ("requires-python", SemanticTokenType::Variable),
+                ("=", SemanticTokenType::Operator),
+                ("\">=3.12\"", SemanticTokenType::String),
+                ("dependencies", SemanticTokenType::Variable),
+                ("=", SemanticTokenType::Operator),
+                ("[", SemanticTokenType::Operator),
+                ("\"httpx\"", SemanticTokenType::String),
+                (",", SemanticTokenType::Operator),
+                ("\"attrs\"", SemanticTokenType::String),
+                ("]", SemanticTokenType::Operator),
+                ("[", SemanticTokenType::Operator),
+                ("tool", SemanticTokenType::Namespace),
+                (".", SemanticTokenType::Operator),
+                ("uv", SemanticTokenType::Namespace),
+                ("]", SemanticTokenType::Operator),
+                ("enabled", SemanticTokenType::Variable),
+                ("=", SemanticTokenType::Operator),
+                ("true", SemanticTokenType::BuiltinConstant),
+                ("disabled", SemanticTokenType::Variable),
+                ("=", SemanticTokenType::Operator),
+                ("false", SemanticTokenType::BuiltinConstant),
+                ("retries", SemanticTokenType::Variable),
+                ("=", SemanticTokenType::Operator),
+                ("2", SemanticTokenType::Number),
+                ("\"quoted-key\"", SemanticTokenType::Variable),
+                ("=", SemanticTokenType::Operator),
+                ("{", SemanticTokenType::Operator),
+                ("nested", SemanticTokenType::Variable),
+                ("=", SemanticTokenType::Operator),
+                ("\"value\"", SemanticTokenType::String),
+                ("}", SemanticTokenType::Operator),
+                ("[[", SemanticTokenType::Operator),
+                ("tool", SemanticTokenType::Namespace),
+                (".", SemanticTokenType::Operator),
+                ("packages", SemanticTokenType::Namespace),
+                ("]]", SemanticTokenType::Operator),
+                ("name", SemanticTokenType::Variable),
+                ("=", SemanticTokenType::Operator),
+                ("\"example\"", SemanticTokenType::String),
+                ("after", SemanticTokenType::Variable),
+                ("2", SemanticTokenType::Number),
+            ]
+        );
+    }
+
+    #[test]
+    fn script_metadata_distinguishes_numeric_and_datetime_values() {
+        let source = r#"# /// script
+# integer = 42
+# hexadecimal = 0xff
+# float = 1.5
+# infinity = +inf
+# not-a-number = nan
+# date = 2026-08-14
+# time = 08:15:30
+# datetime = 2026-08-14T08:15:30
+# offset-datetime = 2026-08-14T08:15:30Z
+# ///
+"#;
+        let test = SemanticTokenTest::new(source);
+        let tokens = test.highlight_file();
+        let source = ruff_db::source::source_text(&test.db, test.file);
+        let values: Vec<_> = tokens
+            .iter()
+            .filter(|token| {
+                matches!(
+                    token.token_type,
+                    SemanticTokenType::Number | SemanticTokenType::Regexp
+                )
+            })
+            .map(|token| (&source[token.range()], token.token_type))
+            .collect();
+
+        assert_eq!(
+            values,
+            vec![
+                ("42", SemanticTokenType::Number),
+                ("0xff", SemanticTokenType::Number),
+                ("1.5", SemanticTokenType::Number),
+                ("+inf", SemanticTokenType::Number),
+                ("nan", SemanticTokenType::Number),
+                ("2026-08-14", SemanticTokenType::Regexp),
+                ("08:15:30", SemanticTokenType::Regexp),
+                ("2026-08-14T08:15:30", SemanticTokenType::Regexp),
+                ("2026-08-14T08:15:30Z", SemanticTokenType::Regexp),
+            ]
+        );
+    }
+
+    #[test]
+    fn script_metadata_multiline_strings_exclude_comment_prefixes() {
+        let source = r#"# /// script
+# description = """
+# first
+#
+# last
+# """
+# ///
+"#;
+        let test = SemanticTokenTest::new(source);
+        let tokens = test.highlight_file();
+        let source = ruff_db::source::source_text(&test.db, test.file);
+        let highlighted: Vec<_> = tokens
+            .iter()
+            .map(|token| (&source[token.range()], token.token_type))
+            .collect();
+
+        assert_eq!(
+            highlighted,
+            vec![
+                ("description", SemanticTokenType::Variable),
+                ("=", SemanticTokenType::Operator),
+                ("\"\"\"", SemanticTokenType::String),
+                ("first", SemanticTokenType::String),
+                ("last", SemanticTokenType::String),
+                ("\"\"\"", SemanticTokenType::String),
+            ]
+        );
+    }
+
+    #[test]
+    fn script_metadata_inside_statement_remains_in_source_order() {
+        let source = r#"value = (
+    1
+# /// script
+# dependencies = ["httpx"]
+# ///
+    + 2
+)
+"#;
+        let test = SemanticTokenTest::new(source);
+        let tokens = test.highlight_file();
+        let source = ruff_db::source::source_text(&test.db, test.file);
+        let highlighted: Vec<_> = tokens
+            .iter()
+            .map(|token| (&source[token.range()], token.token_type))
+            .collect();
+
+        assert_eq!(
+            highlighted,
+            vec![
+                ("value", SemanticTokenType::Variable),
+                ("1", SemanticTokenType::Number),
+                ("dependencies", SemanticTokenType::Variable),
+                ("=", SemanticTokenType::Operator),
+                ("[", SemanticTokenType::Operator),
+                ("\"httpx\"", SemanticTokenType::String),
+                ("]", SemanticTokenType::Operator),
+                ("2", SemanticTokenType::Number),
+            ]
+        );
+    }
+
+    #[test]
+    fn script_metadata_respects_requested_token_range() {
+        let source = r#"# /// script
+# dependencies = ["httpx"]
+# ///
+value = 1
+"#;
+        let test = SemanticTokenTest::new(source);
+        let range = TextRange::at(
+            r"# /// script
+# dependencies = ["
+                .text_len(),
+            "\"httpx\"".text_len(),
+        );
+        let tokens = test.highlight_range(range);
+
+        assert_eq!(tokens.len(), 1);
+        assert_eq!(tokens[0].range(), range);
+        assert_eq!(tokens[0].token_type, SemanticTokenType::String);
     }
 
     #[test]
@@ -4653,6 +4964,16 @@ def f():
     }
 
     #[test]
+    fn private_builtin_helpers_do_not_receive_semantic_tokens() {
+        // Private helpers excluded from implicit builtin lookup must remain unresolved for IDE
+        // highlighting instead of receiving tokens from their typeshed definitions.
+        let test = SemanticTokenTest::new("_T_co\n_P\n");
+
+        let tokens = test.highlight_file();
+        assert_snapshot!(test.to_snapshot(&tokens), @"");
+    }
+
+    #[test]
     fn unresolved_attributes_do_not_receive_semantic_tokens() {
         let test = SemanticTokenTest::new(
             r#"
@@ -4685,19 +5006,15 @@ from pathlib import Missing as Alias
         assert_snapshot!(test.to_snapshot(&tokens), @r#""pathlib" @ 6..13: Namespace"#);
     }
 
-    pub(super) struct SemanticTokenTest {
-        pub(super) db: ty_project::TestDb,
+    struct SemanticTokenTest {
+        db: ty_project::TestDb,
         file: File,
     }
 
     impl SemanticTokenTest {
         fn new(source: &str) -> Self {
-            let mut db = ty_project::TestDb::new(ProjectMetadata::new(
-                "test".into(),
-                SystemPathBuf::from("/"),
-            ));
-
-            db.init_program().unwrap();
+            let mut db =
+                ty_project::TestDb::new(ProjectMetadata::new("test", SystemPathBuf::from("/")));
 
             let path = SystemPath::new("src/main.py");
             db.write_file(path, ruff_python_trivia::textwrap::dedent(source))
@@ -4710,12 +5027,28 @@ from pathlib import Missing as Alias
 
         /// Get semantic tokens for the entire file
         fn highlight_file(&self) -> SemanticTokens {
-            semantic_tokens(&self.db, self.file, None)
+            semantic_tokens(
+                &self.db,
+                ProgramFile::new(
+                    &self.db,
+                    self.file,
+                    self.db.program_environment().program(&self.db),
+                ),
+                None,
+            )
         }
 
         /// Get semantic tokens for a specific range in the file
         fn highlight_range(&self, range: TextRange) -> SemanticTokens {
-            semantic_tokens(&self.db, self.file, Some(range))
+            semantic_tokens(
+                &self.db,
+                ProgramFile::new(
+                    &self.db,
+                    self.file,
+                    self.db.program_environment().program(&self.db),
+                ),
+                Some(range),
+            )
         }
 
         /// Helper function to convert semantic tokens to a snapshot-friendly text format

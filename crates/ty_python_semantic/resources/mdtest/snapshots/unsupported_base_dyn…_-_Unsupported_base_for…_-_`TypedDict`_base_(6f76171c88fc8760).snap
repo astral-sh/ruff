@@ -26,7 +26,6 @@ error[invalid-base]: Invalid base for class created via `type()`
   |
 3 | X = type("X", (TypedDict,), {})  # error: [invalid-base]
   |                ^^^^^^^^^ Has type `<special-form 'typing_extensions.TypedDict'>`
-  |
 info: Classes created via `type()` cannot be TypedDicts
 info: Consider using `TypedDict("X", {})` instead
 

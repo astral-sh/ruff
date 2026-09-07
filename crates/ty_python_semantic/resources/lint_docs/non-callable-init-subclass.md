@@ -1,12 +1,11 @@
 ## What it does
 
-Checks for class definitions that will fail due to non-callable `__init_subclass__`
-methods.
+Checks for class definitions that will fail due to non-callable `__init_subclass__` methods.
 
 ## Why is this bad?
 
-If a class defines a non-callable `__init_subclass__` method/attribute, any attempt
-to subclass that class will raise a `TypeError` at runtime.
+If a class defines a non-callable `__init_subclass__` method/attribute, any attempt to subclass that
+class will raise a `TypeError` at runtime.
 
 ## Examples
 

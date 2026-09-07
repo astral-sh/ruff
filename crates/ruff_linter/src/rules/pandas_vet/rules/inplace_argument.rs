@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::Locator;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::{Parentheses, remove_argument};
 use crate::{Edit, Fix, FixAvailability, Violation};
 use ruff_python_semantic::Modules;
@@ -40,7 +41,7 @@ use ruff_python_semantic::Modules;
 /// ## References
 /// - [_Why You Should Probably Never Use pandas `inplace=True`_](https://towardsdatascience.com/why-you-should-probably-never-use-pandas-inplace-true-9f9f211849e4)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.188")]
+#[violation_metadata(stable_since = "v0.0.188", category = Category::Pedantic)]
 pub(crate) struct PandasUseOfInplaceArgument;
 
 impl Violation for PandasUseOfInplaceArgument {

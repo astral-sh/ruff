@@ -337,4 +337,3 @@ Module(
 2 | total(1, 2, x for x in range(5), 6)
 3 | sum(x for x in range(10),)
   |     ^^^^^^^^^^^^^^^^^^^^ Syntax Error: Unparenthesized generator expression cannot be used here
-  |

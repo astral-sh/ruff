@@ -2,7 +2,7 @@
 
 ## Basic narrowing
 
-The `callable()` builtin returns `TypeIs[Callable[..., object]]`, which narrows the type to the
+The `callable()` builtin returns `TypeIs[Top[Callable[..., object]]]`, which narrows the type to the
 intersection with `Top[Callable[..., object]]`. The `Top[...]` wrapper indicates this is a fully
 static type representing the top materialization of a gradual callable.
 
@@ -54,7 +54,15 @@ def f(x: object):
 
 ## Calling narrowed callables
 
-The narrowed type `Top[Callable[..., object]]` represents the set of all possible callable types
+### Strict generic narrowing mode
+
+```toml
+[analysis]
+strict-generic-narrowing = true
+```
+
+In strict generic narrowing mode, an `isinstance(.., Callable)` check intersects the type with
+`Top[Callable[..., object]]`. This type represents the set of all possible callable types
 (including, e.g., functions that take no arguments and functions that require arguments). While such
 objects *are* callable (they pass `callable()`), no specific set of arguments can be guaranteed to
 be valid.
@@ -78,6 +86,36 @@ def resolve(value: str):
         reveal_type(value)  # revealed: str & Top[(...) -> object]
         # error: [call-top-callable]
         reveal_type(value())  # revealed: object
+```
+
+### Gradual generic narrowing mode
+
+```toml
+[analysis]
+strict-generic-narrowing = false
+```
+
+In gradual generic narrowing mode, an `isinstance(.., Callable)` check narrows to a gradual
+callable. Its parameters accept arbitrary arguments, and its return type is `Unknown`:
+
+```py
+from typing import Callable
+
+def call_with_args(y: object):
+    if isinstance(y, Callable):
+        reveal_type(y)  # revealed: (...) -> Unknown
+
+        reveal_type(y())  # revealed: Unknown
+        reveal_type(y(1, "foo"))  # revealed: Unknown
+        reveal_type(y(1, "foo", keyword_arg="bar"))  # revealed: Unknown
+```
+
+An already-specialized callable retains its known parameter and return types:
+
+```py
+def preserve_callable_signature(fn: Callable[[int], str]) -> None:
+    if isinstance(fn, Callable):
+        reveal_type(fn)  # revealed: (int, /) -> str
 ```
 
 ## Narrowing with named expressions (walrus operator)
@@ -112,7 +150,8 @@ functions expecting gradual callables.
 
 ```py
 from typing import Any, Callable, TypeVar
-from ty_extensions import static_assert, Top, is_assignable_to
+from ty_extensions import static_assert, Top
+from ty_extensions._internal import is_assignable_to
 
 static_assert(is_assignable_to(Top[Callable[..., bool]], Callable[..., int]))
 
@@ -138,9 +177,14 @@ import collections.abc
 
 def f(x: object):
     if isinstance(x, typing.Callable):
-        reveal_type(x)  # revealed: Top[(...) -> object]
+        reveal_type(x)  # revealed: (...) -> Unknown
+    else:
+        reveal_type(x)  # revealed: ~Top[(...) -> object]
+
     if isinstance(x, collections.abc.Callable):
-        reveal_type(x)  # revealed: Top[(...) -> object]
+        reveal_type(x)  # revealed: (...) -> Unknown
+    else:
+        reveal_type(x)  # revealed: ~Top[(...) -> object]
 ```
 
 ## `Callable` special-form identity
@@ -192,13 +236,17 @@ reveal_type(CollectionsAbcCallable)  # revealed: <special-form 'collections.abc.
 
 ## Class-pattern behavior for `typing.Callable` and `collections.abc.Callable`
 
-At runtime, `collections.abc.Callable` is supported in `match` statement class patterns, however
-`typing.Callable` is not.
+At runtime, `collections.abc.Callable` is an instance of `type` and is supported in `match`
+statement class patterns; however, `typing.Callable` is not.
 
 ### `collections.abc.Callable`
 
 ```py
 from collections import abc
+
+def accepts_type(x: type): ...
+
+accepts_type(abc.Callable)  # no diagnostic
 
 def _(subj: None | abc.Callable[..., str]) -> None:
     match subj:
@@ -228,6 +276,10 @@ def _(subj: abc.Callable[..., str]) -> None:
 
 ```py
 import typing
+
+def accepts_type(x: type): ...
+
+accepts_type(typing.Callable)  # error: [invalid-argument-type]
 
 def _(subj: None | typing.Callable[..., str]) -> None:
     match subj:

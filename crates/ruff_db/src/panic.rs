@@ -183,10 +183,11 @@ mod tests {
     fn no_backtrace_for_salsa_cancelled() {
         #[salsa::input]
         struct Input {
+            #[returns(copy)]
             value: u32,
         }
 
-        #[salsa::tracked]
+        #[salsa::tracked(returns(copy))]
         fn test_query(db: &dyn Database, input: Input) -> u32 {
             loop {
                 // This should throw a cancelled error

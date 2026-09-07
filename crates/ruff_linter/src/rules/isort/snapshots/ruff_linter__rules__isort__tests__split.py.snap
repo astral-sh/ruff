@@ -28,7 +28,6 @@ I001 [*] Import block is un-sorted or un-formatted
 20 | /     import D
 21 | |     import B
    | |____________^
-   |
 help: Organize imports
    |
 19 |
@@ -46,7 +45,6 @@ I001 [*] Import block is un-sorted or un-formatted
 30 | / import d
 31 | | import c
    | |________^
-   |
 help: Organize imports
    |
 29 |

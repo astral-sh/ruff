@@ -19,7 +19,6 @@ error[type-assertion-failure]: Argument does not have asserted type `str`
   |     ^^^^^^^^^^^^-^^^^^^
   |                 |
   |                 Inferred type is `int`
-  |
 info: `str` and `int` are not equivalent types
 ```
 
@@ -38,7 +37,6 @@ error[type-assertion-failure]: Argument does not have asserted type `int`
    |     ^^^^^^^^^^^^-^^^^^^
    |                 |
    |                 Inferred type is `bool`
-   |
 info: `bool` is a subtype of `int`, but they are not equivalent
 ```
 
@@ -106,7 +104,6 @@ error[type-assertion-failure]: Argument does not have asserted type `Bar`
   |     ^^^^^^^^^^^^-^^^^^^
   |                 |
   |                 Inferred type is `Foo`
-  |
 info: `Bar` and `Foo` are not equivalent types
 ```
 
@@ -123,7 +120,6 @@ error[assert-type-unspellable-subtype]: Argument does not have asserted type `Ba
    |         ^^^^^^^^^^^^-^^^^^^
    |                     |
    |                     Inferred type is `Foo & Bar`
-   |
 info: `Foo & Bar` is a subtype of `Bar`, but they are not equivalent
 ```
 
@@ -141,7 +137,6 @@ error[type-assertion-failure]: Argument does not have asserted type `Baz`
    |         ^^^^^^^^^^^^-^^^^^^
    |                     |
    |                     Inferred type is `Foo & Bar`
-   |
 info: `Baz` and `Foo & Bar` are not equivalent types
 ```
 
@@ -168,7 +163,7 @@ def _(f: F):
 from typing import Any
 from typing_extensions import Literal, assert_type
 
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 # Any and Unknown are considered equivalent
 def _(a: Unknown, b: Any):
@@ -193,7 +188,7 @@ Tuple types with the same elements are the same.
 ```py
 from typing_extensions import Any, assert_type
 
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 def _(a: tuple[int, str, bytes]):
     assert_type(a, tuple[int, str, bytes])  # fine

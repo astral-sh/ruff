@@ -1,8 +1,6 @@
 //! Rules from [flake8-gettext](https://pypi.org/project/flake8-gettext/).
 use crate::checkers::ast::Checker;
-use crate::preview::{
-    is_extended_i18n_function_matching_enabled, is_plural_ngettext_check_enabled,
-};
+use crate::preview::is_plural_ngettext_check_enabled;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::Modules;
@@ -44,10 +42,6 @@ pub(crate) fn is_gettext_func_call(
         return true;
     }
 
-    if !is_extended_i18n_function_matching_enabled(checker.settings()) {
-        return false;
-    }
-
     let semantic = checker.semantic();
 
     let Some(qualified_name) = semantic.resolve_qualified_name(func) else {
@@ -77,7 +71,6 @@ mod tests {
     use test_case::test_case;
 
     use crate::registry::Rule;
-    use crate::settings::types::PreviewMode;
     use crate::test::test_path;
     use crate::{assert_diagnostics, settings};
 
@@ -101,10 +94,7 @@ mod tests {
         let snapshot = format!("preview__{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_gettext").join(path).as_path(),
-            &settings::LinterSettings {
-                preview: PreviewMode::Enabled,
-                ..settings::LinterSettings::for_rule(rule_code)
-            },
+            &settings::LinterSettings::for_rule(rule_code).with_preview_mode(),
         )?;
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())

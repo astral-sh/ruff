@@ -2,11 +2,11 @@ use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use full::FullRenderer;
-use ruff_annotate_snippets::{
-    Annotation as AnnotateAnnotation, Level as AnnotateLevel, Message as AnnotateMessage,
-    Snippet as AnnotateSnippet,
+use annotate_snippets::{
+    Annotation as AnnotateAnnotation, AnnotationKind, Group as AnnotateGroup,
+    Level as AnnotateLevel, Snippet as AnnotateSnippet,
 };
+use full::FullRenderer;
 use ruff_notebook::{Notebook, NotebookIndex};
 use ruff_source_file::{LineIndex, OneIndexed, SourceCode};
 use ruff_text_size::{TextLen, TextRange, TextSize};
@@ -206,7 +206,7 @@ impl<'a> Resolved<'a> {
 /// both.)
 #[derive(Debug)]
 struct ResolvedDiagnostic<'a> {
-    level: AnnotateLevel,
+    level: AnnotateLevel<'static>,
     id: Option<String>,
     documentation_url: Option<String>,
     message: String,
@@ -238,9 +238,8 @@ impl<'a> ResolvedDiagnostic<'a> {
             })
             .collect();
 
-        let id = if !config.preview
-            && let Some(code) = diag.secondary_code()
-        {
+        let use_code = !config.preview || config.prefer_rule_codes;
+        let id = if use_code && let Some(code) = diag.secondary_code() {
             code.to_string()
         } else if config.hide_severity {
             // When Ruff gets real severities, we should put the colon back in
@@ -252,10 +251,11 @@ impl<'a> ResolvedDiagnostic<'a> {
             diag.id().to_string()
         };
 
+        let level = diag.inner.severity.to_annotate();
         let level = if config.hide_severity {
-            AnnotateLevel::None
+            level.no_name()
         } else {
-            diag.inner.severity.to_annotate()
+            level
         };
 
         ResolvedDiagnostic {
@@ -396,7 +396,7 @@ impl<'a> ResolvedDiagnostic<'a> {
         snippets_by_input
             .sort_by(|snips1, snips2| snips1.has_primary.cmp(&snips2.has_primary).reverse());
         RenderableDiagnostic {
-            level: self.level,
+            level: self.level.clone(),
             id: self.id.as_deref(),
             documentation_url: self.documentation_url.as_deref(),
             message: &self.message,
@@ -492,7 +492,7 @@ struct Renderable<'r> {
 #[derive(Debug)]
 struct RenderableDiagnostic<'r> {
     /// The severity of the diagnostic.
-    level: AnnotateLevel,
+    level: AnnotateLevel<'static>,
     /// The ID of the diagnostic. The ID can usually be used on the CLI or in a
     /// config file to change the severity of a lint.
     ///
@@ -520,7 +520,7 @@ struct RenderableDiagnostic<'r> {
 
 impl RenderableDiagnostic<'_> {
     /// Convert this to an "annotate" snippet.
-    fn to_annotate(&self) -> AnnotateMessage<'_> {
+    fn to_annotate(&self) -> AnnotateGroup<'_> {
         let snippets = self.snippets_by_input.iter().flat_map(|snippets| {
             let path = snippets.path;
             snippets
@@ -528,15 +528,18 @@ impl RenderableDiagnostic<'_> {
                 .iter()
                 .map(|snippet| snippet.to_annotate(path))
         });
-        let mut message = self
+        let mut title = self
             .level
-            .title(self.message)
-            .is_fixable(self.is_fixable)
-            .lineno_offset(self.header_offset);
+            .clone()
+            .primary_title(self.message)
+            .is_fixable(self.is_fixable);
         if let Some(id) = self.id {
-            message = message.id_with_url(id, self.documentation_url);
+            title = title.id(id);
+            if let Some(url) = self.documentation_url {
+                title = title.id_url(url);
+            }
         }
-        message.snippets(snippets)
+        title.elements(snippets).lineno_offset(self.header_offset)
     }
 }
 
@@ -713,10 +716,11 @@ impl<'r> RenderableSnippet<'r> {
     }
 
     /// Convert this to an "annotate" snippet.
-    fn to_annotate<'a>(&'a self, path: &'a str) -> AnnotateSnippet<'a> {
-        AnnotateSnippet::source(&self.snippet)
-            .origin(path)
+    fn to_annotate<'a>(&'a self, path: &'a str) -> AnnotateSnippet<'a, AnnotateAnnotation<'a>> {
+        AnnotateSnippet::source(self.snippet.as_ref())
+            .path(path)
             .line_start(self.line_start.get())
+            .fold(false)
             .annotations(
                 self.annotations
                     .iter()
@@ -766,23 +770,12 @@ impl<'r> RenderableAnnotation<'r> {
 
     /// Convert this to an "annotate" annotation.
     fn to_annotate(&self) -> AnnotateAnnotation<'_> {
-        // This is not really semantically meaningful, but
-        // it does currently result in roughly the message
-        // we want to convey.
-        //
-        // TODO: While this means primary annotations use `^` and
-        // secondary annotations use `-` (which is fine), this does
-        // result in coloring for primary annotations that looks like
-        // an error (red) and coloring for secondary annotations that
-        // looks like a warning (yellow). This is perhaps not quite in
-        // line with what we want, but fixing this probably requires
-        // changes to `ruff_annotate_snippets`, so we punt for now.
-        let level = if self.is_primary {
-            AnnotateLevel::Error
+        let kind = if self.is_primary {
+            AnnotationKind::Primary
         } else {
-            AnnotateLevel::Warning
+            AnnotationKind::Context
         };
-        let mut ann = level.span(self.range.into());
+        let mut ann = kind.span(self.range.into());
         if let Some(message) = self.message {
             ann = ann.label(message);
         }
@@ -906,12 +899,6 @@ impl FileResolver for &dyn Db {
 pub struct Input {
     pub(crate) text: SourceText,
     pub(crate) line_index: LineIndex,
-}
-
-impl Input {
-    pub fn line_index(&self) -> &LineIndex {
-        &self.line_index
-    }
 }
 
 /// Returns the line number accounting for the given `len`
@@ -1398,7 +1385,6 @@ watermelon
           |
         5 | elephant
           | ^^^^^^^^
-          |
         ",
         );
 
@@ -1432,7 +1418,6 @@ watermelon
         10 | jackrabbit
         11 | kangaroo
            | ^^^^^^^^
-           |
         ",
         );
 
@@ -1489,7 +1474,6 @@ watermelon
         10 | jackrabbit
         11 | kangaroo
            | ^^^^^^^^
-           |
         ",
         );
     }
@@ -1779,7 +1763,6 @@ watermelon
           |
         5 | canary
           | ^^^^^^
-          |
         ",
         );
     }
@@ -1963,7 +1946,6 @@ watermelon
         10 | jackrabbit
         11 | kangaroo
            | ^^^^^^^^
-           |
         ",
         );
 
@@ -1992,7 +1974,6 @@ watermelon
         10 | jackrabbit
         11 | kangaroo
            | ^^^^^^^^
-           |
         warning: sub-diagnostic message
          --> fruits:3:1
           |
@@ -2089,7 +2070,7 @@ watermelon
         4 |   dog
         5 | / elephant
         6 | | finch
-          | |______^
+          | |_____^
         7 |   gorilla
         8 |   hippopotamus
           |
@@ -2181,10 +2162,8 @@ watermelon
           |
         2 |    beetle
         3 |    canary
-        4 |    dog
-          |  __^
-        5 | |  elephant
-          | | _^
+        4 | /  dog
+        5 | |/ elephant
         6 | || finch
           | ||_____^
         7 | |  gorilla
@@ -2210,10 +2189,8 @@ watermelon
           |
         2 |    beetle
         3 |    canary
-        4 |    dog
-          |  __^
-        5 | |  elephant
-          | | _^
+        4 | /  dog
+        5 | |/ elephant
         6 | || finch
           | ||_____^
         7 | |  gorilla
@@ -2241,10 +2218,8 @@ watermelon
           |
         3 |    canary
         4 |    dog
-        5 |    elephant
-          |  __^
-        6 | |  finch
-          | | _^
+        5 | /  elephant
+        6 | |/ finch
         7 | || gorilla
           | ||_______^
           |  |_______|
@@ -2276,13 +2251,11 @@ watermelon
           |
         3 |    canary
         4 |    dog
-        5 |    elephant
-          |   _^
-          |  |_|
+        5 | // elephant
         6 | || finch
           | ||_____^
-        7 |  | gorilla
-          |  |_______^
+        7 | |  gorilla
+          | |________^
         8 |    hippopotamus
         9 |    inchworm
           |
@@ -2304,8 +2277,7 @@ watermelon
           |
         3 |    canary
         4 |    dog
-        5 |    elephant
-          |  __^
+        5 | /  elephant
         6 | |  finch
           | |__^___^
           |   _|
@@ -2359,7 +2331,7 @@ watermelon
         3 | canary
         4 | dog
         5 | elephant
-          |   ----
+          |   ^^^^
           |   |
           |   giant land mammal
           |   but afraid of mice
@@ -2451,7 +2423,6 @@ watermelon
           |
         7 | gorilla
           | ------- secondary 7
-          |
         ",
         );
     }
@@ -2535,7 +2506,6 @@ watermelon
            |
          2 | banana
            | ------ secondary fruits 2
-           |
         ",
         );
     }
@@ -2561,7 +2531,7 @@ watermelon
         assert_eq!(
             diagnostics
                 .iter()
-                .map(Diagnostic::primary_message)
+                .map(Diagnostic::headline_message)
                 .collect::<Vec<_>>(),
             ["checking main.py", "checking mod.py"]
         );
@@ -2637,12 +2607,6 @@ watermelon
             self.config = config.with_show_fix_status(yes);
         }
 
-        /// Show a diff for the fix when rendering.
-        pub(super) fn show_fix_diff(&mut self, yes: bool) {
-            let config = self.config.clone();
-            self.config = config.show_fix_diff(yes);
-        }
-
         /// The lowest fix applicability to show when rendering.
         pub(super) fn fix_applicability(&mut self, applicability: Applicability) {
             let config = self.config.clone();
@@ -2669,12 +2633,7 @@ watermelon
         /// of the corresponding line minus one. (The "minus one" is because
         /// otherwise, the span will end where the next line begins, and this
         /// confuses `ruff_annotate_snippets` as of 2025-03-13.)
-        pub(super) fn span(
-            &self,
-            path: &str,
-            line_offset_start: &str,
-            line_offset_end: &str,
-        ) -> Span {
+        fn span(&self, path: &str, line_offset_start: &str, line_offset_end: &str) -> Span {
             let span = self.path(path);
 
             let file = span.expect_ty_file();
@@ -2835,7 +2794,7 @@ watermelon
         }
 
         /// Set the fix on the diagnostic.
-        pub(super) fn fix(mut self, fix: Fix) -> DiagnosticBuilder<'e> {
+        fn fix(mut self, fix: Fix) -> DiagnosticBuilder<'e> {
             self.diag.set_fix(fix);
             self
         }

@@ -1,6 +1,6 @@
-/*!
-A simple command line tool for ad hoc completion benchmarking.
-*/
+//!
+//! A simple command line tool for ad hoc completion benchmarking.
+//!
 
 // This is a developer tool and is therefore fine to use `eprintln!`.
 #![allow(clippy::print_stderr)]
@@ -17,7 +17,7 @@ use ty_ide::{Completion, CompletionCapabilities};
 use ty_project::metadata::Options;
 use ty_project::metadata::options::EnvironmentOptions;
 use ty_project::metadata::value::RelativePathBuf;
-use ty_project::{ProjectDatabase, ProjectMetadata};
+use ty_project::{ProjectDatabase, ProjectMetadata, SemanticDb as _};
 
 #[derive(Debug, clap::Parser)]
 #[command(
@@ -91,14 +91,13 @@ fn main() -> anyhow::Result<ExitCode> {
     let system = OsSystem::new(&project_dir);
     let mut project_metadata = ProjectMetadata::discover(&project_dir, &system)?;
     // Explicitly point ty to the .venv to avoid any set VIRTUAL_ENV variable to take precedence.
-    project_metadata.apply_options(Options {
+    project_metadata.apply_override_options(Options {
         environment: Some(EnvironmentOptions {
             python: Some(RelativePathBuf::cli(".venv")),
             ..EnvironmentOptions::default()
         }),
         ..Options::default()
     });
-    project_metadata.apply_configuration_files(&system)?;
     let db = ProjectDatabase::fallible(project_metadata, system)?;
 
     let start = std::time::Instant::now();
@@ -143,7 +142,7 @@ fn get_completions<'db>(
         db,
         &settings,
         CompletionCapabilities::default(),
-        file,
+        db.program_file(file),
         offset,
     ))
 }

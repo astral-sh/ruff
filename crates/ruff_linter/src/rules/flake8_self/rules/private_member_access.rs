@@ -10,7 +10,10 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::rules::pylint::helpers::is_dunder_operator_method;
+use crate::codes::Category;
+use crate::rules::pylint::helpers::{
+    is_dunder_operator_method, is_underscore_prefixed_public_member,
+};
 
 /// ## What it does
 /// Checks for accesses on "private" class members.
@@ -56,7 +59,7 @@ use crate::rules::pylint::helpers::is_dunder_operator_method;
 /// ## References
 /// - [_What is the meaning of single or double underscores before an object name?_](https://stackoverflow.com/questions/1301346/what-is-the-meaning-of-single-and-double-underscore-before-an-object-name)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.240")]
+#[violation_metadata(stable_since = "v0.0.240", category = Category::Pedantic)]
 pub(crate) struct PrivateMemberAccess {
     access: String,
 }
@@ -104,7 +107,7 @@ pub(crate) fn private_member_access(checker: &Checker, expr: &Expr) {
 
     // Allow some public functions whose names start with an underscore, like `os._exit()`.
     if let Some(qualified_name) = semantic.resolve_qualified_name(expr) {
-        if matches!(qualified_name.segments(), ["os", "_exit"]) {
+        if is_underscore_prefixed_public_member(&qualified_name) {
             return;
         }
     }

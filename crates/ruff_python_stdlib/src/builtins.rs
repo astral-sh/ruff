@@ -15,7 +15,7 @@ const IPYTHON_BUILTINS: &[&str] = &["__IPYTHON__", "display", "get_ipython"];
 
 /// Globally defined names which are not attributes of the builtins module, or
 /// are only present on some platforms.
-pub const MAGIC_GLOBALS: &[&str] = &[
+const MAGIC_GLOBALS: &[&str] = &[
     "WindowsError",
     "__annotations__",
     "__builtins__",
@@ -530,6 +530,7 @@ pub fn is_exception(name: &str, minor_version: u8) -> bool {
                 | "UserWarning"
         ) | (10.., "EncodingWarning")
             | (11.., "BaseExceptionGroup" | "ExceptionGroup")
-            | (13.., "PythonFinalizationError" | "ImportCycleError")
+            | (13.., "PythonFinalizationError")
+            | (15.., "ImportCycleError")
     )
 }

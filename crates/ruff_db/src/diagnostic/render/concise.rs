@@ -67,10 +67,9 @@ impl<'a> ConciseRenderer<'a> {
                 write!(f, "{sep} ")?;
             }
 
+            let use_name = self.config.preview && !self.config.prefer_rule_codes;
             if self.config.hide_severity {
-                if !self.config.preview
-                    && let Some(code) = diag.secondary_code()
-                {
+                if !use_name && let Some(code) = diag.secondary_code() {
                     write!(
                         f,
                         "{code} ",
@@ -100,7 +99,7 @@ impl<'a> ConciseRenderer<'a> {
                     Severity::Error => ("error", stylesheet.error),
                     Severity::Fatal => ("fatal", stylesheet.error),
                 };
-                let id = if self.config.preview {
+                let id = if use_name {
                     diag.id().as_str()
                 } else {
                     diag.secondary_code_or_id()

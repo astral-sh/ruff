@@ -29,7 +29,6 @@ error[invalid-assignment]: Cannot assign to a subscript on an object of type `Re
   |
 6 | config["retries"] = 3  # error: [invalid-assignment]
   | ^^^^^^^^^^^^^^^^^
-  |
 help: Consider adding a `__setitem__` method to `ReadOnlyDict`.
 
 ```

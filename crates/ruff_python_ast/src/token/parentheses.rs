@@ -1,4 +1,4 @@
-use ruff_text_size::{Ranged, TextLen, TextRange};
+use ruff_text_size::{Ranged, TextRange};
 
 use super::{TokenKind, Tokens};
 use crate::{AnyNodeRef, ExprRef};
@@ -16,16 +16,20 @@ pub fn parentheses_iterator<'a>(
     tokens: &'a Tokens,
 ) -> impl Iterator<Item = TextRange> + 'a {
     let after_tokens = if let Some(parent) = parent {
+        let after_tokens = tokens.in_range(TextRange::new(expr.end(), parent.end()));
+
         // If the parent is a node that brings its own parentheses, exclude the closing parenthesis
         // from our search range. Otherwise, we risk matching on calls, like `func(x)`, for which
         // the open and close parentheses are part of the `Arguments` node.
-        let exclusive_parent_end = if parent.is_arguments() {
-            parent.end() - ")".text_len()
+        // The closing parenthesis may be missing in an incomplete call.
+        if parent.is_arguments()
+            && let Some((last, remaining)) = after_tokens.split_last()
+            && last.kind() == TokenKind::Rpar
+        {
+            remaining
         } else {
-            parent.end()
-        };
-
-        tokens.in_range(TextRange::new(expr.end(), exclusive_parent_end))
+            after_tokens
+        }
     } else {
         tokens.after(expr.end())
     };

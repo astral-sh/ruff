@@ -40,7 +40,7 @@ SEVERITY_LABELS: Final = {
 @pytest.fixture(scope="module", params=ALL_PROJECTS, ids=lambda p: p.name)
 def project_setup(
     request,
-) -> Generator[tuple[Project, Venv], None, None]:
+) -> Generator[tuple[Project, Venv]]:
     """Set up a project and its venv once per module (shared across all tests for this project)."""
     project: Project = request.param
 
@@ -187,7 +187,7 @@ class LspTest(ABC):
     def absolute_file_path(self, file_path: str) -> Path:
         return self.cwd / file_path
 
-    def files_to_check(self) -> Generator[Path, None, None]:
+    def files_to_check(self) -> Generator[Path]:
         yield self.edited_file_path
 
         for file in self.edit.affected_files:

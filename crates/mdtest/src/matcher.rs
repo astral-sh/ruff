@@ -9,15 +9,19 @@ use std::sync::LazyLock;
 use colored::Colorize;
 use path_slash::PathExt;
 use ruff_db::Db;
+use ruff_db::PythonFile;
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::{SourceText, line_index, source_text};
+use ruff_python_ast::PythonVersion;
 use ruff_source_file::{LineIndex, OneIndexed};
 use smallvec::SmallVec;
 
 use crate::RunOptions;
-use crate::assertion::{InlineFileAssertions, LineAssertions, ParsedAssertion, UnparsedAssertion};
+use crate::assertion::{
+    AssertionSource, InlineFileAssertions, LineAssertions, ParsedAssertion, UnparsedAssertion,
+};
 use crate::diagnostic::SortedDiagnostics;
 
 #[derive(Debug, Default)]
@@ -27,7 +31,7 @@ pub struct FailuresByLine {
 }
 
 impl FailuresByLine {
-    pub fn iter(&self) -> impl Iterator<Item = (OneIndexed, &[Failure])> {
+    pub(crate) fn iter(&self) -> impl Iterator<Item = (OneIndexed, &[Failure])> {
         self.lines.iter().map(|line_failures| {
             (
                 line_failures.line_number,
@@ -91,31 +95,41 @@ struct LineFailures {
 pub fn match_file(
     db: &dyn Db,
     file: File,
+    python_version: PythonVersion,
     diagnostics: &[Diagnostic],
     options: RunOptions,
 ) -> Result<Vec<Diagnostic>, FailuresByLine> {
     // Parse assertions from comments in the file, and get diagnostics from the file; both
     // ordered by line number.
     let source = source_text(db, file);
-    let parsed = parsed_module(db, file).load(db);
     let line_index = line_index(db, file);
-    let assertions = InlineFileAssertions::from_file(&source, &parsed, &line_index);
+    let (assertions, diagnostics) = if file.path(db).extension() == Some("toml") {
+        let assertions =
+            InlineFileAssertions::from_file(source.as_str(), AssertionSource::Toml, &line_index);
+        let diagnostics = SortedDiagnostics::new(diagnostics, &|diagnostic_range| {
+            line_index.line_index(diagnostic_range.start())
+        });
+        (assertions, diagnostics)
+    } else {
+        let parsed = parsed_module(db, PythonFile::new(db, file, python_version)).load(db);
+        let assertions = InlineFileAssertions::from_file(
+            source.as_str(),
+            AssertionSource::Python(&parsed),
+            &line_index,
+        );
 
-    // Sort diagnostics according to the line number of the starting offset of the token in which the diagnostic appears.
-    //
-    // This can be different to the line number of the starting offset of the diagnostic range!
-    // For example, if the diagnostic is a syntax error inside a stringized annotation,
-    // the syntax error's range will likely point to a sub-range of the string literal,
-    // which will make the error unmatchable by mdtest unless we look at the token in which
-    // the diagnostic occurs (the string-literal) and use the token start as the basis for
-    // the line number.
-    let diagnostics = SortedDiagnostics::new(diagnostics, &|diagnostic_range| {
-        let token_start = parsed
-            .tokens()
-            .token_range(diagnostic_range.start())
-            .start();
-        line_index.line_index(token_start)
-    });
+        // Sort diagnostics according to the line number of the starting offset of the token in
+        // which the diagnostic appears. This can differ from the line containing the start of the
+        // diagnostic range, for example for syntax errors inside stringized annotations.
+        let diagnostics = SortedDiagnostics::new(diagnostics, &|diagnostic_range| {
+            let token_start = parsed
+                .tokens()
+                .token_range(diagnostic_range.start())
+                .start();
+            line_index.line_index(token_start)
+        });
+        (assertions, diagnostics)
+    };
 
     let mut line_diagnostics = diagnostics.iter_lines();
 
@@ -262,31 +276,13 @@ impl UnmatchedWithColumn for &Diagnostic {
 
 /// Discard `@Todo`-type metadata from expected types, which is not available
 /// when running in release mode.
-///
-/// Some `@Todo` variants (like `@Todo(StarredExpression)` and `@Todo(typing.Unpack)`)
-/// are hardcoded enum variants that always display their message, so we preserve those.
 fn discard_todo_metadata(ty: &str) -> Cow<'_, str> {
     #[cfg(not(debug_assertions))]
     {
-        /// `@Todo` variants that are hardcoded and always display their message,
-        /// even in release mode.
-        const PRESERVED_TODO_VARIANTS: &[&str] = &[
-            "@Todo(StarredExpression)",
-            "@Todo(typing.Unpack)",
-            "@Todo(TypeVarTuple)",
-        ];
-
         static TODO_METADATA_REGEX: LazyLock<regex::Regex> =
             LazyLock::new(|| regex::Regex::new(r"@Todo\([^)]*\)").unwrap());
 
-        TODO_METADATA_REGEX.replace_all(ty, |caps: &regex::Captures| {
-            let matched = caps.get(0).unwrap().as_str();
-            if PRESERVED_TODO_VARIANTS.contains(&matched) {
-                matched.to_string()
-            } else {
-                "@Todo".to_string()
-            }
-        })
+        TODO_METADATA_REGEX.replace_all(ty, "@Todo")
     }
 
     #[cfg(debug_assertions)]
@@ -469,7 +465,7 @@ fn match_reveal_type_diagnostic(
             return false;
         }
 
-        let primary_message = diagnostic.primary_message();
+        let headline_message = diagnostic.headline_message();
         let Some(primary_annotation) =
             (diagnostic.primary_annotation()).and_then(|a| a.get_message())
         else {
@@ -480,7 +476,7 @@ fn match_reveal_type_diagnostic(
 
         // reveal_type, reveal_protocol_interface
         if matches!(
-            primary_message,
+            headline_message,
             "Revealed type" | "Revealed protocol interface"
         ) && expected_reveal_type_message.is_none_or(|expected_reveal_type_message| {
             primary_annotation == expected_reveal_type_message
@@ -490,7 +486,7 @@ fn match_reveal_type_diagnostic(
 
         // reveal_when_assignable_to, reveal_when_subtype_of, reveal_mro
         if matches!(
-            primary_message,
+            headline_message,
             "Assignability holds" | "Subtyping holds" | "Revealed MRO"
         ) && expected_reveal_type
             .is_none_or(|expected_reveal_type| primary_annotation == expected_reveal_type)
@@ -535,6 +531,7 @@ mod tests {
     use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Severity, Span};
     use ruff_db::files::{File, system_path_to_file};
     use ruff_db::system::DbWithWritableSystem as _;
+    use ruff_python_ast::PythonVersion;
     use ruff_python_trivia::textwrap::dedent;
     use ruff_source_file::OneIndexed;
     use ruff_text_size::TextRange;
@@ -595,7 +592,7 @@ mod tests {
             .into_iter()
             .map(|diagnostic| diagnostic.into_diagnostic(file))
             .collect();
-        super::match_file(&db, file, &diagnostics, options)
+        super::match_file(&db, file, PythonVersion::latest_ty(), &diagnostics, options)
     }
 
     fn assert_fail(result: Result<Vec<Diagnostic>, FailuresByLine>, messages: &[(usize, &[&str])]) {

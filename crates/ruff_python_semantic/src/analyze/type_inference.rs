@@ -443,7 +443,7 @@ pub enum NumberLike {
 impl NumberLike {
     /// Coerces two number-like types to the "highest" number-like type.
     #[must_use]
-    pub fn coerce(self, other: NumberLike) -> NumberLike {
+    fn coerce(self, other: NumberLike) -> NumberLike {
         match (self, other) {
             (NumberLike::Complex, _) | (_, NumberLike::Complex) => NumberLike::Complex,
             (NumberLike::Float, _) | (_, NumberLike::Float) => NumberLike::Float,

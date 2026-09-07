@@ -70,4 +70,3 @@ Module(
   |
 1 | [item for *items in source]
   |           ^^^^^^ Syntax Error: Starred expression cannot be used here
-  |

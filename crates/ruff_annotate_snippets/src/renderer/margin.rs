@@ -1,4 +1,4 @@
-use std::cmp::{max, min};
+use core::cmp::{max, min};
 
 const ELLIPSIS_PASSING: usize = 6;
 const LONG_WHITESPACE: usize = 20;
@@ -17,7 +17,7 @@ pub(crate) struct Margin {
     /// The end of the line to be displayed.
     computed_right: usize,
     /// The current width of the terminal. 140 by default and in tests.
-    term_width: usize,
+    pub(crate) term_width: usize,
     /// The end column of a span label, including the span. Doesn't account for labels not in the
     /// same line as the span.
     label_right: usize,
@@ -41,15 +41,9 @@ impl Margin {
         //    |                     ^^^^^^^^^
         // ```
 
-        let whitespace_left = whitespace_left.saturating_sub(ELLIPSIS_PASSING);
-        let span_left = span_left.saturating_sub(ELLIPSIS_PASSING);
-
         let mut m = Margin {
-            // When an annotation points at leading whitespace (e.g. an indentation error),
-            // `whitespace_left` can exceed `span_left`. Clamp it so that trimming whitespace
-            // never hides the leftmost annotation.
-            whitespace_left: min(whitespace_left, span_left),
-            span_left,
+            whitespace_left: whitespace_left.saturating_sub(ELLIPSIS_PASSING),
+            span_left: span_left.saturating_sub(ELLIPSIS_PASSING),
             span_right: span_right + ELLIPSIS_PASSING,
             computed_left: 0,
             computed_right: 0,
@@ -77,7 +71,12 @@ impl Margin {
 
         if self.computed_right - self.computed_left > self.term_width {
             // Trimming only whitespace isn't enough, let's get craftier.
-            if self.label_right - self.whitespace_left <= self.term_width {
+            if self.label_right.saturating_sub(self.whitespace_left) <= self.term_width
+                // Trimming whitespace when the right-most label is somewhrere
+                // within it would result in the label pointing to the wrong
+                // place
+                && self.label_right >= self.whitespace_left
+            {
                 // Attempt to fit the code window only trimming whitespace.
                 self.computed_left = self.whitespace_left;
                 self.computed_right = self.computed_left + self.term_width;

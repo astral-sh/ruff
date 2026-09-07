@@ -468,4 +468,3 @@ Module(
 6 | lst[*a, *b]  # multiple unpacks
 7 | array[3:5, *idxs]  # mixed with slices
   |            ^^^^^ Syntax Error: Cannot use star expression in index on Python 3.10 (syntax was added in Python 3.11)
-  |

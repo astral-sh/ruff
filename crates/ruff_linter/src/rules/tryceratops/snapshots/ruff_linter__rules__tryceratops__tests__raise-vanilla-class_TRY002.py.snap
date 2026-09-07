@@ -19,7 +19,6 @@ TRY002 Create your own exception
 16 |     if b == 1:
 17 |         raise Exception
    |               ^^^^^^^^^
-   |
 
 TRY002 Create your own exception
   --> TRY002.py:37:15
@@ -39,4 +38,3 @@ TRY002 Create your own exception
 40 |     if b == 1:
 41 |         raise BaseException
    |               ^^^^^^^^^^^^^
-   |

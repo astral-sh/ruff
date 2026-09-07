@@ -67,4 +67,3 @@ Module(
 5 | # at the newline token after `:`
 6 | if True:
   |         ^ Syntax Error: Expected an indented block after `if` statement
-  |

@@ -1,0 +1,48 @@
+<svg width="869px" height="236px" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    .fg { fill: #AAAAAA }
+    .bg { fill: #000000 }
+    .fg-bright-blue { fill: #5555FF }
+    .fg-bright-red { fill: #FF5555 }
+    .container {
+      padding: 0 10px;
+      line-height: 18px;
+    }
+    .bold { font-weight: bold; }
+    tspan {
+      font: 14px SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace;
+      white-space: pre;
+      line-height: 18px;
+    }
+  </style>
+
+  <rect width="100%" height="100%" y="0" rx="4.5" class="bg" />
+
+  <text xml:space="preserve" class="container fg">
+    <tspan x="10px" y="28px"><tspan class="fg-bright-red bold">error[E0308]</tspan><tspan class="bold">: mismatched types</tspan>
+</tspan>
+    <tspan x="10px" y="46px"><tspan>  </tspan><tspan class="fg-bright-blue bold"> ╭▸ </tspan><tspan>src/format.rs:52:1</tspan>
+</tspan>
+    <tspan x="10px" y="64px"><tspan>   </tspan><tspan class="fg-bright-blue bold">│</tspan>
+</tspan>
+    <tspan x="10px" y="82px"><tspan class="fg-bright-blue bold">51</tspan><tspan> </tspan><tspan class="fg-bright-blue bold">│</tspan><tspan>   ) -&gt; Option&lt;String&gt; {</tspan>
+</tspan>
+    <tspan x="10px" y="100px"><tspan>   </tspan><tspan class="fg-bright-blue bold">│</tspan><tspan>        </tspan><tspan class="fg-bright-blue bold">──────────────</tspan><tspan> </tspan><tspan class="fg-bright-blue bold">expected `std::option::Option&lt;std::string::String&gt;` because of return type</tspan>
+</tspan>
+    <tspan x="10px" y="118px"><tspan class="fg-bright-blue bold">52</tspan><tspan> </tspan><tspan class="fg-bright-blue bold">│</tspan><tspan> </tspan><tspan class="fg-bright-red bold">┏</tspan><tspan>     for ann in annotations {</tspan>
+</tspan>
+    <tspan x="10px" y="136px"><tspan class="fg-bright-blue bold">53</tspan><tspan> </tspan><tspan class="fg-bright-blue bold">│</tspan><tspan> </tspan><tspan class="fg-bright-red bold">┃</tspan><tspan>         match (ann.range.0, ann.range.1) {</tspan>
+</tspan>
+    <tspan x="10px" y="154px"><tspan class="fg-bright-blue bold">54</tspan><tspan> </tspan><tspan class="fg-bright-blue bold">│</tspan><tspan> </tspan><tspan class="fg-bright-red bold">┃</tspan><tspan>             (None, None) =&gt; continue,</tspan>
+</tspan>
+    <tspan x="10px" y="172px"><tspan class="fg-bright-blue bold">55</tspan><tspan> </tspan><tspan class="fg-bright-blue bold">│</tspan><tspan> </tspan><tspan class="fg-bright-red bold">┃</tspan><tspan>             (Some(start), Some(end)) if start &gt; end_index || end &lt; start_index =&gt; continue,</tspan>
+</tspan>
+    <tspan x="10px" y="190px"><tspan>   </tspan><tspan class="fg-bright-blue bold">┆</tspan><tspan> </tspan><tspan class="fg-bright-red bold">┇</tspan>
+</tspan>
+    <tspan x="10px" y="208px"><tspan class="fg-bright-blue bold">72</tspan><tspan> </tspan><tspan class="fg-bright-blue bold">│</tspan><tspan> </tspan><tspan class="fg-bright-red bold">┃</tspan><tspan>     }</tspan>
+</tspan>
+    <tspan x="10px" y="226px"><tspan>   </tspan><tspan class="fg-bright-blue bold">╰╴</tspan><tspan class="fg-bright-red bold">┗━━━━━┛</tspan><tspan> </tspan><tspan class="fg-bright-red bold">expected enum `std::option::Option`, found ()</tspan>
+</tspan>
+  </text>
+
+</svg>

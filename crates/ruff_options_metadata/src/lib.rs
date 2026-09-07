@@ -207,6 +207,7 @@ impl OptionSet {
     /// ### Find a nested option
     ///
     /// ```rust
+    /// # use std::assert_matches;
     /// # use ruff_options_metadata::{OptionEntry, OptionField, OptionsMetadata, Visit};
     ///
     /// static HARD_TABS: OptionField = OptionField {
@@ -244,7 +245,7 @@ impl OptionSet {
     /// }
     ///
     /// assert_eq!(Root::metadata().find("format.hard-tabs").and_then(OptionEntry::into_field), Some(HARD_TABS.clone()));
-    /// assert!(matches!(Root::metadata().find("format"), Some(OptionEntry::Set(_))));
+    /// assert_matches!(Root::metadata().find("format"), Some(OptionEntry::Set(_)));
     /// assert!(Root::metadata().find("format.spaces").is_none());
     /// assert!(Root::metadata().find("lint.hard-tabs").is_none());
     /// ```

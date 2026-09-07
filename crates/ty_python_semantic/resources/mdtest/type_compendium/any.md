@@ -13,7 +13,8 @@ type, which means that it represents an *unknown* set of runtime values.
 ## Every type is assignable to `Any`, and `Any` is assignable to every type
 
 ```py
-from ty_extensions import static_assert, is_assignable_to
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to
 from typing_extensions import Never, Any
 
 class C: ...
@@ -47,7 +48,8 @@ The union `Any | T` of `Any` with a fully static type `T` describes an unknown s
 type with *lower bound* `T`. Again, this can be demonstrated using the assignable-to relation:
 
 ```py
-from ty_extensions import static_assert, is_assignable_to, is_equivalent_to
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to, is_equivalent_to
 from typing_extensions import Any
 
 # A class hierarchy Small <: Medium <: Big
@@ -78,7 +80,8 @@ that is *no larger than* the set of values described by `T`. It represents an un
 type with *upper bound* `T`:
 
 ```pyi
-from ty_extensions import static_assert, is_assignable_to, is_equivalent_to
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to, is_equivalent_to
 from typing import Any
 
 class Big: ...
@@ -125,7 +128,8 @@ gradual types:
 > `tuple[int, object]` to `tuple[int, int]` is a static type error.
 
 ```py
-from ty_extensions import static_assert, is_assignable_to
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to
 from typing import Any
 
 static_assert(is_assignable_to(tuple[int, Any], tuple[int, int]))

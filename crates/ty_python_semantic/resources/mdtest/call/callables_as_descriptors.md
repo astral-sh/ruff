@@ -13,7 +13,7 @@ instance to the first argument. The bound-method object therefore has a differen
 the first argument:
 
 ```py
-from ty_extensions import RegularCallableTypeOf
+from ty_extensions._internal import RegularCallableTypeOf
 from typing import Any, Callable
 
 class C1:
@@ -143,6 +143,45 @@ class C2:
 C2().method_decorated(1)
 ```
 
+A generic decorator must preserve a type variable bound by the method's enclosing class, even when
+the decorator uses an ellipsis instead of a `ParamSpec`:
+
+```py
+def preserve_return[R](function: Callable[..., R]) -> Callable[..., R]:
+    return function
+
+class DecoratedBox[T]:
+    @preserve_return
+    def value(self) -> T:
+        raise NotImplementedError
+
+    @preserve_return
+    def values(self) -> list[T]:
+        raise NotImplementedError
+
+reveal_type(DecoratedBox[int]().value())  # revealed: int
+reveal_type(DecoratedBox[int]().values())  # revealed: list[int]
+```
+
+The same behavior applies to decorators and classes using legacy type variables:
+
+```py
+from typing import Generic, TypeVar
+
+LegacyT = TypeVar("LegacyT")
+LegacyR = TypeVar("LegacyR")
+
+def legacy_preserve_return(function: Callable[..., LegacyR]) -> Callable[..., LegacyR]:
+    return function
+
+class LegacyDecoratedBox(Generic[LegacyT]):
+    @legacy_preserve_return
+    def value(self) -> LegacyT:
+        raise NotImplementedError
+
+reveal_type(LegacyDecoratedBox[int]().value())  # revealed: int
+```
+
 And if the callable-typed decorator leaves some generic parameters unconstrained, we should keep
 those parameters unspecialized rather than collapsing them to `Never`:
 
@@ -174,27 +213,35 @@ class C3:
 reveal_type(C3().method_decorated(1))  # revealed: int | str
 ```
 
-Note that we currently only apply this heuristic when calling a function such as `memoize` via the
-decorator syntax. This is inconsistent, because the above *should* be equivalent to the following,
-but here we emit errors:
+Transparent decorators are also treated consistently when spelled as an equivalent assignment:
 
 ```py
-def memoize3(f: Callable[[C4, int], str]) -> Callable[[C4, int], str]:
-    raise NotImplementedError
-
 class C4:
     def method(self, x: int) -> str:
         return str(x)
-    method_decorated = memoize3(method)
+    method_decorated = memoize(method)
 
-# error: [missing-argument]
-# error: [invalid-argument-type]
 C4().method_decorated(1)
 ```
 
-The reason for this is that the heuristic is problematic. We don't *know* that the `Callable` in the
-return type of `memoize` is actually related to the method that we pass in. But when `memoize` is
-applied as a decorator, it is reasonable to assume so.
+For non-transparent decorators, avoid resolving the decorated function's signature before the
+decorator itself has been rejected. Doing so can introduce a cycle when the signature refers back to
+the decorated name:
+
+```py
+decorated = lambda: decorated
+try:
+    pass
+except* Exception:
+    pass
+
+unknown_decorator: Any
+
+# error: [dynamic-function-decorator-return]
+@unknown_decorator  # error: [unresolved-reference]
+def decorated(argument: lambda: decorated, /):  # error: [invalid-type-form]
+    pass
+```
 
 In general, a function call might however return a `Callable` that is unrelated to the argument
 passed in. And here, it seems more reasonable and safe to treat the `Callable` as a non-descriptor.
@@ -282,6 +329,44 @@ class Matrix:
 Matrix() < Matrix()
 ```
 
+The dunder-name heuristic does not apply when the callable takes no arguments, because it cannot
+accept a receiver:
+
+```py
+class Thunk:
+    __value_thunk__: Callable[[], int]
+
+    def replace(self, other: "Thunk") -> None:
+        self.__value_thunk__ = other.__value_thunk__
+
+reveal_type(Thunk().__value_thunk__)  # revealed: () -> int
+```
+
+For other concrete signatures, the heuristic does not check whether the first parameter can accept
+the instance:
+
+```py
+def descriptor_candidate(value: str) -> int:
+    return len(value)
+
+class DescriptorCandidate:
+    __value__: Callable[[str], int] = descriptor_candidate
+
+reveal_type(DescriptorCandidate().__value__)  # revealed: () -> int
+```
+
+A gradual callable signature might accept the receiver, so we preserve the function-descriptor
+heuristic. This also preserves function attributes on class access:
+
+```py
+from typing import Any
+
+class Method:
+    __call__: Callable[..., Any]
+
+Method.__call__.__code__
+```
+
 ## `self`-binding behaviour of function-like `Callable`s
 
 Binding the `self` parameter of a function-like `Callable` creates a new `Callable` that is also
@@ -348,7 +433,7 @@ The callable type of a type object is not function-like.
 
 ```py
 from typing import ClassVar
-from ty_extensions import RegularCallableTypeOf
+from ty_extensions._internal import RegularCallableTypeOf
 
 class WithNew:
     def __new__(self, x: int) -> WithNew:
@@ -427,6 +512,128 @@ reveal_type(Child().method)  # revealed: (int, /) -> str
 
 Parent().method(1)
 Child().method(1)
+```
+
+## Recursive receiver protocols across overloads
+
+Each overload introduces its own type variables, even when two overloads have identical signatures.
+Binding the receiver preserves these variables when its protocol refers back to the same method.
+
+```py
+from typing import Protocol, overload
+
+class P[T](Protocol):
+    def method(self) -> T: ...
+
+@overload
+def method[T](obj: P[T]) -> T: ...
+@overload
+def method[U](obj: P[U]) -> U: ...
+@overload
+def method(obj: object) -> int: ...
+def method(obj):
+    raise NotImplementedError
+
+class C:
+    method = method
+
+reveal_type(C().method)  # revealed: Overload[[T]() -> T, [U]() -> U, () -> int]
+```
+
+## Concrete overload alternatives with a recursive receiver
+
+A recursive protocol-typed receiver also works with concrete overloads that accept different
+argument types. Binding the receiver preserves both concrete alternatives.
+
+```py
+from typing import Protocol, overload
+
+class P[T](Protocol):
+    def method(self, arg: T) -> None: ...
+
+@overload
+def method[T](obj: P[T], arg: T) -> None: ...
+@overload
+def method(obj: object, arg: int) -> None: ...
+@overload
+def method(obj: object, arg: str) -> None: ...
+def method(obj, arg):
+    raise NotImplementedError
+
+class C:
+    method = method
+
+reveal_type(C().method)  # revealed: Overload[[T](arg: T) -> None, (arg: int) -> None, (arg: str) -> None]
+```
+
+## Recursive receiver protocols with tuple parameters
+
+The receiver's type variables can occur together in a tuple parameter and separately in the return
+type. Binding the receiver preserves both variables and the concrete overload alternatives.
+
+```py
+from typing import Protocol, overload
+
+class P[A, R](Protocol):
+    def method(self, arg: tuple[A, R]) -> R: ...
+
+@overload
+def method[A, R](obj: P[A, R], arg: tuple[A, R]) -> R: ...
+@overload
+def method(obj: object, arg: tuple[int, str]) -> str: ...
+@overload
+def method(obj: object, arg: tuple[str, int]) -> int: ...
+def method(obj, arg):
+    raise NotImplementedError
+
+class C:
+    method = method
+
+# revealed: Overload[[A, R](arg: tuple[A, R]) -> R, (arg: tuple[int, str]) -> str, (arg: tuple[str, int]) -> int]
+reveal_type(C().method)
+C().method((1, "x"))
+C().method(("x", 1))
+C().method((1,))  # error: [no-matching-overload]
+```
+
+## Recursive receiver protocols with invariant containers
+
+Type variables in invariant containers also survive receiver binding. Calls still enforce the
+parameter's container shape after the recursive receiver constraints have been resolved.
+
+```py
+from typing import Protocol, overload
+
+class P[A, R](Protocol):
+    def method(self, arg: list[A]) -> list[R]: ...
+
+@overload
+def method[A, R](obj: P[A, R], arg: list[A]) -> list[R]: ...
+@overload
+def method(obj: object, arg: list[int]) -> list[int]: ...
+@overload
+def method(obj: object, arg: list[str]) -> list[str]: ...
+def method(obj, arg):
+    raise NotImplementedError
+
+class C:
+    method = method
+
+# revealed: Overload[[A, R](arg: list[A]) -> list[R], (arg: list[int]) -> list[int], (arg: list[str]) -> list[str]]
+reveal_type(C().method)
+C().method([1])
+C().method(["x"])
+C().method(1)  # error: [no-matching-overload]
+```
+
+## Builtin functions with recursive receiver protocols
+
+Assigning `pow` to a class's `__pow__` attribute is valid. Its overloads accept protocols describing
+that same method, so receiver checking is recursive.
+
+```py
+class C:
+    __pow__ = pow
 ```
 
 [`tensorbase`]: https://github.com/pytorch/pytorch/blob/f3913ea641d871f04fa2b6588a77f63efeeb9f10/torch/_tensor.py#L1084-L1092

@@ -463,7 +463,7 @@ impl<'a> Bindings<'a> {
     }
 
     /// Pushes a new [`Binding`] and returns its [`BindingId`].
-    pub fn push(&mut self, binding: Binding<'a>) -> BindingId {
+    pub(crate) fn push(&mut self, binding: Binding<'a>) -> BindingId {
         self.0.push(binding)
     }
 }

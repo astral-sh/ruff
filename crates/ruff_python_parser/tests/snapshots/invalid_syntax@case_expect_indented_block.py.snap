@@ -92,4 +92,3 @@ Module(
 2 |     case 1:
 3 |     case 2: ...
   |     ^^^^ Syntax Error: Expected an indented block after `case` block
-  |

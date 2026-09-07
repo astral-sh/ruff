@@ -4,7 +4,8 @@ import socket
 import sys
 from _typeshed import Incomplete, ReadableBuffer, WriteableBuffer
 from collections.abc import Callable
-from typing import IO, Any, ClassVar, Final, NoReturn
+from typing import IO, Any, ClassVar, Final
+from typing_extensions import Never
 
 from . import events, futures, proactor_events, selector_events, streams, windows_utils
 
@@ -123,18 +124,18 @@ if sys.platform == "win32":
     else:
         class WindowsSelectorEventLoopPolicy(events.BaseDefaultEventLoopPolicy):
             _loop_factory: ClassVar[type[SelectorEventLoop]]
-            def get_child_watcher(self) -> NoReturn:
+            def get_child_watcher(self) -> Never:
                 """Get the watcher for child processes."""
 
-            def set_child_watcher(self, watcher: Any) -> NoReturn:
+            def set_child_watcher(self, watcher: Any) -> Never:
                 """Set the watcher for child processes."""
 
         class WindowsProactorEventLoopPolicy(events.BaseDefaultEventLoopPolicy):
             _loop_factory: ClassVar[type[ProactorEventLoop]]
-            def get_child_watcher(self) -> NoReturn:
+            def get_child_watcher(self) -> Never:
                 """Get the watcher for child processes."""
 
-            def set_child_watcher(self, watcher: Any) -> NoReturn:
+            def set_child_watcher(self, watcher: Any) -> Never:
                 """Set the watcher for child processes."""
 
     if sys.version_info >= (3, 14):

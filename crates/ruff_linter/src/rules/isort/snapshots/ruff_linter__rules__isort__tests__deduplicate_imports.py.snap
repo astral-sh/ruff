@@ -9,7 +9,6 @@ I001 [*] Import block is un-sorted or un-formatted
 3 | | import os as os1
 4 | | import os as os2
   | |________________^
-  |
 help: Organize imports
   |
 1 | import os

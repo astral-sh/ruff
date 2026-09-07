@@ -251,7 +251,6 @@ RSE102 [*] Unnecessary parentheses on raised exception
 106 | if future.exception():
 107 |     raise future.Exception()
     |                           ^^
-    |
 help: Remove unnecessary parentheses
     |
 106 | if future.exception():
@@ -269,7 +268,6 @@ RSE102 [*] Unnecessary parentheses on raised exception
 111 | |     # comment
 112 | | )
     | |_^
-    |
 help: Remove unnecessary parentheses
     |
 109 |

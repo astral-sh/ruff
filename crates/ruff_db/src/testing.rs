@@ -18,7 +18,10 @@ pub fn assert_function_query_was_not_run<Db, Q, QDb, I, R>(
 
     db.attach(|_| {
         if let Some(will_execute_event) = will_execute_event {
-            panic!("Expected query {query_name}({id:?}) not to have run but it did: {will_execute_event:?}\n\n{events:#?}");
+            panic!(
+                "Expected query {query_name}({id:?}) not to have run but it did: \
+                 {will_execute_event:?}\n\n{events:#?}"
+            );
         }
     });
 }
@@ -40,7 +43,8 @@ pub fn assert_const_function_query_was_not_run<Db, Q, QDb, R>(
     db.attach(|_| {
         if let Some(will_execute_event) = event {
             panic!(
-                "Expected query {query_name}() not to have run but it did: {will_execute_event:?}\n\n{events:#?}"
+                "Expected query {query_name}() not to have run but it did: \
+                 {will_execute_event:?}\n\n{events:#?}"
             );
         }
     });
@@ -61,12 +65,14 @@ pub fn assert_function_query_was_not_run_by_name<Db>(
             match input {
                 Some(input) => {
                     panic!(
-                        "Expected query {query_name}({input:?}) not to have run but it did: {will_execute_event:?}\n\n{events:#?}"
+                        "Expected query {query_name}({input:?}) not to have run \
+                        but it did: {will_execute_event:?}\n\n{events:#?}"
                     );
                 }
                 None => {
                     panic!(
-                        "Expected query {query_name} not to have run for any input but it did: {will_execute_event:?}\n\n{events:#?}"
+                        "Expected query {query_name} not to have run for any input \
+                        but it did: {will_execute_event:?}\n\n{events:#?}"
                     );
                 }
             }
@@ -227,10 +233,11 @@ fn query_was_not_run() {
 
     #[salsa::input(debug)]
     struct Input {
+        #[returns(clone)]
         text: String,
     }
 
-    #[salsa::tracked]
+    #[salsa::tracked(returns(copy))]
     fn len(db: &dyn salsa::Database, input: Input) -> usize {
         input.text(db).len()
     }
@@ -262,10 +269,11 @@ fn query_was_not_run_fails_if_query_was_run() {
 
     #[salsa::input(debug)]
     struct Input {
+        #[returns(clone)]
         text: String,
     }
 
-    #[salsa::tracked]
+    #[salsa::tracked(returns(copy))]
     fn len(db: &dyn salsa::Database, input: Input) -> usize {
         input.text(db).len()
     }
@@ -294,10 +302,11 @@ fn const_query_was_not_run_fails_if_query_was_run() {
 
     #[salsa::input]
     struct Input {
+        #[returns(clone)]
         text: String,
     }
 
-    #[salsa::tracked]
+    #[salsa::tracked(returns(copy))]
     fn len(db: &dyn salsa::Database) -> usize {
         db.report_untracked_read();
         5
@@ -325,10 +334,11 @@ fn query_was_run_fails_if_query_was_not_run() {
 
     #[salsa::input(debug)]
     struct Input {
+        #[returns(clone)]
         text: String,
     }
 
-    #[salsa::tracked]
+    #[salsa::tracked(returns(copy))]
     fn len(db: &dyn salsa::Database, input: Input) -> usize {
         input.text(db).len()
     }

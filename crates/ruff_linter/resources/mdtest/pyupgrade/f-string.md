@@ -41,7 +41,6 @@ error[UP032]: Use f-string instead of `format` call
   |
 4 | "{x}".format(x=foo())  # snapshot: f-string
   | ^^^^^^^^^^^^^^^^^^^^^
-  |
 help: Convert to f-string
   |
 3 |
@@ -66,7 +65,6 @@ error[UP032]: Use f-string instead of `format` call
   |
 1 | "" "{}".format(x)  # snapshot: f-string
   | ^^^^^^^^^^^^^^^^^
-  |
 help: Convert to f-string
   |
   - "" "{}".format(x)  # snapshot: f-string
@@ -85,7 +83,6 @@ error[UP032]: Use f-string instead of `format` call
   |
 2 | "a" "" "{}".format(x)  # snapshot: f-string
   | ^^^^^^^^^^^^^^^^^^^^^
-  |
 help: Convert to f-string
   |
 1 | "" "{}".format(x)  # snapshot: f-string
@@ -108,7 +105,6 @@ error[UP032]: Use f-string instead of `format` call
   |
 3 | x = ("" "{}").format(value)  # snapshot: f-string
   |     ^^^^^^^^^^^^^^^^^^^^^^^
-  |
 help: Convert to f-string
   |
 2 | "a" "" "{}".format(x)  # snapshot: f-string
@@ -136,7 +132,6 @@ error[UP032]: Use f-string instead of `format` call
 6 | |     # comment
 7 | |     "{}".format(value)
   | |______________________^
-  |
 help: Convert to f-string
   |
 6 |     # comment
@@ -159,7 +154,6 @@ error[UP032]: Use f-string instead of `format` call
   |
 9 | y = ("" "").format(value)  # snapshot: f-string
   |     ^^^^^^^^^^^^^^^^^^^^^
-  |
 help: Convert to f-string
   |
 8 | )

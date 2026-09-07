@@ -123,12 +123,6 @@ impl<'src> Lexer<'src> {
         self.current_range
     }
 
-    /// Returns the current parenthesis, bracket, and brace nesting level.
-    #[inline]
-    pub(crate) const fn nesting(&self) -> u32 {
-        self.nesting
-    }
-
     /// Returns the flags for the current token.
     pub(crate) const fn current_flags(&self) -> TokenFlags {
         self.current_flags
@@ -144,7 +138,7 @@ impl<'src> Lexer<'src> {
 
     /// Lex the next token.
     pub fn next_token(&mut self) -> TokenKind {
-        self.cursor.start_token();
+        // `lex_token` marks the start on the path that lexes each token.
         self.current_flags = TokenFlags::empty();
         self.current_kind = self.lex_token();
         // For `Unknown` token, the `push_error` method updates the current range.
@@ -157,6 +151,7 @@ impl<'src> Lexer<'src> {
     fn lex_token(&mut self) -> TokenKind {
         if let Some(interpolated_string) = self.interpolated_strings.current() {
             if !interpolated_string.is_in_interpolation(self.nesting) {
+                self.cursor.start_token();
                 if let Some(token) = self.lex_interpolated_string_middle_or_end() {
                     if token.is_interpolated_string_end() {
                         self.interpolated_strings.pop();
@@ -166,7 +161,11 @@ impl<'src> Lexer<'src> {
             }
         }
         // Return dedent tokens until the current indentation level matches the indentation of the next token.
-        else if let Some(indentation) = self.pending_indentation.take() {
+        // Avoid `Option::take` here: this check runs for every token, and `take` writes `None`
+        // even when there is no pending indentation.
+        else if let Some(indentation) = self.pending_indentation {
+            self.pending_indentation = None;
+            self.cursor.start_token();
             match self.indentations.current().try_compare(indentation) {
                 Ok(Ordering::Greater) => {
                     self.pending_indentation = Some(indentation);
@@ -189,6 +188,8 @@ impl<'src> Lexer<'src> {
         }
 
         if self.state.is_after_newline() {
+            // Indent and dedent tokens include leading whitespace in their ranges.
+            self.cursor.start_token();
             if let Some(indentation) = self.eat_indentation() {
                 return indentation;
             }
@@ -198,7 +199,7 @@ impl<'src> Lexer<'src> {
             }
         }
 
-        // The lexer might've skipped whitespaces, so update the start offset
+        // Whitespace between tokens is not part of the next token's range.
         self.cursor.start_token();
 
         if let Some(c) = self.cursor.bump() {
@@ -347,6 +348,12 @@ impl<'src> Lexer<'src> {
     }
 
     fn skip_whitespace(&mut self) -> Result<(), LexicalError> {
+        let whitespace_start = if matches!(self.cursor.first(), ' ' | '\t' | '\\' | '\x0C') {
+            self.offset()
+        } else {
+            return Ok(());
+        };
+
         loop {
             match self.cursor.first() {
                 ' ' => {
@@ -366,7 +373,10 @@ impl<'src> Lexer<'src> {
                         ));
                     }
                     if self.cursor.is_eof() {
-                        return Err(LexicalError::new(LexicalErrorType::Eof, self.token_range()));
+                        return Err(LexicalError::new(
+                            LexicalErrorType::Eof,
+                            TextRange::new(whitespace_start, self.offset()),
+                        ));
                     }
                 }
                 // Form feed
@@ -626,19 +636,27 @@ impl<'src> Lexer<'src> {
     /// Lex an identifier. Also used for keywords and string/bytes literals with a prefix.
     fn lex_identifier(&mut self, first: char) -> TokenKind {
         // Detect potential string like rb'' b'' f'' t'' u'' r''
-        let quote = match (first, self.cursor.first()) {
-            (_, quote @ ('\'' | '"')) => self.try_single_char_prefix(first).then(|| {
-                self.cursor.bump();
-                quote
-            }),
-            (_, second) if is_quote(self.cursor.second()) => {
-                self.try_double_char_prefix([first, second]).then(|| {
+        let quote = if let Some(prefix) = single_char_prefix(first) {
+            match self.cursor.first() {
+                quote @ ('\'' | '"') => {
+                    self.current_flags |= prefix;
                     self.cursor.bump();
-                    // SAFETY: Safe because of the `is_quote` check in this match arm's guard
-                    self.cursor.bump().unwrap()
-                })
+                    Some(quote)
+                }
+                second
+                    if let quote = self.cursor.second()
+                        && is_quote(quote) =>
+                {
+                    self.try_double_char_prefix([first, second]).then(|| {
+                        self.cursor.bump();
+                        self.cursor.bump();
+                        quote
+                    })
+                }
+                _ => None,
             }
-            _ => None,
+        } else {
+            None
         };
 
         if let Some(quote) = quote {
@@ -717,21 +735,6 @@ impl<'src> Lexer<'src> {
             b"yield" => TokenKind::Yield,
             _ => TokenKind::Name,
         }
-    }
-
-    /// Try lexing the single character string prefix, updating the token flags accordingly.
-    /// Returns `true` if it matches.
-    fn try_single_char_prefix(&mut self, first: char) -> bool {
-        match first {
-            'f' | 'F' => self.current_flags |= TokenFlags::F_STRING,
-            't' | 'T' => self.current_flags |= TokenFlags::T_STRING,
-            'u' | 'U' => self.current_flags |= TokenFlags::UNICODE_STRING,
-            'b' | 'B' => self.current_flags |= TokenFlags::BYTE_STRING,
-            'r' => self.current_flags |= TokenFlags::RAW_STRING_LOWERCASE,
-            'R' => self.current_flags |= TokenFlags::RAW_STRING_UPPERCASE,
-            _ => return false,
-        }
-        true
     }
 
     /// Try lexing the double character string prefix, updating the token flags accordingly.
@@ -1045,10 +1048,10 @@ impl<'src> Lexer<'src> {
     /// Lex a hex/octal/decimal/binary number without a decimal point.
     fn lex_number_radix(&mut self, radix: Radix) -> TokenKind {
         #[cfg(debug_assertions)]
-        debug_assert!(matches!(
-            self.cursor.previous().to_ascii_lowercase(),
-            'x' | 'o' | 'b'
-        ));
+        {
+            use std::debug_assert_matches;
+            debug_assert_matches!(self.cursor.previous().to_ascii_lowercase(), 'x' | 'o' | 'b');
+        }
 
         let number = self.radix_run(radix);
         if !number.has_digit {
@@ -1486,7 +1489,7 @@ impl<'src> Lexer<'src> {
         self.errors.truncate(errors_position);
     }
 
-    pub fn finish(self) -> Vec<LexicalError> {
+    pub(crate) fn finish(self) -> Vec<LexicalError> {
         self.errors
     }
 }
@@ -1569,6 +1572,18 @@ struct RadixRun {
 
 const fn is_quote(c: char) -> bool {
     matches!(c, '\'' | '"')
+}
+
+fn single_char_prefix(c: char) -> Option<TokenFlags> {
+    Some(match c {
+        'f' | 'F' => TokenFlags::F_STRING,
+        't' | 'T' => TokenFlags::T_STRING,
+        'u' | 'U' => TokenFlags::UNICODE_STRING,
+        'b' | 'B' => TokenFlags::BYTE_STRING,
+        'r' => TokenFlags::RAW_STRING_LOWERCASE,
+        'R' => TokenFlags::RAW_STRING_UPPERCASE,
+        _ => return None,
+    })
 }
 
 const fn is_ascii_identifier_start(c: char) -> bool {

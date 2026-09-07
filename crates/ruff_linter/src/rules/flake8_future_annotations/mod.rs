@@ -9,7 +9,6 @@ mod tests {
     use test_case::test_case;
 
     use crate::registry::Rule;
-    use crate::settings::types::PreviewMode;
     use crate::test::test_path;
     use crate::{assert_diagnostics, settings};
     use ruff_python_ast::PythonVersion;
@@ -30,10 +29,8 @@ mod tests {
         let snapshot = path.to_string_lossy().into_owned();
         let diagnostics = test_path(
             Path::new("flake8_future_annotations").join(path).as_path(),
-            &settings::LinterSettings {
-                unresolved_target_version: PythonVersion::PY37.into(),
-                ..settings::LinterSettings::for_rule(Rule::FutureRewritableTypeAnnotation)
-            },
+            &settings::LinterSettings::for_rule(Rule::FutureRewritableTypeAnnotation)
+                .with_target_version(PythonVersion::PY37),
         )?;
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())
@@ -50,25 +47,8 @@ mod tests {
         let snapshot = format!("fa102_{}", path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_future_annotations").join(path).as_path(),
-            &settings::LinterSettings {
-                unresolved_target_version: PythonVersion::PY37.into(),
-                ..settings::LinterSettings::for_rule(Rule::FutureRequiredTypeAnnotation)
-            },
-        )?;
-        assert_diagnostics!(snapshot, diagnostics);
-        Ok(())
-    }
-
-    #[test_case(Path::new("no_future_import_uses_preview_generics.py"))]
-    fn fa102_preview(path: &Path) -> Result<()> {
-        let snapshot = format!("fa102_preview_{}", path.to_string_lossy());
-        let diagnostics = test_path(
-            Path::new("flake8_future_annotations").join(path).as_path(),
-            &settings::LinterSettings {
-                unresolved_target_version: PythonVersion::PY37.into(),
-                preview: PreviewMode::Enabled,
-                ..settings::LinterSettings::for_rule(Rule::FutureRequiredTypeAnnotation)
-            },
+            &settings::LinterSettings::for_rule(Rule::FutureRequiredTypeAnnotation)
+                .with_target_version(PythonVersion::PY37),
         )?;
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())

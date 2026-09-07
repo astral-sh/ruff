@@ -6,6 +6,8 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+logger = logging.getLogger(__name__)
+
 
 @dataclass(frozen=True, kw_only=True, slots=True)
 class Venv:
@@ -63,7 +65,7 @@ class Venv:
     ) -> None:
         """Installs the dependencies required to type check the project."""
 
-        logging.debug(f"Installing dependencies: {', '.join(pip_install_args)}")
+        logger.debug(f"Installing dependencies: {', '.join(pip_install_args)}")
         mypy_overrides = Path(__file__).with_name("mypy-overrides.txt")
 
         command = [

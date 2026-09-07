@@ -20,7 +20,7 @@ pub(crate) struct TokenSource<'src> {
 
 impl<'src> TokenSource<'src> {
     /// Create a new token source for the given lexer.
-    pub(crate) fn new(lexer: Lexer<'src>, source: &str, start_offset: TextSize) -> Self {
+    fn new(lexer: Lexer<'src>, source: &str, start_offset: TextSize) -> Self {
         TokenSource {
             lexer,
             tokens: allocate_tokens_vec(&source[start_offset.to_usize()..]),
@@ -45,12 +45,6 @@ impl<'src> TokenSource<'src> {
     /// Returns the range of the current token.
     pub(crate) const fn current_range(&self) -> TextRange {
         self.lexer.current_range()
-    }
-
-    /// Returns the current parenthesis, bracket, and brace nesting level.
-    #[inline]
-    pub(crate) const fn nesting(&self) -> u32 {
-        self.lexer.nesting()
     }
 
     /// Returns the flags for the current token.

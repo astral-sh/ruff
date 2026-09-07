@@ -17,7 +17,7 @@ from typing_extensions import TypeVar
 if TYPE_CHECKING:
     from .message import UserMessage
 
-T = TypeVar("T")
+T = TypeVar("T", covariant=True)
 
 class Messageable(Protocol[T]): ...
 class WrapsUser(Messageable["UserMessage"]): ...

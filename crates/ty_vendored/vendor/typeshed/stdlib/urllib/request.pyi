@@ -75,8 +75,8 @@ from email.message import Message
 from http.client import HTTPConnection, HTTPMessage, HTTPResponse
 from http.cookiejar import CookieJar
 from re import Pattern
-from typing import IO, Any, ClassVar, Literal, NoReturn, Protocol, TypeAlias, TypeVar, overload, type_check_only
-from typing_extensions import deprecated
+from typing import IO, Any, ClassVar, Literal, Protocol, TypeAlias, TypeVar, overload, type_check_only
+from typing_extensions import Never, deprecated
 from urllib.error import HTTPError as HTTPError
 from urllib.response import addclosehook, addinfourl
 
@@ -587,7 +587,7 @@ class CacheFTPHandler(FTPHandler):
     def clear_cache(self) -> None: ...  # undocumented
 
 class UnknownHandler(BaseHandler):
-    def unknown_open(self, req: Request) -> NoReturn: ...
+    def unknown_open(self, req: Request) -> Never: ...
 
 class HTTPErrorProcessor(BaseHandler):
     """Process HTTP error responses."""

@@ -4,6 +4,7 @@ use ruff_python_ast::{self as ast, Expr, ExprLambda, Parameter, ParameterWithDef
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -53,7 +54,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// in: `foo(x=1, y=2)`. Since `func` does not define the arguments `x` and `y`,
 /// unlike the lambda, the call would raise a `TypeError`.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.15.0")]
+#[violation_metadata(stable_since = "0.15.0", category = Category::Style)]
 pub(crate) struct UnnecessaryLambda;
 
 impl Violation for UnnecessaryLambda {
@@ -224,7 +225,7 @@ pub(crate) fn unnecessary_lambda(checker: &Checker, lambda: &ExprLambda) {
     // Suppress the fix if the assignment expression target shadows one of the lambda's parameters.
     // This is necessary to avoid introducing a change in the behavior of the program.
     for name in names {
-        if let Some(binding_id) = checker.semantic().lookup_symbol(name.id()) {
+        if let Some(binding_id) = checker.semantic().lookup_symbol(name.id()).binding_id() {
             let binding = checker.semantic().binding(binding_id);
             if checker
                 .semantic()

@@ -85,7 +85,6 @@ RUF072 [*] Empty `finally` clause
 29 | / finally:
 30 | |     pass
    | |________^
-   |
 help: Remove the `finally` clause
    |
 28 |     baz()

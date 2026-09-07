@@ -1,7 +1,6 @@
 use std::ops::Deref;
 
 use bitflags::bitflags;
-use rustc_hash::{FxBuildHasher, FxHashSet};
 use thin_vec::ThinVec;
 
 use ruff_python_ast::name::Name;
@@ -67,7 +66,7 @@ pub(super) const EXPR_SET: TokenSet = TokenSet::new([
 .union(LITERAL_SET);
 
 /// Tokens that can appear after an expression.
-pub(super) const END_EXPR_SET: TokenSet = TokenSet::new([
+const END_EXPR_SET: TokenSet = TokenSet::new([
     // Ex) `expr` (without a newline)
     TokenKind::EndOfFile,
     // Ex) `expr`
@@ -248,12 +247,14 @@ impl<'src> Parser<'src> {
         left_precedence: OperatorPrecedence,
         context: ExpressionContext,
     ) -> ParsedExpr {
-        let start = self.node_start();
-        let lhs = self.parse_lhs_expression(left_precedence, context);
-        self.parse_binary_expression_or_higher_recursive(lhs, left_precedence, context, start)
+        self.with_recursion(|parser| {
+            let start = parser.node_start();
+            let lhs = parser.parse_lhs_expression(left_precedence, context);
+            parser.parse_binary_expression_or_higher_recursive(lhs, left_precedence, context, start)
+        })
     }
 
-    pub(super) fn parse_binary_expression_or_higher_recursive(
+    fn parse_binary_expression_or_higher_recursive(
         &mut self,
         mut left: ParsedExpr,
         left_precedence: OperatorPrecedence,
@@ -303,22 +304,7 @@ impl<'src> Parser<'src> {
                 BinaryLikeOperator::Binary(bin_op) => {
                     self.bump(TokenKind::from(bin_op));
 
-                    let right = if new_precedence.is_right_associative() {
-                        // For right-associative operators (`**`), the right
-                        // operand recursion is unbounded in `a**a**a**...`,
-                        // and it bypasses the guard in `parse_lhs_expression`
-                        // (that scope is exited once the atom is parsed).
-                        if let Some(right) = self.with_recursion(|parser| {
-                            parser.parse_binary_expression_or_higher(new_precedence, context)
-                        }) {
-                            right
-                        } else {
-                            self.report_recursion_limit_exceeded(self.current_token_range());
-                            self.recursion_recovery_expr()
-                        }
-                    } else {
-                        self.parse_binary_expression_or_higher(new_precedence, context)
-                    };
+                    let right = self.parse_binary_expression_or_higher(new_precedence, context);
 
                     Expr::BinOp(ast::ExprBinOp {
                         left: Box::new(left.expr),
@@ -349,59 +335,6 @@ impl<'src> Parser<'src> {
         context: ExpressionContext,
     ) -> ParsedExpr {
         let token = self.current_token_kind();
-        if !Self::token_starts_recursive_lhs(token) {
-            return self.parse_lhs_expression_inner(left_precedence, context, token);
-        }
-
-        if let Some(result) = self.with_recursion(|parser| {
-            parser.parse_lhs_expression_inner(left_precedence, context, token)
-        }) {
-            result
-        } else {
-            self.report_recursion_limit_exceeded(self.current_token_range());
-            self.recursion_recovery_expr()
-        }
-    }
-
-    /// Returns whether parsing an expression that starts with `token` can
-    /// immediately recurse through another expression parse.
-    #[inline]
-    fn token_starts_recursive_lhs(token: TokenKind) -> bool {
-        token.as_unary_operator().is_some()
-            || matches!(
-                token,
-                TokenKind::Star
-                    | TokenKind::Await
-                    | TokenKind::Lambda
-                    | TokenKind::Yield
-                    | TokenKind::FStringStart
-                    | TokenKind::TStringStart
-                    | TokenKind::Lpar
-                    | TokenKind::Lsqb
-                    | TokenKind::Lbrace
-            )
-    }
-
-    /// The standard expression-recovery node returned when the recursion
-    /// limit is exceeded: an empty `Name` with the `Invalid` context.
-    fn recursion_recovery_expr(&mut self) -> ParsedExpr {
-        ParsedExpr {
-            expr: Expr::Name(ast::ExprName {
-                range: self.missing_node_range(),
-                id: Name::empty(),
-                ctx: ExprContext::Invalid,
-                node_index: AtomicNodeIndex::NONE,
-            }),
-            is_parenthesized: false,
-        }
-    }
-
-    fn parse_lhs_expression_inner(
-        &mut self,
-        left_precedence: OperatorPrecedence,
-        context: ExpressionContext,
-        token: TokenKind,
-    ) -> ParsedExpr {
         let start = self.node_start();
 
         if let Some(unary_op) = token.as_unary_operator() {
@@ -417,11 +350,11 @@ impl<'src> Parser<'src> {
                     );
                 }
             } else {
+                // > The power operator `**` binds less tightly than an arithmetic
+                // > or bitwise unary operator on its right, that is, 2**-1 is 0.5.
+                //
+                // Reference: https://docs.python.org/3/reference/expressions.html#id21
                 if left_precedence > OperatorPrecedence::PosNegBitNot
-                    // > The power operator `**` binds less tightly than an arithmetic
-                    // > or bitwise unary operator on its right, that is, 2**-1 is 0.5.
-                    //
-                    // Reference: https://docs.python.org/3/reference/expressions.html#id21
                     && left_precedence != OperatorPrecedence::Exponent
                 {
                     self.add_error(
@@ -583,7 +516,8 @@ impl<'src> Parser<'src> {
         }
 
         if self.current_token_kind().is_soft_keyword() {
-            let id = Name::new(self.src_text(range));
+            let text = self.src_text(range);
+            let id = self.intern_name(text);
             self.bump_soft_keyword_as_name();
             return ast::Identifier {
                 id,
@@ -617,7 +551,8 @@ impl<'src> Parser<'src> {
                 range,
             );
 
-            let id = Name::new(self.src_text(range));
+            let text = self.src_text(range);
+            let id = self.intern_name(text);
             self.bump_any();
             ast::Identifier {
                 id,
@@ -744,7 +679,7 @@ impl<'src> Parser<'src> {
     /// expression, `[` for a subscript expression, or `.` for an attribute expression.
     ///
     /// This method does nothing if the current token is not a candidate for a postfix expression.
-    pub(super) fn parse_postfix_expression(
+    fn parse_postfix_expression(
         &mut self,
         mut lhs: Expr,
         start: TextSize,
@@ -752,20 +687,8 @@ impl<'src> Parser<'src> {
     ) -> Expr {
         loop {
             lhs = match self.current_token_kind() {
-                TokenKind::Lpar => {
-                    if self.tokens.nesting() > self.max_nesting_depth {
-                        self.report_recursion_limit_exceeded(self.current_token_range());
-                        break lhs;
-                    }
-                    Expr::Call(self.parse_call_expression(lhs, start))
-                }
-                TokenKind::Lsqb => {
-                    if self.tokens.nesting() > self.max_nesting_depth {
-                        self.report_recursion_limit_exceeded(self.current_token_range());
-                        break lhs;
-                    }
-                    Expr::Subscript(self.parse_subscript_expression(lhs, start))
-                }
+                TokenKind::Lpar => Expr::Call(self.parse_call_expression(lhs, start)),
+                TokenKind::Lsqb => Expr::Subscript(self.parse_subscript_expression(lhs, start)),
                 TokenKind::Dot => {
                     Expr::Attribute(self.parse_attribute_expression(lhs, start, context))
                 }
@@ -784,13 +707,14 @@ impl<'src> Parser<'src> {
     /// If the parser isn't position at a `(` token.
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#calls>
-    pub(super) fn parse_call_expression(&mut self, func: Expr, start: TextSize) -> ast::ExprCall {
+    fn parse_call_expression(&mut self, func: Expr, start: TextSize) -> ast::ExprCall {
         let arguments = self.parse_arguments(ArgumentsContext::Call);
+        debug_assert_eq!(self.node_range(start).end(), arguments.end());
 
         ast::ExprCall {
             func: Box::new(func),
             arguments,
-            range: self.node_range(start),
+            range_start: start,
             node_index: AtomicNodeIndex::NONE,
         }
     }
@@ -815,8 +739,8 @@ impl<'src> Parser<'src> {
             };
         }
 
-        let mut args = vec![];
-        let mut keywords = vec![];
+        let args_snapshot = self.expr_scratch.snapshot();
+        let keywords_snapshot = self.keyword_scratch.snapshot();
         let mut seen_keyword_argument = false; // foo = 1
         let mut seen_keyword_unpacking = false; // **foo
 
@@ -826,7 +750,7 @@ impl<'src> Parser<'src> {
                 if parser.eat(TokenKind::DoubleStar) {
                     let value = parser.parse_conditional_expression_or_higher();
 
-                    keywords.push(ast::Keyword {
+                    parser.keyword_scratch.push(ast::Keyword {
                         arg: None,
                         value: value.expr,
                         range: parser.node_range(argument_start),
@@ -916,7 +840,7 @@ impl<'src> Parser<'src> {
 
                         let value = parser.parse_conditional_expression_or_higher();
 
-                        keywords.push(ast::Keyword {
+                        parser.keyword_scratch.push(ast::Keyword {
                             arg: Some(arg),
                             value: value.expr,
                             range: parser.node_range(argument_start),
@@ -936,23 +860,19 @@ impl<'src> Parser<'src> {
                                 );
                             }
                         }
-                        // Reserve exactly one slot for the first positional argument, while
-                        // avoiding any allocation for keyword-only calls.
-                        if args.is_empty() {
-                            args.reserve_exact(1);
-                        }
-                        args.push(parsed_expr.expr);
+                        parser.expr_scratch.push(parsed_expr.expr);
                     }
                 }
             });
 
         self.expect(TokenKind::Rpar);
 
+        let keywords = self.keyword_scratch.take_thin_vec(keywords_snapshot);
         let arguments = ast::Arguments {
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
-            args: args.into_boxed_slice(),
-            keywords: keywords.into(),
+            args: self.expr_scratch.take(args_snapshot),
+            keywords,
         };
 
         self.validate_arguments(&arguments, has_trailing_comma, context);
@@ -1005,16 +925,16 @@ impl<'src> Parser<'src> {
         // If there are more than one element in the slice, we need to create a tuple
         // expression to represent it.
         if self.eat(TokenKind::Comma) {
-            let mut slices = vec![slice];
+            let slices_snapshot = self.expr_scratch.snapshot();
+            self.expr_scratch.push(slice);
 
             self.parse_comma_separated_list(RecoveryContextKind::Slices, |parser| {
-                slices.push(parser.parse_slice());
+                let slice = parser.parse_slice();
+                parser.expr_scratch.push(slice);
             });
 
-            slices.shrink_to_fit();
-
             slice = Expr::Tuple(ast::ExprTuple {
-                elts: slices,
+                elts: self.expr_scratch.take(slices_snapshot),
                 ctx: ExprContext::Load,
                 range: self.node_range(slice_start),
                 parenthesized: false,
@@ -1252,8 +1172,8 @@ impl<'src> Parser<'src> {
     ) -> ast::ExprBoolOp {
         self.bump(TokenKind::from(op));
 
-        let mut values = Vec::with_capacity(2);
-        values.push(lhs);
+        let values_snapshot = self.expr_scratch.snapshot();
+        self.expr_scratch.push(lhs);
         let mut progress = ParserProgress::default();
 
         // Keep adding the expression to `values` until we see a different
@@ -1263,17 +1183,15 @@ impl<'src> Parser<'src> {
 
             let parsed_expr =
                 self.parse_binary_expression_or_higher(OperatorPrecedence::from(op), context);
-            values.push(parsed_expr.expr);
+            self.expr_scratch.push(parsed_expr.expr);
 
             if !self.eat(TokenKind::from(op)) {
                 break;
             }
         }
 
-        values.shrink_to_fit();
-
         ast::ExprBoolOp {
-            values,
+            values: self.expr_scratch.take(values_snapshot),
             op,
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
@@ -1322,7 +1240,7 @@ impl<'src> Parser<'src> {
     ) -> ast::ExprCompare {
         self.bump_cmp_op(op);
 
-        let mut comparators = vec![];
+        let comparators_snapshot = self.expr_scratch.snapshot();
         let mut operators = vec![op];
 
         let mut progress = ParserProgress::default();
@@ -1330,13 +1248,13 @@ impl<'src> Parser<'src> {
         loop {
             progress.assert_progressing(self);
 
-            comparators.push(
-                self.parse_binary_expression_or_higher(
+            let comparator = self
+                .parse_binary_expression_or_higher(
                     OperatorPrecedence::ComparisonsMembershipIdentity,
                     context,
                 )
-                .expr,
-            );
+                .expr;
+            self.expr_scratch.push(comparator);
 
             let next_token = self.current_token_kind();
             if matches!(next_token, TokenKind::In) && context.is_in_excluded() {
@@ -1356,7 +1274,7 @@ impl<'src> Parser<'src> {
         ast::ExprCompare {
             left: Box::new(lhs),
             ops: operators.into_boxed_slice(),
-            comparators: comparators.into_boxed_slice(),
+            comparators: self.expr_scratch.take(comparators_snapshot),
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
         }
@@ -1469,16 +1387,20 @@ impl<'src> Parser<'src> {
                 // We could convert the node into a string and mark it as invalid
                 // and would be clever to mark the type which is fewer in quantity.
 
+                // test_err mixed_tstring_and_bytes_literals
+                // t'first' b'second'
+                // b'first' t'second'
+                // t'first' br'second'
+                // 'first' b'second' t'third'
+                // b'first' 'second' t'third'
+                // 'first' t'second' 'third' b'fourth'
+                // b'first' t'second' f'third'
+
                 // test_err mixed_bytes_and_non_bytes_literals
                 // 'first' b'second'
                 // f'first' b'second'
                 // 'first' f'second' b'third'
-                self.add_error(
-                    ParseErrorType::OtherError(
-                        "Bytes literal cannot be mixed with non-bytes literals".to_string(),
-                    ),
-                    range,
-                );
+                self.report_mixed_string_literal_error(&strings, range);
             }
             // Only construct a byte expression if all the literals are bytes
             // otherwise, we'll try either string, t-string, or f-string. This is to retain
@@ -1497,16 +1419,9 @@ impl<'src> Parser<'src> {
                     node_index: AtomicNodeIndex::NONE,
                 });
             }
-        }
-
-        if has_tstring {
+        } else if has_tstring {
             if tstring_count < strings.len() {
-                self.add_error(
-                    ParseErrorType::OtherError(
-                        "Cannot mix t-string literals with string or bytes literals".to_string(),
-                    ),
-                    range,
-                );
+                self.report_mixed_string_literal_error(&strings, range);
             }
             // Only construct a t-string expression if all the literals are t-strings
             // otherwise, we'll try either string or f-string. This is to retain
@@ -1588,6 +1503,26 @@ impl<'src> Parser<'src> {
         })
     }
 
+    fn report_mixed_string_literal_error(&mut self, strings: &[StringType], range: TextRange) {
+        // CPython reports the first incompatible pair. A t-string mismatch takes
+        // precedence over a bytes mismatch within that pair.
+        for pair in strings.windows(2) {
+            let message = match pair {
+                [StringType::TString(_), StringType::TString(_)]
+                | [StringType::Bytes(_), StringType::Bytes(_)] => continue,
+                [StringType::TString(_), _] | [_, StringType::TString(_)] => {
+                    "Cannot mix t-string literals with string or bytes literals"
+                }
+                [StringType::Bytes(_), _] | [_, StringType::Bytes(_)] => {
+                    "Bytes literal cannot be mixed with non-bytes literals"
+                }
+                _ => continue,
+            };
+            self.add_error(ParseErrorType::OtherError(message.to_string()), range);
+            break;
+        }
+    }
+
     /// Parses a single string or byte literal.
     ///
     /// This does not handle implicitly concatenated strings.
@@ -1596,7 +1531,7 @@ impl<'src> Parser<'src> {
     ///
     /// If the parser isn't positioned at a `String` token.
     ///
-    /// See: <https://docs.python.org/3.13/reference/lexical_analysis.html#string-and-bytes-literals>
+    /// See: <https://docs.python.org/3/reference/lexical_analysis.html#string-and-bytes-literals>
     fn parse_string_or_byte_literal(&mut self) -> StringType {
         let range = self.current_token_range();
         let flags = self.tokens.current_flags().as_any_string_flags();
@@ -1902,18 +1837,13 @@ impl<'src> Parser<'src> {
 
         let format_spec = if self.eat(TokenKind::Colon) {
             let spec_start = self.node_start();
-            let elements = if let Some(elements) = self.with_recursion(|parser| {
+            let elements = self.with_recursion(|parser| {
                 parser.parse_interpolated_string_elements(
                     flags,
                     InterpolatedStringElementsKind::FormatSpec(string_kind),
                     string_kind,
                 )
-            }) {
-                elements
-            } else {
-                self.report_recursion_limit_exceeded(self.current_token_range());
-                ast::InterpolatedStringElements::from(vec![])
-            };
+            });
             Some(Box::new(ast::InterpolatedStringFormatSpec {
                 range: self.node_range(spec_start),
                 elements,
@@ -2455,20 +2385,20 @@ impl<'src> Parser<'src> {
             self.expect(TokenKind::Comma);
         }
 
-        let mut elts = vec![first_element];
+        let elts_snapshot = self.expr_scratch.snapshot();
+        self.expr_scratch.push(first_element);
 
         self.parse_comma_separated_list(RecoveryContextKind::TupleElements(parenthesized), |p| {
-            elts.push(parse_func(p).expr);
+            let element = parse_func(p).expr;
+            p.expr_scratch.push(element);
         });
 
         if parenthesized.is_yes() {
             self.expect(TokenKind::Rpar);
         }
 
-        elts.shrink_to_fit();
-
         ast::ExprTuple {
-            elts,
+            elts: self.expr_scratch.take(elts_snapshot),
             ctx: ExprContext::Load,
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
@@ -2484,22 +2414,20 @@ impl<'src> Parser<'src> {
             self.expect(TokenKind::Comma);
         }
 
-        let mut elts = vec![first_element];
+        let elts_snapshot = self.expr_scratch.snapshot();
+        self.expr_scratch.push(first_element);
 
         self.parse_comma_separated_list(RecoveryContextKind::ListElements, |parser| {
-            elts.push(
-                parser
-                    .parse_named_expression_or_higher(ExpressionContext::starred_bitwise_or())
-                    .expr,
-            );
+            let element = parser
+                .parse_named_expression_or_higher(ExpressionContext::starred_bitwise_or())
+                .expr;
+            parser.expr_scratch.push(element);
         });
 
         self.expect(TokenKind::Rsqb);
 
-        elts.shrink_to_fit();
-
         ast::ExprList {
-            elts,
+            elts: self.expr_scratch.take(elts_snapshot),
             ctx: ExprContext::Load,
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
@@ -2529,7 +2457,8 @@ impl<'src> Parser<'src> {
             );
         }
 
-        let mut elts = vec![first_element.expr];
+        let elts_snapshot = self.expr_scratch.snapshot();
+        self.expr_scratch.push(first_element.expr);
 
         self.parse_comma_separated_list(RecoveryContextKind::SetElements, |parser| {
             let parsed_expr =
@@ -2544,7 +2473,7 @@ impl<'src> Parser<'src> {
                 );
             }
 
-            elts.push(parsed_expr.expr);
+            parser.expr_scratch.push(parsed_expr.expr);
         });
 
         self.expect(TokenKind::Rbrace);
@@ -2552,7 +2481,7 @@ impl<'src> Parser<'src> {
         ast::ExprSet {
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
-            elts,
+            elts: self.expr_scratch.take(elts_snapshot),
         }
     }
 
@@ -2653,7 +2582,7 @@ impl<'src> Parser<'src> {
         self.expect(TokenKind::In);
         let iter = self.parse_simple_expression(ExpressionContext::default());
 
-        let mut ifs = Vec::new();
+        let ifs_snapshot = self.expr_scratch.snapshot();
         let mut progress = ParserProgress::default();
 
         while self.eat(TokenKind::If) {
@@ -2661,20 +2590,15 @@ impl<'src> Parser<'src> {
 
             let parsed_expr = self.parse_simple_expression(ExpressionContext::default());
 
-            if ifs.is_empty() {
-                ifs.reserve_exact(1);
-            }
-            ifs.push(parsed_expr.expr);
+            self.expr_scratch.push(parsed_expr.expr);
         }
-
-        ifs.shrink_to_fit();
 
         ast::Comprehension {
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
             target: target.expr,
             iter: iter.expr,
-            ifs,
+            ifs: self.expr_scratch.take(ifs_snapshot),
             is_async,
         }
     }
@@ -2685,7 +2609,7 @@ impl<'src> Parser<'src> {
     /// parenthesized or the first token of the expression.
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#generator-expressions>
-    pub(super) fn parse_generator_expression(
+    fn parse_generator_expression(
         &mut self,
         element: Expr,
         start: TextSize,
@@ -2929,11 +2853,7 @@ impl<'src> Parser<'src> {
     /// If the parser isn't positioned at a `:=` token.
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#assignment-expressions>
-    pub(super) fn parse_named_expression(
-        &mut self,
-        mut target: Expr,
-        start: TextSize,
-    ) -> ast::ExprNamed {
+    fn parse_named_expression(&mut self, mut target: Expr, start: TextSize) -> ast::ExprNamed {
         self.bump(TokenKind::ColonEqual);
 
         if !target.is_name_expr() {
@@ -3002,15 +2922,8 @@ impl<'src> Parser<'src> {
         // lambda x: yield y
         // lambda x: yield from y
 
-        // `lambda: lambda: lambda: ...` recurses through the lambda body at
-        // the conditional layer, bypassing the `parse_lhs_expression` guard.
-        let body =
-            if let Some(body) = self.with_recursion(Self::parse_conditional_expression_or_higher) {
-                body
-            } else {
-                self.report_recursion_limit_exceeded(self.current_token_range());
-                self.recursion_recovery_expr()
-            };
+        // Lambda bodies recurse through the conditional layer without entering the binary parser.
+        let body = self.with_recursion(Self::parse_conditional_expression_or_higher);
 
         ast::ExprLambda {
             body: Box::new(body.expr),
@@ -3027,24 +2940,15 @@ impl<'src> Parser<'src> {
     /// If the parser isn't positioned at an `if` token.
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#conditional-expressions>
-    pub(super) fn parse_if_expression(&mut self, body: Expr, start: TextSize) -> ast::ExprIf {
+    fn parse_if_expression(&mut self, body: Expr, start: TextSize) -> ast::ExprIf {
         self.bump(TokenKind::If);
 
         let test = self.parse_simple_expression(ExpressionContext::default());
 
         self.expect(TokenKind::Else);
 
-        // `a if b else a if b else ...` recurses through `orelse` at the
-        // conditional layer, which is not covered by the `parse_lhs_expression`
-        // guard (that scope is released once each atom is parsed). Guard here.
-        let orelse = if let Some(orelse) =
-            self.with_recursion(Self::parse_conditional_expression_or_higher)
-        {
-            orelse
-        } else {
-            self.report_recursion_limit_exceeded(self.current_token_range());
-            self.recursion_recovery_expr()
-        };
+        // The binary-expression guard has already returned before parsing the `else` branch.
+        let orelse = self.with_recursion(Self::parse_conditional_expression_or_higher);
 
         ast::ExprIf {
             body: Box::new(body),
@@ -3086,31 +2990,13 @@ impl<'src> Parser<'src> {
     }
 
     /// Performs the following validations on the arguments:
-    /// 1. There aren't any duplicate keyword argument
-    /// 2. Generator expressions are parenthesized when required by the argument context.
+    /// - Generator expressions are parenthesized when required by the argument context.
     fn validate_arguments(
         &mut self,
         arguments: &ast::Arguments,
         has_trailing_comma: bool,
         context: ArgumentsContext,
     ) {
-        let mut all_arg_names =
-            FxHashSet::with_capacity_and_hasher(arguments.keywords.len(), FxBuildHasher);
-
-        for (name, range) in arguments
-            .keywords
-            .iter()
-            .filter_map(|argument| argument.arg.as_ref().map(|arg| (arg, argument.range)))
-        {
-            let arg_name = name.as_str();
-            if !all_arg_names.insert(arg_name) {
-                self.add_error(
-                    ParseErrorType::DuplicateKeywordArgumentError(arg_name.to_string()),
-                    range,
-                );
-            }
-        }
-
         let generator_must_be_parenthesized = match context {
             ArgumentsContext::Call => has_trailing_comma || arguments.len() > 1,
             // CPython rejects an unparenthesized generator expression as a class base even though
@@ -3169,7 +3055,7 @@ impl ParsedExpr {
     }
 
     #[inline]
-    pub(super) const fn is_unparenthesized_named_expr(&self) -> bool {
+    const fn is_unparenthesized_named_expr(&self) -> bool {
         !self.is_parenthesized && self.expr.is_named_expr()
     }
 }
@@ -3293,7 +3179,7 @@ impl ExpressionContext {
         ExpressionContext::starred_bitwise_or().with_yield_expression_allowed()
     }
 
-    pub(super) fn disallow_starred_expressions(self) -> Self {
+    fn disallow_starred_expressions(self) -> Self {
         let flags = self.0 & !ExpressionContextFlags::ALLOW_STARRED_EXPRESSION;
         ExpressionContext(flags)
     }

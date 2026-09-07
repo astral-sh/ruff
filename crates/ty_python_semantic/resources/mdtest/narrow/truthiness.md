@@ -1,5 +1,18 @@
 # Narrowing For Truthiness Checks (`if x` or `if not x`)
 
+## Generator expressions
+
+A generator object is truthy even when it yields no values.
+
+```py
+def narrow(value: int | None) -> None:
+    # error: [redundant-condition] "always truthy"
+    if (value for _ in ()):
+        if value is None:
+            return
+    reveal_type(value)  # revealed: int
+```
+
 ## Value Literals
 
 ```py
@@ -20,24 +33,28 @@ def _(x: X):
         reveal_type(x)  # revealed: Literal[-1, True, "foo", b"bar"]
 
 def _(x: X):
+    # error: [redundant-condition] "always truthy"
     if x and not x:
         reveal_type(x)  # revealed: Never
     else:
         reveal_type(x)  # revealed: Literal[0, -1, "", "foo", b"", b"bar"] | bool | None | tuple[()]
 
 def _(x: X):
+    # error: [redundant-condition] "Variable `x` is always truthy (has type `Literal[-1, True, "foo", b"bar"]`)"
     if not (x and not x):
         reveal_type(x)  # revealed: Literal[0, -1, "", "foo", b"", b"bar"] | bool | None | tuple[()]
     else:
         reveal_type(x)  # revealed: Never
 
 def _(x: X):
+    # error: [redundant-condition] "always falsy"
     if x or not x:
         reveal_type(x)  # revealed: Literal[-1, 0, "foo", "", b"bar", b""] | bool | None | tuple[()]
     else:
         reveal_type(x)  # revealed: Never
 
 def _(x: X):
+    # error: [redundant-condition] "Variable `x` is always falsy (has type `Literal[0, False, "", b""] | None | tuple[()]`)"
     if not (x or not x):
         reveal_type(x)  # revealed: Never
     else:
@@ -71,6 +88,59 @@ if (foo1 := Foo()).val:
     reveal_type(foo1.val)  # revealed: int & ~AlwaysFalsy
 ```
 
+## Narrowing tagged unions of nominal classes by attribute truthiness
+
+```py
+from typing import Literal
+
+class Success:
+    success: Literal[True]
+    result: int
+
+class Failure:
+    success: Literal[False]
+    errors: list[str]
+
+def _(response: Success | Failure):
+    if response.success:
+        reveal_type(response)  # revealed: Success
+        reveal_type(response.result)  # revealed: int
+    else:
+        reveal_type(response)  # revealed: Failure
+        reveal_type(response.errors)  # revealed: list[str]
+
+    if not response.success:
+        reveal_type(response)  # revealed: Failure
+    else:
+        reveal_type(response)  # revealed: Success
+
+class TruthyIntTag:
+    success: Literal[1]
+
+class FalsyIntTag:
+    success: Literal[0]
+
+class AmbiguousTag:
+    success: bool
+
+def _(response: Success | Failure | TruthyIntTag | FalsyIntTag | AmbiguousTag):
+    if response.success:
+        reveal_type(response)  # revealed: Success | TruthyIntTag | AmbiguousTag
+    else:
+        reveal_type(response)  # revealed: Failure | FalsyIntTag | AmbiguousTag
+
+def truthiness_after_value_guard(response: Success | Failure | None):
+    if not response:
+        return
+
+    if response.success:
+        reveal_type(response)  # revealed: Success & ~AlwaysFalsy
+        reveal_type(response.result)  # revealed: int
+    else:
+        reveal_type(response)  # revealed: Failure & ~AlwaysFalsy
+        reveal_type(response.errors)  # revealed: list[str]
+```
+
 ## Function Literals
 
 Basically functions are always truthy.
@@ -87,8 +157,8 @@ def bar(world: str, *args, **kwargs) -> float:
 
 x = foo if flag() else bar
 
-if x:
-    reveal_type(x)  # revealed: (def foo(hello: int) -> bytes) | (def bar(world: str, *args, **kwargs) -> int | float)
+if x:  # error: [redundant-condition] "always truthy"
+    reveal_type(x)  # revealed: (def foo(hello: int) -> bytes) | (def bar(world: str, *args, **kwargs) -> float)
 else:
     reveal_type(x)  # revealed: Never
 ```
@@ -162,14 +232,14 @@ class F:
 
 t = T()
 
-if t:
+if t:  # error: [redundant-condition] "always truthy"
     reveal_type(t)  # revealed: T
 else:
     reveal_type(t)  # revealed: Never
 
 f = F()
 
-if f:
+if f:  # error: [redundant-condition] "always falsy"
     reveal_type(f)  # revealed: Never
 else:
     reveal_type(f)  # revealed: F
@@ -211,11 +281,14 @@ if isinstance(x, str) and not isinstance(x, B):
 
 ## Narrowing Multiple Variables
 
+A contradictory condition makes its body unreachable, narrowing every variable to `Never` inside
+that body. We report the complete condition when no individual operand is reported.
+
 ```py
 from typing import Literal
 
 def f(x: Literal[0, 1], y: Literal["", "hello"]):
-    if x and y and not x and not y:
+    if x and y and not x and not y:  # error: [redundant-condition] "always falsy"
         reveal_type(x)  # revealed: Never
         reveal_type(y)  # revealed: Never
     else:
@@ -223,6 +296,7 @@ def f(x: Literal[0, 1], y: Literal["", "hello"]):
         reveal_type(x)  # revealed: Literal[0, 1]
         reveal_type(y)  # revealed: Literal["", "hello"]
 
+    # error: [redundant-condition] "Nonempty string `y` is always truthy (has type `Literal["hello"]`)"
     if (x or not x) and (y and not y):
         reveal_type(x)  # revealed: Never
         reveal_type(y)  # revealed: Never
@@ -489,6 +563,7 @@ def f(arg1: Empty | None, arg2: NonEmpty | None, arg3: HasNotRequired1 | None, a
     if arg4:
         reveal_type(arg4)  # revealed: HasNotRequired2 & ~AlwaysFalsy
 
+    # error: [redundant-condition] "always truthy"
     if arg5:
         reveal_type(arg5)  # revealed: AlsoNonEmpty
 ```
@@ -536,7 +611,7 @@ def f(floaty: FloatNewType, complexy: ComplexNewType):
 
     if complexy:
         reveal_type(complexy)  # revealed: ComplexNewType & ~AlwaysFalsy
-        reveal_type(complexy.real)  # revealed: int | float
+        reveal_type(complexy.real)  # revealed: float
         expects_complex(complexy)  # fine
         expects_float(complexy)  # error: [invalid-argument-type]
 ```

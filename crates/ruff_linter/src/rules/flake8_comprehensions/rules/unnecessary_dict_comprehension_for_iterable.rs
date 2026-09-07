@@ -7,6 +7,7 @@ use ruff_python_ast::{self as ast, Arguments, Comprehension, Expr, ExprCall, Exp
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::pad_start;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
@@ -49,7 +50,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: `dict.fromkeys`](https://docs.python.org/3/library/stdtypes.html#dict.fromkeys)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.10.0")]
+#[violation_metadata(stable_since = "0.10.0", category = Category::Complexity)]
 pub(crate) struct UnnecessaryDictComprehensionForIterable {
     is_value_none_literal: bool,
 }
@@ -224,7 +225,7 @@ fn fix_unnecessary_dict_comprehension(value: &Expr, generator: &Comprehension) -
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         })),
         arguments: args,
-        range: TextRange::default(),
+        range_start: ruff_text_size::TextSize::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     })
 }

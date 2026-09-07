@@ -283,7 +283,11 @@ def match_non_exhaustive(x: Color):
             assert_never(x)  # error: [type-assertion-failure]
 ```
 
-Matching every named member is not exhaustive for enums that can also have unnamed members.
+Matching every named member is not exhaustive for `Flag` classes.
+
+Custom `_missing_` methods technically could create a new undeclared member via `object.__new__`,
+but this is also possible outside a `_missing_` method. We choose to in general ignore this
+possibility; we don't assume that a `_missing_` method will do this.
 
 ```py
 from enum import Enum, Flag
@@ -296,17 +300,47 @@ class MissingValueEnum(Enum):
 
     @classmethod
     def _missing_(cls, value: object) -> "MissingValueEnum":
-        return object.__new__(cls)
+        return cls.ONLY
 
 def match_flag(value: Permission) -> int:  # error: [invalid-return-type]
     match value:
         case Permission.READ:
             return 1
 
-def match_open_enum(value: MissingValueEnum) -> int:  # error: [invalid-return-type]
+def match_custom_missing_enum(value: MissingValueEnum) -> int:
     match value:
         case MissingValueEnum.ONLY:
             return 1
+```
+
+## Checks on enums with custom missing methods
+
+An enum remains exhaustive when it overrides `_missing_`, even if its value comes from a function
+with the enum as its return type.
+
+```py
+from enum import Enum
+from typing import assert_never
+
+class FallbackColor(Enum):
+    RED = 1
+    BLUE = 2
+
+    @classmethod
+    def _missing_(cls, value: object) -> "FallbackColor":
+        return FallbackColor.RED
+
+def get_color() -> FallbackColor:
+    return FallbackColor.BLUE
+
+color = get_color()
+match color:
+    case FallbackColor.RED:
+        pass
+    case FallbackColor.BLUE:
+        pass
+    case _:
+        assert_never(color)
 ```
 
 ## Checks on enum literal subsets
@@ -574,6 +608,48 @@ def no_invalid_return_diagnostic_here_either[T](x: A[T]) -> ASub[T]:
         return x
 ```
 
+## Class patterns with variadic generics
+
+A class pattern matches every specialization of its variadic generic class, including a symbolic
+type variable tuple.
+
+```py
+from typing import Generic, TypeVarTuple, assert_never
+
+Ts = TypeVarTuple("Ts")
+
+class Variadic(Generic[*Ts]): ...
+
+def symbolic(value: Variadic[*Ts]) -> None:
+    match value:
+        case Variadic():
+            reveal_type(value)  # revealed: Variadic[*tuple[*Ts@symbolic]]
+        case _:
+            assert_never(value)
+```
+
+The same pattern is exhaustive when the type variable tuple has an empty specialization.
+
+```py
+def empty(value: Variadic[()]) -> None:
+    match value:
+        case Variadic():
+            reveal_type(value)  # revealed: Variadic[()]
+        case _:
+            assert_never(value)
+```
+
+A nonempty specialization must also remain reachable and exhaustive.
+
+```py
+def nonempty(value: Variadic[int]) -> None:
+    match value:
+        case Variadic():
+            reveal_type(value)  # revealed: Variadic[int]
+        case _:
+            assert_never(value)
+```
+
 ## More `match` pattern types
 
 ### `as` patterns
@@ -817,4 +893,42 @@ def i(x: ComplexN) -> bool:
         return True
     elif isinstance(x, complex):
         return False
+```
+
+## `isinstance` checks with `Callable`
+
+```toml
+[environment]
+python-version = "3.12"
+
+[rules]
+possibly-unresolved-reference = "error"
+```
+
+The final `Callable` check is exhaustive. These examples deliberately omit an `else` branch and any
+terminal-call assertions so that reachability is determined by the `isinstance` checks alone.
+
+```py
+from collections.abc import Callable
+from typing import Callable as TypingCallable
+
+def assigned(x: Callable[[int], int] | dict[str, int]) -> int:
+    if isinstance(x, dict):
+        result = 1
+    elif isinstance(x, Callable):
+        result = 2
+    return result
+
+def returns(x: Callable[[int], int] | dict[str, int]) -> int:
+    if isinstance(x, dict):
+        return 1
+    elif isinstance(x, TypingCallable):
+        return 2
+
+def match_exhaustive(x: Callable[[int], int] | dict[str, int]) -> int:
+    match x:
+        case dict():
+            return 1
+        case Callable():
+            return 2
 ```

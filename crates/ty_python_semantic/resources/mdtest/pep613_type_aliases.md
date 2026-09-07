@@ -80,7 +80,8 @@ def _(a: MyGenericAlias1, b: MyGenericAlias2, c: MyGenericAlias3) -> None:
 
 ```py
 from typing import TypeAlias
-from ty_extensions import is_subtype_of, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
 
 MyList: TypeAlias = list["int"]
 
@@ -152,6 +153,8 @@ def _(list_of_int: MyList[int], list_or_set_of_str: ListOrSet[str]):
 
 ### Stringified generic alias
 
+#### Explicitly specialized
+
 ```py
 from typing import TypeAlias, TypeVar
 
@@ -162,7 +165,78 @@ TotallyStringifiedPEP613: TypeAlias = "dict[T, U]"
 TotallyStringifiedPartiallySpecialized: TypeAlias = "TotallyStringifiedPEP613[U, int]"
 
 def f(x: "TotallyStringifiedPartiallySpecialized[str]"):
-    reveal_type(x)  # revealed: @Todo(Generic stringified PEP-613 type alias)
+    reveal_type(x)  # revealed: dict[str, int]
+```
+
+#### Unsubscripted
+
+```py
+from typing import TypeAlias, TypeVar
+
+T = TypeVar("T")
+
+ListAlias: TypeAlias = "list[T]"
+
+def takes_list(value: ListAlias) -> None:
+    reveal_type(value)  # revealed: list[Unknown]
+
+takes_list([1])
+```
+
+## Class-scoped type variables
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+A legacy generic alias binds its own type variables and cannot capture a type variable already bound
+to its enclosing class. The restriction also applies to stringified aliases.
+
+```py
+from typing import Generic, TypeAlias, TypeVar
+
+T = TypeVar("T")
+S = TypeVar("S")
+
+class Box(Generic[T]):
+    # error: [invalid-type-form] "Type alias cannot capture class-scoped type variable `T`"
+    Items: TypeAlias = list[T]
+    # error: [invalid-type-form] "Type alias cannot capture class-scoped type variable `T`"
+    Quoted: TypeAlias = "list[T]"
+
+    Independent: TypeAlias = list[S]
+    Concrete: TypeAlias = list[int]
+
+reveal_type(Box.Independent[str]())  # revealed: list[str]
+reveal_type(Box.Concrete())  # revealed: list[int]
+```
+
+PEP 695 `type` statements can capture the enclosing class's type parameters, but using `TypeAlias`
+inside a PEP 695 class still follows the legacy alias rules.
+
+```py
+class Modern[T]:
+    type Items = list[T]
+    # error: [invalid-type-form] "Type alias cannot capture class-scoped type variable `T`"
+    Legacy: TypeAlias = list[T]
+```
+
+The same restriction applies to class-scoped `ParamSpec` and `TypeVarTuple` parameters.
+
+```py
+from typing import Callable, ParamSpec, TypeVarTuple
+
+P = ParamSpec("P")
+Ts = TypeVarTuple("Ts")
+
+class Callbacks(Generic[P]):
+    # error: [invalid-type-form] "Type alias cannot capture class-scoped type variable `P`"
+    Callback: TypeAlias = Callable[P, None]
+
+class Tuples(Generic[*Ts]):
+    # error: [invalid-type-form] "Type alias cannot capture class-scoped type variable `Ts`"
+    Items: TypeAlias = tuple[*Ts]
 ```
 
 ## Subscripted generic alias in union
@@ -253,8 +327,7 @@ MyList = TypeAliasType("MyList", list[T], type_params=(T,))
 MyAlias5 = Callable[[MyList[T]], int]
 
 def _(c: MyAlias5[int]):
-    # TODO: should be (list[int], /) -> int
-    reveal_type(c)  # revealed: (Unknown, /) -> int
+    reveal_type(c)  # revealed: (MyList[int], /) -> int
 
 K = TypeVar("K")
 V = TypeVar("V")
@@ -264,14 +337,12 @@ MyDict = TypeAliasType("MyDict", dict[K, V], type_params=(K, V))
 MyAlias6 = Callable[[MyDict[K, V]], int]
 
 def _(c: MyAlias6[str, bytes]):
-    # TODO: should be (dict[str, bytes], /) -> int
-    reveal_type(c)  # revealed: (Unknown, /) -> int
+    reveal_type(c)  # revealed: (MyDict[str, bytes], /) -> int
 
 ListOrDict: TypeAlias = MyList[T] | dict[str, T]
 
 def _(x: ListOrDict[int]):
-    # TODO: should be list[int] | dict[str, int]
-    reveal_type(x)  # revealed: Unknown | dict[str, int]
+    reveal_type(x)  # revealed: list[int] | dict[str, int]
 
 MyAlias7: TypeAlias = Callable[Concatenate[T, ...], None]
 
@@ -358,7 +429,8 @@ my_isinstance(1, (int, (str, 1)))
 
 ```py
 from typing import TypeAlias, TypeVar, Union
-from ty_extensions import Bottom, Top, is_subtype_of, static_assert
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import is_subtype_of
 
 K = TypeVar("K")
 V = TypeVar("V")
@@ -517,7 +589,6 @@ error[invalid-type-form]: `Unpack` is not allowed in type alias values
    |
 14 | differently_bad: TypeAlias = Unpack[tuple[int, ...]]  # snapshot: invalid-type-form
    |                              ^^^^^^^^^^^^^^^^^^^^^^^
-   |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 ```

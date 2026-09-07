@@ -1,7 +1,8 @@
 use lsp_types::{DidSaveTextDocumentNotification, DidSaveTextDocumentParams};
+use ty_project::ScriptEnvironmentAvailability;
 
 use crate::server::Result;
-use crate::server::api::diagnostics::publish_diagnostics_if_needed;
+use crate::server::api::diagnostics::publish_all_document_diagnostics;
 use crate::server::api::traits::{NotificationHandler, SyncNotificationHandler};
 use crate::session::Session;
 use crate::session::client::Client;
@@ -16,11 +17,14 @@ impl SyncNotificationHandler for DidSaveTextDocumentHandler {
     fn run(
         session: &mut Session,
         client: &Client,
-        _params: DidSaveTextDocumentParams,
+        params: DidSaveTextDocumentParams,
     ) -> Result<()> {
-        for document in session.file_document_handles() {
-            publish_diagnostics_if_needed(&document, session, client);
+        if let Ok(document) = session.document_handle(&params.text_document.uri) {
+            // Keep diagnostics visible if unsaved edits first turned this file into a script.
+            document.synchronize_script(session, client, ScriptEnvironmentAvailability::Available);
         }
+
+        publish_all_document_diagnostics(session, client);
 
         Ok(())
     }

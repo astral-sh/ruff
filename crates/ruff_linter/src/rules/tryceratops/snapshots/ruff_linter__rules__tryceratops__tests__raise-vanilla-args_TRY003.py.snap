@@ -19,7 +19,6 @@ TRY003 Avoid specifying long messages outside the exception class
 33 |     if a % 2 == 0:
 34 |         raise BadArgCantBeEven(f"The argument '{a}' should be even")
    |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 
 TRY003 Avoid specifying long messages outside the exception class
   --> TRY003.py:39:15
@@ -28,7 +27,6 @@ TRY003 Avoid specifying long messages outside the exception class
 38 |     if a % 2 == 0:
 39 |         raise BadArgCantBeEven(f"The argument {a} should not be odd.")
    |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 
 TRY003 Avoid specifying long messages outside the exception class
   --> TRY003.py:44:15
@@ -37,4 +35,3 @@ TRY003 Avoid specifying long messages outside the exception class
 43 |     if a % 2 == 0:
 44 |         raise BadArgCantBeEven("The argument `a` should not be odd.")
    |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |

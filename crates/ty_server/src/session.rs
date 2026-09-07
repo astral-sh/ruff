@@ -11,6 +11,7 @@ use lsp_types::{
     ClientInfo, DiagnosticProvider, DiagnosticRegistrationOptions,
     DidChangeWatchedFilesRegistrationOptions, FileSystemWatcher, Registration, RegistrationParams,
     TextDocumentContentChangeEvent, Unregistration, UnregistrationParams, Uri,
+    WorkDoneProgressBegin,
 };
 use lsp_types::{DidChangeWatchedFilesNotification, ExitNotification, Notification};
 use lsp_types::{
@@ -23,8 +24,11 @@ use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_python_ast::PySourceType;
 use ty_combine::Combine;
 use ty_project::metadata::Options;
-use ty_project::watch::{ChangeEvent, CreatedKind};
-use ty_project::{ChangeResult, Db as _, ProjectDatabase, ProjectMetadata};
+use ty_project::watch::ChangeEvent;
+use ty_project::{
+    ChangeResult, Db as _, ProjectDatabase, ProjectMetadata, ProjectReloadResult,
+    ScriptEnvironmentAvailability, UseUv, UvSyncChanges,
+};
 
 use index::DocumentError;
 use ty_python_core::program::UseDefaultStrategy;
@@ -33,8 +37,12 @@ pub(crate) use self::options::InitializationOptions;
 pub use self::options::{ClientOptions, DiagnosticMode, GlobalOptions, WorkspaceOptions};
 pub(crate) use self::settings::{GlobalSettings, WorkspaceSettings};
 use crate::capabilities::{ResolvedClientCapabilities, server_diagnostic_options};
+use crate::db::Db as _;
 use crate::document::{DocumentKey, DocumentVersion, LanguageId, NotebookDocument};
-use crate::server::{Action, publish_settings_diagnostics};
+use crate::server::{
+    Action, LazyWorkDoneProgress, ScriptProgress, publish_all_document_diagnostics,
+    publish_diagnostics_if_needed, publish_settings_diagnostics,
+};
 use crate::session::client::Client;
 use crate::session::index::Document;
 use crate::session::request_queue::RequestQueue;
@@ -70,6 +78,12 @@ pub(crate) struct Session {
 
     /// Initialization options that were provided by the client during server initialization.
     initialization_options: InitializationOptions,
+
+    /// The uv integrations enabled for the lifetime of this server.
+    use_uv: UseUv,
+
+    /// Shares one progress indicator while script synchronization requests are outstanding.
+    script_progress: ScriptProgress,
 
     /// Resolved global settings that are shared across all workspaces.
     global_settings: Arc<GlobalSettings>,
@@ -155,6 +169,8 @@ impl Session {
             workspaces.register(uri)?;
         }
 
+        let use_uv = initialization_options.use_uv(&*native_system);
+
         Ok(Self {
             native_system,
             position_encoding,
@@ -162,6 +178,8 @@ impl Session {
             deferred_messages: VecDeque::new(),
             index: Some(index),
             initialization_options,
+            use_uv,
+            script_progress: ScriptProgress::default(),
             global_settings: Arc::new(GlobalSettings::default()),
             projects: BTreeMap::new(),
             resolved_client_capabilities,
@@ -187,7 +205,7 @@ impl Session {
         &mut self.request_queue
     }
 
-    pub(crate) fn initialization_options(&self) -> &InitializationOptions {
+    fn initialization_options(&self) -> &InitializationOptions {
         &self.initialization_options
     }
 
@@ -230,12 +248,142 @@ impl Session {
             .and_then(|request| {
                 if !self.request_queue.incoming().is_pending(&request.id) {
                     // Clear out the suspended request if the request has been cancelled.
-                    tracing::debug!("Skipping suspended workspace diagnostics request `{}` because it was cancelled", request.id);
+                    tracing::debug!(
+                        "Skipping suspended workspace diagnostics request `{}` \
+                        because it was cancelled",
+                        request.id
+                    );
                     return None;
                 }
 
                 request.resume_if_revision_changed(self.revision, client)
             });
+    }
+
+    /// Returns each project's background uv synchronization wakeups.
+    pub(crate) fn uv_sync_wakeups(&self) -> Vec<(SystemPathBuf, crossbeam::channel::Receiver<()>)> {
+        self.projects
+            .iter()
+            .map(|(root, state)| (root.clone(), state.db.uv_environments().sync_wakeups()))
+            .collect()
+    }
+
+    /// Gives one project's uv environments an opportunity to make progress.
+    pub(crate) fn poll_uv_sync(&mut self, client: &Client, project_root: &SystemPath) {
+        let Some(project) = self.projects.get_mut(project_root) else {
+            tracing::debug!(
+                "Ignored uv synchronization wakeup for removed project `{project_root}`"
+            );
+            return;
+        };
+        let db = &mut project.db;
+        let environments = db.uv_environments().clone();
+        let changes = environments.poll_sync(db);
+        if matches!(
+            changes.project,
+            Some(ProjectReloadResult::Changed {
+                files_changed: true,
+            })
+        ) {
+            let scripts: Vec<_> = db.project().script_files(db).iter().collect();
+            Self::synchronize_closed_scripts(
+                db,
+                &scripts,
+                client,
+                self.resolved_client_capabilities,
+                &self.script_progress,
+            );
+        }
+        self.uv_environments_changed(client, project_root, changes);
+    }
+
+    fn uv_environments_changed(
+        &mut self,
+        client: &Client,
+        project_root: &SystemPath,
+        changes: UvSyncChanges,
+    ) {
+        if changes.is_empty() {
+            return;
+        }
+
+        if changes.project.is_some() {
+            publish_settings_diagnostics(self, client, project_root.to_path_buf());
+        }
+
+        self.bump_revision();
+
+        self.resume_suspended_workspace_diagnostic_request(client);
+
+        let capabilities = self.client_capabilities();
+        if capabilities.supports_workspace_diagnostic_refresh() {
+            client.send_request::<lsp_types::DiagnosticRefreshRequest>(self, (), |_, ()| {});
+        } else if changes.project.is_some() {
+            publish_all_document_diagnostics(self, client);
+        } else if let Some(project) = self.projects.get(project_root) {
+            for file in changes.scripts {
+                if let Some(document) = project.db.document(file) {
+                    let document = DocumentHandle::from_document(document);
+                    publish_diagnostics_if_needed(&document, self, client);
+                }
+            }
+        }
+
+        if capabilities.supports_semantic_tokens_refresh() {
+            client.send_request::<lsp_types::SemanticTokensRefreshRequest>(self, (), |_, ()| {});
+        }
+
+        if capabilities.supports_inlay_hint_refresh() {
+            client.send_request::<lsp_types::InlayHintRefreshRequest>(self, (), |_, ()| {});
+        }
+    }
+
+    /// Requests synchronization using the scripts' saved metadata.
+    fn synchronize_closed_scripts(
+        db: &mut ProjectDatabase,
+        scripts: &[File],
+        client: &Client,
+        capabilities: ResolvedClientCapabilities,
+        progress: &ScriptProgress,
+    ) {
+        for &file in scripts {
+            // Open and save handle editor documents separately. Their metadata may contain
+            // unsaved changes, including overlays that are not in the diagnostic open-file set.
+            if db.document(file).is_some() {
+                continue;
+            }
+            Self::request_script_sync(
+                db,
+                file,
+                client,
+                capabilities,
+                ScriptEnvironmentAvailability::Pending,
+                progress,
+            );
+        }
+    }
+
+    fn request_script_sync(
+        db: &mut ProjectDatabase,
+        file: File,
+        client: &Client,
+        capabilities: ResolvedClientCapabilities,
+        availability: ScriptEnvironmentAvailability,
+        progress: &ScriptProgress,
+    ) {
+        let environments = db.uv_environments().clone();
+        environments.request_sync(db, file, availability, &|db, file| {
+            let file_path = file.path(db);
+            let display_path = file_path.as_system_path().map_or_else(
+                || file_path.to_string(),
+                |path| {
+                    path.strip_prefix(db.project().root(db))
+                        .unwrap_or(path)
+                        .to_string()
+                },
+            );
+            progress.for_script(client, capabilities, display_path)
+        });
     }
 
     /// Bumps the revision.
@@ -325,7 +473,7 @@ impl Session {
     /// Refer to [`project_db`] for more details on how the project is selected.
     ///
     /// [`project_db`]: Session::project_db
-    pub(crate) fn project_db_mut(&mut self, path: &AnySystemPath) -> &mut ProjectDatabase {
+    fn project_db_mut(&mut self, path: &AnySystemPath) -> &mut ProjectDatabase {
         &mut self.project_state_mut(path).db
     }
 
@@ -335,7 +483,7 @@ impl Session {
     /// given path, or the first project if no project is found for the path.
     ///
     /// If the path is a virtual path, it will return the first project database in the session.
-    pub(crate) fn project_state(&self, path: &AnySystemPath) -> &ProjectState {
+    fn project_state(&self, path: &AnySystemPath) -> &ProjectState {
         match path {
             AnySystemPath::System(system_path) => self
                 .project_state_for_path(system_path)
@@ -382,10 +530,7 @@ impl Session {
 
     /// Returns a reference to the project's [`ProjectState`] corresponding to the given path, if
     /// any.
-    pub(crate) fn project_state_for_path(
-        &self,
-        path: impl AsRef<SystemPath>,
-    ) -> Option<&ProjectState> {
+    fn project_state_for_path(&self, path: impl AsRef<SystemPath>) -> Option<&ProjectState> {
         let path = path.as_ref();
         self.projects
             .range(..=path.to_path_buf())
@@ -410,21 +555,34 @@ impl Session {
 
     pub(crate) fn apply_changes(
         &mut self,
+        client: &Client,
         path: &AnySystemPath,
         changes: &[ChangeEvent],
     ) -> ChangeResult {
-        let overrides = path.as_system().and_then(|root| {
-            self.workspaces()
-                .for_path(root)?
-                .settings()
-                .project_options_overrides()
-                .cloned()
-        });
-
         self.bump_revision();
 
-        self.project_db_mut(path)
-            .apply_changes(changes, overrides.as_ref())
+        let capabilities = self.resolved_client_capabilities;
+        let script_progress = self.script_progress.clone();
+        let db = self.project_db_mut(path);
+        let result = db.apply_changes(changes);
+        if let Some(project_path) = result.project_sync_path() {
+            db.uv_environments()
+                .request_project_sync(db, project_path, &|db, project| {
+                    Some(Box::new(LazyWorkDoneProgress::new_on_main_loop(
+                        client,
+                        WorkDoneProgressBegin {
+                            title: format!("Refreshing {} metadata", project.name(db)),
+                            cancellable: Some(false),
+                            message: None,
+                            percentage: None,
+                        },
+                        capabilities,
+                    )))
+                });
+        }
+        let scripts = result.scripts_to_synchronize(db);
+        Self::synchronize_closed_scripts(db, &scripts, client, capabilities, &script_progress);
+        result
     }
 
     /// Returns a mutable iterator over all project databases.
@@ -433,7 +591,7 @@ impl Session {
     }
 
     /// Returns a mutable iterator over all projects.
-    pub(crate) fn project_states_mut(&mut self) -> impl Iterator<Item = &'_ mut ProjectState> + '_ {
+    fn project_states_mut(&mut self) -> impl Iterator<Item = &'_ mut ProjectState> + '_ {
         self.projects.values_mut()
     }
 
@@ -540,7 +698,7 @@ impl Session {
     ///
     /// The client provided is used to show error messages and publish
     /// diagnostics related to configuration.
-    pub(crate) fn initialize_workspace_folder(
+    fn initialize_workspace_folder(
         &mut self,
         client: &Client,
         uri: &Uri,
@@ -572,7 +730,18 @@ impl Session {
             }
         };
 
-        let settings = options.into_settings(&root, client, &*self.native_system);
+        // Zed sends a single file as a workspace folder. Preserve that path as the
+        // workspace's identity, but resolve configuration and imports from its parent directory.
+        // https://github.com/zed-industries/zed/issues/40627
+        let workspace_directory = if self.native_system.is_file(&root)
+            && let Some(parent) = root.parent()
+        {
+            parent
+        } else {
+            root.as_path()
+        };
+
+        let settings = options.into_settings(workspace_directory, client, &*self.native_system);
         let Some(workspace) = self.workspaces.workspaces.get_mut(&root) else {
             tracing::debug!("Ignoring workspace `{uri}` since it was not registered");
             return;
@@ -592,35 +761,42 @@ impl Session {
         let system = LSPSystem::new(
             self.index.as_ref().unwrap().clone(),
             self.native_system.clone(),
+            self.initialization_options.workspace_trust,
         );
 
-        let configuration_file = workspace
-            .settings
-            .project_options_overrides()
-            .and_then(|settings| settings.config_file_override.as_ref());
+        let configuration_file = workspace.settings.configuration_file();
 
         let metadata = if let Some(configuration_file) = configuration_file {
-            ProjectMetadata::from_config_file(configuration_file.clone(), &root, &system)
+            ProjectMetadata::from_config_file_with_uv(
+                configuration_file.clone(),
+                workspace_directory,
+                &system,
+                self.use_uv,
+            )
         } else {
-            ProjectMetadata::discover(&root, &system)
+            ProjectMetadata::discover_with_uv(workspace_directory, &system, self.use_uv)
         };
 
         let project = metadata
             .context("Failed to discover project configuration")
             .and_then(|mut metadata| {
+                if let Some(fallback_options) = workspace.settings.fallback_options() {
+                    metadata.apply_fallback_options(fallback_options.clone());
+                }
+
                 metadata
                     .apply_configuration_files(&system)
                     .context("Failed to apply configuration files")?;
 
-                if let Some(overrides) = workspace.settings.project_options_overrides() {
-                    metadata.apply_overrides(overrides);
+                if let Some(override_options) = workspace.settings.override_options() {
+                    metadata.apply_override_options(override_options.clone());
                 }
 
                 ProjectDatabase::fallible(metadata, system.clone())
             });
 
-        let (root, db) = match project {
-            Ok(db) => (root, db),
+        let mut db = match project {
+            Ok(db) => db,
             Err(err) => {
                 tracing::error!(
                     "Failed to create project for workspace `{uri}`: {err:#}. \
@@ -634,17 +810,12 @@ impl Session {
 
                 let Ok(metadata) = ProjectMetadata::from_options(
                     Options::default(),
-                    root,
+                    workspace_directory.to_path_buf(),
                     None,
                     &UseDefaultStrategy,
-                );
-                let db_with_default_settings = ProjectDatabase::use_defaults(metadata, system);
-                let default_root = db_with_default_settings
-                    .project()
-                    .root(&db_with_default_settings)
-                    .to_path_buf();
-
-                (default_root, db_with_default_settings)
+                )
+                .map(|metadata| metadata.with_use_uv(self.use_uv));
+                ProjectDatabase::use_defaults(metadata, system)
             }
         };
 
@@ -653,6 +824,14 @@ impl Session {
         let untracked = previous
             .map(|state| state.untracked_files_with_pushed_diagnostics)
             .unwrap_or_default();
+        let scripts: Vec<_> = db.project().script_files(&db).iter().collect();
+        Self::synchronize_closed_scripts(
+            &mut db,
+            &scripts,
+            client,
+            self.resolved_client_capabilities,
+            &self.script_progress,
+        );
         self.projects.insert(
             root.clone(),
             ProjectState {
@@ -871,7 +1050,7 @@ impl Session {
     /// This is done by notifying the client with an empty list of diagnostics for the document.
     /// For notebook cells, this clears diagnostics for the specific cell.
     /// For other document types, this clears diagnostics for the main document.
-    pub(crate) fn clear_diagnostics(&self, client: &Client, uri: &Uri) {
+    fn clear_diagnostics(&self, client: &Client, uri: &Uri) {
         if self.global_settings().diagnostic_mode().is_off() {
             return;
         }
@@ -929,12 +1108,14 @@ impl Session {
             match diagnostic_mode {
                 DiagnosticMode::Off => {
                     tracing::debug!(
-                        "Skipping registration of diagnostic capability because diagnostics are turned off"
+                        "Skipping registration of diagnostic capability \
+                        because diagnostics are turned off"
                     );
                 }
                 DiagnosticMode::OpenFilesOnly | DiagnosticMode::Workspace => {
                     tracing::debug!(
-                        "Registering diagnostic capability with {diagnostic_mode:?} diagnostic mode"
+                        "Registering diagnostic capability \
+                        with {diagnostic_mode:?} diagnostic mode"
                     );
                     registrations.push(Registration {
                         id: DIAGNOSTIC_REGISTRATION_ID.into(),
@@ -1098,7 +1279,11 @@ impl Session {
             let paths = self
                 .project_dbs()
                 .flat_map(|db| {
-                    ty_module_resolver::system_module_search_paths(db).map(move |path| (db, path))
+                    ty_module_resolver::system_module_search_paths(
+                        db,
+                        db.project().program(db).resolver_environment(db),
+                    )
+                    .map(move |path| (db, path))
                 })
                 .filter(|(db, path)| !path.starts_with(db.project().root(*db)))
                 .map(|(_, path)| path)
@@ -1195,35 +1380,68 @@ impl Session {
     /// If a document is already open here, it will be overwritten.
     ///
     /// Returns a handle to the opened document.
-    pub(crate) fn open_notebook_document(&mut self, document: NotebookDocument) -> DocumentHandle {
+    pub(crate) fn open_notebook_document(
+        &mut self,
+        client: &Client,
+        document: NotebookDocument,
+    ) -> DocumentHandle {
         let handle = self.index_mut().open_notebook_document(document);
-        self.open_document_in_db(&handle, None);
+        self.open_document_in_db(client, &handle, None);
         handle
     }
 
     /// Registers a text document at the provided `path`.
     /// If a document is already open here, it will be overwritten.
     ///
+    /// Starts script synchronization from the backing file before installing the editor contents.
+    ///
     /// Returns a handle to the opened document.
-    pub(crate) fn open_text_document(&mut self, document: TextDocument) -> DocumentHandle {
+    pub(crate) fn open_text_document(
+        &mut self,
+        client: &Client,
+        document: TextDocument,
+    ) -> DocumentHandle {
         let language_id = document.language_id();
+
+        // Request synchronization before installing the editor contents because uv reads the
+        // script from disk. This ensures both use the saved metadata, so saving changed metadata
+        // requests another synchronization.
+        if self.use_uv != UseUv::Off
+            && language_id == LanguageId::Python
+            && document.notebook().is_none()
+            && let DocumentKey::File(system_path) = DocumentKey::from_uri(document.uri())
+        {
+            let capabilities = self.resolved_client_capabilities;
+            let script_progress = self.script_progress.clone();
+            let db = self.project_db_mut(&AnySystemPath::System(system_path.clone()));
+
+            // Refresh any cached disk revision before reading the script tag. A filesystem
+            // change may not have reached the watcher yet, and the later open event will
+            // refresh the file from the editor contents instead.
+            File::sync_path(db, &system_path);
+            if let Ok(file) = system_path_to_file(db, &system_path) {
+                Self::request_script_sync(
+                    db,
+                    file,
+                    client,
+                    capabilities,
+                    ScriptEnvironmentAvailability::Pending,
+                    &script_progress,
+                );
+            }
+        }
         let handle = self.index_mut().open_text_document(document);
-        self.open_document_in_db(&handle, Some(language_id));
+        self.open_document_in_db(client, &handle, Some(language_id));
         handle
     }
 
-    fn open_document_in_db(&mut self, document: &DocumentHandle, language_id: Option<LanguageId>) {
+    fn open_document_in_db(
+        &mut self,
+        client: &Client,
+        document: &DocumentHandle,
+        language_id: Option<LanguageId>,
+    ) {
         let path = document.notebook_or_file_path();
-
-        // This is a "maybe" because the `File` might've not been interned yet i.e., the
-        // `try_system` call will return `None` which doesn't mean that the file is new, it's just
-        // that the server didn't need the file yet.
-        let is_maybe_new_system_file = path.as_system().is_some_and(|system_path| {
-            let db = self.project_db(path);
-            db.files()
-                .try_system(db, system_path)
-                .is_none_or(|file| !file.exists(db))
-        });
 
         // When we know the document isn't a Python source file
         // then we'll avoid adding it to the project. (But we
@@ -1232,15 +1450,7 @@ impl Session {
 
         match path {
             AnySystemPath::System(system_path) => {
-                let event = if is_maybe_new_system_file {
-                    ChangeEvent::Created {
-                        path: system_path.clone(),
-                        kind: CreatedKind::File,
-                    }
-                } else {
-                    ChangeEvent::Opened(system_path.clone())
-                };
-                self.apply_changes(path, &[event]);
+                self.apply_changes(client, path, &[ChangeEvent::Opened(system_path.clone())]);
 
                 if is_not_python {
                     return;
@@ -1630,15 +1840,15 @@ impl Workspace {
         &self.settings
     }
 
-    pub(crate) fn settings_arc(&self) -> Arc<WorkspaceSettings> {
+    fn settings_arc(&self) -> Arc<WorkspaceSettings> {
         self.settings.clone()
     }
 
-    pub(crate) fn is_initialized(&self) -> bool {
+    fn is_initialized(&self) -> bool {
         self.initialized
     }
 
-    pub(crate) fn initialize(&mut self, settings: WorkspaceSettings) {
+    fn initialize(&mut self, settings: WorkspaceSettings) {
         self.settings = Arc::new(settings);
         self.initialized = true;
     }
@@ -1771,7 +1981,7 @@ impl DocumentHandle {
     }
 
     #[expect(unused)]
-    pub(crate) fn file_path(&self) -> Option<&AnySystemPath> {
+    fn file_path(&self) -> Option<&AnySystemPath> {
         match self {
             Self::Text { path, .. } | Self::Notebook { path, .. } => Some(path),
             Self::Cell { .. } => None,
@@ -1779,7 +1989,7 @@ impl DocumentHandle {
     }
 
     #[expect(unused)]
-    pub(crate) fn notebook_path(&self) -> Option<&AnySystemPath> {
+    fn notebook_path(&self) -> Option<&AnySystemPath> {
         match self {
             DocumentHandle::Notebook { path, .. } => Some(path),
             DocumentHandle::Cell { notebook_path, .. } => Some(notebook_path),
@@ -1810,9 +2020,37 @@ impl DocumentHandle {
         matches!(self, Self::Cell { .. } | Self::Notebook { .. })
     }
 
+    /// Synchronizes an open script, using `availability` until its first synchronization completes.
+    pub(crate) fn synchronize_script(
+        &self,
+        session: &mut Session,
+        client: &Client,
+        availability: ScriptEnvironmentAvailability,
+    ) {
+        let path = self.notebook_or_file_path();
+        let Some(system_path) = path.as_system() else {
+            return;
+        };
+        let capabilities = session.resolved_client_capabilities;
+        let script_progress = session.script_progress.clone();
+        let db = session.project_db_mut(path);
+        let Some(file) = db.files().try_system(db, system_path) else {
+            return;
+        };
+        Session::request_script_sync(
+            db,
+            file,
+            client,
+            capabilities,
+            availability,
+            &script_progress,
+        );
+    }
+
     pub(crate) fn update_text_document(
         &mut self,
         session: &mut Session,
+        client: &Client,
         content_changes: Vec<TextDocumentContentChangeEvent>,
         new_version: DocumentVersion,
     ) -> crate::Result<()> {
@@ -1835,7 +2073,7 @@ impl DocumentHandle {
             self.set_version(document.version());
         }
 
-        self.update_in_db(session);
+        self.update_in_db(session, client);
 
         Ok(())
     }
@@ -1843,6 +2081,7 @@ impl DocumentHandle {
     pub(crate) fn update_notebook_document(
         &mut self,
         session: &mut Session,
+        client: &Client,
         cells: Option<lsp_types::NotebookDocumentCellChanges>,
         metadata: Option<lsp_types::LspObject>,
         new_version: DocumentVersion,
@@ -1862,11 +2101,11 @@ impl DocumentHandle {
             self.set_version(new_version);
         }
 
-        self.update_in_db(session);
+        self.update_in_db(session, client);
         Ok(())
     }
 
-    fn update_in_db(&self, session: &mut Session) {
+    fn update_in_db(&self, session: &mut Session, client: &Client) {
         let path = self.notebook_or_file_path();
         let changes = match path {
             AnySystemPath::System(system_path) => {
@@ -1877,7 +2116,7 @@ impl DocumentHandle {
             }
         };
 
-        session.apply_changes(path, &changes);
+        session.apply_changes(client, path, &changes);
     }
 
     fn set_version(&mut self, version: DocumentVersion) {
@@ -1899,7 +2138,7 @@ impl DocumentHandle {
     ///
     /// This can return an error when the document does not exist in the
     /// session index.
-    pub(crate) fn close(&self, session: &mut Session) -> crate::Result<bool> {
+    pub(crate) fn close(&self, session: &mut Session, client: &Client) -> crate::Result<bool> {
         let is_cell = self.is_cell();
         let path = self.notebook_or_file_path();
 
@@ -1930,8 +2169,11 @@ impl DocumentHandle {
                             db.project().remove_file(db, file);
                         }
 
-                        // Bump the file's revision back to using the file system's revision.
-                        file.sync(db);
+                        // Restore file and script membership from the saved contents. Discarding
+                        // unsaved script metadata can bring a file back into the project when
+                        // `exclude-scripts` is enabled. Also request synchronization for saved
+                        // metadata changes that were skipped while the editor overlay was present.
+                        self.update_in_db(session, client);
                     } else {
                         // This can only fail when the path is a directory or it doesn't exists but the
                         // file should exists for this handler in this branch. This is because every
@@ -1998,4 +2240,59 @@ pub(super) fn warn_about_unknown_options(
     };
     tracing::warn!("{message}");
     client.show_warning_message(message);
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io::ErrorKind;
+    use std::sync::Arc;
+
+    use anyhow::Context;
+    use ruff_db::system::{Command, CommandExecutor, OsSystem, System as _};
+
+    use super::Index;
+    use crate::system::{LSPSystem, WorkspaceTrust};
+
+    /// Mutating the document index requires exclusive ownership after Salsa cancels the current
+    /// database snapshots. A background command executor must not retain an `LSPSystem`, because
+    /// that would keep the index alive and prevent the server from applying document changes.
+    #[test]
+    fn detached_command_executor_does_not_retain_document_index() {
+        let index = Arc::new(Index::new());
+        let system = LSPSystem::new(
+            index.clone(),
+            Arc::new(OsSystem::default()),
+            WorkspaceTrust::default(),
+        );
+        let executor = system.command_executor().map(CommandExecutor::dyn_clone);
+        assert!(executor.is_some());
+        drop(system);
+
+        assert_eq!(Arc::strong_count(&index), 1);
+
+        drop(executor);
+    }
+
+    #[test]
+    fn detached_untrusted_executor_rejects_commands() -> anyhow::Result<()> {
+        let system = LSPSystem::new(
+            Arc::new(Index::new()),
+            Arc::new(OsSystem::default()),
+            WorkspaceTrust::Untrusted,
+        )
+        .dyn_clone();
+        let executor = system
+            .command_executor()
+            .context("Expected an executor for the untrusted workspace")?
+            .dyn_clone();
+        drop(system);
+
+        let error = executor.execute(Command::new("must-not-run")).unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::PermissionDenied);
+        assert_eq!(
+            error.to_string(),
+            "external commands are disabled in an untrusted workspace",
+        );
+        Ok(())
+    }
 }

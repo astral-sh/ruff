@@ -14,7 +14,6 @@ I001 [*] Import block is un-sorted or un-formatted
 8 | |
 9 | | from . import my_local_folder_object
   | |____________________________________^
-  |
 help: Organize imports
   |
 4 |

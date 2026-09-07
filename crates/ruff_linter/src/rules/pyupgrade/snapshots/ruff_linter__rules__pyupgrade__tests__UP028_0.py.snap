@@ -8,7 +8,6 @@ UP028 [*] Replace `yield` over `for` loop with `yield from`
 2 | /     for x in y:
 3 | |         yield x
   | |_______________^
-  |
 help: Replace with `yield from`
   |
 1 | def f():
@@ -26,7 +25,6 @@ UP028 [*] Replace `yield` over `for` loop with `yield from`
 7 | /     for x, y in z:
 8 | |         yield (x, y)
   | |____________________^
-  |
 help: Replace with `yield from`
   |
 6 | def g():
@@ -44,7 +42,6 @@ UP028 [*] Replace `yield` over `for` loop with `yield from`
 12 | /     for x in [1, 2, 3]:
 13 | |         yield x
    | |_______________^
-   |
 help: Replace with `yield from`
    |
 11 | def h():
@@ -62,7 +59,6 @@ UP028 [*] Replace `yield` over `for` loop with `yield from`
 17 | /     for x in {x for x in y}:
 18 | |         yield x
    | |_______________^
-   |
 help: Replace with `yield from`
    |
 16 | def i():
@@ -80,7 +76,6 @@ UP028 [*] Replace `yield` over `for` loop with `yield from`
 22 | /     for x in (1, 2, 3):
 23 | |         yield x
    | |_______________^
-   |
 help: Replace with `yield from`
    |
 21 | def j():
@@ -98,7 +93,6 @@ UP028 [*] Replace `yield` over `for` loop with `yield from`
 27 | /     for x, y in {3: "x", 6: "y"}:
 28 | |         yield x, y
    | |__________________^
-   |
 help: Replace with `yield from`
    |
 26 | def k():
@@ -147,7 +141,6 @@ UP028 [*] Replace `yield` over `for` loop with `yield from`
 44 | /     for x, y in [{3: (3, [44, "long ss"]), 6: "y"}]:
 45 | |         yield x, y
    | |__________________^
-   |
 help: Replace with `yield from`
    |
 43 | def f():
@@ -209,7 +202,6 @@ UP028 [*] Replace `yield` over `for` loop with `yield from`
 67 | /     for z in x:
 68 | |         yield z
    | |_______________^
-   |
 help: Replace with `yield from`
    |
 66 |         yield x
@@ -250,7 +242,6 @@ UP028 [*] Replace `yield` over `for` loop with `yield from`
 82 | |     ):
 83 | |         yield h
    | |_______________^
-   |
 help: Replace with `yield from`
    |
 78 | def _serve_method(fn):
@@ -357,7 +348,6 @@ UP028 [*] Replace `yield` over `for` loop with `yield from`
 170 | /     for a in 1,:
 171 | |         yield a
     | |_______________^
-    |
 help: Replace with `yield from`
     |
 169 | def f():
@@ -389,5 +379,4 @@ UP028 Replace `yield` over `for` loop with `yield from`
 187 | /         for some_non_local in iterable:
 188 | |             yield some_non_local
     | |________________________________^
-    |
 help: Replace with `yield from`

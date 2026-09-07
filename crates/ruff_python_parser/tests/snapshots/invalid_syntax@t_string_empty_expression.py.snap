@@ -119,4 +119,3 @@ Module(
 2 | t"{}"
 3 | t"{  }"
   |      ^ Syntax Error: Expected an expression
-  |

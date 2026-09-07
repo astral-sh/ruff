@@ -45,7 +45,6 @@ warning[deprecated]: The function `myfunc` is deprecated
   |
 6 | myfunc(1)  # error: [deprecated] "use OtherClass"
   | ^^^^^^ use OtherClass
-  |
 
 ```
 
@@ -55,7 +54,6 @@ warning[deprecated]: The class `MyClass` is deprecated
    |
 12 | MyClass()  # error: [deprecated] "use BetterClass"
    | ^^^^^^^ use BetterClass
-   |
 
 ```
 
@@ -65,7 +63,6 @@ warning[deprecated]: The function `afunc` is deprecated
    |
 21 | MyClass.afunc()  # error: [deprecated] "use something else"
    |         ^^^^^ use something else
-   |
 
 ```
 
@@ -75,6 +72,5 @@ warning[deprecated]: The function `amethod` is deprecated
    |
 22 | MyClass().amethod()  # error: [deprecated] "don't use this!"
    |           ^^^^^^^ don't use this!
-   |
 
 ```

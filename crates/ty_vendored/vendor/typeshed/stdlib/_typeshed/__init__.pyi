@@ -58,6 +58,14 @@ Unused: TypeAlias = object  # stable
 # for more information.
 MaybeNone: TypeAlias = Any  # stable
 
+# typeshed-internal type aliases to facilitate transition from
+# `float` to either `float | int` or `float` (and similar for `complex`).
+# When you encounter one of these type aliases, you are encouraged to
+# replace them with the correct type. Please don't use them outside typeshed.
+# See https://github.com/python/typeshed/issues/16059 for details.
+FloatInt: TypeAlias = float | int
+ComplexInt: TypeAlias = complex | float | int
+
 # Used to mark arguments that default to a sentinel value. This prevents
 # stubtest from complaining about the default value not matching.
 #
@@ -160,6 +168,18 @@ class SupportsTrunc(Protocol):
 
 # Mapping-like protocols
 
+# The second and third overload could technically be combined, but splitting
+# them works better with some type checkers.
+class SupportsGet(Protocol[_KT_contra, _VT_co]):  # type: ignore[misc] # Covariant type as parameter
+    @overload
+    def get(self, key: _KT_contra, /) -> _VT_co | None: ...
+    @overload
+    def get(  # pyrefly: ignore[invalid-variance]
+        self, key: _KT_contra, default: _VT_co, /  # type: ignore[misc] # pyright: ignore[reportGeneralTypeIssues] # Covariant type as parameter
+    ) -> _VT_co: ...
+    @overload
+    def get(self, key: _KT_contra, default: _T, /) -> _VT_co | _T: ...
+
 # stable
 class SupportsItems(Protocol[_KT_co, _VT_co]):
     def items(self) -> AbstractSet[tuple[_KT_co, _VT_co]]: ...
@@ -184,6 +204,8 @@ class SupportsItemAccess(Protocol[_KT_contra, _VT]):
     def __getitem__(self, key: _KT_contra, /) -> _VT: ...
     def __setitem__(self, key: _KT_contra, value: _VT, /) -> None: ...
     def __delitem__(self, key: _KT_contra, /) -> None: ...
+
+# Path and file handling
 
 StrPath: TypeAlias = str | PathLike[str]  # stable
 BytesPath: TypeAlias = bytes | PathLike[bytes]  # stable

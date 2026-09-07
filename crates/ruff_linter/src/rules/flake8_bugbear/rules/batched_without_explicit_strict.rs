@@ -1,8 +1,10 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::ExprCall;
 use ruff_python_ast::PythonVersion;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::flake8_bugbear::helpers::is_infinite_iterable;
 use crate::{FixAvailability, Violation};
 
@@ -49,7 +51,7 @@ use crate::{FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: `batched`](https://docs.python.org/3/library/itertools.html#batched)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.10.0")]
+#[violation_metadata(stable_since = "0.10.0", category = Category::Pedantic)]
 pub(crate) struct BatchedWithoutExplicitStrict;
 
 impl Violation for BatchedWithoutExplicitStrict {
@@ -94,5 +96,5 @@ pub(crate) fn batched_without_explicit_strict(checker: &Checker, call: &ExprCall
         return;
     }
 
-    checker.report_diagnostic(BatchedWithoutExplicitStrict, call.range);
+    checker.report_diagnostic(BatchedWithoutExplicitStrict, call.range());
 }

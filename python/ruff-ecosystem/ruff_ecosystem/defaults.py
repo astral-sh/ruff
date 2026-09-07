@@ -23,12 +23,6 @@ DEFAULT_TARGETS = [
     Project(
         repo=Repository(owner="apache", name="airflow", ref="main"),
         check_options=CheckOptions(select="ALL"),
-        config_overrides={
-            # Broken symlink
-            "exclude": [
-                "task-sdk/src/airflow/sdk/_shared/AGENTS.md",
-            ]
-        },
     ),
     Project(
         repo=Repository(owner="apache", name="superset", ref="master"),
@@ -38,28 +32,21 @@ DEFAULT_TARGETS = [
     Project(repo=Repository(owner="binary-husky", name="gpt_academic", ref="master")),
     Project(repo=Repository(owner="bloomberg", name="pytest-memray", ref="main")),
     Project(
-        repo=Repository(owner="bokeh", name="bokeh", ref="branch-3.3"),
+        repo=Repository(owner="bokeh", name="bokeh", ref="branch-3.10"),
         check_options=CheckOptions(select="ALL"),
     ),
-    # Disabled due to use of explicit `select` with `E999`, which has been removed.
-    # See: https://github.com/astral-sh/ruff/pull/12129
-    # Project(
-    #     repo=Repository(owner="demisto", name="content", ref="master"),
-    #     format_options=FormatOptions(
-    #         # Syntax errors in this file
-    #         exclude="Packs/ThreatQ/Integrations/ThreatQ/ThreatQ.py"
-    #     ),
-    # ),
+    Project(repo=Repository(owner="demisto", name="content", ref="master")),
     Project(repo=Repository(owner="docker", name="docker-py", ref="main")),
     Project(repo=Repository(owner="facebookresearch", name="chameleon", ref="main")),
     Project(repo=Repository(owner="freedomofpress", name="securedrop", ref="develop")),
     Project(repo=Repository(owner="fronzbot", name="blinkpy", ref="dev")),
     Project(repo=Repository(owner="ibis-project", name="ibis", ref="main")),
     Project(repo=Repository(owner="ing-bank", name="probatus", ref="main")),
-    Project(repo=Repository(owner="jrnl-org", name="jrnl", ref="develop")),
+    Project(repo=Repository(owner="jrnl-org", name="jrnl", ref="main")),
     Project(repo=Repository(owner="langchain-ai", name="langchain", ref="master")),
     Project(repo=Repository(owner="latchbio", name="latch", ref="main")),
     Project(repo=Repository(owner="lnbits", name="lnbits", ref="main")),
+    Project(repo=Repository(owner="mhammond", name="pywin32", ref="main")),
     Project(repo=Repository(owner="milvus-io", name="pymilvus", ref="master")),
     Project(repo=Repository(owner="mlflow", name="mlflow", ref="master")),
     Project(repo=Repository(owner="model-bakers", name="model_bakery", ref="main")),
@@ -88,19 +75,17 @@ DEFAULT_TARGETS = [
     Project(
         repo=Repository(owner="scikit-build", name="scikit-build-core", ref="main")
     ),
-    # TODO(charlie): Ecosystem check fails in non-preview due to the direct
-    # selection of preview rules.
-    # Project(
-    #     repo=Repository(
-    #         owner="sphinx-doc",
-    #         name="sphinx",
-    #         ref="master",
-    #     ),
-    #     format_options=FormatOptions(
-    #         # Does not contain valid UTF-8
-    #         exclude="tests/roots/test-pycode/cp_1251_coded.py"
-    #     ),
-    # ),
+    Project(
+        repo=Repository(
+            owner="sphinx-doc",
+            name="sphinx",
+            ref="master",
+        ),
+        format_options=FormatOptions(
+            # Does not contain valid UTF-8
+            exclude="tests/roots/test-pycode/cp_1251_coded.py"
+        ),
+    ),
     Project(repo=Repository(owner="spruceid", name="siwe-py", ref="main")),
     Project(repo=Repository(owner="tiangolo", name="fastapi", ref="master")),
     Project(repo=Repository(owner="yandex", name="ch-backup", ref="main")),

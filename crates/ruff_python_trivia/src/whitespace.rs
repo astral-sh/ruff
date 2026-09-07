@@ -1,5 +1,49 @@
+use std::borrow::Cow;
+
 use ruff_source_file::LineRanges;
 use ruff_text_size::{TextRange, TextSize};
+
+/// Expands tabs to the next eight-column tab stop, matching Python's `str.expandtabs`.
+pub fn expand_tabs(source: &str) -> Cow<'_, str> {
+    const TAB_SIZE: usize = 8;
+
+    if !source.contains('\t') {
+        return Cow::Borrowed(source);
+    }
+
+    let mut expanded = String::with_capacity(source.len());
+    let mut column = 0;
+
+    for character in source.chars() {
+        match character {
+            '\t' => {
+                let spaces = tab_offset(column, TAB_SIZE);
+                expanded.extend(std::iter::repeat_n(' ', spaces));
+                column += spaces;
+            }
+            '\r' | '\n' => {
+                expanded.push(character);
+                column = 0;
+            }
+            _ => {
+                expanded.push(character);
+                column += 1;
+            }
+        }
+    }
+
+    Cow::Owned(expanded)
+}
+
+/// Returns the number of columns from `column` to the next tab stop.
+pub const fn tab_offset(column: usize, tab_size: usize) -> usize {
+    tab_size - column % tab_size
+}
+
+/// Returns the number of columns from `column` to the next tab stop using `u32` values.
+pub const fn tab_offset_u32(column: u32, tab_size: u32) -> u32 {
+    tab_size - column % tab_size
+}
 
 /// Extract the leading indentation from a line.
 pub fn indentation_at_offset(offset: TextSize, source: &str) -> Option<&str> {
@@ -76,5 +120,40 @@ impl PythonWhitespace for str {
 
     fn trim_whitespace_end(&self) -> &Self {
         self.trim_end_matches(is_python_whitespace)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::assert_matches;
+    use std::borrow::Cow;
+
+    use super::{expand_tabs, tab_offset, tab_offset_u32};
+
+    #[test]
+    fn tab_expansion_borrows_unchanged_text() {
+        assert_matches!(expand_tabs("unchanged"), Cow::Borrowed(_));
+    }
+
+    #[test]
+    fn tab_expansion_allocates_changed_text() {
+        let expanded = expand_tabs("  \tvalue");
+
+        assert_matches!(&expanded, Cow::Owned(_));
+        assert_eq!(expanded, "        value");
+    }
+
+    #[test]
+    fn tab_offset_advances_to_next_stop() {
+        assert_eq!(tab_offset(0, 8), 8);
+        assert_eq!(tab_offset(2, 8), 6);
+        assert_eq!(tab_offset(8, 8), 8);
+    }
+
+    #[test]
+    fn u32_tab_offset_advances_to_next_stop() {
+        assert_eq!(tab_offset_u32(0, 8), 8);
+        assert_eq!(tab_offset_u32(2, 8), 6);
+        assert_eq!(tab_offset_u32(8, 8), 8);
     }
 }

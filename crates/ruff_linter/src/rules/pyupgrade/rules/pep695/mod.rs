@@ -284,6 +284,7 @@ pub(crate) fn expr_name_to_type_var<'a>(
 ) -> Option<TypeVar<'a>> {
     let StmtAssign { value, .. } = semantic
         .lookup_symbol(name.id.as_str())
+        .binding_id()
         .and_then(|binding_id| semantic.binding(binding_id).source)
         .map(|node_id| semantic.statement(node_id))?
         .as_assign_stmt()?;
@@ -366,6 +367,20 @@ fn in_nested_context(checker: &Checker) -> bool {
         .any(|stmt| matches!(stmt, Stmt::ClassDef(_) | Stmt::FunctionDef(_)))
 }
 
+/// Returns `true` if a type variable without a default follows a type variable with a default.
+///
+/// In a PEP 695 type parameter list this is a syntax error:
+///
+/// ```python
+/// type Pair[T = int, S] = tuple[T, S]  # non-default type parameter `S` follows default type parameter
+/// ```
+fn non_default_follows_default(type_vars: &[TypeVar]) -> bool {
+    type_vars
+        .iter()
+        .skip_while(|tv| tv.default.is_none())
+        .any(|tv| tv.default.is_none())
+}
+
 /// Deduplicate `vars`, returning `None` if `vars` is empty or any duplicates are found.
 /// Also returns `None` if any `TypeVar` has a default value and the target Python version
 /// is below 3.13 or preview mode is not enabled. Note that `typing_extensions` backports
@@ -381,6 +396,10 @@ fn check_type_vars<'a>(vars: Vec<TypeVar<'a>>, checker: &Checker) -> Option<Vec<
         && (checker.target_version() < PythonVersion::PY313
             || !is_type_var_default_enabled(checker.settings()))
     {
+        return None;
+    }
+
+    if non_default_follows_default(&vars) {
         return None;
     }
 

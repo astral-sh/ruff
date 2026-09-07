@@ -8,7 +8,7 @@ use clap::Parser as ClapParser;
 use ruff_python_formatter::cli::{Cli, Emit, format_and_debug_print};
 
 /// Read a `String` from `stdin`.
-pub(crate) fn read_from_stdin() -> Result<String> {
+fn read_from_stdin() -> Result<String> {
     let mut buffer = String::new();
     io::stdin().lock().read_to_string(&mut buffer)?;
     Ok(buffer)

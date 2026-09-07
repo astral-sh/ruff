@@ -89,4 +89,3 @@ Module(
 1 | import (a)
 2 | import (a, b)
   |        ^ Syntax Error: Expected one or more symbol names after import
-  |

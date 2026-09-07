@@ -54,4 +54,8 @@ class Collector(ABC):
 
     @abstractmethod
     def export(self, filename: StrOrBytesPath) -> None:
-        """Export collected data to a file."""
+        """Export collected data.
+
+        Returns:
+            bool: True if output was generated, False if there was no data to export.
+        """

@@ -1078,7 +1078,6 @@ Module(
 14 | f"""{f"""{x}"""}"""                # mark the whole triple quote
 15 | f"{'\n'.join(['\t', '\v', '\r'])}"  # multiple escape sequences, multiple errors
    |     ^ Syntax Error: Cannot use an escape sequence (backslash) in f-strings on Python 3.11 (syntax was added in Python 3.12)
-   |
 
 
    |
@@ -1086,7 +1085,6 @@ Module(
 14 | f"""{f"""{x}"""}"""                # mark the whole triple quote
 15 | f"{'\n'.join(['\t', '\v', '\r'])}"  # multiple escape sequences, multiple errors
    |                ^ Syntax Error: Cannot use an escape sequence (backslash) in f-strings on Python 3.11 (syntax was added in Python 3.12)
-   |
 
 
    |
@@ -1094,7 +1092,6 @@ Module(
 14 | f"""{f"""{x}"""}"""                # mark the whole triple quote
 15 | f"{'\n'.join(['\t', '\v', '\r'])}"  # multiple escape sequences, multiple errors
    |                      ^ Syntax Error: Cannot use an escape sequence (backslash) in f-strings on Python 3.11 (syntax was added in Python 3.12)
-   |
 
 
    |
@@ -1102,4 +1099,3 @@ Module(
 14 | f"""{f"""{x}"""}"""                # mark the whole triple quote
 15 | f"{'\n'.join(['\t', '\v', '\r'])}"  # multiple escape sequences, multiple errors
    |                            ^ Syntax Error: Cannot use an escape sequence (backslash) in f-strings on Python 3.11 (syntax was added in Python 3.12)
-   |

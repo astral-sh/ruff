@@ -14,7 +14,6 @@ TC004 [*] Move import `datetime` out of type-checking block. Import is used for 
 17 | class A(pydantic.BaseModel):
 18 |     x: datetime.datetime
    |        -------- Used at runtime here
-   |
 help: Move out of type-checking block
    |
 7  | from pydantic import BaseModel
@@ -41,7 +40,6 @@ TC004 [*] Move import `array.array` out of type-checking block. Import is used f
 37 | class G(BaseModel):
 38 |     x: array
    |        ----- Used at runtime here
-   |
 help: Move out of type-checking block
    |
 7  | from pydantic import BaseModel
@@ -68,7 +66,6 @@ TC004 [*] Move import `pandas` out of type-checking block. Import is used for mo
 21 | class B(BaseModel):
 22 |     x: pandas.DataFrame
    |        ------ Used at runtime here
-   |
 help: Move out of type-checking block
    |
 7  | from pydantic import BaseModel

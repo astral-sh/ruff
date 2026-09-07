@@ -49,7 +49,7 @@ impl AzureRenderer<'_> {
                     )?;
                 }
             }
-            let code = if self.config.preview {
+            let code = if self.config.preview && !self.config.prefer_rule_codes {
                 diag.id().as_str()
             } else {
                 diag.secondary_code_or_id()

@@ -98,4 +98,3 @@ Module(
   |
 1 | with open("foo.txt") as __debug__: ...
   |                         ^^^^^^^^^ Syntax Error: cannot assign to `__debug__`
-  |

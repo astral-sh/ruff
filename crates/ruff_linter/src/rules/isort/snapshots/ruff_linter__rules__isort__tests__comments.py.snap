@@ -38,7 +38,6 @@ I001 [*] Import block is un-sorted or un-formatted
 32 | | from F import a  # Comment 1
 33 | | from F import b
    | |_______________^
-   |
 help: Organize imports
    |
 2  | # Comment 2

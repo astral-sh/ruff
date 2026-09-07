@@ -98,7 +98,7 @@ def dont_forget_me(value=collections.deque()):
     ...
 
 
-# N.B. we're also flagging the function call in the comprehension
+# B006 still flags mutable comprehension defaults.
 def list_comprehension_also_not_okay(default=[i**2 for i in range(3)]):
     pass
 

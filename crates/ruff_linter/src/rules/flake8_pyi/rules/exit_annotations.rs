@@ -12,6 +12,7 @@ use ruff_python_semantic::{SemanticModel, analyze::visibility::is_overload};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -47,7 +48,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///     ) -> None: ...
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.279")]
+#[violation_metadata(stable_since = "v0.0.279", category = Category::Suspicious)]
 pub(crate) struct BadExitAnnotation {
     func_kind: FuncKind,
     error_kind: ErrorKind,

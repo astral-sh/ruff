@@ -4,6 +4,7 @@ use ruff_text_size::Ranged;
 use ruff_text_size::{TextLen, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::docstrings::Docstring;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
@@ -36,7 +37,7 @@ use crate::rules::pydocstyle::helpers::ends_with_backslash;
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.68")]
+#[violation_metadata(stable_since = "v0.0.68", category = Category::Formatting)]
 pub(crate) struct SurroundingWhitespace;
 
 impl Violation for SurroundingWhitespace {

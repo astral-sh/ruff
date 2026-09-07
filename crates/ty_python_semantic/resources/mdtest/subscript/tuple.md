@@ -125,13 +125,13 @@ The stdlib API `os.stat` is a commonly used API that returns an instance of a tu
 ```py
 import os
 import stat
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 reveal_type(os.stat("my_file.txt"))  # revealed: stat_result
 reveal_type(os.stat("my_file.txt")[stat.ST_MODE])  # revealed: int
-reveal_type(os.stat("my_file.txt")[stat.ST_ATIME])  # revealed: int | float
+reveal_type(os.stat("my_file.txt")[stat.ST_ATIME])  # revealed: float
 
-# revealed: (<class 'stat_result'>, <class 'structseq[int | float]'>, <class 'tuple[int, int, int, int, int, int, int, int | float, int | float, int | float]'>, <class 'Sequence[int | float]'>, <class 'Reversible[int | float]'>, <class 'Collection[int | float]'>, <class 'Iterable[int | float]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
+# revealed: (<class 'stat_result'>, <class 'structseq[float]'>, <class 'tuple[int, int, int, int, int, int, int, float, float, float]'>, <class 'Sequence[float]'>, <class 'Reversible[float]'>, <class 'Collection[float]'>, <class 'Iterable[float]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
 reveal_mro(os.stat_result)
 
 # There are no specific overloads for the `float` elements in `os.stat_result`,
@@ -139,7 +139,7 @@ reveal_mro(os.stat_result)
 # gives the right result for those elements in the tuple, and we aim to synthesize
 # the minimum number of overloads for any given tuple
 #
-# revealed: Overload[(self, index: Literal[-10, -9, -8, -7, -6, -5, -4, 0, 1, 2, 3, 4, 5, 6], /) -> int, (self, index: SupportsIndex, /) -> int | float, (self, index: slice[SupportsIndex | None, SupportsIndex | None, SupportsIndex | None], /) -> tuple[int | float, ...]]
+# revealed: Overload[(self, index: Literal[-10, -9, -8, -7, -6, -5, -4, 0, 1, 2, 3, 4, 5, 6], /) -> int, (self, index: SupportsIndex, /) -> float, (self, index: slice[SupportsIndex | None, SupportsIndex | None, SupportsIndex | None], /) -> tuple[float, ...]]
 reveal_type(os.stat_result.__getitem__)
 ```
 
@@ -158,7 +158,8 @@ tuples are naturally understood as being subtypes of protocols that have precise
 
 ```py
 from typing import Protocol, Literal
-from ty_extensions import static_assert, is_subtype_of
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
 
 class IntFromZeroSubscript(Protocol):
     def __getitem__(self, index: Literal[0], /) -> int: ...
@@ -433,7 +434,7 @@ python-version = "3.9"
 ```
 
 ```py
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 class A(tuple[int, str]): ...
 
@@ -475,7 +476,7 @@ python-version = "3.9"
 
 ```py
 from typing import Tuple
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 class A(Tuple[int, str]): ...
 
@@ -495,7 +496,7 @@ def test(val: tuple[str] | tuple[int]):
     reveal_type(val[0])  # revealed: str | int
 
 def test2(val: tuple[str, None] | list[int | float]):
-    reveal_type(val[0])  # revealed: str | int | float
+    reveal_type(val[0])  # revealed: str | float
 ```
 
 ## Union subscript access with non-indexable type

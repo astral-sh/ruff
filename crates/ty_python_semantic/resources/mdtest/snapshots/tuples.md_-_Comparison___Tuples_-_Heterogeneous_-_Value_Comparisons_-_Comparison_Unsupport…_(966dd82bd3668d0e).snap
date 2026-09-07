@@ -53,7 +53,6 @@ error[unsupported-operator]: Unsupported `<` operation
   |             |   |
   |             |   Has type `tuple[Literal[1], Literal["hello"]]`
   |             Has type `tuple[Literal[1], Literal[2]]`
-  |
 info: Operation fails because operator `<` is not supported between the tuple elements at index 2 (of type `Literal[2]` and `Literal["hello"]`)
 
 ```
@@ -67,7 +66,6 @@ error[unsupported-operator]: Unsupported `<=` operation
    |             |    |
    |             |    Has type `tuple[Literal[1], Literal["hello"]]`
    |             Has type `tuple[Literal[1], Literal[2]]`
-   |
 info: Operation fails because operator `<=` is not supported between the tuple elements at index 2 (of type `Literal[2]` and `Literal["hello"]`)
 
 ```
@@ -81,7 +79,6 @@ error[unsupported-operator]: Unsupported `>` operation
    |             |   |
    |             |   Has type `tuple[Literal[1], Literal["hello"]]`
    |             Has type `tuple[Literal[1], Literal[2]]`
-   |
 info: Operation fails because operator `>` is not supported between the tuple elements at index 2 (of type `Literal[2]` and `Literal["hello"]`)
 
 ```
@@ -95,7 +92,6 @@ error[unsupported-operator]: Unsupported `>=` operation
    |             |    |
    |             |    Has type `tuple[Literal[1], Literal["hello"]]`
    |             Has type `tuple[Literal[1], Literal[2]]`
-   |
 info: Operation fails because operator `>=` is not supported between the tuple elements at index 2 (of type `Literal[2]` and `Literal["hello"]`)
 
 ```
@@ -108,7 +104,6 @@ error[unsupported-operator]: Unsupported `<` operation
    |             -----------^^^-----------
    |             |
    |             Both operands have type `tuple[object]`
-   |
 info: Operation fails because operator `<` is not supported between the tuple elements at index 1 (both of type `object`)
 
 ```
@@ -121,7 +116,6 @@ error[unsupported-operator]: Unsupported `<` operation
    |                           -----------^^^-----------
    |                           |
    |                           Both operands have type `tuple[object]`
-   |
 info: Operation fails because operator `<` is not supported between the tuple elements at index 1 (both of type `object`)
 
 ```

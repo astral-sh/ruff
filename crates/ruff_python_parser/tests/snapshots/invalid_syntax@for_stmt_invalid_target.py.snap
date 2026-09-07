@@ -508,7 +508,6 @@ Module(
 6 | for yield x in y: ...
 7 | for [x, 1, y, *["a"]] in z: ...
   |         ^ Syntax Error: Invalid assignment target
-  |
 
 
   |
@@ -516,7 +515,6 @@ Module(
 6 | for yield x in y: ...
 7 | for [x, 1, y, *["a"]] in z: ...
   |                 ^^^ Syntax Error: Invalid assignment target
-  |
 
 
 ## Semantic Syntax Errors

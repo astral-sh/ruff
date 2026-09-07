@@ -4,6 +4,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for `global` variables that are not assigned a value in the current
@@ -40,7 +41,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: The `global` statement](https://docs.python.org/3/reference/simple_stmts.html#the-global-statement)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.174")]
+#[violation_metadata(stable_since = "v0.0.174", category = Category::Style)]
 pub(crate) struct GlobalVariableNotAssigned {
     name: String,
 }

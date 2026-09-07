@@ -6,6 +6,7 @@ use ruff_source_file::{UniversalNewlineIterator, UniversalNewlines};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::docstrings::Docstring;
 use crate::docstrings::sections::SectionKind;
 use crate::{Edit, Fix, FixAvailability, Violation};
@@ -35,6 +36,11 @@ use crate::rules::pydocstyle::helpers::logical_line;
 ///     """Return the mean of the given values."""
 /// ```
 ///
+/// ## Fix safety
+/// This fix is marked as unsafe, as it may alter the intended formatting of the
+/// docstring, or affect tools that parse docstrings and rely on specific
+/// formatting.
+///
 /// ## Options
 /// - `lint.pydocstyle.convention`
 ///
@@ -45,7 +51,7 @@ use crate::rules::pydocstyle::helpers::logical_line;
 ///
 /// [PEP 257]: https://peps.python.org/pep-0257/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.68")]
+#[violation_metadata(stable_since = "v0.0.68", category = Category::Pedantic)]
 pub(crate) struct MissingTrailingPeriod;
 
 impl Violation for MissingTrailingPeriod {

@@ -203,7 +203,6 @@ UP049 Generic class uses private type parameters
 38 | # offer a diagnostic
 39 | class F[_async]: ...
    |         ^^^^^^
-   |
 help: Rename type parameter to remove leading underscores
 
 UP049 Generic class uses private type parameters
@@ -223,7 +222,6 @@ UP049 Generic class uses private type parameters
    |
 64 | class C[_0]: ...
    |         ^^
-   |
 help: Rename type parameter to remove leading underscores
 
 UP049 Generic class uses private type parameters
@@ -241,7 +239,6 @@ UP049 Generic class uses private type parameters
 67 | class C[T, _T]: ...
 68 | class C[_T, T]: ...
    |         ^^
-   |
 help: Rename type parameter to remove leading underscores
 
 UP049 [*] Generic class uses private type parameters

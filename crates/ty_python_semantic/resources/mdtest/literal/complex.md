@@ -3,5 +3,5 @@
 ## Complex numbers
 
 ```py
-reveal_type(2j)  # revealed: complex
+reveal_type(2j)  # revealed: complex*
 ```

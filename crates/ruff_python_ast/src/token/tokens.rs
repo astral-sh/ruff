@@ -27,7 +27,7 @@ impl Tokens {
     /// Unlike `binary_search_by_key`, this method ensures that if multiple tokens start at the same offset,
     /// it returns the index of the first one. Multiple tokens can start at the same offset in cases where
     /// zero-length tokens are involved (like `Dedent` or `Newline` at the end of the file).
-    pub fn binary_search_by_start(&self, offset: TextSize) -> Result<usize, usize> {
+    fn binary_search_by_start(&self, offset: TextSize) -> Result<usize, usize> {
         let partition_point = self.partition_point(|token| token.start() < offset);
 
         let after = &self[partition_point..];
@@ -226,6 +226,15 @@ impl Tokens {
     }
 }
 
+impl IntoIterator for Tokens {
+    type Item = Token;
+    type IntoIter = std::vec::IntoIter<Token>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.raw.into_iter()
+    }
+}
+
 impl<'a> IntoIterator for &'a Tokens {
     type Item = &'a Token;
     type IntoIter = std::slice::Iter<'a, Token>;
@@ -338,10 +347,8 @@ impl From<&Tokens> for TriviaRanges {
 
 /// An iterator over the [`Token`]s with context.
 ///
-/// This struct is created by the [`iter_with_context`] method on [`Tokens`]. Refer to its
-/// documentation for more details.
-///
-/// [`iter_with_context`]: Tokens::iter_with_context
+/// Use [`Tokens::iter_with_context`] to iterate over all tokens, or [`Self::new`] to iterate over a
+/// token slice.
 #[derive(Debug, Clone)]
 pub struct TokenIterWithContext<'a> {
     inner: std::slice::Iter<'a, Token>,
@@ -349,7 +356,8 @@ pub struct TokenIterWithContext<'a> {
 }
 
 impl<'a> TokenIterWithContext<'a> {
-    fn new(tokens: &'a [Token]) -> TokenIterWithContext<'a> {
+    /// Creates an iterator with a nesting level of zero at the start of the token slice.
+    pub fn new(tokens: &'a [Token]) -> TokenIterWithContext<'a> {
         TokenIterWithContext {
             inner: tokens.iter(),
             nesting: 0,

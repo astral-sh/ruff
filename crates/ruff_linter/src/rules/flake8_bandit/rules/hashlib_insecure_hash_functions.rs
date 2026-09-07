@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 use crate::rules::flake8_bandit::helpers::string_literal;
 
@@ -74,7 +75,7 @@ use crate::rules::flake8_bandit::helpers::string_literal;
 /// - [Common Weakness Enumeration: CWE-328](https://cwe.mitre.org/data/definitions/328.html)
 /// - [Common Weakness Enumeration: CWE-916](https://cwe.mitre.org/data/definitions/916.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.212")]
+#[violation_metadata(stable_since = "v0.0.212", category = Category::Security)]
 pub(crate) struct HashlibInsecureHashFunction {
     library: String,
     string: String,

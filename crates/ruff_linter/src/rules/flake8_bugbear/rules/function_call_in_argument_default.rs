@@ -10,6 +10,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for function calls in default function arguments.
@@ -62,7 +63,7 @@ use crate::checkers::ast::Checker;
 /// ## Options
 /// - `lint.flake8-bugbear.extend-immutable-calls`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.102")]
+#[violation_metadata(stable_since = "v0.0.102", category = Category::Suspicious)]
 pub(crate) struct FunctionCallInDefaultArgument {
     name: Option<String>,
 }
@@ -72,10 +73,15 @@ impl Violation for FunctionCallInDefaultArgument {
     fn message(&self) -> String {
         if let Some(name) = &self.name {
             format!(
-                "Do not perform function call `{name}` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable"
+                "Do not perform function call `{name}` in argument defaults; \
+                instead, perform the call within the function, \
+                or read the default from a module-level singleton variable"
             )
         } else {
-            "Do not perform function call in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable".to_string()
+            "Do not perform function call in argument defaults; \
+                instead, perform the call within the function, \
+                or read the default from a module-level singleton variable"
+                .to_string()
         }
     }
 }

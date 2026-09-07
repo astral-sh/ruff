@@ -1,0 +1,931 @@
+# Legacy `TypeVarTuple`
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+The tests in this file focus on how `TypeVarTuple`s are defined and specialized using the legacy
+notation. Shared uses of `TypeVarTuple`s are tested with PEP 695 syntax in
+`../pep695/typevartuple.md`; alternate `Unpack` spelling is tested in `unpack.md`.
+
+## Tuple representation
+
+```py
+from typing import TypeVarTuple
+
+Ts = TypeVarTuple("Ts")
+
+def preserve(values: tuple[int, *Ts, str]) -> None:
+    reveal_type(values)  # revealed: tuple[int, *Ts@preserve, str]
+```
+
+## Definition
+
+### Valid
+
+```py
+from typing import TypeVarTuple
+
+Ts = TypeVarTuple("Ts")
+reveal_type(type(Ts))  # revealed: <class 'TypeVarTuple'>
+reveal_type(Ts)  # revealed: TypeVarTuple
+reveal_type(Ts.__name__)  # revealed: Literal["Ts"]
+```
+
+The `TypeVarTuple` name can also be provided as a keyword argument:
+
+```py
+from typing import TypeVarTuple
+
+Ts = TypeVarTuple(name="Ts")
+reveal_type(Ts.__name__)  # revealed: Literal["Ts"]
+```
+
+### Must be directly assigned to a variable
+
+```py
+from typing import TypeVarTuple
+
+Ts = TypeVarTuple("Ts")
+
+# error: [invalid-legacy-type-variable]
+Ts1: TypeVarTuple = TypeVarTuple("Ts1")
+
+# error: [invalid-legacy-type-variable]
+tuple_with_typevartuple = ("foo", TypeVarTuple("Us"))
+reveal_type(tuple_with_typevartuple[1])  # revealed: TypeVarTuple
+```
+
+### `TypeVarTuple` parameter must match variable name
+
+```py
+from typing import Generic, TypeVarTuple
+
+Ts1 = TypeVarTuple("Ts1")
+
+# error: [mismatched-type-name]
+Ts2 = TypeVarTuple("Ts3")
+
+class Array(Generic[*Ts2]): ...
+```
+
+### Bounds and constraints
+
+The `bound` parameter was added to `typing.TypeVarTuple` in Python 3.15. On older Python versions,
+using it is invalid. Constraints are not supported in any Python version.
+
+#### Before Python 3.15
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from typing import TypeVarTuple
+
+# error: [invalid-legacy-type-variable] "The `bound` parameter of `typing.TypeVarTuple` was added in Python 3.15"
+Ts1 = TypeVarTuple("Ts1", bound=int)
+# error: [invalid-legacy-type-variable]
+Ts2 = TypeVarTuple("Ts2", int, str)
+```
+
+#### Python 3.15
+
+ty does not yet support the `bound` parameter when targeting Python 3.15.
+
+```toml
+[environment]
+python-version = "3.15"
+```
+
+```py
+from typing import TypeVarTuple
+
+# error: [invalid-legacy-type-variable] "The `bound` argument for `TypeVarTuple` is not supported"
+Ts = TypeVarTuple("Ts", bound=int)
+```
+
+#### `typing_extensions.TypeVarTuple`
+
+`typing_extensions.TypeVarTuple` exposes the `bound` parameter on older Python versions. ty
+recognizes the backport but does not yet support the parameter.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing_extensions import TypeVarTuple
+
+# error: [invalid-legacy-type-variable] "The `bound` argument for `TypeVarTuple` is not supported"
+Ts = TypeVarTuple("Ts", bound=int)
+```
+
+### Variance
+
+Legacy `TypeVarTuple` accepts `covariant` and `contravariant` arguments. A `TypeVarTuple` with no
+variance specified is invariant, and a `TypeVarTuple` with `infer_variance=True` uses variance
+inference. These parameters were added to `typing.TypeVarTuple` in Python 3.15.
+
+#### Before Python 3.15
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from typing import TypeVarTuple
+
+# error: [invalid-legacy-type-variable] "The `covariant` parameter of `typing.TypeVarTuple` was added in Python 3.15"
+Ts_Co = TypeVarTuple("Ts_Co", covariant=True)
+# error: [invalid-legacy-type-variable] "The `contravariant` parameter of `typing.TypeVarTuple` was added in Python 3.15"
+Ts_Contra = TypeVarTuple("Ts_Contra", contravariant=True)
+# error: [invalid-legacy-type-variable] "The `infer_variance` parameter of `typing.TypeVarTuple` was added in Python 3.15"
+Ts_Inferred = TypeVarTuple("Ts_Inferred", infer_variance=True)
+```
+
+#### Python 3.15
+
+```toml
+[environment]
+python-version = "3.15"
+```
+
+```py
+from typing import Generic, TypeVarTuple
+
+Ts = TypeVarTuple("Ts")
+
+class InvariantArray(Generic[*Ts]):
+    values: tuple[*Ts]
+
+invariant_out: InvariantArray[object] = InvariantArray[int]()  # error: [invalid-assignment]
+invariant_in: InvariantArray[int] = InvariantArray[object]()  # error: [invalid-assignment]
+
+Ts_Co = TypeVarTuple("Ts_Co", covariant=True)
+
+class CovariantArray(Generic[*Ts_Co]):
+    def get(self) -> tuple[*Ts_Co]:
+        raise NotImplementedError
+
+covariant_ok: CovariantArray[object] = CovariantArray[int]()
+covariant_error: CovariantArray[int] = CovariantArray[object]()  # error: [invalid-assignment]
+
+Ts_Contra = TypeVarTuple("Ts_Contra", contravariant=True)
+
+class ContravariantArray(Generic[*Ts_Contra]):
+    def set(self, value: tuple[*Ts_Contra]) -> None:
+        raise NotImplementedError
+
+contravariant_ok: ContravariantArray[int] = ContravariantArray[object]()
+contravariant_error: ContravariantArray[object] = ContravariantArray[int]()  # error: [invalid-assignment]
+
+Ts_Inferred_Co = TypeVarTuple("Ts_Inferred_Co", infer_variance=True)
+
+class InferredCovariantArray(Generic[*Ts_Inferred_Co]):
+    def get(self) -> tuple[*Ts_Inferred_Co]:
+        raise NotImplementedError
+
+inferred_covariant_ok: InferredCovariantArray[object] = InferredCovariantArray[int]()
+inferred_covariant_error: InferredCovariantArray[int] = InferredCovariantArray[object]()  # error: [invalid-assignment]
+
+Ts_Inferred_Contra = TypeVarTuple("Ts_Inferred_Contra", infer_variance=True)
+
+class InferredContravariantArray(Generic[*Ts_Inferred_Contra]):
+    def set(self, value: tuple[*Ts_Inferred_Contra]) -> None:
+        raise NotImplementedError
+
+inferred_contravariant_ok: InferredContravariantArray[int] = InferredContravariantArray[object]()
+# error: [invalid-assignment]
+inferred_contravariant_error: InferredContravariantArray[object] = InferredContravariantArray[int]()
+```
+
+The variance arguments must have statically known boolean values, and `infer_variance=True` cannot
+be combined with an explicit variance.
+
+```py
+from typing import TypeVarTuple
+
+def cond() -> bool:
+    return True
+
+# error: [invalid-legacy-type-variable]
+Both = TypeVarTuple("Both", covariant=True, contravariant=True)
+# error: [invalid-legacy-type-variable]
+AmbiguousCovariant = TypeVarTuple("AmbiguousCovariant", covariant=cond())
+# error: [invalid-legacy-type-variable]
+AmbiguousContravariant = TypeVarTuple("AmbiguousContravariant", contravariant=cond())
+# error: [invalid-legacy-type-variable]
+AmbiguousInferVariance = TypeVarTuple("AmbiguousInferVariance", infer_variance=cond())
+# error: [invalid-legacy-type-variable]
+CovariantAndInferred = TypeVarTuple("CovariantAndInferred", covariant=True, infer_variance=True)
+```
+
+#### `typing_extensions.TypeVarTuple`
+
+`typing_extensions.TypeVarTuple` backports the variance parameters to older Python versions.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing_extensions import TypeVarTuple
+
+Ts_Co = TypeVarTuple("Ts_Co", covariant=True)
+Ts_Contra = TypeVarTuple("Ts_Contra", contravariant=True)
+Ts_Inferred = TypeVarTuple("Ts_Inferred", infer_variance=True)
+```
+
+### Variance in method signatures
+
+A tuple is covariant in its unpacked type variables. Returning `tuple[*Ts]` therefore uses `Ts`
+covariantly, while accepting either `*args: *Ts` or a parameter annotated as `tuple[*Ts]` uses it
+contravariantly.
+
+```toml
+[environment]
+python-version = "3.15"
+```
+
+```py
+from typing import Generic, TypeVarTuple
+
+Ts_co = TypeVarTuple("Ts_co", covariant=True)
+Ts_contra = TypeVarTuple("Ts_contra", contravariant=True)
+
+class Covariant(Generic[*Ts_co]):
+    def returns(self) -> tuple[*Ts_co]:
+        raise NotImplementedError
+
+    # snapshot: invalid-generic-class
+    def accepts(self, *args: *Ts_co) -> None: ...
+
+class Contravariant(Generic[*Ts_contra]):
+    def accepts(self, *args: *Ts_contra) -> None: ...
+
+    # error: [invalid-generic-class] "Variance of type variable `Ts_contra` is incompatible with method `returns`"
+    def returns(self) -> tuple[*Ts_contra]:
+        raise NotImplementedError
+```
+
+```snapshot
+error[invalid-generic-class]: Variance of type variable `Ts_co` is incompatible with method `accepts`
+  --> src/mdtest_snippet.py:11:30
+   |
+11 |     def accepts(self, *args: *Ts_co) -> None: ...
+   |                              ^^^^^^
+info: Type variable `Ts_co` is declared as covariant, but this method requires it to be contravariant
+```
+
+Passing the tuple as a single argument has the same variance as unpacking it into variadic
+arguments.
+
+```py
+class CovariantTuple(Generic[*Ts_co]):
+    # error: [invalid-generic-class]
+    def accepts(self, value: tuple[*Ts_co]) -> None: ...
+
+class ContravariantTuple(Generic[*Ts_contra]):
+    def accepts(self, value: tuple[*Ts_contra]) -> None: ...
+```
+
+A callable reverses the variance of its argument types. Returning a callable that consumes
+`Ts_contra` is valid, while accepting the same callable is not.
+
+```py
+from typing import Callable
+
+class Callbacks(Generic[*Ts_contra]):
+    def returns(self) -> Callable[[*Ts_contra], None]:
+        raise NotImplementedError
+
+    # error: [invalid-generic-class]
+    def accepts(self, callback: Callable[[*Ts_contra], None]) -> None: ...
+```
+
+Constructors and function-scoped type variables do not constrain the class's variance.
+
+```py
+class Constructed(Generic[*Ts_co]):
+    def __init__(self, *args: *Ts_co) -> None: ...
+    def __new__(cls, *args: *Ts_co) -> "Constructed[*Ts_co]":
+        raise NotImplementedError
+
+def accepts(*args: *Ts_co) -> None: ...
+
+class NotGeneric:
+    def accepts(self, *args: *Ts_co) -> None: ...
+```
+
+### Variance in overloaded methods
+
+TODO: Variance validation is deferred for overloaded methods until it accounts for the complete
+overload set. We miss the invalid use of a covariant `TypeVarTuple` in the first overload's
+parameter.
+
+```toml
+[environment]
+python-version = "3.15"
+```
+
+```py
+from typing import Generic, TypeVarTuple, overload
+
+Ts_co = TypeVarTuple("Ts_co", covariant=True)
+
+class Overloaded(Generic[*Ts_co]):
+    @overload
+    # TODO: Emit `invalid-generic-class`; this use of `Ts_co` requires contravariance.
+    def method(self, value: tuple[*Ts_co]) -> int: ...
+    @overload
+    def method(self, value: int) -> str: ...
+    def method(self, value: tuple[*Ts_co] | int) -> int | str:
+        return 0
+```
+
+### Variance in generic methods
+
+A method's independent type variable can accept any argument. The `tuple[*Ts_co]` arm in the
+parameter annotation is redundant because `T` already accepts that argument, and the result includes
+both types. This signature respects the class's covariance.
+
+```toml
+[environment]
+python-version = "3.15"
+```
+
+```py
+from typing import Generic, TypeVar, TypeVarTuple
+
+Ts_co = TypeVarTuple("Ts_co", covariant=True)
+T = TypeVar("T")
+
+class Covariant(Generic[*Ts_co]):
+    def identity(self, value: tuple[*Ts_co] | T) -> tuple[*Ts_co] | T:
+        return value
+```
+
+TODO: Variance validation is deferred for methods with independent type parameters. The
+contravariant `TypeVarTuple` in the return annotations below would otherwise be rejected.
+
+```py
+Ts_contra = TypeVarTuple("Ts_contra", contravariant=True)
+
+class GenericMethods(Generic[*Ts_contra]):
+    # TODO: Emit `invalid-generic-class`; this use of `Ts_contra` requires covariance.
+    def legacy(self, value: T) -> tuple[*Ts_contra]:
+        raise NotImplementedError
+
+    # TODO: Emit `invalid-generic-class`; this use of `Ts_contra` requires covariance.
+    def pep695[U](self, value: U) -> tuple[*Ts_contra]:
+        raise NotImplementedError
+```
+
+### Variance with explicit receivers
+
+`Self` and the class's own `TypeVarTuple` do not restrict the receiver. Consuming the covariant
+tuple still violates covariance.
+
+```toml
+[environment]
+python-version = "3.15"
+```
+
+```py
+from typing import Generic, Self, TypeVarTuple
+
+Ts_co = TypeVarTuple("Ts_co", covariant=True)
+
+class Unrestricted(Generic[*Ts_co]):
+    # error: [invalid-generic-class]
+    def method(self: "Unrestricted[*Ts_co]", value: tuple[*Ts_co]) -> None: ...
+    @classmethod
+    # error: [invalid-generic-class]
+    def class_method(cls: type[Self], value: tuple[*Ts_co]) -> None: ...
+    def returns(self: Self) -> tuple[*Ts_co]:
+        raise NotImplementedError
+```
+
+A specialized receiver does not make this contravariant use of `Ts_co` valid.
+
+```py
+class Restricted(Generic[*Ts_co]):
+    # error: [invalid-generic-class]
+    def method(self: "Restricted[int]", value: tuple[*Ts_co]) -> None: ...
+```
+
+## Generic Classes
+
+### Multiple `TypeVarTuple`s
+
+```py
+from typing import Generic, TypeVarTuple
+
+Xs = TypeVarTuple("Xs")
+Ys = TypeVarTuple("Ys")
+Zs = TypeVarTuple("Zs")
+# error: [invalid-legacy-type-variable]
+Invalid = TypeVarTuple("Invalid", int, float)
+
+# error: [invalid-generic-class] "Only one `TypeVarTuple` parameter is allowed in a `Generic` subscription"
+class Ambiguous(Generic[*Xs, *Ys]): ...
+
+# error: [invalid-generic-class] "Only one `TypeVarTuple` parameter is allowed in a `Generic` subscription"
+class VeryAmbiguous(Generic[*Xs, *Ys, *Zs]): ...
+
+# error: [invalid-generic-class] "Only one `TypeVarTuple` parameter is allowed in a `Generic` subscription"
+class InvalidAmbiguous(Generic[*Xs, *Invalid]): ...
+```
+
+### Explicit specialization
+
+```py
+from typing import Generic, TypeVar, TypeVarTuple
+
+T = TypeVar("T")
+Ts = TypeVarTuple("Ts")
+U = TypeVar("U")
+
+class Simple(Generic[*Ts]):
+    attr: tuple[*Ts]
+
+reveal_type(Simple[()]().attr)  # revealed: tuple[()]
+reveal_type(Simple[int, str]().attr)  # revealed: tuple[int, str]
+reveal_type(Simple[*tuple[int, str]]().attr)  # revealed: tuple[int, str]
+
+# error: [invalid-type-form] "List literals are not allowed in this context in a type expression"
+reveal_type(Simple[[int, str]]().attr)  # revealed: tuple[Unknown]
+# error: [invalid-type-form] "List literals are not allowed in this context in a type expression"
+reveal_type(Simple[*[int, str]]().attr)  # revealed: tuple[Unknown, ...]
+```
+
+```py
+class Prefix(Generic[T, *Ts]):
+    attr: tuple[T, *Ts]
+
+reveal_type(Prefix[int]().attr)  # revealed: tuple[int]
+reveal_type(Prefix[int, bool]().attr)  # revealed: tuple[int, bool]
+reveal_type(Prefix[int, bool, str]().attr)  # revealed: tuple[int, bool, str]
+reveal_type(Prefix[int, *tuple[bool, str]]().attr)  # revealed: tuple[int, bool, str]
+
+# TODO: Should this raise an error?
+reveal_type(Prefix().attr)  # revealed: tuple[Unknown, *tuple[Unknown, ...]]
+```
+
+```py
+class Suffix(Generic[*Ts, T]):
+    attr: tuple[*Ts, T]
+
+reveal_type(Suffix[int]().attr)  # revealed: tuple[int]
+reveal_type(Suffix[int, str]().attr)  # revealed: tuple[int, str]
+reveal_type(Suffix[int, str, bool]().attr)  # revealed: tuple[int, str, bool]
+reveal_type(Suffix[*tuple[int, str], bool]().attr)  # revealed: tuple[int, str, bool]
+
+# TODO: Should this raise an error?
+reveal_type(Suffix().attr)  # revealed: tuple[*tuple[Unknown, ...], Unknown]
+```
+
+```py
+class Between(Generic[T, *Ts, U]):
+    attr: tuple[T, *Ts, U]
+
+reveal_type(Between[int, str]().attr)  # revealed: tuple[int, str]
+reveal_type(Between[int, bool, str]().attr)  # revealed: tuple[int, bool, str]
+reveal_type(Between[int, bool, bytes, str]().attr)  # revealed: tuple[int, bool, bytes, str]
+reveal_type(Between[int, *tuple[bool], str]().attr)  # revealed: tuple[int, bool, str]
+
+reveal_type(Between().attr)  # revealed: tuple[Unknown, *tuple[Unknown, ...], Unknown]
+# error: [invalid-type-arguments] "No type argument provided for required type variable `U` of class `Between`"
+reveal_type(Between[int]().attr)  # revealed: tuple[Unknown, *tuple[Unknown, ...], Unknown]
+```
+
+### Inherited specializations containing `Never`
+
+A `Never` argument in a variadic generic must retain its position when a subclass forwards its type
+arguments to a generic base.
+
+```py
+from typing import Any, Generic, Never, TypeVarTuple
+
+Ts = TypeVarTuple("Ts")
+
+class Kind(Generic[*Ts]): ...
+class SupportsKind(Kind[*Ts]): ...
+class Container(SupportsKind[int, Never]): ...
+
+def _(value: Container) -> None:
+    expected: Kind[int, Any] = value
+```
+
+### Callbacks returning containers with `Never` arguments
+
+A callback can return a concrete container whose variadic base contains `Never` when the expected
+container type uses `Any` in that position.
+
+```py
+from collections.abc import Callable
+from typing import Any, Generic, Never, TypeVar, TypeVarTuple
+
+T = TypeVar("T")
+U = TypeVar("U")
+Ts = TypeVarTuple("Ts")
+
+class Kind(Generic[T, *Ts]): ...
+
+class Result(Kind[T, Never]):
+    def bind(self, callback: Callable[[T], Kind[U, Any]]) -> "Result[U]":
+        raise NotImplementedError
+
+def parse(value: str) -> Result[int]:
+    raise NotImplementedError
+
+def _(result: Result[str]) -> None:
+    reveal_type(result.bind(parse))  # revealed: Result[int]
+```
+
+### `TypeVarTuple` with `ParamSpec`
+
+```py
+from typing import Callable, Generic, TypeVarTuple, ParamSpec
+
+P = ParamSpec("P")
+Ts = TypeVarTuple("Ts")
+
+class TypeVarTupleWithParamSpec(Generic[*Ts, P]):
+    fn: Callable[P, tuple[*Ts]]
+
+reveal_type(TypeVarTupleWithParamSpec[[str, int]]().fn)  # revealed: (str, int, /) -> tuple[()]
+reveal_type(TypeVarTupleWithParamSpec[int, [str, int]]().fn)  # revealed: (str, int, /) -> tuple[int]
+reveal_type(TypeVarTupleWithParamSpec[int, str, [str, int]]().fn)  # revealed: (str, int, /) -> tuple[int, str]
+
+# error: [invalid-type-arguments]
+reveal_type(TypeVarTupleWithParamSpec[str, int]().fn)  # revealed: (...) -> tuple[str]
+
+reveal_type(TypeVarTupleWithParamSpec[str, int, []]().fn)  # revealed: () -> tuple[str, int]
+reveal_type(TypeVarTupleWithParamSpec[str, int, ...]().fn)  # revealed: (...) -> tuple[str, int]
+```
+
+### Inferred specialization from construction
+
+Calling a generic class without explicit type arguments infers its specialization from the
+constructor arguments.
+
+```py
+from typing import Generic, TypeVarTuple
+
+Ts = TypeVarTuple("Ts")
+
+class Positional(Generic[*Ts]):
+    def __init__(self, shape: tuple[*Ts]) -> None:
+        self.shape = shape
+
+class Variadic(Generic[*Ts]):
+    def __init__(self, *shape: *Ts) -> None:
+        self.shape = shape
+
+reveal_type(Positional(()))  # revealed: Positional[()]
+reveal_type(Positional((1, "a")))  # revealed: Positional[int, str]
+
+reveal_type(Variadic())  # revealed: Variadic[()]
+reveal_type(Variadic(1, "a"))  # revealed: Variadic[int, str]
+
+def _(i: int, s: str) -> None:
+    reveal_type(Positional((i, s)))  # revealed: Positional[int, str]
+    reveal_type(Variadic(i, s))  # revealed: Variadic[int, str]
+```
+
+### Unspecified type arguments
+
+When a generic class parameterized by a type variable tuple is used without any type parameters and
+the `TypeVarTuple` has no default value, it behaves as if the type variable tuple was substituted
+with `tuple[Any, ...]`. ty represents the missing type information as `tuple[Unknown, ...]`,
+distinguishing it from an explicitly provided `tuple[Any, ...]`.
+
+```py
+from typing import Generic, TypeVarTuple
+
+Ts = TypeVarTuple("Ts")
+
+class Unspecified(Generic[*Ts]):
+    attr: tuple[*Ts]
+
+unspecified = Unspecified()
+reveal_type(unspecified)  # revealed: Unspecified[*tuple[Unknown, ...]]
+reveal_type(unspecified.attr)  # revealed: tuple[Unknown, ...]
+```
+
+### Default type arguments
+
+A defaulted type variable tuple supplies its unpacked tuple when the generic class is not explicitly
+specialized. Explicit type arguments override the default.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Generic, TypeVarTuple, Unpack
+
+Ts = TypeVarTuple("Ts", default=Unpack[tuple[int, str]])
+
+# error: [invalid-legacy-type-variable] "The default value for `TypeVarTuple` must be an unpacked tuple type or another TypeVarTuple"
+InvalidDefault = TypeVarTuple("InvalidDefault", default=tuple[int, str])
+
+class WithDefault(Generic[*Ts]):
+    attr: tuple[*Ts]
+
+reveal_type(WithDefault().attr)  # revealed: tuple[int, str]
+reveal_type(WithDefault[bool, bytes]().attr)  # revealed: tuple[bool, bytes]
+```
+
+### Backported default type arguments
+
+`typing_extensions.TypeVarTuple` backports the `default` parameter to older Python versions.
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+```py
+from typing import Generic
+from typing_extensions import TypeVarTuple, Unpack
+
+Ts = TypeVarTuple("Ts", default=Unpack[tuple[int, str]])
+
+class WithBackportedDefault(Generic[Unpack[Ts]]):
+    attr: tuple[Unpack[Ts]]
+
+reveal_type(WithBackportedDefault().attr)  # revealed: tuple[int, str]
+```
+
+## Type Aliases
+
+### Legacy generic aliases
+
+```py
+from typing import TypeVar, TypeVarTuple
+
+T = TypeVar("T")
+Ts = TypeVarTuple("Ts")
+U = TypeVar("U")
+
+Simple = tuple[*Ts]
+Between = tuple[T, *Ts, U]
+Prefix = tuple[T, *Ts]
+Suffix = tuple[*Ts, U]
+
+def _(
+    a1: Simple[()],
+    a2: Simple[int, str],
+    a3: Between[int, str],
+    a4: Between[int, bool, str],
+    a5: Between[int, bool, bytes, str],
+    a6: Prefix[bool],
+    a7: Prefix[bool, int, str],
+    a8: Suffix[bool],
+    a9: Suffix[int, str, bool],
+    # error: [invalid-type-arguments] "No type argument provided for required type variable `U`"
+    a10: Between[int],
+):
+    reveal_type(a1)  # revealed: tuple[()]
+    reveal_type(a2)  # revealed: tuple[int, str]
+    reveal_type(a3)  # revealed: tuple[int, str]
+    reveal_type(a4)  # revealed: tuple[int, bool, str]
+    reveal_type(a5)  # revealed: tuple[int, bool, bytes, str]
+    reveal_type(a6)  # revealed: tuple[bool]
+    reveal_type(a7)  # revealed: tuple[bool, int, str]
+    reveal_type(a8)  # revealed: tuple[bool]
+    reveal_type(a9)  # revealed: tuple[int, str, bool]
+    reveal_type(a10)  # revealed: tuple[Unknown, *tuple[Unknown, ...], Unknown]
+```
+
+### Legacy aliases containing `Never`
+
+A legacy alias must retain free type variables that appear alongside a `Never` argument in a
+variadic specialization.
+
+```py
+from typing import Generic, Never, TypeVar, TypeVarTuple
+
+T = TypeVar("T")
+Ts = TypeVarTuple("Ts")
+
+class Container(Generic[*Ts]): ...
+
+Padded = Container[T, Never]
+
+def _(value: Padded[int]) -> None:
+    reveal_type(value)  # revealed: Container[int, Never]
+```
+
+### Variadic arguments require variadic aliases
+
+An unpacked type variable tuple or arbitrary-length tuple cannot be used to specialize a
+non-variadic alias.
+
+```py
+from typing import TypeVar, TypeVarTuple
+
+T = TypeVar("T")
+Ts = TypeVarTuple("Ts")
+
+Alias = tuple[int, T]
+
+# error: [invalid-type-form] "`Unpack` can only be used with a fixed tuple type in this context"
+InvalidTypeVarTuple = Alias[*Ts]
+
+# error: [invalid-type-form] "`Unpack` can only be used with a fixed tuple type in this context"
+InvalidUnboundedTuple = Alias[*tuple[float, ...]]
+```
+
+### Unpacked tuple type arguments
+
+```py
+from typing import TypeVarTuple
+
+Ts = TypeVarTuple("Ts")
+
+Alias = tuple[int, *Ts]
+
+def _(a1: Alias[*tuple[str, bool]], a2: Alias[*tuple[str, ...]]) -> None:
+    reveal_type(a1)  # revealed: tuple[int, str, bool]
+    reveal_type(a2)  # revealed: tuple[int, *tuple[str, ...]]
+```
+
+### Unspecified alias type arguments
+
+A bare variadic alias substitutes an unknown-length tuple of `Any`.
+
+```py
+from typing import Any, TypeVarTuple
+
+Ts = TypeVarTuple("Ts")
+
+Alias = tuple[bytes, *Ts]
+
+def _(a1: Alias, a2: Alias[*tuple[Any, ...]]) -> None:
+    reveal_type(a1)  # revealed: tuple[bytes, *tuple[Unknown, ...]]
+    reveal_type(a2)  # revealed: tuple[bytes, *tuple[Any, ...]]
+```
+
+### Splitting arbitrary-length tuples
+
+```py
+from typing import TypeVar, TypeVarTuple
+
+T = TypeVar("T")
+Ts = TypeVarTuple("Ts")
+
+First = tuple[*Ts, T]
+Second = tuple[T, *Ts]
+
+def _(
+    f1: First[*tuple[int, ...]],
+    f2: First[*tuple[int, ...], str],
+    s1: Second[*tuple[int, ...]],
+    s2: Second[str, *tuple[int, ...]],
+):
+    reveal_type(f1)  # revealed: tuple[*tuple[int, ...], int]
+    reveal_type(f2)  # revealed: tuple[*tuple[int, ...], str]
+    reveal_type(s1)  # revealed: tuple[int, *tuple[int, ...]]
+    reveal_type(s2)  # revealed: tuple[str, *tuple[int, ...]]
+```
+
+### Type variable tuples cannot be split
+
+Unlike an arbitrary-length tuple, a type variable tuple cannot be split to satisfy a fixed type
+parameter before or after another type variable tuple.
+
+```py
+from typing import TypeVar, TypeVarTuple
+
+T = TypeVar("T")
+Ts1 = TypeVarTuple("Ts1")
+Ts2 = TypeVarTuple("Ts2")
+
+Prefix = tuple[T, *Ts1]
+Suffix = tuple[*Ts1, T]
+
+# error: [invalid-type-form] "A TypeVarTuple cannot be split to provide a fixed type argument"
+InvalidPrefix = Prefix[*Ts2]
+
+# error: [invalid-type-form] "A TypeVarTuple cannot be split to provide a fixed type argument"
+InvalidSuffix = Suffix[*Ts2]
+```
+
+### Variadic substitutions
+
+Legacy aliases can forward a type variable tuple.
+
+```py
+from typing import TypeVar, TypeVarTuple
+
+Ts = TypeVarTuple("Ts")
+
+First = tuple[bytes, *Ts]
+Second = First[int, *Ts]
+
+def f(a1: First[str, bool], a2: Second[str, bool]) -> None:
+    reveal_type(a1)  # revealed: tuple[bytes, str, bool]
+    reveal_type(a2)  # revealed: tuple[bytes, int, str, bool]
+```
+
+### Using Callable
+
+```py
+from typing import Callable, TypeVarTuple
+
+Ts = TypeVarTuple("Ts")
+
+Alias = Callable[[*Ts], None]
+
+def test(fn: Alias[int, *Ts]) -> tuple[*Ts]:
+    raise NotImplementedError
+
+def fn0(a: int) -> None: ...
+def fn1(a: int, b: str) -> None: ...
+def fn2(a: int, b: str, c: bytes) -> None: ...
+
+reveal_type(test(fn0))  # revealed: tuple[()]
+reveal_type(test(fn1))  # revealed: tuple[str]
+reveal_type(test(fn2))  # revealed: tuple[str, bytes]
+```
+
+## Missing unpack
+
+A legacy type variable tuple must also be unpacked. In a tuple annotation, it recovers as
+`*tuple[Unknown, ...]`, so `tuple[Ts]` becomes `tuple[Unknown, ...]`, rather than the single-element
+`tuple[Unknown]`. This avoids a cascading assignment error when the value is assigned to a correctly
+unpacked tuple annotation.
+
+```py
+from typing import Generic, TypeVarTuple
+
+Ts = TypeVarTuple("Ts")
+
+# error: [invalid-generic-class] "`TypeVarTuple` must be unpacked with `*` or `Unpack[]` when used as an argument to `Generic`"
+class Container(Generic[Ts]):
+    # error: [invalid-type-form] "Bare TypeVarTuple `Ts`"
+    def __init__(self, values: tuple[Ts]) -> None:
+        reveal_type(values)  # revealed: tuple[Unknown, ...]
+        self.values: tuple[*Ts] = values
+```
+
+`typing.Tuple` uses the same recovery as the built-in `tuple`.
+
+```py
+from typing import Tuple
+
+# error: [invalid-type-form] "Bare TypeVarTuple `Ts`"
+def legacy_tuple(values: Tuple[Ts]) -> None:
+    reveal_type(values)  # revealed: tuple[Unknown, ...]
+```
+
+## Missing unpack in implicit tuple aliases
+
+Tuple specializations used to define implicit type aliases also recover bare type variable tuples as
+`*tuple[Unknown, ...]`. This applies to both `tuple` and `typing.Tuple`.
+
+```py
+from typing import Tuple, TypeVarTuple
+
+Ts = TypeVarTuple("Ts")
+
+BuiltinAlias = tuple[Ts]  # error: [invalid-type-form] "Bare TypeVarTuple `Ts`"
+LegacyAlias = Tuple[Ts]  # error: [invalid-type-form] "Bare TypeVarTuple `Ts`"
+
+reveal_type(BuiltinAlias)  # revealed: <class 'tuple[Unknown, ...]'>
+reveal_type(LegacyAlias)  # revealed: <class 'tuple[Unknown, ...]'>
+
+def aliases(builtin: BuiltinAlias, legacy: LegacyAlias) -> None:
+    reveal_type(builtin)  # revealed: tuple[Unknown, ...]
+    reveal_type(legacy)  # revealed: tuple[Unknown, ...]
+```
+
+## Missing unpack in a union-valued tuple element
+
+In a homogeneous tuple annotation, a name that may refer to a bare type variable tuple or a valid
+element type preserves the valid alternative and recovers the bare pack to `Unknown`.
+
+```py
+from typing import TypeVarTuple
+
+Ts = TypeVarTuple("Ts")
+
+def condition() -> bool:
+    return True
+
+Element = Ts if condition() else int
+
+# error: [invalid-type-form] "Bare TypeVarTuple `Ts`"
+def homogeneous_union(values: tuple[Element, ...]) -> None:
+    reveal_type(values)  # revealed: tuple[Unknown | int, ...]
+```

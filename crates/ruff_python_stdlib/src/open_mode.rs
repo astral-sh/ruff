@@ -43,7 +43,11 @@ impl OpenMode {
         if open_mode.contains(OpenMode::UNIVERSAL_NEWLINES)
             && open_mode.intersects(OpenMode::WRITE | OpenMode::APPEND | OpenMode::CREATE)
         {
-            return Err("Open mode cannot contain the universal newlines (`U`) flag with write (`w`), append (`a`), or create (`x`) flags".to_string());
+            return Err(
+                "Open mode cannot contain the universal newlines (`U`) flag \
+                    with write (`w`), append (`a`), or create (`x`) flags"
+                    .to_string(),
+            );
         }
 
         // Otherwise, reading, writing, creating, and appending are mutually exclusive.
@@ -58,7 +62,11 @@ impl OpenMode {
         .count()
             != 1
         {
-            return Err("Open mode must contain exactly one of the following flags: read (`r`), write (`w`), create (`x`), or append (`a`)".to_string());
+            return Err(
+                "Open mode must contain exactly one of the following flags: \
+                    read (`r`), write (`w`), create (`x`), or append (`a`)"
+                    .to_string(),
+            );
         }
 
         Ok(open_mode)

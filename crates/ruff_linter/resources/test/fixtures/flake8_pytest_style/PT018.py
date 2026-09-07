@@ -70,3 +70,10 @@ def test_parenthesized_not():
 
     assert (not self.find_graph_output(node.output[0]) or
             self.find_graph_input(node.input[0]))
+
+
+def test_comments():
+    assert (
+        # comment
+        something and something_else
+    )

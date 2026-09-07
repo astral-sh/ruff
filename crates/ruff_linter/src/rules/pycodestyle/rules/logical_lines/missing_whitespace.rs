@@ -4,6 +4,7 @@ use ruff_text_size::Ranged;
 
 use crate::Edit;
 use crate::checkers::ast::LintContext;
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Fix};
 
 use super::{DefinitionState, LogicalLine};
@@ -24,7 +25,7 @@ use super::{DefinitionState, LogicalLine};
 /// a = (1, 2)
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.0.269")]
+#[violation_metadata(preview_since = "v0.0.269", category = Category::Formatting)]
 pub(crate) struct MissingWhitespace {
     token: TokenKind,
 }

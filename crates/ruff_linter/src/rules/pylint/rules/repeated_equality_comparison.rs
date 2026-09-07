@@ -11,6 +11,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::Locator;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::snippet::SourceCodeSnippet;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
@@ -53,7 +54,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// - [Python documentation: Membership test operations](https://docs.python.org/3/reference/expressions.html#membership-test-operations)
 /// - [Python documentation: `set`](https://docs.python.org/3/library/stdtypes.html#set)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.279")]
+#[violation_metadata(stable_since = "v0.0.279", category = Category::Pedantic)]
 pub(crate) struct RepeatedEqualityComparison {
     expression: SourceCodeSnippet,
     all_hashable: bool,
@@ -65,16 +66,17 @@ impl AlwaysFixableViolation for RepeatedEqualityComparison {
         match (self.expression.full_display(), self.all_hashable) {
             (Some(expression), false) => {
                 format!(
-                    "Consider merging multiple comparisons: `{expression}`. Use a `set` if the elements are hashable."
+                    "Consider merging multiple comparisons: `{expression}`. \
+                    Use a `set` if the elements are hashable."
                 )
             }
             (Some(expression), true) => {
                 format!("Consider merging multiple comparisons: `{expression}`.")
             }
-            (None, false) => {
-                "Consider merging multiple comparisons. Use a `set` if the elements are hashable."
-                    .to_string()
-            }
+            (None, false) => "\
+                Consider merging multiple comparisons. \
+                    Use a `set` if the elements are hashable."
+                .to_string(),
             (None, true) => "Consider merging multiple comparisons.".to_string(),
         }
     }

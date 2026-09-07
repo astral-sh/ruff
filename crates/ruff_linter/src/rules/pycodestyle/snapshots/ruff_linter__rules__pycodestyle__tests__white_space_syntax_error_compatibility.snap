@@ -6,4 +6,3 @@ invalid-syntax: Expected an expression
   |
 1 | a = (1 or)
   |          ^
-  |

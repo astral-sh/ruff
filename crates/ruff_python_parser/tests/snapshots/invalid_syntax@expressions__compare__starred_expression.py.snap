@@ -205,4 +205,3 @@ Module(
 4 | *x < y
 5 | *x is not y
   |  ^^^^^^^^^^ Syntax Error: Comparison expression cannot be used here
-  |

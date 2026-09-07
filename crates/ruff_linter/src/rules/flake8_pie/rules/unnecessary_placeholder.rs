@@ -4,6 +4,7 @@ use ruff_python_ast::{Expr, ExprStringLiteral, Stmt, StmtExpr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix;
 use crate::{AlwaysFixableViolation, Applicability};
 use crate::{Edit, Fix};
@@ -57,7 +58,7 @@ use crate::{Edit, Fix};
 /// ## References
 /// - [Python documentation: The `pass` statement](https://docs.python.org/3/reference/simple_stmts.html#the-pass-statement)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.208")]
+#[violation_metadata(stable_since = "v0.0.208", category = Category::Style)]
 pub(crate) struct UnnecessaryPlaceholder {
     kind: Placeholder,
 }

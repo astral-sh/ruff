@@ -49,7 +49,7 @@ impl<'a> Nodes<'a> {
 
     /// Return the [`NodeId`] of the parent node.
     #[inline]
-    pub fn parent_id(&self, node_id: NodeId) -> Option<NodeId> {
+    pub(crate) fn parent_id(&self, node_id: NodeId) -> Option<NodeId> {
         self.nodes[node_id].parent
     }
 
@@ -89,7 +89,7 @@ pub enum NodeRef<'a> {
 impl<'a> NodeRef<'a> {
     /// Returns the [`Stmt`] if this is a statement, or `None` if the reference is to another
     /// kind of AST node.
-    pub fn as_statement(&self) -> Option<&'a Stmt> {
+    pub(crate) fn as_statement(&self) -> Option<&'a Stmt> {
         match self {
             NodeRef::Stmt(stmt) => Some(stmt),
             NodeRef::Expr(_) => None,
@@ -98,18 +98,18 @@ impl<'a> NodeRef<'a> {
 
     /// Returns the [`Expr`] if this is a expression, or `None` if the reference is to another
     /// kind of AST node.
-    pub fn as_expression(&self) -> Option<&'a Expr> {
+    pub(crate) fn as_expression(&self) -> Option<&'a Expr> {
         match self {
             NodeRef::Stmt(_) => None,
             NodeRef::Expr(expr) => Some(expr),
         }
     }
 
-    pub fn is_statement(&self) -> bool {
+    pub(crate) fn is_statement(&self) -> bool {
         self.as_statement().is_some()
     }
 
-    pub fn is_expression(&self) -> bool {
+    pub(crate) fn is_expression(&self) -> bool {
         self.as_expression().is_some()
     }
 }

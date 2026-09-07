@@ -5,6 +5,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for the use of hardcoded temporary file or directory paths.
@@ -40,7 +41,7 @@ use crate::checkers::ast::Checker;
 /// - [Common Weakness Enumeration: CWE-379](https://cwe.mitre.org/data/definitions/379.html)
 /// - [Python documentation: `tempfile`](https://docs.python.org/3/library/tempfile.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.211")]
+#[violation_metadata(stable_since = "v0.0.211", category = Category::Security)]
 pub(crate) struct HardcodedTempFile {
     string: String,
 }
