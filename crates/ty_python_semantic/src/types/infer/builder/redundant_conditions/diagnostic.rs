@@ -122,14 +122,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 ));
             }
 
-            if let ast::Expr::Compare(ast::ExprCompare {
-                left,
-                ops,
-                comparators,
-                ..
-            }) = test
+            if let ast::Expr::Compare(ast::ExprCompare { ops, operands, .. }) = test
                 && ops.len() == 1
-                && let [single_comparator] = &**comparators
+                && let [left, single_comparator] = &**operands
             {
                 if let (Type::LiteralValue(left_type), Type::LiteralValue(right_type)) = (
                     self.expression_type(left),
@@ -611,16 +606,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let db = self.db();
         let env = self.program_environment();
 
-        if let ast::Expr::Compare(ast::ExprCompare {
-            left,
-            ops,
-            comparators,
-            ..
-        }) = test
+        if let ast::Expr::Compare(ast::ExprCompare { ops, operands, .. }) = test
             && let [single_op] = &**ops
-            && let [single_comparator] = &**comparators
+            && let [left, single_comparator] = &**operands
             && let (ast::Expr::Call(call), other) | (other, ast::Expr::Call(call)) =
-                (&**left, single_comparator)
+                (left, single_comparator)
             && matches!(single_op, ast::CmpOp::Eq | ast::CmpOp::NotEq)
             && let ast::Arguments { args, keywords, .. } = &call.arguments
             && keywords.is_empty()
@@ -976,7 +966,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let candidates = match operand {
             ast::Expr::Name(_) => [Some(operand), None],
             ast::Expr::Compare(compare) if compare.ops.len() == 1 => {
-                [Some(compare.left.as_ref()), compare.comparators.first()]
+                [compare.operands.first(), compare.operands.get(1)]
             }
             ast::Expr::Call(call) => [call.arguments.args.first(), None],
             _ => return None,
