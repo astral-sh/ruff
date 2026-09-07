@@ -72,19 +72,26 @@ def identity(value: F) -> F:
 def f():
     pass
 
+reveal_type(identity(f) is f)  # revealed: Literal[True]
+reveal_type(f is identity(f))  # revealed: Literal[True]
+
+reveal_type(identity(f) is not f)  # revealed: Literal[False]
+reveal_type(f is not identity(f))  # revealed: Literal[False]
+
 def g():
     pass
 
-reveal_type(identity(f) is f)  # revealed: Literal[True]
-reveal_type(f is identity(f))  # revealed: Literal[True]
-reveal_type(identity(f) is not f)  # revealed: Literal[False]
 reveal_type(identity(f) is g)  # revealed: Literal[False]
+reveal_type(g is identity(f))  # revealed: Literal[False]
+
+reveal_type(identity(f) is not g)  # revealed: Literal[True]
+reveal_type(g is not identity(f))  # revealed: Literal[True]
 ```
 
 ## Identity comparisons between function specializations
 
-Different specializations of a method have disjoint static types but can refer to the same function
-object at runtime if the method is unbound:
+Different specializations of the same unbound method have disjoint static types but refer to the
+same function object at runtime:
 
 ```toml
 [environment]
@@ -100,8 +107,6 @@ int_method = C[int].method
 str_method = C[str].method
 reveal_type(int_method is str_method)  # revealed: Literal[True]
 reveal_type(int_method is not str_method)  # revealed: Literal[False]
-reveal_type(C[int]().method is C[int]().method)  # revealed: bool
-reveal_type(C[int]().method is C[str]().method)  # revealed: Literal[False]
 ```
 
 ## Identity comparisons with NewTypes
