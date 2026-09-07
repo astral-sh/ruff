@@ -366,6 +366,97 @@ def expects_str_return(c: Callable[[int | str], str]) -> None:
 expects_str_return(wide_return_converter)
 ```
 
+## Literal parameter domains
+
+A callable must accept every literal value allowed by the target parameter. `LiteralString` accepts
+specific string literals, while boolean and integer literals remain distinct:
+
+```py
+from typing import Callable, Literal, Protocol, TypeVar, overload
+from typing_extensions import LiteralString
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to
+
+static_assert(not is_assignable_to(Callable[[Literal["a"]], int], Callable[[Literal["b"]], int]))
+static_assert(is_assignable_to(Callable[[LiteralString], int], Callable[[Literal["a"]], int]))
+static_assert(not is_assignable_to(Callable[[Literal["a"]], int], Callable[[LiteralString], int]))
+static_assert(not is_assignable_to(Callable[[Literal[1]], int], Callable[[Literal[True]], int]))
+```
+
+Generic overloads are compared using the matching literal parameter domain. Their remaining
+parameters and return types still determine whether the callable is compatible:
+
+```py
+T = TypeVar("T")
+
+class Lookup(Protocol):
+    @overload
+    def __call__(self, key: Literal["integer"], default: T, /) -> int | T: ...
+    @overload
+    def __call__(self, key: Literal["text"], default: T, /) -> str | T: ...
+
+static_assert(is_assignable_to(Lookup, Callable[[Literal["text"], bytes], str | bytes]))
+static_assert(not is_assignable_to(Lookup, Callable[[Literal["missing"], bytes], object]))
+static_assert(not is_assignable_to(Lookup, Callable[[Literal["text"], bytes], int]))
+```
+
+## Generic parameter and return constraints
+
+A generic callable must have a specialization that satisfies both the parameter and return types.
+Matching its parameter does not make an incompatible return type valid:
+
+```py
+from typing import Callable, Protocol, TypeVar
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to
+
+T = TypeVar("T")
+
+class Wrap(Protocol):
+    def __call__(self, value: T, /) -> tuple[T, str]: ...
+
+static_assert(is_assignable_to(Wrap, Callable[[str], tuple[str, str]]))
+static_assert(not is_assignable_to(Wrap, Callable[[str], tuple[str, int]]))
+```
+
+The parameter type also contributes to inference when a callback's return type is generic:
+
+```py
+def identity(value: T) -> T:
+    return value
+
+def result(callback: Callable[[int], T]) -> T:
+    return callback(1)
+
+reveal_type(result(identity))  # revealed: int
+```
+
+## Recursive callable returns
+
+Recursive return types must satisfy the callable relation together with the finite parameter
+requirements. Accepting every object allows the next step to accept an integer as well:
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to
+
+class IntegerStep(Protocol):
+    def __call__(self, value: int, /) -> IntegerStep: ...
+
+class ObjectStep(Protocol):
+    def __call__(self, value: object, /) -> ObjectStep: ...
+
+class StringStep(Protocol):
+    def __call__(self, value: str, /) -> StringStep: ...
+
+static_assert(is_assignable_to(ObjectStep, IntegerStep))
+static_assert(not is_assignable_to(IntegerStep, ObjectStep))
+static_assert(not is_assignable_to(StringStep, IntegerStep))
+```
+
 ## Union
 
 ```py
