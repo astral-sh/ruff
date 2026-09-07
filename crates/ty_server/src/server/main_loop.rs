@@ -248,7 +248,9 @@ impl std::fmt::Debug for SendRequest {
 struct UvSyncWakeups(Vec<(SystemPathBuf, crossbeam::channel::Receiver<()>)>);
 
 impl UvSyncWakeups {
-    /// Waits for a project wakeup, client message, or main-loop action.
+    /// Waits for a project wakeup, main-loop action, or client message, in that order.
+    /// If incoming requests keep winning, the main loop can block submitting jobs while
+    /// workers block sending responses to its bounded action channel.
     fn select(
         &self,
         connection: &crossbeam::channel::Receiver<Message>,
@@ -258,8 +260,8 @@ impl UvSyncWakeups {
         for (_, receiver) in &self.0 {
             select.recv(receiver);
         }
-        let connection_index = select.recv(connection);
         let main_loop_index = select.recv(main_loop);
+        let connection_index = select.recv(connection);
         let operation = select.select();
         let index = operation.index();
 
@@ -271,12 +273,12 @@ impl UvSyncWakeups {
             });
         }
 
-        if index == connection_index {
-            // Ignore disconnect errors, they're handled by the main loop (it will exit).
-            return Ok(operation.recv(connection).ok().map(Event::Message));
+        if index == main_loop_index {
+            return operation.recv(main_loop).map(Some);
         }
 
-        debug_assert_eq!(index, main_loop_index);
-        operation.recv(main_loop).map(Some)
+        debug_assert_eq!(index, connection_index);
+        // Ignore disconnect errors, they're handled by the main loop (it will exit).
+        Ok(operation.recv(connection).ok().map(Event::Message))
     }
 }
