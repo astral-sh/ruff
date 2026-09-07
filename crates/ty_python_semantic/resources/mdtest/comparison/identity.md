@@ -56,7 +56,7 @@ reveal_type(list[int] is list[int])  # revealed: bool
 reveal_type(list[int] is not list[int])  # revealed: bool
 ```
 
-## Function identity after generic substitution
+## Function identity after passing through a generic identity function
 
 Passing a function through a generic identity function preserves the function object, so
 `identity(f) is f` is correctly inferred as `Literal[True]` in the examples below:
