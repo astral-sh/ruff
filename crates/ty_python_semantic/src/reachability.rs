@@ -1833,7 +1833,7 @@ fn analyze_non_empty_iterable(db: &dyn Db, iterable: Expression) -> Truthiness {
     heap_size = get_size2::GetSize::get_heap_size
 )]
 fn sync_context_manager_suppresses<'db>(db: &'db dyn Db, expression: Expression<'db>) -> bool {
-    context_manager_suppresses(db, expression, false)
+    context_manager_suppresses(db, expression, EvaluationMode::Sync)
 }
 
 #[salsa::tracked(
@@ -1842,19 +1842,19 @@ fn sync_context_manager_suppresses<'db>(db: &'db dyn Db, expression: Expression<
     heap_size = get_size2::GetSize::get_heap_size
 )]
 fn async_context_manager_suppresses<'db>(db: &'db dyn Db, expression: Expression<'db>) -> bool {
-    context_manager_suppresses(db, expression, true)
+    context_manager_suppresses(db, expression, EvaluationMode::Async)
 }
 
 fn context_manager_suppresses<'db>(
     db: &'db dyn Db,
     expression: Expression<'db>,
-    is_async: bool,
+    evaluation_mode: EvaluationMode,
 ) -> bool {
     let env = ProgramEnvironment::from_scope(expression.scope(db));
     infer_same_file_expression_type(db, expression, TypeContext::default()).can_suppress_exceptions(
         db,
         &env,
-        EvaluationMode::from_is_async(is_async),
+        evaluation_mode,
     )
 }
 
