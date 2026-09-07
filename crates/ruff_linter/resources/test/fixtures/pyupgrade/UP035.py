@@ -132,3 +132,31 @@ from typing.re import Match
 
 # UP035 on py37+ only
 from typing.re import Pattern
+
+
+# Runtime-sensitive UP035 applicability
+
+from typing import TYPE_CHECKING
+
+from typing import Sequence as TypingOnlySequence
+
+if TYPE_CHECKING:
+    typing_only_value: TypingOnlySequence
+
+from typing import Sequence as RuntimeSequence
+
+runtime_value = RuntimeSequence
+
+from typing import Sequence as RuntimeAnnotationSequence
+
+def runtime_annotation(value: RuntimeAnnotationSequence) -> None:
+    pass
+
+from typing import Sequence as ReexportSequence
+
+__all__ = ["ReexportSequence"]
+
+class RuntimeClass:
+    from typing import Sequence as ClassSequence
+
+    value = ClassSequence

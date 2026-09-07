@@ -3,8 +3,9 @@ use itertools::Itertools;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::token::Tokens;
 use ruff_python_ast::whitespace::indentation;
-use ruff_python_ast::{Alias, StmtImportFrom, StmtRef};
+use ruff_python_ast::{self as ast, Alias, StmtImportFrom, StmtRef};
 use ruff_python_codegen::Stylist;
+use ruff_python_semantic::{AnyImport, Imported, NodeId, Scope};
 use ruff_text_size::Ranged;
 
 use crate::Locator;
@@ -12,7 +13,7 @@ use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::rules::pyupgrade::fixes;
 use crate::rules::pyupgrade::rules::unnecessary_future_import::is_import_required_by_isort;
-use crate::{Edit, Fix, FixAvailability, Violation};
+use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 use ruff_python_ast::PythonVersion;
 
 use super::RequiredImports;
@@ -48,6 +49,13 @@ enum Deprecation {
 /// ## Why is this bad?
 /// Deprecated imports may be removed in future versions of Python, and
 /// should be replaced with their new equivalents.
+///
+/// ## Fix safety
+/// Fixes that replace deprecated aliases from `typing` or `typing.re` with
+/// runtime implementations can change the value of the imported object.
+/// Ruff marks these fixes as safe only when the affected import has at least
+/// one reference, every reference is in a typing-only context, and the import
+/// is not re-exported. Otherwise, the fix is marked unsafe.
 ///
 /// Note that, in some cases, it may be preferable to continue importing
 /// members from `typing_extensions` even after they're added to the Python
@@ -113,6 +121,13 @@ fn is_relevant_module(module: &str) -> bool {
             | "typing.io"
             | "typing.re"
             | "backports.strenum"
+    )
+}
+
+fn is_runtime_sensitive_migration(module: &str, target: &str) -> bool {
+    matches!(
+        (module, target),
+        ("typing", "collections.abc" | "collections" | "re") | ("typing.re", "re")
     )
 }
 
@@ -739,12 +754,123 @@ impl<'a> ImportReplacer<'a> {
     }
 }
 
+fn runtime_sensitive_applicability(
+    checker: &Checker,
+    scope: &Scope,
+    node_id: NodeId,
+    operation: &WithoutRename,
+) -> Applicability {
+    let mut matched_binding = false;
+
+    for binding_id in scope.binding_ids() {
+        let binding = checker.semantic().binding(binding_id);
+
+        if binding.source != Some(node_id) {
+            continue;
+        }
+
+        let Some(AnyImport::FromImport(import)) = binding.as_any_import() else {
+            continue;
+        };
+
+        if !operation
+            .members
+            .iter()
+            .any(|member| member == import.member_name().as_ref())
+        {
+            continue;
+        }
+
+        matched_binding = true;
+
+        if binding.is_explicit_export() {
+            return Applicability::Unsafe;
+        }
+
+        let mut references = binding.references().peekable();
+
+        if references.peek().is_none() {
+            return Applicability::Unsafe;
+        }
+
+        if references.any(|reference_id| {
+            let reference = checker.semantic().reference(reference_id);
+
+            reference.in_dunder_all_definition() || !reference.in_typing_context()
+        }) {
+            return Applicability::Unsafe;
+        }
+    }
+
+    if matched_binding {
+        Applicability::Safe
+    } else {
+        Applicability::Unsafe
+    }
+}
+
 /// UP035
 pub(crate) fn deprecated_import(checker: &Checker, import_from_stmt: &StmtImportFrom) {
+    report_deprecated_import(
+        checker,
+        import_from_stmt,
+        |module, operation| !is_runtime_sensitive_migration(module, &operation.target),
+        |_| Applicability::Safe,
+        true,
+    );
+}
+
+/// Report runtime-sensitive UP035 fixes after semantic traversal.
+pub(crate) fn deprecated_import_runtime_sensitive(checker: &Checker, scope: &Scope) {
+    let mut statements = scope
+        .binding_ids()
+        .filter_map(|binding_id| {
+            let binding = checker.semantic().binding(binding_id);
+
+            let AnyImport::FromImport(import) = binding.as_any_import()? else {
+                return None;
+            };
+
+            let module = import.source_name().join(".");
+
+            if !matches!(module.as_str(), "typing" | "typing.re") {
+                return None;
+            }
+
+            binding.source
+        })
+        .unique()
+        .collect_vec();
+
+    statements.sort_unstable_by_key(|node_id| checker.semantic().statement(*node_id).start());
+
+    for node_id in statements {
+        let ast::Stmt::ImportFrom(import_from_stmt) = checker.semantic().statement(node_id) else {
+            continue;
+        };
+
+        report_deprecated_import(
+            checker,
+            import_from_stmt,
+            |module, operation| is_runtime_sensitive_migration(module, &operation.target),
+            |operation| runtime_sensitive_applicability(checker, scope, node_id, operation),
+            false,
+        );
+    }
+}
+
+fn report_deprecated_import(
+    checker: &Checker,
+    import_from_stmt: &StmtImportFrom,
+    operation_filter: impl Fn(&str, &WithoutRename) -> bool,
+    applicability: impl Fn(&WithoutRename) -> Applicability,
+    report_renames: bool,
+) {
     // Avoid relative and star imports.
     if import_from_stmt.level > 0 {
         return;
     }
+
     if import_from_stmt
         .names
         .first()
@@ -752,6 +878,7 @@ pub(crate) fn deprecated_import(checker: &Checker, import_from_stmt: &StmtImport
     {
         return;
     }
+
     let Some(module) = import_from_stmt.module.as_deref() else {
         return;
     };
@@ -771,28 +898,39 @@ pub(crate) fn deprecated_import(checker: &Checker, import_from_stmt: &StmtImport
     );
 
     for (operation, fix) in fixer.without_renames() {
+        if !operation_filter(module, &operation) {
+            continue;
+        }
+
+        let fix_applicability = applicability(&operation);
+
         let mut diagnostic = checker.report_diagnostic(
             DeprecatedImport {
                 deprecation: Deprecation::WithoutRename(operation),
             },
             import_from_stmt.range(),
         );
+
         diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
+
         if let Some(content) = fix {
-            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                content,
-                import_from_stmt.range(),
-            )));
+            diagnostic.set_fix(Fix::applicable_edit(
+                Edit::range_replacement(content, import_from_stmt.range()),
+                fix_applicability,
+            ));
         }
     }
 
-    for operation in fixer.with_renames() {
-        let mut diagnostic = checker.report_diagnostic(
-            DeprecatedImport {
-                deprecation: Deprecation::WithRename(operation),
-            },
-            import_from_stmt.range(),
-        );
-        diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
+    if report_renames {
+        for operation in fixer.with_renames() {
+            let mut diagnostic = checker.report_diagnostic(
+                DeprecatedImport {
+                    deprecation: Deprecation::WithRename(operation),
+                },
+                import_from_stmt.range(),
+            );
+
+            diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
+        }
     }
 }
