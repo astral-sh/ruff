@@ -658,6 +658,20 @@ def concrete_pivot[T, U]():
     static_assert(not constraints.implies_subtype_of(T, U))
 ```
 
+### Transitivity can propagate across exact symbolic pivots
+
+A pivot may contain typevars as long as both premises use the same static symbolic type. The unknown
+specialization of the pivot's typevars does not affect the transitive relationship.
+
+```py
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
+
+def symbolic_pivot[A, B, T, U]():
+    constraints = ConstraintSet.upper_bound(T, tuple[A, B]) & ConstraintSet.lower_bound(tuple[A, B], U)
+    static_assert(constraints.implies_subtype_of(T, U))
+```
+
 ### Transitivity can propagate through nested covariant typevars
 
 When a typevar appears nested inside a covariant generic type in another constraint's bound, we can
@@ -700,6 +714,73 @@ def lower_bound[U, T]():
     static_assert(constraints.implies_subtype_of(Covariant[int], U))
     static_assert(constraints.implies_subtype_of(Covariant[bool], U))
     static_assert(not constraints.implies_subtype_of(Covariant[str], U))
+```
+
+### Static substitutions may increase constructor depth
+
+Substituting a static bound remains sound when the bound contains generic constructors, even when
+the resulting type is more deeply nested than either premise.
+
+```py
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
+
+class Inner[T]:
+    def get(self) -> T:
+        raise ValueError
+
+class Outer[T]:
+    def get(self) -> T:
+        raise ValueError
+
+def lower_bound[T, U]():
+    constraints = ConstraintSet.lower_bound(Inner[int], T) & ConstraintSet.lower_bound(Outer[T], U)
+    # TODO: no error
+    # error: [static-assert-error]
+    static_assert(constraints.implies_subtype_of(Outer[Inner[int]], U))
+```
+
+### Gradual equivalence substitutions preserve correlation
+
+A gradual equivalence uses the same materialization on both sides. We can therefore substitute it
+into a nested bound without relying on transitivity through gradual assignability.
+
+```py
+from typing import Any
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
+
+class Covariant[T]:
+    def get(self) -> T:
+        raise ValueError
+
+def equivalence_into_lower[T, U]():
+    constraints = ConstraintSet.equality(T, Any) & ConstraintSet.lower_bound(Covariant[T], U)
+    static_assert(constraints.implies_subtype_of(Covariant[Any], U))
+
+def equivalence_into_equality[T, U]():
+    constraints = ConstraintSet.equality(T, Any) & ConstraintSet.equality(U, Covariant[T])
+    static_assert(constraints.implies_subtype_of(Covariant[Any], U))
+    static_assert(constraints.implies_subtype_of(U, Covariant[Any]))
+```
+
+### Gradual range substitutions do not preserve correlation
+
+A one-sided gradual bound does not require its occurrences to use the same materialization. Gradual
+assignability is not transitive, so such a bound cannot be substituted into a nested bound.
+
+```py
+from typing import Any
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
+
+class Covariant[T]:
+    def get(self) -> T:
+        raise ValueError
+
+def lower_bound[T, U]():
+    constraints = ConstraintSet.lower_bound(Any, T) & ConstraintSet.lower_bound(Covariant[T], U)
+    static_assert(not constraints.implies_subtype_of(Covariant[Any], U))
 ```
 
 ### Transitivity can propagate through nested contravariant typevars

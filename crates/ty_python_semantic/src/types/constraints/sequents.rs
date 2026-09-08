@@ -1228,8 +1228,9 @@ impl<'db> ConcreteLowerBound<'db> {
             Constraint::add_contravariant_tightened_sequent(db, env, map, self, other);
 
             // `(T ≤ pivot) ∧ (pivot ≤ U) → (T ≤ U)` when both constraints use the same
-            // fully static pivot type.
-            if other.bound != self.typevar.domain(db).bottom(db)
+            // statically eligible pivot type.
+            if self.typevar.domain(db) == other.typevar.domain(db)
+                && other.bound != self.typevar.domain(db).bottom(db)
                 && other.bound != self.typevar.domain(db).top(db)
                 && self.bound.is_static_sequent_eligible(db, env)
                 && other.bound.is_static_sequent_eligible(db, env)
@@ -1281,7 +1282,8 @@ impl<'db> ConcreteLowerBound<'db> {
             Constraint::add_invariant_tightened_sequent(db, env, map, self, other);
 
             // `(pivot ≤ T) ∧ (U = pivot) → (U ≤ T)`.
-            if self.bound.is_static_sequent_eligible(db, env)
+            if self.typevar.domain(db) == other.typevar.domain(db)
+                && self.bound.is_static_sequent_eligible(db, env)
                 && other.bound.is_static_sequent_eligible(db, env)
                 && self
                     .bound
@@ -1460,7 +1462,8 @@ impl<'db> ConcreteUpperBound<'db> {
             Constraint::add_invariant_tightened_sequent(db, env, map, self, other);
 
             // `(T ≤ pivot) ∧ (U = pivot) → (T ≤ U)`.
-            if self.bound.is_static_sequent_eligible(db, env)
+            if self.typevar.domain(db) == other.typevar.domain(db)
+                && self.bound.is_static_sequent_eligible(db, env)
                 && other.bound.is_static_sequent_eligible(db, env)
                 && self
                     .bound
