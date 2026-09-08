@@ -2,6 +2,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{PythonVersion, Stmt, StmtImport, StmtImportFrom};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
+use super::lazy_import_immediately_resolved::is_single_member_import;
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::rules::flake8_tidy_imports::rules::BannedModuleImportPolicies;
@@ -33,6 +34,16 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// lazy import typing
 /// ```
 ///
+/// ## Fix availability
+///
+/// The fix is only available for statements that import a single name, since
+/// changing `lazy` on a multi-member import could violate another name's policy.
+///
+/// ## Fix safety
+///
+/// This rule's fix is marked as unsafe because changing when a module is
+/// imported can affect runtime behavior, including import-time side effects.
+///
 /// ## Options
 /// - `lint.flake8-tidy-imports.require-lazy`
 /// - `lint.flake8-tidy-imports.ban-lazy`
@@ -50,7 +61,7 @@ enum LazyImportPolicy {
 }
 
 impl Violation for LazyImportMismatch {
-    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Always;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -168,6 +179,10 @@ fn report_lazy_import_policy(
     policy: LazyImportPolicy,
 ) {
     let mut diagnostic = checker.report_diagnostic(LazyImportMismatch { policy, name }, range);
+    // Changing the entire statement could violate another imported name's policy.
+    if !is_single_member_import(stmt) {
+        return;
+    }
     match policy {
         LazyImportPolicy::RequireLazy => {
             diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
