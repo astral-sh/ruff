@@ -637,9 +637,7 @@ impl<'db> ProtocolInterfaceView<'db> {
         receiver: Option<Type<'db>>,
     ) -> Option<PlaceAndQualifiers<'db>> {
         self.member_by_name(db, name).map(|member| {
-            let read = member
-                .access_with_receiver(db, env, ProtocolMemberAccessMode::Class, receiver)
-                .read;
+            let read = member.class_access(db, env, receiver).read;
             PlaceAndQualifiers {
                 place: read
                     .and_then(|read| read.resolve(db, env))
@@ -2227,37 +2225,33 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         env: &ProgramEnvironment<'db>,
         mode: ProtocolMemberAccessMode,
     ) -> ProtocolMemberAccess<'db> {
-        self.access_with_receiver(db, env, mode, None)
+        let capabilities = self.data.capabilities(db, env);
+        let access = match mode {
+            ProtocolMemberAccessMode::Instance => capabilities.instance,
+            ProtocolMemberAccessMode::Class => capabilities.class,
+        };
+        self.materialization
+            .map_or(access, |kind| access.materialize(db, env, kind))
     }
 
-    fn access_with_receiver(
+    fn class_access(
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        mode: ProtocolMemberAccessMode,
         receiver: Option<Type<'db>>,
     ) -> ProtocolMemberAccess<'db> {
         let access = if let ProtocolMemberKind::Method(member, ProtocolMethodKind::Class) =
             self.data.kind
             && let Type::Callable(callable) = member.ty()
-            && let Some((receiver, self_type)) = receiver.and_then(|receiver| match mode {
-                ProtocolMemberAccessMode::Instance => {
-                    Some((receiver.to_meta_type(db, env), receiver))
-                }
-                ProtocolMemberAccessMode::Class => receiver
-                    .to_instance_approximation(db, env)
-                    .map(|self_type| (receiver, self_type)),
-            }) {
+            && let Some(receiver) = receiver
+            && let Some(self_type) = receiver.to_instance_approximation(db, env)
+        {
             // Protocols specify callable behavior without requiring a nominal bound method:
             // a static method can also implement a classmethod requirement.
             let callable = protocol_bind_method(db, env.program(db), callable, receiver, self_type);
             ProtocolMemberAccess::new(Some(member.with_ty(Type::Callable(callable))), None)
         } else {
-            let capabilities = self.data.capabilities(db, env);
-            match mode {
-                ProtocolMemberAccessMode::Instance => capabilities.instance,
-                ProtocolMemberAccessMode::Class => capabilities.class,
-            }
+            return self.access(db, env, ProtocolMemberAccessMode::Class);
         };
         self.materialization
             .map_or(access, |kind| access.materialize(db, env, kind))
