@@ -141,8 +141,17 @@ impl<'db> ClassBase<'db> {
         subclass: Option<ClassLiteral<'db>>,
     ) -> Option<Self> {
         match ty {
+            Type::RecursiveVar(_) => {
+                unreachable!("semantic operation on an unbound recursive variable")
+            }
             Type::Dynamic(dynamic) => Some(Self::Dynamic(dynamic)),
             Type::Divergent(divergent) => Some(Self::Divergent(divergent)),
+            Type::Recursive(recursive) => recursive.map_or_else(
+                db,
+                env,
+                || None,
+                |unfolded| Self::try_from_type(db, env, unfolded, subclass),
+            ),
             Type::ClassLiteral(literal) => Some(Self::Class(literal.default_specialization(db))),
             Type::GenericAlias(generic) => Some(Self::Class(ClassType::Generic(generic))),
             Type::NominalInstance(instance)

@@ -124,7 +124,9 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> bool {
-        any_over_type(db, env, self, false, |ty| {
+        // Contextual inference must not adopt an alias whose arguments still
+        // contain placeholders from an enclosing generic call.
+        any_over_type_including_alias_arguments(db, env, self, |ty| {
             matches!(ty, Type::Dynamic(DynamicType::UnspecializedTypeVar))
         })
     }
@@ -1398,7 +1400,8 @@ impl<'db> BoundTypeVarInstance<'db> {
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::EagerExpansion
-            | TypeMapping::RescopeReturnCallables(_) => Type::TypeVar(self),
+            | TypeMapping::RescopeReturnCallables(_)
+            | TypeMapping::Recursive(_) => Type::TypeVar(self),
             TypeMapping::Materialize(materialization_kind) => {
                 if visitor.materialize_typevar_bounds_and_defaults {
                     Type::TypeVar(self.materialize_impl(db, *materialization_kind, visitor))

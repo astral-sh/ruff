@@ -3328,6 +3328,16 @@ fn completion_kind_from_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Comp
             Type::TypeAlias(alias) => {
                 visitor.visit(db, ty, || imp(db, alias.value_type(db), visitor))?
             }
+            Type::Recursive(recursive) => visitor.visit(db, ty, || {
+                imp(
+                    db,
+                    recursive.unfold(db, &recursive.environment(db)),
+                    visitor,
+                )
+            })?,
+            Type::RecursiveVar(_) => {
+                unreachable!("semantic operation on an unbound recursive variable")
+            }
         })
     }
     imp(db, ty, &CompletionKindVisitor::default())

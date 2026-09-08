@@ -613,6 +613,39 @@ impl<'db> TypeAliasType<'db> {
         }
     }
 
+    /// Rewrite stored arguments without evaluating the alias's definition or defaults.
+    pub(super) fn map_stored_specialization(
+        self,
+        db: &'db dyn Db,
+        mapping: &TypeMapping<'_, 'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> Self {
+        let Some(specialization) = self.specialization(db) else {
+            return self;
+        };
+        let mapped = specialization.apply_type_mapping_impl(db, mapping, &[], visitor);
+        if mapped == specialization {
+            return self;
+        }
+        match self {
+            Self::PEP695(alias) => Self::PEP695(PEP695TypeAliasType::new(
+                db,
+                alias.name(db),
+                alias.rhs_scope(db),
+                Some(mapped),
+                alias.materialization_kind(db),
+            )),
+            Self::ManualPEP695(alias) => Self::ManualPEP695(ManualPEP695TypeAliasType::new(
+                db,
+                alias.name(db),
+                alias.definition(db),
+                alias.typing_module(db),
+                Some(mapped),
+                alias.materialization_kind(db),
+            )),
+        }
+    }
+
     pub(crate) fn apply_specialization(
         self,
         db: &'db dyn Db,
@@ -630,7 +663,7 @@ impl<'db> TypeAliasType<'db> {
 
     /// Returns a struct that can display the fully qualified name of this type alias.
     pub(crate) fn qualified_name(self, db: &'db dyn Db) -> QualifiedTypeAliasName<'db> {
-        QualifiedTypeAliasName::from_type_alias(db, self)
+        QualifiedTypeAliasName::new(db, self.definition(db), self.name(db))
     }
 }
 
@@ -699,12 +732,18 @@ impl<'db> TypeAliasType<'db> {
 #[derive(Clone, Copy)]
 pub(crate) struct QualifiedTypeAliasName<'db> {
     db: &'db dyn Db,
-    type_alias: TypeAliasType<'db>,
+    definition: Definition<'db>,
+    name: &'db str,
 }
 
 impl<'db> QualifiedTypeAliasName<'db> {
-    fn from_type_alias(db: &'db dyn Db, type_alias: TypeAliasType<'db>) -> Self {
-        Self { db, type_alias }
+    /// Qualify an alias name using the scope in which it was defined.
+    pub(super) fn new(db: &'db dyn Db, definition: Definition<'db>, name: &'db str) -> Self {
+        Self {
+            db,
+            definition,
+            name,
+        }
     }
 
     /// Returns the components of the qualified name of this type alias, excluding the alias itself.
@@ -712,7 +751,7 @@ impl<'db> QualifiedTypeAliasName<'db> {
     /// For example, calling this method on a type alias `D` inside a class `C` in module `a.b`
     /// would return `["a", "b", "C"]`.
     pub(crate) fn components_excluding_self(&self) -> Vec<String> {
-        let definition = self.type_alias.definition(self.db);
+        let definition = self.definition;
         let file = definition.program_file(self.db);
         let file_scope_id = definition.file_scope(self.db);
 
@@ -728,6 +767,6 @@ impl std::fmt::Display for QualifiedTypeAliasName<'_> {
             f.write_str(&parent)?;
             f.write_char('.')?;
         }
-        f.write_str(self.type_alias.name(self.db))
+        f.write_str(self.name)
     }
 }

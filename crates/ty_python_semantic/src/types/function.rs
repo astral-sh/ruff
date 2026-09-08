@@ -1261,12 +1261,13 @@ impl<'db> FunctionType<'db> {
         // Returned-callable rescoping and type-alias specialization should not rebuild signatures from the
         // function literal; doing so can re-enter recursive `TypeOf` evaluation.
         let literal = self.literal(db);
-        let (updated_signature, updated_implementation_callables) = if matches!(
-            type_mapping,
-            TypeMapping::ApplySpecialization(specialization)
-                | TypeMapping::ApplySpecializationWithMaterialization { specialization, .. }
-                if specialization.preserves_lazy_signatures()
-        ) {
+        let (updated_signature, updated_implementation_callables) = if type_mapping.is_structural()
+            || matches!(
+                type_mapping,
+                TypeMapping::ApplySpecialization(specialization)
+                    | TypeMapping::ApplySpecializationWithMaterialization { specialization, .. }
+                    if specialization.preserves_lazy_signatures()
+            ) {
             (
                 self.updated_signature(db).map(|signature| {
                     signature.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
@@ -1964,6 +1965,14 @@ fn is_instance_truthiness<'db>(
     };
 
     match ty {
+        Type::Recursive(recursive) => {
+            recursive.map_or(db, env, Truthiness::Ambiguous, |unfolded| {
+                is_instance_truthiness(db, env, unfolded, class)
+            })
+        }
+        Type::RecursiveVar(_) => {
+            unreachable!("semantic operation on an unbound recursive variable")
+        }
         Type::Union(..) => {
             // We do not handle unions specifically here, because something like `A | SubclassOfA` would
             // have been simplified to `A` anyway

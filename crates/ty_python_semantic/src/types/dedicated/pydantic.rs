@@ -984,6 +984,19 @@ fn lax_input_type_impl<'db>(
         return result;
     }
 
+    if let Type::Recursive(recursive) = field_type {
+        // Guard the constructor: recursive arguments can grow without repeating a specialization.
+        let constructor = Type::Recursive(recursive.constructor(db));
+        if !expanding_types.insert(constructor) {
+            return Type::any();
+        }
+        let result = recursive.map_or(db, env, Type::any(), |unfolded| {
+            lax_input_type_impl(db, env, unfolded, expanding_types)
+        });
+        expanding_types.remove(&constructor);
+        return result;
+    }
+
     if field_type.as_union().and_then(|union| union.known(db)) == Some(KnownUnion::Float) {
         return lax_alias(db, env, "LaxFloat");
     }

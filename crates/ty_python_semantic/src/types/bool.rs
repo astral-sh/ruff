@@ -243,6 +243,9 @@ impl<'db> Type<'db> {
         };
 
         let truthiness = match self {
+            Type::RecursiveVar(_) => {
+                unreachable!("semantic operation on an unbound recursive variable")
+            }
             Type::Callable(callable) if callable.is_function_like(db) => Truthiness::AlwaysTrue,
 
             Type::Dynamic(_)
@@ -252,6 +255,13 @@ impl<'db> Type<'db> {
             | Type::TypeIs(_)
             | Type::TypeGuard(_)
             | Type::TypeForm(_) => Truthiness::Ambiguous,
+
+            Type::Recursive(recursive) => recursive.map_or_else(
+                db,
+                env,
+                || Ok(Truthiness::Ambiguous),
+                |unfolded| unfolded.try_bool_impl(db, env, allow_short_circuit, visitor),
+            )?,
 
             Type::TypedDict(td) => {
                 if td.items(db).values().any(TypedDictField::is_required) {

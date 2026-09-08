@@ -71,9 +71,9 @@ use crate::types::{
     BindingContext, BoundMethodType, BoundTypeVarInstance, CallableType, CallableTypes,
     ClassLiteral, DATACLASS_FLAGS, DataclassFlags, DataclassParams, DynamicType, GenericAlias,
     InternedConstraintSet, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
-    LiteralValueTypeKind, NominalInstanceType, PropertyInstanceType, SpecialFormType, TypeContext,
-    TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance, UnionAccumulator, UnionBuilder,
-    UnionType, WrapperDescriptorKind, enums, is_property_method, list_members,
+    LiteralValueTypeKind, NominalInstanceType, PropertyInstanceType, TypeContext, TypeMapping,
+    TypeVarBoundOrConstraints, TypeVarVariance, UnionAccumulator, UnionBuilder, UnionType,
+    WrapperDescriptorKind, enums, is_property_method, list_members,
 };
 use crate::{DisplaySettings, FxOrderSet};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
@@ -6682,9 +6682,12 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                         .and_then(|function| function.known(db)),
                     Some(KnownFunction::IsInstance | KnownFunction::IsSubclass)
                 )
-                && argument_type
-                    .as_special_form()
-                    .is_some_and(SpecialFormType::is_valid_isinstance_target)
+                && argument_type.is_valid_isinstance_target(
+                    db,
+                    self.env,
+                    expected_ty,
+                    &mut FxHashSet::default(),
+                )
         };
 
         // This is one of the few places where we want to check if there's _any_ specialization
@@ -10045,6 +10048,43 @@ fn all_arguments_range(node: AnyNodeRef) -> TextRange {
             )
         })
         .unwrap_or(node.range())
+}
+
+impl<'db> Type<'db> {
+    /// Validate typing special forms inside the same nested tuples accepted by class-info arguments.
+    fn is_valid_isinstance_target(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        expected: Type<'db>,
+        seen: &mut FxHashSet<Type<'db>>,
+    ) -> bool {
+        if !seen.insert(self) {
+            return true;
+        }
+        match self {
+            Type::SpecialForm(special) if special.is_valid_isinstance_target() => true,
+            Type::Union(union) => union
+                .elements(db)
+                .iter()
+                .all(|ty| ty.is_valid_isinstance_target(db, env, expected, seen)),
+            Type::TypeAlias(alias) => alias
+                .value_type(db)
+                .is_valid_isinstance_target(db, env, expected, seen),
+            Type::Recursive(recursive) => recursive
+                .unfold(db, env)
+                .is_valid_isinstance_target(db, env, expected, seen),
+            _ => {
+                if let Some(tuple) = self.tuple_instance_spec(db, env) {
+                    tuple
+                        .iter_element_types(db)
+                        .all(|ty| ty.is_valid_isinstance_target(db, env, expected, seen))
+                } else {
+                    self.is_assignable_to(db, env, expected)
+                }
+            }
+        }
+    }
 }
 
 // TODO: Replace these tests with mdtests once correlated alternatives affect call inference's

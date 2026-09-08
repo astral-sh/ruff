@@ -24,11 +24,13 @@ use crate::types::callable::CallableTypeKind;
 use crate::types::class::{ClassLiteral, ClassType, GenericAlias};
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::function::{FunctionType, OverloadLiteral};
-use crate::types::generics::{GenericContext, Specialization};
+use crate::types::generics::{GenericContext, Specialization, walk_specialization_types};
+use crate::types::recursive::RecursiveType;
 use crate::types::signatures::{
     CallableSignature, Parameter, Parameters, ParametersKind, Signature,
 };
 use crate::types::tuple::{TupleSpec, VariableSegment};
+use crate::types::type_alias::QualifiedTypeAliasName;
 use crate::types::typevar::BoundTypeVarIdentity;
 use crate::types::visitor::TypeVisitor;
 use crate::types::{
@@ -52,6 +54,7 @@ use ty_python_core::semantic_index;
 enum NamedItem<'db> {
     Class(ClassLiteral<'db>),
     TypeAlias(TypeAliasType<'db>),
+    Recursive(RecursiveType<'db>),
 }
 
 impl<'db> NamedItem<'db> {
@@ -62,6 +65,9 @@ impl<'db> NamedItem<'db> {
                 // Specializations of the same alias share a display name.
                 left.definition(db) == right.definition(db)
             }
+            (NamedItem::Recursive(left), NamedItem::Recursive(right)) => {
+                left.definition(db) == right.definition(db)
+            }
             _ => false,
         }
     }
@@ -70,6 +76,7 @@ impl<'db> NamedItem<'db> {
         match self {
             NamedItem::Class(class) => class.name(db),
             NamedItem::TypeAlias(type_alias) => type_alias.name(db),
+            NamedItem::Recursive(recursive) => recursive.name(db),
         }
     }
 
@@ -78,6 +85,10 @@ impl<'db> NamedItem<'db> {
             NamedItem::Class(class) => class.qualified_name(db).components_excluding_self(),
             NamedItem::TypeAlias(type_alias) => {
                 type_alias.qualified_name(db).components_excluding_self()
+            }
+            NamedItem::Recursive(recursive) => {
+                QualifiedTypeAliasName::new(db, recursive.definition(db), recursive.name(db))
+                    .components_excluding_self()
             }
         }
     }
@@ -617,6 +628,7 @@ impl<'db> TypeVisitor<'db> for AmbiguousNameCollector<'_, 'db> {
                 self.record_class(db, ClassLiteral::Static(alias.origin(db)));
             }
             Type::TypeAlias(type_alias) => self.record_type_alias(db, type_alias),
+            Type::Recursive(recursive) => self.record(db, NamedItem::Recursive(recursive)),
             // Visit the class (as if it were a nominal-instance type)
             // rather than the protocol members, if it is a class-based protocol.
             // (For the purposes of displaying the type, we'll use the class name.)
@@ -634,6 +646,13 @@ impl<'db> TypeVisitor<'db> for AmbiguousNameCollector<'_, 'db> {
                 return;
             }
             visitor::walk_non_atomic_type(db, t, self);
+        }
+    }
+
+    fn visit_recursive_type(&self, db: &'db dyn Db, recursive: RecursiveType<'db>) {
+        // Only the alias name and its arguments are displayed, not its unfolded body.
+        if let Some(arguments) = recursive.arguments(db) {
+            walk_specialization_types(db, arguments, self);
         }
     }
 }
@@ -878,7 +897,9 @@ impl<'db> TypeAliasType<'db> {
     ) -> TypeAliasDisplay<'db> {
         TypeAliasDisplay {
             db,
-            type_alias: self,
+            ty: Type::TypeAlias(self),
+            definition: self.definition(db),
+            name: self.name(db),
             settings,
         }
     }
@@ -906,27 +927,57 @@ impl<'db> TypeAliasType<'db> {
 
 struct TypeAliasDisplay<'db> {
     db: &'db dyn Db,
-    type_alias: TypeAliasType<'db>,
+    ty: Type<'db>,
+    definition: Definition<'db>,
+    name: &'db str,
     settings: DisplaySettings<'db>,
+}
+
+impl<'db> TypeAliasDisplay<'db> {
+    fn fmt_specialized(
+        &self,
+        env: &ProgramEnvironment<'db>,
+        specialization: Option<Specialization<'db>>,
+        materialization: Option<MaterializationKind>,
+        f: &mut TypeWriter<'_, '_, 'db>,
+    ) -> fmt::Result {
+        if let Some(kind) = materialization {
+            let (name, form) = match kind {
+                MaterializationKind::Top => ("Top", SpecialFormType::Top),
+                MaterializationKind::Bottom => ("Bottom", SpecialFormType::Bottom),
+            };
+            f.with_type(Type::SpecialForm(form)).write_str(name)?;
+            f.write_char('[')?;
+        }
+
+        self.fmt_detailed(f)?;
+        if let Some(specialization) = specialization {
+            specialization
+                .display_short(self.db, env, TupleSpecialization::No, self.settings.clone())
+                .fmt_detailed(f)?;
+        }
+
+        if materialization.is_some() {
+            f.write_char(']')?;
+        }
+        Ok(())
+    }
 }
 
 impl<'db> FmtDetailed<'db> for TypeAliasDisplay<'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
-        let qualification_level = self
-            .settings
-            .qualified_type_aliases
-            .get(self.type_alias.name(self.db));
+        let qualification_level = self.settings.qualified_type_aliases.get(self.name);
 
-        let ty = Type::TypeAlias(self.type_alias);
+        let ty = self.ty;
         if qualification_level.is_some() {
-            let qualified_name = self.type_alias.qualified_name(self.db);
+            let qualified_name = QualifiedTypeAliasName::new(self.db, self.definition, self.name);
             write!(f.with_type(ty), "{qualified_name}")?;
         } else {
-            write!(f.with_type(ty), "{}", self.type_alias.name(self.db))?;
+            write!(f.with_type(ty), "{}", self.name)?;
         }
 
         if qualification_level == Some(&QualificationLevel::FileAndLineNumber) {
-            let definition = self.type_alias.definition(self.db);
+            let definition = self.definition;
             let file = definition.file(self.db);
             let offset = definition
                 .focus_range(
@@ -1042,6 +1093,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                 write!(f.with_type(self.ty), "{dynamic}")
             }
             Type::Divergent(_) => f.with_type(self.ty).write_str("Divergent"),
+            Type::RecursiveVar(_) => unreachable!("display of an unbound recursive variable"),
             Type::Never => f.with_type(self.ty).write_str("Never"),
             Type::NominalInstance(instance) => {
                 let class = instance.class(db, self.env);
@@ -1578,31 +1630,27 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                 }
                 f.write_char('>')
             }
-            Type::TypeAlias(alias) => {
-                let materialization_kind = alias.materialization_kind(db);
-                if let Some(kind) = materialization_kind {
-                    let (name, form) = match kind {
-                        MaterializationKind::Top => ("Top", SpecialFormType::Top),
-                        MaterializationKind::Bottom => ("Bottom", SpecialFormType::Bottom),
-                    };
-                    f.with_type(Type::SpecialForm(form)).write_str(name)?;
-                    f.write_char('[')?;
-                }
-
-                alias
-                    .display_with(db, self.settings.clone())
-                    .fmt_detailed(f)?;
-                if let Some(specialization) = alias.specialization(db) {
-                    specialization
-                        .display_short(db, self.env, TupleSpecialization::No, self.settings.clone())
-                        .fmt_detailed(f)?;
-                }
-
-                if materialization_kind.is_some() {
-                    f.write_char(']')?;
-                }
-                Ok(())
+            Type::TypeAlias(alias) => alias
+                .display_with(db, self.settings.clone())
+                .fmt_specialized(
+                    self.env,
+                    alias.specialization(db),
+                    alias.materialization_kind(db),
+                    f,
+                ),
+            Type::Recursive(recursive) => TypeAliasDisplay {
+                db,
+                ty: self.ty,
+                definition: recursive.definition(db),
+                name: recursive.name(db),
+                settings: self.settings.clone(),
             }
+            .fmt_specialized(
+                self.env,
+                recursive.arguments(db),
+                recursive.materialization_kind(db),
+                f,
+            ),
             Type::NewTypeInstance(newtype) => f.with_type(self.ty).write_str(newtype.name(db)),
         }
     }

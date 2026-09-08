@@ -1527,6 +1527,32 @@ def f(x: A):
         reveal_type(item)  # revealed: list[A | str | None] | str | None
 ```
 
+### Recursive alias contexts in generic calls
+
+When a recursive alias appears inside a list parameter, the argument's elements supply the type
+argument for the enclosing generic function.
+
+```py
+from typing import TypeVar
+
+W = TypeVar("W")
+type Tree[T] = T | tuple[Tree[T]]
+
+def first_list(value: list[Tree[W]]) -> W:
+    raise NotImplementedError
+
+def modern_first_list[W](value: list[Tree[W]]) -> W:
+    raise NotImplementedError
+
+reveal_type(first_list([1]))  # revealed: int | tuple[Tree[int]]
+reveal_type(modern_first_list([1]))  # revealed: int | tuple[Tree[int]]
+
+# revealed: tuple[Tree[tuple[tuple[int]] | tuple[int] | int]] | int
+reveal_type(first_list([((1,),)]))
+# revealed: tuple[Tree[tuple[tuple[int]] | tuple[int] | int]] | int
+reveal_type(modern_first_list([((1,),)]))
+```
+
 ### Tuple comparison
 
 ```py

@@ -506,12 +506,23 @@ impl ClassInfoConstraintFunction {
         };
 
         match classinfo {
+            Type::RecursiveVar(_) => {
+                unreachable!("semantic operation on an unbound recursive variable")
+            }
             Type::TypeAlias(alias) => self.generate_constraint(
                 db,
                 env,
                 alias.value_type(db),
                 is_positive,
                 use_generic_filtering,
+            ),
+            Type::Recursive(recursive) => recursive.map_or_else(
+                db,
+                env,
+                || None,
+                |unfolded| {
+                    self.generate_constraint(db, env, unfolded, is_positive, use_generic_filtering)
+                },
             ),
             Type::ClassLiteral(class_literal) => Some(constraint_from_class_literal(class_literal)),
             Type::SubclassOf(subclass_of_ty) => {
@@ -5262,6 +5273,9 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
 // one `TypedDict` (even if other types are also present), or a type alias to such a type.
 fn is_or_contains_typeddict<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
     match ty {
+        Type::RecursiveVar(_) => {
+            unreachable!("semantic operation on an unbound recursive variable")
+        }
         Type::TypedDict(_) => true,
         Type::Intersection(intersection) => intersection
             .positive(db)
@@ -5272,6 +5286,11 @@ fn is_or_contains_typeddict<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
             .iter()
             .any(|union_member_ty| is_or_contains_typeddict(db, *union_member_ty)),
         Type::TypeAlias(alias) => is_or_contains_typeddict(db, alias.value_type(db)),
+        Type::Recursive(recursive) => {
+            recursive.map_or(db, &recursive.environment(db), false, |unfolded| {
+                is_or_contains_typeddict(db, unfolded)
+            })
+        }
 
         Type::Dynamic(_)
         | Type::Divergent(_)
@@ -5432,6 +5451,9 @@ fn all_matching_typeddict_fields_have_literal_types<'db>(
     };
 
     match ty {
+        Type::RecursiveVar(_) => {
+            unreachable!("semantic operation on an unbound recursive variable")
+        }
         Type::TypedDict(td) => matching_field_is_literal(&td),
         Type::Union(union) => union.elements(db).iter().all(|union_member_ty| {
             !is_or_contains_typeddict(db, *union_member_ty)
@@ -5447,6 +5469,14 @@ fn all_matching_typeddict_fields_have_literal_types<'db>(
             env,
             alias.value_type(db),
             field_name,
+        ),
+        Type::Recursive(recursive) => recursive.map_or_else(
+            db,
+            env,
+            || false,
+            |unfolded| {
+                all_matching_typeddict_fields_have_literal_types(db, env, unfolded, field_name)
+            },
         ),
         Type::Intersection(intersection) => {
             intersection
