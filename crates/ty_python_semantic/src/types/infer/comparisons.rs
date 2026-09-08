@@ -11,11 +11,13 @@ use crate::types::cyclic::CycleDetector;
 use crate::types::equality::{
     ComparisonSoundnessPolicy, TupleEqualityEvaluator, equality_truthiness, inequality_truthiness,
 };
+use crate::types::known_instance::{FunctoolsPartialInstance, InternedType};
 use crate::types::tuple::{Tuple, TupleSpec};
 use crate::types::{
-    DynamicType, FunctionType, IntersectionBuilder, IntersectionType, KnownClass,
-    KnownInstanceType, LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy, Type,
-    TypeContext, TypeTransformer, TypeVarBoundOrConstraints, UnionBuilder,
+    BoundMethodType, CallableType, DynamicType, FunctionType, IntersectionBuilder,
+    IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueType,
+    LiteralValueTypeKind, MemberLookupPolicy, PropertyInstanceType, Type, TypeContext,
+    TypeTransformer, TypeVarBoundOrConstraints, UnionBuilder,
 };
 use ty_python_core::Truthiness;
 
@@ -29,8 +31,12 @@ impl<'db> Type<'db> {
     /// commitments such as `list[int]` and `list[str]` without some other code already being
     /// unsound.
     ///
-    /// Function signature substitutions can likewise differ between views of the same function
-    /// object. Use the underlying function literal without substituted signatures for identity.
+    /// Function signature substitutions can likewise differ between views of the same function,
+    /// bound method, property, or saved function wrapper. Use the underlying function literal
+    /// without substituted signatures for identity. A bound method's `__self__` can also have
+    /// different static tags across views; upcast its type while keeping the receiver used for
+    /// signature specialization. A precise `functools.partial` stores a specialized callable
+    /// signature, but its wrapped function remains the same object across specializations.
     ///
     /// Preserve negations that constrain the object itself, such as `~None`, `~SomeClass`, and
     /// `~Literal[1]`. A `NewType` tag, function signature, type-variable selection, type-guard proof,
@@ -53,6 +59,54 @@ impl<'db> Type<'db> {
     ) -> Type<'db> {
         struct IdentityComparisonUpcasting;
 
+        fn unspecialized_function<'db>(
+            db: &'db dyn Db,
+            function: FunctionType<'db>,
+        ) -> FunctionType<'db> {
+            FunctionType::new(db, function.literal(db), None)
+        }
+
+        fn upcast_property<'db>(
+            db: &'db dyn Db,
+            env: &ProgramEnvironment<'db>,
+            property: PropertyInstanceType<'db>,
+            visitor: &TypeTransformer<'db, IdentityComparisonUpcasting>,
+        ) -> PropertyInstanceType<'db> {
+            property.with_accessors(
+                db,
+                property.getter(db).map(|ty| upcast(db, env, ty, visitor)),
+                property.setter(db).map(|ty| upcast(db, env, ty, visitor)),
+                property.deleter(db).map(|ty| upcast(db, env, ty, visitor)),
+            )
+        }
+
+        fn upcast_partial<'db>(
+            db: &'db dyn Db,
+            env: &ProgramEnvironment<'db>,
+            partial: FunctoolsPartialInstance<'db>,
+        ) -> Option<FunctoolsPartialInstance<'db>> {
+            // A partial's wrapped function is fixed, but its reduced signature can differ between
+            // views. A structural callable does not identify a particular wrapped function.
+            let Type::FunctionLiteral(function) =
+                partial.wrapped(db).inner(db).resolve_type_alias(db)
+            else {
+                return None;
+            };
+            let Type::Callable(upper_callable) =
+                Type::Callable(CallableType::unknown(db)).top_materialization(db, env)
+            else {
+                return None;
+            };
+            Some(FunctoolsPartialInstance::new(
+                db,
+                InternedType::new(
+                    db,
+                    Type::FunctionLiteral(unspecialized_function(db, function)),
+                ),
+                upper_callable,
+            ))
+        }
+
         fn upcast<'db>(
             db: &'db dyn Db,
             env: &ProgramEnvironment<'db>,
@@ -67,7 +121,66 @@ impl<'db> Type<'db> {
                     upcast(db, env, newtype.concrete_base_type(db), visitor)
                 }
                 Type::FunctionLiteral(function) => {
-                    Type::FunctionLiteral(FunctionType::new(db, function.literal(db), None))
+                    Type::FunctionLiteral(unspecialized_function(db, function))
+                }
+                Type::BoundMethod(method) => visitor.visit_type(db, ty, || {
+                    Type::BoundMethod(BoundMethodType::new(
+                        db,
+                        unspecialized_function(db, method.function(db)),
+                        upcast(db, env, method.self_instance(db), visitor),
+                        method.signature_receiver(db),
+                    ))
+                }),
+                Type::KnownBoundMethod(method) => visitor.visit_type(db, ty, || {
+                    Type::KnownBoundMethod(match method {
+                        KnownBoundMethodType::FunctionTypeDunderGet(function) => {
+                            KnownBoundMethodType::FunctionTypeDunderGet(unspecialized_function(
+                                db, function,
+                            ))
+                        }
+                        KnownBoundMethodType::FunctionTypeDunderCall(function) => {
+                            KnownBoundMethodType::FunctionTypeDunderCall(unspecialized_function(
+                                db, function,
+                            ))
+                        }
+                        KnownBoundMethodType::PropertyDunderGet(property) => {
+                            KnownBoundMethodType::PropertyDunderGet(upcast_property(
+                                db, env, property, visitor,
+                            ))
+                        }
+                        KnownBoundMethodType::PropertyDunderSet(property) => {
+                            KnownBoundMethodType::PropertyDunderSet(upcast_property(
+                                db, env, property, visitor,
+                            ))
+                        }
+                        KnownBoundMethodType::PropertyDunderDelete(property) => {
+                            KnownBoundMethodType::PropertyDunderDelete(upcast_property(
+                                db, env, property, visitor,
+                            ))
+                        }
+                        _ => method,
+                    })
+                }),
+                Type::PropertyInstance(property) => visitor.visit_type(db, ty, || {
+                    Type::PropertyInstance(upcast_property(db, env, property, visitor))
+                }),
+                Type::KnownInstance(KnownInstanceType::FunctoolsPartial(partial)) => {
+                    upcast_partial(db, env, partial).map_or_else(
+                        || {
+                            KnownClass::FunctoolsPartial
+                                .to_instance(db, env)
+                                .top_materialization(db, env)
+                        },
+                        |partial| Type::KnownInstance(KnownInstanceType::FunctoolsPartial(partial)),
+                    )
+                }
+                Type::KnownInstance(KnownInstanceType::FunctoolsPartialCall(partial)) => {
+                    upcast_partial(db, env, partial).map_or_else(
+                        || KnownClass::MethodWrapperType.to_instance(db, env),
+                        |partial| {
+                            Type::KnownInstance(KnownInstanceType::FunctoolsPartialCall(partial))
+                        },
+                    )
                 }
                 Type::TypeVar(typevar) => visitor.visit_type(db, ty, || {
                     let bound_or_constraints = typevar.require_bound_or_constraints(db, env);
@@ -93,6 +206,19 @@ impl<'db> Type<'db> {
                         match element.resolve_type_alias(db) {
                             Type::NewTypeInstance(_)
                             | Type::FunctionLiteral(_)
+                            | Type::BoundMethod(_)
+                            | Type::KnownBoundMethod(
+                                KnownBoundMethodType::FunctionTypeDunderGet(_)
+                                | KnownBoundMethodType::FunctionTypeDunderCall(_)
+                                | KnownBoundMethodType::PropertyDunderGet(_)
+                                | KnownBoundMethodType::PropertyDunderSet(_)
+                                | KnownBoundMethodType::PropertyDunderDelete(_),
+                            )
+                            | Type::PropertyInstance(_)
+                            | Type::KnownInstance(
+                                KnownInstanceType::FunctoolsPartial(_)
+                                | KnownInstanceType::FunctoolsPartialCall(_),
+                            )
                             | Type::TypeVar(_)
                             | Type::TypeIs(_)
                             | Type::TypeGuard(_) => continue,

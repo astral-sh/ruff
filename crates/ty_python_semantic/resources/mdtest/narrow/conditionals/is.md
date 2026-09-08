@@ -79,6 +79,57 @@ def overlapping_generic_types(integers: tuple[int, ...], strings: tuple[str, ...
         reveal_type(strings)  # revealed: tuple[str, ...] & tuple[int, ...]
 ```
 
+## `is` with `functools.partial`
+
+A partial saved on a generic class is the same object through different specializations of that
+class. An identity check with one view must preserve the other view's argument types.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from functools import partial
+
+class C[T]:
+    def method(self, value: T) -> T:
+        return value
+
+    callback = partial(method)
+
+callback = C[int].callback
+if callback is C[str].callback:
+    reveal_type(callback)  # revealed: partial[(self, value: int) -> int]
+    reveal_type(callback(C[int](), 1))  # revealed: int
+    callback(C[int](), "wrong")  # error: [invalid-argument-type] "Expected `int`"
+```
+
+Passing a saved partial or its `__call__` wrapper through a generic identity function also preserves
+its call signature on the true branch.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def identity(value: T) -> T:
+    return value
+
+def double(value: int) -> int:
+    return value * 2
+
+saved = partial(double)
+if saved is identity(saved):
+    reveal_type(saved)  # revealed: partial[(value: int) -> int]
+    saved("wrong")  # error: [invalid-argument-type] "Expected `int`"
+
+saved_call = saved.__call__
+if saved_call is identity(saved_call):
+    reveal_type(saved_call)  # revealed: (value: int) -> int
+    saved_call("wrong")  # error: [invalid-argument-type] "Expected `int`"
+```
+
 ## `is` with a `NewType`
 
 A `NewType` constructor returns its argument unchanged, so its tag belongs to one static view rather

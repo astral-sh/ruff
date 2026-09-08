@@ -109,6 +109,122 @@ reveal_type(int_method is str_method)  # revealed: Literal[True]
 reveal_type(int_method is not str_method)  # revealed: Literal[False]
 ```
 
+## Bound method identity
+
+Accessing a method creates a bound method object, so even two references with the same bound method
+type need not identify the same object. A generic identity function and `functools.partial` both
+retain the bound method object passed to them. Its signature may be specialized by those calls, but
+that does not make an identity comparison with the saved method always false.
+
+```py
+from functools import partial
+from typing import TypeVar, final
+
+T = TypeVar("T")
+
+def identity(value: T) -> T:
+    return value
+
+class C:
+    @final
+    def method(self, value: int) -> int:
+        return value
+
+saved_method = C().method
+reveal_type(saved_method is saved_method)  # revealed: bool
+reveal_type(identity(saved_method) is saved_method)  # revealed: bool
+reveal_type(saved_method is identity(saved_method))  # revealed: bool
+reveal_type(identity(saved_method) is not saved_method)  # revealed: bool
+reveal_type(partial(saved_method).func is saved_method)  # revealed: bool
+
+reveal_type(identity(saved_method)(1))  # revealed: int
+
+class D:
+    @final
+    def method(self, value: int) -> int:
+        return value
+
+reveal_type(saved_method is D().method)  # revealed: Literal[False]
+```
+
+`NewType` constructors also leave the receiver object unchanged. Bound method types with different
+`NewType` tags on their receivers are statically disjoint, but can describe the same method object.
+
+```py
+from typing import NewType
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_disjoint_from
+
+Left = NewType("Left", C)
+Right = NewType("Right", C)
+
+static_assert(is_disjoint_from(TypeOf[Left(C()).method], TypeOf[Right(C()).method]))
+
+def compare(left: TypeOf[Left(C()).method], right: TypeOf[Right(C()).method]) -> None:
+    reveal_type(left is right)  # revealed: bool
+```
+
+## Identity of properties, saved method wrappers, and partials
+
+Specializing a generic class changes the static signatures of its property's accessor and unbound
+method. The property, a `functools.partial` of the method, and the wrappers saved on the class are
+each created once. Their views through `C[int]` and `C[str]` can therefore identify the same object.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from functools import partial
+
+class C[T]:
+    @property
+    def prop(self) -> T:
+        raise NotImplementedError
+
+    def method(self, value: T) -> T:
+        return value
+
+    callback = partial(method)
+    callback_call = callback.__call__
+    method_getter = method.__get__
+    method_caller = method.__call__
+
+reveal_type(C[int].prop is C[str].prop)  # revealed: bool
+reveal_type(C[int].prop is not C[str].prop)  # revealed: bool
+reveal_type(C[int].callback is C[str].callback)  # revealed: bool
+reveal_type(C[int].callback_call is C[str].callback_call)  # revealed: bool
+reveal_type(C[int].method_getter is C[str].method_getter)  # revealed: bool
+reveal_type(C[int].method_caller is C[str].method_caller)  # revealed: bool
+```
+
+The callable signatures remain specialized for calls. Different property definitions, partials
+wrapping different functions, and the two saved wrappers of `method` still describe distinct
+objects.
+
+```py
+class D:
+    @property
+    def prop(self) -> int:
+        return 0
+
+def other(value: int) -> int:
+    return value
+
+def another(value: int) -> int:
+    return value
+
+other_callback = partial(other)
+another_callback = partial(another)
+
+reveal_type(C[int].callback(C[int](), 1))  # revealed: int
+reveal_type(C[str].callback(C[str](), "value"))  # revealed: str
+reveal_type(C[int].prop is D.prop)  # revealed: Literal[False]
+reveal_type(other_callback is another_callback)  # revealed: Literal[False]
+reveal_type(C[int].method_getter is C[int].method_caller)  # revealed: Literal[False]
+```
+
 ## Identity comparisons with NewTypes
 
 Two variables cannot share the same memory address if they have disjoint nominal-instance backing
