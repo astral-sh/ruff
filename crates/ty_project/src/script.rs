@@ -100,6 +100,11 @@ pub(crate) fn script(db: &dyn Db, file: File) -> Option<Script<'_>> {
         return None;
     }
 
+    let project_metadata = db.project().metadata(db);
+    if !project_metadata.uses_configuration_files() {
+        return None;
+    }
+
     let mut diagnostics = ScriptConfigurationDiagnostics::default();
     let metadata = parse_script_metadata(file, tag, &mut diagnostics);
     let environment = script_environment(db, file);
@@ -115,8 +120,6 @@ pub(crate) fn script(db: &dyn Db, file: File) -> Option<Script<'_>> {
         .and_then(|path| path.parent())
         .unwrap_or_else(|| db.system().current_directory());
     let context = OptionsContext::Script(configuration_root);
-
-    let project_metadata = db.project().metadata(db);
 
     let options = resolve_script_options(
         project_metadata,

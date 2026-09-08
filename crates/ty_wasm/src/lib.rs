@@ -113,31 +113,15 @@ pub struct Workspace {
     system: WasmSystem,
 }
 
-#[wasm_bindgen]
 impl Workspace {
-    /// Creates a workspace with defaults that can be overridden by configuration files.
-    #[wasm_bindgen(constructor)]
-    pub fn new(
-        root: &str,
+    fn from_metadata(
+        project: ProjectMetadata,
         position_encoding: PositionEncoding,
-        default_options: JsValue,
-    ) -> Result<Workspace, Error> {
-        let default_options = Options::deserialize_with(
-            ValueSource::Cli,
-            serde_wasm_bindgen::Deserializer::from(default_options),
-        )
-        .map_err(into_error)?;
-
-        let system = WasmSystem::new(SystemPath::new(root));
-
-        let mut project =
-            ProjectMetadata::discover(SystemPath::new(root), &system).map_err(into_error)?;
-        project.apply_fallback_options(default_options);
-
+    ) -> Result<Self, Error> {
+        let system = WasmSystem::new(project.root());
         let mut db = ProjectDatabase::fallible(project, system.clone()).map_err(into_error)?;
 
-        // By default, it will check all files in the project but we only want to check the open
-        // files in the playground.
+        // A workspace checks the files explicitly opened by its caller.
         db.set_check_mode(CheckMode::OpenFiles);
 
         Ok(Self {
@@ -146,18 +130,51 @@ impl Workspace {
             system,
         })
     }
+}
 
-    /// Replaces the explicit options, which take precedence over configuration files and defaults.
+#[wasm_bindgen]
+impl Workspace {
+    /// Creates a workspace with caller-supplied options.
+    ///
+    /// Configuration files and inline script metadata are ignored. Use `updateOptions`
+    /// to replace these options, or `discover` to create a workspace that loads configuration.
+    #[wasm_bindgen(constructor)]
+    pub fn new(
+        root: &str,
+        position_encoding: PositionEncoding,
+        options: JsValue,
+    ) -> Result<Workspace, Error> {
+        let project = ProjectMetadata::from_fixed_options(
+            deserialize_options(options)?,
+            SystemPathBuf::from(root),
+        );
+        Self::from_metadata(project, position_encoding)
+    }
+
+    /// Creates a workspace that discovers configuration as files are opened and changed.
+    ///
+    /// Configuration files and inline script metadata take precedence over `default_options`.
+    /// Options supplied through `updateOptions` take precedence over both.
+    pub fn discover(
+        root: &str,
+        position_encoding: PositionEncoding,
+        default_options: JsValue,
+    ) -> Result<Workspace, Error> {
+        let root = SystemPath::new(root);
+        // The filesystem is initially empty. Discovery starts when configuration files are opened.
+        let mut project =
+            ProjectMetadata::new(root.file_name().unwrap_or("root"), root.to_path_buf());
+        project.apply_fallback_options(deserialize_options(default_options)?);
+        Self::from_metadata(project, position_encoding)
+    }
+
+    /// Replaces the caller-supplied options.
+    ///
+    /// In a workspace created with `discover`, these override configuration files and defaults.
     #[wasm_bindgen(js_name = "updateOptions")]
     pub fn update_options(&mut self, options: JsValue) -> Result<(), Error> {
-        let options = Options::deserialize_with(
-            ValueSource::Cli,
-            serde_wasm_bindgen::Deserializer::from(options),
-        )
-        .map_err(into_error)?;
-
         let mut project = self.db.project().metadata(&self.db).clone();
-        project.replace_override_options(options);
+        project.replace_override_options(deserialize_options(options)?);
 
         let settings = (|| {
             let merged_options = project.to_merged_options();
@@ -190,8 +207,8 @@ impl Workspace {
                 );
                 Ok(())
             }
-            Err(error) => {
-                // Remember the parsed JSON options even if TOML settings are invalid. Repairing
+            Err(error) if project.uses_configuration_files() => {
+                // Remember the explicit options even if TOML settings are invalid. Repairing
                 // the TOML must not restore an override that was removed in the meantime.
                 let diagnostics = self.db.project().settings_diagnostics(&self.db).to_vec();
                 self.db
@@ -199,6 +216,7 @@ impl Workspace {
                     .reload(&mut self.db, project, None, diagnostics);
                 Err(error)
             }
+            Err(error) => Err(error),
         }
     }
 
@@ -835,6 +853,14 @@ impl Workspace {
             path: vendored_path.to_path_buf().into(),
         })
     }
+}
+
+fn deserialize_options(options: JsValue) -> Result<Options, Error> {
+    Options::deserialize_with(
+        ValueSource::Cli,
+        serde_wasm_bindgen::Deserializer::from(options),
+    )
+    .map_err(into_error)
 }
 
 pub(crate) fn into_error<E: std::fmt::Display>(err: E) -> Error {

@@ -42,9 +42,8 @@ pub struct ProjectMetadata {
     override_options: Option<Box<Options>>,
 
     /// The raw (unmerged, unresolved) options from the project's configuration.
-    /// When [`Self::config_file_override`] is `None`, then these are the options from the
-    /// project's `ty.toml` or `pyproject.toml`. The options come from
-    /// the file specified by [`Self::config_file_override`] if it is `Some` (e.g. when using `--config-file <path>`).
+    /// These come from discovery or an explicit configuration file, and are empty when
+    /// the caller supplies fixed options through [`Self::from_fixed_options`].
     options: Options,
 
     /// The Python version and interpreter path derived from uv workspace metadata.
@@ -64,12 +63,10 @@ pub struct ProjectMetadata {
     #[cfg_attr(test, serde(skip_serializing_if = "Option::is_none"))]
     fallback_options: Option<Box<Options>>,
 
-    /// The explicit configuration file that replaces normal project discovery.
-    ///
-    /// Can be specified using `--config-file <path>`. When `Some`, [`Self::options`] were loaded from this file
-    /// instead of from the project's `pyproject.toml` or `ty.toml` file.
-    #[cfg_attr(test, serde(skip_serializing_if = "Option::is_none"))]
-    config_file_override: Option<SystemPathBuf>,
+    /// Determines whether configuration is discovered, loaded from an explicit file, or
+    /// supplied entirely by the caller. This policy is preserved when files change.
+    #[cfg_attr(test, serde(skip_serializing_if = "ConfigurationSource::is_discovery"))]
+    configuration_source: ConfigurationSource,
 
     #[cfg_attr(test, serde(skip))]
     environment: ProjectEnvironment,
@@ -89,7 +86,26 @@ impl ProjectMetadata {
             override_options: None,
             user_configuration: None,
             fallback_options: None,
-            config_file_override: None,
+            configuration_source: ConfigurationSource::Discovery,
+            environment: ProjectEnvironment::default(),
+            use_uv: UseUv::Off,
+        }
+    }
+
+    /// Creates a project whose options are supplied entirely by the caller.
+    ///
+    /// Project, user, and inline script configuration are ignored, including after file
+    /// changes and rescans. Options can be replaced with [`Self::replace_override_options`].
+    pub fn from_fixed_options(options: Options, root: SystemPathBuf) -> Self {
+        Self {
+            name: ProjectName::new(root.file_name().unwrap_or("root")),
+            root,
+            options: Options::default(),
+            uv_workspace_options: None,
+            override_options: Some(Box::new(options)),
+            user_configuration: None,
+            fallback_options: None,
+            configuration_source: ConfigurationSource::Fixed,
             environment: ProjectEnvironment::default(),
             use_uv: UseUv::Off,
         }
@@ -129,7 +145,7 @@ impl ProjectMetadata {
             override_options: None,
             user_configuration: None,
             fallback_options: None,
-            config_file_override: Some(path),
+            configuration_source: ConfigurationSource::File(path),
             environment: ProjectEnvironment::default(),
             use_uv,
         })
@@ -177,7 +193,7 @@ impl ProjectMetadata {
             override_options: None,
             user_configuration: None,
             fallback_options: None,
-            config_file_override: None,
+            configuration_source: ConfigurationSource::Discovery,
             environment: ProjectEnvironment::default(),
             use_uv: UseUv::Off,
         })
@@ -423,16 +439,19 @@ impl ProjectMetadata {
         path: &SystemPath,
         environment: ProjectEnvironment,
     ) -> Result<Self, ProjectMetadataError> {
-        let mut metadata = if let Some(config_file) = self.config_file_override() {
-            Self::from_config_file_with_uv(
-                config_file.to_path_buf(),
+        let mut metadata = match &self.configuration_source {
+            ConfigurationSource::Discovery => {
+                Self::discover_with_uv_workspace(path, system, environment)?
+                    .with_use_uv(self.use_uv)
+            }
+            ConfigurationSource::File(config_file) => Self::from_config_file_with_uv(
+                config_file.clone(),
                 self.root(),
                 system,
                 self.use_uv,
             )?
-            .with_environment(environment)
-        } else {
-            Self::discover_with_uv_workspace(path, system, environment)?.with_use_uv(self.use_uv)
+            .with_environment(environment),
+            ConfigurationSource::Fixed => return Ok(self.clone()),
         };
 
         metadata.override_options.clone_from(&self.override_options);
@@ -463,7 +482,19 @@ impl ProjectMetadata {
 
     /// Returns the explicit configuration file that replaces normal project discovery, if any.
     pub(crate) fn config_file_override(&self) -> Option<&SystemPath> {
-        self.config_file_override.as_deref()
+        match &self.configuration_source {
+            ConfigurationSource::File(path) => Some(path),
+            ConfigurationSource::Discovery | ConfigurationSource::Fixed => None,
+        }
+    }
+
+    /// Returns whether configuration files and inline script metadata can supply options.
+    pub fn uses_configuration_files(&self) -> bool {
+        !matches!(self.configuration_source, ConfigurationSource::Fixed)
+    }
+
+    pub(crate) fn uses_configuration_discovery(&self) -> bool {
+        self.configuration_source.is_discovery()
     }
 
     /// Returns configuration paths outside normal project discovery that should be watched.
@@ -582,6 +613,10 @@ impl ProjectMetadata {
         &mut self,
         system: &dyn System,
     ) -> Result<(), ConfigurationFileError> {
+        if !self.uses_configuration_files() {
+            return Ok(());
+        }
+
         self.user_configuration = None;
 
         if let Some(user) = ConfigurationFile::user(system)? {
@@ -622,6 +657,20 @@ impl ProjectMetadata {
             metadata: self,
             options,
         }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
+#[cfg_attr(test, derive(serde::Serialize))]
+enum ConfigurationSource {
+    Discovery,
+    File(SystemPathBuf),
+    Fixed,
+}
+
+impl ConfigurationSource {
+    fn is_discovery(&self) -> bool {
+        matches!(self, Self::Discovery)
     }
 }
 

@@ -932,10 +932,12 @@ mod tests {
     use ruff_db::system::{DbWithWritableSystem as _, SystemPathBuf, TestSystem};
     use ruff_db::testing::assert_function_query_was_not_run_by_name;
     use ruff_python_trivia::textwrap::dedent;
+    use ruff_ranged_value::ValueSource;
     use ty_module_resolver::list_modules;
     use ty_python_semantic::Db as _;
 
     use crate::db::testing::TestDb;
+    use crate::metadata::Options;
     use crate::watch::ChangeEvent;
     use crate::{Db, ProjectDatabase, ProjectMetadata, UseUv};
 
@@ -1005,6 +1007,82 @@ mod tests {
         fs.write_file_all(&script, ordinary)?;
         db.apply_changes(&[ChangeEvent::file_content_changed(script)]);
         assert_eq!(db.check().len(), 1);
+
+        Ok(())
+    }
+
+    #[test]
+    fn fixed_options_ignore_configuration_during_rescans() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let fs = system.memory_file_system().clone();
+        let root = SystemPathBuf::from("/project");
+        let main = root.join("main.py");
+        let user_configuration = SystemPathBuf::from("/config");
+        system
+            .in_memory()
+            .set_user_configuration_directory(Some(user_configuration.clone()));
+        fs.write_file_all(&main, "import nonexistent\nx: int = 'not an int'\n")?;
+
+        let options =
+            Options::from_toml_str("[rules]\nunresolved-import = 'ignore'\n", ValueSource::Cli)?;
+        let metadata = ProjectMetadata::from_fixed_options(options, root.clone());
+        let mut db = ProjectDatabase::fallible(metadata, system)?;
+        assert_eq!(db.check().len(), 1);
+
+        // Rescans synchronize files without loading project, ancestor, or user configuration.
+        for configuration in [
+            root.join("ty.toml"),
+            SystemPathBuf::from("/ty.toml"),
+            user_configuration.join("ty/ty.toml"),
+        ] {
+            fs.write_file_all(&configuration, "[rules]\ninvalid-assignment = 'ignore'\n")?;
+            db.apply_changes(&[ChangeEvent::Rescan]);
+            assert_eq!(db.project().root(&db), root.as_path());
+            let diagnostics = db.check();
+            assert_eq!(diagnostics.len(), 1);
+            assert_eq!(diagnostics[0].id().as_str(), "invalid-assignment");
+            fs.remove_file(&configuration)?;
+        }
+
+        // Fixed configuration still permits ordinary source changes to invalidate diagnostics.
+        fs.write_file_all(&main, "import nonexistent\nx: int = 1\n")?;
+        db.apply_changes(&[ChangeEvent::file_content_changed(main)]);
+        assert!(db.check().is_empty());
+
+        Ok(())
+    }
+
+    #[test]
+    fn explicit_configuration_reloads_only_the_selected_file() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let fs = system.memory_file_system().clone();
+        let root = SystemPathBuf::from("/project");
+        let selected = SystemPathBuf::from("/config/selected.toml");
+        let ambient = root.join("ty.toml");
+        fs.write_files_all([
+            (root.join("main.py"), "x: int = 'not an int'\n"),
+            (selected.clone(), "[rules]\ninvalid-assignment = 'ignore'\n"),
+            (ambient.clone(), "[rules]\ninvalid-assignment = 'error'\n"),
+        ])?;
+        let metadata = ProjectMetadata::from_config_file(selected.clone(), &root, &system)?;
+        let mut db = ProjectDatabase::fallible(metadata, system)?;
+        assert!(db.check().is_empty());
+
+        // Ambient configuration is ignored, including after a full filesystem rescan.
+        fs.write_file_all(&ambient, "[rules]\ninvalid-assignment = 'warn'\n")?;
+        let changes = db.apply_changes(&[ChangeEvent::file_content_changed(ambient)]);
+        assert!(!changes.project_changed());
+        assert!(db.check().is_empty());
+        db.apply_changes(&[ChangeEvent::Rescan]);
+        assert!(db.check().is_empty());
+
+        fs.write_file_all(&selected, "[rules]\ninvalid-assignment = 'error'\n")?;
+        let changes = db.apply_changes(&[ChangeEvent::file_content_changed(selected)]);
+        assert!(changes.project_changed());
+        assert_eq!(db.project().root(&db), root.as_path());
+        let diagnostics = db.check();
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].id().as_str(), "invalid-assignment");
 
         Ok(())
     }

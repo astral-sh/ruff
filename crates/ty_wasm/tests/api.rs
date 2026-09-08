@@ -65,10 +65,136 @@ fn check() {
 }
 
 #[wasm_bindgen_test]
-fn restored_pyproject_preserves_defaults() {
+fn fixed_options_ignore_configuration_files() {
+    ty_wasm::before_main();
+
+    for (name, contents) in [
+        ("ty.toml", "[environment]\npython-version = '3.11'\n"),
+        ("pyproject.toml", "[project]\nrequires-python = '>=3.11'\n"),
+    ] {
+        let mut workspace = Workspace::new(
+            "/",
+            PositionEncoding::Utf32,
+            js_sys::JSON::parse(
+                r#"{
+                    "environment": {"python-version": "3.10"},
+                    "rules": {"undefined-reveal": "ignore"}
+                }"#,
+            )
+            .unwrap(),
+        )
+        .expect("Workspace to be created");
+        let file = workspace
+            .open_file(
+                "main.py",
+                "import sys\nreveal_type(sys.version_info.minor)\n",
+            )
+            .expect("File to be opened");
+
+        let configuration = workspace
+            .open_file(name, contents)
+            .expect("Configuration to be opened");
+        assert_python_version(&workspace, &file, 10);
+
+        workspace
+            .update_file(&configuration, &contents.replace("3.11", "3.12"))
+            .expect("Configuration to be updated");
+        assert_python_version(&workspace, &file, 10);
+
+        workspace
+            .close_file(configuration)
+            .expect("Configuration to be removed");
+        assert_python_version(&workspace, &file, 10);
+    }
+}
+
+#[wasm_bindgen_test]
+fn fixed_options_replace_constructor_options() {
     ty_wasm::before_main();
 
     let mut workspace = Workspace::new(
+        "/",
+        PositionEncoding::Utf32,
+        js_sys::JSON::parse(
+            r#"{
+                "environment": {"python-version": "3.10"},
+                "rules": {"undefined-reveal": "ignore"}
+            }"#,
+        )
+        .unwrap(),
+    )
+    .expect("Workspace to be created");
+    let file = workspace
+        .open_file(
+            "main.py",
+            "import sys\nreveal_type(sys.version_info.minor)\n",
+        )
+        .expect("File to be opened");
+    assert_python_version(&workspace, &file, 10);
+
+    // A failed update leaves both the program and diagnostic settings unchanged.
+    let invalid = workspace.update_options(
+        js_sys::JSON::parse(
+            r#"{
+                "environment": {"python-version": "3.11"},
+                "analysis": {"allowed-unresolved-imports": [""]}
+            }"#,
+        )
+        .unwrap(),
+    );
+    assert!(invalid.is_err());
+    assert_python_version(&workspace, &file, 10);
+
+    // Omitting the Python version restores ty's default, not the constructor option.
+    workspace
+        .update_options(
+            js_sys::JSON::parse(r#"{"rules": {"undefined-reveal": "ignore"}}"#).unwrap(),
+        )
+        .expect("Options to be updated");
+    assert_python_version(&workspace, &file, 14);
+}
+
+#[wasm_bindgen_test]
+fn fixed_options_ignore_script_metadata() {
+    ty_wasm::before_main();
+
+    let mut workspace = Workspace::new(
+        "/",
+        PositionEncoding::Utf32,
+        js_sys::JSON::parse(
+            r#"{
+                "environment": {"python-version": "3.10"},
+                "rules": {"undefined-reveal": "ignore"}
+            }"#,
+        )
+        .unwrap(),
+    )
+    .expect("Workspace to be created");
+    let file = workspace
+        .open_file(
+            "main.py",
+            "# /// script\n# requires-python = '>=3.11'\n# ///\n\
+             import sys\nreveal_type(sys.version_info.minor)\n",
+        )
+        .expect("File to be opened");
+    assert_python_version(&workspace, &file, 10);
+
+    // Malformed inline configuration is also just a comment in fixed-options mode.
+    workspace
+        .update_file(
+            &file,
+            "# /// script\n# requires-python =\n# ///\n\
+             import sys\nreveal_type(sys.version_info.minor)\n",
+        )
+        .expect("File to be updated");
+    assert_python_version(&workspace, &file, 10);
+}
+
+#[wasm_bindgen_test]
+fn restored_pyproject_preserves_defaults() {
+    ty_wasm::before_main();
+
+    let mut workspace = Workspace::discover(
         "/",
         PositionEncoding::Utf32,
         js_sys::JSON::parse(
@@ -120,7 +246,7 @@ fn explicit_options_override_configuration() {
 
     // JSON options have the same precedence regardless of the restored file order.
     for options_first in [true, false] {
-        let mut workspace = Workspace::new(
+        let mut workspace = Workspace::discover(
             "/",
             PositionEncoding::Utf32,
             js_sys::JSON::parse(
@@ -184,7 +310,7 @@ fn explicit_options_update_with_invalid_configuration() {
         ("[environment]\npython-version = ", true),
         ("[analysis]\nallowed-unresolved-imports = ['']\n", false),
     ] {
-        let mut workspace = Workspace::new(
+        let mut workspace = Workspace::discover(
             "/",
             PositionEncoding::Utf32,
             js_sys::JSON::parse(
@@ -239,7 +365,7 @@ fn explicit_options_update_with_invalid_configuration() {
 #[track_caller]
 fn assert_python_version(workspace: &Workspace, file: &FileHandle, minor: u8) {
     let diagnostics = workspace.check_file(file).expect("Check to succeed");
-    // In particular, the fallback suppression of undefined-reveal still applies.
+    // In particular, the configured suppression of undefined-reveal still applies.
     assert_eq!(diagnostics.len(), 1);
     assert_eq!(diagnostics[0].id(), "revealed-type");
     assert_eq!(

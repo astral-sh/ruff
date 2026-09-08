@@ -345,7 +345,7 @@ impl ProjectDatabase {
                 .unwrap_or(&project_root);
             let metadata = project.metadata(self);
             if metadata.use_uv().workspace_discovery_enabled()
-                && metadata.config_file_override().is_none()
+                && metadata.uses_configuration_discovery()
             {
                 result.project_sync_path = Some(path.to_path_buf());
             } else {
@@ -448,7 +448,7 @@ struct ConfigurationPaths {
 impl ConfigurationPaths {
     fn from_metadata(metadata: &ProjectMetadata) -> Self {
         Self {
-            normal_discovery: metadata.config_file_override().is_none(),
+            normal_discovery: metadata.uses_configuration_discovery(),
             extra: metadata
                 .extra_configuration_paths()
                 .map(SystemPath::to_path_buf)

@@ -45,7 +45,7 @@ export default function Playground() {
   if (sessionPromiseRef.current == null) {
     sessionPromiseRef.current = startPlayground().then((fetched) => {
       setVersion(fetched.version);
-      const workspace = new Workspace(
+      const workspace = Workspace.discover(
         "/",
         PositionEncoding.Utf16,
         JSON.parse(DEFAULT_SETTINGS),
