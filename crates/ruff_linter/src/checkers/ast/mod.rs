@@ -1880,6 +1880,11 @@ impl<'a> Visitor<'a> for Checker<'a> {
                                 Some(typing::Callable::Cast)
                             } else if self
                                 .semantic
+                                .match_typing_qualified_name(&qualified_name, "TypeForm")
+                            {
+                                Some(typing::Callable::TypeForm)
+                            } else if self
+                                .semantic
                                 .match_typing_qualified_name(&qualified_name, "NewType")
                             {
                                 Some(typing::Callable::NewType)
@@ -1948,6 +1953,18 @@ impl<'a> Visitor<'a> for Checker<'a> {
                                     }
                                 }
                             }
+                        }
+                    }
+                    Some(typing::Callable::TypeForm) => {
+                        let mut args = arguments.args.iter();
+                        if let Some(arg) = args.next() {
+                            self.visit_type_definition(arg);
+                        }
+                        for arg in args {
+                            self.visit_non_type_definition(arg);
+                        }
+                        for keyword in &*arguments.keywords {
+                            self.visit_non_type_definition(&keyword.value);
                         }
                     }
                     Some(typing::Callable::NewType) => {
