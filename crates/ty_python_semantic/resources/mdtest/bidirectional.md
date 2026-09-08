@@ -1591,8 +1591,7 @@ def _(a: int | None):
 
 ## Instance attributes
 
-Both meta and class/instance attribute annotations are used as type context. For a metaclass
-descriptor, the setter's value parameter supplies the context:
+Both meta and class/instance attribute annotations are used as type context:
 
 ```py
 from typing import Literal, Any
@@ -1616,23 +1615,6 @@ def _(flag: bool):
         c.x = reveal_type([1])  # revealed: list[int]
 
         C.x = reveal_type([1])  # revealed: list[Literal[1]]
-```
-
-A property setter also provides context after specializing its owner. The setter below expects
-`list[object]`, so the fresh list can contain any object even though its initial element is `None`:
-
-```py
-class Owner[T]:
-    @property
-    def items(self) -> list[T]:
-        return []
-
-    @items.setter
-    def items(self, value: list[T]) -> None: ...
-
-def assign(owner: Owner[object]) -> None:
-    owner.items = reveal_type([None])  # revealed: list[object]
-    owner.items = 1  # error: [invalid-assignment]
 ```
 
 For union targets, each element of the union is considered as a separate type context:

@@ -11,7 +11,7 @@ use crate::Db;
 use ty_module_resolver::KnownModule;
 use ty_python_core::use_def_map;
 
-use super::call::{Bindings, CallArguments, CallDunderError, CallError};
+use super::call::CallArguments;
 use super::callable::CallableTypeKind;
 use super::{
     IntersectionType, KnownClass, KnownInstanceType, MemberLookupPolicy, Parameter, Signature,
@@ -863,65 +863,20 @@ pub(super) fn assignment_attribute_members<'db>(
     })
 }
 
-/// A setter call after descriptor discovery and write precedence have selected its receiver.
-///
-/// Python binds `__set__` to the descriptor before passing the owner and assigned value. Keeping
-/// these two explicit arguments separate from the bound receiver also preserves their diagnostic
-/// ranges. This differs from `__get__`, which Python calls with the descriptor as an explicit
-/// argument and must continue to use its own dispatch.
-#[derive(Clone, Copy)]
-pub(super) struct DescriptorSetCall<'db> {
-    pub(super) descriptor_ty: Type<'db>,
-    pub(super) receiver_ty: Type<'db>,
-}
-
-impl<'db> DescriptorSetCall<'db> {
-    /// Look up the bound setter without consulting instance storage or gradual bases.
-    pub(super) fn setter(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Place<'db> {
-        self.descriptor_ty
-            .member_lookup_with_policy(
-                db,
-                env,
-                "__set__",
-                MemberLookupPolicy::REQUIRE_CONCRETE | MemberLookupPolicy::NO_INSTANCE_FALLBACK,
-            )
-            .place
-    }
-
-    pub(super) fn try_call(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        value_ty: Type<'db>,
-    ) -> Result<Bindings<'db>, CallDunderError<'db>> {
-        // Keep the complete descriptor receiver when binding `self`, including intersection
-        // constraints. Splitting an intersection before binding can lose a required base class.
-        let Place::Defined(DefinedPlace {
-            ty: setter_ty,
-            definedness,
-            provenance,
-            ..
-        }) = self.setter(db, env)
-        else {
-            return Err(CallDunderError::MethodNotAvailable);
-        };
-        let bindings = setter_ty
-            .try_call(
-                db,
-                env,
-                &CallArguments::positional([self.receiver_ty, value_ty]),
-            )
-            .map_err(|CallError(kind, bindings)| {
-                CallDunderError::CallError(kind, bindings, provenance)
-            })?;
-        if definedness == Definedness::PossiblyUndefined {
-            return Err(CallDunderError::PossiblyUnbound {
-                bindings: Box::new(bindings),
-                unbound_on: None,
-            });
-        }
-        Ok(bindings)
-    }
+/// Look up the bound setter without consulting instance storage or gradual bases.
+pub(super) fn descriptor_setter<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    descriptor_ty: Type<'db>,
+) -> Place<'db> {
+    descriptor_ty
+        .member_lookup_with_policy(
+            db,
+            env,
+            "__set__",
+            MemberLookupPolicy::REQUIRE_CONCRETE | MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+        )
+        .place
 }
 
 /// The values accepted by a descriptor setter, when representable as a single type.
@@ -978,11 +933,7 @@ fn single_descriptor_setter_domain<'db>(
             ty: setter_ty,
             definedness: Definedness::AlwaysDefined,
             ..
-        }) = (DescriptorSetCall {
-            descriptor_ty,
-            receiver_ty,
-        })
-        .setter(db, env)
+        }) = descriptor_setter(db, env, descriptor_ty)
         else {
             return DescriptorSetterDomain::Missing;
         };

@@ -1099,149 +1099,6 @@ wrapper_descriptor(f, None, f)
 wrapper_descriptor(f, None, type(f), "one too many")
 ```
 
-## Setter binding
-
-### Static setters and deleters
-
-A static setter receives the owner instance and assigned value. A static deleter receives only the
-owner instance. Neither receives the descriptor itself:
-
-```py
-class Descriptor:
-    @staticmethod
-    def __set__(instance: object, value: int) -> None: ...
-    @staticmethod
-    def __delete__(instance: object) -> None: ...
-
-class Owner:
-    value = Descriptor()
-
-owner = Owner()
-owner.value = 1
-del owner.value
-
-owner.value = "wrong"  # error: [invalid-assignment] "Expected `int`, found `Literal["wrong"]`"
-```
-
-### Descriptor-valued setters
-
-When `__set__` is itself a descriptor, Python invokes its `__get__` to obtain the setter. The
-returned callable receives the owner instance and assigned value:
-
-```py
-class BoundSetter:
-    def __call__(self, instance: object, value: int) -> None: ...
-
-class Setter:
-    def __get__(self, instance: object, owner: type | None = None) -> BoundSetter:
-        return BoundSetter()
-
-class Descriptor:
-    __set__ = Setter()
-
-class Owner:
-    value = Descriptor()
-
-Owner().value = 1
-Owner().value = "wrong"  # error: [invalid-assignment]
-```
-
-### Conditionally defined setters
-
-A conditional setter is called when present. When it is absent, an assignment can create an instance
-attribute, so the possibility of a missing setter does not make the assignment invalid:
-
-```py
-def assign(flag: bool) -> None:
-    class Descriptor:
-        if flag:
-            def __set__(self, instance: object, value: int) -> None: ...
-
-    class Owner:
-        value = Descriptor()
-
-    Owner().value = 1
-```
-
-### Union alternatives bind their own setters
-
-An ordinary method receives the descriptor implicitly, while a class method receives its class. An
-assignment must satisfy both possible setters, so only `str` is accepted by this union:
-
-```py
-class OrdinaryDescriptor:
-    def __set__(self, instance: object, value: int | str) -> None: ...
-
-class ClassDescriptor:
-    @classmethod
-    def __set__(cls, instance: object, value: str | bytes) -> None: ...
-
-class Owner:
-    value: OrdinaryDescriptor | ClassDescriptor
-
-owner = Owner()
-owner.value = "accepted"
-owner.value = 1  # error: [invalid-assignment]
-owner.value = b"wrong"  # error: [invalid-assignment]
-```
-
-### Intersection descriptors preserve their complete type
-
-The setter's `self` annotation requires both `Descriptor` and `Marker`, so binding retains both
-parts of the descriptor type:
-
-```py
-from __future__ import annotations
-from ty_extensions import Intersection
-
-class Marker: ...
-
-class Descriptor:
-    def __set__(self: Intersection[Descriptor, Marker], instance: object, value: int) -> None: ...
-
-def assign(descriptor: Intersection[Descriptor, Marker]) -> None:
-    class Owner:
-        value = descriptor
-
-    Owner().value = 1
-```
-
-### Setter binding in protocol compatibility
-
-A descriptor with a static setter can satisfy a writable protocol property. Its accepted value type
-determines compatibility with the protocol's setter:
-
-```py
-from typing import Protocol
-from ty_extensions import static_assert
-from ty_extensions._internal import is_subtype_of
-
-class Descriptor:
-    def __get__(self, instance: object, owner: type | None = None) -> int:
-        return 1
-
-    @staticmethod
-    def __set__(instance: object, value: int) -> None: ...
-
-class Owner:
-    value = Descriptor()
-
-class IntWriter(Protocol):
-    @property
-    def value(self) -> int: ...
-    @value.setter
-    def value(self, new_value: int) -> None: ...
-
-class StrWriter(Protocol):
-    @property
-    def value(self) -> int: ...
-    @value.setter
-    def value(self, new_value: str) -> None: ...
-
-static_assert(is_subtype_of(Owner, IntWriter))
-static_assert(not is_subtype_of(Owner, StrWriter))
-```
-
 ## Error handling and edge cases
 
 ### `__get__` is called with correct arguments
@@ -2085,6 +1942,31 @@ class Decorated:
 bound = Decorated().method
 reveal_type(bound)  # revealed: Decorator[(value: str)]
 bound(1)  # error: [invalid-argument-type]
+```
+
+### Static getters, setters and deleters
+
+```py
+class Descriptor:
+    @staticmethod
+    def __get__(descriptor: object, instance: object, owner: type | None = None) -> int:
+        return 1
+
+    @staticmethod
+    def __set__(instance: object, value: int) -> None: ...
+    @staticmethod
+    def __delete__(instance: object) -> None: ...
+
+class Owner:
+    value = Descriptor()
+
+owner = Owner()
+reveal_type(owner.value)  # revealed: int
+reveal_type(Owner.value)  # revealed: int
+owner.value = 1
+del owner.value
+
+owner.value = "wrong"  # error: [invalid-assignment] "Expected `int`, found `Literal["wrong"]`"
 ```
 
 [descriptors]: https://docs.python.org/3/howto/descriptor.html

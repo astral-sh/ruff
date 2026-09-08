@@ -5,8 +5,8 @@ use smallvec::{SmallVec, smallvec};
 use super::{ArgumentsIter, MultiInferenceGuard, TypeInferenceBuilder};
 use crate::place::{DefinedPlace, Definedness, Place, PlaceAndQualifiers};
 use crate::types::attribute_write::{
-    AttributeWriteRequirement, ClassAttributeWriteMember, DescriptorSetCall,
-    DescriptorSetterDomain, ExplicitAttributeWriteRequirement, FallbackAttributeWriteRequirement,
+    AttributeWriteRequirement, ClassAttributeWriteMember, DescriptorSetterDomain,
+    ExplicitAttributeWriteRequirement, FallbackAttributeWriteRequirement,
     InstanceAttributeWriteMember, ProtocolMemberWriteRequirement, attribute_write_requirement,
     descriptor_setter_domain, property_setter_returns_never,
 };
@@ -434,12 +434,15 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                     {
                         return false;
                     }
-                    self.descriptor_write_calls(*descriptor_ty, *receiver_ty)
-                        .all(|call| {
-                            match self.evaluate_descriptor_write(call, value_ty, emit_diagnostics) {
+                    self.descriptor_write_alternatives(*descriptor_ty)
+                        .all(|descriptor_ty| {
+                            match self.evaluate_descriptor_write(
+                                descriptor_ty,
+                                *receiver_ty,
+                                value_ty,
+                                emit_diagnostics,
+                            ) {
                                 Some(Definedness::AlwaysDefined) => true,
-                                // A protocol write capability requires the setter to be present
-                                // on every alternative.
                                 Some(Definedness::PossiblyUndefined) => {
                                     if emit_diagnostics {
                                         self.report(
@@ -806,12 +809,15 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
     ) -> bool {
         match requirement {
             ExplicitAttributeWriteRequirement::Descriptor { descriptor_ty, .. } => self
-                .descriptor_write_calls(*descriptor_ty, object_ty)
-                .all(|call| {
-                    // An ordinary descriptor only constrains the branch where its setter exists.
-                    // When absent, assignment can create an instance attribute.
-                    self.evaluate_descriptor_write(call, value_ty, emit_diagnostics)
-                        .is_some()
+                .descriptor_write_alternatives(*descriptor_ty)
+                .all(|descriptor_ty| {
+                    self.evaluate_descriptor_write(
+                        descriptor_ty,
+                        object_ty,
+                        value_ty,
+                        emit_diagnostics,
+                    )
+                    .is_some()
                 }),
             ExplicitAttributeWriteRequirement::AssignableTo { ty, .. } => {
                 let value_ty = self.infer_value(TypeContext::new(Some(*ty)), false);
@@ -820,13 +826,15 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
         }
     }
 
-    /// Keep alternatives separate so each caller can stop at its first unacceptable setter.
-    /// Resolve nested aliases without splitting intersection receivers or reordering alternatives.
-    fn descriptor_write_calls(
+    /// Yield each possible descriptor type so writes can be checked one alternative at a time.
+    ///
+    /// For example, if an attribute has type `IntDescriptor | StrDescriptor`, an assignment must
+    /// satisfy both setters: either descriptor could be present at runtime. Checking them
+    /// separately lets the caller stop and report the first alternative that rejects the write.
+    fn descriptor_write_alternatives(
         &self,
         descriptor_ty: Type<'db>,
-        receiver_ty: Type<'db>,
-    ) -> impl Iterator<Item = DescriptorSetCall<'db>> + use<'db> {
+    ) -> impl Iterator<Item = Type<'db>> + use<'db> {
         let db = self.builder.db();
         let mut pending: SmallVec<[_; 1]> = smallvec![descriptor_ty];
         std::iter::from_fn(move || {
@@ -835,30 +843,38 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                 if let Type::Union(union) = descriptor_ty {
                     pending.extend(union.elements(db).iter().rev().copied());
                 } else {
-                    return Some(DescriptorSetCall {
-                        descriptor_ty,
-                        receiver_ty,
-                    });
+                    return Some(descriptor_ty);
                 }
             }
             None
         })
     }
 
-    /// Return setter presence for a valid write, or report why the write is invalid and return `None`.
+    /// Check the setter call and return whether the setter is always or only possibly present.
+    /// Return `None` when the write fails, reporting the error if `emit_diagnostics` is enabled.
+    ///
+    /// For example, a descriptor can define `__set__(self, instance, value: int)` inside an
+    /// `if flag:` block. Assigning an integer returns `Some(PossiblyUndefined)`: the call is valid
+    /// when the setter exists, but the setter might be absent. An unconditional setter accepting
+    /// the same value returns `Some(AlwaysDefined)`. Passing a string to either setter returns
+    /// `None`, since the call is invalid when the setter exists.
     fn evaluate_descriptor_write(
         &mut self,
-        call: DescriptorSetCall<'db>,
+        descriptor_ty: Type<'db>,
+        receiver_ty: Type<'db>,
         value_ty: Type<'db>,
         emit_diagnostics: bool,
     ) -> Option<Definedness> {
         let env = self.builder.program_environment();
         let db = self.builder.db();
-        let DescriptorSetCall {
-            descriptor_ty,
-            receiver_ty,
-        } = call;
-        let setter_result = call.try_call(db, env, value_ty);
+        let setter_result = descriptor_ty.try_call_dunder_with_policy(
+            db,
+            env,
+            "__set__",
+            &mut CallArguments::positional([receiver_ty, value_ty]),
+            TypeContext::default(),
+            MemberLookupPolicy::REQUIRE_CONCRETE,
+        );
         // `Never` supports arbitrary operations only because there can be no runtime value to
         // mutate; it is not a concrete descriptor with a terminal setter.
         let setter_returns_never = !descriptor_ty.is_never()

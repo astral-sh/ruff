@@ -8,10 +8,10 @@ use ruff_python_ast::name::Name;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::types::attribute_write::{
-    AttributeWriteRequirement, ClassAttributeWriteMember, DescriptorSetCall,
-    DescriptorSetterDomain, ExplicitAttributeWriteRequirement, FallbackAttributeWriteRequirement,
+    AttributeWriteRequirement, ClassAttributeWriteMember, DescriptorSetterDomain,
+    ExplicitAttributeWriteRequirement, FallbackAttributeWriteRequirement,
     InstanceAttributeWriteMember, ProtocolMemberWriteRequirement, attribute_write_requirement,
-    descriptor_setter_domain,
+    descriptor_setter, descriptor_setter_domain,
 };
 use crate::types::call::{CallArguments, CallDunderError};
 use crate::types::overrides::{VariableKind, effective_superclass_variable_kind};
@@ -2622,17 +2622,22 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     self.check_descriptor_property_write(db, *descriptor_ty, object_ty, value_ty)
                 });
         }
-        let setter_call = DescriptorSetCall {
-            descriptor_ty,
-            receiver_ty: object_ty,
-        };
         if matches!(
-            setter_call.try_call(db, env, Type::unknown()),
+            descriptor_ty.try_call_dunder_with_policy(
+                db,
+                env,
+                "__set__",
+                &mut CallArguments::positional([object_ty, Type::unknown()]),
+                TypeContext::default(),
+                MemberLookupPolicy::REQUIRE_CONCRETE,
+            ),
             Err(CallDunderError::CallError(..) | CallDunderError::MethodNotAvailable)
         ) {
             return self.never();
         }
-        let Place::Defined(DefinedPlace { ty: setter_ty, .. }) = setter_call.setter(db, env) else {
+        let Place::Defined(DefinedPlace { ty: setter_ty, .. }) =
+            descriptor_setter(db, env, descriptor_ty)
+        else {
             return self.never();
         };
 
