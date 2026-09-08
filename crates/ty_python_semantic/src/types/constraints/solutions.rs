@@ -4,9 +4,11 @@ use std::marker::PhantomData;
 use std::ops::ControlFlow;
 
 use crate::types::constraints::paths::PathAssignments;
+use crate::types::constraints::projection::ProjectionTypeBudget;
 use crate::types::constraints::{
     ALWAYS_FALSE, ALWAYS_TRUE, ConstraintBound, ConstraintBoundsBuilder, ConstraintId,
-    ConstraintSetStorage, NodeId, PathBound, PathBounds, SolutionLimits, TypeVarSolution,
+    ConstraintSetBuilder, ConstraintSetStorage, NodeId, PathBound, PathBounds, ProjectionError,
+    SolutionBudget, SolutionLimits, Solutions, TypeVarSolution,
 };
 use crate::types::graph::DependencyGraph;
 use crate::types::typevar::TypeVarSet;
@@ -43,6 +45,38 @@ impl<'db> TypeVarSolution<'db> {
             dependencies.push(found.into_iter().collect());
         }
         DependencyGraph::new(dependencies)
+    }
+
+    /// Solve one defining equation per variable using the shared path solver.
+    /// The equations already form one conjunction; discovering alternative constraint
+    /// paths would only derive redundant consequences before closing their cycles.
+    pub(in crate::types) fn solve_equations(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        equations: &[Self],
+    ) -> Result<Solutions<'db>, ProjectionError> {
+        let inferable =
+            TypeVarSet::from_typevars(db, equations.iter().map(|equation| equation.bound_typevar));
+        let bounds = PathBounds::Constrained(
+            Box::new([equations
+                .iter()
+                .map(|equation| PathBound::exact(equation.bound_typevar, equation.solution))
+                .collect()]),
+            inferable,
+        );
+        let builder = ConstraintSetBuilder::new();
+        let mut budget = ProjectionTypeBudget::new(SolutionBudget::default().type_terms);
+        bounds.try_solve_with(
+            db,
+            env,
+            |_variance, bound| PathBounds::default_solve(db, env, &builder, bound),
+            |solution| {
+                for binding in solution {
+                    budget.charge_type(db, binding.solution)?;
+                }
+                Ok(())
+            },
+        )
     }
 
     /// Solve dependencies within one path, preserving correlations between paths.
@@ -184,7 +218,11 @@ impl<'db> TypeVarSolution<'db> {
 
     /// Eliminate Boolean cycles without substituting references below constructors.
     /// The normalized equations can be closed as recursive types or unfolded symbolically.
-    fn normalize_equations(db: &'db dyn Db, env: &ProgramEnvironment<'db>, equations: &mut [Self]) {
+    pub(in crate::types) fn normalize_equations(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        equations: &mut [Self],
+    ) {
         for index in 0..equations.len() {
             let variable = equations[index].bound_typevar;
             let equation = equations[index].without_self_constraint(db, env);

@@ -821,3 +821,18 @@ def _():
             # scope.
             reveal_type(x)  # revealed: Literal["f2"] | int
 ```
+
+## Recursive tuple construction
+
+Assignments in a nested function contribute to the recursive type of the enclosing binding.
+
+```py
+def outer():
+    value = 0
+
+    def update():
+        nonlocal value
+        value = (value,)
+
+    reveal_type(value)  # revealed: (μa0. tuple[a0 | Literal[0]]) | Literal[0]
+```

@@ -105,7 +105,7 @@ impl<'db> CallArgumentTypes<'db> {
         }
     }
 
-    fn iter(&self) -> impl Iterator<Item = (TypeContext<'db>, Type<'db>)> {
+    pub(super) fn iter(&self) -> impl Iterator<Item = (TypeContext<'db>, Type<'db>)> {
         self.types
             .iter()
             .map(|(tcx, ty)| (TypeContext::new(Some(*tcx)), *ty))

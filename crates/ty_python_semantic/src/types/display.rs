@@ -716,9 +716,16 @@ impl<'db> Type<'db> {
         env: &'env ProgramEnvironment<'db>,
         settings: DisplaySettings<'db>,
     ) -> DisplayType<'env, 'db> {
+        // Resolve query references before deciding which syntax needs parentheses.
+        let ty = match self {
+            Type::Recursive(recursive) if let Some(key) = recursive.inference_key(db) => {
+                key.solution(db).ty
+            }
+            ty => ty,
+        };
         // Unnamed entries in an already displayed graph expand inline. Resolve
         // them before deciding whether the displayed expression needs parentheses.
-        let ty = if let Type::Recursive(recursive) = self
+        let ty = if let Type::Recursive(recursive) = ty
             && !settings.recursive_binders.contains(&recursive)
             && settings
                 .recursive_binders
@@ -727,7 +734,7 @@ impl<'db> Type<'db> {
         {
             recursive.unfold(db, env)
         } else {
-            self
+            ty
         };
         DisplayType {
             ty,

@@ -11,6 +11,7 @@ use crate::types::diagnostic::{
     DIVISION_BY_ZERO, report_unsupported_augmented_assignment, report_unsupported_binary_operation,
 };
 use crate::types::function::OverloadLiteral;
+use crate::types::recursive::RecursiveInputs;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::typevar::TypeVarConstraints;
 use crate::types::{
@@ -442,8 +443,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             // the result would then become Any or Unknown, respectively).
             (div @ Type::Divergent(_), _, _) | (_, div @ Type::Divergent(_), _) => Some(div),
 
-            (unknown @ Type::Dynamic(DynamicType::AmbiguousOverload), _, _)
-            | (_, unknown @ Type::Dynamic(DynamicType::AmbiguousOverload), _) => Some(unknown),
+            (Type::Dynamic(DynamicType::AmbiguousOverload(_)), _, _)
+            | (_, Type::Dynamic(DynamicType::AmbiguousOverload(_)), _) => {
+                Some(RecursiveInputs::unknown(
+                    db,
+                    RecursiveInputs::collect(db, env, [left_ty, right_ty]),
+                ))
+            }
 
             (any @ Type::Dynamic(DynamicType::Any), _, _)
             | (_, any @ Type::Dynamic(DynamicType::Any), _) => Some(any),

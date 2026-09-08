@@ -78,6 +78,21 @@ impl<'db> RecursiveGraphBuilder<'db> {
         .finish(db, env, roots.len())
     }
 
+    /// Minimize an already closed type, including a finite prefix of a recursive graph.
+    pub(super) fn normalize(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+    ) -> Type<'db> {
+        Self {
+            inputs: RefCell::new([ty].into_iter().collect()),
+            equations: FxHashMap::default(),
+            variables: FxHashMap::default(),
+        }
+        .finish(db, env, 1)
+        .map_or(ty, |solution| solution.types[0])
+    }
+
     fn finish(
         self,
         db: &'db dyn Db,

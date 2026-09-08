@@ -44,6 +44,7 @@ use std::hint::cold_path;
 use super::RecursivelyDefined;
 use super::generic_gradual_intersections::{GenericIntersection, generic_gradual_intersection};
 use crate::types::enums::EnumComplement;
+use crate::types::recursive::RecursiveInputs;
 use crate::types::set_theoretic::expand_intersection_typevars_and_newtypes;
 use crate::types::visitor::any_over_type;
 use crate::types::{
@@ -1023,6 +1024,11 @@ impl<'db> UnionBuilder<'db> {
                 return;
             }
 
+            if let Some(merged) = RecursiveInputs::merge(db, ty, element_type) {
+                *element = UnionElement::Type(merged);
+                return;
+            }
+
             // `object` already contains every possible union element.
             if !self.cycle_recovery && element_type == Type::object() {
                 return;
@@ -1729,6 +1735,12 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 let mut to_remove = SmallVec::<[usize; 1]>::new();
                 let mut replacement = None;
                 for (index, existing_positive) in self.positive.iter().enumerate() {
+                    if let Some(merged) =
+                        RecursiveInputs::merge(db, new_positive, *existing_positive)
+                    {
+                        replacement = Some((index, merged));
+                        break;
+                    }
                     if let Some(result) =
                         generic_gradual_intersection(db, env, new_positive, *existing_positive)
                     {

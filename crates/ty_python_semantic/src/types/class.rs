@@ -5,6 +5,7 @@ pub(crate) use self::dynamic_literal::{
     DynamicClassAnchor, DynamicClassLiteral, DynamicMetaclassConflict, dynamic_class_bases_argument,
 };
 pub(super) use self::enum_literal::{DynamicEnumAnchor, DynamicEnumLiteral, EnumSpec};
+pub(super) use self::implicit_attributes::ImplicitAttributeName;
 use self::implicit_attributes::{AugmentedBindings, ImplicitAttribute};
 pub use self::known::KnownClass;
 use self::named_tuple::synthesize_namedtuple_class_member;
@@ -2924,7 +2925,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
 
             for definition in bindings.definitions(db) {
                 let inferred_ty = infer_definition_types(db, *definition)
-                    .binding_type(*definition)
+                    .binding_type(db, *definition)
                     .apply_optional_specialization(db, specialization);
                 union = union.add(inferred_ty);
                 provenance = provenance.or(Provenance::SingleDefinition(*definition));

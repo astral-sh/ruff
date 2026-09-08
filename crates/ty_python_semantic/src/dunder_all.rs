@@ -180,7 +180,7 @@ impl<'db> DunderAllNamesCollector<'db> {
     fn standalone_expression_type(&self, expr: &ast::Expr) -> Type<'db> {
         let db = self.db;
         infer_expression_types(db, self.index.expression(expr), TypeContext::default())
-            .expression_type(expr)
+            .expression_type(db, expr)
     }
 
     /// Evaluate the given expression and return its truthiness.

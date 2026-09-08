@@ -722,7 +722,7 @@ impl<'db> TypeVarInstance<'db> {
                     | DynamicType::UnspecializedTypeVar
                     | DynamicType::UnknownLambdaParameter
                     | DynamicType::InvalidConcatenateUnknown
-                    | DynamicType::AmbiguousOverload => Parameters::unknown(),
+                    | DynamicType::AmbiguousOverload(_) => Parameters::unknown(),
                 },
                 Type::Divergent(_) => Parameters::unknown(),
                 Type::TypeVar(typevar) if typevar.is_paramspec(db) => {
