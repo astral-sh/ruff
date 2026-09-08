@@ -514,6 +514,7 @@ pub(super) trait ProvidesConcreteBound<'db>: Copy + Into<Constraint<'db>> {
     fn provenance(self) -> ConstraintProvenance;
     fn typevar(self) -> BoundTypeVarInstance<'db>;
     fn bound(self) -> Type<'db>;
+    fn is_equivalence(self) -> bool;
     fn map(self, provenance: ConstraintProvenance, bound: Type<'db>) -> Self;
 }
 
@@ -529,6 +530,7 @@ pub(super) trait ProvidesTypeVarBound<'db>: Copy + Into<Constraint<'db>> {
     fn provenance(self) -> ConstraintProvenance;
     fn left(self) -> BoundTypeVarInstance<'db>;
     fn right(self) -> BoundTypeVarInstance<'db>;
+    fn is_equivalence(self) -> bool;
 }
 
 pub(super) trait ProvidesTypeVarRangeBound<'db>: ProvidesTypeVarBound<'db> {}
@@ -633,6 +635,10 @@ impl<'db> ProvidesConcreteBound<'db> for ConcreteLowerBound<'db> {
 
     fn bound(self) -> Type<'db> {
         self.bound
+    }
+
+    fn is_equivalence(self) -> bool {
+        false
     }
 
     fn map(self, provenance: ConstraintProvenance, bound: Type<'db>) -> Self {
@@ -749,6 +755,10 @@ impl<'db> ProvidesConcreteBound<'db> for ConcreteUpperBound<'db> {
         self.bound
     }
 
+    fn is_equivalence(self) -> bool {
+        false
+    }
+
     fn map(self, provenance: ConstraintProvenance, bound: Type<'db>) -> Self {
         Self {
             provenance,
@@ -859,6 +869,10 @@ impl<'db> ProvidesConcreteBound<'db> for ConcreteEquivalenceBound<'db> {
 
     fn bound(self) -> Type<'db> {
         self.bound
+    }
+
+    fn is_equivalence(self) -> bool {
+        true
     }
 
     fn map(self, provenance: ConstraintProvenance, bound: Type<'db>) -> Self {
@@ -986,6 +1000,10 @@ impl<'db> ProvidesTypeVarBound<'db> for TypeVarRangeBound<'db> {
     fn right(self) -> BoundTypeVarInstance<'db> {
         self.right
     }
+
+    fn is_equivalence(self) -> bool {
+        false
+    }
 }
 
 impl<'db> ProvidesTypeVarRangeBound<'db> for TypeVarRangeBound<'db> {}
@@ -1050,6 +1068,10 @@ impl<'db> TypeVarEquivalenceBound<'db> {
             fn right(self) -> BoundTypeVarInstance<'db> {
                 self.0.right
             }
+
+            fn is_equivalence(self) -> bool {
+                true
+            }
         }
 
         impl<'db> ProvidesTypeVarRangeBound<'db> for Forwards<'db> {}
@@ -1083,6 +1105,10 @@ impl<'db> TypeVarEquivalenceBound<'db> {
             fn right(self) -> BoundTypeVarInstance<'db> {
                 // Reversed!
                 self.0.left
+            }
+
+            fn is_equivalence(self) -> bool {
+                true
             }
         }
 
