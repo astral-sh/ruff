@@ -878,48 +878,6 @@ kind = "inherent_method"
 level = "expect"
 reason = "command descriptions expose a complete argument builder and inspection API"
 
-# Keep the command environment builder and inspection methods public.
-
-[[override]]
-lint = "hawk::dead_public"
-crate = "ruff_db"
-item = "system::command::Command::env_clear"
-kind = "inherent_method"
-level = "expect"
-reason = "command environment methods mirror the standard library Command API"
-
-[[override]]
-lint = "hawk::dead_public"
-crate = "ruff_db"
-item = "system::command::Command::env"
-kind = "inherent_method"
-level = "expect"
-reason = "command environment methods mirror the standard library Command API"
-
-[[override]]
-lint = "hawk::dead_public"
-crate = "ruff_db"
-item = "system::command::Command::env_remove"
-kind = "inherent_method"
-level = "expect"
-reason = "command environment methods mirror the standard library Command API"
-
-[[override]]
-lint = "hawk::unnecessary_public"
-crate = "ruff_db"
-item = "system::command::Command::get_envs"
-kind = "inherent_method"
-level = "expect"
-reason = "command environment methods mirror the standard library Command API"
-
-[[override]]
-lint = "hawk::unnecessary_public"
-crate = "ruff_db"
-item = "system::command::Command::get_env_clear"
-kind = "inherent_method"
-level = "expect"
-reason = "command environment methods mirror the standard library Command API"
-
 [[override]]
 lint = "hawk::dead_public"
 crate = "ty_python_core"
