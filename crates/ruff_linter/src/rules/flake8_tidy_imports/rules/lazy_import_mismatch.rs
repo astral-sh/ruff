@@ -34,12 +34,15 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// lazy import typing
 /// ```
 ///
-/// ## Fix safety
-/// This rule's fix is marked as unsafe because changing when a module is
-/// imported can affect runtime behavior, including import-time side effects.
+/// ## Fix availability
 ///
 /// The fix is only available for statements that import a single name, since
 /// changing `lazy` on a multi-member import could violate another name's policy.
+///
+/// ## Fix safety
+///
+/// This rule's fix is marked as unsafe because changing when a module is
+/// imported can affect runtime behavior, including import-time side effects.
 ///
 /// ## Options
 /// - `lint.flake8-tidy-imports.require-lazy`
