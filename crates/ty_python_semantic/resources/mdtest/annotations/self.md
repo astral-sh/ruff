@@ -429,6 +429,75 @@ reveal_type(GenericCircle[int].bar())  # revealed: GenericCircle[int]
 reveal_type(GenericCircle.baz(1))  # revealed: GenericShape[Literal[1]]
 ```
 
+### Protocol class methods
+
+A class method accessed through `type[Factory]` returns a `Factory` instance. Retrieving the method
+before calling it preserves that return type, as does invoking its `__call__` attribute:
+
+```py
+from collections.abc import Callable
+from typing import Protocol, Self
+
+class Factory(Protocol):
+    @classmethod
+    def make(cls: type[Self]) -> Self: ...
+
+def factory(cls: type[Factory]) -> Callable[[], Factory]:
+    reveal_type(cls.make)  # revealed: () -> Factory
+    reveal_type(cls.make())  # revealed: Factory
+    method = cls.make
+    reveal_type(method())  # revealed: Factory
+    reveal_type(method.__call__())  # revealed: Factory
+    return method
+```
+
+### Protocol class methods on intersection receivers
+
+When a class implements a protocol and inherits from another class, the class method's `Self` return
+type describes instances of both. The bound callable satisfies both a `Callable` annotation and a
+callback protocol that require this intersection return type:
+
+```py
+from collections.abc import Callable
+from typing import Protocol, Self
+from ty_extensions import Intersection
+
+class Factory(Protocol):
+    @classmethod
+    def make(cls: type[Self]) -> Self: ...
+
+class Mixin: ...
+
+class Callback[R](Protocol):
+    def __call__(self) -> R: ...
+
+def factory(cls: Intersection[type[Factory], type[Mixin]]) -> Callback[Intersection[Factory, Mixin]]:
+    reveal_type(cls.make)  # revealed: () -> Factory & Mixin
+    reveal_type(cls.make())  # revealed: Factory & Mixin
+    method = cls.make
+    reveal_type(method())  # revealed: Factory & Mixin
+    reveal_type(method.__call__())  # revealed: Factory & Mixin
+    callback: Callable[[], Intersection[Factory, Mixin]] = method
+    return method
+```
+
+The remaining parameters keep their annotations after binding the class receiver. An implicit `cls`
+annotation also preserves the complete intersection in the return type:
+
+```py
+class ValueFactory(Protocol):
+    @classmethod
+    def make(cls, value: int) -> Self: ...
+
+def value_factory(cls: Intersection[type[ValueFactory], type[Mixin]]) -> Callable[[int], Intersection[ValueFactory, Mixin]]:
+    reveal_type(cls.make(1))  # revealed: ValueFactory & Mixin
+    method = cls.make
+    reveal_type(method(1))  # revealed: ValueFactory & Mixin
+    reveal_type(method.__call__(1))  # revealed: ValueFactory & Mixin
+    method("bad")  # error: [invalid-argument-type]
+    return method
+```
+
 ### Calling `super()` in overridden methods with `Self` return type
 
 This is a regression test for <https://github.com/astral-sh/ty/issues/2122>.
