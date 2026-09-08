@@ -966,17 +966,27 @@ fn single_descriptor_setter_domain<'db>(
     descriptor_ty: Type<'db>,
     receiver_ty: Type<'db>,
 ) -> DescriptorSetterDomain<'db> {
-    let Place::Defined(DefinedPlace {
-        ty: setter_ty,
-        definedness: Definedness::AlwaysDefined,
-        ..
-    }) = (DescriptorSetCall {
-        descriptor_ty,
-        receiver_ty,
-    })
-    .setter(db, env)
-    else {
-        return DescriptorSetterDomain::Missing;
+    let (setter_ty, self_ty) = if let Type::PropertyInstance(property) = descriptor_ty {
+        // The synthesized `property.__set__` signature accepts `object`, but the property's
+        // setter provides the actual value type. An owner method's `Self` refers to that owner.
+        let Some(setter_ty) = property.setter(db) else {
+            return DescriptorSetterDomain::Missing;
+        };
+        (setter_ty, receiver_ty)
+    } else {
+        let Place::Defined(DefinedPlace {
+            ty: setter_ty,
+            definedness: Definedness::AlwaysDefined,
+            ..
+        }) = (DescriptorSetCall {
+            descriptor_ty,
+            receiver_ty,
+        })
+        .setter(db, env)
+        else {
+            return DescriptorSetterDomain::Missing;
+        };
+        (setter_ty, descriptor_ty)
     };
 
     let Some(callables) = setter_ty.try_upcast_to_callable(db, env) else {
@@ -986,8 +996,7 @@ fn single_descriptor_setter_domain<'db>(
     for callable in &callables {
         let mut write_types = Vec::new();
         for signature in callable.signatures(db) {
-            match descriptor_setter_signature_domain(db, env, signature, descriptor_ty, receiver_ty)
-            {
+            match descriptor_setter_signature_domain(db, env, signature, self_ty, receiver_ty) {
                 DescriptorSetterSignatureDomain::Inapplicable => {}
                 DescriptorSetterSignatureDomain::Known(write_ty) => write_types.push(write_ty),
                 DescriptorSetterSignatureDomain::Deferred => {
@@ -1009,12 +1018,12 @@ enum DescriptorSetterSignatureDomain<'db> {
     Deferred,
 }
 
-/// Derive the values accepted by one `__set__` overload when they fit in [`Type`].
+/// Derive the values accepted by one setter overload when they fit in [`Type`].
 fn descriptor_setter_signature_domain<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     signature: &Signature<'db>,
-    descriptor_ty: Type<'db>,
+    self_ty: Type<'db>,
     receiver_ty: Type<'db>,
 ) -> DescriptorSetterSignatureDomain<'db> {
     let parameters = signature.parameters();
@@ -1039,10 +1048,9 @@ fn descriptor_setter_signature_domain<'db>(
     let Some(receiver_parameter) = parameters.get_positional(0) else {
         return missing_required_parameter();
     };
-    let receiver_parameter =
-        receiver_parameter
-            .annotated_type()
-            .bind_self_typevars(db, env, descriptor_ty);
+    let receiver_parameter = receiver_parameter
+        .annotated_type()
+        .bind_self_typevars(db, env, self_ty);
     if contains_signature_typevar(db, env, signature, receiver_parameter) {
         return DescriptorSetterSignatureDomain::Deferred;
     }
@@ -1055,7 +1063,7 @@ fn descriptor_setter_signature_domain<'db>(
     };
     let write_ty = write_parameter
         .annotated_type()
-        .bind_self_typevars(db, env, descriptor_ty);
+        .bind_self_typevars(db, env, self_ty);
     if !contains_signature_typevar(db, env, signature, write_ty) {
         return DescriptorSetterSignatureDomain::Known(write_ty);
     }
@@ -1078,7 +1086,7 @@ fn descriptor_setter_signature_domain<'db>(
     match typevar.typevar(db).bound_or_constraints(db, env) {
         None => DescriptorSetterSignatureDomain::Known(Type::object()),
         Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-            DescriptorSetterSignatureDomain::Known(bound.bind_self_typevars(db, env, descriptor_ty))
+            DescriptorSetterSignatureDomain::Known(bound.bind_self_typevars(db, env, self_ty))
         }
         Some(TypeVarBoundOrConstraints::Constraints(_)) => {
             DescriptorSetterSignatureDomain::Deferred
