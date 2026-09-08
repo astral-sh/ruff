@@ -31,7 +31,7 @@ use ty_project::{
 };
 
 use index::DocumentError;
-use ty_python_core::program::UseDefaultStrategy;
+use ty_python_core::program::{FallibleStrategy, UseDefaultStrategy};
 
 pub(crate) use self::options::InitializationOptions;
 pub use self::options::{ClientOptions, DiagnosticMode, GlobalOptions, WorkspaceOptions};
@@ -792,7 +792,11 @@ impl Session {
                     metadata.apply_override_options(override_options.clone());
                 }
 
-                ProjectDatabase::fallible(metadata, system.clone())
+                ProjectDatabase::with_place_load_recording(
+                    metadata,
+                    system.clone(),
+                    &FallibleStrategy,
+                )
             });
 
         let mut db = match project {
@@ -815,7 +819,12 @@ impl Session {
                     &UseDefaultStrategy,
                 )
                 .map(|metadata| metadata.with_use_uv(self.use_uv));
-                ProjectDatabase::use_defaults(metadata, system)
+                let Ok(db) = ProjectDatabase::with_place_load_recording(
+                    metadata,
+                    system,
+                    &UseDefaultStrategy,
+                );
+                db
             }
         };
 

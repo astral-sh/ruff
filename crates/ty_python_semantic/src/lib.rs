@@ -16,6 +16,11 @@ pub use db::{
 pub(crate) use diagnostic::add_inferred_python_version_hint_to_diagnostic;
 pub use diagnostic::inferred_python_version_source_annotation;
 pub use fixes::{fix_all_diagnostics, suppress_all_diagnostics};
+#[allow(
+    dead_code,
+    reason = "definition-resolution metadata is exposed for IDE consumers"
+)]
+pub use place::definitions::DefinitionResolution;
 use ruff_db::PythonFile;
 use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Severity, Span};
 use ruff_db::files::File;
@@ -45,17 +50,19 @@ pub use ty_site_packages::{
     SitePackagesDiscoveryError, SitePackagesPaths, SysPrefixPathOrigin,
 };
 pub use types::ide_support::{
-    ImplementationsFinder, ImportAliasResolution, ResolvedDefinition, TypeHierarchyClass,
-    contains_identifier, definitions_for_attribute, definitions_for_bin_op,
+    ImplementationsFinder, ImportAliasResolution, InferredNameLoads, ResolvedDefinition,
+    TypeHierarchyClass, contains_identifier, definitions_for_attribute, definitions_for_bin_op,
     definitions_for_imported_symbol, definitions_for_name, definitions_for_unary_op,
     map_stub_definition, type_hierarchy_prepare, type_hierarchy_subtypes,
     type_hierarchy_supertypes,
 };
 pub use types::{
-    DisplaySettings, FixtureBinding, FixtureExposure, FixtureNameSource, ProgramEnvironment,
-    TypeQualifiers, fixture_bindings_for_parameter, fixture_exposures_for_definition,
-    pytest_global_plugin_files,
+    DeferredExpressionState, DisplaySettings, FixtureBinding, FixtureExposure, FixtureNameSource,
+    InferredNameLoad, ProgramEnvironment, TypeQualifiers, fixture_bindings_for_parameter,
+    fixture_exposures_for_definition, pytest_global_plugin_files,
 };
+#[allow(dead_code, reason = "inference APIs are exposed for IDE consumers")]
+pub use types::{binding_type, ide_support::NameLoadInference};
 
 mod db;
 pub mod dependency;

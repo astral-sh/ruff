@@ -1,8 +1,10 @@
 use smallvec::SmallVec;
+use ty_module_resolver::Module;
 use ty_python_core::definition::{Definition, DefinitionKind, DefinitionState};
 use ty_python_core::scope::ScopeId;
 use ty_python_core::{
-    BindingWithConstraintsIterator, BoundnessAnalysis, global_scope, place_table, use_def_map,
+    BindingWithConstraintsIterator, BoundnessAnalysis, Program, ProgramFile, global_scope,
+    place_table, use_def_map,
 };
 
 use crate::Db;
@@ -15,13 +17,30 @@ use crate::place_load::{ImplicitPlaceLoad, PlaceLoadSource, PlaceLoadSourceKind}
 use crate::reachability::ReachabilityConstraintsExtension;
 use crate::types::ProgramEnvironment;
 
+/// Returns the definitions that may supply the value for a module global at the end of its scope.
+pub(crate) fn definitions_for_module_global<'db>(
+    db: &'db dyn Db,
+    program: Program<'db>,
+    module: Module<'db>,
+    name: &str,
+) -> Option<DefinitionResolution<'db>> {
+    let file = ProgramFile::new(db, module.file(db)?, program);
+    let scope = global_scope(db, file);
+    let symbol = place_table(db, scope).symbol_id(name)?;
+
+    Some(DefinitionResolution::from_bindings(
+        db,
+        use_def_map(db, scope).end_of_scope_symbol_bindings(symbol),
+    ))
+}
+
 /// A set of definitions found by name resolution along with facts about their availability.
 #[derive(Debug, Clone, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 #[expect(
     clippy::struct_excessive_bools,
     reason = "these flags describe independent facts about the resolved definitions"
 )]
-pub(crate) struct DefinitionResolution<'db> {
+pub struct DefinitionResolution<'db> {
     definitions: SmallVec<[Definition<'db>; 2]>,
     is_complete: bool,
     may_be_unbound: bool,
@@ -35,28 +54,52 @@ pub(crate) struct DefinitionResolution<'db> {
 )]
 impl<'db> DefinitionResolution<'db> {
     /// Returns the definitions found by name resolution.
-    pub(crate) fn definitions(&self) -> &[Definition<'db>] {
+    pub fn definitions(&self) -> &[Definition<'db>] {
         &self.definitions
     }
 
     /// Returns whether every possible result is represented by a definition.
-    pub(crate) fn is_complete(&self) -> bool {
+    pub fn is_complete(&self) -> bool {
         self.is_complete
     }
 
     /// Returns whether the value is bound on every reachable control-flow path.
-    pub(crate) fn is_definitely_bound(&self) -> bool {
+    pub fn is_definitely_bound(&self) -> bool {
         !self.may_be_unbound
     }
 
     /// Returns whether a reachable deletion may leave the value unbound.
-    pub(crate) fn may_be_deleted(&self) -> bool {
+    pub fn may_be_deleted(&self) -> bool {
         self.may_be_deleted
     }
 
     /// Returns whether resolution crosses a `global` or `nonlocal` declaration.
-    pub(crate) fn crosses_scope_declaration(&self) -> bool {
+    pub fn crosses_scope_declaration(&self) -> bool {
         self.crosses_scope_declaration
+    }
+
+    /// Replaces each definition with its projected definitions.
+    ///
+    /// The result is incomplete if any definition has no projection.
+    pub(crate) fn project_definitions<I>(
+        mut self,
+        mut project: impl FnMut(Definition<'db>) -> I,
+    ) -> Self
+    where
+        I: IntoIterator<Item = Definition<'db>>,
+    {
+        let definitions = std::mem::take(&mut self.definitions);
+
+        for definition in definitions {
+            let mut has_projection = false;
+            for projected in project(definition) {
+                has_projection = true;
+                self.push_definition(projected);
+            }
+            self.is_complete &= has_projection;
+        }
+
+        self
     }
 
     fn from_place_load_source(
@@ -313,5 +356,60 @@ impl<'db> DefinitionResolutionBuilder<'db> {
         self.resolution.crosses_scope_declaration |= crosses_scope_declaration;
         self.resolution.definitions.shrink_to_fit();
         self.resolution
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use ruff_db::files::system_path_to_file;
+    use ty_python_core::ProgramFile;
+
+    use super::definitions_for_module_global;
+    use crate::SemanticModel;
+    use crate::db::tests::TestDbBuilder;
+
+    #[test]
+    fn definitions_for_module_global_retains_conditional_definitions() {
+        let db = TestDbBuilder::new()
+            .with_file(
+                "/src/pkg/__init__.py",
+                r#"
+if flag:
+    from . import first as value
+else:
+    from . import second as value
+"#,
+            )
+            .with_file(
+                "/src/pkg/first.py",
+                r#"
+"#,
+            )
+            .with_file(
+                "/src/pkg/second.py",
+                r#"
+"#,
+            )
+            .with_file(
+                "/src/use.py",
+                r#"
+import pkg
+"#,
+            )
+            .build()
+            .expect("valid TestDb setup");
+        let file = system_path_to_file(&db, "/src/use.py").expect("test file should exist");
+        let program = db.program_environment().program(&db);
+        let model = SemanticModel::new(&db, ProgramFile::new(&db, file, program));
+        let module = model
+            .resolve_module(Some("pkg"), 0)
+            .expect("test package should resolve");
+
+        let resolution = definitions_for_module_global(&db, program, module, "value")
+            .expect("module global should exist");
+
+        assert_eq!(resolution.definitions().len(), 2);
+        assert!(resolution.is_complete());
+        assert!(resolution.is_definitely_bound());
     }
 }
