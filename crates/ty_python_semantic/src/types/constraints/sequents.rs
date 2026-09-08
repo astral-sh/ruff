@@ -6,8 +6,8 @@ use std::fmt::{Debug, Display};
 use crate::types::constraints::variables::{
     ConcreteEquivalenceBound, ConcreteLowerBound, ConcreteUpperBound, Constraint,
     ConstraintProvenance, ProvidesConcreteBound, ProvidesConcreteLowerBound,
-    ProvidesConcreteUpperBound, ProvidesTypeVarEquivalenceBound, ProvidesTypeVarRangeBound,
-    TypeVarEquivalenceBound, TypeVarRangeBound,
+    ProvidesConcreteUpperBound, ProvidesTypeVarBound, ProvidesTypeVarEquivalenceBound,
+    ProvidesTypeVarRangeBound, TypeVarEquivalenceBound, TypeVarRangeBound,
 };
 use crate::types::constraints::{
     ALWAYS_FALSE, ConstraintId, ConstraintSetBuilder, ConstraintSetStorage, Node,
@@ -311,6 +311,30 @@ impl<'db> SequentMap<Constraint<'db>> {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ReplacementIs {
+    FromEquivalence,
+    FromRange,
+}
+
+impl ReplacementIs {
+    fn from_concrete_bound<'db>(bound: impl ProvidesConcreteBound<'db>) -> ReplacementIs {
+        if bound.is_equivalence() {
+            ReplacementIs::FromEquivalence
+        } else {
+            ReplacementIs::FromRange
+        }
+    }
+
+    fn from_typevar_bound<'db>(bound: impl ProvidesTypeVarBound<'db>) -> ReplacementIs {
+        if bound.is_equivalence() {
+            ReplacementIs::FromEquivalence
+        } else {
+            ReplacementIs::FromRange
+        }
+    }
+}
+
 impl<'db> Constraint<'db> {
     fn add_sequents(
         self,
@@ -583,11 +607,21 @@ impl<'db> Constraint<'db> {
         needle_bound: Type<'db>,
         replacement_typevar: BoundTypeVarInstance<'db>,
         replacement_bound: Type<'db>,
+        replacement_is: ReplacementIs,
     ) -> Option<Type<'db>> {
-        // Gradual assignability is not transitive. Substituting a dynamic replacement into another
-        // bound would let an uncertain relationship participate in an arbitrarily long sequent
-        // chain.
-        if !replacement_bound.is_static_sequent_eligible(db, env) {
+        // Substituting a gradual type is not always safe.
+        //
+        // If we are substituting because a lower or upper bound, that means we are applying
+        // transitivity. Gradual assignability is not transitive. Substituting a dynamic
+        // replacement into another bound would let an uncertain relationship participate in an
+        // arbitrarily long sequent chain.
+        //
+        // If we are substituting because of an equivalence bound, that means we have two terms
+        // that are equal, and we are just substituting one for the other. This does not rely on
+        // transitivity, and is therefore sound even for gradual types.
+        if replacement_is == ReplacementIs::FromRange
+            && !replacement_bound.is_static_sequent_eligible(db, env)
+        {
             return None;
         }
 
@@ -665,6 +699,7 @@ impl<'db> Constraint<'db> {
             left.bound(),
             right.typevar(),
             right.bound(),
+            ReplacementIs::from_concrete_bound(right),
         ) else {
             return;
         };
@@ -698,6 +733,7 @@ impl<'db> Constraint<'db> {
             left.bound(),
             right.typevar(),
             right.bound(),
+            ReplacementIs::from_concrete_bound(right),
         ) else {
             return;
         };
@@ -731,6 +767,7 @@ impl<'db> Constraint<'db> {
             left.bound(),
             right.typevar(),
             right.bound(),
+            ReplacementIs::from_concrete_bound(right),
         ) else {
             return;
         };
@@ -763,6 +800,7 @@ impl<'db> Constraint<'db> {
                 lower.bound(),
                 upper.typevar(),
                 upper.bound(),
+                ReplacementIs::from_concrete_bound(upper),
             )
         {
             let derived = lower.into_lower_bound().map(provenance, replacement);
@@ -784,6 +822,7 @@ impl<'db> Constraint<'db> {
                 upper.bound(),
                 lower.typevar(),
                 lower.bound(),
+                ReplacementIs::from_concrete_bound(lower),
             )
         {
             let derived = upper.into_upper_bound().map(provenance, replacement);
@@ -817,6 +856,7 @@ impl<'db> Constraint<'db> {
             left.bound(),
             right.typevar(),
             right.bound(),
+            ReplacementIs::from_concrete_bound(right),
         ) else {
             return;
         };
@@ -851,6 +891,7 @@ impl<'db> Constraint<'db> {
             left.bound(),
             right.right(),
             Type::TypeVar(right.left()),
+            ReplacementIs::from_typevar_bound(right),
         ) else {
             return;
         };
@@ -885,6 +926,7 @@ impl<'db> Constraint<'db> {
             left.bound(),
             right.left(),
             Type::TypeVar(right.right()),
+            ReplacementIs::from_typevar_bound(right),
         ) else {
             return;
         };
@@ -919,6 +961,7 @@ impl<'db> Constraint<'db> {
             left.bound(),
             right.left(),
             Type::TypeVar(right.right()),
+            ReplacementIs::from_typevar_bound(right),
         ) else {
             return;
         };
@@ -953,6 +996,7 @@ impl<'db> Constraint<'db> {
             left.bound(),
             right.left(),
             Type::TypeVar(right.right()),
+            ReplacementIs::from_typevar_bound(right),
         ) else {
             return;
         };
@@ -987,6 +1031,7 @@ impl<'db> Constraint<'db> {
             left.bound(),
             right.right(),
             Type::TypeVar(right.left()),
+            ReplacementIs::from_typevar_bound(right),
         ) else {
             return;
         };
@@ -1021,6 +1066,7 @@ impl<'db> Constraint<'db> {
             left.bound(),
             right.left(),
             Type::TypeVar(right.right()),
+            ReplacementIs::from_typevar_bound(right),
         ) else {
             return;
         };
@@ -1055,6 +1101,7 @@ impl<'db> Constraint<'db> {
             left.bound(),
             right.left(),
             Type::TypeVar(right.right()),
+            ReplacementIs::from_typevar_bound(right),
         ) else {
             return;
         };
