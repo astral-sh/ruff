@@ -363,7 +363,10 @@ impl<'a> Checker<'a> {
 
     /// Whether changing this import's module preserves membership in `__lazy_modules__`.
     pub(crate) fn import_rewrite_preserves_laziness(&self, original: &str, target: &str) -> bool {
-        if self.lazy_import_context().is_some() {
+        if self.lazy_import_context().is_some()
+            || matches!(self.semantic.current_statement(), Stmt::ImportFrom(import)
+                if import.names.iter().any(|alias| alias.name.as_str() == "*"))
+        {
             return true;
         }
         matches!(
