@@ -7,10 +7,8 @@ use ruff_python_ast as ast;
 use rustc_hash::FxHashMap;
 
 use crate::ProgramEnvironment;
-use crate::types::enums::enum_metadata;
-use crate::types::tuple::Tuple;
 use crate::types::typed_dict::extract_unpacked_typed_dict_keys_from_value_type;
-use crate::types::{KnownClass, Type, TypeContext, expand_type};
+use crate::types::{Type, TypeContext, expand_type};
 
 /// Maximum total number of expanded argument type combinations across all arguments
 /// in [`CallArguments::expand`].
@@ -543,26 +541,5 @@ pub(crate) fn is_expandable_type<'db>(
     env: &ProgramEnvironment<'db>,
     ty: Type<'db>,
 ) -> bool {
-    match ty {
-        Type::EnumComplement(_) => true,
-        Type::Intersection(intersection) => intersection.finite_alternatives(db, env).is_some(),
-        Type::NominalInstance(instance) => {
-            let class = instance.class(db, env);
-            if class.is_known(db, KnownClass::Bool) {
-                return true;
-            }
-            if let Some(tuple_spec) = instance.tuple_spec(db, env)
-                && let Tuple::Fixed(fixed_length_tuple) = &*tuple_spec
-                && fixed_length_tuple
-                    .iter_all_elements()
-                    .any(|element| is_expandable_type(db, env, element))
-            {
-                return true;
-            }
-            enum_metadata(db, class.class_literal(db)).is_some()
-        }
-        Type::Union(_) => true,
-        Type::TypeAlias(alias) => is_expandable_type(db, env, alias.value_type(db)),
-        _ => false,
-    }
+    expand_type(db, env, ty).is_some()
 }
