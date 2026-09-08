@@ -4,9 +4,10 @@ use ruff_text_size::Ranged;
 use super::{ArgumentsIter, MultiInferenceGuard, TypeInferenceBuilder};
 use crate::place::{DefinedPlace, Place, PlaceAndQualifiers};
 use crate::types::attribute_write::{
-    AttributeWriteRequirement, ClassAttributeWriteMember, ExplicitAttributeWriteRequirement,
-    FallbackAttributeWriteRequirement, InstanceAttributeWriteMember,
-    ProtocolMemberWriteRequirement, attribute_write_requirement, property_setter_returns_never,
+    AttributeWriteRequirement, ClassAttributeWriteMember, DescriptorSetCall,
+    DescriptorSetterDomain, ExplicitAttributeWriteRequirement, FallbackAttributeWriteRequirement,
+    InstanceAttributeWriteMember, ProtocolMemberWriteRequirement, attribute_write_requirement,
+    descriptor_setter_domain, property_setter_returns_never,
 };
 use crate::types::call::{Bindings, CallArguments, CallDiagnosticOverride, CallError};
 use crate::types::class::FrozenDataclassDispatch;
@@ -73,7 +74,6 @@ enum AssignmentAttributeWriteDiagnostic<'db> {
     BadDunderSet {
         failure: CallError<'db>,
         descriptor_ty: Type<'db>,
-        includes_descriptor_argument: bool,
     },
     PossiblyMissing,
     BadSetAttr {
@@ -90,6 +90,12 @@ enum AssignmentAttributeWriteDiagnostic<'db> {
 enum ContextualInference {
     Commit,
     Speculate,
+}
+
+#[derive(Clone, Copy)]
+enum DescriptorWriteKind {
+    Ordinary,
+    Protocol,
 }
 
 /// Whether a resolved write target contributes or suppresses a property deprecation.
@@ -433,11 +439,12 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                     {
                         return false;
                     }
-                    self.evaluate_protocol_descriptor_write(
+                    self.evaluate_descriptor_write(
                         *descriptor_ty,
                         *receiver_ty,
                         value_ty,
                         emit_diagnostics,
+                        DescriptorWriteKind::Protocol,
                     )
                 }
                 None => {
@@ -548,7 +555,13 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
             ) {
             self.infer_and_try_call_setattr(setattr_receiver, emit_diagnostics)
         } else {
-            let value_ty = self.infer_value(TypeContext::default(), emit_diagnostics);
+            let tcx = match member {
+                InstanceAttributeWriteMember::Explicit { member, .. } => {
+                    self.descriptor_type_context(object_ty, member)
+                }
+                _ => TypeContext::default(),
+            };
+            let value_ty = self.infer_value(tcx, emit_diagnostics);
             let setattr_result = setattr_receiver.try_call_dunder_with_policy(
                 db,
                 env,
@@ -693,7 +706,8 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                     self.infer_value(TypeContext::default(), emit_diagnostics);
                     return false;
                 }
-                let value_ty = self.infer_value(TypeContext::default(), emit_diagnostics);
+                let tcx = self.descriptor_type_context(object_ty, member);
+                let value_ty = self.infer_value(tcx, emit_diagnostics);
                 let member_valid =
                     self.evaluate_explicit_member(object_ty, member, value_ty, emit_diagnostics);
                 if let Some(fallback) = fallback {
@@ -759,6 +773,25 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
         }
     }
 
+    fn descriptor_type_context(
+        &self,
+        receiver_ty: Type<'db>,
+        requirement: &ExplicitAttributeWriteRequirement<'db>,
+    ) -> TypeContext<'db> {
+        if let ExplicitAttributeWriteRequirement::Descriptor { descriptor_ty, .. } = requirement
+            && let DescriptorSetterDomain::Known(write_ty) = descriptor_setter_domain(
+                self.builder.db(),
+                self.builder.program_environment(),
+                *descriptor_ty,
+                receiver_ty,
+            )
+        {
+            TypeContext::new(Some(write_ty))
+        } else {
+            TypeContext::default()
+        }
+    }
+
     fn evaluate_explicit_member(
         &mut self,
         object_ty: Type<'db>,
@@ -767,17 +800,14 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
         emit_diagnostics: bool,
     ) -> bool {
         match requirement {
-            ExplicitAttributeWriteRequirement::Descriptor {
-                descriptor_ty,
-                setter_ty,
-                ..
-            } => self.evaluate_descriptor_write(
-                *descriptor_ty,
-                *setter_ty,
-                object_ty,
-                value_ty,
-                emit_diagnostics,
-            ),
+            ExplicitAttributeWriteRequirement::Descriptor { descriptor_ty, .. } => self
+                .evaluate_descriptor_write(
+                    *descriptor_ty,
+                    object_ty,
+                    value_ty,
+                    emit_diagnostics,
+                    DescriptorWriteKind::Ordinary,
+                ),
             ExplicitAttributeWriteRequirement::AssignableTo { ty, .. } => {
                 let value_ty = self.infer_value(TypeContext::new(Some(*ty)), false);
                 self.check_type_pair(value_ty, *ty, emit_diagnostics)
@@ -785,30 +815,33 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
         }
     }
 
-    fn evaluate_protocol_descriptor_write(
+    fn evaluate_descriptor_write(
         &mut self,
         descriptor_ty: Type<'db>,
         receiver_ty: Type<'db>,
         value_ty: Type<'db>,
         emit_diagnostics: bool,
+        kind: DescriptorWriteKind,
     ) -> bool {
         let env = self.builder.program_environment();
         let db = self.builder.db();
         let descriptor_ty = descriptor_ty.resolve_type_alias(db);
         if let Type::Union(union) = descriptor_ty {
             for descriptor_ty in union.elements(db) {
-                if !self.evaluate_protocol_descriptor_write(
+                if !self.evaluate_descriptor_write(
                     *descriptor_ty,
                     receiver_ty,
                     value_ty,
                     false,
+                    kind,
                 ) {
                     if emit_diagnostics {
-                        self.evaluate_protocol_descriptor_write(
+                        self.evaluate_descriptor_write(
                             *descriptor_ty,
                             receiver_ty,
                             value_ty,
                             true,
+                            kind,
                         );
                     }
                     return false;
@@ -817,65 +850,20 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
             return true;
         }
 
-        if property_setter_returns_never(db, env, descriptor_ty, receiver_ty, value_ty) {
-            if emit_diagnostics {
-                self.report(AssignmentAttributeWriteDiagnostic::TerminalDescriptor);
-            }
-            return false;
+        let setter_result = DescriptorSetCall {
+            descriptor_ty,
+            receiver_ty,
         }
-
-        match descriptor_ty.try_call_dunder_with_policy(
-            db,
-            env,
-            "__set__",
-            &mut CallArguments::positional([receiver_ty, value_ty]),
-            TypeContext::default(),
-            MemberLookupPolicy::REQUIRE_CONCRETE,
-        ) {
-            Ok(_) => true,
-            Err(CallDunderError::CallError(kind, bindings, _)) => {
-                if emit_diagnostics {
-                    self.report(AssignmentAttributeWriteDiagnostic::BadDunderSet {
-                        failure: CallError(kind, bindings),
-                        descriptor_ty,
-                        includes_descriptor_argument: false,
-                    });
-                }
-                false
-            }
-            Err(CallDunderError::MethodNotAvailable | CallDunderError::PossiblyUnbound { .. }) => {
-                if emit_diagnostics {
-                    self.report(AssignmentAttributeWriteDiagnostic::CannotAssign);
-                }
-                false
-            }
-        }
-    }
-
-    fn evaluate_descriptor_write(
-        &mut self,
-        descriptor_ty: Type<'db>,
-        setter_ty: Type<'db>,
-        object_ty: Type<'db>,
-        value_ty: Type<'db>,
-        emit_diagnostics: bool,
-    ) -> bool {
-        let db = self.builder.db();
-        let env = self.builder.program_environment();
-        let setter_result = setter_ty.try_call(
-            db,
-            env,
-            &CallArguments::positional([descriptor_ty, object_ty, value_ty]),
-        );
+        .try_call(db, env, value_ty);
         // `Never` supports arbitrary operations only because there can be no runtime value to
         // mutate; it is not a concrete descriptor with a terminal setter.
         let setter_returns_never = !descriptor_ty.is_never()
             && match &setter_result {
                 Ok(bindings) => bindings.return_type(db, env).is_never(),
-                Err(error) => error.return_type(db, env).is_never(),
+                Err(error) => error.return_type(db, env).is_some_and(|ty| ty.is_never()),
             };
         if setter_returns_never
-            || property_setter_returns_never(db, env, descriptor_ty, object_ty, value_ty)
+            || property_setter_returns_never(db, env, descriptor_ty, receiver_ty, value_ty)
         {
             if emit_diagnostics {
                 self.report(AssignmentAttributeWriteDiagnostic::TerminalDescriptor);
@@ -885,13 +873,25 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
 
         match setter_result {
             Ok(_) => true,
-            Err(error) => {
+            // A selected ordinary descriptor only constrains the branch where its setter exists.
+            // A protocol write capability requires the setter to be present on every branch.
+            Err(CallDunderError::PossiblyUnbound { .. })
+                if matches!(kind, DescriptorWriteKind::Ordinary) =>
+            {
+                true
+            }
+            Err(CallDunderError::CallError(kind, bindings, _)) => {
                 if emit_diagnostics {
                     self.report(AssignmentAttributeWriteDiagnostic::BadDunderSet {
-                        failure: error,
+                        failure: CallError(kind, bindings),
                         descriptor_ty,
-                        includes_descriptor_argument: true,
                     });
+                }
+                false
+            }
+            Err(CallDunderError::MethodNotAvailable | CallDunderError::PossiblyUnbound { .. }) => {
+                if emit_diagnostics {
+                    self.report(AssignmentAttributeWriteDiagnostic::CannotAssign);
                 }
                 false
             }
@@ -1066,14 +1066,12 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
             AssignmentAttributeWriteDiagnostic::BadDunderSet {
                 failure,
                 descriptor_ty,
-                includes_descriptor_argument,
             } => {
                 report_bad_dunder_set_call(
                     &self.builder.context,
                     &failure,
                     self.object_ty,
                     descriptor_ty,
-                    includes_descriptor_argument,
                     self.target,
                     self.value,
                 );

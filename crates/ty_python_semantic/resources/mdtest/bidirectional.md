@@ -1591,7 +1591,8 @@ def _(a: int | None):
 
 ## Instance attributes
 
-Both meta and class/instance attribute annotations are used as type context:
+Both meta and class/instance attribute annotations are used as type context. For a metaclass
+descriptor, the setter's value parameter supplies the context:
 
 ```py
 from typing import Literal, Any
@@ -1614,8 +1615,6 @@ def _(flag: bool):
     def _(c: C):
         c.x = reveal_type([1])  # revealed: list[int]
 
-        # TODO: Use the parameter type of `__set__` as type context to avoid this error.
-        # error: [invalid-assignment]
         C.x = [1]
 ```
 

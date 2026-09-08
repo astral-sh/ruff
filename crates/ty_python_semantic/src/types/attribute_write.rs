@@ -11,7 +11,7 @@ use crate::Db;
 use ty_module_resolver::KnownModule;
 use ty_python_core::use_def_map;
 
-use super::call::CallArguments;
+use super::call::{Bindings, CallArguments, CallDunderError, CallError};
 use super::callable::CallableTypeKind;
 use super::{
     IntersectionType, KnownClass, KnownInstanceType, MemberLookupPolicy, Parameter, Signature,
@@ -130,12 +130,8 @@ pub(super) enum ClassAttributeWriteMember<'db> {
 /// How an explicitly resolved member accepts a write.
 pub(super) enum ExplicitAttributeWriteRequirement<'db> {
     /// Invoke a concrete descriptor's `__set__` method.
-    ///
-    /// `setter_ty` is the unbound method and is called with `descriptor_ty`, the object, and the
-    /// assigned value.
     Descriptor {
         descriptor_ty: Type<'db>,
-        setter_ty: Type<'db>,
         qualifiers: TypeQualifiers,
     },
     /// Check the assigned value directly against the member's effective write type.
@@ -594,13 +590,12 @@ fn explicit_attribute_write_requirement<'db>(
         };
     }
 
-    if let Place::Defined(DefinedPlace { ty: setter_ty, .. }) = attr_ty
+    if let Place::Defined(_) = attr_ty
         .class_member_with_policy(db, env, "__set__", MemberLookupPolicy::REQUIRE_CONCRETE)
         .place
     {
         ExplicitAttributeWriteRequirement::Descriptor {
             descriptor_ty: attr_ty,
-            setter_ty,
             qualifiers,
         }
     } else {
@@ -868,6 +863,67 @@ pub(super) fn assignment_attribute_members<'db>(
     })
 }
 
+/// A setter call after descriptor discovery and write precedence have selected its receiver.
+///
+/// Python binds `__set__` to the descriptor before passing the owner and assigned value. Keeping
+/// these two explicit arguments separate from the bound receiver also preserves their diagnostic
+/// ranges. This differs from `__get__`, which Python calls with the descriptor as an explicit
+/// argument and must continue to use its own dispatch.
+#[derive(Clone, Copy)]
+pub(super) struct DescriptorSetCall<'db> {
+    pub(super) descriptor_ty: Type<'db>,
+    pub(super) receiver_ty: Type<'db>,
+}
+
+impl<'db> DescriptorSetCall<'db> {
+    /// Look up the bound setter without consulting instance storage or gradual bases.
+    pub(super) fn setter(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Place<'db> {
+        self.descriptor_ty
+            .member_lookup_with_policy(
+                db,
+                env,
+                "__set__",
+                MemberLookupPolicy::REQUIRE_CONCRETE | MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+            )
+            .place
+    }
+
+    pub(super) fn try_call(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        value_ty: Type<'db>,
+    ) -> Result<Bindings<'db>, CallDunderError<'db>> {
+        // Keep the complete descriptor receiver when binding `self`, including intersection
+        // constraints. Splitting an intersection before binding can lose a required base class.
+        let Place::Defined(DefinedPlace {
+            ty: setter_ty,
+            definedness,
+            provenance,
+            ..
+        }) = self.setter(db, env)
+        else {
+            return Err(CallDunderError::MethodNotAvailable);
+        };
+        let bindings = setter_ty
+            .try_call(
+                db,
+                env,
+                &CallArguments::positional([self.receiver_ty, value_ty]),
+            )
+            .map_err(|CallError(kind, bindings)| {
+                CallDunderError::CallError(kind, bindings, provenance)
+            })?;
+        if definedness == Definedness::PossiblyUndefined {
+            return Err(CallDunderError::PossiblyUnbound {
+                bindings: Box::new(bindings),
+                unbound_on: None,
+            });
+        }
+        Ok(bindings)
+    }
+}
+
 /// The values accepted by a descriptor setter, when representable as a single type.
 #[derive(Copy, Clone)]
 pub(super) enum DescriptorSetterDomain<'db> {
@@ -883,6 +939,7 @@ pub(super) fn descriptor_setter_domain<'db>(
     descriptor_ty: Type<'db>,
     receiver_ty: Type<'db>,
 ) -> DescriptorSetterDomain<'db> {
+    let descriptor_ty = descriptor_ty.resolve_type_alias(db);
     match descriptor_ty {
         Type::Union(union) => {
             let mut write_types = Vec::with_capacity(union.elements(db).len());
@@ -913,14 +970,11 @@ fn single_descriptor_setter_domain<'db>(
         ty: setter_ty,
         definedness: Definedness::AlwaysDefined,
         ..
-    }) = descriptor_ty
-        .member_lookup_with_policy(
-            db,
-            env,
-            "__set__",
-            MemberLookupPolicy::REQUIRE_CONCRETE | MemberLookupPolicy::NO_INSTANCE_FALLBACK,
-        )
-        .place
+    }) = (DescriptorSetCall {
+        descriptor_ty,
+        receiver_ty,
+    })
+    .setter(db, env)
     else {
         return DescriptorSetterDomain::Missing;
     };
