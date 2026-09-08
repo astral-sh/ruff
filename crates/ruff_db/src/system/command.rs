@@ -134,7 +134,7 @@ impl CommandEnv {
     }
 
     /// Uses `environment` as a base without replacing explicit changes.
-    pub(super) fn merge(&mut self, environment: &Self) {
+    fn merge(&mut self, environment: &Self) {
         if self.clear {
             return;
         }
