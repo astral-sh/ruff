@@ -306,6 +306,42 @@ segments: Mapping[str, Any] = {"start": (1, 2), "end": (3, 4, 5)}
 reveal_type(segments)  # revealed: dict[str, tuple[int, ...]]
 ```
 
+## Unannotated tuple attributes in class bodies
+
+An unannotated tuple assigned to a class attribute is inferred as a homogeneous, variable-length
+tuple. Its element types are promoted and combined, even when the value came from another tuple. An
+explicit annotation retains the declared tuple shape, and an empty tuple remains empty.
+
+```py
+pair = (1, 2)
+
+class Values:
+    numbers = (1, 2)
+    mixed = (1, "two")
+    inherited_pair = pair
+    annotated: tuple[int, int] = (1, 2)
+    empty = ()
+
+reveal_type(pair)  # revealed: tuple[Literal[1], Literal[2]]
+reveal_type(Values.numbers)  # revealed: tuple[int, ...]
+reveal_type(Values.mixed)  # revealed: tuple[int | str, ...]
+reveal_type(Values.inherited_pair)  # revealed: tuple[int, ...]
+reveal_type(Values.annotated)  # revealed: tuple[int, int]
+reveal_type(Values.empty)  # revealed: tuple[()]
+```
+
+`__slots__` and `__match_args__` retain their fixed length so ty can use them for class semantics.
+
+```py
+class SpecialNames:
+    __slots__ = ("value",)
+    __match_args__ = ("value",)
+
+reveal_type(SpecialNames.__slots__)  # revealed: tuple[Literal["value"]]
+reveal_type(SpecialNames.__match_args__)  # revealed: tuple[str]
+reveal_type(SpecialNames().value)  # revealed: Unknown
+```
+
 ## Invariant and contravariant return types are promoted
 
 We promote in non-covariant position in the return type of a generic function, or constructor of a

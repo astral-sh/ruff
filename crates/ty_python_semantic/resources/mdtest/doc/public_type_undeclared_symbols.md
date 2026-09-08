@@ -24,7 +24,8 @@ reveal_type(Counter().value)  # revealed: int
 Class literals stored in inferred attributes are widened when accessed through an instance. A
 subclass can override an undeclared class attribute, so a method that accesses the attribute through
 `self` cannot assume that it still holds the original class object. Direct access on a specific
-class object remains exact:
+class object remains exact. The tuple-valued class attribute has an unknown length, while its
+element can still retain the class object type:
 
 ```py
 from typing import Final, NewType, TypeVar, final
@@ -39,7 +40,7 @@ class TestResponse:
 
     def check(self) -> None:
         reveal_type(self.response_class)  # revealed: type[Response]
-        reveal_type(self.response_classes)  # revealed: tuple[type[Response]]
+        reveal_type(self.response_classes)  # revealed: tuple[type[Response], ...]
         reveal_type(self.response_class == Response)  # revealed: bool
 
         if self.response_class == Response:
@@ -51,7 +52,7 @@ class TestHtmlResponse(TestResponse):
     response_class = HtmlResponse
 
 reveal_type(TestResponse.response_class)  # revealed: <class 'Response'>
-reveal_type(TestResponse.response_classes)  # revealed: tuple[<class 'Response'>]
+reveal_type(TestResponse.response_classes)  # revealed: tuple[<class 'Response'>, ...]
 
 def check_type(response: type[TestResponse]) -> None:
     reveal_type(response.response_class)  # revealed: type[Response]

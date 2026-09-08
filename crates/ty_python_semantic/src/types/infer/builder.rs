@@ -3428,6 +3428,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let add = self.add_binding(target.into(), definition);
         let target_ty =
             self.infer_assignment_definition_impl(assignment, definition, add.type_context());
+        let target_ty = if add.declared_ty.is_none()
+            && self.index.scope(definition.file_scope(self.db())).kind() == ScopeKind::Class
+            && let ast::Expr::Name(name) = target
+            && !matches!(name.id.as_str(), "__slots__" | "__match_args__")
+            && let Some(tuple) = target_ty.exact_tuple_instance_spec(self.db())
+            // An enum's tuple payload supplies positional arguments to `__new__`.
+            && !nearest_enclosing_class(self.db(), self.index, self.scope()).is_some_and(|class| {
+                is_enum_class_by_inheritance(self.db(), self.program_environment(), class)
+            }) {
+            let db = self.db();
+            let env = self.program_environment();
+            let element = tuple.homogeneous_element_type(db, env).promote(db, env);
+            Type::homogeneous_tuple(db, env, element)
+        } else {
+            target_ty
+        };
         self.store_expression_type(target, target_ty);
         add.insert(self, target_ty);
     }

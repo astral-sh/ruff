@@ -662,7 +662,7 @@ fn redundant_condition_lookup_does_not_reenter_scope_inference() -> anyhow::Resu
         "if isinstance({}, dict):\n    pass\n",
         "if isinstance(1.0, float):\n    pass\n",
         "if isinstance(1j, complex):\n    pass\n",
-        "class C:\n    flag = (1, 2)\n\nif C.flag:\n    pass\n",
+        "class C:\n    flag: tuple[int, int] = (1, 2)\n\nif C.flag:\n    pass\n",
     ] {
         let registry = crate::default_lint_registry();
         let mut rules = RuleSelection::from_registry(registry);
@@ -710,7 +710,7 @@ fn repeated_tuple_conditions_share_provenance() -> anyhow::Result<()> {
     let repetitions = 100;
     let names = "value = (1,)\nif value:\n    pass\n".repeat(repetitions);
     let attributes = format!(
-        "class C:\n{}\n{}",
+        "class C:\n    value: tuple[int]\n{}\n{}",
         "    value = (1,)\n".repeat(repetitions),
         "if C.value:\n    pass\n".repeat(repetitions),
     );
