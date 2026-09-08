@@ -763,7 +763,7 @@ pub(crate) mod testing {
         }
 
         /// Creates a test database with the given recording policy.
-        fn with_place_load_recording_mode(
+        pub fn with_place_load_recording_mode(
             project: ProjectMetadata,
             recording_mode: PlaceLoadRecordingMode,
         ) -> Self {
