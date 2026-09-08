@@ -1094,6 +1094,13 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     // Mark the top-level module as "seen" by the semantic model.
                     self.semantic.add_module(module);
 
+                    let mut flags = BindingFlags::EXTERNAL;
+                    if self.lazy_import_context().is_none()
+                        && self.semantic.import_laziness(stmt, alias).is_lazy()
+                    {
+                        flags |= BindingFlags::LAZY;
+                    }
+
                     if alias.asname.is_none() && alias.name.contains('.') {
                         let qualified_name = QualifiedName::user_defined(&alias.name);
                         self.add_binding(
@@ -1102,10 +1109,9 @@ impl<'a> Visitor<'a> for Checker<'a> {
                             BindingKind::SubmoduleImport(SubmoduleImport {
                                 qualified_name: Box::new(qualified_name),
                             }),
-                            BindingFlags::EXTERNAL,
+                            flags,
                         );
                     } else {
-                        let mut flags = BindingFlags::EXTERNAL;
                         if alias.asname.is_some() {
                             flags |= BindingFlags::ALIAS;
                         }
@@ -1168,6 +1174,11 @@ impl<'a> Visitor<'a> for Checker<'a> {
                             .add_star_import(StarImport { level, module });
                     } else {
                         let mut flags = BindingFlags::EXTERNAL;
+                        if self.lazy_import_context().is_none()
+                            && self.semantic.import_laziness(stmt, alias).is_lazy()
+                        {
+                            flags |= BindingFlags::LAZY;
+                        }
                         if alias.asname.is_some() {
                             flags |= BindingFlags::ALIAS;
                         }

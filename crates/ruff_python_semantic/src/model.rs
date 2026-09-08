@@ -2487,6 +2487,13 @@ pub enum ImportLaziness {
     Unknown,
 }
 
+impl ImportLaziness {
+    /// Returns `true` if the import laziness is [`Self::Lazy`].
+    pub fn is_lazy(&self) -> bool {
+        matches!(self, Self::Lazy)
+    }
+}
+
 pub struct ShadowedBinding {
     /// The binding that is shadowing another binding.
     binding_id: BindingId,
