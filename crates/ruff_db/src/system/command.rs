@@ -67,7 +67,10 @@ impl Command {
     ///
     /// Removed variables have a value of `None`. Variables inherited from the parent process
     /// are not included.
-    #[cfg(feature = "os")]
+    #[cfg_attr(
+        not(feature = "os"),
+        expect(dead_code, reason = "available to non-OS command executors")
+    )]
     pub(crate) fn get_envs(&self) -> impl Iterator<Item = (&str, Option<&str>)> {
         self.environment
             .vars
@@ -76,7 +79,10 @@ impl Command {
     }
 
     /// Returns whether the command clears environment variables inherited from its parent process.
-    #[cfg(feature = "os")]
+    #[cfg_attr(
+        not(feature = "os"),
+        expect(dead_code, reason = "available to non-OS command executors")
+    )]
     pub(crate) fn get_env_clear(&self) -> bool {
         self.environment.get_clear()
     }
