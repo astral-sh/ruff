@@ -3385,6 +3385,49 @@ def update_large_union_value(
     value.value = invalid  # error: [invalid-assignment]
 ```
 
+### Conditional setters in a descriptor union
+
+Both descriptors accept a list of integers when their setters are present. Assignment through the
+protocol still requires every possible descriptor to have a setter. An ordinary assignment allows
+the conditional setter to be absent, since that branch can create an instance attribute:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol
+
+def example(flag: bool) -> None:
+    class GenericDescriptor:
+        def __get__(self, instance: object, owner: type | None = None) -> object:
+            return 0
+
+        def __set__[T](self, instance: object, value: list[T]) -> None: ...
+
+    class ConditionalDescriptor:
+        def __get__(self, instance: object, owner: type | None = None) -> object:
+            return 0
+
+        if flag:
+            def __set__(self, instance: object, value: list[int]) -> None: ...
+
+    def descriptor(getter: object) -> GenericDescriptor | ConditionalDescriptor:
+        raise NotImplementedError
+
+    class P(Protocol):
+        @descriptor
+        def value(self) -> object: ...
+
+    class Owner:
+        value: GenericDescriptor | ConditionalDescriptor
+
+    def update(protocol: P, owner: Owner) -> None:
+        protocol.value = [1]  # error: [invalid-assignment] "Cannot assign to attribute `value` on type `P`"
+        owner.value = [1]
+```
+
 ### Overloaded setters selected by descriptor type
 
 An overload can also restrict the type of the descriptor itself. The decorator below returns
