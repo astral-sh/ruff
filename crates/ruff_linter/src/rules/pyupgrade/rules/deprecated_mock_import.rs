@@ -19,7 +19,7 @@ use crate::codes::Category;
 use crate::cst::matchers::{match_import, match_import_from, match_statement};
 use crate::fix::codemods::CodegenStylist;
 use crate::rules::pyupgrade::rules::is_import_required_by_isort;
-use crate::{AlwaysFixableViolation, Edit, Fix};
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub(crate) enum MockReference {
@@ -61,18 +61,20 @@ pub(crate) struct DeprecatedMockImport {
     reference_type: MockReference,
 }
 
-impl AlwaysFixableViolation for DeprecatedMockImport {
+impl Violation for DeprecatedMockImport {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         "`mock` is deprecated, use `unittest.mock`".to_string()
     }
 
-    fn fix_title(&self) -> String {
+    fn fix_title(&self) -> Option<String> {
         let DeprecatedMockImport { reference_type } = self;
-        match reference_type {
+        Some(match reference_type {
             MockReference::Import => "Import from `unittest.mock` instead".to_string(),
             MockReference::Attribute => "Replace `mock.mock` with `mock`".to_string(),
-        }
+        })
     }
 }
 
@@ -287,15 +289,21 @@ pub(crate) fn deprecated_mock_import(checker: &Checker, stmt: &Stmt) {
         // Find all `mock` imports.
         Stmt::Import(ast::StmtImport {
             names,
-            is_lazy: _,
+            is_lazy,
             range: _,
             node_index: _,
         }) if names
             .iter()
             .any(|name| &name.name == "mock" || &name.name == "mock.mock") =>
         {
+            // The CST-based fixer does not support explicit lazy import syntax.
+            let can_fix = !*is_lazy
+                && names
+                    .iter()
+                    .filter(|name| matches!(name.name.as_str(), "mock" | "mock.mock"))
+                    .all(|name| checker.import_rewrite_preserves_laziness(&name.name, "unittest"));
             // Generate the fix, if needed, which is shared between all `mock` imports.
-            let content = if let Some(indent) = indentation(checker.source(), stmt) {
+            let content = if can_fix && let Some(indent) = indentation(checker.source(), stmt) {
                 match format_import(stmt, indent, checker.locator(), checker.stylist()) {
                     Ok(content) => Some(content),
                     Err(e) => {
@@ -336,6 +344,7 @@ pub(crate) fn deprecated_mock_import(checker: &Checker, stmt: &Stmt) {
             module: Some(module),
             level,
             names,
+            is_lazy,
             ..
         }) => {
             if *level > 0 {
@@ -361,7 +370,16 @@ pub(crate) fn deprecated_mock_import(checker: &Checker, stmt: &Stmt) {
                     stmt.range(),
                 );
                 diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
-                if let Some(indent) = indentation(checker.source(), stmt) {
+                let can_fix = !*is_lazy
+                    && names.iter().all(|name| {
+                        let target = if name.name.as_str() == "mock" {
+                            "unittest"
+                        } else {
+                            "unittest.mock"
+                        };
+                        checker.import_rewrite_preserves_laziness(module, target)
+                    });
+                if can_fix && let Some(indent) = indentation(checker.source(), stmt) {
                     diagnostic.try_set_fix(|| {
                         format_import_from(stmt, indent, checker.locator(), checker.stylist())
                             .map(|content| Edit::range_replacement(content, stmt.range()))
