@@ -88,6 +88,8 @@ use rustc_hash::FxHashMap;
 use serde_json::{Value, json};
 use tempfile::TempDir;
 use ty_project::UseUv;
+#[cfg(feature = "test-uv")]
+use ty_project::uv_test_env_vars;
 use ty_server::{ClientOptions, LogLevel, Server, init_logging};
 
 /// Number of times to retry receiving a message before giving up
@@ -232,6 +234,7 @@ impl TestServer {
 
         // Create test system and set environment variable overrides
         let test_system = Arc::new(TestSystem::new(os_system));
+        test_system.clear_env_vars();
         for (name, value) in env_vars {
             match value {
                 Some(value) => {
@@ -1279,11 +1282,7 @@ impl TestServerBuilder {
             test_context: TestContext::new()?,
             initialization_options: None,
             client_capabilities,
-            env_vars: vec![
-                ("HOME".into(), None),
-                ("PATH".into(), None),
-                ("VIRTUAL_ENV".into(), None),
-            ],
+            env_vars: Vec::new(),
         })
     }
 
@@ -1300,8 +1299,10 @@ impl TestServerBuilder {
 
     /// Enable uv integration using the uv executable on the test process's PATH.
     #[cfg(feature = "test-uv")]
-    pub(crate) fn with_real_uv(self, use_uv: UseUv) -> Result<Self> {
+    pub(crate) fn with_real_uv(mut self, use_uv: UseUv) -> Result<Self> {
         let uv = OsSystem::default().which("uv")?;
+        self.env_vars
+            .extend(uv_test_env_vars().map(|(name, value)| (name.to_owned(), Some(value))));
         Ok(self.with_use_uv(use_uv).with_env_var("UV", uv.as_str()))
     }
 

@@ -880,6 +880,30 @@ reason = "command descriptions expose a complete argument builder and inspection
 
 [[override]]
 lint = "hawk::dead_public"
+crate = "ruff_db"
+item = "system::command::Command::env_clear"
+kind = "inherent_method"
+level = "expect"
+reason = "command environment methods mirror the standard library Command API"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ruff_db"
+item = "system::command::Command::env"
+kind = "inherent_method"
+level = "expect"
+reason = "command environment methods mirror the standard library Command API"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ruff_db"
+item = "system::command::Command::env_remove"
+kind = "inherent_method"
+level = "expect"
+reason = "command environment methods mirror the standard library Command API"
+
+[[override]]
+lint = "hawk::dead_public"
 crate = "ty_python_core"
 item = "expression::Expression::<'db>::program"
 kind = "inherent_method"

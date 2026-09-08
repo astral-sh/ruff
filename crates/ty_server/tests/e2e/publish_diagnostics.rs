@@ -968,6 +968,8 @@ mod uv_metadata {
     use ruff_db::system::SystemPath;
     use serde_json::json;
     use ty_project::UseUv;
+    #[cfg(feature = "test-uv")]
+    use ty_project::uv_test_env_vars;
 
     use crate::TestServerBuilder;
 
@@ -1008,6 +1010,8 @@ package = "invalid"
 
         server.write_file("src/pyproject.toml", manifest)?;
         let output = Command::new("uv")
+            .env_clear()
+            .envs(uv_test_env_vars())
             .current_dir(server.file_path("src"))
             .args(["sync", "--offline"])
             .output()?;
