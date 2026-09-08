@@ -1228,13 +1228,21 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: micro
+          - name: micro-a-l
             target: ty
-            filter: micro
+            filter: 'ty_micro\[[a-l]'
             mode: simulation
-          - name: micro
+          - name: micro-m-z
             target: ty
-            filter: micro
+            filter: 'ty_micro\[[^a-l]'
+            mode: simulation
+          - name: micro-a-l
+            target: ty
+            filter: 'ty_micro\[[a-l]'
+            mode: memory
+          - name: micro-m-z
+            target: ty
+            filter: 'ty_micro\[[^a-l]'
             mode: memory
           - name: constraint_set
             target: ty_constraint_set
