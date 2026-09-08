@@ -33,6 +33,90 @@ class Cyclic:
 reveal_type(Cyclic("").data)
 ```
 
+## Promoting recursive values stored in attributes
+
+A local variable keeps its literal types as it is repeatedly nested in tuples. Storing the value in
+an attribute promotes the literals throughout the recursive type, so the attribute can hold other
+values of those same types.
+
+```py
+class Tree:
+    def __init__(self, count: int):
+        value = 0
+        for _ in range(count):
+            value = (value, 1)
+        # revealed: (μa0. tuple[a0 | Literal[0], Literal[1]]) | Literal[0]
+        reveal_type(value)
+        self.value = value
+
+reveal_type(Tree(1).value)  # revealed: μa0. tuple[a0, int] | int
+
+def inspect(tree: Tree):
+    value = tree.value
+    if isinstance(value, tuple):
+        reveal_type(value[0])  # revealed: int | (μa0. tuple[a0 | int, int])
+        reveal_type(value[1])  # revealed: int
+        wrong: str = value[0]  # error: [invalid-assignment]
+```
+
+## Promoting class literals in recursive attributes
+
+Class objects nested in a recursive tuple are promoted to subclass types when stored in an
+attribute, while the recursive tuple structure is preserved.
+
+```py
+class Token: ...
+
+class Classes:
+    def __init__(self, count: int):
+        value = Token
+        for _ in range(count):
+            value = (value, Token)
+        self.value = value
+
+reveal_type(Classes(1).value)  # revealed: μa0. tuple[a0, type[Token]] | type[Token]
+```
+
+## Class literals in self-referential instance attributes
+
+An attribute can contain its own value alongside a class object and an integer. Both kinds of
+literals are promoted at every level, including when the attribute is inherited.
+
+```py
+class Token: ...
+
+class Nested:
+    def update(self, other: "Nested"):
+        self.value = (other.value, Token, 1)
+
+reveal_type(Nested().value)  # revealed: μa0. tuple[a0, type[Token], int]
+reveal_type(Nested().value[0][1])  # revealed: type[Token]
+reveal_type(Nested().value[0][2])  # revealed: int
+
+class Child(Nested): ...
+
+reveal_type(Child().value)  # revealed: μa0. tuple[a0, type[Token], int]
+```
+
+## Self-referential class attributes
+
+A classmethod can construct a tuple containing the same class attribute. Reading nested elements
+preserves the recursive structure and their promoted types.
+
+```py
+class Token: ...
+
+class Nested:
+    @classmethod
+    def update(cls):
+        cls.value = (cls.value, Token, 1)
+
+# revealed: tuple[μa0. tuple[a0, type[Token], int], <class 'Token'>, int]
+reveal_type(Nested.value)
+reveal_type(Nested.value[0][1])  # revealed: type[Token]
+reveal_type(Nested.value[0][2])  # revealed: int
+```
+
 ## Copying tuple attributes
 
 Copying tuple attributes preserves their lengths, including when two attributes are copied into each
@@ -111,8 +195,8 @@ reveal_type(Containers().a[0]["next"][0])  # revealed: Divergent
 
 ## Mutually recursive attributes with initial values
 
-Each attribute has an initial value and can contain the other attribute in a tuple. TODO: Infer
-types equivalent to the explicit recursive aliases below.
+Each attribute has an initial value and can contain the other attribute in a tuple. The inferred
+types are equivalent to the explicit recursive aliases below.
 
 ```toml
 [environment]
@@ -135,8 +219,8 @@ class Pair:
 type Left = int | tuple[Right, int]
 type Right = str | tuple[Left, str]
 
-static_assert(is_equivalent_to(TypeOf[Pair().left], Left))  # error: [static-assert-error]
-static_assert(is_equivalent_to(TypeOf[Pair().right], Right))  # error: [static-assert-error]
+static_assert(is_equivalent_to(TypeOf[Pair().left], Left))
+static_assert(is_equivalent_to(TypeOf[Pair().right], Right))
 ```
 
 ## Multiple paths through recursive attributes
@@ -176,10 +260,30 @@ static_assert(is_equivalent_to(TypeOf[Ring().c], C))  # error: [static-assert-er
 static_assert(is_equivalent_to(TypeOf[Ring().d], D))  # error: [static-assert-error]
 ```
 
+## Mutually recursive attributes with the same type
+
+Two attributes can refer to each other and have the same recursive type. Each type is displayed with
+a single `μ` binder.
+
+```py
+class Same:
+    def __init__(self):
+        self.left = 0
+        self.right = 0
+
+    def update(self, other: "Same"):
+        self.left = (other.right,)
+        self.right = (other.left,)
+
+reveal_type(Same().left)  # revealed: μa0. tuple[a0] | int
+reveal_type(Same().right)  # revealed: μa0. tuple[a0] | int
+```
+
 ## Self-reference and mutual references
 
-An attribute can refer both to itself and to another recursively defined attribute. TODO: Infer the
-full recursive structure, including the initial values at each level.
+An attribute can refer both to itself and to another recursively defined attribute. The inferred
+types preserve the initial values at each level. The type of `a` is displayed with one `μ` binder.
+Starting from `b`, the display uses two bound variables to name the shared recursive type of `a`.
 
 ```toml
 [environment]
@@ -198,10 +302,13 @@ class Branches:
         self.a = (other.a, other.b)
         self.b = (other.a,)
 
+reveal_type(Branches().a)  # revealed: μa0. tuple[a0, tuple[a0] | str] | int
+reveal_type(Branches().b)  # revealed: μ{a0; a1 = tuple[a1, a0] | int}. tuple[a1] | str
+
 type A = int | tuple[A, B]
 type B = str | tuple[A]
-static_assert(is_equivalent_to(TypeOf[Branches().b], B))  # error: [static-assert-error]
-static_assert(is_equivalent_to(TypeOf[Branches().a], A))  # error: [static-assert-error]
+static_assert(is_equivalent_to(TypeOf[Branches().b], B))
+static_assert(is_equivalent_to(TypeOf[Branches().a], A))
 ```
 
 ## Cycle normalization preserves non-gradual variadic parameters

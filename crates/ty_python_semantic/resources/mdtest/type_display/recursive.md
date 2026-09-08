@@ -57,3 +57,49 @@ def outer(flag: bool, values: list[int]):
     # revealed: tuple[(μa0. tuple[a0 | Literal[0]]) | Literal[0]] | Literal["other"]
     reveal_type("other" if flag else (value,))
 ```
+
+## Truncated recursive bodies
+
+Abbreviating a long recursive body in a diagnostic preserves the order of the surrounding union,
+even when the omitted alternatives contain all references to its binder.
+
+```py
+class A: ...
+class B: ...
+class C: ...
+class D: ...
+class E: ...
+class F: ...
+class z: ...
+
+class Container:
+    def __init__(self, value: A | B | C | D | E | F):
+        self.value = value
+
+    def grow(self):
+        self.value = (self.value,)
+
+def inspect(container: Container, flag: bool):
+    # error: [invalid-assignment] "tuple[μa0. tuple[a0] | A | B | ... omitted 4 union elements] | z"
+    value: str = (container.value,) if flag else z()
+```
+
+## Unions of class objects
+
+Class-object alternatives inside a recursive type are displayed in a consistent order, including
+when they are grouped under a single `type[...]` annotation.
+
+```py
+class A: ...
+class B: ...
+
+class Container:
+    def __init__(self, left: type[B], right: type[A], choose: bool):
+        self.value = left if choose else right
+
+    def grow(self):
+        self.value = (self.value,)
+
+def inspect(container: Container):
+    reveal_type(container.value)  # revealed: μa0. tuple[a0] | type[A | B]
+```

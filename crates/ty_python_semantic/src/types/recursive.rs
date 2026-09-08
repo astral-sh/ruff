@@ -6,9 +6,10 @@
 
 mod graph;
 mod inference;
+mod operations;
 mod tuple_length;
 
-pub(super) use inference::{InferenceKey, InferenceQuery, RecursiveInputs};
+pub(super) use inference::{InferenceKey, InferenceQuery, InferenceSource, RecursiveInputs};
 pub(super) use tuple_length::TupleLengthAnalysis;
 
 use std::cell::{Cell, RefCell};
@@ -18,6 +19,7 @@ use ty_python_core::definition::Definition;
 use ty_python_core::place_table;
 
 use self::graph::RecursiveGraphBuilder;
+use self::operations::{RecursiveOperation, RecursiveOperations};
 use super::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use super::generics::{ApplySpecialization, Specialization, walk_specialization_types};
 use super::relation::{TypeRelation, TypeRelationChecker};
@@ -221,7 +223,7 @@ pub enum RecursiveOrigin<'db> {
     /// A closed solution of recursive type constraints, independent of any query cycle.
     ConstraintSolution(Program<'db>),
     /// A closed reference to a query equation; its identity excludes provisional solutions.
-    Inference(InferenceKey<'db>),
+    Inference(InferenceSource<'db>),
     /// A query's unresolved initial binder. It is replaced by a query reference at read boundaries.
     InferenceCycle {
         program: Program<'db>,
@@ -258,6 +260,9 @@ pub struct RecursiveType<'db> {
     /// The lazy materialization applied to this recursive alias, if any.
     #[returns(copy)]
     pub(super) materialization_kind: Option<MaterializationKind>,
+    /// Deferred operations on the closed query reference, outside its recursive binder.
+    #[returns(copy)]
+    operations: Option<RecursiveOperations<'db>>,
 }
 
 impl get_size2::GetSize for RecursiveType<'_> {}
@@ -283,6 +288,7 @@ impl<'db> RecursiveType<'db> {
             ),
             0,
             arguments,
+            None,
             None,
         ))
     }
@@ -310,6 +316,7 @@ impl<'db> RecursiveType<'db> {
             0,
             None,
             None,
+            None,
         ))
     }
 
@@ -317,7 +324,7 @@ impl<'db> RecursiveType<'db> {
     fn inference(db: &'db dyn Db, key: InferenceKey<'db>) -> Self {
         Self::new_internal(
             db,
-            RecursiveOrigin::Inference(key),
+            RecursiveOrigin::Inference(key.source),
             RecursiveGraph::new_internal(
                 db,
                 vec![Type::RecursiveVar(RecursiveVar::new_internal(
@@ -328,12 +335,16 @@ impl<'db> RecursiveType<'db> {
             0,
             None,
             None,
+            key.operations,
         )
     }
 
     pub(super) fn inference_key(self, db: &'db dyn Db) -> Option<InferenceKey<'db>> {
         match self.origin(db) {
-            RecursiveOrigin::Inference(key) => Some(key),
+            RecursiveOrigin::Inference(source) => Some(InferenceKey {
+                source,
+                operations: self.operations(db),
+            }),
             _ => None,
         }
     }
@@ -371,6 +382,7 @@ impl<'db> RecursiveType<'db> {
             entry,
             arguments,
             self.materialization_kind(db),
+            self.operations(db),
         ))
     }
 
@@ -404,6 +416,7 @@ impl<'db> RecursiveType<'db> {
             && self.graph(db) == other.graph(db)
             && self.arguments(db) == other.arguments(db)
             && self.materialization_kind(db) == other.materialization_kind(db)
+            && self.operations(db) == other.operations(db)
     }
 
     /// Close recursive occurrences after inferring an alias's constructor expression.
@@ -451,6 +464,7 @@ impl<'db> RecursiveType<'db> {
             0,
             self.arguments(db),
             None,
+            None,
         ))
     }
 
@@ -462,6 +476,7 @@ impl<'db> RecursiveType<'db> {
             self.entry(db),
             arguments,
             self.materialization_kind(db),
+            self.operations(db),
         )
     }
 
@@ -477,6 +492,7 @@ impl<'db> RecursiveType<'db> {
             self.entry(db),
             self.arguments(db),
             materialization,
+            self.operations(db),
         )
     }
 
@@ -588,7 +604,8 @@ impl<'db> RecursiveType<'db> {
             TypeMapping::Recursive(RecursiveMapping(RecursiveSubstitution::Bind(target)))
                 if self.origin(db) == target.origin(db)
                     && self.graph(db) == target.graph(db)
-                    && self.materialization_kind(db) == target.materialization_kind(db) =>
+                    && self.materialization_kind(db) == target.materialization_kind(db)
+                    && self.operations(db) == target.operations(db) =>
             {
                 let arguments = self
                     .arguments(db)
@@ -618,7 +635,11 @@ impl<'db> RecursiveType<'db> {
                     self.entry(db),
                     arguments,
                     self.materialization_kind(db),
+                    self.operations(db),
                 ))
+            }
+            TypeMapping::Promote(mode, kind) if self.inference_key(db).is_some() => {
+                Type::Recursive(self.with_operation(db, RecursiveOperation::Promote(*mode, *kind)))
             }
             // Until mappings can retain an equation's input, use the ordinary cycle
             // approximation instead of repeatedly specializing provisional solutions.
@@ -685,6 +706,7 @@ impl<'db> RecursiveType<'db> {
                 self.graph(db) == root.graph(db)
                     && self.origin(db) == root.origin(db)
                     && self.materialization_kind(db) == root.materialization_kind(db)
+                    && self.operations(db) == root.operations(db)
             }) =>
             {
                 Type::Recursive(self)
@@ -701,6 +723,7 @@ impl<'db> RecursiveType<'db> {
                             entry,
                             self.arguments(db),
                             self.materialization_kind(db),
+                            self.operations(db),
                         );
                         let mapped = root.map_type(db, visitor.env, |unfolded| {
                             unfolded.apply_type_mapping_impl(db, mapping, tcx, &nested)

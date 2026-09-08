@@ -1325,6 +1325,45 @@ struct MemberLookupKey<'db> {
     policy: MemberLookupPolicy,
 }
 
+impl get_size2::GetSize for MemberLookupKey<'_> {}
+
+/// Identifies the member query whose result supplies a recursive equation.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+struct MemberInference<'db> {
+    #[returns(copy)]
+    key: MemberLookupKey<'db>,
+    #[returns(copy)]
+    kind: MemberInferenceKind<'db>,
+}
+
+impl get_size2::GetSize for MemberInference<'_> {}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, get_size2::GetSize, salsa::SalsaValue)]
+enum MemberInferenceKind<'db> {
+    Class,
+    Instance(Option<Type<'db>>),
+}
+
+impl<'db> MemberInference<'db> {
+    fn environment(self, db: &'db dyn Db) -> ProgramEnvironment<'db> {
+        ProgramEnvironment::from_program(self.key(db).program(db))
+    }
+
+    fn equation(self, db: &'db dyn Db) -> Type<'db> {
+        let key = self.key(db);
+        let member = match self.kind(db) {
+            MemberInferenceKind::Class => Type::class_member_with_policy_inner(db, key),
+            MemberInferenceKind::Instance(receiver) => Type::member_lookup_query(db, key, receiver)
+                .unwrap_or_else(|error| error.fallback_member(db))
+                .member(db),
+        };
+        member
+            .place
+            .ignore_possibly_undefined()
+            .unwrap_or(Type::Never)
+    }
+}
+
 /// Meta data for `Type::Todo`, which represents a known limitation in ty.
 #[cfg(debug_assertions)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize)]
@@ -4000,15 +4039,15 @@ impl<'db> Type<'db> {
         name: &str,
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
-        Self::class_member_with_policy_inner(
-            db,
-            MemberLookupKey::new(db, env.program(db), self, name, policy),
-        )
+        let key = MemberLookupKey::new(db, env.program(db), self, name, policy);
+        let query = MemberInference::new(db, key, MemberInferenceKind::Class);
+        Self::class_member_with_policy_inner(db, key)
+            .map_type(|ty| recursive::InferenceQuery::Member(query).value(db, ty))
     }
 
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, id, _| Place::bound(Type::divergent(id)).into(),
+        cycle_initial=|db, id, key: MemberLookupKey<'db>| { Place::bound(RecursiveType::initial_inference(db, &ProgramEnvironment::from_program(key.program(db)), id)).into() },
         cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, member: PlaceAndQualifiers<'db>, key: MemberLookupKey<'db>| {
             member.cycle_normalized(db, &ProgramEnvironment::from_program(key.program(db)), *previous, cycle)
         },
@@ -5500,9 +5539,30 @@ impl<'db> Type<'db> {
         policy: MemberLookupPolicy,
         receiver: Option<Type<'db>>,
     ) -> MemberLookupResult<'db> {
+        if self.materialized_divergent_fallback().is_none() {
+            if name == "__class__" {
+                return Place::bound(self.dunder_class(db, env)).into();
+            }
+            if matches!(self, Type::Dynamic(_) | Type::Divergent(_) | Type::Never) {
+                return Place::bound(self).into();
+            }
+        }
+        let key = MemberLookupKey::new(db, env.program(db), self, name, policy);
+        let query = MemberInference::new(db, key, MemberInferenceKind::Instance(receiver));
+        map_member_lookup_type(db, Self::member_lookup_query(db, key, receiver), |ty| {
+            recursive::InferenceQuery::Member(query).value(db, ty)
+        })
+    }
+
+    /// Read a member result before replacing recursive types with its query reference.
+    fn member_lookup_query(
+        db: &'db dyn Db,
+        key: MemberLookupKey<'db>,
+        receiver: Option<Type<'db>>,
+    ) -> MemberLookupResult<'db> {
         #[salsa::tracked(
             returns(copy),
-            cycle_initial=|_, id, _| Place::bound(Type::divergent(id)).into(),
+            cycle_initial=|db, id, key: MemberLookupKey<'db>| { Place::bound(RecursiveType::initial_inference(db, &ProgramEnvironment::from_program(key.program(db)), id)).into() },
             cycle_fn=|db, cycle, previous: &MemberLookupResult<'db>, member: MemberLookupResult<'db>, key: MemberLookupKey<'db>| {
                 cycle_normalized_member_lookup(db, &ProgramEnvironment::from_program(key.program(db)), member, *previous, cycle)
             },
@@ -5517,7 +5577,7 @@ impl<'db> Type<'db> {
 
         #[salsa::tracked(
             returns(copy),
-            cycle_initial=|_, id, _, _| Place::bound(Type::divergent(id)).into(),
+            cycle_initial=|db, id, key: MemberLookupKey<'db>, _| { Place::bound(RecursiveType::initial_inference(db, &ProgramEnvironment::from_program(key.program(db)), id)).into() },
             cycle_fn=|db, cycle, previous: &MemberLookupResult<'db>, member: MemberLookupResult<'db>, key: MemberLookupKey<'db>, _| {
                 cycle_normalized_member_lookup(db, &ProgramEnvironment::from_program(key.program(db)), member, *previous, cycle)
             },
@@ -6258,17 +6318,6 @@ impl<'db> Type<'db> {
             }
         }
 
-        if self.materialized_divergent_fallback().is_none() {
-            if name == "__class__" {
-                return Place::bound(self.dunder_class(db, env)).into();
-            }
-
-            if matches!(self, Type::Dynamic(_) | Type::Divergent(_) | Type::Never) {
-                return Place::bound(self).into();
-            }
-        }
-
-        let key = MemberLookupKey::new(db, env.program(db), self, name, policy);
         match receiver {
             Some(receiver) => member_lookup_with_policy_and_receiver_inner(db, key, receiver),
             None => member_lookup_with_policy_inner(db, key),
@@ -10550,7 +10599,7 @@ impl PromotionMode {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, get_size2::GetSize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub enum PromotionKind {
     /// Default promotion behaviour: recurse into nested types
     Regular,

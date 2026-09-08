@@ -4912,19 +4912,21 @@ reveal_type(Answer.__members__)  # revealed: MappingProxyType[str, Answer]
 
 ## Recursive inferred implicit instance attribute types
 
-An attribute built from its own value has a recursive type. We currently approximate its recursive
-part with `Divergent`, so indexing into that part also produces `Divergent`.
+An attribute built from its own value has a recursive type. Indexing into its recursive part
+preserves that type, and literals are promoted throughout the nested tuples.
 
 ```py
 class C:
     def f(self, other: "C"):
         self.x = (other.x, 1)
 
-reveal_type(C().x)  # revealed: tuple[Divergent, int]
-reveal_type(C().x[0])  # revealed: Divergent
+reveal_type(C().x)  # revealed: μa0. tuple[a0, int]
+reveal_type(C().x[0])  # revealed: μa0. tuple[a0, int]
+reveal_type(C().x[0][1])  # revealed: int
+wrong: str = C().x[0][1]  # error: [invalid-assignment]
 ```
 
-An initial value remains an alternative alongside the approximated tuple:
+An initial value remains an alternative at every level of the recursive tuple:
 
 ```py
 class WithInitial:
@@ -4934,7 +4936,7 @@ class WithInitial:
     def update(self, other: "WithInitial"):
         self.value = (other.value, "b")
 
-reveal_type(WithInitial().value)  # revealed: int | tuple[Divergent, str]
+reveal_type(WithInitial().value)  # revealed: μa0. tuple[a0, str] | int
 ```
 
 A helper function can also construct the recursive tuple:

@@ -3,8 +3,8 @@
 //!
 //! # Approximation boundaries
 //!
-//! Equation collection follows query references. It stops at
-//! 32 distinct query references, or when the non-lazy traversal of an equation finds
+//! Equation collection follows query references and their deferred operations. It stops at
+//! 32 distinct query/operation pairs, or when the non-lazy traversal of an equation finds
 //! `Dynamic` or `Divergent`. This traversal does not force lazy alias or member definitions.
 //! These are termination limits, not tests for whether a recursive type has a solution.
 //!
@@ -14,8 +14,9 @@
 //! possible. A solving query that still cycles after `TAINTED_CYCLES` iterations falls back
 //! to a single `Divergent` marker.
 //!
-//! Semantic type mappings, including specialization and materialization, currently replace
-//! an inference reference with its `Divergent` approximation. Structural substitutions
+//! Promotion can retain references as deferred operations.
+//! Other semantic type mappings, including specialization and materialization, currently
+//! replace an inference reference with its `Divergent` approximation. Structural substitutions
 //! handle references directly according to the requested substitution, without this semantic
 //! fallback. These restrictions concern query-owned inference references; named
 //! recursive aliases and closed structural solutions have their own mapping semantics.
@@ -26,6 +27,7 @@ use ruff_python_ast::name::Name;
 use salsa::plumbing::AsId;
 use ty_python_core::definition::Definition;
 
+use super::operations::RecursiveOperations;
 use super::{RecursiveMapping, RecursiveOrigin, RecursiveSubstitution, RecursiveType};
 use crate::types::class::ImplicitAttributeName;
 use crate::types::constraints::{SolutionPaths, Solutions, TypeVarSolution};
@@ -33,14 +35,21 @@ use crate::types::generics::walk_specialization_types;
 use crate::types::infer::{InferExpression, infer_definition_types, infer_expression_types_impl};
 use crate::types::visitor::{TypeCollector, TypeKind, TypeVisitor, walk_non_atomic_type};
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundTypeVarInstance, DivergentType, DynamicType, Type, TypeContext,
-    TypeMapping, TypeVarVariance, any_over_type,
+    ApplyTypeMappingVisitor, BoundTypeVarInstance, DivergentType, DynamicType, MemberInference,
+    Type, TypeContext, TypeMapping, TypeVarVariance, any_over_type,
 };
 use crate::{Db, FxIndexMap, Program, ProgramEnvironment, TAINTED_CYCLES};
 
 /// Identifies the inference result that supplies an equation's body.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::SalsaValue)]
-pub struct InferenceKey<'db>(pub(in crate::types) InferenceQuery<'db>);
+pub struct InferenceSource<'db>(pub(in crate::types) InferenceQuery<'db>);
+
+/// A query equation after applying a sequence of deferred operations.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::SalsaValue)]
+pub struct InferenceKey<'db> {
+    pub(super) source: InferenceSource<'db>,
+    pub(super) operations: Option<RecursiveOperations<'db>>,
+}
 
 /// Inference results that can supply the body of a constructor equation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::SalsaValue)]
@@ -48,14 +57,20 @@ pub(in crate::types) enum InferenceQuery<'db> {
     Binding(Definition<'db>),
     Expression(InferExpression<'db>),
     Attribute(ImplicitAttributeName<'db>),
+    Member(MemberInference<'db>),
 }
 
 impl get_size2::GetSize for InferenceKey<'_> {}
+impl get_size2::GetSize for InferenceSource<'_> {}
 
 impl<'db> InferenceQuery<'db> {
     /// Return an acyclic value directly or a closed reference to its defining query.
     pub(in crate::types) fn value(self, db: &'db dyn Db, body: Type<'db>) -> Type<'db> {
-        InferenceKey(self).value(db, body)
+        InferenceKey {
+            source: InferenceSource(self),
+            operations: None,
+        }
+        .value(db, body)
     }
 }
 
@@ -75,7 +90,7 @@ impl<'db> InferenceSolution<'db> {
     }
 }
 
-impl<'db> InferenceKey<'db> {
+impl<'db> InferenceSource<'db> {
     pub(super) fn environment(self, db: &'db dyn Db) -> ProgramEnvironment<'db> {
         match self.0 {
             InferenceQuery::Binding(definition) => ProgramEnvironment::from_definition(definition),
@@ -83,7 +98,26 @@ impl<'db> InferenceKey<'db> {
                 ProgramEnvironment::from_scope(input.into_inner(db).0.scope(db))
             }
             InferenceQuery::Attribute(attribute) => attribute.environment(db),
+            InferenceQuery::Member(member) => member.environment(db),
         }
+    }
+
+    fn equation(self, db: &'db dyn Db) -> Type<'db> {
+        match self.0 {
+            InferenceQuery::Binding(definition) => {
+                infer_definition_types(db, definition).raw_binding_type(definition)
+            }
+            InferenceQuery::Expression(input) => infer_expression_types_impl(db, input)
+                .raw_expression_type(input.into_inner(db).0.node_ref(db)),
+            InferenceQuery::Attribute(attribute) => attribute.equation(db),
+            InferenceQuery::Member(member) => member.equation(db),
+        }
+    }
+}
+
+impl<'db> InferenceKey<'db> {
+    fn environment(self, db: &'db dyn Db) -> ProgramEnvironment<'db> {
+        self.source.environment(db)
     }
 
     fn reference(self, db: &'db dyn Db) -> Type<'db> {
@@ -103,21 +137,18 @@ impl<'db> InferenceKey<'db> {
     }
 
     fn equation(self, db: &'db dyn Db) -> Type<'db> {
-        match self.0 {
-            InferenceQuery::Binding(definition) => {
-                infer_definition_types(db, definition).raw_binding_type(definition)
-            }
-            InferenceQuery::Expression(input) => infer_expression_types_impl(db, input)
-                .raw_expression_type(input.into_inner(db).0.node_ref(db)),
-            InferenceQuery::Attribute(attribute) => attribute.equation(db),
-        }
+        let body = self.source.equation(db);
+        self.operations.map_or(body, |operations| {
+            operations.apply(db, &self.environment(db), body)
+        })
     }
 
     pub(super) fn fallback(self) -> Type<'db> {
-        let id = match self.0 {
+        let id = match self.source.0 {
             InferenceQuery::Binding(definition) => definition.as_id(),
             InferenceQuery::Expression(input) => input.as_id(),
             InferenceQuery::Attribute(attribute) => attribute.as_id(),
+            InferenceQuery::Member(member) => member.as_id(),
         };
         Type::Divergent(DivergentType::from_inference(id))
     }
@@ -153,8 +184,9 @@ impl<'db> InferenceKey<'db> {
             cursor += 1;
             for key in inputs {
                 if !equations.contains_key(&key) {
-                    // Query inputs can themselves contain inferred types. Bound graph
-                    // discovery before those inputs can create an unbounded worklist.
+                    // Query inputs and deferred operation sequences can grow. Distinct
+                    // sequences are distinct equations, so this also bounds repeated
+                    // projections that adjacent idempotence cannot simplify.
                     if equations.len() >= 32 {
                         return self.approximate_equation(db, root);
                     }
