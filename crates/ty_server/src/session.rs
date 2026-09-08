@@ -848,6 +848,8 @@ impl Session {
                 untracked_files_with_pushed_diagnostics: untracked,
             },
         );
+        // Queued background work must not reuse indices or file handles from the old project set.
+        self.bump_revision();
 
         publish_settings_diagnostics(self, client, root);
     }
@@ -1339,13 +1341,20 @@ impl Session {
 
     /// Creates a snapshot of the current state of the [`Session`].
     pub(crate) fn snapshot_session(&self) -> SessionSnapshot {
+        let (project_contexts, projects) = self
+            .projects
+            .iter()
+            .map(|(root, project)| {
+                let disabled = self
+                    .workspaces
+                    .settings_for_path(root)
+                    .or_else(|| self.workspaces.settings_virtual_fallback())
+                    .is_some_and(|settings| settings.is_language_services_disabled());
+                ((root.clone(), disabled), project.db.clone())
+            })
+            .unzip();
         SessionSnapshot {
-            projects: self
-                .projects
-                .values()
-                .map(|project| &project.db)
-                .cloned()
-                .collect(),
+            projects,
             index: self.index.clone().unwrap(),
             global_settings: self.global_settings.clone(),
             position_encoding: self.position_encoding,
@@ -1353,6 +1362,28 @@ impl Session {
             resolved_client_capabilities: self.resolved_client_capabilities,
             revision: self.revision,
             client_name: self.client_name,
+            project_contexts,
+        }
+    }
+
+    /// Enables recording discovered by a background request before taking its next snapshot.
+    pub(crate) fn enable_place_load_recording(
+        &mut self,
+        revision: u64,
+        files: Vec<(usize, Vec<File>)>,
+    ) {
+        // A stale snapshot may refer to replaced databases or a different project order.
+        // Leave it untouched; the retry will discover the requirements again.
+        if self.revision != revision {
+            return;
+        }
+        for (owner, files) in files {
+            if let Some(project) = self.projects.values_mut().nth(owner) {
+                project
+                    .db
+                    .project()
+                    .enable_place_load_recording(&mut project.db, files);
+            }
         }
     }
 
@@ -1656,6 +1687,8 @@ pub(crate) struct SessionSnapshot {
     in_test: bool,
     revision: u64,
     client_name: ClientName,
+    /// Workspace roots and disabled states, in the same order as `projects`.
+    project_contexts: Vec<(SystemPathBuf, bool)>,
 
     /// IMPORTANT: It's important that the databases come last, or at least,
     /// after any `Arc` that we try to extract or mutate in-place using `Arc::into_inner`
@@ -1672,6 +1705,34 @@ pub(crate) struct SessionSnapshot {
 impl SessionSnapshot {
     pub(crate) fn projects(&self) -> &[ProjectDatabase] {
         &self.projects
+    }
+
+    /// Returns the workspace root corresponding to `project`.
+    pub(crate) fn workspace_root(&self, project: usize) -> &SystemPath {
+        &self.project_contexts[project].0
+    }
+
+    /// Returns the closest enclosing workspace, without falling back to another project.
+    pub(crate) fn enclosing_project_index(&self, path: &SystemPath) -> Option<usize> {
+        self.project_contexts
+            .iter()
+            .enumerate()
+            .filter(|(_, (root, _))| path.starts_with(root))
+            .max_by_key(|(_, (root, _))| root.as_str().len())
+            .map(|(index, _)| index)
+    }
+
+    /// Returns whether language services are disabled for the selected workspace.
+    pub(crate) fn language_services_disabled(&self, project: usize) -> bool {
+        self.project_contexts[project].1
+    }
+
+    /// Returns whether `path` contains a workspace other than `project`.
+    pub(crate) fn contains_other_workspace(&self, project: usize, path: &SystemPath) -> bool {
+        self.project_contexts
+            .iter()
+            .enumerate()
+            .any(|(index, (root, _))| index != project && root.starts_with(path))
     }
 
     pub(crate) fn index(&self) -> &Index {
@@ -2257,10 +2318,54 @@ mod tests {
     use std::sync::Arc;
 
     use anyhow::Context;
-    use ruff_db::system::{Command, CommandExecutor, OsSystem, System as _};
+    use lsp_types::Uri;
+    use ruff_db::files::system_path_to_file;
+    use ruff_db::system::{Command, CommandExecutor, OsSystem, System as _, TestSystem};
+    use ty_project::Db as _;
+    use ty_python_semantic::should_record_place_loads;
 
-    use super::Index;
+    use super::{Client, ClientName, Index, InitializationOptions, Session, WorkspaceOptions};
+    use crate::PositionEncoding;
+    use crate::capabilities::ResolvedClientCapabilities;
     use crate::system::{LSPSystem, WorkspaceTrust};
+
+    #[test]
+    fn recording_preparation_rejects_changed_workspace_order() {
+        let (mut session, client) = recording_session();
+        let original = Uri::parse("file:///z").expect("valid original workspace URI");
+        session
+            .register_workspace_folder(original.clone())
+            .expect("register original workspace");
+        session.initialize_workspace_folder(&client, &original, WorkspaceOptions::default());
+        let snapshot = session.snapshot_session();
+        let revision = snapshot.revision();
+        let file = system_path_to_file(&snapshot.projects()[0], "/z/use.py")
+            .expect("original file exists");
+        drop(snapshot);
+
+        let added = Uri::parse("file:///a").expect("valid added workspace URI");
+        session
+            .register_workspace_folder(added.clone())
+            .expect("register added workspace");
+        session.initialize_workspace_folder(&client, &added, WorkspaceOptions::default());
+
+        session.enable_place_load_recording(revision, vec![(0, vec![file])]);
+        let snapshot = session.snapshot_session();
+        assert_ne!(snapshot.revision(), revision);
+        for db in snapshot.projects() {
+            for file in &db.project().files(db) {
+                assert!(!should_record_place_loads(db, file));
+            }
+        }
+
+        let revision = snapshot.revision();
+        drop(snapshot);
+        session.enable_place_load_recording(revision, vec![(1, vec![file])]);
+        assert!(should_record_place_loads(
+            &session.snapshot_session().projects()[1],
+            file
+        ));
+    }
 
     /// Mutating the document index requires exclusive ownership after Salsa cancels the current
     /// database snapshots. A background command executor must not retain an `LSPSystem`, because
@@ -2303,5 +2408,33 @@ mod tests {
             "external commands are disabled in an untrusted workspace",
         );
         Ok(())
+    }
+
+    fn recording_session() -> (Session, Client) {
+        let system = TestSystem::default();
+        for path in ["/a/use.py", "/z/use.py"] {
+            system
+                .memory_file_system()
+                .write_file_all(
+                    path,
+                    r#"
+value = 1
+"#,
+                )
+                .expect("write workspace fixture");
+        }
+        let session = Session::new(
+            ResolvedClientCapabilities::default(),
+            PositionEncoding::default(),
+            Vec::new(),
+            InitializationOptions::default(),
+            Arc::new(system),
+            ClientName::Other,
+            true,
+        )
+        .expect("valid test session");
+        let (main_loop_sender, _) = crossbeam::channel::unbounded();
+        let (client_sender, _) = crossbeam::channel::unbounded();
+        (session, Client::new(main_loop_sender, client_sender))
     }
 }

@@ -620,7 +620,7 @@ impl Project {
     }
 
     /// Returns the open files in the project.
-    fn open_files(self, db: &dyn Db) -> &FxHashSet<File> {
+    pub fn open_files(self, db: &dyn Db) -> &FxHashSet<File> {
         self.open_fileset(db)
     }
 
