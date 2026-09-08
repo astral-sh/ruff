@@ -175,7 +175,7 @@ impl<'db> Type<'db> {
                     }
                 }),
                 SubclassOfInner::TypeVar(tvar) => {
-                    match tvar.typevar(db).require_bound_or_constraints(db, env) {
+                    match tvar.require_bound_or_constraints(db, env) {
                         TypeVarBoundOrConstraints::UpperBound(bound) => {
                             let upcast_callables = bound
                                 .constructor_for_typevar_bound(db, env)
