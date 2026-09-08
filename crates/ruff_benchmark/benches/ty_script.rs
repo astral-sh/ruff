@@ -4,20 +4,15 @@ use std::time::Duration;
 use divan::{Bencher, bench};
 use rayon::ThreadPoolBuilder;
 use ruff_db::system::{OsSystem, SystemPath, TestSystem};
-use ty_project::{Db, ProjectDatabase, ProjectMetadata, ScriptEnvironmentAvailability};
+use ty_project::{
+    Db, ProjectDatabase, ProjectMetadata, ScriptEnvironmentAvailability, uv_test_env_vars,
+};
 use ty_static::EnvVars;
 
 fn setup_iteration(root: &SystemPath) -> ProjectDatabase {
     let system = TestSystem::new(OsSystem::new(root));
-    for name in [
-        EnvVars::VIRTUAL_ENV,
-        EnvVars::CONDA_PREFIX,
-        EnvVars::CONDA_DEFAULT_ENV,
-        EnvVars::CONDA_ROOT,
-        EnvVars::PYTHONPATH,
-    ] {
-        system.remove_env_var(name);
-    }
+    system.clear_env_vars();
+    system.set_env_vars(uv_test_env_vars());
     system.set_env_var(EnvVars::TY_UV, "scripts");
     system.set_env_var(EnvVars::UV, "uv");
 

@@ -1437,7 +1437,7 @@ mod uv_metadata {
     use std::{fs, process::Command};
 
     use insta_cmd::assert_cmd_snapshot;
-    use ruff_db::system::test_env_vars;
+    use ty_project::uv_test_env_vars;
     use ty_static::EnvVars;
 
     use crate::CliTest;
@@ -1446,7 +1446,7 @@ mod uv_metadata {
     fn command_with_script_uv(case: &CliTest) -> Command {
         let mut command = case.command();
         command
-            .envs(test_env_vars())
+            .envs(uv_test_env_vars())
             .env(EnvVars::TY_UV, "1")
             .env(EnvVars::UV, "uv")
             .env("UV_CACHE_DIR", case.root().join("cache"));
@@ -1456,7 +1456,7 @@ mod uv_metadata {
     fn assert_uv_supports_script_metadata() -> anyhow::Result<()> {
         let output = Command::new("uv")
             .env_clear()
-            .envs(test_env_vars())
+            .envs(uv_test_env_vars())
             .args(["workspace", "metadata", "--help"])
             .output()?;
 
@@ -1814,7 +1814,7 @@ mod uv_metadata {
         let environment = case.root().join(".venv");
         let output = Command::new("uv")
             .env_clear()
-            .envs(test_env_vars())
+            .envs(uv_test_env_vars())
             .args(["venv", "--no-project", "--python", "3.12"])
             .arg(&environment)
             .env("UV_CACHE_DIR", case.root().join("cache"))

@@ -1,5 +1,4 @@
 use ruff_notebook::{Notebook, NotebookError};
-use std::ffi::OsString;
 use std::panic::RefUnwindSafe;
 use std::process::Output;
 use std::sync::{Arc, Mutex};
@@ -14,28 +13,6 @@ use crate::system::{
 use super::WritableSystem;
 use super::command::CommandEnv;
 use super::walk_directory::WalkDirectoryBuilder;
-
-/// Host environment variables needed to locate executables, Python installations, and caches.
-///
-/// Use with [`std::process::Command::env_clear`] to keep settings such as `UV_LOCKED` and
-/// `PYTHONPATH` from affecting test subprocesses.
-pub fn test_env_vars() -> impl Iterator<Item = (&'static str, OsString)> {
-    [
-        "PATH",
-        "PATHEXT",
-        "SYSTEMROOT",
-        "HOME",
-        "USERPROFILE",
-        "XDG_DATA_HOME",
-        "TMPDIR",
-        "TEMP",
-        "TMP",
-        "UV_CACHE_DIR",
-        "UV_PYTHON_INSTALL_DIR",
-    ]
-    .into_iter()
-    .filter_map(|name| std::env::var_os(name).map(|value| (name, value)))
-}
 
 /// System implementation intended for testing.
 ///
