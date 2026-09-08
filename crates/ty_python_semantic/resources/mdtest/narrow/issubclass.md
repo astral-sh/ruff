@@ -207,17 +207,17 @@ python-version = "3.12"
 ```
 
 Deeper tuples can contain different classes when the recursive type arguments change. The outer
-argument `int` does not describe all the classes tested: `(type,)` is also a valid class-info value.
+argument `int` does not describe all the classes tested: `(list,)` is also a valid class-info value.
 
 ```py
 from typing import TypeAlias, TypeVar
 
 T = TypeVar("T")
-Growing: TypeAlias = type[T] | tuple["Growing[type[T]]", ...]
-type ExplicitGrowing[T] = type[T] | tuple[ExplicitGrowing[type[T]], ...]
+Growing: TypeAlias = type[T] | tuple["Growing[list[T]]", ...]
+type ExplicitGrowing[T] = type[T] | tuple[ExplicitGrowing[list[T]], ...]
 
-classes: Growing[int] = (type,)
-explicit_classes: ExplicitGrowing[int] = (type,)
+classes: Growing[int] = (list,)
+explicit_classes: ExplicitGrowing[int] = (list,)
 
 def implicit(value: type, classes: Growing[int]):
     if issubclass(value, classes):

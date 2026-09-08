@@ -69,11 +69,12 @@ use crate::types::visitor::{
 };
 use crate::types::{
     BindingContext, BoundMethodType, BoundTypeVarInstance, CallableType, CallableTypes,
-    ClassLiteral, DATACLASS_FLAGS, DataclassFlags, DataclassParams, DynamicType, GenericAlias,
-    InternedConstraintSet, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
-    LiteralValueTypeKind, NominalInstanceType, PropertyInstanceType, TypeContext, TypeMapping,
-    TypeVarBoundOrConstraints, TypeVarVariance, UnionAccumulator, UnionBuilder, UnionType,
-    WrapperDescriptorKind, enums, is_property_method, list_members,
+    ClassLiteral, CycleDetector, DATACLASS_FLAGS, DataclassFlags, DataclassParams, DynamicType,
+    GenericAlias, InternedConstraintSet, IntersectionType, KnownBoundMethodType, KnownClass,
+    KnownInstanceType, LiteralValueTypeKind, NominalInstanceType, PropertyInstanceType,
+    TypeContext, TypeIdentity, TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance,
+    UnionAccumulator, UnionBuilder, UnionType, WrapperDescriptorKind, enums, is_property_method,
+    list_members,
 };
 use crate::{DisplaySettings, FxOrderSet};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
@@ -6682,12 +6683,13 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                         .and_then(|function| function.known(db)),
                     Some(KnownFunction::IsInstance | KnownFunction::IsSubclass)
                 )
-                && argument_type.is_valid_isinstance_target(
-                    db,
-                    self.env,
-                    expected_ty,
-                    &mut FxHashSet::default(),
-                )
+                && ClassInfoValidator {
+                    env: self.env,
+                    expected: expected_ty,
+                    visitor: CycleDetector::new(true),
+                    constructors: CycleDetector::new(true),
+                }
+                .validate(db, argument_type)
         };
 
         // This is one of the few places where we want to check if there's _any_ specialization
@@ -10050,37 +10052,64 @@ fn all_arguments_range(node: AnyNodeRef) -> TextRange {
         .unwrap_or(node.range())
 }
 
-impl<'db> Type<'db> {
-    /// Validate typing special forms inside the same nested tuples accepted by class-info arguments.
-    fn is_valid_isinstance_target(
-        self,
+/// Validate class-info values, including typing special forms in nested tuples.
+struct ClassInfoValidator<'a, 'db> {
+    env: &'a ProgramEnvironment<'db>,
+    expected: Type<'db>,
+    visitor: CycleDetector<'db, KnownFunction, Type<'db>, bool, 1>,
+    constructors: CycleDetector<'db, KnownFunction, Type<'db>, bool, 1>,
+}
+
+impl<'db> ClassInfoValidator<'_, 'db> {
+    fn validate(&self, db: &'db dyn Db, ty: Type<'db>) -> bool {
+        self.visitor
+            .try_visit(
+                db,
+                ty,
+                |_| true,
+                || self.validate_impl(db, ty, |ty| self.validate(db, ty)),
+            )
+            .unwrap_or_else(|ty| self.validate_constructor(db, ty))
+    }
+
+    fn validate_constructor(&self, db: &'db dyn Db, ty: Type<'db>) -> bool {
+        // A growing recursive application is valid if its constructor is valid
+        // independently of its arguments. Keep formal parameters unspecialized.
+        let ty =
+            match ty {
+                Type::TypeAlias(alias)
+                    if matches!(ty.to_type_identity(db), TypeIdentity::GrowingTypeAlias(_)) =>
+                {
+                    Type::TypeAlias(alias.apply_specialization(db, |parameters| {
+                        parameters.identity_specialization(db)
+                    }))
+                }
+                Type::Recursive(recursive) if recursive.may_have_unbounded_specialization(db) => {
+                    Type::Recursive(recursive.constructor(db))
+                }
+                _ => ty,
+            };
+        self.constructors.visit(db, ty, || {
+            self.validate_impl(db, ty, |ty| self.validate_constructor(db, ty))
+        })
+    }
+
+    fn validate_impl(
+        &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        expected: Type<'db>,
-        seen: &mut FxHashSet<Type<'db>>,
+        ty: Type<'db>,
+        mut validate: impl FnMut(Type<'db>) -> bool,
     ) -> bool {
-        if !seen.insert(self) {
-            return true;
-        }
-        match self {
+        match ty {
             Type::SpecialForm(special) if special.is_valid_isinstance_target() => true,
-            Type::Union(union) => union
-                .elements(db)
-                .iter()
-                .all(|ty| ty.is_valid_isinstance_target(db, env, expected, seen)),
-            Type::TypeAlias(alias) => alias
-                .value_type(db)
-                .is_valid_isinstance_target(db, env, expected, seen),
-            Type::Recursive(recursive) => recursive
-                .unfold(db, env)
-                .is_valid_isinstance_target(db, env, expected, seen),
+            Type::Union(union) => union.elements(db).iter().copied().all(validate),
+            Type::TypeAlias(alias) => validate(alias.value_type(db)),
+            Type::Recursive(recursive) => recursive.map_or(db, self.env, false, validate),
             _ => {
-                if let Some(tuple) = self.tuple_instance_spec(db, env) {
-                    tuple
-                        .iter_element_types(db)
-                        .all(|ty| ty.is_valid_isinstance_target(db, env, expected, seen))
+                if let Some(tuple) = ty.tuple_instance_spec(db, self.env) {
+                    tuple.iter_element_types(db).all(validate)
                 } else {
-                    self.is_assignable_to(db, env, expected)
+                    ty.is_assignable_to(db, self.env, self.expected)
                 }
             }
         }

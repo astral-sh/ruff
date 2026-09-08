@@ -145,17 +145,17 @@ python-version = "3.12"
 ```
 
 Deeper tuples can contain different classes when the recursive type arguments change. The outer
-argument `int` does not describe all the classes tested: `(type,)` is also a valid class-info value.
+argument `int` does not describe all the classes tested: `(list,)` is also a valid class-info value.
 
 ```py
 from typing import TypeAlias, TypeVar
 
 T = TypeVar("T")
-Growing: TypeAlias = type[T] | tuple["Growing[type[T]]", ...]
-type ExplicitGrowing[T] = type[T] | tuple[ExplicitGrowing[type[T]], ...]
+Growing: TypeAlias = type[T] | tuple["Growing[list[T]]", ...]
+type ExplicitGrowing[T] = type[T] | tuple[ExplicitGrowing[list[T]], ...]
 
-classes: Growing[int] = (type,)
-explicit_classes: ExplicitGrowing[int] = (type,)
+classes: Growing[int] = (list,)
+explicit_classes: ExplicitGrowing[int] = (list,)
 
 def implicit(value: object, classes: Growing[int]):
     if isinstance(value, classes):
@@ -164,6 +164,85 @@ def implicit(value: object, classes: Growing[int]):
 def explicit(value: object, classes: ExplicitGrowing[int]):
     if isinstance(value, classes):
         reveal_type(value)  # revealed: object
+```
+
+## Validating growing recursive tuples
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+Changing type arguments does not invalidate a recursive tuple whose leaves are always classes. Both
+`isinstance` and `issubclass` accept these tuples, including classes reached through another alias.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+type Identity[U] = U
+ClassInfo = Identity[type] | tuple["ClassInfo[list[T]]", ...]
+type ExplicitClassInfo[T] = Identity[type] | tuple[ExplicitClassInfo[list[T]], ...]
+
+def valid(classes: ClassInfo[int], explicit_classes: ExplicitClassInfo[int]):
+    isinstance(None, classes)
+    issubclass(int, classes)
+    isinstance(None, explicit_classes)
+    issubclass(int, explicit_classes)
+```
+
+When the argument also supplies the leaf type, a class at the outer level does not guarantee that
+all deeper leaves are classes. These aliases also admit lists, which are invalid class-info values.
+
+```py
+Invalid = T | tuple["Invalid[list[T]]", ...]
+type ExplicitInvalid[T] = T | tuple[ExplicitInvalid[list[T]], ...]
+
+def invalid(classes: Invalid[type], explicit_classes: ExplicitInvalid[type]):
+    isinstance(None, classes)  # error: [invalid-argument-type]
+    issubclass(int, classes)  # error: [invalid-argument-type]
+    isinstance(None, explicit_classes)  # error: [invalid-argument-type]
+    issubclass(int, explicit_classes)  # error: [invalid-argument-type]
+```
+
+A leaf can itself be a recursive tuple with fixed arguments. Those arguments still constrain its
+leaves, even when the enclosing alias has growing arguments.
+
+```py
+U = TypeVar("U")
+Stable = U | tuple["Stable[U]", ...]
+Nested = Stable[type] | tuple["Nested[list[T]]", ...]
+type ExplicitNested[T] = Stable[type] | tuple[ExplicitNested[list[T]], ...]
+
+def nested(classes: Nested[int], explicit_classes: ExplicitNested[int]):
+    isinstance(None, classes)
+    issubclass(int, classes)
+    isinstance(None, explicit_classes)
+    issubclass(int, explicit_classes)
+```
+
+## Recursive tuples with metaclass arguments
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+Successive metaclasses are still classes. Starting with `type[int]`, these aliases therefore contain
+only valid class-info values at every depth.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+ClassInfo = T | tuple["ClassInfo[type[T]]", ...]
+type ExplicitClassInfo[T] = T | tuple[ExplicitClassInfo[type[T]], ...]
+
+def valid(classes: ClassInfo[type[int]], explicit_classes: ExplicitClassInfo[type[int]]):
+    isinstance(None, classes)
+    issubclass(int, classes)
+    isinstance(None, explicit_classes)
+    issubclass(int, explicit_classes)
 ```
 
 ## `classinfo` is a PEP-604 union of types

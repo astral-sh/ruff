@@ -147,7 +147,7 @@ enum RecursiveDefinition<'db> {
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 enum FlowKind {
-    /// The source parameter is passed directly or only through normalized set operations.
+    /// The source parameter is passed through operations that cannot accumulate structure.
     Direct,
     /// The source parameter occurs inside a type structure that can accumulate.
     Nested,
@@ -193,7 +193,8 @@ struct DefinitionUse<'db> {
 /// Whether a recursive definition can keep producing new specializations is modeled as a graph
 /// problem. The formal parameters of every reachable definition are the nodes, and each argument
 /// of a recursive reference adds an edge to the parameter it specializes from every source
-/// parameter occurring in it: [`FlowKind::Direct`] if the parameter is passed as is, and
+/// parameter occurring in it: [`FlowKind::Direct`] for direct references, normalized set operations,
+/// and metaclass projections, and
 /// [`FlowKind::Nested`] if it occurs inside a type structure that can accumulate. Arguments
 /// without source parameters add no edges and act as resets.
 ///
@@ -757,6 +758,12 @@ impl<'db> TypeVisitor<'db> for SourceParameterCollector<'_, 'db> {
             }
             Type::Intersection(intersection) => {
                 self.visit_intersection_type(db, intersection);
+                return;
+            }
+            Type::SubclassOf(subclass_of) if let Some(typevar) = subclass_of.into_type_var() => {
+                // Repeated metaclass projection reaches `type`; it does not
+                // accumulate layers like `list[T]` or `tuple[T]`.
+                self.visit_type(db, Type::TypeVar(typevar));
                 return;
             }
             _ => {}
