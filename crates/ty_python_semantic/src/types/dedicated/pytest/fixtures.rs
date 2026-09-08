@@ -661,7 +661,7 @@ fn mock_patch_count<'db>(
             let new_position = if is_known_class_instance(
                 db,
                 function_definition,
-                decorators.expression_type(&call.func),
+                decorators.expression_type(call.func.as_ref()),
                 "_patcher",
                 &[KnownModule::UnittestMock],
             ) {

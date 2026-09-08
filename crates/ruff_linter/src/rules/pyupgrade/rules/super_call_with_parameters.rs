@@ -222,10 +222,7 @@ pub(crate) fn super_call_with_parameters(checker: &Checker, call: &ast::ExprCall
     //
     // See: https://docs.python.org/3/library/dataclasses.html#dataclasses.dataclass
     if decorator_list.iter().any(|decorator| {
-        let Expr::Call(ast::ExprCall {
-            func, arguments, ..
-        }) = &decorator.expression
-        else {
+        let Expr::Call(ast::ExprCall { func, arguments }) = &decorator.expression else {
             return false;
         };
 

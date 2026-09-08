@@ -435,9 +435,9 @@ end at the same offset.
 See also [Call](https://docs.python.org/3/library/ast.html#ast.Call)"""
 custom_debug = true
 custom_range = true
+custom_node_index = true
 fields = [
-  { name = "range_start", type = "ruff_text_size::TextSize", skip_visit = true },
-  { name = "func", type = "Expr" },
+  { name = "func", type = "CallFunction" },
   { name = "arguments", type = "Arguments" },
 ]
 

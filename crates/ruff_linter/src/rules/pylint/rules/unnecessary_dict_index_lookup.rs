@@ -115,9 +115,7 @@ fn dict_items<'a>(
     call_expr: &'a Expr,
     tuple_expr: &'a Expr,
 ) -> Option<(&'a ast::ExprName, &'a ast::ExprName, &'a ast::ExprName)> {
-    let ast::ExprCall {
-        func, arguments, ..
-    } = call_expr.as_call_expr()?;
+    let ast::ExprCall { func, arguments } = call_expr.as_call_expr()?;
 
     if !arguments.is_empty() {
         return None;

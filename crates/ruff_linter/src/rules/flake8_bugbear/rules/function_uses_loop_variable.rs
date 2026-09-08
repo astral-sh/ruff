@@ -125,12 +125,7 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
 
     fn visit_expr(&mut self, expr: &'a Expr) {
         match expr {
-            Expr::Call(ast::ExprCall {
-                func,
-                arguments,
-                range_start: _,
-                node_index: _,
-            }) => {
+            Expr::Call(ast::ExprCall { func, arguments }) => {
                 // Mark immediately-invoked lambdas as safe — the closure
                 // is consumed right away, so late-binding is not a concern.
                 if func.is_lambda_expr() {

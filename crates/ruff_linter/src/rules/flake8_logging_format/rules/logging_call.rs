@@ -191,7 +191,6 @@ fn check_log_record_attr_clash(checker: &Checker, extra: &Keyword) {
         Expr::Call(ast::ExprCall {
             func,
             arguments: Arguments { keywords, .. },
-            ..
         }) if checker.semantic().match_builtin_expr(func, "dict") => {
             for keyword in keywords {
                 if let Some(attr) = &keyword.arg {

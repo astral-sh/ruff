@@ -97,11 +97,7 @@ pub(crate) fn airflow_3_removal_expr(checker: &Checker, expr: &Expr) {
     }
 
     match expr {
-        Expr::Call(
-            call_expr @ ExprCall {
-                func, arguments, ..
-            },
-        ) => {
+        Expr::Call(call_expr @ ExprCall { func, arguments }) => {
             if let Some(qualified_name) = checker.semantic().resolve_qualified_name(func) {
                 check_call_arguments(checker, &qualified_name, arguments);
             }
@@ -1278,10 +1274,7 @@ fn is_context_key_access(checker: &Checker, expr: &Expr, key: &str) -> bool {
         }
     }
     // context.get("key")
-    if let Expr::Call(ExprCall {
-        func, arguments, ..
-    }) = expr
-    {
+    if let Expr::Call(ExprCall { func, arguments }) = expr {
         if let Expr::Attribute(ExprAttribute { value, attr, .. }) = func.as_ref() {
             if attr.as_str() == "get" {
                 if let Some(Expr::StringLiteral(ExprStringLiteral { value: arg_key, .. })) =

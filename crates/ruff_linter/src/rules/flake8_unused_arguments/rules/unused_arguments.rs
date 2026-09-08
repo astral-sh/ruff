@@ -405,10 +405,7 @@ pub(crate) fn is_not_implemented_stub_with_variable(
         return false;
     }
 
-    let ast::Expr::Call(ast::ExprCall {
-        func, arguments, ..
-    }) = &**exception
-    else {
+    let ast::Expr::Call(ast::ExprCall { func, arguments }) = &**exception else {
         return false;
     };
 

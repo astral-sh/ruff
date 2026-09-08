@@ -289,9 +289,7 @@ impl Renamer {
             return None;
         };
 
-        let ast::ExprCall {
-            func, arguments, ..
-        } = value.as_call_expr()?;
+        let ast::ExprCall { func, arguments } = value.as_call_expr()?;
 
         let qualified_name = semantic.resolve_qualified_name(func)?;
 

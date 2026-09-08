@@ -150,7 +150,6 @@ pub(crate) fn logging_eager_conversion(checker: &Checker, call: &ast::ExprCall) 
         if let Expr::Call(ast::ExprCall {
             func,
             arguments: str_call_args,
-            ..
         }) = arg
         {
             let CFormatType::String(format_conversion) = spec.format_type else {

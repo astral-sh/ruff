@@ -74,12 +74,7 @@ fn is_empty(expr: &Expr, semantic: &SemanticModel) -> bool {
         Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. }) => value.is_empty(),
         Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => value.is_empty(),
         Expr::FString(s) => is_empty_f_string(s),
-        Expr::Call(ast::ExprCall {
-            func,
-            arguments,
-            range_start: _,
-            node_index: _,
-        }) => {
+        Expr::Call(ast::ExprCall { func, arguments }) => {
             if arguments.is_empty() {
                 collection_methods
                     .iter()

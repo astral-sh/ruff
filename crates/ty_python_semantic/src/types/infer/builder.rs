@@ -3802,10 +3802,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let env = self.program_environment();
         // Infer deferred bounds/constraints/defaults of a legacy TypeVar / ParamSpec / NewType,
         // and field types for functional TypedDict.
-        let ast::Expr::Call(ast::ExprCall {
-            func, arguments, ..
-        }) = value
-        else {
+        let ast::Expr::Call(ast::ExprCall { func, arguments }) = value else {
             return;
         };
         let func_ty = self
@@ -9064,12 +9061,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let db = self.db();
         let env = self.program_environment();
-        let ast::ExprCall {
-            range_start: _,
-            node_index: _,
-            func,
-            arguments,
-        } = call_expression;
+        let ast::ExprCall { func, arguments } = call_expression;
 
         // Semantic indexing recognizes only bare empty constructor calls. Confirm that the name
         // still resolves to the corresponding builtin before using later collection constraints.

@@ -426,17 +426,17 @@ fn return_stmt(id: Name, test: &Expr, target: &Expr, iter: &Expr, generator: Gen
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
-    let node2 = ast::ExprCall {
-        func: Box::new(node1.into()),
-        arguments: Arguments {
+    let node2 = ast::ExprCall::new(
+        node1.into(),
+        Arguments {
             args: [node.into()].into(),
             keywords: std::iter::empty().collect(),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         },
-        range_start: ruff_text_size::TextSize::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-    };
+        ruff_text_size::TextSize::default(),
+        ruff_python_ast::AtomicNodeIndex::NONE,
+    );
     let node3 = ast::StmtReturn {
         value: Some(Box::new(node2.into())),
         range: TextRange::default(),

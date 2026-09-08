@@ -247,11 +247,9 @@ fn generate_with_statement(
             ast::ArgOrKeyword::Keyword(keyword) => Either::Right(keyword.clone()),
         });
 
-    let context_call = ast::ExprCall {
-        node_index: AtomicNodeIndex::NONE,
-        range_start: ruff_text_size::TextSize::default(),
-        func: legacy_call.func.clone(),
-        arguments: ast::Arguments {
+    let context_call = ast::ExprCall::new(
+        legacy_call.func.as_ref().clone(),
+        ast::Arguments {
             node_index: AtomicNodeIndex::NONE,
             range: TextRange::default(),
             args: expected.cloned().as_slice().into(),
@@ -267,19 +265,21 @@ fn generate_with_statement(
                 .as_slice()
                 .into(),
         },
-    };
+        ruff_text_size::TextSize::default(),
+        AtomicNodeIndex::NONE,
+    );
 
-    let func_call = ast::ExprCall {
-        node_index: AtomicNodeIndex::NONE,
-        range_start: ruff_text_size::TextSize::default(),
-        func: Box::new(func.clone()),
-        arguments: ast::Arguments {
+    let func_call = ast::ExprCall::new(
+        func.clone(),
+        ast::Arguments {
             node_index: AtomicNodeIndex::NONE,
             range: TextRange::default(),
             args: func_args.into(),
             keywords: func_keywords.into(),
         },
-    };
+        ruff_text_size::TextSize::default(),
+        AtomicNodeIndex::NONE,
+    );
 
     let body = if let Some(assign_targets) = assign_targets {
         Stmt::Assign(ast::StmtAssign {

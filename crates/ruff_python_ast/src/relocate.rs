@@ -66,13 +66,9 @@ impl Transformer for Relocator {
             Expr::Compare(ast::ExprCompare { range, .. }) => {
                 *range = self.range;
             }
-            Expr::Call(ast::ExprCall {
-                range_start,
-                arguments,
-                ..
-            }) => {
-                *range_start = self.range.start();
-                arguments.range = self.range;
+            Expr::Call(call) => {
+                call.set_range_start(self.range.start());
+                call.arguments.range = self.range;
             }
             Expr::FString(ast::ExprFString { range, .. }) => {
                 *range = self.range;

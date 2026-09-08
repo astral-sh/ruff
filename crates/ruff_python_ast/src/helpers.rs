@@ -74,9 +74,7 @@ impl SideEffect {
     fn from_expr(expr: &Expr, is_builtin: &dyn Fn(&str) -> bool) -> Self {
         match expr {
             // Empty initializers for known builtins are side-effect-free.
-            Expr::Call(ast::ExprCall {
-                func, arguments, ..
-            }) if arguments.is_empty() => {
+            Expr::Call(ast::ExprCall { func, arguments }) if arguments.is_empty() => {
                 if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
                     if is_iterable_initializer(id.as_str(), |id| is_builtin(id)) {
                         return Self::Absent;
@@ -395,8 +393,6 @@ where
             Expr::Call(ast::ExprCall {
                 func: call_func,
                 arguments,
-                range_start: _,
-                node_index: _,
             }) => {
                 // Note that this is the evaluation order but not necessarily the declaration order
                 // (e.g. for `f(*args, a=2, *args2, **kwargs)` it's not)
@@ -1493,9 +1489,7 @@ impl Truthiness {
                     Self::Truthy
                 }
             }
-            Expr::Call(ast::ExprCall {
-                func, arguments, ..
-            }) => {
+            Expr::Call(ast::ExprCall { func, arguments }) => {
                 if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
                     if is_iterable_initializer(id.as_str(), |id| is_builtin(id)) {
                         if arguments.is_empty() {

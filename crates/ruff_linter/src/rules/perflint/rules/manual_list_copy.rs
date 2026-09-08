@@ -75,8 +75,6 @@ pub(crate) fn manual_list_copy(checker: &Checker, for_stmt: &ast::StmtFor) {
                 range: _,
                 node_index: _,
             },
-        range_start: _,
-        node_index: _,
     }) = value.as_ref()
     else {
         return;

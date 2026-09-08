@@ -707,12 +707,7 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
                     comparisons.len() as u32,
                 );
             }
-            Expr::Call(ast::ExprCall {
-                range_start: _,
-                node_index: _,
-                func,
-                arguments: _,
-            }) => {
+            Expr::Call(ast::ExprCall { func, arguments: _ }) => {
                 self.any_parenthesized_expressions = true;
                 // Only walk the function, the arguments are always parenthesized
                 self.visit_expr(func);
@@ -1022,7 +1017,7 @@ impl CallChainLayout {
         // our first break after this value.
         let mut root_value_parenthesized = false;
         loop {
-            match expr {
+            let inner = match expr {
                 ExprRef::Attribute(ast::ExprAttribute { value, .. }) => {
                     // ```
                     // f().g
@@ -1039,6 +1034,7 @@ impl CallChainLayout {
                     }
 
                     expr = ExprRef::from(value.as_ref());
+                    continue;
                 }
                 // ```
                 // f()
@@ -1048,27 +1044,27 @@ impl CallChainLayout {
                 // ^^^^^^^^^^ expr
                 // ^^^^ value
                 // ```
-                ExprRef::Call(ast::ExprCall { func: inner, .. })
-                | ExprRef::Subscript(ast::ExprSubscript { value: inner, .. }) => {
-                    // We preserve these parentheses so don't recurse
-                    // e.g. (a)[0].x().y().z()
-                    //         ^stop here
-                    if context.is_expression_parenthesized(inner.into()) {
-                        break;
-                    }
-
-                    // Accumulate the `call_like_count`, but we only
-                    // want to count things like `a()[0]()()` once.
-                    if !inner.is_call_expr() && !inner.is_subscript_expr() {
-                        call_like_count += 1;
-                    }
-
-                    expr = ExprRef::from(inner.as_ref());
-                }
+                ExprRef::Call(call) => call.func.as_ref(),
+                ExprRef::Subscript(subscript) => subscript.value.as_ref(),
                 _ => {
                     break;
                 }
+            };
+
+            // We preserve these parentheses so don't recurse
+            // e.g. (a)[0].x().y().z()
+            //         ^stop here
+            if context.is_expression_parenthesized(inner.into()) {
+                break;
             }
+
+            // Accumulate the `call_like_count`, but we only
+            // want to count things like `a()[0]()()` once.
+            if !inner.is_call_expr() && !inner.is_subscript_expr() {
+                call_like_count += 1;
+            }
+
+            expr = ExprRef::from(inner);
         }
 
         if computed_attribute_values_after_parentheses + u32::from(root_value_parenthesized) < 2 {
@@ -1382,9 +1378,9 @@ pub(crate) fn is_splittable_expression(expr: &Expr, context: &PyFormatContext) -
         Expr::UnaryOp(unary) => is_splittable_expression(unary.operand.as_ref(), context),
         Expr::Yield(ast::ExprYield { value, .. }) => value.is_some(),
 
-        Expr::Call(ast::ExprCall {
-            arguments, func, ..
-        }) => !arguments.is_empty() || context.is_expression_parenthesized(func.as_ref().into()),
+        Expr::Call(ast::ExprCall { arguments, func }) => {
+            !arguments.is_empty() || context.is_expression_parenthesized(func.as_ref().into())
+        }
 
         // String like literals can expand if they are implicit concatenated.
         Expr::FString(fstring) => fstring.value.is_implicit_concatenated(),
@@ -1431,10 +1427,11 @@ pub(crate) fn left_most<'expr>(expression: &'expr Expr, trivia: &TriviaRanges) -
         let left = match current {
             Expr::BinOp(ast::ExprBinOp { left, .. })
             | Expr::If(ast::ExprIf { body: left, .. })
-            | Expr::Call(ast::ExprCall { func: left, .. })
             | Expr::Attribute(ast::ExprAttribute { value: left, .. })
             | Expr::Subscript(ast::ExprSubscript { value: left, .. })
             | Expr::Compare(ast::ExprCompare { left, .. }) => Some(&**left),
+
+            Expr::Call(call) => Some(call.func.as_ref()),
 
             Expr::BoolOp(expr_bool_op) => expr_bool_op.values.first(),
 

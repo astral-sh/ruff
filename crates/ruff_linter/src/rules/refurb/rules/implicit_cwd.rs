@@ -60,10 +60,7 @@ pub(crate) fn no_implicit_cwd(checker: &Checker, call: &ExprCall) {
         return;
     }
 
-    let Expr::Call(ExprCall {
-        func, arguments, ..
-    }) = value.as_ref()
-    else {
+    let Expr::Call(ExprCall { func, arguments }) = value.as_ref() else {
         return;
     };
 

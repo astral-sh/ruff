@@ -60,13 +60,7 @@ impl AlwaysFixableViolation for UnnecessaryParenOnRaiseException {
 
 /// RSE102
 pub(crate) fn unnecessary_paren_on_raise_exception(checker: &Checker, expr: &Expr) {
-    let Expr::Call(ast::ExprCall {
-        func,
-        arguments,
-        range_start: _,
-        node_index: _,
-    }) = expr
-    else {
+    let Expr::Call(ast::ExprCall { func, arguments }) = expr else {
         return;
     };
 

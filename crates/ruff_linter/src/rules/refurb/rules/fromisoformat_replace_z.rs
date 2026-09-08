@@ -214,9 +214,7 @@ impl<'a> ReplaceTimeZone<'a> {
 ///
 /// It returns the value of the `date` argument and its parent.
 fn strip_z_date(call: &ExprCall) -> Option<(&Expr, &Expr)> {
-    let ExprCall {
-        func, arguments, ..
-    } = call;
+    let ExprCall { func, arguments } = call;
 
     let Expr::Attribute(ExprAttribute { value, attr, .. }) = &**func else {
         return None;

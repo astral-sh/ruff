@@ -89,9 +89,7 @@ pub(crate) fn type_none_comparison(checker: &Checker, compare: &ast::ExprCompare
 /// `type` with a single argument.
 fn type_call_arg<'a>(expr: &'a Expr, semantic: &'a SemanticModel) -> Option<&'a Expr> {
     // The expression must be a single-argument call to `type`.
-    let ast::ExprCall {
-        func, arguments, ..
-    } = expr.as_call_expr()?;
+    let ast::ExprCall { func, arguments } = expr.as_call_expr()?;
     if arguments.len() != 1 {
         return None;
     }

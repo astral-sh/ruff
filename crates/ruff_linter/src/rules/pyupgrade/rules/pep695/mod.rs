@@ -301,9 +301,7 @@ pub(crate) fn expr_name_to_type_var<'a>(
                 default: None,
             });
         }
-        Expr::Call(ExprCall {
-            func, arguments, ..
-        }) => {
+        Expr::Call(ExprCall { func, arguments }) => {
             let kind = if semantic.match_typing_expr(func, "TypeVar") {
                 TypeParamKind::TypeVar
             } else if semantic.match_typing_expr(func, "TypeVarTuple") {

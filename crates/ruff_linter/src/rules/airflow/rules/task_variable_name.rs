@@ -61,10 +61,7 @@ pub(crate) fn variable_name_task_id(checker: &Checker, targets: &[Expr], value: 
     };
 
     // If the value is not a call, we can't do anything.
-    let Expr::Call(ast::ExprCall {
-        func, arguments, ..
-    }) = value
-    else {
+    let Expr::Call(ast::ExprCall { func, arguments }) = value else {
         return;
     };
 

@@ -741,12 +741,7 @@ fn pytest_fixture_parentheses(
 /// PT001, PT002, PT003
 fn check_fixture_decorator(checker: &Checker, func_name: &str, decorator: &Decorator) {
     match &decorator.expression {
-        Expr::Call(ast::ExprCall {
-            func: _,
-            arguments,
-            range_start: _,
-            node_index: _,
-        }) => {
+        Expr::Call(ast::ExprCall { func: _, arguments }) => {
             if checker.is_rule_enabled(Rule::PytestFixtureIncorrectParenthesesStyle) {
                 if !checker.settings().flake8_pytest_style.fixture_parentheses
                     && arguments.args.is_empty()

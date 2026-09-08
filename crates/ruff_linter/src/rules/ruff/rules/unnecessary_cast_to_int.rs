@@ -150,9 +150,7 @@ fn single_argument_to_int_call<'a>(
     call: &'a ExprCall,
     semantic: &SemanticModel,
 ) -> Option<&'a Expr> {
-    let ExprCall {
-        func, arguments, ..
-    } = call;
+    let ExprCall { func, arguments } = call;
 
     if !semantic.match_builtin_expr(func, "int") {
         return None;

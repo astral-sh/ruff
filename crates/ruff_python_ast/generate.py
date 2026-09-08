@@ -29,6 +29,7 @@ types_requiring_crate_prefix = {
     "FStringValue",
     "TStringValue",
     "Arguments",
+    "CallFunction",
     "CmpOp",
     "Comprehension",
     "DictItem",
@@ -61,6 +62,7 @@ type_to_visitor_function: dict[str, VisitorInfo] = {
     "Parameters": VisitorInfo("visit_parameters", True),
     "Stmt": VisitorInfo("visit_body", True),
     "Arguments": VisitorInfo("visit_arguments", True),
+    "CallFunction": VisitorInfo("visit_expr"),
 }
 
 
@@ -150,6 +152,7 @@ class Node:
     custom_debug: bool
     custom_source_order: bool
     custom_range: bool
+    custom_node_index: bool
     source_order: list[str] | None
 
     def __init__(self, group: Group, node_name: str, node: dict[str, Any]) -> None:
@@ -163,6 +166,7 @@ class Node:
         self.custom_debug = node.get("custom_debug", False)
         self.custom_source_order = node.get("custom_source_order", False)
         self.custom_range = node.get("custom_range", False)
+        self.custom_node_index = node.get("custom_node_index", False)
         self.derives = node.get("derives", [])
         self.doc = node.get("doc")
         self.source_order = node.get("source_order")
@@ -473,6 +477,8 @@ def write_owned_enum(out: list[str], ast: Ast) -> None:
         """)
 
     for node in ast.all_nodes:
+        if node.custom_node_index:
+            continue
         out.append(f"""
             impl crate::HasNodeIndex for {node.ty} {{
                 fn node_index(&self) -> &crate::AtomicNodeIndex {{
@@ -1062,7 +1068,8 @@ def write_node(out: list[str], ast: Ast) -> None:
             out.append('#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]')
             name = node.name
             out.append(f"pub struct {name} {{")
-            out.append("pub node_index: crate::AtomicNodeIndex,")
+            if not node.custom_node_index:
+                out.append("pub node_index: crate::AtomicNodeIndex,")
             if not node.custom_range:
                 out.append("pub range: ruff_text_size::TextRange,")
             for field in node.fields:
@@ -1111,7 +1118,8 @@ def write_source_order(out: list[str], ast: Ast) -> None:
                     fields_list += f"{field.name},\n"
             if not node.custom_range:
                 fields_list += "range: _,\n"
-            fields_list += "node_index: _,\n"
+            if not node.custom_node_index:
+                fields_list += "node_index: _,\n"
 
             for field in node.fields_in_source_order():
                 visitor_name = (

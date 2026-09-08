@@ -388,10 +388,7 @@ pub fn is_immutable_newtype_call(
         return false;
     };
 
-    let Expr::Call(ExprCall {
-        func, arguments, ..
-    }) = value.as_ref()
-    else {
+    let Expr::Call(ExprCall { func, arguments }) = value.as_ref() else {
         return false;
     };
 

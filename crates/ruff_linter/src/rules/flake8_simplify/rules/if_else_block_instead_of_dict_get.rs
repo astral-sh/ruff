@@ -202,17 +202,17 @@ pub(crate) fn if_else_block_instead_of_dict_get(checker: &Checker, stmt_if: &ast
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
-    let node3 = ast::ExprCall {
-        func: Box::new(node2.into()),
-        arguments: Arguments {
+    let node3 = ast::ExprCall::new(
+        node2.into(),
+        Arguments {
             args: [node1, node].into(),
             keywords: std::iter::empty().collect(),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         },
-        range_start: ruff_text_size::TextSize::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-    };
+        ruff_text_size::TextSize::default(),
+        ruff_python_ast::AtomicNodeIndex::NONE,
+    );
     let node4 = expected_var.clone();
     let node5 = ast::StmtAssign {
         targets: vec![node4],
@@ -311,17 +311,17 @@ pub(crate) fn if_exp_instead_of_dict_get(
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
-    let fixed_node = ast::ExprCall {
-        func: Box::new(dict_get_node.into()),
-        arguments: Arguments {
+    let fixed_node = ast::ExprCall::new(
+        dict_get_node.into(),
+        Arguments {
             args: [dict_key_node, default_value_node].into(),
             keywords: std::iter::empty().collect(),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         },
-        range_start: ruff_text_size::TextSize::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-    };
+        ruff_text_size::TextSize::default(),
+        ruff_python_ast::AtomicNodeIndex::NONE,
+    );
 
     let contents = checker.generator().expr(&fixed_node.into());
 

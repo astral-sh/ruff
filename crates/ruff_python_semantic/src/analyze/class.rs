@@ -403,9 +403,7 @@ fn has_metaclass_new_signature(class_def: &ast::StmtClassDef, semantic: &Semanti
 pub fn is_metaclass(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> IsMetaclass {
     let mut maybe = false;
     let is_base_class = any_base_class(class_def, semantic, |expr| match expr {
-        Expr::Call(ast::ExprCall {
-            func, arguments, ..
-        }) => {
+        Expr::Call(ast::ExprCall { func, arguments }) => {
             maybe = true;
             // Ex) `class Foo(type(Protocol)): ...`
             arguments.len() == 1 && semantic.match_builtin_expr(func.as_ref(), "type")

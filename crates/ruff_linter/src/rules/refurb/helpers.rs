@@ -29,17 +29,17 @@ pub(super) fn generate_method_call(name: Name, method: &str, generator: Generato
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     // Make it into a call `name.method()`
-    let call = ast::ExprCall {
-        func: Box::new(attr.into()),
-        arguments: ast::Arguments {
+    let call = ast::ExprCall::new(
+        attr.into(),
+        ast::Arguments {
             args: [].into(),
             keywords: std::iter::empty().collect(),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         },
-        range_start: ruff_text_size::TextSize::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-    };
+        ruff_text_size::TextSize::default(),
+        ruff_python_ast::AtomicNodeIndex::NONE,
+    );
     // And finally, turn it into a statement.
     let stmt = ast::StmtExpr {
         value: Box::new(call.into()),
@@ -262,7 +262,6 @@ fn find_file_open<'a>(
     let ast::ExprCall {
         func,
         arguments: ast::Arguments { args, keywords, .. },
-        ..
     } = item.context_expr.as_call_expr()?;
 
     // Ignore calls with `*args` and `**kwargs`. In the exact case of `open(*filename, mode="w")`,
@@ -313,7 +312,6 @@ fn find_path_open<'a>(
     let ast::ExprCall {
         func,
         arguments: ast::Arguments { args, keywords, .. },
-        ..
     } = item.context_expr.as_call_expr()?;
     if args.iter().any(Expr::is_starred_expr)
         || keywords.iter().any(|keyword| keyword.arg.is_none())

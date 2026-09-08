@@ -388,17 +388,17 @@ impl UnittestAssert {
                     range: TextRange::default(),
                     node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 };
-                let node1 = ast::ExprCall {
-                    func: Box::new(node.into()),
-                    arguments: Arguments {
+                let node1 = ast::ExprCall::new(
+                    node.into(),
+                    Arguments {
                         args: [(**obj).clone(), (**cls).clone()].into(),
                         keywords: std::iter::empty().collect(),
                         range: TextRange::default(),
                         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                     },
-                    range_start: ruff_text_size::TextSize::default(),
-                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                };
+                    ruff_text_size::TextSize::default(),
+                    ruff_python_ast::AtomicNodeIndex::NONE,
+                );
                 let isinstance = node1.into();
                 if matches!(self, UnittestAssert::IsInstance) {
                     Ok(assert(&isinstance, msg))
@@ -437,17 +437,17 @@ impl UnittestAssert {
                     range: TextRange::default(),
                     node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 };
-                let node2 = ast::ExprCall {
-                    func: Box::new(node1.into()),
-                    arguments: Arguments {
+                let node2 = ast::ExprCall::new(
+                    node1.into(),
+                    Arguments {
                         args: [(**regex).clone(), (**text).clone()].into(),
                         keywords: std::iter::empty().collect(),
                         range: TextRange::default(),
                         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                     },
-                    range_start: ruff_text_size::TextSize::default(),
-                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                };
+                    ruff_text_size::TextSize::default(),
+                    ruff_python_ast::AtomicNodeIndex::NONE,
+                );
                 let re_search = node2.into();
                 if matches!(self, UnittestAssert::Regex | UnittestAssert::RegexpMatches) {
                     Ok(assert(&re_search, msg))

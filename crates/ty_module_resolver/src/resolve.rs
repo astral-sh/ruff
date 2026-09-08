@@ -1995,7 +1995,6 @@ impl LegacyNamespacePackageVisitor {
         let ast::Expr::Call(ast::ExprCall {
             func: extend_func,
             arguments: extend_arguments,
-            ..
         }) = value
         else {
             return;
@@ -2016,7 +2015,6 @@ impl LegacyNamespacePackageVisitor {
             ast::Expr::Call(ruff_python_ast::ExprCall {
                 func: maybe_import,
                 arguments: import_arguments,
-                ..
             }) => {
                 let ast::Expr::Name(maybe_import) = &**maybe_import else {
                     return;
@@ -2067,7 +2065,6 @@ impl LegacyNamespacePackageVisitor {
         let ast::Expr::Call(ast::ExprCall {
             func,
             arguments: declare_arguments,
-            ..
         }) = value
         else {
             return;
@@ -2090,7 +2087,6 @@ impl LegacyNamespacePackageVisitor {
         let ast::Expr::Call(ast::ExprCall {
             func: maybe_import,
             arguments: import_arguments,
-            ..
         }) = &**maybe_pkg_resources
         else {
             return;

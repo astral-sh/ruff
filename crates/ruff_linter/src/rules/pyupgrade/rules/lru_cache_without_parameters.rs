@@ -57,13 +57,7 @@ impl AlwaysFixableViolation for LRUCacheWithoutParameters {
 /// UP011
 pub(crate) fn lru_cache_without_parameters(checker: &Checker, decorator_list: &[Decorator]) {
     for decorator in decorator_list {
-        let Expr::Call(ast::ExprCall {
-            func,
-            arguments,
-            range_start: _,
-            node_index: _,
-        }) = &decorator.expression
-        else {
+        let Expr::Call(ast::ExprCall { func, arguments }) = &decorator.expression else {
             continue;
         };
 

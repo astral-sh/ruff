@@ -289,10 +289,7 @@ fn handle_non_finite_float_special_case(
         return None;
     }
 
-    let Expr::Call(ExprCall {
-        func, arguments, ..
-    }) = arg_value
-    else {
+    let Expr::Call(ExprCall { func, arguments }) = arg_value else {
         return None;
     };
 

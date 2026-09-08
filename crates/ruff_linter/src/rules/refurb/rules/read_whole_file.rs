@@ -176,17 +176,17 @@ fn make_suggestion(open: &FileOpen<'_>, generator: Generator) -> String {
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
-    let call = ast::ExprCall {
-        func: Box::new(name.into()),
-        arguments: ast::Arguments {
+    let call = ast::ExprCall::new(
+        name.into(),
+        ast::Arguments {
             args: [].into(),
             keywords: open.keywords.iter().copied().cloned().collect(),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         },
-        range_start: ruff_text_size::TextSize::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-    };
+        ruff_text_size::TextSize::default(),
+        ruff_python_ast::AtomicNodeIndex::NONE,
+    );
     generator.expr(&call.into())
 }
 

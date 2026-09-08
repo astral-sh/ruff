@@ -96,11 +96,9 @@ pub(super) fn pattern_to_expr(pattern: Pattern) -> Expr {
         }) => {
             debug_assert_eq!(range.end(), arguments.end());
 
-            Expr::Call(ast::ExprCall {
-                range_start: range.start(),
-                node_index: node_index.clone(),
-                func: cls,
-                arguments: ast::Arguments {
+            Expr::Call(ast::ExprCall::new(
+                *cls,
+                ast::Arguments {
                     range: arguments.range,
                     node_index: node_index.clone(),
                     args: arguments
@@ -119,7 +117,9 @@ pub(super) fn pattern_to_expr(pattern: Pattern) -> Expr {
                         })
                         .collect(),
                 },
-            })
+                range.start(),
+                node_index,
+            ))
         }
         Pattern::MatchStar(ast::PatternMatchStar {
             range,

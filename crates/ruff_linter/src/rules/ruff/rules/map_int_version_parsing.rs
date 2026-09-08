@@ -72,8 +72,6 @@ fn map_call_with_two_arguments<'a>(
                 range: _,
                 node_index: _,
             },
-        range_start: _,
-        node_index: _,
     } = call;
 
     if !keywords.is_empty() {
@@ -93,10 +91,7 @@ fn map_call_with_two_arguments<'a>(
 
 /// Whether `expr` has the form `__version__.split(".")` or `something.__version__.split(".")`.
 fn is_dunder_version_split_dot(expr: &ast::Expr) -> bool {
-    let ast::Expr::Call(ast::ExprCall {
-        func, arguments, ..
-    }) = expr
-    else {
+    let ast::Expr::Call(ast::ExprCall { func, arguments }) = expr else {
         return false;
     };
 

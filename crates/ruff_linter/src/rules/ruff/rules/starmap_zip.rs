@@ -134,8 +134,9 @@ fn replace_with_map(starmap: &ExprCall, zip: &ExprCall, checker: &Checker) -> Op
         zip.start(),
     )));
 
-    let full_zip_func_range = parenthesized_range((&zip.func).into(), zip.into(), checker.tokens())
-        .unwrap_or(zip.func.range());
+    let full_zip_func_range =
+        parenthesized_range(zip.func.as_ref().into(), zip.into(), checker.tokens())
+            .unwrap_or(zip.func.range());
 
     // Delete the `zip` callee
     remove_zip.push(Edit::range_deletion(full_zip_func_range));

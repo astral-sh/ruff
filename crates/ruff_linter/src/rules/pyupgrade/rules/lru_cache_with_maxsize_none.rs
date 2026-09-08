@@ -72,8 +72,6 @@ pub(crate) fn lru_cache_with_maxsize_none(checker: &Checker, decorator_list: &[D
                     range: _,
                     node_index: _,
                 },
-            range_start: _,
-            node_index: _,
         }) = &decorator.expression
         else {
             continue;

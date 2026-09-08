@@ -70,7 +70,6 @@ pub(crate) fn zip_dict_keys_and_values(checker: &Checker, expr: &ast::ExprCall) 
     let ast::ExprCall {
         func,
         arguments: Arguments { args, keywords, .. },
-        ..
     } = expr;
     match &keywords[..] {
         [] => {}
@@ -141,10 +140,7 @@ pub(crate) fn zip_dict_keys_and_values(checker: &Checker, expr: &ast::ExprCall) 
 }
 
 fn get_var_attr_args(expr: &Expr) -> Option<(&ExprName, &Identifier, &Arguments)> {
-    let Expr::Call(ast::ExprCall {
-        func, arguments, ..
-    }) = expr
-    else {
+    let Expr::Call(ast::ExprCall { func, arguments }) = expr else {
         return None;
     };
     let Expr::Attribute(ExprAttribute { value, attr, .. }) = func.as_ref() else {

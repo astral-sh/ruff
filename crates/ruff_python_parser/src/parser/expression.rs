@@ -711,12 +711,7 @@ impl<'src> Parser<'src> {
         let arguments = self.parse_arguments(ArgumentsContext::Call);
         debug_assert_eq!(self.node_range(start).end(), arguments.end());
 
-        ast::ExprCall {
-            func: Box::new(func),
-            arguments,
-            range_start: start,
-            node_index: AtomicNodeIndex::NONE,
-        }
+        ast::ExprCall::new(func, arguments, start, AtomicNodeIndex::NONE)
     }
 
     /// Parses an argument list.
@@ -734,7 +729,7 @@ impl<'src> Parser<'src> {
             return ast::Arguments {
                 range: self.node_range(start),
                 node_index: AtomicNodeIndex::NONE,
-                args: ThinVec::new(),
+                args: Box::default(),
                 keywords: ThinVec::default(),
             };
         }
@@ -871,7 +866,7 @@ impl<'src> Parser<'src> {
         let arguments = ast::Arguments {
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
-            args: self.expr_scratch.take_thin_vec(args_snapshot),
+            args: self.expr_scratch.take(args_snapshot),
             keywords,
         };
 

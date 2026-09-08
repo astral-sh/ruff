@@ -106,7 +106,6 @@ fn is_nan_float(expr: &Expr, semantic: &SemanticModel) -> bool {
     let Expr::Call(ast::ExprCall {
         func,
         arguments: ast::Arguments { args, keywords, .. },
-        ..
     }) = expr
     else {
         return false;

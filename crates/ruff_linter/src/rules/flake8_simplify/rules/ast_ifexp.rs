@@ -181,25 +181,23 @@ pub(crate) fn if_expr_with_true_false(
     } else if checker.semantic().has_builtin_binding("bool") {
         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
             checker.generator().expr(
-                &ast::ExprCall {
-                    func: Box::new(
-                        ast::ExprName {
-                            id: Name::new_static("bool"),
-                            ctx: ExprContext::Load,
-                            range: TextRange::default(),
-                            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                        }
-                        .into(),
-                    ),
-                    arguments: Arguments {
+                &ast::ExprCall::new(
+                    ast::ExprName {
+                        id: Name::new_static("bool"),
+                        ctx: ExprContext::Load,
+                        range: TextRange::default(),
+                        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                    }
+                    .into(),
+                    Arguments {
                         args: [test.clone()].into(),
                         keywords: std::iter::empty().collect(),
                         range: TextRange::default(),
                         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                     },
-                    range_start: ruff_text_size::TextSize::default(),
-                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                }
+                    ruff_text_size::TextSize::default(),
+                    ruff_python_ast::AtomicNodeIndex::NONE,
+                )
                 .into(),
             ),
             expr.range(),

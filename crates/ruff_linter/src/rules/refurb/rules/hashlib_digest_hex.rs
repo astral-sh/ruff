@@ -70,10 +70,7 @@ pub(crate) fn hashlib_digest_hex(checker: &Checker, call: &ExprCall) {
         return;
     }
 
-    let Expr::Call(ExprCall {
-        func, arguments, ..
-    }) = value.as_ref()
-    else {
+    let Expr::Call(ExprCall { func, arguments }) = value.as_ref() else {
         return;
     };
 

@@ -138,8 +138,6 @@ fn collect_nested_args(min_max: MinMax, args: &[Expr], semantic: &SemanticModel)
                         range: _,
                         node_index: _,
                     },
-                range_start: _,
-                node_index: _,
             }) = arg
             {
                 if MinMax::try_from_call(func, keywords, semantic) == Some(min_max) {
@@ -191,7 +189,6 @@ pub(crate) fn nested_min_max(
         let Expr::Call(ast::ExprCall {
             func,
             arguments: Arguments { keywords, .. },
-            ..
         }) = arg
         else {
             return false;
@@ -200,17 +197,17 @@ pub(crate) fn nested_min_max(
     }) {
         let mut diagnostic =
             checker.report_diagnostic(NestedMinMax { func: min_max }, expr.range());
-        let flattened_expr = Expr::Call(ast::ExprCall {
-            func: Box::new(func.clone()),
-            arguments: Arguments {
+        let flattened_expr = Expr::Call(ast::ExprCall::new(
+            func.clone(),
+            Arguments {
                 args: collect_nested_args(min_max, args, checker.semantic()).into(),
                 keywords: keywords.iter().cloned().collect(),
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             },
-            range_start: ruff_text_size::TextSize::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-        });
+            ruff_text_size::TextSize::default(),
+            ruff_python_ast::AtomicNodeIndex::NONE,
+        ));
         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
             checker.generator().expr(&flattened_expr),
             expr.range(),

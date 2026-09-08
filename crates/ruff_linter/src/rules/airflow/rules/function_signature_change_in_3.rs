@@ -65,10 +65,7 @@ pub(crate) fn airflow_3_incompatible_function_signature(checker: &Checker, expr:
         return;
     }
 
-    let Expr::Call(ExprCall {
-        func, arguments, ..
-    }) = expr
-    else {
+    let Expr::Call(ExprCall { func, arguments }) = expr else {
         return;
     };
 

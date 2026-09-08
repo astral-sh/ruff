@@ -356,16 +356,7 @@ fn affix_matches_slice_bound(data: &RemoveAffixData, semantic: &SemanticModel) -
             // Only support prefix removal for size at most `usize::MAX`
             .and_then(ast::Int::as_usize)
             .is_some_and(|x| x == string_val.chars().count()),
-        (
-            AffixKind::StartsWith,
-            ast::Expr::Call(ast::ExprCall {
-                range_start: _,
-                node_index: _,
-                func,
-                arguments,
-            }),
-            _,
-        ) => {
+        (AffixKind::StartsWith, ast::Expr::Call(ast::ExprCall { func, arguments }), _) => {
             arguments.len() == 1
                 && arguments.find_positional(0).is_some_and(|arg| {
                     let compr_affix = ast::comparable::ComparableExpr::from(affix);
@@ -406,13 +397,9 @@ fn affix_matches_slice_bound(data: &RemoveAffixData, semantic: &SemanticModel) -
                 node_index: _,
             }),
             _,
-        ) => operand.as_call_expr().is_some_and(
-            |ast::ExprCall {
-                 range_start: _,
-                 node_index: _,
-                 func,
-                 arguments,
-             }| {
+        ) => operand
+            .as_call_expr()
+            .is_some_and(|ast::ExprCall { func, arguments }| {
                 arguments.len() == 1
                     && arguments.find_positional(0).is_some_and(|arg| {
                         let compr_affix = ast::comparable::ComparableExpr::from(affix);
@@ -420,8 +407,7 @@ fn affix_matches_slice_bound(data: &RemoveAffixData, semantic: &SemanticModel) -
                         compr_affix == compr_arg
                     })
                     && semantic.match_builtin_expr(func, "len")
-            },
-        ),
+            }),
         _ => false,
     }
 }

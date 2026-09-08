@@ -80,10 +80,7 @@ pub(crate) fn unnecessary_lambda(checker: &Checker, lambda: &ExprLambda) {
     } = lambda;
 
     // The lambda should consist of a single function call.
-    let Expr::Call(ast::ExprCall {
-        arguments, func, ..
-    }) = body.as_ref()
-    else {
+    let Expr::Call(ast::ExprCall { arguments, func }) = body.as_ref() else {
         return;
     };
 

@@ -223,10 +223,7 @@ impl<'a> StatementVisitor<'a> for LogExceptionVisitor<'a> {
         }
         match stmt {
             Stmt::Expr(ast::StmtExpr { value, .. }) => {
-                if let Expr::Call(ast::ExprCall {
-                    func, arguments, ..
-                }) = value.as_ref()
-                {
+                if let Expr::Call(ast::ExprCall { func, arguments }) = value.as_ref() {
                     match func.as_ref() {
                         Expr::Attribute(ast::ExprAttribute { attr, .. })
                             if logging::is_logger_candidate(

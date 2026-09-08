@@ -60,7 +60,6 @@ pub(crate) fn raise_vanilla_args(checker: &Checker, expr: &Expr) {
     let Expr::Call(ast::ExprCall {
         func,
         arguments: Arguments { args, .. },
-        ..
     }) = expr
     else {
         return;

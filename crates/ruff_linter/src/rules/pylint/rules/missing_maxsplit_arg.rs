@@ -90,10 +90,7 @@ fn is_string(expr: &Expr, semantic: &SemanticModel) -> bool {
 /// PLC0207
 pub(crate) fn missing_maxsplit_arg(checker: &Checker, value: &Expr, slice: &Expr, expr: &Expr) {
     // Check the sliced expression is a function
-    let Expr::Call(ExprCall {
-        func, arguments, ..
-    }) = value
-    else {
+    let Expr::Call(ExprCall { func, arguments }) = value else {
         return;
     };
 

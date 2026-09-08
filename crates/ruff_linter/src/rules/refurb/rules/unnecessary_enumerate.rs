@@ -97,10 +97,7 @@ pub(crate) fn unnecessary_enumerate(checker: &Checker, stmt_for: &ast::StmtFor) 
     let [index, value] = elts.as_slice() else {
         return;
     };
-    let Expr::Call(ast::ExprCall {
-        func, arguments, ..
-    }) = stmt_for.iter.as_ref()
-    else {
+    let Expr::Call(ast::ExprCall { func, arguments }) = stmt_for.iter.as_ref() else {
         return;
     };
 
@@ -237,45 +234,41 @@ fn generate_range_len_call(name: Name, generator: Generator) -> String {
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     // Construct `len(name)`.
-    let len = ast::ExprCall {
-        func: Box::new(
-            ast::ExprName {
-                id: Name::new_static("len"),
-                ctx: ast::ExprContext::Load,
-                range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-            }
-            .into(),
-        ),
-        arguments: Arguments {
+    let len = ast::ExprCall::new(
+        ast::ExprName {
+            id: Name::new_static("len"),
+            ctx: ast::ExprContext::Load,
+            range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+        }
+        .into(),
+        Arguments {
             args: [var.into()].into(),
             keywords: std::iter::empty().collect(),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         },
-        range_start: ruff_text_size::TextSize::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-    };
+        ruff_text_size::TextSize::default(),
+        ruff_python_ast::AtomicNodeIndex::NONE,
+    );
     // Construct `range(len(name))`.
-    let range = ast::ExprCall {
-        func: Box::new(
-            ast::ExprName {
-                id: Name::new_static("range"),
-                ctx: ast::ExprContext::Load,
-                range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-            }
-            .into(),
-        ),
-        arguments: Arguments {
+    let range = ast::ExprCall::new(
+        ast::ExprName {
+            id: Name::new_static("range"),
+            ctx: ast::ExprContext::Load,
+            range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+        }
+        .into(),
+        Arguments {
             args: [len.into()].into(),
             keywords: std::iter::empty().collect(),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         },
-        range_start: ruff_text_size::TextSize::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-    };
+        ruff_text_size::TextSize::default(),
+        ruff_python_ast::AtomicNodeIndex::NONE,
+    );
     // And finally, turn it into a statement.
     let stmt = ast::StmtExpr {
         value: Box::new(range.into()),

@@ -168,9 +168,7 @@ pub(crate) fn verbose_decimal_constructor(checker: &Checker, call: &ast::ExprCal
                 applicability,
             ));
         }
-        Expr::Call(ast::ExprCall {
-            func, arguments, ..
-        }) => {
+        Expr::Call(ast::ExprCall { func, arguments }) => {
             // Must be a call to the `float` builtin.
             if !checker.semantic().match_builtin_expr(func, "float") {
                 return;

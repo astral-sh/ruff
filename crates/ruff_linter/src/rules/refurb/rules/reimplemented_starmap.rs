@@ -317,17 +317,17 @@ fn construct_starmap_call(starmap_binding: Name, iter: &Expr, func: &Expr) -> as
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
-    ast::ExprCall {
-        func: Box::new(starmap.into()),
-        arguments: ast::Arguments {
+    ast::ExprCall::new(
+        starmap.into(),
+        ast::Arguments {
             args: [func.clone(), iter.clone()].into(),
             keywords: std::iter::empty().collect(),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         },
-        range_start: ruff_text_size::TextSize::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-    }
+        ruff_text_size::TextSize::default(),
+        ruff_python_ast::AtomicNodeIndex::NONE,
+    )
 }
 
 /// Wrap given function call with yet another call.
@@ -338,17 +338,17 @@ fn wrap_with_call_to(call: ast::ExprCall, func_name: Name) -> ast::ExprCall {
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
-    ast::ExprCall {
-        func: Box::new(name.into()),
-        arguments: ast::Arguments {
+    ast::ExprCall::new(
+        name.into(),
+        ast::Arguments {
             args: [call.into()].into(),
             keywords: std::iter::empty().collect(),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         },
-        range_start: ruff_text_size::TextSize::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-    }
+        ruff_text_size::TextSize::default(),
+        ruff_python_ast::AtomicNodeIndex::NONE,
+    )
 }
 
 #[derive(Debug)]
@@ -378,7 +378,6 @@ fn match_call(element: &Expr) -> Option<(&[Expr], &Expr)> {
     let ast::ExprCall {
         func,
         arguments: ast::Arguments { args, keywords, .. },
-        ..
     } = element.as_call_expr()?;
 
     if !keywords.is_empty() {

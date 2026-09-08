@@ -109,10 +109,7 @@ pub(crate) fn list_assign_reversed(checker: &Checker, assign: &StmtAssign) {
 /// For example, given `list(list(list([1, 2, 3])))`, this function
 /// would return the inner `[1, 2, 3]` expression.
 fn peel_lists(expr: &Expr) -> &Expr {
-    let Some(ExprCall {
-        func, arguments, ..
-    }) = expr.as_call_expr()
-    else {
+    let Some(ExprCall { func, arguments }) = expr.as_call_expr() else {
         return expr;
     };
 
@@ -138,9 +135,7 @@ fn extract_name_from_reversed<'a>(
     expr: &'a Expr,
     semantic: &SemanticModel,
 ) -> Option<&'a ExprName> {
-    let ExprCall {
-        func, arguments, ..
-    } = expr.as_call_expr()?;
+    let ExprCall { func, arguments } = expr.as_call_expr()?;
 
     if !arguments.keywords.is_empty() {
         return None;

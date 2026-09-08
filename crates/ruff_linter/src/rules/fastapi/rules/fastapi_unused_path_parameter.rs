@@ -418,10 +418,7 @@ impl<'a> Dependency<'a> {
 }
 
 fn depends_arguments<'a>(expr: &'a Expr, semantic: &SemanticModel) -> Option<&'a Arguments> {
-    let Expr::Call(ExprCall {
-        func, arguments, ..
-    }) = expr
-    else {
+    let Expr::Call(ExprCall { func, arguments }) = expr else {
         return None;
     };
 

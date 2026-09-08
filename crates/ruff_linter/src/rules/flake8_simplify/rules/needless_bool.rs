@@ -275,17 +275,17 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             };
-            let call_node = ast::ExprCall {
-                func: Box::new(func_node.into()),
-                arguments: Arguments {
+            let call_node = ast::ExprCall::new(
+                func_node.into(),
+                Arguments {
                     args: [if_test.clone()].into(),
                     keywords: std::iter::empty().collect(),
                     range: TextRange::default(),
                     node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 },
-                range_start: ruff_text_size::TextSize::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-            };
+                ruff_text_size::TextSize::default(),
+                ruff_python_ast::AtomicNodeIndex::NONE,
+            );
             Some(Expr::Call(call_node))
         } else {
             None

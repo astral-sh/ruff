@@ -315,8 +315,6 @@ fn isinstance_target<'a>(call: &'a Expr, semantic: &'a SemanticModel) -> Option<
                 range: _,
                 node_index: _,
             },
-        range_start: _,
-        node_index: _,
     } = call.as_call_expr()?;
     if args.len() != 2 {
         return None;

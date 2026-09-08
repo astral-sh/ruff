@@ -35,7 +35,6 @@ pub(crate) fn is_infinite_iterable(arg: &Expr, semantic: &SemanticModel) -> bool
     let Expr::Call(ast::ExprCall {
         func,
         arguments: Arguments { args, keywords, .. },
-        ..
     }) = &arg
     else {
         return false;

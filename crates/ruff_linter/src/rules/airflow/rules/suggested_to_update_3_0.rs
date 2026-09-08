@@ -93,9 +93,7 @@ pub(crate) fn airflow_3_0_suggested_update_expr(checker: &Checker, expr: &Expr) 
     }
 
     match expr {
-        Expr::Call(ExprCall {
-            func, arguments, ..
-        }) => {
+        Expr::Call(ExprCall { func, arguments }) => {
             if let Some(qualified_name) = checker.semantic().resolve_qualified_name(func) {
                 check_call_arguments(checker, &qualified_name, arguments);
             }

@@ -207,10 +207,7 @@ fn is_immediately_closed(semantic: &SemanticModel) -> bool {
         return false;
     };
 
-    let Expr::Call(ast::ExprCall {
-        func, arguments, ..
-    }) = expr
-    else {
+    let Expr::Call(ast::ExprCall { func, arguments }) = expr else {
         return false;
     };
 

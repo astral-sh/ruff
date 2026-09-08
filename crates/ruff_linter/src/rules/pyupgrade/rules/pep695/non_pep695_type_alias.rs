@@ -131,10 +131,7 @@ pub(crate) fn non_pep695_type_alias_type(checker: &Checker, stmt: &StmtAssign) {
 
     let StmtAssign { targets, value, .. } = stmt;
 
-    let Expr::Call(ExprCall {
-        func, arguments, ..
-    }) = value.as_ref()
-    else {
+    let Expr::Call(ExprCall { func, arguments }) = value.as_ref() else {
         return;
     };
 

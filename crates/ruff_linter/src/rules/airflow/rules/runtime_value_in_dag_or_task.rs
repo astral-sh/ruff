@@ -101,9 +101,7 @@ fn find_runtime_varying_call<'a>(
     semantic: &SemanticModel,
 ) -> Option<(&'a Expr, &'static str)> {
     match expr {
-        Expr::Call(ExprCall {
-            func, arguments, ..
-        }) => {
+        Expr::Call(ExprCall { func, arguments }) => {
             if let Some(qualified_name) = semantic.resolve_qualified_name(func) {
                 let name = match qualified_name.segments() {
                     ["datetime", "datetime", "now"] => Some("datetime.now"),

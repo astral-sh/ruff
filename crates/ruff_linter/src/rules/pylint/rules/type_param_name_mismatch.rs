@@ -74,10 +74,7 @@ pub(crate) fn type_param_name_mismatch(checker: &Checker, value: &Expr, targets:
         return;
     };
 
-    let Expr::Call(ast::ExprCall {
-        func, arguments, ..
-    }) = value
-    else {
+    let Expr::Call(ast::ExprCall { func, arguments }) = value else {
         return;
     };
 

@@ -4007,11 +4007,11 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                 ast::Expr::Call(ast::ExprCall {
                     func,
                     arguments: ast::Arguments { args, keywords, .. },
-                    ..
                 }) => {
                     if keywords.is_empty()
                         && let [single_argument] = &**args
-                        && let Type::ClassLiteral(called_class) = inference.expression_type(func)
+                        && let Type::ClassLiteral(called_class) =
+                            inference.expression_type(func.as_ref())
                         && called_class.is_known(db, KnownClass::Type)
                     {
                         Some(single_argument)

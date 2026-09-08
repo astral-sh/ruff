@@ -122,12 +122,7 @@ fn single_item<'a>(expr: &'a Expr, semantic: &'a SemanticModel) -> Option<&'a Ex
             [item] => Some(item),
             _ => None,
         },
-        Expr::Call(ast::ExprCall {
-            func,
-            arguments,
-            range_start: _,
-            node_index: _,
-        }) => {
+        Expr::Call(ast::ExprCall { func, arguments }) => {
             if arguments.len() != 1 || !is_set_method(func, semantic) {
                 return None;
             }

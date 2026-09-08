@@ -1188,7 +1188,7 @@ impl GotoTarget<'_> {
                     let grandparent_expr = covering_node.ancestors().nth(2);
                     let attribute_expr = attribute.into();
                     if let Some(AnyNodeRef::ExprCall(call)) = grandparent_expr {
-                        if ruff_python_ast::ExprRef::from(&call.func) == attribute_expr {
+                        if ruff_python_ast::ExprRef::from(call.func.as_ref()) == attribute_expr {
                             return Some(GotoTarget::Call {
                                 call,
                                 callable: attribute_expr,

@@ -55,14 +55,14 @@ fn assertion_error(msg: Option<&Expr>) -> Stmt {
     Stmt::Raise(ast::StmtRaise {
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-        exc: Some(Box::new(Expr::Call(ast::ExprCall {
-            func: Box::new(Expr::Name(ast::ExprName {
+        exc: Some(Box::new(Expr::Call(ast::ExprCall::new(
+            Expr::Name(ast::ExprName {
                 id: "AssertionError".into(),
                 ctx: ExprContext::Load,
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-            })),
-            arguments: Arguments {
+            }),
+            Arguments {
                 args: if let Some(msg) = msg {
                     [msg.clone()].into()
                 } else {
@@ -72,9 +72,9 @@ fn assertion_error(msg: Option<&Expr>) -> Stmt {
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             },
-            range_start: ruff_text_size::TextSize::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-        }))),
+            ruff_text_size::TextSize::default(),
+            ruff_python_ast::AtomicNodeIndex::NONE,
+        )))),
         cause: None,
     })
 }

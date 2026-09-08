@@ -1460,10 +1460,7 @@ impl<'db> SymbolVisitor<'db> {
                     // We can't update `__all__` if it doesn't already exist.
                     return;
                 }
-                let Some(ast::ExprCall {
-                    func, arguments, ..
-                }) = expr.value.as_call_expr()
-                else {
+                let Some(ast::ExprCall { func, arguments }) = expr.value.as_call_expr() else {
                     return;
                 };
                 let Some(ast::ExprAttribute {

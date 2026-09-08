@@ -116,9 +116,7 @@ fn member_has_unknown_value(semantic: &SemanticModel, expr: &Expr) -> bool {
     match expr {
         Expr::EllipsisLiteral(_) => true,
 
-        Expr::Call(ExprCall {
-            func, arguments, ..
-        }) => {
+        Expr::Call(ExprCall { func, arguments }) => {
             if !semantic.match_typing_expr(func, "cast") {
                 return false;
             }

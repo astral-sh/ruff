@@ -539,8 +539,6 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                         range: _,
                         node_index: _,
                     },
-                range_start: _,
-                node_index: _,
             },
         ) => {
             if checker.any_rule_enabled(&[

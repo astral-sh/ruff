@@ -99,10 +99,7 @@ pub(crate) fn bit_count(checker: &Checker, call: &ExprCall) {
         return;
     }
 
-    let Expr::Call(ExprCall {
-        func, arguments, ..
-    }) = value.as_ref()
-    else {
+    let Expr::Call(ExprCall { func, arguments }) = value.as_ref() else {
         return;
     };
 

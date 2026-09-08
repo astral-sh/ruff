@@ -96,10 +96,7 @@ pub(crate) fn fstring_number_format(checker: &Checker, subscript: &ast::ExprSubs
     }
 
     // The call must be exactly `hex(...)`, `bin(...)`, or `oct(...)`.
-    let Expr::Call(ExprCall {
-        func, arguments, ..
-    }) = subscript.value.as_ref()
-    else {
+    let Expr::Call(ExprCall { func, arguments }) = subscript.value.as_ref() else {
         return;
     };
 

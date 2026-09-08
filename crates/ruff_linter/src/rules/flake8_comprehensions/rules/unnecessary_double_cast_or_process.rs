@@ -84,7 +84,6 @@ pub(crate) fn unnecessary_double_cast_or_process(
         arguments: Arguments {
             keywords: inner_kw, ..
         },
-        ..
     }) = arg
     else {
         return;

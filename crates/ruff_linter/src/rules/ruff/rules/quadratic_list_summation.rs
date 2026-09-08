@@ -111,12 +111,7 @@ impl AlwaysFixableViolation for QuadraticListSummation {
 
 /// RUF017
 pub(crate) fn quadratic_list_summation(checker: &Checker, call: &ast::ExprCall) {
-    let ast::ExprCall {
-        func,
-        arguments,
-        range_start: _,
-        node_index: _,
-    } = call;
+    let ast::ExprCall { func, arguments } = call;
 
     let Some(iterable) = arguments.args.first() else {
         return;
@@ -205,9 +200,9 @@ fn start_is_empty_list(arguments: &Arguments, semantic: &SemanticModel) -> bool 
     };
 
     match start_arg {
-        Expr::Call(ast::ExprCall {
-            func, arguments, ..
-        }) => arguments.is_empty() && semantic.match_builtin_expr(func, "list"),
+        Expr::Call(ast::ExprCall { func, arguments }) => {
+            arguments.is_empty() && semantic.match_builtin_expr(func, "list")
+        }
         Expr::List(list) => list.is_empty() && list.ctx.is_load(),
         _ => false,
     }

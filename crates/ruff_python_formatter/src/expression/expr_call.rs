@@ -23,12 +23,7 @@ impl FormatRuleWithOptions<ExprCall, PyFormatContext<'_>> for FormatExprCall {
 
 impl FormatNodeRule<ExprCall> for FormatExprCall {
     fn fmt_fields(&self, item: &ExprCall, f: &mut PyFormatter) -> FormatResult<()> {
-        let ExprCall {
-            range_start: _,
-            node_index: _,
-            func,
-            arguments,
-        } = item;
+        let ExprCall { func, arguments } = item;
 
         let comments = f.context().comments().clone();
         let dangling = comments.dangling(item);
@@ -37,7 +32,9 @@ impl FormatNodeRule<ExprCall> for FormatExprCall {
 
         let fmt_func = format_with(|f: &mut PyFormatter| {
             // Format the function expression.
-            if f.context().is_expression_parenthesized(func.into()) {
+            if f.context()
+                .is_expression_parenthesized(func.as_ref().into())
+            {
                 func.format().with_options(Parentheses::Always).fmt(f)
             } else {
                 match func.as_ref() {

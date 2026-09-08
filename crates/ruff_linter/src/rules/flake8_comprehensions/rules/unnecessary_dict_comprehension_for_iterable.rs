@@ -217,17 +217,17 @@ fn fix_unnecessary_dict_comprehension(value: &Expr, generator: &Comprehension) -
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
-    Expr::Call(ExprCall {
-        func: Box::new(Expr::Name(ExprName {
+    Expr::Call(ExprCall::new(
+        Expr::Name(ExprName {
             id: "dict.fromkeys".into(),
             ctx: ExprContext::Load,
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-        })),
-        arguments: args,
-        range_start: ruff_text_size::TextSize::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-    })
+        }),
+        args,
+        ruff_text_size::TextSize::default(),
+        ruff_python_ast::AtomicNodeIndex::NONE,
+    ))
 }
 
 fn contains_side_effecting_sub_expression(target: &Expr) -> bool {

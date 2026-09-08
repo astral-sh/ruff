@@ -118,9 +118,7 @@ fn enumerate_items<'a>(
     tuple_expr: &'a Expr,
     semantic: &SemanticModel,
 ) -> Option<(&'a ast::ExprName, &'a ast::ExprName, &'a ast::ExprName)> {
-    let ast::ExprCall {
-        func, arguments, ..
-    } = call_expr.as_call_expr()?;
+    let ast::ExprCall { func, arguments } = call_expr.as_call_expr()?;
 
     let Expr::Tuple(ast::ExprTuple { elts, .. }) = tuple_expr else {
         return None;

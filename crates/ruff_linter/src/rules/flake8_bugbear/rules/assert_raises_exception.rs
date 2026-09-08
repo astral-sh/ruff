@@ -108,13 +108,7 @@ fn detect_blind_exception(
 /// B017
 pub(crate) fn assert_raises_exception(checker: &Checker, items: &[WithItem]) {
     for item in items {
-        let Expr::Call(ast::ExprCall {
-            func,
-            arguments,
-            range_start: _,
-            node_index: _,
-        }) = &item.context_expr
-        else {
+        let Expr::Call(ast::ExprCall { func, arguments }) = &item.context_expr else {
             continue;
         };
 
@@ -132,12 +126,7 @@ pub(crate) fn assert_raises_exception(checker: &Checker, items: &[WithItem]) {
 
 /// B017 (call form)
 pub(crate) fn assert_raises_exception_call(checker: &Checker, call: &ast::ExprCall) {
-    let ast::ExprCall {
-        func,
-        arguments,
-        range_start: _,
-        node_index: _,
-    } = call;
+    let ast::ExprCall { func, arguments } = call;
     let semantic = checker.semantic();
 
     if arguments.args.len() < 2 && arguments.find_argument("func", 1).is_none() {

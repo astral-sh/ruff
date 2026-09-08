@@ -115,10 +115,7 @@ fn get_undecorated_methods(checker: &Checker, class_stmt: &Stmt, method_type: &M
     // gather all explicit *method calls
     for stmt in &class_def.body {
         if let Stmt::Assign(ast::StmtAssign { targets, value, .. }) = stmt {
-            if let Expr::Call(ast::ExprCall {
-                func, arguments, ..
-            }) = value.as_ref()
-            {
+            if let Expr::Call(ast::ExprCall { func, arguments }) = value.as_ref() {
                 if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
                     if id == method_name && checker.semantic().has_builtin_binding(method_name) {
                         if arguments.args.len() != 1 {

@@ -131,13 +131,7 @@ fn match_typed_dict_assign<'a>(
     let [Expr::Name(ast::ExprName { id: class_name, .. })] = targets else {
         return None;
     };
-    let Expr::Call(ast::ExprCall {
-        func,
-        arguments,
-        range_start: _,
-        node_index: _,
-    }) = value
-    else {
+    let Expr::Call(ast::ExprCall { func, arguments }) = value else {
         return None;
     };
     if !semantic.match_typing_expr(func, "TypedDict") {
@@ -276,8 +270,6 @@ fn match_fields_and_total(arguments: &Arguments) -> Option<(Suite, Option<&Keywo
                 Expr::Call(ast::ExprCall {
                     func,
                     arguments: Arguments { keywords, .. },
-                    range_start: _,
-                    node_index: _,
                 }) => Some((fields_from_dict_call(func, keywords)?, total)),
                 _ => None,
             }

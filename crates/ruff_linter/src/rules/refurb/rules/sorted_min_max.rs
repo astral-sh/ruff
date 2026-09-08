@@ -99,10 +99,7 @@ pub(crate) fn sorted_min_max(checker: &Checker, subscript: &ast::ExprSubscript) 
     }
 
     // Early return if the value is not a call expression.
-    let Expr::Call(ast::ExprCall {
-        func, arguments, ..
-    }) = value.as_ref()
-    else {
+    let Expr::Call(ast::ExprCall { func, arguments }) = value.as_ref() else {
         return;
     };
 

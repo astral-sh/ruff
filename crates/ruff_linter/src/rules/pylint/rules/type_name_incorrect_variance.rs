@@ -74,10 +74,7 @@ pub(crate) fn type_name_incorrect_variance(checker: &Checker, value: &Expr) {
         return;
     }
 
-    let Expr::Call(ast::ExprCall {
-        func, arguments, ..
-    }) = value
-    else {
+    let Expr::Call(ast::ExprCall { func, arguments }) = value else {
         return;
     };
 

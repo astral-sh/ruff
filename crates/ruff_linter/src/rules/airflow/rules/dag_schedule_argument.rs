@@ -59,10 +59,7 @@ pub(crate) fn dag_no_schedule_argument(checker: &Checker, expr: &Expr) {
     }
 
     // Don't check non-call expressions.
-    let Expr::Call(ast::ExprCall {
-        func, arguments, ..
-    }) = expr
-    else {
+    let Expr::Call(ast::ExprCall { func, arguments }) = expr else {
         return;
     };
 

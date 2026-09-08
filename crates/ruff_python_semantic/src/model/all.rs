@@ -168,13 +168,12 @@ impl SemanticModel<'_> {
                 return (None, DunderAllFlags::empty());
             }
             // Allow `tuple()`, `list()`, and their generic forms, like `list[int]()`.
-            Expr::Call(ast::ExprCall {
-                func, arguments, ..
-            }) if arguments.keywords.is_empty()
-                && arguments.args.len() <= 1
-                && self
-                    .resolve_builtin_symbol(map_subscript(func))
-                    .is_some_and(|symbol| matches!(symbol, "tuple" | "list")) =>
+            Expr::Call(ast::ExprCall { func, arguments })
+                if arguments.keywords.is_empty()
+                    && arguments.args.len() <= 1
+                    && self
+                        .resolve_builtin_symbol(map_subscript(func))
+                        .is_some_and(|symbol| matches!(symbol, "tuple" | "list")) =>
             {
                 let [arg] = arguments.args.as_ref() else {
                     return (None, DunderAllFlags::empty());

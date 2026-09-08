@@ -82,9 +82,7 @@ impl AlwaysFixableViolation for LenTest {
 
 /// PLC1802
 pub(crate) fn len_test(checker: &Checker, call: &ExprCall) {
-    let ExprCall {
-        func, arguments, ..
-    } = call;
+    let ExprCall { func, arguments } = call;
     let semantic = checker.semantic();
 
     if !semantic.in_boolean_test() {

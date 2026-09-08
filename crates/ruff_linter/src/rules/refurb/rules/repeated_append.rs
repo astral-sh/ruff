@@ -267,10 +267,7 @@ fn match_append<'a>(semantic: &'a SemanticModel, stmt: &'a Stmt) -> Option<Appen
         return None;
     };
 
-    let Expr::Call(ast::ExprCall {
-        func, arguments, ..
-    }) = value.as_ref()
-    else {
+    let Expr::Call(ast::ExprCall { func, arguments }) = value.as_ref() else {
         return None;
     };
 
@@ -357,17 +354,17 @@ fn make_suggestion(group: &AppendGroup, generator: Generator) -> String {
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     // Make the actual call `var.extend((elt1, elt2, ..., eltN))`
-    let call = ast::ExprCall {
-        func: Box::new(attr.into()),
-        arguments: ast::Arguments {
+    let call = ast::ExprCall::new(
+        attr.into(),
+        ast::Arguments {
             args: [tuple.into()].into(),
             keywords: std::iter::empty().collect(),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         },
-        range_start: ruff_text_size::TextSize::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-    };
+        ruff_text_size::TextSize::default(),
+        ruff_python_ast::AtomicNodeIndex::NONE,
+    );
     // And finally, turn it into a statement.
     let stmt = ast::StmtExpr {
         value: Box::new(call.into()),

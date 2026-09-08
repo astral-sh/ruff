@@ -1193,12 +1193,7 @@ impl<'a> Generator<'a> {
                     }
                 });
             }
-            Expr::Call(ast::ExprCall {
-                func,
-                arguments,
-                range_start: _,
-                node_index: _,
-            }) => {
+            Expr::Call(ast::ExprCall { func, arguments }) => {
                 self.unparse_expr(func, precedence::MAX);
                 self.p("(");
                 if let (

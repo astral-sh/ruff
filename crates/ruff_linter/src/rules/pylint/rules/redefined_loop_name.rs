@@ -265,7 +265,6 @@ fn assignment_is_cast_expr(value: &Expr, target: &Expr, semantic: &SemanticModel
     let Expr::Call(ast::ExprCall {
         func,
         arguments: Arguments { args, .. },
-        ..
     }) = value
     else {
         return false;

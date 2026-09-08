@@ -133,7 +133,6 @@ pub(crate) fn sort_dunder_all_extend_call(
     ast::ExprCall {
         func,
         arguments: ast::Arguments { args, keywords, .. },
-        ..
     }: &ast::ExprCall,
 ) {
     let ([value_passed], []) = (&**args, &**keywords) else {

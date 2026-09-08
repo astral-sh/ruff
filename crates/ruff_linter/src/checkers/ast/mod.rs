@@ -1741,12 +1741,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
 
         // Step 1: Binding
         match expr {
-            Expr::Call(ast::ExprCall {
-                func,
-                arguments: _,
-                range_start: _,
-                node_index: _,
-            }) => {
+            Expr::Call(ast::ExprCall { func, arguments: _ }) => {
                 if let Expr::Name(ast::ExprName {
                     id,
                     ctx,
@@ -1861,12 +1856,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
             }) => {
                 self.visit_boolean_test(operand);
             }
-            Expr::Call(ast::ExprCall {
-                func,
-                arguments,
-                range_start: _,
-                node_index: _,
-            }) => {
+            Expr::Call(ast::ExprCall { func, arguments }) => {
                 self.visit_expr(func);
 
                 let callable =

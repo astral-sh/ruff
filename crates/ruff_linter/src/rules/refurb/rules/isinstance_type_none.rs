@@ -88,9 +88,7 @@ fn is_none(expr: &Expr, semantic: &SemanticModel) -> bool {
             Expr::NoneLiteral(_) if in_union_context => true,
 
             // Ex) `type(None)`
-            Expr::Call(ast::ExprCall {
-                func, arguments, ..
-            }) => {
+            Expr::Call(ast::ExprCall { func, arguments }) => {
                 if !semantic.match_builtin_expr(func, "type") {
                     return false;
                 }

@@ -349,17 +349,17 @@ impl<'a> ReFunc<'a> {
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         });
-        Expr::Call(ExprCall {
-            func: Box::new(method),
-            arguments: Arguments {
+        Expr::Call(ExprCall::new(
+            method,
+            Arguments {
                 args: args.into(),
                 keywords: std::iter::empty().collect(),
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             },
-            range_start: ruff_text_size::TextSize::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-        })
+            ruff_text_size::TextSize::default(),
+            ruff_python_ast::AtomicNodeIndex::NONE,
+        ))
     }
 }
 

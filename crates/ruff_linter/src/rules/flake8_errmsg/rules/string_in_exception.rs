@@ -189,7 +189,6 @@ pub(crate) fn string_in_exception(checker: &Checker, stmt: &Stmt, exc: &Expr) {
     let Expr::Call(ast::ExprCall {
         func,
         arguments: Arguments { args, .. },
-        ..
     }) = exc
     else {
         return;

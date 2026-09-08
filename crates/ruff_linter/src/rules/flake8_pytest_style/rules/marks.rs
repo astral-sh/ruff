@@ -156,12 +156,7 @@ fn pytest_mark_parentheses(
 
 fn check_mark_parentheses(checker: &Checker, decorator: &Decorator, marker: &str) {
     match &decorator.expression {
-        Expr::Call(ast::ExprCall {
-            func: _,
-            arguments,
-            range_start: _,
-            node_index: _,
-        }) => {
+        Expr::Call(ast::ExprCall { func: _, arguments }) => {
             if !checker.settings().flake8_pytest_style.mark_parentheses
                 && arguments.args.is_empty()
                 && arguments.keywords.is_empty()

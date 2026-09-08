@@ -4380,12 +4380,6 @@ impl crate::HasNodeIndex for crate::ExprCompare {
     }
 }
 
-impl crate::HasNodeIndex for crate::ExprCall {
-    fn node_index(&self) -> &crate::AtomicNodeIndex {
-        &self.node_index
-    }
-}
-
 impl crate::HasNodeIndex for crate::ExprFString {
     fn node_index(&self) -> &crate::AtomicNodeIndex {
         &self.node_index
@@ -9793,9 +9787,7 @@ pub struct ExprCompare {
 #[derive(Clone, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ExprCall {
-    pub node_index: crate::AtomicNodeIndex,
-    pub range_start: ruff_text_size::TextSize,
-    pub func: Box<Expr>,
+    pub func: crate::CallFunction,
     pub arguments: crate::Arguments,
 }
 
@@ -10835,12 +10827,7 @@ impl ExprCall {
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
-        let ExprCall {
-            range_start: _,
-            func,
-            arguments,
-            node_index: _,
-        } = self;
+        let ExprCall { func, arguments } = self;
         visitor.visit_expr(func);
         visitor.visit_arguments(arguments);
     }

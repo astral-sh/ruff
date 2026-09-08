@@ -513,12 +513,7 @@ pub fn walk_expr<V: Transformer + ?Sized>(visitor: &V, expr: &mut Expr) {
                 visitor.visit_expr(expr);
             }
         }
-        Expr::Call(ast::ExprCall {
-            func,
-            arguments,
-            range_start: _,
-            node_index: _,
-        }) => {
+        Expr::Call(ast::ExprCall { func, arguments }) => {
             visitor.visit_expr(func);
             visitor.visit_arguments(arguments);
         }

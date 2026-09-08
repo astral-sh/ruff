@@ -73,9 +73,9 @@ pub(crate) fn loop_iterator_mutation(checker: &Checker, stmt_for: &StmtFor) {
         }
         // Ex) Given `for i, item in enumerate(items):`, `i` is the index and `items` is the
         // iterable.
-        Expr::Call(ExprCall {
-            func, arguments, ..
-        }) if checker.semantic().match_builtin_expr(func, "enumerate") => {
+        Expr::Call(ExprCall { func, arguments })
+            if checker.semantic().match_builtin_expr(func, "enumerate") =>
+        {
             // Ex) `items`
             let Some(iter) = arguments.args.first() else {
                 return;

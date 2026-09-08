@@ -86,7 +86,6 @@ fn check_dict_items_usage(checker: &Checker, target: &Expr, iter: &Expr) {
     let Expr::Call(ast::ExprCall {
         func,
         arguments: Arguments { args, .. },
-        ..
     }) = iter
     else {
         return;

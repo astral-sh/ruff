@@ -48,12 +48,7 @@ impl Violation for UnnecessaryListCall {
 
 /// C411
 pub(crate) fn unnecessary_list_call(checker: &Checker, expr: &Expr, call: &ExprCall) {
-    let ExprCall {
-        func,
-        arguments,
-        range_start: _,
-        node_index: _,
-    } = call;
+    let ExprCall { func, arguments } = call;
 
     if !arguments.keywords.is_empty() {
         return;

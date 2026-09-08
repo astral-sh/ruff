@@ -72,9 +72,7 @@ impl Violation for UnnecessaryEmptyIterableWithinDequeCall {
 
 /// RUF037
 pub(crate) fn unnecessary_literal_within_deque_call(checker: &Checker, deque: &ast::ExprCall) {
-    let ast::ExprCall {
-        func, arguments, ..
-    } = deque;
+    let ast::ExprCall { func, arguments } = deque;
 
     let Some(qualified) = checker.semantic().resolve_qualified_name(func) else {
         return;

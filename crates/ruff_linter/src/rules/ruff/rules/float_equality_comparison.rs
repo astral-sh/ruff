@@ -192,9 +192,7 @@ fn is_numeric_expr(expr: &Expr) -> bool {
 
 fn should_skip_comparison(expr: &Expr, semantic: &SemanticModel) -> bool {
     match expr {
-        Expr::Call(ast::ExprCall {
-            func, arguments, ..
-        }) => {
+        Expr::Call(ast::ExprCall { func, arguments }) => {
             // Skip `pytest.approx`
             if let Some(qualified_name) = semantic.resolve_qualified_name(func) {
                 if matches!(qualified_name.segments(), ["pytest", "approx"]) {

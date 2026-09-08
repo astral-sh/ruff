@@ -107,10 +107,7 @@ pub(super) fn is_typed_dict_class(class_def: &ast::StmtClassDef, semantic: &Sema
 /// ```
 pub(super) fn is_django_model_import(name: &str, stmt: &Stmt, semantic: &SemanticModel) -> bool {
     fn match_model_import(name: &str, expr: &Expr, semantic: &SemanticModel) -> bool {
-        let Expr::Call(ast::ExprCall {
-            func, arguments, ..
-        }) = expr
-        else {
+        let Expr::Call(ast::ExprCall { func, arguments }) = expr else {
             return false;
         };
 

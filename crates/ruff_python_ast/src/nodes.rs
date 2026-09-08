@@ -1,10 +1,10 @@
 #![allow(clippy::derive_partial_eq_without_eq)]
 
-use crate::AtomicNodeIndex;
 use crate::generated::{
     ExprBytesLiteral, ExprCall, ExprDict, ExprFString, ExprList, ExprName, ExprSet,
     ExprStringLiteral, ExprTString, ExprTuple, PatternMatchAs, PatternMatchOr, StmtClassDef,
 };
+use crate::{AtomicNodeIndex, HasNodeIndex};
 use std::borrow::Cow;
 use std::fmt;
 use std::fmt::Debug;
@@ -1438,21 +1438,101 @@ impl ExprStringLiteral {
     }
 }
 
-impl Ranged for ExprCall {
-    fn range(&self) -> TextRange {
-        TextRange::new(self.range_start, self.arguments.end())
+impl ExprCall {
+    /// Create a call whose callee shares an allocation with the call's source start and node index.
+    #[inline]
+    pub fn new(
+        func: Expr,
+        arguments: Arguments,
+        range_start: TextSize,
+        node_index: AtomicNodeIndex,
+    ) -> Self {
+        Self {
+            func: CallFunction(Box::new(CallFunctionData {
+                func,
+                range_start,
+                node_index,
+            })),
+            arguments,
+        }
+    }
+
+    pub(crate) fn set_range_start(&mut self, start: TextSize) {
+        self.func.0.range_start = start;
     }
 }
 
-#[expect(
-    clippy::missing_fields_in_debug,
-    reason = "`range_start` is represented by the reconstructed `range` field"
-)]
+/// The callee of a call expression, stored with the containing call's metadata.
+///
+/// Sharing the callee's allocation with the call's node index and source start leaves room
+/// for positional arguments to use a boxed slice while keeping `ExprCall` at 48 bytes on
+/// 64-bit targets. The callee retains its own node index and range inside `Expr`.
+#[derive(Clone, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
+pub struct CallFunction(Box<CallFunctionData>);
+
+impl AsRef<Expr> for CallFunction {
+    #[inline]
+    fn as_ref(&self) -> &Expr {
+        &self.0.func
+    }
+}
+
+impl AsMut<Expr> for CallFunction {
+    #[inline]
+    fn as_mut(&mut self) -> &mut Expr {
+        &mut self.0.func
+    }
+}
+
+impl Deref for CallFunction {
+    type Target = Expr;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        self.as_ref()
+    }
+}
+
+impl DerefMut for CallFunction {
+    #[inline]
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.as_mut()
+    }
+}
+
+impl fmt::Debug for CallFunction {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.as_ref().fmt(formatter)
+    }
+}
+
+#[derive(Clone, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
+struct CallFunctionData {
+    func: Expr,
+    range_start: TextSize,
+    node_index: AtomicNodeIndex,
+}
+
+impl HasNodeIndex for ExprCall {
+    #[inline]
+    fn node_index(&self) -> &AtomicNodeIndex {
+        &self.func.0.node_index
+    }
+}
+
+impl Ranged for ExprCall {
+    fn range(&self) -> TextRange {
+        TextRange::new(self.func.0.range_start, self.arguments.end())
+    }
+}
+
 impl fmt::Debug for ExprCall {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("ExprCall")
-            .field("node_index", &self.node_index)
+            .field("node_index", self.node_index())
             .field("range", &self.range())
             .field("func", &self.func)
             .field("arguments", &self.arguments)
@@ -3611,7 +3691,7 @@ impl ParameterWithDefault {
 pub struct Arguments {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
-    pub args: ThinVec<Expr>,
+    pub args: Box<[Expr]>,
     pub keywords: ThinVec<Keyword>,
 }
 
@@ -4044,11 +4124,58 @@ impl From<bool> for Singleton {
 mod tests {
     use ruff_text_size::{Ranged, TextRange, TextSize};
 
+    use thin_vec::ThinVec;
+
     use crate::generated::*;
     use crate::{
-        Arguments, AtomicNodeIndex, FString, FStringFlags, FStringPart, FStringPartMut,
-        FStringValue, Mod, Parameters, StringLiteral, StringLiteralFlags,
+        Arguments, AtomicNodeIndex, CallFunction, ExprContext, FString, FStringFlags, FStringPart,
+        FStringPartMut, FStringValue, HasNodeIndex, Mod, NodeIndex, Parameters, StringLiteral,
+        StringLiteralFlags,
     };
+
+    #[test]
+    fn call_and_callee_metadata() {
+        // In `((f))()`, the call starts before the callee's own range.
+        let func = Expr::Name(ExprName {
+            node_index: AtomicNodeIndex::NONE,
+            range: TextRange::new(2.into(), 3.into()),
+            id: "f".into(),
+            ctx: ExprContext::Load,
+        });
+        let mut call = ExprCall::new(
+            func,
+            Arguments {
+                range: TextRange::new(5.into(), 7.into()),
+                node_index: AtomicNodeIndex::NONE,
+                args: Box::default(),
+                keywords: ThinVec::default(),
+            },
+            0.into(),
+            AtomicNodeIndex::NONE,
+        );
+        call.node_index().set(NodeIndex::from(1));
+        call.func.node_index().set(NodeIndex::from(2));
+
+        assert_eq!(call.range(), TextRange::new(0.into(), 7.into()));
+        assert_eq!(call.func.range(), TextRange::new(2.into(), 3.into()));
+        assert_eq!(call.node_index().load(), NodeIndex::from(1));
+        assert_eq!(call.func.node_index().load(), NodeIndex::from(2));
+
+        let cloned = call.clone();
+        call.set_range_start(1.into());
+        call.node_index().set(NodeIndex::from(3));
+        *call.func = Expr::NoneLiteral(ExprNoneLiteral {
+            node_index: AtomicNodeIndex::NONE,
+            range: TextRange::new(2.into(), 3.into()),
+        });
+
+        assert_eq!(call.range(), TextRange::new(1.into(), 7.into()));
+        assert_eq!(call.node_index().load(), NodeIndex::from(3));
+        assert_eq!(cloned.range(), TextRange::new(0.into(), 7.into()));
+        assert_eq!(cloned.node_index().load(), NodeIndex::from(1));
+        assert!(cloned.func.is_name_expr());
+        assert_eq!(cloned.func.node_index().load(), NodeIndex::from(2));
+    }
 
     #[test]
     fn f_string_parts() {
@@ -4120,7 +4247,9 @@ mod tests {
         assert_eq!(std::mem::size_of::<Mod>(), 32);
         assert_eq!(std::mem::size_of::<Pattern>(), 72);
         assert_eq!(std::mem::size_of::<Parameters>(), 56);
-        assert_eq!(std::mem::size_of::<Arguments>(), 32);
+        assert_eq!(std::mem::size_of::<Arguments>(), 40);
+        assert_eq!(std::mem::size_of::<CallFunction>(), 8);
+        assert_eq!(std::mem::size_of::<super::CallFunctionData>(), 64);
         assert_eq!(std::mem::size_of::<Expr>(), 56);
         assert_eq!(std::mem::size_of::<ExprAttribute>(), 56);
         assert_eq!(std::mem::size_of::<ExprAwait>(), 24);

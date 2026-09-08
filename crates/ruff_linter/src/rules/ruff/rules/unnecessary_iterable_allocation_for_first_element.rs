@@ -84,9 +84,7 @@ pub(crate) fn unnecessary_iterable_allocation_for_first_element(checker: &Checke
             value
         }
         // Ex) `list(x).pop(0)`
-        Expr::Call(ast::ExprCall {
-            func, arguments, ..
-        }) => {
+        Expr::Call(ast::ExprCall { func, arguments }) => {
             if !arguments.keywords.is_empty() {
                 return;
             }
@@ -163,7 +161,6 @@ fn match_iteration_target(expr: &Expr, semantic: &SemanticModel) -> Option<Itera
         Expr::Call(ast::ExprCall {
             func,
             arguments: Arguments { args, .. },
-            ..
         }) => {
             let [arg] = &**args else {
                 return None;

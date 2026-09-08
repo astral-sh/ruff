@@ -91,8 +91,6 @@ pub(crate) fn multiple_starts_ends_with(checker: &Checker, expr: &Expr) {
                     range: _,
                     node_index: _,
                 },
-            range_start: _,
-            node_index: _,
         }) = &call
         else {
             continue;
@@ -152,8 +150,6 @@ pub(crate) fn multiple_starts_ends_with(checker: &Checker, expr: &Expr) {
                                 range: _,
                                 node_index: _,
                             },
-                        range_start: _,
-                        node_index: _,
                     }) = expr
                     else {
                         unreachable!(
@@ -196,17 +192,17 @@ pub(crate) fn multiple_starts_ends_with(checker: &Checker, expr: &Expr) {
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             });
-            let node3 = Expr::Call(ast::ExprCall {
-                func: Box::new(node2),
-                arguments: Arguments {
+            let node3 = Expr::Call(ast::ExprCall::new(
+                node2,
+                Arguments {
                     args: [node].into(),
                     keywords: std::iter::empty().collect(),
                     range: TextRange::default(),
                     node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 },
-                range_start: ruff_text_size::TextSize::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-            });
+                ruff_text_size::TextSize::default(),
+                ruff_python_ast::AtomicNodeIndex::NONE,
+            ));
             let call = node3;
 
             // Generate the combined `BoolOp`.
