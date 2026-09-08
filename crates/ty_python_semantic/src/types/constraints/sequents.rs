@@ -1226,8 +1226,6 @@ impl<'db> ConcreteLowerBound<'db> {
             // fully static pivot type.
             if other.bound != self.typevar.domain(db).bottom(db)
                 && other.bound != self.typevar.domain(db).top(db)
-                && !self.bound.has_typevar(db, env)
-                && !other.bound.has_typevar(db, env)
                 && self.bound.is_static_sequent_eligible(db, env)
                 && other.bound.is_static_sequent_eligible(db, env)
                 && other
@@ -1278,9 +1276,7 @@ impl<'db> ConcreteLowerBound<'db> {
             Constraint::add_invariant_tightened_sequent(db, env, map, self, other);
 
             // `(pivot ≤ T) ∧ (U = pivot) → (U ≤ T)`.
-            if !self.bound.has_typevar(db, env)
-                && !other.bound.has_typevar(db, env)
-                && self.bound.is_static_sequent_eligible(db, env)
+            if self.bound.is_static_sequent_eligible(db, env)
                 && other.bound.is_static_sequent_eligible(db, env)
                 && self
                     .bound
@@ -1459,9 +1455,7 @@ impl<'db> ConcreteUpperBound<'db> {
             Constraint::add_invariant_tightened_sequent(db, env, map, self, other);
 
             // `(T ≤ pivot) ∧ (U = pivot) → (T ≤ U)`.
-            if !self.bound.has_typevar(db, env)
-                && !other.bound.has_typevar(db, env)
-                && self.bound.is_static_sequent_eligible(db, env)
+            if self.bound.is_static_sequent_eligible(db, env)
                 && other.bound.is_static_sequent_eligible(db, env)
                 && self
                     .bound
