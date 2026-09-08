@@ -2840,7 +2840,7 @@ def _(v: OptionalX | RequiredX) -> None:
     # but this is a terrible error message:
     #
     # error: [call-non-callable] "Object of type `Overload[]` is not callable"
-    reveal_type(v.pop("x"))  # revealed: Unknown
+    reveal_type(v.pop("x"))  # revealed: int | Unknown
 
 def union_pop_with_default(u: OptionalX | OptStrX) -> None:
     # `Literal[0]` is assignable to `int`, so `OptionalX` arm returns `int`; `OptStrX` arm

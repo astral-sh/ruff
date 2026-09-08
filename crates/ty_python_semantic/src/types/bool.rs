@@ -243,9 +243,7 @@ impl<'db> Type<'db> {
         };
 
         let truthiness = match self {
-            Type::Callable(callable)
-                if callable.is_function_like(db) || callable.is_method_wrapper(db) =>
-            {
+            Type::Callable(callable) if callable.runtime_class(db).is_some() => {
                 Truthiness::AlwaysTrue
             }
 

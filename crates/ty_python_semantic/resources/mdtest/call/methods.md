@@ -505,6 +505,108 @@ The `owner` argument takes precedence over the `instance` argument:
 reveal_type(getattr_static(C, "f").__get__("dummy", C))  # revealed: bound method <class 'C'>.f() -> Unknown
 ```
 
+### The underlying function of a classmethod
+
+A bound classmethod exposes its ordinary function through `__func__`. That function is distinct from
+the classmethod descriptor, and its explicit `__get__` binds the supplied instance. An owner
+argument does not turn this ordinary function back into a classmethod.
+
+```py
+from inspect import getattr_static
+from ty_extensions import static_assert
+
+class C:
+    @classmethod
+    def method(cls, value: int) -> int:
+        return value
+
+class D(C): ...
+
+function = C.method.__func__
+static_assert(getattr_static(C, "method") is not function)
+static_assert(function is D.method.__func__)
+reveal_type(type(function))  # revealed: <class 'FunctionType'>
+
+rebound = function.__get__(D, C)
+reveal_type(rebound.__self__)  # revealed: <class 'D'>
+reveal_type(rebound(1))  # revealed: int
+
+instance_bound = function.__get__(D(), C)
+reveal_type(instance_bound.__self__)  # revealed: D
+```
+
+### `Self` when rebinding an extracted classmethod function
+
+An extracted classmethod function binds its `type[Self]` parameter to the supplied class. `Self`
+therefore denotes an instance of that class in both direct calls and the bound callable signature.
+
+```py
+from collections.abc import Callable
+from typing_extensions import Self
+
+class Base:
+    @classmethod
+    def create(cls) -> Self:
+        return cls()
+
+    def identity(self: Self) -> Self:
+        return self
+
+class Child(Base): ...
+
+rebound = Base.create.__func__.__get__(Child, type)
+reveal_type(rebound.__self__)  # revealed: <class 'Child'>
+reveal_type(rebound())  # revealed: Child
+reveal_type(rebound.__call__())  # revealed: Child
+factory: Callable[[], Child] = rebound
+```
+
+An ordinary `self: Self` annotation keeps the receiver itself as `Self`:
+
+```py
+identity = Base.identity.__get__(Child(), type)
+reveal_type(identity())  # revealed: Child
+reveal_type(identity.__call__())  # revealed: Child
+```
+
+### `Self` when rebinding a decorated classmethod function
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+A callable-returning decorator preserves an explicit `type[Self]` receiver annotation. Extracting
+the function from the raw classmethod descriptor and binding a class specializes `Self` to that
+class's instance type:
+
+```py
+from collections.abc import Callable
+from inspect import getattr_static
+from typing import Self
+
+def preserve[**P, R](function: Callable[P, R]) -> Callable[P, R]:
+    return function
+
+class Base:
+    @classmethod
+    @preserve
+    def create(cls: type[Self]) -> Self:
+        return cls()
+
+class Child(Base): ...
+
+function = getattr_static(Base, "create").__func__
+rebound = function.__get__(Child, type)
+reveal_type(rebound.__self__)  # revealed: <class 'Child'>
+reveal_type(rebound())  # revealed: Child
+reveal_type(rebound.__call__())  # revealed: Child
+factory: Callable[[], Child] = rebound
+```
+
+TODO: Preserve the implicit `type[Self]` receiver annotation through callable-returning decorators,
+so extracting a synthesized function also specializes `Self` correctly when `cls` is unannotated.
+
 ### Classmethods mixed with other decorators
 
 ```toml
@@ -1047,6 +1149,42 @@ reveal_type(getattr_static(C, "f").__get__(None, C))  # revealed: def f() -> Unk
 reveal_type(getattr_static(C, "f").__get__(C(), C))  # revealed: def f() -> Unknown
 reveal_type(getattr_static(C, "f").__get__(C()))  # revealed: def f() -> Unknown
 reveal_type(getattr_static(C, "f").__get__("dummy", C))  # revealed: def f() -> Unknown
+```
+
+### Binding an extracted staticmethod function
+
+Accessing a staticmethod exposes an ordinary function. Storing that function on another class
+therefore allows it to bind a receiver. Reusing the original staticmethod descriptor preserves its
+non-binding behavior.
+
+```py
+from inspect import getattr_static
+from ty_extensions import static_assert
+
+class C:
+    @staticmethod
+    def method(receiver: object, value: int) -> int:
+        return value
+
+function = C.method
+descriptor = getattr_static(C, "method")
+static_assert(descriptor is not function)
+static_assert(function is C().method)
+
+class D:
+    method = function
+    static = descriptor
+
+reveal_type(D().method(1))  # revealed: int
+reveal_type(D().method.__self__)  # revealed: D
+reveal_type(D().method.__func__)  # revealed: (receiver: object, value: int) -> int
+reveal_type(type(D().method.__func__))  # revealed: <class 'FunctionType'>
+reveal_type(D().static(object(), 1))  # revealed: int
+
+explicit = function.__get__(D(), C)
+reveal_type(explicit.__self__)  # revealed: D
+reveal_type(explicit(1))  # revealed: int
+static_assert(explicit.__func__ is function)
 ```
 
 ### Staticmethods mixed with other decorators
