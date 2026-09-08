@@ -735,8 +735,6 @@ class Outer[T]:
 
 def lower_bound[T, U]():
     constraints = ConstraintSet.lower_bound(Inner[int], T) & ConstraintSet.lower_bound(Outer[T], U)
-    # TODO: no error
-    # error: [static-assert-error]
     static_assert(constraints.implies_subtype_of(Outer[Inner[int]], U))
 ```
 
