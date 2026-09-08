@@ -56,8 +56,8 @@ use ruff_python_semantic::all::{DunderAllDefinition, DunderAllFlags};
 use ruff_python_semantic::analyze::{imports, typing};
 use ruff_python_semantic::{
     BindingFlags, BindingId, BindingKind, Exceptions, Export, FromImport, GeneratorKind, Globals,
-    Import, Module, ModuleKind, ModuleSource, NodeId, ScopeId, ScopeKind, SemanticModel,
-    SemanticModelFlags, StarImport, SubmoduleImport,
+    Import, ImportLaziness, Module, ModuleKind, ModuleSource, NodeId, ScopeId, ScopeKind,
+    SemanticModel, SemanticModelFlags, StarImport, SubmoduleImport,
 };
 use ruff_python_trivia::CommentRanges;
 use ruff_source_file::{OneIndexed, SourceFile, SourceFileBuilder, SourceRow};
@@ -359,6 +359,21 @@ impl<'a> Checker<'a> {
         }
 
         None
+    }
+
+    /// Whether changing this import's module preserves membership in `__lazy_modules__`.
+    pub(crate) fn import_rewrite_preserves_laziness(&self, original: &str, target: &str) -> bool {
+        if self.lazy_import_context().is_some() {
+            return true;
+        }
+        matches!(
+            (
+                self.semantic.module_laziness(original),
+                self.semantic.module_laziness(target)
+            ),
+            (ImportLaziness::Lazy, ImportLaziness::Lazy)
+                | (ImportLaziness::Eager, ImportLaziness::Eager)
+        )
     }
 
     /// Return the preferred quote for a generated `StringLiteral` node, given where we are in the
