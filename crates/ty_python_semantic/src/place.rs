@@ -2194,7 +2194,7 @@ fn is_non_exported<'db>(
 // This will first check if the definition is using the "redundant alias" pattern like `import foo
 // as foo` or `from foo import bar as bar`. If it's not, it will check whether the symbol is being
 // exported via `__all__`.
-fn is_reexported(db: &dyn Db, definition: Definition<'_>) -> bool {
+pub(crate) fn is_reexported(db: &dyn Db, definition: Definition<'_>) -> bool {
     // This information is computed by the semantic index builder.
     if definition.is_reexported(db) {
         return true;
