@@ -1,11 +1,12 @@
+use std::borrow::Cow;
 use std::path::Path;
 
 use bitflags::bitflags;
 use rustc_hash::FxHashMap;
 
-use ruff_python_ast::helpers::{from_relative_import, map_subscript};
+use ruff_python_ast::helpers::{from_relative_import, map_subscript, resolve_imported_module_path};
 use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
-use ruff_python_ast::{self as ast, Expr, ExprContext, PySourceType, PythonVersion, Stmt};
+use ruff_python_ast::{self as ast, Alias, Expr, ExprContext, PySourceType, PythonVersion, Stmt};
 use ruff_python_stdlib::builtins::{is_python_builtin, python_builtins, python_magic_globals};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -2408,6 +2409,82 @@ impl<'a> SemanticModel<'a> {
             _ => false,
         })
     }
+
+    /// Classify an import using its syntax and the current `__lazy_modules__` declaration.
+    /// The caller must check that the import occurs in a context where laziness is allowed.
+    pub fn import_laziness(&self, statement: &Stmt, alias: &Alias) -> ImportLaziness {
+        let explicit = match statement {
+            Stmt::Import(import) => import.is_lazy,
+            Stmt::ImportFrom(import) => import.is_lazy,
+            _ => return ImportLaziness::Unknown,
+        };
+        if explicit {
+            return ImportLaziness::Lazy;
+        }
+        if self.lazy_modules.is_none() {
+            return ImportLaziness::Eager;
+        }
+        let Some(module) = self.import_module_name(statement, alias) else {
+            return ImportLaziness::Unknown;
+        };
+        self.module_laziness(&module)
+    }
+
+    /// Test exact module membership in the current `__lazy_modules__` declaration.
+    /// Returns [`ImportLaziness::Unknown`] when the declaration is not a literal collection of strings.
+    pub fn module_laziness(&self, module: &str) -> ImportLaziness {
+        let Some(value) = self.lazy_modules else {
+            return ImportLaziness::Eager;
+        };
+        let (Expr::List(ast::ExprList { elts: elements, .. })
+        | Expr::Tuple(ast::ExprTuple { elts: elements, .. })
+        | Expr::Set(ast::ExprSet { elts: elements, .. })) = value
+        else {
+            return ImportLaziness::Unknown;
+        };
+        if !elements.iter().all(Expr::is_string_literal_expr) {
+            return ImportLaziness::Unknown;
+        }
+        if elements.iter().any(|element| {
+            element
+                .as_string_literal_expr()
+                .is_some_and(|literal| literal.value.to_str() == module)
+        }) {
+            ImportLaziness::Lazy
+        } else {
+            ImportLaziness::Eager
+        }
+    }
+
+    /// Return the module tested for membership in `__lazy_modules__`.
+    /// A `from package import member` statement tests `package`, not `package.member`.
+    fn import_module_name<'b>(
+        &self,
+        statement: &'b Stmt,
+        alias: &'b Alias,
+    ) -> Option<Cow<'b, str>> {
+        match statement {
+            Stmt::Import(_) => Some(Cow::Borrowed(alias.name.as_str())),
+            Stmt::ImportFrom(ast::StmtImportFrom { level, module, .. }) => {
+                resolve_imported_module_path(
+                    *level,
+                    module.as_deref(),
+                    self.module.qualified_name(),
+                )
+            }
+            _ => None,
+        }
+    }
+}
+
+/// Whether an import is lazy, as determined statically.
+///
+/// Dynamic assignments to `__lazy_modules__` are classified as unknown.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ImportLaziness {
+    Lazy,
+    Eager,
+    Unknown,
 }
 
 pub struct ShadowedBinding {
