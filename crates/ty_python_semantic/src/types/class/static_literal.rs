@@ -1561,6 +1561,8 @@ impl<'db> StaticClassLiteral<'db> {
                     ..
                 }) if ty.is_empty_tuple(db)
             )
+            // Stub files describe the public type directly; keep their inferred types exact.
+            && !self.file(db).is_stub(db)
             // An enum's tuple payload supplies positional arguments to `__new__`.
             && !is_enum_class_by_inheritance(db, env, self);
         let member = member.map_type(|ty| {

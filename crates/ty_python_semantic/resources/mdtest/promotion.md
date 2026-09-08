@@ -401,6 +401,27 @@ reveal_type(SpecialNames.__match_args__)  # revealed: tuple[()]
 reveal_type(Member.EMPTY.value)  # revealed: tuple[()]
 ```
 
+## Empty tuple class attributes in stubs
+
+Stub files describe the public interface directly, so an empty tuple assigned in a stub keeps its
+exact type when accessed through either the class or an instance.
+
+`values.pyi`:
+
+```pyi
+class Stubbed:
+    empty = ()
+```
+
+```py
+from typing import assert_type
+from values import Stubbed
+
+reveal_type(Stubbed.empty)  # revealed: tuple[()]
+reveal_type(Stubbed().empty)  # revealed: tuple[()]
+assert_type(Stubbed.empty, tuple[()])
+```
+
 ## Empty tuple implicit attributes
 
 The same heuristic applies to an attribute inferred only from an empty tuple assigned in an instance
