@@ -69,6 +69,103 @@ def _(x: Literal[1, "a"]):
         reveal_type(x)  # revealed: Literal["a"]
 ```
 
+## Recursive tuples as `classinfo`
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+A recursive tuple of integer classes narrows a successful check to `int`. An unsuccessful check does
+not exclude integers: the tuple can be empty or contain only a subclass of `int`. Implicit and PEP
+695 aliases describe the same class-info values.
+
+```py
+ClassInfo = type[int] | tuple["ClassInfo", ...]
+type ExplicitClassInfo = type[int] | tuple[ExplicitClassInfo, ...]
+
+def implicit(value: object, classes: ClassInfo):
+    if isinstance(value, classes):
+        reveal_type(value)  # revealed: int
+    else:
+        reveal_type(value)  # revealed: object
+
+def explicit(value: object, classes: ExplicitClassInfo):
+    if isinstance(value, classes):
+        reveal_type(value)  # revealed: int
+    else:
+        reveal_type(value)  # revealed: object
+```
+
+Even when the leaf class is final, a failed check does not exclude its instances: the recursive
+tuple can be empty.
+
+```py
+from typing import final
+
+@final
+class Leaf: ...
+
+FinalClasses = type[Leaf] | tuple["FinalClasses", ...]
+type ExplicitFinalClasses = type[Leaf] | tuple[ExplicitFinalClasses, ...]
+
+def final_classes(value: object, classes: FinalClasses, explicit_classes: ExplicitFinalClasses):
+    if isinstance(value, classes):
+        reveal_type(value)  # revealed: Leaf
+    else:
+        reveal_type(value)  # revealed: object
+    if isinstance(value, explicit_classes):
+        reveal_type(value)  # revealed: Leaf
+    else:
+        reveal_type(value)  # revealed: object
+```
+
+A tuple tree with no class objects can only make the check fail:
+
+```py
+OnlyTuples = tuple["OnlyTuples", ...]
+type ExplicitOnlyTuples = tuple[ExplicitOnlyTuples, ...]
+
+def only_tuples(value: object, classes: OnlyTuples, explicit_classes: ExplicitOnlyTuples):
+    if isinstance(value, classes):
+        reveal_type(value)  # revealed: Never
+    else:
+        reveal_type(value)  # revealed: object
+    if isinstance(value, explicit_classes):
+        reveal_type(value)  # revealed: Never
+    else:
+        reveal_type(value)  # revealed: object
+```
+
+## `classinfo` with changing recursive arguments
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+Deeper tuples can contain different classes when the recursive type arguments change. The outer
+argument `int` does not describe all the classes tested: `(type,)` is also a valid class-info value.
+
+```py
+from typing import TypeAlias, TypeVar
+
+T = TypeVar("T")
+Growing: TypeAlias = type[T] | tuple["Growing[type[T]]", ...]
+type ExplicitGrowing[T] = type[T] | tuple[ExplicitGrowing[type[T]], ...]
+
+classes: Growing[int] = (type,)
+explicit_classes: ExplicitGrowing[int] = (type,)
+
+def implicit(value: object, classes: Growing[int]):
+    if isinstance(value, classes):
+        reveal_type(value)  # revealed: object
+
+def explicit(value: object, classes: ExplicitGrowing[int]):
+    if isinstance(value, classes):
+        reveal_type(value)  # revealed: object
+```
+
 ## `classinfo` is a PEP-604 union of types
 
 ```toml
