@@ -885,12 +885,13 @@ struct MultiBindingsByUse(ThinVec<(ScopedUseId, Box<[Bindings]>)>);
 
 impl MultiBindingsByUse {
     fn from_map(map: FxHashMap<ScopedUseId, Vec<Bindings>>) -> Self {
-        let mut entries = map
-            .into_iter()
-            .map(|(use_id, bindings)| (use_id, bindings.into_boxed_slice()))
-            .collect::<Vec<_>>();
+        let mut entries = ThinVec::with_capacity(map.len());
+        entries.extend(
+            map.into_iter()
+                .map(|(use_id, bindings)| (use_id, bindings.into_boxed_slice())),
+        );
         entries.sort_unstable_by_key(|(use_id, _)| *use_id);
-        Self(entries.into_iter().collect())
+        Self(entries)
     }
 
     fn get(&self, use_id: ScopedUseId) -> Option<&[Bindings]> {
