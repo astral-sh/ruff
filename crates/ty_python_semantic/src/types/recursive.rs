@@ -226,9 +226,11 @@ impl<'db> RecursiveType<'db> {
             .name()
     }
 
-    /// Restore the formal arguments for analysis of the recursive constructor.
+    /// Restore the formal arguments and remove materialization for constructor analysis.
     pub(super) fn constructor(self, db: &'db dyn Db) -> Self {
-        self.with_arguments(
+        // Like an unspecialized PEP 695 alias, parameter-flow analysis must not
+        // re-enter materialization while deriving the constructor's identity.
+        self.with_materialization(db, None).with_arguments(
             db,
             self.parameters(db)
                 .map(|parameters| parameters.identity_specialization(db)),
@@ -342,7 +344,7 @@ impl<'db> RecursiveType<'db> {
             _ => {
                 // Transform the constructor before applying the arguments. Binding a specialized
                 // unfolding would bake those arguments into the body of every later application.
-                let constructor = self.with_materialization(db, None).constructor(db);
+                let constructor = self.constructor(db);
                 let mapped = visitor.visit(db, Type::Recursive(constructor), mapping, || {
                     constructor.map_type(db, visitor.env, |unfolded| {
                         let mapped = unfolded.apply_type_mapping_impl(db, mapping, tcx, visitor);
@@ -445,8 +447,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         if !matches!(
             self.relation,
             TypeRelation::Subtyping | TypeRelation::Assignability
-        ) || source.with_materialization(db, None).constructor(db)
-            != target.with_materialization(db, None).constructor(db)
+        ) || source.constructor(db) != target.constructor(db)
         {
             return self.never();
         }
