@@ -1089,6 +1089,68 @@ static_assert(is_subtype_of(D[B], D[A]))
 static_assert(not is_subtype_of(D[A], D[B]))
 ```
 
+## Tuple elements
+
+Tuples are covariant in each element type. A class that accepts `tuple[T, object]` is therefore
+contravariant in `T`.
+
+```py
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+class Covariant[T]:
+    def produce(self) -> tuple[T, object]:
+        raise NotImplementedError
+
+static_assert(not is_subtype_of(Covariant[int], Covariant[bool]))
+static_assert(is_subtype_of(Covariant[bool], Covariant[int]))
+
+class Contravariant[T]:
+    def consume(self, value: tuple[T, object]) -> None: ...
+
+static_assert(is_subtype_of(Contravariant[int], Contravariant[bool]))
+static_assert(not is_subtype_of(Contravariant[bool], Contravariant[int]))
+
+class Invariant[T]:
+    def produce(self) -> tuple[list[T], object]:
+        raise NotImplementedError
+
+static_assert(not is_subtype_of(Invariant[int], Invariant[bool]))
+static_assert(not is_subtype_of(Invariant[bool], Invariant[int]))
+```
+
+The same applies to all elements of a variable-length tuple.
+
+```py
+class PrefixConsumer[T]:
+    def consume(self, value: tuple[T, *tuple[object, ...]]) -> None: ...
+
+static_assert(is_subtype_of(PrefixConsumer[int], PrefixConsumer[bool]))
+static_assert(not is_subtype_of(PrefixConsumer[bool], PrefixConsumer[int]))
+
+class SuffixConsumer[T]:
+    def consume(self, value: tuple[*tuple[object, ...], T]) -> None: ...
+
+static_assert(is_subtype_of(SuffixConsumer[int], SuffixConsumer[bool]))
+static_assert(not is_subtype_of(SuffixConsumer[bool], SuffixConsumer[int]))
+
+class RepeatedConsumer[T]:
+    def consume(self, value: tuple[object, *tuple[T, ...]]) -> None: ...
+
+static_assert(is_subtype_of(RepeatedConsumer[int], RepeatedConsumer[bool]))
+static_assert(not is_subtype_of(RepeatedConsumer[bool], RepeatedConsumer[int]))
+```
+
+An unpacked type variable tuple also contributes to variance.
+
+```py
+class VariadicConsumer[*Ts]:
+    def consume(self, value: tuple[object, *Ts]) -> None: ...
+
+static_assert(is_subtype_of(VariadicConsumer[int], VariadicConsumer[bool]))
+static_assert(not is_subtype_of(VariadicConsumer[bool], VariadicConsumer[int]))
+```
+
 ## Union Types
 
 Union types are covariant in all their members. If `A <: B`, then `A | C <: B | C` and
