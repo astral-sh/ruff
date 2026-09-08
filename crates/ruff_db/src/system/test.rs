@@ -1,5 +1,4 @@
 use ruff_notebook::{Notebook, NotebookError};
-use rustc_hash::FxHashMap;
 use std::ffi::OsString;
 use std::panic::RefUnwindSafe;
 use std::process::Output;
@@ -13,6 +12,7 @@ use crate::system::{
 };
 
 use super::WritableSystem;
+use super::command::CommandEnv;
 use super::walk_directory::WalkDirectoryBuilder;
 
 /// Host environment variables needed to locate executables, Python installations, and caches.
@@ -47,16 +47,15 @@ pub fn test_env_vars() -> impl Iterator<Item = (&'static str, OsString)> {
 #[derive(Debug)]
 pub struct TestSystem {
     inner: Arc<dyn WritableSystem + RefUnwindSafe + Send + Sync>,
-    /// Environment variable overrides. If a key is present here, it takes precedence
-    /// over the inner system's environment variables.
-    env_overrides: Arc<Mutex<FxHashMap<String, Option<String>>>>,
+    /// Environment changes shared by system lookups and cloned command executors.
+    environment: Arc<Mutex<CommandEnv>>,
 }
 
 impl Clone for TestSystem {
     fn clone(&self) -> Self {
         Self {
             inner: self.inner.clone(),
-            env_overrides: self.env_overrides.clone(),
+            environment: self.environment.clone(),
         }
     }
 }
@@ -65,21 +64,36 @@ impl TestSystem {
     pub fn new(inner: impl WritableSystem + RefUnwindSafe + Send + Sync + 'static) -> Self {
         Self {
             inner: Arc::new(inner),
-            env_overrides: Arc::new(Mutex::new(FxHashMap::default())),
+            environment: Arc::new(Mutex::new(CommandEnv::default())),
         }
+    }
+
+    /// Clears the inherited environment and any previously set variables.
+    pub fn clear_env_vars(&self) {
+        self.environment.lock().unwrap().clear();
     }
 
     /// Sets an environment variable override. This takes precedence over the inner system.
     pub fn set_env_var(&self, name: impl Into<String>, value: impl Into<String>) {
-        self.env_overrides
-            .lock()
-            .unwrap()
-            .insert(name.into(), Some(value.into()));
+        self.environment.lock().unwrap().set(name, value);
+    }
+
+    /// Sets multiple environment variable overrides.
+    pub fn set_env_vars<I, K, V>(&self, variables: I)
+    where
+        I: IntoIterator<Item = (K, V)>,
+        K: Into<String>,
+        V: Into<String>,
+    {
+        let mut environment = self.environment.lock().unwrap();
+        for (name, value) in variables {
+            environment.set(name, value);
+        }
     }
 
     /// Removes an environment variable override, making it appear as not set.
     pub fn remove_env_var(&self, name: impl Into<String>) {
-        self.env_overrides.lock().unwrap().insert(name.into(), None);
+        self.environment.lock().unwrap().remove(name);
     }
 
     /// Returns the [`InMemorySystem`].
@@ -164,6 +178,17 @@ impl System for TestSystem {
         Err(WhichError::CannotFindBinaryPath)
     }
 
+    fn run_command(&self, mut command: Command) -> Result<Output> {
+        let system = self.system();
+        let Some(executor) = system.command_executor() else {
+            return system.run_command(command);
+        };
+
+        command.env_merge(&self.environment.lock().unwrap());
+
+        executor.execute(command)
+    }
+
     fn command_executor(&self) -> Option<&dyn CommandExecutor> {
         self.system()
             .command_executor()
@@ -194,15 +219,16 @@ impl System for TestSystem {
     }
 
     fn env_var(&self, name: &str) -> std::result::Result<String, std::env::VarError> {
-        // Check overrides first
-        if let Some(override_value) = self.env_overrides.lock().unwrap().get(name) {
-            return match override_value {
-                Some(value) => Ok(value.clone()),
-                None => Err(std::env::VarError::NotPresent),
-            };
+        let (value, clear) = {
+            let environment = self.environment.lock().unwrap();
+            (environment.get(name).cloned(), environment.get_clear())
+        };
+        match value {
+            Some(Some(value)) => Ok(value),
+            Some(None) => Err(std::env::VarError::NotPresent),
+            None if clear => Err(std::env::VarError::NotPresent),
+            None => self.system().env_var(name),
         }
-        // Fall back to inner system
-        self.system().env_var(name)
     }
 
     fn dyn_clone(&self) -> Box<dyn System> {
@@ -211,22 +237,8 @@ impl System for TestSystem {
 }
 
 impl CommandExecutor for TestSystem {
-    fn execute(&self, mut command: Command) -> Result<Output> {
-        let mut environment: FxHashMap<OsString, OsString> = test_env_vars()
-            .map(|(name, value)| (name.into(), value))
-            .collect();
-        for (name, value) in self.env_overrides.lock().unwrap().iter() {
-            match value {
-                Some(value) => {
-                    environment.insert(name.into(), value.into());
-                }
-                None => {
-                    environment.remove(&OsString::from(name));
-                }
-            }
-        }
-        command.environment = Some(environment);
-        self.system().run_command(command)
+    fn execute(&self, command: Command) -> Result<Output> {
+        self.run_command(command)
     }
 
     fn dyn_clone(&self) -> Box<dyn CommandExecutor> {
