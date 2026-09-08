@@ -259,6 +259,10 @@ fn create_diagnostic(
     type_vars: &[TypeVar],
     type_alias_kind: TypeAliasKind,
 ) {
+    if type_vars.iter().any(TypeVar::has_unsupported_restriction) {
+        return;
+    }
+
     // If any type variables have defaults, skip the rule unless
     // running with preview mode enabled and targeting Python 3.13+.
     if (checker.target_version() < PythonVersion::PY313
