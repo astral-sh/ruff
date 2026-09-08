@@ -491,15 +491,20 @@ impl<'db> Constraint<'db> {
         let upper_constraint = upper.into();
         let upper = upper.into_upper_bound();
 
-        let when = lower
-            .bound()
-            .when_constraint_set_equivalent_to_owned(db, env, upper.bound());
-        Self::add_constraint_set_implication(
-            map,
-            lower_constraint,
-            upper_constraint,
-            when.as_ref(),
-        );
+        if lower.bound().is_static_sequent_eligible(db, env)
+            && upper.bound().is_static_sequent_eligible(db, env)
+        {
+            let when =
+                lower
+                    .bound()
+                    .when_constraint_set_equivalent_to_owned(db, env, upper.bound());
+            Self::add_constraint_set_implication(
+                map,
+                lower_constraint,
+                upper_constraint,
+                when.as_ref(),
+            );
+        }
     }
 
     fn add_constraint_set_implication(

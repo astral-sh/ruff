@@ -440,9 +440,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         upper: Type<'db>,
     ) -> Self {
         let mut storage = builder.storage.borrow_mut();
-        if lower == upper
-            && lower.bottom_materialization(db, env) == lower.top_materialization(db, env)
-        {
+        if lower == upper {
             let constraints = Constraint::new_equivalence_bound(
                 db,
                 env,
@@ -501,22 +499,12 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         bound: Type<'db>,
     ) -> Self {
         let mut storage = builder.storage.borrow_mut();
-        // We can only create a ConcreteEquivalence constraint for a fully static bound.
-        if bound.bottom_materialization(db, env) == bound.top_materialization(db, env) {
-            let constraints = Constraint::new_equivalence_bound(
-                db,
-                env,
-                ConstraintProvenance::Evidence,
-                typevar,
-                bound,
-            );
-            let (node, source_order) = Constraint::new_nodes(db, env, &mut storage, constraints);
-            return Self::from_node(builder, node, source_order);
-        }
-
-        let constraints = iter::chain(
-            Constraint::new_lower_bound(db, ConstraintProvenance::Evidence, typevar, bound),
-            Constraint::new_upper_bound(db, env, ConstraintProvenance::Evidence, typevar, bound),
+        let constraints = Constraint::new_equivalence_bound(
+            db,
+            env,
+            ConstraintProvenance::Evidence,
+            typevar,
+            bound,
         );
         let (node, source_order) = Constraint::new_nodes(db, env, &mut storage, constraints);
         Self::from_node(builder, node, source_order)

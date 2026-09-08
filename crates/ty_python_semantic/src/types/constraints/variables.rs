@@ -275,10 +275,10 @@ impl<'db> Constraint<'db> {
     /// Returns the constraints that model the requirement that `typevar` must be equivalent to
     /// `bound`.
     ///
-    /// A fully static equality is represented by one equivalence constraint when possible. Gradual
-    /// bounds are represented by separate lower and upper constraints. We also use the latter
-    /// representation when a top-level union or intersection refers to `typevar` itself, so that
-    /// the tautological half of the equality can be removed without discarding the other half.
+    /// An equality is represented by one equivalence constraint when possible. We break the
+    /// constraint apart into separate lower- and upper-bound constraints when a top-level union or
+    /// intersection refers to `typevar` itself, so that the tautological half of the equality can
+    /// be removed without discarding the other half.
     pub(super) fn new_equivalence_bound(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -300,17 +300,14 @@ impl<'db> Constraint<'db> {
             _ => false,
         };
 
-        let normalized_bound = Self::normalize_bound(db, typevar, bound);
-        if normalized_bound.bottom_materialization(db, env)
-            != normalized_bound.top_materialization(db, env)
-            || bound_refers_to_typevar
-        {
+        if bound_refers_to_typevar {
             return Either::Left(std::iter::chain(
                 Self::new_lower_bound(db, provenance, typevar, bound),
                 Self::new_upper_bound(db, env, provenance, typevar, bound),
             ));
         }
 
+        let normalized_bound = Self::normalize_bound(db, typevar, bound);
         let constraint = match normalized_bound {
             // Two identical typevars must always solve to the same type, so it is not useful to
             // have an equivalence bound that is the typevar being constrained.
