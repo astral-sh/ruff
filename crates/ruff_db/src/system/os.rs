@@ -238,17 +238,7 @@ impl CommandExecutor for OsSystem {
         process
             .args(command.get_args())
             .current_dir(directory.as_std_path());
-        if command.get_env_clear() {
-            process.env_clear();
-        }
-
-        for (name, value) in command.get_envs() {
-            if let Some(value) = value {
-                process.env(name, value);
-            } else {
-                process.env_remove(name);
-            }
-        }
+        command.apply_environment(&mut process);
         process.output()
     }
 

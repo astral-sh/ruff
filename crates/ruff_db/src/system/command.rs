@@ -63,22 +63,6 @@ impl Command {
         self
     }
 
-    /// Returns the environment variables explicitly set or removed for the command.
-    ///
-    /// Removed variables have a value of `None`. Variables inherited from the parent process
-    /// are not included.
-    pub fn get_envs(&self) -> impl Iterator<Item = (&str, Option<&str>)> {
-        self.environment
-            .vars
-            .iter()
-            .map(|(name, value)| (name.as_str(), value.as_deref()))
-    }
-
-    /// Returns whether the command clears environment variables inherited from its parent process.
-    pub fn get_env_clear(&self) -> bool {
-        self.environment.get_clear()
-    }
-
     /// Returns the executable to invoke.
     pub fn get_executable(&self) -> &str {
         &self.executable
@@ -96,6 +80,21 @@ impl Command {
 
     pub(super) fn env_merge(&mut self, environment: &CommandEnv) {
         self.environment.merge(environment);
+    }
+
+    #[cfg(feature = "os")]
+    pub(super) fn apply_environment(&self, process: &mut std::process::Command) {
+        if self.environment.clear {
+            process.env_clear();
+        }
+
+        for (name, value) in &self.environment.vars {
+            if let Some(value) = value {
+                process.env(name, value);
+            } else {
+                process.env_remove(name);
+            }
+        }
     }
 }
 
