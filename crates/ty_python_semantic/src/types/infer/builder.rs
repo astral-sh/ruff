@@ -6892,7 +6892,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Type::Intersection(intersection) => intersection
                 .iter_positive(self.db())
                 .any(|ty| self.has_string_literal_completion_candidates(ty)),
-            Type::TypeAlias(_) => true,
+            Type::TypeAlias(_) | Type::Recursive(_) => true,
             _ => false,
         }
     }
