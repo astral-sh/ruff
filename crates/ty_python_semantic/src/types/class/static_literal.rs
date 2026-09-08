@@ -1548,7 +1548,27 @@ impl<'db> StaticClassLiteral<'db> {
         }
 
         let body_scope = self.body_scope(db);
-        let member = class_member(db, body_scope, name).map_type(|ty| {
+        let member = class_member(db, body_scope, name);
+        // A bare name in the class body retains the exact empty tuple; only the attribute
+        // accessed through the class or an instance has a widened public type.
+        let widen_empty_tuple = !matches!(name, "__slots__" | "__match_args__")
+            && !member.inner.qualifiers.contains(TypeQualifiers::FINAL)
+            && matches!(
+                member.inner.place,
+                Place::Defined(DefinedPlace {
+                    ty,
+                    origin: TypeOrigin::Inferred,
+                    ..
+                }) if ty.is_empty_tuple(db)
+            )
+            // An enum's tuple payload supplies positional arguments to `__new__`.
+            && !is_enum_class_by_inheritance(db, env, self);
+        let member = member.map_type(|ty| {
+            let ty = if widen_empty_tuple {
+                Type::homogeneous_tuple(db, env, Type::unknown())
+            } else {
+                ty
+            };
             let ty = if name.starts_with("__") && name.ends_with("__") {
                 into_dunder_paramspec_callable(db, env, ty)
             } else {
