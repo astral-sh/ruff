@@ -2388,6 +2388,30 @@ def _(keys: list[str]):
     reveal_type(reduce(lambda total, k: total + len(k), keys, 0))
 ```
 
+### Transitive constraints preserve typevar domains
+
+A variadic call can infer both a TypeVarTuple and an ordinary return TypeVar from tuple types. Even
+when those tuple types are equivalent, transitivity cannot introduce a direct relationship between
+typevars from different domains.
+
+```py
+from collections.abc import Callable
+from typing import TypeVar, TypeVarTuple, Unpack
+
+P = TypeVarTuple("P")
+B = TypeVar("B")
+A = TypeVar("A")
+C = TypeVar("C")
+
+def starpipe(args: tuple[Unpack[P]], fn: Callable[[Unpack[P]], B], /) -> B:
+    raise NotImplementedError
+
+def pair(first: A, second: C) -> tuple[A, C]:
+    return first, second
+
+starpipe((1, 2), pair)
+```
+
 ## Passing a constrained TypeVar to a function expecting a compatible constrained TypeVar
 
 A constrained TypeVar should be assignable to a different constrained TypeVar if each constraint of
