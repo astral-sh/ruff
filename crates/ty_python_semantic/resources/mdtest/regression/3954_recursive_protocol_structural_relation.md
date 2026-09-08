@@ -258,11 +258,17 @@ def alias_property_convert(value: AliasPropertySource[int]) -> AliasPropertyTarg
 ## Recursive self-binding
 
 The nominal shortcut must not bind an unconstrained TypeVar to another specialization of the same
-protocol or one supplied by a sibling union arm.
+protocol or one supplied by a sibling union arm. We check that in two ways: First, we directly
+construct constraint sets representing these restrictions, and verify that those constraint sets are
+always satisfiable. Second, if we _did_ violate these restrictions, we would have unbounded
+recursive growth in the types that we infer. The `invalid-return-type` checks in the function bodies
+ensure that recursive inference terminates without accepting invalid returns.
 
 ```py
 from collections.abc import Iterable
-from typing import Any, Protocol, TypeAlias, TypeVar, reveal_type
+from typing import Any, Protocol, TypeAlias, TypeVar
+from ty_extensions import static_assert
+from ty_extensions._internal import is_constraint_set_assignable_to
 
 T_co = TypeVar("T_co", covariant=True)
 
@@ -271,8 +277,8 @@ class Recursive(Protocol[T_co]):
 
 def convert(value: Any | Recursive[T_co]) -> list[T_co]:
     result = [value]
-    reveal_type(result)  # revealed: list[T_co@convert | Any | Recursive[T_co@convert]]
-    return result  # error: [invalid-return-type]
+    # error: [invalid-return-type]
+    return result
 
 U = TypeVar("U", covariant=True)
 
@@ -282,10 +288,18 @@ class F(Protocol[U]):
 class M(Protocol):
     def marker(self): ...
 
+def no_sibling_binding[T]():
+    constraints = is_constraint_set_assignable_to(F[M], F[T])
+    static_assert(constraints)
+
+def no_recursive_self_binding[T]():
+    constraints = is_constraint_set_assignable_to(F[F[M]], F[T])
+    static_assert(constraints)
+
 Options: TypeAlias = Iterable[U] | F[U] | M
 
 def s(value: Options[U]) -> list[U]:
     result = [value]
-    reveal_type(result)  # revealed: list[U@s | Iterable[U@s] | F[U@s] | M]
-    return result  # error: [invalid-return-type]
+    # error: [invalid-return-type]
+    return result
 ```

@@ -11,7 +11,7 @@ use crate::types::constraints::variables::{
 };
 use crate::types::constraints::{
     ALWAYS_FALSE, ConstraintId, ConstraintSetBuilder, ConstraintSetStorage, Node,
-    OwnedConstraintSet, max_constructor_and_typevar_depth,
+    OwnedConstraintSet,
 };
 use crate::types::typevar::TypeVarSet;
 use crate::types::variance::VarianceInferable;
@@ -593,8 +593,8 @@ impl<'db> Constraint<'db> {
         });
     }
 
-    /// Substitutes `replacement_bound` for `replacement_typevar` as long as it does not
-    /// recursively deepen the bound on `needle_typevar`.
+    /// Substitutes `replacement_bound` for `replacement_typevar` unless the two bounds contain a
+    /// direct self-reference.
     ///
     /// A replacement containing `replacement_typevar`, such as substituting `G[U]` for `U`, can be
     /// fed back into the same substitution to produce `G[G[U]]`. A replacement containing
@@ -630,23 +630,6 @@ impl<'db> Constraint<'db> {
         // `F[F[M]] ≤ U`, and so on.
         if needle_typevar.is_same_typevar_as(db, replacement_typevar) {
             return None;
-        }
-
-        // For a concrete replacement nested inside a non-set-theoretic type, require constructor
-        // nesting to decrease. This gives recursive chains a well-founded measure: replacing `U`
-        // in `F[U]` with `F[M]` would otherwise produce `F[F[M]]`, which can be fed back into the
-        // same substitution. Unions and intersections do not add runtime constructor nesting, so
-        // their transitive simplification is unaffected.
-        if !replacement_bound.is_type_var()
-            && !matches!(needle_bound, Type::Union(_) | Type::Intersection(_))
-        {
-            let (needle_constructor_depth, _) =
-                max_constructor_and_typevar_depth(db, env, needle_bound);
-            let (replacement_constructor_depth, _) =
-                max_constructor_and_typevar_depth(db, env, replacement_bound);
-            if replacement_constructor_depth >= needle_constructor_depth {
-                return None;
-            }
         }
 
         if let Type::TypeVar(replacement) = replacement_bound
@@ -1942,56 +1925,5 @@ mod tests {
                 db, &env, left, right
             ));
         }
-    }
-
-    #[test]
-    fn ground_leaf_can_tighten_nested_lower_bound_without_enabling_deepening() {
-        let db = setup_db();
-        let db = &db;
-        let env = db.program_environment();
-        let s = create_typevar(db, "S");
-        let t = create_typevar(db, "T");
-        let int = known_instance(db, KnownClass::Int);
-
-        let lower = |typevar, bound| {
-            Constraint::from(ConcreteLowerBound::new(
-                ConstraintProvenance::Evidence,
-                typevar,
-                bound,
-            ))
-        };
-        let produces = |map: &SequentMap<Constraint<'_>>, expected| {
-            map.sequents.iter().any(|sequent| {
-                matches!(
-                    sequent,
-                    Sequent::PairImplication {
-                        post: Constraint::ConcreteLower(post),
-                        ..
-                    } if post.typevar.is_same_typevar_as(db, t) && post.bound == expected
-                )
-            })
-        };
-
-        let iterator_s =
-            KnownClass::Iterator.to_specialized_instance(db, &env, &[Type::TypeVar(s)]);
-        let iterator_int = KnownClass::Iterator.to_specialized_instance(db, &env, &[int]);
-        let map = SequentMap::<Constraint>::for_constraint_pair(
-            db,
-            &env,
-            lower(s, int),
-            lower(t, iterator_s),
-        );
-        assert!(produces(map, iterator_int));
-
-        let list_s = KnownClass::List.to_specialized_instance(db, &env, &[Type::TypeVar(s)]);
-        let list_int = KnownClass::List.to_specialized_instance(db, &env, &[int]);
-        let list_list_int = KnownClass::List.to_specialized_instance(db, &env, &[list_int]);
-        let map = SequentMap::<Constraint>::for_constraint_pair(
-            db,
-            &env,
-            lower(s, list_int),
-            lower(t, list_s),
-        );
-        assert!(!produces(map, list_list_int));
     }
 }

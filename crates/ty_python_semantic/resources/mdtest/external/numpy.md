@@ -66,15 +66,15 @@ def process(padding):
     if len(padding) == 0:
         padding = np.zeros((0, 2), dtype=np.int64)
 
-    # TODO: error: [invalid-argument-type]
+    # error: [invalid-argument-type]
     return list(map(prepare, padding))
 ```
 
 ## Phantom property inference
 
 An overloaded helper method can encode a type mapping for a property whose own receiver is a
-protocol. Matching the nonempty-shape overload should contribute the concrete array type to the
-property result. The generic fallback currently survives without that concrete arm.
+protocol. The nonempty-shape overload contributes the concrete array type alongside the generic
+fallback.
 
 ```pyi
 from typing import Generic, Protocol, TypeVar, overload, type_check_only
@@ -114,7 +114,6 @@ class Normal(
 
 def make_normal() -> Normal[tuple[int], np.float32]: ...
 
-# TODO: revealed: ndarray[ShapeT@phantom_parameter, dtype[ScalarT@phantom_parameter]] | ndarray[tuple[int], dtype[floating[_32Bit]]]
-# revealed: ndarray[ShapeT@phantom_parameter, dtype[ScalarT@phantom_parameter]]
+# revealed: ndarray[ShapeT@phantom_parameter, dtype[ScalarT@phantom_parameter]] | ndarray[tuple[int], dtype[floating[_32Bit]]]
 reveal_type(make_normal().value)
 ```
