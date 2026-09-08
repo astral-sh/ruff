@@ -35,7 +35,7 @@ use crate::{
         context::InferContext,
         diagnostic::{INVALID_PROTOCOL, report_undeclared_protocol_member},
         generics::Specialization,
-        signatures::walk_signature,
+        signatures::{CallableSignature, walk_signature},
         variance::infer_protocol_variance,
     },
 };
@@ -2834,9 +2834,33 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 .when_some_and(db, self.constraints, |callables| {
                     callables.iter().when_all(db, self.constraints, |callable| {
                         if callable.is_function_like(db) {
+                            // Class access exposes the unbound protocol receiver. Only source
+                            // overloads that accept that positional argument can participate:
+                            // binding a zero-argument static method otherwise removes a parameter
+                            // from the protocol signature while leaving the source unchanged.
+                            let signatures = CallableSignature::from_overloads(
+                                callable
+                                    .signatures(db)
+                                    .iter()
+                                    .filter(|signature| {
+                                        let parameters = signature.parameters();
+                                        parameters.get_positional(0).is_some()
+                                            || parameters.variadic().is_some()
+                                    })
+                                    .map(|signature| {
+                                        signature.bind_self(
+                                            db,
+                                            env,
+                                            Some(implementation_self_binding_ty),
+                                        )
+                                    }),
+                            );
+                            if signatures.overloads.is_empty() {
+                                return self.never();
+                            }
                             self.check_callable_pair(
                                 db,
-                                callable.bind_self(db, env, Some(implementation_self_binding_ty)),
+                                callable.with_signatures(db, signatures),
                                 protocol_bind_self(
                                     db,
                                     env.program(db),

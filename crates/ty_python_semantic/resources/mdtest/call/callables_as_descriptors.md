@@ -369,8 +369,8 @@ Method.__call__.__code__
 
 ## `self`-binding behaviour of function-like `Callable`s
 
-Binding the `self` parameter of a function-like `Callable` creates a new `Callable` that is also
-function-like:
+Binding the `self` parameter of a function-like `Callable` creates a bound method. A decorator can
+erase the parameter list without losing the method's function attributes:
 
 `main.py`:
 
@@ -714,6 +714,393 @@ The bound method's `__func__` refers to the replacement function.
 
 ```py
 reveal_type(C.method.__func__)  # revealed: def replacement(cls: type, value: int) -> int
+```
+
+## Identity of decorated functions and bound methods
+
+We assume that a callable-returning decorator preserves the function's descriptor behavior, though
+its annotation alone does not guarantee this. Class access returns a function, while instance access
+captures the receiver in a bound method. Both objects are truthy and expose function attributes, but
+their nominal types differ:
+
+```py
+from collections.abc import Callable
+from types import FunctionType, MethodType
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_disjoint_from, is_subtype_of
+
+def preserve[**P, R](function: Callable[P, R]) -> Callable[P, R]:
+    return function
+
+class Example:
+    @preserve
+    def method(self, value: int) -> str:
+        return str(value)
+
+instance = Example()
+function = Example.method
+method = instance.method
+
+reveal_type(type(function))  # revealed: <class 'FunctionType'>
+reveal_type(type(method))  # revealed: <class 'MethodType'>
+reveal_type(bool(function))  # revealed: Literal[True]
+reveal_type(bool(method))  # revealed: Literal[True]
+reveal_type(function.__name__)  # revealed: str
+reveal_type(method.__name__)  # revealed: str
+reveal_type(method.__self__)  # revealed: Example
+reveal_type(method.__func__)  # revealed: (self, value: int) -> str
+
+static_assert(is_subtype_of(TypeOf[function], FunctionType))
+static_assert(is_subtype_of(TypeOf[method], MethodType))
+static_assert(not is_subtype_of(TypeOf[method], FunctionType))
+static_assert(not is_subtype_of(TypeOf[function], MethodType))
+static_assert(is_disjoint_from(TypeOf[function], TypeOf[method]))
+static_assert(is_disjoint_from(TypeOf[method], TypeOf[function]))
+static_assert(not is_disjoint_from(TypeOf[method], Callable[[int], str]))
+```
+
+Binding changes the callable's parameters without changing the underlying function signature:
+
+```py
+unbound: Callable[[Example, int], str] = function
+bound: Callable[[int], str] = method
+underlying: Callable[[Example, int], str] = method.__func__
+
+reveal_type(function(instance, 1))  # revealed: str
+reveal_type(method(1))  # revealed: str
+reveal_type(method.__call__(1))  # revealed: str
+reveal_type(type(method.__call__))  # revealed: <class 'MethodWrapperType'>
+reveal_type(method.__func__(instance, 1))  # revealed: str
+
+method.__call__("wrong")  # error: [invalid-argument-type]
+
+# error: [invalid-assignment]
+wrong_signature: Callable[[Example, int], str] = method
+```
+
+## Callable relations after binding
+
+Binding a callable with `Any` in its signature preserves that gradual type. Such a method is
+assignable to the same type, but it does not become a subtype of every materialization of that type.
+The same distinction applies to its descriptor wrappers. A function literal retains its specific
+identity, while a fully static synthesized signature is a subtype of itself.
+
+```py
+from collections.abc import Callable
+from typing import Any
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_assignable_to, is_disjoint_from, is_subtype_of
+
+def preserve[**P, R](function: Callable[P, R]) -> Callable[P, R]:
+    return function
+
+class Example:
+    @preserve
+    def gradual(self, value: Any) -> Any:
+        return value
+
+    @preserve
+    def concrete(self, value: int) -> int:
+        return value
+
+    def literal(self, value: Any) -> Any:
+        return value
+
+method = Example().gradual
+static_assert(is_assignable_to(TypeOf[method], TypeOf[method]))
+static_assert(not is_subtype_of(TypeOf[method], TypeOf[method]))
+static_assert(not is_subtype_of(TypeOf[Example.gradual.__get__], TypeOf[Example.gradual.__get__]))
+static_assert(not is_subtype_of(TypeOf[method.__get__], TypeOf[method.__get__]))
+static_assert(is_subtype_of(TypeOf[Example().concrete], TypeOf[Example().concrete]))
+static_assert(is_subtype_of(TypeOf[Example().literal], TypeOf[Example().literal]))
+```
+
+Method wrappers preserve the relationship between inherited methods. A method captured on a child
+instance can inhabit the corresponding type for its base class, so their wrappers are not disjoint.
+This holds for both function literals and synthesized callables:
+
+```py
+class Child(Example): ...
+
+def inherited_wrappers(base: Example, child: Child):
+    static_assert(is_assignable_to(TypeOf[child.literal.__call__], TypeOf[base.literal.__call__]))
+    static_assert(not is_disjoint_from(TypeOf[child.literal.__call__], TypeOf[base.literal.__call__]))
+    static_assert(is_assignable_to(TypeOf[child.literal.__get__], TypeOf[base.literal.__get__]))
+    static_assert(not is_disjoint_from(TypeOf[child.literal.__get__], TypeOf[base.literal.__get__]))
+    static_assert(is_subtype_of(TypeOf[child.concrete.__call__], TypeOf[base.concrete.__call__]))
+    static_assert(not is_disjoint_from(TypeOf[child.concrete.__call__], TypeOf[base.concrete.__call__]))
+    static_assert(is_subtype_of(TypeOf[child.concrete.__get__], TypeOf[base.concrete.__get__]))
+    static_assert(not is_disjoint_from(TypeOf[child.concrete.__get__], TypeOf[base.concrete.__get__]))
+```
+
+A synthesized function signature describes a set of possible functions. Its `__get__` wrapper can
+overlap with another wrapper whose function signature accepts a narrower parameter type:
+
+```py
+@preserve
+def broad(value: object) -> str:
+    return str(value)
+
+@preserve
+def narrow(value: int) -> str:
+    return str(value)
+
+static_assert(is_subtype_of(TypeOf[broad.__get__], TypeOf[narrow.__get__]))
+static_assert(not is_disjoint_from(TypeOf[broad.__get__], TypeOf[narrow.__get__]))
+```
+
+## Explicit descriptor access on decorated functions
+
+Calling a decorated function's `__get__` explicitly follows the same binding rules as ordinary
+attribute access. Supplying an instance creates a method; supplying `None` and an owner returns the
+unbound function:
+
+```py
+from collections.abc import Callable
+
+def preserve[**P, R](function: Callable[P, R]) -> Callable[P, R]:
+    return function
+
+class Example:
+    @preserve
+    def method(self, value: int) -> str:
+        return str(value)
+
+function = Example.method
+bound = function.__get__(Example())
+unbound = function.__get__(None, Example)
+
+reveal_type(type(bound))  # revealed: <class 'MethodType'>
+reveal_type(bound.__self__)  # revealed: Example
+reveal_type(bound(1))  # revealed: str
+reveal_type(type(unbound))  # revealed: <class 'FunctionType'>
+reveal_type(unbound(Example(), 1))  # revealed: str
+reveal_type(function.__get__(Example(), None)(1))  # revealed: str
+
+# error: [no-matching-overload]
+function.__get__()
+```
+
+Since Python 3.13, bound methods define their own `__get__`, which returns the existing method.
+Calling it explicitly retains the captured receiver and bound signature:
+
+```py
+retained = bound.__get__(object())
+reveal_type(retained.__self__)  # revealed: Example
+reveal_type(retained(1))  # revealed: str
+reveal_type(bound.__get__(None, Example).__self__)  # revealed: Example
+reveal_type(bound.__get__(None, Example)(1))  # revealed: str
+```
+
+## Explicit descriptor access on bound methods before Python 3.13
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+Before Python 3.13, a bound method exposes `__get__` through its underlying function. An explicit
+call can therefore bind that function to another receiver, or retrieve it without a receiver:
+
+```py
+from collections.abc import Callable
+
+def preserve[**P, R](function: Callable[P, R]) -> Callable[P, R]:
+    return function
+
+class Example:
+    @preserve
+    def method(self, value: int) -> str:
+        return str(value)
+
+class Child(Example):
+    pass
+
+bound = Example().method
+rebound = bound.__get__(Child())
+reveal_type(rebound.__self__)  # revealed: Child
+reveal_type(rebound(1))  # revealed: str
+reveal_type(bound.__get__(None, Example)(Example(), 1))  # revealed: str
+```
+
+## Identity of decorated static methods
+
+Accessing a decorated static method through either the class or an instance returns the wrapped
+function. The result retains its full parameter list and has ordinary function attributes:
+
+```py
+from collections.abc import Callable
+from inspect import getattr_static
+from types import FunctionType
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_disjoint_from, is_subtype_of
+
+def preserve[**P, R](function: Callable[P, R]) -> Callable[P, R]:
+    return function
+
+class Example:
+    @preserve
+    @staticmethod
+    def method(value: int) -> str:
+        return str(value)
+
+from_class = Example.method
+from_instance = Example().method
+
+reveal_type(type(from_class))  # revealed: <class 'FunctionType'>
+reveal_type(type(from_instance))  # revealed: <class 'FunctionType'>
+reveal_type(bool(from_class))  # revealed: Literal[True]
+reveal_type(bool(from_instance))  # revealed: Literal[True]
+reveal_type(from_class.__name__)  # revealed: str
+reveal_type(from_instance.__name__)  # revealed: str
+reveal_type(from_class(1))  # revealed: str
+reveal_type(from_instance(1))  # revealed: str
+
+static_assert(is_subtype_of(TypeOf[from_class], FunctionType))
+static_assert(is_subtype_of(TypeOf[from_instance], FunctionType))
+callback: Callable[[int], str] = from_instance
+```
+
+Explicitly invoking the original descriptor also returns the function. The function's own descriptor
+then binds normally, so binding its integer parameter produces a zero-argument method:
+
+```py
+descriptor = getattr_static(Example, "method")
+reveal_type(type(descriptor))  # revealed: <class 'staticmethod'>
+reveal_type(bool(descriptor))  # revealed: Literal[True]
+reveal_type(descriptor.__name__)  # revealed: str
+reveal_type(descriptor.__func__)  # revealed: (value: int) -> str
+static_descriptor: staticmethod[[int], str] = descriptor
+static_assert(is_disjoint_from(TypeOf[descriptor], TypeOf[from_class]))
+static_assert(is_disjoint_from(TypeOf[from_class], TypeOf[descriptor]))
+static_assert(not is_disjoint_from(TypeOf[descriptor], Callable[[int], str]))
+reveal_type(descriptor.__get__(None, Example)(1))  # revealed: str
+reveal_type(descriptor.__get__(Example())(1))  # revealed: str
+reveal_type(from_class.__get__(1)())  # revealed: str
+```
+
+## Identity of decorated class methods
+
+A decorated class method binds the class on both class and instance access. The bound method keeps
+that class as its receiver and exposes the original function with its unbound signature:
+
+```py
+from collections.abc import Callable
+from inspect import getattr_static
+from types import MethodType
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_disjoint_from, is_subtype_of
+
+def preserve[**P, R](function: Callable[P, R]) -> Callable[P, R]:
+    return function
+
+class Example:
+    @preserve
+    @classmethod
+    def method(cls, value: int) -> str:
+        return str(value)
+
+from_class = Example.method
+from_instance = Example().method
+
+reveal_type(type(from_class))  # revealed: <class 'MethodType'>
+reveal_type(type(from_instance))  # revealed: <class 'MethodType'>
+reveal_type(bool(from_class))  # revealed: Literal[True]
+reveal_type(bool(from_instance))  # revealed: Literal[True]
+reveal_type(from_class.__name__)  # revealed: str
+reveal_type(from_instance.__name__)  # revealed: str
+reveal_type(from_class.__self__)  # revealed: <class 'Example'>
+reveal_type(from_class.__func__(Example, 1))  # revealed: str
+reveal_type(from_class(1))  # revealed: str
+reveal_type(from_instance(1))  # revealed: str
+
+static_assert(is_subtype_of(TypeOf[from_class], MethodType))
+static_assert(is_subtype_of(TypeOf[from_instance], MethodType))
+callback: Callable[[int], str] = from_instance
+```
+
+The owner passed to `__get__` determines the captured class, even when the instance has a different
+type. Without an owner, the instance's type supplies the receiver:
+
+```py
+descriptor = getattr_static(Example, "method")
+reveal_type(type(descriptor))  # revealed: <class 'classmethod'>
+reveal_type(bool(descriptor))  # revealed: Literal[True]
+reveal_type(descriptor.__name__)  # revealed: str
+reveal_type(descriptor.__func__(Example, 1))  # revealed: str
+class_descriptor: classmethod[Example, [int], str] = descriptor
+static_assert(is_disjoint_from(TypeOf[descriptor], TypeOf[from_class]))
+static_assert(is_disjoint_from(TypeOf[from_class], TypeOf[descriptor]))
+static_assert(not is_disjoint_from(TypeOf[descriptor], Callable[..., str]))
+reveal_type(descriptor.__get__(None, Example).__self__)  # revealed: <class 'Example'>
+reveal_type(descriptor.__get__("other", Example).__self__)  # revealed: <class 'Example'>
+reveal_type(descriptor.__get__(Example()).__self__)  # revealed: type[Example]
+reveal_type(descriptor.__get__(None, Example)(1))  # revealed: str
+```
+
+## `Self` in decorated class methods
+
+Binding a decorated class method to a subclass substitutes that subclass for `Self`, including when
+the descriptor is invoked explicitly:
+
+```py
+from collections.abc import Callable
+from inspect import getattr_static
+from typing import Self
+
+def preserve[**P, R](function: Callable[P, R]) -> Callable[P, R]:
+    return function
+
+class Base:
+    @preserve
+    @classmethod
+    def create(cls) -> Self:
+        return cls()
+
+class Child(Base):
+    pass
+
+reveal_type(Child.create())  # revealed: Child
+reveal_type(Child().create())  # revealed: Child
+reveal_type(Child.create.__self__)  # revealed: <class 'Child'>
+reveal_type(getattr_static(Base, "create").__get__(None, Child)())  # revealed: Child
+reveal_type(getattr_static(Base, "create").__get__(Child())())  # revealed: Child
+```
+
+## Stored decorated bound methods
+
+A bound method stored on another class keeps its original receiver. Accessing it through an instance
+does not bind again or remove another argument:
+
+```py
+from collections.abc import Callable
+
+def preserve[**P, R](function: Callable[P, R]) -> Callable[P, R]:
+    return function
+
+class Source:
+    @preserve
+    def method(self, value: int) -> str:
+        return str(value)
+
+    @preserve
+    @classmethod
+    def class_method(cls, value: int) -> str:
+        return str(value)
+
+class Stored:
+    method = Source().method
+    class_method = Source.class_method
+
+reveal_type(Stored.method(1))  # revealed: str
+reveal_type(Stored().method(1))  # revealed: str
+reveal_type(Stored.class_method(1))  # revealed: str
+reveal_type(Stored().class_method(1))  # revealed: str
+reveal_type(Stored().method.__self__)  # revealed: Source
+reveal_type(Stored().class_method.__self__)  # revealed: type[Source]
+
+# error: [missing-argument]
+Stored().method()
 ```
 
 ## Types are not bound-method descriptors

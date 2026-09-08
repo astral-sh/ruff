@@ -7437,6 +7437,43 @@ class StaticMethod:
 static_assert(not is_assignable_to(type[StaticMethod], type[Foo]))
 ```
 
+An optional keyword-only parameter still cannot accept the unbound protocol receiver.
+
+```py
+class KeywordOnlyStaticMethod:
+    y: ClassVar[str] = "foo"
+    def __init__(self) -> None:
+        self.x = 1
+    @staticmethod
+    def method(*, value: int = 0) -> bytes:
+        return b"foo"
+
+static_assert(not is_assignable_to(type[KeywordOnlyStaticMethod], type[Foo]))
+```
+
+For overloaded methods, only overloads that accept that receiver contribute to the class-side
+contract.
+
+```py
+from typing import overload
+
+class OverloadedStaticMethod:
+    y: ClassVar[str] = "foo"
+    def __init__(self) -> None:
+        self.x = 1
+    @staticmethod
+    @overload
+    def method() -> bytes: ...
+    @staticmethod
+    @overload
+    def method(receiver: object) -> int: ...
+    @staticmethod
+    def method(receiver: object = None) -> bytes | int:
+        return b"foo" if receiver is None else 1
+
+static_assert(not is_assignable_to(type[OverloadedStaticMethod], type[Foo]))
+```
+
 Static methods and class methods declared by a protocol are checked on the candidate class object.
 They can be provided by the candidate's metaclass.
 

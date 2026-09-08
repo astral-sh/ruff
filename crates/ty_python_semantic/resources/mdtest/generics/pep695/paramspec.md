@@ -1197,6 +1197,81 @@ def _(callback: Callback[[object, int]] | Callback[[str, object]], value: int) -
     inner("value", "value")  # error: [invalid-argument-type]
 ```
 
+An explicit `__get__` stored before specialization preserves every parameter list in the inferred
+union. Binding the function still requires calls to be accepted by every alternative:
+
+```py
+class Methods[**P]:
+    def method(self, *args: P.args, **kwargs: P.kwargs) -> None: ...
+    get = method.__get__
+
+def with_descriptor[**P](callback: Callback[P]) -> Methods[P]:
+    raise NotImplementedError
+
+def _(callback: Callback[[object, int]] | Callback[[str, object]]) -> None:
+    methods = with_descriptor(callback)
+    bound = methods.get(methods)
+
+    reveal_type(type(bound))  # revealed: <class 'MethodType'>
+    reveal_type(bound("value", 1))  # revealed: None
+    bound(1, 1)  # error: [invalid-argument-type]
+    bound("value", "value")  # error: [invalid-argument-type]
+```
+
+The same stored `__get__` preserves a single concrete parameter list:
+
+```py
+def _(methods: Methods[[str, int]]) -> None:
+    bound = methods.get(methods)
+
+    reveal_type(type(bound))  # revealed: <class 'MethodType'>
+    reveal_type(bound("value", 1))  # revealed: None
+    bound(1, 1)  # error: [invalid-argument-type]
+```
+
+Storing a bound method's `__call__` or `__get__` also preserves the union during specialization. The
+method keeps its captured receiver when its native `__get__` is called:
+
+```py
+def preserve[**P, R](function: Callable[P, R]) -> Callable[P, R]:
+    return function
+
+class StoredBoundMethod[**P]:
+    @preserve
+    def method(self: object, *args: P.args, **kwargs: P.kwargs) -> None: ...
+    bound = method.__get__(object())
+    call = bound.__call__
+    get = bound.__get__
+
+def with_bound_method[**P](callback: Callback[P]) -> StoredBoundMethod[P]:
+    raise NotImplementedError
+
+def _(callback: Callback[[object, int]] | Callback[[str, object]]) -> None:
+    methods = with_bound_method(callback)
+
+    reveal_type(methods.call("value", 1))  # revealed: None
+    methods.call(1, 1)  # error: [invalid-argument-type]
+    methods.call("value", "value")  # error: [invalid-argument-type]
+
+    bound = methods.get(1)
+    reveal_type(bound.__self__)  # revealed: object
+    reveal_type(bound("value", 1))  # revealed: None
+    bound(1, 1)  # error: [invalid-argument-type]
+    bound("value", "value")  # error: [invalid-argument-type]
+```
+
+Both stored wrappers also preserve a single concrete parameter list:
+
+```py
+def _(methods: StoredBoundMethod[[str, int]]) -> None:
+    reveal_type(methods.call("value", 1))  # revealed: None
+    methods.call(1, 1)  # error: [invalid-argument-type]
+
+    bound = methods.get(1)
+    reveal_type(bound("value", 1))  # revealed: None
+    bound(1, 1)  # error: [invalid-argument-type]
+```
+
 ### Bounded expansion of union-valued `ParamSpec`s
 
 Specializing an overloaded method with several union-valued `ParamSpec`s leads to exponential

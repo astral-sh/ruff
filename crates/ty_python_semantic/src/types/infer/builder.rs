@@ -9368,22 +9368,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // Check for unsound calls to abstract classmethods/staticmethods on class objects
         match callable_type {
-            Type::BoundMethod(bound_method) if let Some(function) = bound_method.function(db) => {
-                if let Some(class) = bound_method.self_instance(self.db()).to_class_type(db) {
-                    if function.is_classmethod(self.db())
-                        && function.as_abstract_method(self.db(), class).is_some()
-                        && function.has_trivial_body(self.db())
-                    {
-                        report_call_to_abstract_method(
-                            &self.context,
-                            call_expression,
-                            function,
-                            "classmethod",
-                        );
-                    }
+            Type::BoundMethod(bound_method) => {
+                if let Some(function) = bound_method.function(self.db())
+                    && let Some(class) = bound_method.self_instance(self.db()).to_class_type(db)
+                    && bound_method.class_method(self.db())
+                    && function.as_abstract_method(self.db(), class).is_some()
+                    && function.has_trivial_body(self.db())
+                {
+                    report_call_to_abstract_method(
+                        &self.context,
+                        call_expression,
+                        function,
+                        "classmethod",
+                    );
                 }
             }
-            Type::FunctionLiteral(function) if function.is_staticmethod(self.db()) => {
+            Type::FunctionLiteral(function) if function.has_staticmethod_declaration(self.db()) => {
                 if let ast::Expr::Attribute(ast::ExprAttribute { value, .. }) = func.as_ref() {
                     let value_type = self.expression_type(value);
                     if let Some(class) = value_type.to_class_type(db) {
@@ -10149,7 +10149,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Next handle functions
         let function = match ty {
             Type::FunctionLiteral(function) => function,
-            Type::BoundMethod(bound) if let Some(function) = bound.function(self.db()) => function,
+            Type::BoundMethod(bound) => {
+                self.check_deprecated(ranged, bound.func(self.db()));
+                return;
+            }
             Type::Callable(callable) => {
                 self.report_deprecated_functions(ranged, callable.deprecated(self.db()));
                 return;

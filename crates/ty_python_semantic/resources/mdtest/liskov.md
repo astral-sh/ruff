@@ -2311,6 +2311,7 @@ error[invalid-method-override]: Invalid override of method `instance_method`
  2 |     def instance_method(self, x: int) -> int: ...
    |         ------------------------------------ `Parent.instance_method` defined here
 info: `BadChild1A.instance_method` is a staticmethod but `Parent.instance_method` is an instance method
+info: the parameter named `self` does not match `x` (and can be used as a keyword parameter)
 info: This violates the Liskov Substitution Principle
 ```
 
@@ -2379,6 +2380,7 @@ error[invalid-method-override]: Invalid override of method `class_method`
  4 |     def class_method(cls, x: int) -> int: ...
    |         -------------------------------- `Parent.class_method` defined here
 info: `BadChild3A.class_method` is a staticmethod but `Parent.class_method` is a classmethod
+info: the parameter named `cls` does not match `x` (and can be used as a keyword parameter)
 info: This violates the Liskov Substitution Principle
 ```
 

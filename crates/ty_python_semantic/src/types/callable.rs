@@ -12,7 +12,7 @@ use crate::{
         SubclassOfInner, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, UnionType,
         constraints::{ConstraintSet, IteratorConstraintsExtension},
         function::OverloadLiteral,
-        known_instance::FunctoolsPartialInstance,
+        known_instance::{FunctoolsPartialInstance, MethodWrapperKind},
         relation::{TypeRelation, TypeRelationChecker},
         signatures::{CallableSignature, PartialSignatureApplication},
         visitor, walk_signature,
@@ -21,6 +21,84 @@ use crate::{
 use ty_python_core::definition::Definition;
 
 impl<'db> Type<'db> {
+    /// The function descriptor representation, independently of its literal or synthesized payload.
+    pub(super) fn function_like_kind(self, db: &'db dyn Db) -> Option<CallableTypeKind> {
+        match self {
+            Type::FunctionLiteral(function) => Some(function.callable_type_kind(db)),
+            Type::Callable(callable) if callable.is_method_like(db) => Some(callable.kind(db)),
+            Type::KnownInstance(KnownInstanceType::MethodWrapper(wrapper)) => {
+                Some(match wrapper.kind(db) {
+                    MethodWrapperKind::Staticmethod => CallableTypeKind::StaticMethodLike,
+                    MethodWrapperKind::Classmethod => CallableTypeKind::ClassMethodLike,
+                })
+            }
+            _ => None,
+        }
+    }
+
+    pub(super) fn is_classmethod(self, db: &'db dyn Db) -> bool {
+        self.function_like_kind(db) == Some(CallableTypeKind::ClassMethodLike)
+    }
+
+    /// Returns the function exposed by descriptor access or a bound method's `__func__`.
+    pub(super) fn underlying_function(self, db: &'db dyn Db) -> Type<'db> {
+        match self {
+            Type::FunctionLiteral(function) => {
+                Type::FunctionLiteral(function.underlying_function(db))
+            }
+            Type::Callable(callable) if callable.is_method_like(db) => {
+                Type::Callable(callable.into_function_like(db))
+            }
+            Type::KnownInstance(KnownInstanceType::MethodWrapper(wrapper)) => wrapper.wrapped(db),
+            _ => self,
+        }
+    }
+
+    /// Implements function, staticmethod and classmethod `__get__` for either payload form.
+    pub(super) fn function_like_descriptor_get(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        instance: Option<Type<'db>>,
+        owner: Option<Type<'db>>,
+    ) -> Option<Type<'db>> {
+        // Specializing a stored `__get__` can expand a ParamSpec into several callable
+        // alternatives. Each retains its own receiver and signature after binding.
+        match self {
+            Type::Union(union) => {
+                return union.try_map(db, env, |alternative| {
+                    alternative.function_like_descriptor_get(db, env, instance, owner)
+                });
+            }
+            Type::TypeAlias(alias) => {
+                return alias
+                    .value_type(db)
+                    .function_like_descriptor_get(db, env, instance, owner);
+            }
+            _ => {}
+        }
+        let kind = self.function_like_kind(db)?;
+        let receiver = match kind {
+            CallableTypeKind::StaticMethodLike => return Some(self.underlying_function(db)),
+            CallableTypeKind::ClassMethodLike => owner
+                .filter(|owner| !owner.is_none(db))
+                .or_else(|| instance.map(|instance| instance.to_meta_type(db, env))),
+            _ => instance,
+        };
+        Some(receiver.map_or_else(
+            || self.underlying_function(db),
+            |receiver| {
+                Type::BoundMethod(super::BoundMethodType::from_callable(
+                    db,
+                    self,
+                    env.program(db),
+                    receiver,
+                    receiver,
+                ))
+            },
+        ))
+    }
+
     /// Create a callable type with a single non-overloaded signature.
     pub(crate) fn single_callable(db: &'db dyn Db, signature: Signature<'db>) -> Type<'db> {
         Type::Callable(CallableType::single(db, signature))
@@ -430,9 +508,9 @@ pub enum CallableTypeKind {
     /// - They use `types.FunctionType` as their owner type when constructing `super()`.
     /// - They act as [non-data descriptors][descriptor-protocol]: access through a class leaves
     ///   the signature unchanged, while access through an instance binds the first parameter
-    ///   to that instance. The resulting callable remains function-like.
-    ///   TODO: Model the result as a bound method. Its runtime type is `types.MethodType`,
-    ///   so retaining the `types.FunctionType` behavior listed above is inaccurate.
+    ///   to that instance. The result is a [`super::BoundMethodType`], retaining the unbound
+    ///   function and the captured receiver separately. It has `types.MethodType` identity
+    ///   and does not bind again on subsequent attribute access.
     /// - Like function literals, they defer binding `typing.Self` until the receiver is known
     ///   from the call's arguments, as illustrated below.
     ///
@@ -509,79 +587,24 @@ pub enum CallableTypeKind {
     /// represents the parameter list substituted for `P`.
     DunderParamSpec,
 
-    /// A callable with the descriptor behavior of `staticmethod`.
+    /// A synthesized `staticmethod` descriptor wrapping function signatures.
     ///
-    /// These are [non-data descriptors][descriptor-protocol] that return the callable unchanged
-    /// on both class and instance access, without binding a receiver.
-    ///
-    /// TODO: Distinguish the `staticmethod` descriptor from the wrapped function returned by
-    /// descriptor access. Currently, this kind is retained after access, and member lookup
-    /// and type relations lack both nominal types: truthiness is ambiguous, the metatype is
-    /// `type`, and only `object` attributes plus `__call__` are exposed.
-    ///
-    /// In the example below, `Example.method` is an always-truthy `types.FunctionType` instance
-    /// at runtime. After the `Callable`-returning decorator is applied, ty incorrectly rejects
-    /// its `__name__` attribute and the assignment, and loses precision for `type` and `bool`:
-    ///
-    /// ```python
-    /// from collections.abc import Callable
-    /// from types import FunctionType
-    /// from typing import reveal_type
-    ///
-    /// def preserve[**P, R](function: Callable[P, R]) -> Callable[P, R]:
-    ///     return function
-    ///
-    /// class Example:
-    ///     @preserve
-    ///     @staticmethod
-    ///     def method(value: int) -> str:
-    ///         return str(value)
-    ///
-    /// Example.method.__name__  # ty reports unresolved-attribute; Python returns "method".
-    /// function: FunctionType = Example.method  # ty reports invalid-assignment.
-    /// reveal_type(type(Example.method))  # ty reveals type; Python returns FunctionType.
-    /// reveal_type(bool(Example.method))  # ty reveals bool; the result is always True.
-    /// ```
-    ///
-    /// [descriptor-protocol]: https://docs.python.org/3/howto/descriptor.html#descriptor-protocol
+    /// Class and instance access both return a [`Self::FunctionLike`] callable with the
+    /// original signatures. The descriptor and the resulting function have distinct nominal
+    /// identities and binding behavior: accessing the descriptor never supplies a receiver,
+    /// but the function it returns can subsequently bind through its own `__get__`.
+    /// The raw descriptor exposes the function through `__func__` and `__wrapped__`.
     StaticMethodLike,
 
-    /// A callable with the descriptor behavior of `classmethod`.
+    /// A synthesized `classmethod` descriptor wrapping function signatures.
     ///
-    /// These are [non-data descriptors][descriptor-protocol] that bind the first parameter on
-    /// both class and instance access, using the owner when no instance is supplied.
+    /// Class and instance access both produce a [`super::BoundMethodType`] whose captured
+    /// receiver is the owner class. The method's `__func__` is an ordinary function-like
+    /// callable with the unbound signatures. `Self` in the bound signatures refers to an
+    /// instance of the captured class, independently of the class-object receiver.
     ///
-    /// TODO: Distinguish the `classmethod` descriptor from the bound method returned by
-    /// descriptor access. Currently, this kind is retained after binding. Neither the
-    /// descriptor's `classmethod` type nor the bound method's `types.MethodType` is reflected
-    /// in member lookup or type relations: truthiness is ambiguous, the metatype is `type`,
-    /// and only `object` attributes plus `__call__` are exposed.
-    ///
-    /// In the example below, `Example.method` is an always-truthy `types.MethodType` instance
-    /// at runtime. After the `Callable`-returning decorator is applied, ty incorrectly rejects
-    /// its `__name__` attribute and the assignment, and loses precision for `type` and `bool`:
-    ///
-    /// ```python
-    /// from collections.abc import Callable
-    /// from types import MethodType
-    /// from typing import reveal_type
-    ///
-    /// def preserve[**P, R](function: Callable[P, R]) -> Callable[P, R]:
-    ///     return function
-    ///
-    /// class Example:
-    ///     @preserve
-    ///     @classmethod
-    ///     def method(cls, value: int) -> str:
-    ///         return str(value)
-    ///
-    /// Example.method.__name__  # ty reports unresolved-attribute; Python returns "method".
-    /// method: MethodType = Example.method  # ty reports invalid-assignment.
-    /// reveal_type(type(Example.method))  # ty reveals type; Python returns MethodType.
-    /// reveal_type(bool(Example.method))  # ty reveals bool; the result is always True.
-    /// ```
-    ///
-    /// [descriptor-protocol]: https://docs.python.org/3/howto/descriptor.html#descriptor-protocol
+    /// We retain the wrapped call signatures on this descriptor for decorator inference,
+    /// although an unapplied `classmethod` descriptor itself is not callable at runtime.
     ClassMethodLike,
 
     /// An internal representation of the value bound to a `typing.ParamSpec` type variable.
@@ -748,6 +771,16 @@ impl<'db> CallableType<'db> {
 
     pub(crate) fn is_function_like(self, db: &'db dyn Db) -> bool {
         matches!(self.kind(db), CallableTypeKind::FunctionLike)
+    }
+
+    /// Nominal runtime identity is independent of the callable's accepted arguments.
+    pub(super) fn runtime_class(self, db: &'db dyn Db) -> Option<KnownClass> {
+        match self.kind(db) {
+            CallableTypeKind::FunctionLike => Some(KnownClass::FunctionType),
+            CallableTypeKind::StaticMethodLike => Some(KnownClass::Staticmethod),
+            CallableTypeKind::ClassMethodLike => Some(KnownClass::Classmethod),
+            _ => None,
+        }
     }
 
     fn is_dunder_paramspec(self, db: &'db dyn Db) -> bool {
@@ -1025,7 +1058,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source: CallableType<'db>,
         target: CallableType<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        if target.is_function_like(db) && !source.is_function_like(db) {
+        if target.runtime_class(db).is_some()
+            && target.runtime_class(db) != source.runtime_class(db)
+        {
             return self.never();
         }
 

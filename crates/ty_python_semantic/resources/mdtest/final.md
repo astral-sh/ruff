@@ -102,13 +102,10 @@ class Child(Parent):
 class OtherChild(Parent): ...
 
 class Grandchild(OtherChild):
-    # TODO: The Liskov violation here maybe shouldn't be emitted? Whether called on the
-    # type or on an instance, it will behave the same from the caller's perspective. The only
-    # difference is whether the method body gets access to `self`, which is not a
-    # concern of Liskov.
+    # The static method accepts the same instance calls as the inherited method, but
+    # overriding a final method is still prohibited.
     @staticmethod
     # error: [override-of-final-method]
-    # error: [invalid-method-override]
     def foo(): ...
     @property
     # TODO: we should emit a Liskov violation here too

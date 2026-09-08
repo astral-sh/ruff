@@ -244,7 +244,22 @@ impl<'db> Type<'db> {
             db: &'db dyn Db,
             function: FunctionType<'db>,
         ) -> FunctionType<'db> {
-            FunctionType::new(db, function.literal(db), None)
+            function.without_updated_signatures(db)
+        }
+
+        fn upcast_bound_method<'db>(
+            db: &'db dyn Db,
+            env: &ProgramEnvironment<'db>,
+            method: BoundMethodType<'db>,
+            visitor: &UpcastingVisitor<'db>,
+        ) -> BoundMethodType<'db> {
+            method
+                .with_func(db, upcast(db, env, method.func(db), visitor).ty)
+                .with_signature_receiver(
+                    db,
+                    upcast(db, env, method.self_instance(db), visitor).ty,
+                    method.signature_receiver(db),
+                )
         }
 
         fn upcast_property<'db>(
@@ -313,24 +328,34 @@ impl<'db> Type<'db> {
                     unspecialized_function(db, function),
                 )),
                 Type::BoundMethod(method) => visit_type(db, ty, visitor, || {
-                    UpcastResult::unstable(Type::BoundMethod(BoundMethodType::from_callable(
-                        db,
-                        upcast(db, env, method.func(db), visitor).ty,
-                        upcast(db, env, method.self_instance(db), visitor).ty,
-                        method.signature_receiver(db),
+                    UpcastResult::unstable(Type::BoundMethod(upcast_bound_method(
+                        db, env, method, visitor,
                     )))
                 }),
                 Type::KnownBoundMethod(method) => visit_type(db, ty, visitor, || {
                     let (method, retention) = match method {
                         KnownBoundMethodType::FunctionTypeDunderGet(function) => (
-                            KnownBoundMethodType::FunctionTypeDunderGet(unspecialized_function(
-                                db, function,
+                            KnownBoundMethodType::FunctionTypeDunderGet(InternedType::new(
+                                db,
+                                upcast(db, env, function.inner(db), visitor).ty,
                             )),
                             NegativeRetention::Unstable,
                         ),
                         KnownBoundMethodType::FunctionTypeDunderCall(function) => (
                             KnownBoundMethodType::FunctionTypeDunderCall(unspecialized_function(
                                 db, function,
+                            )),
+                            NegativeRetention::Unstable,
+                        ),
+                        KnownBoundMethodType::MethodTypeDunderGet(method) => (
+                            KnownBoundMethodType::MethodTypeDunderGet(upcast_bound_method(
+                                db, env, method, visitor,
+                            )),
+                            NegativeRetention::Unstable,
+                        ),
+                        KnownBoundMethodType::MethodTypeDunderCall(method) => (
+                            KnownBoundMethodType::MethodTypeDunderCall(upcast_bound_method(
+                                db, env, method, visitor,
                             )),
                             NegativeRetention::Unstable,
                         ),
