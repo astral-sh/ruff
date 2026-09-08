@@ -1,6 +1,9 @@
 //! Deferred operations on closed inference references.
 
 use ruff_python_ast::ExprContext;
+use ty_python_core::EvaluationMode;
+
+use crate::types::iteration::IterationProjection;
 
 use super::RecursiveType;
 use crate::types::{PromotionKind, PromotionMode, Type, TypeContext, TypeMapping};
@@ -20,6 +23,7 @@ impl get_size2::GetSize for RecursiveOperations<'_> {}
 pub enum RecursiveOperation<'db> {
     Promote(PromotionMode, PromotionKind),
     Subscript(Type<'db>),
+    Iterate(EvaluationMode, IterationProjection),
 }
 
 impl RecursiveOperation<'_> {
@@ -62,6 +66,9 @@ impl<'db> RecursiveOperations<'db> {
                     &TypeMapping::Promote(mode, kind),
                     TypeContext::default(),
                 ),
+                RecursiveOperation::Iterate(mode, projection) => {
+                    projection.apply(db, env, ty, mode)
+                }
                 RecursiveOperation::Subscript(index) => ty
                     .subscript_impl(db, env, index, ExprContext::Load)
                     .unwrap_or_else(|error| error.result_type()),

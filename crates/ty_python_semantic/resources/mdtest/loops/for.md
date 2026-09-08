@@ -1952,7 +1952,7 @@ def duplicate_nonempty(n: int):
     value = (0,)
     for _ in range(n):
         value = (*value, *value)
-    reveal_type(value)  # revealed: tuple[Literal[0]] | tuple[Divergent, ...]
+    reveal_type(value)  # revealed: tuple[Literal[0], ...]
     reveal_type(len(value))  # revealed: int
 ```
 
@@ -1974,7 +1974,7 @@ def nest(initial: Any, n: int):
 ### Unpacking recursively built tuples
 
 A tuple can grow in both length and nesting. Its unpacked prefix has variable length, and its final
-element is the previous tuple. Both recursive parts are approximated with `Divergent`; the initial
+element is the previous tuple. The element type retains this recursive structure; the initial
 one-element tuple remains possible when the loop does not run.
 
 ```py
@@ -1982,7 +1982,8 @@ def grow(n: int):
     value = (0,)
     for _ in range(n):
         value = (*value, value)
-    reveal_type(value)  # revealed: tuple[Literal[0]] | tuple[*tuple[Divergent, ...], Divergent]
+    # revealed: tuple[Literal[0]] | (μa0. tuple[*tuple[(a0 | Literal[0] | tuple[Literal[0]]) | Literal[0], ...], a0 | tuple[Literal[0]]])
+    reveal_type(value)
 ```
 
 ### Mutually growing tuple expansions
@@ -2000,7 +2001,7 @@ def grow(n: int):
         left = (*right, left)
         right = (*previous, 1)
     reveal_type(len(left))  # revealed: int
-    # revealed: tuple[Literal["begin"]] | tuple[*tuple[μ{a0; a1 = tuple[*tuple[a0, ...], a1 | tuple[Literal[0]]]}. a1 | Literal[0, 1, "begin"] | tuple[Literal[0]], ...], Literal[1]]
+    # revealed: tuple[Literal["begin"]] | tuple[*tuple[μ{a0; a1 = tuple[*tuple[a0 | Literal["begin"], ...], a1 | tuple[Literal[0]]]}. a1 | Literal[0, 1, "begin"] | tuple[Literal[0]], ...], Literal[1]]
     reveal_type(right)
     reveal_type(right[-1])  # revealed: Literal[1] | Literal["begin"]
     if isinstance(left[-1], tuple):

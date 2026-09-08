@@ -14,7 +14,7 @@
 //! possible. A solving query that still cycles after `TAINTED_CYCLES` iterations falls back
 //! to a single `Divergent` marker.
 //!
-//! Promotion and subscripting can retain references as deferred operations.
+//! Promotion, subscripting, and iteration can retain references as deferred operations.
 //! Other semantic type mappings, including specialization and materialization, currently
 //! replace an inference reference with its `Divergent` approximation. Structural substitutions
 //! handle references directly according to the requested substitution, without this semantic

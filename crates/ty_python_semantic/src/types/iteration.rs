@@ -1,5 +1,8 @@
 use crate::Db;
 use crate::ProgramEnvironment;
+use crate::subscript::PyIndex;
+use crate::types::recursive::RecursiveInputs;
+use crate::types::recursive::operations::RecursiveOperation;
 use crate::types::{
     AwaitError, Bindings, CallArguments, CallDunderError, KnownClass, LintDiagnosticGuard,
     LintDiagnosticGuardBuilder, LiteralValueTypeKind, Type, TypeContext, TypeVarBoundOrConstraints,
@@ -8,12 +11,107 @@ use crate::types::{
     context::InferContext,
     diagnostic::NOT_ITERABLE,
     todo_type,
-    tuple::{TupleSpec, TupleSpecBuilder},
+    tuple::{TupleLength, TupleSpec, TupleSpecBuilder, VariableLengthTuple, VariableSegment},
 };
 use compact_str::ToCompactString;
 use ruff_python_ast as ast;
 use std::borrow::Cow;
 use ty_python_core::EvaluationMode;
+
+/// A position or a remaining segment of the values produced by iteration.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
+pub enum IterationProjection {
+    Index(i32),
+    Rest { prefix: usize, suffix: usize },
+}
+
+impl IterationProjection {
+    const ALL: Self = Self::Rest {
+        prefix: 0,
+        suffix: 0,
+    };
+
+    /// Project iteration elements, retaining direct query references as deferred operations.
+    pub(super) fn apply<'db>(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+        mode: EvaluationMode,
+    ) -> Type<'db> {
+        if let Type::Recursive(recursive) = ty
+            && recursive.inference_key(db).is_some()
+        {
+            return Type::Recursive(
+                recursive.with_operation(db, RecursiveOperation::Iterate(mode, self)),
+            );
+        }
+        if self != Self::ALL
+            && let Type::Union(union) = ty
+        {
+            // Merging tuple specs can erase positions. Whole iteration instead uses
+            // the ordinary iterator protocol, which does not depend on positions.
+            return UnionType::from_elements(
+                db,
+                env,
+                union
+                    .elements(db)
+                    .iter()
+                    .map(|element| self.apply(db, env, *element, mode)),
+            );
+        }
+        match ty.try_iterate_impl(db, env, mode) {
+            Ok(spec) => match self {
+                Self::Index(index) => spec
+                    .as_ref()
+                    .py_index(db, env, index)
+                    .unwrap_or_else(|_| Type::unknown()),
+                Self::Rest { prefix, suffix } => spec
+                    .resize(db, env, TupleLength::Variable(prefix, suffix))
+                    .ok()
+                    .and_then(|rest| rest.variable_element_type(db))
+                    .unwrap_or_else(Type::unknown),
+            },
+            Err(error) => error.fallback_element_type(db, env),
+        }
+    }
+}
+
+impl TupleLength {
+    /// Keep known iteration positions while representing their types as projections of the input.
+    fn project_iteration<'db>(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+        mode: EvaluationMode,
+    ) -> TupleSpec<'db> {
+        match self {
+            Self::Fixed(length) => TupleSpec::heterogeneous((0..length).map(|index| {
+                i32::try_from(index)
+                    .map_or(IterationProjection::ALL, IterationProjection::Index)
+                    .apply(db, env, ty, mode)
+            })),
+            Self::Variable(prefix, suffix) => VariableLengthTuple::mixed(
+                (0..prefix).map(|index| {
+                    i32::try_from(index)
+                        .map_or(IterationProjection::ALL, IterationProjection::Index)
+                        .apply(db, env, ty, mode)
+                }),
+                VariableSegment::Homogeneous(
+                    IterationProjection::Rest { prefix, suffix }.apply(db, env, ty, mode),
+                ),
+                (0..suffix).map(|index| {
+                    i32::try_from(suffix - index)
+                        .map_or(IterationProjection::ALL, |index| {
+                            IterationProjection::Index(-index)
+                        })
+                        .apply(db, env, ty, mode)
+                }),
+            ),
+        }
+    }
+}
 
 /// Extract the element types from an expression with a statically known fixed-length iteration.
 ///
@@ -104,6 +202,23 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         mode: EvaluationMode,
     ) -> Result<Cow<'db, TupleSpec<'db>>, IterationError<'db>> {
+        if !RecursiveInputs::contains(db, env, [self]) {
+            return self.try_iterate_impl(db, env, mode);
+        }
+        // Resolve only for validity and length. Element types retain the original
+        // query inputs so constructing the next equation does not embed a solution.
+        let shape = RecursiveInputs::resolve(db, env, self).try_iterate_impl(db, env, mode)?;
+        Ok(Cow::Owned(
+            shape.len().project_iteration(db, env, self, mode),
+        ))
+    }
+
+    fn try_iterate_impl(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        mode: EvaluationMode,
+    ) -> Result<Cow<'db, TupleSpec<'db>>, IterationError<'db>> {
         fn non_async_special_case<'db>(
             db: &'db dyn Db,
             env: &ProgramEnvironment<'db>,
@@ -188,7 +303,7 @@ impl<'db> Type<'db> {
                         let mut elements_iter = elements.iter();
                         let first_element_spec = elements_iter
                             .next()?
-                            .try_iterate_with_mode(db, env, EvaluationMode::Sync)
+                            .try_iterate_impl(db, env, EvaluationMode::Sync)
                             .ok()?;
                         let mut builder = TupleSpecBuilder::from(&*first_element_spec);
                         for element in elements_iter {
@@ -196,7 +311,7 @@ impl<'db> Type<'db> {
                                 db,
                                 env,
                                 &*element
-                                    .try_iterate_with_mode(db, env, EvaluationMode::Sync)
+                                    .try_iterate_impl(db, env, EvaluationMode::Sync)
                                     .ok()?,
                             );
                         }
@@ -226,9 +341,7 @@ impl<'db> Type<'db> {
                         let mut specs_iter = intersection
                             .positive_elements_or_object(db)
                             .filter_map(|element| {
-                                element
-                                    .try_iterate_with_mode(db, env, EvaluationMode::Sync)
-                                    .ok()
+                                element.try_iterate_impl(db, env, EvaluationMode::Sync).ok()
                             });
                         let first_spec = specs_iter.next()?;
                         let mut builder = TupleSpecBuilder::from(&*first_spec);
@@ -245,7 +358,9 @@ impl<'db> Type<'db> {
                     }
 
                     // Flattening changed the type; recursively iterate the flattened result.
-                    flattened.try_iterate(db, env).ok()
+                    flattened
+                        .try_iterate_impl(db, env, EvaluationMode::Sync)
+                        .ok()
                 }
                 Type::EnumComplement(complement) => {
                     non_async_special_case(db, env, complement.remaining_literal_union(db, env))
@@ -285,11 +400,22 @@ impl<'db> Type<'db> {
             }
         }
 
+        if let Type::Recursive(recursive) = self
+            && recursive.inference_key(db).is_some()
+        {
+            return Ok(Cow::Owned(TupleSpec::homogeneous(Type::Recursive(
+                recursive.with_operation(
+                    db,
+                    RecursiveOperation::Iterate(mode, IterationProjection::ALL),
+                ),
+            ))));
+        }
+
         if mode.is_async() {
             if let Type::Intersection(_) = self {
                 let flattened = self.flatten_typevars(db, env);
                 if flattened != self {
-                    return flattened.try_iterate_with_mode(db, env, mode);
+                    return flattened.try_iterate_impl(db, env, mode);
                 }
             }
 
