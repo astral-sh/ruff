@@ -307,10 +307,10 @@ impl<'db> StaticClassLiteral<'db> {
                 .build()
                 .promote(db, env)
                 .promote_singletons(db, env);
-            let inferred_ty = if target_method_decorator == MethodDecorator::None {
-                inferred_ty
-                    .widen_short_tuple_for_attribute(db, env)
-                    .unwrap_or(inferred_ty)
+            let inferred_ty = if target_method_decorator == MethodDecorator::None
+                && inferred_ty == Type::empty_tuple(db, env)
+            {
+                Type::homogeneous_tuple(db, env, Type::unknown())
             } else {
                 inferred_ty
             };

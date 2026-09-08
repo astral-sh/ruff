@@ -710,7 +710,7 @@ fn repeated_tuple_conditions_share_provenance() -> anyhow::Result<()> {
     let repetitions = 100;
     let names = "value = (1,)\nif value:\n    pass\n".repeat(repetitions);
     let attributes = format!(
-        "class C:\n    value: tuple[int]\n{}\n{}",
+        "class C:\n{}\n{}",
         "    value = (1,)\n".repeat(repetitions),
         "if C.value:\n    pass\n".repeat(repetitions),
     );

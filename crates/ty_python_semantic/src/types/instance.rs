@@ -134,22 +134,6 @@ impl<'db> Type<'db> {
         Type::tuple(TupleType::empty(db, env))
     }
 
-    /// Widen an inferred attribute's exact empty or one-element tuple to a homogeneous tuple.
-    pub(crate) fn widen_short_tuple_for_attribute(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-    ) -> Option<Self> {
-        let tuple = self.exact_tuple_instance_spec(db)?;
-        let fixed = tuple.as_fixed_length()?;
-        let element = match fixed.all_elements() {
-            [] => Type::unknown(),
-            [element] => (*element).promote(db, env),
-            _ => return None,
-        };
-        Some(Type::homogeneous_tuple(db, env, element))
-    }
-
     pub(crate) const fn sys_version_info() -> Self {
         // Keep construction query-free: resolving the backing typeshed class here is on the hot
         // path for projects with many version guards. Resolve it lazily when class behavior is
