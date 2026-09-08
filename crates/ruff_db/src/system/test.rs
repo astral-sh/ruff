@@ -167,9 +167,8 @@ impl System for TestSystem {
     }
 
     fn command_executor(&self) -> Option<&dyn CommandExecutor> {
-        self.system()
-            .command_executor()
-            .map(|_| self as &dyn CommandExecutor)
+        self.system().command_executor()?;
+        Some(self)
     }
 
     fn read_directory<'a>(
