@@ -154,6 +154,17 @@ pub struct SemanticModel<'a> {
     /// Modules that have been seen by the semantic model.
     pub seen: Modules,
 
+    /// The value of the most recently visited module-level `__lazy_modules__` assignment.
+    ///
+    /// A declaration affects subsequent imports, without changing earlier imports:
+    ///
+    /// ```python
+    /// import json  # Eager.
+    /// __lazy_modules__ = ["json", "pathlib"]
+    /// import pathlib  # Lazy.
+    /// ```
+    pub lazy_modules: Option<&'a Expr>,
+
     /// Exceptions that are handled by the current `try` block.
     ///
     /// For example, if we're visiting the `x = 1` assignment below,
@@ -208,6 +219,7 @@ impl<'a> SemanticModel<'a> {
             rebinding_scopes: FxHashMap::default(),
             flags: SemanticModelFlags::new(path),
             seen: Modules::empty(),
+            lazy_modules: None,
             handled_exceptions: Vec::default(),
             resolved_names: FxHashMap::default(),
         };

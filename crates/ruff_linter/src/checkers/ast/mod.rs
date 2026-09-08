@@ -2839,6 +2839,27 @@ impl<'a> Checker<'a> {
             return;
         }
 
+        if id == "__lazy_modules__" && self.semantic.current_scope().kind.is_module() {
+            match parent {
+                Stmt::Assign(ast::StmtAssign { targets, value, .. })
+                    if let [Expr::Name(name)] = targets.as_slice()
+                        && name.id == id =>
+                {
+                    self.semantic.lazy_modules = Some(value);
+                }
+                Stmt::AnnAssign(ast::StmtAnnAssign {
+                    target,
+                    value: Some(value),
+                    ..
+                }) if let Expr::Name(name) = target.as_ref()
+                    && name.id == id =>
+                {
+                    self.semantic.lazy_modules = Some(value);
+                }
+                _ => {}
+            }
+        }
+
         // Match the left-hand side of an annotated assignment without a value,
         // like `x` in `x: int`. N.B. In stub files, these should be viewed
         // as assignments on par with statements such as `x: int = 5`.
