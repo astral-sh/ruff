@@ -472,7 +472,7 @@ reveal_type(InitializedCounter().value)  # revealed: Grow[int] | Grow[list[int]]
 #### Augmented assignments with expanding tuple results
 
 Repeatedly nesting an independently initialized tuple must converge instead of exhausting Salsa's
-cycle-iteration limit.
+cycle-iteration limit. The unannotated one-element initial value is widened to arbitrary length.
 
 ```py
 class C:
@@ -482,7 +482,7 @@ class C:
     def update(self) -> None:
         self.value += (self.value,)
 
-reveal_type(C().value)  # revealed: tuple[int] | tuple[Divergent, ...]
+reveal_type(C().value)  # revealed: tuple[int, ...] | tuple[Divergent, ...]
 ```
 
 #### Augmented assignments to inherited instance attributes

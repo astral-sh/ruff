@@ -306,30 +306,41 @@ segments: Mapping[str, Any] = {"start": (1, 2), "end": (3, 4, 5)}
 reveal_type(segments)  # revealed: dict[str, tuple[int, ...]]
 ```
 
-## Empty tuple class attributes
+## Empty and one-element tuple class attributes
 
-An unannotated empty tuple in a class body has no element type to infer. We give the attribute an
-unknown element type and an arbitrary length, including when the value comes from another name.
-Nonempty tuples and explicit annotations retain their fixed length.
+An unannotated empty tuple in a class body has no element type to infer, so we give it an unknown
+element type and an arbitrary length. A one-element tuple also acquires an arbitrary length, with
+its element type promoted. This applies when the value comes from another name. Longer tuples and
+explicit annotations retain their fixed length.
 
 ```py
 empty = ()
+singleton = (1,)
 
 class Values:
     items = ()
     from_name = empty
+    one = (1,)
+    one_from_name = singleton
+    object = (object(),)
     pair = (1, 2)
-    declared: tuple[()] = ()
+    declared_empty: tuple[()] = ()
+    declared_one: tuple[int] = (1,)
 
 reveal_type(empty)  # revealed: tuple[()]
+reveal_type(singleton)  # revealed: tuple[Literal[1]]
 reveal_type(Values.items)  # revealed: tuple[Unknown, ...]
 reveal_type(Values.from_name)  # revealed: tuple[Unknown, ...]
+reveal_type(Values.one)  # revealed: tuple[int, ...]
+reveal_type(Values.one_from_name)  # revealed: tuple[int, ...]
+reveal_type(Values.object)  # revealed: tuple[object, ...]
 reveal_type(Values.pair)  # revealed: tuple[int, int]
-reveal_type(Values.declared)  # revealed: tuple[()]
+reveal_type(Values.declared_empty)  # revealed: tuple[()]
+reveal_type(Values.declared_one)  # revealed: tuple[int]
 ```
 
-The empty tuple has a special meaning for `__slots__` and `__match_args__`, and an enum's tuple
-payload provides arguments for the member constructor. Those tuples keep their exact shape.
+`__slots__` and `__match_args__` use the exact tuple contents for class semantics. An enum's tuple
+payload supplies arguments for the member constructor. These tuples keep their exact shape.
 
 ```py
 from enum import Enum
@@ -338,39 +349,56 @@ class SpecialNames:
     __slots__ = ()
     __match_args__ = ()
 
+class OneSpecialName:
+    __slots__ = ("value",)
+    __match_args__ = ("value",)
+
 class Member(Enum):
     EMPTY = ()
+    SINGLE = (1,)
 
 reveal_type(SpecialNames.__slots__)  # revealed: tuple[()]
 reveal_type(SpecialNames.__match_args__)  # revealed: tuple[()]
+reveal_type(OneSpecialName.__slots__)  # revealed: tuple[Literal["value"]]
+reveal_type(OneSpecialName.__match_args__)  # revealed: tuple[str]
 reveal_type(Member.EMPTY.value)  # revealed: tuple[()]
+reveal_type(Member.SINGLE.value)  # revealed: tuple[Literal[1]]
 ```
 
-## Empty tuple implicit instance attributes
+## Empty and one-element tuple implicit instance attributes
 
-An instance attribute inferred only from an empty tuple also has an unknown element type and an
-arbitrary length. An explicit annotation, a nonempty tuple, and an attribute assigned by a
-classmethod retain their existing types.
+An implicit instance attribute inferred as an empty or one-element tuple follows the same promotion.
+An explicit annotation, a longer tuple, and an attribute assigned by a classmethod retain their
+existing types.
 
 ```py
 empty = ()
+singleton = (1,)
 
 class Attributes:
     def __init__(self) -> None:
         self.items = ()
         self.from_name = empty
+        self.one = (1,)
+        self.one_from_name = singleton
         self.pair = (1, 2)
-        self.declared: tuple[()] = ()
+        self.declared_empty: tuple[()] = ()
+        self.declared_one: tuple[int] = (1,)
 
     @classmethod
     def configure(cls) -> None:
         cls.class_items = ()
+        cls.class_one = (1,)
 
 reveal_type(Attributes().items)  # revealed: tuple[Unknown, ...]
 reveal_type(Attributes().from_name)  # revealed: tuple[Unknown, ...]
+reveal_type(Attributes().one)  # revealed: tuple[int, ...]
+reveal_type(Attributes().one_from_name)  # revealed: tuple[int, ...]
 reveal_type(Attributes().pair)  # revealed: tuple[int, int]
-reveal_type(Attributes().declared)  # revealed: tuple[()]
+reveal_type(Attributes().declared_empty)  # revealed: tuple[()]
+reveal_type(Attributes().declared_one)  # revealed: tuple[int]
 reveal_type(Attributes.class_items)  # revealed: tuple[()]
+reveal_type(Attributes.class_one)  # revealed: tuple[int]
 ```
 
 When different assignments infer both an empty and a nonempty tuple for an instance attribute, the
