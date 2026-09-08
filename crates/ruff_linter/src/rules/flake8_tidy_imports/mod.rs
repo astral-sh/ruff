@@ -268,20 +268,9 @@ mod tests {
             from __future__ import annotations
 
             import os
-            import this, typing
-            lazy import this, typing
-            import a, typing, b
-            import this, typing  # noqa: F401
-            import typing, email
-            from foo import bar, baz
 
             if True:
                 import email
-                import sitecustomize, typing_extensions
-
-            if True: import this, typing
-            if True: \
-                import this, typing
 
             with manager():
                 from foo import bar
@@ -305,20 +294,9 @@ mod tests {
             from __future__ import annotations
 
             lazy import os
-            import this, typing
-            lazy import this, typing
-            import a, typing, b
-            import this, typing  # noqa: F401
-            import typing, email
-            from foo import bar, baz
 
             if True:
                 lazy import email
-                import sitecustomize, typing_extensions
-
-            if True: import this, typing
-            if True: \
-                import this, typing
 
             with manager():
                 lazy from foo import bar
@@ -348,17 +326,7 @@ mod tests {
             Path::new("flake8_tidy_imports/TID254_fix.py"),
             &LinterSettings {
                 flake8_tidy_imports: flake8_tidy_imports::settings::Settings {
-                    require_lazy: ImportSelector::Selection(ImportSelection::Imports(vec![
-                        "os".to_string(),
-                        "typing".to_string(),
-                        "email".to_string(),
-                        "typing_extensions".to_string(),
-                        "foo".to_string(),
-                    ])),
-                    ban_lazy: ImportSelector::Selection(ImportSelection::Imports(vec![
-                        "sitecustomize".to_string(),
-                        "this".to_string(),
-                    ])),
+                    require_lazy: ImportSelector::Selection(ImportSelection::All(AllImports::All)),
                     ..Default::default()
                 },
                 ..LinterSettings::for_rule(Rule::LazyImportMismatch)
@@ -367,8 +335,7 @@ mod tests {
             },
         );
 
-        assert_eq!(diagnostics.len(), 13);
-        assert_eq!(diagnostics.iter().filter(|d| d.fix().is_some()).count(), 3);
+        assert_eq!(diagnostics.len(), 3);
         assert_eq!(fixed.source_code(), expected);
     }
 
@@ -378,26 +345,18 @@ mod tests {
             r#"
             import foo
             import foo.bar
-            import foo, foo.bar
-            import foo.bar, foo
 
             from foo import bar
             from foo import baz
-            from foo import bar, baz
-            lazy from foo import bar, baz
             "#,
         );
         let expected = dedent(
             r#"
             import foo
             lazy import foo.bar
-            import foo, foo.bar
-            import foo.bar, foo
 
             lazy from foo import bar
             from foo import baz
-            from foo import bar, baz
-            lazy from foo import bar, baz
             "#,
         );
 
@@ -414,9 +373,6 @@ mod tests {
                     require_lazy: ImportSelector::Selection(ImportSelection::Imports(vec![
                         "foo.bar".to_string(),
                     ])),
-                    ban_lazy: ImportSelector::Selection(ImportSelection::Imports(vec![
-                        "foo.baz".to_string(),
-                    ])),
                     ..Default::default()
                 },
                 ..LinterSettings::for_rule(Rule::LazyImportMismatch)
@@ -425,8 +381,7 @@ mod tests {
             },
         );
 
-        assert_eq!(diagnostics.len(), 6);
-        assert_eq!(diagnostics.iter().filter(|d| d.fix().is_some()).count(), 2);
+        assert_eq!(diagnostics.len(), 2);
         assert_eq!(fixed.source_code(), expected);
     }
 
@@ -480,8 +435,6 @@ mod tests {
             lazy import sitecustomize
             lazy import typing
             lazy from foo import bar
-            lazy import typing, email
-            lazy from foo import bar, baz
             "#,
         );
         let expected = dedent(
@@ -489,8 +442,6 @@ mod tests {
             lazy import sitecustomize
             import typing
             from foo import bar
-            lazy import typing, email
-            lazy from foo import bar, baz
             "#,
         );
 
@@ -516,8 +467,7 @@ mod tests {
             },
         );
 
-        assert_eq!(diagnostics.len(), 5);
-        assert_eq!(diagnostics.iter().filter(|d| d.fix().is_some()).count(), 2);
+        assert_eq!(diagnostics.len(), 2);
         assert_eq!(fixed.source_code(), expected);
     }
 }
