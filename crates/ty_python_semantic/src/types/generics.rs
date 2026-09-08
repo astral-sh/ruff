@@ -5032,7 +5032,7 @@ mod tests {
     }
 
     #[test]
-    fn inference_detects_expanding_cycles_hidden_by_merging() -> anyhow::Result<()> {
+    fn inference_rejects_recursive_candidates_that_violate_bounds() -> anyhow::Result<()> {
         let db = setup_db();
         let db = &db;
         let env = db.program_environment();
@@ -5050,26 +5050,20 @@ mod tests {
             [[int, str], [str, int]],
         ));
 
-        // Select T = list[U], U = T on one path and T = U = object on the other. Only the
-        // individual path still contains the cycle after merging with object.
+        // The custom candidate T = list[U], U = T has a recursive solution, but
+        // violates this path's T = int, U = str bounds. Keep the other valid path.
         let inference = builder
             .build_inference_with(|typevar, bounds| {
                 let ty = match (typevar, bounds?.evidence_lower()) {
                     (typevar, Some(lower)) if typevar == t && lower == int => list_of_u,
                     (typevar, Some(lower)) if typevar == u && lower == str => Type::TypeVar(t),
-                    _ => Type::object(),
+                    _ => return None,
                 };
                 Some(PathBoundSolution::Solved(ty))
             })
-            .map_err(|()| anyhow::anyhow!("an expanding cycle should recover"))?;
-        assert_eq!(
-            inference.solutions(db),
-            &TypeVarInferenceSolutions::Unavailable(TypeVarInferenceFallback::ExpandingCycle)
-        );
-        assert_eq!(
-            inference.merged_types(db),
-            [Some(Type::object()), Some(Type::object())]
-        );
+            .map_err(|()| anyhow::anyhow!("the other path should remain valid"))?;
+        assert_eq!(inference.solutions(db), &TypeVarInferenceSolutions::Single);
+        assert_eq!(inference.merged_types(db), [Some(str), Some(int)]);
         Ok(())
     }
 

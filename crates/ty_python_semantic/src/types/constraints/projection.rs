@@ -163,7 +163,7 @@ impl<'db> ConstraintSet<'db, '_> {
     ) -> Result<Solutions<'db>, ProjectionError> {
         let path_bounds = self.bounded_path_bounds(db, env, inferable, budget)?;
         let mut type_budget = ProjectionTypeBudget::new(budget.type_terms);
-        path_bounds.try_solve_with(choose, |solution| {
+        path_bounds.try_solve_with(db, env, choose, |solution| {
             for binding in solution {
                 type_budget.charge_type(db, binding.solution)?;
             }
@@ -202,6 +202,8 @@ impl<'db> ConstraintSet<'db, '_> {
         let path_bounds = self.bounded_path_bounds(db, env, inferable, budget)?;
 
         path_bounds.try_fold_with(
+            db,
+            env,
             choose,
             initial,
             &mut ProjectionTypeBudget::new(budget.type_terms),
@@ -213,6 +215,8 @@ impl<'db> ConstraintSet<'db, '_> {
 impl<'db> PathBounds<'db> {
     fn try_fold_with<T>(
         &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         mut choose: impl FnMut(TypeVarVariance, &PathBound<'db>) -> PathBoundSolution<'db>,
         mut accumulated: T,
         budget: &mut ProjectionTypeBudget,
@@ -222,15 +226,17 @@ impl<'db> PathBounds<'db> {
             &mut ProjectionTypeBudget,
         ) -> Result<T, ProjectionError>,
     ) -> Result<SolutionProjection<T>, ProjectionError> {
-        let paths = match self {
+        let (paths, inferable) = match self {
             Self::Unsatisfiable => return Ok(SolutionProjection::Unsatisfiable),
             Self::Unconstrained => return Ok(SolutionProjection::Unconstrained),
-            Self::Constrained(paths) => paths,
+            Self::Constrained(paths, inferable) => (paths, *inferable),
         };
 
         let mut retained = false;
         for path in paths {
-            let Some((solution, incomplete)) = Self::solve_path_with(path, &mut choose) else {
+            let Some((solution, incomplete)) =
+                Self::solve_path_with(db, env, path, inferable, &mut choose)
+            else {
                 continue;
             };
             if incomplete {

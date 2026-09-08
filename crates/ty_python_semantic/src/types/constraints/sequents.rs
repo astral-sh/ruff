@@ -1310,10 +1310,37 @@ impl SequentMap {
                 self.add_single_implication(intersection_constraint, right_constraint);
             }
 
-            // The sequent map only needs to include constraints that might appear in a BDD. If the
-            // intersection does not collapse to a single constraint, then there's no new
-            // constraint that we need to add to the sequent map.
-            IntersectionResult::CannotSimplify => {}
+            IntersectionResult::CannotSimplify => {
+                // Even when merging the bounds would produce a union or intersection, each lower
+                // bound must satisfy the other constraint's upper bound. Keep these as separate
+                // ranges so single-constraint sequents can derive any nested typevar constraints.
+                let left = storage.constraint_data(left_constraint);
+                let right = storage.constraint_data(right_constraint);
+                for (lower_source, upper_source) in [(left, right), (right, left)] {
+                    let (Some(lower), Some(upper)) = (
+                        lower_source.stored_lower_bound(),
+                        upper_source.stored_upper_bound(),
+                    ) else {
+                        continue;
+                    };
+                    let range = ConstraintId::new_with_bounds(
+                        db,
+                        env,
+                        storage,
+                        left.typevar,
+                        Some(lower),
+                        Some(upper),
+                    );
+                    self.add_pair_implication(
+                        db,
+                        env,
+                        storage,
+                        left_constraint,
+                        right_constraint,
+                        range,
+                    );
+                }
+            }
 
             IntersectionResult::Disjoint => {
                 tracing::trace!(

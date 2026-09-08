@@ -149,6 +149,7 @@ mod enums;
 mod equality;
 mod function;
 mod generics;
+mod graph;
 pub mod ide_support;
 mod infer;
 mod instance;
@@ -464,6 +465,8 @@ pub(crate) struct ApplyTypeMappingVisitor<'env, 'db> {
     /// Starts at 0 in the unfolded body or closed binding input, excluding the target
     /// binder itself. Unfolding replaces variables at this index; binding creates them.
     recursive_depth: u32,
+    /// Closed backedges retained while transforming a simultaneous recursive binder.
+    recursive_roots: Vec<RecursiveType<'db>>,
     /// Whether materialization also transforms type-variable bounds and defaults.
     materialize_typevar_bounds_and_defaults: bool,
     default: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
@@ -482,6 +485,7 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
             env,
             recursion_context: None,
             recursive_depth: 0,
+            recursive_roots: Vec::new(),
             materialize_typevar_bounds_and_defaults: true,
             default: OnceCell::default(),
             top_materialization: OnceCell::default(),
@@ -499,6 +503,7 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
         Self {
             recursion_context: self.recursion_context,
             recursive_depth: self.recursive_depth,
+            recursive_roots: self.recursive_roots.clone(),
             materialize_typevar_bounds_and_defaults: self.materialize_typevar_bounds_and_defaults,
             ..Self::new(self.env)
         }
@@ -8896,6 +8901,22 @@ impl<'db> Type<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Type<'db> {
+        if let TypeMapping::Recursive(mapping) = type_mapping
+            && let Some(ty) = mapping.extract_type(db, self, visitor)
+        {
+            return ty;
+        }
+        self.apply_type_mapping_children(db, type_mapping, tcx, visitor)
+    }
+
+    /// Map a node's children after its structural mapper has handled the node itself.
+    fn apply_type_mapping_children<'a>(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> Type<'db> {
         // If we are binding `typing.Self`, and this type is what we are binding `Self` to, return
         // early. This is not just an optimization, it also prevents us from infinitely expanding
         // the type, if it's something that can contain a `Self` reference.
@@ -10620,7 +10641,7 @@ pub enum TypeMapping<'a, 'db> {
         materialization_kind: MaterializationKind,
     },
     /// A structural substitution constructed only by the recursive-type binder.
-    Recursive(RecursiveMapping<'db>),
+    Recursive(RecursiveMapping<'a, 'db>),
     /// Replaces any literal types with their corresponding promoted type form (e.g. `Literal["string"]`
     /// to `str`, or `def _() -> int` to `Callable[[], int]`).
     Promote(PromotionMode, PromotionKind),

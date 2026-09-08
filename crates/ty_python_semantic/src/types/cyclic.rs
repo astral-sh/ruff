@@ -255,7 +255,7 @@ impl<'db> RecursiveDefinition<'db> {
                 (
                     Self::Structural {
                         recursive: recursive.constructor(db),
-                        definition: recursive.definition(db),
+                        definition: recursive.alias(db)?.0,
                     },
                     Some(specialization),
                 )

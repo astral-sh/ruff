@@ -1196,7 +1196,10 @@ mod tests {
             let mut walker = SolutionWalker::new(source_orders.clone());
             let ControlFlow::Continue(()) =
                 walker.visit_node(db, &env, &mut storage, &mut path, set.node, &mut limits);
-            assert_eq!(walker.finish(db, &env, &mut storage), expected);
+            assert_eq!(
+                walker.finish(db, &env, &mut storage, TypeVarSet::from_typevars(db, [t])),
+                expected
+            );
         }
     }
 }

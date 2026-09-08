@@ -54,7 +54,10 @@ use ty_python_core::semantic_index;
 enum NamedItem<'db> {
     Class(ClassLiteral<'db>),
     TypeAlias(TypeAliasType<'db>),
-    Recursive(RecursiveType<'db>),
+    Recursive {
+        definition: Definition<'db>,
+        name: &'db str,
+    },
 }
 
 impl<'db> NamedItem<'db> {
@@ -65,9 +68,14 @@ impl<'db> NamedItem<'db> {
                 // Specializations of the same alias share a display name.
                 left.definition(db) == right.definition(db)
             }
-            (NamedItem::Recursive(left), NamedItem::Recursive(right)) => {
-                left.definition(db) == right.definition(db)
-            }
+            (
+                NamedItem::Recursive {
+                    definition: left, ..
+                },
+                NamedItem::Recursive {
+                    definition: right, ..
+                },
+            ) => left == right,
             _ => false,
         }
     }
@@ -76,7 +84,7 @@ impl<'db> NamedItem<'db> {
         match self {
             NamedItem::Class(class) => class.name(db),
             NamedItem::TypeAlias(type_alias) => type_alias.name(db),
-            NamedItem::Recursive(recursive) => recursive.name(db),
+            NamedItem::Recursive { name, .. } => name,
         }
     }
 
@@ -86,9 +94,8 @@ impl<'db> NamedItem<'db> {
             NamedItem::TypeAlias(type_alias) => {
                 type_alias.qualified_name(db).components_excluding_self()
             }
-            NamedItem::Recursive(recursive) => {
-                QualifiedTypeAliasName::new(db, recursive.definition(db), recursive.name(db))
-                    .components_excluding_self()
+            NamedItem::Recursive { definition, name } => {
+                QualifiedTypeAliasName::new(db, definition, name).components_excluding_self()
             }
         }
     }
@@ -150,6 +157,9 @@ pub struct DisplaySettings<'db> {
     /// Function types that are currently being displayed.
     /// Used to prevent infinite recursion when displaying self-referential function types.
     visited_function_types: Rc<FxHashSet<FunctionType<'db>>>,
+    /// Anonymous binders surrounding the displayed closed unfolding. Repeated
+    /// occurrences refer to their binder instead of unfolding indefinitely.
+    recursive_binders: Rc<[RecursiveType<'db>]>,
     /// Whether to hide the return type of the outermost signature.
     /// Return types of nested callable types inside parameters are still shown.
     hide_return_type: bool,
@@ -308,6 +318,16 @@ struct TypeDetailsWriter<'db> {
 }
 
 impl<'db> TypeDetailsWriter<'db> {
+    /// Buffer a display once so label comparisons can reuse its text and navigation ranges.
+    fn render(value: &impl FmtDetailed<'db>) -> TypeDisplayDetails<'db> {
+        let mut writer = TypeWriter::Details(Self::new());
+        value.fmt_detailed(&mut writer).unwrap();
+        match writer {
+            TypeWriter::Details(details) => details.finish_type_details(),
+            TypeWriter::Formatter(_) => unreachable!("Expected Details variant"),
+        }
+    }
+
     fn new() -> Self {
         Self {
             label: String::new(),
@@ -415,6 +435,20 @@ trait FmtDetailed<'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result;
 }
 
+impl<'db> FmtDetailed<'db> for TypeDisplayDetails<'db> {
+    fn fmt_detailed(&self, writer: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
+        if let TypeWriter::Details(details) = writer {
+            let offset = details.label.text_len();
+            details
+                .targets
+                .extend(self.targets.iter().map(|range| *range + offset));
+            details.details.extend(self.details.iter().cloned());
+            details.is_valid_syntax &= self.is_valid_syntax;
+        }
+        writer.write_str(&self.label)
+    }
+}
+
 struct Join<'a, 'b, 'c, 'db> {
     fmt: &'c mut TypeWriter<'a, 'b, 'db>,
     separator: &'static str,
@@ -451,6 +485,7 @@ impl<'db> Join<'_, '_, '_, 'db> {
     }
 }
 
+#[derive(Clone)]
 pub enum TypeDetail<'db> {
     /// Dummy item to indicate a function signature's parameters have started
     SignatureStart,
@@ -628,7 +663,9 @@ impl<'db> TypeVisitor<'db> for AmbiguousNameCollector<'_, 'db> {
                 self.record_class(db, ClassLiteral::Static(alias.origin(db)));
             }
             Type::TypeAlias(type_alias) => self.record_type_alias(db, type_alias),
-            Type::Recursive(recursive) => self.record(db, NamedItem::Recursive(recursive)),
+            Type::Recursive(recursive) if let Some((definition, name)) = recursive.alias(db) => {
+                self.record(db, NamedItem::Recursive { definition, name });
+            }
             // Visit the class (as if it were a nominal-instance type)
             // rather than the protocol members, if it is a class-based protocol.
             // (For the purposes of displaying the type, we'll use the class name.)
@@ -650,8 +687,11 @@ impl<'db> TypeVisitor<'db> for AmbiguousNameCollector<'_, 'db> {
     }
 
     fn visit_recursive_type(&self, db: &'db dyn Db, recursive: RecursiveType<'db>) {
-        // Only the alias name and its arguments are displayed, not its unfolded body.
-        if let Some(arguments) = recursive.arguments(db) {
+        if recursive.alias(db).is_none() {
+            // Inferred recursive types display their bodies, including ambiguous names.
+            self.visit_type(db, recursive.unfold(db, self.env));
+        } else if let Some(arguments) = recursive.arguments(db) {
+            // Named aliases only display their names and arguments.
             walk_specialization_types(db, arguments, self);
         }
     }
@@ -663,12 +703,11 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         env: &'env ProgramEnvironment<'db>,
     ) -> DisplayType<'env, 'db> {
-        DisplayType {
-            ty: self,
-            settings: DisplaySettings::from_possibly_ambiguous_types(db, env, [self]),
+        self.display_with(
             db,
             env,
-        }
+            DisplaySettings::from_possibly_ambiguous_types(db, env, [self]),
+        )
     }
 
     pub(crate) fn display_with<'env>(
@@ -677,8 +716,21 @@ impl<'db> Type<'db> {
         env: &'env ProgramEnvironment<'db>,
         settings: DisplaySettings<'db>,
     ) -> DisplayType<'env, 'db> {
+        // Unnamed entries in an already displayed graph expand inline. Resolve
+        // them before deciding whether the displayed expression needs parentheses.
+        let ty = if let Type::Recursive(recursive) = self
+            && !settings.recursive_binders.contains(&recursive)
+            && settings
+                .recursive_binders
+                .iter()
+                .any(|binder| recursive.shares_graph(db, *binder))
+        {
+            recursive.unfold(db, env)
+        } else {
+            self
+        };
         DisplayType {
-            ty: self,
+            ty,
             db,
             env,
             settings,
@@ -726,13 +778,7 @@ impl<'db> DisplayType<'_, 'db> {
     }
 
     pub fn to_string_parts(&self) -> TypeDisplayDetails<'db> {
-        let mut f = TypeWriter::Details(TypeDetailsWriter::new());
-        self.fmt_detailed(&mut f).unwrap();
-
-        match f {
-            TypeWriter::Details(details) => details.finish_type_details(),
-            TypeWriter::Formatter(_) => unreachable!("Expected Details variant"),
-        }
+        TypeDetailsWriter::render(self)
     }
 }
 
@@ -1638,19 +1684,57 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                     alias.materialization_kind(db),
                     f,
                 ),
-            Type::Recursive(recursive) => TypeAliasDisplay {
-                db,
-                ty: self.ty,
-                definition: recursive.definition(db),
-                name: recursive.name(db),
-                settings: self.settings.clone(),
+            Type::Recursive(recursive) if let Some((definition, name)) = recursive.alias(db) => {
+                TypeAliasDisplay {
+                    db,
+                    ty: self.ty,
+                    definition,
+                    name,
+                    settings: self.settings.clone(),
+                }
+                .fmt_specialized(
+                    self.env,
+                    recursive.arguments(db),
+                    recursive.materialization_kind(db),
+                    f,
+                )
             }
-            .fmt_specialized(
-                self.env,
-                recursive.arguments(db),
-                recursive.materialization_kind(db),
-                f,
-            ),
+            Type::Recursive(recursive) => {
+                if let Some(index) = self
+                    .settings
+                    .recursive_binders
+                    .iter()
+                    .position(|binder| *binder == recursive)
+                {
+                    return write!(f.with_type(self.ty), "a{index}");
+                }
+                let members = recursive.members(db);
+                let mut settings = self.settings.clone();
+                let offset = settings.recursive_binders.len();
+                settings.recursive_binders = settings
+                    .recursive_binders
+                    .iter()
+                    .copied()
+                    .chain(members.iter().copied())
+                    .collect();
+                if members.len() == 1 {
+                    write!(f, "μa{offset}. ")?;
+                } else {
+                    write!(f, "μ{{a{offset}")?;
+                    for (index, member) in members.into_iter().enumerate().skip(1) {
+                        write!(f, "; a{} = ", offset + index)?;
+                        member
+                            .unfold(db, self.env)
+                            .display_with(db, self.env, settings.clone())
+                            .fmt_detailed(f)?;
+                    }
+                    f.write_str("}. ")?;
+                }
+                recursive
+                    .unfold(db, self.env)
+                    .display_with(db, self.env, settings)
+                    .fmt_detailed(f)
+            }
             Type::NewTypeInstance(newtype) => f.with_type(self.ty).write_str(newtype.name(db)),
         }
     }
@@ -3027,24 +3111,13 @@ fn subclass_of_known_class(db: &dyn Db, subclass_of: SubclassOfType<'_>) -> Opti
 
 impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
-        fn singleline_union_element_label<'db>(
-            db: &'db dyn Db,
-            env: &ProgramEnvironment<'db>,
-            element: Type<'db>,
-            settings: &DisplaySettings<'db>,
-        ) -> String {
-            element
-                .display_with(db, env, settings.singleline())
-                .to_string()
-        }
-
-        fn duplicate_ambiguous_labels(element_labels: &[Option<String>]) -> FxHashSet<&str> {
+        fn duplicate_ambiguous_labels<'a>(
+            element_labels: &'a [Option<TypeDisplayDetails<'_>>],
+        ) -> FxHashSet<&'a str> {
             let mut counts: FxHashMap<&str, usize> = FxHashMap::default();
-
-            for label in element_labels.iter().flatten() {
-                *counts.entry(&**label).or_default() += 1;
+            for display in element_labels.iter().flatten() {
+                *counts.entry(&display.label).or_default() += 1;
             }
-
             counts
                 .into_iter()
                 .filter_map(|(label, count)| (count > 1).then_some(label))
@@ -3083,7 +3156,14 @@ impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
                 (self.condensable_literals(element).is_none()
                     && !element.is_subclass_of()
                     && !is_numeric_tower_element(element))
-                .then(|| singleline_union_element_label(db, self.env, element, &self.settings))
+                .then(|| {
+                    TypeDetailsWriter::render(&DisplayMaybeParenthesizedType {
+                        ty: element,
+                        db,
+                        env: self.env,
+                        settings: self.settings.singleline(),
+                    })
+                })
             })
             .collect();
         let duplicate_ambiguous_labels = duplicate_ambiguous_labels(&element_labels);
@@ -3164,20 +3244,22 @@ impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
                 }
             } else {
                 displayed_entries += 1;
-                let settings = if label
-                    .as_deref()
-                    .is_some_and(|label| duplicate_ambiguous_labels.contains(label))
-                {
-                    self.settings.singleline().force_signature_name()
-                } else {
-                    self.settings.singleline()
-                };
-                join.entry(&DisplayMaybeParenthesizedType {
-                    ty: *element,
-                    db,
-                    env: self.env,
-                    settings,
-                });
+                if let Some(display) = label {
+                    if duplicate_ambiguous_labels.contains(display.label.as_str())
+                        && self.settings.signature_name_display != SignatureNameDisplay::Force
+                    {
+                        join.entry(&DisplayMaybeParenthesizedType {
+                            ty: *element,
+                            db,
+                            env: self.env,
+                            settings: self.settings.singleline().force_signature_name(),
+                        });
+                    } else {
+                        // Rendering again at each union would double the work for each
+                        // level of nesting. Preserve the buffered navigation ranges too.
+                        join.entry(display);
+                    }
+                }
             }
         }
 
@@ -3524,15 +3606,23 @@ struct DisplayMaybeParenthesizedType<'env, 'db> {
 impl<'db> FmtDetailed<'db> for DisplayMaybeParenthesizedType<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
         let db = self.db;
+        let display = self.ty.display_with(db, self.env, self.settings.clone());
         let write_parentheses = |f: &mut TypeWriter<'_, '_, 'db>| {
             f.set_invalid_type_annotation();
             f.write_char('(')?;
-            self.ty
-                .display_with(db, self.env, self.settings.clone())
-                .fmt_detailed(f)?;
+            display.fmt_detailed(f)?;
             f.write_char(')')
         };
-        match self.ty {
+        match display.ty {
+            // A recursive binder extends to the end of its body, more loosely
+            // than unions, intersections, negation, or member access. A reference
+            // to an enclosing binder is just an atomic name such as `a0`.
+            Type::Recursive(recursive)
+                if recursive.alias(db).is_none()
+                    && !self.settings.recursive_binders.contains(&recursive) =>
+            {
+                write_parentheses(f)
+            }
             ty if should_parenthesize_callable_type(ty, db) => write_parentheses(f),
             Type::KnownBoundMethod(_) | Type::FunctionLiteral(_) | Type::BoundMethod(_) => {
                 write_parentheses(f)
@@ -3548,10 +3638,7 @@ impl<'db> FmtDetailed<'db> for DisplayMaybeParenthesizedType<'_, 'db> {
             Type::Intersection(intersection) if !intersection.has_one_element(db) => {
                 write_parentheses(f)
             }
-            _ => self
-                .ty
-                .display_with(db, self.env, self.settings.clone())
-                .fmt_detailed(f),
+            _ => display.fmt_detailed(f),
         }
     }
 }

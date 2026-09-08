@@ -1290,6 +1290,24 @@ reveal_type(invoke(head_invariant, Invariant[int]()))
 reveal_type(invoke(lift_invariant, 1))
 ```
 
+## Inferring callback return types from shared parameter types
+
+An invariant parameter of a generic callback can determine the callback's return type. Here the same
+list supplies both values and indices, so `select`'s `tuple[int]` index type also fixes the value
+type to `int`.
+
+```py
+from typing import Callable, reveal_type
+
+def invoke[A, B](fn: Callable[[list[A], list[A]], B], values: list[A]) -> B:
+    return fn(values, values)
+
+def select[U](values: list[tuple[U]], indices: list[tuple[int]]) -> U:
+    return values[indices[0][0]][0]
+
+reveal_type(invoke(select, [(0,)]))  # revealed: int
+```
+
 ## Passing unbound generic methods to generic functions
 
 An unbound method accessed through a bare generic class uses the class's default specialization. The

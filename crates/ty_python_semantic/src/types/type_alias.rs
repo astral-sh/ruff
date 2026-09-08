@@ -99,6 +99,11 @@ impl<'db> AliasCycleSummary<'db> {
                 .elements(db)
                 .iter()
                 .find_map(|&element| Self::collect(db, element, typevars)),
+            Type::Intersection(intersection) => intersection
+                .positive(db)
+                .iter()
+                .chain(intersection.negative(db))
+                .find_map(|&element| Self::collect(db, element, typevars)),
             _ => ty.is_divergent().then_some(ty),
         }
     }
