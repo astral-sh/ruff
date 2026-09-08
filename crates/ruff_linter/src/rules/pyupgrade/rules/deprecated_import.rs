@@ -193,7 +193,6 @@ const TYPING_EXTENSIONS_TO_TYPING: &[&str] = &[
     "ValuesView",
     "cast",
     "no_type_check",
-    "no_type_check_decorator",
     // Introduced in Python 3.5.2, but `typing_extensions` contains backported bugfixes and
     // optimizations,
     // "NewType",
