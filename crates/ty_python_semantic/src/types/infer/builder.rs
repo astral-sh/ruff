@@ -3432,15 +3432,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             && self.index.scope(definition.file_scope(self.db())).kind() == ScopeKind::Class
             && let ast::Expr::Name(name) = target
             && !matches!(name.id.as_str(), "__slots__" | "__match_args__")
-            && let Some(tuple) = target_ty.exact_tuple_instance_spec(self.db())
+            && target_ty == Type::empty_tuple(self.db(), self.program_environment())
             // An enum's tuple payload supplies positional arguments to `__new__`.
             && !nearest_enclosing_class(self.db(), self.index, self.scope()).is_some_and(|class| {
                 is_enum_class_by_inheritance(self.db(), self.program_environment(), class)
             }) {
-            let db = self.db();
-            let env = self.program_environment();
-            let element = tuple.homogeneous_element_type(db, env).promote(db, env);
-            Type::homogeneous_tuple(db, env, element)
+            Type::homogeneous_tuple(self.db(), self.program_environment(), Type::unknown())
         } else {
             target_ty
         };

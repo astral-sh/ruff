@@ -303,15 +303,22 @@ impl<'db> StaticClassLiteral<'db> {
         }
 
         let member = if is_attribute_bound {
+            let inferred_ty = union_of_inferred_types
+                .build()
+                .promote(db, env)
+                .promote_singletons(db, env);
+            let inferred_ty = if target_method_decorator == MethodDecorator::None
+                && inferred_ty == Type::empty_tuple(db, env)
+            {
+                Type::homogeneous_tuple(db, env, Type::unknown())
+            } else {
+                inferred_ty
+            };
+
             Member {
-                inner: Place::bound(
-                    union_of_inferred_types
-                        .build()
-                        .promote(db, env)
-                        .promote_singletons(db, env),
-                )
-                .with_provenance(provenance)
-                .with_qualifiers(qualifiers),
+                inner: Place::bound(inferred_ty)
+                    .with_provenance(provenance)
+                    .with_qualifiers(qualifiers),
             }
         } else {
             Member::unbound()
