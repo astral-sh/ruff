@@ -633,7 +633,15 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         other: Type<'db>,
     ) -> bool {
-        #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| true, heap_size=ruff_memory_usage::heap_size)]
+        // Recursive inference can make provisional redundancy proofs oscillate.
+        // Retaining an element is conservative, so keep a failed proof instead of
+        // repeatedly adding and removing the element.
+        #[salsa::tracked(
+            returns(copy),
+            cycle_initial=|_, _, _| true,
+            cycle_fn=|_, _, previous: &bool, current, _| *previous && current,
+            heap_size=ruff_memory_usage::heap_size
+        )]
         fn is_redundant_with_impl<'db>(db: &'db dyn Db, types: TypePair<'db>) -> bool {
             let program = types.program(db);
             let env = ProgramEnvironment::from_program(program);

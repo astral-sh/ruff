@@ -21,6 +21,8 @@ use super::diagnostic::{
 };
 use super::infer::TypeContext;
 use super::instance::SliceLiteral;
+use super::recursive::RecursiveInputs;
+use super::recursive::operations::RecursiveOperation;
 use super::special_form::SpecialFormType;
 use super::{
     ClassLiteral, IntersectionBuilder, IntersectionType, KnownInstanceType, Type, TypeAliasType,
@@ -561,15 +563,40 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        index: Type<'db>,
+        context: ast::ExprContext,
+    ) -> Result<Type<'db>, SubscriptError<'db>> {
+        let result = self.subscript_impl(db, env, index, context);
+        if !RecursiveInputs::contains(db, env, [self, index]) {
+            return result;
+        }
+        // Check the closed input without inserting its solution into the equation.
+        // Doing this while collecting equations would recursively start new solvers
+        // before their equation-count limit could take effect.
+        let ty = result.unwrap_or_else(|error| error.result_type());
+        RecursiveInputs::resolve(db, env, self)
+            .subscript_impl(db, env, RecursiveInputs::resolve(db, env, index), context)
+            .map(|_| ty)
+            .map_err(|mut error| {
+                error.result_ty = ty;
+                error
+            })
+    }
+
+    /// Evaluate a subscription symbolically, without solving its recursive inputs for diagnostics.
+    pub(super) fn subscript_impl(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         slice_ty: Type<'db>,
         expr_context: ast::ExprContext,
     ) -> Result<Type<'db>, SubscriptError<'db>> {
         if let Some(fallback) = self.materialized_divergent_fallback() {
-            return fallback.subscript(db, env, slice_ty, expr_context);
+            return fallback.subscript_impl(db, env, slice_ty, expr_context);
         }
 
         if let Some(fallback) = slice_ty.materialized_divergent_fallback() {
-            return self.subscript(db, env, fallback, expr_context);
+            return self.subscript_impl(db, env, fallback, expr_context);
         }
 
         let value_ty = self;
@@ -580,21 +607,30 @@ impl<'db> Type<'db> {
             }
             (Type::Dynamic(_) | Type::Divergent(_) | Type::Never, _) => Some(Ok(value_ty)),
 
-            (Type::Recursive(recursive), _) => Some(recursive.map_or_else(
-                db,
-                env,
-                || Ok(value_ty),
-                |unfolded| unfolded.subscript(db, env, slice_ty, expr_context),
-            )),
+            (Type::Recursive(recursive), _) => Some(
+                if recursive.inference_key(db).is_some() && expr_context == ast::ExprContext::Load {
+                    Ok(Type::Recursive(recursive.with_operation(
+                        db,
+                        RecursiveOperation::Subscript(slice_ty),
+                    )))
+                } else {
+                    recursive.map_or_else(
+                        db,
+                        env,
+                        || Ok(value_ty),
+                        |unfolded| unfolded.subscript_impl(db, env, slice_ty, expr_context),
+                    )
+                },
+            ),
 
             (_, Type::Recursive(recursive)) => Some(recursive.map_or_else(
                 db,
                 env,
                 || Ok(value_ty),
-                |unfolded| value_ty.subscript(db, env, unfolded, expr_context),
+                |unfolded| value_ty.subscript_impl(db, env, unfolded, expr_context),
             )),
 
-            (Type::TypeAlias(alias), _) => Some(alias.value_type(db).subscript(
+            (Type::TypeAlias(alias), _) => Some(alias.value_type(db).subscript_impl(
                 db,
                 env,
                 slice_ty,
@@ -602,7 +638,7 @@ impl<'db> Type<'db> {
             )),
 
             (_, Type::TypeAlias(alias)) => {
-                Some(value_ty.subscript(db, env, alias.value_type(db), expr_context))
+                Some(value_ty.subscript_impl(db, env, alias.value_type(db), expr_context))
             }
 
             (Type::Union(union), _) => Some(map_subscript_alternatives(
@@ -610,7 +646,7 @@ impl<'db> Type<'db> {
                 env,
                 value_ty,
                 union.elements(db).iter().copied(),
-                |element| element.subscript(db, env, slice_ty, expr_context),
+                |element| element.subscript_impl(db, env, slice_ty, expr_context),
             )),
 
             (_, Type::Union(union)) => Some(map_subscript_alternatives(
@@ -618,11 +654,11 @@ impl<'db> Type<'db> {
                 env,
                 slice_ty,
                 union.elements(db).iter().copied(),
-                |element| value_ty.subscript(db, env, element, expr_context),
+                |element| value_ty.subscript_impl(db, env, element, expr_context),
             )),
 
             (Type::EnumComplement(complement), _) => {
-                Some(complement.remaining_literal_union(db, env).subscript(
+                Some(complement.remaining_literal_union(db, env).subscript_impl(
                     db,
                     env,
                     slice_ty,
@@ -630,7 +666,7 @@ impl<'db> Type<'db> {
                 ))
             }
 
-            (_, Type::EnumComplement(complement)) => Some(value_ty.subscript(
+            (_, Type::EnumComplement(complement)) => Some(value_ty.subscript_impl(
                 db,
                 env,
                 complement.remaining_literal_union(db, env),
@@ -641,14 +677,14 @@ impl<'db> Type<'db> {
                 db,
                 env,
                 intersection,
-                |element| element.subscript(db, env, slice_ty, expr_context),
+                |element| element.subscript_impl(db, env, slice_ty, expr_context),
             )),
 
             (_, Type::Intersection(intersection)) => Some(map_intersection_subscript(
                 db,
                 env,
                 intersection,
-                |element| value_ty.subscript(db, env, element, expr_context),
+                |element| value_ty.subscript_impl(db, env, element, expr_context),
             )),
 
             (Type::TypeVar(typevar), _)
@@ -660,7 +696,7 @@ impl<'db> Type<'db> {
                     env,
                     value_ty,
                     constraints.elements(db).iter().copied(),
-                    |constraint| constraint.subscript(db, env, slice_ty, expr_context),
+                    |constraint| constraint.subscript_impl(db, env, slice_ty, expr_context),
                 ))
             }
 
@@ -842,14 +878,24 @@ impl<'db> Type<'db> {
                 if (lhs_literal.is_string() || lhs_literal.is_bytes())
                     && let Some(bool) = rhs_literal.as_bool() =>
             {
-                Some(value_ty.subscript(db, env, Type::int_literal(i64::from(bool)), expr_context))
+                Some(value_ty.subscript_impl(
+                    db,
+                    env,
+                    Type::int_literal(i64::from(bool)),
+                    expr_context,
+                ))
             }
 
             (Type::NominalInstance(nominal), Type::LiteralValue(literal))
                 if let Some(bool) = literal.as_bool()
                     && nominal.tuple_spec(db, env).is_some() =>
             {
-                Some(value_ty.subscript(db, env, Type::int_literal(i64::from(bool)), expr_context))
+                Some(value_ty.subscript_impl(
+                    db,
+                    env,
+                    Type::int_literal(i64::from(bool)),
+                    expr_context,
+                ))
             }
 
             (Type::KnownInstance(KnownInstanceType::SubscriptedProtocol(_)), _) => {

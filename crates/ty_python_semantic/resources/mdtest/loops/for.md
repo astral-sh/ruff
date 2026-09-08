@@ -2002,7 +2002,7 @@ def grow(n: int):
     reveal_type(len(left))  # revealed: int
     # revealed: tuple[Literal["begin"]] | tuple[*tuple[μ{a0; a1 = tuple[*tuple[a0, ...], a1 | tuple[Literal[0]]]}. a1 | Literal[0, 1, "begin"] | tuple[Literal[0]], ...], Literal[1]]
     reveal_type(right)
-    reveal_type(right[-1])  # revealed: Literal["begin", 1]
+    reveal_type(right[-1])  # revealed: Literal[1] | Literal["begin"]
     if isinstance(left[-1], tuple):
         # error: [invalid-assignment]
         leaf: int | str = left[-1][-1]
@@ -2025,7 +2025,7 @@ def grow(n: int, extend: bool):
             left = left
         right = (*previous, 1)
     reveal_type(len(left))  # revealed: int
-    reveal_type(right[-1])  # revealed: Literal["start", 1]
+    reveal_type(right[-1])  # revealed: Literal[1] | Literal["start"]
 ```
 
 ### Mutually recursive loop bindings

@@ -6,7 +6,7 @@
 
 mod graph;
 mod inference;
-mod operations;
+pub(super) mod operations;
 mod tuple_length;
 
 pub(super) use inference::{InferenceKey, InferenceQuery, InferenceSource, RecursiveInputs};

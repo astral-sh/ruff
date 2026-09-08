@@ -14,7 +14,7 @@
 //! possible. A solving query that still cycles after `TAINTED_CYCLES` iterations falls back
 //! to a single `Divergent` marker.
 //!
-//! Promotion can retain references as deferred operations.
+//! Promotion and subscripting can retain references as deferred operations.
 //! Other semantic type mappings, including specialization and materialization, currently
 //! replace an inference reference with its `Divergent` approximation. Structural substitutions
 //! handle references directly according to the requested substitution, without this semantic
@@ -339,6 +339,26 @@ impl<'db> RecursiveInputs<'db> {
         Type::Dynamic(DynamicType::AmbiguousOverload(
             (!keys.is_empty()).then(|| Self::new(db, keys.into_boxed_slice())),
         ))
+    }
+
+    /// Resolve query references for diagnostics without inserting solutions into equations.
+    pub(in crate::types) fn resolve(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+    ) -> Type<'db> {
+        let replacements: Vec<_> = Self::collect(db, env, [ty])
+            .into_iter()
+            .map(|key| (key.reference(db), key.solution(db).ty))
+            .collect();
+        ty.apply_type_mapping(
+            db,
+            env,
+            &TypeMapping::Recursive(RecursiveMapping(RecursiveSubstitution::Replace(
+                &replacements,
+            ))),
+            TypeContext::default(),
+        )
     }
 
     /// Collect query references without traversing their defining equations.
