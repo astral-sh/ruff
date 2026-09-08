@@ -1550,7 +1550,9 @@ impl<'db> Signature<'db> {
             .is_some_and(|parameter| parameter.is_positional() && parameter.inferred_annotation)
     }
 
-    fn apply_self_with_receiver(
+    /// Bind `Self` and receiver constraints while retaining the positional receiver
+    /// for argument checking and inference of the class's type parameters.
+    pub(super) fn apply_self_with_receiver(
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
