@@ -1,7 +1,9 @@
 use crate::Db;
 use ruff_python_ast as ast;
 use ruff_text_size::TextRange;
+use rustc_hash::FxHashMap;
 use smallvec::SmallVec;
+use std::cell::RefCell;
 
 use crate::ProgramEnvironment;
 use crate::types::call::{CallArguments, CallDunderError};
@@ -26,30 +28,33 @@ impl<'db> Type<'db> {
     /// identity comparison.
     ///
     /// A `NewType` constructor returns its argument unchanged, so its tag can differ between two
-    /// views of the same object: upcast a `NewType` to its concrete base. In contrast, preserve
-    /// invariant generic arguments because the same mutable object cannot satisfy incompatible
-    /// commitments such as `list[int]` and `list[str]` without some other code already being
-    /// unsound.
+    /// views of the same runtime object at the same runtime memory address. We therefore upcast a
+    /// `NewType` to its concrete base.
+    ///
+    /// By contrast, we preserve invariant generic arguments because the same mutable object cannot
+    /// satisfy incompatible commitments such as `list[int]` and `list[str]` without some other
+    /// code already being unsound.
     ///
     /// Function signature substitutions can likewise differ between views of the same function,
-    /// bound method, property, or saved function wrapper. Use the underlying function literal
-    /// without substituted signatures for identity. A bound method's `__self__` can also have
-    /// different static tags across views; upcast its type while keeping the receiver used for
-    /// signature specialization. A precise `functools.partial` stores a specialized callable
-    /// signature, but its wrapped function remains the same object across specializations.
+    /// bound method, property, or saved function wrapper. We therefore use the underlying function
+    /// literal without substituted signatures for identity. A bound method's `__self__` can also
+    /// have different static tags across views; we upcast its type while keeping the receiver used
+    /// for signature specialization. And a precise `functools.partial` stores a specialized
+    /// callable signature, but its wrapped function remains the same object across specializations.
     ///
-    /// Preserve negations that constrain the object itself, such as `~None`, `~SomeClass`, and
-    /// `~Literal[1]`. A `NewType` tag, function signature, type-variable selection, type-guard proof,
-    /// or literal-string origin can differ between views. A negated string literal excludes its
-    /// runtime value only when another constraint already establishes that the string has literal
-    /// origin.
+    /// We preserve negations that restrict the runtime memory addresses the object could possibly
+    /// occupy (negations relating to runtime class or runtime value), such as `~None`, `~SomeClass`,
+    /// and `~Literal[1]`. A `NewType` tag, function signature, type-variable selection, type-guard
+    /// proof, or literal-string origin can differ between views of the same memory address, however,
+    /// so these negations are discarded. String literals require special handling due to the
+    /// `LiteralString` type: a negated string literal excludes its runtime value only when another
+    /// constraint already establishes that the string has literal origin.
     ///
     /// A type variable can also hide a `NewType` tag: even a variable bounded by `int` can be
-    /// instantiated as an integer `NewType`. Expand variables to their upcast bounds or constraints
-    /// instead of transferring that potentially tagged relationship; an unbounded variable becomes
-    /// `object`.
+    /// instantiated as an integer `NewType`. We therefore expand `TypeVar`s to their upcast bounds
+    /// or constraints instead of transferring that potentially tagged relationship.
     ///
-    /// Use this upcast both to decide whether identity is possible and to narrow the other
+    /// We use this upcast both to decide whether identity is possible and to narrow the other
     /// operand when it succeeds. Each operand retains its own existing tags, substituted
     /// signatures, and type-variable relationships when the resulting constraint is applied.
     pub(crate) fn identity_comparison_type(
@@ -58,6 +63,143 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
     ) -> Type<'db> {
         struct IdentityComparisonUpcasting;
+
+        /// Whether an excluded type can still rule out identity with another static view of the
+        /// same runtime object.
+        ///
+        /// An identity comparison can involve two static views of one runtime object at a single
+        /// runtime memory address. Upcasting the positive types accounts for this, but an
+        /// exclusion such as `~T` can only be kept if it still holds for the other view.
+        /// Excluding `int` rules out all runtime instances of `int`; excluding a `NewType` tag
+        /// may only rule out one static view of all runtime instances of `int`.
+        ///
+        /// String literals require special handling due to the `LiteralString` types: excluding
+        /// a string literal also depends on whether literal-string origin is known.
+        ///
+        /// The variants are ordered from most to least reusable so `max` can combine their
+        /// requirements for compound types.
+        #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+        enum NegativeRetention {
+            /// The negation describes a runtime class or value, e.g. `~int` or `~Literal[2]`:
+            /// the first excludes all instances of `int`, while the second rules out all objects
+            /// whose `__class__` is exactly `int` which compare equal to `2`:
+            ///
+            /// ```python
+            /// from typing import NewType, reveal_type
+            /// from ty_extensions import Not
+            ///
+            /// UserId = NewType("UserId", int)
+            ///
+            /// def compare(value: Not[int], tagged: UserId) -> None:
+            ///     reveal_type(value is tagged)  # Literal[False]
+            /// ```
+            Stable,
+
+            /// A string-literal exclusion only rules out the runtime string when the containing
+            /// intersection also establishes literal-string origin:
+            ///
+            /// ```python
+            /// from typing import Literal, reveal_type
+            /// from typing_extensions import LiteralString
+            /// from ty_extensions import Intersection, Not
+            ///
+            /// def without_origin(value: Not[Literal["hello"]]) -> None:
+            ///     reveal_type(value is "hello")  # bool
+            ///
+            /// def with_origin(value: Intersection[LiteralString, Not[Literal["hello"]]]) -> None:
+            ///     reveal_type(value is "hello")  # Literal[False]
+            /// ```
+            RequiresLiteralStringOrigin,
+
+            /// The negation can describe another static view of the same object. A `NewType`
+            /// constructor returns its integer argument unchanged, so excluding its tag does not
+            /// exclude the integer at runtime:
+            ///
+            /// ```python
+            /// from typing import NewType, reveal_type
+            /// from ty_extensions import Not
+            ///
+            /// UserId = NewType("UserId", int)
+            ///
+            /// def compare(value: Not[UserId], tagged: UserId) -> None:
+            ///     reveal_type(value is tagged)  # bool
+            /// ```
+            Unstable,
+        }
+
+        impl NegativeRetention {
+            fn can_retain(self, has_literal_string_origin: bool) -> bool {
+                match self {
+                    Self::Stable => true,
+                    Self::RequiresLiteralStringOrigin => has_literal_string_origin,
+                    Self::Unstable => false,
+                }
+            }
+        }
+
+        /// The type to use for identity checks, together with whether an exclusion of the
+        /// original type remains valid for another static view of the same object. For example,
+        /// upcasting `UserId` produces `int`, but `Not[UserId]` cannot be retained.
+        #[derive(Clone, Copy, Debug)]
+        struct UpcastResult<'db> {
+            ty: Type<'db>,
+            negative_retention: NegativeRetention,
+        }
+
+        impl<'db> UpcastResult<'db> {
+            fn new(ty: Type<'db>, negative_retention: NegativeRetention) -> Self {
+                Self {
+                    ty,
+                    negative_retention,
+                }
+            }
+
+            fn stable(ty: Type<'db>) -> Self {
+                Self::new(ty, NegativeRetention::Stable)
+            }
+
+            fn unstable(ty: Type<'db>) -> Self {
+                Self::new(ty, NegativeRetention::Unstable)
+            }
+        }
+
+        /// A visitor which caches both parts of an upcast while traversing aliases,
+        /// receivers, and accessors.
+        ///
+        /// [`TypeTransformer`] returns the original type on a recursive revisit; if
+        /// no negation rule has been computed for that type, its exclusion cannot
+        /// be retained.
+        #[derive(Default)]
+        struct UpcastingVisitor<'db> {
+            types: TypeTransformer<'db, IdentityComparisonUpcasting>,
+            negative_retention: RefCell<FxHashMap<Type<'db>, NegativeRetention>>,
+        }
+
+        fn visit_type<'db>(
+            db: &'db dyn Db,
+            ty: Type<'db>,
+            visitor: &UpcastingVisitor<'db>,
+            compute: impl FnOnce() -> UpcastResult<'db>,
+        ) -> UpcastResult<'db> {
+            let upcast_type = visitor.types.visit_type(db, ty, || {
+                let upcast_result = compute();
+                visitor
+                    .negative_retention
+                    .borrow_mut()
+                    .insert(ty, upcast_result.negative_retention);
+                upcast_result.ty
+            });
+            UpcastResult::new(
+                upcast_type,
+                visitor
+                    .negative_retention
+                    .borrow()
+                    .get(&ty)
+                    .copied()
+                    // A recursive visit returns the original type without an upcast result.
+                    .unwrap_or(NegativeRetention::Unstable),
+            )
+        }
 
         fn unspecialized_function<'db>(
             db: &'db dyn Db,
@@ -70,13 +212,19 @@ impl<'db> Type<'db> {
             db: &'db dyn Db,
             env: &ProgramEnvironment<'db>,
             property: PropertyInstanceType<'db>,
-            visitor: &TypeTransformer<'db, IdentityComparisonUpcasting>,
+            visitor: &UpcastingVisitor<'db>,
         ) -> PropertyInstanceType<'db> {
             property.with_accessors(
                 db,
-                property.getter(db).map(|ty| upcast(db, env, ty, visitor)),
-                property.setter(db).map(|ty| upcast(db, env, ty, visitor)),
-                property.deleter(db).map(|ty| upcast(db, env, ty, visitor)),
+                property
+                    .getter(db)
+                    .map(|ty| upcast(db, env, ty, visitor).ty),
+                property
+                    .setter(db)
+                    .map(|ty| upcast(db, env, ty, visitor).ty),
+                property
+                    .deleter(db)
+                    .map(|ty| upcast(db, env, ty, visitor).ty),
             )
         }
 
@@ -111,83 +259,149 @@ impl<'db> Type<'db> {
             db: &'db dyn Db,
             env: &ProgramEnvironment<'db>,
             ty: Type<'db>,
-            visitor: &TypeTransformer<'db, IdentityComparisonUpcasting>,
-        ) -> Type<'db> {
+            visitor: &UpcastingVisitor<'db>,
+        ) -> UpcastResult<'db> {
             match ty {
-                Type::TypeAlias(alias) => {
-                    visitor.visit_type(db, ty, || upcast(db, env, alias.value_type(db), visitor))
-                }
-                Type::NewTypeInstance(newtype) => {
-                    upcast(db, env, newtype.concrete_base_type(db), visitor)
-                }
-                Type::FunctionLiteral(function) => {
-                    Type::FunctionLiteral(unspecialized_function(db, function))
-                }
-                Type::BoundMethod(method) => visitor.visit_type(db, ty, || {
-                    Type::BoundMethod(BoundMethodType::new(
+                Type::TypeAlias(alias) => visit_type(db, ty, visitor, || {
+                    upcast(db, env, alias.value_type(db), visitor)
+                }),
+                Type::NewTypeInstance(newtype) => visit_type(db, ty, visitor, || {
+                    UpcastResult::unstable(
+                        upcast(db, env, newtype.concrete_base_type(db), visitor).ty,
+                    )
+                }),
+                Type::FunctionLiteral(function) => UpcastResult::unstable(Type::FunctionLiteral(
+                    unspecialized_function(db, function),
+                )),
+                Type::BoundMethod(method) => visit_type(db, ty, visitor, || {
+                    UpcastResult::unstable(Type::BoundMethod(BoundMethodType::new(
                         db,
                         unspecialized_function(db, method.function(db)),
-                        upcast(db, env, method.self_instance(db), visitor),
+                        upcast(db, env, method.self_instance(db), visitor).ty,
                         method.signature_receiver(db),
-                    ))
+                    )))
                 }),
-                Type::KnownBoundMethod(method) => visitor.visit_type(db, ty, || {
-                    Type::KnownBoundMethod(match method {
-                        KnownBoundMethodType::FunctionTypeDunderGet(function) => {
+                Type::KnownBoundMethod(method) => visit_type(db, ty, visitor, || {
+                    let (method, retention) = match method {
+                        KnownBoundMethodType::FunctionTypeDunderGet(function) => (
                             KnownBoundMethodType::FunctionTypeDunderGet(unspecialized_function(
                                 db, function,
-                            ))
-                        }
-                        KnownBoundMethodType::FunctionTypeDunderCall(function) => {
+                            )),
+                            NegativeRetention::Unstable,
+                        ),
+                        KnownBoundMethodType::FunctionTypeDunderCall(function) => (
                             KnownBoundMethodType::FunctionTypeDunderCall(unspecialized_function(
                                 db, function,
-                            ))
-                        }
-                        KnownBoundMethodType::PropertyDunderGet(property) => {
+                            )),
+                            NegativeRetention::Unstable,
+                        ),
+                        KnownBoundMethodType::PropertyDunderGet(property) => (
                             KnownBoundMethodType::PropertyDunderGet(upcast_property(
                                 db, env, property, visitor,
-                            ))
-                        }
-                        KnownBoundMethodType::PropertyDunderSet(property) => {
+                            )),
+                            NegativeRetention::Unstable,
+                        ),
+                        KnownBoundMethodType::PropertyDunderSet(property) => (
                             KnownBoundMethodType::PropertyDunderSet(upcast_property(
                                 db, env, property, visitor,
-                            ))
-                        }
-                        KnownBoundMethodType::PropertyDunderDelete(property) => {
+                            )),
+                            NegativeRetention::Unstable,
+                        ),
+                        KnownBoundMethodType::PropertyDunderDelete(property) => (
                             KnownBoundMethodType::PropertyDunderDelete(upcast_property(
                                 db, env, property, visitor,
-                            ))
+                            )),
+                            NegativeRetention::Unstable,
+                        ),
+                        KnownBoundMethodType::StrStartswith(_)
+                        | KnownBoundMethodType::ConstraintSetLowerBound
+                        | KnownBoundMethodType::ConstraintSetUpperBound
+                        | KnownBoundMethodType::ConstraintSetEquality
+                        | KnownBoundMethodType::ConstraintSetRange
+                        | KnownBoundMethodType::ConstraintSetAlways
+                        | KnownBoundMethodType::ConstraintSetNever
+                        | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
+                        | KnownBoundMethodType::ConstraintSetSatisfies(_)
+                        | KnownBoundMethodType::ConstraintSetExists(_)
+                        | KnownBoundMethodType::ConstraintSetForAll(_)
+                        | KnownBoundMethodType::ConstraintSetSolutionsFor(_)
+                        | KnownBoundMethodType::ConstraintSetSolutions(_)
+                        | KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_) => {
+                            (method, NegativeRetention::Stable)
                         }
-                        _ => method,
-                    })
+                    };
+                    UpcastResult::new(Type::KnownBoundMethod(method), retention)
                 }),
-                Type::PropertyInstance(property) => visitor.visit_type(db, ty, || {
-                    Type::PropertyInstance(upcast_property(db, env, property, visitor))
+                Type::PropertyInstance(property) => visit_type(db, ty, visitor, || {
+                    UpcastResult::unstable(Type::PropertyInstance(upcast_property(
+                        db, env, property, visitor,
+                    )))
                 }),
                 Type::KnownInstance(KnownInstanceType::FunctoolsPartial(partial)) => {
-                    upcast_partial(db, env, partial).map_or_else(
-                        || {
-                            KnownClass::FunctoolsPartial
-                                .to_instance(db, env)
-                                .top_materialization(db, env)
-                        },
-                        |partial| Type::KnownInstance(KnownInstanceType::FunctoolsPartial(partial)),
+                    UpcastResult::unstable(
+                        upcast_partial(db, env, partial)
+                            .map(|partial| {
+                                Type::KnownInstance(KnownInstanceType::FunctoolsPartial(partial))
+                            })
+                            .unwrap_or_else(|| {
+                                KnownClass::FunctoolsPartial
+                                    .to_instance(db, env)
+                                    .top_materialization(db, env)
+                            }),
                     )
                 }
                 Type::KnownInstance(KnownInstanceType::FunctoolsPartialCall(partial)) => {
-                    upcast_partial(db, env, partial).map_or_else(
-                        || KnownClass::MethodWrapperType.to_instance(db, env),
-                        |partial| {
-                            Type::KnownInstance(KnownInstanceType::FunctoolsPartialCall(partial))
-                        },
+                    UpcastResult::unstable(
+                        upcast_partial(db, env, partial)
+                            .map(|partial| {
+                                Type::KnownInstance(KnownInstanceType::FunctoolsPartialCall(
+                                    partial,
+                                ))
+                            })
+                            .unwrap_or_else(|| KnownClass::MethodWrapperType.to_instance(db, env)),
                     )
                 }
-                Type::TypeVar(typevar) => visitor.visit_type(db, ty, || {
-                    let bound_or_constraints = typevar.require_bound_or_constraints(db, env);
-                    upcast(db, env, bound_or_constraints.as_type(db, env), visitor)
+                Type::KnownInstance(
+                    KnownInstanceType::SubscriptedProtocol(_)
+                    | KnownInstanceType::SubscriptedGeneric(_)
+                    | KnownInstanceType::TypeVar(_)
+                    | KnownInstanceType::TypeAliasType(_)
+                    | KnownInstanceType::Deprecated(_)
+                    | KnownInstanceType::Field(_)
+                    | KnownInstanceType::ConstraintSet(_)
+                    | KnownInstanceType::ConstraintSetSolution(_)
+                    | KnownInstanceType::GenericContext(_)
+                    | KnownInstanceType::Specialization(_)
+                    | KnownInstanceType::UnionType(_)
+                    | KnownInstanceType::Literal(_)
+                    | KnownInstanceType::Annotated(_)
+                    | KnownInstanceType::TypeGenericAlias(_)
+                    | KnownInstanceType::Callable(_)
+                    | KnownInstanceType::LiteralStringAlias(_)
+                    | KnownInstanceType::NewType(_)
+                    | KnownInstanceType::Sentinel(_)
+                    | KnownInstanceType::NamedTupleSpec(_)
+                    | KnownInstanceType::Range { .. },
+                ) => UpcastResult::stable(ty),
+                Type::TypeVar(typevar) => visit_type(db, ty, visitor, || {
+                    UpcastResult::unstable(
+                        upcast(
+                            db,
+                            env,
+                            typevar.require_bound_or_constraints(db, env).as_type(db, env),
+                            visitor,
+                        )
+                        .ty,
+                    )
                 }),
                 Type::Union(union) => {
-                    union.map(db, env, |element| upcast(db, env, *element, visitor))
+                    let mut retention = NegativeRetention::Stable;
+                    let ty = union.map(db, env, |element| {
+                        let upcast_result = upcast(db, env, *element, visitor);
+                        retention = retention.max(upcast_result.negative_retention);
+                        upcast_result.ty
+                    });
+                    UpcastResult::new(ty, retention)
                 }
                 Type::Intersection(intersection) => {
                     let has_literal_string_origin = intersection
@@ -195,54 +409,61 @@ impl<'db> Type<'db> {
                         .iter()
                         .any(|element| element.is_subtype_of(db, env, Type::literal_string()));
                     let mut builder = IntersectionBuilder::new(db, env);
+                    let mut retention = NegativeRetention::Stable;
                     for element in intersection.positive(db) {
-                        builder = builder.add_positive(upcast(db, env, *element, visitor));
+                        let upcast_result = upcast(db, env, *element, visitor);
+                        retention = retention.max(upcast_result.negative_retention);
+                        builder = builder.add_positive(upcast_result.ty);
                     }
                     for element in intersection.negative(db) {
-                        // Static tags, function signatures, predicate proofs, and literal-string
-                        // origin can differ between views. Once literal origin is known, an
-                        // excluded string literal also excludes its runtime value and must be
-                        // preserved.
-                        match element.resolve_type_alias(db) {
-                            Type::NewTypeInstance(_)
-                            | Type::FunctionLiteral(_)
-                            | Type::BoundMethod(_)
-                            | Type::KnownBoundMethod(
-                                KnownBoundMethodType::FunctionTypeDunderGet(_)
-                                | KnownBoundMethodType::FunctionTypeDunderCall(_)
-                                | KnownBoundMethodType::PropertyDunderGet(_)
-                                | KnownBoundMethodType::PropertyDunderSet(_)
-                                | KnownBoundMethodType::PropertyDunderDelete(_),
-                            )
-                            | Type::PropertyInstance(_)
-                            | Type::KnownInstance(
-                                KnownInstanceType::FunctoolsPartial(_)
-                                | KnownInstanceType::FunctoolsPartialCall(_),
-                            )
-                            | Type::TypeVar(_)
-                            | Type::TypeIs(_)
-                            | Type::TypeGuard(_) => continue,
-                            Type::LiteralValue(literal)
-                                if literal.is_literal_string()
-                                    || literal.is_string() && !has_literal_string_origin =>
-                            {
-                                continue;
-                            }
-                            _ => builder.add_negative_in_place(*element),
+                        let upcast_result = upcast(db, env, *element, visitor);
+                        if upcast_result
+                            .negative_retention
+                            .can_retain(has_literal_string_origin)
+                        {
+                            builder.add_negative_in_place(*element);
+                        } else {
+                            retention = NegativeRetention::Unstable;
                         }
                     }
-                    builder.build()
+                    UpcastResult::new(builder.build(), retention)
                 }
-                _ => ty,
+                Type::LiteralValue(literal) => UpcastResult::new(
+                    ty,
+                    if literal.is_literal_string() {
+                        NegativeRetention::Unstable
+                    } else if literal.is_string() {
+                        NegativeRetention::RequiresLiteralStringOrigin
+                    } else {
+                        NegativeRetention::Stable
+                    },
+                ),
+                Type::TypeIs(_) | Type::TypeGuard(_) => UpcastResult::unstable(ty),
+                Type::Dynamic(_)
+                | Type::Divergent(_)
+                | Type::Never
+                | Type::WrapperDescriptor(_)
+                | Type::DataclassDecorator(_)
+                | Type::DataclassTransformer(_)
+                | Type::Callable(_)
+                | Type::ModuleLiteral(_)
+                | Type::ClassLiteral(_)
+                | Type::GenericAlias(_)
+                | Type::SubclassOf(_)
+                | Type::NominalInstance(_)
+                | Type::ProtocolInstance(_)
+                | Type::SpecialForm(_)
+                | Type::SlotDescriptor(_)
+                | Type::EnumComplement(_)
+                | Type::AlwaysTruthy
+                | Type::AlwaysFalsy
+                | Type::BoundSuper(_)
+                | Type::TypeForm(_)
+                | Type::TypedDict(_) => UpcastResult::stable(ty),
             }
         }
 
-        upcast(
-            db,
-            env,
-            self,
-            &TypeTransformer::<IdentityComparisonUpcasting>::default(),
-        )
+        upcast(db, env, self, &UpcastingVisitor::default()).ty
     }
 
     /// Return whether values of these types always, never, or possibly identify the same object.

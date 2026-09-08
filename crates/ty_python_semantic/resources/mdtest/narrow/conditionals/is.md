@@ -81,8 +81,16 @@ def overlapping_generic_types(integers: tuple[int, ...], strings: tuple[str, ...
 
 ## `is` with `functools.partial`
 
-A partial saved on a generic class is the same object through different specializations of that
-class. An identity check with one view must preserve the other view's argument types.
+In the following example, the class body creates `callback` only once, so `C[int].callback` and
+`C[str].callback` refer to a single `functools.partial` object at a single runtime memory address.
+Each specialization gives that object a different static call signature, however, leading to ty
+treating the two "views" as inhabiting different types.
+
+Assigning `C[int].callback` to the local `callback` means that calls through this variable use the
+`T = int` signature: `callback(C[int](), ...)` needs an `int` as its second argument. Looking up
+`C[str].callback` uses `T = str` to describe calls through that expression. The identity check shows
+that the expressions can refer to the same partial; it does not make the local `callback` accept the
+second expression's `str` argument type. The string call below is therefore still an error.
 
 ```toml
 [environment]
@@ -106,7 +114,7 @@ if callback is C[str].callback:
 ```
 
 Passing a saved partial or its `__call__` wrapper through a generic identity function also preserves
-its call signature on the true branch.
+its call signature on the if-true branch.
 
 ```py
 from typing import TypeVar
@@ -564,6 +572,16 @@ def excluded_newtype_in_unions(
     if value is other:
         reveal_type(value)  # revealed: int & ~UserId
         reveal_type(other)  # revealed: UserId
+```
+
+Excluding a union containing the tag still permits identity with a value carrying that tag. The
+other union member describes a different runtime type.
+
+```py
+def excluded_union(value: Not[UserId | bytes], other: UserId) -> None:
+    reveal_type(value is other)  # revealed: bool
+    if value is other:
+        reveal_type(value)  # revealed: int & ~UserId
 ```
 
 Unlike a negated `NewType`, a negated runtime class genuinely rules out identity with its instances.

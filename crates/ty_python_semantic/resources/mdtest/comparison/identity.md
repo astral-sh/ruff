@@ -111,10 +111,27 @@ reveal_type(int_method is not str_method)  # revealed: Literal[False]
 
 ## Bound method identity
 
-Accessing a method creates a bound method object, so even two references with the same bound method
-type need not identify the same object. A generic identity function and `functools.partial` both
-retain the bound method object passed to them. Its signature may be specialized by those calls, but
-that does not make an identity comparison with the saved method always false.
+Accessing a method on a class instance creates a new bound method object. Since multiple different
+instances can usually inhabit any given nominal-instance type, two variables with the same
+bound-method type do not necessarily occupy the same memory address at runtime:
+
+```py
+from typing import final
+
+class C:
+    @final
+    def method(self, value: int) -> int:
+        return value
+
+saved_method = C().method
+
+reveal_type(C().method is C().method)  # revealed: bool
+reveal_type(saved_method is saved_method)  # revealed: bool
+```
+
+A generic identity function and `functools.partial` both retain the bound-method object passed to
+them. The method's signature may be specialized by those calls, but that does not make an identity
+comparison with the saved method always false:
 
 ```py
 from functools import partial
@@ -125,17 +142,25 @@ T = TypeVar("T")
 def identity(value: T) -> T:
     return value
 
-class C:
-    @final
-    def method(self, value: int) -> int:
-        return value
-
-saved_method = C().method
-reveal_type(saved_method is saved_method)  # revealed: bool
 reveal_type(identity(saved_method) is saved_method)  # revealed: bool
+reveal_type(identity(saved_method) is C().method)  # revealed: bool
 reveal_type(saved_method is identity(saved_method))  # revealed: bool
+reveal_type(C().method is identity(saved_method))  # revealed: bool
+
 reveal_type(identity(saved_method) is not saved_method)  # revealed: bool
+reveal_type(identity(saved_method) is not C().method)  # revealed: bool
+reveal_type(saved_method is not identity(saved_method))  # revealed: bool
+reveal_type(C().method is not identity(saved_method))  # revealed: bool
+
 reveal_type(partial(saved_method).func is saved_method)  # revealed: bool
+reveal_type(partial(saved_method).func is C().method)  # revealed: bool
+reveal_type(saved_method is partial(saved_method).func)  # revealed: bool
+reveal_type(C().method is partial(saved_method).func)  # revealed: bool
+
+reveal_type(partial(saved_method).func is not saved_method)  # revealed: bool
+reveal_type(partial(saved_method).func is not C().method)  # revealed: bool
+reveal_type(saved_method is not partial(saved_method).func)  # revealed: bool
+reveal_type(C().method is not partial(saved_method).func)  # revealed: bool
 
 reveal_type(identity(saved_method)(1))  # revealed: int
 
@@ -145,6 +170,9 @@ class D:
         return value
 
 reveal_type(saved_method is D().method)  # revealed: Literal[False]
+reveal_type(C().method is D().method)  # revealed: Literal[False]
+reveal_type(saved_method is not D().method)  # revealed: Literal[True]
+reveal_type(C().method is not D().method)  # revealed: Literal[True]
 ```
 
 `NewType` constructors also leave the receiver object unchanged. Bound method types with different
@@ -166,9 +194,12 @@ def compare(left: TypeOf[Left(C()).method], right: TypeOf[Right(C()).method]) ->
 
 ## Identity of properties, saved method wrappers, and partials
 
-Specializing a generic class changes the static signatures of its property's accessor and unbound
-method. The property, a `functools.partial` of the method, and the wrappers saved on the class are
-each created once. Their views through `C[int]` and `C[str]` can therefore identify the same object.
+If a generic class defines a property `prop`, specializing that class changes the static signatures
+of `prop`'s accessor and the underlying function(s) wrapped by the property method.
+
+In the following example, the property, a `functools.partial` of the method, and the wrappers saved
+on the class are each created once. Their views through `C[int]` and `C[str]` can therefore identify
+the same object.
 
 ```toml
 [environment]
@@ -199,7 +230,7 @@ reveal_type(C[int].method_getter is C[str].method_getter)  # revealed: bool
 reveal_type(C[int].method_caller is C[str].method_caller)  # revealed: bool
 ```
 
-The callable signatures remain specialized for calls. Different property definitions, partials
+The callable signatures remain specialized for calls. Different property definitions, `partial`s
 wrapping different functions, and the two saved wrappers of `method` still describe distinct
 objects.
 
