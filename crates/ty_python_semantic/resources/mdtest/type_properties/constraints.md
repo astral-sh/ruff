@@ -1726,10 +1726,10 @@ The display distinguishes gradual parameter lists from one required `Any` parame
 ```py
 def gradual[**P]() -> None:
     ellipsis = ConstraintSet.range(Callable[..., int], P, Callable[..., str])
-    # revealed: ConstraintSet[(((...) ≤ P@gradual) ∧ (P@gradual ≤ (...)))]
+    # revealed: ConstraintSet[(P@gradual = (...))]
     reveal_type(ellipsis.with_detailed_display())
     any_parameter = ConstraintSet.range(Callable[[Any], int], P, Callable[[Any], str])
-    # revealed: ConstraintSet[(((Any, /) ≤ P@gradual) ∧ (P@gradual ≤ (Any, /)))]
+    # revealed: ConstraintSet[(P@gradual = (Any, /))]
     reveal_type(any_parameter.with_detailed_display())
 ```
 
