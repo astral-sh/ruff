@@ -2426,6 +2426,55 @@ def short_circuit(value: object):
         pass
 ```
 
+We normally suppress `redundant-condition-strict` on a complete condition if any subexpression would
+trigger `redundant-condition`, to avoid reporting the same mistake twice. An unreachable
+subexpression is different: we would suppress its diagnostic because Python never evaluates it.
+Suppressing the outer diagnostic as well would leave no warning at all, so we still report the
+complete condition in these cases.
+
+When Python checks `falsy and flag` in the below example, it checks `falsy` first. Since that is
+false, the whole condition is false, and Python skips checking `flag`. Replacing `flag` with
+`"yes"`, as in the second `if` test, does not change this: the `and` condition can still be
+determined to always be false without checking the truthiness of the string.
+
+The `or` condition works the other way around. Since `truthy` is true, `truthy or ""` can be
+determined to be always true without checking the truthiness of the empty string.
+
+The strings `"yes"` and `""` would normally trigger `redundant-condition`, since one always counts
+as true and the other always counts as false. Because neither is reached here, we report only
+`redundant-condition-strict` on each complete condition:
+
+```py
+from typing import Literal
+
+def unreachable_operands(falsy: Literal[False], truthy: Literal[True], flag: bool):
+    if falsy and flag:  # error: [redundant-condition-strict] "Condition `falsy and flag` is always false"
+        pass
+    if falsy and "yes":  # error: [redundant-condition-strict] "Condition `falsy and "yes"` is always false"
+        pass
+    if truthy or "":  # error: [redundant-condition-strict] "Condition `truthy or ""` is always true"
+        pass
+```
+
+The same applies to the strings in the inline `if` expressions below. Python's `a if test else b`
+syntax chooses between two values: it evaluates `a` if `test` is true, and `b` otherwise. The other
+expression is not evaluated. The chosen value is then checked by the outer `if` statement to decide
+whether to run its body.
+
+In `False if True else "yes"`, the middle `True` selects `False`, so the first `if` body never runs.
+In `"yes" if False else True`, the middle `False` selects the `True` after `else`, so the second
+`if` body always runs. We report both complete conditions under `redundant-condition-strict`. As
+with the `and` and `or` examples above, neither string is evaluated, so we do not report a warning
+on the string or let its presence hide the warning about the complete condition:
+
+```py
+def unreachable_branches():
+    if False if True else "yes":  # error: [redundant-condition-strict] "Condition `False if True else "yes"` is always false"
+        pass
+    if "yes" if False else True:  # error: [redundant-condition-strict] "Condition `"yes" if False else True` is always true"
+        pass
+```
+
 ## Boolean tests inside value expressions
 
 A call's arguments compute values, but can contain their own boolean tests. Those tests are checked
