@@ -601,6 +601,29 @@ class NoOrder(NoOrderBase):
         return True
 ```
 
+## Inherited from a dynamic dataclass
+
+Applying `dataclass()` to a dynamic class preserves its ordering methods. A subclass can use the
+inherited method with `@total_ordering`:
+
+```py
+from dataclasses import dataclass
+from functools import total_ordering
+
+def lt_impl(self, other) -> bool:
+    return True
+
+Base = type("Base", (), {"__lt__": lt_impl})
+Base = dataclass(Base)
+
+@total_ordering
+class Child(Base):
+    def __eq__(self, other: object) -> bool:
+        return True
+
+reveal_type(Child() <= Child())  # revealed: bool
+```
+
 ## Dynamic namespace
 
 When a `type()`-constructed class has a dynamic namespace, we assume it might provide an ordering
