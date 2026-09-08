@@ -246,9 +246,7 @@ impl<'db> Type<'db> {
             Type::RecursiveVar(_) => {
                 unreachable!("semantic operation on an unbound recursive variable")
             }
-            Type::Callable(callable)
-                if callable.is_function_like(db) || callable.is_method_wrapper(db) =>
-            {
+            Type::Callable(callable) if callable.runtime_class(db).is_some() => {
                 Truthiness::AlwaysTrue
             }
 
