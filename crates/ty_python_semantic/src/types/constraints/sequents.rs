@@ -453,11 +453,6 @@ impl<'db> Constraint<'db> {
         // implication. (That is, this check directly encodes `(α ≤ T) ∧ (T ≤ β) → (α ≤ β)` as an
         // implication.)
 
-        let lower_constraint = lower.into();
-        let lower = lower.into_lower_bound();
-        let upper_constraint = upper.into();
-        let upper = upper.into_upper_bound();
-
         // Skip trivial cases where the assignability check won't produce useful results.
         if lower.bound() == lower.typevar().domain(db).bottom(db)
             || upper.bound() == upper.typevar().domain(db).top(db)
@@ -468,12 +463,7 @@ impl<'db> Constraint<'db> {
         let when = lower
             .bound()
             .when_constraint_set_assignable_to_owned(db, env, upper.bound());
-        Self::add_constraint_set_implication(
-            map,
-            lower_constraint,
-            upper_constraint,
-            when.as_ref(),
-        );
+        Self::add_constraint_set_implication(map, lower.into(), upper.into(), when.as_ref());
     }
 
     fn add_sequents_for_equivalence(
@@ -485,12 +475,6 @@ impl<'db> Constraint<'db> {
     ) {
         // Given constraints `T = α` and `T = β`, `α = β` must also hold. If those bounds contain
         // other typevars, we can infer additional constraints.
-
-        let lower_constraint = lower.into();
-        let lower = lower.into_lower_bound();
-        let upper_constraint = upper.into();
-        let upper = upper.into_upper_bound();
-
         if lower.bound().is_static_sequent_eligible(db, env)
             && upper.bound().is_static_sequent_eligible(db, env)
         {
@@ -498,12 +482,7 @@ impl<'db> Constraint<'db> {
                 lower
                     .bound()
                     .when_constraint_set_equivalent_to_owned(db, env, upper.bound());
-            Self::add_constraint_set_implication(
-                map,
-                lower_constraint,
-                upper_constraint,
-                when.as_ref(),
-            );
+            Self::add_constraint_set_implication(map, lower.into(), upper.into(), when.as_ref());
         }
     }
 
@@ -668,11 +647,6 @@ impl<'db> Constraint<'db> {
         left: impl ProvidesConcreteLowerBound<'db>,
         right: impl ProvidesConcreteLowerBound<'db>,
     ) {
-        let left_constraint = left.into();
-        let left = left.into_lower_bound();
-        let right_constraint = right.into();
-        let right = right.into_lower_bound();
-
         // Given `α ≤ T` and `β ≤ U`, if α contains U covariantly, we can substitute β for U:
         //
         //   (Co[U] ≤ T) ∧ (β ≤ U) ⇒ (Co[β] ≤ T)
@@ -695,8 +669,8 @@ impl<'db> Constraint<'db> {
             return;
         };
         let provenance = ConstraintProvenance::derived(left.provenance(), right.provenance());
-        let derived = left.map(provenance, replacement);
-        map.add_pair_implication(left_constraint, right_constraint, derived.into());
+        let derived = left.into_lower_bound().map(provenance, replacement);
+        map.add_pair_implication(left.into(), right.into(), derived.into());
     }
 
     fn add_covariant_upper_tightened_sequent(
@@ -706,11 +680,6 @@ impl<'db> Constraint<'db> {
         left: impl ProvidesConcreteUpperBound<'db>,
         right: impl ProvidesConcreteUpperBound<'db>,
     ) {
-        let left_constraint = left.into();
-        let left = left.into_upper_bound();
-        let right_constraint = right.into();
-        let right = right.into_upper_bound();
-
         // Given `T ≤ α` and `U ≤ β`, if α contains U covariantly, we can substitute β for U:
         //
         //   (T ≤ Co[U]) ∧ (U ≤ β) ⇒ (T ≤ Co[β])
@@ -733,8 +702,8 @@ impl<'db> Constraint<'db> {
             return;
         };
         let provenance = ConstraintProvenance::derived(left.provenance(), right.provenance());
-        let derived = left.map(provenance, replacement);
-        map.add_pair_implication(left_constraint, right_constraint, derived.into());
+        let derived = left.into_upper_bound().map(provenance, replacement);
+        map.add_pair_implication(left.into(), right.into(), derived.into());
     }
 
     fn add_covariant_equivalence_tightened_sequent(
@@ -777,10 +746,6 @@ impl<'db> Constraint<'db> {
         lower: impl ProvidesConcreteLowerBound<'db>,
         upper: impl ProvidesConcreteUpperBound<'db>,
     ) {
-        let lower_constraint = lower.into();
-        let lower = lower.into_lower_bound();
-        let upper_constraint = upper.into();
-        let upper = upper.into_upper_bound();
         let provenance = ConstraintProvenance::derived(lower.provenance(), upper.provenance());
 
         // Given `α ≤ T` and `U ≤ β`, if α contains U contravariantly, substitute β for U:
@@ -800,8 +765,8 @@ impl<'db> Constraint<'db> {
                 upper.bound(),
             )
         {
-            let derived = lower.map(provenance, replacement);
-            map.add_pair_implication(lower_constraint, upper_constraint, derived.into());
+            let derived = lower.into_lower_bound().map(provenance, replacement);
+            map.add_pair_implication(lower.into(), upper.into(), derived.into());
         }
 
         // If β contains T contravariantly, substitute α for T:
@@ -821,8 +786,8 @@ impl<'db> Constraint<'db> {
                 lower.bound(),
             )
         {
-            let derived = upper.map(provenance, replacement);
-            map.add_pair_implication(lower_constraint, upper_constraint, derived.into());
+            let derived = upper.into_upper_bound().map(provenance, replacement);
+            map.add_pair_implication(lower.into(), upper.into(), derived.into());
         }
     }
 
@@ -867,9 +832,6 @@ impl<'db> Constraint<'db> {
         left: impl ProvidesConcreteLowerBound<'db>,
         right: impl ProvidesTypeVarRangeBound<'db>,
     ) {
-        let left_constraint = left.into();
-        let left = left.into_lower_bound();
-
         // Given `α ≤ T` and `S ≤ U`, if α contains U covariantly, we can substitute S for U. For
         // instance,
         //
@@ -893,8 +855,8 @@ impl<'db> Constraint<'db> {
             return;
         };
         let provenance = ConstraintProvenance::derived(left.provenance(), right.provenance());
-        let derived = left.map(provenance, replacement);
-        map.add_pair_implication(left_constraint, right.into(), derived.into());
+        let derived = left.into_lower_bound().map(provenance, replacement);
+        map.add_pair_implication(left.into(), right.into(), derived.into());
     }
 
     fn add_covariant_upper_weakened_sequent(
@@ -904,9 +866,6 @@ impl<'db> Constraint<'db> {
         left: impl ProvidesConcreteUpperBound<'db>,
         right: impl ProvidesTypeVarRangeBound<'db>,
     ) {
-        let left_constraint = left.into();
-        let left = left.into_upper_bound();
-
         // Given `T ≤ α` and `U ≤ S`, if α contains U covariantly, we can substitute S for U. For
         // instance,
         //
@@ -930,8 +889,8 @@ impl<'db> Constraint<'db> {
             return;
         };
         let provenance = ConstraintProvenance::derived(left.provenance(), right.provenance());
-        let derived = left.map(provenance, replacement);
-        map.add_pair_implication(left_constraint, right.into(), derived.into());
+        let derived = left.into_upper_bound().map(provenance, replacement);
+        map.add_pair_implication(left.into(), right.into(), derived.into());
     }
 
     fn add_covariant_equivalence_weakened_sequent(
@@ -975,9 +934,6 @@ impl<'db> Constraint<'db> {
         left: impl ProvidesConcreteLowerBound<'db>,
         right: impl ProvidesTypeVarRangeBound<'db>,
     ) {
-        let left_constraint = left.into();
-        let left = left.into_lower_bound();
-
         // Given `α ≤ T` and `U ≤ S`, if α contains U contravariantly, we can substitute S for U
         // and flip the constraint. For instance,
         //
@@ -1001,8 +957,8 @@ impl<'db> Constraint<'db> {
             return;
         };
         let provenance = ConstraintProvenance::derived(left.provenance(), right.provenance());
-        let derived = left.map(provenance, replacement);
-        map.add_pair_implication(left_constraint, right.into(), derived.into());
+        let derived = left.into_lower_bound().map(provenance, replacement);
+        map.add_pair_implication(left.into(), right.into(), derived.into());
     }
 
     fn add_contravariant_upper_weakened_sequent(
@@ -1012,9 +968,6 @@ impl<'db> Constraint<'db> {
         left: impl ProvidesConcreteUpperBound<'db>,
         right: impl ProvidesTypeVarRangeBound<'db>,
     ) {
-        let left_constraint = left.into();
-        let left = left.into_upper_bound();
-
         // Given `T ≤ α` and `S ≤ U`, if α contains U contravariantly, we can substitute S for U
         // and flip the constraint. For instance,
         //
@@ -1038,8 +991,8 @@ impl<'db> Constraint<'db> {
             return;
         };
         let provenance = ConstraintProvenance::derived(left.provenance(), right.provenance());
-        let derived = left.map(provenance, replacement);
-        map.add_pair_implication(left_constraint, right.into(), derived.into());
+        let derived = left.into_upper_bound().map(provenance, replacement);
+        map.add_pair_implication(left.into(), right.into(), derived.into());
     }
 
     fn add_contravariant_equivalence_weakened_sequent(
