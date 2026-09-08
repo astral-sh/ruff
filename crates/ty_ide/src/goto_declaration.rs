@@ -4,13 +4,15 @@ use ruff_db::files::FileRange;
 use ruff_db::parsed::parsed_module;
 use ruff_text_size::{Ranged, TextSize};
 use ty_python_core::ProgramFile;
-use ty_python_semantic::{ImportAliasResolution, SemanticModel};
+use ty_python_semantic::SemanticModel;
 
 /// Navigate to the declaration of a symbol.
 ///
 /// A "declaration" includes both formal declarations (class statements, def statements,
 /// and variable annotations) but also variable assignments. This expansive definition
 /// is needed because Python doesn't require formal declarations of variables like most languages do.
+/// Calls to overloaded functions navigate to the matching overload declarations. If the call
+/// cannot be resolved, the available declarations remain navigation targets.
 pub fn goto_declaration(
     db: &dyn Db,
     file: ProgramFile<'_>,
@@ -21,8 +23,7 @@ pub fn goto_declaration(
     let goto_target = find_goto_target(&model, &module, offset)?;
 
     let declaration_targets = goto_target
-        .definitions(&model, ImportAliasResolution::ResolveAliases)?
-        .goto_declaration(&model, &goto_target)?
+        .goto_declaration(&model)?
         .into_navigation_targets(model.db());
 
     Some(RangedValue {
@@ -2176,6 +2177,142 @@ class MyClass:
     }
 
     #[test]
+    fn goto_declaration_overloaded_function() {
+        let test = cursor_test(
+            "
+from typing import overload
+
+@overload
+def f(x: int) -> int: ...
+@overload
+def f(x: str) -> str: ...
+def f(x: int | str) -> int | str:
+    return x
+
+f<CURSOR>(1)
+",
+        );
+        assert_snapshot!(test.goto_declaration(), @"
+        info[goto-declaration]: Go to declaration
+          --> main.py:11:1
+           |
+        11 | f(1)
+           | ^ Clicking here
+        info: Found 1 declaration
+         --> main.py:5:5
+          |
+        5 | def f(x: int) -> int: ...
+          |     -
+        ");
+    }
+
+    #[test]
+    fn goto_declaration_overloaded_bound_method_alias() {
+        let test = cursor_test(
+            "
+from typing import overload
+
+class C:
+    @overload
+    def f(self, x: int) -> int: ...
+    @overload
+    def f(self, x: str) -> str: ...
+    def f(self, x: int | str) -> int | str:
+        return x
+
+saved = C().f
+saved<CURSOR>(1)
+",
+        );
+        assert_snapshot!(test.goto_declaration(), @"
+        info[goto-declaration]: Go to declaration
+          --> main.py:13:1
+           |
+        13 | saved(1)
+           | ^^^^^ Clicking here
+        info: Found 2 declarations
+          --> main.py:6:9
+           |
+         6 |     def f(self, x: int) -> int: ...
+           |         -
+           |
+          ::: main.py:12:1
+           |
+        12 | saved = C().f
+           | -----
+        ");
+    }
+
+    #[test]
+    fn goto_declaration_overload_ambiguous_call() {
+        let test = cursor_test(
+            "
+from typing import Any, overload
+
+@overload
+def f(x: int) -> int: ...
+@overload
+def f(x: str) -> str: ...
+def f(x: int | str) -> int | str:
+    return x
+
+def use(x: Any):
+    f<CURSOR>(x)
+",
+        );
+        assert_snapshot!(test.goto_declaration(), @"
+        info[goto-declaration]: Go to declaration
+          --> main.py:12:5
+           |
+        12 |     f(x)
+           |     ^ Clicking here
+        info: Found 2 declarations
+         --> main.py:5:5
+          |
+        5 | def f(x: int) -> int: ...
+          |     -
+        6 | @overload
+        7 | def f(x: str) -> str: ...
+          |     -
+        ");
+    }
+
+    #[test]
+    fn goto_declaration_overload_invalid_call() {
+        let test = cursor_test(
+            "
+from typing import overload
+
+@overload
+def f(x: int) -> int: ...
+@overload
+def f(x: str) -> str: ...
+def f(x: int | str) -> int | str:
+    return x
+
+f<CURSOR>(None)
+",
+        );
+        assert_snapshot!(test.goto_declaration(), @"
+        info[goto-declaration]: Go to declaration
+          --> main.py:11:1
+           |
+        11 | f(None)
+           | ^ Clicking here
+        info: Found 3 declarations
+         --> main.py:5:5
+          |
+        5 | def f(x: int) -> int: ...
+          |     -
+        6 | @overload
+        7 | def f(x: str) -> str: ...
+          |     -
+        8 | def f(x: int | str) -> int | str:
+          |     -
+        ");
+    }
+
+    #[test]
     fn goto_declaration_overload_type_disambiguated1() {
         let test = CursorTest::builder()
             .source(
@@ -2213,14 +2350,10 @@ def ab(a: str): ...
           |
         4 | ab(1)
           | ^^ Clicking here
-        info: Found 2 declarations
+        info: Found 1 declaration
          --> mymodule.pyi:5:5
           |
         5 | def ab(a: int): ...
-          |     --
-        6 |
-        7 | @overload
-        8 | def ab(a: str): ...
           |     --
         ");
     }
@@ -2263,13 +2396,9 @@ def ab(a: str): ...
           |
         4 | ab("hello")
           | ^^ Clicking here
-        info: Found 2 declarations
-         --> mymodule.pyi:5:5
+        info: Found 1 declaration
+         --> mymodule.pyi:8:5
           |
-        5 | def ab(a: int): ...
-          |     --
-        6 |
-        7 | @overload
         8 | def ab(a: str): ...
           |     --
         "#);
@@ -2313,14 +2442,10 @@ def ab(a: int): ...
           |
         4 | ab(1, 2)
           | ^^ Clicking here
-        info: Found 2 declarations
+        info: Found 1 declaration
          --> mymodule.pyi:5:5
           |
         5 | def ab(a: int, b: int): ...
-          |     --
-        6 |
-        7 | @overload
-        8 | def ab(a: int): ...
           |     --
         ");
     }
@@ -2363,13 +2488,9 @@ def ab(a: int): ...
           |
         4 | ab(1)
           | ^^ Clicking here
-        info: Found 2 declarations
-         --> mymodule.pyi:5:5
+        info: Found 1 declaration
+         --> mymodule.pyi:8:5
           |
-        5 | def ab(a: int, b: int): ...
-          |     --
-        6 |
-        7 | @overload
         8 | def ab(a: int): ...
           |     --
         ");
@@ -2416,19 +2537,11 @@ def ab(a: int, *, c: int): ...
           |
         4 | ab(1, b=2)
           | ^^ Clicking here
-        info: Found 3 declarations
-          --> mymodule.pyi:5:5
-           |
-         5 | def ab(a: int): ...
-           |     --
-         6 |
-         7 | @overload
-         8 | def ab(a: int, *, b: int): ...
-           |     --
-         9 |
-        10 | @overload
-        11 | def ab(a: int, *, c: int): ...
-           |     --
+        info: Found 1 declaration
+         --> mymodule.pyi:8:5
+          |
+        8 | def ab(a: int, *, b: int): ...
+          |     --
         ");
     }
 
@@ -2473,17 +2586,9 @@ def ab(a: int, *, c: int): ...
           |
         4 | ab(1, c=2)
           | ^^ Clicking here
-        info: Found 3 declarations
-          --> mymodule.pyi:5:5
+        info: Found 1 declaration
+          --> mymodule.pyi:11:5
            |
-         5 | def ab(a: int): ...
-           |     --
-         6 |
-         7 | @overload
-         8 | def ab(a: int, *, b: int): ...
-           |     --
-         9 |
-        10 | @overload
         11 | def ab(a: int, *, c: int): ...
            |     --
         ");

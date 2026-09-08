@@ -20,7 +20,8 @@ use ty_python_semantic::types::Type;
 use ty_python_semantic::types::ide_support::{
     call_signature_details, call_type_simplified_by_overloads, constructor_signature,
     definitions_and_overloads_for_function, definitions_for_keyword_argument,
-    typed_dict_key_definition,
+    is_overload_definition, matching_call_definitions, overload_implementations,
+    overloaded_function_definitions, typed_dict_key_definition,
 };
 use ty_python_semantic::{Db as SemanticDb, ResolvedDefinition};
 use ty_python_semantic::{
@@ -283,8 +284,9 @@ impl<'db> Definitions<'db> {
         Some(Self::new(vec![resolved]))
     }
 
-    /// Apply the "goto declaration" interpretation to these definitions.
-    pub(crate) fn goto_declaration(
+    /// Select the definitions of the symbol under the cursor, preserving overload co-definitions.
+    /// References and rename use these without the additional filtering applied by navigation.
+    pub(crate) fn for_symbol(
         self,
         model: &SemanticModel<'db>,
         goto_target: &GotoTarget<'_>,
@@ -336,36 +338,25 @@ impl<'db> Definitions<'db> {
         }
     }
 
-    /// Get the "goto-definition" interpretation of this definition
-    ///
-    /// In this case we apply stub-mapping to try to find the "real" implementation
-    /// if the definition we have is found in a stub file.
-    pub(crate) fn goto_definition(
-        self,
-        model: &SemanticModel<'db>,
-        goto_target: &GotoTarget<'_>,
-    ) -> Option<Definitions<'db>> {
-        let mut definitions = self;
+    fn map_overload_implementations(self, db: &'db dyn Db) -> Self {
+        let mut definitions = Vec::new();
+        for resolved in self.0 {
+            let implementations = resolved
+                .definition()
+                .map(|definition| overload_implementations(db, definition))
+                .unwrap_or_default();
 
-        if let GotoTarget::Parameter(parameter) = goto_target {
-            let fixture_bindings =
-                fixture_bindings_for_parameter(model.db(), parameter.definition(model));
-
-            if !fixture_bindings.is_empty() {
-                definitions = Self::new(
-                    fixture_bindings
-                        .iter()
-                        .map(|binding| ResolvedDefinition::Definition(binding.fixture()))
-                        .collect(),
+            if implementations.is_empty() {
+                definitions.push(resolved);
+            } else {
+                definitions.extend(
+                    implementations
+                        .into_iter()
+                        .map(ResolvedDefinition::Definition),
                 );
             }
         }
-
-        Some(
-            definitions
-                .goto_declaration(model, goto_target)?
-                .map_stubs(model.db()),
-        )
+        Self::new(definitions)
     }
 
     /// Map definitions from stub files to corresponding source implementations.
@@ -506,6 +497,101 @@ pub(crate) fn docstring_for_call_definition<'db>(
 }
 
 impl GotoTarget<'_> {
+    /// Select overload declarations for navigation without narrowing references or rename.
+    pub(crate) fn goto_declaration<'db>(
+        &self,
+        model: &SemanticModel<'db>,
+    ) -> Option<Definitions<'db>> {
+        let selected = match self {
+            Self::FunctionDef(function)
+                if is_overload_definition(model.db(), function.definition(model)) =>
+            {
+                Some(Definitions::new(vec![ResolvedDefinition::Definition(
+                    function.definition(model),
+                )]))
+            }
+            Self::Call { call, .. } => matching_call_definitions(model, call)
+                .and_then(|definitions| self.with_function_definitions(model, definitions)),
+            _ => None,
+        };
+
+        selected
+            .or_else(|| self.definitions(model, ImportAliasResolution::ResolveAliases))?
+            .for_symbol(model, self)
+    }
+
+    /// Prefer the inferred function's implementation, then map stubs and unresolved overloads.
+    pub(crate) fn goto_definition<'db>(
+        &self,
+        model: &SemanticModel<'db>,
+    ) -> Option<Definitions<'db>> {
+        let db = model.db();
+        let selected = match self {
+            Self::Call { .. } | Self::FunctionDef(_) => self
+                .inferred_type(model)
+                .and_then(|ty| overloaded_function_definitions(db, ty))
+                .and_then(|definitions| self.with_function_definitions(model, definitions)),
+            Self::Parameter(parameter) => {
+                let bindings = fixture_bindings_for_parameter(db, parameter.definition(model));
+                (!bindings.is_empty()).then(|| {
+                    Definitions::new(
+                        bindings
+                            .iter()
+                            .map(|binding| ResolvedDefinition::Definition(binding.fixture()))
+                            .collect(),
+                    )
+                })
+            }
+            _ => None,
+        };
+
+        Some(
+            selected
+                .or_else(|| self.definitions(model, ImportAliasResolution::ResolveAliases))?
+                .for_symbol(model, self)?
+                .map_stubs(db)
+                .map_overload_implementations(db),
+        )
+    }
+
+    /// Keep symbol definitions alongside selected functions without repeating call dispatch.
+    fn with_function_definitions<'db>(
+        &self,
+        model: &SemanticModel<'db>,
+        selected: Vec<Definition<'db>>,
+    ) -> Option<Definitions<'db>> {
+        if selected.is_empty() {
+            return None;
+        }
+
+        let db = model.db();
+        let mut definitions = match self {
+            Self::Call { .. } => {
+                self.expression_definitions(model, ImportAliasResolution::ResolveAliases)
+            }
+            _ => self.definitions(model, ImportAliasResolution::ResolveAliases),
+        }
+        .map(|definitions| definitions.0)
+        .unwrap_or_default();
+        definitions.retain(|resolved| {
+            !resolved.definition().is_some_and(|definition| {
+                definition.kind(db).is_function_def()
+                    && selected.iter().any(|selected| {
+                        definition.scope(db) == selected.scope(db)
+                            && definition.place(db) == selected.place(db)
+                    })
+            })
+        });
+
+        Some(Definitions::new(
+            selected
+                .into_iter()
+                .map(ResolvedDefinition::Definition)
+                .chain(definitions)
+                .collect(),
+        ))
+    }
+
     pub(crate) fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Option<Type<'db>> {
         match self {
             GotoTarget::Expression(expression) => expression.inferred_type(model),
