@@ -14,6 +14,7 @@ use ruff_db::system::DbWithWritableSystem as _;
 use ruff_db::testing::{assert_function_query_was_not_run, assert_function_query_was_run};
 use ruff_python_ast::visitor::{Visitor, walk_expr};
 use ruff_python_ast::{self as ast, PythonVersion};
+use ruff_text_size::Ranged;
 use salsa::Database as _;
 use salsa::plumbing::AsId;
 use ty_python_core::definition::Definition;
@@ -60,7 +61,7 @@ result = value
 }
 
 #[test]
-fn recording_retains_deferredness() {
+fn recording_retains_deferredness_and_reaching_definitions() {
     let source = r#"
 import first as value
 annotation: value.C
@@ -77,6 +78,11 @@ import second as value
     assert_eq!(&source[snapshot.metadata[0].0], "value");
     assert_eq!(&source[snapshot.metadata[1].0], "value");
     assert_ne!(snapshot.metadata[0].0, snapshot.metadata[1].0);
+    assert_eq!(
+        snapshot.metadata[0].2,
+        ["first as value", "second as value"]
+    );
+    assert_eq!(snapshot.metadata[1].2, ["first as value"]);
 }
 
 #[test]
@@ -199,6 +205,7 @@ result = value
     assert_eq!(recorded.metadata.len(), 1);
     assert_eq!(recorded.metadata[0].1, DeferredExpressionState::None);
     assert_eq!(&source[recorded.metadata[0].0], "value");
+    assert_eq!(recorded.metadata[0].2, ["first as value"]);
     assert!(recording_snapshot(&db, other, "value").metadata.is_empty());
 
     let updated_source = r#"
@@ -212,6 +219,7 @@ result = value
     assert_eq!(updated.metadata[0].1, DeferredExpressionState::None);
     assert_eq!(&updated_source[updated.metadata[0].0], "value");
     assert_ne!(updated.metadata[0].0, recorded.metadata[0].0);
+    assert_eq!(updated.metadata[0].2, ["second as value"]);
 
     db.set_place_load_recording(file, false);
     assert!(recording_snapshot(&db, file, "value").metadata.is_empty());
@@ -251,6 +259,14 @@ annotation: "tuple[first.C, second.C]"
     assert_ne!(annotation_metadata[0].range, annotation_metadata[1].range);
     assert_eq!(&source[annotation_metadata[0].range], "first");
     assert_eq!(&source[annotation_metadata[1].range], "second");
+    assert_eq!(
+        recording_definition_texts(&db, &annotation_metadata[0].resolution),
+        ["first"]
+    );
+    assert_eq!(
+        recording_definition_texts(&db, &annotation_metadata[1].resolution),
+        ["second"]
+    );
 }
 
 fn program_file(db: &TestDb, file: File) -> ProgramFile<'_> {
@@ -2122,7 +2138,7 @@ fn assert_recording_preserves_types(source: &str, name: &str) {
 #[derive(Debug, PartialEq, Eq)]
 struct RecordingSnapshot {
     types: Vec<(ExpressionNodeKey, String)>,
-    metadata: Vec<(TextRange, DeferredExpressionState)>,
+    metadata: Vec<(TextRange, DeferredExpressionState, Vec<String>)>,
 }
 
 fn recording_snapshot(db: &TestDb, file: File, name: &str) -> RecordingSnapshot {
@@ -2180,12 +2196,27 @@ fn recording_snapshot(db: &TestDb, file: File, name: &str) -> RecordingSnapshot 
                 continue;
             }
             let metadata = metadata.expect("requested place-load metadata is recorded");
-            snapshot
-                .metadata
-                .push((metadata.range, metadata.deferred_state));
+            snapshot.metadata.push((
+                metadata.range,
+                metadata.deferred_state,
+                recording_definition_texts(db, &metadata.resolution),
+            ));
         }
     }
     snapshot
+}
+
+fn recording_definition_texts(db: &TestDb, resolution: &DefinitionResolution<'_>) -> Vec<String> {
+    resolution
+        .definitions()
+        .iter()
+        .map(|definition| {
+            let file = definition.program_file(db).python_file(db);
+            let module = parsed_module(db, file).load(db);
+            let source = ruff_db::source::source_text(db, file.file(db));
+            source[definition.full_range(db, &module).range()].to_string()
+        })
+        .collect()
 }
 
 struct RecordingNameCollector<'ast, 'name> {

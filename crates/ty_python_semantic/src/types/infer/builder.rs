@@ -35,6 +35,7 @@ use super::{
     infer_unpack_types,
 };
 use crate::diagnostic::format_enumeration;
+use crate::place::definitions::DefinitionResolutionBuilder;
 use crate::place::{
     ConsideredDefinitions, DefinedPlace, Definedness, LookupError, Place, PlaceAndQualifiers,
     RequiresExplicitReExport, TypeOrigin, builtins_module_scope, class_body_implicit_symbol,
@@ -316,7 +317,7 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     expected_types: FxHashMap<ExpressionNodeKey, Type<'db>>,
 
     /// Place-load metadata retained only when this file opts into recording.
-    place_load_metadata: FxHashMap<ExpressionNodeKey, PlaceLoadMetadata>,
+    place_load_metadata: FxHashMap<ExpressionNodeKey, PlaceLoadMetadata<'db>>,
 
     /// The scope this region is part of.
     scope: ScopeId<'db>,
@@ -10369,10 +10370,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut place = PlaceAndQualifiers::from(Place::Undefined);
         let mut failure = None;
         let mut checked_deprecated = false;
+        let mut definition_resolution = (expr_ref.is_name_expr()
+            && crate::db::should_record_place_loads(self.db(), self.file()))
+        .then(DefinitionResolutionBuilder::new);
 
         while let Some(step) = resolution.next() {
             match step {
                 PlaceLoadResolutionStep::Source(source) => {
+                    if let Some(definitions) = definition_resolution.as_mut() {
+                        definitions.add_source(self.db(), env, self.scope(), &source);
+                    }
                     if !checked_deprecated && source.is_post_lexical() {
                         // Deprecation diagnostics apply to the result of lexical name resolution,
                         // before it is combined with implicit module globals or builtins. Hence, we
@@ -10421,12 +10428,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             place
         };
 
-        if expr_ref.is_name_expr() && crate::db::should_record_place_loads(self.db(), self.file()) {
+        if let Some(mut definitions) = definition_resolution {
+            if failure == Some(PlaceLoadFailure::NotFound) {
+                definitions.mark_incomplete();
+            }
             self.place_load_metadata.insert(
                 expr_ref.into(),
                 PlaceLoadMetadata {
                     range: expr_ref.range(),
                     deferred_state: self.deferred_state,
+                    resolution: definitions.finish(
+                        place.place.is_definitely_bound(),
+                        resolution.crosses_scope_declaration(),
+                    ),
                 },
             );
         }
@@ -12418,7 +12432,7 @@ enum ExpressionCacheEntry<'db> {
 /// Unlike [`ExpressionInference`], this type is short-lived, and avoids the cost of compaction
 /// that is otherwise performed for Salsa results.
 struct FullExpressionCacheEntry<'db> {
-    place_load_metadata: FxHashMap<ExpressionNodeKey, PlaceLoadMetadata>,
+    place_load_metadata: FxHashMap<ExpressionNodeKey, PlaceLoadMetadata<'db>>,
     expressions: FxHashMap<ExpressionNodeKey, Type<'db>>,
     comparison_truthiness: FxHashMap<ExpressionNodeKey, Truthiness>,
     type_expression_flags: FxHashMap<ExpressionNodeKey, TypeExpressionFlags>,
