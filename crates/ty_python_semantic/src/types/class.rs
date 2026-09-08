@@ -1918,8 +1918,21 @@ impl<'db> ClassType<'db> {
         let fallback_member_lookup = || {
             let specialization = specialization
                 .map(|specialization| specialization.tuple_runtime_element_specialization(db));
-            class_literal
-                .own_class_member(db, env, inherited_generic_context, specialization, name)
+            let mut member = class_literal.own_class_member(
+                db,
+                env,
+                inherited_generic_context,
+                specialization,
+                name,
+            );
+            // A declaration such as `value: T` is inspected before the specialization is applied,
+            // because afterwards the substituted type no longer reveals that the class body only
+            // declared storage for a value supplied from outside. See
+            // `TypeQualifiers::GENERIC_INSTANCE_ATTRIBUTE`.
+            if member.is_generic_instance_attribute(db) {
+                member.inner.qualifiers |= TypeQualifiers::GENERIC_INSTANCE_ATTRIBUTE;
+            }
+            member
                 .map_type(|ty| ty.apply_optional_owner_specialization_to_member(db, specialization))
         };
 

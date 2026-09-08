@@ -168,6 +168,54 @@ def check_self(value: Child) -> None:
     result: Child = value[0]
 ```
 
+The heuristic looks at the annotation as written in the class body, not the specialized type.
+`__call__: Callable[[Args], Return]` gets a `self` bound, but `__call__: F` (where `F` is a
+`TypeVar`) does not, even after `F` is specialized to a callable. The class body says nothing about
+what the first parameter of `F` is, so we keep the full signature on instance access:
+
+```py
+from typing import TypeVar
+
+F = TypeVar("F", bound=Callable[..., object])
+
+class WithCall(Protocol[F]):
+    __call__: F
+
+def check_call(value: WithCall[Callable[[str], None]]) -> None:
+    reveal_type(value.__call__)  # revealed: (str, /) -> None
+    reveal_type(value("value"))  # revealed: None
+```
+
+pytest 8 uses this pattern to attach an exception class to `pytest.skip` and `pytest.fail`. The
+decorated function keeps its original signature:
+
+```py
+from typing import cast
+
+ET = TypeVar("ET", bound=type[BaseException])
+
+class WithException(Protocol[F, ET]):
+    Exception: ET
+    __call__: F
+
+def with_exception(exception_type: ET) -> Callable[[F], WithException[F, ET]]:
+    def decorate(func: F) -> WithException[F, ET]:
+        func_with_exception = cast(WithException[F, ET], func)
+        func_with_exception.Exception = exception_type
+        return func_with_exception
+    return decorate
+
+class Skipped(BaseException): ...
+
+@with_exception(Skipped)
+def skip(reason: str = "", *, allow_module_level: bool = False) -> None: ...
+
+reveal_type(skip)  # revealed: WithException[(reason: str = "", *, allow_module_level: bool = False) -> None, <class 'Skipped'>]
+reveal_type(skip.Exception)  # revealed: <class 'Skipped'>
+skip("reason")
+skip("reason", allow_module_level=True)
+```
+
 And of course the same is true if we have only an implicit assignment inside a method:
 
 ```py
