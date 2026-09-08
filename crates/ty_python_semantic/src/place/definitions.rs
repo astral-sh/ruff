@@ -192,3 +192,47 @@ impl<'db> DefinitionResolution<'db> {
         self.crosses_scope_declaration |= other.crosses_scope_declaration;
     }
 }
+
+/// Accumulates reaching definitions and resolution flags while inference resolves a name.
+pub(crate) struct DefinitionResolutionBuilder<'db> {
+    resolution: DefinitionResolution<'db>,
+}
+
+impl<'db> DefinitionResolutionBuilder<'db> {
+    /// Starts recording reaching definitions before any load sources have been visited.
+    pub(crate) fn new() -> Self {
+        Self {
+            resolution: DefinitionResolution {
+                definitions: SmallVec::new(),
+                is_complete: true,
+                may_be_deleted: false,
+                crosses_scope_declaration: false,
+            },
+        }
+    }
+
+    /// Records the reachable definitions and limitations of a source visited by inference.
+    pub(crate) fn add_source(
+        &mut self,
+        db: &'db dyn Db,
+        environment: &ProgramEnvironment<'db>,
+        scope: ScopeId<'db>,
+        source: &PlaceLoadSource<'db>,
+    ) {
+        let source_resolution =
+            DefinitionResolution::from_place_load_source(db, environment, scope, source);
+        self.resolution.extend(source_resolution);
+    }
+
+    /// Marks a load whose possible values are not fully represented by the recorded definitions.
+    pub(crate) fn mark_incomplete(&mut self) {
+        self.resolution.is_complete = false;
+    }
+
+    /// Finishes the record with the scope-declaration state from name resolution.
+    pub(crate) fn finish(mut self, crosses_scope_declaration: bool) -> DefinitionResolution<'db> {
+        self.resolution.crosses_scope_declaration |= crosses_scope_declaration;
+        self.resolution.definitions.shrink_to_fit();
+        self.resolution
+    }
+}
