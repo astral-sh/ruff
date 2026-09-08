@@ -1025,7 +1025,7 @@ mod tests {
 
         let options =
             Options::from_toml_str("[rules]\nunresolved-import = 'ignore'\n", ValueSource::Cli)?;
-        let metadata = ProjectMetadata::from_fixed_options(options, root.clone());
+        let metadata = ProjectMetadata::from_fixed_options(options, &root);
         let mut db = ProjectDatabase::fallible(metadata, system)?;
         assert_eq!(db.check().len(), 1);
 

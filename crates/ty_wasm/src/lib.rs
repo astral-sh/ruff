@@ -146,7 +146,7 @@ impl Workspace {
     ) -> Result<Workspace, Error> {
         let project = ProjectMetadata::from_fixed_options(
             deserialize_options(options)?,
-            SystemPathBuf::from(root),
+            SystemPath::new(root),
         );
         Self::from_metadata(project, position_encoding)
     }

@@ -3,6 +3,7 @@
 use ty_wasm::{
     DiagnosticTag, FileHandle, Position, PositionEncoding, SubDiagnosticSeverity, Workspace,
 };
+use wasm_bindgen::JsValue;
 use wasm_bindgen_test::wasm_bindgen_test;
 
 #[wasm_bindgen_test]
@@ -72,18 +73,9 @@ fn fixed_options_ignore_configuration_files() {
         ("ty.toml", "[environment]\npython-version = '3.11'\n"),
         ("pyproject.toml", "[project]\nrequires-python = '>=3.11'\n"),
     ] {
-        let mut workspace = Workspace::new(
-            "/",
-            PositionEncoding::Utf32,
-            js_sys::JSON::parse(
-                r#"{
-                    "environment": {"python-version": "3.10"},
-                    "rules": {"undefined-reveal": "ignore"}
-                }"#,
-            )
-            .unwrap(),
-        )
-        .expect("Workspace to be created");
+        let mut workspace =
+            Workspace::new("/", PositionEncoding::Utf32, python_version_options(10))
+                .expect("Workspace to be created");
         let file = workspace
             .open_file(
                 "main.py",
@@ -112,18 +104,8 @@ fn fixed_options_ignore_configuration_files() {
 fn fixed_options_replace_constructor_options() {
     ty_wasm::before_main();
 
-    let mut workspace = Workspace::new(
-        "/",
-        PositionEncoding::Utf32,
-        js_sys::JSON::parse(
-            r#"{
-                "environment": {"python-version": "3.10"},
-                "rules": {"undefined-reveal": "ignore"}
-            }"#,
-        )
-        .unwrap(),
-    )
-    .expect("Workspace to be created");
+    let mut workspace = Workspace::new("/", PositionEncoding::Utf32, python_version_options(10))
+        .expect("Workspace to be created");
     let file = workspace
         .open_file(
             "main.py",
@@ -158,18 +140,8 @@ fn fixed_options_replace_constructor_options() {
 fn fixed_options_ignore_script_metadata() {
     ty_wasm::before_main();
 
-    let mut workspace = Workspace::new(
-        "/",
-        PositionEncoding::Utf32,
-        js_sys::JSON::parse(
-            r#"{
-                "environment": {"python-version": "3.10"},
-                "rules": {"undefined-reveal": "ignore"}
-            }"#,
-        )
-        .unwrap(),
-    )
-    .expect("Workspace to be created");
+    let mut workspace = Workspace::new("/", PositionEncoding::Utf32, python_version_options(10))
+        .expect("Workspace to be created");
     let file = workspace
         .open_file(
             "main.py",
@@ -194,18 +166,9 @@ fn fixed_options_ignore_script_metadata() {
 fn restored_pyproject_preserves_defaults() {
     ty_wasm::before_main();
 
-    let mut workspace = Workspace::discover(
-        "/",
-        PositionEncoding::Utf32,
-        js_sys::JSON::parse(
-            r#"{
-                "environment": {"python-version": "3.14"},
-                "rules": {"undefined-reveal": "ignore"}
-            }"#,
-        )
-        .unwrap(),
-    )
-    .expect("Workspace to be created");
+    let mut workspace =
+        Workspace::discover("/", PositionEncoding::Utf32, python_version_options(14))
+            .expect("Workspace to be created");
     let file = workspace
         .open_file(
             "main.py",
@@ -246,18 +209,9 @@ fn explicit_options_override_configuration() {
 
     // JSON options have the same precedence regardless of the restored file order.
     for options_first in [true, false] {
-        let mut workspace = Workspace::discover(
-            "/",
-            PositionEncoding::Utf32,
-            js_sys::JSON::parse(
-                r#"{
-                    "environment": {"python-version": "3.14"},
-                    "rules": {"undefined-reveal": "ignore"}
-                }"#,
-            )
-            .unwrap(),
-        )
-        .expect("Workspace to be created");
+        let mut workspace =
+            Workspace::discover("/", PositionEncoding::Utf32, python_version_options(14))
+                .expect("Workspace to be created");
         let file = workspace
             .open_file(
                 "main.py",
@@ -310,18 +264,9 @@ fn explicit_options_update_with_invalid_configuration() {
         ("[environment]\npython-version = ", true),
         ("[analysis]\nallowed-unresolved-imports = ['']\n", false),
     ] {
-        let mut workspace = Workspace::discover(
-            "/",
-            PositionEncoding::Utf32,
-            js_sys::JSON::parse(
-                r#"{
-                    "environment": {"python-version": "3.14"},
-                    "rules": {"undefined-reveal": "ignore"}
-                }"#,
-            )
-            .unwrap(),
-        )
-        .expect("Workspace to be created");
+        let mut workspace =
+            Workspace::discover("/", PositionEncoding::Utf32, python_version_options(14))
+                .expect("Workspace to be created");
         let file = workspace
             .open_file(
                 "main.py",
@@ -360,6 +305,16 @@ fn explicit_options_update_with_invalid_configuration() {
             .expect("Configuration to be repaired");
         assert_python_version(&workspace, &file, 12);
     }
+}
+
+fn python_version_options(minor: u8) -> JsValue {
+    js_sys::JSON::parse(&format!(
+        r#"{{
+            "environment": {{"python-version": "3.{minor}"}},
+            "rules": {{"undefined-reveal": "ignore"}}
+        }}"#,
+    ))
+    .unwrap()
 }
 
 #[track_caller]

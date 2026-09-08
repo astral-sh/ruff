@@ -96,18 +96,11 @@ impl ProjectMetadata {
     ///
     /// Project, user, and inline script configuration are ignored, including after file
     /// changes and rescans. Options can be replaced with [`Self::replace_override_options`].
-    pub fn from_fixed_options(options: Options, root: SystemPathBuf) -> Self {
+    pub fn from_fixed_options(options: Options, root: &SystemPath) -> Self {
         Self {
-            name: ProjectName::new(root.file_name().unwrap_or("root")),
-            root,
-            options: Options::default(),
-            uv_workspace_options: None,
             override_options: Some(Box::new(options)),
-            user_configuration: None,
-            fallback_options: None,
             configuration_source: ConfigurationSource::Fixed,
-            environment: ProjectEnvironment::default(),
-            use_uv: UseUv::Off,
+            ..Self::new(root.file_name().unwrap_or("root"), root.to_path_buf())
         }
     }
 
