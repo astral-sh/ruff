@@ -767,9 +767,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         // An unreachable operand can retain a literal type, as in `False and "yes"`.
         // Its diagnostic would be discarded, so it must not suppress the enclosing condition.
-        if !self
-            .context
-            .is_range_reachable(condition.expression.range())
+        // Only scan reachability here if an enclosing condition could be reported. Otherwise,
+        // diagnostic emission checks reachability after checking whether the rule is enabled.
+        if preference == BooleanDiagnosticPreference::EnclosingCondition
+            && !self
+                .context
+                .is_range_reachable(condition.expression.range())
         {
             return ConditionCheckResult::CheckEnclosingCondition;
         }
