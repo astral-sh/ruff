@@ -132,7 +132,6 @@ impl<'db> ConstructorBinding<'db> {
                 &type_mapping,
                 TypeContext::default(),
                 &visitor,
-                /* skip_return_type */ false,
             );
             overload.set_constructor_context(db, constructor_context);
         }
