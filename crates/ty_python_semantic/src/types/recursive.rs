@@ -436,6 +436,8 @@ impl<'db> RecursiveType<'db> {
         })
     }
 
+    /// Transform this application's closed unfolding, retaining `Type::Recursive(self)`
+    /// if unfolding returns that exact type.
     pub(crate) fn map_type(
         self,
         db: &'db dyn Db,
@@ -445,6 +447,8 @@ impl<'db> RecursiveType<'db> {
         self.map_or_else(db, env, || Type::Recursive(self), operation)
     }
 
+    /// Apply `operation` to the closed result of [`Self::unfold`], or call `fallback`
+    /// if that result is exactly `Type::Recursive(self)` (for example, for `μa. a`).
     pub(crate) fn map_or_else<F>(
         self,
         db: &'db dyn Db,
@@ -456,6 +460,8 @@ impl<'db> RecursiveType<'db> {
             .unwrap_or_else(fallback)
     }
 
+    /// Apply `operation` to the closed unfolding, or return `fallback` if unfolding
+    /// returns exactly `Type::Recursive(self)`.
     pub(crate) fn map_or<F>(
         self,
         db: &'db dyn Db,
