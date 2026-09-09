@@ -27,6 +27,15 @@ impl<'db> Type<'db> {
     /// Upcast `self` to a type that conservatively describes its possible runtime objects in an
     /// identity comparison.
     ///
+    /// Python's [`is` operator][is operator] tests whether two expressions refer to the same
+    /// object. An object's identity is distinct from its type and value, as described in
+    /// [Python's data model][object identity].
+    /// We cannot inspect object identities during static analysis, but the operands' types can
+    /// tell us whether they could refer to the same object. For example, two variables of type
+    /// `Literal[1]` [might refer to the same integer object][literal identity];
+    /// variables of types `Literal[1]` and `Literal[2]` cannot, because one integer object cannot
+    /// have both values.
+    ///
     /// A `NewType` constructor returns its argument unchanged, so its tag can differ between two
     /// views of the same runtime object at the same runtime memory address. We therefore upcast a
     /// `NewType` to its concrete base.
@@ -37,10 +46,12 @@ impl<'db> Type<'db> {
     ///
     /// Function signature substitutions can likewise differ between views of the same function,
     /// bound method, property, or saved function wrapper. We therefore use the underlying function
-    /// literal without substituted signatures for identity. A bound method's `__self__` can also
-    /// have different static tags across views; we upcast its type while keeping the receiver used
-    /// for signature specialization. And a precise `functools.partial` stores a specialized
-    /// callable signature, but its wrapped function remains the same object across specializations.
+    /// literal without substituted signatures for identity. A [bound method][instance methods]
+    /// holds a reference to its underlying function (`__func__`) and its receiver (`__self__`).
+    /// The receiver can have different static tags across views; we upcast its type for the
+    /// comparison while keeping the method's specialized signature for calls. And a precise
+    /// `functools.partial` stores a specialized callable signature, but its wrapped function
+    /// remains the same object across specializations.
     ///
     /// We preserve negations that restrict the runtime memory addresses the object could possibly
     /// occupy (negations relating to runtime class or runtime value), such as `~None`, `~SomeClass`,
@@ -57,6 +68,11 @@ impl<'db> Type<'db> {
     /// We use this upcast both to decide whether identity is possible and to narrow the other
     /// operand when it succeeds. Each operand retains its own existing tags, substituted
     /// signatures, and type-variable relationships when the resulting constraint is applied.
+    ///
+    /// [is operator]: https://docs.python.org/3/reference/expressions.html#identity-comparisons
+    /// [object identity]: https://docs.python.org/3/reference/datamodel.html#objects-values-and-types
+    /// [literal identity]: https://docs.python.org/3/reference/expressions.html#literals-and-object-identity
+    /// [instance methods]: https://docs.python.org/3/reference/datamodel.html#instance-methods
     pub(crate) fn identity_comparison_type(
         self,
         db: &'db dyn Db,
@@ -64,17 +80,27 @@ impl<'db> Type<'db> {
     ) -> Type<'db> {
         struct IdentityComparisonUpcasting;
 
-        /// Whether an excluded type can still rule out identity with another static view of the
-        /// same runtime object.
+        /// Whether a negated type can still rule out identity with another variable.
         ///
-        /// An identity comparison can involve two static views of one runtime object at a single
-        /// runtime memory address. Upcasting the positive types accounts for this, but an
-        /// exclusion such as `~T` can only be kept if it still holds for the other view.
-        /// Excluding `int` rules out all runtime instances of `int`; excluding a `NewType` tag
-        /// may only rule out one static view of all runtime instances of `int`.
+        /// Two variables with different static types can refer to one object at the same runtime
+        /// memory address. Upcasting positive types accounts for this, but a negation such as
+        /// `~T` can only be kept if it also rules out the object at that address. A `NewType`
+        /// constructor returns its argument unchanged despite giving the result a new static type:
         ///
-        /// String literals require special handling due to the `LiteralString` types: excluding
-        /// a string literal also depends on whether literal-string origin is known.
+        /// ```python
+        /// from typing import NewType, reveal_type
+        ///
+        /// UserId = NewType("UserId", int)
+        ///
+        /// def compare(not_user_id: ~UserId, not_int: ~int, tagged: UserId) -> None:
+        ///     reveal_type(not_user_id is tagged)  # bool
+        ///     reveal_type(not_int is tagged)  # Literal[False]
+        /// ```
+        ///
+        /// `~UserId` only rules out the `NewType` tag; `~int` rules out all runtime instances of
+        /// `int`, including those returned by `UserId`. String literals require special handling
+        /// due to the `LiteralString` type: negating a string literal also depends on whether
+        /// literal-string origin is known.
         ///
         /// The variants are ordered from most to least reusable so `max` can combine their
         /// requirements for compound types.
@@ -95,8 +121,8 @@ impl<'db> Type<'db> {
             /// ```
             Stable,
 
-            /// A string-literal exclusion only rules out the runtime string when the containing
-            /// intersection also establishes literal-string origin:
+            /// A negation such as `~Literal["hello"]` only rules out the runtime string when the
+            /// containing intersection also establishes literal-string origin:
             ///
             /// ```python
             /// from typing import Literal, reveal_type
@@ -137,9 +163,22 @@ impl<'db> Type<'db> {
             }
         }
 
-        /// The type to use for identity checks, together with whether an exclusion of the
-        /// original type remains valid for another static view of the same object. For example,
-        /// upcasting `UserId` produces `int`, but `Not[UserId]` cannot be retained.
+        /// The type to use for identity checks, together with whether negating the original type
+        /// still rules out the same runtime object. A `NewType` constructor returns its argument
+        /// unchanged, so both an `int` and a `UserId` variable can refer to that integer:
+        ///
+        /// ```python
+        /// from typing import NewType, reveal_type
+        ///
+        /// UserId = NewType("UserId", int)
+        ///
+        /// def compare(plain: int, excluded: ~UserId, tagged: UserId) -> None:
+        ///     reveal_type(plain is tagged)  # bool
+        ///     reveal_type(excluded is tagged)  # bool
+        /// ```
+        ///
+        /// Upcasting `UserId` produces `int` for the positive comparison; `~UserId` cannot be
+        /// retained because it excludes no integer objects at runtime.
         #[derive(Clone, Copy, Debug)]
         struct UpcastResult<'db> {
             ty: Type<'db>,
@@ -167,7 +206,7 @@ impl<'db> Type<'db> {
         /// receivers, and accessors.
         ///
         /// [`TypeTransformer`] returns the original type on a recursive revisit; if
-        /// no negation rule has been computed for that type, its exclusion cannot
+        /// no negation rule has been computed for that type, its negation cannot
         /// be retained.
         #[derive(Default)]
         struct UpcastingVisitor<'db> {
@@ -388,7 +427,9 @@ impl<'db> Type<'db> {
                         upcast(
                             db,
                             env,
-                            typevar.require_bound_or_constraints(db, env).as_type(db, env),
+                            typevar
+                                .require_bound_or_constraints(db, env)
+                                .as_type(db, env),
                             visitor,
                         )
                         .ty,
