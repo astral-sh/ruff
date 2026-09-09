@@ -1,5 +1,6 @@
 use crate::ProgramEnvironment;
 use itertools::Either;
+use rustc_hash::FxHashSet;
 
 use std::convert::Infallible;
 
@@ -123,7 +124,7 @@ impl<'db> UnionType<'db> {
     pub(crate) fn has_aliases(self, db: &'db dyn Db) -> bool {
         self.elements(db)
             .iter()
-            .any(|element| matches!(element, Type::TypeAlias(_)))
+            .any(|element| matches!(element, Type::TypeAlias(_) | Type::Recursive(_)))
     }
 
     /// Recursively expands aliases that expose top-level union elements.
@@ -134,8 +135,20 @@ impl<'db> UnionType<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Type<'db> {
-        // Rebuild the union so that `UnionBuilder` simplifies any redundancies exposed.
-        Self::from_elements(db, env, self.elements(db).iter().copied())
+        // Expose both alias forms without expanding aliases inside containers during reduction.
+        let mut builder = UnionBuilder::new(db, env).unpack_aliases(false);
+        let mut pending = vec![Type::Union(self)];
+        let mut seen = FxHashSet::default();
+        while let Some(element) = pending.pop() {
+            if !seen.insert(element) {
+                continue;
+            }
+            match element.resolve_type_alias(db) {
+                Type::Union(union) => pending.extend(union.elements(db).iter().rev().copied()),
+                resolved => builder.add_in_place(resolved),
+            }
+        }
+        builder.build()
     }
 
     pub(crate) fn from_elements_cycle_recovery<I, T>(
