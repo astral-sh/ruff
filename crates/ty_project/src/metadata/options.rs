@@ -497,7 +497,7 @@ impl Options {
                 output_format: terminal.output_format,
                 color: colored::control::SHOULD_COLORIZE.should_colorize(),
             });
-        let src = strategy.fallback(src, |_| SrcSettings::default())?;
+        let src = strategy.fallback(src, |_| SrcSettings::default(context.configuration_root()))?;
 
         let mut analysis_diagnostics = Vec::new();
         let analysis = self
@@ -1370,7 +1370,7 @@ fn build_exclude_filter(
         }
     }
 
-    excludes.build().map_err(|_| {
+    excludes.build(project_root).map_err(|_| {
         let diagnostic = OptionDiagnostic::new(
             DiagnosticId::InvalidGlob,
             format!(

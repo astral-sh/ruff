@@ -70,10 +70,7 @@ impl IncludeExcludeFilter {
             }
         }
     }
-}
-
-impl Default for IncludeExcludeFilter {
-    fn default() -> Self {
+    pub(crate) fn default_for_root(root: &SystemPath) -> Self {
         let mut includes = IncludeFilterBuilder::new();
         includes
             .add(
@@ -100,7 +97,7 @@ impl Default for IncludeExcludeFilter {
                 .build()
                 .expect("default include filter to be infallible"),
             exclude: excludes
-                .build()
+                .build(root)
                 .expect("default exclude filter to be infallible"),
         }
     }

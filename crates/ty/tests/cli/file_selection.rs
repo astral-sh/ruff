@@ -896,6 +896,119 @@ fn force_exclude_directory_exclusion() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// An excluded directory above the project root does not exclude files in the project.
+#[test]
+fn force_exclude_project_under_excluded_directory() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "dist/project/src/main.py",
+        r#"
+        print(undefined_var)
+        "#,
+    )?;
+    let project_dir = case.root().join("dist/project");
+
+    assert_cmd_snapshot!(case.command().current_dir(&project_dir).arg("--force-exclude"), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-reference]: Name `undefined_var` used when not defined
+     --> src/main.py:2:7
+      |
+    2 | print(undefined_var)
+      |       ^^^^^^^^^^^^^
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+
+    assert_cmd_snapshot!(case.command().current_dir(&project_dir).arg("--force-exclude").arg("src"), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-reference]: Name `undefined_var` used when not defined
+     --> src/main.py:2:7
+      |
+    2 | print(undefined_var)
+      |       ^^^^^^^^^^^^^
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+
+    assert_cmd_snapshot!(case.command().current_dir(&project_dir).arg("--force-exclude").arg("src/main.py"), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-reference]: Name `undefined_var` used when not defined
+     --> src/main.py:2:7
+      |
+    2 | print(undefined_var)
+      |       ^^^^^^^^^^^^^
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+/// An explicit path outside the project is excluded when an ancestor is excluded.
+#[test]
+fn force_exclude_sibling_under_excluded_directory() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        ("dist/project/main.py", ""),
+        ("dist/sibling/main.py", "print(undefined_var)"),
+    ])?;
+    let project_dir = case.root().join("dist/project");
+
+    assert_cmd_snapshot!(case.command().current_dir(&project_dir).arg("--force-exclude").arg("../sibling"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    WARN No python files found under the given path(s)
+    ");
+
+    assert_cmd_snapshot!(case.command().current_dir(&project_dir).arg("--force-exclude").arg("../sibling/main.py"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    WARN No python files found under the given path(s)
+    ");
+
+    Ok(())
+}
+
+/// An excluded directory outside the project is skipped when passed explicitly.
+#[test]
+fn force_exclude_directory_outside_project() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        ("project/main.py", ""),
+        ("sibling/dist/main.py", "print(undefined_var)"),
+    ])?;
+    let project_dir = case.root().join("project");
+
+    assert_cmd_snapshot!(case.command().current_dir(&project_dir).arg("--force-exclude").arg("../sibling/dist"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    WARN No python files found under the given path(s)
+    ");
+
+    Ok(())
+}
+
 #[test]
 fn cli_and_configuration_exclude() -> anyhow::Result<()> {
     let case = CliTest::with_files([

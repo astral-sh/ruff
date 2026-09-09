@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use globset::{Candidate, GlobBuilder, GlobSet, GlobSetBuilder};
 use regex_automata::util::pool::Pool;
-use ruff_db::system::SystemPath;
+use ruff_db::system::{SystemPath, SystemPathBuf};
 
 use crate::GlobFilterCheckMode;
 use crate::glob::portable::AbsolutePortableGlobPattern;
@@ -20,12 +20,14 @@ use crate::glob::portable::AbsolutePortableGlobPattern;
 ///
 /// # Equality
 ///
-/// Two filters are equal if they're constructed from the same patterns (including order).
-/// Two filters that exclude the exact same files but were constructed from different patterns aren't considered
-/// equal.
+/// Two filters are equal if they have the same root and are constructed from the same patterns
+/// (including order). Two filters that exclude the exact same files but were constructed from
+/// different patterns aren't considered equal.
 #[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
 pub(crate) struct ExcludeFilter {
     ignore: Gitignore,
+    /// Upper boundary for ad hoc checks of paths inside the project.
+    root: SystemPathBuf,
 }
 
 impl ExcludeFilter {
@@ -40,22 +42,23 @@ impl ExcludeFilter {
     }
 
     fn matches(&self, path: &SystemPath, mode: GlobFilterCheckMode, directory: bool) -> bool {
-        // If the path is excluded, return `ignore`
-        if self.ignore.matched(path, directory).is_ignore() {
-            return true;
-        }
-
         match mode {
-            GlobFilterCheckMode::TopDown => {
-                // No hit or an allow hit means the file or directory is not excluded.
-                false
-            }
+            GlobFilterCheckMode::TopDown => self.ignore.matched(path, directory).is_ignore(),
             GlobFilterCheckMode::Adhoc => {
-                // If the path is allowlisted or there's no hit, try the parent to ensure we don't return false
-                // for a folder where there's an exclude for a parent.
-                path.ancestors()
-                    .skip(1)
-                    .any(|ancestor| self.ignore.matched(ancestor, true).is_ignore())
+                // If `dist/project` is the project root, excluding `dist` must not hide its files.
+                // Explicit paths outside the project still consider all their ancestors.
+                let within_project = path.starts_with(&self.root);
+                let mut is_directory = directory;
+                for ancestor in path.ancestors() {
+                    if self.ignore.matched(ancestor, is_directory).is_ignore() {
+                        return true;
+                    }
+                    if within_project && ancestor == self.root.as_path() {
+                        break;
+                    }
+                    is_directory = true;
+                }
+                false
             }
         }
     }
@@ -87,9 +90,10 @@ impl ExcludeFilterBuilder {
         Ok(self)
     }
 
-    pub(crate) fn build(self) -> Result<ExcludeFilter, globset::Error> {
+    pub(crate) fn build(self, root: &SystemPath) -> Result<ExcludeFilter, globset::Error> {
         Ok(ExcludeFilter {
             ignore: self.ignore.build()?,
+            root: root.to_path_buf(),
         })
     }
 }
