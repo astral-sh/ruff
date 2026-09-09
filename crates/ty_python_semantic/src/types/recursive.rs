@@ -4,20 +4,16 @@
 //! substitutions may inspect an open body. Ordinary type operations receive its
 //! closed unfolding, including during intermediate normalization steps.
 
-use std::cell::{Cell, RefCell};
-
-use rustc_hash::FxHashSet;
 use ty_python_core::definition::Definition;
 use ty_python_core::place_table;
 
 use super::constraints::{ConstraintSet, IteratorConstraintsExtension};
-use super::generics::{ApplySpecialization, Specialization, walk_specialization_types};
+use super::generics::{ApplySpecialization, Specialization};
 use super::relation::{TypeRelation, TypeRelationChecker};
 use super::variance::{VarianceInferable, VarianceOrigin};
-use super::visitor::{TypeKind, TypeVisitor, walk_non_atomic_type};
 use super::{
     ApplyTypeMappingVisitor, BoundTypeVarIdentity, GenericContext, MaterializationKind, Type,
-    TypeAliasType, TypeContext, TypeMapping, VarianceTerm,
+    TypeContext, TypeMapping, VarianceTerm,
 };
 use crate::{Db, ProgramEnvironment};
 
@@ -150,23 +146,17 @@ impl<'db> RecursiveType<'db> {
         env: &ProgramEnvironment<'db>,
         original: Type<'db>,
     ) -> Type<'db> {
-        original.assert_no_unbound_recursive_vars(db, env);
         let body = original.apply_type_mapping_impl(
             db,
             &TypeMapping::Recursive(RecursiveMapping(RecursiveSubstitution::Bind(self))),
             TypeContext::default(),
             &ApplyTypeMappingVisitor::new(env),
         );
-        // Binding changes a closed type only by introducing references to this binder.
-        debug_assert_eq!(
-            body != original,
-            RecursiveReferences::contains_escaping(db, env, body)
-        );
-
         // Alias arguments can expose a reference without introducing a container.
-        let result = if body.has_unguarded_alias_cycle(db) {
+        if body.has_unguarded_alias_cycle(db) {
             Type::divergent(self.cycle(db).0)
         } else if body == original {
+            // Binding changes a closed type only by introducing references to this binder.
             body
         } else {
             Type::Recursive(Self::new_internal(
@@ -177,9 +167,7 @@ impl<'db> RecursiveType<'db> {
                 self.arguments(db),
                 None,
             ))
-        };
-        result.assert_no_unbound_recursive_vars(db, env);
-        result
+        }
     }
 
     fn with_arguments(self, db: &'db dyn Db, arguments: Option<Specialization<'db>>) -> Self {
@@ -243,7 +231,6 @@ impl<'db> RecursiveType<'db> {
     /// The traversal starts at depth 0 inside this binder; only nested recursive
     /// bodies increase the depth used to identify references to this binder.
     pub fn unfold(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
-        Type::Recursive(self).assert_no_unbound_recursive_vars(db, env);
         // A growing specialization cannot converge by repeating the same query key. Materialize
         // its closed unfolding directly, under the caller's recursion guard, instead.
         if self.materialization_kind(db).is_some() && !self.may_have_unbounded_specialization(db) {
@@ -255,7 +242,6 @@ impl<'db> RecursiveType<'db> {
             TypeContext::default(),
             &ApplyTypeMappingVisitor::new(env),
         );
-        unfolded.assert_no_unbound_recursive_vars(db, env);
         let unfolded = match self.arguments(db) {
             Some(arguments) => unfolded.apply_type_mapping(
                 db,
@@ -542,95 +528,11 @@ impl<'db> VarianceInferable<'db> for RecursiveType<'db> {
     }
 }
 
-/// A syntactic walk that counts binders without unfolding or normalizing types.
-struct RecursiveReferences<'env, 'db> {
-    env: &'env ProgramEnvironment<'db>,
-    /// Number of surrounding recursive binders entered from the inspected root.
-    /// A variable is bound within that root exactly when its de Bruijn index is
-    /// smaller than this count.
-    depth: Cell<u32>,
-    found: Cell<bool>,
-    /// The same interned subtree can be bound at one depth and escaping at another.
-    seen: RefCell<FxHashSet<(Type<'db>, u32)>>,
-}
-
-impl<'env, 'db> RecursiveReferences<'env, 'db> {
-    /// Inspect a type without assuming any binders outside it. A raw body can have
-    /// escaping references even when its enclosing `RecursiveType` is closed.
-    fn contains_escaping(
-        db: &'db dyn Db,
-        env: &'env ProgramEnvironment<'db>,
-        ty: Type<'db>,
-    ) -> bool {
-        let visitor = Self {
-            env,
-            depth: Cell::new(0),
-            found: Cell::new(false),
-            seen: RefCell::default(),
-        };
-        visitor.visit_type(db, ty);
-        visitor.found.get()
-    }
-}
-
-impl<'db> TypeVisitor<'db> for RecursiveReferences<'_, 'db> {
-    fn program_environment(&self) -> &ProgramEnvironment<'db> {
-        self.env
-    }
-    fn should_visit_lazy_type_attributes(&self) -> bool {
-        false
-    }
-    /// At depth `d`, only indices below `d` have a binder within the inspected root.
-    /// Revisit shared subtrees when the depth changes, since their binding can change.
-    fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
-        if self.found.get() {
-            return;
-        }
-        if let Type::RecursiveVar(reference) = ty {
-            if reference.depth(db) >= self.depth.get() {
-                self.found.set(true);
-            }
-            if let Some(arguments) = reference.arguments(db) {
-                walk_specialization_types(db, arguments, self);
-            }
-        } else if self.seen.borrow_mut().insert((ty, self.depth.get()))
-            && let TypeKind::NonAtomic(node) = TypeKind::from(ty)
-        {
-            walk_non_atomic_type(db, node, self);
-        }
-    }
-    /// Count this binder only inside its body. Application arguments remain in the
-    /// surrounding scope, and the original depth is restored before visiting siblings.
-    fn visit_recursive_type(&self, db: &'db dyn Db, recursive: RecursiveType<'db>) {
-        if let Some(arguments) = recursive.arguments(db) {
-            walk_specialization_types(db, arguments, self);
-        }
-        let depth = self.depth.get();
-        self.depth.set(depth + 1);
-        self.visit_type(db, recursive.body(db));
-        self.depth.set(depth);
-    }
-    fn visit_type_alias_type(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
-        if let Some(specialization) = alias.specialization(db) {
-            walk_specialization_types(db, specialization, self);
-        }
-    }
-}
-
-impl<'db> Type<'db> {
+impl Type<'_> {
     /// Reject a bare recursive variable at a semantic-operation boundary.
-    /// Binding and unfolding check nested bodies; ordinary type operations must
-    /// not rescan the entire type graph just to validate each operand.
     pub(super) const fn assert_not_recursive_var(self) {
         debug_assert!(
             !matches!(self, Self::RecursiveVar(_)),
-            "semantic operation on an unbound recursive variable"
-        );
-    }
-
-    fn assert_no_unbound_recursive_vars(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) {
-        debug_assert!(
-            !RecursiveReferences::contains_escaping(db, env, self),
             "semantic operation on an unbound recursive variable"
         );
     }
