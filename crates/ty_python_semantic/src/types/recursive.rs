@@ -17,17 +17,15 @@ use super::{
 };
 use crate::{Db, ProgramEnvironment};
 
-/// A recursive variable, indexed by the number of intervening recursive binders.
-/// Zero refers to the nearest binder. An escaping reference has no type semantics;
-/// in particular, it is neither a gradual type nor an assignability operand.
+/// A recursive variable named by its binder's query cycle.
+/// An escaping reference has no type semantics; in particular, it is neither a
+/// gradual type nor an assignability operand.
 /// Only binding and substitution operations may construct recursive variables.
 #[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
 pub struct RecursiveVar<'db> {
-    /// Zero-based de Bruijn index: the number of recursive binders between this
-    /// occurrence and its binder. In `μa. μb. tuple[a, b]`, `a` has index 1 and
-    /// `b` has index 0. This is relative to the occurrence, not the root of the type.
+    /// Refers to the nearest enclosing recursive binder with this cycle identity.
     #[returns(copy)]
-    depth: u32,
+    cycle: RecursiveCycle,
     /// The unspecialized arguments of this occurrence, in the alias definition's scope.
     /// For `Tree = tuple[T, "Tree[list[T]] | None"]`, these are `[list[T]]`.
     /// Unfolding substitutes the enclosing application's arguments for the type parameters.
@@ -38,15 +36,7 @@ pub struct RecursiveVar<'db> {
 impl get_size2::GetSize for RecursiveVar<'_> {}
 
 impl<'db> RecursiveVar<'db> {
-    /// Whether this reference belongs to the innermost recursive binder.
-    pub(super) fn is_innermost(self, db: &'db dyn Db) -> bool {
-        self.depth(db) == 0
-    }
-
-    /// Unfold references whose index equals the number of nested binders entered
-    /// by the visitor. Smaller indices belong to inner binders and stay unchanged.
-    /// Larger indices escape the closed input; binding also rejects equal indices,
-    /// since its input cannot already refer to the binder being introduced.
+    /// Unfold references to the target cycle, retaining variables bound by other cycles.
     pub(super) fn apply_type_mapping(
         self,
         db: &'db dyn Db,
@@ -58,12 +48,12 @@ impl<'db> RecursiveVar<'db> {
             .map(|arguments| arguments.apply_type_mapping_impl(db, mapping, &[], visitor));
         match mapping {
             TypeMapping::Recursive(RecursiveMapping(RecursiveSubstitution::Unfold(recursive)))
-                if self.depth(db) == visitor.recursive_depth =>
+                if self.cycle(db) == recursive.cycle(db) =>
             {
                 Type::Recursive(recursive.with_arguments(db, arguments))
             }
-            TypeMapping::Recursive(_) if self.depth(db) < visitor.recursive_depth => {
-                Type::RecursiveVar(Self::new_internal(db, self.depth(db), arguments))
+            TypeMapping::Recursive(_) => {
+                Type::RecursiveVar(Self::new_internal(db, self.cycle(db), arguments))
             }
             _ => unreachable!("semantic operation on an unbound recursive variable"),
         }
@@ -78,6 +68,17 @@ pub struct RecursiveMapping<'db>(RecursiveSubstitution<'db>);
 enum RecursiveSubstitution<'db> {
     Unfold(RecursiveType<'db>),
     Bind(RecursiveBinding<'db>),
+}
+
+impl RecursiveSubstitution<'_> {
+    fn cycle(self, db: &dyn Db) -> RecursiveCycle {
+        match self {
+            Self::Unfold(recursive) | Self::Bind(RecursiveBinding::Constructor(recursive)) => {
+                recursive.cycle(db)
+            }
+            Self::Bind(RecursiveBinding::Alias(cycle)) => cycle,
+        }
+    }
 }
 
 /// Inference binds references to an alias across iterations; transformations bind an exact type.
@@ -102,7 +103,7 @@ impl<'db> RecursiveBinding<'db> {
     }
 }
 
-/// The query cycle that introduced a provisional recursive type.
+/// Identifies an alias query and names its recursive binder and variables.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct RecursiveCycle(salsa::Id);
 
@@ -123,8 +124,8 @@ impl get_size2::GetSize for RecursiveCycle {}
 /// ```
 ///
 /// Here `μF` binds the recursive constructor, and `λT` binds its type parameter.
-/// The occurrence `F[list[T]]` is stored as `RecursiveVar` with depth 0 and
-/// unspecialized arguments `[list[T]]`.
+/// The occurrence `F[list[T]]` is stored as `RecursiveVar` with the constructor's
+/// `RecursiveCycle` and unspecialized arguments `[list[T]]`.
 ///
 /// To infer the container subscript `x[1]` for `x: Tree[int]`, first unfold `x`'s type.
 /// Unfolding replaces references to the recursive binder with the recursive type
@@ -143,51 +144,12 @@ impl get_size2::GetSize for RecursiveCycle {}
 /// ```
 ///
 /// Tuple subscripting then selects the element at index 1: `x[1]: Tree[list[int]] | None`.
-///
-/// Using de Bruijn indices for recursive references, the constructor is:
-///
-/// ```text
-/// μ. λT. tuple[T, 0[list[T]] | None]
-/// ```
-///
-/// These indices count only recursive (`μ`) binders, not type parameters (`λT`).
-/// Mutually recursive aliases can refer to both inner and outer recursive binders:
-///
-/// ```python
-/// A = tuple[int, "B | None"]
-/// B = tuple[str, "A | None", "B | None"]
-/// ```
-///
-/// We can write `A` with named binders, then replace the references with indices:
-///
-/// ```text
-/// μa. tuple[int, (μb. tuple[str, a | None, b | None]) | None]
-/// μ.  tuple[int, (μ.  tuple[str, 1 | None, 0 | None]) | None]
-/// ```
-///
-/// To define unfolding in this notation, let `R = μ. B` have no free recursive
-/// variables. Let `U_d(X)` substitute `R` for references to its binder in `X`,
-/// beneath `d` nested recursive binders:
-///
-/// ```text
-/// unfold(R)  = U_0(B)
-/// U_d(i)     = R              if i = d
-///            = i              if i < d
-/// U_d(μ. X)  = μ. U_{d+1}(X)
-/// U_d(X[Y])  = U_d(X)[U_d(Y)]
-/// ```
-///
-/// For `A` above,
-///
-/// ```text
-/// unfold(A) = tuple[int, (μ. tuple[str, A | None, 0 | None]) | None]
-/// ```
 #[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
 pub struct RecursiveType<'db> {
     /// The defining symbol of the implicit alias, including for qualified references.
     #[returns(copy)]
     pub(super) definition: Definition<'db>,
-    /// Distinguishes the provisional types of different alias queries.
+    /// Names the binder and distinguishes provisional types of different alias queries.
     #[returns(copy)]
     cycle: RecursiveCycle,
     #[returns(copy)]
@@ -204,19 +166,20 @@ pub struct RecursiveType<'db> {
 impl get_size2::GetSize for RecursiveType<'_> {}
 
 impl<'db> RecursiveType<'db> {
-    /// Seed a query cycle with `μa. a`: index 0 refers to the binder created here.
+    /// Seed a query cycle with `μa. a`, using the same identity for binder and variable.
     pub(super) fn initial(
         db: &'db dyn Db,
         definition: Definition<'db>,
         cycle: salsa::Id,
         parameters: Option<GenericContext<'db>>,
     ) -> Self {
+        let cycle = RecursiveCycle(cycle);
         let arguments = parameters.map(|parameters| parameters.identity_specialization(db));
         Self::new_internal(
             db,
             definition,
-            RecursiveCycle(cycle),
-            Type::RecursiveVar(RecursiveVar::new_internal(db, 0, arguments)),
+            cycle,
+            Type::RecursiveVar(RecursiveVar::new_internal(db, cycle, arguments)),
             arguments,
             None,
         )
@@ -242,7 +205,7 @@ impl<'db> RecursiveType<'db> {
     }
 
     /// Bind occurrences of this recursive constructor in a closed result.
-    /// An occurrence under `d` existing binders becomes index `d` of the new outer binder.
+    /// Each bound occurrence retains its arguments and refers to this constructor's cycle.
     fn bind(
         self,
         db: &'db dyn Db,
@@ -332,8 +295,6 @@ impl<'db> RecursiveType<'db> {
     }
 
     /// Substitute closed types for references before exposing the body.
-    /// The traversal starts at depth 0 inside this binder; only nested recursive
-    /// bodies increase the depth used to identify references to this binder.
     pub fn unfold(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
         // A growing specialization cannot converge by repeating the same query key. Materialize
         // its closed unfolding directly, under the caller's recursion guard, instead.
@@ -366,9 +327,7 @@ impl<'db> RecursiveType<'db> {
         }
     }
 
-    /// Structural binding replaces matching constructors with a reference whose index
-    /// equals the visitor's depth. Other recursive bodies add one binder to that depth;
-    /// their application arguments use the original depth, outside their own binder.
+    /// Substitute by cycle identity, respecting the scope of nested recursive binders.
     pub(super) fn apply_type_mapping_impl(
         self,
         db: &'db dyn Db,
@@ -383,17 +342,16 @@ impl<'db> RecursiveType<'db> {
                 let arguments = self
                     .arguments(db)
                     .map(|arguments| arguments.apply_type_mapping_impl(db, mapping, &[], visitor));
-                Type::RecursiveVar(RecursiveVar::new_internal(
-                    db,
-                    visitor.recursive_depth,
-                    arguments,
-                ))
+                Type::RecursiveVar(RecursiveVar::new_internal(db, self.cycle(db), arguments))
             }
-            TypeMapping::Recursive(_) => {
-                let nested = visitor.with_recursive_binder();
-                let body = self
-                    .body(db)
-                    .apply_type_mapping_impl(db, mapping, tcx, &nested);
+            TypeMapping::Recursive(RecursiveMapping(substitution)) => {
+                // This binder shadows the target in its body, but not in its arguments.
+                let body = if self.cycle(db) == substitution.cycle(db) {
+                    self.body(db)
+                } else {
+                    self.body(db)
+                        .apply_type_mapping_impl(db, mapping, tcx, visitor)
+                };
                 let arguments = self
                     .arguments(db)
                     .map(|arguments| arguments.apply_type_mapping_impl(db, mapping, &[], visitor));

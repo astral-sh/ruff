@@ -59,9 +59,9 @@ impl<'db> AliasCycleSummary<'db> {
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
     ) -> Option<Type<'db>> {
         match ty {
-            // This walk does not enter nested binders, so the innermost binder
-            // is the recursive body being checked.
-            Type::RecursiveVar(reference) => reference.is_innermost(db).then_some(ty),
+            // Nested recursive binders stop this walk, so a bare reference closes
+            // an unguarded cycle in the recursive body being checked.
+            Type::RecursiveVar(_) => Some(ty),
             Type::TypeAlias(alias) => {
                 // Inspect the definition independently of its arguments. Nested applications like
                 // `Recursive[Recursive[int]]` can be finite even when `Recursive` has growing

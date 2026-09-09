@@ -460,10 +460,6 @@ type MaterializationEquivalenceVisitor<'db> =
 pub(crate) struct ApplyTypeMappingVisitor<'env, 'db> {
     env: &'env ProgramEnvironment<'db>,
     recursion_context: Option<&'env TypeRecursionContext<'db>>,
-    /// Number of nested recursive binders entered during a structural substitution.
-    /// Starts at 0 in the unfolded body or closed binding input, excluding the target
-    /// binder itself. Unfolding replaces variables at this index; binding creates them.
-    recursive_depth: u32,
     /// Whether materialization also transforms type-variable bounds and defaults.
     materialize_typevar_bounds_and_defaults: bool,
     default: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
@@ -481,7 +477,6 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
         Self {
             env,
             recursion_context: None,
-            recursive_depth: 0,
             materialize_typevar_bounds_and_defaults: true,
             default: OnceCell::default(),
             top_materialization: OnceCell::default(),
@@ -494,22 +489,13 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
         }
     }
 
-    /// Start fresh transformation caches at the same recursive binder depth.
+    /// Start fresh transformation caches for another mapping with the same context.
     fn fresh(&self) -> Self {
         Self {
             recursion_context: self.recursion_context,
-            recursive_depth: self.recursive_depth,
             materialize_typevar_bounds_and_defaults: self.materialize_typevar_bounds_and_defaults,
             ..Self::new(self.env)
         }
-    }
-
-    /// Enter a nested recursive body. The changed depth can give the same type a
-    /// different substitution result, so transformation caches must also be fresh.
-    fn with_recursive_binder(&self) -> Self {
-        let mut nested = self.fresh();
-        nested.recursive_depth += 1;
-        nested
     }
 
     fn with_recursion_context(mut self, context: Option<&'env TypeRecursionContext<'db>>) -> Self {
