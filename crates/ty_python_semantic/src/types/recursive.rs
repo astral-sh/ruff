@@ -54,9 +54,6 @@ impl<'db> RecursiveVar<'db> {
         mapping: &TypeMapping<'_, 'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Type<'db> {
-        let TypeMapping::Recursive(_) = mapping else {
-            unreachable!("semantic operation on an unbound recursive variable");
-        };
         let arguments = self
             .arguments(db)
             .map(|arguments| arguments.apply_type_mapping_impl(db, mapping, &[], visitor));
