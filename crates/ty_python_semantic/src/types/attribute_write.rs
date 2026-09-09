@@ -130,12 +130,8 @@ pub(super) enum ClassAttributeWriteMember<'db> {
 /// How an explicitly resolved member accepts a write.
 pub(super) enum ExplicitAttributeWriteRequirement<'db> {
     /// Invoke a concrete descriptor's `__set__` method.
-    ///
-    /// `setter_ty` is the unbound method and is called with `descriptor_ty`, the object, and the
-    /// assigned value.
     Descriptor {
         descriptor_ty: Type<'db>,
-        setter_ty: Type<'db>,
         qualifiers: TypeQualifiers,
     },
     /// Check the assigned value directly against the member's effective write type.
@@ -594,13 +590,12 @@ fn explicit_attribute_write_requirement<'db>(
         };
     }
 
-    if let Place::Defined(DefinedPlace { ty: setter_ty, .. }) = attr_ty
+    if let Place::Defined(_) = attr_ty
         .class_member_with_policy(db, env, "__set__", MemberLookupPolicy::REQUIRE_CONCRETE)
         .place
     {
         ExplicitAttributeWriteRequirement::Descriptor {
             descriptor_ty: attr_ty,
-            setter_ty,
             qualifiers,
         }
     } else {
@@ -868,6 +863,21 @@ pub(super) fn assignment_attribute_members<'db>(
     })
 }
 
+pub(super) fn descriptor_setter<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    descriptor_ty: Type<'db>,
+) -> Place<'db> {
+    descriptor_ty
+        .member_lookup_with_policy(
+            db,
+            env,
+            "__set__",
+            MemberLookupPolicy::REQUIRE_CONCRETE | MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+        )
+        .place
+}
+
 /// The values accepted by a descriptor setter, when representable as a single type.
 #[derive(Copy, Clone)]
 pub(super) enum DescriptorSetterDomain<'db> {
@@ -883,6 +893,7 @@ pub(super) fn descriptor_setter_domain<'db>(
     descriptor_ty: Type<'db>,
     receiver_ty: Type<'db>,
 ) -> DescriptorSetterDomain<'db> {
+    let descriptor_ty = descriptor_ty.resolve_type_alias(db);
     match descriptor_ty {
         Type::Union(union) => {
             let mut write_types = Vec::with_capacity(union.elements(db).len());
@@ -909,20 +920,23 @@ fn single_descriptor_setter_domain<'db>(
     descriptor_ty: Type<'db>,
     receiver_ty: Type<'db>,
 ) -> DescriptorSetterDomain<'db> {
-    let Place::Defined(DefinedPlace {
-        ty: setter_ty,
-        definedness: Definedness::AlwaysDefined,
-        ..
-    }) = descriptor_ty
-        .member_lookup_with_policy(
-            db,
-            env,
-            "__set__",
-            MemberLookupPolicy::REQUIRE_CONCRETE | MemberLookupPolicy::NO_INSTANCE_FALLBACK,
-        )
-        .place
-    else {
-        return DescriptorSetterDomain::Missing;
+    let (setter_ty, self_ty) = if let Type::PropertyInstance(property) = descriptor_ty {
+        // The synthesized `property.__set__` signature accepts `object`, but the property's
+        // setter provides the actual value type. An owner method's `Self` refers to that owner.
+        let Some(setter_ty) = property.setter(db) else {
+            return DescriptorSetterDomain::Missing;
+        };
+        (setter_ty, receiver_ty)
+    } else {
+        let Place::Defined(DefinedPlace {
+            ty: setter_ty,
+            definedness: Definedness::AlwaysDefined,
+            ..
+        }) = descriptor_setter(db, env, descriptor_ty)
+        else {
+            return DescriptorSetterDomain::Missing;
+        };
+        (setter_ty, descriptor_ty)
     };
 
     let Some(callables) = setter_ty.try_upcast_to_callable(db, env) else {
@@ -932,8 +946,7 @@ fn single_descriptor_setter_domain<'db>(
     for callable in &callables {
         let mut write_types = Vec::new();
         for signature in callable.signatures(db) {
-            match descriptor_setter_signature_domain(db, env, signature, descriptor_ty, receiver_ty)
-            {
+            match descriptor_setter_signature_domain(db, env, signature, self_ty, receiver_ty) {
                 DescriptorSetterSignatureDomain::Inapplicable => {}
                 DescriptorSetterSignatureDomain::Known(write_ty) => write_types.push(write_ty),
                 DescriptorSetterSignatureDomain::Deferred => {
@@ -955,12 +968,12 @@ enum DescriptorSetterSignatureDomain<'db> {
     Deferred,
 }
 
-/// Derive the values accepted by one `__set__` overload when they fit in [`Type`].
+/// Derive the values accepted by one setter overload when they fit in [`Type`].
 fn descriptor_setter_signature_domain<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     signature: &Signature<'db>,
-    descriptor_ty: Type<'db>,
+    self_ty: Type<'db>,
     receiver_ty: Type<'db>,
 ) -> DescriptorSetterSignatureDomain<'db> {
     let parameters = signature.parameters();
@@ -985,10 +998,9 @@ fn descriptor_setter_signature_domain<'db>(
     let Some(receiver_parameter) = parameters.get_positional(0) else {
         return missing_required_parameter();
     };
-    let receiver_parameter =
-        receiver_parameter
-            .annotated_type()
-            .bind_self_typevars(db, env, descriptor_ty);
+    let receiver_parameter = receiver_parameter
+        .annotated_type()
+        .bind_self_typevars(db, env, self_ty);
     if contains_signature_typevar(db, env, signature, receiver_parameter) {
         return DescriptorSetterSignatureDomain::Deferred;
     }
@@ -1001,7 +1013,7 @@ fn descriptor_setter_signature_domain<'db>(
     };
     let write_ty = write_parameter
         .annotated_type()
-        .bind_self_typevars(db, env, descriptor_ty);
+        .bind_self_typevars(db, env, self_ty);
     if !contains_signature_typevar(db, env, signature, write_ty) {
         return DescriptorSetterSignatureDomain::Known(write_ty);
     }
@@ -1023,7 +1035,7 @@ fn descriptor_setter_signature_domain<'db>(
 
     match typevar.require_bound_or_constraints(db, env) {
         TypeVarBoundOrConstraints::UpperBound(bound) => {
-            DescriptorSetterSignatureDomain::Known(bound.bind_self_typevars(db, env, descriptor_ty))
+            DescriptorSetterSignatureDomain::Known(bound.bind_self_typevars(db, env, self_ty))
         }
         TypeVarBoundOrConstraints::Constraints(_) => DescriptorSetterSignatureDomain::Deferred,
     }

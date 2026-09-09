@@ -11,7 +11,7 @@ use crate::types::attribute_write::{
     AttributeWriteRequirement, ClassAttributeWriteMember, DescriptorSetterDomain,
     ExplicitAttributeWriteRequirement, FallbackAttributeWriteRequirement,
     InstanceAttributeWriteMember, ProtocolMemberWriteRequirement, attribute_write_requirement,
-    descriptor_setter_domain,
+    descriptor_setter, descriptor_setter_domain,
 };
 use crate::types::call::{CallArguments, CallDunderError};
 use crate::types::overrides::{VariableKind, effective_superclass_variable_kind};
@@ -2591,23 +2591,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             return self.never();
         }
         match requirement {
-            ExplicitAttributeWriteRequirement::Descriptor {
-                descriptor_ty,
-                setter_ty,
-                ..
-            } => {
+            ExplicitAttributeWriteRequirement::Descriptor { descriptor_ty, .. } => {
                 if let Some(property) = descriptor_ty.as_property_instance()
                     && let Some(set_type) = property_set_type(db, self.env, property, object_ty)
                 {
                     return self.check_type_pair(db, value_ty, set_type);
                 }
-                self.check_descriptor_property_write(
-                    db,
-                    *descriptor_ty,
-                    *setter_ty,
-                    object_ty,
-                    value_ty,
-                )
+                self.check_descriptor_property_write(db, *descriptor_ty, object_ty, value_ty)
             }
             ExplicitAttributeWriteRequirement::AssignableTo { ty, .. } => {
                 self.check_type_pair(db, value_ty, *ty)
@@ -2619,23 +2609,39 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         &self,
         db: &'db dyn Db,
         descriptor_ty: Type<'db>,
-        setter_ty: Type<'db>,
         object_ty: Type<'db>,
         value_ty: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
         let env = self.env;
-        if setter_ty
-            .try_call(
+        let descriptor_ty = descriptor_ty.resolve_type_alias(db);
+        if let Type::Union(union) = descriptor_ty {
+            return union
+                .elements(db)
+                .iter()
+                .when_all(db, self.constraints, |descriptor_ty| {
+                    self.check_descriptor_property_write(db, *descriptor_ty, object_ty, value_ty)
+                });
+        }
+        if matches!(
+            descriptor_ty.try_call_dunder_with_policy(
                 db,
                 env,
-                &CallArguments::positional([descriptor_ty, object_ty, Type::unknown()]),
-            )
-            .is_err()
-        {
+                "__set__",
+                &mut CallArguments::positional([object_ty, Type::unknown()]),
+                TypeContext::default(),
+                MemberLookupPolicy::REQUIRE_CONCRETE,
+            ),
+            Err(CallDunderError::CallError(..) | CallDunderError::MethodNotAvailable)
+        ) {
             return self.never();
         }
+        let Place::Defined(DefinedPlace { ty: setter_ty, .. }) =
+            descriptor_setter(db, env, descriptor_ty)
+        else {
+            return self.never();
+        };
 
-        self.check_callable_write_parameter(db, setter_ty, 2, descriptor_ty, value_ty)
+        self.check_callable_write_parameter(db, setter_ty, 1, descriptor_ty, value_ty)
     }
 
     fn check_setattr_property_write(
