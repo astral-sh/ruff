@@ -620,11 +620,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if is_decorated_overload_implementation {
             // Overloads describe the exposed function. The implementation check compares the
             // unbound callable, before classmethod or staticmethod descriptor binding.
-            let implementation_ty = match inferred_ty {
+            let unwrap_method = |ty| match ty {
                 Type::KnownInstance(KnownInstanceType::MethodWrapper(wrapper)) => {
                     wrapper.wrapped(db)
                 }
-                _ => inferred_ty,
+                _ => ty,
+            };
+            let implementation_ty = match inferred_ty {
+                Type::Union(union) => {
+                    union.map(db, self.program_environment(), |ty| unwrap_method(*ty))
+                }
+                _ => unwrap_method(inferred_ty),
             };
             let last_definition = match inferred_ty {
                 Type::FunctionLiteral(function) => Some(function.literal(db).last_definition),
