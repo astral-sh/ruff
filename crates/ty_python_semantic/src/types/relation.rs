@@ -2624,6 +2624,14 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 self.check_type_pair(db, KnownClass::FunctionType.to_instance(db, env), target)
             }
 
+            // Method-wrapper callables are subtypes of `MethodWrapperType`.
+            (Type::Callable(callable), _) if callable.is_method_wrapper(db) => self
+                .check_type_pair(
+                    db,
+                    KnownClass::MethodWrapperType.to_instance(db, env),
+                    target,
+                ),
+
             (Type::Callable(_), _) => self.never(),
 
             (Type::BoundSuper(source), Type::BoundSuper(target)) => self

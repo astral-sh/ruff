@@ -609,6 +609,54 @@ Base.method("x")  # error: [no-matching-overload]
 Other.method(1)  # error: [no-matching-overload]
 ```
 
+## Extracted `__call__` methods do not bind again
+
+A bound method's `__call__` retains the method's signature. Storing it on another class does not
+bind that class's instance to its first remaining parameter.
+
+```py
+from types import MethodWrapperType
+
+class A:
+    def method(self, value: int) -> int:
+        return value
+
+callback = A().method.__call__
+reveal_type(callback.__name__)  # revealed: str
+reveal_type(callback.__qualname__)  # revealed: str
+reveal_type(bool(callback))  # revealed: Literal[True]
+method_wrapper: MethodWrapperType = callback
+
+class B:
+    callback = callback
+
+reveal_type(B.callback(1))  # revealed: int
+reveal_type(B().callback(1))  # revealed: int
+B().callback("wrong")  # error: [invalid-argument-type]
+```
+
+The same applies to `__call__` extracted from a `staticmethod` descriptor: its underlying function
+still requires all its declared arguments after the extracted method is stored on a class.
+
+```py
+def stringify(value: int) -> str:
+    return str(value)
+
+wrapped = staticmethod(stringify)
+callback = wrapped.__call__
+reveal_type(callback.__name__)  # revealed: str
+reveal_type(callback.__qualname__)  # revealed: str
+reveal_type(bool(callback))  # revealed: Literal[True]
+method_wrapper: MethodWrapperType = callback
+
+class C:
+    callback = callback
+
+reveal_type(C.callback(1))  # revealed: str
+reveal_type(C().callback(1))  # revealed: str
+C().callback("wrong")  # error: [invalid-argument-type]
+```
+
 ## Generic inference for method wrappers
 
 When a generic function returns a mutable container, inference can widen literal types in its
