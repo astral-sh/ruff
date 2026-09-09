@@ -60,7 +60,7 @@ use crate::types::generics::Specialization;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     ClassLiteral, KnownClass, RecursiveType, StaticClassLiteral, Type, TypeAndQualifiers,
-    TypeQualifiers,
+    TypeQualifiers, any_over_type,
 };
 use crate::{Db, FxIndexSet};
 
@@ -80,6 +80,13 @@ mod comparisons;
 #[cfg(test)]
 mod tests;
 
+/// An alias query retains whether its result came from a cycle even if binding removes recursion.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, salsa::SalsaValue, get_size2::GetSize)]
+struct RecursiveAliasInference<'db> {
+    ty: Type<'db>,
+    recursive: bool,
+}
+
 /// Infer the type denoted by an implicit alias independently of its runtime value.
 ///
 /// `_parameters` supplies the formal type parameters collected by [`implicit_alias_parameters`].
@@ -94,27 +101,30 @@ mod tests;
 #[salsa::tracked(
     returns(copy),
     cycle_initial=|db, id, definition: Definition<'db>, parameters: Option<crate::types::GenericContext<'db>>| {
-        Type::Recursive(RecursiveType::initial(db, definition, id, parameters))
+        RecursiveAliasInference { ty: Type::Recursive(RecursiveType::initial(db, definition, id, parameters)), recursive: true }
     },
-    cycle_fn=|db, cycle: &salsa::Cycle, _: &Type<'db>, result: Type<'db>, definition: Definition<'db>, parameters: Option<crate::types::GenericContext<'db>>| {
-        RecursiveType::recover(db, definition, cycle.id(), parameters, result)
+    cycle_fn=|db, cycle: &salsa::Cycle, _: &RecursiveAliasInference<'db>, result: RecursiveAliasInference<'db>, definition: Definition<'db>, parameters: Option<crate::types::GenericContext<'db>>| {
+        RecursiveAliasInference { ty: RecursiveType::recover(db, definition, cycle.id(), parameters, result.ty), recursive: true }
     },
     heap_size=ruff_memory_usage::heap_size
 )]
-pub(super) fn infer_recursive_implicit_alias<'db>(
+fn infer_recursive_implicit_alias<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
     _parameters: Option<crate::types::GenericContext<'db>>,
-) -> Type<'db> {
+) -> RecursiveAliasInference<'db> {
     let program_file = definition.program_file(db);
     let python_file = program_file.python_file(db);
     let module = parsed_module(db, python_file).load(db);
     let Some(value) = definition.kind(db).value(&module) else {
-        return Type::unknown();
+        return RecursiveAliasInference {
+            ty: Type::unknown(),
+            recursive: false,
+        };
     };
     let index = semantic_index(db, program_file);
     let env = ProgramEnvironment::from_file(program_file);
-    TypeInferenceBuilder::new(
+    let ty = TypeInferenceBuilder::new(
         db,
         &env,
         InferenceRegion::Definition(definition),
@@ -123,7 +133,11 @@ pub(super) fn infer_recursive_implicit_alias<'db>(
         index,
         &module,
     )
-    .finish_recursive_implicit_alias(definition, value)
+    .finish_recursive_implicit_alias(definition, value);
+    RecursiveAliasInference {
+        ty,
+        recursive: any_over_type(db, &env, ty, false, |ty| matches!(ty, Type::Recursive(_))),
+    }
 }
 
 bitflags::bitflags! {
