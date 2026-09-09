@@ -31,7 +31,7 @@ use crate::lint::LintMetadata;
 use crate::place::{DefinedPlace, Definedness, Place};
 use crate::subscript::PyIndex;
 use crate::types::ProgramEnvironment;
-use crate::types::call::arguments::{CallArgumentTypes, Expansion, is_expandable_type};
+use crate::types::call::arguments::{CallArgumentExpansions, CallArgumentTypes, Expansion};
 use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, PathBound, PathBoundSolution, PathBounds, SolutionPaths,
@@ -3792,8 +3792,9 @@ impl<'db> CallableBinding<'db> {
         // provisional. If we have an arity-2 overload and an arity-3 overload, and the call has
         // `*arg` where `arg` is a union of a 2-tuple and a 3-tuple, we shouldn't eliminate any
         // overload for arity reasons before trying argument expansion.
+        let argument_expansions = call_arguments.expansions(db, env);
         let (should_retry_after_provisional_arity, overloads_for_expansion) =
-            if self.should_retry_after_provisional_arity(db, env, call_arguments.as_ref()) {
+            if self.should_retry_after_provisional_arity(&argument_expansions) {
                 // We will retry all overloads after argument expansion.
                 (true, (0..self.overloads.len()).collect())
             } else {
@@ -3906,7 +3907,7 @@ impl<'db> CallableBinding<'db> {
 
         // Step 3: Perform "argument type expansion". Reference:
         // https://typing.python.org/en/latest/spec/overload.html#argument-type-expansion
-        let mut expansions = call_arguments.expand(db, env).peekable();
+        let mut expansions = argument_expansions.iter().peekable();
 
         // Return early if there are no argument types to expand.
         if expansions.peek().is_none() {
@@ -3928,7 +3929,7 @@ impl<'db> CallableBinding<'db> {
             let Some(argument_type) = argument_types.get_default() else {
                 continue;
             };
-            if is_expandable_type(db, env, argument_type) {
+            if argument_expansions.argument_types(argument_index).is_some() {
                 continue;
             }
             let is_argument_assignable_to_any_overload = self.overloads.iter().any(|overload| {
@@ -4160,7 +4161,7 @@ impl<'db> CallableBinding<'db> {
         env: &ProgramEnvironment<'db>,
         call_arguments: &CallArguments<'_, 'db>,
     ) -> SmallVec<[usize; 1]> {
-        if self.should_retry_after_provisional_arity(db, env, call_arguments) {
+        if self.should_retry_after_provisional_arity(&call_arguments.expansions(db, env)) {
             (0..self.overloads.len()).collect()
         } else {
             self.matching_overloads().map(|(index, _)| index).collect()
@@ -4169,18 +4170,11 @@ impl<'db> CallableBinding<'db> {
 
     fn should_retry_after_provisional_arity(
         &self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        call_arguments: &CallArguments<'_, 'db>,
+        expansions: &CallArgumentExpansions<'_, '_, 'db>,
     ) -> bool {
         self.overloads.len() > 1
             && self.matching_overloads().count() < self.overloads.len()
-            && call_arguments.iter().any(|(argument, argument_types)| {
-                matches!(argument, Argument::Variadic)
-                    && argument_types
-                        .get_default()
-                        .is_some_and(|argument_type| is_expandable_type(db, env, argument_type))
-            })
+            && expansions.has_expandable_variadic()
     }
 
     /// Filter overloads based on variadic argument to variadic parameter match.
