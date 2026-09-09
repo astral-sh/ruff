@@ -32,6 +32,7 @@ error[invalid-key]: Unknown key "Retries" for TypedDict `Config`
   |     ------ ^^^^^^^^^ Did you mean "retries"?
   |     |
   |     TypedDict `Config`
+help: Replace with "retries"
   |
 6 | def _(config: Config) -> None:
   -     config["Retries"] = 30.0  # error: [invalid-key]

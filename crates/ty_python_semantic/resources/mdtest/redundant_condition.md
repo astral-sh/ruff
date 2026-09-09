@@ -38,6 +38,7 @@ warning[redundant-condition]: Function `func` is always truthy
   |
 3 | if func:  # snapshot: redundant-condition
   |    ^^^^ Did you mean to call this function?
+help: Replace with `func()`
   |
 2 |
   - if func:  # snapshot: redundant-condition
@@ -65,6 +66,7 @@ warning[redundant-condition]: Method `Foo.bar` is always truthy
    |
 10 |         if self.bar:  # snapshot: redundant-condition
    |            ^^^^^^^^ Did you mean to call this method?
+help: Replace with `self.bar()`
    |
 9  |     def baz(self):
    -         if self.bar:  # snapshot: redundant-condition
@@ -764,6 +766,7 @@ warning[redundant-condition]: Function `func` is always truthy
   |
 3 |     if flag and func:  # snapshot: redundant-condition
   |                 ^^^^ Did you mean to call this function?
+help: Replace with `func()`
   |
 2 | def compound_statement_conditions(flag: bool, other: bool):
   -     if flag and func:  # snapshot: redundant-condition
@@ -778,6 +781,7 @@ warning[redundant-condition]: Function `func` is always truthy
    |
 19 |     selected = True if flag and func else False  # snapshot: redundant-condition
    |                                 ^^^^ Did you mean to call this function?
+help: Replace with `func()`
    |
 18 | def compound_expression_conditions(flag: bool):
    -     selected = True if flag and func else False  # snapshot: redundant-condition
@@ -792,6 +796,7 @@ warning[redundant-condition]: Function `func` is always truthy
    |
 24 |     assert flag and func  # snapshot: redundant-condition
    |                     ^^^^ Did you mean to call this function?
+help: Replace with `func()`
    |
 23 | def compound_assertion_condition(flag: bool):
    -     assert flag and func  # snapshot: redundant-condition
@@ -976,6 +981,7 @@ warning[redundant-condition]: Function `coroutine` is always truthy
   |
 3 |     if coroutine:  # snapshot: redundant-condition
   |        ^^^^^^^^^ Did you mean to `await` and call this function?
+help: Replace with `await coroutine()`
   |
 2 | async def inspect_async_function():
   -     if coroutine:  # snapshot: redundant-condition
@@ -1014,6 +1020,7 @@ warning[redundant-condition]: Function `always_truthy` is always truthy
   |
 7 |     if always_truthy:  # snapshot: redundant-condition
   |        ^^^^^^^^^^^^^ Did you mean to call this function?
+help: Replace with `always_truthy()`
   |
 6 | def inspect_truthy_function():
   -     if always_truthy:  # snapshot: redundant-condition
@@ -1028,6 +1035,7 @@ warning[redundant-condition]: Function `always_truthy_coro` is always truthy
    |
 14 |     if always_truthy_coro:  # snapshot: redundant-condition
    |        ^^^^^^^^^^^^^^^^^^ Did you mean to `await` and call this function?
+help: Replace with `await always_truthy_coro()`
    |
 13 | async def foo():
    -     if always_truthy_coro:  # snapshot: redundant-condition
@@ -1061,6 +1069,7 @@ warning[redundant-condition]: Function `wut` is always truthy
   |
 3 | if wut:  # snapshot: redundant-condition
   |    ^^^ Did you mean to call this function?
+help: Replace with `wut(...)`
   |
 2 |
   - if wut:  # snapshot: redundant-condition
@@ -1075,6 +1084,7 @@ warning[redundant-condition]: Function `wuttt` is always truthy
   |
 8 |     if wuttt:  # snapshot: redundant-condition
   |        ^^^^^ Did you mean to `await` and call this function?
+help: Replace with `await wuttt(...)`
   |
 7 | async def bar():
   -     if wuttt:  # snapshot: redundant-condition
@@ -1110,6 +1120,7 @@ warning[redundant-condition]: Function `asynchronous` is always truthy
    |
 11 |     if asynchronous:  # snapshot: redundant-condition
    |        ^^^^^^^^^^^^ Did you mean to `await` and call this function?
+help: Replace with `await asynchronous(...)`
    |
 10 | async def inspect_asynchronous_overloads():
    -     if asynchronous:  # snapshot: redundant-condition
@@ -1141,6 +1152,7 @@ warning[redundant-condition]: Function `mixed` is always truthy
    |
 21 |     if mixed:  # snapshot: redundant-condition
    |        ^^^^^ Did you mean to call this function?
+help: Replace with `mixed(...)`
    |
 20 | async def inspect_mixed_overloads():
    -     if mixed:  # snapshot: redundant-condition
@@ -1190,6 +1202,7 @@ warning[redundant-condition]: Function `unannotated` is always truthy
    |
 18 |     if unannotated:  # snapshot: redundant-condition
    |        ^^^^^^^^^^^ Did you mean to call this function?
+help: Replace with `unannotated()`
    |
 17 | async def check_synchronous_functions():
    -     if unannotated:  # snapshot: redundant-condition
@@ -1204,6 +1217,7 @@ warning[redundant-condition]: Function `dynamic` is always truthy
    |
 20 |     if dynamic:  # snapshot: redundant-condition
    |        ^^^^^^^ Did you mean to call this function?
+help: Replace with `dynamic()`
    |
 19 |         pass
    -     if dynamic:  # snapshot: redundant-condition
@@ -1218,6 +1232,7 @@ warning[redundant-condition]: Function `terminate` is always truthy
    |
 22 |     if terminate:  # snapshot: redundant-condition
    |        ^^^^^^^^^ Did you mean to call this function?
+help: Replace with `terminate()`
    |
 21 |         pass
    -     if terminate:  # snapshot: redundant-condition
@@ -1232,6 +1247,7 @@ warning[redundant-condition]: Function `terminate_via_alias` is always truthy
    |
 24 |     if terminate_via_alias:  # snapshot: redundant-condition
    |        ^^^^^^^^^^^^^^^^^^^ Did you mean to call this function?
+help: Replace with `terminate_via_alias()`
    |
 23 |         pass
    -     if terminate_via_alias:  # snapshot: redundant-condition
@@ -1275,6 +1291,7 @@ warning[redundant-condition]: Function `make_coroutine` is always truthy
    |
 11 |     if make_coroutine:  # snapshot: redundant-condition
    |        ^^^^^^^^^^^^^^ Did you mean to `await` and call this function?
+help: Replace with `await make_coroutine()`
    |
 10 | async def check_coroutine_factory():
    -     if make_coroutine:  # snapshot: redundant-condition
@@ -2536,6 +2553,7 @@ warning[redundant-condition]: Function `func` is always truthy
    |
 28 |     selected = not func if flag else not func
    |                    ^^^^ Did you mean to call this function?
+help: Replace with `func()`
    |
 27 |     # snapshot: redundant-condition
    -     selected = not func if flag else not func
@@ -2550,6 +2568,7 @@ warning[redundant-condition]: Function `func` is always truthy
    |
 28 |     selected = not func if flag else not func
    |                                          ^^^^ Did you mean to call this function?
+help: Replace with `func()`
    |
 27 |     # snapshot: redundant-condition
    -     selected = not func if flag else not func
