@@ -52,7 +52,7 @@ export default function Playground() {
         setError,
         () => dispatchFiles({ type: "documentChanged" }),
       );
-      restoreWorkspace(session, fetched.workspace, dispatchFiles, setError);
+      restoreWorkspace(session, fetched.workspace, dispatchFiles);
       setSession(session);
       return session;
     });
@@ -101,7 +101,11 @@ export default function Playground() {
     if (serialized != null) {
       const downloadFiles = { ...serialized.files };
 
-      if (SETTINGS_FILE_NAME in downloadFiles) {
+      if (
+        SETTINGS_FILE_NAME in downloadFiles &&
+        !("ty.toml" in downloadFiles) &&
+        !("pyproject.toml" in downloadFiles)
+      ) {
         try {
           const toml = await import("smol-toml");
           const tomlContent = toml.stringify(
@@ -129,12 +133,17 @@ export default function Playground() {
       let handle = null;
 
       if (name === SETTINGS_FILE_NAME) {
-        updateOptions(workspace, "{}", setError);
+        if (!session.hasConfigurationFile()) {
+          updateOptions(workspace, "{}", setError);
+        }
       } else {
         handle = workspace.openFile(name, "");
       }
 
       const model = session.openDocument(name, "", handle);
+      if (isOptionsFile(name) && name !== SETTINGS_FILE_NAME) {
+        session.syncOptions();
+      }
       dispatchFiles({
         type: "add",
         name,
@@ -162,19 +171,18 @@ export default function Playground() {
       const content = session.text(oldName) ?? "";
       const handle = oldFile.handle;
       let newHandle: FileHandle | null = null;
-      if (handle == null) {
-        updateOptions(workspace, null, setError);
-      } else {
+      if (handle != null) {
         workspace.closeFile(handle);
       }
 
-      if (newName === SETTINGS_FILE_NAME) {
-        updateOptions(workspace, content, setError);
-      } else {
+      if (newName !== SETTINGS_FILE_NAME) {
         newHandle = workspace.openFile(newName, content);
       }
 
       const model = session.renameDocument(oldName, newName, newHandle);
+      if (isOptionsFile(oldName) || isOptionsFile(newName)) {
+        session.syncOptions();
+      }
       dispatchFiles({
         type: "rename",
         id: file,
@@ -191,13 +199,14 @@ export default function Playground() {
       const workspace = session.workspace;
       const removedFile = files.metadata[file];
       const { handle, name } = removedFile;
-      if (handle == null) {
-        updateOptions(workspace, null, setError);
-      } else {
+      if (handle != null) {
         workspace.closeFile(handle);
       }
 
       session.closeDocument(name);
+      if (isOptionsFile(name)) {
+        session.syncOptions();
+      }
       dispatchFiles({ type: "remove", id: file });
     },
     [files.metadata],
@@ -238,7 +247,7 @@ export default function Playground() {
     );
     dispatchFiles({ type: "reset" });
 
-    restoreWorkspace(session, DEFAULT_WORKSPACE, dispatchFiles, setError);
+    restoreWorkspace(session, DEFAULT_WORKSPACE, dispatchFiles);
   }, [session, files]);
 
   return (
@@ -284,6 +293,14 @@ export default function Playground() {
         </div>
       ) : null}
     </main>
+  );
+}
+
+function isOptionsFile(name: string): boolean {
+  return (
+    name === SETTINGS_FILE_NAME ||
+    name === "ty.toml" ||
+    name === "pyproject.toml"
   );
 }
 
@@ -715,6 +732,19 @@ export class PlaygroundSession {
     return this.model(name)?.getValue() ?? null;
   }
 
+  syncOptions(): void {
+    const content = this.hasConfigurationFile()
+      ? "{}"
+      : this.text(SETTINGS_FILE_NAME);
+    updateOptions(this.workspace, content, this.setError);
+  }
+
+  hasConfigurationFile(): boolean {
+    return (
+      this.model("ty.toml") != null || this.model("pyproject.toml") != null
+    );
+  }
+
   private registerModelChanged(
     name: string,
     handle: FileHandle | null,
@@ -725,7 +755,7 @@ export class PlaygroundSession {
 
       if (handle != null) {
         updateFile(this.workspace, handle, content, this.setError);
-      } else if (name === SETTINGS_FILE_NAME) {
+      } else if (name === SETTINGS_FILE_NAME && !this.hasConfigurationFile()) {
         updateOptions(this.workspace, content, this.setError);
       }
 
@@ -767,10 +797,8 @@ function restoreWorkspace(
     current: string;
   },
   dispatchFiles: ActionDispatch<[FileAction]>,
-  setError: (error: string | null) => void,
 ) {
   const workspace = session.workspace;
-  let hasSettings = false;
 
   // oxlint-disable-next-line prefer-const
   for (let [name, content] of Object.entries(state.files)) {
@@ -783,10 +811,7 @@ function restoreWorkspace(
       name = SETTINGS_FILE_NAME;
     }
 
-    if (name === SETTINGS_FILE_NAME) {
-      updateOptions(workspace, content, setError);
-      hasSettings = true;
-    } else {
+    if (name !== SETTINGS_FILE_NAME) {
       handle = workspace.openFile(name, content);
     }
 
@@ -799,9 +824,7 @@ function restoreWorkspace(
     });
   }
 
-  if (!hasSettings) {
-    updateOptions(workspace, null, setError);
-  }
+  session.syncOptions();
 
   const selected =
     state.current === "knot.json" ? SETTINGS_FILE_NAME : state.current;
