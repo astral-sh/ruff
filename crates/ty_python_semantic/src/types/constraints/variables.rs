@@ -1059,76 +1059,12 @@ impl<'db> TypeVarEquivalenceBound<'db> {
         }
     }
 
-    pub(super) fn forwards(self) -> impl ProvidesTypeVarEquivalenceBound<'db> {
-        #[derive(Clone, Copy)]
-        struct Forwards<'db>(TypeVarEquivalenceBound<'db>);
-
-        impl<'db> From<Forwards<'db>> for Constraint<'db> {
-            fn from(bound: Forwards<'db>) -> Constraint<'db> {
-                Constraint::TypeVarEquivalence(bound.0)
-            }
-        }
-
-        impl<'db> ProvidesTypeVarBound<'db> for Forwards<'db> {
-            fn provenance(self) -> ConstraintProvenance {
-                self.0.provenance
-            }
-
-            fn left(self) -> BoundTypeVarInstance<'db> {
-                self.0.left
-            }
-
-            fn right(self) -> BoundTypeVarInstance<'db> {
-                self.0.right
-            }
-
-            fn is_equivalence(self) -> bool {
-                true
-            }
-        }
-
-        impl<'db> ProvidesTypeVarRangeBound<'db> for Forwards<'db> {}
-        impl<'db> ProvidesTypeVarEquivalenceBound<'db> for Forwards<'db> {}
-
-        Forwards(self)
+    pub(super) fn forwards(self) -> TypeVarEquivalenceDirectedView<'db> {
+        TypeVarEquivalenceDirectedView(self, false)
     }
 
-    pub(super) fn backwards(self) -> impl ProvidesTypeVarEquivalenceBound<'db> {
-        #[derive(Clone, Copy)]
-        struct Backwards<'db>(TypeVarEquivalenceBound<'db>);
-
-        impl<'db> From<Backwards<'db>> for Constraint<'db> {
-            fn from(bound: Backwards<'db>) -> Constraint<'db> {
-                Constraint::TypeVarEquivalence(bound.0)
-            }
-        }
-
-        impl<'db> ProvidesTypeVarBound<'db> for Backwards<'db> {
-            fn provenance(self) -> ConstraintProvenance {
-                self.0.provenance
-            }
-
-            #[expect(clippy::misnamed_getters)]
-            fn left(self) -> BoundTypeVarInstance<'db> {
-                // Reversed!
-                self.0.right
-            }
-
-            #[expect(clippy::misnamed_getters)]
-            fn right(self) -> BoundTypeVarInstance<'db> {
-                // Reversed!
-                self.0.left
-            }
-
-            fn is_equivalence(self) -> bool {
-                true
-            }
-        }
-
-        impl<'db> ProvidesTypeVarRangeBound<'db> for Backwards<'db> {}
-        impl<'db> ProvidesTypeVarEquivalenceBound<'db> for Backwards<'db> {}
-
-        Backwards(self)
+    pub(super) fn backwards(self) -> TypeVarEquivalenceDirectedView<'db> {
+        TypeVarEquivalenceDirectedView(self, true)
     }
 
     fn apply_type_mapping_impl(
@@ -1195,3 +1131,42 @@ impl<'db> From<TypeVarEquivalenceBound<'db>> for Constraint<'db> {
         Constraint::TypeVarEquivalence(bound)
     }
 }
+
+#[derive(Clone, Copy)]
+pub(super) struct TypeVarEquivalenceDirectedView<'db>(TypeVarEquivalenceBound<'db>, bool);
+
+impl<'db> From<TypeVarEquivalenceDirectedView<'db>> for Constraint<'db> {
+    fn from(bound: TypeVarEquivalenceDirectedView<'db>) -> Constraint<'db> {
+        Constraint::TypeVarEquivalence(bound.0)
+    }
+}
+
+impl TypeVarEquivalenceDirectedView<'_> {
+    pub(super) fn reverse(self) -> Self {
+        let Self(bound, reversed) = self;
+        Self(bound, !reversed)
+    }
+}
+
+impl<'db> ProvidesTypeVarBound<'db> for TypeVarEquivalenceDirectedView<'db> {
+    fn provenance(self) -> ConstraintProvenance {
+        self.0.provenance
+    }
+
+    fn left(self) -> BoundTypeVarInstance<'db> {
+        let Self(bound, reversed) = self;
+        if reversed { bound.right } else { bound.left }
+    }
+
+    fn right(self) -> BoundTypeVarInstance<'db> {
+        let Self(bound, reversed) = self;
+        if reversed { bound.left } else { bound.right }
+    }
+
+    fn is_equivalence(self) -> bool {
+        true
+    }
+}
+
+impl<'db> ProvidesTypeVarRangeBound<'db> for TypeVarEquivalenceDirectedView<'db> {}
+impl<'db> ProvidesTypeVarEquivalenceBound<'db> for TypeVarEquivalenceDirectedView<'db> {}
