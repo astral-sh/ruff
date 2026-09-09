@@ -2327,6 +2327,38 @@ def invalid_odd() -> Odd:
     return ((1,),)  # error: [invalid-return-type]
 ```
 
+### Self-recursion within mutually recursive aliases
+
+An inner tuple can refer both to itself and to the outer tuple. Indexing preserves their distinct
+element types, and both references enforce those types on returned values.
+
+```py
+Outer = tuple[int, "Inner | None"]
+Inner = tuple[str, "Outer | None", "Inner | None"]
+
+def inspect(outer: Outer):
+    inner = outer[1]
+    if inner is not None:
+        reveal_type(inner[0])  # revealed: str
+        reveal_type(inner[1])  # revealed: Outer | None
+        reveal_type(inner[2])  # revealed: Inner | None
+        next_outer = inner[1]
+        if next_outer is not None:
+            reveal_type(next_outer[0])  # revealed: int
+        next_inner = inner[2]
+        if next_inner is not None:
+            reveal_type(next_inner[0])  # revealed: str
+
+def valid() -> Outer:
+    return (1, ("inner", (2, None), ("inner", None, None)))
+
+def invalid_outer() -> Outer:
+    return (1, ("inner", ("bad", None), None))  # error: [invalid-return-type]
+
+def invalid_inner() -> Outer:
+    return (1, ("inner", None, (2, None, None)))  # error: [invalid-return-type]
+```
+
 ### Three mutually recursive generic aliases
 
 The three aliases alternate containers while preserving the leaf type. Currently, only the alias at
@@ -2350,6 +2382,35 @@ def valid() -> A[int]:
 
 def invalid() -> A[int]:
     return [({"leaf": "bad"},)]  # error: [invalid-return-type]
+```
+
+### Self-recursion within three mutually recursive generic aliases
+
+Each alias preserves its own element type and the shared type argument when a tuple refers back to
+itself or either of the other aliases.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+Outer = tuple[T, "Middle[T] | None"]
+Middle = tuple[list[T], "Inner[T] | None", "Middle[T] | None"]
+Inner = tuple[set[T], "Outer[T] | None", "Middle[T] | None", "Inner[T] | None"]
+
+def inspect(outer: Outer[int]):
+    reveal_type(outer[0])  # revealed: int
+    middle = outer[1]
+    if middle is None:
+        return
+    reveal_type(middle[0])  # revealed: list[int]
+    reveal_type(middle[2])  # revealed: Middle[int] | None
+    inner = middle[1]
+    if inner is None:
+        return
+    reveal_type(inner[0])  # revealed: set[int]
+    reveal_type(inner[1])  # revealed: Outer[int] | None
+    reveal_type(inner[2])  # revealed: Middle[int] | None
+    reveal_type(inner[3])  # revealed: Inner[int] | None
 ```
 
 ### Recursive callable parameters
