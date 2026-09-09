@@ -1145,10 +1145,11 @@ pub struct FunctionType<'db> {
     #[returns(ref)]
     updated_signatures: Option<Box<UpdatedFunctionSignatures<'db>>>,
 
-    /// Descriptor access can expose the ordinary function underneath `staticmethod` or
-    /// `classmethod`, while its declaration still retains those decorators for diagnostics.
+    /// The runtime descriptor kind after applying decorators or descriptor access. The
+    /// declaration retains all decorators for signature inference and diagnostics, including
+    /// wrappers that have not yet been applied while checking an inner decorator.
     #[returns(copy)]
-    descriptor_unwrapped: bool,
+    descriptor_kind: Option<CallableTypeKind>,
 }
 
 // The Salsa heap is tracked separately.
@@ -1178,21 +1179,36 @@ impl<'db> FunctionType<'db> {
         literal: FunctionLiteral<'db>,
         updated_signatures: Option<Box<UpdatedFunctionSignatures<'db>>>,
     ) -> Self {
-        Self::new_internal(db, literal, updated_signatures, false)
+        Self::new_internal(db, literal, updated_signatures, None)
     }
 
     /// The ordinary function exposed by a method wrapper or its bound method's `__func__`.
     pub(super) fn underlying_function(self, db: &'db dyn Db) -> Self {
         if self.is_classmethod(db) || self.is_staticmethod(db) {
-            Self::new_internal(db, self.literal(db), self.updated_signatures(db), true)
+            self.with_descriptor_kind(db, CallableTypeKind::FunctionLike)
         } else {
             self
         }
     }
 
+    pub(super) fn with_descriptor_kind(self, db: &'db dyn Db, kind: CallableTypeKind) -> Self {
+        // Keep the original representation when wrapping and unwrapping returns to
+        // the declaration's kind, so the same function retains a single identity.
+        let declared = Self::new_internal(db, self.literal(db), self.updated_signatures(db), None);
+        if declared.callable_type_kind(db) == kind {
+            return declared;
+        }
+        Self::new_internal(
+            db,
+            self.literal(db),
+            self.updated_signatures(db),
+            Some(kind),
+        )
+    }
+
     /// Erase signature substitutions without changing the represented runtime object.
     pub(super) fn without_updated_signatures(self, db: &'db dyn Db) -> Self {
-        Self::new_internal(db, self.literal(db), None, self.descriptor_unwrapped(db))
+        Self::new_internal(db, self.literal(db), None, self.descriptor_kind(db))
     }
 
     pub(super) fn updated_signature(self, db: &'db dyn Db) -> Option<&'db CallableSignature<'db>> {
@@ -1243,7 +1259,7 @@ impl<'db> FunctionType<'db> {
                 self.updated_signature(db).cloned(),
                 Some(implementation_callables),
             ),
-            self.descriptor_unwrapped(db),
+            self.descriptor_kind(db),
         )
     }
 
@@ -1276,7 +1292,7 @@ impl<'db> FunctionType<'db> {
                 Some(updated_signature),
                 updated_implementation_callables,
             ),
-            self.descriptor_unwrapped(db),
+            self.descriptor_kind(db),
         )
     }
 
@@ -1333,7 +1349,7 @@ impl<'db> FunctionType<'db> {
                 db,
                 literal,
                 UpdatedFunctionSignatures::new(updated_signature, updated_implementation_callables),
-                self.descriptor_unwrapped(db),
+                self.descriptor_kind(db),
             )
         }
     }
@@ -1352,7 +1368,7 @@ impl<'db> FunctionType<'db> {
                 .with_dataclass_transformer_params(db, params),
             ..literal
         };
-        Self::new_internal(db, literal, None, self.descriptor_unwrapped(db))
+        Self::new_internal(db, literal, None, self.descriptor_kind(db))
     }
 
     pub(crate) fn with_deprecated(
@@ -1371,7 +1387,7 @@ impl<'db> FunctionType<'db> {
             db,
             literal,
             self.updated_signatures(db),
-            self.descriptor_unwrapped(db),
+            self.descriptor_kind(db),
         )
     }
 
@@ -1426,8 +1442,8 @@ impl<'db> FunctionType<'db> {
     /// Returns true if every definition of this method uses `@classmethod`, or is implicitly a
     /// classmethod. An inconsistently applied decorator does not affect method binding.
     pub(crate) fn is_classmethod(self, db: &'db dyn Db) -> bool {
-        if self.descriptor_unwrapped(db) {
-            return false;
+        if let Some(kind) = self.descriptor_kind(db) {
+            return kind == CallableTypeKind::ClassMethodLike;
         }
         let mut overloads = self.iter_overloads_and_implementation(db);
         // Overload discovery can return no definitions during cycle recovery.
@@ -1440,7 +1456,10 @@ impl<'db> FunctionType<'db> {
     /// Returns true if every definition of this method uses `@staticmethod`, or is implicitly a
     /// static method. An inconsistently applied decorator does not affect method binding.
     pub(crate) fn is_staticmethod(self, db: &'db dyn Db) -> bool {
-        !self.descriptor_unwrapped(db) && self.has_staticmethod_declaration(db)
+        self.descriptor_kind(db).map_or_else(
+            || self.has_staticmethod_declaration(db),
+            |kind| kind == CallableTypeKind::StaticMethodLike,
+        )
     }
 
     /// Whether this function was declared as a staticmethod, even if descriptor access has
@@ -1865,7 +1884,7 @@ impl<'db> FunctionType<'db> {
                         updated_signature,
                         updated_implementation_callables,
                     ),
-                    self.descriptor_unwrapped(db),
+                    self.descriptor_kind(db),
                 ))
             },
         )
@@ -1888,7 +1907,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         target: FunctionType<'db>,
     ) -> ConstraintSet<'db, 'c> {
         if source.literal(db) != target.literal(db)
-            || source.descriptor_unwrapped(db) != target.descriptor_unwrapped(db)
+            || source.descriptor_kind(db) != target.descriptor_kind(db)
         {
             return self.never();
         }

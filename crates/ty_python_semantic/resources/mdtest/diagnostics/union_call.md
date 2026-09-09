@@ -183,6 +183,44 @@ def _(x: T, y: int) -> T:
     return x.foo(y)
 ```
 
+## A shared generated initializer under a custom metaclass
+
+When several constructor alternatives share a generated initializer, we report its invalid argument
+once. Binding that initializer to different classes does not create distinct argument errors:
+
+```py
+from dataclasses import dataclass
+
+class Meta(type):
+    def __call__(cls, *args, **kwargs): ...
+
+@dataclass
+class Base(metaclass=Meta):
+    nullable: bool
+
+class Child(Base): ...
+
+def convert(condition: bool):
+    # error: [invalid-argument-type]
+    return (Child if condition else Base)(nullable=None)
+```
+
+Different specializations of an inherited initializer still produce distinct argument errors:
+
+```py
+@dataclass
+class GenericBase[T](metaclass=Meta):
+    value: T
+
+class IntChild(GenericBase[int]): ...
+class StrChild(GenericBase[str]): ...
+
+def specialized(condition: bool):
+    # error: [invalid-argument-type] "Expected `int`, found `None`"
+    # error: [invalid-argument-type] "Expected `str`, found `None`"
+    return (IntChild if condition else StrChild)(value=None)
+```
+
 ## Union with overloaded method and incompatible variant
 
 When calling a method on a union type where:
