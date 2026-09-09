@@ -136,6 +136,22 @@ reason = "preserves the public syntax-validity predicate API"
 
 [[override]]
 lint = "hawk::unnecessary_public"
+crate = "ruff_python_parser"
+item = "lexer::Lexer::<'src>::current_range"
+kind = "inherent_method"
+level = "expect"
+reason = "lets downstream lexer callers inspect the current token range"
+
+[[override]]
+lint = "hawk::unnecessary_public"
+crate = "ruff_python_parser"
+item = "lexer::Lexer::<'src>::current_flags"
+kind = "inherent_method"
+level = "expect"
+reason = "lets downstream lexer callers inspect the current token flags"
+
+[[override]]
+lint = "hawk::unnecessary_public"
 crate = "ruff_workspace"
 item = "settings::FormatterSettings::resolve_target_version"
 kind = "inherent_method"
@@ -877,6 +893,30 @@ item = "system::command::Command::get_current_dir"
 kind = "inherent_method"
 level = "expect"
 reason = "command descriptions expose a complete argument builder and inspection API"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ruff_db"
+item = "system::command::Command::env_clear"
+kind = "inherent_method"
+level = "expect"
+reason = "command environment methods mirror the standard library Command API"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ruff_db"
+item = "system::command::Command::env"
+kind = "inherent_method"
+level = "expect"
+reason = "command environment methods mirror the standard library Command API"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ruff_db"
+item = "system::command::Command::env_remove"
+kind = "inherent_method"
+level = "expect"
+reason = "command environment methods mirror the standard library Command API"
 
 [[override]]
 lint = "hawk::dead_public"

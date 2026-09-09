@@ -70,12 +70,8 @@ impl<'db> Type<'db> {
                     Type::FunctionLiteral(FunctionType::new(db, function.literal(db), None))
                 }
                 Type::TypeVar(typevar) => visitor.visit_type(db, ty, || {
-                    match typevar.typevar(db).bound_or_constraints(db, env) {
-                        Some(bound_or_constraints) => {
-                            upcast(db, env, bound_or_constraints.as_type(db, env), visitor)
-                        }
-                        None => KnownClass::Object.to_instance(db, env),
-                    }
+                    let bound_or_constraints = typevar.require_bound_or_constraints(db, env);
+                    upcast(db, env, bound_or_constraints.as_type(db, env), visitor)
                 }),
                 Type::Union(union) => {
                     union.map(db, env, |element| upcast(db, env, *element, visitor))

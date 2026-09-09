@@ -728,6 +728,21 @@ def excludes_constrained_generic(value: ConstrainedCovariant[Any] | bool) -> boo
     return value
 ```
 
+A concrete `ParamSpec` specialization does not affect an `isinstance()` check. Negative narrowing
+therefore excludes that specialization along with every other instance of the generic class.
+
+```py
+from typing import Callable
+
+class ParamSpecBox[**P]:
+    callback: Callable[P, None]
+
+def excludes_paramspec_generic(value: ParamSpecBox[[int]] | int) -> int:
+    if isinstance(value, ParamSpecBox):
+        return 0
+    return value
+```
+
 Similarly, contravariant type parameters use their lower bound of `Never`:
 
 ```py

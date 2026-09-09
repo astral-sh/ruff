@@ -159,6 +159,27 @@ def f(x: N, y: int, z: O):
     reveal_type(x is not z)  # revealed: Literal[True]
 ```
 
+## Identity comparisons with type guard results
+
+`TypeIs` and `TypeGuard` functions return booleans, so comparing their results with `True` or
+`False` can succeed or fail.
+
+```py
+from typing_extensions import TypeGuard, TypeIs
+
+def is_int(x: object) -> TypeIs[int]:
+    return isinstance(x, int)
+
+def is_int_guard(x: object) -> TypeGuard[int]:
+    return isinstance(x, int)
+
+def f(x: object):
+    reveal_type(is_int(x) is True)  # revealed: bool
+    reveal_type(is_int(x) is False)  # revealed: bool
+    reveal_type(is_int_guard(x) is True)  # revealed: bool
+    reveal_type(is_int_guard(x) is False)  # revealed: bool
+```
+
 ## Identity comparisons see through type aliases
 
 ```toml
