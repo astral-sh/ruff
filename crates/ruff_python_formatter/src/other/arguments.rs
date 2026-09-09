@@ -106,7 +106,7 @@ impl FormatNodeRule<Arguments> for FormatArguments {
                 //     hey_this_is_a_very_long_call, it_has_funny_attributes_asdf_asdf, really=True
                 // )
                 // ```
-                parenthesized("(", &group(&all_arguments), ")")
+                parenthesized("(", &all_arguments, ")")
                     .with_hugging(is_arguments_huggable(item, f.context()))
                     .with_dangling_comments(dangling_comments)
             ]

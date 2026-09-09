@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
-input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/prefer_rhs_split.py
 ---
 ## Input
 
@@ -118,7 +117,69 @@ a = (
 ```diff
 --- Black
 +++ Ruff
-@@ -60,9 +60,7 @@
+@@ -1,12 +1,16 @@
+ first_item, second_item = (
+     some_looooooooong_module.some_looooooooooooooong_function_name(
+-        first_argument, second_argument, third_argument
++        first_argument,
++        second_argument,
++        third_argument,
+     )
+ )
+ 
+ some_dict["with_a_long_key"] = (
+     some_looooooooong_module.some_looooooooooooooong_function_name(
+-        first_argument, second_argument, third_argument
++        first_argument,
++        second_argument,
++        third_argument,
+     )
+ )
+ 
+@@ -22,14 +26,18 @@
+ # Make sure chaining assignments work.
+ first_item, second_item, third_item, forth_item = m["everything"] = (
+     some_looooooooong_module.some_looooooooooooooong_function_name(
+-        first_argument, second_argument, third_argument
++        first_argument,
++        second_argument,
++        third_argument,
+     )
+ )
+ 
+ # Make sure when the RHS's first split at the non-optional paren fits,
+ # we split there instead of the outer RHS optional paren.
+ first_item, second_item = some_looooooooong_module.some_loooooog_function_name(
+-    first_argument, second_argument, third_argument
++    first_argument,
++    second_argument,
++    third_argument,
+ )
+ 
+ (
+@@ -40,7 +48,9 @@
+     fifth_item,
+     last_item_very_loooooong,
+ ) = some_looooooooong_module.some_looooooooooooooong_function_name(
+-    first_argument, second_argument, third_argument
++    first_argument,
++    second_argument,
++    third_argument,
+ )
+ 
+ (
+@@ -51,7 +61,9 @@
+     fifth_item,
+     last_item_very_loooooong,
+ ) = everything = some_looooong_function_name(
+-    first_argument, second_argument, third_argument
++    first_argument,
++    second_argument,
++    third_argument,
+ )
+ 
+ 
+@@ -60,9 +72,7 @@
      some_arg
  ).intersection(pk_cols)
  
@@ -136,13 +197,17 @@ a = (
 ```python
 first_item, second_item = (
     some_looooooooong_module.some_looooooooooooooong_function_name(
-        first_argument, second_argument, third_argument
+        first_argument,
+        second_argument,
+        third_argument,
     )
 )
 
 some_dict["with_a_long_key"] = (
     some_looooooooong_module.some_looooooooooooooong_function_name(
-        first_argument, second_argument, third_argument
+        first_argument,
+        second_argument,
+        third_argument,
     )
 )
 
@@ -158,14 +223,18 @@ some_dict["with_a_long_key"] = (
 # Make sure chaining assignments work.
 first_item, second_item, third_item, forth_item = m["everything"] = (
     some_looooooooong_module.some_looooooooooooooong_function_name(
-        first_argument, second_argument, third_argument
+        first_argument,
+        second_argument,
+        third_argument,
     )
 )
 
 # Make sure when the RHS's first split at the non-optional paren fits,
 # we split there instead of the outer RHS optional paren.
 first_item, second_item = some_looooooooong_module.some_loooooog_function_name(
-    first_argument, second_argument, third_argument
+    first_argument,
+    second_argument,
+    third_argument,
 )
 
 (
@@ -176,7 +245,9 @@ first_item, second_item = some_looooooooong_module.some_loooooog_function_name(
     fifth_item,
     last_item_very_loooooong,
 ) = some_looooooooong_module.some_looooooooooooooong_function_name(
-    first_argument, second_argument, third_argument
+    first_argument,
+    second_argument,
+    third_argument,
 )
 
 (
@@ -187,7 +258,9 @@ first_item, second_item = some_looooooooong_module.some_loooooog_function_name(
     fifth_item,
     last_item_very_loooooong,
 ) = everything = some_looooong_function_name(
-    first_argument, second_argument, third_argument
+    first_argument,
+    second_argument,
+    third_argument,
 )
 
 
