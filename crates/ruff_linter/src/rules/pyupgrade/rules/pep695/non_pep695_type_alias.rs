@@ -14,8 +14,8 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 use ruff_python_ast::PythonVersion;
 
 use super::{
-    DisplayTypeVars, TypeParamKind, TypeVar, TypeVarReferenceVisitor, expr_name_to_type_var,
-    non_default_follows_default,
+    DisplayTypeVars, TypeParamKind, TypeVar, TypeVarReferenceVisitor, TypeVarRestriction,
+    expr_name_to_type_var, non_default_follows_default,
 };
 
 /// ## What it does
@@ -65,6 +65,9 @@ use super::{
 /// runtime behavior around `isinstance()` calls noted above. The fix is also unsafe for
 /// `TypeAliasType` assignments if there are any comments in the replacement range that would be
 /// deleted.
+///
+/// Outside stub files, `TypeAliasType` fixes with starred constraints are also unsafe: the
+/// original `TypeVar` may already have consumed the constraint iterator.
 ///
 /// ## See also
 ///
@@ -286,28 +289,36 @@ fn create_diagnostic(
     );
     let edit = Edit::range_replacement(content, stmt.range());
 
-    let applicability =
-        if type_alias_kind == TypeAliasKind::TypeAlias && !checker.source_type.is_stub() {
-            // The fix is always unsafe in non-stubs
-            // because new-style aliases have different runtime behavior.
-            // See https://github.com/astral-sh/ruff/issues/6434
+    let has_starred_constraint = type_vars.iter().any(|type_var| {
+        matches!(
+            &type_var.restriction,
+            Some(TypeVarRestriction::Constraint(constraints))
+                if constraints.iter().any(|constraint| constraint.is_starred_expr())
+        )
+    });
+
+    let applicability = if !checker.source_type.is_stub()
+        && (type_alias_kind == TypeAliasKind::TypeAlias || has_starred_constraint)
+    {
+        // A `TypeAlias` has different runtime behavior from a `type` statement.
+        // See https://github.com/astral-sh/ruff/issues/6434
+        // Starred constraints can also unpack an iterator already consumed by `TypeVar`.
+        Applicability::Unsafe
+    } else {
+        // For the remaining aliases, the fix is only unsafe if it would delete comments.
+        //
+        // it would be easier to check for comments in the whole `stmt.range`, but because
+        // `create_diagnostic` uses the full source text of `value`, comments within `value` are
+        // actually preserved. thus, we have to check for comments in `stmt` but outside of `value`
+        let pre_value = TextRange::new(stmt.start(), range_with_parentheses.start());
+        let post_value = TextRange::new(range_with_parentheses.end(), stmt.end());
+
+        if comment_ranges.intersects(pre_value) || comment_ranges.intersects(post_value) {
             Applicability::Unsafe
         } else {
-            // In stub files, or in non-stub files for `TypeAliasType` assignments,
-            // the fix is only unsafe if it would delete comments.
-            //
-            // it would be easier to check for comments in the whole `stmt.range`, but because
-            // `create_diagnostic` uses the full source text of `value`, comments within `value` are
-            // actually preserved. thus, we have to check for comments in `stmt` but outside of `value`
-            let pre_value = TextRange::new(stmt.start(), range_with_parentheses.start());
-            let post_value = TextRange::new(range_with_parentheses.end(), stmt.end());
-
-            if comment_ranges.intersects(pre_value) || comment_ranges.intersects(post_value) {
-                Applicability::Unsafe
-            } else {
-                Applicability::Safe
-            }
-        };
+            Applicability::Safe
+        }
+    };
 
     checker
         .report_diagnostic(
