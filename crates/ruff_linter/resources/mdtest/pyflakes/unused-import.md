@@ -13,8 +13,8 @@ For standard-library generic types such as `slice` and `frozendict`, Ruff visits
 type expressions. Names in quoted annotations therefore mark their imports as used.
 
 ```py
-from decimal import Decimal
-from fractions import Fraction
+from decimal import Decimal  # no diagnostic
+from fractions import Fraction  # no diagnostic
 
 DecimalSlice = slice["Decimal"]
 FractionMap = frozendict[str, "Fraction"]
