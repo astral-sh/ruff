@@ -863,7 +863,6 @@ pub(super) fn assignment_attribute_members<'db>(
     })
 }
 
-/// Look up the bound setter without consulting instance storage or gradual bases.
 pub(super) fn descriptor_setter<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
