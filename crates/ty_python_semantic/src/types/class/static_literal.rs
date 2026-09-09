@@ -1173,7 +1173,16 @@ impl<'db> StaticClassLiteral<'db> {
     pub(in crate::types) fn inferred_metaclass(self, db: &'db dyn Db) -> ClassMetaclass<'db> {
         self.try_metaclass(db)
             .map(|(metaclass, _)| metaclass)
-            .unwrap_or_else(|_| ClassMetaclass::Selected(SubclassOfType::subclass_of_unknown()))
+            .unwrap_or_else(|error| match error.kind {
+                MetaclassErrorKind::Conflict { candidate, .. } => {
+                    // Keep the candidate for member lookup; `try_metaclass` still reports the
+                    // conflict during class validation. Falling back to `Unknown` here can change
+                    // attribute inference and make the conflict disappear on the next cycle
+                    // iteration, causing metaclass inference to oscillate.
+                    ClassMetaclass::Selected(candidate.metaclass.into())
+                }
+                _ => ClassMetaclass::Selected(SubclassOfType::subclass_of_unknown()),
+            })
     }
 
     /// Return the selected metaclass or protocol fallback, or an error if it cannot be inferred.
