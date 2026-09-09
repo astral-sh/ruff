@@ -9222,22 +9222,15 @@ impl<'db> Type<'db> {
                     .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
             )),
 
-            Type::Union(union) if type_mapping.is_structural() => {
-                // Binding can turn different provisional constructors into the same variable.
-                // Deduplicate structurally without running type relations on open bodies.
-                let elements = union
+            Type::Union(union) if type_mapping.is_structural() => Type::Union(UnionType::new(
+                db,
+                union
                     .elements(db)
                     .iter()
                     .map(|element| element.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
-                    .collect::<FxOrderSet<_>>()
-                    .into_iter()
-                    .collect::<Box<[_]>>();
-                match &*elements {
-                    [] => Type::Never,
-                    [element] => *element,
-                    _ => Type::Union(UnionType::new(db, elements, union.recursively_defined(db))),
-                }
-            }
+                    .collect::<Box<[_]>>(),
+                union.recursively_defined(db),
+            )),
             Type::Union(union) => union.map_leave_aliases(db, visitor.env, |element| {
                 element.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
             }),

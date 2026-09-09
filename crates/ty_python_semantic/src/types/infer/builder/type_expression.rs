@@ -101,8 +101,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             _ => return None,
         }
         let parameters = implicit_alias_parameters(db, definition);
-        let inference = infer_recursive_implicit_alias(db, definition, parameters);
-        inference.recursive.then_some((inference.ty, parameters))
+        let ty = infer_recursive_implicit_alias(db, definition, parameters);
+        any_over_type(db, self.program_environment(), ty, false, |ty| {
+            matches!(ty, Type::Recursive(_))
+        })
+        .then_some((ty, parameters))
     }
 
     pub(in crate::types::infer) fn finish_recursive_implicit_alias(

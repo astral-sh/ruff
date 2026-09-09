@@ -13,7 +13,7 @@ use super::relation::{TypeRelation, TypeRelationChecker};
 use super::variance::{VarianceInferable, VarianceOrigin};
 use super::{
     ApplyTypeMappingVisitor, BoundTypeVarIdentity, GenericContext, MaterializationKind, Type,
-    TypeContext, TypeMapping, UnionBuilder, VarianceTerm,
+    TypeContext, TypeMapping, VarianceTerm,
 };
 use crate::{Db, ProgramEnvironment};
 
@@ -213,49 +213,18 @@ impl<'db> RecursiveType<'db> {
         original: Type<'db>,
         binding: RecursiveBinding<'db>,
     ) -> Type<'db> {
-        let mapping =
-            TypeMapping::Recursive(RecursiveMapping(RecursiveSubstitution::Bind(binding)));
-        let visitor = ApplyTypeMappingVisitor::new(env);
-        let body = original.apply_type_mapping_impl(db, &mapping, TypeContext::default(), &visitor);
-        // `μa. T = T` when binding introduces no references to `a`.
-        if body == original {
-            return body;
-        }
-        // `Never | a` has already collapsed to `a` before binding.
-        if matches!(body, Type::RecursiveVar(reference)
-            if reference.arguments(db) == self.arguments(db))
-        {
-            return Type::Never;
-        }
-        if let Type::Union(original) = original
-            && original.elements(db).iter().all(|original| {
-                let bound = original.apply_type_mapping_impl(
-                    db,
-                    &mapping,
-                    TypeContext::default(),
-                    &visitor,
-                );
-                *original == bound
-                    || matches!(bound, Type::RecursiveVar(reference)
-                            if reference.arguments(db) == self.arguments(db))
-            })
-        {
-            // `μa. (T | a) = T` only when binding leaves every member of T unchanged.
-            // A recursive application with different arguments is not the same variable.
-            let mut union = UnionBuilder::new(db, env)
-                .unpack_aliases(false)
-                .recursively_defined(original.recursively_defined(db));
-            for &element in original.elements(db) {
-                if !matches!(element, Type::Recursive(recursive) if binding.matches(db, recursive))
-                {
-                    union.add_in_place(element);
-                }
-            }
-            return union.build();
-        }
+        let body = original.apply_type_mapping_impl(
+            db,
+            &TypeMapping::Recursive(RecursiveMapping(RecursiveSubstitution::Bind(binding))),
+            TypeContext::default(),
+            &ApplyTypeMappingVisitor::new(env),
+        );
         // Alias arguments can expose a reference without introducing a container.
         if body.has_unguarded_alias_cycle(db) {
             Type::divergent(self.cycle(db).0)
+        } else if body == original {
+            // Binding changes a closed type only by introducing references to this binder.
+            body
         } else {
             Type::Recursive(Self::new_internal(
                 db,
@@ -338,13 +307,6 @@ impl<'db> RecursiveType<'db> {
             TypeContext::default(),
             &ApplyTypeMappingVisitor::new(env),
         );
-        // Provisional identity binders can survive in other aliases' results.
-        // Their least fixed point is `Never`, including when used outside cycle recovery.
-        let unfolded = if unfolded == Type::Recursive(self) {
-            Type::Never
-        } else {
-            unfolded
-        };
         let unfolded = match self.arguments(db) {
             Some(arguments) => unfolded.apply_type_mapping(
                 db,

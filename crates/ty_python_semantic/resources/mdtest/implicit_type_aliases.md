@@ -2592,64 +2592,6 @@ def invalid_second() -> Second:
     return ((("leaf",),),)  # error: [invalid-return-type]
 ```
 
-### Unions with an unguarded self-reference
-
-An unguarded self-reference adds no values to a union whose other members do not reference the
-alias. Recovery retains those members and their type parameters.
-
-```py
-from typing import TypeAlias, TypeVar
-
-T = TypeVar("T")
-Scalar: TypeAlias = "T | Scalar[T]"
-Copy: TypeAlias = "Scalar[T]"
-
-def inspect(scalar: Scalar[int], copy: Copy[str]):
-    reveal_type(scalar)  # revealed: int
-    reveal_type(copy)  # revealed: str
-
-def invalid_scalar() -> Scalar[int]:
-    return "bad"  # error: [invalid-return-type]
-```
-
-If no members remain, the alias describes no values and recovers as `Never`.
-
-```py
-from typing import Union
-from typing_extensions import Never
-
-Empty = Union[Never, "Empty"]
-
-def inspect_empty(value: Empty):
-    reveal_type(value)  # revealed: Never
-
-def invalid_empty() -> Empty:
-    return 1  # error: [invalid-return-type]
-```
-
-### Unguarded self-references alongside another recursive alias
-
-Removing a union's direct self-reference preserves recursion through its other member. Here the
-remaining type is a tuple whose element is an integer or another such tuple.
-
-```py
-from typing import Union
-
-Nested = tuple[Union[int, "Alias"]]
-Alias = Union[Nested, "Alias"]
-
-def inspect(value: Alias):
-    reveal_type(value[0])  # revealed: int | Nested
-    if isinstance(value[0], tuple):
-        reveal_type(value[0][0])  # revealed: int | Nested
-
-def valid() -> Alias:
-    return ((1,),)
-
-def invalid() -> Alias:
-    return (("bad",),)  # error: [invalid-return-type]
-```
-
 ### Unguarded recursion through generic aliases
 
 An alias that returns its argument unchanged does not make a recursive definition valid, even when

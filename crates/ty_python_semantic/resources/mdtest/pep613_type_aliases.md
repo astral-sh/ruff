@@ -402,14 +402,14 @@ reveal_type(ClassInfo)  # revealed: <types.UnionType special-form 'type | UnionT
 # fmt: on
 ```
 
-An unguarded self-reference in a union adds no alternatives. Recovery retains the other members when
-they contain no references to the alias.
+TODO: The following alias is invalid because its cycle passes through no containing type. Until it
+is diagnosed, it falls back to `Divergent` so it cannot produce a usable recursive definition.
 
 ```py
 Unguarded: TypeAlias = "int | Unguarded"
 
 def unguarded(value: Unguarded):
-    reveal_type(value)  # revealed: int
+    reveal_type(value)  # revealed: Divergent
 
 def my_isinstance(obj: object, classinfo: ClassInfo) -> bool:
     reveal_type(classinfo)  # revealed: ClassInfo
