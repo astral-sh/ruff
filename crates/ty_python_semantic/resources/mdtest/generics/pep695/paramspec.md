@@ -1024,7 +1024,16 @@ def gradual(name: str, callback: Callable[[Any, int], Any]): ...
 forward(gradual, "name", lambda value, count: reveal_type((value, count)))  # revealed: tuple[Any, int]
 ```
 
-The same applies to callbacks with an unknown return type:
+A gradual parameter list gives each callback parameter the type `Any`:
+
+```py
+def gradual_list(name: str, callback: Callable[..., Any]): ...
+
+gradual_list("name", lambda first, second: reveal_type((first, second)))  # revealed: tuple[Any, Any]
+forward(gradual_list, "name", lambda first, second: reveal_type((first, second)))  # revealed: tuple[Any, Any]
+```
+
+Concrete parameter types also provide context when a callback's return type is unknown:
 
 ```py
 from ty_extensions._internal import Unknown
