@@ -1338,9 +1338,11 @@ fn build_exclude_filter(
     let system = db.system();
     let mut excludes = ExcludeFilterBuilder::new();
 
+    // Like excludes in a `ty.toml`, default excludes only apply under the project root.
+    // An explicit `../sibling/dist` is not excluded by project defaults.
     for pattern in default_patterns {
         PortableGlobPattern::parse(pattern, PortableGlobKind::Exclude)
-            .and_then(|exclude| Ok(excludes.add(&exclude.into_absolute(""))?))
+            .and_then(|exclude| Ok(excludes.add(&exclude.into_absolute(project_root))?))
             .unwrap_or_else(|err| {
                 panic!("Expected default exclude to be valid glob but adding it failed with: {err}")
             });
@@ -1370,7 +1372,7 @@ fn build_exclude_filter(
         }
     }
 
-    excludes.build(project_root).map_err(|_| {
+    excludes.build().map_err(|_| {
         let diagnostic = OptionDiagnostic::new(
             DiagnosticId::InvalidGlob,
             format!(

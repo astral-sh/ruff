@@ -84,7 +84,7 @@ impl IncludeExcludeFilter {
 
         for pattern in DEFAULT_SRC_EXCLUDES {
             PortableGlobPattern::parse(pattern, PortableGlobKind::Exclude)
-                .and_then(|exclude| Ok(excludes.add(&exclude.into_absolute(""))?))
+                .and_then(|exclude| Ok(excludes.add(&exclude.into_absolute(root))?))
                 .unwrap_or_else(|err| {
                     panic!(
                         "Expected default exclude to be valid glob but adding it failed with: {err}"
@@ -97,7 +97,7 @@ impl IncludeExcludeFilter {
                 .build()
                 .expect("default include filter to be infallible"),
             exclude: excludes
-                .build(root)
+                .build()
                 .expect("default exclude filter to be infallible"),
         }
     }

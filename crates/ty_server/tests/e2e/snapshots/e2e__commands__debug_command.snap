@@ -160,7 +160,6 @@ Settings: Settings {
                     ],
                     ..
                 ),
-                root: "<temp_dir>/",
             },
         },
     },
