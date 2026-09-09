@@ -442,9 +442,8 @@ pub fn is_type_checking_block(stmt: &ast::StmtIf, semantic: &SemanticModel) -> b
         // for this specific check even if it's defined somewhere else, like the current module.
         // Ex) `if TYPE_CHECKING:`
         Expr::Name(ast::ExprName { id, .. }) => {
-            id == "TYPE_CHECKING"
-                // Ex) `if TC:` with `from typing import TYPE_CHECKING as TC`
-                || semantic.match_typing_expr(test, "TYPE_CHECKING")
+            // Ex) `if TC:` with `from typing import TYPE_CHECKING as TC`
+            id == "TYPE_CHECKING" || semantic.match_typing_expr(test, "TYPE_CHECKING")
         }
         // Ex) `if typing.TYPE_CHECKING:`
         Expr::Attribute(ast::ExprAttribute { attr, .. }) => attr == "TYPE_CHECKING",

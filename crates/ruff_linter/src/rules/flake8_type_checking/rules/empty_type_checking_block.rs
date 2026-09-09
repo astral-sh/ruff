@@ -5,6 +5,7 @@ use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix;
 use crate::{AlwaysFixableViolation, Fix};
 
@@ -33,7 +34,7 @@ use crate::{AlwaysFixableViolation, Fix};
 /// ## References
 /// - [PEP 563: Runtime annotation resolution and `TYPE_CHECKING`](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.8.0")]
+#[violation_metadata(stable_since = "0.8.0", category = Category::Suspicious)]
 pub(crate) struct EmptyTypeCheckingBlock;
 
 impl AlwaysFixableViolation for EmptyTypeCheckingBlock {

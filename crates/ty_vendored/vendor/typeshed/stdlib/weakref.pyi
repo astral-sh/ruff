@@ -308,5 +308,8 @@ class finalize(Generic[_P, _T]):
     def alive(self) -> bool:
         """Whether finalizer is alive"""
 
-    atexit: bool
-    """Whether finalizer should be called at exit"""
+    @property
+    def atexit(self) -> bool:
+        """Whether finalizer should be called at exit"""
+    @atexit.setter
+    def atexit(self, value: bool) -> None: ...

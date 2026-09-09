@@ -368,7 +368,6 @@ error[RUF102]: Invalid rule code in suppression: unknown-rule, unused-import
  9 | import sys
 10 | # ruff:enable[unused-import, unknown-rule]
    | ------------------------------------------
-help: Add non-Ruff rule codes to the `lint.external` configuration option
 help: Enable `lint.preview` to use rule names
 help: Remove the suppression comment
   |
@@ -481,7 +480,6 @@ error[RUF102]: Invalid rule code in suppression: not-a-rule
   |
 2 | # ruff:ignore[unused-import, not-a-rule]
   |                              ^^^^^^^^^^
-help: Add non-Ruff rule codes to the `lint.external` configuration option
 help: Remove the rule code `not-a-rule`
   |
 1 | # snapshot: invalid-rule-code
@@ -836,7 +834,6 @@ error[RUF102]: Invalid rule code in suppression: XYZ
   |
 3 | # ruff:ignore[XYZ] # ruff:file-ignore[F821]
   |               ^^^
-help: Add non-Ruff rule codes to the `lint.external` configuration option
 help: Remove the suppression comment
   |
 2 | # error: [invalid-suppression-comment]

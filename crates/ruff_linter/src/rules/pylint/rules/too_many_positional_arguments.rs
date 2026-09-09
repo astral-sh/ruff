@@ -5,6 +5,7 @@ use ruff_python_semantic::analyze::{function_type, visibility};
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for function definitions that include too many positional arguments.
@@ -55,7 +56,7 @@ use crate::checkers::ast::Checker;
 ///
 /// [override]: https://docs.python.org/3/library/typing.html#typing.override
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.16.0")]
+#[violation_metadata(stable_since = "0.16.0", category = Category::Pedantic)]
 pub(crate) struct TooManyPositionalArguments {
     c_pos: usize,
     max_pos: usize,

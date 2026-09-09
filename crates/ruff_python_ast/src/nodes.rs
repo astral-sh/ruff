@@ -2,8 +2,8 @@
 
 use crate::AtomicNodeIndex;
 use crate::generated::{
-    ExprBytesLiteral, ExprDict, ExprFString, ExprList, ExprName, ExprSet, ExprStringLiteral,
-    ExprTString, ExprTuple, PatternMatchAs, PatternMatchOr, StmtClassDef,
+    ExprBytesLiteral, ExprCall, ExprDict, ExprFString, ExprList, ExprName, ExprSet,
+    ExprStringLiteral, ExprTString, ExprTuple, PatternMatchAs, PatternMatchOr, StmtClassDef,
 };
 use std::borrow::Cow;
 use std::fmt;
@@ -1328,6 +1328,28 @@ impl ExprStringLiteral {
     }
 }
 
+impl Ranged for ExprCall {
+    fn range(&self) -> TextRange {
+        TextRange::new(self.range_start, self.arguments.end())
+    }
+}
+
+#[expect(
+    clippy::missing_fields_in_debug,
+    reason = "`range_start` is represented by the reconstructed `range` field"
+)]
+impl fmt::Debug for ExprCall {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("ExprCall")
+            .field("node_index", &self.node_index)
+            .field("range", &self.range())
+            .field("func", &self.func)
+            .field("arguments", &self.arguments)
+            .finish()
+    }
+}
+
 /// The value representing a [`ExprStringLiteral`].
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
@@ -1368,10 +1390,10 @@ impl StringLiteralValue {
             "Use `StringLiteralValue::single` to create single-part strings"
         );
         Self {
-            inner: StringLiteralValueInner::Concatenated(ConcatenatedStringLiteral {
+            inner: StringLiteralValueInner::Concatenated(Box::new(ConcatenatedStringLiteral {
                 strings,
                 value: OnceLock::new(),
-            }),
+            })),
         }
     }
 
@@ -1494,7 +1516,7 @@ enum StringLiteralValueInner {
     Single(StringLiteral),
 
     /// An implicitly concatenated string literals i.e., `"foo" "bar"`.
-    Concatenated(ConcatenatedStringLiteral),
+    Concatenated(Box<ConcatenatedStringLiteral>),
 }
 
 bitflags! {
@@ -3924,14 +3946,14 @@ mod tests {
         assert_eq!(std::mem::size_of::<Pattern>(), 72);
         assert_eq!(std::mem::size_of::<Parameters>(), 56);
         assert_eq!(std::mem::size_of::<Arguments>(), 40);
-        assert_eq!(std::mem::size_of::<Expr>(), 72);
+        assert_eq!(std::mem::size_of::<Expr>(), 64);
         assert_eq!(std::mem::size_of::<ExprAttribute>(), 56);
         assert_eq!(std::mem::size_of::<ExprAwait>(), 24);
         assert_eq!(std::mem::size_of::<ExprBinOp>(), 32);
         assert_eq!(std::mem::size_of::<ExprBoolOp>(), 40);
         assert_eq!(std::mem::size_of::<ExprBooleanLiteral>(), 16);
         assert_eq!(std::mem::size_of::<ExprBytesLiteral>(), 48);
-        assert_eq!(std::mem::size_of::<ExprCall>(), 64);
+        assert_eq!(std::mem::size_of::<ExprCall>(), 56);
         assert_eq!(std::mem::size_of::<ExprCompare>(), 56);
         assert_eq!(std::mem::size_of::<ExprDict>(), 40);
         assert_eq!(std::mem::size_of::<ExprDictComp>(), 56);
@@ -3951,7 +3973,7 @@ mod tests {
         assert_eq!(std::mem::size_of::<ExprSetComp>(), 48);
         assert_eq!(std::mem::size_of::<ExprSlice>(), 40);
         assert_eq!(std::mem::size_of::<ExprStarred>(), 24);
-        assert_eq!(std::mem::size_of::<ExprStringLiteral>(), 64);
+        assert_eq!(std::mem::size_of::<ExprStringLiteral>(), 48);
         assert_eq!(std::mem::size_of::<ExprSubscript>(), 32);
         assert_eq!(std::mem::size_of::<ExprTuple>(), 40);
         assert_eq!(std::mem::size_of::<ExprUnaryOp>(), 24);

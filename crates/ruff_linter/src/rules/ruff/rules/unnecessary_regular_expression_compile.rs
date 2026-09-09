@@ -9,6 +9,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for `re.compile()` calls whose result is used exactly once, either
@@ -74,7 +75,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: `re.compile`](https://docs.python.org/3/library/re.html#re.compile)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "NEXT_RUFF_VERSION")]
+#[violation_metadata(preview_since = "NEXT_RUFF_VERSION", category = Category::Complexity)]
 pub(crate) struct UnnecessaryRegularExpressionCompile {
     re_func: &'static str,
 }
@@ -93,7 +94,7 @@ impl Violation for UnnecessaryRegularExpressionCompile {
     }
 }
 
-/// RUF077: inline form, e.g. `re.compile(pattern).match(string)`.
+/// RUF078: inline form, e.g. `re.compile(pattern).match(string)`.
 pub(crate) fn unnecessary_regular_expression_compile(checker: &Checker, call: &ExprCall) {
     let semantic = checker.semantic();
     if !semantic.seen_module(Modules::RE) {
@@ -123,7 +124,7 @@ pub(crate) fn unnecessary_regular_expression_compile(checker: &Checker, call: &E
     );
 }
 
-/// RUF077: bound form, e.g. `pattern = re.compile(...)` read exactly once as `pattern.match(...)`.
+/// RUF078: bound form, e.g. `pattern = re.compile(...)` read exactly once as `pattern.match(...)`.
 pub(crate) fn unnecessary_regular_expression_compile_binding(checker: &Checker, binding: &Binding) {
     let semantic = checker.semantic();
     if !semantic.seen_module(Modules::RE) {

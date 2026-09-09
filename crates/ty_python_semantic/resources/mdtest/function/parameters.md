@@ -1,12 +1,54 @@
 # Function parameter types
 
+## Basic
+
 Within a function scope, the declared type of each parameter is its annotated type (or Unknown if
-not annotated). The initial inferred type is the annotated type of the parameter, if any. If there
-is no annotation, it is the union of `Unknown` with the type of the default value expression (if
-any).
+not annotated). The initial inferred type is the annotated type of the parameter, if any:
+
+```py
+def f(declared: int, unannotated):
+    reveal_type(declared)  # revealed: int
+    reveal_type(unannotated)  # revealed: Unknown
+```
 
 The variadic parameter is a variadic tuple of its annotated type; the variadic-keywords parameter is
-a dictionary from strings to its annotated type.
+a dictionary from strings to its annotated type:
+
+```py
+def g(*args: int, **kwargs: int):
+    reveal_type(args)  # revealed: tuple[int, ...]
+    reveal_type(kwargs)  # revealed: dict[str, int]
+```
+
+## Unannotated parameters with defaults
+
+If there is no annotation but there is a default value, the inferred paramter type is the union of
+the inferred type of the default value and `Unknown`:
+
+```py
+def f(a="foo", b=0, c=True, d=None):
+    reveal_type(a)  # revealed: Unknown | Literal["foo"]
+    reveal_type(b)  # revealed: Unknown | Literal[0]
+    reveal_type(c)  # revealed: Unknown | Literal[True]
+    reveal_type(d)  # revealed: Unknown | None
+```
+
+This means that the code in the function body needs to handle the case where the parameter is set to
+the default value:
+
+```py
+def g(x=0):
+    print(x + 1)
+
+    # error: [unsupported-operator] "Operator `+` is not supported between objects of type `Unknown | Literal[0]` and `Literal["foo"]`"
+    x + "foo"
+```
+
+But it still allows callers to pass in arguments of a wider type:
+
+```py
+g(1.5)  # fine
+```
 
 ## Parameter kinds
 

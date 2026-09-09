@@ -40,9 +40,20 @@ def collect(*args: Unpack[Ts]) -> tuple[Unpack[Ts]]:
     reveal_type(args)  # revealed: tuple[*Ts@collect]
     raise NotImplementedError
 
-# TODO: Infer the `TypeVarTuple` from arguments matched to the variadic parameter.
-reveal_type(collect())  # revealed: tuple[Unknown, ...]
-reveal_type(collect(1, "a"))  # revealed: tuple[Unknown, ...]
+reveal_type(collect())  # revealed: tuple[()]
+reveal_type(collect(1, "a"))  # revealed: tuple[Literal[1], Literal["a"]]
+```
+
+The legacy spelling must also preserve argument-derived types when a surrounding assignment expects
+an incompatible return type.
+
+```py
+inferred = collect(1)
+reveal_type(inferred)  # revealed: tuple[Literal[1]]
+# error: [invalid-assignment]
+indirect: tuple[str] = inferred
+# error: [invalid-assignment]
+direct: tuple[str] = collect(1)
 ```
 
 ## Callable parameters
@@ -71,6 +82,24 @@ reveal_type(invoke(format_value, 1, "value"))  # revealed: str
 reveal_type(invoke(format_value, 1))  # revealed: str
 ```
 
+## Forwarding a `ParamSpec` through an unpacked type variable tuple
+
+A callable that forwards a parameter specification can itself be passed, with its arguments, to a
+callable whose positional parameters are described by an unpacked type variable tuple.
+
+```py
+from typing import Callable, ParamSpec, TypeVarTuple, Unpack
+
+P = ParamSpec("P")
+Ts = TypeVarTuple("Ts")
+
+def invoke(callback: Callable[[Unpack[Ts]], None], *args: Unpack[Ts]) -> None: ...
+def forward(callback: Callable[P, None], *args: P.args, **kwargs: P.kwargs) -> None: ...
+def one_arg(value: int) -> None: ...
+
+invoke(forward, one_arg, 1)
+```
+
 ## Type aliases
 
 A legacy alias can use `Unpack[Ts]` and accept either individual types or an unpacked tuple type.
@@ -92,8 +121,9 @@ def f(
 
 ## Unsupported union unpacking
 
-Unpacking a type variable tuple into `Union` is currently not supported. Both the rejected union and
-runtime element access recover to `object`.
+Unpacking a type variable tuple into `Union` is currently not supported. The rejected union recovers
+to `object` both on its own and inside another generic specialization. Runtime element access also
+recovers to `object`.
 
 ```py
 from typing import TypeVarTuple, Union, Unpack
@@ -106,6 +136,10 @@ def reject_union(value: Union[Unpack[Ts]]) -> None:
     # TODO: should reveal `Union[*Ts]` representation
     reveal_type(value)  # revealed: object
 
+# error: [invalid-type-form] "Unpacking a `TypeVarTuple` in `Union` is not supported"
+def reject_nested_union(value: list[Union[Unpack[Ts], None]]) -> None:
+    reveal_type(value)  # revealed: list[object]
+
 def element_types(values: tuple[Unpack[Ts]]) -> None:
     # TODO: should reveal `Union[*Ts]` representation
     reveal_type(values[0])  # revealed: object
@@ -113,6 +147,35 @@ def element_types(values: tuple[Unpack[Ts]]) -> None:
     for value in values:
         # TODO: should reveal `Union[*Ts]` representation
         reveal_type(value)  # revealed: object
+```
+
+## Invalid unpack operand nested in a union
+
+Although `Unpack[int]` is valid Python syntax, its non-tuple operand should report an ordinary
+diagnostic when the union appears inside a generic specialization.
+
+```py
+from typing import Union, Unpack
+
+# error: [invalid-type-form] "`Unpack` can only unpack a tuple type or `TypeVarTuple`"
+def invalid_operand(value: list[Union[Unpack[int], None]]) -> None:
+    reveal_type(value)  # revealed: list[tuple[Unknown, ...] | None]
+```
+
+## Invalid unpack contexts still infer the operand
+
+An invalid unpack context should not suppress runtime errors from its operand. String annotations do
+not execute their contents, so unresolved names inside an invalid string annotation remain silent.
+
+```py
+from typing import Unpack
+
+# error: [invalid-type-form] "`Unpack` is not allowed in parameter annotations"
+# error: [unresolved-reference] "Name `Missing` used when not defined"
+def invalid_context(value: Unpack[Missing]) -> None: ...
+
+# error: [invalid-type-form] "`Unpack` is not allowed in parameter annotations"
+def invalid_stringified_context(value: "Unpack[Missing]") -> None: ...
 ```
 
 ## Concrete and nested tuple unpacking
@@ -128,8 +191,7 @@ def accept(
 
 accept(True, "phase", "status", b"ok")
 accept(True, b"ok")
-# TODO: error: [invalid-argument-type] "Argument to function `accept` is incorrect: Expected `tuple[bool, *tuple[str, ...], bytes]`"
-accept(True, 1, b"bad")
+accept(True, 1, b"bad")  # error: [invalid-argument-type]
 ```
 
 ## Defaults

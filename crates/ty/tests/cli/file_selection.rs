@@ -90,6 +90,27 @@ fn exclude_scripts_only_applies_to_implicitly_discovered_files() -> anyhow::Resu
     Ok(())
 }
 
+#[test]
+fn exclude_scripts_ignores_scripts_with_invalid_toml() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        ("main.py", "value: int = 1"),
+        (
+            "script.py",
+            r#"
+            # /// script
+            # requires-python =
+            # ///
+            value: int = "script"
+            "#,
+        ),
+    ])?;
+
+    let output = case.command().arg("--exclude-scripts").output()?;
+    assert!(output.status.success(), "{output:?}");
+
+    Ok(())
+}
+
 /// Test exclude CLI argument functionality
 #[test]
 fn exclude_argument() -> anyhow::Result<()> {
@@ -804,7 +825,7 @@ fn explicit_path_overrides_exclude_force_exclude() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Test that `--force-exclude` respects exclude patterns even for explicitly passed files.
+/// Test that `--force-exclude` respects exclude patterns for explicitly passed files and directories.
 #[test]
 fn force_exclude_directory_exclusion() -> anyhow::Result<()> {
     let case = CliTest::with_files([
@@ -863,6 +884,14 @@ fn force_exclude_directory_exclusion() -> anyhow::Result<()> {
     ----- stderr -----
     WARN No python files found under the given path(s)
     ");
+
+    // The exclusion also applies when the passed directory is inside an excluded directory.
+    let output = case
+        .command()
+        .arg("--force-exclude")
+        .arg("out/amd64/install")
+        .output()?;
+    assert!(output.status.success(), "{output:?}");
 
     Ok(())
 }

@@ -4,6 +4,7 @@ use ruff_source_file::find_newline;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::snippet::SourceCodeSnippet;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
@@ -32,7 +33,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// or introduce syntax errors. The fix for integer literals is also marked as unsafe
 /// if the expression contains comments that would be removed by the fix.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.13.0")]
+#[violation_metadata(stable_since = "0.13.0", category = Category::Pedantic)]
 pub(crate) struct FStringNumberFormat {
     replacement: Option<SourceCodeSnippet>,
     base: Base,

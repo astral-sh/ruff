@@ -5,6 +5,7 @@ use ruff_python_ast::{self as ast, Number};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::importer::ImportRequest;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
@@ -28,7 +29,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: `math` constants](https://docs.python.org/3/library/math.html#constants)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.1.6")]
+#[violation_metadata(preview_since = "v0.1.6", category = Category::Correctness)]
 pub(crate) struct MathConstant {
     literal: String,
     constant: &'static str,

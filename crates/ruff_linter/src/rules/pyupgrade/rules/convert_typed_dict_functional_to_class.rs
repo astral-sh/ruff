@@ -10,6 +10,7 @@ use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -63,7 +64,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// [Python keywords]: https://docs.python.org/3/reference/lexical_analysis.html#keywords
 /// [Dunder names]: https://docs.python.org/3/reference/lexical_analysis.html#reserved-classes-of-identifiers
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.155")]
+#[violation_metadata(stable_since = "v0.0.155", category = Category::Pedantic)]
 pub(crate) struct ConvertTypedDictFunctionalToClass {
     name: String,
 }
@@ -133,7 +134,7 @@ fn match_typed_dict_assign<'a>(
     let Expr::Call(ast::ExprCall {
         func,
         arguments,
-        range: _,
+        range_start: _,
         node_index: _,
     }) = value
     else {
@@ -275,7 +276,7 @@ fn match_fields_and_total(arguments: &Arguments) -> Option<(Suite, Option<&Keywo
                 Expr::Call(ast::ExprCall {
                     func,
                     arguments: Arguments { keywords, .. },
-                    range: _,
+                    range_start: _,
                     node_index: _,
                 }) => Some((fields_from_dict_call(func, keywords)?, total)),
                 _ => None,

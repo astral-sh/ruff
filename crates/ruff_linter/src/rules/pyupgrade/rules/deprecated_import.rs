@@ -9,6 +9,7 @@ use ruff_text_size::Ranged;
 
 use crate::Locator;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::pyupgrade::fixes;
 use crate::rules::pyupgrade::rules::unnecessary_future_import::is_import_required_by_isort;
 use crate::{Edit, Fix, FixAvailability, Violation};
@@ -64,7 +65,7 @@ enum Deprecation {
 /// from collections.abc import Sequence
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.239")]
+#[violation_metadata(stable_since = "v0.0.239", category = Category::Suspicious)]
 pub(crate) struct DeprecatedImport {
     deprecation: Deprecation,
 }

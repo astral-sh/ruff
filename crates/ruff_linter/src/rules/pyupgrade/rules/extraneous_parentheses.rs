@@ -6,6 +6,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::Locator;
 use crate::checkers::ast::LintContext;
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
@@ -25,7 +26,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// print("Hello, world")
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.228")]
+#[violation_metadata(stable_since = "v0.0.228", category = Category::Complexity)]
 pub(crate) struct ExtraneousParentheses;
 
 impl AlwaysFixableViolation for ExtraneousParentheses {

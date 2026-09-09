@@ -8,6 +8,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::pylint::settings::ConstantType;
 
 /// ## What it does
@@ -50,7 +51,7 @@ use crate::rules::pylint::settings::ConstantType;
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#constants
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.221")]
+#[violation_metadata(stable_since = "v0.0.221", category = Category::Pedantic)]
 pub(crate) struct MagicValueComparison {
     value: String,
 }

@@ -4,6 +4,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for `print` statements that use the `>>` syntax.
@@ -47,7 +48,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: `print`](https://docs.python.org/3/library/functions.html#print)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.39")]
+#[violation_metadata(stable_since = "v0.0.39", category = Category::Correctness)]
 pub(crate) struct InvalidPrintSyntax;
 
 impl Violation for InvalidPrintSyntax {

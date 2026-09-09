@@ -155,8 +155,8 @@ pub(crate) fn render(renderer: &Renderer, groups: Report<'_>) -> String {
                         spliced_lines,
                         display_suggestion,
                     )) => {
-                        let matches_previous_suggestion =
-                            last_suggestion_path == Some(suggestion.path.as_ref());
+                        let matches_previous_suggestion = last_suggestion_path
+                            == Some((Some(suggestion.path.as_ref()), suggestion.cell_index));
                         emit_suggestion_default(
                             renderer,
                             &mut buffer,
@@ -173,7 +173,8 @@ pub(crate) fn render(renderer: &Renderer, groups: Report<'_>) -> String {
                         );
 
                         if matches!(peek, Some(PreProcessedElement::Suggestion(_))) {
-                            last_suggestion_path = Some(suggestion.path.as_ref());
+                            last_suggestion_path =
+                                Some((Some(suggestion.path.as_ref()), suggestion.cell_index));
                         } else {
                             last_suggestion_path = None;
                         }
@@ -181,7 +182,7 @@ pub(crate) fn render(renderer: &Renderer, groups: Report<'_>) -> String {
 
                     PreProcessedElement::Origin(origin) => {
                         let buffer_msg_line_offset = buffer.num_lines();
-                        let is_primary = primary_path == Some(&origin.path) && !seen_primary;
+                        let is_primary = primary_path == origin.path.as_ref() && !seen_primary;
                         seen_primary |= is_primary;
                         render_origin(
                             renderer,
@@ -528,26 +529,34 @@ fn render_origin(
         );
     }
 
-    let str = {
-        use core::fmt::Write as _;
-
-        let mut buffer = origin.path.as_ref().to_owned();
-        if let Some(cell_index) = origin.cell_index {
-            write!(&mut buffer, ":cell {cell_index}").unwrap();
-        }
-        if let Some(line) = origin.line {
-            if renderer.anonymized_line_numbers {
-                write!(&mut buffer, ":{ANONYMIZED_LINE_NUM}").unwrap();
-            } else {
-                write!(&mut buffer, ":{line}").unwrap();
-            }
-            if let Some(col) = origin.char_column {
-                write!(&mut buffer, ":{col}").unwrap();
-            }
-        }
-        buffer
-    };
+    let str = format_origin(origin, renderer.anonymized_line_numbers);
     buffer.append(buffer_msg_line_offset, &str, ElementStyle::LineAndColumn);
+}
+
+fn format_origin(origin: &Origin<'_>, anonymized_line_numbers: bool) -> String {
+    use core::fmt::Write as _;
+
+    let mut buffer = String::new();
+    if let Some(path) = &origin.path {
+        write!(&mut buffer, "{path}").unwrap();
+    }
+    if let Some(cell_index) = origin.cell_index {
+        if !buffer.is_empty() {
+            write!(&mut buffer, ":").unwrap();
+        }
+        write!(&mut buffer, "cell {cell_index}").unwrap();
+    }
+    if let Some(line) = origin.line {
+        if anonymized_line_numbers {
+            write!(&mut buffer, ":{ANONYMIZED_LINE_NUM}").unwrap();
+        } else {
+            write!(&mut buffer, ":{line}").unwrap();
+        }
+        if let Some(col) = origin.char_column {
+            write!(&mut buffer, ":{col}").unwrap();
+        }
+    }
+    buffer
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1514,7 +1523,7 @@ fn emit_suggestion_default(
     sm: &SourceMap<'_>,
     primary_path: Option<&Cow<'_, str>>,
     matches_previous_suggestion: bool,
-    is_first: bool,
+    _is_first: bool,
     is_cont: bool,
 ) {
     let buffer_offset = buffer.num_lines();
@@ -1522,8 +1531,8 @@ fn emit_suggestion_default(
     let (complete, parts, highlights, replaced_highlights) = spliced_lines;
     let is_multiline = complete.lines().count() > 1;
 
-    if suggestion.path.as_ref() != primary_path
-        && let Some(path) = suggestion.path.as_ref()
+    let secondary_path = suggestion.path.as_ref() != primary_path;
+    if ((secondary_path && suggestion.path.as_ref().is_some()) || suggestion.cell_index.is_some())
         && !matches_previous_suggestion
     {
         let (loc, _) = sm.span_to_locations(parts[0].span.clone());
@@ -1532,13 +1541,19 @@ fn emit_suggestion_default(
         for _ in 0..max_line_num_len {
             buffer.append(row_num - 1, " ", ElementStyle::NoStyle);
         }
-        let arrow = renderer.decor_style.file_start(is_first, false);
+        let arrow = renderer.decor_style.secondary_file_start();
         buffer.append(row_num - 1, arrow, ElementStyle::LineNumber);
-        let message = if renderer.anonymized_line_numbers {
-            format!("{}:{}:{}", path, loc.line, loc.char + 1)
-        } else {
-            format!("{}:{}:{}", path, ANONYMIZED_LINE_NUM, loc.char + 1)
+        let origin = Origin {
+            path: suggestion
+                .path
+                .as_ref()
+                .filter(|_| secondary_path)
+                .map(|p| Cow::Borrowed(p.as_ref())),
+            cell_index: suggestion.cell_index,
+            line: Some(loc.line),
+            char_column: Some(loc.char + 1),
         };
+        let message = format_origin(&origin, renderer.anonymized_line_numbers);
         buffer.append(row_num - 1, &message, ElementStyle::LineAndColumn);
 
         draw_col_separator_no_space(renderer, buffer, row_num, max_line_num_len + 1);
@@ -2805,7 +2820,7 @@ fn pre_process<'a>(
                 }
                 Element::Origin(origin) => {
                     if primary_path.is_none() {
-                        primary_path = Some(Some(&origin.path));
+                        primary_path = Some(origin.path.as_ref());
                     }
                     elements.push(PreProcessedElement::Origin(origin));
                 }

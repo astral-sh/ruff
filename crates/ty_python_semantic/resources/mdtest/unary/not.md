@@ -4,18 +4,23 @@
 
 ```py
 reveal_type(not None)  # revealed: Literal[True]
+
 reveal_type(not not None)  # revealed: Literal[False]
 ```
 
 ## Function
 
 ```py
+from typing_extensions import reveal_type
+
 def f():
     return 1
 
+# error: [redundant-condition] "always truthy"
 reveal_type(not f)  # revealed: Literal[False]
-# TODO Unknown should not be part of the type of typing.reveal_type
-# reveal_type(not reveal_type)  revealed: Literal[False]
+
+# error: [redundant-condition] "always truthy"
+reveal_type(not reveal_type)  # revealed: Literal[False]
 ```
 
 ## Module
@@ -24,7 +29,10 @@ reveal_type(not f)  # revealed: Literal[False]
 import b
 import warnings
 
+# error: [redundant-condition] "always truthy"
 reveal_type(not b)  # revealed: Literal[False]
+
+# error: [redundant-condition] "always truthy"
 reveal_type(not warnings)  # revealed: Literal[False]
 ```
 
@@ -61,11 +69,15 @@ def _(flag: bool):
         r = ""
         s = 0
         t = ""
-
+    
+    # error: [redundant-condition] "always truthy"
     reveal_type(not p)  # revealed: Literal[False]
+
     reveal_type(not q)  # revealed: bool
     reveal_type(not r)  # revealed: bool
     reveal_type(not s)  # revealed: bool
+
+    # error: [redundant-condition] "always falsy"
     reveal_type(not t)  # revealed: Literal[True]
 ```
 
@@ -97,29 +109,43 @@ reveal_type(not x)  # revealed: Literal[True]
 ## String literal
 
 ```py
+# error: [redundant-condition] "always truthy"
 reveal_type(not "hello")  # revealed: Literal[False]
+# error: [redundant-condition] "always falsy"
 reveal_type(not "")  # revealed: Literal[True]
+# error: [redundant-condition] "always truthy"
 reveal_type(not "0")  # revealed: Literal[False]
+# error: [redundant-condition] "always truthy"
 reveal_type(not "hello" + "world")  # revealed: Literal[False]
 ```
 
 ## Bytes literal
 
 ```py
+# error: [redundant-condition] "always truthy"
 reveal_type(not b"hello")  # revealed: Literal[False]
+# error: [redundant-condition] "always falsy"
 reveal_type(not b"")  # revealed: Literal[True]
+# error: [redundant-condition] "always truthy"
 reveal_type(not b"0")  # revealed: Literal[False]
+# error: [redundant-condition] "always truthy"
 reveal_type(not b"hello" + b"world")  # revealed: Literal[False]
 ```
 
 ## Tuple
 
 ```py
+# error: [redundant-condition] "Expression `(1,)` is always truthy (has type `tuple[Literal[1]]`)"
 reveal_type(not (1,))  # revealed: Literal[False]
+# error: [redundant-condition] "Expression `(1, 2)` is always truthy (has type `tuple[Literal[1], Literal[2]]`)"
 reveal_type(not (1, 2))  # revealed: Literal[False]
+# error: [redundant-condition] "Expression `(1, 2, 3)` is always truthy (has type `tuple[Literal[1], Literal[2], Literal[3]]`)"
 reveal_type(not (1, 2, 3))  # revealed: Literal[False]
+# error: [redundant-condition] "Expression `()` is always falsy (has type `tuple[()]`)"
 reveal_type(not ())  # revealed: Literal[True]
+# error: [redundant-condition] "always truthy"
 reveal_type(not ("hello",))  # revealed: Literal[False]
+# error: [redundant-condition] "always truthy"
 reveal_type(not (1, "hello"))  # revealed: Literal[False]
 ```
 
@@ -142,6 +168,7 @@ class AlwaysTrue:
     def __bool__(self) -> Literal[True]:
         return True
 
+# error: [redundant-condition] "always truthy"
 # revealed: Literal[False]
 reveal_type(not AlwaysTrue())
 
@@ -149,6 +176,7 @@ class AlwaysFalse:
     def __bool__(self) -> Literal[False]:
         return False
 
+# error: [redundant-condition] "always falsy"
 # revealed: Literal[True]
 reveal_type(not AlwaysFalse())
 
@@ -181,6 +209,7 @@ class WithBothLenAndBool1:
     def __len__(self) -> Literal[2]:
         return 2
 
+# error: [redundant-condition] "always falsy"
 # revealed: Literal[True]
 reveal_type(not WithBothLenAndBool1())
 
@@ -191,6 +220,7 @@ class WithBothLenAndBool2:
     def __len__(self) -> Literal[0]:
         return 0
 
+# error: [redundant-condition]
 # revealed: Literal[False]
 reveal_type(not WithBothLenAndBool2())
 

@@ -1998,7 +1998,8 @@ two lines`,
                 &format_args![
                     space(),
                     token(
-                        "// Using reserved width causes this content to not fit even though it's a line suffix element"
+                        "// Using reserved width causes this content \
+                        to not fit even though it's a line suffix element"
                     )
                 ],
                 93
@@ -2007,7 +2008,8 @@ two lines`,
 
         assert_eq!(
             printed.as_code(),
-            "[\n  1, 2, 3\n]; // Using reserved width causes this content to not fit even though it's a line suffix element"
+            "[\n  1, 2, 3\n]; // Using reserved width causes this content \
+            to not fit even though it's a line suffix element"
         );
     }
 
@@ -2026,8 +2028,15 @@ two lines`,
                     group(&format_args![
                         token("This group breaks because:"),
                         soft_line_break_or_space(),
-                        if_group_fits_on_line(&token("This content fits but should not be printed.")).with_group_id(Some(group_id)),
-                        if_group_breaks(&token("It measures with the 'if_group_breaks' variant because the referenced group breaks and that's just way too much text.")).with_group_id(Some(group_id)),
+                        if_group_fits_on_line(&token(
+                            "This content fits but should not be printed."
+                        ))
+                        .with_group_id(Some(group_id)),
+                        if_group_breaks(&token(
+                            "It measures with the 'if_group_breaks' variant because the \
+                            referenced group breaks and that's just way too much text."
+                        ))
+                        .with_group_id(Some(group_id)),
                     ])
                 ]
             )
@@ -2037,7 +2046,11 @@ two lines`,
 
         assert_eq!(
             printed.as_code(),
-            "The referenced group breaks.\nThis group breaks because:\nIt measures with the 'if_group_breaks' variant because the referenced group breaks and that's just way too much text."
+            "\
+The referenced group breaks.
+This group breaks because:
+It measures with the 'if_group_breaks' variant because the referenced group breaks \
+and that's just way too much text."
         );
     }
 
@@ -2058,7 +2071,11 @@ two lines`,
             write!(
                 f,
                 [
-                    group(&token("Group with id-1 does not fit on the line because it exceeds the line width of 80 characters by")).with_id(Some(id_1)),
+                    group(&token(
+                        "Group with id-1 does not fit on the line \
+                        because it exceeds the line width of 80 characters by"
+                    ))
+                    .with_id(Some(id_1)),
                     hard_line_break()
                 ]
             )?;

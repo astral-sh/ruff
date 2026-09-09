@@ -4,6 +4,7 @@ use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -67,7 +68,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// - [Python documentation: `__getattr__`](https://docs.python.org/3/reference/datamodel.html#object.__getattr__)
 /// - [Python documentation: `__call__`](https://docs.python.org/3/reference/datamodel.html#object.__call__)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.106")]
+#[violation_metadata(stable_since = "v0.0.106", category = Category::Suspicious)]
 pub(crate) struct UnreliableCallableCheck;
 
 impl Violation for UnreliableCallableCheck {

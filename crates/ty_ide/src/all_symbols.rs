@@ -1,8 +1,9 @@
 use compact_str::CompactString;
 use rayon::prelude::*;
 use ruff_db::files::File;
-use ty_module_resolver::{Module, ModuleName, all_modules, resolve_real_shadowable_module};
+use ty_module_resolver::{Module, all_modules};
 use ty_project::{Db, parallel::ParallelIteratorExt};
+use ty_python_core::ProgramFile;
 
 use crate::{
     SymbolKind,
@@ -15,7 +16,7 @@ use crate::{
 /// by the query.
 pub fn all_symbols<'db>(
     db: &'db dyn Db,
-    importing_from: File,
+    importing_from: ProgramFile<'db>,
     query: &QueryPattern,
 ) -> Vec<AllSymbolInfo<'db>> {
     // If the query is empty, return immediately to avoid expensive file scanning
@@ -26,16 +27,12 @@ pub fn all_symbols<'db>(
     let all_symbols_span = tracing::debug_span!("all_symbols");
     let _span = all_symbols_span.enter();
 
-    let typing_extensions = ModuleName::new_static("typing_extensions").unwrap();
-    let is_typing_extensions_available = importing_from.is_stub(db)
-        || resolve_real_shadowable_module(db, importing_from, &typing_extensions).is_some();
+    let program = importing_from.program(db);
+    let resolver_environment = importing_from.resolver_environment(db);
 
-    let results = all_modules(db)
+    let results = all_modules(db, resolver_environment)
         .into_par_iter()
         .map_with_db(db, |db, module| {
-            let Some(file) = module.file(db) else {
-                return Vec::new();
-            };
             let name = module.name(db);
 
             // Note that this will always consider namespace
@@ -46,17 +43,18 @@ pub fn all_symbols<'db>(
             // namespace packages in auto-import anyway.)
             let is_non_first_party = module.search_path(db).is_none_or(|sp| !sp.is_first_party());
 
-            // Filter out non-first-party modules that are conventionally
-            // regarded as private or tests.
-            if is_non_first_party && (name.is_private() || name.is_test_module()) {
+            // Filter out non-first-party test and private modules, while retaining private
+            // typeshed packages that are useful when writing type annotations.
+            if is_non_first_party
+                && (name.is_test_module() || name.is_private() && !module.is_type_check_only(db))
+            {
                 return Vec::new();
             }
 
-            // TODO: also make it available in `TYPE_CHECKING` blocks
-            // (we'd need https://github.com/astral-sh/ty/issues/1553 to do this well)
-            if !is_typing_extensions_available && name == &typing_extensions {
+            let Some(file) = module.file(db) else {
                 return Vec::new();
-            }
+            };
+            let program_file = ProgramFile::new(db, file, program);
 
             let symbols_for_file_span = tracing::debug_span!(
                 parent: &all_symbols_span,
@@ -69,7 +67,7 @@ pub fn all_symbols<'db>(
             if query.is_match_symbol_name(module.name(db)) {
                 symbols.push(AllSymbolInfo::from_module(db, module, file));
             }
-            for (_, symbol) in symbols_for_file_global_only(db, file).search(query) {
+            for (_, symbol) in symbols_for_file_global_only(db, program_file).search(query) {
                 // Test functions (starting with `test_`) in third-party
                 // packages are almost never useful to import.
                 if is_non_first_party && symbol.name.starts_with("test_") {
@@ -706,7 +704,11 @@ def zqzqzq():
         info: Function zqzqzq
         ");
 
-        let symbols = all_symbols(&test.db, test.cursor.file, &QueryPattern::fuzzy("zqzqzq"));
+        let symbols = all_symbols(
+            &test.db,
+            test.program_file(test.cursor.file),
+            &QueryPattern::fuzzy("zqzqzq"),
+        );
         let symbol = symbols
             .iter()
             .find_map(|info| info.symbol.as_ref())
@@ -1104,7 +1106,11 @@ def test_helper_xyzxyzxyz():
 
     impl CursorTest {
         fn all_symbols(&self, query: &str) -> String {
-            let symbols = all_symbols(&self.db, self.cursor.file, &QueryPattern::fuzzy(query));
+            let symbols = all_symbols(
+                &self.db,
+                self.program_file(self.cursor.file),
+                &QueryPattern::fuzzy(query),
+            );
 
             if symbols.is_empty() {
                 return "No symbols found".to_string();

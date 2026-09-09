@@ -136,6 +136,33 @@ reveal_type(generic_context(into_regular_callable(C)))
 reveal_type(into_regular_callable(C)(1))
 ```
 
+## Generic `__iter__` methods with explicit receivers
+
+Binding `__iter__` to an `Unpacker[Iterable[int]]` infers `S` as `int` from the explicit
+`self: Unpacker[Iterable[S]]` annotation. Calls to `list()` and `iter()` preserve this element type,
+just as `tuple()` and `for` loops do.
+
+Regression test for <https://github.com/astral-sh/ty/issues/3598>.
+
+```py
+from collections.abc import Iterable, Iterator
+
+class Unpacker[T: Iterable[object]]:
+    def __init__(self, it: T, /) -> None:
+        self._it = it
+    def __iter__[S](self: "Unpacker[Iterable[S]]") -> Iterator[S]:
+        return iter(self._it)
+
+def integers() -> Unpacker[Iterable[int]]:
+    return Unpacker([1, 2, 3])
+
+reveal_type(tuple(integers()))  # revealed: tuple[int, ...]
+for x in integers():
+    reveal_type(x)  # revealed: int
+reveal_type(list(integers()))  # revealed: list[int]
+reveal_type(iter(integers()))  # revealed: Iterator[int]
+```
+
 ## Naming a generic `Callable`: type aliases
 
 The easiest way to refer to a generic `Callable` type directly is via a type alias:
@@ -664,6 +691,25 @@ def f(val: str | bytes) -> None:
     pass
 
 reveal_type(accepts_callable(f))  # revealed: str | bytes
+```
+
+When overloads exchange their input and output types, the inferred return tuple currently contains a
+union for each type variable.
+
+```py
+def infer_pair[T, U](converter: Callable[[T], U]) -> tuple[T, U]:
+    raise NotImplementedError
+
+@overload
+def swap(value: int) -> str: ...
+@overload
+def swap(value: str) -> int: ...
+def swap(value: int | str) -> int | str:
+    raise NotImplementedError
+
+# TODO: Infer the intersection of `tuple[int, str]` and `tuple[str, int]`.
+# Both specializations validate the same call, so its result satisfies both return types.
+reveal_type(infer_pair(swap))  # revealed: tuple[int | str, str | int]
 ```
 
 When `T` is constrained to a union by other arguments, the overloaded callable must still be treated

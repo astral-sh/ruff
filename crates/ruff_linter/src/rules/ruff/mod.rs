@@ -125,7 +125,7 @@ mod tests {
     #[test_case(Rule::NonEmptyInitModule, Path::new("RUF067/modules/__init__.py"))]
     #[test_case(Rule::NonEmptyInitModule, Path::new("RUF067/modules/okay.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("ruff").join(path).as_path(),
             &settings::LinterSettings::for_rule(rule_code),
@@ -243,14 +243,10 @@ mod tests {
     fn missing_fstring_syntax_backslash_py311() -> Result<()> {
         assert_diagnostics_diff!(
             Path::new("ruff/RUF027_0.py"),
-            &LinterSettings {
-                unresolved_target_version: PythonVersion::PY312.into(),
-                ..LinterSettings::for_rule(Rule::MissingFStringSyntax)
-            },
-            &LinterSettings {
-                unresolved_target_version: PythonVersion::PY311.into(),
-                ..LinterSettings::for_rule(Rule::MissingFStringSyntax)
-            },
+            &LinterSettings::for_rule(Rule::MissingFStringSyntax)
+                .with_target_version(PythonVersion::PY312),
+            &LinterSettings::for_rule(Rule::MissingFStringSyntax)
+                .with_target_version(PythonVersion::PY311),
         );
         Ok(())
     }
@@ -293,7 +289,7 @@ mod tests {
     fn implicit_optional_py39(path: &Path) -> Result<()> {
         let snapshot = format!(
             "PY39_{}_{}",
-            Rule::ImplicitOptional.noqa_code(),
+            Rule::ImplicitOptional.name(),
             path.to_string_lossy()
         );
         let diagnostics = test_path(
@@ -353,10 +349,8 @@ mod tests {
 
             print(None | (int)and 2)
             ",
-            &settings::LinterSettings {
-                unresolved_target_version: PythonVersion::PY313.into(),
-                ..settings::LinterSettings::for_rule(Rule::NoneNotAtEndOfUnion)
-            },
+            &settings::LinterSettings::for_rule(Rule::NoneNotAtEndOfUnion)
+                .with_target_version(PythonVersion::PY313),
         );
         assert_diagnostics!("PY313_RUF036_runtime_evaluated", diagnostics);
     }
@@ -365,10 +359,8 @@ mod tests {
     fn quadratic_list_summation_py315() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/RUF017_0.py"),
-            &settings::LinterSettings {
-                unresolved_target_version: PythonVersion::PY315.into(),
-                ..settings::LinterSettings::for_rule(Rule::QuadraticListSummation)
-            },
+            &settings::LinterSettings::for_rule(Rule::QuadraticListSummation)
+                .with_target_version(PythonVersion::PY315),
         )?;
         assert_diagnostics!("PY315_RUF017_RUF017_0.py", diagnostics);
         Ok(())
@@ -378,12 +370,8 @@ mod tests {
     fn unnecessary_iterable_allocation_for_first_element_py315() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/RUF015_py315.py"),
-            &settings::LinterSettings {
-                unresolved_target_version: PythonVersion::PY315.into(),
-                ..settings::LinterSettings::for_rule(
-                    Rule::UnnecessaryIterableAllocationForFirstElement,
-                )
-            },
+            &settings::LinterSettings::for_rule(Rule::UnnecessaryIterableAllocationForFirstElement)
+                .with_target_version(PythonVersion::PY315),
         )?;
         assert_diagnostics!("PY315_RUF015_RUF015_py315.py", diagnostics);
         Ok(())
@@ -393,10 +381,8 @@ mod tests {
     fn access_annotations_from_class_dict_py310() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/RUF063.py"),
-            &LinterSettings {
-                unresolved_target_version: PythonVersion::PY310.into(),
-                ..LinterSettings::for_rule(Rule::AccessAnnotationsFromClassDict)
-            },
+            &LinterSettings::for_rule(Rule::AccessAnnotationsFromClassDict)
+                .with_target_version(PythonVersion::PY310),
         )?;
         assert_diagnostics!(diagnostics);
         Ok(())
@@ -406,10 +392,8 @@ mod tests {
     fn access_annotations_from_class_dict_py314() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/RUF063.py"),
-            &LinterSettings {
-                unresolved_target_version: PythonVersion::PY314.into(),
-                ..LinterSettings::for_rule(Rule::AccessAnnotationsFromClassDict)
-            },
+            &LinterSettings::for_rule(Rule::AccessAnnotationsFromClassDict)
+                .with_target_version(PythonVersion::PY314),
         )?;
         assert_diagnostics!(diagnostics);
         Ok(())
@@ -785,7 +769,7 @@ mod tests {
     #[test_case(Rule::InvalidPyprojectToml, Path::new("various_invalid"))]
     #[test_case(Rule::InvalidPyprojectToml, Path::new("pep639"))]
     fn invalid_pyproject_toml(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let messages = test_toml_path(
             Path::new("ruff/pyproject_toml")
                 .join(path)
@@ -813,17 +797,10 @@ mod tests {
     #[test_case(Rule::UselessFinally, Path::new("RUF072.py"))]
     #[test_case(Rule::FStringPercentFormat, Path::new("RUF073.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!(
-            "preview__{}_{}",
-            rule_code.noqa_code(),
-            path.to_string_lossy()
-        );
+        let snapshot = format!("preview__{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("ruff").join(path).as_path(),
-            &settings::LinterSettings {
-                preview: PreviewMode::Enabled,
-                ..settings::LinterSettings::for_rule(rule_code)
-            },
+            &settings::LinterSettings::for_rule(rule_code).with_preview_mode(),
         )?;
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())
@@ -833,16 +810,14 @@ mod tests {
     fn preview_rules_py37(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__py37__{}_{}",
-            rule_code.noqa_code(),
+            rule_code.name(),
             path.to_string_lossy()
         );
         let diagnostics = test_path(
             Path::new("ruff").join(path).as_path(),
-            &settings::LinterSettings {
-                preview: PreviewMode::Enabled,
-                unresolved_target_version: PythonVersion::PY37.into(),
-                ..settings::LinterSettings::for_rule(rule_code)
-            },
+            &settings::LinterSettings::for_rule(rule_code)
+                .with_preview_mode()
+                .with_target_version(PythonVersion::PY37),
         )?;
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())
@@ -852,16 +827,14 @@ mod tests {
     fn preview_rules_py38(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__py38__{}_{}",
-            rule_code.noqa_code(),
+            rule_code.name(),
             path.to_string_lossy()
         );
         let diagnostics = test_path(
             Path::new("ruff").join(path).as_path(),
-            &settings::LinterSettings {
-                preview: PreviewMode::Enabled,
-                unresolved_target_version: PythonVersion::PY38.into(),
-                ..settings::LinterSettings::for_rule(rule_code)
-            },
+            &settings::LinterSettings::for_rule(rule_code)
+                .with_preview_mode()
+                .with_target_version(PythonVersion::PY38),
         )?;
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())
@@ -880,7 +853,7 @@ mod tests {
 
         let snapshot = format!(
             "custom_dummy_var_regexp_preset__{}_{}_{}",
-            rule_code.noqa_code(),
+            rule_code.name(),
             path.to_string_lossy(),
             id,
         );
@@ -897,17 +870,11 @@ mod tests {
 
     #[test_case(Rule::StarmapZip, Path::new("RUF058_2.py"))]
     fn map_strict_py314(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!(
-            "py314__{}_{}",
-            rule_code.noqa_code(),
-            path.to_string_lossy()
-        );
+        let snapshot = format!("py314__{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("ruff").join(path).as_path(),
-            &settings::LinterSettings {
-                unresolved_target_version: PythonVersion::PY314.into(),
-                ..settings::LinterSettings::for_rule(rule_code)
-            },
+            &settings::LinterSettings::for_rule(rule_code)
+                .with_target_version(PythonVersion::PY314),
         )?;
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())

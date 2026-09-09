@@ -377,6 +377,17 @@ error[invalid-type-form]: Int literals are not allowed in this context in a type
    |                                   ^^ Did you mean `typing.Literal[42]`?
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+help: Wrap in `Literal[...]`
+   |
+1  + from typing import Literal
+2  | from typing_extensions import TypedDict
+--------------------------------------------------------------------------------
+89 | # error: [invalid-type-form]
+   - Bad10 = TypedDict("Bad10", {name: 42})
+90 + Bad10 = TypedDict("Bad10", {name: Literal[42]})
+91 |
+   |
+note: This is an unsafe fix and may change runtime behavior
 
 ```
 
@@ -397,6 +408,17 @@ error[invalid-type-form]: Int literals are not allowed in this context in a type
    |                                       ^^ Did you mean `typing.Literal[42]`?
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+help: Wrap in `Literal[...]`
+   |
+1  + from typing import Literal
+2  | from typing_extensions import TypedDict
+--------------------------------------------------------------------------------
+93 | # error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
+   - class Bad11(TypedDict("Bad11", {name: 42})): ...
+94 + class Bad11(TypedDict("Bad11", {name: Literal[42]})): ...
+95 |
+   |
+note: This is an unsafe fix and may change runtime behavior
 
 ```
 

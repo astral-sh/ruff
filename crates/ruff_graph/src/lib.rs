@@ -3,12 +3,13 @@ use std::collections::{BTreeMap, BTreeSet};
 use anyhow::Result;
 
 use ruff_db::system::{SystemPath, SystemPathBuf};
-use ruff_python_ast::PySourceType;
+use ruff_linter::source_kind::SourceKind;
 use ruff_python_ast::helpers::to_module_path;
 use ruff_python_parser::{ParseOptions, parse};
+pub use ty_module_resolver::ResolverEnvironment;
 
 use crate::collector::Collector;
-pub use crate::db::ModuleDb;
+pub use crate::db::{ModuleDb, resolve_search_paths};
 use crate::resolver::Resolver;
 pub use crate::settings::{AnalyzeSettings, Direction, StringImports};
 
@@ -23,17 +24,19 @@ pub struct ModuleImports(BTreeSet<SystemPathBuf>);
 
 impl ModuleImports {
     /// Detect the [`ModuleImports`] for a given Python file.
-    pub fn detect(
-        db: &ModuleDb,
-        source: &str,
-        source_type: PySourceType,
+    pub fn detect<'db>(
+        db: &'db ModuleDb,
+        environment: ResolverEnvironment<'db>,
+        source: &SourceKind,
         path: &SystemPath,
         package: Option<&SystemPath>,
         string_imports: StringImports,
         type_checking_imports: bool,
     ) -> Result<Self> {
         // Parse the source code.
-        let parsed = parse(source, ParseOptions::from(source_type))?;
+        let parse_options = ParseOptions::from(source.py_source_type())
+            .with_target_version(environment.python_version(db));
+        let parsed = parse(source.source_code(), parse_options)?;
 
         let module_path =
             package.and_then(|package| to_module_path(package.as_std_path(), path.as_std_path()));
@@ -48,8 +51,9 @@ impl ModuleImports {
 
         // Resolve the imports.
         let mut resolved_imports = ModuleImports::default();
+        let resolver = Resolver::new(db, path, environment);
         for import in imports {
-            for resolved in Resolver::new(db, path).resolve(import) {
+            for resolved in resolver.resolve(import) {
                 if let Some(path) = resolved.as_system_path() {
                     resolved_imports.insert(path.to_path_buf());
                 }

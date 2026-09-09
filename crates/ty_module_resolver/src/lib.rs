@@ -1,15 +1,19 @@
+use std::hash::BuildHasherDefault;
 use std::iter::FusedIterator;
 
 use ruff_db::system::SystemPath;
+use rustc_hash::FxHasher;
 
 pub use db::Db;
+pub use environment::{ResolverEnvironment, ResolverFile};
 pub use module::KnownModule;
 pub use module::Module;
-pub use module_name::{ModuleName, ModuleNameResolutionError};
+pub use module_name::{ImportingFile, ModuleName, ModuleNameResolutionError};
 pub use path::{SearchPath, SearchPathError};
 pub use resolve::{
-    SearchPaths, file_to_module, resolve_module, resolve_module_confident, resolve_real_module,
-    resolve_real_module_confident, resolve_real_shadowable_module,
+    SearchPaths, editable_search_paths, file_to_module, resolve_module, resolve_module_confident,
+    resolve_module_for_import_from, resolve_real_module, resolve_real_module_confident,
+    resolve_real_shadowable_module, stub_file_to_real_module,
 };
 pub use settings::{SearchPathSettings, SearchPathSettingsError};
 pub use strategy::{FallibleStrategy, MisconfigurationStrategy, UseDefaultStrategy};
@@ -20,6 +24,7 @@ pub use module_glob::{ModuleGlobError, ModuleGlobSet, ModuleGlobSetBuilder, Modu
 pub use resolve::{ModuleResolveMode, SearchPathIterator, search_paths};
 
 mod db;
+mod environment;
 mod list;
 mod module;
 mod module_glob;
@@ -30,15 +35,20 @@ mod settings;
 mod strategy;
 mod typeshed;
 
+type FxOrderMap<K, V> = ordermap::map::OrderMap<K, V, BuildHasherDefault<FxHasher>>;
+
 #[cfg(test)]
 mod testing;
 
 /// Returns an iterator over all search paths pointing to a system path
-pub fn system_module_search_paths(db: &dyn Db) -> SystemModuleSearchPathsIter<'_> {
+pub fn system_module_search_paths<'db>(
+    db: &'db dyn Db,
+    resolver_environment: ResolverEnvironment<'db>,
+) -> SystemModuleSearchPathsIter<'db> {
     SystemModuleSearchPathsIter {
         // Always run in `Typing` mode because we want to include as much as possible
         // and we don't care about the "real" stdlib
-        inner: search_paths(db, ModuleResolveMode::Typing),
+        inner: search_paths(db, resolver_environment, ModuleResolveMode::Typing),
     }
 }
 

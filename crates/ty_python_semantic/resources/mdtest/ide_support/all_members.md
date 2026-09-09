@@ -675,6 +675,32 @@ static_assert(has_member(module, "evaluate"))
 static_assert(not has_member(module, "Optional"))
 ```
 
+### Private typing-only stub members
+
+Typing-only helpers in stubs remain available as module members for autocomplete.
+
+`module.pyi`:
+
+```pyi
+from typing import TypeAlias, TypeVar
+
+_Alias: TypeAlias = int
+_T = TypeVar("_T")
+_runtime: int
+```
+
+`main.py`:
+
+```py
+import module
+from ty_extensions import static_assert
+from ty_extensions._internal import has_member
+
+static_assert(has_member(module, "_runtime"))
+static_assert(has_member(module, "_Alias"))
+static_assert(has_member(module, "_T"))
+```
+
 ## Conditionally available members
 
 Some members are only conditionally available. For example, `bytearray.take_bytes` was only

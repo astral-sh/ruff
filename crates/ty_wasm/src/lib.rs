@@ -24,10 +24,11 @@ use ty_ide::{
 };
 use ty_ide::{NavigationTarget, NavigationTargets, hints, signature_help};
 use ty_project::metadata::options::Options;
-use ty_project::watch::{ChangeEvent, ChangedKind, CreatedKind, DeletedKind};
+use ty_project::watch::{ChangeEvent, ChangedKind, DeletedKind};
 use ty_project::{CheckMode, ProjectMetadata};
-use ty_project::{Db, ProjectDatabase};
-use ty_python_core::program::{FallibleStrategy, Program};
+use ty_project::{Db, ProjectDatabase, SemanticDb as _};
+use ty_python_core::program::FallibleStrategy;
+use ty_python_semantic::ProgramEnvironment;
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
@@ -169,19 +170,22 @@ impl Workspace {
         let (program_settings, program_settings_diagnostics) = merged_options
             .to_program_settings(&self.system, self.db.vendored(), &FallibleStrategy)
             .map_err(into_error)?;
-        Program::get(&self.db).update_from_settings(&mut self.db, program_settings);
+        self.db
+            .project()
+            .update_program(&mut self.db, program_settings);
 
-        let (settings, settings_diagnostics) = merged_options
+        let (settings, mut settings_diagnostics) = merged_options
             .to_settings(&self.db, &FallibleStrategy)
             .map_err(into_error)?;
-
-        self.db.project().reload(
-            &mut self.db,
-            project,
-            Some(settings),
-            settings_diagnostics,
-            program_settings_diagnostics,
+        settings_diagnostics.extend(
+            program_settings_diagnostics
+                .into_iter()
+                .map(|diagnostic| diagnostic.into_diagnostic(&self.db)),
         );
+
+        self.db
+            .project()
+            .reload(&mut self.db, project, Some(settings), settings_diagnostics);
 
         Ok(())
     }
@@ -195,10 +199,7 @@ impl Workspace {
             .write_file_all(&path, contents)
             .map_err(into_error)?;
 
-        self.db.apply_changes(&[ChangeEvent::Created {
-            path: path.clone(),
-            kind: CreatedKind::File,
-        }]);
+        self.db.apply_changes(&[ChangeEvent::Opened(path.clone())]);
 
         let file = system_path_to_file(&self.db, &path).expect("File to exist");
 
@@ -290,7 +291,11 @@ impl Workspace {
 
     /// Returns the parsed AST for `path`
     pub fn parsed(&self, file_id: &FileHandle) -> Result<String, Error> {
-        let parsed = ruff_db::parsed::parsed_module(&self.db, file_id.file).load(&self.db);
+        let parsed = ruff_db::parsed::parsed_module(
+            &self.db,
+            self.db.program_file(file_id.file).python_file(&self.db),
+        )
+        .load(&self.db);
 
         Ok(format!("{:#?}", parsed.syntax()))
     }
@@ -301,7 +306,11 @@ impl Workspace {
 
     /// Returns the token stream for `path` serialized as a string.
     pub fn tokens(&self, file_id: &FileHandle) -> Result<String, Error> {
-        let parsed = ruff_db::parsed::parsed_module(&self.db, file_id.file).load(&self.db);
+        let parsed = ruff_db::parsed::parsed_module(
+            &self.db,
+            self.db.program_file(file_id.file).python_file(&self.db),
+        )
+        .load(&self.db);
 
         Ok(format!("{:#?}", parsed.tokens()))
     }
@@ -324,7 +333,9 @@ impl Workspace {
 
         let offset = position.to_text_size(&source, &index, self.position_encoding)?;
 
-        let Some(targets) = goto_type_definition(&self.db, file_id.file, offset) else {
+        let Some(targets) =
+            goto_type_definition(&self.db, self.db.program_file(file_id.file), offset)
+        else {
             return Ok(Vec::new());
         };
 
@@ -348,7 +359,8 @@ impl Workspace {
 
         let offset = position.to_text_size(&source, &index, self.position_encoding)?;
 
-        let Some(targets) = goto_declaration(&self.db, file_id.file, offset) else {
+        let Some(targets) = goto_declaration(&self.db, self.db.program_file(file_id.file), offset)
+        else {
             return Ok(Vec::new());
         };
 
@@ -372,7 +384,8 @@ impl Workspace {
 
         let offset = position.to_text_size(&source, &index, self.position_encoding)?;
 
-        let Some(targets) = goto_definition(&self.db, file_id.file, offset) else {
+        let Some(targets) = goto_definition(&self.db, self.db.program_file(file_id.file), offset)
+        else {
             return Ok(Vec::new());
         };
 
@@ -396,7 +409,9 @@ impl Workspace {
 
         let offset = position.to_text_size(&source, &index, self.position_encoding)?;
 
-        let Some(targets) = find_references(&self.db, file_id.file, offset, true) else {
+        let Some(targets) =
+            find_references(&self.db, self.db.program_file(file_id.file), offset, true)
+        else {
             return Ok(Vec::new());
         };
 
@@ -435,7 +450,7 @@ impl Workspace {
 
         let offset = position.to_text_size(&source, &index, self.position_encoding)?;
 
-        let Some(range) = can_rename(&self.db, file_id.file, offset) else {
+        let Some(range) = can_rename(&self.db, self.db.program_file(file_id.file), offset) else {
             return Ok(None);
         };
 
@@ -458,12 +473,13 @@ impl Workspace {
         let index = line_index(&self.db, file_id.file);
 
         let offset = position.to_text_size(&source, &index, self.position_encoding)?;
+        let program_file = self.db.program_file(file_id.file);
 
-        if can_rename(&self.db, file_id.file, offset).is_none() {
+        if can_rename(&self.db, program_file, offset).is_none() {
             return Ok(Vec::new());
         }
 
-        let Some(rename_results) = rename(&self.db, file_id.file, offset, new_name) else {
+        let Some(rename_results) = rename(&self.db, program_file, offset, new_name) else {
             return Ok(Vec::new());
         };
 
@@ -488,7 +504,7 @@ impl Workspace {
 
         let offset = position.to_text_size(&source, &index, self.position_encoding)?;
 
-        let Some(range_info) = hover(&self.db, file_id.file, offset) else {
+        let Some(range_info) = hover(&self.db, self.db.program_file(file_id.file), offset) else {
             return Ok(None);
         };
 
@@ -519,11 +535,13 @@ impl Workspace {
         let offset = position.to_text_size(&source, &index, self.position_encoding)?;
 
         let settings = ty_ide::CompletionSettings::default();
+        let program_file = self.db.program_file(file_id.file);
+        let env = ProgramEnvironment::from_file(program_file);
         let completions = ty_ide::completion(
             &self.db,
             &settings,
             CompletionCapabilities::default(),
-            file_id.file,
+            program_file,
             offset,
         );
 
@@ -532,7 +550,7 @@ impl Workspace {
             .map(|comp| {
                 let name = comp.label().to_string();
                 let kind = comp.kind.map(CompletionKind::from);
-                let type_display = comp.ty.map(|ty| ty.display(&self.db).to_string());
+                let type_display = comp.ty.map(|ty| ty.display(&self.db, &env).to_string());
                 let import_edit = comp.import.as_ref().map(|edit| {
                     let range = Range::from_text_range(
                         edit.range(),
@@ -567,7 +585,7 @@ impl Workspace {
 
         let result = inlay_hints(
             &self.db,
-            file_id.file,
+            self.db.program_file(file_id.file),
             range.to_text_range(&index, &source, self.position_encoding)?,
             // TODO: Provide a way to configure this
             &InlayHintSettings {
@@ -624,7 +642,8 @@ impl Workspace {
         let index = line_index(&self.db, file_id.file);
         let source = source_text(&self.db, file_id.file);
 
-        let semantic_token = ty_ide::semantic_tokens(&self.db, file_id.file, None);
+        let semantic_token =
+            ty_ide::semantic_tokens(&self.db, self.db.program_file(file_id.file), None);
 
         let result = semantic_token
             .iter()
@@ -649,7 +668,7 @@ impl Workspace {
 
         let semantic_token = ty_ide::semantic_tokens(
             &self.db,
-            file_id.file,
+            self.db.program_file(file_id.file),
             Some(range.to_text_range(&index, &source, self.position_encoding)?),
         );
 
@@ -686,7 +705,7 @@ impl Workspace {
             actions.extend(
                 ty_ide::code_actions(
                     &self.db,
-                    file_id.file,
+                    self.db.program_file(file_id.file),
                     range,
                     diagnostic.inner.id().as_str(),
                 )
@@ -721,7 +740,9 @@ impl Workspace {
 
         let offset = position.to_text_size(&source, &index, self.position_encoding)?;
 
-        let Some(signature_help_info) = signature_help(&self.db, file_id.file, offset) else {
+        let Some(signature_help_info) =
+            signature_help(&self.db, self.db.program_file(file_id.file), offset)
+        else {
             return Ok(None);
         };
 
@@ -768,7 +789,9 @@ impl Workspace {
 
         let offset = position.to_text_size(&source, &index, self.position_encoding)?;
 
-        let Some(targets) = document_highlights(&self.db, file_id.file, offset) else {
+        let Some(targets) =
+            document_highlights(&self.db, self.db.program_file(file_id.file), offset)
+        else {
             return Ok(Vec::new());
         };
 
@@ -1559,6 +1582,8 @@ pub enum SemanticTokenKind {
     Decorator,
     BuiltinConstant,
     TypeParameter,
+    Operator,
+    Regexp,
 }
 
 impl From<ty_ide::SemanticTokenType> for SemanticTokenKind {
@@ -1579,6 +1604,8 @@ impl From<ty_ide::SemanticTokenType> for SemanticTokenKind {
             ty_ide::SemanticTokenType::Decorator => Self::Decorator,
             ty_ide::SemanticTokenType::BuiltinConstant => Self::BuiltinConstant,
             ty_ide::SemanticTokenType::TypeParameter => Self::TypeParameter,
+            ty_ide::SemanticTokenType::Operator => Self::Operator,
+            ty_ide::SemanticTokenType::Regexp => Self::Regexp,
         }
     }
 }

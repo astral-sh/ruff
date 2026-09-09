@@ -11,6 +11,7 @@ use ruff_text_size::Ranged;
 
 use crate::Locator;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::cst::helpers::or_space;
 use crate::cst::matchers::{match_comparison, transform_expression};
 use crate::fix::edits::pad;
@@ -48,7 +49,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// - [Python documentation: Comparisons](https://docs.python.org/3/reference/expressions.html#comparisons)
 /// - [Python documentation: Assignment statements](https://docs.python.org/3/reference/simple_stmts.html#assignment-statements)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.207")]
+#[violation_metadata(stable_since = "v0.0.207", category = Category::Pedantic)]
 pub(crate) struct YodaConditions {
     suggestion: Option<SourceCodeSnippet>,
 }

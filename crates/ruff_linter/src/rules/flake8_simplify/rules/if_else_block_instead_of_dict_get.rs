@@ -10,6 +10,7 @@ use ruff_python_semantic::analyze::typing::{
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::fits;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
@@ -61,7 +62,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: Mapping Types](https://docs.python.org/3/library/stdtypes.html#mapping-types-dict)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.219")]
+#[violation_metadata(stable_since = "v0.0.219", category = Category::Complexity)]
 pub(crate) struct IfElseBlockInsteadOfDictGet {
     contents: String,
 }
@@ -209,7 +210,7 @@ pub(crate) fn if_else_block_instead_of_dict_get(checker: &Checker, stmt_if: &ast
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         },
-        range: TextRange::default(),
+        range_start: ruff_text_size::TextSize::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     let node4 = expected_var.clone();
@@ -318,7 +319,7 @@ pub(crate) fn if_exp_instead_of_dict_get(
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         },
-        range: TextRange::default(),
+        range_start: ruff_text_size::TextSize::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
 

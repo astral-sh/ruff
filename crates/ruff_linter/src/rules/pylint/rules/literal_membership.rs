@@ -4,6 +4,7 @@ use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
@@ -34,7 +35,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## References
 /// - [What’s New In Python 3.2](https://docs.python.org/3/whatsnew/3.2.html#optimizations)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.1.1")]
+#[violation_metadata(preview_since = "v0.1.1", category = Category::Pedantic)]
 pub(crate) struct LiteralMembership;
 
 impl AlwaysFixableViolation for LiteralMembership {

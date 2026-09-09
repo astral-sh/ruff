@@ -8,7 +8,7 @@
 
 ```py
 from typing_extensions import assert_never, Never, Any
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 def _(never: Never):
     assert_never(never)  # fine
@@ -20,7 +20,7 @@ If it is not, a `type-assertion-failure` diagnostic is emitted.
 
 ```py
 from typing_extensions import assert_never, Never, Any
-from ty_extensions import Unknown
+from ty_extensions._internal import Unknown
 
 def _():
     assert_never(0)  # snapshot: type-assertion-failure

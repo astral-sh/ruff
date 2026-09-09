@@ -762,7 +762,7 @@ class Context:
         """Set all traps to False."""
 
     def copy(self) -> Context:
-        """Return a duplicate of the context with all flags cleared."""
+        """Return a duplicate of the context."""
 
     def __copy__(self) -> Context: ...
     # see https://github.com/python/cpython/issues/94107

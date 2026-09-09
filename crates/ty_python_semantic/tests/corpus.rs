@@ -1,23 +1,21 @@
 use std::sync::Arc;
 
 use anyhow::{Context, anyhow};
-use ruff_db::Db;
 use ruff_db::files::{File, Files, system_path_to_file};
 use ruff_db::system::{DbWithTestSystem, System, SystemPath, SystemPathBuf, TestSystem};
 use ruff_db::vendored::VendoredFileSystem;
-use ruff_python_ast::PythonVersion;
 
-use ty_module_resolver::SearchPathSettings;
-use ty_python_core::platform::PythonPlatform;
-use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
+use ty_python_core::program::ProgramSettings;
+use ty_python_semantic::dependency::DependencyMetadata;
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::pull_types::pull_types;
-use ty_python_semantic::{AnalysisSettings, check_file_unwrap, default_lint_registry};
-use ty_site_packages::{PythonVersionSource, PythonVersionWithSource};
+use ty_python_semantic::{
+    AnalysisSettings, Db as _, PythonVersionWithSource, check_file_unwrap, default_lint_registry,
+};
 
 use ruff_db::diagnostic::Diagnostic;
 use test_case::test_case;
-use ty_python_core::Db as _;
+use ty_python_core::{Db as _, ProgramFile, TestProgramDb};
 
 fn get_cargo_workspace_root() -> anyhow::Result<&'static SystemPath> {
     SystemPath::new(env!("CARGO_MANIFEST_DIR"))
@@ -111,7 +109,9 @@ fn run_corpus_tests(pattern: &str) -> anyhow::Result<()> {
             // (and some non-expressions that clearly define a single type)
             let file = system_path_to_file(&db, path).unwrap();
 
-            if let Err(err) = std::panic::catch_unwind(|| pull_types(&db, file)) {
+            if let Err(err) = std::panic::catch_unwind(|| {
+                pull_types(&db, db.program_file(file));
+            }) {
                 println!("Check failed for {relative_path:?}.");
                 std::panic::resume_unwind(err);
             }
@@ -147,35 +147,23 @@ pub struct CorpusDb {
     system: TestSystem,
     vendored: VendoredFileSystem,
     analysis_settings: Arc<AnalysisSettings>,
+    program_settings: ProgramSettings,
 }
 
 impl CorpusDb {
     #[expect(clippy::new_without_default)]
     pub fn new() -> Self {
-        let db = Self {
+        let vendored = ty_vendored::file_system().clone();
+        let program_settings = ProgramSettings::empty(&vendored);
+        Self {
             storage: salsa::Storage::new(None),
             system: TestSystem::default(),
-            vendored: ty_vendored::file_system().clone(),
+            vendored,
             rule_selection: RuleSelection::from_registry(default_lint_registry()),
             files: Files::default(),
             analysis_settings: Arc::new(AnalysisSettings::default()),
-        };
-
-        Program::from_settings(
-            &db,
-            ProgramSettings {
-                python_version: PythonVersionWithSource {
-                    version: PythonVersion::latest_ty(),
-                    source: PythonVersionSource::default(),
-                },
-                python_platform: PythonPlatform::default(),
-                search_paths: SearchPathSettings::new(vec![])
-                    .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
-                    .unwrap(),
-            },
-        );
-
-        db
+            program_settings,
+        }
     }
 }
 
@@ -202,18 +190,10 @@ impl ruff_db::Db for CorpusDb {
     fn files(&self) -> &Files {
         &self.files
     }
-
-    fn python_version(&self) -> PythonVersion {
-        Program::get(self).python_version(self)
-    }
 }
 
 #[salsa::db]
-impl ty_module_resolver::Db for CorpusDb {
-    fn search_paths(&self) -> &ty_module_resolver::SearchPaths {
-        Program::get(self).search_paths(self)
-    }
-}
+impl ty_module_resolver::Db for CorpusDb {}
 
 #[salsa::db]
 impl ty_python_core::Db for CorpusDb {
@@ -223,13 +203,28 @@ impl ty_python_core::Db for CorpusDb {
 }
 
 #[salsa::db]
+impl TestProgramDb for CorpusDb {
+    fn program_settings(&self) -> &ProgramSettings {
+        &self.program_settings
+    }
+}
+
+#[salsa::db]
 impl ty_python_semantic::Db for CorpusDb {
     fn check_file(&self, file: File) -> Vec<Diagnostic> {
         if self.should_check_file(file) {
-            check_file_unwrap(self, file)
+            check_file_unwrap(self, self.program_file(file))
         } else {
             Vec::new()
         }
+    }
+
+    fn program_file(&self, file: File) -> ProgramFile<'_> {
+        self.program().program_file(self, file)
+    }
+
+    fn python_version_with_source(&self, _file: File) -> &PythonVersionWithSource {
+        &self.program_settings.python_version
     }
 
     fn rule_selection(&self, _file: File) -> &RuleSelection {
@@ -250,6 +245,10 @@ impl ty_python_semantic::Db for CorpusDb {
 
     fn analysis_settings(&self, _file: File) -> &AnalysisSettings {
         &self.analysis_settings
+    }
+
+    fn dependency_metadata(&self, _file: File) -> Option<&DependencyMetadata> {
+        None
     }
 
     fn dyn_clone(&self) -> Box<dyn ty_python_semantic::Db> {

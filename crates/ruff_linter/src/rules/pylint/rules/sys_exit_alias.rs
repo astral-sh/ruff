@@ -3,6 +3,7 @@ use ruff_python_ast::ExprCall;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::importer::ImportRequest;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
@@ -50,7 +51,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: Constants added by the `site` module](https://docs.python.org/3/library/constants.html#constants-added-by-the-site-module)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.156")]
+#[violation_metadata(stable_since = "v0.0.156", category = Category::Suspicious)]
 pub(crate) struct SysExitAlias {
     name: String,
 }

@@ -14,17 +14,20 @@ use ruff_db::files::{FileRootKind, system_path_to_file};
 use ruff_db::system::{DbWithWritableSystem as _, SystemPath, SystemPathBuf};
 use ruff_db::testing::{setup_logging, setup_logging_with_filter};
 use ruff_diagnostics::Applicability;
+use ruff_python_ast::PythonVersion;
 use ruff_source_file::OneIndexed;
+use std::assert_matches;
 use std::fmt::Write;
 use ty_module_resolver::{
     Module, SearchPath, SearchPathSettings, list_modules, resolve_module_confident,
 };
+use ty_python_core::TestProgramDb as _;
 use ty_python_core::platform::PythonPlatform;
-use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
+use ty_python_core::program::{FallibleStrategy, ProgramSettings};
 use ty_python_semantic::pull_types::pull_types;
 use ty_python_semantic::types::UNDEFINED_REVEAL;
 use ty_python_semantic::{
-    PythonEnvironment, PythonVersionSource, PythonVersionWithSource, SysPrefixPathOrigin,
+    Db as _, PythonEnvironment, PythonVersionSource, PythonVersionWithSource, SysPrefixPathOrigin,
     fix_all_diagnostics,
 };
 
@@ -167,11 +170,9 @@ fn run_test(
                 return None;
             }
 
-            assert!(
-                matches!(
-                    embedded.lang,
-                    "py" | "pyi" | "python" | "ipynb" | "text" | "cfg" | "pth"
-                ),
+            assert_matches!(
+                embedded.lang,
+                "py" | "pyi" | "python" | "ipynb" | "text" | "cfg" | "pth",
                 "Supported file types are: py (or python), pyi, ipynb, text, cfg and ignore"
             );
 
@@ -188,24 +189,10 @@ fn run_test(
                 {
                     typeshed_files.push(relative_path_to_custom_typeshed.to_path_buf());
                 }
-            } else if let Some(component_index) = full_path
-                .components()
-                .position(|c| c.as_str() == "<path-to-site-packages>")
+            } else if let Some(site_packages_path) =
+                expand_site_packages_placeholder(&full_path, python_version)
             {
-                // If the path contains `<path-to-site-packages>`, we need to replace it with the
-                // actual site-packages directory based on the Python platform and version.
-                let mut components = full_path.components();
-                let mut new_path: SystemPathBuf =
-                    components.by_ref().take(component_index).collect();
-                if cfg!(target_os = "windows") {
-                    new_path.extend(["Lib", "site-packages"]);
-                } else {
-                    new_path.push("lib");
-                    new_path.push(format!("python{python_version}"));
-                    new_path.push("site-packages");
-                }
-                new_path.extend(components.skip(1));
-                full_path = new_path;
+                full_path = site_packages_path;
             }
 
             let temp_string;
@@ -289,11 +276,12 @@ fn run_test(
         .unwrap_or_default()
         .iter()
         .map(|path| {
-            if path.is_absolute() {
+            let path = if path.is_absolute() {
                 path.clone()
             } else {
                 src_path.join(path)
-            }
+            };
+            expand_site_packages_placeholder(&path, python_version).unwrap_or(path)
         })
         .collect();
 
@@ -316,8 +304,14 @@ fn run_test(
         .expect("Failed to resolve search path settings"),
     };
 
-    Program::init_or_update(db, settings);
+    db.update_program(settings);
     db.update_analysis_options(configuration.analysis.as_ref());
+    db.update_dependency_metadata(
+        configuration
+            .dependency_metadata
+            .as_ref()
+            .map(|fixture| &fixture.metadata),
+    );
     db.update_mdtest_rule_selection(configuration.rules.as_ref(), options.default_error_rule);
     db.set_verbosity(test.configuration().verbose());
 
@@ -348,16 +342,23 @@ fn run_test(
                 }
             };
 
-            let failure = match matcher::match_file(db, test_file.file, &diagnostics, options)
-                .and_then(|inline_diagnostics| {
-                    mdtest::validate_inline_snapshot(
-                        db,
-                        "ty",
-                        test_file,
-                        &inline_diagnostics,
-                        &mut markdown_edits,
-                    )
-                }) {
+            let failure = match matcher::match_file(
+                db,
+                test_file.file,
+                python_version,
+                &diagnostics,
+                options,
+            )
+            .and_then(|inline_diagnostics| {
+                mdtest::validate_inline_snapshot(
+                    db,
+                    "ty",
+                    test_file,
+                    &inline_diagnostics,
+                    &mut markdown_edits,
+                    |rendered| normalize_site_packages_paths(rendered, python_version),
+                )
+            }) {
                 Ok(()) => None,
                 Err(line_failures) => Some(FileFailures {
                     backtick_offsets: test_file.to_code_block_backtick_offsets(),
@@ -367,7 +368,8 @@ fn run_test(
 
             all_diagnostics.extend(diagnostics);
 
-            let pull_types_result = attempt_test(|file| pull_types(db, file), test_file);
+            let pull_types_result =
+                attempt_test(|file| pull_types(db, db.program_file(file)), test_file);
             match pull_types_result {
                 Ok(()) => {}
                 Err(failures) => {
@@ -498,22 +500,25 @@ struct ModuleInconsistency<'db> {
 /// `list_module`.
 fn run_module_resolution_consistency_test(db: &db::Db) -> Result<(), Vec<ModuleInconsistency<'_>>> {
     let mut errs = vec![];
-    for from_list in list_modules(db).iter().copied() {
+    let environment = db.program().resolver_environment(db);
+    for from_list in list_modules(db, environment).iter().copied() {
         // TODO: For now list_modules does not partake in desperate module resolution so
         // only compare against confident module resolution.
-        errs.push(match resolve_module_confident(db, from_list.name(db)) {
-            None => ModuleInconsistency {
-                db,
-                from_list,
-                from_resolve: None,
+        errs.push(
+            match resolve_module_confident(db, environment, from_list.name(db)) {
+                None => ModuleInconsistency {
+                    db,
+                    from_list,
+                    from_resolve: None,
+                },
+                Some(from_resolve) if from_list != from_resolve => ModuleInconsistency {
+                    db,
+                    from_list,
+                    from_resolve: Some(from_resolve),
+                },
+                _ => continue,
             },
-            Some(from_resolve) if from_list != from_resolve => ModuleInconsistency {
-                db,
-                from_list,
-                from_resolve: Some(from_resolve),
-            },
-            _ => continue,
-        });
+        );
     }
     if errs.is_empty() { Ok(()) } else { Err(errs) }
 }
@@ -566,6 +571,50 @@ impl std::fmt::Display for ModuleInconsistency<'_> {
     }
 }
 
+// Site-packages placeholders are specific to ty's fixtures. Keeping their normalization outside
+// the shared mdtest crate avoids rewriting Ruff snapshots or paths in displayed source and messages.
+fn normalize_site_packages_paths(rendered: &str, python_version: PythonVersion) -> String {
+    let unix_site_packages_path = format!("/lib/python{python_version}/site-packages/");
+    let mut normalized = String::with_capacity(rendered.len());
+
+    for line in rendered.split_inclusive('\n') {
+        let trimmed = line.trim_start();
+
+        if trimmed.starts_with("--> ") || trimmed.starts_with("::: ") {
+            let line = line
+                .replace(&unix_site_packages_path, "/<path-to-site-packages>/")
+                .replace("/Lib/site-packages/", "/<path-to-site-packages>/");
+            normalized.push_str(&line);
+        } else {
+            normalized.push_str(line);
+        }
+    }
+
+    normalized
+}
+
+fn expand_site_packages_placeholder(
+    path: &SystemPath,
+    python_version: PythonVersion,
+) -> Option<SystemPathBuf> {
+    let component_index = path
+        .components()
+        .position(|component| component.as_str() == "<path-to-site-packages>")?;
+
+    let mut components = path.components();
+    let mut expanded: SystemPathBuf = components.by_ref().take(component_index).collect();
+    if cfg!(target_os = "windows") {
+        expanded.extend(["Lib", "site-packages"]);
+    } else {
+        expanded.push("lib");
+        expanded.push(format!("python{python_version}"));
+        expanded.push("site-packages");
+    }
+    expanded.extend(components.skip(1));
+
+    Some(expanded)
+}
+
 fn parse<'s>(
     short_title: &'s str,
     source: &'s str,
@@ -587,7 +636,31 @@ fn parse<'s>(
 
 #[cfg(test)]
 mod tests {
+    use ruff_python_ast::PythonVersion;
     use ruff_python_trivia::textwrap::dedent;
+
+    #[test]
+    fn normalizes_site_packages_paths_only_in_diagnostic_locations() {
+        let rendered = "warning[example]: Invalid value\n\
+             --> .venv/lib/python3.10/site-packages/dependency.py:1:5\n\
+              |\n\
+            1 | path = \".venv/lib/python3.10/site-packages/dependency.py\"\n\
+              |\n\
+             ::: .venv/Lib/site-packages/other.py:2:1\n\
+            help: Inspect .venv/lib/python3.10/site-packages/dependency.py";
+        let expected = "warning[example]: Invalid value\n\
+             --> .venv/<path-to-site-packages>/dependency.py:1:5\n\
+              |\n\
+            1 | path = \".venv/lib/python3.10/site-packages/dependency.py\"\n\
+              |\n\
+             ::: .venv/<path-to-site-packages>/other.py:2:1\n\
+            help: Inspect .venv/lib/python3.10/site-packages/dependency.py";
+
+        assert_eq!(
+            super::normalize_site_packages_paths(rendered, PythonVersion::PY310),
+            expected,
+        );
+    }
 
     #[test]
     fn multiple_sections_with_dependencies_not_allowed() {

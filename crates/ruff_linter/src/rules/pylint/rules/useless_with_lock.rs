@@ -4,6 +4,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for lock objects that are created and immediately discarded in
@@ -48,7 +49,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: `Lock Objects`](https://docs.python.org/3/library/threading.html#lock-objects)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.5.0")]
+#[violation_metadata(stable_since = "0.5.0", category = Category::Correctness)]
 pub(crate) struct UselessWithLock;
 
 impl Violation for UselessWithLock {

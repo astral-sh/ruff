@@ -5,6 +5,7 @@ use ruff_python_semantic::analyze::function_type;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::importer::ImportRequest;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
@@ -51,7 +52,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// - `lint.pep8-naming.classmethod-decorators`
 /// - `lint.pep8-naming.staticmethod-decorators`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.6.0")]
+#[violation_metadata(stable_since = "0.6.0", category = Category::Suspicious)]
 pub(crate) struct SingledispatchMethod;
 
 impl Violation for SingledispatchMethod {

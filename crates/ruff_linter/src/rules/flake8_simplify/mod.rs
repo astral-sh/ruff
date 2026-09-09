@@ -11,7 +11,6 @@ mod tests {
 
     use crate::registry::Rule;
     use crate::settings::LinterSettings;
-    use crate::settings::types::PreviewMode;
     use crate::test::test_path;
     use crate::{assert_diagnostics, assert_diagnostics_diff, settings};
 
@@ -51,7 +50,7 @@ mod tests {
     #[test_case(Rule::DictGetWithNoneDefault, Path::new("SIM910.py"))]
     #[test_case(Rule::ZipDictKeysAndValues, Path::new("SIM911.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_simplify").join(path).as_path(),
             &settings::LinterSettings::for_rule(rule_code),
@@ -62,17 +61,10 @@ mod tests {
 
     #[test_case(Rule::EnumerateForLoop, Path::new("SIM113.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!(
-            "preview__{}_{}",
-            rule_code.noqa_code(),
-            path.to_string_lossy()
-        );
+        let snapshot = format!("preview__{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_simplify").join(path).as_path(),
-            &LinterSettings {
-                preview: PreviewMode::Enabled,
-                ..LinterSettings::for_rule(rule_code)
-            },
+            &LinterSettings::for_rule(rule_code).with_preview_mode(),
         )?;
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())
@@ -80,7 +72,7 @@ mod tests {
 
     #[test_case(Rule::SuppressibleException, Path::new("SIM105_5.py"))]
     fn version_specific_rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("diff_{}_{}", rule_code.noqa_code(), path.to_string_lossy());
+        let snapshot = format!("diff_{}_{}", rule_code.name(), path.to_string_lossy());
         assert_diagnostics_diff!(
             snapshot,
             Path::new("flake8_simplify").join(path).as_path(),

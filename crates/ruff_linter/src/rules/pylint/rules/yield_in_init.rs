@@ -5,6 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::pylint::helpers::in_dunder_method;
 
 /// ## What it does
@@ -29,7 +30,7 @@ use crate::rules::pylint::helpers::in_dunder_method;
 /// ## References
 /// - [CodeQL: `py-init-method-is-generator`](https://codeql.github.com/codeql-query-help/python/py-init-method-is-generator/)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.245")]
+#[violation_metadata(stable_since = "v0.0.245", category = Category::Correctness)]
 pub(crate) struct YieldInInit;
 
 impl Violation for YieldInInit {

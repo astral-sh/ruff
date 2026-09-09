@@ -1,8 +1,8 @@
-# `unnecessary-regular-expression-compile` (`RUF077`)
+# `unnecessary-regular-expression-compile` (`RUF078`)
 
 ```toml
 lint.preview = true
-lint.select = ["RUF077"]
+lint.select = ["RUF078"]
 ```
 
 ## Inline form
@@ -17,7 +17,7 @@ re.compile(r"hello").match("world")  # snapshot: unnecessary-regular-expression-
 ```
 
 ```snapshot
-error[RUF077]: Compiled regular expression is used only once
+error[RUF078]: Compiled regular expression is used only once
  --> src/mdtest_snippet.py:3:1
   |
 3 | re.compile(r"hello").match("world")  # snapshot: unnecessary-regular-expression-compile

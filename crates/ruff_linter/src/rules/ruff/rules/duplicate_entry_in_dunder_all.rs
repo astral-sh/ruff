@@ -6,6 +6,7 @@ use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits;
 use crate::{FixAvailability, Violation};
 
@@ -48,7 +49,7 @@ use crate::{FixAvailability, Violation};
 /// ]
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.16.0")]
+#[violation_metadata(stable_since = "0.16.0", category = Category::Correctness)]
 pub(crate) struct DuplicateEntryInDunderAll;
 
 impl Violation for DuplicateEntryInDunderAll {

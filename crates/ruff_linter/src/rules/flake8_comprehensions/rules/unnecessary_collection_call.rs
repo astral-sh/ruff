@@ -3,6 +3,7 @@ use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::flake8_comprehensions::fixes;
 use crate::rules::flake8_comprehensions::fixes::{pad_end, pad_start};
 use crate::rules::flake8_comprehensions::settings::Settings;
@@ -40,7 +41,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## Options
 /// - `lint.flake8-comprehensions.allow-dict-calls-with-keyword-arguments`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.61")]
+#[violation_metadata(stable_since = "v0.0.61", category = Category::Complexity)]
 pub(crate) struct UnnecessaryCollectionCall {
     kind: Collection,
 }

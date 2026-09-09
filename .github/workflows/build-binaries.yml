@@ -18,6 +18,7 @@ on:
       - pyproject.toml
       # And when we change this workflow itself...
       - .github/workflows/build-binaries.yml
+      - scripts/build_ruff_pgo.py
 
 concurrency:
   group: build-binaries-${{ github.ref }}
@@ -26,6 +27,8 @@ concurrency:
 permissions: {}
 
 env:
+  UV_LOCKED: 1
+  ACTIONS_CACHE_MODE: none
   PACKAGE_NAME: ruff
   MODULE_NAME: ruff
   PYTHON_VERSION: "3.13"
@@ -37,7 +40,7 @@ env:
 jobs:
   sdist:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-24.04-4
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -45,20 +48,29 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
+          cache: ""
           python-version: ${{ env.PYTHON_VERSION }}
       - name: "Prep README.md"
         run: python scripts/transform_readme.py --target pypi
       - name: "Build sdist"
         uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0
         with:
+          sccache: false
           maturin-version: v1.14.1
           command: sdist
           args: --out dist
       - name: "Test sdist"
-        run: |
-          pip install dist/"${PACKAGE_NAME}"-*.tar.gz --force-reinstall
-          "${MODULE_NAME}" --help
-          python -m "${MODULE_NAME}" --help
+        uses: astral-sh/github-actions/release-smoke-test@3994daa59cb9d97f991f8196a17218a2641fce4b
+        with:
+          image: python:3.13-bookworm@sha256:933b46a028fd786c9c3d426ebabc237e29a15912231ea8de576e95f0e4f41a4c
+          artifacts: dist
+          rust-toolchain: rust-toolchain.toml
+          run: |
+            # pip builds outside /test, where the toolchain file no longer applies.
+            rustup default "$(rustup show active-toolchain | cut -d ' ' -f1)"
+            pip install /dist/"${PACKAGE_NAME}"-*.tar.gz --force-reinstall
+            "${MODULE_NAME}" --help
+            python -m "${MODULE_NAME}" --help
       - name: "Upload sdist"
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -75,6 +87,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
+          cache: ""
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: x64
       - name: "Prep README.md"
@@ -82,6 +95,7 @@ jobs:
       - name: "Build wheels - x86_64"
         uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0
         with:
+          sccache: false
           maturin-version: v1.14.1
           target: x86_64
           args: --release --locked --out dist --compatibility pypi
@@ -115,6 +129,10 @@ jobs:
   macos-aarch64:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'namespace-profile-macos-15' || 'macos-15' }}
+    env:
+      # Use Rust's bundled Mach-O LLD, which supports ICF.
+      # ICF reduces the macOS aarch64 ruff binary size by ~0.8%.
+      RUSTFLAGS: "-C linker=rust-lld -C linker-flavor=ld64.lld -C link-arg=--icf=safe"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -122,20 +140,31 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
+          cache: ""
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: arm64
+      - name: "Install LLVM profiling tools"
+        run: rustup component add llvm-tools-preview
+      - name: "Train PGO Ruff"
+        run: |
+          python scripts/build_ruff_pgo.py \
+            --target aarch64-apple-darwin \
+            --target-dir "${{ github.workspace }}/target/ruff-pgo" \
+            --train-only
       - name: "Prep README.md"
         run: python scripts/transform_readme.py --target pypi
       - name: "Build wheels - aarch64"
         uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0
         with:
+          sccache: false
           maturin-version: v1.14.1
           target: aarch64
           args: --release --locked --out dist --compatibility pypi
         env:
-          # Use Rust's bundled Mach-O LLD, which supports ICF.
-          # ICF reduces the macOS aarch64 ruff binary size by ~0.8%.
-          RUSTFLAGS: "-C linker=rust-lld -C linker-flavor=ld64.lld -C link-arg=--icf=safe"
+          RUSTFLAGS: "${{ env.RUSTFLAGS }} -Cprofile-use=${{ github.workspace }}/target/ruff-pgo/ruff.profdata"
+          # Apple Clang cannot consume profile data from rustc's LLVM version.
+          CFLAGS: "-fno-profile-generate -fno-profile-use"
+          CXXFLAGS: "-fno-profile-generate -fno-profile-use"
       - name: "Test wheel - aarch64"
         run: |
           pip install dist/"${PACKAGE_NAME}"-*.whl --force-reinstall
@@ -183,19 +212,48 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
+          cache: ""
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: ${{ matrix.platform.arch }}
+      - name: "Install LLVM profiling tools"
+        if: ${{ matrix.platform.target == 'x86_64-pc-windows-msvc' }}
+        run: rustup component add llvm-tools-preview
+      - name: "Train PGO Ruff"
+        if: ${{ matrix.platform.target == 'x86_64-pc-windows-msvc' }}
+        shell: bash
+        run: |
+          export RUSTFLAGS="${RUSTFLAGS:+${RUSTFLAGS} }-C target-feature=+crt-static"
+
+          python scripts/build_ruff_pgo.py \
+            --target "${{ matrix.platform.target }}" \
+            --target-dir "${{ github.workspace }}/target/ruff-pgo" \
+            --train-only
+
+          echo "RUSTFLAGS=${RUSTFLAGS:+${RUSTFLAGS} }-Cprofile-use=${{ github.workspace }}/target/ruff-pgo/ruff.profdata" >> "$GITHUB_ENV"
       - name: "Prep README.md"
         run: python scripts/transform_readme.py --target pypi
       - name: "Build wheels"
         uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0
         with:
+          sccache: false
           maturin-version: v1.14.1
           target: ${{ matrix.platform.target }}
           args: --release --locked --out dist --compatibility pypi
         env:
           # aarch64 build fails, see https://github.com/PyO3/maturin/issues/2110
           XWIN_VERSION: 16
+      - name: "Verify static Windows runtime"
+        if: ${{ matrix.platform.target == 'x86_64-pc-windows-msvc' }}
+        shell: bash
+        run: |
+          LLVM_READOBJ="$(rustc --print sysroot)/lib/rustlib/${{ matrix.platform.target }}/bin/llvm-readobj.exe"
+          IMPORTS_FILE="$RUNNER_TEMP/ruff-coff-imports.txt"
+          "$LLVM_READOBJ" --coff-imports "target/${{ matrix.platform.target }}/release/ruff.exe" > "$IMPORTS_FILE"
+
+          if grep -Eiq 'vcruntime[[:digit:]_]*\.dll|api-ms-win-crt-' "$IMPORTS_FILE"; then
+            echo "Ruff must not dynamically link the Visual C++ runtime" >&2
+            exit 1
+          fi
       - name: "Test wheel"
         if: ${{ !startsWith(matrix.platform.target, 'aarch64') }}
         shell: bash
@@ -224,7 +282,7 @@ jobs:
 
   linux:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.target == 'x86_64-unknown-linux-gnu' && 'depot-ubuntu-24.04-8' || 'depot-ubuntu-24.04-4' }}
     strategy:
       matrix:
         target:
@@ -237,23 +295,41 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
+          cache: ""
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: x64
+      - name: "Install LLVM profiling tools"
+        if: ${{ matrix.target == 'x86_64-unknown-linux-gnu' }}
+        run: rustup component add llvm-tools-preview
+      - name: "Train PGO Ruff"
+        if: ${{ matrix.target == 'x86_64-unknown-linux-gnu' }}
+        run: |
+          python scripts/build_ruff_pgo.py \
+            --target "${{ matrix.target }}" \
+            --target-dir "${{ github.workspace }}/target/ruff-pgo" \
+            --train-only
+
+          echo "RUSTFLAGS=${RUSTFLAGS:+${RUSTFLAGS} }-Cprofile-use=${{ github.workspace }}/target/ruff-pgo/ruff.profdata" >> "$GITHUB_ENV"
       - name: "Prep README.md"
         run: python scripts/transform_readme.py --target pypi
       - name: "Build wheels"
         uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0
         with:
+          sccache: false
           maturin-version: v1.14.1
           target: ${{ matrix.target }}
           manylinux: 2_17
           args: --release --locked --out dist --compatibility pypi
       - name: "Test wheel"
         if: ${{ startsWith(matrix.target, 'x86_64') }}
-        run: |
-          pip install dist/"${PACKAGE_NAME}"-*.whl --force-reinstall
-          "${MODULE_NAME}" --help
-          python -m "${MODULE_NAME}" --help
+        uses: astral-sh/github-actions/release-smoke-test@3994daa59cb9d97f991f8196a17218a2641fce4b
+        with:
+          image: python:3.13-bookworm@sha256:933b46a028fd786c9c3d426ebabc237e29a15912231ea8de576e95f0e4f41a4c
+          artifacts: dist
+          run: |
+            pip install /dist/"${PACKAGE_NAME}"-*.whl --force-reinstall
+            "${MODULE_NAME}" --help
+            python -m "${MODULE_NAME}" --help
       - name: "Upload wheels"
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -280,35 +356,106 @@ jobs:
             *.tar.gz
             *.sha256
 
+  linux-aarch64:
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
+    runs-on: depot-ubuntu-24.04-arm-8
+    env:
+      # see https://github.com/astral-sh/ruff/issues/3791
+      # and https://github.com/gnzlbg/jemallocator/issues/170#issuecomment-1503228963
+      JEMALLOC_SYS_WITH_LG_PAGE: "16"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          cache: ""
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: "Install LLVM profiling tools"
+        run: rustup component add llvm-tools-preview
+      - name: "Train PGO Ruff"
+        run: |
+          python scripts/build_ruff_pgo.py \
+            --target aarch64-unknown-linux-gnu \
+            --target-dir "${{ github.workspace }}/target/ruff-pgo" \
+            --train-only
+
+          echo "RUSTFLAGS=${RUSTFLAGS:+${RUSTFLAGS} }-Cprofile-use=${{ github.workspace }}/target/ruff-pgo/ruff.profdata" >> "$GITHUB_ENV"
+      - name: "Prep README.md"
+        run: python scripts/transform_readme.py --target pypi
+      - name: "Build wheels"
+        uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0
+        with:
+          sccache: false
+          maturin-version: v1.14.1
+          target: aarch64-unknown-linux-gnu
+          manylinux: 2_17
+          docker-options: -e JEMALLOC_SYS_WITH_LG_PAGE=16
+          args: --release --locked --out dist --compatibility pypi
+      - name: "Test wheel"
+        uses: astral-sh/github-actions/release-smoke-test@3994daa59cb9d97f991f8196a17218a2641fce4b
+        with:
+          image: python:3.13-bookworm@sha256:933b46a028fd786c9c3d426ebabc237e29a15912231ea8de576e95f0e4f41a4c
+          platform: linux/arm64
+          artifacts: dist
+          run: |
+            pip install /dist/"${PACKAGE_NAME}"-*.whl --force-reinstall
+            "${MODULE_NAME}" --help
+            python -m "${MODULE_NAME}" --help
+      - name: "Upload wheels"
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: wheels-aarch64-unknown-linux-gnu
+          path: dist
+      - name: "Archive binary"
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TARGET=aarch64-unknown-linux-gnu
+          ARCHIVE_NAME=ruff-$TARGET
+          ARCHIVE_FILE=$ARCHIVE_NAME.tar.gz
+
+          mkdir -p $ARCHIVE_NAME
+          cp target/$TARGET/release/ruff $ARCHIVE_NAME/ruff
+          tar czvf $ARCHIVE_FILE $ARCHIVE_NAME
+          shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
+      - name: "Upload binary"
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: artifacts-aarch64-unknown-linux-gnu
+          path: |
+            *.tar.gz
+            *.sha256
+
   linux-cross:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-24.04-4
     strategy:
       matrix:
         platform:
-          - target: aarch64-unknown-linux-gnu
-            arch: aarch64
-            manylinux: 2_17
-            # see https://github.com/astral-sh/ruff/issues/3791
-            # and https://github.com/gnzlbg/jemallocator/issues/170#issuecomment-1503228963
-            maturin_docker_options: -e JEMALLOC_SYS_WITH_LG_PAGE=16
           - target: armv7-unknown-linux-gnueabihf
-            arch: armv7
+            test_image: arm32v7/ubuntu:20.04@sha256:d9a6ab6baaf86907ea1d46f0cbc87547920077c9c6017721faed6eeb51e9aa7e
+            test_platform: linux/arm/v7
             manylinux: 2_17
           - target: s390x-unknown-linux-gnu
-            arch: s390x
+            test_image: s390x/ubuntu:20.04@sha256:221f5f8e28d896556d0e55605cd6936450e6231544e9d83d687beae2d0e71afd
+            test_platform: linux/s390x
             manylinux: 2_17
+            maturin_docker_options: -e CFLAGS_s390x_unknown_linux_gnu=-march=z10
           - target: powerpc64le-unknown-linux-gnu
-            arch: ppc64le
             manylinux: 2_17
             # see https://github.com/astral-sh/ruff/issues/10073
             maturin_docker_options: -e JEMALLOC_SYS_WITH_LG_PAGE=16
           - target: arm-unknown-linux-musleabihf
             # Use the cross container, but tag as `linux_armv6l`
             manylinux: auto
-            arch: arm
+            test_image: balenalib/rpi-raspbian:bullseye@sha256:851cfc48b26f6413a72a7f6873a7624ba2a427048976f6ab4483f72fe165d4f1
+            test_platform: linux/arm/v6
           - target: riscv64gc-unknown-linux-gnu
-            arch: riscv64
+            test_image: riscv64/ubuntu:20.04@sha256:610bedb0c5d9aeae4b45e9064e820c4e0b0f6c1d2843116b0a1ae754890951ac
+            test_platform: linux/riscv64
             # Minimum manylinux target for riscv64
             manylinux: 2_31
 
@@ -319,30 +466,31 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
+          cache: ""
           python-version: ${{ env.PYTHON_VERSION }}
       - name: "Prep README.md"
         run: python scripts/transform_readme.py --target pypi
       - name: "Build wheels"
         uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0
         with:
+          sccache: false
           maturin-version: v1.14.1
           target: ${{ matrix.platform.target }}
           manylinux: ${{ matrix.platform.manylinux }}
           docker-options: ${{ matrix.platform.maturin_docker_options }}
           args: --release --locked --out dist --compatibility pypi
-      - uses: uraimo/run-on-arch-action@f9b26e3a1a408d5fd530d20c17b9f3f4428ff8d9 # v3.1.0
-        if: ${{ matrix.platform.arch != 'ppc64le'}}
-        name: Test wheel
+      - name: "Test wheel"
+        if: ${{ matrix.platform.target != 'powerpc64le-unknown-linux-gnu' }}
+        uses: astral-sh/github-actions/release-smoke-test@3994daa59cb9d97f991f8196a17218a2641fce4b
         with:
-          arch: ${{ matrix.platform.arch == 'arm' && 'armv6' || matrix.platform.arch }}
-          distro: ${{ matrix.platform.arch == 'arm' && 'bullseye' || 'ubuntu20.04' }}
-          githubToken: ${{ github.token }}
-          install: |
+          image: ${{ matrix.platform.test_image }}
+          platform: ${{ matrix.platform.test_platform }}
+          artifacts: dist
+          run: |
             apt-get update
             apt-get install -y --no-install-recommends python3 python3-pip libatomic1
-            pip3 install -U pip
-          run: |
-            pip3 install ${{ env.PACKAGE_NAME }} --no-index --find-links dist/ --force-reinstall
+            python3 -m pip install --upgrade --require-hashes -r /pip-requirements.txt
+            python3 -m pip install "${PACKAGE_NAME}" --no-index --find-links /dist --force-reinstall
             ruff --help
       - name: "Upload wheels"
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -372,7 +520,7 @@ jobs:
 
   musllinux:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-24.04-4
     strategy:
       matrix:
         target:
@@ -385,6 +533,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
+          cache: ""
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: x64
       - name: "Prep README.md"
@@ -392,19 +541,22 @@ jobs:
       - name: "Build wheels"
         uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0
         with:
+          sccache: false
           maturin-version: v1.14.1
           target: ${{ matrix.target }}
           manylinux: musllinux_1_2
           args: --release --locked --out dist --compatibility pypi
       - name: "Test wheel"
         if: matrix.target == 'x86_64-unknown-linux-musl'
-        run: |
-          docker run --rm -v ${{ github.workspace }}:/io -w /io --env MODULE_NAME --env PACKAGE_NAME alpine:latest sh -c "
-            apk add python3;
-            python -m venv .venv;
-            .venv/bin/pip3 install ${PACKAGE_NAME} --no-index --find-links dist/ --force-reinstall;
-            .venv/bin/${MODULE_NAME} --help;
-            "
+        uses: astral-sh/github-actions/release-smoke-test@3994daa59cb9d97f991f8196a17218a2641fce4b
+        with:
+          image: alpine:latest@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
+          artifacts: dist
+          run: |
+            apk add python3
+            python -m venv .venv
+            .venv/bin/pip3 install "${PACKAGE_NAME}" --no-index --find-links /dist --force-reinstall
+            .venv/bin/"${MODULE_NAME}" --help
       - name: "Upload wheels"
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -433,15 +585,15 @@ jobs:
 
   musllinux-cross:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
-    runs-on: ubuntu-latest
+    runs-on: depot-ubuntu-24.04-4
     strategy:
       matrix:
         platform:
           - target: aarch64-unknown-linux-musl
-            arch: aarch64
+            test_platform: linux/arm64
             maturin_docker_options: -e JEMALLOC_SYS_WITH_LG_PAGE=16
           - target: armv7-unknown-linux-musleabihf
-            arch: armv7
+            test_platform: linux/arm/v7
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -450,29 +602,30 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
+          cache: ""
           python-version: ${{ env.PYTHON_VERSION }}
       - name: "Prep README.md"
         run: python scripts/transform_readme.py --target pypi
       - name: "Build wheels"
         uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0
         with:
+          sccache: false
           maturin-version: v1.14.1
           target: ${{ matrix.platform.target }}
           manylinux: musllinux_1_2
           args: --release --locked --out dist --compatibility pypi
           docker-options: ${{ matrix.platform.maturin_docker_options }}
-      - uses: uraimo/run-on-arch-action@f9b26e3a1a408d5fd530d20c17b9f3f4428ff8d9 # v3.1.0
-        name: Test wheel
+      - name: "Test wheel"
+        uses: astral-sh/github-actions/release-smoke-test@3994daa59cb9d97f991f8196a17218a2641fce4b
         with:
-          arch: ${{ matrix.platform.arch }}
-          distro: alpine_latest
-          githubToken: ${{ github.token }}
-          install: |
-            apk add python3
+          image: alpine:latest@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
+          platform: ${{ matrix.platform.test_platform }}
+          artifacts: dist
           run: |
+            apk add python3
             python -m venv .venv
-            .venv/bin/pip3 install ${{ env.PACKAGE_NAME }} --no-index --find-links dist/ --force-reinstall
-            .venv/bin/${{ env.MODULE_NAME }} --help
+            .venv/bin/pip3 install "${PACKAGE_NAME}" --no-index --find-links /dist --force-reinstall
+            .venv/bin/"${MODULE_NAME}" --help
       - name: "Upload wheels"
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:

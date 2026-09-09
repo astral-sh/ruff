@@ -27,7 +27,7 @@ mod tests {
     #[test_case(Rule::SuperfluousElseContinue, Path::new("RET507.py"))]
     #[test_case(Rule::SuperfluousElseBreak, Path::new("RET508.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_return").join(path).as_path(),
             &LinterSettings::for_rule(rule_code),

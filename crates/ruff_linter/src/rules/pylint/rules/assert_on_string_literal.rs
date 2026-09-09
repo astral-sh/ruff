@@ -5,6 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 enum Kind {
@@ -26,7 +27,7 @@ enum Kind {
 /// assert "always true"
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.258")]
+#[violation_metadata(stable_since = "v0.0.258", category = Category::Correctness)]
 pub(crate) struct AssertOnStringLiteral {
     kind: Kind,
 }

@@ -421,8 +421,16 @@ fields = [
 custom_source_order = true
 
 [Expr.nodes.ExprCall]
-doc = "See also [Call](https://docs.python.org/3/library/ast.html#ast.Call)"
+doc = """A call expression whose end offset is derived from its arguments.
+
+The parser and error-recovery code must ensure that the call and its arguments
+end at the same offset.
+
+See also [Call](https://docs.python.org/3/library/ast.html#ast.Call)"""
+custom_debug = true
+custom_range = true
 fields = [
+  { name = "range_start", type = "ruff_text_size::TextSize", skip_visit = true },
   { name = "func", type = "Expr" },
   { name = "arguments", type = "Arguments" },
 ]

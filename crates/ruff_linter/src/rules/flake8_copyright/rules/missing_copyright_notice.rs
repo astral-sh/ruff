@@ -4,6 +4,7 @@ use ruff_text_size::{TextRange, TextSize};
 use crate::Locator;
 use crate::Violation;
 use crate::checkers::ast::LintContext;
+use crate::codes::Category;
 use crate::settings::LinterSettings;
 
 /// ## What it does
@@ -20,7 +21,7 @@ use crate::settings::LinterSettings;
 /// - `lint.flake8-copyright.min-file-size`
 /// - `lint.flake8-copyright.notice-rgx`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.16.0")]
+#[violation_metadata(stable_since = "0.16.0", category = Category::Pedantic)]
 pub(crate) struct MissingCopyrightNotice;
 
 impl Violation for MissingCopyrightNotice {

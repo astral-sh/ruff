@@ -1,18 +1,15 @@
 ## What it does
 
-Checks for string-literal annotations where the string cannot be
-parsed as a Python expression.
+Checks for string-literal annotations where the string cannot be parsed as a Python expression.
 
 ## Why is this bad?
 
-Type annotations are expected to be Python expressions that
-describe the expected type of a variable, parameter, attribute or
-`return` statement.
+Type annotations are expected to be Python expressions that describe the expected type of a
+variable, parameter, attribute or `return` statement.
 
-Type annotations are permitted to be string-literal expressions, in
-order to enable forward references to names not yet defined.
-However, it must be possible to parse the contents of that string
-literal as a normal Python expression.
+Type annotations are permitted to be string-literal expressions, in order to enable forward
+references to names not yet defined. However, it must be possible to parse the contents of that
+string literal as a normal Python expression.
 
 ## Example
 

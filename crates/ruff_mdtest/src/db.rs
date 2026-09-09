@@ -40,10 +40,6 @@ impl SourceDb for Db {
     fn files(&self) -> &Files {
         &self.files
     }
-
-    fn python_version(&self) -> ruff_python_ast::PythonVersion {
-        ruff_python_ast::PythonVersion::latest()
-    }
 }
 
 #[salsa::db]

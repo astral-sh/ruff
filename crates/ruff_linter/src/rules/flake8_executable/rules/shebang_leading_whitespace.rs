@@ -5,6 +5,7 @@ use ruff_text_size::{TextRange, TextSize};
 
 use crate::Locator;
 use crate::checkers::ast::LintContext;
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 
 /// ## What it does
@@ -37,7 +38,7 @@ use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 /// ## References
 /// - [Python documentation: Executable Python Scripts](https://docs.python.org/3/tutorial/appendix.html#executable-python-scripts)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.229")]
+#[violation_metadata(stable_since = "v0.0.229", category = Category::Correctness)]
 pub(crate) struct ShebangLeadingWhitespace;
 
 impl AlwaysFixableViolation for ShebangLeadingWhitespace {

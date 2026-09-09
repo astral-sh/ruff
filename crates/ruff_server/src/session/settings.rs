@@ -41,7 +41,8 @@ impl GlobalClientSettings {
                 Ok(settings) => settings,
                 Err(settings) => {
                     self.client.show_error_message(
-                        "Ruff received invalid settings from the editor. Refer to the logs for more information."
+                        "Ruff received invalid settings from the editor. \
+                        Refer to the logs for more information.",
                     );
                     settings
                 }
@@ -113,7 +114,7 @@ impl TryFrom<ClientConfiguration> for ResolvedConfiguration {
             )),
             ClientConfiguration::Object(map) => {
                 let _guard = ValueSourceGuard::new(ValueSource::Editor, false);
-                let options = toml::Table::try_from(map)?.try_into::<Options>()?;
+                let options = Options::from_toml_table(toml::Table::try_from(map)?)?;
                 if options.extend.is_some() {
                     Err(ResolvedConfigurationError::ExtendNotSupported)
                 } else {

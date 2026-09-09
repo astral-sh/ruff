@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::flake8_tidy_imports::matchers::NameMatchPolicy;
 
 /// ## What it does
@@ -25,7 +26,7 @@ use crate::rules::flake8_tidy_imports::matchers::NameMatchPolicy;
 /// ## Options
 /// - `lint.flake8-tidy-imports.banned-api`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.201")]
+#[violation_metadata(stable_since = "v0.0.201", category = Category::Restriction)]
 pub(crate) struct BannedApi {
     name: String,
     message: String,

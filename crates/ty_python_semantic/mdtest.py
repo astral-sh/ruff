@@ -7,7 +7,7 @@
 # ]
 #
 # [tool.uv]
-# exclude-newer = "7 days"
+# exclude-newer = "P7D"
 # ///
 
 from __future__ import annotations

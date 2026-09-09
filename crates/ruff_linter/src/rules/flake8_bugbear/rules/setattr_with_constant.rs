@@ -7,6 +7,7 @@ use ruff_python_stdlib::identifiers::{is_identifier, is_mangled_private};
 use unicode_normalization::UnicodeNormalization;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
@@ -52,7 +53,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## References
 /// - [Python documentation: `setattr`](https://docs.python.org/3/library/functions.html#setattr)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.111")]
+#[violation_metadata(stable_since = "v0.0.111", category = Category::Complexity)]
 pub(crate) struct SetAttrWithConstant;
 
 impl AlwaysFixableViolation for SetAttrWithConstant {

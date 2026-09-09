@@ -24,6 +24,7 @@ ruff_python_parser = { workspace = true, optional = true }
 ruff_python_trivia = { workspace = true, optional = true }
 ty_module_resolver = { workspace = true, optional = true }
 ty_project = { workspace = true, optional = true }
+ty_python_semantic = { workspace = true, optional = true }
 
 anyhow = { workspace = true }
 codspeed-criterion-compat = { workspace = true, default-features = false, optional = true }
@@ -44,6 +45,8 @@ rayon = { workspace = true }
 ruff_python_ast = { workspace = true }
 ruff_ranged_value = { workspace = true }
 rustc-hash = { workspace = true }
+tempfile = { workspace = true }
+ty_static = { workspace = true }
 
 [features]
 default = ["module_resolution", "ruff_instrumented", "ty_instrumented", "ty_walltime"]
@@ -58,7 +61,7 @@ ruff_instrumented = [
     "tikv-jemallocator",
 ]
 # Enables the ty instrumented benchmarks
-ty_instrumented = ["criterion", "ty_project", "ruff_python_trivia"]
+ty_instrumented = ["criterion", "ty_project", "ty_python_semantic", "ruff_python_trivia"]
 # Enables the module-resolution benchmark
 module_resolution = ["divan", "ty_module_resolver", "ty_project"]
 codspeed = ["codspeed-criterion-compat"]
@@ -91,9 +94,19 @@ harness = false
 required-features = ["ty_instrumented"]
 
 [[bench]]
+name = "ty_constraint_set"
+harness = false
+required-features = ["ty_instrumented"]
+
+[[bench]]
 name = "module_resolution"
 harness = false
 required-features = ["module_resolution"]
+
+[[bench]]
+name = "ty_script"
+harness = false
+required-features = ["ty_walltime"]
 
 [[bench]]
 name = "ty_walltime"
@@ -113,6 +126,7 @@ ignored = [
     "ruff_python_parser",
     "ruff_python_trivia",
     "ty_module_resolver",
+    "ty_python_semantic",
     "mimalloc",
     "tikv-jemallocator"
 ]

@@ -1,13 +1,13 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{Arguments, Expr, ExprCall, ExprNumberLiteral, Number};
+use ruff_python_edits::unwrapped_call_argument;
 use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
 use ruff_python_semantic::analyze::typing;
-use ruff_source_file::find_newline;
 use ruff_text_size::Ranged;
 
-use crate::Locator;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 
 /// ## What it does
@@ -34,7 +34,7 @@ use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 /// The fix is marked unsafe if it is not possible to guarantee that the first argument of
 /// `round()` is of type `int`, or if the fix deletes comments.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.12.0")]
+#[violation_metadata(stable_since = "0.12.0", category = Category::Complexity)]
 pub(crate) struct UnnecessaryRound;
 
 impl AlwaysFixableViolation for UnnecessaryRound {
@@ -98,7 +98,18 @@ pub(crate) fn unnecessary_round(checker: &Checker, call: &ExprCall) {
         applicability = Applicability::Unsafe;
     }
 
-    let edit = unwrap_round_call(call, rounded, checker.semantic(), checker.locator());
+    let parent = checker
+        .semantic()
+        .current_expression_parent()
+        .map_or_else(|| checker.semantic().current_statement().into(), Into::into);
+    let content = unwrapped_call_argument(
+        call,
+        rounded,
+        Some(parent),
+        checker.tokens(),
+        checker.source(),
+    );
+    let edit = Edit::range_replacement(content, call.range());
     let fix = Fix::applicable_edit(edit, applicability);
 
     checker
@@ -208,22 +219,4 @@ pub(super) fn rounded_and_ndigits<'a>(
     };
 
     Some((rounded, rounded_kind, ndigits_kind))
-}
-
-fn unwrap_round_call(
-    call: &ExprCall,
-    rounded: &Expr,
-    semantic: &SemanticModel,
-    locator: &Locator,
-) -> Edit {
-    let rounded_expr = locator.slice(rounded.range());
-    let has_parent_expr = semantic.current_expression_parent().is_some();
-    let new_content =
-        if has_parent_expr || rounded.is_named_expr() || find_newline(rounded_expr).is_some() {
-            format!("({rounded_expr})")
-        } else {
-            rounded_expr.to_string()
-        };
-
-    Edit::range_replacement(new_content, call.range)
 }

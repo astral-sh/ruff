@@ -3,6 +3,7 @@ use ruff_python_ast::StmtTry;
 use ruff_text_size::{Ranged, TextLen, TextRange};
 
 use crate::Violation;
+use crate::codes::Category;
 
 use crate::checkers::ast::Checker;
 use crate::rules::pylint::helpers::num_statements;
@@ -69,7 +70,7 @@ use crate::rules::pylint::helpers::num_statements;
 /// uses a different default setting.
 /// To replicate it exactly, set `lint.pylint.max-statements-in-try` to 1.
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.15.14")]
+#[violation_metadata(preview_since = "0.15.14", category = Category::Pedantic)]
 pub(crate) struct TooManyStatementsInTryClause {
     statements: usize,
     max_statements: usize,

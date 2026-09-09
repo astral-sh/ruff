@@ -523,7 +523,7 @@ impl<'a> Patch<'a> {
 /// ```
 #[derive(Clone, Debug)]
 pub struct Origin<'a> {
-    pub(crate) path: Cow<'a, str>,
+    pub(crate) path: Option<Cow<'a, str>>,
     /// The optional cell index in a Jupyter notebook, used for reporting source locations along
     /// with the ranges on `annotations`.
     pub(crate) cell_index: Option<usize>,
@@ -541,7 +541,7 @@ impl<'a> Origin<'a> {
     /// </div>
     pub fn path(path: impl Into<Cow<'a, str>>) -> Self {
         Self {
-            path: path.into(),
+            path: Some(path.into()),
             cell_index: None,
             line: None,
             char_column: None,

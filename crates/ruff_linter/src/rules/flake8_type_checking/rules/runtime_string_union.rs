@@ -5,6 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for the presence of string literals in `X | Y`-style union types.
@@ -53,7 +54,7 @@ use crate::checkers::ast::Checker;
 ///
 /// [PEP 604]: https://peps.python.org/pep-0604/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.8.0")]
+#[violation_metadata(stable_since = "0.8.0", category = Category::Correctness)]
 pub(crate) struct RuntimeStringUnion;
 
 impl Violation for RuntimeStringUnion {

@@ -37,6 +37,8 @@ bitflags::bitflags! {
         const COMPLETION_ITEM_SNIPPET_SUPPORT = 1 << 19;
         const FULL_DIAGNOSTIC_OUTPUT = 1 << 20;
         const IMPLEMENTATION_LINK_SUPPORT = 1 << 21;
+        const TRIGGER_SIGNATURE_HELP_COMMAND = 1 << 22;
+        const SEMANTIC_TOKENS_REFRESH = 1 << 23;
     }
 }
 
@@ -101,6 +103,11 @@ impl ResolvedClientCapabilities {
     /// Returns `true` if the client supports inlay hint refresh.
     pub(crate) const fn supports_inlay_hint_refresh(self) -> bool {
         self.contains(Self::INLAY_HINT_REFRESH)
+    }
+
+    /// Returns `true` if the client supports refreshing semantic tokens.
+    pub(crate) const fn supports_semantic_tokens_refresh(self) -> bool {
+        self.contains(Self::SEMANTIC_TOKENS_REFRESH)
     }
 
     /// Returns `true` if the client supports pull diagnostics.
@@ -201,6 +208,11 @@ impl ResolvedClientCapabilities {
         self.contains(Self::PREFER_MARKDOWN_IN_COMPLETION)
     }
 
+    /// Returns `true` if the client supports the `ty.triggerParameterHints` completion command.
+    pub(crate) const fn supports_trigger_parameter_hints_command(self) -> bool {
+        self.contains(Self::TRIGGER_SIGNATURE_HELP_COMMAND)
+    }
+
     pub(super) fn new(client_capabilities: &ClientCapabilities) -> Self {
         let mut flags = Self::empty();
 
@@ -226,6 +238,13 @@ impl ResolvedClientCapabilities {
             .unwrap_or_default()
         {
             flags |= Self::INLAY_HINT_REFRESH;
+        }
+
+        if workspace
+            .and_then(|workspace| workspace.semantic_tokens.as_ref()?.refresh_support)
+            .unwrap_or_default()
+        {
+            flags |= Self::SEMANTIC_TOKENS_REFRESH;
         }
 
         if let Some(capabilities) =
@@ -270,6 +289,19 @@ impl ResolvedClientCapabilities {
             .unwrap_or_default()
         {
             flags |= Self::FULL_DIAGNOSTIC_OUTPUT;
+        }
+
+        if client_capabilities
+            .experimental
+            .as_ref()
+            .and_then(|experimental| experimental.get("commands")?.get("commands")?.as_array())
+            .is_some_and(|commands| {
+                commands
+                    .iter()
+                    .any(|command| command.as_str() == Some("ty.triggerParameterHints"))
+            })
+        {
+            flags |= Self::TRIGGER_SIGNATURE_HELP_COMMAND;
         }
 
         if text_document

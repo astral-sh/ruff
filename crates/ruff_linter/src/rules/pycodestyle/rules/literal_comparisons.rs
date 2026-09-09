@@ -7,7 +7,7 @@ use ruff_python_ast::{self as ast, CmpOp, Expr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::codes::Rule;
+use crate::codes::{Category, Rule};
 use crate::fix::snippet::SourceCodeSnippet;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
@@ -58,7 +58,7 @@ impl EqCmpOp {
 /// [PEP 8]: https://peps.python.org/pep-0008/#programming-recommendations
 /// [this issue]: https://github.com/astral-sh/ruff/issues/4560
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.28")]
+#[violation_metadata(stable_since = "v0.0.28", category = Category::Pedantic)]
 pub(crate) struct NoneComparison(EqCmpOp);
 
 impl AlwaysFixableViolation for NoneComparison {
@@ -121,7 +121,7 @@ impl AlwaysFixableViolation for NoneComparison {
 /// [PEP 8]: https://peps.python.org/pep-0008/#programming-recommendations
 /// [this issue]: https://github.com/astral-sh/ruff/issues/4560
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.28")]
+#[violation_metadata(stable_since = "v0.0.28", category = Category::Pedantic)]
 pub(crate) struct TrueFalseComparison {
     value: bool,
     op: EqCmpOp,

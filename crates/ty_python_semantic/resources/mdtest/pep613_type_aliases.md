@@ -183,6 +183,62 @@ def takes_list(value: ListAlias) -> None:
 takes_list([1])
 ```
 
+## Class-scoped type variables
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+A legacy generic alias binds its own type variables and cannot capture a type variable already bound
+to its enclosing class. The restriction also applies to stringified aliases.
+
+```py
+from typing import Generic, TypeAlias, TypeVar
+
+T = TypeVar("T")
+S = TypeVar("S")
+
+class Box(Generic[T]):
+    # error: [invalid-type-form] "Type alias cannot capture class-scoped type variable `T`"
+    Items: TypeAlias = list[T]
+    # error: [invalid-type-form] "Type alias cannot capture class-scoped type variable `T`"
+    Quoted: TypeAlias = "list[T]"
+
+    Independent: TypeAlias = list[S]
+    Concrete: TypeAlias = list[int]
+
+reveal_type(Box.Independent[str]())  # revealed: list[str]
+reveal_type(Box.Concrete())  # revealed: list[int]
+```
+
+PEP 695 `type` statements can capture the enclosing class's type parameters, but using `TypeAlias`
+inside a PEP 695 class still follows the legacy alias rules.
+
+```py
+class Modern[T]:
+    type Items = list[T]
+    # error: [invalid-type-form] "Type alias cannot capture class-scoped type variable `T`"
+    Legacy: TypeAlias = list[T]
+```
+
+The same restriction applies to class-scoped `ParamSpec` and `TypeVarTuple` parameters.
+
+```py
+from typing import Callable, ParamSpec, TypeVarTuple
+
+P = ParamSpec("P")
+Ts = TypeVarTuple("Ts")
+
+class Callbacks(Generic[P]):
+    # error: [invalid-type-form] "Type alias cannot capture class-scoped type variable `P`"
+    Callback: TypeAlias = Callable[P, None]
+
+class Tuples(Generic[*Ts]):
+    # error: [invalid-type-form] "Type alias cannot capture class-scoped type variable `Ts`"
+    Items: TypeAlias = tuple[*Ts]
+```
+
 ## Subscripted generic alias in union
 
 ```py

@@ -2,11 +2,10 @@ use std::fs;
 use std::path::PathBuf;
 
 use anyhow::{Result, bail};
-use pretty_assertions::StrComparison;
 use schemars::generate::SchemaSettings;
 
 use crate::ROOT_DIR;
-use crate::generate_all::{Mode, REGENERATE_ALL_COMMAND};
+use crate::generate_all::{Mode, REGENERATE_ALL_COMMAND, generated_file_diff};
 use ruff_workspace::options::Options;
 
 #[derive(clap::Args)]
@@ -33,7 +32,7 @@ pub(crate) fn main(args: &Args) -> Result<()> {
             if current == schema_string {
                 println!("Up-to-date: {filename}");
             } else {
-                let comparison = StrComparison::new(&current, &schema_string);
+                let comparison = generated_file_diff(&current, &schema_string);
                 bail!("{filename} changed, please run `{REGENERATE_ALL_COMMAND}`:\n{comparison}");
             }
         }
