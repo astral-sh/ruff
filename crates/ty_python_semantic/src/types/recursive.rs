@@ -28,6 +28,9 @@ pub struct RecursiveVar<'db> {
     /// `b` has index 0. This is relative to the occurrence, not the root of the type.
     #[returns(copy)]
     depth: u32,
+    /// The unspecialized arguments of this occurrence, in the alias definition's scope.
+    /// For `Tree = tuple[T, "Tree[list[T]] | None"]`, these are `[list[T]]`.
+    /// Unfolding substitutes the enclosing application's arguments for the type parameters.
     #[returns(copy)]
     arguments: Option<Specialization<'db>>,
 }
@@ -83,9 +86,80 @@ pub struct RecursiveCycle(salsa::Id);
 
 impl get_size2::GetSize for RecursiveCycle {}
 
-/// A recursive type whose raw body is private. Unfolding substitutes closed types
-/// for references before exposing the body to ordinary type operations.
+/// An application of a structural recursive type constructor.
+/// The private body remains unspecialized; `arguments` records this application's
+/// substitution for the constructor's type parameters. Unfolding replaces recursive
+/// references with closed types, then applies that substitution before exposing the
+/// result to ordinary type operations.
 /// Use the binding operations in this module to construct recursive types.
+///
+/// For example, with type variable `T`, the alias
+/// `Tree = tuple[T, "Tree[list[T]] | None"]` has the recursive constructor:
+///
+/// ```text
+/// μF. λT. tuple[T, F[list[T]] | None]
+/// ```
+///
+/// Here `μF` binds the recursive constructor, and `λT` binds its type parameter.
+/// The occurrence `F[list[T]]` is stored as `RecursiveVar` with depth 0 and
+/// unspecialized arguments `[list[T]]`.
+///
+/// To infer the container subscript `x[1]` for `x: Tree[int]`, first unfold `x`'s type.
+/// Unfolding replaces references to the recursive binder with the recursive type
+/// itself. Writing `B[a := R]` for capture-avoiding substitution of `R` for `a` in `B`:
+///
+/// ```text
+/// unfold(μa. B) = B[a := μa. B]
+/// ```
+///
+/// For `Tree[int]`, substitute the constructor for `F`, then apply `T := int`:
+///
+/// ```text
+/// unfold((μF. λT. tuple[T, F[list[T]] | None])[int])
+/// = tuple[int, (μF. λT. tuple[T, F[list[T]] | None])[list[int]] | None]
+/// = tuple[int, Tree[list[int]] | None]
+/// ```
+///
+/// Tuple subscripting then selects the element at index 1: `x[1]: Tree[list[int]] | None`.
+///
+/// Using de Bruijn indices for recursive references, the constructor is:
+///
+/// ```text
+/// μ. λT. tuple[T, 0[list[T]] | None]
+/// ```
+///
+/// These indices count only recursive (`μ`) binders, not type parameters (`λT`).
+/// Mutually recursive aliases can refer to both inner and outer recursive binders:
+///
+/// ```python
+/// A = tuple[int, "B | None"]
+/// B = tuple[str, "A | None", "B | None"]
+/// ```
+///
+/// We can write `A` with named binders, then replace the references with indices:
+///
+/// ```text
+/// μa. tuple[int, (μb. tuple[str, a | None, b | None]) | None]
+/// μ.  tuple[int, (μ.  tuple[str, 1 | None, 0 | None]) | None]
+/// ```
+///
+/// To define unfolding in this notation, let `R = μ. B` have no free recursive
+/// variables. Let `U_d(X)` substitute `R` for references to its binder in `X`,
+/// beneath `d` nested recursive binders:
+///
+/// ```text
+/// unfold(R)  = U_0(B)
+/// U_d(i)     = R              if i = d
+///            = i              if i < d
+/// U_d(μ. X)  = μ. U_{d+1}(X)
+/// U_d(X[Y])  = U_d(X)[U_d(Y)]
+/// ```
+///
+/// For `A` above,
+///
+/// ```text
+/// unfold(A) = tuple[int, (μ. tuple[str, A | None, 0 | None]) | None]
+/// ```
 #[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
 pub struct RecursiveType<'db> {
     /// The defining symbol of the implicit alias, including for qualified references.
@@ -96,7 +170,8 @@ pub struct RecursiveType<'db> {
     cycle: RecursiveCycle,
     #[returns(copy)]
     body: Type<'db>,
-    /// The arguments of a closed application of this recursive constructor.
+    /// The actual arguments for this application, which may themselves contain type variables.
+    /// They are applied when unfolding; the stored body remains unspecialized.
     #[returns(copy)]
     pub(super) arguments: Option<Specialization<'db>>,
     /// The lazy materialization applied to this recursive alias, if any.
