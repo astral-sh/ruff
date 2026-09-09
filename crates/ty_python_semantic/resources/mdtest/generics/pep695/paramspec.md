@@ -1000,6 +1000,22 @@ def default[T = Callable[[int], int]](callback: T) -> None: ...
 forward(default, lambda x: reveal_type(x))  # revealed: int
 ```
 
+### Forwarded arguments with type-variable bounds
+
+When a type variable is bounded by `LiteralString`, string literals are not promoted to `str` when
+providing context for other arguments. This applies to ordinary calls and calls forwarded through a
+`ParamSpec`.
+
+```py
+from typing import Any, Callable, LiteralString
+
+def forward[**P](function: Callable[P, Any], /, *args: P.args, **kwargs: P.kwargs): ...
+def target[T: LiteralString](first: T, values: list[T]) -> None: ...
+
+target("a", ["a"])
+forward(target, "a", ["a"])
+```
+
 ### Forwarded callbacks with gradual types
 
 A callback forwarded through a `ParamSpec` receives its own parameter type as context, including

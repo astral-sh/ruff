@@ -7974,7 +7974,19 @@ impl<'db> Binding<'db> {
                 let argument_constraints = argument_specialization
                     .and_then(|specialization| specialization.get(db, typevar))
                     .filter(|ty| !ty.has_provisional_marker(db, env))
-                    .map(|ty| ty.promote(db, env));
+                    .map(|ty| {
+                        let promoted = ty.promote(db, env);
+                        // Context for other arguments must still satisfy the type variable's
+                        // bound. For example, `Literal["a"]` satisfies `LiteralString`, but
+                        // promoting it to `str` would violate that bound.
+                        if let Some(bound) = typevar.typevar(db).upper_bound(db, env)
+                            && !promoted.is_assignable_to(db, env, bound)
+                        {
+                            ty
+                        } else {
+                            promoted
+                        }
+                    });
 
                 // TODO: We should similarly combine both the call expression and argument constraints
                 // here. We currently only rely on argument constraints when there is no explicit declared
