@@ -1,5 +1,6 @@
 use crate::ProgramEnvironment;
 use itertools::Either;
+use rustc_hash::FxHashSet;
 
 use std::convert::Infallible;
 
@@ -119,11 +120,14 @@ impl<'db> UnionType<'db> {
         builder.build()
     }
 
-    /// Returns `true` if any direct element of this union is a type alias.
+    /// Returns whether a direct alias or recursive binder can be expanded without solving
+    /// a query-owned inference reference.
     pub(crate) fn has_aliases(self, db: &'db dyn Db) -> bool {
-        self.elements(db)
-            .iter()
-            .any(|element| matches!(element, Type::TypeAlias(_)))
+        self.elements(db).iter().any(|element| match element {
+            Type::TypeAlias(_) => true,
+            Type::Recursive(recursive) => recursive.inference_key(db).is_none(),
+            _ => false,
+        })
     }
 
     /// Recursively expands aliases that expose top-level union elements.
@@ -134,8 +138,26 @@ impl<'db> UnionType<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Type<'db> {
-        // Rebuild the union so that `UnionBuilder` simplifies any redundancies exposed.
-        Self::from_elements(db, env, self.elements(db).iter().copied())
+        // Expose both alias forms without expanding aliases inside containers during reduction.
+        let mut builder = UnionBuilder::new(db, env).unpack_aliases(false);
+        let mut pending = vec![Type::Union(self)];
+        let mut seen = FxHashSet::default();
+        while let Some(element) = pending.pop() {
+            if !seen.insert(element) {
+                continue;
+            }
+            // Expanding query references would solve them before deferred projections
+            // have been recorded. Aliases and closed recursive solutions can be expanded.
+            let resolved = match element {
+                Type::Recursive(recursive) if recursive.inference_key(db).is_some() => element,
+                _ => element.resolve_type_alias(db),
+            };
+            match resolved {
+                Type::Union(union) => pending.extend(union.elements(db).iter().rev().copied()),
+                resolved => builder.add_in_place(resolved),
+            }
+        }
+        builder.build()
     }
 
     pub(crate) fn from_elements_cycle_recovery<I, T>(

@@ -599,7 +599,12 @@ impl<'db> Type<'db> {
             return self.subscript_impl(db, env, fallback, expr_context);
         }
 
-        let value_ty = self;
+        // Resolving inference references can also leave nested unions. Flatten all
+        // alternatives together before collecting errors, retaining deferred references.
+        let [value_ty, slice_ty] = [self, slice_ty].map(|ty| match ty {
+            Type::Union(union) => union.expand_aliases(db, env),
+            ty => ty,
+        });
 
         let inferred = match (value_ty, slice_ty) {
             (Type::RecursiveVar(_), _) | (_, Type::RecursiveVar(_)) => {
