@@ -255,7 +255,7 @@ impl<'db> Type<'db> {
         ) -> BoundMethodType<'db> {
             method
                 .with_func(db, upcast(db, env, method.func(db), visitor).ty)
-                .with_signature_receiver(
+                .with_constrained_receiver(
                     db,
                     upcast(db, env, method.self_instance(db), visitor).ty,
                     method.signature_receiver(db),

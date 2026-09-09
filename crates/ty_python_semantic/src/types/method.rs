@@ -1,9 +1,8 @@
-use crate::{Program, ProgramEnvironment};
 use itertools::Either;
 use ruff_python_ast::name::Name;
 
 use crate::{
-    Db,
+    Db, Program, ProgramEnvironment,
     types::{
         ApplyTypeMappingVisitor, CallableType, CallableTypes, InternedType, KnownClass,
         LiteralValueType, LiteralValueTypeKind, Parameter, Parameters, PropertyInstanceType,
@@ -30,23 +29,73 @@ pub struct BoundMethodType<'db> {
     /// Class method binding captures a class object but substitutes its instance type for `Self`.
     #[returns(copy)]
     pub(super) class_method: bool,
-    /// The instance on which this method has been called. Corresponds to the `__self__`
-    /// attribute on a bound method object
     #[returns(copy)]
-    pub(super) self_instance: Type<'db>,
-
-    /// The receiver type used to validate and specialize the function signature.
-    ///
-    /// This normally equals [`self_instance`][Self::self_instance]. They differ when member lookup
-    /// distributes over the declared constraints of a typevar: This field contains the particular
-    /// declared constraint that this bound method belongs to, while `self_instance` is the typevar
-    /// itself.
-    #[returns(copy)]
-    pub(super) signature_receiver: Type<'db>,
+    receiver: BoundMethodReceiver<'db>,
 }
 
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for BoundMethodType<'_> {}
+
+/// The captured receiver and the type used to check the method's first parameter.
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+pub enum BoundMethodReceiver<'db> {
+    /// The captured receiver is also used to check the signature.
+    Instance(Type<'db>),
+    /// Looking up `x.method` for `T: (A, B)` checks each alternative separately.
+    /// In the `A` alternative, the signature receives `A`, but `__self__` retains `T`.
+    Constrained {
+        receiver: Type<'db>,
+        constraint: Type<'db>,
+    },
+}
+
+impl<'db> BoundMethodReceiver<'db> {
+    fn constrained(receiver: Type<'db>, constraint: Type<'db>) -> Self {
+        // Specialization can make the captured receiver equal to its constraint. Use the
+        // same representation as direct binding so equivalent bound methods stay identical.
+        if receiver == constraint {
+            Self::Instance(receiver)
+        } else {
+            Self::Constrained {
+                receiver,
+                constraint,
+            }
+        }
+    }
+
+    fn self_instance(self) -> Type<'db> {
+        match self {
+            Self::Instance(receiver) | Self::Constrained { receiver, .. } => receiver,
+        }
+    }
+
+    fn signature_receiver(self) -> Type<'db> {
+        match self {
+            Self::Instance(receiver) => receiver,
+            Self::Constrained { constraint, .. } => constraint,
+        }
+    }
+
+    fn map(self, mut f: impl FnMut(Type<'db>) -> Type<'db>) -> Self {
+        match self {
+            Self::Instance(receiver) => Self::Instance(f(receiver)),
+            Self::Constrained {
+                receiver,
+                constraint,
+            } => Self::constrained(f(receiver), f(constraint)),
+        }
+    }
+
+    fn try_map(self, mut f: impl FnMut(Type<'db>) -> Option<Type<'db>>) -> Option<Self> {
+        Some(match self {
+            Self::Instance(receiver) => Self::Instance(f(receiver)?),
+            Self::Constrained {
+                receiver,
+                constraint,
+            } => Self::constrained(f(receiver)?, f(constraint)?),
+        })
+    }
+}
 
 pub(super) fn walk_bound_method_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
@@ -64,16 +113,14 @@ impl<'db> BoundMethodType<'db> {
         db: &'db dyn Db,
         func: Type<'db>,
         program: Program<'db>,
-        self_instance: Type<'db>,
-        signature_receiver: Type<'db>,
+        receiver: Type<'db>,
     ) -> Self {
         Self::new_internal(
             db,
             func.underlying_function(db),
             program,
             func.is_classmethod(db),
-            self_instance,
-            signature_receiver,
+            BoundMethodReceiver::Instance(receiver),
         )
     }
 
@@ -96,26 +143,28 @@ impl<'db> BoundMethodType<'db> {
             func,
             self.program(db),
             self.class_method(db),
-            self.self_instance(db)
-                .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-            self.signature_receiver(db)
-                .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+            self.receiver(db)
+                .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
         )
     }
 
-    pub(crate) fn new(
-        db: &'db dyn Db,
-        function: FunctionType<'db>,
-        self_instance: Type<'db>,
-        signature_receiver: Type<'db>,
-    ) -> Self {
+    pub(crate) fn new(db: &'db dyn Db, function: FunctionType<'db>, receiver: Type<'db>) -> Self {
         Self::from_callable(
             db,
             Type::FunctionLiteral(function),
             function.program_file(db).program(db),
-            self_instance,
-            signature_receiver,
+            receiver,
         )
+    }
+
+    /// The captured receiver, exposed through the bound method's `__self__` attribute.
+    pub(crate) fn self_instance(self, db: &'db dyn Db) -> Type<'db> {
+        self.receiver(db).self_instance()
+    }
+
+    /// The receiver used to check the signature for this member-lookup alternative.
+    pub(super) fn signature_receiver(self, db: &'db dyn Db) -> Type<'db> {
+        self.receiver(db).signature_receiver()
     }
 
     /// Returns the underlying Python function, when the bound callable has a function definition.
@@ -129,8 +178,7 @@ impl<'db> BoundMethodType<'db> {
             func,
             self.program(db),
             self.class_method(db),
-            self.self_instance(db),
-            self.signature_receiver(db),
+            self.receiver(db),
         )
     }
 
@@ -184,31 +232,29 @@ impl<'db> BoundMethodType<'db> {
     pub(crate) fn map_self_type(
         self,
         db: &'db dyn Db,
-        mut f: impl FnMut(Type<'db>) -> Type<'db>,
+        f: impl FnMut(Type<'db>) -> Type<'db>,
     ) -> Self {
         Self::new_internal(
             db,
             self.func(db),
             self.program(db),
             self.class_method(db),
-            f(self.self_instance(db)),
-            f(self.signature_receiver(db)),
+            self.receiver(db).map(f),
         )
     }
 
-    pub(crate) fn with_signature_receiver(
+    pub(crate) fn with_constrained_receiver(
         self,
         db: &'db dyn Db,
-        self_instance: Type<'db>,
-        signature_receiver: Type<'db>,
+        receiver: Type<'db>,
+        constraint: Type<'db>,
     ) -> Self {
         Self::new_internal(
             db,
             self.func(db),
             self.program(db),
             self.class_method(db),
-            self_instance,
-            signature_receiver,
+            BoundMethodReceiver::constrained(receiver, constraint),
         )
     }
 
@@ -336,10 +382,8 @@ impl<'db> BoundMethodType<'db> {
                 .recursive_type_normalized_impl(db, env, div, nested)?,
             self.program(db),
             self.class_method(db),
-            self.self_instance(db)
-                .recursive_type_normalized_impl(db, env, div, true)?,
-            self.signature_receiver(db)
-                .recursive_type_normalized_impl(db, env, div, true)?,
+            self.receiver(db)
+                .try_map(|ty| ty.recursive_type_normalized_impl(db, env, div, true))?,
         ))
     }
 }
