@@ -484,16 +484,9 @@ impl ProjectMetadata {
             .try_add_root(db, self.root(), FileRootKind::Project);
     }
 
-    /// Applies higher-precedence options to this project.
-    ///
-    /// Options applied later take precedence over options applied earlier.
-    pub fn apply_override_options(&mut self, options: Options) {
-        if let Some(existing) = self.override_options.as_mut() {
-            let previous = std::mem::replace(existing.as_mut(), options);
-            existing.combine_with(previous);
-        } else {
-            self.override_options = Some(Box::new(options));
-        }
+    /// Sets the highest-precedence options for this project, replacing any previous overrides.
+    pub fn set_override_options(&mut self, options: Options) {
+        self.override_options = Some(Box::new(options));
     }
 
     pub(crate) fn environment(&self) -> &ProjectEnvironment {
@@ -521,17 +514,9 @@ impl ProjectMetadata {
         self.environment.metadata.as_ref()
     }
 
-    /// Applies lower-precedence options to this project.
-    ///
-    /// Options applied later take precedence over options applied earlier, but all fallback options
-    /// have lower precedence than the raw, uv workspace, and user-level options.
-    pub fn apply_fallback_options(&mut self, options: Options) {
-        if let Some(existing) = self.fallback_options.as_mut() {
-            let previous = std::mem::replace(existing.as_mut(), options);
-            existing.combine_with(previous);
-        } else {
-            self.fallback_options = Some(Box::new(options));
-        }
+    /// Sets the lowest-precedence options for this project, replacing any previous fallbacks.
+    pub fn set_fallback_options(&mut self, options: Options) {
+        self.fallback_options = Some(Box::new(options));
     }
 
     /// Returns project or script option layers from highest to lowest precedence.
@@ -1171,7 +1156,7 @@ unclosed table, expected `]`
         let mut environment = uv_workspace(&root, &system)?;
         environment.error = Some("uv metadata refresh failed".into());
         let mut metadata = ProjectMetadata::new("app", root).with_environment(environment);
-        metadata.apply_override_options(Options::from_toml_str(
+        metadata.set_override_options(Options::from_toml_str(
             "[rules]\nmissing-direct-dependency = 'warn'",
             ValueSource::Cli,
         )?);
@@ -1243,7 +1228,7 @@ unclosed table, expected `]`
         };
         let mut project =
             ProjectMetadata::discover_with_uv_workspace(&member, &system, uv_environment)?;
-        project.apply_fallback_options(Options::from_toml_str(
+        project.set_fallback_options(Options::from_toml_str(
             r#"
             [environment]
             python = "/editor-venv"
