@@ -26,6 +26,7 @@ D207 [*] Docstring is under-indented
 243 |
 244 | """
     | ^
+    |
 help: Increase indentation
     |
 243 |
@@ -57,6 +58,7 @@ D207 [*] Docstring is under-indented
 440 |     Second Line
 441 |     """
     | ^
+    |
 help: Increase indentation
     |
 440 |     Second Line

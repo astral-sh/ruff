@@ -26,6 +26,7 @@ error[RUF201]: Rule code used instead of name in `lint.select`
   |
 3 |     "F401",  # snapshot: rule-codes-in-selectors
   |      ^^^^
+  |
 help: Replace rule code with `unused-import`
   |
 2 | select = [
@@ -40,6 +41,7 @@ error[RUF201]: Rule code used instead of name in `lint.select`
   |
 4 |     'F402',  # snapshot: rule-codes-in-selectors
   |      ^^^^
+  |
 help: Replace rule code with `import-shadowed-by-loop-var`
   |
 3 |     "F401",  # snapshot: rule-codes-in-selectors
@@ -54,6 +56,7 @@ error[RUF201]: Rule code used instead of name in `lint.select`
   |
 5 |     """F403""",  # snapshot: rule-codes-in-selectors
   |        ^^^^
+  |
 help: Replace rule code with `undefined-local-with-import-star`
   |
 4 |     'F402',  # snapshot: rule-codes-in-selectors
@@ -68,6 +71,7 @@ error[RUF201]: Rule code used instead of name in `lint.select`
   |
 6 |     '''F404''',  # snapshot: rule-codes-in-selectors
   |        ^^^^
+  |
 help: Replace rule code with `late-future-import`
   |
 5 |     """F403""",  # snapshot: rule-codes-in-selectors
@@ -96,6 +100,7 @@ error[RUF201]: Rule code used instead of name in `lint.select`
   |
 3 | select = ["'F401'", "F402"]
   |                      ^^^^
+  |
 help: Replace rule code with `import-shadowed-by-loop-var`
   |
 2 | # snapshot: rule-codes-in-selectors
@@ -200,6 +205,7 @@ error[RUF201]: Rule code used instead of name in `lint.select`
   |
 2 | lint.select = ["F401"]
   |                 ^^^^
+  |
 help: Replace rule code with `unused-import`
 ```
 

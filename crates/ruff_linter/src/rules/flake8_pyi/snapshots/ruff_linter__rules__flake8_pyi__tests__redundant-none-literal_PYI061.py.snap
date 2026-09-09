@@ -282,6 +282,7 @@ PYI061 [*] Use `Literal[...] | None` rather than `Literal[None, ...]`
 67 | # only emit Y062:
 68 | Literal[None, True, None, True]  # Y062 Duplicate "Literal[]" member "True"
    |         ^^^^
+   |
 help: Replace with `Literal[...] | None`
    |
 67 | # only emit Y062:
@@ -298,6 +299,7 @@ PYI061 [*] Use `Literal[...] | None` rather than `Literal[None, ...]`
 67 | # only emit Y062:
 68 | Literal[None, True, None, True]  # Y062 Duplicate "Literal[]" member "True"
    |                     ^^^^
+   |
 help: Replace with `Literal[...] | None`
    |
 67 | # only emit Y062:
@@ -525,6 +527,7 @@ PYI061 [*] Use `Literal[...] | None` rather than `Literal[None, ...]`
 91 | # Rewriting this changes `typing.get_args(options)` at runtime, so the fix is unsafe.
 92 | options = Literal["foo", "bar", None]
    |                                 ^^^^
+   |
 help: Replace with `Literal[...] | None`
    |
 91 | # Rewriting this changes `typing.get_args(options)` at runtime, so the fix is unsafe.

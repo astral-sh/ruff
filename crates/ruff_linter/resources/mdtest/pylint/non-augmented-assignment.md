@@ -32,6 +32,7 @@ error[PLR6104]: Use `+=` to perform an augmented assignment directly
   |
 1 | to_multiply = -1 + to_multiply  # snapshot: non-augmented-assignment
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
 help: Replace with augmented assignment
   |
   - to_multiply = -1 + to_multiply  # snapshot: non-augmented-assignment
@@ -53,6 +54,7 @@ error[PLR6104]: Use `+=` to perform an augmented assignment directly
   |
 8 | to_multiply = (not True) + to_multiply  # snapshot: non-augmented-assignment
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
 help: Replace with augmented assignment
   |
 7 | flags = -True | flags  # error: [non-augmented-assignment]
@@ -79,6 +81,7 @@ error[PLR6104]: Use `**=` to perform an augmented assignment directly
   |
 1 | to_multiply = to_multiply**-1  # snapshot: non-augmented-assignment
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
 help: Replace with augmented assignment
   |
   - to_multiply = to_multiply**-1  # snapshot: non-augmented-assignment

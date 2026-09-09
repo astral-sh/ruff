@@ -4,7 +4,8 @@ use std::num::NonZeroUsize;
 use similar::{ChangeTag, DiffOp, TextDiff};
 
 use annotate_snippets::{
-    Group as AnnotateGroup, Level as AnnotateLevel, Renderer as AnnotateRenderer,
+    Group as AnnotateGroup, Level as AnnotateLevel, Padding as AnnotatePadding,
+    Renderer as AnnotateRenderer,
 };
 use ruff_diagnostics::{Applicability, Fix};
 use ruff_notebook::NotebookIndex;
@@ -62,8 +63,15 @@ impl<'a> FullRenderer<'a> {
 
             let resolved = Resolved::new(self.resolver, diag, self.config);
             let renderable = resolved.to_renderable(self.config);
-            for diag in renderable.diagnostics.iter() {
-                writeln!(f, "{}", renderer.render(&[diag.to_annotate()]))?;
+            let mut diagnostics = renderable.diagnostics.iter().peekable();
+            while let Some(diag) = diagnostics.next() {
+                let mut group = diag.to_annotate();
+                if diagnostics.peek().is_some() && diag.has_trailing_source() {
+                    // Keep the source frame separate from the next subdiagnostic even when its
+                    // last line contains an annotation and the renderer adds no implicit padding.
+                    group = group.element(AnnotatePadding);
+                }
+                writeln!(f, "{}", renderer.render(&[group]))?;
             }
 
             if diag.has_applicable_fix(self.config.fix_applicability())
@@ -400,12 +408,13 @@ mod tests {
     #[test]
     fn output() {
         let (env, diagnostics) = create_diagnostics(DiagnosticFormat::Full);
-        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @r###"
+        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @r#"
         error[F401]: `os` imported but unused
          --> fib.py:1:8
           |
         1 | import os
           |        ^^
+          |
         help: Remove unused import: `os`
 
         error[F841]: Local variable `x` is assigned to but never used
@@ -433,6 +442,7 @@ mod tests {
         11 |     else:
         12 |         return fibonaccii(n - 1) + fibonacci(n - 2)
            |                ^^^^^^^^^^          -
+           |
         info: Did you mean to import it from `/some/path/def.py`?
          --> fib.py:4:5
           |
@@ -443,7 +453,7 @@ mod tests {
         6 |     x = 1
         7 |     if n == 0:
           |
-        "###);
+        "#);
     }
 
     #[test]
@@ -485,6 +495,7 @@ mod tests {
           |
         1 | import os
           |        ^^
+          |
         help: Remove unused import: `os`
           |
           - import os
@@ -524,6 +535,7 @@ mod tests {
         11 |     else:
         12 |         return fibonaccii(n - 1) + fibonacci(n - 2)
            |                ^^^^^^^^^^          -
+           |
         info: Did you mean to import it from `/some/path/def.py`?
          --> fib.py:4:5
           |
@@ -728,6 +740,7 @@ print()
         1 | # cell 1
         2 | import os
           |        ^^
+          |
         help: Remove unused import: `os`
          ::: cell 1
           |
@@ -759,6 +772,7 @@ print()
         3 |     print()
         4 |     x = 1
           |     ^
+          |
         help: Remove assignment to unused variable `x`
         ");
     }
@@ -790,7 +804,7 @@ print()
                 .build(),
         ];
 
-        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @r"
+        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @"
         error[unused-import]: `os` imported but unused
          --> notebook.ipynb:cell 1:2:8
           |
@@ -821,6 +835,7 @@ print()
         3 |     print()
         4 |     x = 1
           |     - second cell
+          |
         help: Remove unused import: `os`
 
         error[test-diagnostic]: main diagnostic message
@@ -832,6 +847,7 @@ print()
         3 |
         4 | print('hello world')
           | ----- print statement
+          |
         help: Remove `print` statement
         ");
     }
@@ -1077,6 +1093,7 @@ line 13
           |
         2 | line 2
           | ^^^^^^
+          |
         help: Replace three lines
            |
         1  | line 1

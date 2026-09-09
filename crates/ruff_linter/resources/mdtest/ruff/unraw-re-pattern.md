@@ -25,6 +25,7 @@ error[RUF039]: First argument to `re.prefixmatch()` is not raw string
   |
 4 | re.prefixmatch("\t", "abc")  # snapshot: unraw-re-pattern
   |                ^^^^
+  |
 help: Replace with raw string
   |
 3 |
@@ -40,6 +41,7 @@ error[RUF039]: First argument to `regex.prefixmatch()` is not raw string
   |
 5 | regex.prefixmatch("\t", "abc")  # snapshot: unraw-re-pattern
   |                   ^^^^
+  |
 help: Replace with raw string
   |
 4 | re.prefixmatch("\t", "abc")  # snapshot: unraw-re-pattern

@@ -19,6 +19,7 @@ error[invalid-assignment]: Object of type `Literal[1]` is not assignable to `<cl
   | -   ^ Incompatible value of type `Literal[1]`
   | |
   | Declared type `<class 'C'>`
+  |
 info: Implicit shadowing of class `C`. Add an annotation to make it explicit if this is intentional
 ```
 
@@ -38,6 +39,7 @@ error[invalid-assignment]: Object of type `Literal[1]` is not assignable to `def
   | -   ^ Incompatible value of type `Literal[1]`
   | |
   | Declared type `def f() -> Unknown`
+  |
 info: Implicit shadowing of function `f`. Add an annotation to make it explicit if this is intentional
 ```
 

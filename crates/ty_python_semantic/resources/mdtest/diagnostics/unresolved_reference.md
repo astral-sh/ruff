@@ -36,6 +36,7 @@ error[unresolved-reference]: Name `List` used when not defined
   |
 1 | foo: List[int]  # snapshot: unresolved-reference
   |      ^^^^ Did you mean `list`?
+  |
 help: Replace with `list`
   |
   - foo: List[int]  # snapshot: unresolved-reference
@@ -50,6 +51,7 @@ error[unresolved-reference]: Name `Type` used when not defined
   |
 2 | bar: Type  # snapshot: unresolved-reference
   |      ^^^^ Did you mean `type`?
+  |
 help: Replace with `type`
   |
 1 | foo: List[int]  # snapshot: unresolved-reference

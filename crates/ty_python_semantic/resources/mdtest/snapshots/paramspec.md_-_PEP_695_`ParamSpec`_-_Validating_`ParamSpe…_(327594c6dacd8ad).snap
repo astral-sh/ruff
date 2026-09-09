@@ -86,6 +86,7 @@ error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context in a p
    |
 11 |     a1: P,
    |         ^
+   |
 info: A bare ParamSpec is only valid:
 info:  - as the first argument to `Callable`
 info:  - as the last argument to `Concatenate`
@@ -101,6 +102,7 @@ error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context in a p
    |
 13 |     a3: Callable[[P], int],
    |                   ^
+   |
 info: A bare ParamSpec is only valid:
 info:  - as the first argument to `Callable`
 info:  - as the last argument to `Concatenate`
@@ -116,6 +118,7 @@ error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context in a p
    |
 15 |     a4: Callable[..., P],
    |                       ^
+   |
 info: A bare ParamSpec is only valid:
 info:  - as the first argument to `Callable`
 info:  - as the last argument to `Concatenate`
@@ -131,6 +134,7 @@ error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context in a p
    |
 17 |     a5: Callable[Concatenate[P, ...], int],
    |                              ^
+   |
 info: A bare ParamSpec is only valid:
 info:  - as the first argument to `Callable`
 info:  - as the last argument to `Concatenate`
@@ -146,6 +150,7 @@ error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context in a p
    |
 19 |     a6: P | int,
    |         ^
+   |
 info: A bare ParamSpec is only valid:
 info:  - as the first argument to `Callable`
 info:  - as the last argument to `Concatenate`
@@ -161,6 +166,7 @@ error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context in a p
    |
 21 |     a7: Union[P, int],
    |               ^
+   |
 info: A bare ParamSpec is only valid:
 info:  - as the first argument to `Callable`
 info:  - as the last argument to `Concatenate`
@@ -176,6 +182,7 @@ error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context in a p
    |
 23 |     a8: Optional[P],
    |                  ^
+   |
 info: A bare ParamSpec is only valid:
 info:  - as the first argument to `Callable`
 info:  - as the last argument to `Concatenate`
@@ -191,6 +198,7 @@ error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context in a p
    |
 25 |     a9: Annotated[P, "metadata"],
    |                   ^
+   |
 info: A bare ParamSpec is only valid:
 info:  - as the first argument to `Callable`
 info:  - as the last argument to `Concatenate`
@@ -206,6 +214,7 @@ error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context in a r
    |
 29 | def invalid_return[**P]() -> P:
    |                              ^
+   |
 info: A bare ParamSpec is only valid:
 info:  - as the first argument to `Callable`
 info:  - as the last argument to `Concatenate`
@@ -221,6 +230,7 @@ error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context in a t
    |
 33 | type Alias[**P] = P
    |                   ^
+   |
 info: A bare ParamSpec is only valid:
 info:  - as the first argument to `Callable`
 info:  - as the last argument to `Concatenate`
@@ -236,6 +246,7 @@ error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context in a t
    |
 37 |     x: P = y
    |        ^
+   |
 info: A bare ParamSpec is only valid:
 info:  - as the first argument to `Callable`
 info:  - as the last argument to `Concatenate`
@@ -251,6 +262,7 @@ error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context in a t
    |
 41 |     x: Final[P] = y
    |              ^
+   |
 info: A bare ParamSpec is only valid:
 info:  - as the first argument to `Callable`
 info:  - as the last argument to `Concatenate`
@@ -266,6 +278,7 @@ error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context in a r
    |
 44 | def invalid_stringified_return[**P]() -> "P":
    |                                           ^
+   |
 info: A bare ParamSpec is only valid:
 info:  - as the first argument to `Callable`
 info:  - as the last argument to `Concatenate`
@@ -281,6 +294,7 @@ error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context in a p
    |
 49 |     a: "P",
    |         ^
+   |
 info: A bare ParamSpec is only valid:
 info:  - as the first argument to `Callable`
 info:  - as the last argument to `Concatenate`
@@ -296,6 +310,7 @@ error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context in a t
    |
 53 |     x: "P" = y
    |         ^
+   |
 info: A bare ParamSpec is only valid:
 info:  - as the first argument to `Callable`
 info:  - as the last argument to `Concatenate`
@@ -311,6 +326,7 @@ error[invalid-type-form]: Bare ParamSpec `Q` is not valid in this context in a p
    |
 60 |     a: InvalidSpecializationTarget[[Q]],
    |                                     ^
+   |
 info: A bare ParamSpec is only valid:
 info:  - as the first argument to `Callable`
 info:  - as the last argument to `Concatenate`
@@ -326,6 +342,7 @@ error[invalid-type-form]: Bare ParamSpec `Q` is not valid in this context in a p
    |
 62 |     b: InvalidSpecializationTarget[Q,],
    |                                    ^
+   |
 info: A bare ParamSpec is only valid:
 info:  - as the first argument to `Callable`
 info:  - as the last argument to `Concatenate`

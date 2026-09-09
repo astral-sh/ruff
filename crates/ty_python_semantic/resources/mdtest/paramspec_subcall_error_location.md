@@ -30,6 +30,7 @@ error[invalid-argument-type]: Argument to function `foo` is incorrect
   |
 9 | foo(fn1, "a", 2, c="c", unknown=1)
   |          ^^^ Expected `int`, found `Literal["a"]`
+  |
 info: Function defined here
  --> src/mdtest_snippet.py:4:5
   |
@@ -42,6 +43,7 @@ error[invalid-argument-type]: Argument to function `foo` is incorrect
   |
 9 | foo(fn1, "a", 2, c="c", unknown=1)
   |                  ^^^^^ Expected `int`, found `Literal["c"]`
+  |
 info: Function defined here
  --> src/mdtest_snippet.py:4:5
   |
@@ -54,6 +56,7 @@ error[unknown-argument]: Argument `unknown` does not match any known parameter o
   |
 9 | foo(fn1, "a", 2, c="c", unknown=1)
   |                         ^^^^^^^^^
+  |
 info: Function signature here
  --> src/mdtest_snippet.py:3:5
   |
@@ -74,6 +77,7 @@ error[too-many-positional-arguments]: Too many positional arguments to function 
    |
 13 | foo(fn2, 1, 2, 3)
    |             ^
+   |
 info: Function signature here
  --> src/mdtest_snippet.py:3:5
   |
@@ -94,6 +98,7 @@ error[positional-only-parameter-as-kwarg]: Positional-only parameter 1 (`a`) pas
    |
 17 | foo(fn3, a=1)
    |          ^^^
+   |
 info: Function signature here
  --> src/mdtest_snippet.py:3:5
   |
@@ -118,6 +123,7 @@ error[missing-argument]: No argument provided for required parameter `b` of func
    |
 22 | foo(fn4, 1, a=2)
    | ^^^^^^^^^^^^^^^^
+   |
 info: Parameter declared here
  --> src/mdtest_snippet.py:3:37
   |
@@ -137,6 +143,7 @@ error[missing-argument]: No arguments provided for required parameters `a`, `b` 
    |
 25 | foo(fn4)
    | ^^^^^^^^
+   |
 info: Parameters declared here
  --> src/mdtest_snippet.py:3:16
   |
@@ -185,6 +192,7 @@ error[invalid-argument-type]: Argument to function `wrapper` is incorrect
   |
 6 | wrapper(callback, value="incorrect")  # snapshot: invalid-argument-type
   |                   ^^^^^^^^^^^^^^^^^ Expected `int`, found `Literal["incorrect"]`
+  |
 info: Function defined here
  --> src/mdtest_snippet.py:4:5
   |
@@ -215,6 +223,7 @@ error[invalid-argument-type]: Argument to function `wrapper` is incorrect
   |
 9 |     wrapper(handler.callback, value="incorrect")  # snapshot: invalid-argument-type
   |                               ^^^^^^^^^^^^^^^^^ Expected `int`, found `Literal["incorrect"]`
+  |
 info: Method defined here
  --> src/mdtest_snippet.py:6:9
   |
@@ -242,6 +251,7 @@ error[invalid-argument-type]: Argument to function `wrapper` is incorrect
   |
 5 |     wrapper(callback, "incorrect")  # snapshot: invalid-argument-type
   |                       ^^^^^^^^^^^ Expected `int`, found `Literal["incorrect"]`
+  |
 info: Function defined here
  --> src/mdtest_snippet.py:3:5
   |
@@ -271,6 +281,7 @@ error[invalid-argument-type]: Argument to function `wrapper` is incorrect
   |
 8 | wrapper(callback, value="incorrect")  # snapshot: invalid-argument-type
   |                   ^^^^^^^^^^^^^^^^^ Expected `int`, found `Literal["incorrect"]`
+  |
 info: Function defined here
  --> src/mdtest_snippet.py:6:5
   |
@@ -302,6 +313,7 @@ error[invalid-argument-type]: Argument to function `wrapper` is incorrect
    |
 10 | wrapper(callback, "value", flag=1)  # snapshot: invalid-argument-type
    |                            ^^^^^^ Expected `str`, found `Literal[1]`
+   |
 info: Function defined here
  --> src/mdtest_snippet.py:7:5
   |
@@ -335,6 +347,7 @@ error[invalid-argument-type]: Argument to function `wrapper` is incorrect
    |
 12 | wrapper(callback, "incorrect")  # snapshot: invalid-argument-type
    |                   ^^^^^^^^^^^ Expected `int`, found `Literal["incorrect"]`
+   |
 info: Function defined here
  --> src/mdtest_snippet.py:9:5
   |
@@ -371,6 +384,7 @@ error[invalid-argument-type]: Argument to function `wrapper` is incorrect
    |
 15 |     wrapper(receiver.method, "incorrect")  # snapshot: invalid-argument-type
    |                              ^^^^^^^^^^^ Expected `int`, found `Literal["incorrect"]`
+   |
 info: Method defined here
   --> src/mdtest_snippet.py:11:9
    |
@@ -399,6 +413,7 @@ error[invalid-argument-type]: Argument to function `wrapper` is incorrect
   |
 7 | wrapper(callback, "incorrect", "valid")  # snapshot: invalid-argument-type
   |                   ^^^^^^^^^^^ Expected `int`, found `Literal["incorrect"]`
+  |
 info: Function defined here
  --> src/mdtest_snippet.py:4:5
   |
@@ -426,6 +441,7 @@ error[invalid-argument-type]: Argument to function `wrapper` is incorrect
   |
 6 | wrapper(callback, "incorrect")  # snapshot: invalid-argument-type
   |                   ^^^^^^^^^^^ Expected `int`, found `Literal["incorrect"]`
+  |
 info: Function defined here
  --> src/mdtest_snippet.py:4:5
   |
@@ -462,16 +478,19 @@ error[invalid-argument-type]: Argument to function `wrap` is incorrect
    |
 10 | wrap(keyword_callback, value="incorrect")  # snapshot: invalid-argument-type
    |                        ^^^^^^^^^^^^^^^^^ Expected `int`, found `Literal["incorrect"]`
+   |
 info: Function defined here
  --> src/mdtest_snippet.py:8:5
   |
 8 | def keyword_callback(*, value: int) -> None: ...
   |     ^^^^^^^^^^^^^^^^    ---------- Parameter declared here
+  |
 info: Matching overload defined here
  --> src/mdtest_snippet.py:4:5
   |
 4 | def wrap[**P](callback: Callable[P, None], *args: P.args, **kwargs: P.kwargs) -> None: ...
   |     ^^^^                                                  ------------------ Parameter declared here
+  |
 info: Non-matching overloads for function `wrap`:
 info:   (value: int, first: int, second: int) -> None
 ```
@@ -488,16 +507,19 @@ error[invalid-argument-type]: Argument to function `wrap` is incorrect
    |
 11 | wrap(positional_callback, "incorrect")  # snapshot: invalid-argument-type
    |                           ^^^^^^^^^^^ Expected `int`, found `Literal["incorrect"]`
+   |
 info: Function defined here
  --> src/mdtest_snippet.py:9:5
   |
 9 | def positional_callback(*values: int) -> None: ...
   |     ^^^^^^^^^^^^^^^^^^^ ------------ Parameter declared here
+  |
 info: Matching overload defined here
  --> src/mdtest_snippet.py:4:5
   |
 4 | def wrap[**P](callback: Callable[P, None], *args: P.args, **kwargs: P.kwargs) -> None: ...
   |     ^^^^                                   ------------- Parameter declared here
+  |
 info: Non-matching overloads for function `wrap`:
 info:   (value: int, first: int, second: int) -> None
 ```
@@ -524,6 +546,7 @@ error[invalid-argument-type]: Argument to bound method `Wrapper.__call__` is inc
   |
 8 | Wrapper()(callback, "incorrect")  # snapshot: invalid-argument-type
   |                     ^^^^^^^^^^^ Expected `int`, found `Literal["incorrect"]`
+  |
 info: Function defined here
  --> src/mdtest_snippet.py:6:5
   |
@@ -556,6 +579,7 @@ error[invalid-argument-type]: Argument to function `wrapper` is incorrect
    |
 10 | wrapper(callback, "incorrect")  # snapshot: invalid-argument-type
    |                   ^^^^^^^^^^^ Expected `int`, found `Literal["incorrect"]`
+   |
 info: Function defined here
  --> src/mdtest_snippet.py:7:5
   |
@@ -589,6 +613,7 @@ error[invalid-argument-type]: Argument to function `wrapper` is incorrect
    |
 11 | wrapper(callback, alpha=1, beta="incorrect")  # snapshot: invalid-argument-type
    |                            ^^^^^^^^^^^^^^^^ Expected `int`, found `Literal["incorrect"]`
+   |
 info: Function defined here
  --> src/mdtest_snippet.py:9:5
   |
@@ -623,6 +648,7 @@ error[invalid-argument-type]: Argument to function `wrapper` is incorrect
    |
 13 | wrapper(callback, value="incorrect")  # snapshot: invalid-argument-type
    |                   ^^^^^^^^^^^^^^^^^ Expected `int`, found `Literal["incorrect"]`
+   |
 info: Function defined here
   --> src/mdtest_snippet.py:10:5
    |
@@ -647,6 +673,7 @@ error[invalid-argument-type]: Argument to function `forward` is incorrect
    |
 18 | forward(partial(callback, 1), value="incorrect")  # snapshot: invalid-argument-type
    |                               ^^^^^^^^^^^^^^^^^ Expected `int`, found `Literal["incorrect"]`
+   |
 info: Function defined here
   --> src/mdtest_snippet.py:10:5
    |
@@ -674,6 +701,7 @@ error[invalid-argument-type]: Argument to function `wrapper` is incorrect
   |
 6 | wrapper(callback, 1, 2)  # snapshot: invalid-argument-type
   |                      ^ Expected `str`, found `Literal[2]`
+  |
 info: Function defined here
  --> src/mdtest_snippet.py:4:5
   |
@@ -704,6 +732,7 @@ error[invalid-argument-type]: Argument to function `wrapper` is incorrect
   |
 9 |     wrapper(callback, value="incorrect")  # snapshot: invalid-argument-type
   |                       ^^^^^^^^^^^^^^^^^ Expected `int`, found `Literal["incorrect"]`
+  |
 info: Method defined here
  --> src/mdtest_snippet.py:6:9
   |
@@ -733,6 +762,7 @@ error[invalid-argument-type]: Argument to function `wrapper` is incorrect
   |
 8 | wrapper(Callback(), value="incorrect")  # snapshot: invalid-argument-type
   |                     ^^^^^^^^^^^^^^^^^ Expected `int`, found `Literal["incorrect"]`
+  |
 info: Method defined here
  --> src/mdtest_snippet.py:6:9
   |
@@ -762,6 +792,7 @@ error[invalid-argument-type]: Argument to function `wrapper` is incorrect
   |
 8 | wrapper(Factory, "incorrect")  # snapshot: invalid-argument-type
   |                  ^^^^^^^^^^^ Expected `int`, found `Literal["incorrect"]`
+  |
 info: Method defined here
  --> src/mdtest_snippet.py:6:9
   |
@@ -799,6 +830,7 @@ error[invalid-argument-type]: Argument to function `wrapper` is incorrect
    |
 16 | wrapper(Factory, value="incorrect")  # snapshot: invalid-argument-type
    |                  ^^^^^^^^^^^^^^^^^ Expected `int`, found `Literal["incorrect"]`
+   |
 info: Method defined here
   --> src/mdtest_snippet.py:13:9
    |
@@ -832,6 +864,7 @@ error[invalid-argument-type]: Argument to function `wrapper` is incorrect
    |
 12 | wrapper(Factory, "incorrect")  # snapshot: invalid-argument-type
    |                  ^^^^^^^^^^^ Expected `int`, found `Literal["incorrect"]`
+   |
 info: Method defined here
  --> src/mdtest_snippet.py:6:9
   |
@@ -862,6 +895,7 @@ error[invalid-argument-type]: Argument to function `wrapper` is incorrect
   |
 9 | wrapper(Factory, "incorrect")  # snapshot: invalid-argument-type
   |                  ^^^^^^^^^^^ Expected `int`, found `Literal["incorrect"]`
+  |
 info: Function defined here
  --> src/mdtest_snippet.py:6:9
   |
@@ -896,6 +930,7 @@ error[invalid-argument-type]: Argument to function `wrapper` is incorrect
    |
 13 | wrapper(Factory, 1, "incorrect")  # snapshot: invalid-argument-type
    |                     ^^^^^^^^^^^ Expected `int`, found `Literal["incorrect"]`
+   |
 info: Function defined here
  --> src/mdtest_snippet.py:9:9
   |
@@ -924,6 +959,7 @@ error[invalid-argument-type]: Argument to function `wrapper` is incorrect
   |
 7 | wrapper(partial(callback, 1), "incorrect")  # snapshot: invalid-argument-type
   |                               ^^^^^^^^^^^ Expected `int`, found `Literal["incorrect"]`
+  |
 info: Function defined here
  --> src/mdtest_snippet.py:5:5
   |
@@ -955,6 +991,7 @@ error[invalid-argument-type]: Argument to function `wrapper` is incorrect
    |
 10 |     wrapper(partial(handler.callback, 1), "incorrect")  # snapshot: invalid-argument-type
    |                                           ^^^^^^^^^^^ Expected `int`, found `Literal["incorrect"]`
+   |
 info: Method defined here
  --> src/mdtest_snippet.py:7:9
   |

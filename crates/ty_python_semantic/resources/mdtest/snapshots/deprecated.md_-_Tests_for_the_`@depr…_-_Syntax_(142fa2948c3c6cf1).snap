@@ -82,6 +82,7 @@ error[missing-argument]: No argument provided for required parameter `arg` of bo
   |
 6 | invalid_deco()  # error: [missing-argument]
   | ^^^^^^^^^^^^^^
+  |
 info: Parameter declared here
     --> stdlib/typing_extensions.pyi:1219:28
      |

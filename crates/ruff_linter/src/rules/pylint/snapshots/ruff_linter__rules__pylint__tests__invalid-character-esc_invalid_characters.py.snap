@@ -60,6 +60,7 @@ PLE2513 [*] Invalid unescaped character ESC, use "\x1b" instead
 59 | # https://github.com/astral-sh/ruff/issues/7455#issuecomment-1741998256
 60 | x = f"""}}a␛b"""
    |            ^
+   |
 help: Replace with escape sequence
    |
 59 | # https://github.com/astral-sh/ruff/issues/7455#issuecomment-1741998256
@@ -155,6 +156,7 @@ PLE2513 [*] Invalid unescaped character ESC, use "\x1b" instead
 80 | nested_tstrings = t'␈{t'␚{t'␛'}'}'
 81 | nested_ftstrings = t'␈{f'␚{t'␛'}'}'
    |                              ^
+   |
 help: Replace with escape sequence
    |
 80 | nested_tstrings = t'␈{t'{t'␛'}'}'

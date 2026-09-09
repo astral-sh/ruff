@@ -7,6 +7,7 @@ RUF059 [*] Unpacked variable `x` is never used
 1 | def f(tup):
 2 |     x, y = tup
   |     ^
+  |
 help: Prefix it with an underscore or any other dummy variable pattern
   |
 1 | def f(tup):
@@ -22,6 +23,7 @@ RUF059 [*] Unpacked variable `y` is never used
 1 | def f(tup):
 2 |     x, y = tup
   |        ^
+  |
 help: Prefix it with an underscore or any other dummy variable pattern
   |
 1 | def f(tup):
@@ -55,6 +57,7 @@ RUF059 [*] Unpacked variable `x` is never used
 15 | def f():
 16 |     (x, y) = coords = 1, 2
    |      ^
+   |
 help: Prefix it with an underscore or any other dummy variable pattern
    |
 15 | def f():
@@ -70,6 +73,7 @@ RUF059 [*] Unpacked variable `y` is never used
 15 | def f():
 16 |     (x, y) = coords = 1, 2
    |         ^
+   |
 help: Prefix it with an underscore or any other dummy variable pattern
    |
 15 | def f():
@@ -85,6 +89,7 @@ RUF059 [*] Unpacked variable `x` is never used
 19 | def f():
 20 |     coords = (x, y) = 1, 2
    |               ^
+   |
 help: Prefix it with an underscore or any other dummy variable pattern
    |
 19 | def f():
@@ -100,6 +105,7 @@ RUF059 [*] Unpacked variable `y` is never used
 19 | def f():
 20 |     coords = (x, y) = 1, 2
    |                  ^
+   |
 help: Prefix it with an underscore or any other dummy variable pattern
    |
 19 | def f():

@@ -7,6 +7,7 @@ FURB131 [*] Prefer `clear` over deleting a full slice
 10 | # FURB131
 11 | del nums[:]
    | ^^^^^^^^^^^
+   |
 help: Replace with `clear()`
    |
 10 | # FURB131
@@ -22,6 +23,7 @@ FURB131 Prefer `clear` over deleting a full slice
 18 | # FURB131
 19 | del x, nums[:]
    | ^^^^^^^^^^^^^^
+   |
 help: Replace with `clear()`
 
 FURB131 [*] Prefer `clear` over deleting a full slice
@@ -31,6 +33,7 @@ FURB131 [*] Prefer `clear` over deleting a full slice
 27 |     # FURB131
 28 |     del x[:]
    |     ^^^^^^^^
+   |
 help: Replace with `clear()`
    |
 27 |     # FURB131
@@ -47,6 +50,7 @@ FURB131 [*] Prefer `clear` over deleting a full slice
 37 |     # FURB131
 38 |     del x[:]
    |     ^^^^^^^^
+   |
 help: Replace with `clear()`
    |
 37 |     # FURB131

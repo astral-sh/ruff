@@ -69,4 +69,5 @@ PYI041 Use `float` instead of `int | float`
   |  ___________^
 8 | | t, float, Foo]") -> "None": ...
   | |_______________^
+  |
 help: Remove redundant type

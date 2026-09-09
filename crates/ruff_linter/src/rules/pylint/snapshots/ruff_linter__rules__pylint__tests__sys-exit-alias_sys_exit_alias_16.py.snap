@@ -53,6 +53,7 @@ PLR1722 Use `sys.exit()` instead of `exit`
 16 |     # no diagnostic for multiple arguments
 17 |     exit(2, 3, 4)
    |     ^^^^
+   |
 help: Replace `exit` with `sys.exit()`
 
 PLR1722 [*] Use `sys.exit()` instead of `exit`
@@ -62,6 +63,7 @@ PLR1722 [*] Use `sys.exit()` instead of `exit`
 22 |     codes = [1]
 23 |     exit(*codes)
    |     ^^^^
+   |
 help: Replace `exit` with `sys.exit()`
    |
 1  + import sys

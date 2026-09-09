@@ -1746,6 +1746,7 @@ error[invalid-argument-type]: Argument to function `f` is incorrect
    |
 15 | f(**Foo1(a=1, b="b"))
    |   ^^^^^^^^^^^^^^^^^^ Expected `int`, found `str`
+   |
 info: Function defined here
   --> src/mdtest_snippet.py:11:5
    |
@@ -1758,6 +1759,7 @@ error[invalid-argument-type]: Argument to function `f` is incorrect
    |
 15 | f(**Foo1(a=1, b="b"))
    |   ^^^^^^^^^^^^^^^^^^ Possible extra items in unpacked open `TypedDict` have type `object`, expected `int`
+   |
 info: Function defined here
   --> src/mdtest_snippet.py:11:5
    |

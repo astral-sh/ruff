@@ -422,6 +422,7 @@ FURB105 [*] Unnecessary empty string passed to `print`
 48 | |     ""
 49 | | )
    | |_^
+   |
 help: Remove empty string
    |
 45 |

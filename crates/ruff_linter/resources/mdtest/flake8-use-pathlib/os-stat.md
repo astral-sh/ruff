@@ -25,6 +25,7 @@ error[PTH116]: `os.stat()` should be replaced by `Path.stat()`, `Path.owner()`, 
   |
 3 | os.stat("foo", follow_symlinks=True)  # snapshot: os-stat
   | ^^^^^^^
+  |
 help: Replace with `Path(...).stat()`
   |
 1 | import os
@@ -52,6 +53,7 @@ error[PTH116]: `os.stat()` should be replaced by `Path.stat()`, `Path.owner()`, 
   |
 3 | os.stat("foo")  # snapshot: os-stat
   | ^^^^^^^
+  |
 help: Replace with `Path(...).stat()`
   |
 1 | import os
@@ -77,6 +79,7 @@ error[PTH116]: `os.stat()` should be replaced by `Path.stat()`, `Path.owner()`, 
   |
 3 | os.stat("foo", follow_symlinks=False)  # snapshot: os-stat
   | ^^^^^^^
+  |
 help: Replace with `Path(...).lstat()`
   |
 1 | import os
@@ -131,6 +134,7 @@ error[PTH116]: `os.stat()` should be replaced by `Path.stat()`, `Path.owner()`, 
   |
 3 | os.stat("foo", follow_symlinks=False)  # snapshot: os-stat
   | ^^^^^^^
+  |
 help: Replace with `Path(...).stat()`
   |
 1 | import os
@@ -157,6 +161,7 @@ error[PTH116]: `os.stat()` should be replaced by `Path.stat()`, `Path.owner()`, 
   |
 6 | os.stat("foo", follow_symlinks=follow)  # snapshot: os-stat
   | ^^^^^^^
+  |
 help: Replace with `Path(...).stat()`
   |
 1 | import os

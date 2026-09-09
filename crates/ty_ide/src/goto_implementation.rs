@@ -207,6 +207,7 @@ mod tests {
            |
         12 |     animal.speak()
            |            ^^^^^ Clicking here
+           |
         info: Found 3 implementations
          --> main.py:3:9
           |
@@ -252,6 +253,7 @@ mod tests {
            |
         17 |     animal.speak()
            |            ^^^^^ Clicking here
+           |
         info: Found 3 implementations
           --> main.py:6:9
            |
@@ -293,6 +295,7 @@ mod tests {
            |
         12 |     animal.speak()
            |            ^^^^^ Clicking here
+           |
         info: Found 2 implementations
          --> main.py:3:9
           |
@@ -327,6 +330,7 @@ mod tests {
           |
         9 | dog.speak()
           |     ^^^^^ Clicking here
+          |
         info: Found 1 implementation
          --> main.py:3:9
           |
@@ -359,6 +363,7 @@ mod tests {
            |
         12 |     dog.speak()
            |         ^^^^^ Clicking here
+           |
         info: Found 1 implementation
          --> main.py:6:9
           |
@@ -382,12 +387,13 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.goto_implementation(), @r"
+        assert_snapshot!(test.goto_implementation(), @"
         info[goto-implementation]: Go to implementation
          --> main.py:9:5
           |
         9 | dog.speak()
           |     ^^^^^ Clicking here
+          |
         info: Found 1 implementation
          --> main.py:6:5
           |
@@ -436,6 +442,7 @@ mod tests {
            |
         13 |     animal.speak(1)
            |            ^^^^^ Clicking here
+           |
         info: Found 1 implementation
          --> main.py:9:9
           |
@@ -471,6 +478,7 @@ mod tests {
            |
         15 |     animal.speak(1)
            |            ^^^^^ Clicking here
+           |
         info: Found 1 implementation
           --> main.py:11:9
            |
@@ -505,12 +513,13 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.goto_implementation(), @r"
+        assert_snapshot!(test.goto_implementation(), @"
         info[goto-implementation]: Go to implementation
          --> main.py:7:9
           |
         7 |     def value(self, value: int) -> None: ...
           |         ^^^^^ Clicking here
+          |
         info: Found 2 implementations
           --> main.py:7:9
            |
@@ -553,12 +562,13 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.goto_implementation(), @r"
+        assert_snapshot!(test.goto_implementation(), @"
         info[goto-implementation]: Go to implementation
           --> main.py:23:17
            |
         23 |     return base.value
            |                 ^^^^^ Clicking here
+           |
         info: Found 2 implementations
           --> main.py:4:9
            |
@@ -601,12 +611,13 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.goto_implementation(), @r"
+        assert_snapshot!(test.goto_implementation(), @"
         info[goto-implementation]: Go to implementation
           --> main.py:23:10
            |
         23 |     base.value = value
            |          ^^^^^ Clicking here
+           |
         info: Found 2 implementations
           --> main.py:7:9
            |
@@ -644,6 +655,7 @@ mod tests {
            |
         12 |     pet.speak()
            |         ^^^^^ Clicking here
+           |
         info: Found 1 implementation
          --> main.py:3:9
           |
@@ -673,6 +685,7 @@ mod tests {
           |
         9 |     animal.speak()
           |            ^^^^^ Clicking here
+          |
         info: Found 2 implementations
          --> main.py:3:9
           |
@@ -703,12 +716,13 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.goto_implementation(), @r"
+        assert_snapshot!(test.goto_implementation(), @"
         info[goto-implementation]: Go to implementation
          --> main.py:8:13
           |
         8 |         cls.speak()
           |             ^^^^^ Clicking here
+          |
         info: Found 2 implementations
           --> main.py:4:9
            |
@@ -739,12 +753,13 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.goto_implementation(), @r"
+        assert_snapshot!(test.goto_implementation(), @"
         info[goto-implementation]: Go to implementation
           --> main.py:11:9
            |
         11 |     cls.speak()
            |         ^^^^^ Clicking here
+           |
         info: Found 2 implementations
          --> main.py:4:9
           |
@@ -791,6 +806,7 @@ mod tests {
           |
         3 |     def method(self): ...
           |         ^^^^^^ Clicking here
+          |
         info: Found 2 implementations
          --> base.py:3:9
           |
@@ -887,6 +903,7 @@ class MyClass:
           |
         4 | x.action()
           |   ^^^^^^ Clicking here
+          |
         info: Found 1 implementation
          --> mymodule.py:5:9
           |
@@ -937,6 +954,7 @@ class MyClass:
           |
         4 | x.action(1)
           |   ^^^^^^ Clicking here
+          |
         info: Found 1 implementation
          --> mymodule.py:5:9
           |
@@ -992,6 +1010,7 @@ class MyClass:
           |
         3 |     def speak(self): ...
           |         ^^^^^ Clicking here
+          |
         info: Found 2 implementations
          --> main.py:3:9
           |
@@ -1040,6 +1059,7 @@ class MyClass:
           |
         4 | class Animal(ABC):
           |       ^^^^^^ Clicking here
+          |
         info: Found 3 implementations
           --> main.py:4:7
            |
@@ -1082,6 +1102,7 @@ class MyClass:
           |
         2 | class Animal:
           |       ^^^^^^ Clicking here
+          |
         info: Found 2 implementations
          --> main.py:2:7
           |
@@ -1109,6 +1130,7 @@ class MyClass:
           |
         2 | class Widget:
           |       ^^^^^^ Clicking here
+          |
         info: Found 1 implementation
          --> main.py:2:7
           |
@@ -1138,6 +1160,7 @@ class MyClass:
           |
         5 | class Mammal(Animal):
           |       ^^^^^^ Clicking here
+          |
         info: Found 2 implementations
          --> main.py:5:7
           |
@@ -1174,6 +1197,7 @@ class MyClass:
           |
         2 | class Base:
           |       ^^^^ Clicking here
+          |
         info: Found 4 implementations
           --> main.py:2:7
            |
@@ -1212,6 +1236,7 @@ class MyClass:
           |
         2 | class Container[T]:
           |       ^^^^^^^^^ Clicking here
+          |
         info: Found 2 implementations
          --> main.py:2:7
           |
@@ -1239,12 +1264,13 @@ class MyClass:
             "#,
         );
 
-        assert_snapshot!(test.goto_implementation(), @r"
+        assert_snapshot!(test.goto_implementation(), @"
         info[goto-implementation]: Go to implementation
          --> main.py:8:10
           |
         8 | def f(x: Animal):
           |          ^^^^^^ Clicking here
+          |
         info: Found 2 implementations
          --> main.py:2:7
           |
@@ -1278,6 +1304,7 @@ class MyClass:
           |
         8 | def f(x: "Animal"):
           |           ^^^^^^ Clicking here
+          |
         info: Found 2 implementations
          --> main.py:2:7
           |
@@ -1311,12 +1338,13 @@ class MyClass:
             )
             .build();
 
-        assert_snapshot!(test.goto_implementation(), @r"
+        assert_snapshot!(test.goto_implementation(), @"
         info[goto-implementation]: Go to implementation
          --> main.py:4:19
           |
         4 | class Dog(animals.Animal):
           |                   ^^^^^^ Clicking here
+          |
         info: Found 2 implementations
          --> animals.py:2:7
           |
@@ -1353,12 +1381,13 @@ class MyClass:
             )
             .build();
 
-        assert_snapshot!(test.goto_implementation(), @r"
+        assert_snapshot!(test.goto_implementation(), @"
         info[goto-implementation]: Go to implementation
          --> main.py:7:9
           |
         7 | animals.Animal()
           |         ^^^^^^ Clicking here
+          |
         info: Found 2 implementations
          --> animals.py:2:7
           |
@@ -1395,6 +1424,7 @@ class MyClass:
            |
         11 | Base()
            | ^^^^ Clicking here
+           |
         info: Found 2 implementations
          --> main.py:5:7
           |
@@ -1423,12 +1453,13 @@ class MyClass:
             "#,
         );
 
-        assert_snapshot!(test.goto_implementation(), @r"
+        assert_snapshot!(test.goto_implementation(), @"
         info[goto-implementation]: Go to implementation
          --> main.py:9:16
           |
         9 | def f(x: Outer.Inner):
           |                ^^^^^ Clicking here
+          |
         info: Found 2 implementations
          --> main.py:3:11
           |
@@ -1458,12 +1489,13 @@ class MyClass:
             "#,
         );
 
-        assert_snapshot!(test.goto_implementation(), @r"
+        assert_snapshot!(test.goto_implementation(), @"
         info[goto-implementation]: Go to implementation
          --> main.py:9:13
           |
         9 |     factory.dog_cls
           |             ^^^^^^^ Clicking here
+          |
         info: Found 1 implementation
          --> main.py:2:7
           |
@@ -1502,6 +1534,7 @@ class MyClass:
            |
         18 | factory.item
            |         ^^^^ Clicking here
+           |
         info: Found 3 implementations
           --> main.py:11:5
            |
@@ -1600,6 +1633,7 @@ class MyClass:
           |
         2 | class Base:
           |       ^^^^ Clicking here
+          |
         info: Found 2 implementations
          --> main.py:2:7
           |
@@ -1637,6 +1671,7 @@ class MyClass:
            |
         12 |     animal.sound
            |            ^^^^^ Clicking here
+           |
         info: Found 3 implementations
          --> main.py:3:5
           |
@@ -1674,6 +1709,7 @@ class MyClass:
           |
         9 |     animal.sound
           |            ^^^^^ Clicking here
+          |
         info: Found 2 implementations
          --> main.py:3:5
           |
@@ -1707,6 +1743,7 @@ class MyClass:
           |
         9 |     animal.sound
           |            ^^^^^ Clicking here
+          |
         info: Found 2 implementations
          --> main.py:3:5
           |
@@ -1734,12 +1771,13 @@ class MyClass:
             "#,
         );
 
-        assert_snapshot!(test.goto_implementation(), @r"
+        assert_snapshot!(test.goto_implementation(), @"
         info[goto-implementation]: Go to implementation
          --> main.py:9:12
           |
         9 |     animal.speak
           |            ^^^^^ Clicking here
+          |
         info: Found 2 implementations
          --> main.py:3:9
           |
@@ -1775,6 +1813,7 @@ class MyClass:
            |
         11 |     animal.sound
            |            ^^^^^ Clicking here
+           |
         info: Found 2 implementations
          --> main.py:4:9
           |
@@ -1814,6 +1853,7 @@ class MyClass:
            |
         14 |     dog.sound
            |         ^^^^^ Clicking here
+           |
         info: Found 1 implementation
          --> main.py:4:9
           |
@@ -1844,6 +1884,7 @@ class MyClass:
            |
         10 |     animal.sound
            |            ^^^^^ Clicking here
+           |
         info: Found 2 implementations
          --> main.py:3:5
           |
@@ -1879,6 +1920,7 @@ class MyClass:
           |
         8 |     animal.sound
           |            ^^^^^ Clicking here
+          |
         info: Found 1 implementation
          --> main.py:3:5
           |
@@ -1920,6 +1962,7 @@ class MyClass:
           |
         4 |     x.sound
           |       ^^^^^ Clicking here
+          |
         info: Found 1 implementation
          --> mymodule.py:3:5
           |
@@ -1958,6 +2001,7 @@ class MyClass:
            |
         14 |     speaker.speak()
            |             ^^^^^ Clicking here
+           |
         info: Found 2 implementations
           --> main.py:5:9
            |
@@ -1995,12 +2039,13 @@ class MyClass:
             "#,
         );
 
-        assert_snapshot!(test.goto_implementation(), @r"
+        assert_snapshot!(test.goto_implementation(), @"
         info[goto-implementation]: Go to implementation
           --> main.py:16:12
            |
         16 |     animal.speak()
            |            ^^^^^ Clicking here
+           |
         info: Found 2 implementations
          --> main.py:5:9
           |
@@ -2038,6 +2083,7 @@ class MyClass:
            |
         12 |     animal.speak()
            |            ^^^^^ Clicking here
+           |
         info: Found 1 implementation
          --> main.py:5:9
           |
@@ -2071,6 +2117,7 @@ class MyClass:
            |
         13 |     animal.sound
            |            ^^^^^ Clicking here
+           |
         info: Found 1 implementation
          --> main.py:5:5
           |

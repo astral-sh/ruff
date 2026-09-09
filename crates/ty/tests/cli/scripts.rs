@@ -73,6 +73,7 @@ fn verbose_rule_diagnostics_identify_script_metadata() -> anyhow::Result<()> {
       |
     7 | print(missing)
       |       ^^^^^^^
+      |
     info: rule `unresolved-reference` was selected in script metadata
 
     Found 1 diagnostic
@@ -136,6 +137,7 @@ fn python_version_diagnostics_identify_script_metadata() -> anyhow::Result<()> {
       |
     6 | PythonFinalizationError
       | ^^^^^^^^^^^^^^^^^^^^^^^
+      |
     info: `PythonFinalizationError` was added as a builtin in Python 3.13
     info: Python 3.12 was assumed when resolving types because it was specified in script metadata
      --> script.py:3:21
@@ -732,6 +734,7 @@ fn scripts_have_no_implicit_first_party_roots() -> anyhow::Result<()> {
       |
     6 | from layout_dependency import value as layout_value
       |      ^^^^^^^^^^^^^^^^^
+      |
     info: Searched in the following paths during module resolution:
     info:   1. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
@@ -741,6 +744,7 @@ fn scripts_have_no_implicit_first_party_roots() -> anyhow::Result<()> {
       |
     7 | from local_dependency import value as local_value
       |      ^^^^^^^^^^^^^^^^
+      |
     info: Searched in the following paths during module resolution:
     info:   1. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
@@ -750,6 +754,7 @@ fn scripts_have_no_implicit_first_party_roots() -> anyhow::Result<()> {
       |
     8 | from shared import value
       |      ^^^^^^
+      |
     info: Searched in the following paths during module resolution:
     info:   1. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
@@ -833,6 +838,7 @@ fn project_search_paths_do_not_apply_to_scripts() -> anyhow::Result<()> {
       |
     6 | from extra_only import value as extra
       |      ^^^^^^^^^^
+      |
     info: Searched in the following paths during module resolution:
     info:   1. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
@@ -842,6 +848,7 @@ fn project_search_paths_do_not_apply_to_scripts() -> anyhow::Result<()> {
       |
     7 | from project_only import value as project
       |      ^^^^^^^^^^^^
+      |
     info: Searched in the following paths during module resolution:
     info:   1. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
@@ -994,6 +1001,7 @@ fn scripts_do_not_use_an_inactive_project_environment() -> anyhow::Result<()> {
       |
     6 | from project_dependency import value
       |      ^^^^^^^^^^^^^^^^^^
+      |
     info: Searched in the following paths during module resolution:
     info:   1. vendored://stdlib (stdlib typeshed stubs vendored by ty)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
@@ -1155,6 +1163,7 @@ fn invalid_python_requirement_reports_configuration_error() -> anyhow::Result<()
       |
     3 | # requires-python = "<3.12"
       |                     ^^^^^^^
+      |
     info: Add a lower bound to indicate the minimum compatible Python version (e.g., `>=3.13`) or specify a version in `environment.python-version`.
 
     Found 1 diagnostic
@@ -1603,6 +1612,7 @@ mod uv_metadata {
            |
         11 | from indirect_module import value
            |      ^^^^^^^^^^^^^^^
+           |
         help: Declare `indirect-dependency` in the script's inline `dependencies` metadata
         info: See https://docs.astral.sh/uv/guides/scripts/#declaring-script-dependencies
 
@@ -1611,6 +1621,7 @@ mod uv_metadata {
            |
         12 | import indirect_module
            |        ^^^^^^^^^^^^^^^
+           |
         help: Declare `indirect-dependency` in the script's inline `dependencies` metadata
         info: See https://docs.astral.sh/uv/guides/scripts/#declaring-script-dependencies
 

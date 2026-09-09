@@ -6,4 +6,5 @@ PLC0414 Required import does not rename original package.
   |
 1 | from module import this as this
   |                    ^^^^^^^^^^^^
+  |
 help: Change required import or disable rule.

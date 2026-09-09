@@ -40,6 +40,7 @@ error[unsupported-bool-conversion]: Boolean conversion is not supported for type
    |
 15 | a < b < b
    | ^^^^^
+   |
 info: `__bool__` on `NotBoolable | Literal[False]` must be callable
 
 ```

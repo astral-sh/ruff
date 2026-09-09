@@ -8,6 +8,7 @@ error[F401][*]: `os` imported but unused
 1 | # cell 1
 2 | import os
   |        ^^
+  |
 help: Remove unused import: `os`
  ::: cell 1
   |

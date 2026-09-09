@@ -261,5 +261,6 @@ error[unsupported-bool-conversion]: Boolean conversion is not supported for type
   |
 5 | not NotBoolable()
   | ^^^^^^^^^^^^^^^^^
+  |
 info: `__bool__` on `NotBoolable` must be callable
 ```

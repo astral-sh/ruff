@@ -326,6 +326,7 @@ error[invalid-type-form]: List literals are not allowed in this context in a typ
    |
 74 | Bad82 = TypedDict("Bad82", {**kwargs, "foo": []})
    |                                              ^^
+   |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 
@@ -346,6 +347,7 @@ error[invalid-type-form]: List literals are not allowed in this context in a typ
    |
 77 | TypedDict("Bad82", {**kwargs, "foo": []})
    |                                      ^^
+   |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 
@@ -375,6 +377,7 @@ error[invalid-type-form]: Int literals are not allowed in this context in a type
    |
 89 | Bad10 = TypedDict("Bad10", {name: 42})
    |                                   ^^ Did you mean `typing.Literal[42]`?
+   |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 help: Wrap in `Literal[...]`
@@ -406,6 +409,7 @@ error[invalid-type-form]: Int literals are not allowed in this context in a type
    |
 93 | class Bad11(TypedDict("Bad11", {name: 42})): ...
    |                                       ^^ Did you mean `typing.Literal[42]`?
+   |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 help: Wrap in `Literal[...]`

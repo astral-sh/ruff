@@ -59,6 +59,7 @@ D208 [*] Docstring is over-indented
  9 |             Returns:
 10 |             """
    | ^
+   |
 help: Remove over-indentation
    |
 9  |             Returns:
@@ -74,6 +75,7 @@ D208 [*] Docstring is over-indented
 23 |     Returns:
 24 |                 """
    | ^
+   |
 help: Remove over-indentation
    |
 23 |     Returns:

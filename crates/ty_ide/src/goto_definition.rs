@@ -72,6 +72,7 @@ def outer():
            |
         17 |     return last
            |            ^^^^ Clicking here
+           |
         info: Found 2 definitions
           --> main.py:5:5
            |
@@ -101,6 +102,7 @@ def f(items):
           |
         4 |     return last
           |            ^^^^ Clicking here
+          |
         info: Found 1 definition
          --> main.py:3:7
           |
@@ -125,6 +127,7 @@ def f(items):
           |
         4 |     return last
           |            ^^^^ Clicking here
+          |
         info: Found 1 definition
          --> main.py:3:8
           |
@@ -179,6 +182,7 @@ def f(items):
           |
         7 | def test_use(resource): ...
           |              ^^^^^^^^ Clicking here
+          |
         info: Found 1 definition
          --> src/test_example.py:5:5
           |
@@ -201,6 +205,7 @@ def f(items):
           |
         2 | def function(parameter): ...
           |              ^^^^^^^^^ Clicking here
+          |
         info: Found 1 definition
          --> main.py:2:14
           |
@@ -222,6 +227,7 @@ def f(items):
           |
         2 | print(last)
           |       ^^^^ Clicking here
+          |
         info: Found 1 definition
          --> lib.py:1:3
           |
@@ -252,6 +258,7 @@ def outer(items):
           |
         8 |         return last
           |                ^^^^ Clicking here
+          |
         info: Found 2 definitions
          --> main.py:3:5
           |
@@ -278,6 +285,7 @@ def outer(items):
           |
         1 | from . import module_a
           |               ^^^^^^^^ Clicking here
+          |
         info: Found 1 definition
          --> mypackage/module_a.py:1:1
           |
@@ -302,6 +310,7 @@ def outer(items):
           |
         2 | x = module_a
           |     ^^^^^^^^ Clicking here
+          |
         info: Found 1 definition
          --> mypackage/module_a.py:1:1
           |
@@ -327,6 +336,7 @@ def outer(items):
           |
         2 | x = module_a
           |     ^^^^^^^^ Clicking here
+          |
         info: Found 1 definition
          --> mypackage/module_a.py:1:1
           |
@@ -369,6 +379,7 @@ def my_function(): ...
           |
         2 | from mymodule import my_function
           |      ^^^^^^^^ Clicking here
+          |
         info: Found 1 definition
          --> mymodule.py:1:1
           |
@@ -409,6 +420,7 @@ def my_function(): ...
           |
         3 | x = mymodule
           |     ^^^^^^^^ Clicking here
+          |
         info: Found 1 definition
          --> mymodule.py:1:1
           |
@@ -454,6 +466,7 @@ def other_function(): ...
           |
         3 | print(my_function())
           |       ^^^^^^^^^^^ Clicking here
+          |
         info: Found 1 definition
          --> mymodule.py:2:5
           |
@@ -489,6 +502,7 @@ def bar() -> None:
           |
         3 | bar()
           | ^^^ Clicking here
+          |
         info: Found 1 definition
          --> a/impl.py:2:5
           |
@@ -527,6 +541,7 @@ def other_function(): ...
           |
         2 | def my_function(): ...
           |     ^^^^^^^^^^^ Clicking here
+          |
         info: Found 1 definition
          --> mymodule.py:2:5
           |
@@ -582,6 +597,7 @@ def other_function(): ...
           |
         3 | print(my_function())
           |       ^^^^^^^^^^^ Clicking here
+          |
         info: Found 3 definitions
          --> mymodule.py:2:5
           |
@@ -639,6 +655,7 @@ class MyOtherClass:
           |
         3 | x = MyClass
           |     ^^^^^^^ Clicking here
+          |
         info: Found 1 definition
          --> mymodule.py:2:7
           |
@@ -681,6 +698,7 @@ class MyOtherClass:
           |
         2 | class MyClass:
           |       ^^^^^^^ Clicking here
+          |
         info: Found 1 definition
          --> mymodule.py:2:7
           |
@@ -730,6 +748,7 @@ class MyOtherClass:
           |
         3 | x = MyClass(0)
           |     ^^^^^^^ Clicking here
+          |
         info: Found 1 definition
          --> mymodule.py:2:7
           |
@@ -783,6 +802,7 @@ class MyOtherClass:
           |
         4 | x.action()
           |   ^^^^^^ Clicking here
+          |
         info: Found 1 definition
          --> mymodule.py:5:9
           |
@@ -825,6 +845,7 @@ class MyClass:
           |
         4 |     x.sound
           |       ^^^^^ Clicking here
+          |
         info: Found 1 definition
          --> mymodule.py:3:5
           |
@@ -858,12 +879,13 @@ COUNT: int
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
+        assert_snapshot!(test.goto_definition(), @"
         info[goto-definition]: Go to definition
          --> main.py:3:10
           |
         3 | mymodule.COUNT
           |          ^^^^^ Clicking here
+          |
         info: Found 1 definition
          --> mymodule.py:2:1
           |
@@ -916,6 +938,7 @@ class MyOtherClass:
           |
         3 | x = MyClass.action()
           |             ^^^^^^ Clicking here
+          |
         info: Found 1 definition
          --> mymodule.py:5:9
           |
@@ -954,6 +977,7 @@ class MyClass: ...
           |
         2 | from mymodule import MyClass
           |                      ^^^^^^^ Clicking here
+          |
         info: Found 1 definition
          --> mymodule.py:2:7
           |
@@ -986,6 +1010,7 @@ my_func(my_other_func(ab=5, y=2), 0)
           |
         5 | my_other_func(my_func(ab=5, y=2), 0)
           |                       ^^ Clicking here
+          |
         info: Found 1 definition
          --> main.py:2:13
           |
@@ -1018,6 +1043,7 @@ my_func(my_other_func(a<CURSOR>b=5, y=2), 0)
           |
         6 | my_func(my_other_func(ab=5, y=2), 0)
           |                       ^^ Clicking here
+          |
         info: Found 1 definition
          --> main.py:3:19
           |
@@ -1050,6 +1076,7 @@ my_func(my_other_func(ab=5, y=2), 0)
           |
         5 | my_other_func(my_func(ab=5, y=2), 0)
           |                       ^^ Clicking here
+          |
         info: Found 1 definition
          --> main.py:2:13
           |
@@ -1082,6 +1109,7 @@ my_func(my_other_func(a<CURSOR>b=5, y=2), 0)
           |
         6 | my_func(my_other_func(ab=5, y=2), 0)
           |                       ^^ Clicking here
+          |
         info: Found 1 definition
          --> main.py:3:19
           |
@@ -1128,6 +1156,7 @@ def ab(a: str): ...
           |
         4 | ab(1)
           | ^^ Clicking here
+          |
         info: Found 1 definition
          --> mymodule.py:2:5
           |
@@ -1174,6 +1203,7 @@ def ab(a: str): ...
           |
         4 | ab("hello")
           | ^^ Clicking here
+          |
         info: Found 1 definition
          --> mymodule.py:2:5
           |
@@ -1220,6 +1250,7 @@ def ab(a: int): ...
           |
         4 | ab(1, 2)
           | ^^ Clicking here
+          |
         info: Found 1 definition
          --> mymodule.py:2:5
           |
@@ -1266,6 +1297,7 @@ def ab(a: int): ...
           |
         4 | ab(1)
           | ^^ Clicking here
+          |
         info: Found 1 definition
          --> mymodule.py:2:5
           |
@@ -1315,6 +1347,7 @@ def ab(a: int, *, c: int): ...
           |
         4 | ab(1, b=2)
           | ^^ Clicking here
+          |
         info: Found 1 definition
          --> mymodule.py:2:5
           |
@@ -1364,6 +1397,7 @@ def ab(a: int, *, c: int): ...
           |
         4 | ab(1, c=2)
           | ^^ Clicking here
+          |
         info: Found 1 definition
          --> mymodule.py:2:5
           |
@@ -1397,6 +1431,7 @@ a <CURSOR>+ b
            |
         10 | a + b
            |   ^ Clicking here
+           |
         info: Found 1 definition
          --> main.py:3:9
           |
@@ -1428,6 +1463,7 @@ B() <CURSOR>+ A()
           |
         8 | B() + A()
           |     ^ Clicking here
+          |
         info: Found 1 definition
          --> main.py:3:9
           |
@@ -1461,6 +1497,7 @@ a<CURSOR>+b
            |
         10 | a+b
            |  ^ Clicking here
+           |
         info: Found 1 definition
          --> main.py:3:9
           |
@@ -1494,6 +1531,7 @@ a+<CURSOR>b
            |
         10 | a+b
            |   ^ Clicking here
+           |
         info: Found 1 definition
          --> main.py:8:1
           |
@@ -1546,6 +1584,7 @@ a = Test()
           |
         7 | ~a
           | ^ Clicking here
+          |
         info: Found 1 definition
          --> main.py:3:9
           |
@@ -1577,6 +1616,7 @@ a = Test()
           |
         7 | ~a
           | ^ Clicking here
+          |
         info: Found 1 definition
          --> main.py:3:9
           |
@@ -1607,6 +1647,7 @@ a = Test()
           |
         7 | ~ a
           | ^ Clicking here
+          |
         info: Found 1 definition
          --> main.py:3:9
           |
@@ -1637,6 +1678,7 @@ a = Test()
           |
         7 | -a
           |  ^ Clicking here
+          |
         info: Found 1 definition
          --> main.py:5:1
           |
@@ -1667,6 +1709,7 @@ a = Test()
           |
         7 | not a
           | ^^^ Clicking here
+          |
         info: Found 1 definition
          --> main.py:3:9
           |
@@ -1697,6 +1740,7 @@ a = Test()
           |
         7 | not a
           | ^^^ Clicking here
+          |
         info: Found 1 definition
          --> main.py:3:9
           |
@@ -1731,6 +1775,7 @@ a = Test()
           |
         8 | not a
           | ^^^ Clicking here
+          |
         info: Found 1 definition
          --> main.py:3:9
           |
@@ -1765,6 +1810,7 @@ a = Test()
           |
         7 | not a
           | ^^^ Clicking here
+          |
         info: Found 1 definition
          --> main.py:3:9
           |
@@ -1790,6 +1836,7 @@ a: float<CURSOR> = 3.14
            |
         LL | a: float = 3.14
            |    ^^^^^ Clicking here
+           |
         info: Found 2 definitions
           --> stdlib/builtins.pyi:LL:7
            |
@@ -1820,6 +1867,7 @@ a: complex<CURSOR> = 3.14
            |
         LL | a: complex = 3.14
            |    ^^^^^^^ Clicking here
+           |
         info: Found 3 definitions
           --> stdlib/builtins.pyi:LL:7
            |
@@ -1876,6 +1924,7 @@ x = MyClass<CURSOR>()
           |
         5 | x = MyClass()
           |     ^^^^^^^ Clicking here
+          |
         info: Found 1 definition
          --> main.py:3:9
           |
@@ -1905,6 +1954,7 @@ x = MyClass(<CURSOR>)
           |
         5 | x = MyClass()
           |     ^^^^^^^ Clicking here
+          |
         info: Found 1 definition
          --> main.py:3:9
           |
@@ -1960,6 +2010,7 @@ x = MyClass(foo<CURSOR>)
           |
         7 | x = MyClass(foo)
           |             ^^^ Clicking here
+          |
         info: Found 1 definition
          --> main.py:2:1
           |
@@ -1992,6 +2043,7 @@ x = MyClass<CURSOR>()
           |
         7 | x = MyClass()
           |     ^^^^^^^ Clicking here
+          |
         info: Found 2 definitions
          --> main.py:3:9
           |
@@ -2023,6 +2075,7 @@ x = DynCla<CURSOR>ss()
           |
         4 | x = DynClass()
           |     ^^^^^^^^ Clicking here
+          |
         info: Found 1 definition
          --> main.py:2:1
           |
@@ -2055,6 +2108,7 @@ x = DynClass<CURSOR>()
            |
         LL | x = DynClass()
            |     ^^^^^^^^ Clicking here
+           |
         info: Found 1 definition
           --> stdlib/builtins.pyi:LL:9
            |
@@ -2101,6 +2155,7 @@ p = Poi<CURSOR>nt(1, 2)
           |
         6 | p = Point(1, 2)
           |     ^^^^^ Clicking here
+          |
         info: Found 1 definition
          --> main.py:4:1
           |
@@ -2137,6 +2192,7 @@ p = Point<CURSOR>(1, 2)
           |
         6 | p = Point(1, 2)
           |     ^^^^^ Clicking here
+          |
         info: Found 1 definition
          --> main.py:4:1
           |
@@ -2169,6 +2225,7 @@ p = Point<CURSOR>(1, 2)
           |
         6 | print(a)
           |       ^ Clicking here
+          |
         info: Found 3 definitions
          --> main.py:2:1
           |
@@ -2208,6 +2265,7 @@ p = Point<CURSOR>(1, 2)
           |
         8 | test.a
           |      ^ Clicking here
+          |
         info: Found 2 definitions
          --> main.py:3:5
           |
@@ -2246,6 +2304,7 @@ p = Point<CURSOR>(1, 2)
            |
         13 | test.a
            |      ^ Clicking here
+           |
         info: Found 2 definitions
          --> main.py:4:9
           |
@@ -2279,6 +2338,7 @@ p = Point<CURSOR>(1, 2)
            |
         LL | Foo.__dictoffset__
            |     ^^^^^^^^^^^^^^ Clicking here
+           |
         info: Found 1 definition
           --> stdlib/builtins.pyi:LL:9
            |
@@ -2309,6 +2369,7 @@ p = Point<CURSOR>(1, 2)
           |
         6 | Bar.a
           |     ^ Clicking here
+          |
         info: Found 1 definition
          --> main.py:3:5
           |
@@ -2363,6 +2424,7 @@ p = Point<CURSOR>(1, 2)
            |
         LL | type.__dictoffset__
            |      ^^^^^^^^^^^^^^ Clicking here
+           |
         info: Found 1 definition
           --> stdlib/builtins.pyi:LL:9
            |
@@ -2392,6 +2454,7 @@ while True:
           |
         5 |     variable
           |     ^^^^^^^^ Clicking here
+          |
         info: Found 1 definition
          --> main.py:3:5
           |
@@ -2423,6 +2486,7 @@ TD(f<CURSOR>=1)
           |
         8 | TD(f=1)
           |    ^ Clicking here
+          |
         info: Found 1 definition
          --> main.py:5:5
           |
@@ -2455,6 +2519,7 @@ td.update(f<CURSOR>=2)
           |
         9 | td.update(f=2)
           |           ^ Clicking here
+          |
         info: Found 1 definition
          --> main.py:5:5
           |
@@ -2488,6 +2553,7 @@ func(f<CURSOR>=1)
            |
         10 | func(f=1)
            |      ^ Clicking here
+           |
         info: Found 1 definition
          --> main.py:5:5
           |
@@ -2519,6 +2585,7 @@ NT(f<CURSOR>=1)
           |
         8 | NT(f=1)
           |    ^ Clicking here
+          |
         info: Found 1 definition
          --> main.py:5:5
           |
@@ -2551,6 +2618,7 @@ DC(f<CURSOR>=1)
           |
         9 | DC(f=1)
           |    ^ Clicking here
+          |
         info: Found 1 definition
          --> main.py:6:5
           |
@@ -2585,6 +2653,7 @@ DC(f<CURSOR>=1)
            |
         11 | DC(f=1)
            |    ^ Clicking here
+           |
         info: Found 1 definition
          --> main.py:9:24
           |
@@ -2620,6 +2689,7 @@ DC(g<CURSOR>=1)
            |
         12 | DC(g=1)
            |    ^ Clicking here
+           |
         info: Found 1 definition
           --> main.py:10:5
            |
@@ -2649,6 +2719,7 @@ for x in range(10):
           |
         5 |     variable
           |     ^^^^^^^^ Clicking here
+          |
         info: Found 1 definition
          --> main.py:3:5
           |
@@ -2681,6 +2752,7 @@ class Bar(Foo):
           |
         8 |         super().__init__(x)
           |                 ^^^^^^^^ Clicking here
+          |
         info: Found 1 definition
          --> main.py:3:9
           |
@@ -2714,6 +2786,7 @@ class GenericFoo[T](Base):
           |
         8 |         super().__init__(x)
           |                 ^^^^^^^^ Clicking here
+          |
         info: Found 1 definition
          --> main.py:3:9
           |

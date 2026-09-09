@@ -966,11 +966,13 @@ error[invalid-argument-type]: Argument to bound method `BytesCaller.__call__` is
    |
 21 |     f(None)
    |       ^^^^ Expected `bytes`, found `None`
+   |
 info: Method defined here
   --> src/mdtest_snippet.py:13:9
    |
 13 |     def __call__(self, x: bytes) -> bytes:
    |         ^^^^^^^^       -------- Parameter declared here
+   |
 info: Union variant `BytesCaller` is incompatible with this call site
 info: Attempted to call union type `(IntCaller & StrCaller) | BytesCaller`
 
@@ -980,11 +982,13 @@ error[invalid-argument-type]: Argument to bound method `IntCaller.__call__` is i
    |
 21 |     f(None)
    |       ^^^^ Expected `int`, found `None`
+   |
 info: Method defined here
  --> src/mdtest_snippet.py:5:9
   |
 5 |     def __call__(self, x: int) -> int:
   |         ^^^^^^^^       ------ Parameter declared here
+  |
 info: Intersection element `IntCaller` is incompatible with this call site
 info: Attempted to call intersection type `IntCaller & StrCaller`
 info: Attempted to call union type `(IntCaller & StrCaller) | BytesCaller`
@@ -995,11 +999,13 @@ error[invalid-argument-type]: Argument to bound method `StrCaller.__call__` is i
    |
 21 |     f(None)
    |       ^^^^ Expected `str`, found `None`
+   |
 info: Method defined here
  --> src/mdtest_snippet.py:9:9
   |
 9 |     def __call__(self, x: str) -> str:
   |         ^^^^^^^^       ------ Parameter declared here
+  |
 info: Intersection element `StrCaller` is incompatible with this call site
 info: Attempted to call intersection type `IntCaller & StrCaller`
 info: Attempted to call union type `(IntCaller & StrCaller) | BytesCaller`
@@ -1039,11 +1045,13 @@ error[invalid-argument-type]: Argument to `UsesInit.__init__` is incorrect
    |
 20 |         constructor(None)
    |                     ^^^^ Expected `int`, found `None`
+   |
 info: Method defined here
  --> src/mdtest_snippet.py:4:9
   |
 4 |     def __init__(self, value: int) -> None: ...
   |         ^^^^^^^^       ---------- Parameter declared here
+  |
 info: Intersection element `bound method UsesInit.__init__(value: int) -> None` is incompatible with this call site
 info: Attempted to call intersection type `type[UsesInit] & type[UsesNew]`
 info: Attempted to call union type `(type[UsesInit] & type[UsesNew]) | type[UsesBytes]`
@@ -1077,11 +1085,13 @@ error[invalid-argument-type]: Argument to bound method `IntCaller.__call__` is i
    |
 14 |     value(None)
    |           ^^^^ Expected `int`, found `None`
+   |
 info: Method defined here
  --> src/mdtest_snippet.py:4:9
   |
 4 |     def __call__(self, value: int) -> None: ...
   |         ^^^^^^^^       ---------- Parameter declared here
+  |
 info: Intersection element `IntCaller` is incompatible with this call site
 info: Attempted to call intersection type `IntCaller & Required & ~Excluded`
 info: Attempted to call union type `(IntCaller & Required & ~Excluded) | AcceptsNone`
@@ -1114,11 +1124,13 @@ error[invalid-argument-type]: Argument to bound method `IntCaller.__call__` is i
    |
 13 |     value(None)
    |           ^^^^ Expected `int`, found `None`
+   |
 info: Method defined here
  --> src/mdtest_snippet.py:4:9
   |
 4 |     def __call__(self, value: int) -> None: ...
   |         ^^^^^^^^       ---------- Parameter declared here
+  |
 info: Union variant `IntCaller & ~Excluded` is incompatible with this call site
 info: Attempted to call union type `(IntCaller & ~Excluded) | AcceptsNone`
 ```

@@ -28,6 +28,7 @@ RET503 [*] Missing explicit `return` at the end of function able to return non-`
 29 | |     else:
 30 | |         return 2
    | |________________^
+   |
 help: Add explicit `return` statement
    |
 30 |         return 2
@@ -45,6 +46,7 @@ RET503 [*] Missing explicit `return` at the end of function able to return non-`
 36 | |
 37 | |     print()  # error
    | |___________^
+   |
 help: Add explicit `return` statement
    |
 37 |     print()  # error
@@ -82,6 +84,7 @@ RET503 [*] Missing explicit `return` at the end of function able to return non-`
 52 | |     else:
 53 | |         print()  # error
    | |_______________^
+   |
 help: Add explicit `return` statement
    |
 53 |         print()  # error
@@ -99,6 +102,7 @@ RET503 [*] Missing explicit `return` at the end of function able to return non-`
 59 | |         return False
 60 | |     no_such_function()  # error
    | |______________________^
+   |
 help: Add explicit `return` statement
    |
 60 |     no_such_function()  # error
@@ -116,6 +120,7 @@ RET503 [*] Missing explicit `return` at the end of function able to return non-`
 66 | |         return False
 67 | |     print("", end="")  # error
    | |_____________________^
+   |
 help: Add explicit `return` statement
    |
 67 |     print("", end="")  # error
@@ -134,6 +139,7 @@ RET503 [*] Missing explicit `return` at the end of function able to return non-`
 85 | |             return 1
 86 | |         y += 1
    | |______________^
+   |
 help: Add explicit `return` statement
    |
 86 |         y += 1
@@ -152,6 +158,7 @@ RET503 [*] Missing explicit `return` at the end of function able to return non-`
 116 | |             break
 117 | |         return z
     | |________________^
+    |
 help: Add explicit `return` statement
     |
 117 |         return z
@@ -172,6 +179,7 @@ RET503 [*] Missing explicit `return` at the end of function able to return non-`
 126 | |             return z
 127 | |         return None
     | |___________________^
+    |
 help: Add explicit `return` statement
     |
 127 |         return None
@@ -189,6 +197,7 @@ RET503 [*] Missing explicit `return` at the end of function able to return non-`
 133 | |             continue
 134 | |         return z
     | |________________^
+    |
 help: Add explicit `return` statement
     |
 134 |         return z
@@ -209,6 +218,7 @@ RET503 [*] Missing explicit `return` at the end of function able to return non-`
 143 | |             return z
 144 | |         return None
     | |___________________^
+    |
 help: Add explicit `return` statement
     |
 144 |         return None
@@ -227,6 +237,7 @@ RET503 [*] Missing explicit `return` at the end of function able to return non-`
 275 | |     for value in values:
 276 | |         print(value)
     | |____________________^
+    |
 help: Add explicit `return` statement
     |
 276 |         print(value)
@@ -246,6 +257,7 @@ RET503 [*] Missing explicit `return` at the end of function able to return non-`
 291 | |         case 1:
 292 | |             print()  # error
     | |___________________^
+    |
 help: Add explicit `return` statement
     |
 292 |             print()  # error
@@ -262,6 +274,7 @@ RET503 [*] Missing explicit `return` at the end of function able to return non-`
 301 | |         if True:
 302 | |             return ""
     | |_____________________^
+    |
 help: Add explicit `return` statement
     |
 302 |             return ""
@@ -277,6 +290,7 @@ RET503 [*] Missing explicit `return` at the end of function able to return non-`
 306 | |         if True:
 307 | |             return ""
     | |_____________________^
+    |
 help: Add explicit `return` statement
     |
 307 |             return ""
@@ -292,6 +306,7 @@ RET503 [*] Missing explicit `return` at the end of function able to return non-`
 311 | |         if True:
 312 | |             return ""  # type: ignore
     | |_____________________^
+    |
 help: Add explicit `return` statement
     |
 312 |             return ""  # type: ignore
@@ -307,6 +322,7 @@ RET503 [*] Missing explicit `return` at the end of function able to return non-`
 316 | |         if True:
 317 | |             return ""  ;
     | |_____________________^
+    |
 help: Add explicit `return` statement
     |
 317 |             return ""  ;
@@ -340,6 +356,7 @@ RET503 [*] Missing explicit `return` at the end of function able to return non-`
 328 | |         return 1
 329 | |     x = 2 \
     | |_________^
+    |
 help: Add explicit `return` statement
     |
 330 |
@@ -358,6 +375,7 @@ RET503 [*] Missing explicit `return` at the end of function able to return non-`
 402 | |         with c:
 403 | |             d
     | |_____________^
+    |
 help: Add explicit `return` statement
     |
 403 |             d
@@ -378,6 +396,7 @@ RET503 [*] Missing explicit `return` at the end of function able to return non-`
 417 | |         return 5
 418 | |     bar()
     | |_________^
+    |
 help: Add explicit `return` statement
     |
 417 |         return 5

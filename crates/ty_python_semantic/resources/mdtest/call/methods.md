@@ -616,6 +616,7 @@ error[missing-argument]: No argument provided for required parameter `arg` of fu
    |
 18 | class MissingArg(RequiresArg): ...
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
 info: Parameter declared here
   --> src/mdtest_snippet.py:13:32
    |
@@ -635,6 +636,7 @@ error[invalid-argument-type]: Argument to function `RequiresArg.__init_subclass_
    |
 20 | class InvalidType(RequiresArg, arg="foo"): ...
    |                                ^^^^^^^^^ Expected `int`, found `Literal["foo"]`
+   |
 info: Function defined here
   --> src/mdtest_snippet.py:13:9
    |
@@ -664,6 +666,7 @@ error[missing-argument]: No argument provided for required parameter `arg` of fu
    |
 24 | class IncorrectArg(RequiresArg, not_arg="foo"):
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
 info: Parameter declared here
   --> src/mdtest_snippet.py:13:32
    |
@@ -676,6 +679,7 @@ error[unknown-argument]: Argument `not_arg` does not match any known parameter o
    |
 24 | class IncorrectArg(RequiresArg, not_arg="foo"):
    |                                 ^^^^^^^^^^^^^
+   |
 info: Function signature here
   --> src/mdtest_snippet.py:13:9
    |
@@ -704,6 +708,7 @@ error[non-callable-init-subclass]: Invalid definition of class `Bad`
 38 | # snapshot: non-callable-init-subclass
 39 | class Bad(NotCallableInitSubclass):
    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Superclass `NotCallableInitSubclass` cannot be subclassed
+   |
 info: `__init_subclass__` on a superclass is implicitly called during creation of a class object
 info: See https://docs.python.org/3/reference/datamodel.html#customizing-class-creation
 ```

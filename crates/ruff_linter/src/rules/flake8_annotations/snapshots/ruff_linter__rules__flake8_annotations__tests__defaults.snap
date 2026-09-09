@@ -317,6 +317,7 @@ ANN201 [*] Missing return type annotation for public function `quoted_escape`
 171 | # should not cause a stack overflow.
 172 | def quoted_escape(x: "'in\x74'"): pass
     |     ^^^^^^^^^^^^^
+    |
 help: Add return type annotation: `None`
     |
 171 | # should not cause a stack overflow.

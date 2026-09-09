@@ -384,6 +384,7 @@ error[invalid-context-manager]: Object of type `Manager | NotAManager` cannot be
    |
 12 |     async with manager as value:
    |                ^^^^^^^
+   |
 info: `NotAManager` does not implement `__aenter__` or `__aexit__`
 info: `__aenter__` returns `int`, which is not awaitable
 info: `__aexit__` returns `bool`, which is not awaitable
@@ -448,6 +449,7 @@ error[invalid-context-manager]: Object of type `Manager` cannot be used with `as
   |
 7 |     async with Manager():
   |                ^^^^^^^^^
+  |
 info: Objects of type `Manager` can be used as sync context managers
 info: Consider using `with` here
 ```
@@ -507,6 +509,7 @@ error[invalid-context-manager]: Object of type `Manager` cannot be used with `as
   |
 9 |     async with Manager():
   |                ^^^^^^^^^
+  |
 info: `__aenter__` returns `int`, which is not awaitable
 info: Consider declaring the method with `async def`
 ```
@@ -551,6 +554,7 @@ error[invalid-context-manager]: Object of type `Manager` cannot be used with `as
   |
 7 |     async with Manager():
   |                ^^^^^^^^^
+  |
 info: `__aenter__` returns `int`, which is not awaitable
 info: Consider declaring the method with `async def`
 ```
@@ -576,6 +580,7 @@ error[invalid-context-manager]: Object of type `Manager` cannot be used with `as
   |
 7 |     async with Manager():
   |                ^^^^^^^^^
+  |
 info: `__aexit__` returns `bool`, which is not awaitable
 info: Consider declaring the method with `async def`
 ```

@@ -8,6 +8,7 @@ E731 [*] Do not assign a `lambda` expression, use a `def`
 2 |     # E731
 3 |     f = lambda x: 2 * x
   |     ^^^^^^^^^^^^^^^^^^^
+  |
 help: Rewrite `f` as a `def`
   |
 2 |     # E731
@@ -25,6 +26,7 @@ E731 [*] Do not assign a `lambda` expression, use a `def`
 7 |     # E731
 8 |     f = lambda x: 2 * x
   |     ^^^^^^^^^^^^^^^^^^^
+  |
 help: Rewrite `f` as a `def`
    |
 7  |     # E731
@@ -42,6 +44,7 @@ E731 [*] Do not assign a `lambda` expression, use a `def`
 13 |     while False:
 14 |         this = lambda y, z: 2 * x
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
 help: Rewrite `this` as a `def`
    |
 13 |     while False:
@@ -59,6 +62,7 @@ E731 [*] Do not assign a `lambda` expression, use a `def`
 18 |     # E731
 19 |     f = lambda: (yield 1)
    |     ^^^^^^^^^^^^^^^^^^^^^
+   |
 help: Rewrite `f` as a `def`
    |
 18 |     # E731
@@ -76,6 +80,7 @@ E731 [*] Do not assign a `lambda` expression, use a `def`
 23 |     # E731
 24 |     f = lambda: (yield from g())
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
 help: Rewrite `f` as a `def`
    |
 23 |     # E731
@@ -93,6 +98,7 @@ E731 [*] Do not assign a `lambda` expression, use a `def`
 56 |     # E731
 57 |     f = lambda x: 2 * x
    |     ^^^^^^^^^^^^^^^^^^^
+   |
 help: Rewrite `f` as a `def`
    |
 56 |     # E731
@@ -149,6 +155,7 @@ E731 [*] Do not assign a `lambda` expression, use a `def`
 85 |     P = ParamSpec("P")
 86 |     f: Callable[P, int] = lambda *args: len(args)
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
 help: Rewrite `f` as a `def`
    |
 85 |     P = ParamSpec("P")
@@ -166,6 +173,7 @@ E731 [*] Do not assign a `lambda` expression, use a `def`
 93 |
 94 |     f: Callable[[], None] = lambda: None
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
 help: Rewrite `f` as a `def`
    |
 93 |
@@ -183,6 +191,7 @@ E731 [*] Do not assign a `lambda` expression, use a `def`
 101 |
 102 |     f: Callable[..., None] = lambda a, b: None
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
 help: Rewrite `f` as a `def`
     |
 101 |
@@ -200,6 +209,7 @@ E731 [*] Do not assign a `lambda` expression, use a `def`
 109 |
 110 |     f: Callable[[int], int] = lambda x: 2 * x
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
 help: Rewrite `f` as a `def`
     |
 109 |
@@ -217,6 +227,7 @@ E731 [*] Do not assign a `lambda` expression, use a `def`
 118 |
 119 |     f: Callable[[str, int], str] = lambda a, b: a * b
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
 help: Rewrite `f` as a `def`
     |
 118 |
@@ -234,6 +245,7 @@ E731 [*] Do not assign a `lambda` expression, use a `def`
 126 |
 127 |     f: Callable[[str, int], tuple[str, int]] = lambda a, b: (a, b)
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
 help: Rewrite `f` as a `def`
     |
 126 |
@@ -251,6 +263,7 @@ E731 [*] Do not assign a `lambda` expression, use a `def`
 134 |
 135 |     f: Callable[[str, int, list[str]], list[str]] = lambda a, b, /, c: [*c, a * b]
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
 help: Rewrite `f` as a `def`
     |
 134 |
@@ -286,6 +299,7 @@ E731 [*] Do not assign a `lambda` expression, use a `def`
 139 |     CELSIUS = (lambda deg_c: deg_c)
 140 |     FAHRENHEIT = (lambda deg_c: deg_c * 9 / 5 + 32)
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
 help: Rewrite `FAHRENHEIT` as a `def`
     |
 139 |     CELSIUS = (lambda deg_c: deg_c)
@@ -305,6 +319,7 @@ E731 [*] Do not assign a `lambda` expression, use a `def`
 148 | |         i := 1,
 149 | |     )
     | |_____^
+    |
 help: Rewrite `f` as a `def`
     |
 146 |
@@ -489,6 +504,7 @@ E731 [*] Do not assign a `lambda` expression, use a `def`
 200 |     f1: Callable[P, str] = lambda x: str(x)
 201 |     f2: Callable[..., str] = lambda x: str(x)
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
 help: Rewrite `f2` as a `def`
     |
 200 |     f1: Callable[P, str] = lambda x: str(x)

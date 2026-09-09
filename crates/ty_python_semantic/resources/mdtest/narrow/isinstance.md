@@ -125,6 +125,7 @@ error[invalid-argument-type]: Invalid second argument to `isinstance`
   |        ^^^^^^^^^^^^^^---------------^
   |                      |
   |                      This `UnionType` instance contains non-class elements
+  |
 info: A `UnionType` instance can only be used as the second argument to `isinstance` if all elements are class objects
 info: Element `<class 'list[int]'>` in the union is not a class object
 ```
@@ -143,6 +144,7 @@ error[invalid-argument-type]: Invalid second argument to `isinstance`
   |          ^^^^^^^^^^^^^^-------------------------------^
   |                        |
   |                        This `UnionType` instance contains non-class elements
+  |
 info: A `UnionType` instance can only be used as the second argument to `isinstance` if all elements are class objects
 info: Elements `<special-form 'Literal[42]'>` and `<class 'list[int]'>` in the union are not class objects
 ```
@@ -161,6 +163,7 @@ error[invalid-argument-type]: Invalid second argument to `isinstance`
    |          ^^^^^^^^^^^^^^----------------------------^
    |                        |
    |                        This `UnionType` instance contains non-class elements
+   |
 info: A `UnionType` instance can only be used as the second argument to `isinstance` if all elements are class objects
 info: Element `<special-form 'typing.Any'>` in the union, and 2 more elements, are not class objects
 ```
@@ -189,6 +192,7 @@ error[invalid-argument-type]: Invalid second argument to `isinstance`
    |        ^^^^^^^^^^^^^^^^^^^^-----------------^^
    |                            |
    |                            This `UnionType` instance contains non-class elements
+   |
 info: A `UnionType` instance can only be used as the second argument to `isinstance` if all elements are class objects
 info: Element `<class 'list[int]'>` in the union is not a class object
 ```
@@ -212,6 +216,7 @@ error[invalid-argument-type]: Invalid second argument to `isinstance`
    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^-----------------^^^
    |                                  |
    |                                  This `UnionType` instance contains non-class elements
+   |
 info: A `UnionType` instance can only be used as the second argument to `isinstance` if all elements are class objects
 info: Element `<class 'list[int]'>` in the union is not a class object
 ```
@@ -235,6 +240,7 @@ error[invalid-argument-type]: Invalid second argument to `isinstance`
    |
 31 |     if isinstance(x, classes):
    |        ^^^^^^^^^^^^^^^^^^^^^^
+   |
 info: A `UnionType` instance can only be used as the second argument to `isinstance` if all elements are class objects
 info: Element `<class 'list[int]'>` in the union `list[int] | bytes` is not a class object
 ```

@@ -8,4 +8,5 @@ F811 Redefinition of unused `FU` from line 1
   |              --         ^^ `FU` redefined here
   |              |
   |              previous definition of `FU` here
+  |
 help: Remove definition: `FU`

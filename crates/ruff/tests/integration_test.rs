@@ -120,6 +120,7 @@ fn stdin_error() {
       |
     1 | import os
       |        ^^
+      |
     help: Remove unused import: `os`
       |
       - import os
@@ -147,6 +148,7 @@ fn stdin_filename() {
       |
     1 | import os
       |        ^^
+      |
     help: Remove unused import: `os`
       |
       - import os
@@ -185,6 +187,7 @@ import bar   # unused import
       |
     2 | import bar   # unused import
       |        ^^^
+      |
     help: Remove unused import: `bar`
       |
     1 |
@@ -196,6 +199,7 @@ import bar   # unused import
       |
     2 | import foo   # unused import
       |        ^^^
+      |
     help: Remove unused import: `foo`
       |
     1 |
@@ -227,6 +231,7 @@ fn check_warn_stdin_filename_with_files() {
       |
     1 | import os
       |        ^^
+      |
     help: Remove unused import: `os`
       |
       - import os
@@ -256,6 +261,7 @@ fn stdin_source_type_py() {
       |
     1 | import os
       |        ^^
+      |
     help: Remove unused import: `os`
       |
       - import os
@@ -594,6 +600,7 @@ fn stdin_override_parser_ipynb() {
       |
     1 | import os
       |        ^^
+      |
     help: Remove unused import: `os`
      ::: cell 1
       |
@@ -605,6 +612,7 @@ fn stdin_override_parser_ipynb() {
       |
     1 | import sys
       |        ^^^
+      |
     help: Remove unused import: `sys`
      ::: cell 3
       |
@@ -638,6 +646,7 @@ fn stdin_override_parser_py() {
       |
     1 | import os
       |        ^^
+      |
     help: Remove unused import: `os`
       |
       - import os
@@ -675,6 +684,7 @@ extension = {ipynb="python"}
       |
     1 | import os
       |        ^^
+      |
     help: Remove unused import: `os`
       |
       - import os
@@ -1853,6 +1863,7 @@ fn check_input_from_argfile() -> Result<()> {
           |
         1 | import os
           |        ^^
+          |
         help: Remove unused import: `os`
           |
           - import os
@@ -2484,6 +2495,7 @@ select = ["RUF017"]
     2 | y = [4, 5, 6]
     3 | sum([x, y], [])
       | ^^^^^^^^^^^^^^^
+      |
     help: Replace with `functools.reduce`
 
     Found 1 error.
@@ -2524,6 +2536,7 @@ unfixable = ["RUF"]
     2 | y = [4, 5, 6]
     3 | sum([x, y], [])
       | ^^^^^^^^^^^^^^^
+      |
     help: Replace with `functools.reduce`
 
     Found 1 error.

@@ -54,6 +54,7 @@ error[invalid-return-type]: Function always implicitly returns `None`, which is 
    |
 11 | def f(cond: bool) -> int:
    |                      ^^^
+   |
 info: Consider changing the return annotation to `-> None` or adding a `return` statement
 
 ```

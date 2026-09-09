@@ -138,6 +138,7 @@ error[invalid-generic-class]: Cannot both inherit from subscripted `Protocol` an
    |
 32 |     Protocol[T1, T2, DefaultStrT, T3],
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
 help: Remove the type parameters from the `Protocol` base
    |
 31 |     # error: [invalid-generic-class]

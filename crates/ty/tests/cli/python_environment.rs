@@ -35,6 +35,7 @@ fn config_override_python_version() -> anyhow::Result<()> {
       |
     5 | print(sys.last_exc)
       |       ^^^^^^^^^^^^
+      |
     info: The member may be available on other Python versions or platforms
     info: Python 3.11 was assumed when resolving the `last_exc` attribute
      --> pyproject.toml:3:18
@@ -141,6 +142,7 @@ fn config_file_annotation_showing_where_python_version_set_typing_error() -> any
       |
     2 | PythonFinalizationError
       | ^^^^^^^^^^^^^^^^^^^^^^^
+      |
     info: `PythonFinalizationError` was added as a builtin in Python 3.13
     info: Python 3.12 was assumed when resolving types
      --> pyproject.toml:3:18
@@ -162,6 +164,7 @@ fn config_file_annotation_showing_where_python_version_set_typing_error() -> any
       |
     2 | PythonFinalizationError
       | ^^^^^^^^^^^^^^^^^^^^^^^
+      |
     info: `PythonFinalizationError` was added as a builtin in Python 3.13
     info: Python 3.12 was assumed when resolving types because it was specified on the command line
 
@@ -258,6 +261,7 @@ fn python_version_inferred_from_system_installation() -> anyhow::Result<()> {
       |
     1 | PythonFinalizationError
       | ^^^^^^^^^^^^^^^^^^^^^^^
+      |
     info: `PythonFinalizationError` was added as a builtin in Python 3.13
     info: Python 3.12 was assumed when resolving types because of the layout of your Python installation
     info: The primary `site-packages` directory of your installation was found at `lib/python3.12/site-packages/`
@@ -283,6 +287,7 @@ fn python_version_inferred_from_system_installation() -> anyhow::Result<()> {
       |
     1 | PythonFinalizationError
       | ^^^^^^^^^^^^^^^^^^^^^^^
+      |
     info: `PythonFinalizationError` was added as a builtin in Python 3.13
     info: Python 3.12 was assumed when resolving types because of the layout of your Python installation
     info: The primary `site-packages` directory of your installation was found at `lib/pypy3.12/site-packages/`
@@ -311,6 +316,7 @@ fn python_version_inferred_from_system_installation() -> anyhow::Result<()> {
       |
     1 | import string.templatelib
       |        ^^^^^^^^^^^^^^^^^^
+      |
     info: The stdlib module `string.templatelib` is only available on Python 3.14+
     info: Python 3.13 was assumed when resolving modules because of the layout of your Python installation
     info: The primary `site-packages` directory of your installation was found at `lib/python3.13t/site-packages/`
@@ -393,6 +399,7 @@ import colorama
       |
     1 | import foo
       |        ^^^
+      |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/project (first-party code)
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
@@ -404,6 +411,7 @@ import colorama
       |
     3 | import colorama
       |        ^^^^^^^^
+      |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/project (first-party code)
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
@@ -426,6 +434,7 @@ import colorama
       |
     2 | import bar
       |        ^^^
+      |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/project (first-party code)
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
@@ -437,6 +446,7 @@ import colorama
       |
     3 | import colorama
       |        ^^^^^^^^
+      |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/project (first-party code)
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
@@ -459,6 +469,7 @@ import colorama
       |
     2 | import bar
       |        ^^^
+      |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/project (first-party code)
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
@@ -470,6 +481,7 @@ import colorama
       |
     3 | import colorama
       |        ^^^^^^^^
+      |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/project (first-party code)
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
@@ -492,6 +504,7 @@ import colorama
       |
     2 | import bar
       |        ^^^
+      |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/project (first-party code)
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
@@ -503,6 +516,7 @@ import colorama
       |
     3 | import colorama
       |        ^^^^^^^^
+      |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/project (first-party code)
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
@@ -556,6 +570,7 @@ import bar",
       |
     1 | import foo
       |        ^^^
+      |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/ (first-party code)
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
@@ -602,6 +617,7 @@ fn lib64_site_packages_directory_on_unix() -> anyhow::Result<()> {
       |
     1 | import foo, bar, baz
       |                  ^^^
+      |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/ (first-party code)
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
@@ -645,6 +661,7 @@ fn many_search_paths() -> anyhow::Result<()> {
       |
     1 | import foo1, baz
       |              ^^^
+      |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/extra1 (extra search path specified on the CLI or in your config file)
     info:   2. <temp_dir>/extra2 (extra search path specified on the CLI or in your config file)
@@ -677,6 +694,7 @@ fn many_search_paths() -> anyhow::Result<()> {
       |
     1 | import foo1, baz
       |              ^^^
+      |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/extra1 (extra search path specified on the CLI or in your config file)
     info:   2. <temp_dir>/extra2 (extra search path specified on the CLI or in your config file)
@@ -711,6 +729,7 @@ fn many_search_paths() -> anyhow::Result<()> {
       |
     1 | import foo1, baz
       |              ^^^
+      |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/extra1 (extra search path specified on the CLI or in your config file)
     info:   2. <temp_dir>/extra2 (extra search path specified on the CLI or in your config file)
@@ -770,12 +789,14 @@ fn pyvenv_cfg_file_annotation_showing_where_python_version_set() -> anyhow::Resu
       |
     1 | PythonFinalizationError
       | ^^^^^^^^^^^^^^^^^^^^^^^
+      |
     info: `PythonFinalizationError` was added as a builtin in Python 3.13
     info: Python 3.12 was assumed when resolving types because of your virtual environment
      --> venv/pyvenv.cfg:2:11
       |
     2 | version = 3.12
       |           ^^^^ Virtual environment metadata
+      |
     info: No Python version was specified on the command line or in a configuration file
 
     Found 1 diagnostic
@@ -824,12 +845,14 @@ fn pyvenv_cfg_file_annotation_no_trailing_newline() -> anyhow::Result<()> {
       |
     1 | PythonFinalizationError
       | ^^^^^^^^^^^^^^^^^^^^^^^
+      |
     info: `PythonFinalizationError` was added as a builtin in Python 3.13
     info: Python 3.12 was assumed when resolving types because of your virtual environment
      --> venv/pyvenv.cfg:3:23
       |
     3 |             version = 3.12
       |                       ^^^^ Virtual environment metadata
+      |
     info: No Python version was specified on the command line or in a configuration file
 
     Found 1 diagnostic
@@ -871,6 +894,7 @@ fn config_file_annotation_showing_where_python_version_set_syntax_error() -> any
       |
     2 | match object():
       | ^^^^^
+      |
     info: Python 3.8 was assumed when parsing syntax
      --> pyproject.toml:3:19
       |
@@ -891,6 +915,7 @@ fn config_file_annotation_showing_where_python_version_set_syntax_error() -> any
       |
     2 | match object():
       | ^^^^^
+      |
     info: Python 3.9 was assumed when parsing syntax because it was specified on the command line
 
     Found 1 diagnostic
@@ -1184,6 +1209,7 @@ fn config_file_python_setting_directory_with_unsupported_python_version() -> any
       |
     2 | version_info = 3.16.0
       |                ^^^^^^
+      |
     info: Expected one of `3.7`, `3.8`, `3.9`, `3.10`, `3.11`, `3.12`, `3.13`, `3.14`, `3.15`.
     info: Set `environment.python-version` explicitly to override the inferred version.
     info: The version was inferred from your virtual environment metadata.
@@ -1268,6 +1294,7 @@ fn defaults_to_a_new_python_version() -> anyhow::Result<()> {
       |
     4 | os.grantpt(1) # only available on unix, Python 3.13 or newer
       | ^^^^^^^^^^
+      |
     info: The member may be available on other Python versions or platforms
     info: Python 3.10 was assumed when resolving the `grantpt` attribute
      --> ty.toml:3:18
@@ -1280,6 +1307,7 @@ fn defaults_to_a_new_python_version() -> anyhow::Result<()> {
       |
     6 | from typing import LiteralString  # added in Python 3.11
       |                    ^^^^^^^^^^^^^
+      |
     info: The member may be available on other Python versions or platforms
     info: Python 3.10 was assumed when resolving imports
      --> ty.toml:3:18
@@ -1702,6 +1730,7 @@ home = ./
       |
     2 | from package1 import ActiveVenv
       |      ^^^^^^^^
+      |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/project (first-party code)
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
@@ -1712,6 +1741,7 @@ home = ./
       |
     3 | from package1 import ChildConda
       |      ^^^^^^^^
+      |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/project (first-party code)
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
@@ -1722,6 +1752,7 @@ home = ./
       |
     4 | from package1 import WorkingVenv
       |      ^^^^^^^^
+      |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/project (first-party code)
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
@@ -1732,6 +1763,7 @@ home = ./
       |
     5 | from package1 import BaseConda
       |      ^^^^^^^^
+      |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/project (first-party code)
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
@@ -2073,6 +2105,7 @@ fn ty_environment_and_active_environment() -> anyhow::Result<()> {
       |
     2 | from ty_package import TyEnvClass
       |      ^^^^^^^^^^
+      |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/ (first-party code)
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
@@ -2191,6 +2224,7 @@ fn ty_system_environment_and_local_venv() -> anyhow::Result<()> {
       |
     3 | from system_package import SystemEnvClass
       |      ^^^^^^^^^^^^^^
+      |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/ (first-party code)
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
@@ -2383,6 +2417,7 @@ fn default_root_tests_package() -> anyhow::Result<()> {
       |
     3 | from bar import bar  # expected unresolved import
       |      ^^^
+      |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/src (first-party code)
     info:   2. <temp_dir>/ (first-party code)
@@ -2452,6 +2487,7 @@ fn default_root_python_package() -> anyhow::Result<()> {
       |
     3 | from bar import bar  # expected unresolved import
       |      ^^^
+      |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/src (first-party code)
     info:   2. <temp_dir>/ (first-party code)
@@ -2493,6 +2529,7 @@ fn default_root_python_package_pyi() -> anyhow::Result<()> {
       |
     3 | from bar import bar  # expected unresolved import
       |      ^^^
+      |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/src (first-party code)
     info:   2. <temp_dir>/ (first-party code)
@@ -2530,6 +2567,7 @@ fn pythonpath_is_respected() -> anyhow::Result<()> {
       |
     2 | import baz
       |        ^^^
+      |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/src (first-party code)
     info:   2. <temp_dir>/ (first-party code)
@@ -2582,6 +2620,7 @@ fn pythonpath_multiple_dirs_is_respected() -> anyhow::Result<()> {
       |
     2 | import baz
       |        ^^^
+      |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/src (first-party code)
     info:   2. <temp_dir>/ (first-party code)
@@ -2593,6 +2632,7 @@ fn pythonpath_multiple_dirs_is_respected() -> anyhow::Result<()> {
       |
     3 | import foo
       |        ^^^
+      |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/src (first-party code)
     info:   2. <temp_dir>/ (first-party code)

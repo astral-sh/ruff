@@ -9,6 +9,7 @@ FURB122 [*] Use of `f.write` in a for loop
 10 | /         for line in lines:
 11 | |             f.write(line)
    | |_________________________^
+   |
 help: Replace with `f.writelines`
    |
 9  |     with open("file", "w") as f:
@@ -26,6 +27,7 @@ FURB122 [*] Use of `f.write` in a for loop
 17 | /         for line in lines:
 18 | |             f.write(other_line)
    | |_______________________________^
+   |
 help: Replace with `f.writelines`
    |
 16 |     with Path("file").open("w") as f:
@@ -43,6 +45,7 @@ FURB122 [*] Use of `f.write` in a for loop
 23 | /         for line in lines:
 24 | |             f.write(line)
    | |_________________________^
+   |
 help: Replace with `f.writelines`
    |
 22 |     with Path("file").open("w") as f:
@@ -60,6 +63,7 @@ FURB122 [*] Use of `f.write` in a for loop
 29 | /         for line in lines:
 30 | |             f.write(line.encode())
    | |__________________________________^
+   |
 help: Replace with `f.writelines`
    |
 28 |     with Path("file").open("wb") as f:
@@ -77,6 +81,7 @@ FURB122 [*] Use of `f.write` in a for loop
 35 | /         for line in lines:
 36 | |             f.write(line.upper())
    | |_________________________________^
+   |
 help: Replace with `f.writelines`
    |
 34 |     with Path("file").open("w") as f:
@@ -94,6 +99,7 @@ FURB122 [*] Use of `f.write` in a for loop
 43 | /         for line in lines:
 44 | |             f.write(line)
    | |_________________________^
+   |
 help: Replace with `f.writelines`
    |
 42 |
@@ -112,6 +118,7 @@ FURB122 [*] Use of `f.write` in a for loop
 51 | |             # a really important comment
 52 | |             f.write(line)
    | |_________________________^
+   |
 help: Replace with `f.writelines`
    |
 49 |     with open("file","w") as f:
@@ -131,6 +138,7 @@ FURB122 [*] Use of `f.write` in a for loop
 57 | /         for () in a:
 58 | |             f.write(())
    | |_______________________^
+   |
 help: Replace with `f.writelines`
    |
 56 |     with open("file", "w") as f:
@@ -148,6 +156,7 @@ FURB122 [*] Use of `f.write` in a for loop
 63 | /         for a, b, c in d:
 64 | |             f.write((a, b))
    | |___________________________^
+   |
 help: Replace with `f.writelines`
    |
 62 |     with open("file", "w") as f:
@@ -165,6 +174,7 @@ FURB122 [*] Use of `f.write` in a for loop
 69 | /         for [(), [a.b], (c,)] in d:
 70 | |             f.write(())
    | |_______________________^
+   |
 help: Replace with `f.writelines`
    |
 68 |     with open("file", "w") as f:
@@ -182,6 +192,7 @@ FURB122 [*] Use of `f.write` in a for loop
 75 | /         for [([([a[b]],)],), [], (c[d],)] in e:
 76 | |             f.write(())
    | |_______________________^
+   |
 help: Replace with `f.writelines`
    |
 74 |     with open("file", "w") as f:
@@ -242,6 +253,7 @@ FURB122 [*] Use of `f.write` in a for loop
 96 | |         ):
 97 | |             f.write(f"{char}")
    | |______________________________^
+   |
 help: Replace with `f.writelines`
    |
 92 |     with open("file", "w") as f:
@@ -264,6 +276,7 @@ FURB122 [*] Use of `f.write` in a for loop
 183 | /         for l in lambda: 0:
 184 | |             f.write(f"[{l}]")
     | |_____________________________^
+    |
 help: Replace with `f.writelines`
     |
 182 |     with Path("file.txt").open("w", encoding="utf-8") as f:
@@ -281,6 +294,7 @@ FURB122 [*] Use of `f.write` in a for loop
 189 | /         for l in (1,) if True else (2,):
 190 | |             f.write(f"[{l}]")
     | |_____________________________^
+    |
 help: Replace with `f.writelines`
     |
 188 |     with Path("file.txt").open("w", encoding="utf-8") as f:
@@ -298,6 +312,7 @@ FURB122 [*] Use of `f.write` in a for loop
 196 | /         for line in lambda: 0:
 197 | |             f.write(line)
     | |_________________________^
+    |
 help: Replace with `f.writelines`
     |
 195 |     with open("file", "w") as f:
@@ -315,6 +330,7 @@ FURB122 [*] Use of `f.write` in a for loop
 202 | /         for line in (1,) if True else (2,):
 203 | |             f.write(line)
     | |_________________________^
+    |
 help: Replace with `f.writelines`
     |
 201 |     with open("file", "w") as f:
@@ -332,6 +348,7 @@ FURB122 [*] Use of `f.write` in a for loop
 209 | /         for line in (lambda: 0):
 210 | |             f.write(f"{line}")
     | |______________________________^
+    |
 help: Replace with `f.writelines`
     |
 208 |     with open("file", "w") as f:
@@ -349,6 +366,7 @@ FURB122 [*] Use of `f.write` in a for loop
 215 | /         for line in ((1,) if True else (2,)):
 216 | |             f.write(f"{line}")
     | |______________________________^
+    |
 help: Replace with `f.writelines`
     |
 214 |     with open("file", "w") as f:

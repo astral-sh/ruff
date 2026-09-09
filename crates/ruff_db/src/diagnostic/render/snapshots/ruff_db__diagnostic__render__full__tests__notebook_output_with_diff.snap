@@ -8,6 +8,7 @@ error[F401][*]: `os` imported but unused
 1 | # cell 1
 2 | import os
   |        ^^
+  |
 help: Remove unused import: `os`
  ::: cell 1
   |
@@ -39,6 +40,7 @@ error[F841][*]: Local variable `x` is assigned to but never used
 3 |     print()
 4 |     x = 1
   |     ^
+  |
 help: Remove assignment to unused variable `x`
  ::: cell 3
   |

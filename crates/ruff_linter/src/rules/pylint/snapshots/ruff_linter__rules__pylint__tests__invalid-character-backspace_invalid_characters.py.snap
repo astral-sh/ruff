@@ -123,6 +123,7 @@ PLE2510 [*] Invalid unescaped character backspace, use "\b" instead
 80 | nested_tstrings = t'␈{t'␚{t'␛'}'}'
 81 | nested_ftstrings = t'␈{f'␚{t'␛'}'}'
    |                      ^
+   |
 help: Replace with escape sequence
    |
 80 | nested_tstrings = t'␈{t'{t'␛'}'}'

@@ -685,6 +685,7 @@ error[invalid-argument-type]: Argument to function `C.attr` is incorrect
    |
 31 | type(attr_property).__set__(attr_property, c, 1)
    |                                               ^ Expected `str`, found `Literal[1]`
+   |
 info: Function defined here
   --> src/mdtest_snippet.py:10:9
    |

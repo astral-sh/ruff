@@ -738,6 +738,7 @@ error[invalid-assignment]: Object of type `tuple[list[int], *Ts@fixed_unhashable
    |             ---------------------------------   ^^^^^^ Incompatible value of type `tuple[list[int], *Ts@fixed_unhashable]`
    |             |
    |             Declared type
+   |
 info: type `list[int]` is not assignable to protocol `Hashable`
 info: └── protocol member `__hash__` is incompatible
 ```
@@ -902,6 +903,7 @@ error[invalid-argument-type]: Argument to function `bounded_arguments` is incorr
    |
 86 |         *values,  # snapshot: invalid-argument-type
    |         ^^^^^^^ Argument type `int` does not satisfy upper bound `str` of type variable `T`
+   |
 info: Type variable defined here
   --> src/mdtest_snippet.py:74:33
    |
@@ -1555,6 +1557,7 @@ error[invalid-argument-type]: Argument to function `repeat` is incorrect
    |
 21 |     repeat((i,), i, s)
    |                  ^^^^ Expected `tuple[int]`, found `tuple[int, str]`
+   |
 info: a tuple of length 2 is not assignable to a tuple of length 1
 info: Function defined here
  --> src/mdtest_snippet.py:8:5

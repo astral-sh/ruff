@@ -70,6 +70,7 @@ PTH208 [*] Use `pathlib.Path.iterdir()` instead.
  9 | bytes_path = b'.'
 10 | os.listdir(bytes_path)
    | ^^^^^^^^^^
+   |
 help: Replace with `Path(...).iterdir()`
    |
 1  | import os
@@ -89,6 +90,7 @@ PTH208 [*] Use `pathlib.Path.iterdir()` instead.
 15 | path_path = Path('.')
 16 | os.listdir(path_path)
    | ^^^^^^^^^^
+   |
 help: Replace with `Path(...).iterdir()`
    |
 15 | path_path = Path('.')

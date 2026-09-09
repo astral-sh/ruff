@@ -8,6 +8,7 @@ PYI013 [*] Non-empty class body must not contain `...`
 2 |     value: int
 3 |     ...
   |     ^^^
+  |
 help: Remove unnecessary `...`
   |
 2 |     value: int
@@ -52,6 +53,7 @@ PYI013 [*] Non-empty class body must not contain `...`
 12 |     ...
 13 |     ...
    |     ^^^
+   |
 help: Remove unnecessary `...`
    |
 12 |     ...
@@ -66,6 +68,7 @@ PYI013 [*] Non-empty class body must not contain `...`
 20 |
 21 |     ...
    |     ^^^
+   |
 help: Remove unnecessary `...`
    |
 20 |
@@ -80,6 +83,7 @@ PYI013 [*] Non-empty class body must not contain `...`
 25 |     value: int
 26 |     ...
    |     ^^^
+   |
 help: Remove unnecessary `...`
    |
 25 |     value: int
@@ -126,6 +130,7 @@ PYI013 [*] Non-empty class body must not contain `...`
 43 |     value: int
 44 |     ... # preserve me
    |     ^^^
+   |
 help: Remove unnecessary `...`
    |
 43 |     value: int

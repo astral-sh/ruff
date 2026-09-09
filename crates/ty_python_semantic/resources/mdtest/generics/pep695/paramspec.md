@@ -1397,12 +1397,14 @@ error[no-matching-overload]: No overload of bound method `Wrapper.call` matches 
    |
 34 | overloaded_wrapper.call(False, b"wrong")  # snapshot: no-matching-overload
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
 info: First overload defined here
  --> src/mdtest_snippet.py:7:5
   |
 7 | /     @overload
 8 | |     def call[**Q](self: "Wrapper[Q]", as_str: Literal[False], /, *args: Q.args, **kwargs: Q.kwargs) -> int: ...
   | |_______________________________________________________________________________________________________________^ First overload defined here
+  |
 info: Possible overloads for bound method `call`:
 info:   [**Q](self: Wrapper[Q], as_str: Literal[False], /, *args: Q.args, **kwargs: Q.kwargs) -> int
 info:   [**Q](self: Wrapper[Q], as_str: Literal[True], /, *args: Q.args, **kwargs: Q.kwargs) -> str
@@ -1446,6 +1448,7 @@ error[no-matching-overload]: No overload of bound method `Factory.make` matches 
    |
 18 | Factory.make()  # snapshot: no-matching-overload
    | ^^^^^^^^^^^^^^
+   |
 info: Possible overloads for bound method `make`:
 info:   (value: int) -> Factory
 info:   (*, label: str) -> Factory

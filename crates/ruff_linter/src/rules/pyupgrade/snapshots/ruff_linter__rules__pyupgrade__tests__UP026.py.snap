@@ -503,6 +503,7 @@ UP026 [*] `mock` is deprecated, use `unittest.mock`
 85 |     # This should yield multiple, aliased imports.
 86 |     from mock import mock as foo, mock as bar, mock
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
 help: Import from `unittest.mock` instead
    |
 85 |     # This should yield multiple, aliased imports.
@@ -519,6 +520,7 @@ UP026 [*] `mock` is deprecated, use `unittest.mock`
 92 | # Error (`mock.Mock()`).
 93 | x = mock.mock.Mock()
    |     ^^^^^^^^^
+   |
 help: Replace `mock.mock` with `mock`
    |
 92 | # Error (`mock.Mock()`).

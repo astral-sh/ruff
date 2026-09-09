@@ -175,6 +175,7 @@ AIR301 [*] `triggering_dataset_events` is removed in Airflow 3.0
 50 |     yesterday_ds_nodash = context["yesterday_ds_nodash"]
 51 |     events = context["triggering_dataset_events"]
    |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
 help: Use `triggering_asset_events` instead
    |
 50 |     yesterday_ds_nodash = context["yesterday_ds_nodash"]
@@ -310,6 +311,7 @@ AIR301 [*] `triggering_dataset_events` is removed in Airflow 3.0
 67 |     yesterday_ds_nodash = context["yesterday_ds_nodash"]
 68 |     events = context["triggering_dataset_events"]
    |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
 help: Use `triggering_asset_events` instead
    |
 67 |     yesterday_ds_nodash = context["yesterday_ds_nodash"]
@@ -487,6 +489,7 @@ AIR301 `inlet_events["<uri>"]` is removed in Airflow 3.0
 190 |     print(context["inlet_events"].get("this://is-url"))
 191 |     print(context.get("inlet_events").get("this://is-url"))
     |                                           ^^^^^^^^^^^^^^^
+    |
 help: Accessing `inlet_events` via a string key is deprecated; use `context["inlet_events"][Asset(uri="this://is-url")]` instead of `context["inlet_events"]["this://is-url"]`.
 
 AIR301 `inlet_events["<uri>"]` is removed in Airflow 3.0
@@ -507,6 +510,7 @@ AIR301 `inlet_events["<uri>"]` is removed in Airflow 3.0
 197 |     print(inlet_events["this://is-url"])
 198 |     print(inlet_events.get("this://is-url"))
     |                            ^^^^^^^^^^^^^^^
+    |
 help: Accessing `inlet_events` via a string key is deprecated; use `context["inlet_events"][Asset(uri="this://is-url")]` instead of `context["inlet_events"]["this://is-url"]`.
 
 AIR301 `execution_date` is removed in Airflow 3.0

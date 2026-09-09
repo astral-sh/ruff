@@ -20,6 +20,7 @@ RUF027 [*] Possible f-string without an `f` prefix
 42 | |     c}  d
 43 | |     """
    | |_______^
+   |
 help: Add `f` prefix
    |
 40 |     # RUF027
@@ -40,6 +41,7 @@ RUF027 [*] Possible f-string without an `f` prefix
 50 | |     a} \
 51 | |     "
    | |_____^
+   |
 help: Add `f` prefix
    |
 48 |     # RUF027

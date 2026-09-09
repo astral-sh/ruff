@@ -36,6 +36,7 @@ warning[unused-ignore-comment]: Unused `ty: ignore` directive
   |
 2 | x = 1  # ty: ignore[unresolved-reference]
   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
 help: Remove the unused suppression comment
  ::: cell 2
   |

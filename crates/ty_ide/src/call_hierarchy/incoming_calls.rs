@@ -592,6 +592,7 @@ mod tests {
           |
         6 |     foo()
           |     ^^^ Call site
+          |
         info: Function: `caller` (`main`)
          --> main.py:5:5
           |
@@ -618,6 +619,7 @@ mod tests {
           |
         7 |     foo()     # this is a call — should appear once
           |     ^^^ Call site
+          |
         info: Function: `caller` (`main`)
          --> main.py:5:5
           |
@@ -652,6 +654,7 @@ def use():
           |
         5 |     foo()
           |     ^^^ Call site
+          |
         info: Function: `use` (`caller`)
          --> caller.py:4:5
           |
@@ -686,6 +689,7 @@ def use():
           |
         5 |     bar()
           |     ^^^ Call site
+          |
         info: Function: `use` (`caller`)
          --> caller.py:4:5
           |
@@ -721,6 +725,7 @@ def invoke(value: Callable) -> int:
           |
         5 |     return value()
           |            ^^^^^ Call site
+          |
         info: Function: `invoke` (`caller`)
          --> caller.py:4:5
           |
@@ -746,6 +751,7 @@ def invoke(value: Callable) -> int:
           |
         6 |     foo(x=1)
           |     ^^^ Call site
+          |
         info: Function: `caller` (`main`)
          --> main.py:5:5
           |
@@ -770,6 +776,7 @@ def invoke(value: Callable) -> int:
           |
         5 | foo()
           | ^^^ Call site
+          |
         info: Module: `main`
         --> main.py:1:1
         ");
@@ -794,6 +801,7 @@ def invoke(value: Callable) -> int:
           |
         5 | @foo
           |  ^^^ Call site
+          |
         info: Module: `main`
         --> main.py:1:1
         ");
@@ -824,6 +832,7 @@ class C:
           |
         9 |         def method(self, value=default()):
           |                                ^^^^^^^ Call site
+          |
         info: Class: `C` (`main`)
          --> main.py:7:7
           |
@@ -856,6 +865,7 @@ class C:
            |
         11 |     a.foo()
            |       ^^^ Call site
+           |
         info: Function: `use` (`main`)
           --> main.py:10:5
            |
@@ -885,6 +895,7 @@ class C:
           |
         8 |         super().m()
           |                 ^ Call site
+          |
         info: Method: `m` (`main`)
          --> main.py:7:9
           |
@@ -920,6 +931,7 @@ def make() -> C:
           |
         5 |     return C()
           |            ^ Call site
+          |
         info: Function: `make` (`caller`)
          --> caller.py:4:5
           |
@@ -953,6 +965,7 @@ def make() -> C:
           |
         8 |     return c.prop
           |              ^^^^ Call site
+          |
         info: Function: `read` (`main`)
          --> main.py:7:5
           |
@@ -989,6 +1002,7 @@ def make() -> C:
            |
         12 |     c.prop = 5
            |       ^^^^ Call site
+           |
         info: Function: `write` (`main`)
           --> main.py:11:5
            |
@@ -1023,6 +1037,7 @@ def make() -> C:
            |
         12 |     del c.prop
            |           ^^^^ Call site
+           |
         info: Function: `remove` (`main`)
           --> main.py:11:5
            |
@@ -1084,6 +1099,7 @@ def make() -> C:
           |
         7 |     return c.method()
           |              ^^^^^^ Call site
+          |
         info: Function: `use` (`main`)
          --> main.py:6:5
           |
@@ -1131,6 +1147,7 @@ def make() -> C:
           |
         5 | f = lambda x: target(x)
           |               ^^^^^^ Call site
+          |
         info: Function: `(lambda)` (`main`)
          --> main.py:5:5
           |
@@ -1176,6 +1193,7 @@ def make() -> C:
           |
         5 | a = lambda x: target(x)
           |               ^^^^^^ Call site
+          |
         info: Function: `(lambda)` (`main`)
          --> main.py:5:5
           |
@@ -1187,6 +1205,7 @@ def make() -> C:
           |
         6 | b = lambda: target(0)
           |             ^^^^^^ Call site
+          |
         info: Function: `(lambda)` (`main`)
          --> main.py:6:5
           |
@@ -1216,6 +1235,7 @@ def make() -> C:
           |
         6 |     f = lambda x: target(x)
           |                   ^^^^^^ Call site
+          |
         info: Function: `(lambda)` (`main`)
          --> main.py:6:9
           |
@@ -1244,6 +1264,7 @@ def make() -> C:
           |
         6 |     return [target(x) for x in xs]
           |             ^^^^^^ Call site
+          |
         info: Function: `caller` (`main`)
          --> main.py:5:5
           |

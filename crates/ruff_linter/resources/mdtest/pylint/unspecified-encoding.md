@@ -23,6 +23,7 @@ error[PLW1514]: `builtins.open` in text mode without explicit `encoding` argumen
   |
 4 | builtins.open("data.txt")  # snapshot: unspecified-encoding
   | ^^^^^^^^^^^^^
+  |
 help: Add explicit `encoding` argument
   |
 3 |

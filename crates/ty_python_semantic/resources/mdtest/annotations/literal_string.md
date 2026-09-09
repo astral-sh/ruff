@@ -62,6 +62,7 @@ error[invalid-type-form]: `LiteralString` expects no type parameter
   |    -------------^^^^^^^
   |    |
   |    Did you mean `Literal`?
+  |
 help: Replace `LiteralString` with `Literal`
   |
 1 + from typing import Literal
@@ -134,6 +135,7 @@ error[invalid-type-form]: `LiteralString` expects no type parameter
  9 | |     42,
 10 | | ]
    | |_^
+   |
 help: Replace `LiteralString` with `Literal`
   |
 3 | # snapshot: invalid-type-form
@@ -257,6 +259,7 @@ error[invalid-type-form]: `LiteralString` expects no type parameter
   |         -------------^^^^^^^
   |         |
   |         Did you mean `Literal`?
+  |
 help: Replace `LiteralString` with `Literal`
   |
 1 + import typing
@@ -287,6 +290,7 @@ error[invalid-type-form]: `LiteralString` expects no type parameter
    |                   -------------^^^^^^^^^^^^^^^^
    |                   |
    |                   Did you mean `Literal`?
+   |
 help: Replace `LiteralString` with `Literal`
    |
 1  + import typing

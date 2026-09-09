@@ -592,6 +592,7 @@ error[missing-override-decorator]: Method `method` overrides `Parent.method` but
 6 | class Child(Parent):
 7 |     def method(self) -> None: ...  # snapshot: missing-override-decorator
   |         ^^^^^^
+  |
 info: Decorate the method with `@typing_extensions.override` to make the override explicit
 ```
 
@@ -629,6 +630,7 @@ error[missing-override-decorator]: Method `method` overrides `Parent.method` but
 6 | class Child(Parent):
 7 |     def method(self) -> None: ...  # snapshot: missing-override-decorator
   |         ^^^^^^
+  |
 info: Decorate the method with `@typing.override` to make the override explicit
 ```
 

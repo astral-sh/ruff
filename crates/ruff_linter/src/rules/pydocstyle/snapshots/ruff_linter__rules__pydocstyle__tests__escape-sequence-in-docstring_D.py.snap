@@ -8,6 +8,7 @@ D301 [*] Use `r"""` if any backslashes in a docstring
 332 | def double_quotes_backslash():
 333 |     """Sum\\mary."""
     |     ^^^^^^^^^^^^^^^^
+    |
 help: Add `r` prefix
     |
 332 | def double_quotes_backslash():

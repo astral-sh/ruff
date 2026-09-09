@@ -129,6 +129,7 @@ error[invalid-assignment]: Object of type `dict[str, first.Value | second.Value]
   |                      ----------- Keyword-variadic parameter annotation declares the type as `dict[str, first.Value]`
 5 |     values = {"item": second.Value()}  # snapshot: invalid-assignment
   |              ^^^^^^^^^^^^^^^^^^^^^^^^ Incompatible value of type `dict[str, first.Value | second.Value]`
+  |
 info: element `second.Value` of union `first.Value | second.Value` is not assignable to `first.Value`
 ```
 
@@ -690,6 +691,7 @@ error[type-assertion-failure]: Argument does not have asserted type `first.Model
   |     ^^^^^^^^^^^^-----^^^^^^^^^^^^^^
   |                 |
   |                 Inferred type is `second.Model`
+  |
 info: `first.Model` and `second.Model` are not equivalent types
 ```
 
@@ -733,6 +735,7 @@ error[assert-type-unspellable-subtype]: Argument does not have asserted type `se
   |         ^^^^^^^^^^^^-----^^^^^^^^^^^^^^^
   |                     |
   |                     Inferred type is `first.Model & second.Model`
+  |
 info: `first.Model & second.Model` is a subtype of `second.Model`, but they are not equivalent
 ```
 

@@ -1648,6 +1648,7 @@ def test_module_staticmethod(module_staticmethod): ...
            |
         10 | def service(database): ...
            |             ^^^^^^^^ fixture requested here
+           |
         info: Found 1 fixture
          --> src/test_example.py:6:5
           |
@@ -1661,6 +1662,7 @@ def test_module_staticmethod(module_staticmethod): ...
            |
         15 | def test_use(database, service, legacy_cache): ...
            |              ^^^^^^^^ fixture requested here
+           |
         info: Found 1 fixture
          --> src/test_example.py:6:5
           |
@@ -1674,6 +1676,7 @@ def test_module_staticmethod(module_staticmethod): ...
            |
         15 | def test_use(database, service, legacy_cache): ...
            |                        ^^^^^^^ fixture requested here
+           |
         info: Found 1 fixture
           --> src/test_example.py:10:5
            |
@@ -1687,6 +1690,7 @@ def test_module_staticmethod(module_staticmethod): ...
            |
         15 | def test_use(database, service, legacy_cache): ...
            |                                 ^^^^^^^^^^^^ fixture requested here
+           |
         info: Found 1 fixture
           --> src/test_example.py:13:5
            |
@@ -1732,6 +1736,7 @@ def test_use(public_name, implementation, dynamic): ...
            |
         15 | def test_use(public_name, implementation, dynamic): ...
            |              ^^^^^^^^^^^ fixture requested here
+           |
         info: Found 1 fixture
           --> src/test_example.py:10:5
            |
@@ -1773,6 +1778,7 @@ class TestExample:
            |
         14 |     def test_use(self, value, dependent): ...
            |                        ^^^^^ fixture requested here
+           |
         info: Found 1 fixture
          --> src/test_example.py:9:9
           |
@@ -1786,6 +1792,7 @@ class TestExample:
            |
         12 |     def dependent(self, value): ...
            |                         ^^^^^ fixture requested here
+           |
         info: Found 1 fixture
          --> src/test_example.py:9:9
           |
@@ -1820,6 +1827,7 @@ class TestExample:
           |
         9 |     def value(self, value): ...
           |                     ^^^^^ fixture requested here
+          |
         info: Found 1 fixture
          --> src/test_example.py:5:5
           |
@@ -1857,6 +1865,7 @@ class TestExample:
           |
         8 | def consumer(dependency): ...
           |              ^^^^^^^^^^ fixture requested here
+          |
         info: Found 1 fixture
          --> src/test_example.py:5:5
           |
@@ -1899,6 +1908,7 @@ class TestAnnotated(Base):
           |
         9 |     def test_use(self, inherited): ...
           |                        ^^^^^^^^^ fixture requested here
+          |
         info: Found 1 fixture
          --> src/test_example.py:6:9
           |
@@ -1914,6 +1924,7 @@ class TestAnnotated(Base):
            |
         17 |     def test_use(self, inherited): ...
            |                        ^^^^^^^^^ fixture requested here
+           |
         info: Found 1 fixture
          --> src/test_example.py:6:9
           |
@@ -1950,6 +1961,7 @@ class TestExample(First, Second):
            |
         13 |     def test_use(self, resource): ...
            |                        ^^^^^^^^ fixture requested here
+           |
         info: Found 1 fixture
           --> src/test_example.py:10:9
            |
@@ -2042,6 +2054,7 @@ def test_explicit_default(patched, value): ...
            |
         14 | def test_patched(patched, value): ...
            |                           ^^^^^ fixture requested here
+           |
         info: Found 1 fixture
           --> src/test_example.py:11:5
            |
@@ -2057,6 +2070,7 @@ def test_explicit_default(patched, value): ...
            |
         20 | def test_patch_multiple(value): ...
            |                         ^^^^^ fixture requested here
+           |
         info: Found 1 fixture
           --> src/test_example.py:11:5
            |
@@ -2070,6 +2084,7 @@ def test_explicit_default(patched, value): ...
            |
         23 | def test_legacy_patch(__patched, value): ...
            |                                  ^^^^^ fixture requested here
+           |
         info: Found 1 fixture
           --> src/test_example.py:11:5
            |
@@ -2105,6 +2120,7 @@ class TestOuter:
            |
         12 |         def test_method(self, value, outer): ...
            |                               ^^^^^ fixture requested here
+           |
         info: Found 1 fixture
          --> src/test_example.py:5:5
           |
@@ -2118,6 +2134,7 @@ class TestOuter:
            |
         12 |         def test_method(self, value, outer): ...
            |                                      ^^^^^ fixture requested here
+           |
         info: Found 1 fixture
          --> src/test_example.py:9:9
           |
@@ -2149,6 +2166,7 @@ class TestExample:
           |
         8 |     def test_method(self, /, value): ...
           |                              ^^^^^ fixture requested here
+          |
         info: Found 1 fixture
          --> src/test_example.py:5:5
           |
@@ -2219,6 +2237,7 @@ class TestOuter:
            |
         15 | def test_indirect(value): ...
            |                   ^^^^^ fixture requested here
+           |
         info: Found 1 fixture
          --> src/test_example.py:6:5
           |
@@ -2232,6 +2251,7 @@ class TestOuter:
            |
         18 | def test_mixed(value, other): ...
            |                ^^^^^ fixture requested here
+           |
         info: Found 1 fixture
          --> src/test_example.py:6:5
           |
@@ -2250,6 +2270,7 @@ class TestOuter:
            |
         24 | def test_aliased_indirect(value): ...
            |                           ^^^^^ fixture requested here
+           |
         info: Found 1 fixture
          --> src/test_example.py:6:5
           |
@@ -2340,6 +2361,7 @@ def test_use(
           |
         7 |     chained,
           |     ^^^^^^^ fixture requested here
+          |
         info: Found 1 fixture
          --> src/fixtures.py:5:5
           |
@@ -2353,6 +2375,7 @@ def test_use(
           |
         8 |     public_name,
           |     ^^^^^^^^^^^ fixture requested here
+          |
         info: Found 1 fixture
          --> src/fixtures.py:8:5
           |
@@ -2366,6 +2389,7 @@ def test_use(
            |
         10 |     star_fixture,
            |     ^^^^^^^^^^^^ fixture requested here
+           |
         info: Found 1 fixture
          --> src/star_fixtures.py:5:5
           |
@@ -2419,6 +2443,7 @@ def test_use(resource): ...
           |
         4 | def test_use(resource): ...
           |              ^^^^^^^^ fixture requested here
+          |
         info: Found 1 fixture
          --> src/a.py:9:9
           |
@@ -2482,6 +2507,7 @@ class TestExample(Base):
           |
         4 | def test_use(public_name): ...
           |              ^^^^^^^^^^^ fixture requested here
+          |
         info: Found 1 fixture
          --> src/fixtures.py:5:5
           |
@@ -2497,6 +2523,7 @@ class TestExample(Base):
           |
         7 |     def test_inherited(self, public_name): ...
           |                              ^^^^^^^^^^^ fixture requested here
+          |
         info: Found 1 fixture
          --> src/fixtures.py:9:9
           |
@@ -2545,6 +2572,7 @@ class TestExample(Plugin):
           |
         5 |     def test_use(self, resource): ...
           |                        ^^^^^^^^ fixture requested here
+          |
         info: Found 1 fixture
          --> src/plugin.pyi:6:9
           |
@@ -2606,6 +2634,7 @@ class TestExample(Plugin):
           |
         4 | def test_module(module_fixture, star_fixture): ...
           |                 ^^^^^^^^^^^^^^ fixture requested here
+          |
         info: Found 1 fixture
          --> src/origin.pyi:5:5
           |
@@ -2618,6 +2647,7 @@ class TestExample(Plugin):
           |
         4 | def test_module(module_fixture, star_fixture): ...
           |                                 ^^^^^^^^^^^^ fixture requested here
+          |
         info: Found 1 fixture
           --> src/origin.pyi:11:5
            |
@@ -2630,6 +2660,7 @@ class TestExample(Plugin):
           |
         7 |     def test_use(self, class_fixture): ...
           |                        ^^^^^^^^^^^^^ fixture requested here
+          |
         info: Found 1 fixture
          --> src/origin.pyi:8:5
           |
@@ -2727,6 +2758,7 @@ def test_use(resource): ...
           |
         9 | def test_use(resource): ...
           |              ^^^^^^^^ fixture requested here
+          |
         info: Found 2 fixtures
          --> src/first.py:5:5
           |
@@ -2776,6 +2808,7 @@ def test_use(typing_only): ...
            |
         18 |     def test_inherited(self, resource): ...
            |                              ^^^^^^^^ fixture requested here
+           |
         info: Found 1 fixture
           --> src/test_example.py:11:9
            |
@@ -2811,6 +2844,7 @@ def hidden(dependency): ...
            |
         10 | def hidden(dependency): ...
            |            ^^^^^^^^^^ fixture requested here
+           |
         info: Found 1 fixture
          --> src/test_example.py:6:5
           |
@@ -2939,6 +2973,7 @@ def test_use(
           |
         3 |     root_fixture,
           |     ^^^^^^^^^^^^ fixture requested here
+          |
         info: Found 1 fixture
          --> src/conftest.py:5:5
           |
@@ -2952,6 +2987,7 @@ def test_use(
           |
         4 |     shadowed,
           |     ^^^^^^^^ fixture requested here
+          |
         info: Found 1 fixture
          --> src/tests/conftest.py:5:5
           |
@@ -2995,6 +3031,7 @@ def test_use(outer_fixture): ...
           |
         2 | def test_use(outer_fixture): ...
           |              ^^^^^^^^^^^^^ fixture requested here
+          |
         info: Found 1 fixture
          --> conftest.py:5:5
           |
@@ -3037,6 +3074,7 @@ def consumer(resource): ...
           |
         5 | def consumer(resource): ...
           |              ^^^^^^^^ fixture requested here
+          |
         info: Found 1 fixture
          --> src/conftest.py:5:5
           |
@@ -3071,6 +3109,7 @@ def resource(): ...
           |
         2 | def test_use(resource): ...
           |              ^^^^^^^^ fixture requested here
+          |
         info: Found 1 fixture
          --> src/project/conftest.py:5:5
           |
@@ -3096,6 +3135,7 @@ def test_use(core_value, tmp_path, tmpdir, unused_fixture, request): ...
           |
         2 | def test_use(core_value, tmp_path, tmpdir, unused_fixture, request): ...
           |              ^^^^^^^^^^ fixture requested here
+          |
         info: Found 1 fixture
          --> .venv/lib/python3.13/site-packages/_pytest/override.py:5:5
           |
@@ -3109,6 +3149,7 @@ def test_use(core_value, tmp_path, tmpdir, unused_fixture, request): ...
           |
         2 | def test_use(core_value, tmp_path, tmpdir, unused_fixture, request): ...
           |                          ^^^^^^^^ fixture requested here
+          |
         info: Found 1 fixture
          --> .venv/lib/python3.13/site-packages/_pytest/tmpdir.py:5:5
           |
@@ -3122,6 +3163,7 @@ def test_use(core_value, tmp_path, tmpdir, unused_fixture, request): ...
           |
         2 | def test_use(core_value, tmp_path, tmpdir, unused_fixture, request): ...
           |                                    ^^^^^^ fixture requested here
+          |
         info: Found 1 fixture
          --> .venv/lib/python3.13/site-packages/_pytest/legacypath.py:7:9
           |
@@ -3165,6 +3207,7 @@ default_plugins = essential_plugins + additional_plugins
           |
         2 | def test_use(core_value, tmp_path): ...
           |              ^^^^^^^^^^ fixture requested here
+          |
         info: Found 1 fixture
          --> .venv/lib/python3.13/site-packages/_pytest/baseplugin.py:5:5
           |
@@ -3186,6 +3229,7 @@ default_plugins = ("tmpdir",)
           |
         2 | def test_use(core_value, tmp_path): ...
           |                          ^^^^^^^^ fixture requested here
+          |
         info: Found 1 fixture
          --> .venv/lib/python3.13/site-packages/_pytest/tmpdir.py:5:5
           |
@@ -3216,6 +3260,7 @@ def test_use(core_value): ...
           |
         7 | def test_use(core_value): ...
           |              ^^^^^^^^^^ fixture requested here
+          |
         info: Found 1 fixture
          --> src/test_example.py:5:5
           |

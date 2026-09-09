@@ -34,6 +34,7 @@ error[type-assertion-failure]: Argument does not have asserted type `Never`
   |     ^^^^^^^^^^^^^-^
   |                  |
   |                  Inferred type of argument is `Literal[0]`
+  |
 info: `Never` and `Literal[0]` are not equivalent types
 ```
 
@@ -50,6 +51,7 @@ error[type-assertion-failure]: Argument does not have asserted type `Never`
   |     ^^^^^^^^^^^^^--^
   |                  |
   |                  Inferred type of argument is `Literal[""]`
+  |
 info: `Never` and `Literal[""]` are not equivalent types
 ```
 
@@ -66,6 +68,7 @@ error[type-assertion-failure]: Argument does not have asserted type `Never`
   |     ^^^^^^^^^^^^^----^
   |                  |
   |                  Inferred type of argument is `None`
+  |
 info: `Never` and `None` are not equivalent types
 ```
 
@@ -82,6 +85,7 @@ error[type-assertion-failure]: Argument does not have asserted type `Never`
    |     ^^^^^^^^^^^^^--^
    |                  |
    |                  Inferred type of argument is `tuple[()]`
+   |
 info: `Never` and `tuple[()]` are not equivalent types
 ```
 
@@ -98,6 +102,7 @@ error[type-assertion-failure]: Argument does not have asserted type `Never`
    |     ^^^^^^^^^^^^^--------------------^
    |                  |
    |                  Inferred type of argument is `Literal[1]`
+   |
 info: `Never` and `Literal[1]` are not equivalent types
 ```
 
@@ -114,6 +119,7 @@ error[type-assertion-failure]: Argument does not have asserted type `Never`
    |     ^^^^^^^^^^^^^----^
    |                  |
    |                  Inferred type of argument is `Any`
+   |
 info: `Never` and `Any` are not equivalent types
 ```
 
@@ -130,6 +136,7 @@ error[type-assertion-failure]: Argument does not have asserted type `Never`
    |     ^^^^^^^^^^^^^-------^
    |                  |
    |                  Inferred type of argument is `Unknown`
+   |
 info: `Never` and `Unknown` are not equivalent types
 ```
 

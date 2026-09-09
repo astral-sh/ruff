@@ -282,6 +282,7 @@ info[disjoint-cast]: Cast to a disjoint type
      |
 2965 | class list(MutableSequence[_T]):
      |       ---- `list` defined here
+     |
 info: `list[int]` is disjoint from `list[int | str]`
 info: `int | str` and `int` are not mutual subtypes of each other, but must be due to invariance
 info: └── element `str` of union `int | str` is not a subtype of `int`
@@ -331,6 +332,7 @@ info[disjoint-cast]: Cast to a disjoint type
  9 | / @final
 10 | | class Function:
    | |______________- `Function` defined here
+   |
 info: `Named` is disjoint from `Function`
 info: `Function` is `@final` and not a subclass of `Named`
 ```
@@ -362,6 +364,7 @@ info[disjoint-cast]: Cast to a disjoint type
      |
 2965 | class list(MutableSequence[_T]):
      |       ---- `list` defined here
+     |
 info: `list[int]` is disjoint from `list[str] | list[bytes]`
 info: every element of union `list[str] | list[bytes]` is disjoint from `list[int]`
 info: ├── `str` and `int` are not mutual subtypes of each other, but must be due to invariance
@@ -395,6 +398,7 @@ info[disjoint-cast]: Cast to a disjoint type
      |
 2850 | class tuple(Sequence[_T_co]):
      |       ----- `tuple` defined here
+     |
 info: `tuple[int, int]` is disjoint from `tuple[int, str]`
 info: tuple element 2 has disjoint types `str` and `int`
 info: └── `str` and `int` are disjoint due to incompatible instance layouts
@@ -426,6 +430,7 @@ info[disjoint-cast]: Cast to a disjoint type
      |
 2850 | class tuple(Sequence[_T_co]):
      |       ----- `tuple` defined here
+     |
 info: `tuple[int, int]` is disjoint from `tuple[int]`
 info: the tuples have incompatible lengths: 1 and 2
 ```
@@ -471,6 +476,7 @@ info[disjoint-cast]: Cast to a disjoint type
  7 | / @final
  8 | | class Source:
    | |____________- `Source` defined here
+   |
 info: protocol `Target` is disjoint from `Source`
 info: `@final` type `Source` does not provide all members of protocol `Target`
 info: └── protocol member `missing` is not defined on type `Source`
@@ -504,6 +510,7 @@ info[disjoint-cast]: Cast to a disjoint type
  7 | / @final
  8 | | class Source:
    | |____________- `Source` defined here
+   |
 info: `Source` is disjoint from protocol `Target`
 info: `@final` type `Source` does not provide all members of protocol `Target`
 info: └── protocol member `missing` is not defined on type `Source`
@@ -549,6 +556,7 @@ info[disjoint-cast]: Cast to a disjoint type
  6 | / @final
  7 | | class Source:
    | |____________- `Source` defined here
+   |
 info: protocol `Target` is disjoint from `Source`
 info: protocol member `values` is incompatible
 info: └── return types `list[int]` and `list[str]` are disjoint
@@ -592,6 +600,7 @@ info[disjoint-cast]: Cast to a disjoint type
  5 |
  6 | class Target(TypedDict):
    |       ------ `Target` defined here
+   |
 info: `Target` is disjoint from `Source`
 info: field `value` has incompatible types `int | str` and `int`
 info: └── element `str` of union `int | str` is not assignable to `int`
@@ -635,6 +644,7 @@ info[disjoint-cast]: Cast to a disjoint type
  6 |
  7 | class Target(TypedDict):
    |       ------ `Target` defined here
+   |
 info: `Target` is disjoint from `Source`
 info: field `value` is required in `Source` but mutable and not-required in `Target`
 ```
@@ -665,6 +675,7 @@ info[disjoint-cast]: Cast to a disjoint type
  6 |
  7 | class Target(TypedDict):
    |       ------ `Target` defined here
+   |
 info: `Source` is disjoint from `Target`
 info: field `value` is required in `Source` but mutable and not-required in `Target`
 ```
@@ -769,6 +780,7 @@ warning[redundant-cast]: Value is already of type `int`
   |
 5 | cast(int, secrets.randbelow(10))
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
 help: Remove the redundant `cast`
   |
 4 | # snapshot: redundant-cast
@@ -789,6 +801,7 @@ warning[redundant-cast]: Value is already of type `int`
   |
 7 | cast(val=secrets.randbelow(10), typ=int)
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
 help: Remove the redundant `cast`
   |
 6 | # snapshot: redundant-cast
@@ -810,6 +823,7 @@ warning[redundant-cast]: Value is already of type `int`
    |
 10 |     return cast(int, x + y) * z
    |            ^^^^^^^^^^^^^^^^
+   |
 help: Remove the redundant `cast`
    |
 9  |     # snapshot: redundant-cast
@@ -831,6 +845,7 @@ warning[redundant-cast]: Value is already of type `int`
    |
 13 |     return -cast(int, x + y)
    |             ^^^^^^^^^^^^^^^^
+   |
 help: Remove the redundant `cast`
    |
 12 |     # snapshot: redundant-cast
@@ -852,6 +867,7 @@ warning[redundant-cast]: Value is already of type `int`
    |
 16 |     print(cast(int, x + y))
    |           ^^^^^^^^^^^^^^^^
+   |
 help: Remove the redundant `cast`
    |
 15 |     # snapshot: redundant-cast
@@ -882,6 +898,7 @@ warning[redundant-cast]: Value is already of type `int`
   |  ____________^
 7 | |                      else y))
   | |_____________________________^
+  |
 help: Remove the redundant `cast`
   |
 5 |     # snapshot: redundant-cast
@@ -915,6 +932,7 @@ warning[redundant-cast]: Value is already of type `int`
   |  ____________^
 7 | |                     y)
   | |______________________^
+  |
 help: Remove the redundant `cast`
   |
 5 |     # snapshot: redundant-cast
@@ -943,6 +961,7 @@ warning[redundant-cast]: Value is already of type `int`
    |  ____________^
 12 | |     + y)
    | |________^
+   |
 help: Remove the redundant `cast`
    |
 10 |     # snapshot: redundant-cast
@@ -984,6 +1003,7 @@ warning[redundant-cast]: Value is already of type `int`
 10 | |         typ=int,
 11 | |     )
    | |_____^
+   |
 help: Remove the redundant `cast`
   |
 4 |     # snapshot: redundant-cast

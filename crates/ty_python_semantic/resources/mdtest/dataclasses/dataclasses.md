@@ -1280,6 +1280,7 @@ error[invalid-frozen-dataclass-subclass]: Non-frozen dataclass cannot inherit fr
 8 | # snapshot: invalid-frozen-dataclass-subclass
 9 | class Child(FrozenBase):
   |       ^^^^^^----------^ Subclass `Child` is not frozen but base class `FrozenBase` is
+  |
 info: This causes the class creation to fail
 info: Base class definition
  --> src/foo.py:4:7

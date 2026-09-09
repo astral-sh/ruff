@@ -280,6 +280,7 @@ error[invalid-generic-class]: Variance of type variable `Ts_co` is incompatible 
    |
 11 |     def accepts(self, *args: *Ts_co) -> None: ...
    |                              ^^^^^^
+   |
 info: Type variable `Ts_co` is declared as covariant, but this method requires it to be contravariant
 ```
 

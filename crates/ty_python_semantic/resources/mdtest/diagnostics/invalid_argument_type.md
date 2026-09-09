@@ -18,6 +18,7 @@ error[invalid-argument-type]: Argument to function `foo` is incorrect
   |
 4 | foo("hello")  # snapshot: invalid-argument-type
   |     ^^^^^^^ Expected `int`, found `Literal["hello"]`
+  |
 info: Function defined here
  --> src/mdtest_snippet.py:1:5
   |
@@ -43,6 +44,7 @@ error[invalid-argument-type]: Argument to function `foo` is incorrect
   |
 2 |     foo("hello")  # snapshot: invalid-argument-type
   |         ^^^^^^^ Expected `int`, found `Literal["hello"]`
+  |
 info: Function defined here
  --> src/mdtest_snippet.py:4:5
   |
@@ -74,6 +76,7 @@ error[invalid-argument-type]: Argument to function `foo` is incorrect
   |
 3 | package.foo("hello")  # snapshot: invalid-argument-type
   |             ^^^^^^^ Expected `int`, found `Literal["hello"]`
+  |
 info: Function defined here
  --> src/package.py:1:5
   |
@@ -98,6 +101,7 @@ error[invalid-argument-type]: Argument to function `foo` is incorrect
   |
 4 | foo(1, "hello", 3)  # snapshot: invalid-argument-type
   |        ^^^^^^^ Expected `int`, found `Literal["hello"]`
+  |
 info: Function defined here
  --> src/mdtest_snippet.py:1:5
   |
@@ -127,6 +131,7 @@ error[invalid-argument-type]: Argument to function `foo` is incorrect
   |
 8 | foo(1, "hello", 3)  # snapshot: invalid-argument-type
   |        ^^^^^^^ Expected `int`, found `Literal["hello"]`
+  |
 info: Function defined here
  --> src/mdtest_snippet.py:1:5
   |
@@ -162,6 +167,7 @@ error[invalid-argument-type]: Argument to function `foo` is incorrect
   |
 7 | foo("a", "b", "c")
   |     ^^^ Expected `int`, found `Literal["a"]`
+  |
 info: Function defined here
  --> src/mdtest_snippet.py:1:5
   |
@@ -174,6 +180,7 @@ error[invalid-argument-type]: Argument to function `foo` is incorrect
   |
 7 | foo("a", "b", "c")
   |          ^^^ Expected `int`, found `Literal["b"]`
+  |
 info: Function defined here
  --> src/mdtest_snippet.py:1:5
   |
@@ -186,6 +193,7 @@ error[invalid-argument-type]: Argument to function `foo` is incorrect
   |
 7 | foo("a", "b", "c")
   |               ^^^ Expected `int`, found `Literal["c"]`
+  |
 info: Function defined here
  --> src/mdtest_snippet.py:1:5
   |
@@ -210,6 +218,7 @@ error[invalid-argument-type]: Argument to function `loads` is incorrect
   |
 3 | json.loads(5)  # snapshot: invalid-argument-type
   |            ^ Expected `str | bytes | bytearray`, found `Literal[5]`
+  |
 info: Function defined here
    --> stdlib/json/__init__.pyi:320:9
     |
@@ -241,6 +250,7 @@ error[invalid-argument-type]: Argument to function `foo` is incorrect
   |
 4 | foo(1, "hello", 3)  # snapshot: invalid-argument-type
   |        ^^^^^^^ Expected `int`, found `Literal["hello"]`
+  |
 info: Function defined here
  --> src/mdtest_snippet.py:1:5
   |
@@ -265,6 +275,7 @@ error[invalid-argument-type]: Argument to function `foo` is incorrect
   |
 4 | foo(1, 2, 3, "hello", 5)  # snapshot: invalid-argument-type
   |              ^^^^^^^ Expected `int`, found `Literal["hello"]`
+  |
 info: Function defined here
  --> src/mdtest_snippet.py:1:5
   |
@@ -289,6 +300,7 @@ error[invalid-argument-type]: Argument to function `foo` is incorrect
   |
 4 | foo(1, 2, z="hello")  # snapshot: invalid-argument-type
   |           ^^^^^^^^^ Expected `int`, found `Literal["hello"]`
+  |
 info: Function defined here
  --> src/mdtest_snippet.py:1:5
   |
@@ -313,6 +325,7 @@ error[invalid-argument-type]: Argument to function `foo` is incorrect
   |
 4 | foo(1, 2, "hello")  # snapshot: invalid-argument-type
   |           ^^^^^^^ Expected `int`, found `Literal["hello"]`
+  |
 info: Function defined here
  --> src/mdtest_snippet.py:1:5
   |
@@ -335,6 +348,7 @@ error[invalid-argument-type]: Argument to function `foo` is incorrect
   |
 4 | foo(a=1, b=2, c=3, d="hello", e=5)  # snapshot: invalid-argument-type
   |                    ^^^^^^^^^ Expected `int`, found `Literal["hello"]`
+  |
 info: Function defined here
  --> src/mdtest_snippet.py:1:5
   |
@@ -359,6 +373,7 @@ error[invalid-argument-type]: Argument to function `foo` is incorrect
   |
 4 | foo(1, 2, z="hello")  # snapshot: invalid-argument-type
   |           ^^^^^^^^^ Expected `int`, found `Literal["hello"]`
+  |
 info: Function defined here
  --> src/mdtest_snippet.py:1:5
   |
@@ -385,6 +400,7 @@ error[invalid-argument-type]: Argument to bound method `C.__call__` is incorrect
   |
 6 | c("wrong")  # snapshot: invalid-argument-type
   |   ^^^^^^^ Expected `int`, found `Literal["wrong"]`
+  |
 info: Method defined here
  --> src/mdtest_snippet.py:2:9
   |
@@ -411,6 +427,7 @@ error[invalid-argument-type]: Argument to bound method `C.square` is incorrect
   |
 6 | c.square("hello")  # snapshot: invalid-argument-type
   |          ^^^^^^^ Expected `int`, found `Literal["hello"]`
+  |
 info: Method defined here
  --> src/mdtest_snippet.py:2:9
   |
@@ -436,6 +453,7 @@ error[invalid-argument-type]: Argument to bound method `P.method` is incorrect
   |
 7 |     p.method("bad")  # snapshot: invalid-argument-type
   |              ^^^^^ Expected `int`, found `Literal["bad"]`
+  |
 info: Method defined here
  --> src/mdtest_snippet.py:4:9
   |
@@ -464,11 +482,13 @@ error[invalid-argument-type]: Argument to bound method `P.method` is incorrect
    |
 10 |     p.method("bad")  # snapshot: invalid-argument-type
    |              ^^^^^ Expected `int`, found `Literal["bad"]`
+   |
 info: Matching overload defined here
  --> src/mdtest_snippet.py:5:9
   |
 5 |     def method(self, value: int) -> None: ...
   |         ^^^^^^       ---------- Parameter declared here
+  |
 info: Non-matching overloads for bound method `method`:
 info:   (self, /, value: int, extra: int) -> None
 ```
@@ -499,6 +519,7 @@ error[invalid-argument-type]: Argument to function `needs_a_foo` is incorrect
   |
 5 | needs_a_foo(Foo())  # snapshot: invalid-argument-type
   |             ^^^^^ Expected `module.Foo`, found `main.Foo`
+  |
 info: Function defined here
  --> src/module.py:3:5
   |
@@ -541,6 +562,7 @@ error[invalid-argument-type]: Argument to function `needs_a_foo` is incorrect
   |
 6 |     needs_a_foo(x)  # snapshot: invalid-argument-type
   |                 ^ Expected `Foo`, found `T@f`
+  |
 info: Function defined here
  --> src/module.py:3:5
   |
@@ -567,11 +589,13 @@ error[invalid-argument-type]: Argument to function `f` is incorrect
   |
 5 | f(5)  # snapshot: invalid-argument-type
   |   ^ Expected `Number`, found `Literal[5]`
+  |
 info: Function defined here
  --> src/mdtest_snippet.py:3:5
   |
 3 | def f(x: Number): ...
   |     ^ --------- Parameter declared here
+  |
 info: Types from the `numbers` module aren't supported for static type checking
 help: Consider using a protocol instead, such as `typing.SupportsFloat`
 
@@ -581,12 +605,14 @@ error[invalid-argument-type]: Argument to function `f` is incorrect
   |
 8 |     f(x)  # snapshot: invalid-argument-type
   |       ^ Expected `Number`, found `float`
+  |
 info: element `int` of union `int | float*` is not assignable to `Number`
 info: Function defined here
  --> src/mdtest_snippet.py:3:5
   |
 3 | def f(x: Number): ...
   |     ^ --------- Parameter declared here
+  |
 info: Types from the `numbers` module aren't supported for static type checking
 help: Consider using a protocol instead, such as `typing.SupportsFloat`
 ```
@@ -610,11 +636,13 @@ error[invalid-argument-type]: Argument to function `modify` is incorrect
   |
 5 | modify(xs)  # snapshot: invalid-argument-type
   |        ^^ Expected `list[int]`, found `list[bool]`
+  |
 info: Function defined here
  --> src/mdtest_snippet.py:1:5
   |
 1 | def modify(xs: list[int]):
   |     ^^^^^^ ------------- Parameter declared here
+  |
 info: `list` is invariant in its type parameter
 info: Consider using the covariant supertype `collections.abc.Sequence`
 info: For more information, see https://docs.astral.sh/ty/reference/typing-faq/#invariant-generics

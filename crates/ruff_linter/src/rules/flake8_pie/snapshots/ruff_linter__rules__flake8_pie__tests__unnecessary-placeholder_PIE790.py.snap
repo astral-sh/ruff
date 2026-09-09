@@ -8,6 +8,7 @@ PIE790 [*] Unnecessary `pass` statement
 3 |
 4 |     pass
   |     ^^^^
+  |
 help: Remove unnecessary `pass`
   |
 3 |
@@ -22,6 +23,7 @@ PIE790 [*] Unnecessary `pass` statement
 8 |     """foo"""
 9 |     pass
   |     ^^^^
+  |
 help: Remove unnecessary `pass`
   |
 8 |     """foo"""
@@ -36,6 +38,7 @@ PIE790 [*] Unnecessary `pass` statement
 13 |     """This is a function."""
 14 |     pass; print("hello")
    |     ^^^^
+   |
 help: Remove unnecessary `pass`
    |
 13 |     """This is a function."""
@@ -51,6 +54,7 @@ PIE790 [*] Unnecessary `pass` statement
 20 |     """bar"""
 21 |     pass
    |     ^^^^
+   |
 help: Remove unnecessary `pass`
    |
 20 |     """bar"""
@@ -65,6 +69,7 @@ PIE790 [*] Unnecessary `pass` statement
 27 |     """bar"""
 28 |     pass
    |     ^^^^
+   |
 help: Remove unnecessary `pass`
    |
 27 |     """bar"""
@@ -79,6 +84,7 @@ PIE790 [*] Unnecessary `pass` statement
 34 |     """bar"""
 35 |     pass
    |     ^^^^
+   |
 help: Remove unnecessary `pass`
    |
 34 |     """bar"""
@@ -93,6 +99,7 @@ PIE790 [*] Unnecessary `pass` statement
 41 |     """bar"""
 42 |     pass
    |     ^^^^
+   |
 help: Remove unnecessary `pass`
    |
 41 |     """bar"""
@@ -107,6 +114,7 @@ PIE790 [*] Unnecessary `pass` statement
 49 |
 50 |     pass
    |     ^^^^
+   |
 help: Remove unnecessary `pass`
    |
 49 |
@@ -121,6 +129,7 @@ PIE790 [*] Unnecessary `pass` statement
 57 |
 58 |     pass
    |     ^^^^
+   |
 help: Remove unnecessary `pass`
    |
 57 |
@@ -152,6 +161,7 @@ PIE790 [*] Unnecessary `pass` statement
 73 |     """bar"""
 74 |     pass
    |     ^^^^
+   |
 help: Remove unnecessary `pass`
    |
 73 |     """bar"""
@@ -200,6 +210,7 @@ PIE790 [*] Unnecessary `pass` statement
 86 |     """buzz"""
 87 |     pass
    |     ^^^^
+   |
 help: Remove unnecessary `pass`
    |
 86 |     """buzz"""
@@ -231,6 +242,7 @@ PIE790 [*] Unnecessary `pass` statement
 95 |     """buzz"""
 96 |     pass
    |     ^^^^
+   |
 help: Remove unnecessary `pass`
    |
 95 |     """buzz"""
@@ -245,6 +257,7 @@ PIE790 [*] Unnecessary `pass` statement
 100 |     """buzz"""
 101 |     pass  # bar
     |     ^^^^
+    |
 help: Remove unnecessary `pass`
     |
 100 |     """buzz"""
@@ -260,6 +273,7 @@ PIE790 [*] Unnecessary `pass` statement
 129 |     print("foo")
 130 |     pass
     |     ^^^^
+    |
 help: Remove unnecessary `pass`
     |
 129 |     print("foo")
@@ -274,6 +288,7 @@ PIE790 [*] Unnecessary `pass` statement
 135 |     print("foo")
 136 |     pass
     |     ^^^^
+    |
 help: Remove unnecessary `pass`
     |
 135 |     print("foo")
@@ -369,6 +384,7 @@ PIE790 [*] Unnecessary `pass` statement
 149 |     pass  # comment
 150 |     pass
     |     ^^^^
+    |
 help: Remove unnecessary `pass`
     |
 149 |     pass  # comment
@@ -383,6 +399,7 @@ PIE790 [*] Unnecessary `...` literal
 154 |     print("foo")
 155 |     ...
     |     ^^^
+    |
 help: Remove unnecessary `...`
     |
 154 |     print("foo")
@@ -397,6 +414,7 @@ PIE790 [*] Unnecessary `...` literal
 160 |     print("foo")
 161 |     ...
     |     ^^^
+    |
 help: Remove unnecessary `...`
     |
 160 |     print("foo")
@@ -541,6 +559,7 @@ PIE790 [*] Unnecessary `...` literal
 208 |         """Docstring"""
 209 |         ...
     |         ^^^
+    |
 help: Remove unnecessary `...`
     |
 208 |         """Docstring"""

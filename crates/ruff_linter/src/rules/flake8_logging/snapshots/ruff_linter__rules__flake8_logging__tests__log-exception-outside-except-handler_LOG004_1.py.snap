@@ -6,6 +6,7 @@ LOG004 [*] `.exception()` call outside exception handlers
   |
 4 | logger.exception("")
   | ^^^^^^^^^^^^^^^^^^^^
+  |
 help: Replace with `.error()`
   |
 3 |

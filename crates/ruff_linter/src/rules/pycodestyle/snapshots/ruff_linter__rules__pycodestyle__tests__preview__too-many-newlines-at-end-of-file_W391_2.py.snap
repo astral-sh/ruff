@@ -11,6 +11,7 @@ W391 [*] Too many newlines at end of file
 16 | |
 17 | |
    | |_^
+   |
 help: Remove trailing newlines
    |
 13 |     bar()

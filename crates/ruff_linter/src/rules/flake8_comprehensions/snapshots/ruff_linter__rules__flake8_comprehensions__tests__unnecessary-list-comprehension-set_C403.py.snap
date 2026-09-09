@@ -405,6 +405,7 @@ C403 [*] Unnecessary list comprehension (rewrite as a set comprehension)
 47 | s = t"{ set([x for x in 'ab']) | set([x for x in 'ab']) }"
 48 | s = t"{set([x for x in 'ab']) | set([x for x in 'ab'])}"
    |        ^^^^^^^^^^^^^^^^^^^^^^
+   |
 help: Rewrite as a set comprehension
    |
 47 | s = t"{ set([x for x in 'ab']) | set([x for x in 'ab']) }"
@@ -420,6 +421,7 @@ C403 [*] Unnecessary list comprehension (rewrite as a set comprehension)
 47 | s = t"{ set([x for x in 'ab']) | set([x for x in 'ab']) }"
 48 | s = t"{set([x for x in 'ab']) | set([x for x in 'ab'])}"
    |                                 ^^^^^^^^^^^^^^^^^^^^^^
+   |
 help: Rewrite as a set comprehension
    |
 47 | s = t"{ set([x for x in 'ab']) | set([x for x in 'ab']) }"

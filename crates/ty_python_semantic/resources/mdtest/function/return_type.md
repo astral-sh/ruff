@@ -660,6 +660,7 @@ error[unsound-return-statement]: Unsound return statement
 10 |     # snapshot: unsound-return-statement
 11 |     return returns_any()
    |            ^^^^^^^^^^^^^ Inferred as `Any`
+   |
 info: `Any` is assignable to `int`, but not a subtype of `int`
 help: Consider using an `assert` to narrow the type prior to the `return` statement
 ```
@@ -681,6 +682,7 @@ error[unsound-return-statement]: Unsound return statement
 13 |     # snapshot: unsound-return-statement
 14 |     return ((42, returns_any()),)
    |            ^^^^^^^^^^^^^^^^^^^^^^ Inferred as `tuple[tuple[Literal[42], Any]]`
+   |
 info: `tuple[tuple[Literal[42], Any]]` is assignable to `tuple[tuple[int, int]]`, but not a subtype of `tuple[tuple[int, int]]`
 info: the first tuple element is not compatible: `tuple[Literal[42], Any]` is not a subtype of `tuple[int, int]`
 info: └── the second tuple element is not compatible: `Any` is not a subtype of `int`
@@ -708,6 +710,7 @@ error[unsound-return-statement]: Unsound return statement
 19 |     # snapshot: unsound-return-statement
 20 |     return returns_any()
    |            ^^^^^^^^^^^^^ Inferred as `Any`
+   |
 info: `Any` is assignable to `int`, but not a subtype of `int`
 help: Consider using an `assert` to narrow the type prior to the `return` statement
 ```
@@ -768,6 +771,7 @@ error[unsound-return-statement]: Unsound return statement
 44 |     # snapshot: unsound-return-statement
 45 |     return returns_any()
    |            ^^^^^^^^^^^^^ Inferred as `Any`
+   |
 info: `Any` is assignable to `bool`, but not a subtype of `bool`
 help: Consider using an `assert` to narrow the type prior to the `return` statement
 ```
@@ -800,6 +804,7 @@ error[unsound-return-statement]: Unsound return statement
 52 |     # snapshot: unsound-return-statement
 53 |     return result
    |            ^^^^^^ Inferred as `bool | Any`
+   |
 info: `bool | Any` is assignable to `bool`, but not a subtype of `bool`
 info: element `Any` of union `bool | Any` is not a subtype of `bool`
 help: Consider using an `assert` to narrow the type prior to the `return` statement

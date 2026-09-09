@@ -31,6 +31,7 @@ error[UP051]: Use `@classmethod` and `@abstractmethod` instead of `abstractclass
   |
 4 |     @abc.abstractclassmethod  # snapshot: deprecated-abc-decorator
   |     ^^^^^^^^^^^^^^^^^^^^^^^^
+  |
 help: Replace with `@classmethod` and `abstractmethod`
   |
 3 | class Foo(abc.ABC):
@@ -46,6 +47,7 @@ error[UP051]: Use `@staticmethod` and `@abstractmethod` instead of `abstractstat
   |
 7 |     @abc.abstractstaticmethod  # snapshot: deprecated-abc-decorator
   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
 help: Replace with `@staticmethod` and `abstractmethod`
   |
 6 |
@@ -61,6 +63,7 @@ error[UP051]: Use `@property` and `@abstractmethod` instead of `abstractproperty
    |
 10 |     @abc.abstractproperty  # snapshot: deprecated-abc-decorator
    |     ^^^^^^^^^^^^^^^^^^^^^
+   |
 help: Replace with `@property` and `abstractmethod`
    |
 9  |

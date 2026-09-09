@@ -195,6 +195,7 @@ error[invalid-generic-class]: Variance of type variable `P_co` is incompatible w
    |
 10 |     def returns(self) -> Callable[P_co, None]:
    |                          ^^^^^^^^^^^^^^^^^^^^
+   |
 info: Type variable `P_co` is declared as covariant, but this method requires it to be contravariant
 ```
 
@@ -217,6 +218,7 @@ error[invalid-generic-class]: Variance of type variable `P_co` is incompatible w
    |
 21 |     def call(self, *args: P_co.args, **kwargs: P_co.kwargs) -> None: ...
    |                           ^^^^^^^^^
+   |
 info: Type variable `P_co` is declared as covariant, but this method requires it to be contravariant
 ```
 

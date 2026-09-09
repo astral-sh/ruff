@@ -6,4 +6,5 @@ F401 `submodule.a` imported but unused; consider removing, adding to `__all__`, 
   |
 1 | import submodule.a
   |        ^^^^^^^^^^^
+  |
 help: Use an explicit re-export: `import submodule as submodule; import submodule.a`

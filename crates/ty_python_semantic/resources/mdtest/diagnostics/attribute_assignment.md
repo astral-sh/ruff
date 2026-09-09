@@ -229,6 +229,7 @@ error[missing-slot]: Cannot assign to attribute `value`: `Slotted` has no slot o
   |
 5 | Slotted().value = 1  # snapshot: missing-slot
   | ^^^^^^^^^^^^^^^
+  |
 info: Attribute `value` is declared but is not included in `__slots__`
 ```
 
@@ -315,6 +316,7 @@ error[invalid-assignment]: Invalid assignment to data descriptor attribute `attr
    |
 11 | instance.attr = "wrong"  # snapshot: invalid-assignment
    |                 ^^^^^^^ Expected `int`, found `Literal["wrong"]`
+   |
 info: Argument to bound method `Descriptor.__set__` is incorrect
 info: This assignment implicitly calls `__set__` on a descriptor of type `Descriptor`
 info: Method defined here
@@ -345,6 +347,7 @@ error[invalid-assignment]: Invalid assignment to data descriptor attribute `attr
    |
 10 | instance.attr = 1  # snapshot: invalid-assignment
    | ^^^^^^^^^^^^^ No argument provided for required parameter `extra` of bound method `WrongDescriptor.__set__`
+   |
 info: This assignment implicitly calls `__set__` on a descriptor of type `WrongDescriptor`
 info: Parameter declared here
  --> src/mdtest_snippet.py:2:53
@@ -379,6 +382,7 @@ error[invalid-assignment]: Invalid assignment to data descriptor attribute `docu
    |
 11 |         self.document = None  # snapshot: invalid-assignment
    |                         ^^^^ Expected `Document`, found `None`
+   |
 info: Argument to function `HasDocumentRef.document` is incorrect
 info: This assignment implicitly calls `__set__` on a descriptor of type `property`
 info: Function defined here
@@ -407,6 +411,7 @@ error[invalid-assignment]: Invalid assignment to data descriptor attribute `x` o
   |
 8 | c.x = (1, b"")  # snapshot: invalid-assignment
   |       ^^^^^^^^ Expected `tuple[int, str]`, found `tuple[Literal[1], Literal[b""]]`
+  |
 info: Argument to bound method `Descriptor.__set__` is incorrect
 info: This assignment implicitly calls `__set__` on a descriptor of type `Descriptor`
 info: the second tuple element is not compatible: `Literal[b""]` is not assignable to `str`

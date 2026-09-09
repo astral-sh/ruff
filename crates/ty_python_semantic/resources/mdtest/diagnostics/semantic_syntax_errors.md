@@ -43,6 +43,7 @@ error[not-iterable]: Object of type `range` is not async-iterable
   |
 9 |     return [[x async for x in elements(n)] async for n in range(3)]
   |                                                           ^^^^^^^^
+  |
 info: It has no `__aiter__` method
 ```
 

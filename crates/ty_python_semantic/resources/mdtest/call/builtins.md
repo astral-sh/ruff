@@ -461,6 +461,7 @@ error[call-non-callable]: `NotImplemented` is not callable
   |           --------------^^
   |           |
   |           Did you mean `NotImplementedError`?
+  |
 help: Use `NotImplementedError` instead
   |
 2 |     # snapshot: call-non-callable
@@ -485,6 +486,7 @@ error[call-non-callable]: `NotImplemented` is not callable
   |           --------------^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   |           |
   |           Did you mean `NotImplementedError`?
+  |
 help: Use `NotImplementedError` instead
   |
 5 |     # snapshot: call-non-callable

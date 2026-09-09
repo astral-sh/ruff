@@ -207,6 +207,7 @@ TC008 [*] Remove quotes from type alias
    |  _____________________^
 28 | |         ' | None')
    | |_________________^
+   |
 help: Remove quotes
    |
 26 |         | None)
