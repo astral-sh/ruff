@@ -1302,12 +1302,18 @@ impl<'db> ConcreteLowerBound<'db> {
             return;
         }
 
-        // `(α ≤ T) ∧ (T ≤ β)` simplifies to `T = α` when `α = β`. (We don't need to add the
-        // projection implication `(T = α) ⇒ (α ≤ T)`, since anything we can derive from `α ≤ T` we
-        // can also derive from `T = α`.)
+        // `(α ≤ T) ∧ (T ≤ β)` simplifies to `T = α` when `α = β`. For ordinary typevars, only
+        // simplify when the materialized bounds are the same `Type`; checking semantic equivalence
+        // can recursively expand protocol members. ParamSpec bounds still need the semantic check
+        // because callable types with different return types can represent the same parameter list.
+        // (We don't need to add the projection implication `(T = α) ⇒ (α ≤ T)`, since anything we
+        // can derive from `α ≤ T` we can also derive from `T = α`.)
         let lower = self.bound.bottom_materialization(db, env);
         let upper = other.bound.top_materialization(db, env);
-        if lower.is_constraint_set_equivalent_to(db, env, upper) {
+        if lower == upper
+            || (self.typevar.is_paramspec(db)
+                && lower.is_constraint_set_equivalent_to(db, env, upper))
+        {
             let provenance = ConstraintProvenance::derived(self.provenance, other.provenance);
             let simplified = ConcreteEquivalenceBound::new(provenance, self.typevar, lower);
             map.add_pair_implication(self.into(), other.into(), simplified.into());
