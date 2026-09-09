@@ -6173,6 +6173,11 @@ impl<'db> Type<'db> {
             }
         }
 
+        // Eagerly distribute over unions as a fast path to avoid building a large union of bound methods.
+        if let Type::Union(union) = self {
+            return union.try_map(db, env, |element| element.len(db, env));
+        }
+
         if let Type::LiteralValue(literal) = self
             && let Some(length) = match literal.kind() {
                 LiteralValueTypeKind::String(string) => Some(string.python_len(db)),
