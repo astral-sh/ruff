@@ -135,12 +135,13 @@ impl<'db> SolutionWalker<'db> {
                         bounds.add_lower(db, env, bound.provenance, Type::TypeVar(bound.left));
                     }
                     Constraint::TypeVarEquivalence(bound) => {
-                        let bounds = mappings.entry(bound.left).or_default();
-                        bounds.add_lower(db, env, bound.provenance, Type::TypeVar(bound.right));
-                        bounds.add_upper(db, env, bound.provenance, Type::TypeVar(bound.right));
-                        let bounds = mappings.entry(bound.right).or_default();
-                        bounds.add_lower(db, env, bound.provenance, Type::TypeVar(bound.left));
-                        bounds.add_upper(db, env, bound.provenance, Type::TypeVar(bound.left));
+                        let (left, right) = bound.in_builder(db, storage);
+                        let bounds = mappings.entry(left).or_default();
+                        bounds.add_lower(db, env, bound.provenance, Type::TypeVar(right));
+                        bounds.add_upper(db, env, bound.provenance, Type::TypeVar(right));
+                        let bounds = mappings.entry(right).or_default();
+                        bounds.add_lower(db, env, bound.provenance, Type::TypeVar(left));
+                        bounds.add_upper(db, env, bound.provenance, Type::TypeVar(left));
                     }
                 }
             }

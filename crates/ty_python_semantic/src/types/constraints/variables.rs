@@ -1046,6 +1046,19 @@ impl<'db> TypeVarEquivalenceBound<'db> {
         }
     }
 
+    /// Returns the builder-specific order that the typevars in this bound should be added in.
+    pub(super) fn in_builder(
+        self,
+        db: &'db dyn Db,
+        storage: &mut ConstraintSetStorage<'db>,
+    ) -> (BoundTypeVarInstance<'db>, BoundTypeVarInstance<'db>) {
+        if self.left.can_be_bound_for(db, storage, self.right) {
+            (self.right, self.left)
+        } else {
+            (self.left, self.right)
+        }
+    }
+
     pub(super) fn forwards(self) -> impl ProvidesTypeVarEquivalenceBound<'db> {
         #[derive(Clone, Copy)]
         struct Forwards<'db>(TypeVarEquivalenceBound<'db>);

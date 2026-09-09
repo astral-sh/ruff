@@ -441,6 +441,10 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     ) -> Self {
         let mut storage = builder.storage.borrow_mut();
         if lower == upper {
+            // Intern typevar first so that if the resulting bound happens to be a
+            // TypeVarEquivalenceBound, we'll intern the left/right typevars in a builder-specific
+            // stable order.
+            storage.intern_typevar(db, typevar);
             let constraints = Constraint::new_equivalence_bound(
                 db,
                 env,
@@ -499,6 +503,10 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         bound: Type<'db>,
     ) -> Self {
         let mut storage = builder.storage.borrow_mut();
+        // Intern typevar first so that if the resulting bound happens to be a
+        // TypeVarEquivalenceBound, we'll intern the left/right typevars in a builder-specific
+        // stable order.
+        storage.intern_typevar(db, typevar);
         let constraints = Constraint::new_equivalence_bound(
             db,
             env,
@@ -1707,6 +1715,27 @@ impl<'db> ConstraintSetStorage<'db> {
             .expect("non-terminal constraint set should have a source_order");
         let source_order = source_orders[old_source_order.index()];
         (node, source_order)
+    }
+}
+
+impl<'db> BoundTypeVarInstance<'db> {
+    /// Returns whether this typevar can be the lower or upper bound of another typevar in a
+    /// constraint set.
+    ///
+    /// We enforce an (arbitrary) ordering on typevars, and ensure that the bounds of a constraint
+    /// are "later" according to that order than the typevar being constrained. Having an order
+    /// ensures that we can build up transitive relationships between constraints without incurring
+    /// any cycles. This particular ordering plays nicely with how we are ordering constraints
+    /// within a BDD — it means that if a typevar has another typevar as a bound, all of the
+    /// constraints that apply to the bound will appear lower in the BDD.
+    fn can_be_bound_for(
+        self,
+        db: &'db dyn Db,
+        storage: &mut ConstraintSetStorage<'db>,
+        typevar: Self,
+    ) -> bool {
+        wobble_index(storage.typevar_id(db, self).index() as u64)
+            < wobble_index(storage.typevar_id(db, typevar).index() as u64)
     }
 }
 
