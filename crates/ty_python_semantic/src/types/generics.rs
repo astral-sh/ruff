@@ -1534,26 +1534,24 @@ impl<'db> Specialization<'db> {
             self.types(db)
                 .iter()
                 .map(|ty| {
-                    let normalize = |ty: &Type<'db>| {
-                        ty.recursive_type_normalized_impl(db, env, div, true)
-                            .unwrap_or(div)
+                    let Type::Union(union) = ty else {
+                        return ty
+                            .recursive_type_normalized_impl(db, env, div, true)
+                            .unwrap_or(div);
                     };
-                    match ty {
-                        Type::Union(union) => {
-                            // Preserve non-recursive alternatives in the outermost specialization:
-                            // `list[str | Divergent]` retains `str`, while a nested recursive list
-                            // in `list[str | list[Divergent]]` still collapses to `Divergent`.
-                            let mut builder = UnionBuilder::new(db, env)
-                                .unpack_aliases(false)
-                                .cycle_recovery(true)
-                                .recursively_defined(union.recursively_defined(db));
-                            for element in union.elements(db) {
-                                builder.add_in_place(normalize(element));
-                            }
-                            builder.build()
-                        }
-                        ty => normalize(ty),
+                    // Preserve non-recursive alternatives without retaining recursive nesting:
+                    // `list[str | list[Divergent]]` becomes `list[str | Divergent]`.
+                    let mut builder = UnionBuilder::new(db, env)
+                        .cycle_recovery(true)
+                        .recursively_defined(union.recursively_defined(db));
+                    for element in union.elements(db) {
+                        builder.add_in_place(
+                            element
+                                .recursive_type_normalized_impl(db, env, div, true)
+                                .unwrap_or(div),
+                        );
                     }
+                    builder.build()
                 })
                 .collect::<Box<[_]>>()
         };
