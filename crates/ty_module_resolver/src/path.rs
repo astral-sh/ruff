@@ -33,7 +33,7 @@ pub(crate) struct ModulePath {
 
 impl ModulePath {
     #[must_use]
-    fn is_standard_library(&self) -> bool {
+    fn is_standard_library_stub(&self) -> bool {
         matches!(
             &*self.search_path.0,
             SearchPathInner::StandardLibraryCustom(_) | SearchPathInner::StandardLibraryVendored(_)
@@ -66,7 +66,7 @@ impl ModulePath {
                 self.relative_path.extension().is_none(),
                 "Cannot push part {component} to {self:?}, which already has an extension"
             );
-            if self.is_standard_library() {
+            if self.is_standard_library_stub() {
                 assert_eq!(
                     component_extension, "pyi",
                     "Extension must be `pyi`; got `{component_extension}`"
@@ -274,7 +274,7 @@ impl ModulePath {
             search_path: _,
             relative_path,
         } = self;
-        if self.is_standard_library() {
+        if self.is_standard_library_stub() {
             stdlib_path_to_module_name(relative_path)
         } else {
             let parent = relative_path.parent()?;
@@ -329,7 +329,7 @@ impl ModulePath {
 
     #[must_use]
     pub(crate) fn with_py_extension(&self) -> Option<Self> {
-        if self.is_standard_library() {
+        if self.is_standard_library_stub() {
             return None;
         }
         let ModulePath {
