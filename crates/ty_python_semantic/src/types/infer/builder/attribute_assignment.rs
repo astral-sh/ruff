@@ -66,6 +66,7 @@ enum AssignmentAttributeWriteDiagnostic<'db> {
         value_ty: Type<'db>,
     },
     CannotAssign,
+    CannotAssignToEnumMember,
     CannotAssignToClassVar,
     TerminalSetAttr {
         member_exists: bool,
@@ -708,6 +709,13 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
         let db = self.builder.db();
         let env = self.builder.program_environment();
         match member {
+            ClassAttributeWriteMember::EnumMember => {
+                self.infer_value(TypeContext::default(), emit_diagnostics);
+                if emit_diagnostics {
+                    self.report(AssignmentAttributeWriteDiagnostic::CannotAssignToEnumMember);
+                }
+                false
+            }
             ClassAttributeWriteMember::Explicit { member, fallback } => {
                 if !self.final_assignment_is_valid(object_ty, member.qualifiers(), emit_diagnostics)
                 {
@@ -1030,6 +1038,18 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                         "Cannot assign to ClassVar `{}` from an instance of type `{}`",
                         self.attribute,
                         self.object_ty.display(db, env),
+                    ));
+                }
+            }
+            AssignmentAttributeWriteDiagnostic::CannotAssignToEnumMember => {
+                if let Some(builder) = self
+                    .builder
+                    .context
+                    .report_lint(&INVALID_ASSIGNMENT, self.target)
+                {
+                    builder.into_diagnostic(format_args!(
+                        "Cannot assign to enum member `{}`",
+                        self.attribute,
                     ));
                 }
             }

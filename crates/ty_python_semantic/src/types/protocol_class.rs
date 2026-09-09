@@ -2576,7 +2576,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             ClassAttributeWriteMember::ClassAttribute(fallback) => {
                 self.check_fallback_property_write(db, fallback, value_ty)
             }
-            ClassAttributeWriteMember::Unresolved { .. } => self.never(),
+            ClassAttributeWriteMember::EnumMember
+            | ClassAttributeWriteMember::Unresolved { .. } => self.never(),
         }
     }
 

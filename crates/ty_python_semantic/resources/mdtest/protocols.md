@@ -2979,6 +2979,45 @@ static_assert(is_subtype_of(PropertyWithSelfSetter, HasConcretePropertySetter))
 static_assert(is_assignable_to(PropertyWithSelfSetter, HasConcretePropertySetter))
 ```
 
+## Enum members and writable protocol members
+
+An enum class can satisfy a read-only property protocol through one of its members. It cannot
+satisfy a writable attribute or property protocol because enum members cannot be reassigned on the
+class.
+
+```py
+from enum import Enum
+from typing import Any, Protocol
+
+class Answer(Enum):
+    NO = 0
+    YES = 1
+
+class ReadOnly(Protocol):
+    @property
+    def NO(self) -> Answer: ...
+
+class Writable(Protocol):
+    @property
+    def NO(self) -> Answer: ...
+    @NO.setter
+    def NO(self, value: int) -> None: ...
+
+class Attribute(Protocol):
+    NO: Any
+
+read_only: ReadOnly = Answer
+writable: Writable = Answer  # error: [invalid-assignment]
+attribute: Attribute = Answer  # error: [invalid-assignment]
+```
+
+An enum instance can shadow the class attribute, so it can satisfy the writable protocols:
+
+```py
+writable_instance: Writable = Answer.YES
+attribute_instance: Attribute = Answer.YES
+```
+
 ## Protocol members defined using descriptor decorators
 
 ### Descriptor reads and writes

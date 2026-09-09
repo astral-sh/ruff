@@ -13,6 +13,7 @@ use ty_python_core::use_def_map;
 
 use super::call::CallArguments;
 use super::callable::CallableTypeKind;
+use super::enums::enum_metadata;
 use super::{
     IntersectionType, KnownClass, KnownInstanceType, MemberLookupPolicy, Parameter, Signature,
     Type, TypeQualifiers, TypeVarBoundOrConstraints, UnionType,
@@ -108,11 +109,14 @@ pub(super) enum InstanceAttributeWriteMember<'db> {
 
 /// The member that governs a write through a class object.
 ///
+/// Enum members are read-only. For other attributes, lookup follows descriptor precedence:
 /// A data descriptor on the metaclass takes precedence over the class object's own attributes,
 /// which in turn take precedence over definitely non-data metaclass members. If the metaclass
 /// member is absent, possibly undefined, or could be a non-data descriptor, the class object's own
 /// attributes form the fallback.
 pub(super) enum ClassAttributeWriteMember<'db> {
+    /// An enum member cannot be replaced on its class.
+    EnumMember,
     /// A metaclass member governs the write, optionally alongside a class-attribute fallback.
     Explicit {
         member: ExplicitAttributeWriteRequirement<'db>,
@@ -439,6 +443,17 @@ fn class_attribute_write_requirement<'db>(
     let Some(class_attr_self_ty) = object_ty.to_instance_approximation(db, env) else {
         return AttributeWriteRequirement::Unconstrained;
     };
+    // EnumType.__setattr__ rejects member reassignment before descriptor dispatch. Resolve
+    // membership by name: a non-member attribute can also contain an enum literal.
+    if let Some(class) = class_attr_self_ty.nominal_class(db, env)
+        && let Some(metadata) = enum_metadata(db, class.class_literal(db))
+        && metadata.contains_member(attribute)
+    {
+        return AttributeWriteRequirement::Class {
+            object_ty,
+            member: ClassAttributeWriteMember::EnumMember,
+        };
+    }
     let (type_member, receiver_fallback) = match members {
         AssignmentAttributeMembers::TypeMember {
             member,
