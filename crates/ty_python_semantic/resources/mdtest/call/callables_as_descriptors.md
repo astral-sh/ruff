@@ -369,8 +369,8 @@ Method.__call__.__code__
 
 ## `self`-binding behaviour of function-like `Callable`s
 
-Binding the `self` parameter of a function-like `Callable` creates a bound method. A decorator can
-erase the parameter list without losing the method's function attributes:
+Binding the `self` parameter of a function-like `Callable` creates a new `Callable` that is also
+function-like:
 
 `main.py`:
 

@@ -93,7 +93,6 @@ impl<'db> Type<'db> {
                     self,
                     env.program(db),
                     receiver,
-                    receiver,
                 ))
             },
         ))

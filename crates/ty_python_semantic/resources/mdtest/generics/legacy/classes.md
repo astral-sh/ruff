@@ -1191,8 +1191,8 @@ reveal_type(generic_context(c.generic_method))
 ## Members of constrained type variables
 
 Member lookup distributes over the constraints of a non-inferable type variable. Each member is
-bound to its matching receiver alternative, while `Self` continues to refer to the original type
-variable.
+bound to its matching receiver alternative, while `Self` and the method's `__self__` attribute
+continue to refer to the original type variable.
 
 ```py
 from typing_extensions import Self, TypeVar
@@ -1222,6 +1222,7 @@ def use_stream(stream: Stream) -> Stream:
     reveal_type(stream.closed)
     # revealed: (bound method Stream@use_stream when TextStream.close() -> None) | (bound method Stream@use_stream when BinaryStream.close() -> None)
     reveal_type(stream.close)
+    reveal_type(stream.close.__self__)  # revealed: Stream@use_stream
     if not stream.closed:
         stream.close()
     return stream.clone()

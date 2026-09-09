@@ -1089,13 +1089,12 @@ fn distribute_member_lookup_over_bound_or_constraints<'db>(
                     policy,
                     Some(*constraint),
                 );
-                let result =
-                    map_member_lookup_type(db, result, |ty| match ty {
-                        Type::BoundMethod(method) => Type::BoundMethod(
-                            method.with_signature_receiver(db, symbolic_receiver, *constraint),
-                        ),
-                        _ => ty,
-                    });
+                let result = map_member_lookup_type(db, result, |ty| match ty {
+                    Type::BoundMethod(method) => Type::BoundMethod(
+                        method.with_constrained_receiver(db, symbolic_receiver, *constraint),
+                    ),
+                    _ => ty,
+                });
                 error = error.or_else(|| result.err().map(|error| error.kind(db)));
                 let member = result.unwrap_or_else(|error| error.fallback_member(db));
                 properties =

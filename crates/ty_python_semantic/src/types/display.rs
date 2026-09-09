@@ -1252,8 +1252,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                 };
                 let self_ty = bound_method.self_instance(db);
                 let receiver_ty = bound_method.signature_receiver(db);
-                let bound_signatures =
-                    function.bound_signatures(db, receiver_ty, bound_method.typing_self_type(db));
+                let bound_signatures = bound_method.bound_signatures(db);
 
                 match bound_signatures.overloads.as_slice() {
                     [signature] => {
