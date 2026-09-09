@@ -43,10 +43,30 @@ use crate::{FxOrderSet, SemanticModel, add_inferred_python_version_hint_to_diagn
 impl<'db> TypeInferenceBuilder<'db, '_> {
     fn recursive_implicit_alias_reference(
         &self,
+        value_ty: Type<'db>,
         definition: Option<Definition<'db>>,
     ) -> Option<(Type<'db>, Option<GenericContext<'db>>)> {
         let db = self.db();
         let mut definition = definition?;
+        // A resolved non-recursive value already describes the alias. Gradual types and
+        // invalid unions can hide recursive references, so they still need inference.
+        if !any_over_type(
+            db,
+            self.program_environment(),
+            value_ty,
+            false,
+            |ty| match ty {
+                Type::Dynamic(_) | Type::Divergent(_) | Type::Recursive(_) | Type::TypeAlias(_) => {
+                    true
+                }
+                Type::KnownInstance(KnownInstanceType::UnionType(union)) => {
+                    union.union_type(db).is_err()
+                }
+                _ => false,
+            },
+        ) {
+            return None;
+        }
         let mut imports = FxHashSet::default();
         while definition.kind(db).is_import() {
             if !imports.insert(definition) {
@@ -193,7 +213,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ) -> Type<'db> {
         let db = self.db();
         let env = self.program_environment();
-        if let Some((alias, parameters)) = self.recursive_implicit_alias_reference(definition) {
+        if let Some((alias, parameters)) = self.recursive_implicit_alias_reference(ty, definition) {
             return match parameters {
                 Some(parameters) => {
                     alias.apply_specialization(db, parameters.default_specialization(db, None))
@@ -1240,7 +1260,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         value_ty: Type<'db>,
         definition: Option<Definition<'db>>,
     ) -> Type<'db> {
-        if let Some((alias, Some(parameters))) = self.recursive_implicit_alias_reference(definition)
+        if let Some((alias, Some(parameters))) =
+            self.recursive_implicit_alias_reference(value_ty, definition)
         {
             let db = self.db();
             return self.infer_explicit_callable_specialization(
