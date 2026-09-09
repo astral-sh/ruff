@@ -781,7 +781,7 @@ impl Session {
             .context("Failed to discover project configuration")
             .and_then(|mut metadata| {
                 if let Some(fallback_options) = workspace.settings.fallback_options() {
-                    metadata.apply_fallback_options(fallback_options.clone());
+                    metadata.set_fallback_options(fallback_options.clone());
                 }
 
                 metadata
@@ -789,7 +789,7 @@ impl Session {
                     .context("Failed to apply configuration files")?;
 
                 if let Some(override_options) = workspace.settings.override_options() {
-                    metadata.apply_override_options(override_options.clone());
+                    metadata.set_override_options(override_options.clone());
                 }
 
                 ProjectDatabase::fallible(metadata, system.clone())
