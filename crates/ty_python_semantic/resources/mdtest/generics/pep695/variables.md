@@ -1074,6 +1074,25 @@ def constrained[T: (Callable[[], int], Callable[[], str])](f: T):
     reveal_type(f())  # revealed: int | str
 ```
 
+## Final attributes on constrained class objects
+
+Assignments through a constrained class object must respect every constraint, even when one is a
+subclass of another. `Base.value` is writable, but `Child.value` is `Final`, so assigning through
+`type[T]` is rejected:
+
+```py
+from typing import Final
+
+class Base:
+    value: int = 0
+
+class Child(Base):
+    value: Final[int] = 0
+
+def assign[T: (Base, Child)](cls: type[T]):
+    cls.value = 1  # error: [invalid-assignment] "Cannot assign to final attribute `value`"
+```
+
 ## Meta-type
 
 The meta-type of a typevar is `type[T]`.

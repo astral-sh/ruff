@@ -276,7 +276,17 @@ impl<'db> SubclassOfType<'db> {
                     None => unreachable!(),
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => bound,
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                        constraints.as_type(db, env)
+                        // Preserve every constraint's qualifiers, even when one class is a
+                        // subtype of another and their union would simplify to the superclass.
+                        return Some(constraints.map_with_boundness_and_qualifiers(
+                            db,
+                            env,
+                            |constraint| {
+                                constraint
+                                    .find_name_in_mro_with_policy(db, env, name, policy)
+                                    .unwrap_or_default()
+                            },
+                        ));
                     }
                 }
             }
