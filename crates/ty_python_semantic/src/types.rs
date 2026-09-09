@@ -11026,6 +11026,9 @@ impl<'db> InvalidTypeExpression<'db> {
                 "Did you mean to use the module's member \
                 `{module_name_final_part}.{module_name_final_part}`?"
             ));
+            diagnostic.help(format_args!(
+                "Replace with `{module_name_final_part}.{module_name_final_part}`"
+            ));
             diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
                 format!(".{module_name_final_part}"),
                 node.end(),

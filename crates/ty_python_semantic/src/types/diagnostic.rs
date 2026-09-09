@@ -4325,6 +4325,7 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
                         diagnostic.set_primary_annotation_message(format_args!(
                             "Did you mean {quoted_suggestion}?"
                         ));
+                        diagnostic.help(format_args!("Replace with {quoted_suggestion}"));
                         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                             quoted_suggestion,
                             key_node.range(),
