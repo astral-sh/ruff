@@ -140,6 +140,31 @@ reveal_type(foo3.takes_self_or_int(foo3))  # revealed: Foo3
 reveal_type(foo3.takes_self_or_int(1))  # revealed: int
 ```
 
+## Cached classmethod implementations
+
+An overloaded classmethod can cache its implementation with `lru_cache`. Each call uses the return
+type of its matching overload.
+
+```py
+from functools import lru_cache
+from typing import overload
+
+class Cached:
+    @overload
+    @classmethod
+    def identity(cls, value: int) -> int: ...
+    @overload
+    @classmethod
+    def identity(cls, value: str) -> str: ...
+    @classmethod
+    @lru_cache
+    def identity(cls, value: int | str) -> int | str:
+        return value
+
+reveal_type(Cached.identity(1))  # revealed: int
+reveal_type(Cached.identity("value"))  # revealed: str
+```
+
 ## Explicit receiver annotations
 
 Binding a method filters overloads that explicitly annotate `self` with a type that cannot accept
@@ -1299,6 +1324,68 @@ reveal_type(callback_narrowed)  # revealed: Overload[(x: int, /) -> int, (x: str
 reveal_type(union_valid)  # revealed: Overload[(x: int, /) -> int, (x: str, /) -> str]
 reveal_type(union_narrowed)  # revealed: Overload[(x: int, /) -> int, (x: str, /) -> str]
 reveal_type(not_callable)  # revealed: Overload[(x: int, /) -> int, (x: str, /) -> str]
+```
+
+### Classmethod implementations returning unions of wrappers
+
+A decorator can replace an overloaded classmethod's implementation with one of several callable
+objects. Each alternative is checked before binding the class argument.
+
+```py
+from typing import TypeAlias, overload
+
+class A:
+    def __call__(self, cls: type, value: int | str) -> int | str:
+        return value
+
+class B:
+    def __call__(self, cls: type, value: int | str) -> int | str:
+        return value
+
+Choice: TypeAlias = A | B
+
+def wrap(function: object) -> Choice:
+    return A()
+
+class C:
+    @overload
+    @classmethod
+    def identity(cls, value: int) -> int: ...
+    @overload
+    @classmethod
+    def identity(cls, value: str) -> str: ...
+    @classmethod
+    @wrap
+    def identity(cls, value: int | str) -> int | str:
+        return value
+
+reveal_type(C.identity(1))  # revealed: int
+reveal_type(C.identity("x"))  # revealed: str
+```
+
+Every possible wrapper must support every overload. An alternative that only accepts `int` cannot
+implement the `str` overload, even when another alternative accepts both.
+
+```py
+class Narrow:
+    def __call__(self, cls: type, value: int) -> int:
+        return value
+
+def narrow_wrap(function: object) -> A | Narrow:
+    return Narrow()
+
+class Invalid:
+    @overload
+    @classmethod
+    def identity(cls, value: int) -> int: ...
+    @overload
+    @classmethod
+    # error: [invalid-overload] "Overload signature is not consistent with implementation"
+    def identity(cls, value: str) -> str: ...
+    @classmethod
+    @narrow_wrap
+    def identity(cls, value: int | str) -> int | str:
+        return value
 ```
 
 ### Implementation consistency parameter mismatch diagnostics

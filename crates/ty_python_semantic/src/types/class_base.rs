@@ -262,6 +262,7 @@ impl<'db> ClassBase<'db> {
                 | KnownInstanceType::Sentinel(_)
                 | KnownInstanceType::Range { .. }
                 | KnownInstanceType::FunctoolsPartial(_)
+                | KnownInstanceType::MethodWrapper(_)
                 | KnownInstanceType::FunctoolsPartialCall(_) => None,
                 KnownInstanceType::TypeGenericAlias(_) => Self::try_from_type(
                     db,

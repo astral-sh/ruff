@@ -651,7 +651,6 @@ class C:
 
     def update(self) -> None:
         # error: [invalid-assignment]
-        # error: [invalid-assignment]
         self.value += 1
 
 # TODO: Include `After` from the non-descriptor branch without including `DescriptorAfter`.

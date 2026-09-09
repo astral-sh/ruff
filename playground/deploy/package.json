@@ -6,6 +6,6 @@
     "npm": ">=11.10.0"
   },
   "devDependencies": {
-    "wrangler": "4.118.0"
+    "wrangler": "4.120.0"
   }
 }

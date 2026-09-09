@@ -1614,9 +1614,7 @@ def _(flag: bool):
     def _(c: C):
         c.x = reveal_type([1])  # revealed: list[int]
 
-        # TODO: Use the parameter type of `__set__` as type context to avoid this error.
-        # error: [invalid-assignment]
-        C.x = [1]
+        C.x = reveal_type([1])  # revealed: list[Literal[1]]
 ```
 
 For union targets, each element of the union is considered as a separate type context:

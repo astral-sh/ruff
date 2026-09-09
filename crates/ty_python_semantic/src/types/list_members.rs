@@ -344,14 +344,11 @@ impl<'db> AllMembers<'db> {
             }
 
             Type::TypeVar(bound_typevar) => {
-                match bound_typevar.typevar(db).bound_or_constraints(db, env) {
-                    None => {
-                        self.extend_with_type(db, env, Type::object());
-                    }
-                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                match bound_typevar.require_bound_or_constraints(db, env) {
+                    TypeVarBoundOrConstraints::UpperBound(bound) => {
                         self.extend_with_type(db, env, bound);
                     }
-                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                    TypeVarBoundOrConstraints::Constraints(constraints) => {
                         self.members.extend(
                             constraints
                                 .elements(db)
@@ -881,7 +878,7 @@ pub(super) fn extract_underlying_functions<'db>(
 ) -> smallvec::SmallVec<[FunctionType<'db>; 1]> {
     match ty {
         Type::FunctionLiteral(function) => smallvec::smallvec_inline![function],
-        Type::BoundMethod(method) => smallvec::smallvec_inline![method.function(db)],
+        Type::BoundMethod(method) => extract_underlying_functions(db, method.func(db)),
         Type::PropertyInstance(property) => property.getter(db).map_or_else(
             || smallvec::smallvec![],
             |getter| extract_underlying_functions(db, getter),
