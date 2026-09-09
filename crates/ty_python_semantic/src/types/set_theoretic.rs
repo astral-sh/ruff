@@ -11,7 +11,7 @@ use crate::types::class::KnownClass;
 use crate::types::enums::EnumComplement;
 use crate::types::{InstanceProjection, Type, TypePair, TypeQualifiers};
 use crate::types::{TypeVarBoundOrConstraints, visitor};
-use crate::{Db, FxOrderSet};
+use crate::{Db, FxOrderSet, Program};
 
 pub(crate) mod builder;
 mod generic_gradual_intersections;
@@ -135,6 +135,20 @@ impl<'db> UnionType<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Type<'db> {
+        // Relation checks expand the same target union for many different source types.
+        self.cached_expand_aliases(db, env.program(db))
+    }
+
+    #[salsa::tracked(
+        returns(copy),
+        cycle_initial=|_, id, _, _| Type::divergent(id),
+        cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, _, program| {
+            result.cycle_normalized(db, &ProgramEnvironment::from_program(program), *previous, cycle)
+        },
+        heap_size=ruff_memory_usage::heap_size
+    )]
+    fn cached_expand_aliases(self, db: &'db dyn Db, program: Program<'db>) -> Type<'db> {
+        let env = &ProgramEnvironment::from_program(program);
         // Expose both alias forms without expanding aliases inside containers during reduction.
         let mut builder = UnionBuilder::new(db, env).unpack_aliases(false);
         let mut pending = vec![Type::Union(self)];
