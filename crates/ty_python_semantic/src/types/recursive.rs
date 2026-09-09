@@ -147,35 +147,42 @@ impl<'db> RecursiveType<'db> {
 
     /// Bind occurrences of this recursive constructor in a closed result.
     /// An occurrence under `d` existing binders becomes index `d` of the new outer binder.
-    fn bind(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>, result: Type<'db>) -> Type<'db> {
-        result.assert_no_unbound_recursive_vars(db, env);
-        let body = result.apply_type_mapping_impl(
+    fn bind(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        original: Type<'db>,
+    ) -> Type<'db> {
+        original.assert_no_unbound_recursive_vars(db, env);
+        let body = original.apply_type_mapping_impl(
             db,
             &TypeMapping::Recursive(RecursiveMapping(RecursiveSubstitution::Bind(self))),
             TypeContext::default(),
             &ApplyTypeMappingVisitor::new(env),
         );
-        let result = self.build(db, env, body);
+        // Binding changes a closed type only by introducing references to this binder.
+        debug_assert_eq!(
+            body != original,
+            RecursiveReferences::contains_escaping(db, env, body)
+        );
+
+        // Alias arguments can expose a reference without introducing a container.
+        let result = if body.has_unguarded_alias_cycle(db) {
+            Type::divergent(self.cycle(db).0)
+        } else if body == original {
+            body
+        } else {
+            Type::Recursive(Self::new_internal(
+                db,
+                self.definition(db),
+                self.cycle(db),
+                body,
+                self.arguments(db),
+                None,
+            ))
+        };
         result.assert_no_unbound_recursive_vars(db, env);
         result
-    }
-
-    fn build(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>, body: Type<'db>) -> Type<'db> {
-        // Alias arguments can expose a reference without introducing a container.
-        if body.has_unguarded_alias_cycle(db) {
-            return Type::divergent(self.cycle(db).0);
-        }
-        if !RecursiveReferences::contains_escaping(db, env, body) {
-            return body;
-        }
-        Type::Recursive(Self::new_internal(
-            db,
-            self.definition(db),
-            self.cycle(db),
-            body,
-            self.arguments(db),
-            None,
-        ))
     }
 
     fn with_arguments(self, db: &'db dyn Db, arguments: Option<Specialization<'db>>) -> Self {
