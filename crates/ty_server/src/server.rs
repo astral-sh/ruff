@@ -7,7 +7,7 @@ use crate::session::{ClientName, InitializationOptions, Session, warn_about_unkn
 use anyhow::Context;
 use lsp_server::{Connection, ErrorCode, Message, Response};
 use lsp_types::{
-    ClientCapabilities, InitializeParams, MessageType, Uri, WorkspaceFolders,
+    ClientCapabilities, InitializeParams, MessageType, WorkspaceFolders,
     WorkspaceFoldersInitializeParams,
 };
 use ruff_db::system::System;
@@ -136,26 +136,7 @@ impl Server {
                     .map(|folder| folder.uri)
                     .collect::<Vec<_>>()
             })
-            .or_else(|| {
-                let current_dir = native_system
-                    .current_directory()
-                    .as_std_path()
-                    .to_path_buf();
-                tracing::warn!(
-                    "No workspace(s) were provided during initialization. \
-                    Using the current working directory from the fallback system as a \
-                    default workspace: {}",
-                    current_dir.display()
-                );
-                let uri = Uri::from_file_path(current_dir).ok()?;
-                Some(vec![uri])
-            })
-            .ok_or_else(|| {
-                anyhow::anyhow!(
-                    "Failed to get the current working directory while creating a \
-                    default workspace."
-                )
-            })?;
+            .unwrap_or_default();
 
         Ok(Self {
             connection,
