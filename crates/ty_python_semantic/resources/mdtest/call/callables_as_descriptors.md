@@ -778,6 +778,103 @@ method.__call__("wrong")  # error: [invalid-argument-type]
 wrong_signature: Callable[[Example, int], str] = method
 ```
 
+## Assigning compatible bound callbacks
+
+Inferred function-like callback types accept bound methods with compatible signatures. This applies
+both to collections of functions and to the result of a callable-returning decorator:
+
+```py
+from typing import Callable
+
+def function() -> None: ...
+def preserve(function: Callable[..., None]) -> Callable[..., None]:
+    return function
+
+class Example:
+    def method(self) -> None:
+        callbacks = {"function": function}
+        callbacks["method"] = self.method
+        callbacks["invalid"] = self.needs_argument  # error: [invalid-assignment]
+
+    def needs_argument(self, value: int) -> None: ...
+
+@preserve
+def decorated() -> None: ...
+
+decorated = Example().method
+```
+
+The descriptor heuristic for dunder attributes also permits storing an already-bound callback on an
+instance:
+
+```py
+class Handler:
+    __callback__: Callable[..., None]
+
+    def method(self) -> None: ...
+
+Handler().__callback__ = Handler().method
+```
+
+## Method wrappers apply in decorator order
+
+An inner decorator receives an ordinary function when `staticmethod` or `classmethod` appears
+outside it. In the opposite order it receives the raw descriptor. Overload selection follows that
+order even though the declaration records all decorators in advance:
+
+```py
+from typing import Callable, Literal, overload
+from types import FunctionType
+
+@overload
+def decorate(function: staticmethod[..., object]) -> Callable[..., Literal["static"]]: ...
+@overload
+def decorate(function: classmethod[object, ..., object]) -> Callable[..., Literal["class"]]: ...
+@overload
+def decorate(function: FunctionType) -> Callable[..., Literal["function"]]: ...
+def decorate(function):
+    raise NotImplementedError
+
+class Example:
+    @staticmethod
+    @decorate
+    def outer_static(): ...
+    @decorate
+    @staticmethod
+    def inner_static(): ...
+    @classmethod
+    @decorate
+    def outer_class(cls): ...
+    @decorate
+    @classmethod
+    def inner_class(cls): ...
+
+reveal_type(Example.outer_static())  # revealed: Literal["function"]
+reveal_type(Example.inner_static())  # revealed: Literal["static"]
+reveal_type(Example.outer_class())  # revealed: Literal["function"]
+reveal_type(Example.inner_class())  # revealed: Literal["class"]
+```
+
+Method wrappers also apply to each callable alternative returned by a decorator:
+
+```py
+type Choices = Callable[[object], int] | Callable[[object], str]
+
+def choose(function: FunctionType) -> Choices:
+    raise NotImplementedError
+
+class Alternatives:
+    @staticmethod
+    @choose
+    def static(value: object): ...
+    @classmethod
+    @choose
+    def class_method(cls): ...
+
+reveal_type(Alternatives().static(1))  # revealed: int | str
+reveal_type(Alternatives.class_method())  # revealed: int | str
+```
+
 ## Callable relations after binding
 
 Binding a callable with `Any` in its signature preserves that gradual type. Such a method is
@@ -977,6 +1074,24 @@ static_assert(not is_disjoint_from(TypeOf[descriptor], Callable[[int], str]))
 reveal_type(descriptor.__get__(None, Example)(1))  # revealed: str
 reveal_type(descriptor.__get__(Example())(1))  # revealed: str
 reveal_type(from_class.__get__(1)())  # revealed: str
+```
+
+## Restoring a staticmethod on an instance
+
+An instance can shadow its class's staticmethod with the function returned by the descriptor. Saving
+and restoring that function preserves its signature:
+
+```py
+class Example:
+    @staticmethod
+    def method(value: int) -> str:
+        return str(value)
+
+instance = Example()
+saved = instance.method
+instance.method = saved
+reveal_type(instance.method(1))  # revealed: str
+instance.method("wrong")  # error: [invalid-argument-type]
 ```
 
 ## Identity of decorated class methods
