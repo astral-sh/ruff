@@ -66,13 +66,20 @@ impl<'a> FullRenderer<'a> {
                 writeln!(f, "{}", renderer.render(&[diag.to_annotate()]))?;
             }
 
-            if diag.has_applicable_fix(self.config.fix_applicability())
+            if (self.config.show_inapplicable_fixes
+                || diag.has_applicable_fix(self.config.fix_applicability()))
                 && let Some(diff) =
                     Diff::from_diagnostic(diag, &stylesheet, self.resolver, self.config)
             {
                 write!(f, "{diff}")?;
                 if let Some(applicability) = to_applicability_annotate(diff.fix) {
                     writeln!(f, "{}", renderer.render(&[applicability]))?;
+                }
+                if !diff.fix.applies(self.config.fix_applicability()) {
+                    let note = AnnotateGroup::with_title(AnnotateLevel::NOTE.primary_title(
+                        "This fix cannot be applied automatically on the command line",
+                    ));
+                    writeln!(f, "{}", renderer.render(&[note]))?;
                 }
             }
 
@@ -373,8 +380,6 @@ fn to_applicability_annotate(fix: &Fix) -> Option<AnnotateGroup<'static>> {
             "This is an unsafe fix and may change runtime behavior",
         ),
         Applicability::DisplayOnly => (
-            // Note that this is still only used in tests. There's no `--display-only-fixes`
-            // analog to `--unsafe-fixes` for users to activate this or see the styling.
             AnnotateLevel::ERROR,
             "This is a display-only fix and is likely to be incorrect",
         ),
@@ -444,6 +449,74 @@ mod tests {
         7 |     if n == 0:
           |
         "###);
+    }
+
+    #[test]
+    fn show_inapplicable_fixes() {
+        let mut env = TestEnvironment::new();
+        env.add("example.py", "x = 1\n");
+        env.show_fix_status(true);
+        env.show_inapplicable_fixes(true);
+
+        let diagnostics = [
+            Applicability::Safe,
+            Applicability::Unsafe,
+            Applicability::DisplayOnly,
+        ]
+        .map(|applicability| {
+            let mut diagnostic = env.err().primary("example.py", "1", "1", "").build();
+            diagnostic.set_fix(Fix::applicable_edit(
+                Edit::range_replacement(
+                    "2".to_string(),
+                    TextRange::new(TextSize::new(4), TextSize::new(5)),
+                ),
+                applicability,
+            ));
+            diagnostic
+        });
+
+        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @"
+        error[test-diagnostic][*]: main diagnostic message
+         --> example.py:1:1
+          |
+        1 | x = 1
+          | ^^^^^
+          |
+          - x = 1
+        1 + x = 2
+          |
+
+        error[test-diagnostic]: main diagnostic message
+         --> example.py:1:1
+          |
+        1 | x = 1
+          | ^^^^^
+          |
+          - x = 1
+        1 + x = 2
+          |
+        note: This is an unsafe fix and may change runtime behavior
+        note: This fix cannot be applied automatically on the command line
+
+        error[test-diagnostic]: main diagnostic message
+         --> example.py:1:1
+          |
+        1 | x = 1
+          | ^^^^^
+          |
+          - x = 1
+        1 + x = 2
+          |
+        note: This is a display-only fix and is likely to be incorrect
+        note: This fix cannot be applied automatically on the command line
+        ");
+
+        env.format(DiagnosticFormat::Concise);
+        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @"
+        example.py:1:1: error[test-diagnostic] [*] main diagnostic message
+        example.py:1:1: error[test-diagnostic] main diagnostic message
+        example.py:1:1: error[test-diagnostic] main diagnostic message
+        ");
     }
 
     #[test]

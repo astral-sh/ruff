@@ -1448,8 +1448,10 @@ pub struct DisplayDiagnosticConfig {
     hide_severity: bool,
     /// Whether to show the availability of a fix in a diagnostic.
     show_fix_status: bool,
-    /// The lowest applicability that should be shown when reporting diagnostics.
+    /// The lowest applicability used for fix availability indicators and, by default, diffs.
     fix_applicability: Applicability,
+    /// Whether to also display fixes that cannot be applied automatically.
+    show_inapplicable_fixes: bool,
 
     cancellation_token: Option<CancellationToken>,
 }
@@ -1469,6 +1471,7 @@ impl DisplayDiagnosticConfig {
             hide_severity: false,
             show_fix_status: false,
             fix_applicability: Applicability::Safe,
+            show_inapplicable_fixes: false,
             cancellation_token: None,
         }
     }
@@ -1560,15 +1563,23 @@ impl DisplayDiagnosticConfig {
         }
     }
 
-    /// Set the lowest fix applicability that should be shown.
+    /// Set the lowest applicability used for fix availability indicators.
     ///
-    /// In other words, an applicability of `Safe` (the default) would suppress showing fixes or fix
-    /// availability for unsafe or display-only fixes.
-    ///
-    /// Note that this option is currently ignored when `hide_severity` is false.
+    /// An applicability of `Safe` (the default) suppresses fix availability indicators for unsafe
+    /// and display-only fixes. Their diffs are also hidden unless
+    /// [`Self::with_show_inapplicable_fixes`] is enabled.
     pub fn with_fix_applicability(self, applicability: Applicability) -> DisplayDiagnosticConfig {
         DisplayDiagnosticConfig {
             fix_applicability: applicability,
+            ..self
+        }
+    }
+
+    /// Show diffs for inapplicable fixes in full output, with a note that they cannot be applied
+    /// automatically on the command line. This does not enable their fix availability indicators.
+    pub fn with_show_inapplicable_fixes(self, yes: bool) -> DisplayDiagnosticConfig {
+        DisplayDiagnosticConfig {
+            show_inapplicable_fixes: yes,
             ..self
         }
     }

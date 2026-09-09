@@ -632,6 +632,7 @@ impl MainLoop {
                     let mut stdout = BufWriter::new(stdout);
                     let display_config = DisplayDiagnosticConfig::new("ty")
                         .format(terminal_settings.output_format.into())
+                        .with_show_inapplicable_fixes(true)
                         .color(colored::control::SHOULD_COLORIZE.should_colorize())
                         .with_cancellation_token(Some(self.cancellation_token.clone()))
                         .context(0);

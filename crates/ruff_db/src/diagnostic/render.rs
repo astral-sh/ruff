@@ -2613,6 +2613,12 @@ watermelon
             self.config = config.with_fix_applicability(applicability);
         }
 
+        /// Show fix diffs even when they cannot be applied automatically.
+        pub(super) fn show_inapplicable_fixes(&mut self, yes: bool) {
+            let config = self.config.clone();
+            self.config = config.with_show_inapplicable_fixes(yes);
+        }
+
         /// Add a file with the given path and contents to this environment.
         pub(super) fn add(&mut self, path: &str, contents: &str) {
             let path = SystemPath::new(path);

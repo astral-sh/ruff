@@ -203,6 +203,112 @@ fn fix() -> anyhow::Result<()> {
 }
 
 #[test]
+fn show_unsafe_fixes() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "fixes.py",
+        r#"
+            from typing import TypedDict
+
+            class Person(TypedDict):
+                name: str  # ty: ignore[invalid-assignment]
+
+            def greet(person: Person):
+                print(person["Name"])
+            "#,
+    )?;
+
+    assert_cmd_snapshot!(case.command().args(["--warn", "unused-ignore-comment"]), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    warning[unused-ignore-comment]: Unused `ty: ignore` directive
+     --> fixes.py:5:16
+      |
+    5 |     name: str  # ty: ignore[invalid-assignment]
+      |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    help: Remove the unused suppression comment
+      |
+    4 | class Person(TypedDict):
+      -     name: str  # ty: ignore[invalid-assignment]
+    5 +     name: str
+    6 |
+      |
+
+    error[invalid-key]: Unknown key "Name" for TypedDict `Person`
+     --> fixes.py:8:18
+      |
+    8 |     print(person["Name"])
+      |           ------ ^^^^^^ Did you mean "name"?
+      |           |
+      |           TypedDict `Person`
+    help: Replace with "name"
+      |
+    7 | def greet(person: Person):
+      -     print(person["Name"])
+    8 +     print(person["name"])
+      |
+    note: This is an unsafe fix and may change runtime behavior
+    note: This fix cannot be applied automatically on the command line
+
+    Found 2 diagnostics
+
+    ----- stderr -----
+    "#);
+
+    assert_cmd_snapshot!(
+        case.command().args(["--warn", "unused-ignore-comment", "--output-format", "concise"]),
+        @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    fixes.py:5:16: warning[unused-ignore-comment] Unused `ty: ignore` directive
+    fixes.py:8:18: error[invalid-key] Unknown key "Name" for TypedDict `Person` - did you mean "name"?
+    Found 2 diagnostics
+
+    ----- stderr -----
+    "#
+    );
+
+    assert_cmd_snapshot!(case.command().args(["--warn", "unused-ignore-comment", "--fix"]), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[invalid-key]: Unknown key "Name" for TypedDict `Person`
+     --> fixes.py:8:18
+      |
+    8 |     print(person["Name"])
+      |           ------ ^^^^^^ Did you mean "name"?
+      |           |
+      |           TypedDict `Person`
+    help: Replace with "name"
+      |
+    7 | def greet(person: Person):
+      -     print(person["Name"])
+    8 +     print(person["name"])
+      |
+    note: This is an unsafe fix and may change runtime behavior
+    note: This fix cannot be applied automatically on the command line
+
+    Found 2 diagnostics (1 fixed, 1 remaining).
+
+    ----- stderr -----
+    "#);
+
+    assert_snapshot!(fs::read_to_string(case.root().join("fixes.py"))?, @r#"
+
+    from typing import TypedDict
+
+    class Person(TypedDict):
+        name: str
+
+    def greet(person: Person):
+        print(person["Name"])
+    "#);
+
+    Ok(())
+}
+
+#[test]
 fn fix_unfixable() -> anyhow::Result<()> {
     let case = CliTest::with_files([
         ("has_syntax_error.py", "x = (\n"),
