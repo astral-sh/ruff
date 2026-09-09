@@ -3,23 +3,18 @@ use std::time::Duration;
 
 use divan::{Bencher, bench};
 use rayon::ThreadPoolBuilder;
-use ruff_db::system::{OsSystem, SystemPath, TestSystem};
-use ty_project::{Db, ProjectDatabase, ProjectMetadata, ScriptEnvironmentAvailability};
+use ruff_db::system::{OsSystem, System, SystemPath, TestSystem};
+use ty_project::{
+    Db, ProjectDatabase, ProjectMetadata, ScriptEnvironmentAvailability, uv_test_env_vars,
+};
 use ty_static::EnvVars;
 
-fn setup_iteration(root: &SystemPath) -> ProjectDatabase {
+fn setup_iteration(root: &SystemPath, uv: &SystemPath) -> ProjectDatabase {
     let system = TestSystem::new(OsSystem::new(root));
-    for name in [
-        EnvVars::VIRTUAL_ENV,
-        EnvVars::CONDA_PREFIX,
-        EnvVars::CONDA_DEFAULT_ENV,
-        EnvVars::CONDA_ROOT,
-        EnvVars::PYTHONPATH,
-    ] {
-        system.remove_env_var(name);
-    }
+    system.clear_env_vars();
+    system.set_env_vars(uv_test_env_vars());
     system.set_env_var(EnvVars::TY_UV, "scripts");
-    system.set_env_var(EnvVars::UV, "uv");
+    system.set_env_var(EnvVars::UV, uv.as_str());
 
     let metadata = ProjectMetadata::discover(root, &system).unwrap();
     ProjectDatabase::fallible(metadata, system).unwrap()
@@ -29,6 +24,7 @@ fn setup_iteration(root: &SystemPath) -> ProjectDatabase {
 fn simple_script(bencher: Bencher) {
     let directory = tempfile::tempdir().unwrap();
     let root = SystemPath::from_std_path(directory.path()).unwrap();
+    let uv = OsSystem::default().which("uv").unwrap();
     std::fs::write(
         root.join("script.py"),
         r#"# /// script
@@ -50,7 +46,7 @@ def greet(user: User) -> str:
     .unwrap();
 
     // Synchronize once before measuring so this benchmark covers the warm uv cache case.
-    let output = Command::new("uv")
+    let output = Command::new(uv.as_std_path())
         .args(["workspace", "metadata", "--sync", "--script"])
         .arg(root.join("script.py").as_std_path())
         .current_dir(root.as_std_path())
@@ -63,7 +59,7 @@ def greet(user: User) -> str:
     );
 
     bencher
-        .with_inputs(|| setup_iteration(root))
+        .with_inputs(|| setup_iteration(root, &uv))
         .bench_local_refs(|db| {
             // Include environment initialization in the measurement, as in the CLI.
             let environments = db.uv_environments().clone();

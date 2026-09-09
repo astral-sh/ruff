@@ -28,7 +28,7 @@ pub(crate) use self::callable::UpcastPolicy;
 use self::class::ClassInstanceFlags;
 pub use self::cyclic::CycleDetector;
 pub(crate) use self::cyclic::TypeTransformer;
-use self::cyclic::{ActiveRecursionDetector, TypeIdentity};
+use self::cyclic::{ActiveRecursionDetector, HasIdentity, TypeIdentity};
 pub use self::dedicated::pytest::{
     FixtureBinding, FixtureExposure, FixtureNameSource, fixture_bindings_for_parameter,
     fixture_exposures_for_definition, pytest_global_plugin_files,
@@ -96,9 +96,7 @@ pub use crate::types::method::{BoundMethodType, KnownBoundMethodType, WrapperDes
 use crate::types::mro::{MroIterator, StaticMroError};
 pub(crate) use crate::types::narrow::{NarrowingConstraint, infer_narrowing_constraints};
 use crate::types::newtype::NewType;
-use crate::types::signatures::{
-    ConcatenateTail, walk_signature, walk_signature_without_return_type,
-};
+use crate::types::signatures::{ConcatenateTail, walk_signature};
 pub(crate) use crate::types::signatures::{Parameter, Parameters};
 use crate::types::special_form::TypeQualifier;
 use crate::types::tuple::TupleSpec;
@@ -564,8 +562,24 @@ pub(crate) type FindLegacyTypeVarsVisitor<'db> =
 pub(crate) struct FindLegacyTypeVars;
 
 /// A [`CycleDetector`] that is used in `visit_specialization` methods.
-type SpecializationVisitor<'db> = CycleDetector<'db, VisitSpecialization, Type<'db>, (), 3>;
+type SpecializationVisitor<'db> =
+    CycleDetector<'db, VisitSpecialization, (Type<'db>, TypeVarVariance), (), 3>;
 struct VisitSpecialization;
+
+impl<'db> HasIdentity<'db> for (Type<'db>, TypeVarVariance) {
+    type Id = (TypeIdentity<'db>, TypeVarVariance);
+
+    fn may_share_identity(&self, db: &'db dyn Db, other: &Self) -> bool {
+        let (self_ty, self_variance) = self;
+        let (other_ty, other_variance) = other;
+        self_variance == other_variance && self_ty.may_share_type_identity(db, *other_ty)
+    }
+
+    fn to_identity(&self, db: &'db dyn Db) -> Self::Id {
+        let (ty, variance) = self;
+        (ty.to_type_identity(db), *variance)
+    }
+}
 
 /// The standard-library `typing` module or its `typing_extensions` backport.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
@@ -2491,14 +2505,44 @@ impl<'db> Type<'db> {
     /// most general form of the type that is fully static.
     #[must_use]
     fn top_materialization(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
-        (*self).cached_materialization(db, env.program(db), MaterializationKind::Top)
+        (*self).materialization(db, env, MaterializationKind::Top)
     }
 
     /// Returns the bottom materialization (or lower bound materialization) of this type, which is
     /// the most specific form of the type that is fully static.
     #[must_use]
     fn bottom_materialization(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
-        (*self).cached_materialization(db, env.program(db), MaterializationKind::Bottom)
+        (*self).materialization(db, env, MaterializationKind::Bottom)
+    }
+
+    fn materialization(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        materialization_kind: MaterializationKind,
+    ) -> Type<'db> {
+        match self {
+            Type::Dynamic(_) => match materialization_kind {
+                MaterializationKind::Top => Type::object(),
+                MaterializationKind::Bottom => Type::Never,
+            },
+            Type::Divergent(divergent) => {
+                Type::Divergent(divergent.materialized(materialization_kind))
+            }
+            Type::Never
+            | Type::AlwaysTruthy
+            | Type::AlwaysFalsy
+            | Type::ClassLiteral(_)
+            | Type::LiteralValue(_)
+            | Type::ModuleLiteral(_)
+            | Type::WrapperDescriptor(_)
+            | Type::DataclassDecorator(_)
+            | Type::DataclassTransformer(_)
+            | Type::BoundSuper(_)
+            | Type::SpecialForm(_) => self,
+            Type::NominalInstance(instance) if !instance.is_definition_generic(db) => self,
+            _ => self.cached_materialization(db, env.program(db), materialization_kind),
+        }
     }
 
     #[salsa::tracked(
@@ -3418,10 +3462,11 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Recursively visit the specialization of a generic class instance.
+    /// Recursively visit a type and its specializations.
     ///
-    /// The provided closure will be called on any nested types, along with their variance with
-    /// respect to the outermost type.
+    /// The provided closure will be called on the type itself and its nested types, along with
+    /// their variance with respect to the outermost type. Repeated types with the same variance
+    /// may be skipped.
     fn visit_specialization<F>(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>, mut f: F)
     where
         F: FnMut(Type<'db>, TypeVarVariance),
@@ -3443,62 +3488,58 @@ impl<'db> Type<'db> {
         f: &mut dyn FnMut(Type<'db>, TypeVarVariance),
         visitor: &SpecializationVisitor<'db>,
     ) {
-        let Some((_, specialization)) = self.class_specialization(db, env) else {
-            match self {
-                Type::Union(union) => {
-                    for element in union.elements(db) {
-                        element.visit_specialization_impl(db, env, polarity, f, visitor);
-                    }
-                }
-                Type::Intersection(intersection) => {
-                    for element in intersection.positive(db) {
-                        element.visit_specialization_impl(db, env, polarity, f, visitor);
-                    }
-                }
-                Type::TypeAlias(alias) => visitor.visit(db, self, || {
-                    alias
-                        .value_type(db)
-                        .visit_specialization_impl(db, env, polarity, f, visitor);
-                }),
-                Type::Callable(callable) => {
-                    for signature in callable.signatures(db) {
-                        for parameter in signature.parameters() {
-                            let variance = TypeVarVariance::Contravariant.compose(polarity);
+        f(self, polarity);
 
-                            f(parameter.annotated_type(), variance);
-
-                            visitor.visit(db, parameter.annotated_type(), || {
-                                parameter
-                                    .annotated_type()
-                                    .visit_specialization_impl(db, env, variance, f, visitor);
-                            });
+        visitor.visit(db, (self, polarity), || {
+            let Some((_, specialization)) = self.class_specialization(db, env) else {
+                match self {
+                    Type::Union(union) => {
+                        for element in union.elements(db) {
+                            element.visit_specialization_impl(db, env, polarity, f, visitor);
                         }
+                    }
+                    Type::Intersection(intersection) => {
+                        for element in intersection.positive(db) {
+                            element.visit_specialization_impl(db, env, polarity, f, visitor);
+                        }
+                        for element in intersection.negative(db) {
+                            element.visit_specialization_impl(db, env, polarity.flip(), f, visitor);
+                        }
+                    }
+                    Type::TypeAlias(alias) => alias
+                        .value_type(db)
+                        .visit_specialization_impl(db, env, polarity, f, visitor),
+                    Type::Callable(callable) => {
+                        for signature in callable.signatures(db) {
+                            for parameter in signature.parameters() {
+                                parameter.annotated_type().visit_specialization_impl(
+                                    db,
+                                    env,
+                                    polarity.flip(),
+                                    f,
+                                    visitor,
+                                );
+                            }
 
-                        visitor.visit(db, signature.return_ty, || {
                             signature
                                 .return_ty
                                 .visit_specialization_impl(db, env, polarity, f, visitor);
-                        });
+                        }
                     }
+                    _ => {}
                 }
-                _ => {}
-            }
 
-            return;
-        };
+                return;
+            };
 
-        for (typevar, ty) in iter::zip(
-            specialization.generic_context(db).variables(db),
-            specialization.types(db),
-        ) {
-            let variance = typevar.variance_with_polarity(db, polarity);
-
-            f(*ty, variance);
-
-            visitor.visit(db, *ty, || {
+            for (typevar, ty) in iter::zip(
+                specialization.generic_context(db).variables(db),
+                specialization.types(db),
+            ) {
+                let variance = typevar.variance_with_polarity(db, polarity);
                 ty.visit_specialization_impl(db, env, variance, f, visitor);
-            });
-        }
+            }
+        });
     }
 
     /// Return true if there is just a single inhabitant for this type.
@@ -4267,12 +4308,11 @@ impl<'db> Type<'db> {
             }
 
             Type::TypeVar(bound_typevar) => {
-                match bound_typevar.typevar(db).bound_or_constraints(db, env) {
-                    None => Type::object().instance_member(db, env, name),
-                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                match bound_typevar.require_bound_or_constraints(db, env) {
+                    TypeVarBoundOrConstraints::UpperBound(bound) => {
                         bound.instance_member(db, env, name)
                     }
-                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
+                    TypeVarBoundOrConstraints::Constraints(constraints) => constraints
                         .map_with_boundness_and_qualifiers(db, env, |constraint| {
                             constraint.instance_member(db, env, name)
                         }),
@@ -6239,20 +6279,17 @@ impl<'db> Type<'db> {
             }
 
             Type::TypeVar(bound_typevar) => {
-                match bound_typevar.typevar(db).bound_or_constraints(db, env) {
-                    None => CallableBinding::not_callable(self).into(),
-                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                match bound_typevar.require_bound_or_constraints(db, env) {
+                    TypeVarBoundOrConstraints::UpperBound(bound) => {
                         bound.bindings_impl(db, env, recursion_guard)
                     }
-                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                        Bindings::from_union(
-                            self,
-                            constraints
-                                .elements(db)
-                                .iter()
-                                .map(|ty| ty.bindings_impl(db, env, recursion_guard)),
-                        )
-                    }
+                    TypeVarBoundOrConstraints::Constraints(constraints) => Bindings::from_union(
+                        self,
+                        constraints
+                            .elements(db)
+                            .iter()
+                            .map(|ty| ty.bindings_impl(db, env, recursion_guard)),
+                    ),
                 }
             }
 
@@ -6503,7 +6540,7 @@ impl<'db> Type<'db> {
                 ),
                 SubclassOfInner::TypeVar(tvar) => {
                     let constructor_instance_type = Type::TypeVar(tvar);
-                    let bindings = match tvar.typevar(db).require_bound_or_constraints(db, env) {
+                    let bindings = match tvar.require_bound_or_constraints(db, env) {
                         TypeVarBoundOrConstraints::UpperBound(bound) => {
                             let constructor = bound.constructor_for_typevar_bound(db, env);
                             if let Type::ClassLiteral(class) = constructor
@@ -7661,18 +7698,12 @@ impl<'db> Type<'db> {
     /// into generic types or other nested structures.
     fn flatten_typevars(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
         match self {
-            Type::TypeVar(tvar) => {
-                match tvar.typevar(db).bound_or_constraints(db, env) {
-                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                        bound.flatten_typevars(db, env)
-                    }
-                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                        constraints.as_type(db, env).flatten_typevars(db, env)
-                    }
-                    // Unbounded typevar is effectively `object`.
-                    None => Type::object(),
+            Type::TypeVar(tvar) => match tvar.require_bound_or_constraints(db, env) {
+                TypeVarBoundOrConstraints::UpperBound(bound) => bound.flatten_typevars(db, env),
+                TypeVarBoundOrConstraints::Constraints(constraints) => {
+                    constraints.as_type(db, env).flatten_typevars(db, env)
                 }
-            }
+            },
             Type::Union(union) => {
                 // Flatten each element and rebuild through the union builder.
                 UnionType::from_elements(
@@ -10994,6 +11025,9 @@ impl<'db> InvalidTypeExpression<'db> {
             diagnostic.set_primary_annotation_message(format_args!(
                 "Did you mean to use the module's member \
                 `{module_name_final_part}.{module_name_final_part}`?"
+            ));
+            diagnostic.help(format_args!(
+                "Replace with `{module_name_final_part}.{module_name_final_part}`"
             ));
             diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
                 format!(".{module_name_final_part}"),

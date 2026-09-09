@@ -146,8 +146,8 @@ fn lazy_import_statement<'a>(binding: &Binding, semantic: &SemanticModel<'a>) ->
     .then_some(stmt)
 }
 
-/// Return `true` if removing `lazy` only makes the resolved import eager.
-fn is_single_member_import(stmt: &Stmt) -> bool {
+/// Return `true` if changing `lazy` affects only one imported name.
+pub(super) fn is_single_member_import(stmt: &Stmt) -> bool {
     match stmt {
         Stmt::Import(StmtImport { names, .. }) | Stmt::ImportFrom(StmtImportFrom { names, .. }) => {
             names.len() == 1

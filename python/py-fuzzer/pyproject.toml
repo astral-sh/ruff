@@ -16,7 +16,7 @@ dependencies = [
 fuzz = "fuzz:main"
 
 [build-system]
-requires = ["flit-core>=3.12,<4"]
+requires = ["flit-core>=3.12,<5"]
 build-backend = "flit_core.buildapi"
 
 [dependency-groups]

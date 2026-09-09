@@ -613,6 +613,13 @@ fn model_config<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> ModelCo
     // Pydantic merges the effective config from each direct base from left to right. A later base
     // therefore takes precedence over an earlier base.
     for base in class.explicit_bases(db) {
+        if matches!(
+            base,
+            Type::KnownInstance(KnownInstanceType::SubscriptedGeneric(_))
+        ) {
+            continue;
+        }
+
         let Some(base) = base.to_class_type(db) else {
             config = ModelConfig::unknown();
             continue;

@@ -74,6 +74,8 @@ reveal_type(p)  # revealed: partial[() -> bool]
 
 ### No args bound
 
+With no arguments bound, the partial keeps the full signature and refers to the original function.
+
 ```py
 from functools import partial
 
@@ -82,6 +84,7 @@ def f(a: int, b: str) -> bool:
 
 p = partial(f)
 reveal_type(p)  # revealed: partial[(a: int, b: str) -> bool]
+reveal_type(p.func is f)  # revealed: Literal[True]
 ```
 
 ### Positional-only params
@@ -1760,6 +1763,9 @@ if isinstance(p, PartialMarker):
 
 ### `partial.func` keeps the original callable type
 
+The `func` attribute refers to the original function object, including when some arguments are
+bound. The original function remains generic independently of those bound arguments.
+
 ```py
 from functools import partial
 from typing import TypeVar
@@ -1771,6 +1777,9 @@ def combine(a: T, b: U) -> tuple[T, U]:
     return (a, b)
 
 p = partial(combine, 1)
+reveal_type(partial(combine).func is combine)  # revealed: Literal[True]
+reveal_type(p.func is combine)  # revealed: Literal[True]
+reveal_type(p.func is not combine)  # revealed: Literal[False]
 reveal_type(p.func(2, "x"))  # revealed: tuple[Literal[2], Literal["x"]]
 ```
 

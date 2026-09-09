@@ -56,6 +56,59 @@ reveal_type(list[int] is list[int])  # revealed: bool
 reveal_type(list[int] is not list[int])  # revealed: bool
 ```
 
+## Function identity after passing through a generic identity function
+
+Passing a function through a generic identity function preserves the function object, so
+`identity(f) is f` is correctly inferred as `Literal[True]` in the examples below:
+
+```py
+from typing import TypeVar
+
+F = TypeVar("F")
+
+def identity(value: F) -> F:
+    return value
+
+def f():
+    pass
+
+reveal_type(identity(f) is f)  # revealed: Literal[True]
+reveal_type(f is identity(f))  # revealed: Literal[True]
+
+reveal_type(identity(f) is not f)  # revealed: Literal[False]
+reveal_type(f is not identity(f))  # revealed: Literal[False]
+
+def g():
+    pass
+
+reveal_type(identity(f) is g)  # revealed: Literal[False]
+reveal_type(g is identity(f))  # revealed: Literal[False]
+
+reveal_type(identity(f) is not g)  # revealed: Literal[True]
+reveal_type(g is not identity(f))  # revealed: Literal[True]
+```
+
+## Identity comparisons between function specializations
+
+Different specializations of the same unbound method have disjoint static types but refer to the
+same function object at runtime:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+class C[T]:
+    def method(self, value: T) -> T:
+        return value
+
+int_method = C[int].method
+str_method = C[str].method
+reveal_type(int_method is str_method)  # revealed: Literal[True]
+reveal_type(int_method is not str_method)  # revealed: Literal[False]
+```
+
 ## Identity comparisons with NewTypes
 
 Two variables cannot share the same memory address if they have disjoint nominal-instance backing
@@ -104,6 +157,27 @@ def f(x: N, y: int, z: O):
     reveal_type(x is not y)  # revealed: Literal[True]
     reveal_type(x is z)  # revealed: Literal[False]
     reveal_type(x is not z)  # revealed: Literal[True]
+```
+
+## Identity comparisons with type guard results
+
+`TypeIs` and `TypeGuard` functions return booleans, so comparing their results with `True` or
+`False` can succeed or fail.
+
+```py
+from typing_extensions import TypeGuard, TypeIs
+
+def is_int(x: object) -> TypeIs[int]:
+    return isinstance(x, int)
+
+def is_int_guard(x: object) -> TypeGuard[int]:
+    return isinstance(x, int)
+
+def f(x: object):
+    reveal_type(is_int(x) is True)  # revealed: bool
+    reveal_type(is_int(x) is False)  # revealed: bool
+    reveal_type(is_int_guard(x) is True)  # revealed: bool
+    reveal_type(is_int_guard(x) is False)  # revealed: bool
 ```
 
 ## Identity comparisons see through type aliases

@@ -1336,7 +1336,7 @@ else:
 
     For example::
 
-        def is_awaitable(val: object) -> TypeIs[Awaitable[object]]:
+        def is_awaitable(val: object) -> TypeIs[Awaitable[Any]]:
             return hasattr(val, '__await__')
 
         def f(val: Union[int, Awaitable[int]]) -> int:

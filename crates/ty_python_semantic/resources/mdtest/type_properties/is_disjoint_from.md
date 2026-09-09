@@ -497,6 +497,32 @@ static_assert(not is_disjoint_from(TypeOf[f], FunctionType))
 static_assert(not is_disjoint_from(TypeOf[f], object))
 ```
 
+### Specialized function literals
+
+Different specializations of an unbound method have incompatible signatures and are considered to
+inhabit disjoint types, even if the two different specializations occupy the same memory address at
+runtime:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_disjoint_from
+
+class C[T]:
+    def method(self, value: T) -> T:
+        return value
+
+int_method = C[int].method
+str_method = C[str].method
+static_assert(is_disjoint_from(TypeOf[int_method], TypeOf[str_method]))
+reveal_type(int_method(C[int](), 1))  # revealed: int
+reveal_type(str_method(C[str](), "a"))  # revealed: str
+```
+
 ### Bound methods
 
 Bound methods are disjoint when their names or possible receiver types cannot overlap.
@@ -726,6 +752,32 @@ static_assert(not is_disjoint_from(bool, TypeIs[str]))
 
 static_assert(is_disjoint_from(str, TypeGuard[str]))
 static_assert(is_disjoint_from(str, TypeIs[str]))
+```
+
+Either kind of type guard can return `True` or `False`, so both overlap with each boolean literal.
+
+```py
+from typing import Literal
+
+static_assert(not is_disjoint_from(TypeGuard[str], Literal[True]))
+static_assert(not is_disjoint_from(TypeGuard[str], Literal[False]))
+static_assert(not is_disjoint_from(TypeIs[str], Literal[True]))
+static_assert(not is_disjoint_from(TypeIs[str], Literal[False]))
+
+static_assert(not is_disjoint_from(Literal[True], TypeGuard[str]))
+static_assert(not is_disjoint_from(Literal[False], TypeGuard[str]))
+static_assert(not is_disjoint_from(Literal[True], TypeIs[str]))
+static_assert(not is_disjoint_from(Literal[False], TypeIs[str]))
+```
+
+The integer literals `0` and `1` are distinct from boolean literals, so they remain disjoint from
+type guard return types.
+
+```py
+static_assert(is_disjoint_from(TypeGuard[str], Literal[0]))
+static_assert(is_disjoint_from(TypeIs[str], Literal[1]))
+static_assert(is_disjoint_from(Literal[1], TypeGuard[str]))
+static_assert(is_disjoint_from(Literal[0], TypeIs[str]))
 ```
 
 ### `Protocol`

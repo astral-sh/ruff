@@ -550,9 +550,7 @@ fn predicate_scope<'db>(db: &'db dyn Db, predicate: &Predicate<'db>) -> ScopeId<
         | PredicateNode::Condition(expression)
         | PredicateNode::ChainedComparisonCondition(expression)
         | PredicateNode::ContextManagerSuppresses { expression, .. } => expression.scope(db),
-        PredicateNode::IsNonTerminalCall(CallableAndCallExpr { callable, .. }) => {
-            callable.scope(db)
-        }
+        PredicateNode::IsNonTerminalCall(call) => call.callable(db).scope(db),
         PredicateNode::Pattern(pattern) => pattern.scope(db),
         PredicateNode::FinallyNormalPathImpossible { scope, .. } => scope,
         PredicateNode::OrPatternAlternative(scope) => scope,
@@ -1734,8 +1732,8 @@ fn analyze_single_pattern_predicate_kind<'db>(
 /// dependency cannot make subsequent code unreachable.
 #[salsa::tracked(
     returns(copy),
-    cycle_initial = |_, _, _, _, _| Truthiness::AlwaysTrue,
-    cycle_fn = |_, cycle: &salsa::Cycle, previous: &Truthiness, result: Truthiness, _, _, _| {
+    cycle_initial = |_, _, _| Truthiness::AlwaysTrue,
+    cycle_fn = |_, cycle: &salsa::Cycle, previous: &Truthiness, result: Truthiness, _| {
         // A call can determine whether its own target is reachable, as with `sys.exit()` before
         // `import sys` in a loop. Expression inference can lose its previous result when it stops
         // being a cycle head, so widen the predicate itself to ensure convergence. Delay widening
@@ -1748,12 +1746,8 @@ fn analyze_single_pattern_predicate_kind<'db>(
     },
     heap_size = get_size2::GetSize::get_heap_size
 )]
-fn analyze_non_terminal_call<'db>(
-    db: &'db dyn Db,
-    callable: Expression<'db>,
-    call_expr: Expression<'db>,
-    is_await: bool,
-) -> Truthiness {
+fn analyze_non_terminal_call<'db>(db: &'db dyn Db, call: CallableAndCallExpr<'db>) -> Truthiness {
+    let callable = call.callable(db);
     let env = ProgramEnvironment::from_scope(callable.scope(db));
     // We first infer just the type of the callable. In the most likely case that the function is
     // not marked with `NoReturn`, or that it always returns `NoReturn`, doing so allows us to avoid
@@ -1763,8 +1757,8 @@ fn analyze_non_terminal_call<'db>(
     // add them on all statement-level function calls.
     let ty = infer_same_file_expression_type(db, callable, TypeContext::default());
 
-    is_non_terminal_call(db, &env, ty, is_await, || {
-        infer_same_file_expression_type(db, call_expr, TypeContext::default())
+    is_non_terminal_call(db, &env, ty, call.is_await(db), || {
+        infer_same_file_expression_type(db, call.call_expr(db), TypeContext::default())
     })
 }
 
@@ -1822,6 +1816,40 @@ fn analyze_non_empty_iterable(db: &dyn Db, iterable: Expression) -> Truthiness {
         }
         _ => Truthiness::Ambiguous,
     }
+}
+
+/// Cache the whole predicate so repeated reachability walks can reuse one query result
+/// instead of looking up the expression's type and suppression behavior separately.
+/// Separate sync and async queries use the expression directly as their Salsa key.
+#[salsa::tracked(
+    returns(copy),
+    cycle_initial = |_, _, _| false,
+    heap_size = get_size2::GetSize::get_heap_size
+)]
+fn sync_context_manager_suppresses<'db>(db: &'db dyn Db, expression: Expression<'db>) -> bool {
+    context_manager_suppresses(db, expression, EvaluationMode::Sync)
+}
+
+#[salsa::tracked(
+    returns(copy),
+    cycle_initial = |_, _, _| false,
+    heap_size = get_size2::GetSize::get_heap_size
+)]
+fn async_context_manager_suppresses<'db>(db: &'db dyn Db, expression: Expression<'db>) -> bool {
+    context_manager_suppresses(db, expression, EvaluationMode::Async)
+}
+
+fn context_manager_suppresses<'db>(
+    db: &'db dyn Db,
+    expression: Expression<'db>,
+    evaluation_mode: EvaluationMode,
+) -> bool {
+    let env = ProgramEnvironment::from_scope(expression.scope(db));
+    infer_same_file_expression_type(db, expression, TypeContext::default()).can_suppress_exceptions(
+        db,
+        &env,
+        evaluation_mode,
+    )
 }
 
 /// Evaluate a condition without re-testing intermediate short-circuit results.
@@ -1930,10 +1958,11 @@ fn analyze_single(db: &dyn Db, env: &ProgramEnvironment<'_>, predicate: &Predica
         PredicateNode::ContextManagerSuppresses {
             expression,
             is_async,
-        } => Truthiness::from(
-            infer_same_file_expression_type(db, expression, TypeContext::default())
-                .can_suppress_exceptions(db, env, EvaluationMode::from_is_async(is_async)),
-        )
+        } => Truthiness::from(if is_async {
+            async_context_manager_suppresses(db, expression)
+        } else {
+            sync_context_manager_suppresses(db, expression)
+        })
         .negate_if(!predicate.is_positive),
         PredicateNode::FinallyNormalPathImpossible {
             scope,
@@ -1942,12 +1971,9 @@ fn analyze_single(db: &dyn Db, env: &ProgramEnvironment<'_>, predicate: &Predica
             evaluate_finally_continuation(db, scope, continuation).is_always_false(),
         )
         .negate_if(!predicate.is_positive),
-        PredicateNode::IsNonTerminalCall(CallableAndCallExpr {
-            callable,
-            call_expr,
-            is_await,
-        }) => analyze_non_terminal_call(db, callable, call_expr, is_await)
-            .negate_if(!predicate.is_positive),
+        PredicateNode::IsNonTerminalCall(call) => {
+            analyze_non_terminal_call(db, call).negate_if(!predicate.is_positive)
+        }
         PredicateNode::Pattern(inner) => analyze_pattern_predicate(db, inner),
         PredicateNode::OrPatternAlternative(_) => Truthiness::Ambiguous,
         PredicateNode::SubjectElementPattern(subject_element) => {

@@ -2638,7 +2638,7 @@ class IntReader:
 def f(reader: IntReader | None):
     match reader:
         case Reader():
-            reveal_type(reader.read())  # revealed: int & Any
+            reveal_type(reader.read())  # revealed: int
         case _:
             reveal_type(reader)  # revealed: None
 ```

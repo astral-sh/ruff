@@ -825,7 +825,7 @@ fn explicit_path_overrides_exclude_force_exclude() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Test that `--force-exclude` respects exclude patterns even for explicitly passed files.
+/// Test that `--force-exclude` respects exclude patterns for explicitly passed files and directories.
 #[test]
 fn force_exclude_directory_exclusion() -> anyhow::Result<()> {
     let case = CliTest::with_files([
@@ -884,6 +884,14 @@ fn force_exclude_directory_exclusion() -> anyhow::Result<()> {
     ----- stderr -----
     WARN No python files found under the given path(s)
     ");
+
+    // The exclusion also applies when the passed directory is inside an excluded directory.
+    let output = case
+        .command()
+        .arg("--force-exclude")
+        .arg("out/amd64/install")
+        .output()?;
+    assert!(output.status.success(), "{output:?}");
 
     Ok(())
 }

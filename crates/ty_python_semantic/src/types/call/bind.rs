@@ -7703,15 +7703,17 @@ impl<'db> Binding<'db> {
         let parameter_type = specialized_overload.signature.parameters()
             [specialized_parameter.index]
             .annotated_type();
-        let parameter_type = specialized_overload
-            .merged_specialization(db)
-            .map_or(parameter_type, |specialization| {
-                parameter_type.apply_specialization(db, specialization)
-            });
-
-        (!parameter_type.has_dynamic(db, env)
-            && !parameter_type.has_typevar_or_typevar_instance(db, env))
-        .then_some(parameter_type)
+        // Preserve gradual context such as `Callable[[int], Any]`, while marking unsolved
+        // type variables in the same way as for arguments to an ordinary generic call.
+        Some(parameter_type.apply_optional_specialization(
+            db,
+            specialized_overload.argument_type_context_specialization(
+                db,
+                env,
+                constraints,
+                call_expression_tcx,
+            ),
+        ))
     }
 
     /// Returns the expected tuple element for an argument matched to a `TypeVarTuple`.
@@ -7777,8 +7779,10 @@ impl<'db> Binding<'db> {
             .ok()
     }
 
-    /// Returns the type context to use for bidirectional inference of a source call argument,
-    /// using the provided argument specialization.
+    /// Returns the type context to use for bidirectional inference of a source call argument.
+    ///
+    /// Request the shared argument specialization only when this parameter needs it. Unmatched
+    /// arguments and parameters that use their type variable's upper bound do not need one.
     ///
     /// This method also handles `ParamSpec` forwarding, where a wrapper argument receives context
     /// from the wrapped callable's parameter.
@@ -7798,7 +7802,7 @@ impl<'db> Binding<'db> {
         arguments_types: &CallArguments<'_, 'db>,
         argument_index: usize,
         call_expression_tcx: TypeContext<'db>,
-        specialization: Option<Specialization<'db>>,
+        specialization: impl Fn() -> Option<Specialization<'db>>,
     ) -> Option<ArgumentTypeContext<'db>> {
         let argument_matches = self.matched_argument_for_call_argument(binding, argument_index)?;
         let [matched_parameter] = argument_matches.parameters.as_slice() else {
@@ -7815,7 +7819,7 @@ impl<'db> Binding<'db> {
                 .merged_specialization(db)
                 .and_then(|specialization| specialization.get(db, paramspec))
                 .or_else(|| {
-                    specialization.and_then(|specialization| specialization.get(db, paramspec))
+                    specialization().and_then(|specialization| specialization.get(db, paramspec))
                 })?
             else {
                 return None;
@@ -7852,9 +7856,11 @@ impl<'db> Binding<'db> {
 
             // A `P.args`/`P.kwargs` parameter receives context from the `ParamSpec` specialization
             // checked during the previous fixpoint round.
-            if let Some(paramspec) = paramspec
-                && let Some(callable) = paramspec_callable(paramspec)
-                && let Some(specialized_parameter_type) =
+            if let Some(paramspec) = paramspec {
+                // Specializing `P.args` or `P.kwargs` directly yields the entire parameter list,
+                // which is not a valid type context for an individual argument.
+                let callable = paramspec_callable(paramspec)?;
+                let specialized_parameter_type =
                     self.paramspec_argument_context(&ParamSpecArgumentContext {
                         db,
                         env,
@@ -7864,15 +7870,14 @@ impl<'db> Binding<'db> {
                         arguments_types,
                         argument_index,
                         call_expression_tcx,
-                    })
-            {
+                    })?;
                 return Some(ArgumentTypeContext::paramspec(
                     original_parameter_type,
                     specialized_parameter_type,
                 ));
             }
 
-            parameter_type = parameter_type.apply_optional_specialization(db, specialization);
+            parameter_type = parameter_type.apply_optional_specialization(db, specialization());
             if let Some(expected_return_ty) = call_expression_tcx.annotation
                 && let Some(expected) = self.typevartuple_argument_context(
                     db,
@@ -7969,7 +7974,19 @@ impl<'db> Binding<'db> {
                 let argument_constraints = argument_specialization
                     .and_then(|specialization| specialization.get(db, typevar))
                     .filter(|ty| !ty.has_provisional_marker(db, env))
-                    .map(|ty| ty.promote(db, env));
+                    .map(|ty| {
+                        let promoted = ty.promote(db, env);
+                        // Context for other arguments must still satisfy the type variable's
+                        // bound. For example, `Literal["a"]` satisfies `LiteralString`, but
+                        // promoting it to `str` would violate that bound.
+                        if let Some(bound) = typevar.typevar(db).upper_bound(db, env)
+                            && !promoted.is_assignable_to(db, env, bound)
+                        {
+                            ty
+                        } else {
+                            promoted
+                        }
+                    });
 
                 // TODO: We should similarly combine both the call expression and argument constraints
                 // here. We currently only rely on argument constraints when there is no explicit declared

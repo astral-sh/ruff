@@ -1068,46 +1068,39 @@ impl<'db> GenericContext<'db> {
         // class C[T, U = T]: ...
         // ```
         //
-        // If there is a mapping for `T`, we want to map `U` to that type, not to `T`. To handle
-        // this, we repeatedly apply the specialization to itself, until we reach a fixed point.
+        // If there is a mapping for `T`, we want to map `U` to that type, not to `T`.
+        // Fill each argument in order so defaults can use the preceding arguments.
         let mut expanded = Vec::with_capacity(types.len());
-        for typevar in variables.clone() {
-            expanded.push(match typevar.kind(db) {
-                TypeVarKind::LegacyTypeVarTuple | TypeVarKind::Pep695TypeVarTuple => {
-                    Type::homogeneous_tuple(db, &env, Type::unknown())
+        for (ty, typevar) in types.zip(variables) {
+            let ty = if let Some(ty) = ty {
+                ty
+            } else if let Some(default) = typevar.default_type(db) {
+                // Typevars are only allowed to refer to earlier typevars in their defaults.
+                // This is statically enforced for PEP 695 contexts, and explicitly required
+                // for legacy contexts.
+                let specialization = ApplySpecialization::Partial {
+                    generic_context: self,
+                    types: &expanded,
+                    skip: None,
+                };
+                default.apply_type_mapping(
+                    db,
+                    &env,
+                    &TypeMapping::ApplySpecialization(specialization),
+                    TypeContext::default(),
+                )
+            } else {
+                match typevar.kind(db) {
+                    TypeVarKind::LegacyTypeVarTuple | TypeVarKind::Pep695TypeVarTuple => {
+                        Type::homogeneous_tuple(db, &env, Type::unknown())
+                    }
+                    TypeVarKind::LegacyParamSpec | TypeVarKind::Pep695ParamSpec => {
+                        Type::paramspec_value_callable(db, Parameters::unknown())
+                    }
+                    _ => Type::unknown(),
                 }
-                TypeVarKind::LegacyParamSpec | TypeVarKind::Pep695ParamSpec => {
-                    Type::paramspec_value_callable(db, Parameters::unknown())
-                }
-                _ => Type::unknown(),
-            });
-        }
-
-        for (idx, (ty, typevar)) in types.zip(variables).enumerate() {
-            if let Some(ty) = ty {
-                expanded[idx] = ty;
-                continue;
-            }
-
-            let Some(default) = typevar.default_type(db) else {
-                continue;
             };
-
-            // Typevars are only allowed to refer to _earlier_ typevars in their defaults. (This is
-            // statically enforced for PEP-695 contexts, and is explicitly called out as a
-            // requirement for legacy contexts.)
-            let specialization = ApplySpecialization::Partial {
-                generic_context: self,
-                types: &expanded[0..idx],
-                skip: None,
-            };
-            let default = default.apply_type_mapping(
-                db,
-                &env,
-                &TypeMapping::ApplySpecialization(specialization),
-                TypeContext::default(),
-            );
-            expanded[idx] = default;
+            expanded.push(ty);
         }
 
         expanded.into_boxed_slice()
@@ -3101,6 +3094,11 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         identity: BoundTypeVarIdentity<'db>,
         ty: Type<'db>,
     ) -> bool {
+        // Self references are not followed, so a cycle needs at least two pending mappings.
+        if types.len() <= 1 {
+            return false;
+        }
+
         let db = self.db;
         match ty {
             // A bare `T = U` edge only replaces one typevar with another; it does not wrap the
@@ -4008,18 +4006,27 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 );
             }
             (Type::Union(union_formal), _) => {
-                // If the formal is a union and the actual is a bare inferable TypeVar in an
-                // invariant position, record the whole union as the mapping. Invariant matching is
-                // equality-like; probing individual union elements below can leave spurious
-                // partial mappings from non-matching elements. For example, while comparing
-                // `ClassSelector[T]` with `ClassSelector[CT | None]`, descending into `None`
-                // would map `T` to `None` before `CT` is solved from another argument.
                 if let Type::TypeVar(actual_typevar) = actual
                     && actual_typevar.is_inferable(db, self.inferable)
-                    && matches!(polarity, TypeVarVariance::Invariant)
                 {
-                    self.add_type_mapping(actual_typevar, formal, polarity);
-                    return Ok(());
+                    let has_variadic = self
+                        .inferable
+                        .iter(db)
+                        .any(|typevar| typevar.is_paramspec(db) || typevar.is_typevartuple(db));
+                    if has_variadic {
+                        // TODO:
+                        // Variadic contexts still solve from legacy mappings. Projecting the relation
+                        // here can choose a narrow TypeVar constraint before later arguments supply
+                        // evidence for another, such as `str | None` instead of `Any`. Preserve the
+                        // legacy union heuristics, including the whole-union mapping for invariance.
+                        if matches!(polarity, TypeVarVariance::Invariant) {
+                            self.add_type_mapping(actual_typevar, formal, polarity);
+                            return Ok(());
+                        }
+                    } else {
+                        let when = self.constraint_for_relation(formal, actual, relation_polarity);
+                        return self.infer_from_constraint_set(when);
+                    }
                 }
 
                 // Second, if the formal is a union, and the actual type is assignable to precisely

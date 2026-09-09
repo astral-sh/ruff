@@ -13,7 +13,7 @@ authors = ["Charlie Marsh <charlie.r.marsh@gmail.com>"]
 license = "MIT"
 
 [workspace.dependencies]
-char_str = { version = "0.0.2" }
+char_str = { version = "0.0.4" }
 ruff = { version = "0.16.6", path = "crates/ruff" }
 ruff_annotate_snippets = { version = "0.0.12", path = "crates/ruff_annotate_snippets" }
 ruff_cache = { version = "0.0.12", path = "crates/ruff_cache" }
@@ -99,7 +99,7 @@ dunce = { version = "1.0.5" }
 etcetera = { version = "0.11.0" }
 fern = { version = "0.7.0" }
 filetime = { version = "0.2.23" }
-get-size2 = { version = "0.10.3", features = [
+get-size2 = { version = "0.11.0", features = [
     "derive",
     "smallvec",
     "hashbrown",

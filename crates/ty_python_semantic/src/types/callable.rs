@@ -15,7 +15,7 @@ use crate::{
         known_instance::FunctoolsPartialInstance,
         relation::{TypeRelation, TypeRelationChecker},
         signatures::{CallableSignature, PartialSignatureApplication},
-        visitor, walk_signature, walk_signature_without_return_type,
+        visitor, walk_signature,
     },
 };
 use ty_python_core::definition::Definition;
@@ -175,7 +175,7 @@ impl<'db> Type<'db> {
                     }
                 }),
                 SubclassOfInner::TypeVar(tvar) => {
-                    match tvar.typevar(db).require_bound_or_constraints(db, env) {
+                    match tvar.require_bound_or_constraints(db, env) {
                         TypeVarBoundOrConstraints::UpperBound(bound) => {
                             let upcast_callables = bound
                                 .constructor_for_typevar_bound(db, env)
@@ -664,16 +664,8 @@ pub(super) fn walk_callable_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     ty: CallableType<'db>,
     visitor: &V,
 ) {
-    if ty.is_paramspec_value(db) {
-        // We normalize the callables that represent the value assigned to a ParamSpec by removing
-        // their return values. A missing return value is usually treated as `Unknown`
-        for signature in &ty.signatures(db).overloads {
-            walk_signature_without_return_type(db, signature, visitor);
-        }
-    } else {
-        for signature in &ty.signatures(db).overloads {
-            walk_signature(db, signature, visitor);
-        }
+    for signature in &ty.signatures(db).overloads {
+        walk_signature(db, signature, visitor);
     }
 }
 
@@ -723,15 +715,26 @@ impl<'db> CallableType<'db> {
     }
 
     fn paramspec_value(db: &'db dyn Db, parameters: Parameters<'db>) -> CallableType<'db> {
-        CallableType::new(
+        Self::paramspec_value_from_signatures(
             db,
             CallableSignature::single(Signature::new(parameters, Type::unknown())),
-            CallableTypeKind::ParamSpecValue,
         )
     }
 
-    fn is_paramspec_value(self, db: &'db dyn Db) -> bool {
-        self.kind(db) == CallableTypeKind::ParamSpecValue
+    pub(super) fn paramspec_value_from_signatures(
+        db: &'db dyn Db,
+        signatures: CallableSignature<'db>,
+    ) -> CallableType<'db> {
+        CallableType::new(
+            db,
+            CallableSignature::from_overloads(
+                signatures
+                    .overloads
+                    .into_iter()
+                    .map(Signature::into_paramspec_value),
+            ),
+            CallableTypeKind::ParamSpecValue,
+        )
     }
 
     /// Create a callable type which accepts any parameters and returns an `Unknown` type.
@@ -776,16 +779,7 @@ impl<'db> CallableType<'db> {
     /// Retain every parameter signature and its generic context, but erase return types
     /// that do not participate in a `ParamSpec` specialization.
     pub(crate) fn into_paramspec_value(self, db: &'db dyn Db) -> CallableType<'db> {
-        CallableType::new(
-            db,
-            CallableSignature::from_overloads(
-                self.signatures(db)
-                    .iter()
-                    .cloned()
-                    .map(|signature| signature.with_return_type(Type::unknown())),
-            ),
-            CallableTypeKind::ParamSpecValue,
-        )
+        Self::paramspec_value_from_signatures(db, self.signatures(db).clone())
     }
 
     /// Returns the reduced callable produced by partially applying selected overloads.
@@ -1030,6 +1024,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         if target.is_function_like(db) && !source.is_function_like(db) {
             return self.never();
         }
+
         self.check_callable_signature_pair(db, source.signatures(db), target.signatures(db))
     }
 
@@ -1042,5 +1037,29 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source.iter().when_all(db, self.constraints, |element| {
             self.check_callable_pair(db, *element, target)
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use crate::db::tests::setup_db;
+    use crate::types::{Parameter, Type};
+
+    #[test]
+    fn paramspec_value_materializations_do_not_add_return_type() {
+        let db = setup_db();
+        let env = db.program_environment();
+        let paramspec_value = Type::paramspec_value_callable(
+            &db,
+            Parameters::standard([
+                Parameter::positional_only(None).with_annotated_type(Type::object())
+            ]),
+        );
+        let bottom = paramspec_value.bottom_materialization(&db, &env);
+        assert_eq!(paramspec_value, bottom);
+        let top = paramspec_value.top_materialization(&db, &env);
+        assert_eq!(paramspec_value, top);
     }
 }

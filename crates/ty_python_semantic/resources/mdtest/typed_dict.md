@@ -3255,7 +3255,10 @@ def get_value(value: GetValue[ValueT]) -> ValueT:
 
 def _(value: StringValue | dict[str, Any]) -> None:
     if isinstance(value, GetAnyValue):
-        reveal_type(get_value(value))  # revealed: Any
+        reveal_type(value)  # revealed: StringValue | dict[str, Any]
+        # TODO: this returns `object` due to a synthesized `__getitem__` fallback overload on the `StringValue` TypedDict.
+        # This is a generic solver limitation. Inferring `str | Any` would be more accurate.
+        reveal_type(get_value(value))  # revealed: object
 ```
 
 The same `Any` result must remain valid when the mapping protocol uses a bounded type variable:
@@ -3276,7 +3279,9 @@ def get_bounded_mapping(value: SupportsKeysAndGetItem[str, BoundedValueT]) -> Bo
 
 def _(value: StringValue | dict[str, Any]) -> None:
     if isinstance(value, AnyValueMapping):
-        reveal_type(get_bounded_mapping(value))  # revealed: Any
+        # TODO: this should not emit an `invalid-argument-type` error (see TODO above)
+        # error: [invalid-argument-type]
+        reveal_type(get_bounded_mapping(value))  # revealed: Unknown
 ```
 
 A `TypedDict` that permits extra items of type `Any` keeps that type when copied:

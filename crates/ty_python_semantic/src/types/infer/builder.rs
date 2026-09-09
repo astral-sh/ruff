@@ -6156,40 +6156,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         type OverloadsWithBinding<'a, 'db> = Vec<(
             &'a Binding<'db>,
             &'a CallableBinding<'db>,
-            Option<Specialization<'db>>,
+            OnceCell<Option<Specialization<'db>>>,
         )>;
 
         fn add_overloads_from_binding<'a, 'db>(
-            db: &'db dyn Db,
-            env: &ProgramEnvironment<'db>,
             overloads_with_binding: &mut OverloadsWithBinding<'a, 'db>,
             binding: &'a CallableBinding<'db>,
-            constraints: &ConstraintSetBuilder<'db>,
-            call_expression_tcx: TypeContext<'db>,
         ) {
             let mut matching_overloads = binding.matching_overloads().peekable();
             if matching_overloads.peek().is_some() {
-                overloads_with_binding.extend(matching_overloads.map(|(_, overload)| {
-                    let specialization = overload.argument_type_context_specialization(
-                        db,
-                        env,
-                        constraints,
-                        call_expression_tcx,
-                    );
-
-                    (overload, binding, specialization)
-                }));
-            } else if let Some(overload) = binding.best_failing_overload() {
-                let specialization = overload.argument_type_context_specialization(
-                    db,
-                    env,
-                    constraints,
-                    call_expression_tcx,
+                overloads_with_binding.extend(
+                    matching_overloads.map(|(_, overload)| (overload, binding, OnceCell::new())),
                 );
-
+            } else if let Some(overload) = binding.best_failing_overload() {
                 // If there is a single overload that does not match, we still infer the argument
                 // types for better diagnostics.
-                overloads_with_binding.push((overload, binding, specialization));
+                overloads_with_binding.push((overload, binding, OnceCell::new()));
             }
         }
         let db = self.db();
@@ -6200,25 +6182,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut overloads_with_binding: OverloadsWithBinding = Vec::new();
         if let Some(candidates) = candidates {
             bindings.visit_overload_set(candidates, &mut |overload, binding| {
-                let specialization = overload.argument_type_context_specialization(
-                    db,
-                    env,
-                    constraints,
-                    call_expression_tcx,
-                );
-
-                overloads_with_binding.push((overload, binding, specialization));
+                overloads_with_binding.push((overload, binding, OnceCell::new()));
             });
         } else {
             bindings.visit_type_context_callables(&mut |binding| {
-                add_overloads_from_binding(
-                    db,
-                    env,
-                    &mut overloads_with_binding,
-                    binding,
-                    constraints,
-                    call_expression_tcx,
-                );
+                add_overloads_from_binding(&mut overloads_with_binding, binding);
             });
         }
 
@@ -6230,7 +6198,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
 
                 let parameter_tcx =
-                    |overload: &Binding<'db>, binding: &CallableBinding<'db>, specialization| {
+                    |overload: &Binding<'db>,
+                     binding: &CallableBinding<'db>,
+                     specialization: &OnceCell<Option<Specialization<'db>>>| {
                         overload.argument_type_context(
                             db,
                             env,
@@ -6239,7 +6209,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             argument_types,
                             argument_index,
                             call_expression_tcx,
-                            specialization,
+                            || {
+                                *specialization.get_or_init(|| {
+                                    overload.argument_type_context_specialization(
+                                        db,
+                                        env,
+                                        constraints,
+                                        call_expression_tcx,
+                                    )
+                                })
+                            },
                         )
                     };
 
@@ -6249,14 +6228,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     MatchingArgumentTypeContext::Unique(parameter_tcx(
                         overload,
                         binding,
-                        *specialization,
+                        specialization,
                     ))
                 } else {
                     MatchingArgumentTypeContext::Many(
                         overloads_with_binding
                             .iter()
                             .map(|(overload, binding, specialization)| {
-                                parameter_tcx(overload, binding, *specialization)
+                                parameter_tcx(overload, binding, specialization)
                             })
                             .collect(),
                     )

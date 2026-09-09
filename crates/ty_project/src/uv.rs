@@ -69,6 +69,32 @@ impl Combine for UseUv {
     }
 }
 
+/// Host variables needed by uv integration tests to find executables, Python installations, and caches.
+///
+/// Tests use this allowlist after clearing the inherited environment so host settings such as
+/// `UV_LOCKED` and `PYTHONPATH` cannot affect subprocesses.
+#[allow(
+    clippy::disallowed_methods,
+    reason = "Test only code, intentionally inherit variables from the host's environment."
+)]
+pub fn uv_test_env_vars() -> impl Iterator<Item = (&'static str, String)> {
+    [
+        "PATH",
+        "PATHEXT",
+        "SYSTEMROOT",
+        "HOME",
+        "USERPROFILE",
+        "XDG_DATA_HOME",
+        "TMPDIR",
+        "TEMP",
+        "TMP",
+        "UV_CACHE_DIR",
+        "UV_PYTHON_INSTALL_DIR",
+    ]
+    .into_iter()
+    .filter_map(|name| std::env::var(name).ok().map(|value| (name, value)))
+}
+
 #[cfg(test)]
 mod tests {
     use ruff_db::system::TestSystem;

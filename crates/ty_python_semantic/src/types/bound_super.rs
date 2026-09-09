@@ -31,11 +31,15 @@ pub(crate) enum TypeVarOwnerContext<'db> {
 }
 
 impl<'db> TypeVarOwnerContext<'db> {
-    fn typevar(self, db: &'db dyn Db) -> TypeVarInstance<'db> {
+    fn bound_typevar(self) -> BoundTypeVarInstance<'db> {
         match self {
             TypeVarOwnerContext::Bare(bound_typevar)
-            | TypeVarOwnerContext::SubclassOf(bound_typevar) => bound_typevar.typevar(db),
+            | TypeVarOwnerContext::SubclassOf(bound_typevar) => bound_typevar,
         }
+    }
+
+    fn typevar(self, db: &'db dyn Db) -> TypeVarInstance<'db> {
+        self.bound_typevar().typevar(db)
     }
 
     fn has_implicit_upper_bound(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
@@ -52,14 +56,12 @@ impl<'db> TypeVarOwnerContext<'db> {
     ) -> Type<'db> {
         match self {
             TypeVarOwnerContext::Bare(typevar) => typevar
-                .typevar(db)
                 .require_bound_or_constraints(db, env)
                 .as_type(db, env),
             TypeVarOwnerContext::SubclassOf(typevar) => SubclassOfType::try_from_instance(
                 db,
                 env,
                 typevar
-                    .typevar(db)
                     .require_bound_or_constraints(db, env)
                     .as_type(db, env),
             )
@@ -208,11 +210,13 @@ impl<'db> BoundSuperError<'db> {
         let type_var = type_var_context.typevar(db);
         match type_var_context.typevar(db).bound_or_constraints(db, env) {
             None => {
+                let top = type_var_context.bound_typevar().domain(db).top(db);
                 diagnostic.info(format_args!(
-                    "Type variable `{}` has `object` as its implicit upper bound",
+                    "Type variable `{}` has `{}` as its implicit upper bound",
                     type_var.name(db),
+                    top.display(db, env),
                 ));
-                Type::object()
+                top
             }
             Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                 diagnostic.info(format_args!(
@@ -669,9 +673,8 @@ impl<'db> BoundSuperType<'db> {
                 SubclassOfInner::Protocol(_) => SuperOwnerKind::Dynamic(DynamicType::Unknown),
                 SubclassOfInner::Dynamic(dynamic) => SuperOwnerKind::Dynamic(dynamic),
                 SubclassOfInner::TypeVar(bound_typevar) => {
-                    let typevar = bound_typevar.typevar(db);
-                    match typevar.bound_or_constraints(db, env) {
-                        Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                    match bound_typevar.require_bound_or_constraints(db, env) {
+                        TypeVarBoundOrConstraints::UpperBound(bound) => {
                             let class = match bound {
                                 Type::NominalInstance(instance) => Some(instance.class(db, env)),
                                 Type::ProtocolInstance(protocol) => {
@@ -698,23 +701,11 @@ impl<'db> BoundSuperType<'db> {
                                 );
                             }
                         }
-                        Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                        TypeVarBoundOrConstraints::Constraints(constraints) => {
                             return build_constrained_union(
                                 constraints,
                                 TypeVarOwnerContext::SubclassOf(bound_typevar),
                             );
-                        }
-                        None => {
-                            // No bound means the implicit upper bound is `object`.
-                            SuperOwnerKind::Resolved(Self::resolve_class_super_owner(
-                                db,
-                                pivot_class,
-                                pivot_class_type,
-                                owner_type,
-                                owner_type,
-                                ClassType::object(db, env),
-                                Some(TypeVarOwnerContext::SubclassOf(bound_typevar)),
-                            )?)
                         }
                     }
                 }
@@ -788,9 +779,8 @@ impl<'db> BoundSuperType<'db> {
                 return delegate_to(alias.value_type(db));
             }
             Type::TypeVar(bound_typevar) => {
-                let typevar = bound_typevar.typevar(db);
-                match typevar.bound_or_constraints(db, env) {
-                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                match bound_typevar.require_bound_or_constraints(db, env) {
+                    TypeVarBoundOrConstraints::UpperBound(bound) => {
                         let class = match bound {
                             Type::NominalInstance(instance) => Some(instance.class(db, env)),
                             Type::ProtocolInstance(protocol) => {
@@ -814,22 +804,11 @@ impl<'db> BoundSuperType<'db> {
                             );
                         }
                     }
-                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                    TypeVarBoundOrConstraints::Constraints(constraints) => {
                         return build_constrained_union(
                             constraints,
                             TypeVarOwnerContext::Bare(bound_typevar),
                         );
-                    }
-                    None => {
-                        // No bound means the implicit upper bound is `object`.
-                        SuperOwnerKind::Resolved(Self::resolve_instance_super_owner(
-                            db,
-                            pivot_class,
-                            pivot_class_type,
-                            owner_type,
-                            ClassType::object(db, env),
-                            Some(TypeVarOwnerContext::Bare(bound_typevar)),
-                        )?)
                     }
                 }
             }

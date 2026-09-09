@@ -284,6 +284,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     } else {
                         Fix::applicable_edit(call_edit, applicability)
                     };
+                    let source = source_text(db, self.file());
+                    let expression_text = &source[test.range()];
+                    let prefix = if is_awaitable_coro_function {
+                        "await "
+                    } else {
+                        ""
+                    };
+                    diagnostic.help(format_args!(
+                        "Replace with `{prefix}{expression_text}{call}`"
+                    ));
                     diagnostic.set_fix(fix);
                 }
 

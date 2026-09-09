@@ -5485,11 +5485,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         let call_expr = self.add_standalone_expression(value);
 
                         let predicate = Predicate {
-                            node: PredicateNode::IsNonTerminalCall(CallableAndCallExpr {
-                                callable,
-                                call_expr,
-                                is_await,
-                            }),
+                            node: PredicateNode::IsNonTerminalCall(CallableAndCallExpr::new(
+                                self.db, callable, call_expr, is_await,
+                            )),
                             is_positive: true,
                         };
 
