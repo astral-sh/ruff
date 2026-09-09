@@ -796,7 +796,7 @@ fn fmt_file_location<'db>(
 /// Returns the qualified name components for a scope, excluding the item itself.
 ///
 /// This is the shared logic used by both [`QualifiedClassName`](super::class::QualifiedClassName)
-/// and [`QualifiedTypeAliasName`](super::type_alias::QualifiedTypeAliasName) to compute the path
+/// and [`QualifiedTypeAliasName`] to compute the path
 /// components (module, enclosing classes, functions) leading to an item.
 ///
 /// # Returns
