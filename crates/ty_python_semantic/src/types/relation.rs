@@ -1867,7 +1867,42 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 Type::KnownInstance(KnownInstanceType::FunctoolsPartialCall(source_partial)),
                 Type::KnownInstance(KnownInstanceType::FunctoolsPartialCall(target_partial)),
             ) => self.with_recursion_guard(db, source, target, || {
-                self.check_callable_pair(db, source_partial.partial(db), target_partial.partial(db))
+                // The reduced signature of `partial(boolean)` is `() -> bool`, which is a
+                // subtype of the `() -> int` signature of `partial(integer)`. The wrapped
+                // functions still differ, and `.func` exposes which one was chosen:
+                //
+                // ```py
+                // from functools import partial
+                //
+                // def integer() -> int:
+                //     return 1
+                //
+                // def boolean() -> bool:
+                //     return True
+                //
+                // int_partial = partial(integer)
+                // bool_partial = partial(boolean)
+                //
+                // def choose(flag: bool) -> bool:
+                //     selected = bool_partial if flag else int_partial
+                //     return reveal_type(selected.func is boolean)  # revealed: bool
+                // ```
+                //
+                // The comparison is true when `flag` is true. Dropping `bool_partial` from the
+                // union based only on its reduced signature would make ty reveal `Literal[False]`
+                // instead of `bool`. Check the wrapped callable as well as the reduced signature.
+                self.check_type_pair(
+                    db,
+                    source_partial.wrapped(db).inner(db),
+                    target_partial.wrapped(db).inner(db),
+                )
+                .and(db, self.constraints, || {
+                    self.check_callable_pair(
+                        db,
+                        source_partial.partial(db),
+                        target_partial.partial(db),
+                    )
+                })
             }),
 
             (
