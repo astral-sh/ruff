@@ -28,11 +28,10 @@ use crate::types::class::{ClassType, KnownClass};
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::relation::{DisjointnessChecker, TypeRelationChecker, TypeVarEvaluation};
 use crate::types::set_theoretic::RecursivelyDefined;
-use crate::types::variance::{VarianceInferable, VarianceTerm};
 use crate::types::visitor::any_over_type_expanding_aliases;
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, ErrorContext,
-    FindLegacyTypeVarsVisitor, IntersectionType, Type, TypeContext, TypeMapping, UnionType,
+    ApplyTypeMappingVisitor, BoundTypeVarInstance, ErrorContext, FindLegacyTypeVarsVisitor,
+    IntersectionType, Type, TypeContext, TypeMapping, UnionType,
 };
 use crate::{Db, FxOrderSet};
 use ty_python_core::Truthiness;
@@ -168,27 +167,6 @@ pub(super) fn walk_tuple_type<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>
 
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for TupleType<'_> {}
-
-impl<'db> VarianceInferable<'db> for TupleType<'db> {
-    fn variance_of(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        typevar: BoundTypeVarIdentity<'db>,
-    ) -> VarianceTerm<'db> {
-        let elements = match self.tuple(db) {
-            Tuple::Fixed(tuple) => Either::Left(tuple.iter_all_elements()),
-            Tuple::Variable(tuple) => Either::Right(
-                tuple
-                    .iter_prefix_elements()
-                    .chain(std::iter::once(tuple.variable().tuple_class_type()))
-                    .chain(tuple.iter_suffix_elements()),
-            ),
-        };
-
-        VarianceTerm::join(db, elements.map(|ty| ty.variance_of(db, env, typevar)))
-    }
-}
 
 #[salsa::tracked]
 impl<'db> TupleType<'db> {
@@ -964,7 +942,7 @@ impl<'db> VariableSegment<'db> {
     ///
     /// Preserve the `TypeVarTuple` here so that variance inference and generic-context traversal
     /// can still observe it. Runtime element operations must use [`Self::element_type`] instead.
-    fn tuple_class_type(self) -> Type<'db> {
+    pub(super) fn tuple_class_type(self) -> Type<'db> {
         match self {
             Self::Homogeneous(element) => element,
             Self::TypeVarTuple(typevartuple) => Type::TypeVar(typevartuple),
