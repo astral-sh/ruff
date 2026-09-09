@@ -39,6 +39,11 @@ pub struct RecursiveVar<'db> {
 impl get_size2::GetSize for RecursiveVar<'_> {}
 
 impl<'db> RecursiveVar<'db> {
+    /// Whether this reference belongs to the innermost recursive binder.
+    pub(super) fn is_innermost(self, db: &'db dyn Db) -> bool {
+        self.depth(db) == 0
+    }
+
     /// Unfold references whose index equals the number of nested binders entered
     /// by the visitor. Smaller indices belong to inner binders and stay unchanged.
     /// Larger indices escape the closed input; binding also rejects equal indices,
@@ -156,7 +161,8 @@ impl<'db> RecursiveType<'db> {
     }
 
     fn build(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>, body: Type<'db>) -> Type<'db> {
-        if Self::has_unguarded_reference(db, body) {
+        // Alias arguments can expose a reference without introducing a container.
+        if body.has_unguarded_alias_cycle(db) {
             return Type::divergent(self.cycle(db).0);
         }
         if !RecursiveReferences::contains_escaping(db, env, body) {
@@ -170,19 +176,6 @@ impl<'db> RecursiveType<'db> {
             self.arguments(db),
             None,
         ))
-    }
-
-    /// Check a raw body for self-references reachable through unions alone.
-    /// No nested binders are entered, so index 0 always denotes the body's own binder.
-    fn has_unguarded_reference(db: &'db dyn Db, body: Type<'db>) -> bool {
-        match body {
-            Type::RecursiveVar(reference) => reference.depth(db) == 0,
-            Type::Union(union) => union
-                .elements(db)
-                .iter()
-                .any(|element| Self::has_unguarded_reference(db, *element)),
-            _ => false,
-        }
     }
 
     fn with_arguments(self, db: &'db dyn Db, arguments: Option<Specialization<'db>>) -> Self {

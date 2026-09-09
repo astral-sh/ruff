@@ -1194,8 +1194,8 @@ def compare_recursive_brand_to_member(left: RecursiveBrand) -> None:
 ```
 
 A recursive alias with changing type arguments may introduce values outside its original enum
-domain. Here, `True` compares equal to the integer-valued enum member, so the `bool` alternative
-must remain reachable.
+domain. Here, `True` compares equal to the integer-valued enum member. The `bool` alternative
+remains reachable and narrows to `True` or `False` according to the comparison.
 
 ```py
 from enum import IntEnum
@@ -1209,9 +1209,9 @@ type Changing[T] = T | Changing[bool]  # error: [cyclic-type-alias-definition]
 
 def compare_changing_specialization(value: Changing[BrandedNumber]) -> None:
     if value == Number.ONE:
-        reveal_type(value)  # revealed: (BrandedNumber & Literal[Number.ONE]) | bool
+        reveal_type(value)  # revealed: (BrandedNumber & Literal[Number.ONE]) | Literal[True]
     else:
-        reveal_type(value)  # revealed: (BrandedNumber & Literal[Number.TWO]) | bool
+        reveal_type(value)  # revealed: (BrandedNumber & Literal[Number.TWO]) | Literal[False]
 ```
 
 Mutually recursive aliases can likewise admit values outside their enum domain. Intersecting the
@@ -1227,9 +1227,9 @@ def compare_mutually_recursive_intersection(
     value: Intersection[RecursiveWithBool, RecursiveWithBrand],
 ) -> None:
     if value == Number.ONE:
-        reveal_type(value)  # revealed: bool | BrandedNumber
+        reveal_type(value)  # revealed: Literal[True] | (BrandedNumber & Literal[Number.ONE])
     else:
-        reveal_type(value)  # revealed: bool | BrandedNumber
+        reveal_type(value)  # revealed: Literal[False] | (BrandedNumber & Literal[Number.TWO])
 ```
 
 ## Recursive aliases containing gradual generic branches

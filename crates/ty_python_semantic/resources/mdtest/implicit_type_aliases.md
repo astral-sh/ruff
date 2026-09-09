@@ -2337,6 +2337,39 @@ def invalid_second() -> Second:
     return ((("leaf",),),)  # error: [invalid-return-type]
 ```
 
+### Unguarded recursion through generic aliases
+
+An alias that returns its argument unchanged does not make a recursive definition valid, even when
+the helper is applied more than once. We recover from these cycles before using the alias.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+type Identity[T] = T
+
+Direct = Identity["Direct"]
+Repeated = Identity[Identity["Repeated"]]
+
+def inspect(direct: Direct, repeated: Repeated):
+    reveal_type(direct)  # revealed: Divergent
+    reveal_type(repeated)  # revealed: Divergent
+    direct[0]
+    repeated[0]
+```
+
+A union retains its non-recursive alternative after recovery.
+
+```py
+WithLeaf = int | Identity["WithLeaf"]
+
+def inspect_union(value: WithLeaf):
+    reveal_type(value)  # revealed: int
+    value[0]  # error: [not-subscriptable]
+```
+
 ### Generic recursive aliases
 
 Type arguments are preserved at every recursive occurrence. A nested value with a different leaf
