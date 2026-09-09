@@ -5952,9 +5952,7 @@ impl<'db> Type<'db> {
                         .into()
                     }
                     "__self__" => Place::bound(bound_method.self_instance(db)).into(),
-                    "__func__" => {
-                        Place::bound(bound_method.func(db).underlying_function(db)).into()
-                    }
+                    "__func__" => Place::bound(bound_method.func(db)).into(),
                     _ => {
                         let result = KnownClass::MethodType
                             .to_instance(db, env)
@@ -5968,7 +5966,6 @@ impl<'db> Type<'db> {
                             // receiver.
                             bound_method
                                 .func(db)
-                                .underlying_function(db)
                                 .member_lookup_with_policy_and_receiver(
                                     db, env, name_str, policy, None,
                                 )

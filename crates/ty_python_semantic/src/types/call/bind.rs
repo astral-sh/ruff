@@ -1572,7 +1572,21 @@ impl<'db> Bindings<'db> {
             let Some(downstream_bindings) = constructor.downstream_constructor() else {
                 continue;
             };
-            if !reported_ctor_init_callables.insert(downstream_bindings.callable_type()) {
+            // Inherited synthesized initializers can bind the same signature to several
+            // class alternatives. Deduplicate by that bound signature while retaining
+            // specializations that change the accepted arguments.
+            let callable = match downstream_bindings.callable_type() {
+                Type::BoundMethod(method)
+                    if matches!(
+                        method.func(context.db()),
+                        Type::FunctionLiteral(_) | Type::Callable(_)
+                    ) =>
+                {
+                    Type::Callable(method.into_callable_type(context.db()))
+                }
+                ty => ty,
+            };
+            if !reported_ctor_init_callables.insert(callable) {
                 continue;
             }
             downstream_bindings.report_diagnostics_impl(context, node);
