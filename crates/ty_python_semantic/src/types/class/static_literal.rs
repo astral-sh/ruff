@@ -1173,7 +1173,16 @@ impl<'db> StaticClassLiteral<'db> {
     pub(in crate::types) fn inferred_metaclass(self, db: &'db dyn Db) -> ClassMetaclass<'db> {
         self.try_metaclass(db)
             .map(|(metaclass, _)| metaclass)
-            .unwrap_or_else(|_| ClassMetaclass::Selected(SubclassOfType::subclass_of_unknown()))
+            .unwrap_or_else(|error| match error.kind {
+                MetaclassErrorKind::Conflict { candidate, .. } => {
+                    // Keep the candidate for member lookup; `try_metaclass` still reports the
+                    // conflict during class validation. Falling back to `Unknown` here can change
+                    // attribute inference and make the conflict disappear on the next cycle
+                    // iteration, causing metaclass inference to oscillate.
+                    ClassMetaclass::Selected(candidate.metaclass.into())
+                }
+                _ => ClassMetaclass::Selected(SubclassOfType::subclass_of_unknown()),
+            })
     }
 
     /// Return the selected metaclass or protocol fallback, or an error if it cannot be inferred.
@@ -1187,7 +1196,6 @@ impl<'db> StaticClassLiteral<'db> {
             cycle_initial=|_, _, _| Err(MetaclassError {
                 kind: MetaclassErrorKind::Cycle,
             }),
-            cycle_fn=try_metaclass_cycle_fn,
             heap_size=ruff_memory_usage::heap_size,
         )]
         fn try_metaclass_inner<'db>(
@@ -3539,32 +3547,6 @@ pub(crate) enum InheritanceCycle {
 impl InheritanceCycle {
     pub(crate) const fn is_participant(self) -> bool {
         matches!(self, InheritanceCycle::Participant)
-    }
-}
-
-/// Preserve a successful metaclass selection when later cycle iterations report an error.
-///
-/// A metaclass conflict can depend on an attribute whose type in turn depends on the selected
-/// metaclass. Discarding the selection on a conflict can make that conflict disappear in the next
-/// iteration, causing inference to oscillate. Once we start widening cycle results, keep the
-/// successful selection so that these transient errors cannot restart the cycle.
-fn try_metaclass_cycle_fn<'db>(
-    _db: &'db dyn Db,
-    cycle: &salsa::Cycle,
-    previous: &Result<
-        (ClassMetaclass<'db>, Option<MetaclassTransformInfo<'db>>),
-        MetaclassError<'db>,
-    >,
-    current: Result<
-        (ClassMetaclass<'db>, Option<MetaclassTransformInfo<'db>>),
-        MetaclassError<'db>,
-    >,
-    _class: StaticClassLiteral<'db>,
-) -> Result<(ClassMetaclass<'db>, Option<MetaclassTransformInfo<'db>>), MetaclassError<'db>> {
-    if cycle.iteration() > crate::TAINTED_CYCLES && current.is_err() && previous.is_ok() {
-        previous.clone()
-    } else {
-        current
     }
 }
 
