@@ -2224,6 +2224,66 @@ def assign():
 valid: Tree[int] = [1, [2]]
 ```
 
+### Recursive aliases in union contexts
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+#### Nested dictionary literals
+
+An outer `None` alternative does not prevent a recursive alias from supplying the expected type for
+a nested dictionary. Implicit aliases and PEP 695 aliases accept the same values.
+
+```py
+Value = str | dict[str, "Value | None"]
+type ExplicitValue = str | dict[str, ExplicitValue | None]
+
+implicit: dict[str, Value | None] = {"input": {"location": "file"}}
+explicit: dict[str, ExplicitValue | None] = {"input": {"location": "file"}}
+
+invalid: dict[str, Value | None] = {"input": {"location": 1}}  # error: [invalid-assignment]
+```
+
+#### Subscript assignments
+
+The expected value type of a dictionary supplies the list element type for both literals and
+comprehensions, even when that value type includes a recursive alias and `None`.
+
+```py
+Value = str | list["Value | None"]
+type ExplicitValue = str | list[ExplicitValue | None]
+
+def implicit(data: dict[str, Value | None], values: list[Value | None]):
+    data["fields"] = ["name"]
+    data["filtered"] = [value for value in values if value is not None]
+
+def explicit(data: dict[str, ExplicitValue | None], values: list[ExplicitValue | None]):
+    data["fields"] = ["name"]
+    data["filtered"] = [value for value in values if value is not None]
+```
+
+#### Return after narrowing
+
+A value remains compatible with the recursive alias after excluding one of its alternatives. It can
+be placed in a dictionary whose values have that alias type.
+
+```py
+Value = str | list["Value | None"] | dict[str, "Value | None"]
+type ExplicitValue = str | list[ExplicitValue | None] | dict[str, ExplicitValue | None]
+
+def implicit(value: Value | None) -> Value | None:
+    if isinstance(value, list):
+        return None
+    return {"items": value}
+
+def explicit(value: ExplicitValue | None) -> ExplicitValue | None:
+    if isinstance(value, list):
+        return None
+    return {"items": value}
+```
+
 ### String variables are not recursive aliases
 
 A string assignment remains a runtime value even when its contents describe a recursive type. An
