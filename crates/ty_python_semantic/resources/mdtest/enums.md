@@ -2320,6 +2320,16 @@ class Settings:
 Settings.default = Answer.YES
 ```
 
+An enum's non-member attribute can also hold a member of another enum:
+
+```py
+class Other(Enum):
+    MEMBER = 1
+    default = nonmember(Answer.NO)
+
+Other.default = Answer.YES
+```
+
 ## Calling enum variants
 
 ```py

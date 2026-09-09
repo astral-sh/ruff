@@ -13,6 +13,7 @@ use ty_python_core::use_def_map;
 
 use super::call::CallArguments;
 use super::callable::CallableTypeKind;
+use super::cyclic::{ActiveRecursionDetector, TypeIdentity};
 use super::enums::enum_metadata;
 use super::{
     IntersectionType, KnownClass, KnownInstanceType, MemberLookupPolicy, Parameter, Signature,
@@ -110,7 +111,7 @@ pub(super) enum InstanceAttributeWriteMember<'db> {
 /// The member that governs a write through a class object.
 ///
 /// Enum members are read-only. For other attributes, lookup follows descriptor precedence:
-/// A data descriptor on the metaclass takes precedence over the class object's own attributes,
+/// a data descriptor on the metaclass takes precedence over the class object's own attributes,
 /// which in turn take precedence over definitely non-data metaclass members. If the metaclass
 /// member is absent, possibly undefined, or could be a non-data descriptor, the class object's own
 /// attributes form the fallback.
@@ -427,6 +428,39 @@ fn instance_attribute_write_member_requirement<'db>(
     }
 }
 
+/// Whether an assignment through a class represented by `instance_ty` can target an enum member.
+///
+/// A generic class write must be valid for every constraint or union-bound alternative. Expand
+/// those alternatives only for this check, preserving the symbolic receiver for normal writes.
+fn class_write_targets_enum_member<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    instance_ty: Type<'db>,
+    attribute: &str,
+    active_aliases: &ActiveRecursionDetector<TypeIdentity<'db>>,
+) -> bool {
+    let check = |ty| class_write_targets_enum_member(db, env, ty, attribute, active_aliases);
+    match instance_ty {
+        Type::TypeAlias(alias) => active_aliases.visit(
+            &instance_ty.to_type_identity(db),
+            || false,
+            || check(alias.value_type(db)),
+        ),
+        Type::TypeVar(typevar) => match typevar.require_bound_or_constraints(db, env) {
+            TypeVarBoundOrConstraints::UpperBound(bound) => check(bound),
+            TypeVarBoundOrConstraints::Constraints(constraints) => {
+                constraints.elements(db).iter().copied().any(check)
+            }
+        },
+        Type::Union(union) => union.elements(db).iter().copied().any(check),
+        Type::Intersection(intersection) => intersection.positive(db).iter().copied().any(check),
+        _ => instance_ty
+            .nominal_class(db, env)
+            .and_then(|class| enum_metadata(db, class.class_literal(db)))
+            .is_some_and(|metadata| metadata.contains_member(attribute)),
+    }
+}
+
 /// Resolve a class-object write against the metaclass and then the class object's attributes.
 ///
 /// The receiver must be convertible to an instance type so that `Self` in class-attribute
@@ -445,10 +479,13 @@ fn class_attribute_write_requirement<'db>(
     };
     // EnumType.__setattr__ rejects member reassignment before descriptor dispatch. Resolve
     // membership by name: a non-member attribute can also contain an enum literal.
-    if let Some(class) = class_attr_self_ty.nominal_class(db, env)
-        && let Some(metadata) = enum_metadata(db, class.class_literal(db))
-        && metadata.contains_member(attribute)
-    {
+    if class_write_targets_enum_member(
+        db,
+        env,
+        class_attr_self_ty,
+        attribute,
+        &ActiveRecursionDetector::default(),
+    ) {
         return AttributeWriteRequirement::Class {
             object_ty,
             member: ClassAttributeWriteMember::EnumMember,
