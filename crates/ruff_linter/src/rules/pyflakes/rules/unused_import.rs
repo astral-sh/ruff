@@ -133,6 +133,7 @@ use crate::{Applicability, Fix, FixAvailability, Violation};
 /// ```
 ///
 /// ## Options
+/// - `lint.dummy-variable-rgx`
 /// - `lint.ignore-init-module-imports`
 /// - `lint.pyflakes.allowed-unused-imports`
 ///
@@ -340,6 +341,12 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope) {
         };
 
         let name = binding.name(checker.source());
+
+        // As a special case, imports matching the dummy variable pattern are
+        // always considered used.
+        if checker.settings().dummy_variable_rgx.is_match(name) {
+            continue;
+        }
 
         // If an import is marked as required, avoid treating it as unused, regardless of whether
         // it was _actually_ used.
