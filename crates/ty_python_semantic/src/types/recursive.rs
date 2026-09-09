@@ -77,7 +77,29 @@ pub struct RecursiveMapping<'db>(RecursiveSubstitution<'db>);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize)]
 enum RecursiveSubstitution<'db> {
     Unfold(RecursiveType<'db>),
-    Bind(RecursiveType<'db>),
+    Bind(RecursiveBinding<'db>),
+}
+
+/// Inference binds references to an alias across iterations; transformations bind an exact type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize)]
+enum RecursiveBinding<'db> {
+    Alias(RecursiveCycle),
+    Constructor(RecursiveType<'db>),
+}
+
+impl<'db> RecursiveBinding<'db> {
+    fn matches(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> bool {
+        match self {
+            Self::Alias(cycle) => {
+                recursive.cycle(db) == cycle && recursive.materialization_kind(db).is_none()
+            }
+            Self::Constructor(target) => {
+                recursive.cycle(db) == target.cycle(db)
+                    && recursive.body(db) == target.body(db)
+                    && recursive.materialization_kind(db) == target.materialization_kind(db)
+            }
+        }
+    }
 }
 
 /// The query cycle that introduced a provisional recursive type.
@@ -188,29 +210,35 @@ impl<'db> RecursiveType<'db> {
         definition: Definition<'db>,
         cycle: salsa::Id,
         parameters: Option<GenericContext<'db>>,
-    ) -> Type<'db> {
+    ) -> Self {
         let arguments = parameters.map(|parameters| parameters.identity_specialization(db));
-        Type::Recursive(Self::new_internal(
+        Self::new_internal(
             db,
             definition,
             RecursiveCycle(cycle),
             Type::RecursiveVar(RecursiveVar::new_internal(db, 0, arguments)),
             arguments,
             None,
-        ))
+        )
     }
 
     /// Close recursive occurrences after inferring an alias's constructor expression.
     pub(super) fn recover(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        previous: Type<'db>,
+        definition: Definition<'db>,
+        cycle: salsa::Id,
+        parameters: Option<GenericContext<'db>>,
         result: Type<'db>,
     ) -> Type<'db> {
-        let Type::Recursive(previous) = previous else {
-            return result;
-        };
-        previous.bind(db, env, result)
+        // Shared dependencies can still contain older iterations of this alias. They refer
+        // to the same definition even when their provisional bodies differ. Derive the binder
+        // from the query inputs: an earlier result might not expose recursive references yet.
+        Self::initial(db, definition, cycle, parameters).bind(
+            db,
+            &ProgramEnvironment::from_definition(definition),
+            result,
+            RecursiveBinding::Alias(RecursiveCycle(cycle)),
+        )
     }
 
     /// Bind occurrences of this recursive constructor in a closed result.
@@ -220,10 +248,11 @@ impl<'db> RecursiveType<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         original: Type<'db>,
+        binding: RecursiveBinding<'db>,
     ) -> Type<'db> {
         let body = original.apply_type_mapping_impl(
             db,
-            &TypeMapping::Recursive(RecursiveMapping(RecursiveSubstitution::Bind(self))),
+            &TypeMapping::Recursive(RecursiveMapping(RecursiveSubstitution::Bind(binding))),
             TypeContext::default(),
             &ApplyTypeMappingVisitor::new(env),
         );
@@ -348,10 +377,8 @@ impl<'db> RecursiveType<'db> {
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Type<'db> {
         match mapping {
-            TypeMapping::Recursive(RecursiveMapping(RecursiveSubstitution::Bind(target)))
-                if self.cycle(db) == target.cycle(db)
-                    && self.body(db) == target.body(db)
-                    && self.materialization_kind(db) == target.materialization_kind(db) =>
+            TypeMapping::Recursive(RecursiveMapping(RecursiveSubstitution::Bind(binding)))
+                if binding.matches(db, self) =>
             {
                 let arguments = self
                     .arguments(db)
@@ -406,7 +433,12 @@ impl<'db> RecursiveType<'db> {
                 let mapped = visitor.visit(db, Type::Recursive(constructor), mapping, || {
                     constructor.map_type(db, visitor.env, |unfolded| {
                         let mapped = unfolded.apply_type_mapping_impl(db, mapping, tcx, visitor);
-                        constructor.bind(db, visitor.env, mapped)
+                        constructor.bind(
+                            db,
+                            visitor.env,
+                            mapped,
+                            RecursiveBinding::Constructor(constructor),
+                        )
                     })
                 });
                 let mapped = match self.arguments(db) {

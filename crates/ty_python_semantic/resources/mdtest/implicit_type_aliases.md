@@ -2413,6 +2413,140 @@ def inspect(outer: Outer[int]):
     reveal_type(inner[3])  # revealed: Inner[int] | None
 ```
 
+### Shared references in mutually recursive aliases
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+A tuple can reach the same alias both directly and through another alias. Both paths preserve the
+leaf type, including when they return to the outer tuple. The aliases describe the same types as
+their explicit counterparts.
+
+```py
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
+
+Root = tuple[int, "Branch | None", "Shared | None"]
+Branch = tuple["Shared | None"]
+Shared = tuple["Root | None", "Branch | None"]
+
+type ExplicitRoot = tuple[int, ExplicitBranch | None, ExplicitShared | None]
+type ExplicitBranch = tuple[ExplicitShared | None]
+type ExplicitShared = tuple[ExplicitRoot | None, ExplicitBranch | None]
+
+static_assert(is_equivalent_to(Root, ExplicitRoot))
+static_assert(is_equivalent_to(Branch, ExplicitBranch))
+static_assert(is_equivalent_to(Shared, ExplicitShared))
+
+def inspect(root: Root):
+    reveal_type(root[0])  # revealed: int
+    branch = root[1]
+    if branch is not None:
+        shared = branch[0]
+        if shared is not None:
+            next_root = shared[0]
+            if next_root is not None:
+                reveal_type(next_root[0])  # revealed: int
+    shared = root[2]
+    if shared is not None:
+        branch = shared[1]
+        if branch is not None:
+            next_shared = branch[0]
+            if next_shared is not None:
+                next_root = next_shared[0]
+                if next_root is not None:
+                    reveal_type(next_root[0])  # revealed: int
+
+def valid() -> Root:
+    return (1, None, (None, (((2, None, None), None),)))
+
+def invalid() -> Root:
+    return (1, None, (None, ((("bad", None, None), None),)))  # error: [invalid-return-type]
+```
+
+### Shared references with changing type arguments
+
+Each alias binds its own type parameter. Traversing a branch wraps that parameter in a list, whether
+the branch is reached directly or through the shared alias.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+V = TypeVar("V")
+Root = tuple[T, "Branch[T] | None", "Shared[T] | None"]
+Branch = tuple["Shared[list[U]] | None"]
+Shared = tuple["Root[V] | None", "Branch[V] | None"]
+
+def inspect(root: Root[int]):
+    reveal_type(root[0])  # revealed: int
+    branch = root[1]
+    if branch is not None:
+        shared = branch[0]
+        if shared is not None:
+            next_root = shared[0]
+            if next_root is not None:
+                reveal_type(next_root[0])  # revealed: list[int]
+    shared = root[2]
+    if shared is not None:
+        branch = shared[1]
+        if branch is not None:
+            next_shared = branch[0]
+            if next_shared is not None:
+                next_root = next_shared[0]
+                if next_root is not None:
+                    reveal_type(next_root[0])  # revealed: list[int]
+
+def valid() -> Root[int]:
+    return (1, None, (None, ((([2], None, None), None),)))
+
+def invalid() -> Root[int]:
+    return (1, None, (None, (((["bad"], None, None), None),)))  # error: [invalid-return-type]
+```
+
+### Generic recursion through different paths
+
+Returning to the outer alias directly preserves its type argument. Returning through another alias
+can change that argument without changing the type of the other path.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+V = TypeVar("V")
+Root = tuple[T, "Direct[T] | None", "Via[T] | None"]
+Direct = tuple[U, "Root[U] | None"]
+Via = tuple[V, "Direct[list[V]] | None"]
+
+def inspect(root: Root[int]):
+    reveal_type(root[0])  # revealed: int
+    direct = root[1]
+    if direct is not None:
+        reveal_type(direct[0])  # revealed: int
+        next_root = direct[1]
+        if next_root is not None:
+            reveal_type(next_root[0])  # revealed: int
+    via = root[2]
+    if via is not None:
+        reveal_type(via[0])  # revealed: int
+        direct = via[1]
+        if direct is not None:
+            reveal_type(direct[0])  # revealed: list[int]
+            next_root = direct[1]
+            if next_root is not None:
+                reveal_type(next_root[0])  # revealed: list[int]
+
+def valid() -> Root[int]:
+    return (1, (2, None), (3, ([4], None)))
+
+def invalid() -> Root[int]:
+    return (1, None, (2, ("bad", None)))  # error: [invalid-return-type]
+```
+
 ### Recursive callable parameters
 
 A recursive callable accepts another callable with the same signature. Its recursive parameter
