@@ -1075,6 +1075,42 @@ class C(A): ...  # error: [cyclic-class-definition]
 reveal_type(A.__class__)  # revealed: type[Unknown]
 ```
 
+## Metaclass conflicts during recursive attribute inference
+
+A stub can refer to an inherited type alias through a nested class with a custom metaclass. When an
+attribute named `type` also depends on that alias, inferring the metaclass's bases can depend on the
+metaclass being selected. Type checking completes even when temporary metaclass conflicts arise
+during this inference cycle.
+
+Regression test for [ty#4492](https://github.com/astral-sh/ty/issues/4492).
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from mod import Outer
+
+# TODO: This should be `int`.
+reveal_type(Outer.value)  # revealed: Unknown
+```
+
+`mod.pyi`:
+
+```pyi
+class Wrapper[T](type): ...
+
+class Outer:
+    class Aliases:
+        Value = int
+
+    class Meta(Wrapper[int], type): ...
+    class Inner(Aliases, metaclass=Meta): ...
+    value: Outer.Inner.Value
+    type: Outer.Inner.Value
+```
+
 ## PEP 695 generic
 
 ```toml
