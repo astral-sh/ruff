@@ -35,7 +35,7 @@ env:
 jobs:
   determine_changes:
     name: "Determine changes"
-    runs-on: ubuntu-latest
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
     outputs:
       comparison_base: ${{ steps.merge_base.outputs.sha }}
       # Flag that is raised when any code that affects parser is changed
@@ -274,7 +274,7 @@ jobs:
 
   cargo-fmt:
     name: "cargo fmt"
-    runs-on: ubuntu-latest
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -286,7 +286,7 @@ jobs:
 
   shellcheck:
     name: "shellcheck"
-    runs-on: ubuntu-latest
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -310,7 +310,7 @@ jobs:
 
   cargo-clippy:
     name: "cargo clippy"
-    runs-on: ubuntu-latest
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
     needs: determine_changes
     if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
     timeout-minutes: 20
@@ -332,7 +332,7 @@ jobs:
 
   hawk:
     name: "cargo hawk"
-    runs-on: ubuntu-latest
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
     needs: determine_changes
     if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
     timeout-minutes: 15
@@ -502,7 +502,7 @@ jobs:
 
   cargo-test-wasm:
     name: "cargo test (wasm)"
-    runs-on: ubuntu-latest
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
     needs: determine_changes
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
     timeout-minutes: 10
@@ -566,7 +566,7 @@ jobs:
 
   cargo-fuzz-build:
     name: "cargo fuzz build"
-    runs-on: ubuntu-latest
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
     needs: determine_changes
     if: ${{ github.ref == 'refs/heads/main' || needs.determine_changes.outputs.fuzz == 'true' || needs.determine_changes.outputs.code == 'true' }}
     timeout-minutes: 10
@@ -589,7 +589,7 @@ jobs:
 
   fuzz-parser:
     name: "fuzz parser"
-    runs-on: ubuntu-latest
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
     needs: determine_changes
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.parser == 'true' || needs.determine_changes.outputs.py-fuzzer == 'true') }}
     timeout-minutes: 20
@@ -630,7 +630,7 @@ jobs:
 
   scripts:
     name: "test scripts"
-    runs-on: ubuntu-latest
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
     needs: determine_changes
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
     timeout-minutes: 5
@@ -845,7 +845,7 @@ jobs:
 
   cargo-shear:
     name: "cargo shear"
-    runs-on: ubuntu-latest
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
     needs: determine_changes
     if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
     steps:
@@ -886,7 +886,7 @@ jobs:
 
   python-package:
     name: "python package"
-    runs-on: ubuntu-latest
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
     timeout-minutes: 20
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') }}
     steps:
@@ -968,7 +968,7 @@ jobs:
 
   docs:
     name: "mkdocs"
-    runs-on: ubuntu-latest
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -995,7 +995,7 @@ jobs:
 
   check-formatter-instability-and-black-similarity:
     name: "formatter instabilities and black similarity"
-    runs-on: ubuntu-latest
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
     needs: determine_changes
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.formatter == 'true' || github.ref == 'refs/heads/main') }}
     timeout-minutes: 10
@@ -1017,7 +1017,7 @@ jobs:
 
   check-ruff-lsp:
     name: "test ruff-lsp"
-    runs-on: ubuntu-latest
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
     timeout-minutes: 5
     needs: determine_changes
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
@@ -1070,7 +1070,7 @@ jobs:
 
   check-playground:
     name: "check playground"
-    runs-on: ubuntu-latest
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
     timeout-minutes: 5
     needs:
       - determine_changes
@@ -1409,7 +1409,7 @@ jobs:
       - prek
       - docs
       - python-package
-    runs-on: ubuntu-slim
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-2' || 'ubuntu-slim' }}
     steps:
       - name: "Check required jobs passed"
         run: |
