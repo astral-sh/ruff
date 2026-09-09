@@ -194,7 +194,7 @@ impl TestCase {
         if !changes.is_empty()
             && let Some(watcher) = &mut self.watcher
         {
-            watcher.update(&self.db);
+            watcher.update(&mut self.db);
             assert!(!watcher.has_errored_paths());
         }
 
@@ -510,7 +510,7 @@ where
     let watcher = directory_watcher(move |events| sender.send(events).unwrap())
         .with_context(|| "Failed to create directory watcher")?;
 
-    let watcher = ProjectWatcher::new(watcher, &db);
+    let watcher = ProjectWatcher::new(watcher, &mut db);
     assert!(!watcher.has_errored_paths());
 
     let test_case = TestCase {
@@ -1571,7 +1571,7 @@ fn shared_script_search_paths_are_unwatched_when_unused() -> anyhow::Result<()> 
 }
 
 #[test]
-fn removed_script_search_paths_keep_cached_files_up_to_date() -> anyhow::Result<()> {
+fn readded_script_search_paths_refresh_cached_files() -> anyhow::Result<()> {
     let script = r#"
     # /// script
     # [tool.ty.environment]
@@ -1582,27 +1582,47 @@ fn removed_script_search_paths_keep_cached_files_up_to_date() -> anyhow::Result<
     "#;
     let mut case = setup(|context: &mut SetupContext| {
         context.write_file("dependencies/dependency.py", "value = 1")?;
+        // On Linux, the project watch can also reach this directory through a symlink.
+        // Imports still need events under their search path when the watch is restored.
+        #[cfg(target_os = "linux")]
+        std::os::unix::fs::symlink(
+            context.join_root_path("dependencies").as_std_path(),
+            context
+                .join_project_path("linked_dependencies")
+                .as_std_path(),
+        )?;
         context.write_project_file("script.py", script)
     })?;
     let dependency = case.root_path().join("dependencies/dependency.py");
     assert!(case.db().check().is_empty());
 
-    // Removing the script metadata removes its extra search path from the project.
+    // Removing the script block removes its extra search path from the project.
     update_file(case.project_path("script.py"), "")?;
     let changes = case.take_watch_changes(event_for_file("script.py"));
     case.apply_changes(&changes);
 
     update_file(&dependency, "value = 'wrong'")?;
-    let changes = case.take_watch_changes(event_for_file("dependency.py"));
-    case.apply_changes(&changes);
 
     update_file(case.project_path("script.py"), script)?;
-    let changes = case.stop_watch(event_for_file("script.py"));
+    let changes = case.take_watch_changes(event_for_file("script.py"));
     case.apply_changes(&changes);
 
     let diagnostics = case.db().check();
     assert_eq!(diagnostics.len(), 1);
     assert_eq!(diagnostics[0].id().as_str(), "invalid-assignment");
+
+    update_file(&dependency, "value = 1")?;
+    let changes = case.stop_watch(event_for_file("dependency.py"));
+    #[cfg(target_os = "linux")]
+    assert!(
+        changes
+            .iter()
+            .any(|event| matches!(event, ChangeEvent::Changed { path, .. } if path == &dependency)),
+        "expected a change at the search path: {changes:?}"
+    );
+    case.apply_changes(&changes);
+
+    assert!(case.db().check().is_empty());
     Ok(())
 }
 
@@ -3137,7 +3157,7 @@ mod uv_metadata {
         if !changes.is_empty()
             && let Some(watcher) = &mut case.watcher
         {
-            watcher.update(&case.db);
+            watcher.update(&mut case.db);
             assert!(!watcher.has_errored_paths());
         }
 

@@ -4,8 +4,9 @@ use std::hash::Hasher;
 use tracing::info;
 
 use ruff_cache::{CacheKey, CacheKeyHasher};
-use ruff_db::Db as _;
+use ruff_db::files::Files;
 use ruff_db::system::{SystemPath, SystemPathBuf};
+use rustc_hash::FxHashSet;
 use ty_module_resolver::system_module_search_paths;
 
 use crate::Project;
@@ -17,8 +18,11 @@ use crate::watch::Watcher;
 pub struct ProjectWatcher {
     watcher: Watcher,
 
-    /// The watched paths, including paths retained to keep known files up to date.
+    /// The paths currently watched, in registration order.
     watched_paths: Vec<SystemPathBuf>,
+
+    /// Paths that were unwatched and must be refreshed if they are watched again.
+    inactive_paths: FxHashSet<SystemPathBuf>,
 
     /// True if registering a watcher for any path failed.
     has_errored_paths: bool,
@@ -29,10 +33,11 @@ pub struct ProjectWatcher {
 
 impl ProjectWatcher {
     /// Create a new project watcher.
-    pub fn new(watcher: Watcher, db: &ProjectDatabase) -> Self {
+    pub fn new(watcher: Watcher, db: &mut ProjectDatabase) -> Self {
         let mut watcher = Self {
             watcher,
             watched_paths: Vec::new(),
+            inactive_paths: FxHashSet::default(),
             cache_key: None,
             has_errored_paths: false,
         };
@@ -42,7 +47,7 @@ impl ProjectWatcher {
         watcher
     }
 
-    pub fn update(&mut self, db: &ProjectDatabase) {
+    pub fn update(&mut self, db: &mut ProjectDatabase) {
         let project = db.project();
         let new_cache_key = watch_paths_cache_key(db, project);
 
@@ -66,8 +71,6 @@ impl ProjectWatcher {
         )
         .map(SystemPath::to_path_buf)
         .collect();
-        let included_paths_len = paths.len();
-
         // Find the non-overlapping module search paths and filter out paths that are already covered by the project.
         // Module search paths are already canonicalized.
         let unique_module_paths = ruff_db::system::deduplicate_nested_paths(
@@ -82,26 +85,9 @@ impl ProjectWatcher {
                 .map(SystemPath::to_path_buf),
         );
 
-        // Removing a search path does not discard its cached files. Keep watching them so
-        // restoring that search path cannot reuse stale file contents or directory listings.
-        let retained_paths: Vec<_> = self
-            .watched_paths
-            .iter()
-            .filter(|path| {
-                !paths.iter().any(|current| path.starts_with(current))
-                    && db.files().has_known_files_under(db, path)
-            })
-            .cloned()
-            .collect();
-        // Current module paths take precedence over retained paths for overlapping symlinks.
-        paths.splice(included_paths_len..included_paths_len, retained_paths);
-
-        if paths == self.watched_paths {
-            self.cache_key = Some(new_cache_key);
-            return;
-        }
-
         let mut watcher_paths = self.watcher.paths_mut();
+        let requested: FxHashSet<_> = paths.iter().collect();
+        let mut reactivated_paths = Vec::new();
 
         // Unregister all watch paths because ordering is important for linux because
         // it only emits an event for the last added watcher if a subtree is covered by multiple watchers.
@@ -114,6 +100,9 @@ impl ProjectWatcher {
         //   - foo.py
         // ```
         for path in self.watched_paths.drain(..) {
+            if !requested.contains(&path) {
+                self.inactive_paths.insert(path.clone());
+            }
             if let Err(error) = watcher_paths.remove(&path) {
                 info!("Failed to remove the file watcher for path `{path}`: {error}");
             }
@@ -121,8 +110,7 @@ impl ProjectWatcher {
 
         self.has_errored_paths = false;
 
-        // Register project paths first, then retained and current module paths, and finally
-        // configuration paths.
+        // Register project paths first, then module paths, and finally configuration paths.
         for path in paths {
             if let Err(error) = watcher_paths.add(&path) {
                 // TODO: Log a user-facing warning.
@@ -131,6 +119,9 @@ impl ProjectWatcher {
                 );
                 self.has_errored_paths = true;
             } else {
+                if self.inactive_paths.remove(&path) {
+                    reactivated_paths.push(path.clone());
+                }
                 self.watched_paths.push(path);
             }
         }
@@ -150,6 +141,10 @@ impl ProjectWatcher {
         );
 
         self.cache_key = Some(new_cache_key);
+
+        // Changes to an unwatched path may not have updated Files. Refresh after registering
+        // the watch so changes made during the refresh can still produce watcher events.
+        Files::sync_all_recursive(db, reactivated_paths);
     }
 
     /// Returns `true` if setting up watching for any path failed.
