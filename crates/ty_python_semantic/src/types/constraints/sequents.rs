@@ -3,11 +3,14 @@
 use std::cell::Cell;
 use std::fmt::{Debug, Display};
 
+use itertools::Either;
+
 use crate::types::constraints::variables::{
     ConcreteEquivalenceBound, ConcreteLowerBound, ConcreteUpperBound, Constraint,
     ConstraintProvenance, ProvidesConcreteBound, ProvidesConcreteLowerBound,
     ProvidesConcreteUpperBound, ProvidesTypeVarBound, ProvidesTypeVarEquivalenceBound,
-    ProvidesTypeVarRangeBound, TypeVarEquivalenceBound, TypeVarRangeBound,
+    ProvidesTypeVarRangeBound, TypeVarEquivalenceBound, TypeVarEquivalenceDirectedView,
+    TypeVarRangeBound,
 };
 use crate::types::constraints::{
     ALWAYS_FALSE, ConstraintId, ConstraintSetBuilder, ConstraintSetStorage, Node,
@@ -40,7 +43,40 @@ use crate::{Db, Program, ProgramEnvironment};
 /// constraint sets.)
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(super) struct SequentMap<'db> {
-    pub(super) sequents: Vec<Sequent<Constraint<'db>>>,
+    /// The sequents that were discovered while creating this sequent map. Some of those sequents
+    /// will be "grouped", so that [`PathAssignments`][super::paths::PathAssignments] can add them
+    /// to a [`ConstraintSetBuilder`] in a way that respects the builder's typevar ordering.
+    pub(super) sequents: Vec<SequentGroup<'db>>,
+
+    /// Pending sequents that have not yet been added to [`sequents`][Self::sequents]. This is only
+    /// used during construction, and will be empty in a finalized sequent map.
+    pending: Vec<Sequent<Constraint<'db>>>,
+}
+
+/// A batch of sequents, along with information about the order they need to be imported into a
+/// [`ConstraintSetBuilder`].
+///
+/// A `SequentMap` is Salsa-cached independently of any particular [`ConstraintSetBuilder`]. Most
+/// sequents can be imported into a builder in the order that they are discovered.
+///
+/// However, if a sequent is derived from a [`TypeVarEquivalenceBound`], we have to be more
+/// careful. When comparing a concrete bound with a `TypeVarEquivalenceBound`, we will create
+/// sequents that substitute the `left` typevar for the `right`, and vice versa. A
+/// `TypeVarEquivalenceBound` is stored internally with its `left` and `right` typevars in an
+/// arbitrary order. That means that whether we do the `left → right` substitution or `right →
+/// left` substitution first can affect the types that we provide while solving, since
+/// [`PathAssignments`][super::paths::PathAssignments] uses "derivation discovery order" as a tiebreaker for derived sequents. The
+/// [`Grouped`][Self::Grouped] variant handles this by storing the sequents that we get for each
+/// substitution separately. This allows `PathAssignments` to choose which substitution direction
+/// to import first, based on its builder's local typevar ordering.
+#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+pub(super) enum SequentGroup<'db> {
+    Ungrouped(Box<[Sequent<Constraint<'db>>]>),
+    Grouped {
+        equivalence: TypeVarEquivalenceBound<'db>,
+        leftwards: Box<[Sequent<Constraint<'db>>]>,
+        rightwards: Box<[Sequent<Constraint<'db>>]>,
+    },
 }
 
 /// Describes one rule for deriving new implicit constraints from existing constraints in a BDD
@@ -98,7 +134,7 @@ impl<'db> SequentMap<'db> {
                 }
             };
 
-            for sequent in &self.sequents {
+            for sequent in self.all_sequents() {
                 match sequent {
                     Sequent::SingleTautology { .. } => {}
 
@@ -157,12 +193,65 @@ impl<'db> SequentMap<'db> {
         })
     }
 
+    fn all_sequents(&self) -> impl Iterator<Item = Sequent<Constraint<'db>>> {
+        self.sequents.iter().flat_map(|group| match group {
+            SequentGroup::Ungrouped(ungrouped) => Either::Left(ungrouped.iter().copied()),
+            SequentGroup::Grouped {
+                leftwards,
+                rightwards,
+                ..
+            } => Either::Right(std::iter::chain(
+                leftwards.iter().copied(),
+                rightwards.iter().copied(),
+            )),
+        })
+    }
+
+    fn extract_pending(&mut self) -> Box<[Sequent<Constraint<'db>>]> {
+        self.pending.drain(..).collect()
+    }
+
+    fn flush_pending(&mut self) {
+        if !self.pending.is_empty() {
+            let pending = self.extract_pending();
+            self.sequents.push(SequentGroup::Ungrouped(pending));
+        }
+    }
+
+    fn add_grouped_sequents(
+        &mut self,
+        equivalence: TypeVarEquivalenceBound<'db>,
+        mut f: impl FnMut(&mut Self, TypeVarEquivalenceDirectedView<'db>),
+    ) {
+        self.flush_pending();
+        f(self, equivalence.forwards());
+        let leftwards = self.extract_pending();
+        f(self, equivalence.backwards());
+        let rightwards = self.extract_pending();
+        match (leftwards.is_empty(), rightwards.is_empty()) {
+            (true, true) => {}
+            (true, false) => self.sequents.push(SequentGroup::Ungrouped(rightwards)),
+            (false, true) => self.sequents.push(SequentGroup::Ungrouped(leftwards)),
+            (false, false) => self.sequents.push(SequentGroup::Grouped {
+                equivalence,
+                leftwards,
+                rightwards,
+            }),
+        }
+    }
+
+    fn finish(&mut self) {
+        self.flush_pending();
+        self.sequents.shrink_to_fit();
+        self.pending.shrink_to_fit();
+    }
+
     fn add_single_tautology(&mut self, ante: Constraint<'db>) {
-        self.sequents.push(Sequent::SingleTautology { ante });
+        self.pending.push(Sequent::SingleTautology { ante });
     }
 
     fn add_pair_impossibility(&mut self, ante1: Constraint<'db>, ante2: Constraint<'db>) {
-        self.sequents
+        self.pending
             .push(Sequent::PairImpossibility { ante1, ante2 });
     }
 
@@ -172,7 +261,7 @@ impl<'db> SequentMap<'db> {
         ante2: Constraint<'db>,
         ante3: Constraint<'db>,
     ) {
-        self.sequents.push(Sequent::TripleImpossibility {
+        self.pending.push(Sequent::TripleImpossibility {
             ante1,
             ante2,
             ante3,
@@ -185,13 +274,12 @@ impl<'db> SequentMap<'db> {
         ante2: Constraint<'db>,
         post: Constraint<'db>,
     ) {
-        self.sequents
+        self.pending
             .push(Sequent::PairImplication { ante1, ante2, post });
     }
 
     fn add_single_implication(&mut self, ante: Constraint<'db>, post: Constraint<'db>) {
-        self.sequents
-            .push(Sequent::SingleImplication { ante, post });
+        self.pending.push(Sequent::SingleImplication { ante, post });
     }
 
     /// Returns a sequent map containing the sequents that we can infer from a single constraint in
@@ -220,7 +308,7 @@ impl<'db> SequentMap<'db> {
             );
             let mut map = SequentMap::default();
             constraint.add_sequents(db, env, &mut map);
-            map.sequents.shrink_to_fit();
+            map.finish();
             map
         }
 
@@ -259,7 +347,7 @@ impl<'db> SequentMap<'db> {
             );
             let mut map = SequentMap::default();
             left.add_sequents_with(db, env, &mut map, right);
-            map.sequents.shrink_to_fit();
+            map.finish();
             map
         }
 
@@ -1321,12 +1409,12 @@ impl<'db> ConcreteLowerBound<'db> {
         }
 
         // We can infer sequents from `α ≤ T` and `S ≤ U` if α _contains_ U.
-        Constraint::add_covariant_lower_weakened_sequent(db, env, map, self, other.forwards());
-        Constraint::add_covariant_lower_weakened_sequent(db, env, map, self, other.backwards());
-        Constraint::add_contravariant_lower_weakened_sequent(db, env, map, self, other.forwards());
-        Constraint::add_contravariant_lower_weakened_sequent(db, env, map, self, other.backwards());
-        Constraint::add_invariant_weakened_sequent(db, env, map, self, other.forwards());
-        Constraint::add_invariant_weakened_sequent(db, env, map, self, other.backwards());
+        map.add_grouped_sequents(other, |map, other| {
+            let reversed = other.reverse();
+            Constraint::add_covariant_lower_weakened_sequent(db, env, map, self, other);
+            Constraint::add_contravariant_lower_weakened_sequent(db, env, map, self, reversed);
+            Constraint::add_invariant_weakened_sequent(db, env, map, self, reversed);
+        });
     }
 }
 
@@ -1501,12 +1589,12 @@ impl<'db> ConcreteUpperBound<'db> {
         }
 
         // We can infer sequents from `T ≤ α` and `S = U` if α _contains_ S.
-        Constraint::add_covariant_upper_weakened_sequent(db, env, map, self, other.forwards());
-        Constraint::add_covariant_upper_weakened_sequent(db, env, map, self, other.backwards());
-        Constraint::add_contravariant_upper_weakened_sequent(db, env, map, self, other.forwards());
-        Constraint::add_contravariant_upper_weakened_sequent(db, env, map, self, other.backwards());
-        Constraint::add_invariant_weakened_sequent(db, env, map, self, other.forwards());
-        Constraint::add_invariant_weakened_sequent(db, env, map, self, other.backwards());
+        map.add_grouped_sequents(other, |map, other| {
+            let reversed = other.reverse();
+            Constraint::add_covariant_upper_weakened_sequent(db, env, map, self, reversed);
+            Constraint::add_contravariant_upper_weakened_sequent(db, env, map, self, other);
+            Constraint::add_invariant_weakened_sequent(db, env, map, self, reversed);
+        });
     }
 }
 
@@ -1613,36 +1701,14 @@ impl<'db> ConcreteEquivalenceBound<'db> {
         }
 
         // We can infer sequents from `T = α` and `S = U` if α _contains_ U.
-        Constraint::add_covariant_equivalence_weakened_sequent(
-            db,
-            env,
-            map,
-            self,
-            other.forwards(),
-        );
-        Constraint::add_covariant_equivalence_weakened_sequent(
-            db,
-            env,
-            map,
-            self,
-            other.backwards(),
-        );
-        Constraint::add_contravariant_equivalence_weakened_sequent(
-            db,
-            env,
-            map,
-            self,
-            other.forwards(),
-        );
-        Constraint::add_contravariant_equivalence_weakened_sequent(
-            db,
-            env,
-            map,
-            self,
-            other.backwards(),
-        );
-        Constraint::add_invariant_weakened_sequent(db, env, map, self, other.forwards());
-        Constraint::add_invariant_weakened_sequent(db, env, map, self, other.backwards());
+        map.add_grouped_sequents(other, |map, other| {
+            let reversed = other.reverse();
+            Constraint::add_covariant_equivalence_weakened_sequent(db, env, map, self, reversed);
+            Constraint::add_contravariant_equivalence_weakened_sequent(
+                db, env, map, self, reversed,
+            );
+            Constraint::add_invariant_weakened_sequent(db, env, map, self, reversed);
+        });
     }
 }
 
@@ -1903,8 +1969,7 @@ mod tests {
 
             assert!(
                 sequents
-                    .sequents
-                    .iter()
+                    .all_sequents()
                     .any(|sequent| matches!(sequent, Sequent::SingleImplication { .. }))
             );
             assert!(!SequentMap::pair_cannot_produce_sequents(

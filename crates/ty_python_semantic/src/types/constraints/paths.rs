@@ -9,7 +9,8 @@ use indexmap::map::Entry;
 use itertools::Itertools;
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use crate::types::constraints::sequents::{Sequent, SequentMap};
+use crate::types::constraints::sequents::{Sequent, SequentGroup, SequentMap};
+use crate::types::constraints::variables::Constraint;
 use crate::types::constraints::{
     ConstraintAssignment, ConstraintId, ConstraintSetStorage, Node, NodeId, PathVisitor,
     SourceOrderId, TypeVarId,
@@ -511,44 +512,74 @@ impl PathAssignments {
         storage: &mut ConstraintSetStorage<'db>,
         map: &SequentMap<'db>,
     ) -> Range<usize> {
-        let sequents = map.sequents.iter().map(|sequent| match sequent {
-            Sequent::SingleTautology { ante } => {
-                let ante = storage.intern_constraint(db, env, *ante);
-                Sequent::SingleTautology { ante }
-            }
-            Sequent::PairImpossibility { ante1, ante2 } => {
-                let ante1 = storage.intern_constraint(db, env, *ante1);
-                let ante2 = storage.intern_constraint(db, env, *ante2);
-                Sequent::PairImpossibility { ante1, ante2 }
-            }
-            Sequent::TripleImpossibility {
-                ante1,
-                ante2,
-                ante3,
-            } => {
-                let ante1 = storage.intern_constraint(db, env, *ante1);
-                let ante2 = storage.intern_constraint(db, env, *ante2);
-                let ante3 = storage.intern_constraint(db, env, *ante3);
+        fn intern_sequents<'db>(
+            db: &'db dyn Db,
+            env: &ProgramEnvironment<'db>,
+            storage: &mut ConstraintSetStorage<'db>,
+            sequents: &[Sequent<Constraint<'db>>],
+            dest: &mut Vec<Sequent<ConstraintId>>,
+        ) {
+            let sequents = sequents.iter().map(|sequent| match sequent {
+                Sequent::SingleTautology { ante } => {
+                    let ante = storage.intern_constraint(db, env, *ante);
+                    Sequent::SingleTautology { ante }
+                }
+                Sequent::PairImpossibility { ante1, ante2 } => {
+                    let ante1 = storage.intern_constraint(db, env, *ante1);
+                    let ante2 = storage.intern_constraint(db, env, *ante2);
+                    Sequent::PairImpossibility { ante1, ante2 }
+                }
                 Sequent::TripleImpossibility {
                     ante1,
                     ante2,
                     ante3,
+                } => {
+                    let ante1 = storage.intern_constraint(db, env, *ante1);
+                    let ante2 = storage.intern_constraint(db, env, *ante2);
+                    let ante3 = storage.intern_constraint(db, env, *ante3);
+                    Sequent::TripleImpossibility {
+                        ante1,
+                        ante2,
+                        ante3,
+                    }
+                }
+                Sequent::PairImplication { ante1, ante2, post } => {
+                    let ante1 = storage.intern_constraint(db, env, *ante1);
+                    let ante2 = storage.intern_constraint(db, env, *ante2);
+                    let post = storage.intern_constraint(db, env, *post);
+                    Sequent::PairImplication { ante1, ante2, post }
+                }
+                Sequent::SingleImplication { ante, post } => {
+                    let ante = storage.intern_constraint(db, env, *ante);
+                    let post = storage.intern_constraint(db, env, *post);
+                    Sequent::SingleImplication { ante, post }
+                }
+            });
+            dest.extend(sequents);
+        }
+
+        let start = self.sequents.len();
+        for group in &map.sequents {
+            match group {
+                SequentGroup::Ungrouped(sequents) => {
+                    intern_sequents(db, env, storage, sequents, &mut self.sequents);
+                }
+                SequentGroup::Grouped {
+                    equivalence,
+                    leftwards,
+                    rightwards,
+                } => {
+                    let (first, _) = equivalence.in_builder(db, storage);
+                    let (first, second) = if first.is_same_typevar_as(db, equivalence.left) {
+                        (leftwards, rightwards)
+                    } else {
+                        (rightwards, leftwards)
+                    };
+                    intern_sequents(db, env, storage, first, &mut self.sequents);
+                    intern_sequents(db, env, storage, second, &mut self.sequents);
                 }
             }
-            Sequent::PairImplication { ante1, ante2, post } => {
-                let ante1 = storage.intern_constraint(db, env, *ante1);
-                let ante2 = storage.intern_constraint(db, env, *ante2);
-                let post = storage.intern_constraint(db, env, *post);
-                Sequent::PairImplication { ante1, ante2, post }
-            }
-            Sequent::SingleImplication { ante, post } => {
-                let ante = storage.intern_constraint(db, env, *ante);
-                let post = storage.intern_constraint(db, env, *post);
-                Sequent::SingleImplication { ante, post }
-            }
-        });
-        let start = self.sequents.len();
-        self.sequents.extend(sequents);
+        }
         let end = self.sequents.len();
         start..end
     }
