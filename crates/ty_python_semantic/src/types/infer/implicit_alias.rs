@@ -109,13 +109,12 @@ impl<'db> ImplicitAliasLegacyTypeVarCollector<'_, 'db> {
         else {
             return;
         };
+        // References to aliases do not declare new type parameters.
         if matches!(
             typevar.kind(self.db),
             TypeVarKind::LegacyTypeVar
                 | TypeVarKind::LegacyParamSpec
                 | TypeVarKind::LegacyTypeVarTuple
-                | TypeVarKind::Pep613Alias
-                | TypeVarKind::TypingSelf
         ) {
             self.variables
                 .insert(typevar.with_binding_context(self.db, self.alias_definition));

@@ -2768,6 +2768,25 @@ def invalid() -> Tree[int]:
     return (("bad",),)  # error: [invalid-return-type]
 ```
 
+### Specialized aliases do not introduce type parameters
+
+A specialized generic alias does not make an enclosing recursive alias generic. Here `Identity`
+contributes `int` as a leaf type, so `Tree` takes no type arguments.
+
+```py
+from typing import TypeAlias, TypeVar
+
+T = TypeVar("T")
+Identity: TypeAlias = T
+Tree = list["Identity[int] | Tree"]
+
+def inspect(value: Tree):
+    reveal_type(value)  # revealed: Tree
+    reveal_type(value[0])  # revealed: int | Tree
+
+def invalid(value: Tree[str]): ...  # error: [not-subscriptable]
+```
+
 ### Recursive typed-dictionary fields in generic aliases
 
 A recursive field on a non-generic typed dictionary does not make an unrelated enclosing generic
