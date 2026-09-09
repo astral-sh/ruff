@@ -488,15 +488,6 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
         }
     }
 
-    /// Start fresh transformation caches for another mapping with the same context.
-    fn fresh(&self) -> Self {
-        Self {
-            recursion_context: self.recursion_context,
-            materialize_typevar_bounds_and_defaults: self.materialize_typevar_bounds_and_defaults,
-            ..Self::new(self.env)
-        }
-    }
-
     fn with_recursion_context(mut self, context: Option<&'env TypeRecursionContext<'db>>) -> Self {
         self.recursion_context = context;
         self
