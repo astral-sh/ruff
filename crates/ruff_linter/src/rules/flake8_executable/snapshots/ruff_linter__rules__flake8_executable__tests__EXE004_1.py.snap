@@ -6,6 +6,7 @@ EXE004 [*] Avoid whitespace before shebang
   |
 1 |     #!/usr/bin/python
   | ^^^^
+  |
 help: Remove whitespace before shebang
   |
   -     #!/usr/bin/python

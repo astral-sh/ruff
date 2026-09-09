@@ -146,6 +146,7 @@ error[invalid-type-form]: `typing.Concatenate` is not allowed in this context in
    |
 29 | reveal_type(Foo[[Concatenate]]().attr)  # revealed: (Unknown, /) -> None
    |                  ^^^^^^^^^^^
+   |
 info: `typing.Concatenate` is only valid:
 info:  - as the first argument to `Callable`
 info:  - as a type argument for a `ParamSpec` parameter
@@ -158,6 +159,7 @@ error[invalid-type-form]: `typing.Concatenate` is not allowed in this context in
    |
 31 | reveal_type(Foo[[Concatenate, int]]().attr)  # revealed: (Unknown, int, /) -> None
    |                  ^^^^^^^^^^^
+   |
 info: `typing.Concatenate` is only valid:
 info:  - as the first argument to `Callable`
 info:  - as a type argument for a `ParamSpec` parameter
@@ -170,6 +172,7 @@ error[invalid-type-form]: `typing.Concatenate` is not allowed in this context in
    |
 34 | reveal_type(Foo[[Concatenate[int], str]]().attr)  # revealed: (Unknown, str, /) -> None
    |                  ^^^^^^^^^^^^^^^^
+   |
 info: `typing.Concatenate` is only valid:
 info:  - as the first argument to `Callable`
 info:  - as a type argument for a `ParamSpec` parameter
@@ -182,6 +185,7 @@ error[invalid-type-form]: `typing.Concatenate` is not allowed in this context in
    |
 36 | reveal_type(Foo[[Concatenate[int, str], str]]().attr)  # revealed: (Unknown, str, /) -> None
    |                  ^^^^^^^^^^^^^^^^^^^^^
+   |
 info: `typing.Concatenate` is only valid:
 info:  - as the first argument to `Callable`
 info:  - as a type argument for a `ParamSpec` parameter
@@ -194,6 +198,7 @@ error[invalid-type-form]: `typing.Concatenate` is not allowed in this context in
    |
 38 | reveal_type(Foo[[Concatenate[()], str]]().attr)  # revealed: (Unknown, str, /) -> None
    |                  ^^^^^^^^^^^^^^^
+   |
 info: `typing.Concatenate` is only valid:
 info:  - as the first argument to `Callable`
 info:  - as a type argument for a `ParamSpec` parameter
@@ -224,6 +229,7 @@ error[invalid-type-form]: `typing.Concatenate` is not allowed in this context in
    |
 51 | reveal_type(Bar[[Concatenate], [Concatenate]]().a)  # revealed: (Unknown, /) -> int
    |                  ^^^^^^^^^^^
+   |
 info: `typing.Concatenate` is only valid:
 info:  - as the first argument to `Callable`
 info:  - as a type argument for a `ParamSpec` parameter
@@ -236,6 +242,7 @@ error[invalid-type-form]: `typing.Concatenate` is not allowed in this context in
    |
 51 | reveal_type(Bar[[Concatenate], [Concatenate]]().a)  # revealed: (Unknown, /) -> int
    |                                 ^^^^^^^^^^^
+   |
 info: `typing.Concatenate` is only valid:
 info:  - as the first argument to `Callable`
 info:  - as a type argument for a `ParamSpec` parameter

@@ -32,6 +32,7 @@ error[unsound-assignment]: Unsound assignment
   |        ---   ^^^^^^^^^^^^^ Inferred as `Any`
   |        |
   |        Expected a subtype of `int` because of this annotation
+  |
 info: `Any` is assignable to `int`, but not a subtype of `int`
 help: Consider using an `assert` to narrow the type before assigning it
 ```
@@ -54,6 +55,7 @@ error[unsound-assignment]: Unsound assignment
   |               ----------------------   ^^^^^^^^^^^^^^^^^^^^^^ Inferred as `tuple[tuple[Literal[42], Any]]`
   |               |
   |               Expected a subtype of `tuple[tuple[int, int]]` because of this annotation
+  |
 info: `tuple[tuple[Literal[42], Any]]` is assignable to `tuple[tuple[int, int]]`, but not a subtype of `tuple[tuple[int, int]]`
 info: the first tuple element is not compatible: `tuple[Literal[42], Any]` is not a subtype of `tuple[int, int]`
 info: └── the second tuple element is not compatible: `Any` is not a subtype of `int`
@@ -122,6 +124,7 @@ error[unsound-assignment]: Unsound assignment
 8 | # snapshot: unsound-assignment
 9 | value = returns_any()
   |         ^^^^^^^^^^^^^ Inferred as `Any`
+  |
 info: `Any` is assignable to `int`, but not a subtype of `int`
 help: Consider using an `assert` to narrow the type before assigning it
 ```
@@ -155,6 +158,7 @@ error[unsound-assignment]: Unsound assignment
   |                   --- Expected a subtype of `int` because of this annotation
 7 |     value = returns_any()  # snapshot: unsound-assignment
   |             ^^^^^^^^^^^^^ Inferred as `Any`
+  |
 info: `Any` is assignable to `int`, but not a subtype of `int`
 help: Consider using an `assert` to narrow the type before assigning it
 ```
@@ -182,6 +186,7 @@ error[unsound-assignment]: Unsound assignment
   |                     --- Variadic parameter annotation declares the type as `tuple[int, ...]`
 7 |     values = returns_any()  # snapshot: unsound-assignment
   |              ^^^^^^^^^^^^^ Inferred as `Any`
+  |
 info: `Any` is assignable to `tuple[int, ...]`, but not a subtype of `tuple[int, ...]`
 help: Consider using an `assert` to narrow the type before assigning it
 ```
@@ -222,6 +227,7 @@ error[unsound-assignment]: Unsound assignment
   |                     -------------------------- Variadic parameter annotation declares the type as `tuple[first.Value | second.Value, ...]`
 9 |     values = (first.Value(), returns_any())  # snapshot: unsound-assignment
   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Inferred as `tuple[first.Value, Any]`
+  |
 info: `tuple[first.Value, Any]` is assignable to `tuple[first.Value | second.Value, ...]`, but not a subtype of `tuple[first.Value | second.Value, ...]`
 help: Consider using an `assert` to narrow the type before assigning it
 ```
@@ -249,6 +255,7 @@ error[unsound-assignment]: Unsound assignment
   |                      --- Keyword-variadic parameter annotation declares the type as `dict[str, int]`
 7 |     values = returns_any()  # snapshot: unsound-assignment
   |              ^^^^^^^^^^^^^ Inferred as `Any`
+  |
 info: `Any` is assignable to `dict[str, int]`, but not a subtype of `dict[str, int]`
 help: Consider using an `assert` to narrow the type before assigning it
 ```
@@ -282,6 +289,7 @@ error[unsound-assignment]: Unsound assignment
    |     -----   ^^^^^^^^^^^^^ Inferred as `Any`
    |     |
    |     Expected a subtype of `int | str` because of its declared type
+   |
 info: `Any` is assignable to `int | str`, but not a subtype of `int | str`
 help: Consider using an `assert` to narrow the type before assigning it
 ```
@@ -330,6 +338,7 @@ error[unsound-assignment]: Unsound assignment
 7 |
 8 | if named_value := returns_any():  # snapshot: unsound-assignment
   |                   ^^^^^^^^^^^^^ Inferred as `Any`
+  |
 info: `Any` is assignable to `int`, but not a subtype of `int`
 help: Consider using an `assert` to narrow the type before assigning it
 ```
@@ -351,6 +360,7 @@ error[unsound-assignment]: Unsound assignment
    | --------------                 ^^^^^^^^^^^^^ Inferred as `Any`
    | |
    | Assigned to this variable
+   |
 info: `Any` is assignable to `int`, but not a subtype of `int`
 help: Consider using an `assert` to narrow the type before assigning it
 ```
@@ -379,6 +389,7 @@ error[unsound-assignment]: Unsound assignment
   |         -----               ^^^^^^^^^^^^^ Inferred as `Any`
   |         |
   |         Assigned to this variable
+  |
 info: `Any` is assignable to `int`, but not a subtype of `int`
 help: Consider using an `assert` to narrow the type before assigning it
 ```
@@ -407,6 +418,7 @@ error[unsound-assignment]: Unsound assignment
   |         ------             ^^^^^^^^^^^^^ Iterable element inferred as `Any` (expected a subtype of `int`)
   |         |
   |         Assigned to this variable
+  |
 info: `list[Any]` is assignable to `list[int]`, but not a subtype of `list[int]`
 help: Consider using an `assert` to narrow the type before assigning it
 ```
@@ -436,6 +448,7 @@ error[unsound-assignment]: Unsound assignment
   |         ------             ^^^^^^^^^^^^^^^^^^^ Iterable element inferred as `int | Any` (expected a subtype of `int`)
   |         |
   |         Assigned to this variable
+  |
 info: `list[int | Any]` is assignable to `list[int]`, but not a subtype of `list[int]`
 info: element `Any` of union `int | Any` is not a subtype of `int`
 help: Consider using an `assert` to narrow the type before assigning it
@@ -463,6 +476,7 @@ error[unsound-assignment]: Unsound assignment
 4 |
 5 | for value in cast(list[Any], []):  # snapshot: unsound-assignment
   |     ^^^^^ Inferred as `Any`
+  |
 info: `Any` is assignable to `int`, but not a subtype of `int`
 help: Consider using an `assert` to narrow the type before assigning it
 ```
@@ -520,6 +534,7 @@ error[unsound-assignment]: Unsound assignment
  9 |     global global_value
 10 |     global_value = returns_any()  # snapshot: unsound-assignment
    |                    ^^^^^^^^^^^^^ Inferred as `Any`
+   |
 info: `Any` is assignable to `int`, but not a subtype of `int`
 help: Consider using an `assert` to narrow the type before assigning it
 
@@ -534,6 +549,7 @@ error[unsound-assignment]: Unsound assignment
 16 |         nonlocal nonlocal_value
 17 |         nonlocal_value = returns_any()  # snapshot: unsound-assignment
    |                          ^^^^^^^^^^^^^ Inferred as `Any`
+   |
 info: `Any` is assignable to `int`, but not a subtype of `int`
 help: Consider using an `assert` to narrow the type before assigning it
 ```
@@ -560,6 +576,7 @@ error[unsound-assignment]: Unsound assignment
   |        --- Expected a subtype of `int` because of this annotation
 7 | value += returns_any()  # snapshot: unsound-assignment
   |          ^^^^^^^^^^^^^ Inferred as `Any`
+  |
 info: `Any` is assignable to `int`, but not a subtype of `int`
 help: Consider using an `assert` to narrow the type before assigning it
 ```
@@ -584,6 +601,7 @@ error[unsound-assignment]: Unsound assignment
    |          ------- Expected a subtype of `Counter` because of this annotation
 13 | counter += 1  # snapshot: unsound-assignment
    | ^^^^^^^^^^^^ Augmented assignment produces a value of type `Any`
+   |
 info: `Any` is assignable to `Counter`, but not a subtype of `Counter`
 help: Consider using an `assert` to narrow the type before assigning it
 ```

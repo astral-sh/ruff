@@ -91,6 +91,7 @@ error[unsupported-operator]: Unsupported `|` operation
    |        |     |
    |        |     Has type `Literal["Foo"]`
    |        Has type `<class 'int'>`
+   |
 info: All parameter annotations are evaluated at runtime by default on Python <3.14
 info: Python 3.13 was assumed when inferring types because it was specified on the command line
 help: Put quotes around the whole union rather than just certain elements
@@ -106,6 +107,7 @@ error[unsupported-operator]: Unsupported `|` operation
    |        |     |
    |        |     Has type `Literal["memoryview"]`
    |        Has type `<class 'int'>`
+   |
 info: All parameter annotations are evaluated at runtime by default on Python <3.14
 info: Python 3.13 was assumed when inferring types because it was specified on the command line
 help: Put quotes around the whole union rather than just certain elements
@@ -121,6 +123,7 @@ error[unsupported-operator]: Unsupported `|` operation
    |        |      |
    |        |      Has type `None`
    |        Has type `Literal["TD"]`
+   |
 info: All parameter annotations are evaluated at runtime by default on Python <3.14
 info: Python 3.13 was assumed when inferring types because it was specified on the command line
 help: Put quotes around the whole union rather than just certain elements
@@ -136,6 +139,7 @@ error[unsupported-operator]: Unsupported `|` operation
    |        |     |
    |        |     Has type `None`
    |        Has type `Literal["P"]`
+   |
 info: All parameter annotations are evaluated at runtime by default on Python <3.14
 info: Python 3.13 was assumed when inferring types because it was specified on the command line
 help: Put quotes around the whole union rather than just certain elements
@@ -148,6 +152,7 @@ error[unsupported-operator]: Unsupported `|` operation
    |
 33 |     h: None | None,
    |        ^^^^^^^^^^^ Both operands have type `None`
+   |
 info: All parameter annotations are evaluated at runtime by default on Python <3.14
 info: Python 3.13 was assumed when inferring types because it was specified on the command line
 
@@ -180,6 +185,7 @@ error[unsupported-operator]: Unsupported `|` operation
    |        |                    |
    |        |                    Has type `Literal["bytes"]`
    |        Has type `<class 'list[int | None]'>`
+   |
 info: All parameter annotations are evaluated at runtime by default on Python <3.14
 info: Python 3.13 was assumed when inferring types because it was specified on the command line
 help: Put quotes around the whole union rather than just certain elements
@@ -195,6 +201,7 @@ error[unsupported-operator]: Unsupported `|` operation
    |             |       |
    |             |       Has type `None`
    |             Has type `Literal["int"]`
+   |
 info: All parameter annotations are evaluated at runtime by default on Python <3.14
 info: Python 3.13 was assumed when inferring types because it was specified on the command line
 help: Put quotes around the whole union rather than just certain elements
@@ -210,6 +217,7 @@ error[unsupported-operator]: Unsupported `|` operation
    |          |       |
    |          |       Has type `None`
    |          Has type `Literal["int"]`
+   |
 info: All type expressions are evaluated at runtime by default on Python <3.14
 info: Python 3.13 was assumed when inferring types because it was specified on the command line
 help: Put quotes around the whole union rather than just certain elements

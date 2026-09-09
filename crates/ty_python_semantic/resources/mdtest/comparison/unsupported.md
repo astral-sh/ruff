@@ -86,6 +86,7 @@ error[unsupported-operator]: Unsupported `in` operation
    |         |     |
    |         |     Has type `Literal[1, "foo"]`
    |         Has type `Literal[42]`
+   |
 info: Operation fails because operator `in` is not supported between objects of type `Literal[42]` and `Literal[1]`
 ```
 
@@ -104,6 +105,7 @@ error[unsupported-operator]: Unsupported `<` operation
    |         |        |
    |         |        Has type `tuple[Literal[1], Literal["hello"]]`
    |         Has type `tuple[Literal[1], Literal[2]]`
+   |
 info: Operation fails because operator `<` is not supported between the tuple elements at index 2 (of type `Literal[2]` and `Literal["hello"]`)
 ```
 
@@ -121,5 +123,6 @@ error[unsupported-operator]: Unsupported `<` operation
    |         ------------^^^------------
    |         |
    |         Both operands have type `tuple[bool, A]`
+   |
 info: Operation fails because operator `<` is not supported between the tuple elements at index 2 (both of type `A`)
 ```

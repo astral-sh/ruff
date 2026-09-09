@@ -33,6 +33,7 @@ error[invalid-await]: `MissingAwait` is not awaitable
   |
 1 | class MissingAwait:
   |       ------------ type defined here
+  |
 info: `__await__` is missing
 
 ```

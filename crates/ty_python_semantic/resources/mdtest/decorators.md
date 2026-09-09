@@ -957,6 +957,7 @@ info[dynamic-function-decorator-return]: Decorator returns `Unknown`
   |
 1 | def dynamic(function: object):
   |     ------------------------- `dynamic` defined here
+  |
 help: Add a return type annotation to `dynamic`
 ```
 
@@ -989,6 +990,7 @@ info[dynamic-function-decorator-return]: Decorator returns `Unknown`
   |
 2 |     def __call__(self, function: object):
   |         -------------------------------- `CallableDecorator.__call__` defined here
+  |
 help: Add a return type annotation to `CallableDecorator.__call__`
 ```
 
@@ -1053,6 +1055,7 @@ info[dynamic-function-decorator-return]: Decorator returns `Unknown`
   |
 1 | def dynamic(value: object):
   |     ---------------------- `dynamic` defined here
+  |
 help: Add a return type annotation to `dynamic`
 ```
 
@@ -1125,6 +1128,7 @@ info[dynamic-function-decorator-return]: Decorator returns `Unknown`
    |
  6 | def dynamic(function): ...
    |     ----------------- Matching overload defined here
+   |
 help: Add a return type annotation to `dynamic`
 ```
 
@@ -1167,6 +1171,7 @@ info[dynamic-function-decorator-return]: Decorator returns `Any`
 21 | | @overload
 22 | | def dynamic(function: Callable[[str], object]): ...
    | |______________________________________________- Overloads of `dynamic` defined here
+   |
 help: Ensure all `dynamic` overloads have a return annotation
 ```
 
@@ -1289,6 +1294,7 @@ info[dynamic-function-decorator-return]: Decorator returns `Unknown`
   |
 1 | def dynamic(function: object):
   |     ------------------------- `dynamic` defined here
+  |
 help: Add a return type annotation to `dynamic`
 ```
 

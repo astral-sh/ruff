@@ -8,6 +8,7 @@ TC003 [*] Move standard library import `collections.abc.Sequence` into a type-ch
 2 |
 3 | from collections.abc import Sequence
   |                             ^^^^^^^^
+  |
 help: Move into type-checking block
   |
 2 |

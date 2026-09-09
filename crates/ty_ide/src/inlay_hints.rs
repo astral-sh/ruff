@@ -1034,6 +1034,7 @@ Source with applied edits:
            |
         LL | Literal: _SpecialForm
            | ^^^^^^^
+           |
         info: Source
           --> main2.py:LL:5
            |
@@ -1045,6 +1046,7 @@ Source with applied edits:
            |
         LL | class int:
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:13
            |
@@ -1056,6 +1058,7 @@ Source with applied edits:
            |
         LL | class int:
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:5
            |
@@ -1067,6 +1070,7 @@ Source with applied edits:
            |
         LL | class int:
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:5
            |
@@ -1078,6 +1082,7 @@ Source with applied edits:
            |
         LL | Literal: _SpecialForm
            | ^^^^^^^
+           |
         info: Source
           --> main2.py:LL:6
            |
@@ -1089,6 +1094,7 @@ Source with applied edits:
            |
         LL | class bytes(Sequence[int]):
            |       ^^^^^
+           |
         info: Source
           --> main2.py:LL:14
            |
@@ -1150,6 +1156,7 @@ Source with applied edits:
            |
         LL | Literal: _SpecialForm
            | ^^^^^^^
+           |
         info: Source
           --> main2.py:LL:6
            |
@@ -1161,6 +1168,7 @@ Source with applied edits:
            |
         LL | class int:
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:14
            |
@@ -1172,6 +1180,7 @@ Source with applied edits:
            |
         LL | Literal: _SpecialForm
            | ^^^^^^^
+           |
         info: Source
           --> main2.py:LL:24
            |
@@ -1183,6 +1192,7 @@ Source with applied edits:
            |
         LL | class str(Sequence[str]):
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:32
            |
@@ -1194,6 +1204,7 @@ Source with applied edits:
            |
         LL | class int:
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:6
            |
@@ -1205,6 +1216,7 @@ Source with applied edits:
            |
         LL | class str(Sequence[str]):
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:17
            |
@@ -1216,6 +1228,7 @@ Source with applied edits:
            |
         LL | class int:
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:6
            |
@@ -1227,6 +1240,7 @@ Source with applied edits:
            |
         LL | class str(Sequence[str]):
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:17
            |
@@ -1255,6 +1269,7 @@ Source with applied edits:
            |
         LL | class int:
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:10
            |
@@ -1266,6 +1281,7 @@ Source with applied edits:
            |
         LL | class list(MutableSequence[_T]):
            |       ^^^^
+           |
         info: Source
           --> main2.py:LL:21
            |
@@ -1277,6 +1293,7 @@ Source with applied edits:
            |
         LL | class int:
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:26
            |
@@ -1339,6 +1356,7 @@ Source with applied edits:
            |
         LL | class int:
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:5
            |
@@ -1350,6 +1368,7 @@ Source with applied edits:
            |
         LL | class str(Sequence[str]):
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:16
            |
@@ -1382,6 +1401,7 @@ Source with applied edits:
            |
         LL | class int:
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:15
            |
@@ -1433,6 +1453,7 @@ Source with applied edits:
            |
         LL | Literal: _SpecialForm
            | ^^^^^^^
+           |
         info: Source
           --> main2.py:LL:6
            |
@@ -1444,6 +1465,7 @@ Source with applied edits:
            |
         LL | class int:
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:14
            |
@@ -1455,6 +1477,7 @@ Source with applied edits:
            |
         LL | Literal: _SpecialForm
            | ^^^^^^^
+           |
         info: Source
           --> main2.py:LL:24
            |
@@ -1466,6 +1489,7 @@ Source with applied edits:
            |
         LL | class str(Sequence[str]):
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:32
            |
@@ -1477,6 +1501,7 @@ Source with applied edits:
            |
         LL | class int:
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:6
            |
@@ -1488,6 +1513,7 @@ Source with applied edits:
            |
         LL | class str(Sequence[str]):
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:17
            |
@@ -1499,6 +1525,7 @@ Source with applied edits:
            |
         LL | class int:
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:6
            |
@@ -1510,6 +1537,7 @@ Source with applied edits:
            |
         LL | class str(Sequence[str]):
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:17
            |
@@ -1552,6 +1580,7 @@ Source with applied edits:
            |
         LL | class tuple(Sequence[_T_co]):
            |       ^^^^^
+           |
         info: Source
           --> main2.py:LL:5
            |
@@ -1563,6 +1592,7 @@ Source with applied edits:
            |
         LL | Literal: _SpecialForm
            | ^^^^^^^
+           |
         info: Source
           --> main2.py:LL:11
            |
@@ -1574,6 +1604,7 @@ Source with applied edits:
            |
         LL | class int:
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:19
            |
@@ -1585,6 +1616,7 @@ Source with applied edits:
            |
         LL | Literal: _SpecialForm
            | ^^^^^^^
+           |
         info: Source
           --> main2.py:LL:23
            |
@@ -1596,6 +1628,7 @@ Source with applied edits:
            |
         LL | class str(Sequence[str]):
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:31
            |
@@ -1607,6 +1640,7 @@ Source with applied edits:
            |
         LL | class tuple(Sequence[_T_co]):
            |       ^^^^^
+           |
         info: Source
           --> main2.py:LL:5
            |
@@ -1618,6 +1652,7 @@ Source with applied edits:
            |
         LL | class int:
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:11
            |
@@ -1629,6 +1664,7 @@ Source with applied edits:
            |
         LL | class str(Sequence[str]):
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:16
            |
@@ -1640,6 +1676,7 @@ Source with applied edits:
            |
         LL | class tuple(Sequence[_T_co]):
            |       ^^^^^
+           |
         info: Source
           --> main2.py:LL:5
            |
@@ -1651,6 +1688,7 @@ Source with applied edits:
            |
         LL | class int:
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:11
            |
@@ -1662,6 +1700,7 @@ Source with applied edits:
            |
         LL | class str(Sequence[str]):
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:16
            |
@@ -1718,6 +1757,7 @@ Source with applied edits:
            |
         LL | Literal: _SpecialForm
            | ^^^^^^^
+           |
         info: Source
           --> main2.py:LL:6
            |
@@ -1729,6 +1769,7 @@ Source with applied edits:
            |
         LL | class int:
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:14
            |
@@ -1740,6 +1781,7 @@ Source with applied edits:
            |
         LL | Literal: _SpecialForm
            | ^^^^^^^
+           |
         info: Source
           --> main2.py:LL:25
            |
@@ -1751,6 +1793,7 @@ Source with applied edits:
            |
         LL | class str(Sequence[str]):
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:33
            |
@@ -1762,6 +1805,7 @@ Source with applied edits:
            |
         LL | Literal: _SpecialForm
            | ^^^^^^^
+           |
         info: Source
           --> main2.py:LL:47
            |
@@ -1773,6 +1817,7 @@ Source with applied edits:
            |
         LL | class int:
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:55
            |
@@ -1784,6 +1829,7 @@ Source with applied edits:
            |
         LL | class int:
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:6
            |
@@ -1795,6 +1841,7 @@ Source with applied edits:
            |
         LL | class str(Sequence[str]):
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:18
            |
@@ -1806,6 +1853,7 @@ Source with applied edits:
            |
         LL | class int:
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:29
            |
@@ -1817,6 +1865,7 @@ Source with applied edits:
            |
         LL | class int:
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:6
            |
@@ -1828,6 +1877,7 @@ Source with applied edits:
            |
         LL | class str(Sequence[str]):
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:18
            |
@@ -1839,6 +1889,7 @@ Source with applied edits:
            |
         LL | class int:
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:29
            |
@@ -1875,6 +1926,7 @@ Source with applied edits:
            |
         LL | Literal: _SpecialForm
            | ^^^^^^^
+           |
         info: Source
           --> main2.py:LL:5
            |
@@ -1886,6 +1938,7 @@ Source with applied edits:
            |
         LL | class int:
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:13
            |
@@ -1897,6 +1950,7 @@ Source with applied edits:
            |
         LL | class int:
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:5
            |
@@ -1942,6 +1996,7 @@ Source with applied edits:
            |
         LL | class int:
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:5
            |
@@ -1990,6 +2045,7 @@ Source with applied edits:
            |
         LL | Unknown: _SpecialForm
            | ^^^^^^^
+           |
         info: Source
           --> main2.py:LL:18
            |
@@ -2001,6 +2057,7 @@ Source with applied edits:
           |
         3 |     def __init__(self, y):
           |                        ^
+          |
         info: Source
          --> main2.py:7:8
           |
@@ -2050,6 +2107,7 @@ Source with applied edits:
            |
         LL | class str(Sequence[str]):
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:17
            |
@@ -2091,6 +2149,7 @@ Source with applied edits:
            |
         LL | class list(MutableSequence[_T]):
            |       ^^^^
+           |
         info: Source
           --> main2.py:LL:17
            |
@@ -2102,6 +2161,7 @@ Source with applied edits:
            |
         LL | class str(Sequence[str]):
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:22
            |
@@ -2143,6 +2203,7 @@ Source with applied edits:
            |
         LL | Literal: _SpecialForm
            | ^^^^^^^
+           |
         info: Source
           --> main2.py:LL:17
            |
@@ -2154,6 +2215,7 @@ Source with applied edits:
            |
         LL | class str(Sequence[str]):
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:25
            |
@@ -2165,6 +2227,7 @@ Source with applied edits:
            |
         LL | class str(Sequence[str]):
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:30
            |
@@ -2222,6 +2285,7 @@ Source with applied edits:
            |
         LL | class str(Sequence[str]):
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:17
            |
@@ -2457,6 +2521,7 @@ Source with applied edits:
            |
         LL | class list(MutableSequence[_T]):
            |       ^^^^
+           |
         info: Source
           --> main2.py:LL:5
            |
@@ -2468,6 +2533,7 @@ Source with applied edits:
            |
         LL | class int:
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:10
            |
@@ -2479,6 +2545,7 @@ Source with applied edits:
            |
         LL | class list(MutableSequence[_T]):
            |       ^^^^
+           |
         info: Source
           --> main2.py:LL:5
            |
@@ -2490,6 +2557,7 @@ Source with applied edits:
            |
         LL | class float:
            |       ^^^^^
+           |
         info: Source
           --> main2.py:LL:10
            |
@@ -2501,6 +2569,7 @@ Source with applied edits:
            |
         LL | class list(MutableSequence[_T]):
            |       ^^^^
+           |
         info: Source
           --> main2.py:LL:5
            |
@@ -2512,6 +2581,7 @@ Source with applied edits:
            |
         LL | class bool(int):
            |       ^^^^
+           |
         info: Source
           --> main2.py:LL:10
            |
@@ -2523,6 +2593,7 @@ Source with applied edits:
            |
         LL | class list(MutableSequence[_T]):
            |       ^^^^
+           |
         info: Source
           --> main2.py:LL:5
            |
@@ -2534,6 +2605,7 @@ Source with applied edits:
            |
         LL | class NoneType:
            |       ^^^^^^^^
+           |
         info: Source
           --> main2.py:LL:10
            |
@@ -2545,6 +2617,7 @@ Source with applied edits:
            |
         LL | Unknown: _SpecialForm
            | ^^^^^^^
+           |
         info: Source
           --> main2.py:LL:17
            |
@@ -2556,6 +2629,7 @@ Source with applied edits:
            |
         LL | class list(MutableSequence[_T]):
            |       ^^^^
+           |
         info: Source
           --> main2.py:LL:5
            |
@@ -2567,6 +2641,7 @@ Source with applied edits:
            |
         LL | class str(Sequence[str]):
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:10
            |
@@ -2578,6 +2653,7 @@ Source with applied edits:
            |
         LL | class list(MutableSequence[_T]):
            |       ^^^^
+           |
         info: Source
           --> main2.py:LL:5
            |
@@ -2589,6 +2665,7 @@ Source with applied edits:
            |
         LL | class str(Sequence[str]):
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:10
            |
@@ -2600,6 +2677,7 @@ Source with applied edits:
            |
         LL | class list(MutableSequence[_T]):
            |       ^^^^
+           |
         info: Source
           --> main2.py:LL:5
            |
@@ -2611,6 +2689,7 @@ Source with applied edits:
            |
         LL | class str(Sequence[str]):
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:10
            |
@@ -2622,6 +2701,7 @@ Source with applied edits:
            |
         LL | class list(MutableSequence[_T]):
            |       ^^^^
+           |
         info: Source
           --> main2.py:LL:5
            |
@@ -2633,6 +2713,7 @@ Source with applied edits:
            |
         LL | class Template:  # TODO: consider making `Template` generic on `TypeVarTuple`
            |       ^^^^^^^^
+           |
         info: Source
           --> main2.py:LL:10
            |
@@ -2644,6 +2725,7 @@ Source with applied edits:
            |
         LL | class list(MutableSequence[_T]):
            |       ^^^^
+           |
         info: Source
           --> main2.py:LL:5
            |
@@ -2655,6 +2737,7 @@ Source with applied edits:
            |
         LL | class bytes(Sequence[int]):
            |       ^^^^^
+           |
         info: Source
           --> main2.py:LL:10
            |
@@ -2666,6 +2749,7 @@ Source with applied edits:
            |
         LL | class list(MutableSequence[_T]):
            |       ^^^^
+           |
         info: Source
           --> main2.py:LL:5
            |
@@ -2677,6 +2761,7 @@ Source with applied edits:
            |
         LL | class float:
            |       ^^^^^
+           |
         info: Source
           --> main2.py:LL:10
            |
@@ -2688,6 +2773,7 @@ Source with applied edits:
            |
         LL | class list(MutableSequence[_T]):
            |       ^^^^
+           |
         info: Source
           --> main2.py:LL:5
            |
@@ -2699,6 +2785,7 @@ Source with applied edits:
            |
         LL | class float:
            |       ^^^^^
+           |
         info: Source
           --> main2.py:LL:10
            |
@@ -2768,6 +2855,7 @@ Source with applied edits:
            |
         LL | Literal: _SpecialForm
            | ^^^^^^^
+           |
         info: Source
           --> main2.py:LL:5
            |
@@ -2779,6 +2867,7 @@ Source with applied edits:
           |
         4 | class Color(Enum):
           |       ^^^^^
+          |
         info: Source
          --> main2.py:8:13
           |
@@ -2790,6 +2879,7 @@ Source with applied edits:
           |
         5 |     RED = 1
           |     ^^^
+          |
         info: Source
          --> main2.py:8:19
           |
@@ -2830,6 +2920,7 @@ Source with applied edits:
            |
         LL | class tuple(Sequence[_T_co]):
            |       ^^^^^
+           |
         info: Source
           --> main2.py:LL:5
            |
@@ -2841,6 +2932,7 @@ Source with applied edits:
           |
         2 | class MyClass:
           |       ^^^^^^^
+          |
         info: Source
          --> main2.py:7:11
           |
@@ -2852,6 +2944,7 @@ Source with applied edits:
           |
         2 | class MyClass:
           |       ^^^^^^^
+          |
         info: Source
          --> main2.py:7:20
           |
@@ -2863,6 +2956,7 @@ Source with applied edits:
           |
         2 | class MyClass:
           |       ^^^^^^^
+          |
         info: Source
          --> main2.py:8:5
           |
@@ -2874,6 +2968,7 @@ Source with applied edits:
           |
         2 | class MyClass:
           |       ^^^^^^^
+          |
         info: Source
          --> main2.py:8:19
           |
@@ -2885,6 +2980,7 @@ Source with applied edits:
           |
         2 | class MyClass:
           |       ^^^^^^^
+          |
         info: Source
          --> main2.py:9:5
           |
@@ -2896,6 +2992,7 @@ Source with applied edits:
           |
         2 | class MyClass:
           |       ^^^^^^^
+          |
         info: Source
          --> main2.py:9:19
           |
@@ -2948,6 +3045,7 @@ Source with applied edits:
            |
         LL | class list(MutableSequence[_T]):
            |       ^^^^
+           |
         info: Source
           --> main2.py:LL:18
            |
@@ -2959,6 +3057,7 @@ Source with applied edits:
            |
         LL | class tuple(Sequence[_T_co]):
            |       ^^^^^
+           |
         info: Source
           --> main2.py:LL:18
            |
@@ -2970,6 +3069,7 @@ Source with applied edits:
           |
         2 | class MyClass[T, U]:
           |       ^^^^^^^
+          |
         info: Source
          --> main2.py:7:5
           |
@@ -2981,6 +3081,7 @@ Source with applied edits:
            |
         LL | class int:
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:13
            |
@@ -2992,6 +3093,7 @@ Source with applied edits:
            |
         LL | class str(Sequence[str]):
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:18
            |
@@ -3003,6 +3105,7 @@ Source with applied edits:
           |
         3 |     def __init__(self, x: list[T], y: tuple[U, U]):
           |                        ^
+          |
         info: Source
          --> main2.py:7:35
           |
@@ -3014,6 +3117,7 @@ Source with applied edits:
           |
         3 |     def __init__(self, x: list[T], y: tuple[U, U]):
           |                                    ^
+          |
         info: Source
          --> main2.py:7:45
           |
@@ -3025,6 +3129,7 @@ Source with applied edits:
            |
         LL | class tuple(Sequence[_T_co]):
            |       ^^^^^
+           |
         info: Source
           --> main2.py:LL:5
            |
@@ -3036,6 +3141,7 @@ Source with applied edits:
           |
         2 | class MyClass[T, U]:
           |       ^^^^^^^
+          |
         info: Source
          --> main2.py:8:11
           |
@@ -3047,6 +3153,7 @@ Source with applied edits:
            |
         LL | class int:
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:19
            |
@@ -3058,6 +3165,7 @@ Source with applied edits:
            |
         LL | class str(Sequence[str]):
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:24
            |
@@ -3069,6 +3177,7 @@ Source with applied edits:
           |
         2 | class MyClass[T, U]:
           |       ^^^^^^^
+          |
         info: Source
          --> main2.py:8:30
           |
@@ -3080,6 +3189,7 @@ Source with applied edits:
            |
         LL | class int:
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:38
            |
@@ -3091,6 +3201,7 @@ Source with applied edits:
            |
         LL | class str(Sequence[str]):
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:43
            |
@@ -3102,6 +3213,7 @@ Source with applied edits:
           |
         3 |     def __init__(self, x: list[T], y: tuple[U, U]):
           |                        ^
+          |
         info: Source
          --> main2.py:8:62
           |
@@ -3113,6 +3225,7 @@ Source with applied edits:
           |
         3 |     def __init__(self, x: list[T], y: tuple[U, U]):
           |                                    ^
+          |
         info: Source
          --> main2.py:8:72
           |
@@ -3124,6 +3237,7 @@ Source with applied edits:
           |
         3 |     def __init__(self, x: list[T], y: tuple[U, U]):
           |                        ^
+          |
         info: Source
          --> main2.py:8:97
           |
@@ -3135,6 +3249,7 @@ Source with applied edits:
           |
         3 |     def __init__(self, x: list[T], y: tuple[U, U]):
           |                                    ^
+          |
         info: Source
          --> main2.py:8:107
           |
@@ -3146,6 +3261,7 @@ Source with applied edits:
           |
         2 | class MyClass[T, U]:
           |       ^^^^^^^
+          |
         info: Source
          --> main2.py:9:5
           |
@@ -3157,6 +3273,7 @@ Source with applied edits:
            |
         LL | class int:
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:13
            |
@@ -3168,6 +3285,7 @@ Source with applied edits:
            |
         LL | class str(Sequence[str]):
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:18
            |
@@ -3179,6 +3297,7 @@ Source with applied edits:
           |
         2 | class MyClass[T, U]:
           |       ^^^^^^^
+          |
         info: Source
          --> main2.py:9:29
           |
@@ -3190,6 +3309,7 @@ Source with applied edits:
            |
         LL | class int:
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:37
            |
@@ -3201,6 +3321,7 @@ Source with applied edits:
            |
         LL | class str(Sequence[str]):
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:42
            |
@@ -3212,6 +3333,7 @@ Source with applied edits:
           |
         3 |     def __init__(self, x: list[T], y: tuple[U, U]):
           |                        ^
+          |
         info: Source
          --> main2.py:9:59
           |
@@ -3223,6 +3345,7 @@ Source with applied edits:
           |
         3 |     def __init__(self, x: list[T], y: tuple[U, U]):
           |                                    ^
+          |
         info: Source
          --> main2.py:9:69
           |
@@ -3234,6 +3357,7 @@ Source with applied edits:
           |
         3 |     def __init__(self, x: list[T], y: tuple[U, U]):
           |                        ^
+          |
         info: Source
          --> main2.py:9:94
           |
@@ -3245,6 +3369,7 @@ Source with applied edits:
           |
         3 |     def __init__(self, x: list[T], y: tuple[U, U]):
           |                                    ^
+          |
         info: Source
          --> main2.py:9:104
           |
@@ -3256,6 +3381,7 @@ Source with applied edits:
           |
         2 | class MyClass[T, U]:
           |       ^^^^^^^
+          |
         info: Source
           --> main2.py:10:5
            |
@@ -3267,6 +3393,7 @@ Source with applied edits:
            |
         LL | class int:
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:13
            |
@@ -3278,6 +3405,7 @@ Source with applied edits:
            |
         LL | class str(Sequence[str]):
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:18
            |
@@ -3289,6 +3417,7 @@ Source with applied edits:
           |
         2 | class MyClass[T, U]:
           |       ^^^^^^^
+          |
         info: Source
           --> main2.py:10:29
            |
@@ -3300,6 +3429,7 @@ Source with applied edits:
            |
         LL | class int:
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:37
            |
@@ -3311,6 +3441,7 @@ Source with applied edits:
            |
         LL | class str(Sequence[str]):
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:42
            |
@@ -3322,6 +3453,7 @@ Source with applied edits:
           |
         3 |     def __init__(self, x: list[T], y: tuple[U, U]):
           |                        ^
+          |
         info: Source
           --> main2.py:10:60
            |
@@ -3333,6 +3465,7 @@ Source with applied edits:
           |
         3 |     def __init__(self, x: list[T], y: tuple[U, U]):
           |                                    ^
+          |
         info: Source
           --> main2.py:10:70
            |
@@ -3344,6 +3477,7 @@ Source with applied edits:
           |
         3 |     def __init__(self, x: list[T], y: tuple[U, U]):
           |                        ^
+          |
         info: Source
           --> main2.py:10:95
            |
@@ -3355,6 +3489,7 @@ Source with applied edits:
           |
         3 |     def __init__(self, x: list[T], y: tuple[U, U]):
           |                                    ^
+          |
         info: Source
           --> main2.py:10:105
            |
@@ -3422,6 +3557,7 @@ Source with applied edits:
           |
         2 | def foo(x: int): pass
           |         ^
+          |
         info: Source
          --> main2.py:3:6
           |
@@ -3463,6 +3599,7 @@ Source with applied edits:
           |
         2 | def foo(x: int): pass
           |         ^
+          |
         info: Source
          --> main2.py:6:6
           |
@@ -3512,6 +3649,7 @@ Source with applied edits:
           |
         2 | def foo(x: int): pass
           |         ^
+          |
         info: Source
           --> main2.py:10:6
            |
@@ -3562,6 +3700,7 @@ Source with applied edits:
           |
         2 | def foo(x: int): pass
           |         ^
+          |
         info: Source
           --> main2.py:10:6
            |
@@ -3615,6 +3754,7 @@ Source with applied edits:
           |
         2 | def foo(x: int): pass
           |         ^
+          |
         info: Source
           --> main2.py:12:6
            |
@@ -3672,6 +3812,7 @@ Source with applied edits:
           |
         4 | def foo(x: int): pass
           |         ^
+          |
         info: Source
           --> main2.py:14:6
            |
@@ -3715,6 +3856,7 @@ Source with applied edits:
            |
         LL | class list(MutableSequence[_T]):
            |       ^^^^
+           |
         info: Source
           --> main2.py:LL:5
            |
@@ -3726,6 +3868,7 @@ Source with applied edits:
            |
         LL | class int:
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:10
            |
@@ -3737,6 +3880,7 @@ Source with applied edits:
            |
         LL | class list(MutableSequence[_T]):
            |       ^^^^
+           |
         info: Source
           --> main2.py:LL:5
            |
@@ -3748,6 +3892,7 @@ Source with applied edits:
            |
         LL | class int:
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:10
            |
@@ -3759,6 +3904,7 @@ Source with applied edits:
           |
         2 | def foo(x: int): pass
           |         ^
+          |
         info: Source
          --> main2.py:7:6
           |
@@ -3865,6 +4011,7 @@ Source with applied edits:
           |
         2 | def foo(a: str, b: int, c: int, d: str): ...
           |         ^
+          |
         info: Source
          --> main2.py:4:6
           |
@@ -3903,6 +4050,7 @@ Source with applied edits:
           |
         2 | def foo(a: str, b: int, c: str): ...
           |         ^
+          |
         info: Source
          --> main2.py:4:6
           |
@@ -3914,6 +4062,7 @@ Source with applied edits:
           |
         2 | def foo(a: str, b: int, c: str): ...
           |                 ^
+          |
         info: Source
          --> main2.py:4:17
           |
@@ -3925,6 +4074,7 @@ Source with applied edits:
           |
         2 | def foo(a: str, b: int, c: str): ...
           |                         ^
+          |
         info: Source
          --> main2.py:4:25
           |
@@ -3962,6 +4112,7 @@ Source with applied edits:
           |
         2 | def foo(a: int, b: int): ...
           |         ^
+          |
         info: Source
          --> main2.py:4:6
           |
@@ -3973,6 +4124,7 @@ Source with applied edits:
           |
         2 | def foo(a: int, b: int): ...
           |                 ^
+          |
         info: Source
          --> main2.py:4:13
           |
@@ -4010,6 +4162,7 @@ Source with applied edits:
           |
         2 | def foo(a: int): ...
           |         ^
+          |
         info: Source
          --> main2.py:4:6
           |
@@ -4036,6 +4189,7 @@ Source with applied edits:
           |
         2 | def foo(x: int, /, y: int): pass
           |                    ^
+          |
         info: Source
          --> main2.py:3:9
           |
@@ -4105,6 +4259,7 @@ Source with applied edits:
           |
         3 |     def __init__(self, x: int): pass
           |                        ^
+          |
         info: Source
          --> main2.py:4:6
           |
@@ -4116,6 +4271,7 @@ Source with applied edits:
           |
         3 |     def __init__(self, x: int): pass
           |                        ^
+          |
         info: Source
          --> main2.py:5:10
           |
@@ -4163,6 +4319,7 @@ Source with applied edits:
           |
         5 |     x: int
           |     ^
+          |
         info: Source
          --> main2.py:8:6
           |
@@ -4174,6 +4331,7 @@ Source with applied edits:
           |
         6 |     y: str
           |     ^
+          |
         info: Source
          --> main2.py:8:13
           |
@@ -4213,6 +4371,7 @@ Source with applied edits:
           |
         3 |     def __new__(cls, x: int): pass
           |                      ^
+          |
         info: Source
          --> main2.py:4:6
           |
@@ -4224,6 +4383,7 @@ Source with applied edits:
           |
         3 |     def __new__(cls, x: int): pass
           |                      ^
+          |
         info: Source
          --> main2.py:5:10
           |
@@ -4267,6 +4427,7 @@ Source with applied edits:
           |
         3 |     def __call__(self, x: int): pass
           |                        ^
+          |
         info: Source
          --> main2.py:6:6
           |
@@ -4321,6 +4482,7 @@ Source with applied edits:
           |
         3 |     def bar(self, y: int): pass
           |                   ^
+          |
         info: Source
          --> main2.py:4:12
           |
@@ -4380,6 +4542,7 @@ Source with applied edits:
           |
         8 |     def choose(self: "Parent", parent_value: int) -> None: ...
           |                                ^^^^^^^^^^^^
+          |
         info: Source
           --> main2.py:14:20
            |
@@ -4391,6 +4554,7 @@ Source with applied edits:
           |
         6 |     def choose(self: "Child", child_value: int) -> None: ...
           |                               ^^^^^^^^^^^
+          |
         info: Source
           --> main2.py:15:19
            |
@@ -4432,6 +4596,7 @@ Source with applied edits:
           |
         4 |     def bar(cls, y: int): pass
           |                  ^
+          |
         info: Source
          --> main2.py:5:10
           |
@@ -4471,6 +4636,7 @@ Source with applied edits:
           |
         4 |     def bar(y: int): pass
           |             ^
+          |
         info: Source
          --> main2.py:5:10
           |
@@ -4508,6 +4674,7 @@ Source with applied edits:
           |
         2 | def foo(x: int | str): pass
           |         ^
+          |
         info: Source
          --> main2.py:3:6
           |
@@ -4519,6 +4686,7 @@ Source with applied edits:
           |
         2 | def foo(x: int | str): pass
           |         ^
+          |
         info: Source
          --> main2.py:4:6
           |
@@ -4556,6 +4724,7 @@ Source with applied edits:
           |
         2 | def foo(x: int, y: str, z: bool): pass
           |         ^
+          |
         info: Source
          --> main2.py:3:6
           |
@@ -4567,6 +4736,7 @@ Source with applied edits:
           |
         2 | def foo(x: int, y: str, z: bool): pass
           |                 ^
+          |
         info: Source
          --> main2.py:3:13
           |
@@ -4578,6 +4748,7 @@ Source with applied edits:
           |
         2 | def foo(x: int, y: str, z: bool): pass
           |                         ^
+          |
         info: Source
          --> main2.py:3:26
           |
@@ -4617,6 +4788,7 @@ Source with applied edits:
            |
         LL | class int:
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:9
            |
@@ -4628,6 +4800,7 @@ Source with applied edits:
           |
         2 | def add(x: int, b, y: int) -> int:
           |         ^
+          |
         info: Source
          --> main2.py:5:21
           |
@@ -4639,6 +4812,7 @@ Source with applied edits:
           |
         2 | def add(x: int, b, y: int) -> int:
           |                 ^
+          |
         info: Source
          --> main2.py:5:28
           |
@@ -4674,6 +4848,7 @@ Source with applied edits:
           |
         2 | def foo(x: int, y: str, z: bool): pass
           |         ^
+          |
         info: Source
          --> main2.py:3:6
           |
@@ -4711,6 +4886,7 @@ Source with applied edits:
           |
         2 | def foo(x: int, y: str): pass
           |                 ^
+          |
         info: Source
          --> main2.py:3:17
           |
@@ -4750,6 +4926,7 @@ Source with applied edits:
           |
         2 | def foo(x: int, y: str = 'default', z: bool = False): pass
           |         ^
+          |
         info: Source
          --> main2.py:3:6
           |
@@ -4761,6 +4938,7 @@ Source with applied edits:
           |
         2 | def foo(x: int, y: str = 'default', z: bool = False): pass
           |         ^
+          |
         info: Source
          --> main2.py:4:6
           |
@@ -4772,6 +4950,7 @@ Source with applied edits:
           |
         2 | def foo(x: int, y: str = 'default', z: bool = False): pass
           |                 ^
+          |
         info: Source
          --> main2.py:4:13
           |
@@ -4783,6 +4962,7 @@ Source with applied edits:
           |
         2 | def foo(x: int, y: str = 'default', z: bool = False): pass
           |         ^
+          |
         info: Source
          --> main2.py:5:6
           |
@@ -4794,6 +4974,7 @@ Source with applied edits:
           |
         2 | def foo(x: int, y: str = 'default', z: bool = False): pass
           |                 ^
+          |
         info: Source
          --> main2.py:5:13
           |
@@ -4805,6 +4986,7 @@ Source with applied edits:
           |
         2 | def foo(x: int, y: str = 'default', z: bool = False): pass
           |                                     ^
+          |
         info: Source
          --> main2.py:5:27
           |
@@ -4858,6 +5040,7 @@ Source with applied edits:
           |
         8 | def baz(a: int, b: str, c: bool): pass
           |         ^
+          |
         info: Source
           --> main2.py:10:6
            |
@@ -4869,6 +5052,7 @@ Source with applied edits:
           |
         2 | def foo(x: int) -> int:
           |         ^
+          |
         info: Source
           --> main2.py:10:14
            |
@@ -4880,6 +5064,7 @@ Source with applied edits:
           |
         8 | def baz(a: int, b: str, c: bool): pass
           |                 ^
+          |
         info: Source
           --> main2.py:10:22
            |
@@ -4891,6 +5076,7 @@ Source with applied edits:
           |
         5 | def bar(y: str) -> str:
           |         ^
+          |
         info: Source
           --> main2.py:10:30
            |
@@ -4902,6 +5088,7 @@ Source with applied edits:
           |
         5 | def bar(y: str) -> str:
           |         ^
+          |
         info: Source
           --> main2.py:10:38
            |
@@ -4913,6 +5100,7 @@ Source with applied edits:
           |
         8 | def baz(a: int, b: str, c: bool): pass
           |                         ^
+          |
         info: Source
           --> main2.py:10:52
            |
@@ -4958,6 +5146,7 @@ Source with applied edits:
           |
         3 |     def foo(self, value: int) -> 'A':
           |                   ^^^^^
+          |
         info: Source
          --> main2.py:8:10
           |
@@ -4969,6 +5158,7 @@ Source with applied edits:
           |
         5 |     def bar(self, name: str) -> 'A':
           |                   ^^^^
+          |
         info: Source
          --> main2.py:8:26
           |
@@ -5010,6 +5200,7 @@ Source with applied edits:
           |
         2 | def foo(x: str) -> str:
           |         ^
+          |
         info: Source
          --> main2.py:5:12
           |
@@ -5049,6 +5240,7 @@ Source with applied edits:
            |
         LL | Unknown: _SpecialForm
            | ^^^^^^^
+           |
         info: Source
           --> main2.py:LL:14
            |
@@ -5060,6 +5252,7 @@ Source with applied edits:
            |
         LL | Unknown: _SpecialForm
            | ^^^^^^^
+           |
         info: Source
           --> main2.py:LL:17
            |
@@ -5101,6 +5294,7 @@ Source with applied edits:
            |
         LL |         LiteralString as LiteralString,
            |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+           |
         info: Source
           --> main2.py:LL:9
            |
@@ -5157,6 +5351,7 @@ Source with applied edits:
            |
         LL | Literal: _SpecialForm
            | ^^^^^^^
+           |
         info: Source
           --> main2.py:LL:9
            |
@@ -5168,6 +5363,7 @@ Source with applied edits:
            |
         LL | class int:
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:17
            |
@@ -5179,6 +5375,7 @@ Source with applied edits:
            |
         LL | class int:
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:20
            |
@@ -5190,6 +5387,7 @@ Source with applied edits:
            |
         LL | class int:
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:23
            |
@@ -5201,6 +5399,7 @@ Source with applied edits:
            |
         LL | class str(Sequence[str]):
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:26
            |
@@ -5212,6 +5411,7 @@ Source with applied edits:
            |
         LL | class NoneType:
            |       ^^^^^^^^
+           |
         info: Source
           --> main2.py:LL:37
            |
@@ -5252,6 +5452,7 @@ Source with applied edits:
           |
         2 | class Foo[T]: ...
           |       ^^^
+          |
         info: Source
          --> main2.py:4:13
           |
@@ -5263,6 +5464,7 @@ Source with applied edits:
            |
         LL | class int:
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:17
            |
@@ -5289,6 +5491,7 @@ Source with applied edits:
            |
         LL | class type:
            |       ^^^^
+           |
         info: Source
           --> main2.py:LL:9
            |
@@ -5300,6 +5503,7 @@ Source with applied edits:
            |
         LL | class list(MutableSequence[_T]):
            |       ^^^^
+           |
         info: Source
           --> main2.py:LL:14
            |
@@ -5311,6 +5515,7 @@ Source with applied edits:
            |
         LL | class str(Sequence[str]):
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:19
            |
@@ -5352,6 +5557,7 @@ Source with applied edits:
           |
         4 |     def whatever(self): ...
           |         ^^^^^^^^
+          |
         info: Source
          --> main2.py:6:6
           |
@@ -5380,6 +5586,7 @@ Source with applied edits:
           |
         2 | def foo(a: int, b: str, /, c: float, d: bool = True, *, e: int, f: str = 'default'): pass
           |                            ^
+          |
         info: Source
          --> main2.py:3:16
           |
@@ -5391,6 +5598,7 @@ Source with applied edits:
           |
         2 | def foo(a: int, b: str, /, c: float, d: bool = True, *, e: int, f: str = 'default'): pass
           |                                      ^
+          |
         info: Source
          --> main2.py:3:26
           |
@@ -5402,6 +5610,7 @@ Source with applied edits:
           |
         2 | def foo(a: int, b: str, /, c: float, d: bool = True, *, e: int, f: str = 'default'): pass
           |                            ^
+          |
         info: Source
          --> main2.py:4:16
           |
@@ -5448,6 +5657,7 @@ Source with applied edits:
           |
         2 |         def bar(x: int | str):
           |                 ^
+          |
         info: Source
          --> main2.py:4:6
           |
@@ -5501,6 +5711,7 @@ Source with applied edits:
           |
         5 | def foo(x: int) -> str: ...
           |         ^
+          |
         info: Source
           --> main2.py:11:6
            |
@@ -5512,6 +5723,7 @@ Source with applied edits:
           |
         7 | def foo(x: str) -> int: ...
           |         ^
+          |
         info: Source
           --> main2.py:12:6
            |
@@ -5569,6 +5781,7 @@ Source with applied edits:
            |
         LL | class Sequence(Reversible[_T_co], Collection[_T_co]):
            |       ^^^^^^^^
+           |
         info: Source
           --> main2.py:LL:5
            |
@@ -5580,6 +5793,7 @@ Source with applied edits:
            |
         LL | class str(Sequence[str]):
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:14
            |
@@ -5636,6 +5850,7 @@ Source with applied edits:
           |
         5 | def f(x: int) -> str: ...
           |       ^
+          |
         info: Source
           --> main2.py:11:4
            |
@@ -5772,6 +5987,7 @@ Source with applied edits:
           |
         2 | def foo(param: int): pass
           |         ^^^^^
+          |
         info: Source
          --> main2.py:7:6
           |
@@ -5783,6 +5999,7 @@ Source with applied edits:
           |
         2 | def foo(param: int): pass
           |         ^^^^^
+          |
         info: Source
          --> main2.py:8:6
           |
@@ -5794,6 +6011,7 @@ Source with applied edits:
           |
         2 | def foo(param: int): pass
           |         ^^^^^
+          |
         info: Source
          --> main2.py:9:6
           |
@@ -5853,6 +6071,7 @@ Source with applied edits:
           |
         2 | def foo(focus_range: int): pass
           |         ^^^^^^^^^^^
+          |
         info: Source
           --> main2.py:13:6
            |
@@ -5892,6 +6111,7 @@ Source with applied edits:
           |
         2 | def foo(x: int): pass
           |         ^
+          |
         info: Source
          --> main2.py:4:6
           |
@@ -5928,6 +6148,7 @@ Source with applied edits:
           |
         2 | def foo(_x: int, y: int): pass
           |                  ^
+          |
         info: Source
          --> main2.py:3:9
           |
@@ -5971,6 +6192,7 @@ Source with applied edits:
           |
         3 |     x: int,
           |     ^
+          |
         info: Source
          --> main2.py:7:6
           |
@@ -5982,6 +6204,7 @@ Source with applied edits:
           |
         4 |     y: int
           |     ^
+          |
         info: Source
          --> main2.py:7:13
           |
@@ -6019,6 +6242,7 @@ Source with applied edits:
            |
         LL | class int:
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:16
            |
@@ -6030,6 +6254,7 @@ Source with applied edits:
            |
         LL | class bool(int):
            |       ^^^^
+           |
         info: Source
           --> main2.py:LL:25
            |
@@ -6041,6 +6266,7 @@ Source with applied edits:
            |
         LL | class str(Sequence[str]):
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:34
            |
@@ -6052,6 +6278,7 @@ Source with applied edits:
            |
         LL | class int:
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:40
            |
@@ -6063,6 +6290,7 @@ Source with applied edits:
            |
         LL | class list(MutableSequence[_T]):
            |       ^^^^
+           |
         info: Source
           --> main2.py:LL:46
            |
@@ -6074,6 +6302,7 @@ Source with applied edits:
            |
         LL | class str(Sequence[str]):
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:51
            |
@@ -6085,6 +6314,7 @@ Source with applied edits:
            |
         LL | Unknown: _SpecialForm
            | ^^^^^^^
+           |
         info: Source
           --> main2.py:LL:60
            |
@@ -6115,6 +6345,7 @@ Source with applied edits:
            |
         LL | class ModuleType:
            |       ^^^^^^^^^^
+           |
         info: Source
           --> main2.py:LL:6
            |
@@ -6126,6 +6357,7 @@ Source with applied edits:
           |
         1 | '''Foo module'''
           | ^^^^^^^^^^^^^^^^
+          |
         info: Source
          --> main2.py:4:14
           |
@@ -6154,6 +6386,7 @@ Source with applied edits:
            |
         LL | Literal: _SpecialForm
            | ^^^^^^^
+           |
         info: Source
           --> main2.py:LL:20
            |
@@ -6165,6 +6398,7 @@ Source with applied edits:
            |
         LL | class str(Sequence[str]):
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:28
            |
@@ -6176,6 +6410,7 @@ Source with applied edits:
            |
         LL | class str(Sequence[str]):
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:33
            |
@@ -6187,6 +6422,7 @@ Source with applied edits:
            |
         LL | class str(Sequence[str]):
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:38
            |
@@ -6215,6 +6451,7 @@ Source with applied edits:
            |
         LL | class WrapperDescriptorType:
            |       ^^^^^^^^^^^^^^^^^^^^^
+           |
         info: Source
           --> main2.py:LL:6
            |
@@ -6226,6 +6463,7 @@ Source with applied edits:
            |
         LL | class FunctionType:
            |       ^^^^^^^^^^^^
+           |
         info: Source
           --> main2.py:LL:39
            |
@@ -6254,6 +6492,7 @@ Source with applied edits:
            |
         LL | class MethodWrapperType:
            |       ^^^^^^^^^^^^^^^^^
+           |
         info: Source
           --> main2.py:LL:6
            |
@@ -6265,6 +6504,7 @@ Source with applied edits:
            |
         LL |     def __call__(self, *args: Any, **kwargs: Any) -> Any:
            |         ^^^^^^^^
+           |
         info: Source
           --> main2.py:LL:22
            |
@@ -6276,6 +6516,7 @@ Source with applied edits:
            |
         LL | class FunctionType:
            |       ^^^^^^^^^^^^
+           |
         info: Source
           --> main2.py:LL:35
            |
@@ -6287,6 +6528,7 @@ Source with applied edits:
           |
         2 | def f(): ...
           |     ^
+          |
         info: Source
          --> main2.py:4:45
           |
@@ -6319,6 +6561,7 @@ Source with applied edits:
            |
         LL | class NewType:
            |       ^^^^^^^
+           |
         info: Source
           --> main2.py:LL:6
            |
@@ -6330,6 +6573,7 @@ Source with applied edits:
           |
         4 | N = NewType('N', str)
           | ^
+          |
         info: Source
          --> main2.py:4:28
           |
@@ -6341,6 +6585,7 @@ Source with applied edits:
            |
         LL |     def __init__(self, name: str, tp: Any) -> None: ...  # AnnotationForm
            |                        ^^^^
+           |
         info: Source
           --> main2.py:LL:44
            |
@@ -6352,6 +6597,7 @@ Source with applied edits:
            |
         LL |     def __init__(self, name: str, tp: Any) -> None: ...  # AnnotationForm
            |                                   ^^
+           |
         info: Source
           --> main2.py:LL:56
            |
@@ -6363,6 +6609,7 @@ Source with applied edits:
            |
         LL | class NewType:
            |       ^^^^^^^
+           |
         info: Source
           --> main2.py:LL:6
            |
@@ -6374,6 +6621,7 @@ Source with applied edits:
           |
         4 | N = NewType('N', str)
           | ^
+          |
         info: Source
          --> main2.py:6:28
           |
@@ -6410,6 +6658,7 @@ Source with applied edits:
            |
         LL | class type:
            |       ^^^^
+           |
         info: Source
           --> main2.py:LL:9
            |
@@ -6421,6 +6670,7 @@ Source with applied edits:
           |
         2 | def f[T](x: type[T]):
           |       ^
+          |
         info: Source
          --> main2.py:3:14
           |
@@ -6449,6 +6699,7 @@ Source with applied edits:
            |
         LL |             name: str,
            |             ^^^^
+           |
         info: Source
           --> main2.py:LL:14
            |
@@ -6460,6 +6711,7 @@ Source with applied edits:
            |
         LL | Protocol: _SpecialForm
            | ^^^^^^^^
+           |
         info: Source
           --> main2.py:LL:26
            |
@@ -6471,6 +6723,7 @@ Source with applied edits:
           |
         3 | T = TypeVar('T')
           | ^
+          |
         info: Source
          --> main2.py:4:42
           |
@@ -6507,6 +6760,7 @@ Source with applied edits:
            |
         LL |             name: str,
            |             ^^^^
+           |
         info: Source
           --> main2.py:LL:16
            |
@@ -6542,6 +6796,7 @@ Source with applied edits:
            |
         LL |         def __new__(cls, name: str, value: Any, *, type_params: tuple[_TypeParameter, ...] = ()) -> Self: ...
            |                          ^^^^
+           |
         info: Source
           --> main2.py:LL:20
            |
@@ -6553,6 +6808,7 @@ Source with applied edits:
            |
         LL |         def __new__(cls, name: str, value: Any, *, type_params: tuple[_TypeParameter, ...] = ()) -> Self: ...
            |                                     ^^^^^
+           |
         info: Source
           --> main2.py:LL:32
            |
@@ -6588,6 +6844,7 @@ Source with applied edits:
            |
         LL |                 name: str,
            |                 ^^^^
+           |
         info: Source
           --> main2.py:LL:20
            |
@@ -6631,6 +6888,7 @@ Source with applied edits:
            |
         LL | Top: _SpecialForm
            | ^^^
+           |
         info: Source
           --> main2.py:LL:9
            |
@@ -6642,6 +6900,7 @@ Source with applied edits:
            |
         LL | class list(MutableSequence[_T]):
            |       ^^^^
+           |
         info: Source
           --> main2.py:LL:13
            |
@@ -6653,6 +6912,7 @@ Source with applied edits:
            |
         LL | class Any:
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:18
            |
@@ -6714,6 +6974,7 @@ Source with applied edits:
           |
         6 |             class B[T]: ...
           |                   ^
+          |
         info: Source
          --> main2.py:4:5
           |
@@ -6725,6 +6986,7 @@ Source with applied edits:
           |
         4 |             class A[T]: ...
           |                   ^
+          |
         info: Source
          --> main2.py:4:7
           |
@@ -6736,6 +6998,7 @@ Source with applied edits:
           |
         2 |             class D[T, U]: ...
           |                   ^
+          |
         info: Source
          --> main2.py:4:9
           |
@@ -6747,6 +7010,7 @@ Source with applied edits:
            |
         LL | class int:
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:11
            |
@@ -6758,6 +7022,7 @@ Source with applied edits:
            |
         LL | class list(MutableSequence[_T]):
            |       ^^^^
+           |
         info: Source
           --> main2.py:LL:16
            |
@@ -6769,6 +7034,7 @@ Source with applied edits:
            |
         LL | class str(Sequence[str]):
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:21
            |
@@ -6780,6 +7046,7 @@ Source with applied edits:
           |
         4 |             class A[T]: ...
           |                   ^
+          |
         info: Source
          --> main2.py:4:27
           |
@@ -6791,6 +7058,7 @@ Source with applied edits:
           |
         6 |             class B[T]: ...
           |                   ^
+          |
         info: Source
          --> main2.py:4:29
           |
@@ -6802,6 +7070,7 @@ Source with applied edits:
            |
         LL | class int:
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:31
            |
@@ -6866,6 +7135,7 @@ Source with applied edits:
           |
         6 |             class B[T]: ...
           |                   ^
+          |
         info: Source
          --> main2.py:4:5
           |
@@ -6877,6 +7147,7 @@ Source with applied edits:
           |
         4 |             class A[T]: ...
           |                   ^
+          |
         info: Source
          --> main2.py:4:7
           |
@@ -6888,6 +7159,7 @@ Source with applied edits:
           |
         2 |             class D[T, U]: ...
           |                   ^
+          |
         info: Source
          --> main2.py:4:9
           |
@@ -6899,6 +7171,7 @@ Source with applied edits:
            |
         LL | class int:
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:11
            |
@@ -6910,6 +7183,7 @@ Source with applied edits:
            |
         LL | class list(MutableSequence[_T]):
            |       ^^^^
+           |
         info: Source
           --> main2.py:LL:16
            |
@@ -6921,6 +7195,7 @@ Source with applied edits:
            |
         LL | class str(Sequence[str]):
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:21
            |
@@ -6932,6 +7207,7 @@ Source with applied edits:
           |
         4 |             class A[T]: ...
           |                   ^
+          |
         info: Source
          --> main2.py:4:27
           |
@@ -6943,6 +7219,7 @@ Source with applied edits:
           |
         6 |             class B[T]: ...
           |                   ^
+          |
         info: Source
          --> main2.py:4:29
           |
@@ -6954,6 +7231,7 @@ Source with applied edits:
            |
         LL | class int:
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:31
            |
@@ -7017,6 +7295,7 @@ Source with applied edits:
           |
         2 |             class D[T]:
           |                   ^
+          |
         info: Source
          --> main2.py:6:5
           |
@@ -7028,6 +7307,7 @@ Source with applied edits:
           |
         4 | class Baz: ...
           |       ^^^
+          |
         info: Source
          --> main2.py:6:7
           |
@@ -7039,6 +7319,7 @@ Source with applied edits:
           |
         3 |                 def __init__(self, x: type[T]):
           |                                    ^
+          |
         info: Source
          --> main2.py:6:18
           |
@@ -7080,6 +7361,7 @@ Source with applied edits:
            |
         LL | class Any:
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:9
            |
@@ -7091,6 +7373,7 @@ Source with applied edits:
            |
         LL | Literal: _SpecialForm
            | ^^^^^^^
+           |
         info: Source
           --> main2.py:LL:15
            |
@@ -7102,6 +7385,7 @@ Source with applied edits:
            |
         LL | class str(Sequence[str]):
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:23
            |
@@ -7154,6 +7438,7 @@ Source with applied edits:
            |
         LL | class dict(MutableMapping[_KT, _VT]):
            |       ^^^^
+           |
         info: Source
           --> main2.py:LL:5
            |
@@ -7165,6 +7450,7 @@ Source with applied edits:
            |
         LL | class TypeVar:
            |       ^^^^^^^
+           |
         info: Source
           --> main2.py:LL:10
            |
@@ -7176,6 +7462,7 @@ Source with applied edits:
            |
         LL | class Any:
            |       ^^^
+           |
         info: Source
           --> main2.py:LL:19
            |
@@ -7187,6 +7474,7 @@ Source with applied edits:
            |
         LL | class NoneType:
            |       ^^^^^^^^
+           |
         info: Source
           --> main2.py:LL:26
            |
@@ -7258,6 +7546,7 @@ Source with applied edits:
           |
         2 |             class A: ...
           |                   ^
+          |
         info: Source
          --> main2.py:4:5
           |
@@ -7269,6 +7558,7 @@ Source with applied edits:
           |
         2 |             class A: ...
           |                   ^
+          |
         info: Source
          --> main2.py:4:13
           |
@@ -7345,6 +7635,7 @@ Source with applied edits:
           |
         2 |                class A: ...
           |                      ^
+          |
         info: Source
          --> main2.py:5:5
           |
@@ -7356,6 +7647,7 @@ Source with applied edits:
           |
         2 |                class A: ...
           |                      ^
+          |
         info: Source
          --> main2.py:5:13
           |
@@ -7367,6 +7659,7 @@ Source with applied edits:
            |
         LL | class list(MutableSequence[_T]):
            |       ^^^^
+           |
         info: Source
           --> main2.py:LL:21
            |
@@ -7378,6 +7671,7 @@ Source with applied edits:
           |
         2 |                class A: ...
           |                      ^
+          |
         info: Source
          --> main2.py:5:26
           |
@@ -7389,6 +7683,7 @@ Source with applied edits:
           |
         2 |                class A: ...
           |                      ^
+          |
         info: Source
          --> main2.py:5:34
           |
@@ -7457,6 +7752,7 @@ Source with applied edits:
           |
         8 | class B[T]:
           |       ^
+          |
         info: Source
           --> main2.py:11:5
            |
@@ -7468,6 +7764,7 @@ Source with applied edits:
           |
         2 |             class A: ...
           |                   ^
+          |
         info: Source
           --> main2.py:11:7
            |
@@ -7479,6 +7776,7 @@ Source with applied edits:
           |
         9 |     x: T
           |     ^
+          |
         info: Source
           --> main2.py:11:16
            |
@@ -7529,6 +7827,7 @@ Source with applied edits:
            |
         LL | Literal: _SpecialForm
            | ^^^^^^^
+           |
         info: Source
           --> main2.py:LL:5
            |
@@ -7540,6 +7839,7 @@ Source with applied edits:
           |
         4 |             class Color(Enum):
           |                   ^^^^^
+          |
         info: Source
          --> main2.py:4:13
           |
@@ -7551,6 +7851,7 @@ Source with applied edits:
           |
         5 |                 RED = 1
           |                 ^^^
+          |
         info: Source
          --> main2.py:4:19
           |
@@ -7600,6 +7901,7 @@ Source with applied edits:
            |
         LL | class list(MutableSequence[_T]):
            |       ^^^^
+           |
         info: Source
           --> main2.py:LL:5
            |
@@ -7611,6 +7913,7 @@ Source with applied edits:
           |
         3 |                 class Inner: ...
           |                       ^^^^^
+          |
         info: Source
          --> main2.py:8:10
           |
@@ -7622,6 +7925,7 @@ Source with applied edits:
           |
         5 | def wrap[T](x: T) -> list[T]:
           |             ^
+          |
         info: Source
          --> main2.py:8:26
           |
@@ -7672,6 +7976,7 @@ Source with applied edits:
            |
         LL | Literal: _SpecialForm
            | ^^^^^^^
+           |
         info: Source
           --> main2.py:LL:5
            |
@@ -7683,6 +7988,7 @@ Source with applied edits:
           |
         4 |             class Color(Enum):
           |                   ^^^^^
+          |
         info: Source
          --> main2.py:4:13
           |
@@ -7694,6 +8000,7 @@ Source with applied edits:
           |
         5 |                 RED = 1
           |                 ^^^
+          |
         info: Source
          --> main2.py:4:19
           |
@@ -7735,6 +8042,7 @@ Source with applied edits:
           |
         3 |                 class Inner: ...
           |                       ^^^^^
+          |
         info: Source
          --> main2.py:4:5
           |
@@ -7773,6 +8081,7 @@ Source with applied edits:
           |
         3 |     class Inner: ...
           |           ^^^^^
+          |
         info: Source
          --> main2.py:8:5
           |

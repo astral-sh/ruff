@@ -431,6 +431,7 @@ error[invalid-syntax-in-forward-annotation]: Syntax error in forward annotation
    |
 43 | m: "yield 1"
    |     ^^^^^^^ Yield expression cannot be used here
+   |
 help: Did you mean `typing.Literal["yield 1"]`?
 help: Wrap in `Literal[...]`
    |
@@ -451,6 +452,7 @@ error[invalid-syntax-in-forward-annotation]: Syntax error in forward annotation
    |
 45 | n: "yield from 1"
    |     ^^^^^^^^^^^^ Yield expression cannot be used here
+   |
 help: Did you mean `typing.Literal["yield from 1"]`?
 help: Wrap in `Literal[...]`
    |
@@ -473,6 +475,7 @@ error[invalid-syntax-in-forward-annotation]: Syntax error in forward annotation
    |     -----^^^^^^^^^^^^-
    |          |
    |          Yield expression cannot be used here
+   |
 help: Did you mean `typing.Literal["list[yield from 1]"]`?
 help: Wrap in `Literal[...]`
    |
@@ -495,6 +498,7 @@ error[invalid-syntax-in-forward-annotation]: Syntax error in forward annotation
    |     ----^
    |         |
    |         Unexpected token at the end of an expression
+   |
 help: Did you mean `typing.Literal["type]"]`?
 help: Wrap in `Literal[...]`
    |

@@ -319,6 +319,7 @@ RUF057 [*] Value being rounded is already an integer
 103 | |     1
 104 | | ))
     | |__^
+    |
 help: Remove unnecessary `round` call
     |
 101 | # Preserve comments within explicit argument parentheses.

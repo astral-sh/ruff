@@ -627,6 +627,7 @@ error[override-of-final-variable]: Cannot override `module_a.Foo.X`
   |
 5 |     X = 2
   |     ^ Overrides a final variable from superclass `module_a.Foo`
+  |
 info: `module_a.Foo.X` is declared as `Final`, forbidding overrides
  --> src/module_a.py:4:5
   |

@@ -95,6 +95,7 @@ API_BASE_URL = 'https://api.example.com'
           |
         2 | def utility_function():
           |     ^^^^^^^^^^^^^^^^
+          |
         info: Function utility_function
         ");
 
@@ -104,6 +105,7 @@ API_BASE_URL = 'https://api.example.com'
           |
         2 | class DataModel:
           |       ^^^^^^^^^
+          |
         info: Class DataModel
         ");
 
@@ -113,6 +115,7 @@ API_BASE_URL = 'https://api.example.com'
           |
         2 | API_BASE_URL = 'https://api.example.com'
           | ^^^^^^^^^^^^
+          |
         info: Constant API_BASE_URL
         ");
     }
@@ -135,6 +138,7 @@ class Test:
           |
         3 |     def from_path(): ...
           |         ^^^^^^^^^
+          |
         info: Method from_path
         ");
     }
@@ -158,6 +162,7 @@ class Test:
           |
         4 |     def from_path(): ...
           |         ^^^^^^^^^
+          |
         info: Method from_path
         ");
     }
@@ -182,6 +187,7 @@ foo = 1
           |
         5 | foo = 1
           | ^^^
+          |
         info: Variable foo
         ");
         assert_snapshot!(test.workspace_symbols("re"), @"No symbols found");

@@ -2432,6 +2432,7 @@ error[unresolved-reference]: Name `x` used when not defined
   |
 5 |         y = x  # snapshot
   |             ^
+  |
 info: An attribute `x` is available: consider using `self.x`
 ```
 
@@ -2449,6 +2450,7 @@ error[unresolved-reference]: Name `x` used when not defined
    |
 10 |         y = x  # snapshot
    |             ^
+   |
 info: An attribute `x` is available: consider using `self.x`
 ```
 
@@ -3266,6 +3268,7 @@ error[invalid-attribute-access]: Invalid access to attribute `missing` on type `
   |
 7 | InvalidGetAttr().missing  # snapshot: invalid-attribute-access
   | ^^^^^^^^^^^^^^^^^^^^^^^^ Too many positional arguments to bound method `InvalidGetAttr.__getattr__`: expected 1, got 2
+  |
 info: This access implicitly calls `__getattr__`
 info: Method signature here
  --> src/mdtest_snippet.py:4:9
@@ -3412,6 +3415,7 @@ error[invalid-attribute-access]: Invalid access to attribute `missing` on type `
   |
 8 | InvalidGetAttribute().missing  # snapshot: invalid-attribute-access
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Too many positional arguments to bound method `InvalidGetAttribute.__getattribute__`: expected 1, got 2
+  |
 info: This access implicitly calls `__getattribute__`
 info: Method signature here
  --> src/mdtest_snippet.py:5:9
@@ -3742,6 +3746,7 @@ error[invalid-assignment]: Cannot assign object of type `tuple[Literal[1], Liter
   |
 5 | c.x = (1, b"")  # snapshot: invalid-assignment
   |       ^^^^^^^^ Expected `tuple[int, str]`, found `tuple[Literal[1], Literal[b""]]`
+  |
 info: Argument to bound method `C.__setattr__` is incorrect
 info: This assignment implicitly calls a custom `__setattr__` method
 info: the second tuple element is not compatible: `Literal[b""]` is not assignable to `str`
@@ -3774,6 +3779,7 @@ error[invalid-assignment]: Cannot assign object of type `tuple[Literal[1], Liter
    |
 11 | d.x = (1, b"")  # snapshot: invalid-assignment
    | ^^^ No overload of bound method `D.__setattr__` matches arguments
+   |
 info: This assignment implicitly calls a custom `__setattr__` method
 info: First overload defined here
  --> src/mdtest_snippet.py:4:5
@@ -3781,6 +3787,7 @@ info: First overload defined here
 4 | /     @overload
 5 | |     def __setattr__(self, name: str, value: tuple[int, str]): ...
   | |_________________________________________________________________^ First overload defined here
+  |
 info: Possible overloads for bound method `__setattr__`:
 info:   (self, name: str, value: tuple[int, str]) -> Unknown
 info:   (self, name: str, value: int) -> Unknown
@@ -3821,6 +3828,7 @@ error[invalid-assignment]: Cannot assign object of type `Literal["May"]` to attr
    |
 13 | date.month = "May"  # snapshot: invalid-assignment
    |              ^^^^^ Expected `int`, found `Literal["May"]`
+   |
 info: Argument to bound method `Date.__setattr__` is incorrect
 info: This assignment implicitly calls a custom `__setattr__` method
 info: Method defined here
@@ -3835,6 +3843,7 @@ error[invalid-assignment]: Cannot assign object of type `Literal["UTC"]` to attr
    |
 16 | date.tz = "UTC"
    | ^^^^^^^ Expected `Literal["day", "month", "year"]`, found `Literal["tz"]`
+   |
 info: Argument to bound method `Date.__setattr__` is incorrect
 info: This assignment implicitly calls a custom `__setattr__` method
 info: Method defined here
@@ -3849,6 +3858,7 @@ error[invalid-assignment]: Cannot assign object of type `Literal["UTC"]` to attr
    |
 16 | date.tz = "UTC"
    |           ^^^^^ Expected `int`, found `Literal["UTC"]`
+   |
 info: Argument to bound method `Date.__setattr__` is incorrect
 info: This assignment implicitly calls a custom `__setattr__` method
 info: Method defined here
@@ -5004,6 +5014,7 @@ error[unresolved-attribute]: Module `datetime` has no member `UTC`
   |
 4 | reveal_type(datetime.UTC)  # revealed: Unknown
   |             ^^^^^^^^^^^^
+  |
 info: The member may be available on other Python versions or platforms
 info: Python 3.10 was assumed when resolving the `UTC` attribute because it was specified on the command line
 ```
@@ -5061,6 +5072,7 @@ warning[possibly-missing-submodule]: Submodule `bar` might not have been importe
   |
 4 | reveal_type(foo.bar)  # revealed: Unknown
   |             ^^^^^^^
+  |
 help: Consider explicitly importing `foo.bar`
 ```
 
@@ -5079,6 +5091,7 @@ warning[possibly-missing-submodule]: Submodule `bar` might not have been importe
   |
 4 | reveal_type(baz.bar)  # revealed: Unknown
   |             ^^^^^^^
+  |
 help: Consider explicitly importing `baz.bar`
 ```
 
@@ -5104,6 +5117,7 @@ error[unresolved-attribute]: Object of type `(...) -> Any` has no attribute `__n
   |
 4 |     x.__name__  # snapshot: unresolved-attribute
   |     ^^^^^^^^^^
+  |
 help: Function objects have a `__name__` attribute, but not all callable objects are functions
 help: See this FAQ for more information: <https://docs.astral.sh/ty/reference/typing-faq/#why-does-ty-say-callable-has-no-attribute-__name__>
 ```
@@ -5119,6 +5133,7 @@ error[unresolved-attribute]: Object of type `(...) -> Any` has no attribute `__a
   |
 6 |     x.__annotate__  # snapshot: unresolved-attribute
   |     ^^^^^^^^^^^^^^
+  |
 help: Function objects have an `__annotate__` attribute, but not all callable objects are functions
 help: See this FAQ for more information: <https://docs.astral.sh/ty/reference/typing-faq/#why-does-ty-say-callable-has-no-attribute-__name__>
 ```

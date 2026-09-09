@@ -12,4 +12,5 @@ F811 Redefinition of unused `fu` from line 1
   |
 1 | import fu
   |        -- previous definition of `fu` here
+  |
 help: Remove definition: `fu`

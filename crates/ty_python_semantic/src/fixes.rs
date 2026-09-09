@@ -905,6 +905,7 @@ mod tests {
         1 | import sys
         2 | a = 5 + 10  # ty: ignore[unresolved-reference]
           |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+          |
         help: Remove the unused suppression comment
           |
         1 | import sys
@@ -1204,6 +1205,7 @@ class B(A):
           |
         1 | value = missing  # ty: ignore[] tracked by [123]  # ty: ignore[unresolved-reference]
           |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+          |
         help: Remove the unused suppression comment
           |
           - value = missing  # ty: ignore[] tracked by [123]  # ty: ignore[unresolved-reference]
@@ -1350,6 +1352,7 @@ class B(A):
         2 |
         3 | result: int = f(missing)  # ty: ignore[division-by-zero, invalid-assignment, too-many-positional-arguments, unresolved-reference]
           |                                        ^^^^^^^^^^^^^^^^
+          |
         help: Remove the unused suppression code
           |
         2 |

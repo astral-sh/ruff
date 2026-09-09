@@ -82,6 +82,7 @@ error[invalid-key]: Unknown key "nane" for TypedDict `Person`
   |     ------ ^^^^^^ Did you mean "name"?
   |     |
   |     TypedDict `Person`
+  |
 help: Replace with "name"
   |
 7 | def access_invalid_literal_string_key(person: Person):
@@ -122,6 +123,7 @@ error[invalid-assignment]: Invalid assignment to key "age" with declared type `i
    |     |      |
    |     |      key has declared type `int | None`
    |     TypedDict `Person`
+   |
 info: Item declaration
  --> src/mdtest_snippet.py:5:5
   |
@@ -138,6 +140,7 @@ error[invalid-key]: Unknown key "nane" for TypedDict `Person`
    |     ------ ^^^^^^ Did you mean "name"?
    |     |
    |     TypedDict `Person`
+   |
 help: Replace with "name"
    |
 21 | def write_to_non_existing_key(person: Person):
@@ -187,6 +190,7 @@ error[invalid-assignment]: Cannot assign to key "id" on TypedDict `Employee`
    |     -------- ^^^^ key is marked read-only
    |     |
    |     TypedDict `Employee`
+   |
 info: Item declaration
   --> src/mdtest_snippet.py:36:5
    |
@@ -203,6 +207,7 @@ error[invalid-key]: Unknown key "nane" for TypedDict `Person`
    |     ------ ^^^^^^ Did you mean 'name'?
    |     |
    |     TypedDict `Person`
+   |
 help: Replace with 'name'
    |
 42 |     # error: [invalid-key]
@@ -220,6 +225,7 @@ error[invalid-typed-dict-field]: Cannot overwrite TypedDict field `name`
    |
 48 |     name: int  # error: [invalid-typed-dict-field]
    |     ^^^^^^^^^ Inherited mutable field type `str` is incompatible with `int`
+   |
 info: Field declaration
   --> src/mdtest_snippet.py:45:5
    |
@@ -234,11 +240,13 @@ error[invalid-typed-dict-field]: Cannot overwrite TypedDict field `value` while 
    |
 56 | class BadMerge(LeftBase, RightBase):  # error: [invalid-typed-dict-field]
    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Inherited mutable field type `str` is incompatible with `int`
+   |
 info: Field declaration
   --> src/mdtest_snippet.py:51:5
    |
 51 |     value: int
    |     ---------- Field `value` already inherited from another base here
+   |
 info: Field declaration
   --> src/mdtest_snippet.py:54:5
    |

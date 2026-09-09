@@ -1597,11 +1597,13 @@ warning[deprecated]: Possible use of deprecated methods: `Both.__new__`, `Both._
    |
 12 | Both()
    | ^^^^
+   |
 info: old new
  --> src/mdtest_snippet.py:5:9
   |
 5 |     def __new__(cls) -> Self:
   |         ^^^^^^^
+  |
 info: old init
  --> src/mdtest_snippet.py:9:9
   |
@@ -1782,11 +1784,13 @@ warning[deprecated]: Possible use of deprecated methods: `First.__call__`, `Seco
    |
 12 |     value()
    |     ^^^^^
+   |
 info: Use `invoke` instead. Direct calls are deprecated; support ends in version 2.
  --> src/mdtest_snippet.py:5:9
   |
 5 |     def __call__(self) -> None: ...
   |         ^^^^^^^^
+  |
 info: Use `invoke` instead.
 Support ends in version 3.
  --> src/mdtest_snippet.py:9:9

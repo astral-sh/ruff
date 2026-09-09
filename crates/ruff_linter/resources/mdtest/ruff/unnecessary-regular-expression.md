@@ -29,6 +29,7 @@ error[RUF055]: Plain string pattern passed to `re` function
   |
 5 | if re.prefixmatch("abc", source):  # snapshot: unnecessary-regular-expression
   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
 help: Replace with `source.startswith("abc")`
   |
 4 |

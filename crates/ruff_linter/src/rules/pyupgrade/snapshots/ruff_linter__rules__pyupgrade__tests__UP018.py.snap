@@ -389,6 +389,7 @@ UP018 [*] Unnecessary `float` call (rewrite as a literal)
 60 | float(+1.0)
 61 | float(-1.0)
    | ^^^^^^^^^^^
+   |
 help: Replace with float literal
    |
 60 | float(+1.0)
@@ -524,6 +525,7 @@ UP018 [*] Unnecessary `int` call (rewrite as a literal)
 75 |
 76 | await int(-1)                # await (-1)
    |       ^^^^^^^
+   |
 help: Replace with integer literal
    |
 75 |
@@ -553,6 +555,7 @@ UP018 [*] Unnecessary `float` call (rewrite as a literal)
 79 | int(+1) ** 0
 80 | float(+1.0)()
    | ^^^^^^^^^^^
+   |
 help: Replace with float literal
    |
 79 | int(+1) ** 0
@@ -644,6 +647,7 @@ UP018 [*] Unnecessary `bool` call (rewrite as a literal)
 91 | float(1.)and None
 92 | bool(True)and()
    | ^^^^^^^^^^
+   |
 help: Replace with boolean literal
    |
 91 | float(1.)and None
@@ -862,6 +866,7 @@ UP018 [*] Unnecessary `complex` call (rewrite as a literal)
 112 | complex(1j).real
 113 | complex(real=1j).real
     | ^^^^^^^^^^^^^^^^
+    |
 help: Replace with complex literal
     |
 112 | complex(1j).real

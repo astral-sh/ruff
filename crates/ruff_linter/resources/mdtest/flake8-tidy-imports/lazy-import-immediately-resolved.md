@@ -26,6 +26,7 @@ error[TID254]: Use a `lazy` import instead of an eager import
   |
 1 | import foo  # snapshot: lazy-import-mismatch
   |        ^^^
+  |
 help: Convert to a lazy import
   |
   - import foo  # snapshot: lazy-import-mismatch

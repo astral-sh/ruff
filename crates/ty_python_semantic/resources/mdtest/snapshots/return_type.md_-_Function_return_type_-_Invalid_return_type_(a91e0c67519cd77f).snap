@@ -53,6 +53,7 @@ error[invalid-return-type]: Function always implicitly returns `None`, which is 
   |
 2 | def f() -> int:
   |            ^^^
+  |
 info: Consider changing the return annotation to `-> None` or adding a `return` statement
 
 ```
@@ -87,6 +88,7 @@ error[empty-body]: Function always implicitly returns `None`, which is not assig
    |
 18 | def m(x: T) -> T: ...
    |                ^
+   |
 info: Consider changing the return annotation to `-> None` or adding a `return` statement
 info: Functions with empty bodies and non-`None` return types are only permitted:
 info:  - in stub files

@@ -26,6 +26,7 @@ D208 [*] Docstring is over-indented
 263 |
 264 |         """
     | ^
+    |
 help: Remove over-indentation
     |
 263 |

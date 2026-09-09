@@ -70,6 +70,7 @@ error[instance-layout-conflict]: Class will raise `TypeError` at runtime due to 
 7 | |     str
 8 | | ): ...
   | |_^ Bases `int` and `str` cannot be combined in multiple inheritance
+  |
 info: Two classes cannot coexist in a class's MRO if their instances have incompatible memory layouts
  --> src/mdtest_snippet.py:6:5
   |
@@ -90,6 +91,7 @@ error[instance-layout-conflict]: Class will raise `TypeError` at runtime due to 
 15 | |     B,
 16 | | ): ...
    | |_^ Bases `int` and `B` cannot be combined in multiple inheritance
+   |
 info: Two classes cannot coexist in a class's MRO if their instances have incompatible memory layouts
   --> src/mdtest_snippet.py:14:5
    |
@@ -110,6 +112,7 @@ error[instance-layout-conflict]: Class will raise `TypeError` at runtime due to 
 21 | |     str
 22 | | ): ...
    | |_^ Bases `D` and `str` cannot be combined in multiple inheritance
+   |
 info: Two classes cannot coexist in a class's MRO if their instances have incompatible memory layouts
   --> src/mdtest_snippet.py:20:5
    |
@@ -129,6 +132,7 @@ error[instance-layout-conflict]: Class will raise `TypeError` at runtime due to 
    |
 24 | class F(int, bytes, bytearray): ...  # error: [instance-layout-conflict]
    |       ^^^^^^^^^^^^^^^^^^^^^^^^ Bases `int`, `bytes` and `bytearray` cannot be combined in multiple inheritance
+   |
 info: Two classes cannot coexist in a class's MRO if their instances have incompatible memory layouts
   --> src/mdtest_snippet.py:24:9
    |
@@ -168,6 +172,7 @@ error[instance-layout-conflict]: Class will raise `TypeError` at runtime due to 
 39 | |     H
 40 | | ): ...
    | |_^ Bases `G` and `H` cannot be combined in multiple inheritance
+   |
 info: Two classes cannot coexist in a class's MRO if their instances have incompatible memory layouts
   --> src/mdtest_snippet.py:38:5
    |

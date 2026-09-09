@@ -93,6 +93,7 @@ warning[missing-direct-dependency]: Import of `indirect` requires a direct depen
   |
 4 | import indirect
   |        ^^^^^^^^
+  |
 help: Declare `indirect-distribution` in `project.dependencies` or `project.optional-dependencies` in your `pyproject.toml`
 info: See https://docs.astral.sh/uv/concepts/projects/dependencies/
 ```
@@ -868,6 +869,7 @@ warning[missing-direct-dependency]: Import of `indirect` requires a direct depen
    |
 23 | import indirect
    |        ^^^^^^^^
+   |
 help: Declare `indirect-distribution` in the script's inline `dependencies` metadata
 info: See https://docs.astral.sh/uv/guides/scripts/#declaring-script-dependencies
 ```

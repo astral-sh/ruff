@@ -4080,6 +4080,7 @@ error[invalid-argument-type]: Invalid argument to key "label" with declared type
    | |                   |     value of type `Literal[2]`
    | |                   key has declared type `str`
    | TypedDict `LabeledBox`
+   |
 info: Item declaration
   --> src/mdtest_snippet.py:10:5
    |

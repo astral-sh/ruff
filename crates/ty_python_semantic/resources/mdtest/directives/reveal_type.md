@@ -50,6 +50,7 @@ warning[undefined-reveal]: `reveal_type` used without importing it
   |
 2 | reveal_type(1)  # error: [revealed-type] "Literal[1]"
   | ^^^^^^^^^^^
+  |
 info: This is allowed for debugging convenience but will fail at runtime
 help: Import `reveal_type` from `typing`
   |
@@ -79,6 +80,7 @@ warning[undefined-reveal]: `reveal_type` used without importing it
   |
 5 |     reveal_type(1)  # error: [revealed-type] "Literal[1]"
   |     ^^^^^^^^^^^
+  |
 info: This is allowed for debugging convenience but will fail at runtime
 ```
 
@@ -104,6 +106,7 @@ warning[undefined-reveal]: `reveal_type` used without importing it
   |
 2 | reveal_type(1)  # error: [revealed-type] "Literal[1]"
   | ^^^^^^^^^^^
+  |
 info: This is allowed for debugging convenience but will fail at runtime
 ```
 
@@ -154,6 +157,7 @@ warning[undefined-reveal]: `reveal_type` used without importing it
   |
 2 | reveal_type(1)  # error: [revealed-type] "Literal[1]"
   | ^^^^^^^^^^^
+  |
 info: This is allowed for debugging convenience but will fail at runtime
 help: Import `reveal_type` from `typing_extensions`
   |
@@ -188,6 +192,7 @@ warning[undefined-reveal]: `reveal_type` used without importing it
   |
 2 | reveal_type(1)  # error: [revealed-type] "Literal[1]"
   | ^^^^^^^^^^^
+  |
 info: This is allowed for debugging convenience but will fail at runtime
 ```
 
@@ -215,6 +220,7 @@ warning[undefined-reveal]: `reveal_type` used without importing it
   |
 2 | reveal_type(1)  # error: [revealed-type] "Literal[1]"
   | ^^^^^^^^^^^
+  |
 info: This is allowed for debugging convenience but will fail at runtime
 ```
 
@@ -262,6 +268,7 @@ warning[undefined-reveal]: `reveal_type` used without importing it
   |
 2 | reveal_type(1)  # error: [revealed-type] "Literal[1]"
   | ^^^^^^^^^^^
+  |
 info: This is allowed for debugging convenience but will fail at runtime
 ```
 
@@ -307,6 +314,7 @@ warning[undefined-reveal]: `reveal_type` used without importing it
   |
 2 | reveal_type(1)  # error: [revealed-type] "Literal[1]"
   | ^^^^^^^^^^^
+  |
 info: This is allowed for debugging convenience but will fail at runtime
 ```
 
@@ -323,6 +331,7 @@ warning[undefined-reveal]: `reveal_type` used without importing it
   |
 2 | reveal_type(1)  # error: [revealed-type] "Literal[1]"
   | ^^^^^^^^^^^
+  |
 info: This is allowed for debugging convenience but will fail at runtime
 help: Import `reveal_type` from `typing_extensions`
   |
@@ -379,6 +388,7 @@ warning[undefined-reveal]: `reveal_type` used without importing it
   |
 2 | reveal_type(1)  # error: [revealed-type] "Literal[1]"
   | ^^^^^^^^^^^
+  |
 info: This is allowed for debugging convenience but will fail at runtime
 ```
 

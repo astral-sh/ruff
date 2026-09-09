@@ -167,6 +167,7 @@ error[unsupported-operator]: Unary operator `+` is not supported for object of t
    |
 15 |     reveal_type(+x)  # revealed: bool
    |                 ^^
+   |
 info: `No` does not implement `__pos__`
 
 
@@ -175,6 +176,7 @@ error[unsupported-operator]: Unary operator `-` is not supported for object of t
    |
 18 |     reveal_type(-x)  # revealed: str
    |                 ^^
+   |
 info: `No` does not implement `__neg__`
 
 
@@ -183,6 +185,7 @@ error[unsupported-operator]: Unary operator `~` is not supported for object of t
    |
 21 |     reveal_type(~x)  # revealed: int
    |                 ^^
+   |
 info: `No` does not implement `__invert__`
 ```
 

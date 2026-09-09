@@ -871,6 +871,7 @@ error[inconsistent-mro]: Cannot create a consistent method resolution order (MRO
   |
 7 | class Foo1(Generic[K, V], dict): ...  # snapshot: inconsistent-mro
   |       ^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
 help: Move `Generic[K, V]` to the end of the bases list
   |
 6 | # error: [missing-type-argument]
@@ -908,6 +909,7 @@ error[inconsistent-mro]: Cannot create a consistent method resolution order (MRO
 16 | |     # comment5
 17 | | ): ...
    | |_^
+   |
 help: Move `Generic[K, V]` to the end of the bases list
    |
 11 |     # comment1
@@ -932,6 +934,7 @@ error[inconsistent-mro]: Cannot create a consistent method resolution order (MRO
    |
 19 | class Foo3(Generic[K, V], dict, metaclass=type): ...  # snapshot: inconsistent-mro
    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
 help: Move `Generic[K, V]` to the end of the bases list
    |
 18 | # error: [missing-type-argument]
@@ -973,6 +976,7 @@ error[inconsistent-mro]: Cannot create a consistent method resolution order (MRO
 28 | |     # comment7
 29 | | ): ...
    | |_^
+   |
 help: Move `Generic[K, V]` to the end of the bases list
    |
 21 |     # comment1
@@ -1131,6 +1135,7 @@ error[instance-layout-conflict]: Class will raise `TypeError` at runtime due to 
   |
 8 | X = type("X", (A, B), {})
   |     ^^^^^^^^^^^^^^^^^^^^^ Bases `A` and `B` cannot be combined in multiple inheritance
+  |
 info: Two classes cannot coexist in a class's MRO if their instances have incompatible memory layouts
  --> src/mdtest_snippet.py:8:16
   |
@@ -1171,6 +1176,7 @@ error[instance-layout-conflict]: Class will raise `TypeError` at runtime due to 
    |
 21 | bad: "Annotated[int, type('Bad', (A, B), {})]"
    |                      ^^^^^^^^^^^^^^^^^^^^^^^ Bases `A` and `B` cannot be combined in multiple inheritance
+   |
 info: Two classes cannot coexist in a class's MRO if their instances have incompatible memory layouts
   --> src/mdtest_snippet.py:21:35
    |

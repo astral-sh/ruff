@@ -1151,6 +1151,7 @@ error[invalid-attribute-access]: Invalid access to descriptor attribute `class_o
    |
 26 | reveal_type(C().class_object_access)  # revealed: int
    |             ^^^ Expected `None`, found `C`
+   |
 info: Argument to function `TailoredForClassObjectAccess.__get__` is incorrect
 info: This access implicitly calls `__get__` on a descriptor of type `TailoredForClassObjectAccess`
 info: Function defined here
@@ -1165,6 +1166,7 @@ error[invalid-attribute-access]: Invalid access to descriptor attribute `instanc
    |
 29 | reveal_type(C.instance_access)  # revealed: str
    |             ^ Expected `C`, found `None`
+   |
 info: Argument to function `TailoredForInstanceAccess.__get__` is incorrect
 info: This access implicitly calls `__get__` on a descriptor of type `TailoredForInstanceAccess`
 info: Function defined here
@@ -1200,6 +1202,7 @@ error[invalid-attribute-access]: Invalid access to descriptor attribute `descrip
   |
 9 | C().descriptor  # snapshot: invalid-attribute-access
   | ^^^ Too many positional arguments to function `Descriptor.__get__`: expected 1, got 3
+  |
 info: This access implicitly calls `__get__` on a descriptor of type `Descriptor`
 info: Function signature here
  --> src/mdtest_snippet.py:3:9

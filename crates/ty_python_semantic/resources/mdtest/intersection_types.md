@@ -1104,11 +1104,13 @@ error[invalid-argument-type]: Argument to `UsesInit.__init__` is incorrect
    |
 15 |         cls(None)
    |             ^^^^ Expected `int`, found `None`
+   |
 info: Method defined here
  --> src/mdtest_snippet.py:4:9
   |
 4 |     def __init__(self, value: int) -> None: ...
   |         ^^^^^^^^       ---------- Parameter declared here
+  |
 info: Intersection element `bound method UsesInit.__init__(value: int) -> None` is incompatible with this call site
 info: Attempted to call intersection type `type[UsesInit] & type[UsesNew]`
 ```

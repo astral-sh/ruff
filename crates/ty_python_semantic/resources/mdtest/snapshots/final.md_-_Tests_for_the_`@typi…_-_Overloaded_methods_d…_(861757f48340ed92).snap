@@ -135,6 +135,7 @@ error[override-of-final-method]: Cannot override `Good.bar`
    |
 19 |     def bar(self, x: int) -> int: ...  # error: [override-of-final-method]
    |         ^^^ Overrides a definition from superclass `Good`
+   |
 info: `Good.bar` is decorated with `@final`, forbidding overrides
  --> src/stub.pyi:5:5
   |
@@ -142,6 +143,7 @@ info: `Good.bar` is decorated with `@final`, forbidding overrides
   |     ------
 6 |     def bar(self, x: str) -> str: ...
   |         --- `Good.bar` defined here
+  |
 help: Remove all overloads for `bar`
    |
 15 | class ChildOfGood(Good):
@@ -163,6 +165,7 @@ error[override-of-final-method]: Cannot override `Good.baz`
    |
 23 |     def baz(self, x: int) -> int: ...  # error: [override-of-final-method]
    |         ^^^ Overrides a definition from superclass `Good`
+   |
 info: `Good.baz` is decorated with `@final`, forbidding overrides
   --> src/stub.pyi:9:5
    |
@@ -171,6 +174,7 @@ info: `Good.baz` is decorated with `@final`, forbidding overrides
 10 |     @overload
 11 |     def baz(self, x: str) -> str: ...
    |         --- `Good.baz` defined here
+   |
 help: Remove all overloads for `baz`
    |
 19 |     def bar(self, x: int) -> int: ...  # error: [override-of-final-method]
@@ -224,11 +228,13 @@ error[override-of-final-method]: Cannot override `Bad.bar`
    |
 43 |     def bar(self, x: int) -> int: ...  # error: [override-of-final-method]
    |         ^^^ Overrides a definition from superclass `Bad`
+   |
 info: `Bad.bar` is decorated with `@final`, forbidding overrides
   --> src/stub.pyi:27:9
    |
 27 |     def bar(self, x: str) -> str: ...
    |         --- `Bad.bar` defined here
+   |
 help: Remove all overloads for `bar`
    |
 39 | class ChildOfBad(Bad):
@@ -250,11 +256,13 @@ error[override-of-final-method]: Cannot override `Bad.baz`
    |
 47 |     def baz(self, x: int) -> int: ...  # error: [override-of-final-method]
    |         ^^^ Overrides a definition from superclass `Bad`
+   |
 info: `Bad.baz` is decorated with `@final`, forbidding overrides
   --> src/stub.pyi:33:9
    |
 33 |     def baz(self, x: str) -> str: ...
    |         --- `Bad.baz` defined here
+   |
 help: Remove all overloads for `baz`
    |
 43 |     def bar(self, x: int) -> int: ...  # error: [override-of-final-method]
@@ -275,6 +283,7 @@ error[override-of-final-method]: Cannot override `Good.f`
    |
 19 |     def f(self, x: int | str) -> int | str:
    |         ^ Overrides a definition from superclass `Good`
+   |
 info: `Good.f` is decorated with `@final`, forbidding overrides
  --> src/main.py:8:5
   |
@@ -282,6 +291,7 @@ info: `Good.f` is decorated with `@final`, forbidding overrides
   |     ------
 9 |     def f(self, x: int | str) -> int | str:
   |         - `Good.f` defined here
+  |
 help: Remove all overloads and the implementation for `f`
    |
 12 | class ChildOfGood(Good):
@@ -372,11 +382,13 @@ error[override-of-final-method]: Cannot override `Bad.f`
    |
 57 |     f = None  # error: [override-of-final-method]
    |     ^ Overrides a definition from superclass `Bad`
+   |
 info: `Bad.f` is decorated with `@final`, forbidding overrides
   --> src/main.py:28:9
    |
 28 |     def f(self, x: int | str) -> int | str:
    |         - `Bad.f` defined here
+   |
 help: Remove the override of `f`
 
 ```
@@ -387,11 +399,13 @@ error[override-of-final-method]: Cannot override `Bad.g`
    |
 58 |     g = None  # error: [override-of-final-method]
    |     ^ Overrides a definition from superclass `Bad`
+   |
 info: `Bad.g` is decorated with `@final`, forbidding overrides
   --> src/main.py:36:9
    |
 36 |     def g(self, x: int | str) -> int | str:
    |         - `Bad.g` defined here
+   |
 help: Remove the override of `g`
 
 ```
@@ -402,11 +416,13 @@ error[override-of-final-method]: Cannot override `Bad.h`
    |
 59 |     h = None  # error: [override-of-final-method]
    |     ^ Overrides a definition from superclass `Bad`
+   |
 info: `Bad.h` is decorated with `@final`, forbidding overrides
   --> src/main.py:44:9
    |
 44 |     def h(self, x: int | str) -> int | str:
    |         - `Bad.h` defined here
+   |
 help: Remove the override of `h`
 
 ```
@@ -417,11 +433,13 @@ error[override-of-final-method]: Cannot override `Bad.i`
    |
 60 |     i = None  # error: [override-of-final-method]
    |     ^ Overrides a definition from superclass `Bad`
+   |
 info: `Bad.i` is decorated with `@final`, forbidding overrides
   --> src/main.py:52:9
    |
 52 |     def i(self, x: int | str) -> int | str:
    |         - `Bad.i` defined here
+   |
 help: Remove the override of `i`
 
 ```

@@ -525,6 +525,7 @@ error[invalid-type-form]: List literals are not allowed in this context in a par
   |
 2 |     x: [int],  # snapshot: invalid-type-form
   |        ^^^^^ Did you mean `list[int]`?
+  |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 help: Replace with `list[...]`
@@ -542,6 +543,7 @@ error[invalid-type-form]: List literals are not allowed in this context in a ret
   |
 3 | ) -> [int]:  # snapshot: invalid-type-form
   |      ^^^^^ Did you mean `list[int]`?
+  |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 help: Replace with `list[...]`
@@ -569,6 +571,7 @@ error[invalid-type-form]: List literals are not allowed in this context in a par
   |
 6 |     x: [int, str],  # snapshot: invalid-type-form
   |        ^^^^^^^^^^
+  |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 
@@ -578,6 +581,7 @@ error[invalid-type-form]: List literals are not allowed in this context in a ret
   |
 7 | ) -> [int, str]:  # snapshot: invalid-type-form
   |      ^^^^^^^^^^
+  |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 ```
@@ -599,6 +603,7 @@ error[invalid-type-form]: Tuple literals are not allowed in this context in a pa
   |
 2 |     x: (),  # snapshot: invalid-type-form
   |        ^^ Did you mean `tuple[()]`?
+  |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 help: Replace with `tuple[...]`
@@ -616,6 +621,7 @@ error[invalid-type-form]: Tuple literals are not allowed in this context in a re
   |
 3 | ) -> ():  # snapshot: invalid-type-form
   |      ^^ Did you mean `tuple[()]`?
+  |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 help: Replace with `tuple[...]`
@@ -643,6 +649,7 @@ error[invalid-type-form]: Tuple literals are not allowed in this context in a pa
   |
 6 |     x: (int,),  # snapshot: invalid-type-form
   |        ^^^^^^ Did you mean `tuple[int]`?
+  |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 help: Replace with `tuple[...]`
@@ -660,6 +667,7 @@ error[invalid-type-form]: Tuple literals are not allowed in this context in a re
   |
 7 | ) -> (int,):  # snapshot: invalid-type-form
   |      ^^^^^^ Did you mean `tuple[int]`?
+  |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 help: Replace with `tuple[...]`
@@ -688,6 +696,7 @@ error[invalid-type-form]: Tuple literals are not allowed in this context in a pa
    |
 10 |     x: (int, str),  # snapshot: invalid-type-form
    |        ^^^^^^^^^^ Did you mean `tuple[int, str]`?
+   |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 help: Replace with `tuple[...]`
@@ -705,6 +714,7 @@ error[invalid-type-form]: Tuple literals are not allowed in this context in a re
    |
 11 | ) -> (int, str):  # snapshot: invalid-type-form
    |      ^^^^^^^^^^ Did you mean `tuple[int, str]`?
+   |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 help: Replace with `tuple[...]`
@@ -735,6 +745,7 @@ error[invalid-type-form]: Dict literals are not allowed in parameter annotations
   |
 2 |     x: {int: str},  # snapshot: invalid-type-form
   |        ^^^^^^^^^^ Did you mean `dict[int, str]`?
+  |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 help: Replace with `dict[...]`
@@ -752,6 +763,7 @@ error[invalid-type-form]: Set literals are not allowed in parameter annotations
   |
 3 |     y: {str},  # snapshot: invalid-type-form
   |        ^^^^^ Did you mean `set[str]`?
+  |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 help: Replace with `set[...]`
@@ -783,6 +795,7 @@ error[invalid-type-form]: Tuple literals are not allowed in this context in a ty
   |
 2 | first: ((int), str)  # snapshot: invalid-type-form
   |        ^^^^^^^^^^^^ Did you mean `tuple[int, str]`?
+  |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 help: Replace with `tuple[...]`
@@ -800,6 +813,7 @@ error[invalid-type-form]: Tuple literals are not allowed in this context in a ty
   |
 3 | last: (int, (str))  # snapshot: invalid-type-form
   |       ^^^^^^^^^^^^ Did you mean `tuple[int, str]`?
+  |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 help: Replace with `tuple[...]`
@@ -817,6 +831,7 @@ error[invalid-type-form]: Tuple literals are not allowed in this context in a ty
   |
 4 | single: (((int)),)  # snapshot: invalid-type-form
   |         ^^^^^^^^^^ Did you mean `tuple[int]`?
+  |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 help: Replace with `tuple[...]`
@@ -834,6 +849,7 @@ error[invalid-type-form]: Tuple literals are not allowed in this context in a ty
   |
 5 | outer: (((int), (str)))  # snapshot: invalid-type-form
   |         ^^^^^^^^^^^^^^ Did you mean `tuple[int, str]`?
+  |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 help: Replace with `tuple[...]`
@@ -862,6 +878,7 @@ error[invalid-type-form]: Dict literals are not allowed in type expressions
   |
 7 | key: {(int): str}  # snapshot: invalid-type-form
   |      ^^^^^^^^^^^^ Did you mean `dict[int, str]`?
+  |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 help: Replace with `dict[...]`
@@ -879,6 +896,7 @@ error[invalid-type-form]: Dict literals are not allowed in type expressions
   |
 8 | value: {int: ((str)),}  # snapshot: invalid-type-form
   |        ^^^^^^^^^^^^^^^ Did you mean `dict[int, str]`?
+  |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 help: Replace with `dict[...]`
@@ -896,6 +914,7 @@ error[invalid-type-form]: Set literals are not allowed in type expressions
   |
 9 | items: {((int)),}  # snapshot: invalid-type-form
   |        ^^^^^^^^^^ Did you mean `set[int]`?
+  |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 help: Replace with `set[...]`
@@ -913,6 +932,7 @@ error[invalid-type-form]: List literals are not allowed in this context in a typ
    |
 10 | values: [((int))]  # snapshot: invalid-type-form
    |         ^^^^^^^^^ Did you mean `list[int]`?
+   |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 help: Replace with `list[...]`
@@ -942,6 +962,7 @@ error[invalid-type-form]: Dict literals are not allowed in type expressions
   |
 2 |     yielded_key: {(yield int): str}  # snapshot: invalid-type-form
   |                  ^^^^^^^^^^^^^^^^^^
+  |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 help: Replace with `dict[...]`
@@ -959,6 +980,7 @@ error[invalid-type-form]: Dict literals are not allowed in type expressions
   |
 3 |     yielded_value: {int: (yield str)}  # snapshot: invalid-type-form
   |                    ^^^^^^^^^^^^^^^^^^
+  |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 help: Replace with `dict[...]`
@@ -976,6 +998,7 @@ error[invalid-type-form]: Set literals are not allowed in type expressions
   |
 4 |     yielded_element: {(yield int)}  # snapshot: invalid-type-form
   |                      ^^^^^^^^^^^^^
+  |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 help: Replace with `set[...]`
@@ -1010,6 +1033,7 @@ error[invalid-type-form]: List literals are not allowed in this context in a typ
   |
 1 | as_list: [int]  # snapshot: invalid-type-form
   |          ^^^^^ Did you mean `list[int]`?
+  |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 
@@ -1019,6 +1043,7 @@ error[invalid-type-form]: Tuple literals are not allowed in this context in a ty
   |
 2 | as_tuple: (int,)  # snapshot: invalid-type-form
   |           ^^^^^^ Did you mean `tuple[int]`?
+  |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 
@@ -1028,6 +1053,7 @@ error[invalid-type-form]: Dict literals are not allowed in type expressions
   |
 3 | as_dict: {str: int}  # snapshot: invalid-type-form
   |          ^^^^^^^^^^ Did you mean `dict[str, int]`?
+  |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 
@@ -1037,6 +1063,7 @@ error[invalid-type-form]: Set literals are not allowed in type expressions
   |
 4 | as_set: {int}  # snapshot: invalid-type-form
   |         ^^^^^ Did you mean `set[int]`?
+  |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 ```
@@ -1065,6 +1092,7 @@ error[invalid-type-form]: List literals are not allowed in this context in a typ
   |
 3 | as_list: [*types]  # snapshot: invalid-type-form
   |          ^^^^^^^^ Did you mean `list[tuple[Unknown, ...]]`?
+  |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 
@@ -1074,6 +1102,7 @@ error[invalid-type-form]: Tuple literals are not allowed in this context in a ty
   |
 4 | as_tuple: (*types,)  # snapshot: invalid-type-form
   |           ^^^^^^^^^ Did you mean `tuple[tuple[Unknown, ...]]`?
+  |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 
@@ -1083,6 +1112,7 @@ error[invalid-type-form]: Set literals are not allowed in type expressions
   |
 5 | as_set: {*types}  # snapshot: invalid-type-form
   |         ^^^^^^^^ Did you mean `set[tuple[Unknown, ...]]`?
+  |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 ```
@@ -1111,6 +1141,7 @@ error[invalid-type-form]: List literals are not allowed in this context in a typ
 3 | |     int,
 4 | | ]
   | |_^ Did you mean `list[int]`?
+  |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 ```
@@ -1138,6 +1169,7 @@ error[invalid-type-form]: Tuple literals are not allowed in this context in a ty
 4 | |     str,  # The final type remains documented.
 5 | | )
   | |_^ Did you mean `tuple[int, str]`?
+  |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 ```
@@ -1167,6 +1199,7 @@ error[invalid-type-form]: Dict literals are not allowed in type expressions
 5 | |     int,  # The trailing comma remains documented.
 6 | | }
   | |_^ Did you mean `dict[str, int]`?
+  |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 ```
@@ -1192,6 +1225,7 @@ error[invalid-type-form]: Set literals are not allowed in type expressions
 3 | |     int,  # The trailing comma remains documented.
 4 | | }
   | |_^ Did you mean `set[int]`?
+  |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 ```
@@ -1215,6 +1249,7 @@ error[invalid-type-form]: Set literals are not allowed in type expressions
   |
 5 |         value: {int}  # snapshot: invalid-type-form
   |                ^^^^^ Did you mean `set[int]`?
+  |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 help: Replace with `set[...]`
@@ -1251,6 +1286,7 @@ error[invalid-type-form]: List literals are not allowed in this context in a typ
   |
 6 |     type Alias[T] = [int]  # snapshot: invalid-type-form
   |                     ^^^^^ Did you mean `list[int]`?
+  |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 help: Replace with `list[...]`
@@ -1278,6 +1314,7 @@ error[invalid-type-form]: List literals are not allowed in this context in a typ
   |
 1 | overridden: [int]  # snapshot: invalid-type-form
   |             ^^^^^ Did you mean `list[int]`?
+  |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 
@@ -1287,6 +1324,7 @@ error[invalid-type-form]: Set literals are not allowed in type expressions
   |
 2 | standard: {int}  # snapshot: invalid-type-form
   |           ^^^^^ Did you mean `set[int]`?
+  |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 help: Replace with `set[...]`
@@ -1322,6 +1360,7 @@ error[invalid-type-form]: List literals are not allowed in this context in a typ
   |
 1 | quoted_list: "[int]"  # snapshot: invalid-type-form
   |               ^^^^^ Did you mean `list[int]`?
+  |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 
@@ -1331,6 +1370,7 @@ error[invalid-type-form]: Tuple literals are not allowed in this context in a ty
   |
 2 | quoted_tuple: "(int, str)"  # snapshot: invalid-type-form
   |                ^^^^^^^^^^ Did you mean `tuple[int, str]`?
+  |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 
@@ -1340,6 +1380,7 @@ error[invalid-type-form]: Dict literals are not allowed in type expressions
   |
 3 | quoted_dict: "{int: str}"  # snapshot: invalid-type-form
   |               ^^^^^^^^^^ Did you mean `dict[int, str]`?
+  |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 
@@ -1349,6 +1390,7 @@ error[invalid-type-form]: Set literals are not allowed in type expressions
   |
 4 | quoted_set: "{int}"  # snapshot: invalid-type-form
   |              ^^^^^ Did you mean `set[int]`?
+  |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 ```
@@ -1399,6 +1441,7 @@ error[invalid-type-form]: Int literals are not allowed in this context in a para
   |
 3 |     a: 42,
   |        ^^ Did you mean `typing.Literal[42]`?
+  |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 help: Wrap in `Literal[...]`
@@ -1418,6 +1461,7 @@ error[invalid-type-form]: Bytes literals are not allowed in this context in a pa
   |
 5 |     b: b"42",
   |        ^^^^^ Did you mean `typing.Literal[b"42"]`?
+  |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 help: Wrap in `Literal[...]`
@@ -1439,6 +1483,7 @@ error[invalid-type-form]: Boolean literals are not allowed in this context in a 
   |
 7 |     c: True,
   |        ^^^^ Did you mean `typing.Literal[True]`?
+  |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 help: Wrap in `Literal[...]`
@@ -1461,6 +1506,7 @@ error[invalid-syntax-in-forward-annotation]: Syntax error in forward annotation
   |         --------^^^^^^
   |                 |
   |                 Unexpected token at the end of an expression
+  |
 help: Did you mean `typing.Literal["invalid syntax"]`?
 help: Wrap in `Literal[...]`
    |
@@ -1499,6 +1545,7 @@ error[invalid-type-form]: Int literals are not allowed in this context in a para
   |
 3 |     integer: (0x_FF),
   |               ^^^^^ Did you mean `typing.Literal[255]`?
+  |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 help: Wrap in `Literal[...]`
@@ -1518,6 +1565,7 @@ error[invalid-type-form]: Bytes literals are not allowed in this context in a pa
   |
 5 |     data: b"/x41",
   |           ^^^^^^^ Did you mean `typing.Literal[b"A"]`?
+  |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 help: Wrap in `Literal[...]`
@@ -1539,6 +1587,7 @@ error[invalid-type-form]: Boolean literals are not allowed in this context in a 
   |
 7 |     quoted: "False",
   |              ^^^^^ Did you mean `typing.Literal[False]`?
+  |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 help: Wrap in `Literal[...]`
@@ -1561,6 +1610,7 @@ error[invalid-syntax-in-forward-annotation]: Syntax error in forward annotation
   |                ---^^^^^^^^^^^^^
   |                   |
   |                   missing closing quote in string literal
+  |
 help: Did you mean `typing.Literal["can't parse this"]`?
 help: Wrap in `Literal[...]`
    |
@@ -1594,6 +1644,7 @@ error[invalid-type-form]: Boolean literals are not allowed in this context in a 
   |
 4 | value: True
   |        ^^^^ Did you mean `typing.Literal[True]`?
+  |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 help: Wrap in `Literal[...]`
@@ -1620,6 +1671,7 @@ error[invalid-type-form]: Int literals are not allowed in this context in a type
   |
 4 | value: 42
   |        ^^ Did you mean `typing.Literal[42]`?
+  |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 help: Wrap in `Literal[...]`
@@ -1647,6 +1699,7 @@ error[invalid-type-form]: Boolean literals are not allowed in this context in a 
   |
 3 |     value: True
   |            ^^^^ Did you mean `typing.Literal[True]`?
+  |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 help: Wrap in `Literal[...]`
@@ -1675,6 +1728,7 @@ error[invalid-type-form]: Boolean literals are not allowed in this context in a 
   |
 6 |     value: False
   |            ^^^^^ Did you mean `typing.Literal[False]`?
+  |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 ```
@@ -1701,6 +1755,7 @@ error[invalid-type-form]: Boolean literals are not allowed in this context in a 
   |
 2 | value: True
   |        ^^^^ Did you mean `typing.Literal[True]`?
+  |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 ```
@@ -1749,6 +1804,7 @@ error[invalid-type-form]: Boolean literals are not allowed in this context in a 
   |
 2 | value: True
   |        ^^^^ Did you mean `typing.Literal[True]`?
+  |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 help: Wrap in `Literal[...]`
@@ -1784,6 +1840,7 @@ error[invalid-type-form]: Boolean literals are not allowed in this context in a 
   |
 2 | value: True
   |        ^^^^ Did you mean `typing.Literal[True]`?
+  |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 ```
@@ -1811,6 +1868,7 @@ error[invalid-type-form]: Boolean literals are not allowed in this context in a 
   |
 2 | value: True
   |        ^^^^ Did you mean `typing.Literal[True]`?
+  |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 ```
@@ -1858,6 +1916,7 @@ error[invalid-type-form]: Boolean literals are not allowed in this context in a 
   |
 2 | value: True
   |        ^^^^ Did you mean `typing.Literal[True]`?
+  |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 ```

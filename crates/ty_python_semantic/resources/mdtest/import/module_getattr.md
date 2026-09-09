@@ -38,6 +38,7 @@ error[invalid-attribute-access]: Invalid access to attribute `missing` on type `
   |
 3 | invalid_getattr_module.missing  # snapshot: invalid-attribute-access
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Too many positional arguments to function `__getattr__`: expected 0, got 1
+  |
 info: This access implicitly calls `__getattr__`
 info: Function signature here
  --> src/invalid_getattr_module.py:3:5
@@ -110,6 +111,7 @@ error[invalid-module-getattr-call]: Cannot import `missing` from module `invalid
   |
 1 | from invalid_getattr_module import missing  # snapshot: invalid-module-getattr-call
   |                                    ^^^^^^^ Too many positional arguments to function `__getattr__`: expected 0, got 1
+  |
 info: This import implicitly calls a module-level `__getattr__` function
 info: Function signature here
  --> src/invalid_getattr_module.py:1:5

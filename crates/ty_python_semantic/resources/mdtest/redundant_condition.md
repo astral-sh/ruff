@@ -38,6 +38,7 @@ warning[redundant-condition]: Function `func` is always truthy
   |
 3 | if func:  # snapshot: redundant-condition
   |    ^^^^ Did you mean to call this function?
+  |
 help: Replace with `func()`
   |
 2 |
@@ -66,6 +67,7 @@ warning[redundant-condition]: Method `Foo.bar` is always truthy
    |
 10 |         if self.bar:  # snapshot: redundant-condition
    |            ^^^^^^^^ Did you mean to call this method?
+   |
 help: Replace with `self.bar()`
    |
 9  |     def baz(self):
@@ -93,6 +95,7 @@ warning[redundant-condition]: A generator is always truthy
    |
 14 |     if filtered:  # snapshot: redundant-condition
    |        ^^^^^^^^ Inferred type is `GeneratorType[int, None, None]`
+   |
 help: Did you mean to use `any()`?
    |
 13 |     filtered = (item for item in items if item < 42)
@@ -118,6 +121,7 @@ warning[redundant-condition]: Condition is always truthy
    |
 20 |     if coroutine():  # snapshot: redundant-condition
    |        ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
+   |
 help: Did you mean to `await` this expression?
    |
 19 | async def main():
@@ -414,6 +418,7 @@ warning[redundant-condition]: Condition is always truthy
     |
 125 |     if x:  # snapshot: redundant-condition
     |        ^ Inferred type is `Pattern[str]`
+    |
 info: `Pattern` instances are always truthy because `Pattern` cannot be subclassed and does not define `__bool__` or `__len__`
    --> stdlib/re.pyi:285:1
     |
@@ -445,11 +450,13 @@ warning[redundant-condition]: Condition is always truthy
   |
 8 |     if choice:  # snapshot: redundant-condition
   |        ^^^^^^ Inferred type is `Choice`
+  |
 info: `Choice` instances are always truthy because `Choice` cannot be subclassed and does not define `__bool__` or `__len__`
  --> src/mdtest_snippet.py:3:7
   |
 3 | class Choice(Enum):
   |       ^^^^^^^^^^^^ `Choice` defined here
+  |
 info: `Choice` cannot be subclassed because it is an `Enum` subclass and defines enum members
 ```
 
@@ -766,6 +773,7 @@ warning[redundant-condition]: Function `func` is always truthy
   |
 3 |     if flag and func:  # snapshot: redundant-condition
   |                 ^^^^ Did you mean to call this function?
+  |
 help: Replace with `func()`
   |
 2 | def compound_statement_conditions(flag: bool, other: bool):
@@ -781,6 +789,7 @@ warning[redundant-condition]: Function `func` is always truthy
    |
 19 |     selected = True if flag and func else False  # snapshot: redundant-condition
    |                                 ^^^^ Did you mean to call this function?
+   |
 help: Replace with `func()`
    |
 18 | def compound_expression_conditions(flag: bool):
@@ -796,6 +805,7 @@ warning[redundant-condition]: Function `func` is always truthy
    |
 24 |     assert flag and func  # snapshot: redundant-condition
    |                     ^^^^ Did you mean to call this function?
+   |
 help: Replace with `func()`
    |
 23 | def compound_assertion_condition(flag: bool):
@@ -981,6 +991,7 @@ warning[redundant-condition]: Function `coroutine` is always truthy
   |
 3 |     if coroutine:  # snapshot: redundant-condition
   |        ^^^^^^^^^ Did you mean to `await` and call this function?
+  |
 help: Replace with `await coroutine()`
   |
 2 | async def inspect_async_function():
@@ -1020,6 +1031,7 @@ warning[redundant-condition]: Function `always_truthy` is always truthy
   |
 7 |     if always_truthy:  # snapshot: redundant-condition
   |        ^^^^^^^^^^^^^ Did you mean to call this function?
+  |
 help: Replace with `always_truthy()`
   |
 6 | def inspect_truthy_function():
@@ -1035,6 +1047,7 @@ warning[redundant-condition]: Function `always_truthy_coro` is always truthy
    |
 14 |     if always_truthy_coro:  # snapshot: redundant-condition
    |        ^^^^^^^^^^^^^^^^^^ Did you mean to `await` and call this function?
+   |
 help: Replace with `await always_truthy_coro()`
    |
 13 | async def foo():
@@ -1069,6 +1082,7 @@ warning[redundant-condition]: Function `wut` is always truthy
   |
 3 | if wut:  # snapshot: redundant-condition
   |    ^^^ Did you mean to call this function?
+  |
 help: Replace with `wut(...)`
   |
 2 |
@@ -1084,6 +1098,7 @@ warning[redundant-condition]: Function `wuttt` is always truthy
   |
 8 |     if wuttt:  # snapshot: redundant-condition
   |        ^^^^^ Did you mean to `await` and call this function?
+  |
 help: Replace with `await wuttt(...)`
   |
 7 | async def bar():
@@ -1120,6 +1135,7 @@ warning[redundant-condition]: Function `asynchronous` is always truthy
    |
 11 |     if asynchronous:  # snapshot: redundant-condition
    |        ^^^^^^^^^^^^ Did you mean to `await` and call this function?
+   |
 help: Replace with `await asynchronous(...)`
    |
 10 | async def inspect_asynchronous_overloads():
@@ -1152,6 +1168,7 @@ warning[redundant-condition]: Function `mixed` is always truthy
    |
 21 |     if mixed:  # snapshot: redundant-condition
    |        ^^^^^ Did you mean to call this function?
+   |
 help: Replace with `mixed(...)`
    |
 20 | async def inspect_mixed_overloads():
@@ -1202,6 +1219,7 @@ warning[redundant-condition]: Function `unannotated` is always truthy
    |
 18 |     if unannotated:  # snapshot: redundant-condition
    |        ^^^^^^^^^^^ Did you mean to call this function?
+   |
 help: Replace with `unannotated()`
    |
 17 | async def check_synchronous_functions():
@@ -1217,6 +1235,7 @@ warning[redundant-condition]: Function `dynamic` is always truthy
    |
 20 |     if dynamic:  # snapshot: redundant-condition
    |        ^^^^^^^ Did you mean to call this function?
+   |
 help: Replace with `dynamic()`
    |
 19 |         pass
@@ -1232,6 +1251,7 @@ warning[redundant-condition]: Function `terminate` is always truthy
    |
 22 |     if terminate:  # snapshot: redundant-condition
    |        ^^^^^^^^^ Did you mean to call this function?
+   |
 help: Replace with `terminate()`
    |
 21 |         pass
@@ -1247,6 +1267,7 @@ warning[redundant-condition]: Function `terminate_via_alias` is always truthy
    |
 24 |     if terminate_via_alias:  # snapshot: redundant-condition
    |        ^^^^^^^^^^^^^^^^^^^ Did you mean to call this function?
+   |
 help: Replace with `terminate_via_alias()`
    |
 23 |         pass
@@ -1291,6 +1312,7 @@ warning[redundant-condition]: Function `make_coroutine` is always truthy
    |
 11 |     if make_coroutine:  # snapshot: redundant-condition
    |        ^^^^^^^^^^^^^^ Did you mean to `await` and call this function?
+   |
 help: Replace with `await make_coroutine()`
    |
 10 | async def check_coroutine_factory():
@@ -1351,6 +1373,7 @@ warning[redundant-condition]: Condition is always truthy
   |
 3 |     return [value for value in range(1) if coroutine()]  # snapshot: redundant-condition
   |                                            ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
+  |
 help: Did you mean to `await` this expression?
   |
 2 | async def inspect_comprehension_awaitable():
@@ -1366,6 +1389,7 @@ warning[redundant-condition]: Condition is always truthy
   |
 6 |     return (value for value in range(1) if coroutine())  # snapshot: redundant-condition
   |                                            ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
+  |
 help: Did you mean to `await` this expression?
   |
 5 | def inspect_generator_awaitable():
@@ -1392,6 +1416,7 @@ error[redundant-condition-strict]: Condition is always truthy
   |
 3 |     if value := coroutine():  # snapshot: redundant-condition-strict
   |        ^^^^^^^^^^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
+  |
 help: Did you mean to `await` this expression?
   |
 2 | async def inspect_named_awaitable():
@@ -1428,6 +1453,7 @@ warning[redundant-condition]: Condition is always truthy
   |
 9 |     if -value:  # snapshot: redundant-condition
   |        ^^^^^^ Inferred type is `CoroutineType[Any, Any, bool]`
+  |
 help: Did you mean to `await` this expression?
    |
 8  | async def inspect_awaitable_operations(value: AwaitableOperations):
@@ -1443,6 +1469,7 @@ warning[redundant-condition]: Condition is always truthy
    |
 12 |     if value + value:  # snapshot: redundant-condition
    |        ^^^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, bool]`
+   |
 help: Did you mean to `await` this expression?
    |
 11 |
@@ -1475,6 +1502,7 @@ warning[redundant-condition]: Condition is always truthy
   |
 4 |         coroutine()  # snapshot: redundant-condition
   |         ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
+  |
 help: Did you mean to `await` this expression?
   |
 3 |     if (
@@ -1490,6 +1518,7 @@ warning[redundant-condition]: Condition is always truthy
   |
 6 |         else coroutine()  # snapshot: redundant-condition
   |              ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
+  |
 help: Did you mean to `await` this expression?
   |
 5 |         if flag
@@ -1523,6 +1552,7 @@ warning[redundant-condition]: Condition is always truthy
   |
 9 |     if await nested_coroutine():  # snapshot: redundant-condition
   |        ^^^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, bool]`
+  |
 help: Did you mean to `await` this expression?
    |
 8  | async def inspect_nested_awaitable():
@@ -1740,6 +1770,7 @@ warning[redundant-condition]: Condition is always truthy
   |
 5 |     direct: Annotated[int, (value for value in range(1) if coroutine())]  # snapshot: redundant-condition
   |                                                            ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
+  |
 help: Did you mean to `await` this expression?
   |
 4 | async def inspect_generator_annotations():
@@ -1755,6 +1786,7 @@ warning[redundant-condition]: Condition is always truthy
   |
 6 |     nested: Annotated[int, ([value for value in ([1] if coroutine() else [])] for _ in range(1))]  # snapshot: redundant-condition
   |                                                         ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
+  |
 help: Did you mean to `await` this expression?
   |
 5 |     direct: Annotated[int, (value for value in range(1) if coroutine())]  # snapshot: redundant-condition
@@ -1788,6 +1820,7 @@ warning[redundant-condition]: Condition is always truthy
   |
 6 |     class NongenericBase(Base if coroutine() else Base):  # snapshot: redundant-condition
   |                                  ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
+  |
 help: Did you mean to `await` this expression?
   |
 5 | async def inspect_allowed_definition_awaitables():
@@ -1803,6 +1836,7 @@ warning[redundant-condition]: Condition is always truthy
   |
 9 |     def generic_default[T](value: int = 1 if coroutine() else 0):  # snapshot: redundant-condition
   |                                              ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
+  |
 help: Did you mean to `await` this expression?
    |
 8  |
@@ -1833,6 +1867,7 @@ warning[redundant-condition]: Condition is always truthy
   |
 5 |     alias = list[Annotated[int, 1 if coroutine() else 0]]  # snapshot: redundant-condition
   |                                      ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
+  |
 help: Did you mean to `await` this expression?
   |
 4 | async def inspect_runtime_type_expressions():
@@ -1848,6 +1883,7 @@ warning[redundant-condition]: Condition is always truthy
   |
 6 |     value: int = 1 if coroutine() else 0  # snapshot: redundant-condition
   |                       ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
+  |
 help: Did you mean to `await` this expression?
   |
 5 |     alias = list[Annotated[int, 1 if coroutine() else 0]]  # snapshot: redundant-condition
@@ -1875,6 +1911,7 @@ warning[redundant-condition]: Condition is always truthy
   |
 3 |     if flag and coroutine():  # snapshot: redundant-condition
   |                 ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, Unknown]`
+  |
 help: Did you mean to `await` this expression?
   |
 2 | async def inspect_compound_awaitable(flag: bool):
@@ -1979,6 +2016,7 @@ warning[redundant-condition]: Condition is always truthy
    |
 12 |     return ([item for item in [1] if predicate()] for _ in [1] if await predicate())  # snapshot: redundant-condition
    |                                      ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, bool]`
+   |
 help: Did you mean to `await` this expression?
    |
 11 | def already_async_generator():
@@ -1994,6 +2032,7 @@ warning[redundant-condition]: Condition is always truthy
    |
 15 |     return (item for item in [1] if predicate())  # snapshot: redundant-condition
    |                                     ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, bool]`
+   |
 help: Did you mean to `await` this expression?
    |
 14 | def direct_generator():
@@ -2034,6 +2073,7 @@ warning[redundant-condition]: Condition is always truthy
   |
 5 |     return ([item for item in [1] if predicate()] for _ in [1])  # snapshot: redundant-condition
   |                                      ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, bool]`
+  |
 help: Did you mean to `await` this expression?
   |
 4 | def nested_in_generator():
@@ -2049,6 +2089,7 @@ warning[redundant-condition]: Condition is always truthy
   |
 8 |     return [[item for item in [1] if predicate()] for _ in [1]]  # snapshot: redundant-condition
   |                                      ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, bool]`
+  |
 help: Did you mean to `await` this expression?
   |
 7 | async def nested_in_list():
@@ -2091,6 +2132,7 @@ warning[redundant-condition]: Condition is always truthy
   |
 4 | if coroutine():  # snapshot: redundant-condition
   |    ^^^^^^^^^^^ Inferred type is `CoroutineType[Any, Any, bool]`
+  |
 help: Did you mean to `await` this expression?
  ::: cell 1
   |
@@ -2553,6 +2595,7 @@ warning[redundant-condition]: Function `func` is always truthy
    |
 28 |     selected = not func if flag else not func
    |                    ^^^^ Did you mean to call this function?
+   |
 help: Replace with `func()`
    |
 27 |     # snapshot: redundant-condition
@@ -2568,6 +2611,7 @@ warning[redundant-condition]: Function `func` is always truthy
    |
 28 |     selected = not func if flag else not func
    |                                          ^^^^ Did you mean to call this function?
+   |
 help: Replace with `func()`
    |
 27 |     # snapshot: redundant-condition
@@ -2763,6 +2807,7 @@ error[redundant-condition-strict]: Condition is always true
   |
 4 |     elif isinstance(value, int):  # snapshot: redundant-condition-strict
   |          ^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+  |
 help: Add an `else` branch that calls `assert_never`
    |
 1  + from typing import assert_never
@@ -2795,6 +2840,7 @@ error[redundant-condition-strict]: Condition is always true
    |
 11 |   elif isinstance(value, int):  # snapshot: redundant-condition-strict
    |        ^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+   |
 help: Add an `else` branch that calls `assert_never`
    |
 1  + from typing import assert_never
@@ -2830,6 +2876,7 @@ error[redundant-condition-strict]: Condition is always true
    |
 19 |         isinstance(value, int)  # snapshot: redundant-condition-strict
    |         ^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+   |
 help: Add an `else` branch that calls `assert_never`
    |
 1  + from typing import assert_never
@@ -2860,6 +2907,7 @@ error[redundant-condition-strict]: Condition is always true
    |
 27 |     elif matched := isinstance(value, int):  # snapshot: redundant-condition-strict
    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+   |
 help: Replace this `elif` with an `else` branch that asserts the condition to be `True`
    |
 26 |         print(value)
@@ -2889,6 +2937,7 @@ error[redundant-condition-strict]: Condition is always true
    |
 33 |     elif isinstance(value, int): print(value)  # snapshot: redundant-condition-strict
    |          ^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+   |
 help: Add an `else` branch that calls `assert_never`
    |
 1  + from typing import assert_never
@@ -2921,6 +2970,7 @@ error[redundant-condition-strict]: Condition is always true
    |
 40 |         isinstance(value, int)  # snapshot: redundant-condition-strict
    |         ^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+   |
 help: Add an `else` branch that calls `assert_never`
    |
 1  + from typing import assert_never
@@ -2951,6 +3001,7 @@ error[redundant-condition-strict]: Condition is always true
    |
 47 |     elif isinstance(value, int):  # snapshot: redundant-condition-strict
    |          ^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+   |
 help: Replace this `elif` with an `else` branch that asserts the condition to be `True`
 ```
 
@@ -2973,6 +3024,7 @@ error[redundant-condition-strict]: Condition is always true
    |          -----^^^^^^^^^^^^
    |          |
    |          Has type `int`
+   |
 help: Replace this `elif` with an `else` branch that asserts the condition to be `True`
    |
 50 |         print(items)
@@ -3008,6 +3060,7 @@ error[redundant-condition-strict]: Condition is always true
   |
 4 |     elif isinstance(value, int):  # snapshot: redundant-condition-strict
   |          ^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+  |
 help: Add an `else` branch that calls `assert_never`
    |
 1  + from typing import assert_never
@@ -3049,6 +3102,7 @@ error[redundant-condition-strict]: Condition is always true
    |          -----^^^^^^^^^^^^
    |          |
    |          Has type `Literal[1]`
+   |
 help: Add an `else` branch that calls `assert_never`
    |
 1  + from typing import assert_never
@@ -3084,6 +3138,7 @@ error[redundant-condition-strict]: Condition is always true
   |
 6 |     elif isinstance(value, int):  # snapshot: redundant-condition-strict
   |          ^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+  |
 help: Add an `else` branch that calls `assert_never`
    |
 1  + from typing import assert_never
@@ -3121,6 +3176,7 @@ error[redundant-condition-strict]: Condition is always true
   |          -----^^^^^^^^^^^^
   |          |
   |          Has type `int`
+  |
 help: Replace this `elif` with an `else` branch that asserts the condition to be `True`
   |
 5 |         print("flag")
@@ -3151,6 +3207,7 @@ error[redundant-condition-strict]: Condition is always true
   |
 5 |         elif isinstance(value, int):  # snapshot: redundant-condition-strict
   |              ^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+  |
 help: Add an `else` branch that calls `assert_never`
   |
 1 + from typing import assert_never
@@ -3189,6 +3246,7 @@ error[redundant-condition-strict]: Condition is always true
   |              -----^^^^^^^^^^^^
   |              |
   |              Has type `int`
+  |
 help: Replace this `elif` with an `else` branch that asserts the condition to be `True`
   |
 6 |             print("flag")
@@ -3224,6 +3282,7 @@ error[redundant-condition-strict]: Condition is always true
   |          |      |
   |          |      Has type `Literal["b"]`
   |          Has type `Literal["b"]`
+  |
 help: Add an `else` branch that calls `assert_never`
   |
   - from typing import Literal
@@ -3259,6 +3318,7 @@ error[redundant-condition-strict]: Condition is always true
   |
 6 |     elif isinstance(value, int):  # snapshot: redundant-condition-strict
   |          ^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+  |
 help: Add an `else` branch that calls `assert_never`
   |
 6 |     elif isinstance(value, int):  # snapshot: redundant-condition-strict
@@ -3294,6 +3354,7 @@ error[redundant-condition-strict]: Condition is always true
   |
 6 |     elif isinstance(value, int):  # snapshot: redundant-condition-strict
   |          ^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+  |
 help: Add an `else` branch that calls `assert_never`
    |
 9  |         # This comment belongs to the `elif` body.
@@ -3322,6 +3383,7 @@ error[redundant-condition-strict]: Condition is always true
   |
 4 |     elif isinstance(value, int):  # snapshot: redundant-condition-strict
   |          ^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+  |
 help: Add an `else` branch that calls `assert_never`
   |
 1 + import typing
@@ -3359,6 +3421,7 @@ error[redundant-condition-strict]: Condition is always true
   |
 7 |     elif isinstance(value, int):  # snapshot: redundant-condition-strict
   |          ^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+  |
 help: Replace this `elif` with an `else` branch that asserts the condition to be `True`
   |
 6 |         print(value)
@@ -3393,6 +3456,7 @@ error[redundant-condition-strict]: Condition is always true
   |
 8 |     elif isinstance(value, int):  # snapshot: redundant-condition-strict
   |          ^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+  |
 help: Add an `else` branch that calls `assert_never`
    |
 1  + import typing
@@ -3429,6 +3493,7 @@ error[redundant-condition-strict]: Condition is always true
   |
 7 |     elif isinstance(get_value(), int):  # snapshot: redundant-condition-strict
   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+  |
 help: Replace this `elif` with an `else` branch that asserts the condition to be `True`
   |
 6 |         print("flag")
@@ -3468,6 +3533,7 @@ error[redundant-condition-strict]: Condition is always true
   |
 4 |     elif isinstance(value, int):  # snapshot: redundant-condition-strict
   |          ^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+  |
 help: Replace this `elif` with an `else` branch that asserts the condition to be `True`
   |
 3 |         print(value)
@@ -3532,6 +3598,7 @@ error[redundant-condition-strict]: Condition is always true
   |
 4 |     elif isinstance(value, int):  # snapshot: redundant-condition-strict
   |          ^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+  |
 help: Add an `else` branch that calls `assert_never`
   |
 1 + from typing_extensions import assert_never
@@ -3574,6 +3641,7 @@ error[redundant-condition-strict]: Condition is always true
   |
 4 |     elif isinstance(value, int):  # snapshot: redundant-condition-strict
   |          ^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+  |
 help: Replace this `elif` with an `else` branch that asserts the condition to be `True`
   |
 3 |         print(value)
@@ -3613,6 +3681,7 @@ error[redundant-condition-strict]: Condition is always true
   |
 4 |     elif isinstance(value, int):  # snapshot: redundant-condition-strict
   |          ^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+  |
 help: Replace this `elif` with an `else` branch that asserts the condition to be `True`
   |
 3 |         print(value)
@@ -3674,6 +3743,7 @@ error[redundant-condition-strict]: Condition is always true
   |
 4 |     elif isinstance(value, int):  # snapshot: redundant-condition-strict
   |          ^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+  |
 help: Replace this `elif` with an `else` branch that asserts the condition to be `True`
   |
 3 |         print(value)
@@ -3719,6 +3789,7 @@ error[redundant-condition-strict]: Condition is always true
   |
 7 |     isinstance(value, int)  # snapshot: redundant-condition-strict
   |     ^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+  |
 help: Replace this `elif` with an `else` branch that asserts the condition to be `True`
    |
 4  |     print(value)
@@ -3765,6 +3836,7 @@ error[redundant-condition-strict]: Condition is always true
   |
 5 |     elif isinstance(value, int): print(value)  # snapshot: redundant-condition-strict
   |          ^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+  |
 help: Replace this `elif` with an `else` branch that asserts the condition to be `True`
 ```
 
@@ -3785,6 +3857,7 @@ error[redundant-condition-strict]: Condition is always true
    |
 12 |         isinstance(value, int)  # snapshot: redundant-condition-strict
    |         ^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+   |
 help: Replace this `elif` with an `else` branch that asserts the condition to be `True`
 ```
 
@@ -3820,6 +3893,7 @@ error[redundant-condition-strict]: Condition is always true
   |  __________^
 6 | |                     int):
   | |________________________^ Inferred type is `Literal[True]`
+  |
 help: Replace this `elif` with an `else` branch that asserts the condition to be `True`
   |
 4 |     # snapshot: redundant-condition-strict
@@ -3866,6 +3940,7 @@ error[redundant-condition-strict]: Condition is always true
   |
 5 |     elif isinstance(value, int): \
   |          ^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+  |
 help: Replace this `elif` with an `else` branch that asserts the condition to be `True`
 ```
 
@@ -3892,6 +3967,7 @@ error[redundant-condition-strict]: Condition is always true
    |
 11 |     elif isinstance(value, int): \
    |          ^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+   |
 help: Replace this `elif` with an `else` branch that asserts the condition to be `True`
 ```
 
@@ -3927,6 +4003,7 @@ error[redundant-condition-strict]: Condition is always true
   |
 4 |     elif isinstance(value, int):  # snapshot: redundant-condition-strict
   |          ^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+  |
 help: Replace this `elif` with an `else` branch that asserts the condition to be `True`
 ```
 

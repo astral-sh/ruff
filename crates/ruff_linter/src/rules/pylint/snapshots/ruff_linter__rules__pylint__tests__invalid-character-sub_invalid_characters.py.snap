@@ -140,6 +140,7 @@ PLE2512 [*] Invalid unescaped character SUB, use "\x1a" instead
 80 | nested_tstrings = t'␈{t'␚{t'␛'}'}'
 81 | nested_ftstrings = t'␈{f'␚{t'␛'}'}'
    |                          ^
+   |
 help: Replace with escape sequence
    |
 80 | nested_tstrings = t'␈{t'{t'␛'}'}'

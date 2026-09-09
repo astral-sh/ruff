@@ -31,6 +31,7 @@ error[TID254]: `typing` should be imported lazily
   |
 2 | import this, typing
   |              ^^^^^^
+  |
 help: Convert to a lazy import
 ```
 
@@ -53,5 +54,6 @@ error[TID254]: `package.deferred` should be imported lazily
   |
 2 | from package import eager, deferred
   |                            ^^^^^^^^
+  |
 help: Convert to a lazy import
 ```

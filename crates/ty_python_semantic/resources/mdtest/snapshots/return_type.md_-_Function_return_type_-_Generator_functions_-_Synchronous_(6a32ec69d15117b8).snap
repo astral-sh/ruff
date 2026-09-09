@@ -59,6 +59,7 @@ error[invalid-return-type]: Return type does not match returned value
    |
 19 | def j() -> str:  # error: [invalid-return-type]
    |            ^^^ expected `str`, found `types.GeneratorType`
+   |
 info: Function is inferred as returning `types.GeneratorType` because it is a generator function
 info: See https://docs.python.org/3/glossary.html#term-generator for more details
 
@@ -94,6 +95,7 @@ error[invalid-return-type]: Function always implicitly returns `None`, which is 
    |
 31 | def missing_return() -> typing.Generator[int, int, int]:  # error: [invalid-return-type]
    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
 info: Consider changing the return annotation to `-> None` or adding a `return` statement
 
 ```

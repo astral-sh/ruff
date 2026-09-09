@@ -46,6 +46,7 @@ RUF103 [*] Invalid suppression comment: no matching 'disable' comment
 18 |     I = 1
 19 |     # ruff: enable[E741, F841]
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
 help: Remove suppression comment
    |
 18 |     I = 1
@@ -110,6 +111,7 @@ RUF100 [*] Unused suppression (non-enabled: `E501`)
 47 |     I = 1
 48 |     # ruff: enable[E501]
    |     --------------------
+   |
 help: Remove unused suppression
    |
 45 |     # An unused suppression diagnostic should also be logged.
@@ -300,6 +302,7 @@ RUF102 [*] Invalid rule code in suppression: YF829
 96 |     # ruff: enable[F841, RQW320]
 97 |     # ruff: enable[YF829]
    |                    -----
+   |
 help: Remove the suppression comment
    |
 92 |     # Unknown rule codes
@@ -376,6 +379,7 @@ F841 [*] Local variable `bar` is assigned to but never used
 117 |     foo = 0
 118 |     bar = 0
     |     ^^^
+    |
 help: Remove assignment to unused variable `bar`
     |
 117 |     foo = 0
@@ -391,6 +395,7 @@ F841 [*] Local variable `bar` is assigned to but never used
 123 |     foo = 0  # ruff: ignore[F841]
 124 |     bar = 0
     |     ^^^
+    |
 help: Remove assignment to unused variable `bar`
     |
 123 |     foo = 0  # ruff: ignore[F841]
@@ -406,6 +411,7 @@ F841 [*] Local variable `bar` is assigned to but never used
 131 |     """  # ruff: ignore[F841]
 132 |     bar = 0
     |     ^^^
+    |
 help: Remove assignment to unused variable `bar`
     |
 131 |     """  # ruff: ignore[F841]
@@ -479,6 +485,7 @@ RUF100 [*] Unused suppression (non-enabled: `F401`)
 176 | print("goodbye")
 177 | # ruff:enable[F401]
     | -------------------
+    |
 help: Remove unused suppression
     |
 174 | # https://github.com/astral-sh/ruff/issues/23235

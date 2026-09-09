@@ -613,6 +613,7 @@ def zqzqzq():
           |
         2 | from pandas.io.api import zqzqzq
           |                           ^^^^^^
+          |
         info: Function zqzqzq
         ");
     }
@@ -657,6 +658,7 @@ def zqzqzq():
           |
         2 | from pandas.io.api import zqzqzq as zqzqzq
           |                                     ^^^^^^
+          |
         info: Function zqzqzq
         ");
     }
@@ -701,6 +703,7 @@ def zqzqzq():
           |
         2 | from pandas.io.api import *
           |                           ^
+          |
         info: Function zqzqzq
         ");
 
@@ -762,6 +765,7 @@ def zqzqzq():
           |
         2 | from pandas.io.parsers import zqzqzq
           |                               ^^^^^^
+          |
         info: Function zqzqzq
 
         info[all-symbols]: AllSymbolInfo
@@ -769,6 +773,7 @@ def zqzqzq():
           |
         2 | from pandas.io.parsers.readers import zqzqzq
           |                                       ^^^^^^
+          |
         info: Function zqzqzq
         ");
     }
@@ -821,6 +826,7 @@ __all__ = ['zqzqzq']
           |
         2 | def zqzqzq():
           |     ^^^^^^
+          |
         info: Function zqzqzq
         ");
     }
@@ -851,6 +857,7 @@ def zqzqzq():
           |
         2 | def zqzqzq():
           |     ^^^^^^
+          |
         info: Function zqzqzq
 
         info[all-symbols]: AllSymbolInfo
@@ -858,6 +865,7 @@ def zqzqzq():
           |
         1 | from pandas import zqzqzq as zqzqzq
           |                              ^^^^^^
+          |
         info: Function zqzqzq
         ");
     }
@@ -891,6 +899,7 @@ def zqzqzq():
           |
         2 | def zqzqzq():
           |     ^^^^^^
+          |
         info: Function zqzqzq
 
         info[all-symbols]: AllSymbolInfo
@@ -898,6 +907,7 @@ def zqzqzq():
           |
         1 | from pandas import zqzqzq as zqzqzq
           |                              ^^^^^^
+          |
         info: Function zqzqzq
 
         info[all-symbols]: AllSymbolInfo
@@ -905,6 +915,7 @@ def zqzqzq():
           |
         1 | from pandas import zqzqzq as zqzqzq
           |                              ^^^^^^
+          |
         info: Function zqzqzq
         ");
     }
@@ -946,6 +957,7 @@ ABCDEFGHIJKLMNOP = 'https://api.example.com'
           |
         2 | ABCDEFGHIJKLMNOP = 'https://api.example.com'
           | ^^^^^^^^^^^^^^^^
+          |
         info: Constant ABCDEFGHIJKLMNOP
 
         info[all-symbols]: AllSymbolInfo
@@ -953,6 +965,7 @@ ABCDEFGHIJKLMNOP = 'https://api.example.com'
           |
         2 | class Abcdefghijklmnop:
           |       ^^^^^^^^^^^^^^^^
+          |
         info: Class Abcdefghijklmnop
 
         info[all-symbols]: AllSymbolInfo
@@ -960,6 +973,7 @@ ABCDEFGHIJKLMNOP = 'https://api.example.com'
           |
         2 | def abcdefghijklmnop():
           |     ^^^^^^^^^^^^^^^^
+          |
         info: Function abcdefghijklmnop
         ");
     }
@@ -990,6 +1004,7 @@ def test_helper_xyzxyzxyz():
           |
         2 | def test_helper_xyzxyzxyz():
           |     ^^^^^^^^^^^^^^^^^^^^^
+          |
         info: Function test_helper_xyzxyzxyz
         ");
     }
@@ -1025,6 +1040,7 @@ def test_helper_xyzxyzxyz():
           |
         1 | def helper_xyzxyzxyz(): pass
           |     ^^^^^^^^^^^^^^^^
+          |
         info: Function helper_xyzxyzxyz
 
         info[all-symbols]: AllSymbolInfo
@@ -1032,6 +1048,7 @@ def test_helper_xyzxyzxyz():
           |
         1 | def useful_xyzxyzxyz(): pass
           |     ^^^^^^^^^^^^^^^^
+          |
         info: Function useful_xyzxyzxyz
         ");
     }
@@ -1056,6 +1073,7 @@ def test_helper_xyzxyzxyz():
           |
         1 | ZQZQZQ = 1
           | ^^^^^^
+          |
         info: Constant ZQZQZQ
 
         info[all-symbols]: AllSymbolInfo
@@ -1063,6 +1081,7 @@ def test_helper_xyzxyzxyz():
           |
         1 | ZQZQZQ = 1
           | ^^^^^^
+          |
         info: Constant ZQZQZQ
 
         info[all-symbols]: AllSymbolInfo
@@ -1070,6 +1089,7 @@ def test_helper_xyzxyzxyz():
           |
         1 | ZQZQZQ = 1
           | ^^^^^^
+          |
         info: Constant ZQZQZQ
 
         info[all-symbols]: AllSymbolInfo
@@ -1077,6 +1097,7 @@ def test_helper_xyzxyzxyz():
           |
         1 | ZQZQZQ = 1
           | ^^^^^^
+          |
         info: Constant ZQZQZQ
         ");
     }
@@ -1100,6 +1121,7 @@ def test_helper_xyzxyzxyz():
           |
         1 | ZQZQZQ = 1
           | ^^^^^^
+          |
         info: Constant ZQZQZQ
         ");
     }

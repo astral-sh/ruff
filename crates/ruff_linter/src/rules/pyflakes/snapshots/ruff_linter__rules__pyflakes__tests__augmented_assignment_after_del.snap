@@ -16,4 +16,5 @@ F841 Local variable `x` is assigned to but never used
  9 |     # error, because the name is defined in the scope, but unbound.
 10 |     x += 1
    |     ^
+   |
 help: Remove assignment to unused variable `x`

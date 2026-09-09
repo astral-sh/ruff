@@ -35,6 +35,7 @@ error[invalid-context-manager]: Object of type `Manager1 | NotAContextManager` c
    |
 11 |     with context_expr as f:
    |          ^^^^^^^^^^^^
+   |
 info: `NotAContextManager` does not implement `__enter__` or `__exit__`
 
 ```

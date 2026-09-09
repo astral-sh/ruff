@@ -48,6 +48,7 @@ error[invalid-typed-dict-statement]: invalid statement in TypedDict class body
    |
 17 |     42
    |     ^^
+   |
 info: Only annotated declarations (`<name>: <type>`) are allowed.
 
 ```

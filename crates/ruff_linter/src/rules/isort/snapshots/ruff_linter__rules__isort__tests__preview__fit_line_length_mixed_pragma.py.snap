@@ -11,6 +11,7 @@ I001 [*] Import block is un-sorted or un-formatted
 5 | | # (code plus the `# keep this` prefix is 89 columns); it must always be wrapped.
 6 | | from bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb import x  # keep this  # noqa: TID251
   | |____________________________________________________________________________^
+  |
 help: Organize imports
   |
 3 | from aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa import x  # keep this  # noqa: TID251

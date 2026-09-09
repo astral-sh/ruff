@@ -10,6 +10,7 @@ SIM105 [*] Use `contextlib.suppress(ValueError)` instead of `try`-`except`-`pass
 8 | | except ValueError:
 9 | |     pass
   | |________^
+  |
 help: Replace `try`-`except`-`pass` with `with contextlib.suppress(ValueError): ...`
   |
 1 + import contextlib
@@ -143,6 +144,7 @@ SIM105 [*] Use `contextlib.suppress(ValueError)` instead of `try`-`except`-`pass
 87 | |     except ValueError:
 88 | |         ...
    | |___________^
+   |
 help: Replace `try`-`except`-`pass` with `with contextlib.suppress(ValueError): ...`
    |
 1  + import contextlib
@@ -261,6 +263,7 @@ SIM105 [*] Use `contextlib.suppress()` instead of `try`-`except`-`pass`
 135 | | except ():
 136 | |     pass
     | |________^
+    |
 help: Replace `try`-`except`-`pass` with `with contextlib.suppress(): ...`
     |
 1   + import contextlib
@@ -285,6 +288,7 @@ SIM105 [*] Use `contextlib.suppress(BaseException)` instead of `try`-`except`-`p
 142 | | except BaseException:
 143 | |     pass
     | |________^
+    |
 help: Replace `try`-`except`-`pass` with `with contextlib.suppress(BaseException): ...`
     |
 1   + import contextlib

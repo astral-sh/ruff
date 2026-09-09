@@ -834,6 +834,7 @@ error[invalid-context-manager]: Object of type `Manager` cannot be used with `wi
   |
 6 | with Manager():
   |      ^^^^^^^^^
+  |
 info: Objects of type `Manager` can be used as async context managers
 info: Consider using `async with` here
 ```

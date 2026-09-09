@@ -100,6 +100,7 @@ PLE2510 Invalid unescaped character backspace, use "\b" instead
 12 | # Implicitly concatenated
 13 | b = '␈' f'␈' '␈
    |      ^
+   |
 help: Replace with escape sequence
 
 PLE2510 Invalid unescaped character backspace, use "\b" instead
@@ -109,6 +110,7 @@ PLE2510 Invalid unescaped character backspace, use "\b" instead
 12 | # Implicitly concatenated
 13 | b = '␈' f'␈' '␈
    |           ^
+   |
 help: Replace with escape sequence
 
 invalid-syntax: missing closing quote in string literal
@@ -126,4 +128,5 @@ PLE2510 Invalid unescaped character backspace, use "\b" instead
 12 | # Implicitly concatenated
 13 | b = '␈' f'␈' '␈
    |               ^
+   |
 help: Replace with escape sequence

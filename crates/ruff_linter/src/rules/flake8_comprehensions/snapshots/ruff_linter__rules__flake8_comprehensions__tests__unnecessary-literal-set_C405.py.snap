@@ -563,6 +563,7 @@ C405 [*] Unnecessary list literal (rewrite as a set literal)
 34 | t"a {set(['a', 'b']) - set(['a'])} b"
 35 | t"a { set(['a', 'b']) - set(['a']) } b"
    |       ^^^^^^^^^^^^^^^
+   |
 help: Rewrite as a set literal
    |
 34 | t"a {set(['a', 'b']) - set(['a'])} b"
@@ -578,6 +579,7 @@ C405 [*] Unnecessary list literal (rewrite as a set literal)
 34 | t"a {set(['a', 'b']) - set(['a'])} b"
 35 | t"a { set(['a', 'b']) - set(['a']) } b"
    |                         ^^^^^^^^^^
+   |
 help: Rewrite as a set literal
    |
 34 | t"a {set(['a', 'b']) - set(['a'])} b"

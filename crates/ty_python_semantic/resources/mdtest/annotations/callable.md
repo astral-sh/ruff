@@ -81,6 +81,7 @@ error[invalid-type-form]: `[...]` is not a valid parameter list for `Callable`
    |
 17 | def fixable(callback: Callable[[...], int]): ...  # snapshot: invalid-type-form
    |                                ^^^^^ Did you mean `Callable[..., int]`?
+   |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 help: Replace `[...]` with `...`
@@ -116,6 +117,7 @@ error[invalid-type-form]: `[...]` is not a valid parameter list for `Callable`
 22 | |             ...,  # The parameter description remains documented.
 23 | |         ],
    | |_________^ Did you mean `Callable[..., int]`?
+   |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 ```
@@ -134,6 +136,7 @@ error[invalid-type-form]: `[...]` is not a valid parameter list for `Callable`
    |
 28 | def quoted(callback: "Callable[[...], int]"): ...
    |                                ^^^^^ Did you mean `Callable[..., int]`?
+   |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 ```

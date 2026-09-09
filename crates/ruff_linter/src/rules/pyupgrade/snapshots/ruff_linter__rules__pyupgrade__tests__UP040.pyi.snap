@@ -25,6 +25,7 @@ UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keywo
 6 | x: typing.TypeAlias = int
 7 | x: TypeAlias = int
   | ^^^^^^^^^^^^^^^^^^
+  |
 help: Use the `type` keyword
   |
 6 | x: typing.TypeAlias = int
@@ -68,6 +69,7 @@ UP040 [*] Type alias `T` uses `TypeAlias` annotation instead of the `type` keywo
 23 | |     # comment7
 24 | | ) # comment8
    | |_^
+   |
 help: Use the `type` keyword
    |
 15 |

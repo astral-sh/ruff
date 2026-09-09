@@ -1298,6 +1298,7 @@ error[invalid-type-form]: Non-generic class `U` cannot be specialized in a type 
   |
 9 | def direct(value: U[0]) -> None:
   |                   ^^^^
+  |
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 ```

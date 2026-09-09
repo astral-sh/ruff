@@ -48,6 +48,7 @@ error[invalid-return-type]: Function always implicitly returns `None`, which is 
   |
 6 | def foo() -> int:
   |              ^^^
+  |
 info: Consider changing the return annotation to `-> None` or adding a `return` statement
 
 ```
@@ -58,6 +59,7 @@ error[invalid-return-type]: Function always implicitly returns `None`, which is 
    |
 11 | def foo() -> int:
    |              ^^^
+   |
 info: Consider changing the return annotation to `-> None` or adding a `return` statement
 
 ```

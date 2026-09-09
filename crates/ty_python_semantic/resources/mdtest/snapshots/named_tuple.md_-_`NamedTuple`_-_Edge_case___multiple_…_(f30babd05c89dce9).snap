@@ -46,6 +46,7 @@ error[invalid-named-tuple]: Cannot overwrite NamedTuple attribute `_asdict`
    |
 14 |         _asdict = True
    |         ^^^^^^^
+   |
 info: This will cause the class creation to fail at runtime
 
 ```
@@ -56,6 +57,7 @@ error[invalid-named-tuple]: Cannot overwrite NamedTuple attribute `_asdict`
    |
 14 |         _asdict = True
    |         ^^^^^^^
+   |
 info: This will cause the class creation to fail at runtime
 
 ```

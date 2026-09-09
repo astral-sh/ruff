@@ -230,6 +230,7 @@ D400 [*] First line should end with a period
 101 | |     My example explanation
 102 | |     """
     | |_______^
+    |
 help: Add period
    |
 97 |     """

@@ -217,6 +217,7 @@ RUF100 [*] Unused `noqa` directive (unused: `F401`)
 92 |
 93 | "shape:  (6,)\nSeries: '' [duration[μs]]\n[\n\t0µs\n\t1µs\n\t2µs\n\t3µs\n\t4µs\n\t5µs\n]"  # noqa: F401
    |                                                                                            ^^^^^^^^^^^^
+   |
 help: Remove unused `noqa` directive
    |
 92 |
@@ -232,6 +233,7 @@ F841 [*] Local variable `e` is assigned to but never used
 107 |     d = 1  # noqa: F841, E50
 108 |     e = 1  # noqa: E50
     |     ^
+    |
 help: Remove assignment to unused variable `e`
     |
 107 |     d = 1  # noqa: F841, E50
@@ -336,6 +338,7 @@ RUF100 [*] Unused `noqa` directive (duplicated: `PGH001`, `S307`)
 130 | x = eval(command)  # noqa: PGH001, S307, PGH001
 131 | x = eval(command)  # noqa: PGH001, S307, PGH001, S307
     |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
 help: Remove unused `noqa` directive
     |
 130 | x = eval(command)  # noqa: PGH001, S307, PGH001

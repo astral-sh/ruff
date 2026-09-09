@@ -54,6 +54,7 @@ error[invalid-type-variable-default]: Type parameters with defaults cannot follo
   |           ---  ^^^^^^^ `T` has a default
   |           |
   |           `Ts` is a TypeVarTuple
+  |
 info: See https://typing.python.org/en/latest/spec/generics.html#defaults-following-typevartuple
 
 ```
@@ -66,6 +67,7 @@ error[invalid-type-variable-default]: Type parameters with defaults cannot follo
   |               ---  ^^^^^^^^ `T2` has a default
   |               |
   |               `Ts` is a TypeVarTuple
+  |
 info: See https://typing.python.org/en/latest/spec/generics.html#defaults-following-typevartuple
 
 ```
@@ -79,6 +81,7 @@ error[invalid-type-variable-default]: Type parameters with defaults cannot follo
   |           |    |
   |           |    `T1` has a default
   |           `Ts` is a TypeVarTuple
+  |
 info: See https://typing.python.org/en/latest/spec/generics.html#defaults-following-typevartuple
 
 ```
@@ -91,6 +94,7 @@ error[invalid-type-variable-default]: Type parameters with defaults cannot follo
    |           ---  ^^^^^^^^^^^^^^^^ `P` has a default
    |           |
    |           `Ts` is a TypeVarTuple
+   |
 info: See https://typing.python.org/en/latest/spec/generics.html#defaults-following-typevartuple
 
 ```
@@ -104,6 +108,7 @@ error[invalid-type-variable-default]: Type parameters with defaults cannot follo
    |            |    |
    |            |    `T1` has a default
    |            `Ts` is a TypeVarTuple
+   |
 info: See https://typing.python.org/en/latest/spec/generics.html#defaults-following-typevartuple
 
 ```
@@ -118,6 +123,7 @@ error[invalid-type-variable-default]: Type parameters with defaults cannot follo
    |             |    |         `T2` also has a default
    |             |    `T1` has a default
    |             `Ts` is a TypeVarTuple
+   |
 info: See https://typing.python.org/en/latest/spec/generics.html#defaults-following-typevartuple
 
 ```
@@ -130,6 +136,7 @@ error[invalid-type-form]: Generic class `Grault` cannot have multiple `TypeVarTu
    |              ---  ^^^^^^^^^^^^^^^^^^^^^^ `Ts` is an additional TypeVarTuple
    |              |
    |              `Us` is the first TypeVarTuple
+   |
 info: See https://typing.python.org/en/latest/spec/generics.html#multiple-type-variable-tuples-not-allowed
 
 ```
@@ -142,6 +149,7 @@ error[invalid-type-variable-default]: Type parameters with defaults cannot follo
    |              ---  ^^^^^^^^^^^^^^^^^^^^^^ `Ts` has a default
    |              |
    |              `Us` is a TypeVarTuple
+   |
 info: See https://typing.python.org/en/latest/spec/generics.html#defaults-following-typevartuple
 
 ```

@@ -217,6 +217,7 @@ fn indirect_dependencies_use_uv_module_ownership() -> anyhow::Result<()> {
       |
     3 | from indirect_module import value
       |      ^^^^^^^^^^^^^^^
+      |
     help: Declare `indirect-dependency` in `project.dependencies` or `project.optional-dependencies` in your `pyproject.toml`
     info: See https://docs.astral.sh/uv/concepts/projects/dependencies/
 
@@ -225,6 +226,7 @@ fn indirect_dependencies_use_uv_module_ownership() -> anyhow::Result<()> {
       |
     4 | import indirect_module
       |        ^^^^^^^^^^^^^^^
+      |
     help: Declare `indirect-dependency` in `project.dependencies` or `project.optional-dependencies` in your `pyproject.toml`
     info: See https://docs.astral.sh/uv/concepts/projects/dependencies/
 
@@ -233,6 +235,7 @@ fn indirect_dependencies_use_uv_module_ownership() -> anyhow::Result<()> {
       |
     1 | import direct_module
       |        ^^^^^^^^^^^^^
+      |
     help: Declare `direct-dependency` in `project.dependencies` or `project.optional-dependencies` in your `pyproject.toml`
     info: See https://docs.astral.sh/uv/concepts/projects/dependencies/
 
@@ -647,6 +650,7 @@ fn scripts_only_mode_disables_uv_workspace_discovery() -> anyhow::Result<()> {
       |
     1 | import shared
       |        ^^^^^^
+      |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/packages/member (first-party code)
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)

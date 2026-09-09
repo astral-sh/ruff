@@ -16,6 +16,7 @@ F841 [*] Local variable `I` is assigned to but never used
 23 |     # logged to user
 24 |     I = 1  # noqa: E741.F841
    |     ^
+   |
 help: Remove assignment to unused variable `I`
    |
 23 |     # logged to user

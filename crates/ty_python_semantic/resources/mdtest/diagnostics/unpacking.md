@@ -12,6 +12,7 @@ error[not-iterable]: Object of type `Literal[1]` is not iterable
   |
 1 | a, b = 1  # snapshot: not-iterable
   |        ^
+  |
 info: It doesn't have an `__iter__` method or a `__getitem__` method
 ```
 

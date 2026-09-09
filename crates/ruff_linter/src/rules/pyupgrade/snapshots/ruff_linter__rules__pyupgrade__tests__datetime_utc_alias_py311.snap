@@ -8,6 +8,7 @@ UP017 [*] Use `datetime.UTC` alias
  9 |
 10 |     print(timezone.utc)
    |           ^^^^^^^^^^^^
+   |
 help: Convert to `datetime.UTC` alias
    |
 1  + from datetime import UTC
@@ -26,6 +27,7 @@ UP017 [*] Use `datetime.UTC` alias
 15 |
 16 |     print(tz.utc)
    |           ^^^^^^
+   |
 help: Convert to `datetime.UTC` alias
    |
 1  + from datetime import UTC
@@ -44,6 +46,7 @@ UP017 [*] Use `datetime.UTC` alias
 21 |
 22 |     print(datetime.timezone.utc)
    |           ^^^^^^^^^^^^^^^^^^^^^
+   |
 help: Convert to `datetime.UTC` alias
    |
 21 |
@@ -59,6 +62,7 @@ UP017 [*] Use `datetime.UTC` alias
 27 |
 28 |     print(dt.timezone.utc)
    |           ^^^^^^^^^^^^^^^
+   |
 help: Convert to `datetime.UTC` alias
    |
 27 |

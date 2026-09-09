@@ -89,6 +89,7 @@ error[positional-only-parameter-as-kwarg]: Positional-only parameter 1 (`__x`) p
   |
 5 | f(__x=1)
   |   ^^^^^
+  |
 info: Function signature here
  --> src/mdtest_snippet.py:1:5
   |
@@ -105,6 +106,7 @@ warning[invalid-legacy-positional-parameter]: Invalid use of the legacy conventi
   |       -       ^^^ Parameter name begins with `__` but will not be treated as positional-only
   |       |
   |       Prior parameter here was positional-or-keyword
+  |
 info: A parameter can only be positional-only if it precedes all positional-or-keyword parameters
 
 ```
@@ -117,6 +119,7 @@ warning[invalid-legacy-positional-parameter]: Invalid use of the legacy conventi
    |        -       ^^^ Parameter name begins with `__` but will not be treated as positional-only
    |        |
    |        Prior parameter here was positional-or-keyword
+   |
 info: A parameter can only be positional-only if it precedes all positional-or-keyword parameters
 
 ```
@@ -129,6 +132,7 @@ warning[invalid-legacy-positional-parameter]: Invalid use of the legacy conventi
    |        -       ^^^ Parameter name begins with `__` but will not be treated as positional-only
    |        |
    |        Prior parameter here was positional-or-keyword
+   |
 info: A parameter can only be positional-only if it precedes all positional-or-keyword parameters
 
 ```
@@ -141,6 +145,7 @@ warning[invalid-legacy-positional-parameter]: Invalid use of the legacy conventi
    |        -             ^^^ Parameter name begins with `__` but will not be treated as positional-only
    |        |
    |        Prior parameter here was positional-or-keyword
+   |
 info: A parameter can only be positional-only if it precedes all positional-or-keyword parameters
 
 ```
@@ -153,6 +158,7 @@ warning[invalid-legacy-positional-parameter]: Invalid use of the legacy conventi
    |        -  ^^^ Parameter name begins with `__` but will not be treated as positional-only
    |        |
    |        Prior parameter here was positional-or-keyword
+   |
 info: A parameter can only be positional-only if it precedes all positional-or-keyword parameters
 
 ```
@@ -165,6 +171,7 @@ warning[invalid-legacy-positional-parameter]: Invalid use of the legacy conventi
    |                       ----  ^^^ Parameter name begins with `__` but will not be treated as positional-only
    |                       |
    |                       Prior parameter here was positional-or-keyword
+   |
 info: A parameter can only be positional-only if it precedes all positional-or-keyword parameters
 
 ```
@@ -175,6 +182,7 @@ error[positional-only-parameter-as-kwarg]: Positional-only parameter 2 (`__x`) p
    |
 63 | C(42).method(__x=1)
    |              ^^^^^
+   |
 info: Method signature here
   --> src/mdtest_snippet.py:49:9
    |
@@ -189,6 +197,7 @@ error[positional-only-parameter-as-kwarg]: Positional-only parameter 2 (`__x`) p
    |
 65 | C.class_method(__x="1")
    |                ^^^^^^^
+   |
 info: Method signature here
   --> src/mdtest_snippet.py:51:9
    |

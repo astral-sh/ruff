@@ -372,6 +372,7 @@ mod tests {
           |
         6 |     helper()
           |     ^^^^^^ Call site
+          |
         info: Function: `helper` (`main`)
          --> main.py:2:5
           |
@@ -398,6 +399,7 @@ mod tests {
           |
         7 |     c.m()
           |       ^ Call site
+          |
         info: Method: `m` (`main`)
          --> main.py:3:9
           |
@@ -423,6 +425,7 @@ mod tests {
           |
         6 |     C()
           |     ^ Call site
+          |
         info: Class: `C` (`main`)
          --> main.py:2:7
           |
@@ -451,6 +454,7 @@ mod tests {
           |     ^^^^^^ Call site
         7 |     helper()
           |     ^^^^^^ Call site
+          |
         info: Function: `helper` (`main`)
          --> main.py:2:5
           |
@@ -517,6 +521,7 @@ mod tests {
            |
         17 | @cls_deco
            |  ^^^^^^^^ Call site
+           |
         info: Function: `cls_deco` (`main`)
          --> main.py:2:5
           |
@@ -528,6 +533,7 @@ mod tests {
            |
         18 | class Cls(base_factory()):
            |           ^^^^^^^^^^^^ Call site
+           |
         info: Function: `base_factory` (`main`)
          --> main.py:5:5
           |
@@ -539,6 +545,7 @@ mod tests {
            |
         19 |     attr = class_body_helper()
            |            ^^^^^^^^^^^^^^^^^ Call site
+           |
         info: Function: `class_body_helper` (`main`)
          --> main.py:8:5
           |
@@ -550,6 +557,7 @@ mod tests {
            |
         21 |     @method_deco
            |      ^^^^^^^^^^^ Call site
+           |
         info: Function: `method_deco` (`main`)
           --> main.py:11:5
            |
@@ -561,6 +569,7 @@ mod tests {
            |
         22 |     def m(self, x=default_factory()):
            |                   ^^^^^^^^^^^^^^^ Call site
+           |
         info: Function: `default_factory` (`main`)
           --> main.py:14:5
            |
@@ -591,6 +600,7 @@ mod tests {
           |
         8 |     nested()
           |     ^^^^^^ Call site
+          |
         info: Function: `nested` (`main`)
          --> main.py:6:9
           |
@@ -618,6 +628,7 @@ mod tests {
           |
         5 | def foo(x=default_factory()):
           |           ^^^^^^^^^^^^^^^ Call site
+          |
         info: Function: `default_factory` (`main`)
          --> main.py:2:5
           |
@@ -645,6 +656,7 @@ mod tests {
           |
         5 | class Derived(base_factory()):
           |               ^^^^^^^^^^^^ Call site
+          |
         info: Function: `base_factory` (`main`)
          --> main.py:2:5
           |
@@ -678,6 +690,7 @@ mod tests {
           |
         9 |     f = lambda x=default_factory(): lambda_body_helper()
           |                  ^^^^^^^^^^^^^^^ Call site
+          |
         info: Function: `default_factory` (`main`)
          --> main.py:2:5
           |
@@ -701,6 +714,7 @@ mod tests {
            |
         LL |     print("hi")  # builtins resolve via stubs, so this *does* appear
            |     ^^^^^ Call site
+           |
         info: Function: `print` (`builtins`)
           --> stdlib/builtins.pyi:LL:5
            |
@@ -712,6 +726,7 @@ mod tests {
            |
         LL |     print("hi")  # builtins resolve via stubs, so this *does* appear
            |     ^^^^^ Call site
+           |
         info: Function: `print` (`builtins`)
           --> stdlib/builtins.pyi:LL:5
            |
@@ -741,6 +756,7 @@ mod tests {
           |
         8 |         super().m()
           |                 ^ Call site
+          |
         info: Method: `m` (`main`)
          --> main.py:3:9
           |
@@ -752,6 +768,7 @@ mod tests {
            |
         LL |         super().m()
            |         ^^^^^ Call site
+           |
         info: Class: `super` (`builtins`)
           --> stdlib/builtins.pyi:LL:7
            |
@@ -787,6 +804,7 @@ def f<CURSOR>oo():
           |
         5 |     helper()
           |     ^^^^^^ Call site
+          |
         info: Function: `helper` (`lib`)
          --> lib.py:2:5
           |

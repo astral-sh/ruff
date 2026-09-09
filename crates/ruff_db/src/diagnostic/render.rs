@@ -519,6 +519,14 @@ struct RenderableDiagnostic<'r> {
 }
 
 impl RenderableDiagnostic<'_> {
+    /// Whether the final snippet displays source code rather than only a file location.
+    fn has_trailing_source(&self) -> bool {
+        self.snippets_by_input
+            .last()
+            .and_then(|input| input.snippets.last())
+            .is_some_and(|snippet| snippet.annotations.iter().all(|ann| !ann.hide_snippet))
+    }
+
     /// Convert this to an "annotate" snippet.
     fn to_annotate(&self) -> AnnotateGroup<'_> {
         let snippets = self.snippets_by_input.iter().flat_map(|snippets| {
@@ -1974,6 +1982,7 @@ watermelon
         10 | jackrabbit
         11 | kangaroo
            | ^^^^^^^^
+           |
         warning: sub-diagnostic message
          --> fruits:3:1
           |

@@ -26,6 +26,7 @@ W293 [*] Blank line contains whitespace
  9 |     \
 10 |     
    | ^^^^
+   |
 help: Remove whitespace from blank line
   |
 7 |

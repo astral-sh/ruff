@@ -11,6 +11,7 @@ I001 [*] Import block is un-sorted or un-formatted
 5 | | # it must still be wrapped.
 6 | | from bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb import x  # noqa: TID251
   | |_________________________________________________________________________________________^
+  |
 help: Organize imports
    |
 3  | from aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa import x  # noqa: TID251

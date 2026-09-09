@@ -62,6 +62,7 @@ SIM210 Use `bool(...)` instead of `True if ... else False`
 14 |
 15 |     a = True if b else False
    |         ^^^^^^^^^^^^^^^^^^^^
+   |
 help: Replace with `bool(...)
 
 SIM210 [*] Remove unnecessary `True if ... else False`
@@ -72,6 +73,7 @@ SIM210 [*] Remove unnecessary `True if ... else False`
    |  ___________^
 20 | |                                    psl.privatesuffix(src.netloc)) else False
    | |____________________________________________________________________________^
+   |
 help: Remove unnecessary `True if ... else False`
    |
 18 | # Regression test for: https://github.com/astral-sh/ruff/issues/7076

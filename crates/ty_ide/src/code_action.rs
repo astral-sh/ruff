@@ -679,6 +679,7 @@ mod tests {
           |
         2 | @deprecated("do not use")
           |  ^^^^^^^^^^
+          |
         help: This is a preferred code action
           |
         1 + from warnings import deprecated
@@ -690,6 +691,7 @@ mod tests {
           |
         2 | @deprecated("do not use")
           |  ^^^^^^^^^^
+          |
         help: This is a preferred code action
           |
         1 + from typing_extensions import deprecated
@@ -727,6 +729,7 @@ mod tests {
           |
         4 | @deprecated("do not use")
           |  ^^^^^^^^^^
+          |
         help: This is a preferred code action
           |
         1 + from warnings import deprecated
@@ -738,6 +741,7 @@ mod tests {
           |
         4 | @deprecated("do not use")
           |  ^^^^^^^^^^
+          |
         help: This is a preferred code action
           |
         1 + from typing_extensions import deprecated
@@ -749,6 +753,7 @@ mod tests {
           |
         4 | @deprecated("do not use")
           |  ^^^^^^^^^^
+          |
         help: This is a preferred code action
           |
         3 |
@@ -786,6 +791,7 @@ mod tests {
           |
         2 | ExecutionLoader
           | ^^^^^^^^^^^^^^^
+          |
         help: This is a preferred code action
           |
         1 + from importlib.abc import ExecutionLoader
@@ -824,6 +830,7 @@ mod tests {
           |
         3 | ExecutionLoader
           | ^^^^^^^^^^^^^^^
+          |
         help: This is a preferred code action
           |
         1 + from importlib.abc import ExecutionLoader
@@ -859,6 +866,7 @@ mod tests {
           |
         3 | ExecutionLoader
           | ^^^^^^^^^^^^^^^
+          |
         help: This is a preferred code action
           |
         1 + from importlib.abc import ExecutionLoader
@@ -870,6 +878,7 @@ mod tests {
           |
         3 | ExecutionLoader
           | ^^^^^^^^^^^^^^^
+          |
         help: This is a preferred code action
           |
         2 | import importlib.abc

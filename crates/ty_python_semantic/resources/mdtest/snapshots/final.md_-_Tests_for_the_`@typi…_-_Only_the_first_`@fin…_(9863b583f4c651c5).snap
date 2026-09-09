@@ -37,6 +37,7 @@ error[override-of-final-method]: Cannot override `A.f`
   |
 9 |     def f(self): ...  # error: [override-of-final-method]
   |         ^ Overrides a definition from superclass `A`
+  |
 info: `A.f` is decorated with `@final`, forbidding overrides
  --> src/mdtest_snippet.py:4:5
   |
@@ -44,6 +45,7 @@ info: `A.f` is decorated with `@final`, forbidding overrides
   |     ------
 5 |     def f(self): ...
   |         - `A.f` defined here
+  |
 help: Remove the override of `f`
   |
 7 | class B(A):
@@ -62,6 +64,7 @@ error[override-of-final-method]: Cannot override `B.f`
    |
 14 |     def f(self): ...  # error: [override-of-final-method]
    |         ^ Overrides a definition from superclass `B`
+   |
 info: `B.f` is decorated with `@final`, forbidding overrides
  --> src/mdtest_snippet.py:8:5
   |
@@ -69,6 +72,7 @@ info: `B.f` is decorated with `@final`, forbidding overrides
   |     ------
 9 |     def f(self): ...  # error: [override-of-final-method]
   |         - `B.f` defined here
+  |
 help: Remove the override of `f`
    |
 11 | class C(B):

@@ -54,6 +54,7 @@ UP045 Use `X | None` for type annotations
 14 |     x: Optional[str]
 15 |     x = Optional[str]
    |         ^^^^^^^^^^^^^
+   |
 help: Convert to `X | None`
 
 UP045 [*] Use `X | None` for type annotations
@@ -109,6 +110,7 @@ UP045 [*] Use `X | None` for type annotations
 38 | |         | list[ServiceSpecification]
 39 | |     ] = None
    | |_____^
+   |
 help: Convert to `X | None`
    |
 35 | class ServiceRefOrValue:
@@ -127,6 +129,7 @@ UP045 [*] Use `X | None` for type annotations
 43 | class ServiceRefOrValue:
 44 |     service_specification: Optional[str]is not True = None
    |                            ^^^^^^^^^^^^^
+   |
 help: Convert to `X | None`
    |
 43 | class ServiceRefOrValue:
@@ -142,6 +145,7 @@ UP045 Use `X | None` for type annotations
 48 | # Optional[None] should not be offered a fix
 49 | foo: Optional[None] = None
    |      ^^^^^^^^^^^^^^
+   |
 help: Convert to `X | None`
 
 UP045 [*] Use `X | None` for type annotations
@@ -221,6 +225,7 @@ UP045 [*] Use `X | None` for type annotations
 77 | nested_optional_typing: typing.Optional[Optional[int]] = None
 78 | triple_nested_optional: Optional[Optional[Optional[str]]] = None
    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
 help: Convert to `X | None`
    |
 77 | nested_optional_typing: typing.Optional[Optional[int]] = None
@@ -236,6 +241,7 @@ UP045 [*] Use `X | None` for type annotations
 77 | nested_optional_typing: typing.Optional[Optional[int]] = None
 78 | triple_nested_optional: Optional[Optional[Optional[str]]] = None
    |                                  ^^^^^^^^^^^^^^^^^^^^^^^
+   |
 help: Convert to `X | None`
    |
 77 | nested_optional_typing: typing.Optional[Optional[int]] = None
@@ -251,6 +257,7 @@ UP045 [*] Use `X | None` for type annotations
 77 | nested_optional_typing: typing.Optional[Optional[int]] = None
 78 | triple_nested_optional: Optional[Optional[Optional[str]]] = None
    |                                           ^^^^^^^^^^^^^
+   |
 help: Convert to `X | None`
    |
 77 | nested_optional_typing: typing.Optional[Optional[int]] = None
@@ -268,6 +275,7 @@ UP045 [*] Use `X | None` for type annotations
 83 | |     # text
 84 | | ] = None
    | |_^
+   |
 help: Convert to `X | None`
    |
 80 |
@@ -358,4 +366,5 @@ UP045 Use `X | None` for type annotations
 92 | bar: Optional[None | int | str] = None
 93 | bar: Optional[None | None] = None
    |      ^^^^^^^^^^^^^^^^^^^^^
+   |
 help: Convert to `X | None`

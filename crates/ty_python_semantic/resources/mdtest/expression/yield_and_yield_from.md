@@ -584,6 +584,7 @@ error[invalid-return-type]: Return type does not match returned value
 4 |     # snapshot: invalid-return-type
 5 |     return 1
   |            ^ expected `Generator[int, int, None]`, found `Literal[1]`
+  |
 info: type `Literal[1]` is not assignable to protocol `Generator[int, int, None]`
 info: └── protocol member `__iter__` is not defined on type `Literal[1]`
 ```
@@ -619,6 +620,7 @@ error[unsound-yield]: Unsound `yield`
 7 |     # snapshot: unsound-yield
 8 |     yield returns_any()
   |           ^^^^^^^^^^^^^ Inferred as `Any`
+  |
 info: `Any` is assignable to `int`, but not a subtype of `int`
 help: Consider using an `assert` to narrow the type before yielding it
 ```
@@ -663,6 +665,7 @@ error[unsound-yield]: Unsound `yield`
 22 |     # snapshot: unsound-yield
 23 |     yield ((42, returns_any()),)
    |           ^^^^^^^^^^^^^^^^^^^^^^ Inferred as `tuple[tuple[Literal[42], Any]]`
+   |
 info: `tuple[tuple[Literal[42], Any]]` is assignable to `tuple[tuple[int, int]]`, but not a subtype of `tuple[tuple[int, int]]`
 info: the first tuple element is not compatible: `tuple[Literal[42], Any]` is not a subtype of `tuple[int, int]`
 info: └── the second tuple element is not compatible: `Any` is not a subtype of `int`
@@ -743,6 +746,7 @@ error[unsound-yield]: Unsound `yield from`
 7 |     # snapshot: unsound-yield
 8 |     yield from dynamic_values()
   |                ^^^^^^^^^^^^^^^^ Yielded elements inferred as `Any`
+  |
 info: `Any` is assignable to `int`, but not a subtype of `int`
 help: Consider using `assert`s to narrow the types of the elements before yielding them
 ```
@@ -806,6 +810,7 @@ error[not-iterable]: Object of type `BrokenIterable` is not iterable
    |
 14 |     yield from BrokenIterable()
    |                ^^^^^^^^^^^^^^^^
+   |
 info: Its `__iter__` method has an invalid signature
 info: type `BrokenIterable` is not assignable to protocol `Iterable[Unknown]`
 info: └── protocol member `__iter__` is incompatible
@@ -823,6 +828,7 @@ error[unsound-yield]: Unsound `yield from`
 13 |     # snapshot: unsound-yield
 14 |     yield from BrokenIterable()
    |                ^^^^^^^^^^^^^^^^ Yielded elements inferred as `Any`
+   |
 info: `Any` is assignable to `int`, but not a subtype of `int`
 help: Consider using `assert`s to narrow the types of the elements before yielding them
 ```

@@ -371,6 +371,7 @@ error[unsupported-bool-conversion]: Boolean conversion is not supported for type
    |
 12 | 10 < Comparable() < 20
    | ^^^^^^^^^^^^^^^^^
+   |
 info: `__bool__` on `NotBoolable` must be callable
 ```
 
@@ -387,6 +388,7 @@ error[unsupported-bool-conversion]: Boolean conversion is not supported for type
    |
 14 | 10 < Comparable() < Comparable()
    | ^^^^^^^^^^^^^^^^^
+   |
 info: `__bool__` on `NotBoolable` must be callable
 ```
 

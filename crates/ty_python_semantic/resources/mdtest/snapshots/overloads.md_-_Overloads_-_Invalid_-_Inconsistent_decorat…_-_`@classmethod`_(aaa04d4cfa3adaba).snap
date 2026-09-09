@@ -157,6 +157,7 @@ error[no-matching-overload]: No overload of function `CheckClassMethod.try_from1
    |
 62 | CheckClassMethod.try_from1(1)  # error: [no-matching-overload]
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
 info: First overload defined here
   --> src/mdtest_snippet.py:9:5
    |
@@ -164,6 +165,7 @@ info: First overload defined here
 10 | |     @classmethod
 11 | |     def try_from1(cls, x: int) -> CheckClassMethod: ...
    | |_______________________________________________________^ First overload defined here
+   |
 info: Possible overloads for function `try_from1`:
 info:   (cls, x: int) -> CheckClassMethod
 info:   (cls, x: str) -> None
@@ -183,6 +185,7 @@ error[invalid-assignment]: Object of type `bound method <class 'Base'>.from_valu
    |      --------------------   ^^^^^^^^^^^^^^^ Incompatible value of type `bound method <class 'Base'>.from_value(x: int) -> int`
    |      |
    |      Declared type
+   |
 info: incompatible return types: `int` is not assignable to `str`
 
 ```

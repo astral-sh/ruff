@@ -51,6 +51,7 @@ error[invalid-type-form]: `typing.Concatenate` is not allowed in this context in
   |
 6 | def invalid0(x: Concatenate): ...
   |                 ^^^^^^^^^^^
+  |
 info: `typing.Concatenate` is only valid:
 info:  - as the first argument to `Callable`
 info:  - as a type argument for a `ParamSpec` parameter
@@ -63,6 +64,7 @@ error[invalid-type-form]: `typing.Concatenate` is not allowed in this context in
   |
 9 | def invalid1(x: Concatenate[int]): ...
   |                 ^^^^^^^^^^^^^^^^
+  |
 info: `typing.Concatenate` is only valid:
 info:  - as the first argument to `Callable`
 info:  - as a type argument for a `ParamSpec` parameter
@@ -75,6 +77,7 @@ error[invalid-type-form]: `typing.Concatenate` is not allowed in this context in
    |
 12 | def invalid2(x: Concatenate[int, ...]) -> None: ...
    |                 ^^^^^^^^^^^^^^^^^^^^^
+   |
 info: `typing.Concatenate` is only valid:
 info:  - as the first argument to `Callable`
 info:  - as a type argument for a `ParamSpec` parameter
@@ -87,6 +90,7 @@ error[invalid-type-form]: `typing.Concatenate` is not allowed in this context in
    |
 15 | def invalid3() -> Concatenate[int, ...]: ...
    |                   ^^^^^^^^^^^^^^^^^^^^^
+   |
 info: `typing.Concatenate` is only valid:
 info:  - as the first argument to `Callable`
 info:  - as a type argument for a `ParamSpec` parameter
@@ -99,6 +103,7 @@ error[invalid-type-form]: `typing.Concatenate` is not allowed in this context in
    |
 18 | def invalid4() -> Concatenate[()]: ...
    |                   ^^^^^^^^^^^^^^^
+   |
 info: `typing.Concatenate` is only valid:
 info:  - as the first argument to `Callable`
 info:  - as a type argument for a `ParamSpec` parameter
@@ -111,6 +116,7 @@ error[invalid-type-form]: `typing.Concatenate` is not allowed in this context in
    |
 21 | a: Concatenate
    |    ^^^^^^^^^^^
+   |
 info: `typing.Concatenate` is only valid:
 info:  - as the first argument to `Callable`
 info:  - as a type argument for a `ParamSpec` parameter
@@ -123,6 +129,7 @@ error[invalid-type-form]: `typing.Concatenate` is not allowed in this context in
    |
 25 |     b: Concatenate[int, P]
    |        ^^^^^^^^^^^^^^^^^^^
+   |
 info: `typing.Concatenate` is only valid:
 info:  - as the first argument to `Callable`
 info:  - as a type argument for a `ParamSpec` parameter
@@ -135,6 +142,7 @@ error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context in a p
    |
 28 | def invalid5[**P](x: Foo[Concatenate[P, ...]]) -> None: ...
    |                                      ^
+   |
 info: A bare ParamSpec is only valid:
 info:  - as the first argument to `Callable`
 info:  - as the last argument to `Concatenate`

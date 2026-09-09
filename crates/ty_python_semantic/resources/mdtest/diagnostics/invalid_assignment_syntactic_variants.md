@@ -542,6 +542,7 @@ error[invalid-assignment]: Object of type `list[int | str]` is not assignable to
   |         ------            ^^^^^^^^^^^^^ Incompatible iterable element of type `int | str` (expected `int`)
   |         |
   |         Assigned to this variable
+  |
 info: element `str` of union `int | str` is not assignable to `int`
 ```
 
