@@ -2243,7 +2243,7 @@ class Answer(Enum):
     ALIAS = NO
     SAME_VALUE = 0
 
-Answer.NO = 5  # error: [invalid-assignment] "Cannot assign to enum member `NO`"
+Answer.NO = 5  # error: [invalid-assignment] "Cannot assign to attribute `NO` on type `<class 'Answer'>`"
 Answer.NO = 0  # error: [invalid-assignment]
 Answer.NO = Answer.NO  # error: [invalid-assignment]
 Answer.ALIAS = 0  # error: [invalid-assignment]

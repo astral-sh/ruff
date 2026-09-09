@@ -1148,6 +1148,16 @@ def mixed_bound[T: A | Plain](cls: type[T]):
     cls.X = 0  # error: [invalid-assignment]
 ```
 
+Constraints retain their write restrictions even when one is a subclass of another:
+
+```py
+class EnumSubclass(Plain, Enum):
+    X = 0
+
+def subclass_constraints[T: (Plain, EnumSubclass)](cls: type[T]):
+    cls.X = 0  # error: [invalid-assignment]
+```
+
 ## Cycles
 
 ### Bounds and constraints
