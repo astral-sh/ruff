@@ -310,6 +310,23 @@ def _[T]() -> None:
     static_assert(negated_type != negated_constraint)
 ```
 
+## Constraints from bound methods
+
+A bound method's captured receiver and specialized signature both constrain generic target types.
+Their combined evidence retains the receiver's concrete specialization:
+
+```py
+from ty_extensions._internal import TypeOf, is_constraint_set_assignable_to
+
+class Box[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+def inspect[T](integer: Box[int], generic: Box[T]):
+    constraints = is_constraint_set_assignable_to(TypeOf[integer.get], TypeOf[generic.get])
+    reveal_type(constraints.solutions_for(T, inferable=tuple[T]))  # revealed: tuple[Solution[T=int]]
+```
+
 ## Constraints from materialized types
 
 ### Invariant classes

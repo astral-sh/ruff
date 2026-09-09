@@ -208,9 +208,27 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // The receiver exposed by `__self__` is an already-captured value, so it is covariant.
         // However, `Self` can also appear in the remaining parameters, where binding the
         // receiver must still preserve ordinary callable contravariance.
-        self.check_function_pair(db, source.function(db), target.function(db))
+        let source_function = source.function(db);
+        let target_function = target.function(db);
+        if source_function.literal(db) != target_function.literal(db) {
+            return self.never();
+        }
+
+        // Incompatible captured receivers already rule out the relation. Check them before
+        // comparing signatures, whose specialized `Self` bounds can contain recursive types.
+        // Diagnostics retain the original order so signature mismatches keep their context.
+        let receiver_constraints = (!self.is_context_collection_enabled())
+            .then(|| self.check_type_pair(db, source.self_instance(db), target.self_instance(db)));
+        if receiver_constraints.is_some_and(ConstraintSet::is_trivially_never_satisfied) {
+            return self.never();
+        }
+
+        // Keep function evidence before receiver evidence in the constraints' source order.
+        self.check_function_pair(db, source_function, target_function)
             .and(db, self.constraints, || {
-                self.check_type_pair(db, source.self_instance(db), target.self_instance(db))
+                receiver_constraints.unwrap_or_else(|| {
+                    self.check_type_pair(db, source.self_instance(db), target.self_instance(db))
+                })
             })
             .and(db, self.constraints, || {
                 self.check_callable_signature_pair(
