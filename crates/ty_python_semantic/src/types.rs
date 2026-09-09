@@ -4739,6 +4739,16 @@ impl<'db> Type<'db> {
         AttributeKind,
         Option<DescriptorGetCallContext<'db>>,
     ) {
+        // A generic instance attribute such as `value: T` has no class-level value that could act
+        // as a descriptor. Its specialized type describes what each instance stores, so it is
+        // returned unchanged: a function substituted for `T` is not bound to the instance.
+        if attribute
+            .qualifiers
+            .contains(TypeQualifiers::GENERIC_INSTANCE_ATTRIBUTE)
+        {
+            return (attribute, AttributeKind::NormalOrNonDataDescriptor, None);
+        }
+
         if let PlaceAndQualifiers {
             place:
                 Place::Defined(DefinedPlace {
@@ -10611,7 +10621,7 @@ impl std::fmt::Display for DynamicType<'_> {
 bitflags! {
     /// Type qualifiers that appear in an annotation expression.
     #[derive(Copy, Clone, Debug, Eq, PartialEq, Default, Hash)]
-    pub struct TypeQualifiers: u8 {
+    pub struct TypeQualifiers: u16 {
         /// `typing.ClassVar`
         const CLASS_VAR = 1 << 0;
         /// `typing.Final`
@@ -10632,6 +10642,15 @@ bitflags! {
         /// `__getattr__` function. We need this in order to implement precedence of submodules
         /// over module-level `__getattr__`, for compatibility with other type checkers.
         const FROM_MODULE_GETATTR = 1 << 7;
+        /// A non-standard type qualifier that marks a class-body declaration whose annotation is
+        /// a bare type variable of the class, such as `value: T` in `class Box(Generic[T])`.
+        ///
+        /// Such a declaration describes storage on each instance; the class itself holds no
+        /// value for the attribute. After the class is specialized, the attribute's type is
+        /// whatever was substituted for the type variable, and that value must not be treated
+        /// as a descriptor defined in the class body. In particular, a function substituted for
+        /// the type variable is not bound to the instance on attribute access.
+        const GENERIC_INSTANCE_ATTRIBUTE = 1 << 8;
     }
 }
 
@@ -10662,10 +10681,11 @@ impl TypeQualifiers {
     /// Returns `true` if this is a non-standard qualifier.
     ///
     /// Non-standard qualifiers are internal implementation details like
-    /// `IMPLICIT_INSTANCE_ATTRIBUTE` and `FROM_MODULE_GETATTR`.
+    /// `IMPLICIT_INSTANCE_ATTRIBUTE`, `FROM_MODULE_GETATTR`, and `GENERIC_INSTANCE_ATTRIBUTE`.
     pub fn is_non_standard(self) -> bool {
-        const NON_STANDARD: TypeQualifiers =
-            TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE.union(TypeQualifiers::FROM_MODULE_GETATTR);
+        const NON_STANDARD: TypeQualifiers = TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE
+            .union(TypeQualifiers::FROM_MODULE_GETATTR)
+            .union(TypeQualifiers::GENERIC_INSTANCE_ATTRIBUTE);
         self.intersects(NON_STANDARD)
     }
 }

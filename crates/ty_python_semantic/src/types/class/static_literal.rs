@@ -1419,28 +1419,6 @@ impl<'db> StaticClassLiteral<'db> {
         policy: MemberLookupPolicy,
         mro_iter: impl Iterator<Item = ClassBase<'db>>,
     ) -> PlaceAndQualifiers<'db> {
-        fn into_function_like_callable<'d>(
-            db: &'d dyn Db,
-            env: &ProgramEnvironment<'d>,
-            ty: Type<'d>,
-        ) -> Type<'d> {
-            match ty {
-                Type::Callable(callable_ty)
-                    if callable_ty.is_regular(db)
-                        && callable_ty.signatures(db).has_parameters() =>
-                {
-                    Type::Callable(callable_ty.into_function_like(db))
-                }
-                Type::Union(union) => union.map(db, env, |element| {
-                    into_function_like_callable(db, env, *element)
-                }),
-                Type::Intersection(intersection) => intersection.map_positive(db, env, |element| {
-                    into_function_like_callable(db, env, *element)
-                }),
-                _ => ty,
-            }
-        }
-
         let result = MroLookup::new(db, env, mro_iter).class_member(
             name,
             policy,
@@ -1448,7 +1426,7 @@ impl<'db> StaticClassLiteral<'db> {
             self.is_known(db, KnownClass::Object),
         );
 
-        let mut member = match result {
+        match result {
             ClassMemberResult::Done(result) => result.finalize(db, env),
             ClassMemberResult::TypedDict(module) => typed_dict_class_member(
                 db,
@@ -1458,15 +1436,7 @@ impl<'db> StaticClassLiteral<'db> {
                 policy,
                 name,
             ),
-        };
-
-        // We generally treat dunder attributes with `Callable` types as function-like callables.
-        // See `callables_as_descriptors.md` for more details.
-        if name.starts_with("__") && name.ends_with("__") {
-            member = member.map_type(|ty| into_function_like_callable(db, env, ty));
         }
-
-        member
     }
 
     /// Returns the inferred type of the class member named `name`. Only bound members
@@ -1483,7 +1453,19 @@ impl<'db> StaticClassLiteral<'db> {
         specialization: Option<Specialization<'db>>,
         name: &str,
     ) -> Member<'db> {
-        fn into_dunder_paramspec_callable<'d>(
+        // We generally treat dunder attributes with `Callable` types as function-like callables,
+        // i.e. as descriptors that bind the instance to their first parameter. See
+        // `callables_as_descriptors.md` for more details.
+        //
+        // This heuristic looks at the type as written in the class body, before the class's
+        // specialization is applied. A dunder declared with a bare type variable, such as
+        // `__call__: F`, is a generic instance attribute (see
+        // `TypeQualifiers::GENERIC_INSTANCE_ATTRIBUTE`): the callable later substituted for `F`
+        // is supplied from outside the class body, so nothing identifies its first parameter as
+        // the receiver. The same reasoning excludes a callable parameterized directly by a
+        // `ParamSpec`, such as `__call__: Callable[P, int]`: after `P` is specialized, the
+        // parameter list already describes the callable's arguments.
+        fn into_function_like_callable<'d>(
             db: &'d dyn Db,
             env: &ProgramEnvironment<'d>,
             ty: Type<'d>,
@@ -1491,15 +1473,16 @@ impl<'db> StaticClassLiteral<'db> {
             match ty {
                 Type::Callable(callable_ty)
                     if callable_ty.is_regular(db)
-                        && callable_ty.signatures(db).is_single_paramspec().is_some() =>
+                        && callable_ty.signatures(db).has_parameters()
+                        && callable_ty.signatures(db).is_single_paramspec().is_none() =>
                 {
-                    Type::Callable(callable_ty.into_dunder_paramspec(db))
+                    Type::Callable(callable_ty.into_function_like(db))
                 }
                 Type::Union(union) => union.map(db, env, |element| {
-                    into_dunder_paramspec_callable(db, env, *element)
+                    into_function_like_callable(db, env, *element)
                 }),
                 Type::Intersection(intersection) => intersection.map_positive(db, env, |element| {
-                    into_dunder_paramspec_callable(db, env, *element)
+                    into_function_like_callable(db, env, *element)
                 }),
                 _ => ty,
             }
@@ -1550,7 +1533,7 @@ impl<'db> StaticClassLiteral<'db> {
         let body_scope = self.body_scope(db);
         let member = class_member(db, body_scope, name).map_type(|ty| {
             let ty = if name.starts_with("__") && name.ends_with("__") {
-                into_dunder_paramspec_callable(db, env, ty)
+                into_function_like_callable(db, env, ty)
             } else {
                 ty
             };

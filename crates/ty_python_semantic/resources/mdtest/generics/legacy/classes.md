@@ -1470,6 +1470,48 @@ reveal_type(DescriptorOrInt[str].value)  # revealed: int
 DescriptorOrInt[int].value = 1
 ```
 
+## Functions stored in generic instance attributes
+
+An attribute declared as `func: F` (where `F` is a type variable) is stored on each instance; the
+class itself has no value for it. So when `F` is a function, accessing the attribute on an instance
+returns that function unchanged, with no `self` bound. This matches mypy and pyright, and it matches
+the runtime, where a function in an instance's `__dict__` is not a method.
+
+```py
+from typing import Callable, Generic, TypeVar
+
+F = TypeVar("F", bound=Callable[..., object])
+
+class Holder(Generic[F]):
+    func: F
+
+    def __init__(self, func: F) -> None:
+        self.func = func
+
+def greet(name: str) -> str:
+    return name
+
+holder = Holder(greet)
+reveal_type(holder.func)  # revealed: (name: str) -> str
+reveal_type(holder.func("world"))  # revealed: str
+holder.func(1)  # error: [invalid-argument-type]
+```
+
+The same holds when the attribute is inherited from a specialized base class, and when the type
+variable is one option in a union:
+
+```py
+class Concrete(Holder[Callable[[str], str]]): ...
+
+reveal_type(Concrete(greet).func)  # revealed: (str, /) -> str
+
+class OptionalHolder(Generic[F]):
+    func: F | None = None
+
+def check(holder: OptionalHolder[Callable[[str], str]]) -> None:
+    reveal_type(holder.func)  # revealed: ((str, /) -> str) | None
+```
+
 ## Metaclass descriptors shadow generic instance attributes
 
 A data descriptor on the metaclass governs class access even when instances have an attribute of the

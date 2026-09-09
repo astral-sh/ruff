@@ -1,9 +1,9 @@
 use crate::Db;
 use crate::place::{
     ConsideredDefinitions, DefinedPlace, Place, PlaceAndQualifiers, RequiresExplicitReExport,
-    place_by_id, place_from_bindings,
+    TypeOrigin, place_by_id, place_from_bindings,
 };
-use crate::types::{ProgramEnvironment, Type};
+use crate::types::{ProgramEnvironment, Type, TypeQualifiers};
 use ty_python_core::{place_table, scope::ScopeId, use_def_map};
 
 /// The return type of certain member-lookup operations. Contains information
@@ -28,7 +28,7 @@ impl<'db> Member<'db> {
     }
 
     /// Returns the type qualifiers of this member.
-    pub(super) fn qualifiers(&self) -> crate::types::TypeQualifiers {
+    pub(super) fn qualifiers(&self) -> TypeQualifiers {
         self.inner.qualifiers
     }
 
@@ -40,6 +40,31 @@ impl<'db> Member<'db> {
     /// Returns the inner type, unless it is definitely undefined.
     pub(super) fn ignore_possibly_undefined(&self) -> Option<Type<'db>> {
         self.inner.place.ignore_possibly_undefined()
+    }
+
+    /// Whether this member is a class-body declaration whose annotation is a bare type variable,
+    /// such as `value: T`, or a union containing one. Such a declaration only describes storage
+    /// on each instance. See [`TypeQualifiers::GENERIC_INSTANCE_ATTRIBUTE`].
+    pub(super) fn is_generic_instance_attribute(&self, db: &'db dyn Db) -> bool {
+        let Place::Defined(DefinedPlace {
+            ty,
+            origin: TypeOrigin::Declared,
+            ..
+        }) = self.inner.place
+        else {
+            return false;
+        };
+        if self.qualifiers().contains(TypeQualifiers::CLASS_VAR) {
+            return false;
+        }
+        match ty {
+            Type::TypeVar(_) => true,
+            Type::Union(union) => union
+                .elements(db)
+                .iter()
+                .any(|element| matches!(element, Type::TypeVar(_))),
+            _ => false,
+        }
     }
 
     /// Map a type transformation function over the type of this member.
