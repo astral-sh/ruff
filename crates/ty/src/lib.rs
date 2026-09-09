@@ -190,7 +190,7 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         db.freeze();
     }
 
-    let (mut main_loop, main_loop_cancellation_token) = MainLoop::new(mode, printer);
+    let (main_loop, main_loop_cancellation_token) = MainLoop::new(mode, printer);
 
     // Listen to Ctrl+C and abort the watch mode.
     let main_loop_cancellation_token = Mutex::new(Some(main_loop_cancellation_token));
@@ -201,10 +201,6 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
             token.stop();
         }
     })?;
-
-    // Mark initial script environments pending before watcher setup reads them.
-    let scripts: Vec<_> = db.project().script_files(&db).iter().collect();
-    main_loop.synchronize_scripts(&mut db, &scripts);
 
     let exit_status = if watch {
         main_loop.watch(&mut db)?
@@ -343,6 +339,10 @@ impl MainLoop {
         let mut revision = 0u64;
         let uv_sync_wakeups = db.uv_environments().sync_wakeups();
         let (check_sender, check_receiver) = crossbeam_channel::bounded(1);
+
+        // Initialize the uv environment for all scripts
+        let scripts: Vec<_> = db.project().script_files(db).iter().collect();
+        self.synchronize_scripts(db, &scripts);
 
         request_check(&check_sender);
 
