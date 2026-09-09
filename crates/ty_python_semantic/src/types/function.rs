@@ -92,11 +92,11 @@ use crate::types::tuple::TupleSpec;
 use crate::types::variance::{VarianceInferable, VarianceOrigin, VarianceTerm};
 use crate::types::visitor::non_any_dynamic_content;
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundMethodType, BoundTypeVarIdentity, BoundTypeVarInstance,
-    CallableType, ClassBase, ClassLiteral, ClassType, FindLegacyTypeVarsVisitor,
-    IntersectionBuilder, KnownClass, KnownInstanceType, SpecialFormType, SubclassOfInner,
-    SubclassOfType, Truthiness, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
-    UnionBuilder, UnionType, binding_type, definition_expression_type, walk_signature,
+    ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, CallableType, ClassBase,
+    ClassLiteral, ClassType, FindLegacyTypeVarsVisitor, IntersectionBuilder, KnownClass,
+    KnownInstanceType, SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness, Type,
+    TypeContext, TypeMapping, TypeVarBoundOrConstraints, UnionBuilder, UnionType, binding_type,
+    definition_expression_type, walk_signature,
 };
 use crate::{Db, FxIndexMap, FxOrderSet, ProgramEnvironment};
 use ty_python_core::ast_ids::HasScopedUseId;
@@ -1663,13 +1663,100 @@ impl<'db> FunctionType<'db> {
         CallableType::new(db, self.signature(db), self.callable_type_kind(db))
     }
 
-    /// Convert the `FunctionType` into a [`BoundMethodType`].
-    pub(crate) fn into_bound_method_type(
+    /// Bind this function's signatures to a receiver while preserving overload selection and `Self`.
+    #[salsa::tracked(
+        returns(copy),
+        cycle_initial=|db, _, _, _, _| CallableType::bottom(db),
+        heap_size=ruff_memory_usage::heap_size
+    )]
+    pub(crate) fn into_bound_callable(
         self,
         db: &'db dyn Db,
-        self_instance: Type<'db>,
-    ) -> BoundMethodType<'db> {
-        BoundMethodType::new(db, self, self_instance, self_instance)
+        receiver_type: Type<'db>,
+        typing_self_type: Type<'db>,
+    ) -> CallableType<'db> {
+        let env = ProgramEnvironment::from_scope(self.literal(db).last_definition.body_scope(db));
+
+        CallableType::new(
+            db,
+            self.bound_signatures_with_receiver(db, &env, receiver_type, typing_self_type),
+            CallableTypeKind::FunctionLike,
+        )
+    }
+
+    /// Bind this function using the caller's environment and separate receiver and `Self` types.
+    pub(crate) fn into_bound_callable_with_receiver(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        receiver_type: Type<'db>,
+        typing_self_type: Type<'db>,
+    ) -> CallableType<'db> {
+        CallableType::new(
+            db,
+            self.bound_signatures_with_receiver(db, env, receiver_type, typing_self_type),
+            CallableTypeKind::FunctionLike,
+        )
+    }
+
+    /// Shares the signatures retained in the function's interned bound callable.
+    pub(crate) fn bound_signatures(
+        self,
+        db: &'db dyn Db,
+        receiver_type: Type<'db>,
+        typing_self_type: Type<'db>,
+    ) -> &'db CallableSignature<'db> {
+        self.into_bound_callable(db, receiver_type, typing_self_type)
+            .signatures(db)
+    }
+
+    fn bound_signatures_with_receiver(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        receiver_type: Type<'db>,
+        typing_self_type: Type<'db>,
+    ) -> CallableSignature<'db> {
+        let function_signature = self.signature(db);
+
+        let [signature] = function_signature.overloads.as_slice() else {
+            if !function_signature
+                .overloads
+                .iter()
+                .any(Signature::has_explicit_positional_receiver_annotation)
+            {
+                return CallableSignature::from_overloads(function_signature.overloads.iter().map(
+                    |signature| {
+                        signature.bind_self_with_receiver(
+                            db,
+                            env,
+                            Some(receiver_type),
+                            Some(typing_self_type),
+                        )
+                    },
+                ));
+            }
+
+            return CallableSignature::from_overloads(
+                function_signature
+                    .overloads
+                    .iter()
+                    .filter_map(|signature| {
+                        signature.bind_self_if_compatible(db, env, receiver_type, typing_self_type)
+                    })
+                    .flat_map(|signature| signature.overloads),
+            );
+        };
+
+        let specialized = if signature.has_receiver_determined_method_typevar(db, env) {
+            signature.specialize_for_bound_receiver(db, env, receiver_type, typing_self_type)
+        } else {
+            None
+        };
+
+        specialized
+            .unwrap_or_else(|| CallableSignature::single(signature.clone()))
+            .bind_self_with_receiver(db, env, Some(receiver_type), Some(typing_self_type))
     }
 
     pub(crate) fn find_legacy_typevars_impl(

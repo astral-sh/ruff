@@ -192,6 +192,30 @@ def compare(left: TypeOf[Left(C()).method], right: TypeOf[Right(C()).method]) ->
     reveal_type(left is right)  # revealed: bool
 ```
 
+## Identity of descriptors wrapping callable objects
+
+Classmethod and staticmethod descriptors are distinct kinds of objects, even when they wrap the same
+callable. Bound classmethods can also wrap callable instances instead of Python functions.
+
+```py
+class CallableObject:
+    def __call__(self, *args: object) -> int:
+        return 0
+
+wrapped = CallableObject()
+static = staticmethod(wrapped)
+class_method = classmethod(wrapped)
+
+reveal_type(static is static)  # revealed: bool
+reveal_type(class_method is class_method)  # revealed: bool
+reveal_type(static is class_method)  # revealed: Literal[False]
+
+class C:
+    method = class_method
+
+reveal_type(C.method is C.method)  # revealed: bool
+```
+
 ## Identity of properties, saved method wrappers, and partials
 
 If a generic class defines a property `prop`, specializing that class changes the static signatures

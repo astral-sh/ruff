@@ -212,10 +212,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     function.signature(db),
                     function.name(db),
                 )),
-                Type::BoundMethod(method) => {
-                    let function = method.function(db);
+                Type::BoundMethod(method) if let Some(function) = method.function(db) => {
                     Some(FunctionInfo::Method(
-                        method.bound_signatures(db),
+                        function.bound_signatures(
+                            db,
+                            method.signature_receiver(db),
+                            method.typing_self_type(db),
+                        ),
                         CallableDescription::defining_class(db, *test_type)
                             .map(|class| {
                                 Cow::Owned(format!("{}.{}", class.name(db), function.name(db)))

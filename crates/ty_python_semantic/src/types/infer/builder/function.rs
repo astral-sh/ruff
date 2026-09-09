@@ -470,7 +470,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
                 _ => {}
             }
-            if !decorator_function_decorator.is_empty() {
+            if !decorator_function_decorator.is_empty()
+                && !decorator_function_decorator
+                    .intersects(FunctionDecorators::CLASSMETHOD | FunctionDecorators::STATICMETHOD)
+            {
                 continue;
             }
 
@@ -543,10 +546,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         );
         let function_literal = FunctionLiteral::new(db, overload_literal);
         let function_type = FunctionType::new(db, function_literal, None);
-        let is_decorated_overload_implementation = !decorator_types_and_nodes.is_empty()
-            && function_literal.has_separate_implementation(db);
-        let is_decorated_overload =
-            !decorator_types_and_nodes.is_empty() && overload_literal.is_overload(db);
+        let has_custom_decorators = decorator_types_and_nodes
+            .iter()
+            .any(|(ty, _)| FunctionDecorators::from_decorator_type(db, *ty).is_empty());
+        let is_decorated_overload_implementation =
+            has_custom_decorators && function_literal.has_separate_implementation(db);
+        let is_decorated_overload = has_custom_decorators && overload_literal.is_overload(db);
 
         let mut inferred_ty = Type::FunctionLiteral(
             if is_decorated_overload_implementation || is_decorated_overload {
@@ -613,6 +618,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         if is_decorated_overload_implementation {
+            // Overloads describe the exposed function. The implementation check compares the
+            // unbound callable, before classmethod or staticmethod descriptor binding.
+            let implementation_ty = match inferred_ty {
+                Type::KnownInstance(KnownInstanceType::MethodWrapper(wrapper)) => {
+                    wrapper.wrapped(db)
+                }
+                _ => inferred_ty,
+            };
             let last_definition = match inferred_ty {
                 Type::FunctionLiteral(function) => Some(function.literal(db).last_definition),
                 Type::Callable(callable) => callable.deprecated(db),
@@ -627,7 +640,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             } else {
                 function_type
             };
-            let implementation_callables = inferred_ty
+            let implementation_callables = implementation_ty
                 .try_upcast_to_callable(db, self.program_environment())
                 .map_or_else(Box::default, |callables| {
                     callables.iter().copied().collect()

@@ -13,7 +13,7 @@ use crate::types::cyclic::CycleDetector;
 use crate::types::equality::{
     ComparisonSoundnessPolicy, TupleEqualityEvaluator, equality_truthiness, inequality_truthiness,
 };
-use crate::types::known_instance::{FunctoolsPartialInstance, InternedType};
+use crate::types::known_instance::{FunctoolsPartialInstance, InternedType, MethodWrapper};
 use crate::types::tuple::{Tuple, TupleSpec};
 use crate::types::{
     BoundMethodType, CallableType, DynamicType, FunctionType, IntersectionBuilder,
@@ -313,9 +313,9 @@ impl<'db> Type<'db> {
                     unspecialized_function(db, function),
                 )),
                 Type::BoundMethod(method) => visit_type(db, ty, visitor, || {
-                    UpcastResult::unstable(Type::BoundMethod(BoundMethodType::new(
+                    UpcastResult::unstable(Type::BoundMethod(BoundMethodType::from_callable(
                         db,
-                        unspecialized_function(db, method.function(db)),
+                        upcast(db, env, method.func(db), visitor).ty,
                         upcast(db, env, method.self_instance(db), visitor).ty,
                         method.signature_receiver(db),
                     )))
@@ -376,6 +376,17 @@ impl<'db> Type<'db> {
                         db, env, property, visitor,
                     )))
                 }),
+                Type::KnownInstance(KnownInstanceType::MethodWrapper(wrapper)) => {
+                    visit_type(db, ty, visitor, || {
+                        UpcastResult::unstable(Type::KnownInstance(
+                            KnownInstanceType::MethodWrapper(MethodWrapper::new(
+                                db,
+                                upcast(db, env, wrapper.wrapped(db), visitor).ty,
+                                wrapper.kind(db),
+                            )),
+                        ))
+                    })
+                }
                 Type::KnownInstance(KnownInstanceType::FunctoolsPartial(partial)) => {
                     UpcastResult::unstable(
                         upcast_partial(db, env, partial)
