@@ -480,6 +480,7 @@ Ruff is used by a number of major open-source projects and companies, including:
 - [Nokia](https://nokia.com/)
 - [NoneBot](https://github.com/nonebot/nonebot2)
 - [NumPyro](https://github.com/pyro-ppl/numpyro)
+- [Numonis](https://numonis.com)
 - [ONNX](https://github.com/onnx/onnx)
 - [OpenBB](https://github.com/OpenBB-finance/OpenBBTerminal)
 - [Open Wine Components](https://github.com/Open-Wine-Components/umu-launcher)
