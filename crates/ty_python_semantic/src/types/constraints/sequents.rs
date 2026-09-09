@@ -38,17 +38,9 @@ use crate::{Db, Program, ProgramEnvironment};
 /// new constraint, and then merges those cached sequents into its own sequent map. (That means we
 /// also share the work of calculating the sequent map across `PathAssignments` for _different_
 /// constraint sets.)
-#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
-pub(super) struct SequentMap<C> {
-    pub(super) sequents: Vec<Sequent<C>>,
-}
-
-impl<C> Default for SequentMap<C> {
-    fn default() -> Self {
-        Self {
-            sequents: Vec::default(),
-        }
-    }
+#[derive(Clone, Debug, Default, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+pub(super) struct SequentMap<'db> {
+    pub(super) sequents: Vec<Sequent<Constraint<'db>>>,
 }
 
 /// Describes one rule for deriving new implicit constraints from existing constraints in a BDD
@@ -71,7 +63,6 @@ pub(super) enum Sequent<C> {
     ///
     /// This indicates that `C₁`, `C₂` and `C₃` are mutually disjoint: it is not possible for all
     /// three to hold. Any path that assumes all three is impossible and can be pruned.
-    #[expect(unused)]
     TripleImpossibility { ante1: C, ante2: C, ante3: C },
 
     /// Sequent of the form `C → D`
@@ -88,13 +79,12 @@ pub(super) enum Sequent<C> {
     PairImplication { ante1: C, ante2: C, post: C },
 }
 
-impl SequentMap<ConstraintId> {
+impl<'db> SequentMap<'db> {
     #[expect(dead_code)] // Keep this around for debugging purposes
-    fn display<'db, 'a>(
+    fn display<'a>(
         &'a self,
         db: &'db dyn Db,
         env: &'a ProgramEnvironment<'db>,
-        storage: &'a ConstraintSetStorage<'db>,
         prefix: &'a dyn Display,
     ) -> impl Display + 'a {
         std::fmt::from_fn(move |f| {
@@ -117,8 +107,8 @@ impl SequentMap<ConstraintId> {
                         write!(
                             f,
                             "{} ∧ {} → false",
-                            ante1.display(db, env, storage),
-                            ante2.display(db, env, storage),
+                            ante1.display(db, env, Some(true)),
+                            ante2.display(db, env, Some(true)),
                         )?;
                     }
 
@@ -131,9 +121,9 @@ impl SequentMap<ConstraintId> {
                         write!(
                             f,
                             "{} ∧ {} ∧ {} → false",
-                            ante1.display(db, env, storage),
-                            ante2.display(db, env, storage),
-                            ante3.display(db, env, storage),
+                            ante1.display(db, env, Some(true)),
+                            ante2.display(db, env, Some(true)),
+                            ante3.display(db, env, Some(true)),
                         )?;
                     }
 
@@ -142,9 +132,9 @@ impl SequentMap<ConstraintId> {
                         write!(
                             f,
                             "{} ∧ {} → {}",
-                            ante1.display(db, env, storage),
-                            ante2.display(db, env, storage),
-                            post.display(db, env, storage),
+                            ante1.display(db, env, Some(true)),
+                            ante2.display(db, env, Some(true)),
+                            post.display(db, env, Some(true)),
                         )?;
                     }
 
@@ -153,8 +143,8 @@ impl SequentMap<ConstraintId> {
                         write!(
                             f,
                             "{} → {}",
-                            ante.display(db, env, storage),
-                            post.display(db, env, storage)
+                            ante.display(db, env, Some(true)),
+                            post.display(db, env, Some(true))
                         )?;
                     }
                 }
@@ -166,10 +156,7 @@ impl SequentMap<ConstraintId> {
             Ok(())
         })
     }
-}
 
-#[expect(dead_code)]
-impl<'db> SequentMap<Constraint<'db>> {
     fn add_single_tautology(&mut self, ante: Constraint<'db>) {
         self.sequents.push(Sequent::SingleTautology { ante });
     }
@@ -179,7 +166,6 @@ impl<'db> SequentMap<Constraint<'db>> {
             .push(Sequent::PairImpossibility { ante1, ante2 });
     }
 
-    #[expect(unused)]
     fn add_triple_impossibility(
         &mut self,
         ante1: Constraint<'db>,
@@ -225,14 +211,14 @@ impl<'db> SequentMap<Constraint<'db>> {
             db: &'db dyn Db,
             program: Program<'db>,
             constraint: Constraint<'db>,
-        ) -> SequentMap<Constraint<'db>> {
+        ) -> SequentMap<'db> {
             let env = &ProgramEnvironment::from_program(program);
             tracing::trace!(
                 target: "ty_python_semantic::types::constraints::SequentMap",
                 constraint = %constraint.display(db, env, Some(true)),
                 "add sequents for constraint",
             );
-            let mut map = SequentMap::<Constraint<'db>>::default();
+            let mut map = SequentMap::default();
             constraint.add_sequents(db, env, &mut map);
             map.sequents.shrink_to_fit();
             map
@@ -263,7 +249,7 @@ impl<'db> SequentMap<Constraint<'db>> {
             program: Program<'db>,
             left: Constraint<'db>,
             right: Constraint<'db>,
-        ) -> SequentMap<Constraint<'db>> {
+        ) -> SequentMap<'db> {
             let env = &ProgramEnvironment::from_program(program);
             tracing::trace!(
                 target: "ty_python_semantic::types::constraints::SequentMap",
@@ -271,7 +257,7 @@ impl<'db> SequentMap<Constraint<'db>> {
                 right = %right.display(db, env, Some(true)),
                 "add sequents for constraint pair",
             );
-            let mut map = SequentMap::<Constraint<'db>>::default();
+            let mut map = SequentMap::default();
             left.add_sequents_with(db, env, &mut map, right);
             map.sequents.shrink_to_fit();
             map
@@ -340,7 +326,7 @@ impl<'db> Constraint<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        map: &mut SequentMap<Constraint<'db>>,
+        map: &mut SequentMap<'db>,
     ) {
         match self {
             Constraint::ConcreteLower(this) => this.add_sequents(db, env, map),
@@ -355,7 +341,7 @@ impl<'db> Constraint<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        map: &mut SequentMap<Constraint<'db>>,
+        map: &mut SequentMap<'db>,
         other: Self,
     ) {
         match (self, other) {
@@ -444,7 +430,7 @@ impl<'db> Constraint<'db> {
     fn add_sequents_for_range(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        map: &mut SequentMap<Constraint<'db>>,
+        map: &mut SequentMap<'db>,
         lower: impl ProvidesConcreteLowerBound<'db>,
         upper: impl ProvidesConcreteUpperBound<'db>,
     ) {
@@ -493,7 +479,7 @@ impl<'db> Constraint<'db> {
     fn add_sequents_for_equivalence(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        map: &mut SequentMap<Constraint<'db>>,
+        map: &mut SequentMap<'db>,
         lower: impl ProvidesConcreteLowerBound<'db>,
         upper: impl ProvidesConcreteUpperBound<'db>,
     ) {
@@ -511,7 +497,7 @@ impl<'db> Constraint<'db> {
     }
 
     fn add_constraint_set_implication(
-        map: &mut SequentMap<Constraint<'db>>,
+        map: &mut SequentMap<'db>,
         lower_constraint: Self,
         upper_constraint: Self,
         when: &OwnedConstraintSet<'db>,
@@ -660,7 +646,7 @@ impl<'db> Constraint<'db> {
     fn add_covariant_lower_tightened_sequent(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        map: &mut SequentMap<Constraint<'db>>,
+        map: &mut SequentMap<'db>,
         left: impl ProvidesConcreteLowerBound<'db>,
         right: impl ProvidesConcreteLowerBound<'db>,
     ) {
@@ -694,7 +680,7 @@ impl<'db> Constraint<'db> {
     fn add_covariant_upper_tightened_sequent(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        map: &mut SequentMap<Constraint<'db>>,
+        map: &mut SequentMap<'db>,
         left: impl ProvidesConcreteUpperBound<'db>,
         right: impl ProvidesConcreteUpperBound<'db>,
     ) {
@@ -728,7 +714,7 @@ impl<'db> Constraint<'db> {
     fn add_covariant_equivalence_tightened_sequent(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        map: &mut SequentMap<Constraint<'db>>,
+        map: &mut SequentMap<'db>,
         left: ConcreteEquivalenceBound<'db>,
         right: ConcreteEquivalenceBound<'db>,
     ) {
@@ -762,7 +748,7 @@ impl<'db> Constraint<'db> {
     fn add_contravariant_tightened_sequent(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        map: &mut SequentMap<Constraint<'db>>,
+        map: &mut SequentMap<'db>,
         lower: impl ProvidesConcreteLowerBound<'db>,
         upper: impl ProvidesConcreteUpperBound<'db>,
     ) {
@@ -816,7 +802,7 @@ impl<'db> Constraint<'db> {
     fn add_invariant_tightened_sequent(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        map: &mut SequentMap<Constraint<'db>>,
+        map: &mut SequentMap<'db>,
         left: impl ProvidesConcreteBound<'db>,
         right: ConcreteEquivalenceBound<'db>,
     ) {
@@ -851,7 +837,7 @@ impl<'db> Constraint<'db> {
     fn add_covariant_lower_weakened_sequent(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        map: &mut SequentMap<Constraint<'db>>,
+        map: &mut SequentMap<'db>,
         left: impl ProvidesConcreteLowerBound<'db>,
         right: impl ProvidesTypeVarRangeBound<'db>,
     ) {
@@ -886,7 +872,7 @@ impl<'db> Constraint<'db> {
     fn add_covariant_upper_weakened_sequent(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        map: &mut SequentMap<Constraint<'db>>,
+        map: &mut SequentMap<'db>,
         left: impl ProvidesConcreteUpperBound<'db>,
         right: impl ProvidesTypeVarRangeBound<'db>,
     ) {
@@ -921,7 +907,7 @@ impl<'db> Constraint<'db> {
     fn add_covariant_equivalence_weakened_sequent(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        map: &mut SequentMap<Constraint<'db>>,
+        map: &mut SequentMap<'db>,
         left: ConcreteEquivalenceBound<'db>,
         right: impl ProvidesTypeVarEquivalenceBound<'db>,
     ) {
@@ -956,7 +942,7 @@ impl<'db> Constraint<'db> {
     fn add_contravariant_lower_weakened_sequent(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        map: &mut SequentMap<Constraint<'db>>,
+        map: &mut SequentMap<'db>,
         left: impl ProvidesConcreteLowerBound<'db>,
         right: impl ProvidesTypeVarRangeBound<'db>,
     ) {
@@ -991,7 +977,7 @@ impl<'db> Constraint<'db> {
     fn add_contravariant_upper_weakened_sequent(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        map: &mut SequentMap<Constraint<'db>>,
+        map: &mut SequentMap<'db>,
         left: impl ProvidesConcreteUpperBound<'db>,
         right: impl ProvidesTypeVarRangeBound<'db>,
     ) {
@@ -1026,7 +1012,7 @@ impl<'db> Constraint<'db> {
     fn add_contravariant_equivalence_weakened_sequent(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        map: &mut SequentMap<Constraint<'db>>,
+        map: &mut SequentMap<'db>,
         left: ConcreteEquivalenceBound<'db>,
         right: impl ProvidesTypeVarEquivalenceBound<'db>,
     ) {
@@ -1061,7 +1047,7 @@ impl<'db> Constraint<'db> {
     fn add_invariant_weakened_sequent(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        map: &mut SequentMap<Constraint<'db>>,
+        map: &mut SequentMap<'db>,
         left: impl ProvidesConcreteBound<'db>,
         right: impl ProvidesTypeVarEquivalenceBound<'db>,
     ) {
@@ -1127,7 +1113,7 @@ impl<'db> ConcreteLowerBound<'db> {
         self,
         db: &'db dyn Db,
         _env: &ProgramEnvironment<'db>,
-        map: &mut SequentMap<Constraint<'db>>,
+        map: &mut SequentMap<'db>,
     ) {
         // `⊥ ≤ T` is always true
         if self.bound == self.typevar.domain(db).bottom(db) {
@@ -1145,7 +1131,7 @@ impl<'db> ConcreteLowerBound<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        map: &mut SequentMap<Constraint<'db>>,
+        map: &mut SequentMap<'db>,
         other: ConcreteLowerBound<'db>,
         reversed: bool,
     ) {
@@ -1202,7 +1188,7 @@ impl<'db> ConcreteLowerBound<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        map: &mut SequentMap<Constraint<'db>>,
+        map: &mut SequentMap<'db>,
         other: ConcreteUpperBound<'db>,
         _reversed: bool,
     ) {
@@ -1253,7 +1239,7 @@ impl<'db> ConcreteLowerBound<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        map: &mut SequentMap<Constraint<'db>>,
+        map: &mut SequentMap<'db>,
         other: ConcreteEquivalenceBound<'db>,
         _reversed: bool,
     ) {
@@ -1296,7 +1282,7 @@ impl<'db> ConcreteLowerBound<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        map: &mut SequentMap<Constraint<'db>>,
+        map: &mut SequentMap<'db>,
         other: TypeVarRangeBound<'db>,
         _reversed: bool,
     ) {
@@ -1316,7 +1302,7 @@ impl<'db> ConcreteLowerBound<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        map: &mut SequentMap<Constraint<'db>>,
+        map: &mut SequentMap<'db>,
         other: TypeVarEquivalenceBound<'db>,
         _reversed: bool,
     ) {
@@ -1349,7 +1335,7 @@ impl<'db> ConcreteUpperBound<'db> {
         self,
         db: &'db dyn Db,
         _env: &ProgramEnvironment<'db>,
-        map: &mut SequentMap<Constraint<'db>>,
+        map: &mut SequentMap<'db>,
     ) {
         // `T ≤ ⊤` is always true
         if self.bound == self.typevar.domain(db).top(db) {
@@ -1367,7 +1353,7 @@ impl<'db> ConcreteUpperBound<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        map: &mut SequentMap<Constraint<'db>>,
+        map: &mut SequentMap<'db>,
         other: ConcreteUpperBound<'db>,
         reversed: bool,
     ) {
@@ -1433,7 +1419,7 @@ impl<'db> ConcreteUpperBound<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        map: &mut SequentMap<Constraint<'db>>,
+        map: &mut SequentMap<'db>,
         other: ConcreteEquivalenceBound<'db>,
         _reversed: bool,
     ) {
@@ -1476,7 +1462,7 @@ impl<'db> ConcreteUpperBound<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        map: &mut SequentMap<Constraint<'db>>,
+        map: &mut SequentMap<'db>,
         other: TypeVarRangeBound<'db>,
         _reversed: bool,
     ) {
@@ -1496,7 +1482,7 @@ impl<'db> ConcreteUpperBound<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        map: &mut SequentMap<Constraint<'db>>,
+        map: &mut SequentMap<'db>,
         other: TypeVarEquivalenceBound<'db>,
         _reversed: bool,
     ) {
@@ -1530,7 +1516,7 @@ impl<'db> ConcreteEquivalenceBound<'db> {
         self,
         _db: &'db dyn Db,
         _env: &ProgramEnvironment<'db>,
-        _map: &mut SequentMap<Constraint<'db>>,
+        _map: &mut SequentMap<'db>,
     ) {
         // We cannot infer any sequents from `T = α` on its own.
     }
@@ -1539,7 +1525,7 @@ impl<'db> ConcreteEquivalenceBound<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        map: &mut SequentMap<Constraint<'db>>,
+        map: &mut SequentMap<'db>,
         other: ConcreteEquivalenceBound<'db>,
         _reversed: bool,
     ) {
@@ -1579,7 +1565,7 @@ impl<'db> ConcreteEquivalenceBound<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        map: &mut SequentMap<Constraint<'db>>,
+        map: &mut SequentMap<'db>,
         other: TypeVarRangeBound<'db>,
         _reversed: bool,
     ) {
@@ -1608,7 +1594,7 @@ impl<'db> ConcreteEquivalenceBound<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        map: &mut SequentMap<Constraint<'db>>,
+        map: &mut SequentMap<'db>,
         other: TypeVarEquivalenceBound<'db>,
         _reversed: bool,
     ) {
@@ -1665,7 +1651,7 @@ impl<'db> TypeVarRangeBound<'db> {
         self,
         db: &'db dyn Db,
         _env: &ProgramEnvironment<'db>,
-        map: &mut SequentMap<Constraint<'db>>,
+        map: &mut SequentMap<'db>,
     ) {
         // `T ≤ T` is always true
         if self.left.is_same_typevar_as(db, self.right) {
@@ -1677,7 +1663,7 @@ impl<'db> TypeVarRangeBound<'db> {
         self,
         db: &'db dyn Db,
         _env: &ProgramEnvironment<'db>,
-        map: &mut SequentMap<Constraint<'db>>,
+        map: &mut SequentMap<'db>,
         other: TypeVarRangeBound<'db>,
         _reversed: bool,
     ) {
@@ -1709,7 +1695,7 @@ impl<'db> TypeVarRangeBound<'db> {
         self,
         db: &'db dyn Db,
         _env: &ProgramEnvironment<'db>,
-        map: &mut SequentMap<Constraint<'db>>,
+        map: &mut SequentMap<'db>,
         other: TypeVarEquivalenceBound<'db>,
         _reversed: bool,
     ) {
@@ -1748,7 +1734,7 @@ impl<'db> TypeVarEquivalenceBound<'db> {
         self,
         db: &'db dyn Db,
         _env: &ProgramEnvironment<'db>,
-        map: &mut SequentMap<Constraint<'db>>,
+        map: &mut SequentMap<'db>,
     ) {
         // `T = T` is always true
         if self.left.is_same_typevar_as(db, self.right) {
@@ -1760,7 +1746,7 @@ impl<'db> TypeVarEquivalenceBound<'db> {
         self,
         db: &'db dyn Db,
         _env: &ProgramEnvironment<'db>,
-        map: &mut SequentMap<Constraint<'db>>,
+        map: &mut SequentMap<'db>,
         other: TypeVarEquivalenceBound<'db>,
         _reversed: bool,
     ) {
@@ -1913,7 +1899,7 @@ mod tests {
         ));
 
         for (left, right) in [(left, right), (right, left)] {
-            let sequents = SequentMap::<Constraint>::for_constraint_pair(db, &env, left, right);
+            let sequents = SequentMap::for_constraint_pair(db, &env, left, right);
 
             assert!(
                 sequents
@@ -1921,7 +1907,7 @@ mod tests {
                     .iter()
                     .any(|sequent| matches!(sequent, Sequent::SingleImplication { .. }))
             );
-            assert!(!SequentMap::<Constraint>::pair_cannot_produce_sequents(
+            assert!(!SequentMap::pair_cannot_produce_sequents(
                 db, &env, left, right
             ));
         }

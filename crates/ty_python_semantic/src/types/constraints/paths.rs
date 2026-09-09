@@ -10,7 +10,6 @@ use itertools::Itertools;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::types::constraints::sequents::{Sequent, SequentMap};
-use crate::types::constraints::variables::Constraint;
 use crate::types::constraints::{
     ConstraintAssignment, ConstraintId, ConstraintSetStorage, Node, NodeId, PathVisitor,
     SourceOrderId, TypeVarId,
@@ -510,7 +509,7 @@ impl PathAssignments {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
-        map: &SequentMap<Constraint<'db>>,
+        map: &SequentMap<'db>,
     ) -> Range<usize> {
         let sequents = map.sequents.iter().map(|sequent| match sequent {
             Sequent::SingleTautology { ante } => {
