@@ -49,6 +49,9 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// method with any other decorator (including common ones like `@property`, `@x.setter`, or
 /// `@typing.override`) is not flagged, even though such decorators typically leave the receiver
 /// binding unchanged, because an arbitrary decorator could alter it.
+///
+/// ## Options
+/// - `lint.pep8-naming.classmethod-decorators`
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "NEXT_RUFF_VERSION", category = Category::Suspicious)]
 pub(crate) struct MethodReceiverDefault;
