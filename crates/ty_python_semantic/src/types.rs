@@ -25,7 +25,7 @@ use ty_module_resolver::{
 };
 
 pub(crate) use self::callable::UpcastPolicy;
-use self::class::ClassInstanceFlags;
+use self::class::{ClassInstanceFlags, MetaclassFallback};
 pub use self::cyclic::CycleDetector;
 pub(crate) use self::cyclic::TypeTransformer;
 use self::cyclic::{ActiveRecursionDetector, HasIdentity, TypeIdentity};
@@ -8471,12 +8471,24 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         context: &TypeRecursionContext<'db>,
     ) -> Type<'db> {
+        self.to_meta_type_with_metaclass_fallback(db, env, context, MetaclassFallback::Allow)
+    }
+
+    /// Project to classes while distinguishing lookup recovery from an observable metaclass.
+    fn to_meta_type_with_metaclass_fallback(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        context: &TypeRecursionContext<'db>,
+        fallback: MetaclassFallback,
+    ) -> Type<'db> {
         fn to_meta_type_inner<'db>(
             db: &'db dyn Db,
             env: &ProgramEnvironment<'db>,
             ty: Type<'db>,
             context: &TypeRecursionContext<'db>,
             visitor: &ActiveRecursionDetector<TypeAliasType<'db>>,
+            fallback: MetaclassFallback,
         ) -> Type<'db> {
             match ty {
                 Type::Never => Type::Never,
@@ -8490,10 +8502,12 @@ impl<'db> Type<'db> {
                     KnownClass::MemberDescriptorType.to_class_literal(db, env)
                 }
                 Type::Union(union) => union.map(db, env, |ty| {
-                    to_meta_type_inner(db, env, *ty, context, visitor)
+                    to_meta_type_inner(db, env, *ty, context, visitor, fallback)
                 }),
                 Type::TypeIs(_) | Type::TypeGuard(_) => KnownClass::Bool.to_class_literal(db, env),
-                Type::TypeForm(_) => to_meta_type_inner(db, env, Type::object(), context, visitor),
+                Type::TypeForm(_) => {
+                    to_meta_type_inner(db, env, Type::object(), context, visitor, fallback)
+                }
                 Type::LiteralValue(literal) => match literal.kind() {
                     LiteralValueTypeKind::Bool(_) => KnownClass::Bool.to_class_literal(db, env),
                     LiteralValueTypeKind::Bytes(_) => KnownClass::Bytes.to_class_literal(db, env),
@@ -8525,8 +8539,12 @@ impl<'db> Type<'db> {
                 Type::TypeVar(bound_typevar) => {
                     SubclassOfType::from(db, env, SubclassOfInner::TypeVar(bound_typevar))
                 }
-                Type::ClassLiteral(class) => class.metaclass(db),
-                Type::GenericAlias(alias) => ClassType::from(alias).metaclass(db),
+                Type::ClassLiteral(class) => class
+                    .inferred_metaclass_with_fallback(db, fallback)
+                    .to_type(db, env),
+                Type::GenericAlias(alias) => ClassType::from(alias)
+                    .inferred_metaclass_with_fallback(db, fallback)
+                    .to_type(db, env),
                 Type::SubclassOf(subclass_of_ty)
                     if let SubclassOfInner::TypeVar(typevar) = subclass_of_ty.subclass_of() =>
                 {
@@ -8535,11 +8553,11 @@ impl<'db> Type<'db> {
                     context.meta_type.typevars.visit(
                         &(env.program(db), typevar.identity(db)),
                         || KnownClass::Type.to_instance(db, env),
-                        || subclass_of_ty.to_meta_type_with_recursion(db, env, context),
+                        || subclass_of_ty.to_meta_type_with_recursion(db, env, context, fallback),
                     )
                 }
                 Type::SubclassOf(subclass_of_ty) => {
-                    subclass_of_ty.to_meta_type_with_recursion(db, env, context)
+                    subclass_of_ty.to_meta_type_with_recursion(db, env, context, fallback)
                 }
                 Type::Dynamic(dynamic) => {
                     SubclassOfType::from(db, env, SubclassOfInner::Dynamic(dynamic))
@@ -8547,14 +8565,14 @@ impl<'db> Type<'db> {
                 Type::Divergent(_) => ty,
                 Type::Intersection(intersection) => {
                     if let Some(alternatives) = intersection.finite_alternative_union(db, env) {
-                        to_meta_type_inner(db, env, alternatives, context, visitor)
+                        to_meta_type_inner(db, env, alternatives, context, visitor, fallback)
                     } else {
                         // Negative constraints do not generally constrain classes: `int & ~Literal[0]`
                         // still has meta-type `type[int]`. Pure negations are bounded by `object`.
                         let mut builder = IntersectionBuilder::new(db, env);
                         for positive in intersection.positive_elements_or_object(db) {
                             builder.add_positive_in_place(to_meta_type_inner(
-                                db, env, positive, context, visitor,
+                                db, env, positive, context, visitor, fallback,
                             ));
                         }
 
@@ -8586,6 +8604,7 @@ impl<'db> Type<'db> {
                                 narrowed_bound,
                                 context,
                                 visitor,
+                                fallback,
                             ));
                         }
 
@@ -8598,6 +8617,7 @@ impl<'db> Type<'db> {
                     complement.remaining_literal_union(db, env),
                     context,
                     visitor,
+                    fallback,
                 ),
                 Type::AlwaysTruthy | Type::AlwaysFalsy => KnownClass::Type.to_instance(db, env),
                 Type::BoundSuper(_) => KnownClass::Super.to_class_literal(db, env),
@@ -8635,6 +8655,7 @@ impl<'db> Type<'db> {
                                             alias.value_type_with_recursion(db, Some(context)),
                                             context,
                                             visitor,
+                                            fallback,
                                         )
                                     };
                                     // Identity analysis can itself expand aliases, so establish the
@@ -8655,13 +8676,25 @@ impl<'db> Type<'db> {
                         },
                     )
                 }
-                Type::NewTypeInstance(newtype) => {
-                    to_meta_type_inner(db, env, newtype.concrete_base_type(db), context, visitor)
-                }
+                Type::NewTypeInstance(newtype) => to_meta_type_inner(
+                    db,
+                    env,
+                    newtype.concrete_base_type(db),
+                    context,
+                    visitor,
+                    fallback,
+                ),
             }
         }
 
-        to_meta_type_inner(db, env, self, context, &ActiveRecursionDetector::default())
+        to_meta_type_inner(
+            db,
+            env,
+            self,
+            context,
+            &ActiveRecursionDetector::default(),
+            fallback,
+        )
     }
 
     /// Get the type of the `__class__` attribute of this type.
@@ -8669,13 +8702,17 @@ impl<'db> Type<'db> {
     /// For most types, this is equivalent to the meta type of this type. `TypedDict` types return
     /// `type[dict[str, object]]`, because their inhabitants are instances of `dict` at runtime.
     /// Class-backed protocols return their structural `type[Protocol]` view.
+    /// Classes with conflicting metaclasses return `type[Unknown]`, even when internal member
+    /// lookup retains a candidate metaclass for cycle recovery.
     #[must_use]
     fn dunder_class(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
         match self {
             Type::Union(union) => union.map(db, env, |element| element.dunder_class(db, env)),
-            Type::Intersection(intersection) => intersection
-                .try_dunder_class(db, env)
-                .unwrap_or_else(|| self.to_meta_type(db, env)),
+            Type::Intersection(intersection)
+                if let Some(ty) = intersection.try_dunder_class(db, env) =>
+            {
+                ty
+            }
             Type::ProtocolInstance(protocol) => protocol.to_meta_type(db, env),
             Type::TypedDict(_) => KnownClass::Dict
                 .to_specialized_class_type(
@@ -8686,7 +8723,12 @@ impl<'db> Type<'db> {
                 .map(Type::from)
                 // Guard against user-customized typesheds with a broken `dict` class
                 .unwrap_or_else(Type::unknown),
-            _ => self.to_meta_type(db, env),
+            _ => self.to_meta_type_with_metaclass_fallback(
+                db,
+                env,
+                &TypeRecursionContext::default(),
+                MetaclassFallback::Disallow,
+            ),
         }
     }
 

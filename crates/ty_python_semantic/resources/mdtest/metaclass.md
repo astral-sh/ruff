@@ -628,7 +628,8 @@ The metaclass of a derived class must be a (non-strict) subclass of the metaclas
 bases. ("Strict subclass" is a synonym for "proper subclass"; a non-strict subclass can be a
 subclass or the class itself.)
 
-We report the conflict and retain the candidate from the first base for attribute lookup.
+We report the conflict and retain the candidate from the first base for attribute lookup. The
+class's metaclass remains unknown when accessed through `__class__` or `type()`.
 
 ```py
 class M1(type):
@@ -641,8 +642,18 @@ class B(metaclass=M2): ...
 # error: [conflicting-metaclass] "The metaclass of a derived class (`C`) must be a subclass of the metaclasses of all its bases, but `M1` (metaclass of base class `A`) and `M2` (metaclass of base class `B`) have no subclass relationship"
 class C(A, B): ...
 
-reveal_type(C.__class__)  # revealed: <class 'M1'>
+reveal_type(C.__class__)  # revealed: type[Unknown]
+reveal_type(type(C))  # revealed: type[Unknown]
 reveal_type(C.value)  # revealed: int
+```
+
+The same distinction applies to subclasses of `C`:
+
+```py
+def check_subclass(cls: type[C]):
+    reveal_type(cls.__class__)  # revealed: type[Unknown]
+    reveal_type(type(cls))  # revealed: type[Unknown]
+    reveal_type(cls.value)  # revealed: int
 ```
 
 ## Conflict (2)
@@ -652,6 +663,7 @@ bases. ("Strict subclass" is a synonym for "proper subclass"; a non-strict subcl
 subclass or the class itself.)
 
 An explicit metaclass is retained for attribute lookup when it conflicts with a base's metaclass.
+`__class__` and `type()` still report an unknown metaclass.
 
 ```py
 class M1(type): ...
@@ -664,7 +676,8 @@ class A(metaclass=M1): ...
 # error: [conflicting-metaclass] "The metaclass of a derived class (`B`) must be a subclass of the metaclasses of all its bases, but `M2` (metaclass of `B`) and `M1` (metaclass of base class `A`) have no subclass relationship"
 class B(A, metaclass=M2): ...
 
-reveal_type(B.__class__)  # revealed: <class 'M2'>
+reveal_type(B.__class__)  # revealed: type[Unknown]
+reveal_type(type(B))  # revealed: type[Unknown]
 reveal_type(B.value)  # revealed: str
 ```
 
@@ -679,6 +692,40 @@ class B(metaclass=M): ...
 class C(A, B): ...
 
 reveal_type(C.__class__)  # revealed: <class 'M'>
+```
+
+## Conflicting metaclasses through unions and intersections
+
+A union retains the known metaclass of its valid alternative. Type aliases preserve this behavior,
+while attribute lookup can use the candidate metaclass of either alternative.
+
+```py
+from typing import Any, TypeAlias
+
+class Meta(type):
+    value: int
+
+class OtherMeta(type): ...
+class Valid(metaclass=Meta): ...
+class Other(metaclass=OtherMeta): ...
+class Invalid(Other, metaclass=Meta): ...  # error: [conflicting-metaclass]
+
+Classes: TypeAlias = type[Invalid] | type[Valid]
+
+def check_union(cls: Classes):
+    reveal_type(cls.__class__)  # revealed: type[Unknown | Meta]
+    reveal_type(type(cls))  # revealed: type[Unknown | Meta]
+    reveal_type(cls.value)  # revealed: int
+```
+
+Narrowing the invalid class to an intersection does not make its metaclass known:
+
+```py
+def check_intersection(other: Any):
+    if Invalid is other:
+        reveal_type(Invalid.__class__)  # revealed: type[Unknown]
+        reveal_type(type(Invalid))  # revealed: type[Unknown]
+        reveal_type(Invalid.value)  # revealed: int & Any
 ```
 
 ## Protocol metaclass inheritance
@@ -957,7 +1004,154 @@ class C(metaclass=M12): ...
 # error: [conflicting-metaclass] "The metaclass of a derived class (`D`) must be a subclass of the metaclasses of all its bases, but `M1` (metaclass of base class `A`) and `M2` (metaclass of base class `B`) have no subclass relationship"
 class D(A, B, C): ...
 
-reveal_type(D.__class__)  # revealed: <class 'M1'>
+reveal_type(D.__class__)  # revealed: type[Unknown]
+```
+
+## Metaclasses with gradual bases
+
+A metaclass with an `Any` base can inherit from `type`. We accept it as an explicit metaclass and
+when reconciling the metaclasses of base classes, regardless of their order.
+
+Regression test for [ty#4510](https://github.com/astral-sh/ty/issues/4510).
+
+```py
+from typing import Any
+
+base: Any = type
+
+class Meta(base): ...
+class Base(object, metaclass=Meta): ...
+class Child(Base, object): ...
+class Plain: ...
+class Reversed(Plain, Base): ...
+
+reveal_type(Base.__class__)  # revealed: <class 'Meta'>
+reveal_type(Child.__class__)  # revealed: <class 'Meta'>
+reveal_type(Reversed.__class__)  # revealed: <class 'Meta'>
+```
+
+A known subclass takes precedence over its base, even when the base's `Any` superclass could make
+the two metaclasses assignable in both directions.
+
+```py
+class DerivedMeta(Meta): ...
+class Other(metaclass=DerivedMeta): ...
+class Combined(Base, Other): ...
+
+reveal_type(Combined.__class__)  # revealed: <class 'DerivedMeta'>
+```
+
+## Metaclasses with unknown bases
+
+An unresolved superclass can also provide the required inheritance relationship. This remains true
+when the unknown base is inherited indirectly.
+
+```py
+from missing import UnknownBase  # error: [unresolved-import]
+
+class RootMeta(UnknownBase): ...
+class Meta(RootMeta): ...
+class Base(object, metaclass=Meta): ...
+class Child(Base, object): ...
+class Plain: ...
+class Reversed(Plain, Base): ...
+
+reveal_type(Base.__class__)  # revealed: <class 'Meta'>
+reveal_type(Child.__class__)  # revealed: <class 'Meta'>
+reveal_type(Reversed.__class__)  # revealed: <class 'Meta'>
+```
+
+## Sibling metaclasses with an unknown ancestor
+
+An unknown ancestor of a shared base cannot make its subclasses inherit from one another. Doing so
+would introduce an inheritance cycle, so these sibling metaclasses still conflict.
+
+```py
+from typing import Any
+
+base: Any = type
+
+class RootMeta(base): ...
+class LeftMeta(RootMeta): ...
+class RightMeta(RootMeta): ...
+class Left(metaclass=LeftMeta): ...
+class Right(metaclass=RightMeta): ...
+class Combined(Left, Right): ...  # error: [conflicting-metaclass]
+class Reversed(Right, Left): ...  # error: [conflicting-metaclass]
+
+reveal_type(Combined.__class__)  # revealed: type[Unknown]
+reveal_type(type(Reversed))  # revealed: type[Unknown]
+```
+
+A separate unknown base can supply the missing relationship. Here `FlexibleMeta` could inherit
+`RightMeta` through its own unknown base, without creating a cycle through `RootMeta`.
+
+```py
+from missing import IndependentBase  # error: [unresolved-import]
+
+class FlexibleMeta(IndependentBase, RootMeta): ...
+class Flexible(metaclass=FlexibleMeta): ...
+class Allowed(Flexible, Right): ...
+
+reveal_type(Allowed.__class__)  # revealed: <class 'FlexibleMeta'>
+```
+
+## Ambiguous metaclasses
+
+When the relationship between two metaclasses is hidden by `Any`, either could be the more derived
+one. Neither base order determines a unique metaclass, and subclasses preserve this uncertainty.
+
+```py
+from typing import Any
+
+root: Any = type
+
+class Meta1(root): ...
+
+base: Any = Meta1
+
+class Meta2(base): ...
+class A(metaclass=Meta1): ...
+class B(metaclass=Meta2): ...
+class Forward(A, B): ...
+class Reverse(B, A): ...
+class Explicit(A, metaclass=Meta2): ...
+class Child(Forward): ...
+class Plain: ...
+class Inherited(Plain, Reverse): ...
+
+reveal_type(Forward.__class__)  # revealed: type[Unknown]
+reveal_type(type(Forward))  # revealed: type[Unknown]
+reveal_type(Reverse.__class__)  # revealed: type[Unknown]
+reveal_type(Explicit.__class__)  # revealed: type[Unknown]
+reveal_type(Child.__class__)  # revealed: type[Unknown]
+reveal_type(Inherited.__class__)  # revealed: type[Unknown]
+```
+
+The hidden bases can also conceal a runtime conflict. If both are actually `type`, the metaclasses
+are unrelated, but the `Any` annotations prevent us from proving that conflict.
+
+```py
+other_base: Any = type
+
+class OtherMeta(other_base): ...
+class Other(metaclass=OtherMeta): ...
+class PossiblyInvalid(A, Other): ...
+
+reveal_type(PossiblyInvalid.__class__)  # revealed: type[Unknown]
+```
+
+A later base with a metaclass that is a known subclass of both candidates resolves the ambiguity.
+This also works when the candidates come from an already ambiguous base class.
+
+```py
+class CommonMeta(Meta2, Meta1): ...
+class Common(metaclass=CommonMeta): ...
+class Resolved(A, B, Common): ...
+class ResolvedInherited(Forward, Common): ...
+
+reveal_type(Resolved.__class__)  # revealed: <class 'CommonMeta'>
+reveal_type(ResolvedInherited.__class__)  # revealed: <class 'CommonMeta'>
 ```
 
 ## Unknown
@@ -1124,8 +1318,9 @@ class Outer:
 
 ## Persistent metaclass conflict during recursive attribute inference
 
-Recursive attribute inference does not suppress a conflict between unrelated metaclasses. We retain
-the explicit candidate for member lookup and report the conflict when checking the stub.
+Recursive attribute inference does not suppress a provable metaclass conflict. `OtherMeta` is final,
+so an unknown base inferred for `Meta` cannot make it a subclass of `OtherMeta`. We retain the
+explicit candidate for member lookup and report the conflict when checking the stub.
 
 ```toml
 [environment]
@@ -1136,13 +1331,17 @@ python-version = "3.12"
 from mod import Outer
 
 reveal_type(Outer.value)  # revealed: Unknown
-reveal_type(Outer.Inner.__class__)  # revealed: <class 'Meta'>
+reveal_type(Outer.Inner.__class__)  # revealed: type[Unknown]
 ```
 
 `mod.pyi`:
 
 ```pyi
+from typing import final
+
 class Wrapper[T](type): ...
+
+@final
 class OtherMeta(type): ...
 
 class Outer:
@@ -1153,6 +1352,38 @@ class Outer:
     class Inner(Aliases, metaclass=Meta): ...  # error: [conflicting-metaclass]
     value: Outer.Inner.Value
     type: Outer.Inner.Value
+```
+
+## Metaclass reflection during recursive attribute inference
+
+The name `type` can refer to a metaclass obtained through an inherited alias's `__class__`
+attribute. Resolving this attribute depends on the metaclass whose bases use `type`; inference still
+converges.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from mod import Outer
+
+reveal_type(Outer.Inner.__class__)  # revealed: <class 'Meta'>
+reveal_type(type(Outer.Inner))  # revealed: <class 'Meta'>
+```
+
+`mod.pyi`:
+
+```pyi
+class Wrapper[T](type): ...
+
+class Outer:
+    class Aliases:
+        Value = int
+
+    class Meta(Wrapper[int], type): ...
+    class Inner(Aliases, metaclass=Meta): ...
+    type = Inner.Value.__class__
 ```
 
 ## PEP 695 generic

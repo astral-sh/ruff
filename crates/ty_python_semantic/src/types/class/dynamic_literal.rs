@@ -11,8 +11,9 @@ use crate::{
         SubclassOfType, Type,
         class::{
             ClassMemberResult, ClassMetaclass, CodeGeneratorKind, DisjointBase,
-            DynamicClassHeaderAnchor, DynamicClassScopeOffset, InstanceMemberResult, MroLookup,
-            dynamic_class_header_range, typed_dict::typed_dict_fallback_class_member,
+            DynamicClassHeaderAnchor, DynamicClassScopeOffset, InstanceMemberResult,
+            MetaclassCandidates, MroLookup, dynamic_class_header_range,
+            typed_dict::typed_dict_fallback_class_member,
         },
         definition_expression_type, extract_fixed_length_iterable_element_types,
         member::Member,
@@ -308,7 +309,9 @@ impl<'db> DynamicClassLiteral<'db> {
             .filter_map(|base_type| ClassBase::try_from_type(db, &env, *base_type, None))
             .filter_map(|base| {
                 match base.inferred_metaclass(db, &env, ClassLiteral::Dynamic(self)) {
-                    ClassMetaclass::Selected(metaclass) => Some((base, metaclass)),
+                    metaclass @ (ClassMetaclass::Selected(_) | ClassMetaclass::Ambiguous(_)) => {
+                        Some((base, metaclass))
+                    }
                     ClassMetaclass::ProtocolFallback => {
                         has_protocol_fallback = true;
                         None
@@ -317,7 +320,7 @@ impl<'db> DynamicClassLiteral<'db> {
             });
 
         // Start with the first selected metaclass, ignoring protocol fallbacks.
-        let Some((mut candidate_base, mut candidate)) = bases.next() else {
+        let Some((candidate_base, candidate)) = bases.next() else {
             return Ok(ClassMetaclass::with_protocol_fallback(
                 db,
                 KnownClass::Type.to_class_literal(db, &env),
@@ -325,44 +328,33 @@ impl<'db> DynamicClassLiteral<'db> {
             ));
         };
 
+        let Some(mut candidates) =
+            MetaclassCandidates::from_metaclass(db, candidate, Some(candidate_base))
+        else {
+            return Ok(candidate);
+        };
+
         // Reconcile with other bases' metaclasses.
         for (base, base_metaclass) in bases {
-            // Get the ClassType for comparison.
-            let Some(candidate_class) = candidate.to_class_type(db) else {
-                // If candidate isn't a class type, keep it as is.
+            let Some(other) = MetaclassCandidates::from_metaclass(db, base_metaclass, Some(base))
+            else {
                 continue;
             };
-            let Some(base_metaclass_class) = base_metaclass.to_class_type(db) else {
-                continue;
-            };
-
-            // Keep the incumbent when both metaclasses are equal.
-            if candidate_class.is_subclass_of(db, &env, base_metaclass_class) {
-                continue;
-            }
-
-            // If base's metaclass is more derived, use it.
-            if base_metaclass_class.is_subclass_of(db, &env, candidate_class) {
-                candidate = base_metaclass;
-                candidate_base = base;
+            if candidates.reconcile(db, &env, &other) {
                 continue;
             }
 
             // Conflict: neither metaclass is a subclass of the other.
             // Python raises `TypeError: metaclass conflict` at runtime.
             return Err(DynamicMetaclassConflict {
-                metaclass1: candidate_class,
-                base1: candidate_base,
-                metaclass2: base_metaclass_class,
+                metaclass1: candidates.first.metaclass,
+                base1: candidates.first.base.unwrap_or(candidate_base),
+                metaclass2: other.first.metaclass,
                 base2: base,
             });
         }
 
-        Ok(ClassMetaclass::with_protocol_fallback(
-            db,
-            candidate,
-            has_protocol_fallback,
-        ))
+        Ok(candidates.into_metaclass(db, &env, has_protocol_fallback))
     }
 
     /// Iterate over the MRO of this class using C3 linearization.

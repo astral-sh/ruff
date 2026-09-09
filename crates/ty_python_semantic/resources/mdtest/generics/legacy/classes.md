@@ -1944,6 +1944,47 @@ Box.value = 2
 reveal_type(Box[str]().value)  # revealed: str
 ```
 
+## Metaclasses of specialized classes
+
+Specializing a class preserves its valid metaclass. A conflicting metaclass remains unknown through
+`__class__` and `type()`, even though its candidate still supplies attributes for member lookup.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Meta(type, Generic[T]):
+    value: T
+
+class OtherMeta(type): ...
+class Base(metaclass=OtherMeta): ...
+class Valid(Generic[T], metaclass=Meta[str]): ...
+class Invalid(Base, Generic[T], metaclass=Meta[str]): ...  # error: [conflicting-metaclass]
+
+reveal_type(Valid[int].__class__)  # revealed: <class 'Meta[str]'>
+reveal_type(type(Valid[int]))  # revealed: <class 'Meta[str]'>
+reveal_type(Invalid[int].__class__)  # revealed: type[Unknown]
+reveal_type(type(Invalid[int]))  # revealed: type[Unknown]
+reveal_type(Invalid[int].value)  # revealed: str
+```
+
+The metaclass also remains unknown when the invalid class is reached through type-variable bounds or
+constraints:
+
+```py
+Bounded = TypeVar("Bounded", bound=Invalid[int])
+Constrained = TypeVar("Constrained", Invalid[int], Invalid[str])
+
+def bounded(cls: type[Bounded]):
+    reveal_type(cls.__class__)  # revealed: type[Unknown]
+    reveal_type(type(cls))  # revealed: type[Unknown]
+
+def constrained(cls: type[Constrained]):
+    reveal_type(cls.__class__)  # revealed: type[Unknown]
+    reveal_type(type(cls))  # revealed: type[Unknown]
+```
+
 ## Specializations propagate
 
 In a specialized generic alias, the specialization is applied to the attributes and methods of the

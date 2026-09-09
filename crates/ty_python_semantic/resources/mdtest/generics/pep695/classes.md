@@ -1250,6 +1250,40 @@ reveal_type(Aliased[str].constant)  # revealed: int
 Aliased[int].constant = 1
 ```
 
+## Metaclasses of specialized classes
+
+Specializing a class preserves its valid metaclass. A conflicting metaclass remains unknown through
+`__class__` and `type()`, even though its candidate still supplies attributes for member lookup.
+
+```py
+class Meta[T](type):
+    value: T
+
+class OtherMeta(type): ...
+class Base(metaclass=OtherMeta): ...
+class Valid[T](metaclass=Meta[str]): ...
+class Invalid[T](Base, metaclass=Meta[str]): ...  # error: [conflicting-metaclass]
+
+reveal_type(Valid[int].__class__)  # revealed: <class 'Meta[str]'>
+reveal_type(type(Valid[int]))  # revealed: <class 'Meta[str]'>
+reveal_type(Invalid[int].__class__)  # revealed: type[Unknown]
+reveal_type(type(Invalid[int]))  # revealed: type[Unknown]
+reveal_type(Invalid[int].value)  # revealed: str
+```
+
+The metaclass also remains unknown when the invalid class is reached through type-variable bounds or
+constraints:
+
+```py
+def bounded[T: Invalid[int]](cls: type[T]):
+    reveal_type(cls.__class__)  # revealed: type[Unknown]
+    reveal_type(type(cls))  # revealed: type[Unknown]
+
+def constrained[T: (Invalid[int], Invalid[str])](cls: type[T]):
+    reveal_type(cls.__class__)  # revealed: type[Unknown]
+    reveal_type(type(cls))  # revealed: type[Unknown]
+```
+
 ## Specializations propagate
 
 In a specialized generic alias, the specialization is applied to the attributes and methods of the

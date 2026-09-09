@@ -2,7 +2,7 @@ use crate::Db;
 use crate::FxOrderSet;
 use crate::ProgramEnvironment;
 use crate::place::PlaceAndQualifiers;
-use crate::types::class::DynamicClassLiteral;
+use crate::types::class::{DynamicClassLiteral, MetaclassFallback};
 use crate::types::constraints::ConstraintSet;
 use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
 use crate::types::variance::{VarianceInferable, VarianceTerm};
@@ -339,10 +339,11 @@ impl<'db> SubclassOfType<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         context: &TypeRecursionContext<'db>,
+        fallback: MetaclassFallback,
     ) -> Type<'db> {
         match self
             .subclass_of
-            .with_transposed_type_var_with_recursion(db, env, context)
+            .with_transposed_type_var_with_recursion(db, env, context, fallback)
         {
             SubclassOfInner::Dynamic(dynamic) => {
                 SubclassOfType::from(db, env, SubclassOfInner::Dynamic(dynamic))
@@ -351,10 +352,12 @@ impl<'db> SubclassOfType<'db> {
             // rather than being a class literal. Projecting to instances preserves this
             // constraint when computing its possible subclasses.
             SubclassOfInner::Class(class) => class
-                .inferred_metaclass(db)
+                .inferred_metaclass_with_fallback(db, fallback)
                 .for_inheritance(db, env)
                 .to_instance_approximation(db, env)
-                .map(|instance| instance.to_meta_type_with_recursion(db, env, context))
+                .map(|instance| {
+                    instance.to_meta_type_with_metaclass_fallback(db, env, context, fallback)
+                })
                 .unwrap_or(SubclassOfType::subclass_of_unknown()),
             // Structural implementations of a protocol can have arbitrary metaclasses. The only
             // guaranteed upper bound is therefore `type`, not the protocol origin's metaclass.
@@ -368,11 +371,11 @@ impl<'db> SubclassOfType<'db> {
                     // `with_transposed_type_var` always adds a bound for unbounded TypeVars
                     None => unreachable!(),
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                        bound.to_meta_type_with_recursion(db, env, context)
+                        bound.to_meta_type_with_metaclass_fallback(db, env, context, fallback)
                     }
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
                         .as_type(db, env)
-                        .to_meta_type_with_recursion(db, env, context),
+                        .to_meta_type_with_metaclass_fallback(db, env, context, fallback),
                 }
             }
         }
@@ -606,7 +609,12 @@ impl<'db> SubclassOfInner<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Self {
-        self.with_transposed_type_var_with_recursion(db, env, &TypeRecursionContext::default())
+        self.with_transposed_type_var_with_recursion(
+            db,
+            env,
+            &TypeRecursionContext::default(),
+            MetaclassFallback::Allow,
+        )
     }
 
     fn with_transposed_type_var_with_recursion(
@@ -614,6 +622,7 @@ impl<'db> SubclassOfInner<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         context: &TypeRecursionContext<'db>,
+        fallback: MetaclassFallback,
     ) -> Self {
         let Some(bound_typevar) = self.into_type_var() else {
             return self;
@@ -627,12 +636,12 @@ impl<'db> SubclassOfInner<'db> {
                 ),
                 Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                     TypeVarBoundOrConstraints::UpperBound(
-                        bound.to_meta_type_with_recursion(db, env, context),
+                        bound.to_meta_type_with_metaclass_fallback(db, env, context, fallback),
                     )
                 }
                 Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
                     TypeVarBoundOrConstraints::Constraints(constraints.map(db, |constraint| {
-                        constraint.to_meta_type_with_recursion(db, env, context)
+                        constraint.to_meta_type_with_metaclass_fallback(db, env, context, fallback)
                     }))
                 }
             })
