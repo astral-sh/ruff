@@ -563,6 +563,52 @@ reveal_type(Explicit.class_method.__func__)  # revealed: Wrapper
 reveal_type(Explicit.class_method.__call__(1))  # revealed: int
 ```
 
+## Checking the receiver of a wrapped classmethod
+
+Calling a classmethod passes the owner class to its wrapped callable. That implicit argument must be
+compatible with the callable's first parameter, just like an explicit argument.
+
+```py
+class Wrapper:
+    def __call__(self, cls: int) -> int:
+        return cls + 1
+
+class C:
+    method = classmethod(Wrapper())
+
+C.method()  # error: [invalid-argument-type]
+C().method()  # error: [invalid-argument-type]
+```
+
+Receiver checking also selects the appropriate overload for the class used to access the method. The
+selected overload still checks the explicit arguments.
+
+```py
+from typing import overload
+
+class OverloadedWrapper:
+    @overload
+    def __call__(self, cls: type[Base], value: int) -> int: ...
+    @overload
+    def __call__(self, cls: type[Other], value: str) -> str: ...
+    def __call__(self, cls: type[Base] | type[Other], value: int | str) -> int | str:
+        return value
+
+class Base:
+    method = classmethod(OverloadedWrapper())
+
+class Child(Base): ...
+
+class Other:
+    method = classmethod(OverloadedWrapper())
+
+reveal_type(Base.method(1))  # revealed: int
+reveal_type(Child.method(1))  # revealed: int
+reveal_type(Other.method("x"))  # revealed: str
+Base.method("x")  # error: [no-matching-overload]
+Other.method(1)  # error: [no-matching-overload]
+```
+
 ## Generic inference for method wrappers
 
 When a generic function returns a mutable container, inference can widen literal types in its
