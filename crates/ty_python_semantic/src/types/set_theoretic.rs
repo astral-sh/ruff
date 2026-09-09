@@ -272,7 +272,8 @@ impl<'db> UnionType<'db> {
         let mut iter = elements.iter().enumerate();
         while let Some((i, ty)) = iter.next() {
             let new_ty = transform_fn(ty)?;
-            if &new_ty != ty || matches!(new_ty, Type::TypeAlias(_) | Type::Recursive(_)) {
+            // The builder unpacks `TypeAlias` nodes but preserves structural recursive types.
+            if &new_ty != ty || matches!(new_ty, Type::TypeAlias(_)) {
                 let mut builder = UnionBuilder::new(db, env);
                 for prev in &elements[..i] {
                     builder.add_in_place(*prev);
