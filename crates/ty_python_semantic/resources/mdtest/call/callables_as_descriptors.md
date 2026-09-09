@@ -601,11 +601,7 @@ def _(str_fn: Callable[[object], str], object_fn: Callable[[object], object]):
     static_assert(is_subtype_of(TypeOf[str_static], TypeOf[object_static]))
     static_assert(not is_assignable_to(TypeOf[object_static], TypeOf[str_static]))
     static_assert(not is_disjoint_from(TypeOf[str_static], TypeOf[object_static]))
-```
-
-A classmethod and a staticmethod are distinct descriptor types, even if they wrap the same callable.
-
-```py
+    # Classmethods and staticmethods are distinct descriptor types, even with the same callable.
     static_assert(not is_assignable_to(TypeOf[str_class], TypeOf[str_static]))
     static_assert(not is_assignable_to(TypeOf[str_static], TypeOf[str_class]))
     static_assert(is_disjoint_from(TypeOf[str_class], TypeOf[str_static]))
@@ -650,12 +646,17 @@ decorator binds that replacement function to the class, even though the replacem
 has no decorators.
 
 ```py
+from ty_extensions._internal import TypeOf
+
 def replacement(cls: type, value: int) -> int:
     return value
 
+def replace_method(original: object) -> TypeOf[replacement]:
+    return replacement
+
 class C:
     @classmethod
-    @(lambda original: replacement)
+    @replace_method
     def method(cls, value: int) -> int:
         return value
 

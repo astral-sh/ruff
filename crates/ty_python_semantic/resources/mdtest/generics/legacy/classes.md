@@ -1520,7 +1520,7 @@ class Box(Generic[T]):
     def make(cls) -> "Box[T]":
         return cls()
 
-Box.make()
+reveal_type(Box.make())  # revealed: Box[Unknown]
 reveal_type(Box[int].make())  # revealed: Box[int]
 ```
 
@@ -1534,7 +1534,7 @@ class C(Generic[T]):
     def identity(value: T) -> T:
         return value
 
-C.identity(1)
+reveal_type(C.identity(1))  # revealed: Unknown
 reveal_type(C[int].identity(1))  # revealed: int
 ```
 

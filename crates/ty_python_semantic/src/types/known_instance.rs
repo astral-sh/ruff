@@ -119,6 +119,8 @@ impl<'db> MethodWrapper<'db> {
             {
                 wrapped
             }
+            // These callables already encode the matching descriptor behavior in their kind,
+            // so they do not need another method wrapper.
             Type::Callable(callable)
                 if match kind {
                     MethodWrapperKind::Classmethod => callable.is_classmethod_like(db),
