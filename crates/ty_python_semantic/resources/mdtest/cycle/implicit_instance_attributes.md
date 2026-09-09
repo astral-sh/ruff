@@ -530,3 +530,98 @@ class Cached:
 
 reveal_type(Cached().metadata)  # revealed: int
 ```
+
+## Growing recursive collections preserve non-recursive element types
+
+A list built from the attribute's previous value has a recursive element type. Normalization retains
+the integer elements while replacing the nested recursive list with `Divergent`, so inference
+converges.
+
+```py
+class Recursive:
+    def update(self):
+        self.values = [1, self.values]
+
+reveal_type(Recursive().values)  # revealed: list[int | Divergent]
+```
+
+## Inherited collection updates when the base is checked first
+
+Normalizing a recursive list type preserves its non-recursive element types. Reassigning the same
+attribute in a subclass does not change the inferred type on its parent. This reproduces
+<https://github.com/astral-sh/ty/issues/4221>.
+
+We still retain a `Divergent` placeholder for the recursive assignment, so the return statement
+emits an unsound-return warning. Its type is independent of which file is checked first.
+
+```toml
+[rules]
+unsound-return-statement = "warn"
+```
+
+`base.py`:
+
+```py
+class Base:
+    values = ["a"]
+
+class Parent(Base):
+    def __init__(self):
+        if self.values:
+            self.values = [*self.values]
+
+    def get_values(self) -> list[str]:
+        return self.values  # error: [unsound-return-statement] "`list[str] | list[str | Divergent]`"
+
+reveal_type(Parent().values)  # revealed: list[str] | list[str | Divergent]
+```
+
+`child.py`:
+
+```py
+from base import Parent
+
+class Child(Parent):
+    def __init__(self):
+        self.values = self.values + ["b"]
+
+reveal_type(Child().values)  # revealed: list[str] | list[str | Divergent]
+```
+
+## Inherited collection updates when the subclass is checked first
+
+Checking the subclass first produces the same list types and unsound-return warning.
+
+```toml
+[rules]
+unsound-return-statement = "warn"
+```
+
+`child.py`:
+
+```py
+from base import Parent
+
+class Child(Parent):
+    def __init__(self):
+        self.values = self.values + ["b"]
+
+reveal_type(Child().values)  # revealed: list[str] | list[str | Divergent]
+```
+
+`base.py`:
+
+```py
+class Base:
+    values = ["a"]
+
+class Parent(Base):
+    def __init__(self):
+        if self.values:
+            self.values = [*self.values]
+
+    def get_values(self) -> list[str]:
+        return self.values  # error: [unsound-return-statement] "`list[str] | list[str | Divergent]`"
+
+reveal_type(Parent().values)  # revealed: list[str] | list[str | Divergent]
+```

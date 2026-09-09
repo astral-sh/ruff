@@ -4583,7 +4583,7 @@ class C3:
         self.x = [self.x[0].flip()]
 
 # TODO: should be `list[Sub] | list[Base]`
-reveal_type(C3(Sub()).x)  # revealed: list[Sub] | list[Divergent]
+reveal_type(C3(Sub()).x)  # revealed: list[Sub] | list[Base | Divergent] | list[Sub | Divergent]
 ```
 
 And cycles between many attributes:
@@ -4641,7 +4641,8 @@ class ManyCycles2:
         self.x3 = [1]
 
     def f1(self: "ManyCycles2"):
-        reveal_type(self.x3)  # revealed: list[int] | list[Divergent] | Unknown | list[Unknown]
+        # revealed: list[int] | list[Divergent] | Unknown | list[int | list[int] | Unknown | Divergent] | list[Unknown] | list[int | list[int] | Divergent | Unknown | list[Unknown]] | list[list[int] | Divergent | Unknown | list[Unknown] | int] | list[list[int] | Divergent | Unknown | list[Unknown]]
+        reveal_type(self.x3)
 
         self.x1 = [self.x2] + [self.x3]
         self.x2 = [self.x1] + [self.x3]
@@ -4714,7 +4715,7 @@ class NestedLists:
     def f(self: "NestedLists"):
         self.x = [self.x]
 
-reveal_type(NestedLists().x)  # revealed: int | list[Divergent]
+reveal_type(NestedLists().x)  # revealed: int | list[int | Divergent]
 
 class NestedMixed:
     def f(self: "NestedMixed"):
@@ -4760,8 +4761,8 @@ class NestedListsConcat:
         self.x = [self.x] + []
         self.y = [self.y].__add__(y)
 
-reveal_type(NestedListsConcat().x)  # revealed: list[int] | list[Divergent] | Unknown
-reveal_type(NestedListsConcat().y)  # revealed: list[int] | list[Divergent] | Unknown
+reveal_type(NestedListsConcat().x)  # revealed: list[int] | list[list[int] | Divergent | Unknown] | Unknown
+reveal_type(NestedListsConcat().y)  # revealed: list[int] | list[list[int] | Divergent | Unknown] | Unknown
 ```
 
 ### Builtin types attributes

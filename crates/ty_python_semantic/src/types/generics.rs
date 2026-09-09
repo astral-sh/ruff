@@ -36,7 +36,8 @@ use crate::types::{
     ClassLiteral, ErrorContext, FindLegacyTypeVarsVisitor, IntersectionType, KnownClass,
     KnownInstanceType, MaterializationKind, SubclassOfInner, Type, TypeAliasType, TypeContext,
     TypeMapping, TypeRecursionContext, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance,
-    UnionAccumulator, UnionType, binding_type, infer_definition_types, inferred_declaration,
+    UnionAccumulator, UnionBuilder, UnionType, binding_type, infer_definition_types,
+    inferred_declaration,
 };
 use crate::{Db, FxIndexMap, FxOrderMap, FxOrderSet};
 use ty_python_core::definition::{Definition, DefinitionKind};
@@ -1533,8 +1534,26 @@ impl<'db> Specialization<'db> {
             self.types(db)
                 .iter()
                 .map(|ty| {
-                    ty.recursive_type_normalized_impl(db, env, div, true)
-                        .unwrap_or(div)
+                    let normalize = |ty: &Type<'db>| {
+                        ty.recursive_type_normalized_impl(db, env, div, true)
+                            .unwrap_or(div)
+                    };
+                    match ty {
+                        Type::Union(union) => {
+                            // Preserve non-recursive alternatives in the outermost specialization:
+                            // `list[str | Divergent]` retains `str`, while a nested recursive list
+                            // in `list[str | list[Divergent]]` still collapses to `Divergent`.
+                            let mut builder = UnionBuilder::new(db, env)
+                                .unpack_aliases(false)
+                                .cycle_recovery(true)
+                                .recursively_defined(union.recursively_defined(db));
+                            for element in union.elements(db) {
+                                builder.add_in_place(normalize(element));
+                            }
+                            builder.build()
+                        }
+                        ty => normalize(ty),
+                    }
                 })
                 .collect::<Box<[_]>>()
         };
