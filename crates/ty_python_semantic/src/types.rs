@@ -6329,14 +6329,27 @@ impl<'db> Type<'db> {
 
             Type::BoundMethod(bound_method) => {
                 let Some(function) = bound_method.function(db) else {
-                    return bound_method.callables(db, env).map_or_else(
-                        || CallableBinding::not_callable(self).into(),
-                        |callables| {
-                            callables
-                                .into_type(db, env)
-                                .bindings_impl(db, env, recursion_guard)
-                        },
-                    );
+                    return bound_method
+                        .func(db)
+                        .try_upcast_to_callable(db, env)
+                        .map_or_else(
+                            || CallableBinding::not_callable(self).into(),
+                            |callables| {
+                                // Retain the receiver parameter so ordinary argument checking can
+                                // validate the captured class as well as the explicit arguments.
+                                Bindings::from_union(
+                                    self,
+                                    callables.iter().map(|callable| {
+                                        CallableBinding::from_overloads(
+                                            self,
+                                            callable.signatures(db).overloads.iter().cloned(),
+                                        )
+                                        .with_bound_type(bound_method.signature_receiver(db))
+                                        .into()
+                                    }),
+                                )
+                            },
+                        );
                 };
                 let signature = function.signature(db);
                 let self_instance = bound_method.self_instance(db);
