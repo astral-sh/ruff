@@ -43,7 +43,7 @@ use crate::types::relation::{
 use crate::types::signatures::{
     CallableSignature, Parameter, Parameters, Signature, SignatureRelationVisitor,
 };
-use crate::types::tuple::TupleSpec;
+use crate::types::tuple::{Tuple, TupleSpec};
 use crate::types::typevar::TypeVarSet;
 use crate::types::variance::VarianceOrigin;
 use crate::types::{
@@ -59,6 +59,7 @@ use crate::{
     },
     types::{MetaclassCandidate, TypeDefinition, UnionType},
 };
+use itertools::Either;
 use ruff_db::diagnostic::Span;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
@@ -513,10 +514,24 @@ impl<'db> VarianceInferable<'db> for GenericAlias<'db> {
     fn variance_of(
         self,
         db: &'db dyn Db,
-        _: &ProgramEnvironment<'db>,
+        env: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
     ) -> VarianceTerm<'db> {
-        VarianceTerm::variable(db, VarianceOrigin::GenericAlias(self), typevar)
+        match self.specialization(db).tuple(db) {
+            Some(tuple) => {
+                let elements = match tuple {
+                    Tuple::Fixed(tuple) => Either::Left(tuple.iter_all_elements()),
+                    Tuple::Variable(tuple) => Either::Right(
+                        tuple
+                            .iter_prefix_elements()
+                            .chain(std::iter::once(tuple.variable().tuple_class_type()))
+                            .chain(tuple.iter_suffix_elements()),
+                    ),
+                };
+                VarianceTerm::join(db, elements.map(|ty| ty.variance_of(db, env, typevar)))
+            }
+            None => VarianceTerm::variable(db, VarianceOrigin::GenericAlias(self), typevar),
+        }
     }
 }
 
