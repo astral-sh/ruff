@@ -132,7 +132,7 @@ repos:
     rev: 321478e58f4938179c6b86e4ddfa923d1547a49b # frozen: v0.16.6
     hooks:
       - id: ruff-check
-        args: [--fix, --exit-non-zero-on-fix]
+        args: [--fix]
         types_or: [python, pyi]
         exclude: crates/ty_python_semantic/resources/corpus/
         require_serial: true
