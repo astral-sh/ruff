@@ -6,7 +6,7 @@ python-version = "3.13"
 python-platform = "linux"
 
 [project]
-dependencies = ["numpy==2.3.0"]
+dependencies = ["numpy==2.4.6"]
 ```
 
 ## Basic usage
