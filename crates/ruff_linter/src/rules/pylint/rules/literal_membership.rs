@@ -51,15 +51,11 @@ impl AlwaysFixableViolation for LiteralMembership {
 
 /// PLR6201
 pub(crate) fn literal_membership(checker: &Checker, compare: &ast::ExprCompare) {
-    let [op] = &*compare.ops else {
-        return;
-    };
-
-    if !matches!(op, CmpOp::In | CmpOp::NotIn) {
+    if !matches!(&*compare.ops, [CmpOp::In | CmpOp::NotIn]) {
         return;
     }
 
-    let [right] = &*compare.comparators else {
+    let [left, right] = &*compare.operands else {
         return;
     };
 
@@ -75,33 +71,30 @@ pub(crate) fn literal_membership(checker: &Checker, compare: &ast::ExprCompare) 
     }
 
     // If `left`, or any of the elements in `right`, are known to _not_ be hashable, return.
-    if std::iter::once(compare.left.as_ref())
-        .chain(elts)
-        .any(|expr| match expr {
-            // Expressions that are known _not_ to be hashable.
-            Expr::List(_)
-            | Expr::Set(_)
-            | Expr::Dict(_)
-            | Expr::ListComp(_)
-            | Expr::SetComp(_)
-            | Expr::DictComp(_)
-            | Expr::Generator(_)
-            | Expr::Await(_)
-            | Expr::Yield(_)
-            | Expr::YieldFrom(_) => true,
-            // Expressions that can be _inferred_ not to be hashable.
-            Expr::Name(name) => {
-                let Some(id) = checker.semantic().resolve_name(name) else {
-                    return false;
-                };
-                let binding = checker.semantic().binding(id);
-                typing::is_list(binding, checker.semantic())
-                    || typing::is_dict(binding, checker.semantic())
-                    || typing::is_set(binding, checker.semantic())
-            }
-            _ => false,
-        })
-    {
+    if std::iter::once(left).chain(elts).any(|expr| match expr {
+        // Expressions that are known _not_ to be hashable.
+        Expr::List(_)
+        | Expr::Set(_)
+        | Expr::Dict(_)
+        | Expr::ListComp(_)
+        | Expr::SetComp(_)
+        | Expr::DictComp(_)
+        | Expr::Generator(_)
+        | Expr::Await(_)
+        | Expr::Yield(_)
+        | Expr::YieldFrom(_) => true,
+        // Expressions that can be _inferred_ not to be hashable.
+        Expr::Name(name) => {
+            let Some(id) = checker.semantic().resolve_name(name) else {
+                return false;
+            };
+            let binding = checker.semantic().binding(id);
+            typing::is_list(binding, checker.semantic())
+                || typing::is_dict(binding, checker.semantic())
+                || typing::is_set(binding, checker.semantic())
+        }
+        _ => false,
+    }) {
         return;
     }
 

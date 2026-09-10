@@ -78,11 +78,11 @@ pub(crate) fn boolean_chained_comparison(checker: &Checker, expr_bool_op: &ExprB
                 are_compare_expr_simplifiable(left_compare, right_compare)
             })
     {
-        let Some(Expr::Name(left_compare_right)) = left_compare.comparators.last() else {
+        let Some(Expr::Name(left_compare_right)) = left_compare.operands.last() else {
             continue;
         };
 
-        let Expr::Name(right_compare_left) = &*right_compare.left else {
+        let Some(Expr::Name(right_compare_left)) = right_compare.operands.first() else {
             continue;
         };
 

@@ -8,7 +8,7 @@ use crate::generated::{
 use std::borrow::Cow;
 use std::fmt;
 use std::fmt::Debug;
-use std::iter::FusedIterator;
+use std::iter::{FusedIterator, Once};
 use std::ops::{Deref, DerefMut};
 use std::slice::{Iter, IterMut};
 use std::sync::OnceLock;
@@ -471,8 +471,8 @@ impl ExprFString {
     /// otherwise.
     pub const fn as_single_part_fstring(&self) -> Option<&FString> {
         match &self.value.inner {
-            FStringValueInner::Single(FStringPart::FString(fstring)) => Some(fstring),
-            _ => None,
+            FStringValueInner::Single(fstring) => Some(fstring),
+            FStringValueInner::Concatenated(_) => None,
         }
     }
 }
@@ -488,7 +488,7 @@ impl FStringValue {
     /// Creates a new f-string literal with a single [`FString`] part.
     pub fn single(value: FString) -> Self {
         Self {
-            inner: FStringValueInner::Single(FStringPart::FString(value)),
+            inner: FStringValueInner::Single(value),
         }
     }
 
@@ -514,31 +514,22 @@ impl FStringValue {
         matches!(self.inner, FStringValueInner::Concatenated(_))
     }
 
-    /// Returns a slice of all the [`FStringPart`]s contained in this value.
-    pub fn as_slice(&self) -> &[FStringPart] {
+    /// Returns an iterator over the parts of this f-string, in source order.
+    pub fn iter(&self) -> FStringParts<'_> {
         match &self.inner {
-            FStringValueInner::Single(part) => std::slice::from_ref(part),
-            FStringValueInner::Concatenated(parts) => parts,
+            FStringValueInner::Single(fstring) => FStringParts::Single(std::iter::once(fstring)),
+            FStringValueInner::Concatenated(parts) => FStringParts::Concatenated(parts.iter()),
         }
     }
 
-    /// Returns a mutable slice of all the [`FStringPart`]s contained in this value.
-    fn as_mut_slice(&mut self) -> &mut [FStringPart] {
+    /// Returns a mutable iterator over the parts of this f-string, in source order.
+    pub fn iter_mut(&mut self) -> FStringPartsMut<'_> {
         match &mut self.inner {
-            FStringValueInner::Single(part) => std::slice::from_mut(part),
-            FStringValueInner::Concatenated(parts) => parts,
+            FStringValueInner::Single(fstring) => FStringPartsMut::Single(std::iter::once(fstring)),
+            FStringValueInner::Concatenated(parts) => {
+                FStringPartsMut::Concatenated(parts.iter_mut())
+            }
         }
-    }
-
-    /// Returns an iterator over all the [`FStringPart`]s contained in this value.
-    pub fn iter(&self) -> Iter<'_, FStringPart> {
-        self.as_slice().iter()
-    }
-
-    /// Returns an iterator over all the [`FStringPart`]s contained in this value
-    /// that allows modification.
-    pub fn iter_mut(&mut self) -> IterMut<'_, FStringPart> {
-        self.as_mut_slice().iter_mut()
     }
 
     /// Returns an iterator over the [`StringLiteral`] parts contained in this value.
@@ -551,7 +542,10 @@ impl FStringValue {
     ///
     /// Here, the string literal parts returned would be `"foo"` and `"baz"`.
     pub fn literals(&self) -> impl Iterator<Item = &StringLiteral> {
-        self.iter().filter_map(|part| part.as_literal())
+        self.iter().filter_map(|part| match part {
+            FStringPartRef::Literal(literal) => Some(literal),
+            FStringPartRef::FString(_) => None,
+        })
     }
 
     /// Returns an iterator over the [`FString`] parts contained in this value.
@@ -564,7 +558,10 @@ impl FStringValue {
     ///
     /// Here, the f-string parts returned would be `f"bar {x}"` and `f"qux"`.
     pub fn f_strings(&self) -> impl Iterator<Item = &FString> {
-        self.iter().filter_map(|part| part.as_f_string())
+        self.iter().filter_map(|part| match part {
+            FStringPartRef::FString(fstring) => Some(fstring),
+            FStringPartRef::Literal(_) => None,
+        })
     }
 
     /// Returns an iterator over all the [`InterpolatedStringElement`] contained in this value.
@@ -589,7 +586,7 @@ impl FStringValue {
     /// f-string, not whether the f-string has 0 parts inside it.
     pub fn is_empty_literal(&self) -> bool {
         match &self.inner {
-            FStringValueInner::Single(fstring_part) => fstring_part.is_empty_literal(),
+            FStringValueInner::Single(fstring) => fstring.elements.is_empty(),
             FStringValueInner::Concatenated(fstring_parts) => {
                 fstring_parts.iter().all(FStringPart::is_empty_literal)
             }
@@ -598,8 +595,8 @@ impl FStringValue {
 }
 
 impl<'a> IntoIterator for &'a FStringValue {
-    type Item = &'a FStringPart;
-    type IntoIter = Iter<'a, FStringPart>;
+    type Item = FStringPartRef<'a>;
+    type IntoIter = FStringParts<'a>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
@@ -607,8 +604,8 @@ impl<'a> IntoIterator for &'a FStringValue {
 }
 
 impl<'a> IntoIterator for &'a mut FStringValue {
-    type Item = &'a mut FStringPart;
-    type IntoIter = IterMut<'a, FStringPart>;
+    type Item = FStringPartMut<'a>;
+    type IntoIter = FStringPartsMut<'a>;
     fn into_iter(self) -> Self::IntoIter {
         self.iter_mut()
     }
@@ -619,10 +616,7 @@ impl<'a> IntoIterator for &'a mut FStringValue {
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 enum FStringValueInner {
     /// A single f-string i.e., `f"foo"`.
-    ///
-    /// This is always going to be `FStringPart::FString` variant which is
-    /// maintained by the `FStringValue::single` constructor.
-    Single(FStringPart),
+    Single(FString),
 
     /// An implicitly concatenated f-string i.e., `"foo" f"bar {x}"`.
     Concatenated(Vec<FStringPart>),
@@ -638,10 +632,7 @@ pub enum FStringPart {
 
 impl FStringPart {
     pub fn quote_style(&self) -> Quote {
-        match self {
-            Self::Literal(string_literal) => string_literal.flags.quote_style(),
-            Self::FString(f_string) => f_string.flags.quote_style(),
-        }
+        FStringPartRef::from(self).quote_style()
     }
 
     pub fn is_empty_literal(&self) -> bool {
@@ -654,12 +645,131 @@ impl FStringPart {
 
 impl Ranged for FStringPart {
     fn range(&self) -> TextRange {
+        FStringPartRef::from(self).range()
+    }
+}
+
+/// A borrowed string literal or f-string part of an [`FStringValue`].
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum FStringPartRef<'a> {
+    Literal(&'a StringLiteral),
+    FString(&'a FString),
+}
+
+impl FStringPartRef<'_> {
+    pub fn quote_style(self) -> Quote {
         match self {
-            FStringPart::Literal(string_literal) => string_literal.range(),
-            FStringPart::FString(f_string) => f_string.range(),
+            Self::Literal(literal) => literal.flags.quote_style(),
+            Self::FString(fstring) => fstring.flags.quote_style(),
         }
     }
 }
+
+impl<'a> From<&'a FStringPart> for FStringPartRef<'a> {
+    fn from(part: &'a FStringPart) -> Self {
+        match part {
+            FStringPart::Literal(literal) => Self::Literal(literal),
+            FStringPart::FString(fstring) => Self::FString(fstring),
+        }
+    }
+}
+
+impl Ranged for FStringPartRef<'_> {
+    fn range(&self) -> TextRange {
+        match self {
+            Self::Literal(literal) => literal.range(),
+            Self::FString(fstring) => fstring.range(),
+        }
+    }
+}
+
+/// A mutably borrowed string literal or f-string part of an [`FStringValue`].
+pub enum FStringPartMut<'a> {
+    Literal(&'a mut StringLiteral),
+    FString(&'a mut FString),
+}
+
+impl<'a> From<&'a mut FStringPart> for FStringPartMut<'a> {
+    fn from(part: &'a mut FStringPart) -> Self {
+        match part {
+            FStringPart::Literal(literal) => Self::Literal(literal),
+            FStringPart::FString(fstring) => Self::FString(fstring),
+        }
+    }
+}
+
+/// The iterator returned by [`FStringValue::iter`].
+#[derive(Clone)]
+pub enum FStringParts<'a> {
+    Single(Once<&'a FString>),
+    Concatenated(Iter<'a, FStringPart>),
+}
+
+impl<'a> Iterator for FStringParts<'a> {
+    type Item = FStringPartRef<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Single(single) => single.next().map(FStringPartRef::FString),
+            Self::Concatenated(parts) => parts.next().map(FStringPartRef::from),
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        match self {
+            Self::Single(single) => single.size_hint(),
+            Self::Concatenated(parts) => parts.size_hint(),
+        }
+    }
+}
+
+impl DoubleEndedIterator for FStringParts<'_> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Single(single) => single.next_back().map(FStringPartRef::FString),
+            Self::Concatenated(parts) => parts.next_back().map(FStringPartRef::from),
+        }
+    }
+}
+
+impl ExactSizeIterator for FStringParts<'_> {}
+impl FusedIterator for FStringParts<'_> {}
+
+/// The iterator returned by [`FStringValue::iter_mut`].
+pub enum FStringPartsMut<'a> {
+    Single(Once<&'a mut FString>),
+    Concatenated(IterMut<'a, FStringPart>),
+}
+
+impl<'a> Iterator for FStringPartsMut<'a> {
+    type Item = FStringPartMut<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Single(single) => single.next().map(FStringPartMut::FString),
+            Self::Concatenated(parts) => parts.next().map(FStringPartMut::from),
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        match self {
+            Self::Single(single) => single.size_hint(),
+            Self::Concatenated(parts) => parts.size_hint(),
+        }
+    }
+}
+
+impl DoubleEndedIterator for FStringPartsMut<'_> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Single(single) => single.next_back().map(FStringPartMut::FString),
+            Self::Concatenated(parts) => parts.next_back().map(FStringPartMut::from),
+        }
+    }
+}
+
+impl ExactSizeIterator for FStringPartsMut<'_> {}
+impl FusedIterator for FStringPartsMut<'_> {}
 
 impl ExprTString {
     /// Returns the single [`TString`] if the t-string isn't implicitly concatenated, [`None`]
@@ -1228,7 +1338,7 @@ impl From<FString> for Expr {
 /// A newtype wrapper around a list of [`InterpolatedStringElement`].
 #[derive(Clone, Default, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct InterpolatedStringElements(Vec<InterpolatedStringElement>);
+pub struct InterpolatedStringElements(Box<[InterpolatedStringElement]>);
 
 impl InterpolatedStringElements {
     /// Returns an iterator over all the [`InterpolatedStringLiteralElement`] nodes contained in this f-string.
@@ -1244,7 +1354,7 @@ impl InterpolatedStringElements {
 
 impl From<Vec<InterpolatedStringElement>> for InterpolatedStringElements {
     fn from(elements: Vec<InterpolatedStringElement>) -> Self {
-        InterpolatedStringElements(elements)
+        InterpolatedStringElements(elements.into_boxed_slice())
     }
 }
 
@@ -3501,7 +3611,7 @@ impl ParameterWithDefault {
 pub struct Arguments {
     pub range: TextRange,
     pub node_index: AtomicNodeIndex,
-    pub args: Box<[Expr]>,
+    pub args: ThinVec<Expr>,
     pub keywords: ThinVec<Keyword>,
 }
 
@@ -3932,8 +4042,73 @@ impl From<bool> for Singleton {
 
 #[cfg(test)]
 mod tests {
+    use ruff_text_size::{Ranged, TextRange, TextSize};
+
     use crate::generated::*;
-    use crate::{Arguments, Mod, Parameters};
+    use crate::{
+        Arguments, AtomicNodeIndex, FString, FStringFlags, FStringPart, FStringPartMut,
+        FStringValue, Mod, Parameters, StringLiteral, StringLiteralFlags,
+    };
+
+    #[test]
+    fn f_string_parts() {
+        let fstring = |start| FString {
+            range: TextRange::at(TextSize::new(start), TextSize::new(3)),
+            node_index: AtomicNodeIndex::NONE,
+            elements: Vec::new().into(),
+            flags: FStringFlags::empty(),
+        };
+        let single = FStringValue::single(fstring(0));
+        let concatenated = FStringValue::concatenated(vec![
+            FStringPart::FString(fstring(0)),
+            FStringPart::Literal(StringLiteral {
+                range: TextRange::at(TextSize::new(3), TextSize::new(3)),
+                node_index: AtomicNodeIndex::NONE,
+                value: "x".into(),
+                flags: StringLiteralFlags::empty(),
+            }),
+            FStringPart::FString(fstring(6)),
+        ]);
+
+        for (mut value, starts) in [(single, vec![0]), (concatenated, vec![0, 3, 6])] {
+            let mut parts = value.iter();
+            let mut expected = starts.iter();
+            while expected.len() > 0 {
+                assert_eq!(parts.len(), expected.len());
+                assert_eq!(
+                    parts.next().map(|part| part.start().to_u32()),
+                    expected.next().copied()
+                );
+                assert_eq!(
+                    parts.next_back().map(|part| part.start().to_u32()),
+                    expected.next_back().copied()
+                );
+            }
+            assert_eq!(parts.len(), 0);
+            assert_eq!(parts.next(), None);
+            assert_eq!(parts.next_back(), None);
+
+            let mut parts = value.iter_mut();
+            for (part, start) in parts.by_ref().rev().zip(starts.iter().rev()) {
+                let range = match part {
+                    FStringPartMut::Literal(literal) => &mut literal.range,
+                    FStringPartMut::FString(fstring) => &mut fstring.range,
+                };
+                assert_eq!(range.start().to_u32(), *start);
+                *range = TextRange::at(TextSize::new(start + 10), TextSize::new(3));
+            }
+            assert_eq!(parts.len(), 0);
+            assert!(parts.next().is_none());
+            assert!(parts.next_back().is_none());
+            assert_eq!(
+                value
+                    .iter()
+                    .map(|part| part.start().to_u32())
+                    .collect::<Vec<_>>(),
+                starts.iter().map(|start| start + 10).collect::<Vec<_>>(),
+            );
+        }
+    }
 
     #[test]
     #[cfg(target_pointer_width = "64")]
@@ -3945,20 +4120,20 @@ mod tests {
         assert_eq!(std::mem::size_of::<Mod>(), 32);
         assert_eq!(std::mem::size_of::<Pattern>(), 72);
         assert_eq!(std::mem::size_of::<Parameters>(), 56);
-        assert_eq!(std::mem::size_of::<Arguments>(), 40);
-        assert_eq!(std::mem::size_of::<Expr>(), 64);
+        assert_eq!(std::mem::size_of::<Arguments>(), 32);
+        assert_eq!(std::mem::size_of::<Expr>(), 56);
         assert_eq!(std::mem::size_of::<ExprAttribute>(), 56);
         assert_eq!(std::mem::size_of::<ExprAwait>(), 24);
         assert_eq!(std::mem::size_of::<ExprBinOp>(), 32);
         assert_eq!(std::mem::size_of::<ExprBoolOp>(), 40);
         assert_eq!(std::mem::size_of::<ExprBooleanLiteral>(), 16);
         assert_eq!(std::mem::size_of::<ExprBytesLiteral>(), 48);
-        assert_eq!(std::mem::size_of::<ExprCall>(), 56);
-        assert_eq!(std::mem::size_of::<ExprCompare>(), 56);
+        assert_eq!(std::mem::size_of::<ExprCall>(), 48);
+        assert_eq!(std::mem::size_of::<ExprCompare>(), 48);
         assert_eq!(std::mem::size_of::<ExprDict>(), 40);
-        assert_eq!(std::mem::size_of::<ExprDictComp>(), 56);
+        assert_eq!(std::mem::size_of::<ExprDictComp>(), 48);
         assert_eq!(std::mem::size_of::<ExprEllipsisLiteral>(), 12);
-        assert_eq!(std::mem::size_of::<ExprFString>(), 56);
+        assert_eq!(std::mem::size_of::<ExprFString>(), 48);
         assert_eq!(std::mem::size_of::<ExprGenerator>(), 48);
         assert_eq!(std::mem::size_of::<ExprIf>(), 40);
         assert_eq!(std::mem::size_of::<ExprIpyEscapeCommand>(), 32);
@@ -3975,6 +4150,7 @@ mod tests {
         assert_eq!(std::mem::size_of::<ExprStarred>(), 24);
         assert_eq!(std::mem::size_of::<ExprStringLiteral>(), 48);
         assert_eq!(std::mem::size_of::<ExprSubscript>(), 32);
+        assert_eq!(std::mem::size_of::<ExprTString>(), 48);
         assert_eq!(std::mem::size_of::<ExprTuple>(), 40);
         assert_eq!(std::mem::size_of::<ExprUnaryOp>(), 24);
         assert_eq!(std::mem::size_of::<ExprYield>(), 24);
