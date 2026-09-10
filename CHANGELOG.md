@@ -36,9 +36,6 @@ Released on 2026-09-10.
 ### Other changes
 
 - Embed archive checksums in the shell installer ([#28281](https://github.com/astral-sh/ruff/pull/28281))
-- Install rustfmt before linting releases ([#28495](https://github.com/astral-sh/ruff/pull/28495))
-- Use paid GitHub-hosted runners for Linux ([#28478](https://github.com/astral-sh/ruff/pull/28478))
-- Use the shared release smoke-test action ([#28288](https://github.com/astral-sh/ruff/pull/28288))
 
 ### Contributors
 
