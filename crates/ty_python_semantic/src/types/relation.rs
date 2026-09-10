@@ -2883,7 +2883,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         })
     }
 
-    fn as_equivalence_checker(&self) -> EquivalenceChecker<'_, 'c, 'db> {
+    pub(super) fn as_equivalence_checker(&self) -> EquivalenceChecker<'_, 'c, 'db> {
         EquivalenceChecker {
             env: self.env,
             constraints: self.constraints,
