@@ -1130,9 +1130,28 @@ UP035 [*] Import from `re` instead: `Pattern`
 133 | # UP035 on py37+ only
 134 | from typing.re import Pattern
     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+135 |
+136 | # `no_type_check_decorator` was removed from `typing` in Python 3.15.
+    |
 help: Import from `re`
     |
 133 | # UP035 on py37+ only
     - from typing.re import Pattern
 134 + from re import Pattern
+135 |
+    |
+
+UP035 [*] Import from `typing` instead: `no_type_check`
+   --> UP035.py:138:1
+    |
+136 | # `no_type_check_decorator` was removed from `typing` in Python 3.15.
+137 | from typing_extensions import no_type_check_decorator
+138 | from typing_extensions import no_type_check, no_type_check_decorator
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: Import from `typing`
+    |
+137 | from typing_extensions import no_type_check_decorator
+    - from typing_extensions import no_type_check, no_type_check_decorator
+138 + from typing_extensions import no_type_check_decorator
+139 + from typing import no_type_check
     |
