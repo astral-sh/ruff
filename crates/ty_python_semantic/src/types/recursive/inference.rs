@@ -4,8 +4,8 @@
 //! # Approximation boundaries
 //!
 //! Equation collection follows query references and their deferred operations. It stops at
-//! 32 distinct query/operation pairs, or when the non-lazy traversal of an equation finds
-//! `Dynamic` or `Divergent`. This traversal does not force lazy alias or member definitions.
+//! 32 distinct query/operation pairs. Equations containing `Dynamic` or `Divergent` are
+//! approximated rather than solved. This traversal does not force lazy alias or member definitions.
 //! These are termination limits, not tests for whether a recursive type has a solution.
 //!
 //! A solver result is used only when there is one complete solution path and its root type
@@ -16,9 +16,9 @@
 //!
 //! Promotion can retain references as deferred operations.
 //! Other semantic type mappings, including specialization and materialization, currently
-//! replace an inference reference with its `Divergent` approximation. Structural substitutions
-//! handle references directly according to the requested substitution, without this semantic
-//! fallback. These restrictions concern query-owned inference references; named
+//! apply to a finite approximation that retains constructors and cuts backedges with `Divergent`.
+//! Structural substitutions handle references directly according to the requested substitution,
+//! without this semantic fallback. These restrictions concern query-owned inference references; named
 //! recursive aliases and closed structural solutions have their own mapping semantics.
 
 use std::cell::{Cell, RefCell};
@@ -143,7 +143,7 @@ impl<'db> InferenceKey<'db> {
         })
     }
 
-    pub(super) fn fallback(self) -> Type<'db> {
+    fn cycle_marker(self) -> Type<'db> {
         let id = match self.source.0 {
             InferenceQuery::Binding(definition) => definition.as_id(),
             InferenceQuery::Expression(input) => input.as_id(),
@@ -157,29 +157,50 @@ impl<'db> InferenceKey<'db> {
         inference_solution(db, self.environment(db).program(db), self)
     }
 
+    /// Approximate query-owned backedges without changing independent recursive types.
+    pub(super) fn approximate(self, db: &'db dyn Db) -> Type<'db> {
+        // The unfolding retains query identities; a closed solution no longer distinguishes
+        // these backedges from independently recursive components.
+        let (equations, _) = self.equations(db, self.solution(db).unfolded);
+        RecursiveMapping::approximate_inference(
+            db,
+            &self.environment(db),
+            self.reference(db),
+            self.cycle_marker(),
+            &equations,
+        )
+    }
+
     /// Retain the equation's outer constructors while approximating unresolved backedges.
-    fn approximate_equation(self, db: &'db dyn Db, body: Type<'db>) -> InferenceSolution<'db> {
+    fn approximate_equation(
+        self,
+        db: &'db dyn Db,
+        equations: &FxIndexMap<InferenceKey<'db>, Type<'db>>,
+    ) -> InferenceSolution<'db> {
         let env = self.environment(db);
-        let divergent = self.fallback();
-        let ty = RecursiveMapping::approximate_inference(db, &env, body, divergent)
-            .recursive_type_normalized_impl(db, &env, divergent, false)
-            .unwrap_or(divergent);
+        let divergent = self.cycle_marker();
+        let ty = RecursiveMapping::approximate_inference(
+            db,
+            &env,
+            self.reference(db),
+            divergent,
+            equations,
+        )
+        .recursive_type_normalized_impl(db, &env, divergent, false)
+        .unwrap_or(divergent);
         InferenceSolution::approximate(ty)
     }
 
-    fn solve(self, db: &'db dyn Db) -> InferenceSolution<'db> {
+    /// Collect dependencies of the supplied root body and report whether all were found.
+    fn equations(
+        self,
+        db: &'db dyn Db,
+        root: Type<'db>,
+    ) -> (FxIndexMap<InferenceKey<'db>, Type<'db>>, bool) {
         let env = self.environment(db);
-        let root = self.equation(db);
         let mut equations = FxIndexMap::from_iter([(self, root)]);
         let mut cursor = 0;
         while let Some((_, body)) = equations.get_index(cursor) {
-            // Gradual recursive equations need a separate bound on materialization.
-            // Keep the cycle approximation until that part of solving can converge.
-            if any_over_type(db, &env, *body, false, |ty| {
-                matches!(ty, Type::Dynamic(_) | Type::Divergent(_))
-            }) {
-                return self.approximate_equation(db, root);
-            }
             let inputs = RecursiveInputs::collect(db, &env, [*body]);
             cursor += 1;
             for key in inputs {
@@ -188,11 +209,28 @@ impl<'db> InferenceKey<'db> {
                     // sequences are distinct equations, so this also bounds repeated
                     // projections that adjacent idempotence cannot simplify.
                     if equations.len() >= 32 {
-                        return self.approximate_equation(db, root);
+                        return (equations, false);
                     }
                     equations.insert(key, key.equation(db));
                 }
             }
+        }
+        (equations, true)
+    }
+
+    fn solve(self, db: &'db dyn Db) -> InferenceSolution<'db> {
+        let env = self.environment(db);
+        let (equations, complete) = self.equations(db, self.equation(db));
+        // Gradual equations still need a bound on materialization, but approximation
+        // follows their dependencies to retain the known constructors.
+        if !complete
+            || equations.values().any(|body| {
+                any_over_type(db, &env, *body, false, |ty| {
+                    matches!(ty, Type::Dynamic(_) | Type::Divergent(_))
+                })
+            })
+        {
+            return self.approximate_equation(db, &equations);
         }
         let variables: Vec<_> = (0..equations.len())
             .map(|index| {
@@ -241,12 +279,15 @@ impl<'db> InferenceKey<'db> {
                 |ty| matches!(ty, Type::TypeVar(variable) if variables.contains(&variable)),
             ) && !RecursiveInputs::contains(db, &env, [*ty])
         });
-        // Remove Boolean backedges while query identities are still distinct. Otherwise
-        // approximating X = T | Y can erase Y even when its equation contains a constructor.
+        let Some(ty) = result else {
+            return self.approximate_equation(db, &equations);
+        };
+        // Expose constructors behind Boolean dependencies while retaining query-owned
+        // backedges, so ordinary operations do not repeatedly embed closed solutions.
         TypeVarSolution::normalize_equations(db, &env, &mut symbolic);
         let replacements: Vec<_> = replacements
             .into_iter()
-            .map(|(reference, variable)| (variable, result.map_or(self.fallback(), |_| reference)))
+            .map(|(reference, variable)| (variable, reference))
             .collect();
         // Structural substitution avoids solving the reinserted query references.
         let mapping = TypeMapping::Recursive(RecursiveMapping(RecursiveSubstitution::Replace(
@@ -256,10 +297,7 @@ impl<'db> InferenceKey<'db> {
             symbolic[0]
                 .solution
                 .apply_type_mapping(db, &env, &mapping, TypeContext::default());
-        match result {
-            Some(ty) => InferenceSolution { ty, unfolded },
-            None => self.approximate_equation(db, unfolded),
-        }
+        InferenceSolution { ty, unfolded }
     }
 }
 

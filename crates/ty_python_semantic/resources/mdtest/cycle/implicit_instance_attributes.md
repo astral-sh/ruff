@@ -808,3 +808,37 @@ class Cached:
 
 reveal_type(Cached().metadata)  # revealed: int
 ```
+
+## Shared mutually recursive attributes
+
+Several attributes can share recursive dependencies and gradual items. Their fixed tuple items
+retain their types when the attributes are materialized.
+
+```py
+from typing import Any
+from ty_extensions import Top
+from ty_extensions._internal import TypeOf
+
+class Graph:
+    def set_0(self, other: "Graph", extra: Any):
+        self.x0 = (other.x1, other.x2, other.x3, other.x4, other.x5, other.x6, other.x7, 1, extra)
+    def set_1(self, other: "Graph", extra: Any):
+        self.x1 = (other.x0, other.x2, other.x3, other.x4, other.x5, other.x6, other.x7, 1, extra)
+    def set_2(self, other: "Graph", extra: Any):
+        self.x2 = (other.x0, other.x1, other.x3, other.x4, other.x5, other.x6, other.x7, 1, extra)
+    def set_3(self, other: "Graph", extra: Any):
+        self.x3 = (other.x0, other.x1, other.x2, other.x4, other.x5, other.x6, other.x7, 1, extra)
+    def set_4(self, other: "Graph", extra: Any):
+        self.x4 = (other.x0, other.x1, other.x2, other.x3, other.x5, other.x6, other.x7, 1, extra)
+    def set_5(self, other: "Graph", extra: Any):
+        self.x5 = (other.x0, other.x1, other.x2, other.x3, other.x4, other.x6, other.x7, 1, extra)
+    def set_6(self, other: "Graph", extra: Any):
+        self.x6 = (other.x0, other.x1, other.x2, other.x3, other.x4, other.x5, other.x7, 1, extra)
+    def set_7(self, other: "Graph", extra: Any):
+        self.x7 = (other.x0, other.x1, other.x2, other.x3, other.x4, other.x5, other.x6, 1, extra)
+
+def inspect(graph: Graph):
+    def bound(value: Top[TypeOf[graph.x0]]):
+        reveal_type(value[7])  # revealed: int
+        wrong: str = value[7]  # error: [invalid-assignment]
+```
