@@ -304,6 +304,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                     ]) {
                         flake8_bandit::rules::suspicious_function_reference(checker, expr);
                     }
+                    if checker.is_rule_enabled(Rule::ExecBuiltin) {
+                        flake8_bandit::rules::exec_used(checker, expr);
+                    }
 
                     // Ex) List[...]
                     if checker.any_rule_enabled(&[
@@ -426,6 +429,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                     Rule::SuspiciousUnverifiedContextUsage,
                 ]) {
                     flake8_bandit::rules::suspicious_function_reference(checker, expr);
+                }
+                if checker.is_rule_enabled(Rule::ExecBuiltin) {
+                    flake8_bandit::rules::exec_used(checker, expr);
                 }
             }
 

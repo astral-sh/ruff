@@ -36,6 +36,12 @@ impl Violation for ExecBuiltin {
 /// S102
 pub(crate) fn exec_used(checker: &Checker, func: &Expr) {
     if checker.semantic().match_builtin_expr(func, "exec") {
+        if matches!(
+            checker.semantic().current_expression_parent(),
+            Some(Expr::Call(parent)) if parent.func.range().contains_range(func.range())
+        ) {
+            return;
+        }
         checker.report_diagnostic(ExecBuiltin, func.range());
     }
 }
